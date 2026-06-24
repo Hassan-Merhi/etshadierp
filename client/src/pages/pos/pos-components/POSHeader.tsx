@@ -8,10 +8,7 @@ import {
   DropdownMenuTrigger,
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
-import {
-  FileDown, MoreHorizontal, Eye, Upload, Download,
-  FileText, FileSpreadsheet, Save, Check,
-} from "lucide-react";
+import { FileDown, MoreHorizontal, Eye, Upload, Download, FileText, FileSpreadsheet, Save, Check } from "lucide-react";
 import { Link } from "wouter";
 
 export interface POSHeaderProps {
@@ -38,7 +35,10 @@ function useRelativeTime(date: Date | null | undefined) {
   const [label, setLabel] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!date) { setLabel(null); return; }
+    if (!date) {
+      setLabel(null);
+      return;
+    }
     const update = () => {
       const secs = Math.floor((Date.now() - date.getTime()) / 1000);
       if (secs < 10) setLabel("Autosaved just now");
@@ -75,11 +75,7 @@ export function POSHeader({
     <PageHeader title={editVoucherId ? "Edit Transaction" : "Point of Sale"}>
       {editVoucherId ? null : (
         <>
-          {autosaveLabel && (
-            <span className="text-xs text-muted-foreground hidden sm:inline">
-              {autosaveLabel}
-            </span>
-          )}
+          {autosaveLabel && <span className="text-xs text-muted-foreground hidden sm:inline">{autosaveLabel}</span>}
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>

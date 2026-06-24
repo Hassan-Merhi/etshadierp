@@ -500,7 +500,6 @@ export function registerFactoryMixBatchRoutes(app: Express) {
       res.json({ id: updated.id, message: "Mix batch moved to Deleted Items" });
       return;
 
-      // eslint-disable-next-line no-unreachable
       await db.transaction(async (tx: any) => {
         const [batch] = await tx
           .select()

@@ -402,7 +402,7 @@ export async function getAllProductionBales(
     grade?: string;
   }
 ): Promise<any[]> {
-  let conditions = [eq(schema.productionBales.companyId, companyId)];
+  const conditions = [eq(schema.productionBales.companyId, companyId)];
 
   if (filters?.mixBatchId) {
     conditions.push(eq(schema.productionBales.mixBatchId, filters.mixBatchId));

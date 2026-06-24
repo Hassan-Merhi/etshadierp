@@ -328,8 +328,7 @@ export function CombinedStockView({
                               className="px-4 py-2 text-right font-mono whitespace-nowrap text-muted-foreground hover:text-foreground hover:underline"
                               title={`View movement for ${loc.name}`}
                               onClick={(e) => {
-                                if (cellQty > 0)
-                                  openMovement(loc.id, loc.name, row.stockItemId, row.stockItemName, e);
+                                if (cellQty > 0) openMovement(loc.id, loc.name, row.stockItemId, row.stockItemName, e);
                                 else e.stopPropagation();
                               }}
                             >

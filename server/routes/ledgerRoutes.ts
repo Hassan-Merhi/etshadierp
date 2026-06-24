@@ -1136,7 +1136,7 @@ export function registerLedgerRoutes(app: Express) {
         }
 
         // No existing Profit account - generate unique code for new capital account
-        let nextCodeNum = 1;
+        const nextCodeNum = 1;
         const accountCode = `CAP-${String(nextCodeNum).padStart(3, "0")}`;
         const accountName = "Owner's Capital";
 

@@ -798,7 +798,7 @@ export function registerFactoryPayrollRoutes(app: Express, requireAuth: any, db:
 
       doc.font("Helvetica").fontSize(7);
 
-      let totals = { base: 0, bale: 0, kg: 0, ot: 0, bonus: 0, deduct: 0, net: 0 };
+      const totals = { base: 0, bale: 0, kg: 0, ot: 0, bonus: 0, deduct: 0, net: 0 };
 
       for (const row of payrollData) {
         const p = row.payroll;

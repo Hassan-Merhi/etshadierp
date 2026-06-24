@@ -213,7 +213,7 @@ export async function adjustInventory(
   } else {
     // ── No existing row: INSERT ───────────────────────────────────────────────
     const rate = Math.max(incomingRate ?? 0, 0);
-    let qty = deltaQty;
+    const qty = deltaQty;
     let totalValue = 0;
     let safeRate = rate;
 

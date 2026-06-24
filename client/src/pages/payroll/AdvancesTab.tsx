@@ -9,7 +9,17 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { Plus, Trash2, ArrowDownCircle, Loader2, ChevronDown, ChevronUp, Banknote, TrendingDown, Activity } from "lucide-react";
+import {
+  Plus,
+  Trash2,
+  ArrowDownCircle,
+  Loader2,
+  ChevronDown,
+  ChevronUp,
+  Banknote,
+  TrendingDown,
+  Activity,
+} from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useCompany } from "@/contexts/CompanyContext";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
@@ -193,14 +203,16 @@ export function AdvancesTab() {
         </TableCell>
         <TableCell>
           {advance.fullyPaid ? (
-            <Badge variant="default" className="bg-green-500">Fully Paid</Badge>
+            <Badge variant="default" className="bg-green-500">
+              Fully Paid
+            </Badge>
           ) : (
-            <Badge variant="outline" className="border-amber-500 text-amber-500">Outstanding</Badge>
+            <Badge variant="outline" className="border-amber-500 text-amber-500">
+              Outstanding
+            </Badge>
           )}
         </TableCell>
-        <TableCell className="text-sm text-muted-foreground max-w-[180px] truncate">
-          {advance.notes || "—"}
-        </TableCell>
+        <TableCell className="text-sm text-muted-foreground max-w-[180px] truncate">{advance.notes || "—"}</TableCell>
         <TableCell className="text-right">
           <div className="flex justify-end gap-1">
             {!advance.fullyPaid && (
@@ -320,11 +332,7 @@ export function AdvancesTab() {
             </Select>
 
             <div className="ml-auto flex gap-2">
-              <Button
-                variant="outline"
-                onClick={() => setAdvanceDialogOpen(true)}
-                data-testid="button-bulk-advance"
-              >
+              <Button variant="outline" onClick={() => setAdvanceDialogOpen(true)} data-testid="button-bulk-advance">
                 <Banknote className="mr-2 h-4 w-4" />
                 Bulk Advance
               </Button>
@@ -362,7 +370,9 @@ export function AdvancesTab() {
                 data-testid="button-toggle-paid-advances"
               >
                 <span className="flex items-center gap-2">
-                  <Badge variant="default" className="bg-green-500">Fully Paid</Badge>
+                  <Badge variant="default" className="bg-green-500">
+                    Fully Paid
+                  </Badge>
                   <span className="text-muted-foreground">
                     {paid.length} advance{paid.length !== 1 ? "s" : ""}
                   </span>
@@ -468,8 +478,7 @@ export function AdvancesTab() {
                         owed: 0,
                       };
                       existing.totalAdvanced += parseFloat(a.amount || "0");
-                      existing.totalRepaid +=
-                        parseFloat(a.amount || "0") - parseFloat(a.remainingBalance || "0");
+                      existing.totalRepaid += parseFloat(a.amount || "0") - parseFloat(a.remainingBalance || "0");
                       existing.owed += parseFloat(a.remainingBalance || "0");
                       workerMap.set(a.employeeId, existing);
                     });
@@ -491,9 +500,7 @@ export function AdvancesTab() {
                             <span className="text-xs text-muted-foreground">{r.code}</span>
                           </div>
                         </TableCell>
-                        <TableCell className="text-right font-mono">
-                          {formatAmount(r.totalAdvanced)}
-                        </TableCell>
+                        <TableCell className="text-right font-mono">{formatAmount(r.totalAdvanced)}</TableCell>
                         <TableCell className="text-right font-mono text-green-600 dark:text-green-400">
                           {formatAmount(r.totalRepaid)}
                         </TableCell>
@@ -502,7 +509,9 @@ export function AdvancesTab() {
                         </TableCell>
                         <TableCell>
                           {r.owed <= 0 ? (
-                            <Badge variant="default" className="bg-green-500">Clear</Badge>
+                            <Badge variant="default" className="bg-green-500">
+                              Clear
+                            </Badge>
                           ) : (
                             <Badge variant="outline" className="border-amber-500 text-amber-500">
                               Owes
@@ -560,7 +569,13 @@ export function AdvancesTab() {
                     <FormItem>
                       <FormLabel>Amount</FormLabel>
                       <FormControl>
-                        <Input type="number" step="0.01" placeholder="0.00" {...field} data-testid="input-advance-amount" />
+                        <Input
+                          type="number"
+                          step="0.01"
+                          placeholder="0.00"
+                          {...field}
+                          data-testid="input-advance-amount"
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -641,7 +656,12 @@ export function AdvancesTab() {
                   </FormItem>
                 )}
               />
-              <Button type="submit" className="w-full" disabled={advanceMutation.isPending} data-testid="button-save-advance">
+              <Button
+                type="submit"
+                className="w-full"
+                disabled={advanceMutation.isPending}
+                data-testid="button-save-advance"
+              >
                 {advanceMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 Save Advance
               </Button>
@@ -655,9 +675,7 @@ export function AdvancesTab() {
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>Record Repayment</DialogTitle>
-            <DialogDescription>
-              Manually record a repayment for {selectedAdvance?.employeeName}.
-            </DialogDescription>
+            <DialogDescription>Manually record a repayment for {selectedAdvance?.employeeName}.</DialogDescription>
           </DialogHeader>
           <Form {...deductionForm}>
             <form onSubmit={deductionForm.handleSubmit((data) => deductionMutation.mutate(data))} className="space-y-4">
@@ -687,7 +705,12 @@ export function AdvancesTab() {
                   </FormItem>
                 )}
               />
-              <Button type="submit" className="w-full" disabled={deductionMutation.isPending} data-testid="button-save-repayment">
+              <Button
+                type="submit"
+                className="w-full"
+                disabled={deductionMutation.isPending}
+                data-testid="button-save-repayment"
+              >
                 {deductionMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 Submit Repayment
               </Button>

@@ -540,7 +540,7 @@ export function registerEmployeeNetPositionRoutes(app: Express) {
         }
 
         // Direct payments
-        let payTotal: Record<string, number> = {};
+        const payTotal: Record<string, number> = {};
         for (const p of allPaymentsF as any[]) {
           if (!groupIds.includes(p.supplierId)) continue;
           const cc = p.currencyCode || "USD";
@@ -558,7 +558,7 @@ export function registerEmployeeNetPositionRoutes(app: Express) {
         }
 
         // Voucher payments
-        let voucherTotals: Record<string, number> = {};
+        const voucherTotals: Record<string, number> = {};
         for (const sid of groupIds) {
           const currMap = voucherPaidByCurrencyBySupplierId[sid] || {};
           for (const [cc, amt] of Object.entries(currMap)) {
@@ -818,7 +818,7 @@ export function registerEmployeeNetPositionRoutes(app: Express) {
       // (tracked directly via employeeId on voucher entries, not via a ledger account).
       // Any ledger account named/coded as "Payroll Payable" duplicates that and
       // must be excluded here — the single correct figure is injected below.
-      let ledgerOnUs = ledgerOnUsRaw.filter((a: any) => {
+      const ledgerOnUs = ledgerOnUsRaw.filter((a: any) => {
         const nameLower = (a.name || "").toLowerCase();
         const code = (a.code || "").toUpperCase();
         const isPayrollPayable =
@@ -830,7 +830,7 @@ export function registerEmployeeNetPositionRoutes(app: Express) {
         return !isPayrollPayable && !isAccruedRentPayable;
       });
       const ledgerForUsTotal = round2(ledgerForUs.reduce((s: number, a: any) => s + a.value, 0));
-      let ledgerOnUsTotal = round2(ledgerOnUs.reduce((s: number, a: any) => s + a.value, 0));
+      const ledgerOnUsTotal = round2(ledgerOnUs.reduce((s: number, a: any) => s + a.value, 0));
 
       const customerItems: { name: string; balanceUsd: number; ledgerAccountId?: number }[] = [];
 

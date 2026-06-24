@@ -76,17 +76,21 @@ export function DaybookTable({
   if (viewMode === "condensed") {
     // Build date → type → rows structure (preserving date order from visibleRows)
     const dateOrder: string[] = [];
-    const dateGroups: Record<string, {
-      total: number;
-      types: Record<string, { total: number; rows: DaybookRow[] }>;
-    }> = {};
+    const dateGroups: Record<
+      string,
+      {
+        total: number;
+        types: Record<string, { total: number; rows: DaybookRow[] }>;
+      }
+    > = {};
 
     for (const row of visibleRows) {
       const date = row._type === "voucher" ? row.data.voucherDate : row.data.offloadedAt.slice(0, 10);
       const type = row._type === "voucher" ? row.data.voucherType : "Offload";
-      const amt = row._type === "voucher"
-        ? parseFloat(String(row.data.totalAmount || "0"))
-        : parseFloat(String(row.data.itemsTotal || "0"));
+      const amt =
+        row._type === "voucher"
+          ? parseFloat(String(row.data.totalAmount || "0"))
+          : parseFloat(String(row.data.itemsTotal || "0"));
 
       if (!dateGroups[date]) {
         dateGroups[date] = { total: 0, types: {} };
@@ -102,7 +106,8 @@ export function DaybookTable({
     const toggle = (key: string) =>
       setExpandedCondensedGroups((prev) => {
         const next = new Set(prev);
-        if (next.has(key)) next.delete(key); else next.add(key);
+        if (next.has(key)) next.delete(key);
+        else next.add(key);
         return next;
       });
 
@@ -131,12 +136,12 @@ export function DaybookTable({
                 >
                   <TableCell className="sticky left-0 bg-muted/30 z-10 pl-4">
                     <div className="flex items-center gap-2">
-                      {isDateExpanded
-                        ? <ChevronDown className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
-                        : <ChevronRight className="w-3.5 h-3.5 text-muted-foreground shrink-0" />}
-                      <span className="text-sm font-semibold">
-                        {formatDisplayDate(parseISO(date))}
-                      </span>
+                      {isDateExpanded ? (
+                        <ChevronDown className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                      ) : (
+                        <ChevronRight className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                      )}
+                      <span className="text-sm font-semibold">{formatDisplayDate(parseISO(date))}</span>
                     </div>
                   </TableCell>
                   <TableCell className="text-right text-sm font-mono text-muted-foreground">{totalCount}</TableCell>
@@ -146,96 +151,124 @@ export function DaybookTable({
                 </TableRow>
 
                 {/* Type rows within date */}
-                {isDateExpanded && Object.entries(dg.types).map(([type, tg]) => {
-                  const typeKey = `${dateKey}-type-${type}`;
-                  const isTypeExpanded = expandedCondensedGroups.has(typeKey);
-                  const badge = type === "Offload"
-                    ? { className: "bg-amber-500/20 text-amber-700 dark:text-amber-400 border-amber-500/30" }
-                    : getVoucherTypeBadge(type);
+                {isDateExpanded &&
+                  Object.entries(dg.types).map(([type, tg]) => {
+                    const typeKey = `${dateKey}-type-${type}`;
+                    const isTypeExpanded = expandedCondensedGroups.has(typeKey);
+                    const badge =
+                      type === "Offload"
+                        ? { className: "bg-amber-500/20 text-amber-700 dark:text-amber-400 border-amber-500/30" }
+                        : getVoucherTypeBadge(type);
 
-                  return (
-                    <div key={typeKey} style={{ display: "contents" }}>
-                      <TableRow
-                        className="cursor-pointer hover:bg-muted/40"
-                        onClick={() => toggle(typeKey)}
-                      >
-                        <TableCell className="sticky left-0 bg-background z-10 pl-10">
-                          <div className="flex items-center gap-2">
-                            {isTypeExpanded
-                              ? <ChevronDown className="w-3 h-3 text-muted-foreground shrink-0" />
-                              : <ChevronRight className="w-3 h-3 text-muted-foreground shrink-0" />}
-                            <Badge {...badge}>{type}</Badge>
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-right text-sm font-mono text-muted-foreground">{tg.rows.length}</TableCell>
-                        {!hideAmounts && (
-                          <TableCell className="text-right font-mono font-medium">{formatAmount(tg.total)}</TableCell>
-                        )}
-                      </TableRow>
-
-                      {/* Individual voucher rows */}
-                      {isTypeExpanded && tg.rows.map((row) => {
-                        if (row._type === "offload") {
-                          const o = row.data;
-                          const desc = [o.containerNumber, o.locationName].filter(Boolean).join(" — ");
-                          return (
-                            <TableRow key={`${typeKey}-offload-${o.id}`} className="bg-muted/20">
-                              <TableCell className="sticky left-0 bg-muted/20 z-10 pl-16 max-w-0 w-full overflow-hidden">
-                                <div className="truncate text-sm" title={desc || "—"}>{desc || "—"}</div>
-                              </TableCell>
-                              <TableCell />
-                              {!hideAmounts && (
-                                <TableCell className="text-right">
-                                  <div className="flex items-center justify-end gap-2">
-                                    <span className="text-sm font-mono">{formatAmount(Number(o.itemsTotal))}</span>
-                                    <Button variant="ghost" size="icon" className="h-6 w-6"
-                                      onClick={(e) => { e.stopPropagation(); navigate(`/offloads/${o.id}`); }} title="View">
-                                      <Eye className="w-3 h-3" />
-                                    </Button>
-                                  </div>
-                                </TableCell>
+                    return (
+                      <div key={typeKey} style={{ display: "contents" }}>
+                        <TableRow className="cursor-pointer hover:bg-muted/40" onClick={() => toggle(typeKey)}>
+                          <TableCell className="sticky left-0 bg-background z-10 pl-10">
+                            <div className="flex items-center gap-2">
+                              {isTypeExpanded ? (
+                                <ChevronDown className="w-3 h-3 text-muted-foreground shrink-0" />
+                              ) : (
+                                <ChevronRight className="w-3 h-3 text-muted-foreground shrink-0" />
                               )}
-                            </TableRow>
-                          );
-                        } else {
-                          const voucher = row.data as Voucher;
-                          const vDesc = voucher.description ||
-                            (["Payment", "Receipt", "Journal"].includes(voucher.voucherType) && accountNameCache[voucher.id]
-                              ? accountNameCache[voucher.id] : null);
-                          return (
-                            <TableRow key={`${typeKey}-v-${voucher.id}`} className="bg-muted/20">
-                              <TableCell className="sticky left-0 bg-muted/20 z-10 pl-16 max-w-0 w-full overflow-hidden">
-                                <div className="flex items-center gap-2 min-w-0">
-                                  <div className="truncate text-sm" title={vDesc || voucher.voucherNumber}>
-                                    {vDesc || voucher.voucherNumber}
-                                  </div>
-                                  {voucher.optional && (
-                                    <Badge variant="outline" className="text-xs text-muted-foreground shrink-0"
-                                      data-testid={`badge-optional-condensed-${voucher.id}`}>
-                                      Optional
-                                    </Badge>
+                              <Badge {...badge}>{type}</Badge>
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-right text-sm font-mono text-muted-foreground">
+                            {tg.rows.length}
+                          </TableCell>
+                          {!hideAmounts && (
+                            <TableCell className="text-right font-mono font-medium">{formatAmount(tg.total)}</TableCell>
+                          )}
+                        </TableRow>
+
+                        {/* Individual voucher rows */}
+                        {isTypeExpanded &&
+                          tg.rows.map((row) => {
+                            if (row._type === "offload") {
+                              const o = row.data;
+                              const desc = [o.containerNumber, o.locationName].filter(Boolean).join(" — ");
+                              return (
+                                <TableRow key={`${typeKey}-offload-${o.id}`} className="bg-muted/20">
+                                  <TableCell className="sticky left-0 bg-muted/20 z-10 pl-16 max-w-0 w-full overflow-hidden">
+                                    <div className="truncate text-sm" title={desc || "—"}>
+                                      {desc || "—"}
+                                    </div>
+                                  </TableCell>
+                                  <TableCell />
+                                  {!hideAmounts && (
+                                    <TableCell className="text-right">
+                                      <div className="flex items-center justify-end gap-2">
+                                        <span className="text-sm font-mono">{formatAmount(Number(o.itemsTotal))}</span>
+                                        <Button
+                                          variant="ghost"
+                                          size="icon"
+                                          className="h-6 w-6"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            navigate(`/offloads/${o.id}`);
+                                          }}
+                                          title="View"
+                                        >
+                                          <Eye className="w-3 h-3" />
+                                        </Button>
+                                      </div>
+                                    </TableCell>
                                   )}
-                                </div>
-                              </TableCell>
-                              <TableCell />
-                              {!hideAmounts && (
-                                <TableCell className="text-right">
-                                  <div className="flex items-center justify-end gap-2">
-                                    <span className="text-sm font-mono">{formatAmount(voucher.totalAmount)}</span>
-                                    <Button variant="ghost" size="icon" className="h-6 w-6"
-                                      onClick={(e) => { e.stopPropagation(); handleView(voucher); }} title="View">
-                                      <Eye className="w-3 h-3" />
-                                    </Button>
-                                  </div>
-                                </TableCell>
-                              )}
-                            </TableRow>
-                          );
-                        }
-                      })}
-                    </div>
-                  );
-                })}
+                                </TableRow>
+                              );
+                            } else {
+                              const voucher = row.data as Voucher;
+                              const vDesc =
+                                voucher.description ||
+                                (["Payment", "Receipt", "Journal"].includes(voucher.voucherType) &&
+                                accountNameCache[voucher.id]
+                                  ? accountNameCache[voucher.id]
+                                  : null);
+                              return (
+                                <TableRow key={`${typeKey}-v-${voucher.id}`} className="bg-muted/20">
+                                  <TableCell className="sticky left-0 bg-muted/20 z-10 pl-16 max-w-0 w-full overflow-hidden">
+                                    <div className="flex items-center gap-2 min-w-0">
+                                      <div className="truncate text-sm" title={vDesc || voucher.voucherNumber}>
+                                        {vDesc || voucher.voucherNumber}
+                                      </div>
+                                      {voucher.optional && (
+                                        <Badge
+                                          variant="outline"
+                                          className="text-xs text-muted-foreground shrink-0"
+                                          data-testid={`badge-optional-condensed-${voucher.id}`}
+                                        >
+                                          Optional
+                                        </Badge>
+                                      )}
+                                    </div>
+                                  </TableCell>
+                                  <TableCell />
+                                  {!hideAmounts && (
+                                    <TableCell className="text-right">
+                                      <div className="flex items-center justify-end gap-2">
+                                        <span className="text-sm font-mono">{formatAmount(voucher.totalAmount)}</span>
+                                        <Button
+                                          variant="ghost"
+                                          size="icon"
+                                          className="h-6 w-6"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleView(voucher);
+                                          }}
+                                          title="View"
+                                        >
+                                          <Eye className="w-3 h-3" />
+                                        </Button>
+                                      </div>
+                                    </TableCell>
+                                  )}
+                                </TableRow>
+                              );
+                            }
+                          })}
+                      </div>
+                    );
+                  })}
               </div>
             );
           })}
@@ -599,7 +632,8 @@ export function DaybookTable({
               Offload
             </Badge>
             <p className="text-sm text-muted-foreground truncate">
-              {o.containerNumber}{o.locationName ? ` — ${o.locationName}` : ""}
+              {o.containerNumber}
+              {o.locationName ? ` — ${o.locationName}` : ""}
             </p>
           </div>
           <div className="flex flex-col items-end gap-1 shrink-0">
@@ -635,7 +669,8 @@ export function DaybookTable({
       const dvid = `voucher-${voucher.id}`;
       const isDvHidden = hiddenRowIds.has(dvid);
       const isLockedType = voucher.voucherType === "Sales" || voucher.voucherType === "Purchase";
-      const vDesc = voucher.description ||
+      const vDesc =
+        voucher.description ||
         (["Payment", "Receipt", "Journal"].includes(voucher.voucherType) && accountNameCache[voucher.id]
           ? accountNameCache[voucher.id]
           : null);
@@ -653,34 +688,34 @@ export function DaybookTable({
           {/* Left: badge + description */}
           <div
             className="flex-1 min-w-0 cursor-pointer"
-            onClick={() => { if (!isDvPendingSync) handleView(voucher); }}
+            onClick={() => {
+              if (!isDvPendingSync) handleView(voucher);
+            }}
           >
             <div className="flex items-center gap-1.5 flex-wrap mb-0.5">
-              <Badge {...getVoucherTypeBadge(voucher.voucherType)}>
-                {voucher.voucherType}
-              </Badge>
+              <Badge {...getVoucherTypeBadge(voucher.voucherType)}>{voucher.voucherType}</Badge>
               {isDvPendingSync && (
                 <Badge variant="outline" className="text-xs text-amber-600 dark:text-amber-400 border-amber-400">
                   Pending
                 </Badge>
               )}
               {voucher.optional && (
-                <Badge variant="outline" className="text-xs">Optional</Badge>
+                <Badge variant="outline" className="text-xs">
+                  Optional
+                </Badge>
               )}
               {isDvHidden && (
-                <Badge variant="outline" className="text-xs text-muted-foreground">Hidden</Badge>
+                <Badge variant="outline" className="text-xs text-muted-foreground">
+                  Hidden
+                </Badge>
               )}
             </div>
-            <p className="text-sm text-muted-foreground truncate">
-              {vDesc || voucher.voucherNumber}
-            </p>
+            <p className="text-sm text-muted-foreground truncate">{vDesc || voucher.voucherNumber}</p>
           </div>
 
           {/* Right: amount + actions */}
           <div className="flex flex-col items-end gap-1 shrink-0">
-            {!hideAmounts && (
-              <span className="font-mono text-sm font-medium">{formatAmount(voucher.totalAmount)}</span>
-            )}
+            {!hideAmounts && <span className="font-mono text-sm font-medium">{formatAmount(voucher.totalAmount)}</span>}
             {!isDvPendingSync && (
               <div className="flex gap-0.5">
                 <Button

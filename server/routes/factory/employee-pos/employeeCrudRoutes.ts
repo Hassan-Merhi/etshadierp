@@ -181,7 +181,7 @@ export function registerEmployeeCrudRoutes(app: Express) {
       if (!empCode) {
         const firstPart = firstName.trim().substring(0, 3).toUpperCase();
         const lastPart = lastName.trim().substring(0, 3).toUpperCase();
-        let baseCode = firstPart + lastPart || "EMP";
+        const baseCode = firstPart + lastPart || "EMP";
         empCode = baseCode;
         let suffix = 1;
         const existing = await db

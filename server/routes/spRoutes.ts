@@ -407,8 +407,8 @@ export function registerSpRoutes(app: Express) {
       const newInvoiceNumber = invoiceNumber ?? existing.invoiceNumber;
       const newInvoiceDate = invoiceDate ?? existing.invoiceDate;
 
-      let otwAcct = await getSpAccount(companyId, "sp_goods_otw");
-      let otwClrAcct = await getSpAccount(companyId, "sp_otw_clearing");
+      const otwAcct = await getSpAccount(companyId, "sp_goods_otw");
+      const otwClrAcct = await getSpAccount(companyId, "sp_otw_clearing");
       if (!otwAcct || !otwClrAcct) {
         return res.status(400).json({ message: "Chart of accounts not set up" });
       }

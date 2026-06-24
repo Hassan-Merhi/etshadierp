@@ -135,8 +135,7 @@ export default function Accounts() {
   const [showDeletedVouchers, setShowDeletedVouchers] = useState(false);
 
   const bulkDeleteMutation = useMutation({
-    mutationFn: async (ids: number[]) =>
-      apiRequest("POST", "/api/vouchers/bulk-delete", { voucherIds: ids }),
+    mutationFn: async (ids: number[]) => apiRequest("POST", "/api/vouchers/bulk-delete", { voucherIds: ids }),
     onSuccess: (_, ids) => {
       toast({ title: `Deleted ${ids.length} voucher(s)` });
       setSelectedVoucherIds(new Set());
@@ -156,7 +155,9 @@ export default function Accounts() {
     queryKey: ["/api/vouchers/search", debouncedFindQuery],
     queryFn: async () => {
       if (!debouncedFindQuery.trim()) return [];
-      const res = await fetch(`/api/vouchers/search?q=${encodeURIComponent(debouncedFindQuery)}`, { credentials: "include" });
+      const res = await fetch(`/api/vouchers/search?q=${encodeURIComponent(debouncedFindQuery)}`, {
+        credentials: "include",
+      });
       if (!res.ok) throw new Error("Search failed");
       return res.json();
     },
@@ -164,7 +165,14 @@ export default function Accounts() {
   });
 
   const updateLedgerMutation = useMutation({
-    mutationFn: async (data: { id: number; name?: string; accountType?: string; openingBalance?: string; openingBalanceSide?: string; active?: boolean }) => {
+    mutationFn: async (data: {
+      id: number;
+      name?: string;
+      accountType?: string;
+      openingBalance?: string;
+      openingBalanceSide?: string;
+      active?: boolean;
+    }) => {
       const { id, ...rest } = data;
       return apiRequest("PUT", `/api/ledger-accounts/${id}`, rest);
     },
@@ -630,9 +638,7 @@ export default function Accounts() {
                 <p className="text-xs mt-1">Type a voucher number, description, or amount above</p>
               </div>
             ) : voucherSearchLoading ? (
-              <div className="flex items-center justify-center py-16 text-muted-foreground text-sm">
-                Searching…
-              </div>
+              <div className="flex items-center justify-center py-16 text-muted-foreground text-sm">Searching…</div>
             ) : voucherSearchResults.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
                 <FileText className="w-10 h-10 mb-3 opacity-30" />
@@ -652,10 +658,10 @@ export default function Accounts() {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="font-medium text-sm">{v.voucherNumber}</span>
-                        <Badge variant="outline" className="text-[10px]">{v.voucherType}</Badge>
-                        {v.locationName && (
-                          <span className="text-xs text-muted-foreground">{v.locationName}</span>
-                        )}
+                        <Badge variant="outline" className="text-[10px]">
+                          {v.voucherType}
+                        </Badge>
+                        {v.locationName && <span className="text-xs text-muted-foreground">{v.locationName}</span>}
                       </div>
                       {v.description && (
                         <p className="text-xs text-muted-foreground truncate mt-0.5">{v.description}</p>
@@ -685,7 +691,8 @@ export default function Accounts() {
           <AlertDialogHeader>
             <AlertDialogTitle>Delete {selectedVoucherIds.size} voucher(s)?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will permanently delete the selected vouchers and reverse any associated inventory or balance changes. This cannot be undone.
+              This will permanently delete the selected vouchers and reverse any associated inventory or balance
+              changes. This cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

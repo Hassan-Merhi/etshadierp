@@ -18,7 +18,7 @@
 const MAX_CONCURRENT = 1;
 
 let _running = 0;
-let _queue: Array<() => void> = [];
+const _queue: Array<() => void> = [];
 
 export function acquirePuppeteerSlot(): Promise<() => void> {
   return new Promise((resolve) => {

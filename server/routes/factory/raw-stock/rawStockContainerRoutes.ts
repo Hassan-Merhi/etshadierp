@@ -352,7 +352,7 @@ export function registerRawStockContainerRoutes(app: Express) {
         );
 
       let newRawStock: any;
-      let affectedBatches: {
+      const affectedBatches: {
         batchId: number;
         batchCode: string;
         oldCostPerKg: number;

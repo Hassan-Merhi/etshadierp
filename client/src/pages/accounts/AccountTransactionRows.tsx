@@ -163,13 +163,21 @@ export function AccountTransactionRows({
                 </TableCell>
                 <TableCell className="py-1.5 text-right font-mono tabular-nums">
                   {isSupplier
-                    ? openingBalance < 0 ? fmt(Math.abs(openingBalance)) : "—"
-                    : openingBalance > 0 ? fmt(openingBalance) : "—"}
+                    ? openingBalance < 0
+                      ? fmt(Math.abs(openingBalance))
+                      : "—"
+                    : openingBalance > 0
+                      ? fmt(openingBalance)
+                      : "—"}
                 </TableCell>
                 <TableCell className="py-1.5 text-right font-mono tabular-nums">
                   {isSupplier
-                    ? openingBalance > 0 ? fmt(openingBalance) : "—"
-                    : openingBalance < 0 ? fmt(Math.abs(openingBalance)) : "—"}
+                    ? openingBalance > 0
+                      ? fmt(openingBalance)
+                      : "—"
+                    : openingBalance < 0
+                      ? fmt(Math.abs(openingBalance))
+                      : "—"}
                 </TableCell>
                 <TableCell className="py-1.5" />
               </TableRow>

@@ -620,7 +620,6 @@ export default function ERPRunPayroll() {
 
   // ── Excel export (payroll amounts) ─────────────────────────────────────────
   async function exportRunExcel(run: PayrollRun) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const XLSXStyle = (await import("xlsx-js-style")) as any;
     const XLSX = XLSXStyle.default ?? XLSXStyle;
 
@@ -667,7 +666,6 @@ export default function ERPRunPayroll() {
     if (hasDed) headers.push(hCell("Deduction"));
     headers.push(hCell("Net Pay"));
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const wsData: any[][] = [headers];
 
     let totalBase = 0,

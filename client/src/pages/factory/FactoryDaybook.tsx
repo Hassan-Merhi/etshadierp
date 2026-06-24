@@ -2073,7 +2073,6 @@ export default function FactoryDaybook() {
     requestAnimationFrame(() => {
       window.scrollTo({ top: scrollY, behavior: "instant" as ScrollBehavior });
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // ── Session persistence: save on every state change ───────────────────────

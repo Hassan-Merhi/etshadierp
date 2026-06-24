@@ -1588,8 +1588,8 @@ export function registerStockSummaryRoutes(app: Express) {
         const currentValue = currentQty * currentRate;
 
         // Calculate voucher-derived opening balance
-        let voucherOpeningQty = priorInwardQty - priorOutwardQty;
-        let voucherOpeningValue = priorInwardValue - priorOutwardValue;
+        const voucherOpeningQty = priorInwardQty - priorOutwardQty;
+        const voucherOpeningValue = priorInwardValue - priorOutwardValue;
         const voucherOpeningRate = voucherOpeningQty > 0 ? voucherOpeningValue / voucherOpeningQty : 0;
 
         // ============ CALCULATE MOVEMENTS AFTER THE SELECTED MONTH ============

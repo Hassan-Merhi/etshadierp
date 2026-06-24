@@ -199,7 +199,7 @@ export function AgentCard({
       toast,
       setWaSending,
     });
-  }, [agent, customOrder, dbPrepaidIds, adjustments, transitTransporterFilter, toast]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [agent, customOrder, dbPrepaidIds, adjustments, transitTransporterFilter, toast]);
 
   // ── Computed state ────────────────────────────────────────────────────────
   const {
@@ -249,7 +249,7 @@ export function AgentCard({
       saveOrder(newIds);
     },
     [openAndPartial]
-  ); // eslint-disable-line react-hooks/exhaustive-deps
+  );
   const moveToTop = useCallback(
     (containerId: number) => {
       const ids = openAndPartial.map((r) => r.id);
@@ -257,7 +257,7 @@ export function AgentCard({
       saveOrder([containerId, ...ids.filter((id) => id !== containerId)]);
     },
     [openAndPartial]
-  ); // eslint-disable-line react-hooks/exhaustive-deps
+  );
 
   const openSum = openAndPartial.reduce((s, r) => s + r.remainingAmount, 0);
   const hasBalance = ledgerBalance !== null;

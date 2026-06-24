@@ -204,7 +204,7 @@ export function registerOrderVerifyRecoverRoutes(app: Express) {
       // scanned, so it is the most reliable per-article aggregate when individual bale
       // rows are unavailable (e.g. after a partial bale-row migration or cleanup).
       let dataSource: "bale_rows" | "order_lines" = "bale_rows";
-      let syntheticBalesFromLines: typeof orderBales = [];
+      const syntheticBalesFromLines: typeof orderBales = [];
 
       if (orderBales.length === 0 && order.totalQtyBales > 0) {
         const rawLinesResult = await db.execute(sql`SELECT * FROM customer_order_lines WHERE order_id = ${orderId}`);

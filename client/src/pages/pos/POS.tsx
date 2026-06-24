@@ -33,7 +33,7 @@ import type { SaleRow, InventoryItem, APIInventoryItem, Location } from "./pos-c
 async function sendInvoicePdfWithRetry(
   voucherId: number,
   locationId: number,
-  opts: { maxAttempts?: number; delayMs?: number; onAttempt?: (n: number) => void } = {},
+  opts: { maxAttempts?: number; delayMs?: number; onAttempt?: (n: number) => void } = {}
 ): Promise<{ ok: true } | { ok: false; message: string }> {
   const maxAttempts = opts.maxAttempts ?? 3;
   const delayMs = opts.delayMs ?? 2000;
@@ -51,7 +51,7 @@ async function sendInvoicePdfWithRetry(
     } catch (e: any) {
       lastMessage = e?.message || "Network error";
     }
-    if (attempt < maxAttempts) await new Promise(r => setTimeout(r, delayMs * attempt));
+    if (attempt < maxAttempts) await new Promise((r) => setTimeout(r, delayMs * attempt));
   }
   return { ok: false, message: lastMessage };
 }
@@ -59,7 +59,7 @@ async function sendInvoicePdfWithRetry(
 // Server-side stock PDF send with retry
 async function sendStockPdfWithRetry(
   locationId: number,
-  opts: { maxAttempts?: number; delayMs?: number; onAttempt?: (n: number) => void } = {},
+  opts: { maxAttempts?: number; delayMs?: number; onAttempt?: (n: number) => void } = {}
 ): Promise<{ ok: true } | { ok: false; message: string }> {
   const maxAttempts = opts.maxAttempts ?? 3;
   const delayMs = opts.delayMs ?? 2000;
@@ -77,7 +77,7 @@ async function sendStockPdfWithRetry(
     } catch (e: any) {
       lastMessage = e?.message || "Network error";
     }
-    if (attempt < maxAttempts) await new Promise(r => setTimeout(r, delayMs * attempt));
+    if (attempt < maxAttempts) await new Promise((r) => setTimeout(r, delayMs * attempt));
   }
   return { ok: false, message: lastMessage };
 }
@@ -116,7 +116,8 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
   const [sendingWhatsApp, setSendingWhatsApp] = useState(false);
   const [lastAutosaved, setLastAutosaved] = useState<Date | null>(null);
   const [pendingAutoSend, setPendingAutoSend] = useState<{
-    voucherId: number; locationId: number;
+    voucherId: number;
+    locationId: number;
   } | null>(null);
   const [pendingStockSend, setPendingStockSend] = useState(false);
 
@@ -398,7 +399,11 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
         toast({ title: "Stock sent", description: "Stock report sent to WhatsApp group." });
       } catch (e: any) {
         setStockWaStatus("failed");
-        toast({ title: "Stock send failed", description: e.message || "Could not send stock report.", variant: "destructive" });
+        toast({
+          title: "Stock send failed",
+          description: e.message || "Could not send stock report.",
+          variant: "destructive",
+        });
       }
     };
     doSend();
@@ -489,8 +494,12 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
         locationId: activeLocation.id,
         paymentAccountType: isCreditSale ? "credit" : paymentAccountType,
         paymentAccountId: isCreditSale
-          ? selectedCustomerId ? parseInt(selectedCustomerId) : null
-          : paymentAccountId ? parseInt(paymentAccountId) : null,
+          ? selectedCustomerId
+            ? parseInt(selectedCustomerId)
+            : null
+          : paymentAccountId
+            ? parseInt(paymentAccountId)
+            : null,
         isCreditSale,
         notes,
         items: validItems.map((row) => ({
@@ -514,7 +523,11 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
       const validItems = rows.filter((r) => r.stockItemId && r.quantity > 0 && r.rate > 0);
       lastSavedFingerprintRef.current = JSON.stringify({
         items: validItems.map((r) => ({ id: r.stockItemId, qty: r.quantity, rate: r.rate })),
-        notes, isCreditSale, paymentAccountType, paymentAccountId, selectedCustomerId,
+        notes,
+        isCreditSale,
+        paymentAccountType,
+        paymentAccountId,
+        selectedCustomerId,
       });
       toast({ title: "Draft Saved", description: "Your transaction has been saved as a draft" });
       refetchDrafts();
@@ -538,8 +551,10 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
       if (validItems.length === 0) return;
       const fingerprint = JSON.stringify({
         items: validItems.map((r: any) => ({ id: r.stockItemId, qty: r.quantity, rate: r.rate })),
-        notes: s.notes, isCreditSale: s.isCreditSale,
-        paymentAccountType: s.paymentAccountType, paymentAccountId: s.paymentAccountId,
+        notes: s.notes,
+        isCreditSale: s.isCreditSale,
+        paymentAccountType: s.paymentAccountType,
+        paymentAccountId: s.paymentAccountId,
         selectedCustomerId: s.selectedCustomerId,
       });
       if (fingerprint === lastSavedFingerprintRef.current) return;
@@ -549,8 +564,12 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
           locationId: s.activeLocation.id,
           paymentAccountType: s.isCreditSale ? "credit" : s.paymentAccountType,
           paymentAccountId: s.isCreditSale
-            ? (s.selectedCustomerId ? parseInt(s.selectedCustomerId) : null)
-            : (s.paymentAccountId ? parseInt(s.paymentAccountId) : null),
+            ? s.selectedCustomerId
+              ? parseInt(s.selectedCustomerId)
+              : null
+            : s.paymentAccountId
+              ? parseInt(s.paymentAccountId)
+              : null,
           isCreditSale: s.isCreditSale,
           notes: s.notes,
           items: validItems.map((row: any) => ({
@@ -596,13 +615,21 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
       return;
     }
     if (activeCurrency === "CFA" && !exchangeRate) {
-      toast({ title: "Error", description: "Please enter an exchange rate for this transaction.", variant: "destructive" });
+      toast({
+        title: "Error",
+        description: "Please enter an exchange rate for this transaction.",
+        variant: "destructive",
+      });
       return;
     }
     const invalidRow = rows.find((r) => r.itemName?.trim() && !r.stockItemId);
     if (invalidRow) {
       const invalidIdx = rows.indexOf(invalidRow);
-      toast({ title: "Invalid item", description: `"${invalidRow.itemName}" is not valid. Please select an item from the list.`, variant: "destructive" });
+      toast({
+        title: "Invalid item",
+        description: `"${invalidRow.itemName}" is not valid. Please select an item from the list.`,
+        variant: "destructive",
+      });
       setSelectedCell({ row: invalidIdx, col: 0 });
       focusCell(invalidIdx, 0);
       return;
@@ -699,8 +726,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
       const numValue = value === "" ? 0 : parseFloat(String(value)) || 0;
       newRows[index][field] = numValue as any;
       if (field === "rate") {
-        newRows[index].rateUSD =
-          activeCurrency === "CFA" && exchangeRate ? numValue / exchangeRate : numValue;
+        newRows[index].rateUSD = activeCurrency === "CFA" && exchangeRate ? numValue / exchangeRate : numValue;
       }
       newRows[index].amount = (newRows[index].quantity || 0) * (newRows[index].rate || 0);
     }
@@ -823,13 +849,13 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
       return;
     }
     const exportData = (Array.isArray(apiInventory) ? apiInventory : []).map((item: any) => ({
-      "Code": item.stockItemCode || "",
+      Code: item.stockItemCode || "",
       "Item Name": item.stockItemName || "",
-      "UOM": item.stockItemUom || "",
+      UOM: item.stockItemUom || "",
       "Stock Qty": parseFloat(item.quantity),
       "Avg Rate (USD)": parseFloat(item.averageRate),
       "Total Value (USD)": parseFloat(item.totalValue),
-      "Group": item.stockGroupName || "",
+      Group: item.stockGroupName || "",
     }));
     const worksheet = XLSX.utils.json_to_sheet(exportData);
     const workbook = XLSX.utils.book_new();
@@ -847,10 +873,10 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
     }
     const data = validRows.map((r, i) => ({
       "#": i + 1,
-      "Item": r.itemName,
-      "Qty": r.quantity,
-      "Rate": r.rate,
-      "Amount": r.amount,
+      Item: r.itemName,
+      Qty: r.quantity,
+      Rate: r.rate,
+      Amount: r.amount,
     }));
     const ws = XLSX.utils.json_to_sheet(data);
     const wb = XLSX.utils.book_new();
@@ -870,11 +896,11 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
       const plBale = r.rateUSD - cfgUSD;
       return {
         "#": i + 1,
-        "Code": r.stockItemCode || "",
-        "Item": r.itemName,
-        "Qty": r.quantity,
+        Code: r.stockItemCode || "",
+        Item: r.itemName,
+        Qty: r.quantity,
         "Rate (USD)": r.rateUSD,
-        "Amount": r.amount,
+        Amount: r.amount,
         "P/L per unit": cfgUSD > 0 ? plBale : "",
         "Total P/L": cfgUSD > 0 ? plBale * r.quantity : "",
       };
@@ -938,29 +964,47 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
         if (!isItemNameField || filteredItems.length === 0) {
           if (hasUnselectedItem) {
             e.preventDefault();
-            toast({ title: "Invalid item", description: "Please select an item from the list.", variant: "destructive" });
+            toast({
+              title: "Invalid item",
+              description: "Please select an item from the list.",
+              variant: "destructive",
+            });
             return;
           }
           e.preventDefault();
-          if (rowIndex > 0) { setSelectedCell({ row: rowIndex - 1, col: colIndex }); focusCell(rowIndex - 1, colIndex); }
+          if (rowIndex > 0) {
+            setSelectedCell({ row: rowIndex - 1, col: colIndex });
+            focusCell(rowIndex - 1, colIndex);
+          }
         }
         break;
       case "ArrowDown":
         if (!isItemNameField || filteredItems.length === 0) {
           if (hasUnselectedItem) {
             e.preventDefault();
-            toast({ title: "Invalid item", description: "Please select an item from the list.", variant: "destructive" });
+            toast({
+              title: "Invalid item",
+              description: "Please select an item from the list.",
+              variant: "destructive",
+            });
             return;
           }
           e.preventDefault();
-          if (rowIndex < rows.length - 1) { setSelectedCell({ row: rowIndex + 1, col: colIndex }); focusCell(rowIndex + 1, colIndex); }
+          if (rowIndex < rows.length - 1) {
+            setSelectedCell({ row: rowIndex + 1, col: colIndex });
+            focusCell(rowIndex + 1, colIndex);
+          }
         }
         break;
       case "Enter":
         if (!isItemNameField || filteredItems.length === 0) {
           if (hasUnselectedItem) {
             e.preventDefault();
-            toast({ title: "Invalid item", description: "Please select an item from the list.", variant: "destructive" });
+            toast({
+              title: "Invalid item",
+              description: "Please select an item from the list.",
+              variant: "destructive",
+            });
             return;
           }
           e.preventDefault();
@@ -969,7 +1013,10 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
             focusCell(rowIndex, colIndex + 1);
           } else if (columns[colIndex]?.key === "rate") {
             if (!rows[rowIndex + 1]) {
-              setRows((prev) => [...prev, { id: String(Date.now()), itemName: "", quantity: 0, rate: 0, rateUSD: 0, amount: 0 }]);
+              setRows((prev) => [
+                ...prev,
+                { id: String(Date.now()), itemName: "", quantity: 0, rate: 0, rateUSD: 0, amount: 0 },
+              ]);
               setTimeout(() => focusCell(rows.length, 0), 50);
             } else {
               setSelectedCell({ row: rowIndex + 1, col: 0 });
@@ -983,7 +1030,10 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
         break;
       case "ArrowLeft":
         e.preventDefault();
-        if (colIndex > 0) { setSelectedCell({ row: rowIndex, col: colIndex - 1 }); focusCell(rowIndex, colIndex - 1); }
+        if (colIndex > 0) {
+          setSelectedCell({ row: rowIndex, col: colIndex - 1 });
+          focusCell(rowIndex, colIndex - 1);
+        }
         break;
       case "ArrowRight":
         if (hasUnselectedItem) {
@@ -992,7 +1042,10 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
           return;
         }
         e.preventDefault();
-        if (colIndex < maxCol) { setSelectedCell({ row: rowIndex, col: colIndex + 1 }); focusCell(rowIndex, colIndex + 1); }
+        if (colIndex < maxCol) {
+          setSelectedCell({ row: rowIndex, col: colIndex + 1 });
+          focusCell(rowIndex, colIndex + 1);
+        }
         break;
       case "Tab":
         if (isItemNameField && activeRow === rowIndex && filteredItems.length > 0 && !e.shiftKey) {

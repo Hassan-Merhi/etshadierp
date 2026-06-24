@@ -22,12 +22,7 @@ const TYPE_VARIANTS: Record<string, string> = {
   factoryWorker: "outline",
 };
 
-export function AccountTable({
-  filteredAccounts,
-  handleAccountChange,
-  hideBalances,
-  formatAmount,
-}: AccountTableProps) {
+export function AccountTable({ filteredAccounts, handleAccountChange, hideBalances, formatAmount }: AccountTableProps) {
   return (
     <div className="rounded-xl border overflow-hidden">
       <Table>

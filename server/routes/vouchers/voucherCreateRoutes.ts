@@ -186,7 +186,7 @@ export function registerVoucherCreateRoutes(app: Express) {
 
       // Create voucher with error handling
       let createdVoucher;
-      let createdEntries = [];
+      const createdEntries = [];
 
       try {
         // Get current exchange rate for multi-currency companies

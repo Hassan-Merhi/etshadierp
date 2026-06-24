@@ -464,7 +464,7 @@ export function registerVoucherTransferRoutes(app: Express) {
 
       // Update voucher with error handling
       let updatedVoucher;
-      let createdEntries = [];
+      const createdEntries = [];
       let oldEntries: any[] = [];
 
       // SALES VOUCHER INVENTORY HANDLING

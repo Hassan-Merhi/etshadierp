@@ -723,7 +723,7 @@ export function registerPosRoutes(app: Express) {
       // Use getOrCreateLedgerAccount so soft-deleted duplicates don't cause a
       // unique-constraint crash — it handles the 23505 error and falls back to
       // fetching the existing (possibly soft-deleted) row.
-      let salesAccount = await storage.getOrCreateLedgerAccount({
+      const salesAccount = await storage.getOrCreateLedgerAccount({
         companyId: req.session.currentCompanyId!,
         code: "SALES",
         name: "Sales Revenue",
@@ -1377,7 +1377,7 @@ export function registerPosRoutes(app: Express) {
           const { id, stockItemId, quantity, sellingPrice } = item;
 
           // Get inventory record for validation and deduction
-          let [inventoryRecord] = await tx
+          const [inventoryRecord] = await tx
             .select()
             .from(inventory)
             .where(and(eq(inventory.locationId, targetLocationId), eq(inventory.stockItemId, stockItemId)))
@@ -1468,7 +1468,7 @@ export function registerPosRoutes(app: Express) {
         }
 
         // Determine payment account - use new values if provided, otherwise preserve original
-        let newDebitEntry: any = {
+        const newDebitEntry: any = {
           voucherId,
           debitAmount: grandTotal.toString(),
           creditAmount: "0",

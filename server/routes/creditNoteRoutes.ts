@@ -289,7 +289,7 @@ export function registerCreditNoteRoutes(app: Express) {
             // Do NOT pass a rate — cost price must never change due to POS/credit-note returns.
             await adjustInventory(tx, locationId, stockItemId, qty, companyId);
 
-            let inventoryAccount = await tx
+            const inventoryAccount = await tx
               .select()
               .from(ledgerAccounts)
               .where(
@@ -312,7 +312,7 @@ export function registerCreditNoteRoutes(app: Express) {
           } else {
             await adjustInventory(tx, locationId, stockItemId, -qty, companyId);
 
-            let inventoryAccount = await tx
+            const inventoryAccount = await tx
               .select()
               .from(ledgerAccounts)
               .where(
@@ -683,7 +683,7 @@ export function registerCreditNoteRoutes(app: Express) {
             // Do NOT pass a rate — cost price must never change due to POS/credit-note returns.
             await adjustInventory(tx, locationId, stockItemId, qty, companyId);
 
-            let inventoryAccount = await tx
+            const inventoryAccount = await tx
               .select()
               .from(ledgerAccounts)
               .where(
@@ -706,7 +706,7 @@ export function registerCreditNoteRoutes(app: Express) {
           } else {
             await adjustInventory(tx, locationId, stockItemId, -qty, companyId);
 
-            let inventoryAccount = await tx
+            const inventoryAccount = await tx
               .select()
               .from(ledgerAccounts)
               .where(

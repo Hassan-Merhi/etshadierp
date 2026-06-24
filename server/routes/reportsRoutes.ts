@@ -1043,7 +1043,7 @@ export function registerReportsRoutes(app: Express) {
       }
 
       // Get the first location in target company (or create a default one)
-      let targetLocations = await storage.getAllLocations(targetCompanyId);
+      const targetLocations = await storage.getAllLocations(targetCompanyId);
       if (targetLocations.length === 0) {
         return res
           .status(400)

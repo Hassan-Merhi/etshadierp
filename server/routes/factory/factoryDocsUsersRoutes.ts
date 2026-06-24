@@ -2250,7 +2250,7 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
           async function makeUniqueCode(tx: any, table: any, field: any, baseValue: string): Promise<string> {
             const [existing] = await tx.select({ id: table.id }).from(table).where(eq(field, baseValue)).limit(1);
             if (!existing) return baseValue;
-            let attempt = baseValue + importSuffix;
+            const attempt = baseValue + importSuffix;
             const [existing2] = await tx.select({ id: table.id }).from(table).where(eq(field, attempt)).limit(1);
             if (!existing2) return attempt;
             let counter = 2;
@@ -3192,7 +3192,7 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
         const dbMaxRow: any = Array.isArray(dbMaxResult) ? dbMaxResult[0] : (dbMaxResult?.rows?.[0] ?? {});
         const dbMax = Number(dbMaxRow?.maxnum ?? 199999);
         const storedNext = seqRow?.nextNumber ?? 200000;
-        let nextNumber = Math.max(storedNext, dbMax + 1, 200000);
+        const nextNumber = Math.max(storedNext, dbMax + 1, 200000);
 
         const newRefs: string[] = [];
         for (let i = 0; i < count; i++) {
@@ -3292,7 +3292,7 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
 
       // attach items counts
       const sessionIds = sessions.map((s: any) => s.id);
-      let itemsBySession: Record<number, any[]> = {};
+      const itemsBySession: Record<number, any[]> = {};
       if (sessionIds.length > 0) {
         const items = await db.select().from(baleRecodeItems).where(inArray(baleRecodeItems.sessionId, sessionIds));
         for (const item of items) {

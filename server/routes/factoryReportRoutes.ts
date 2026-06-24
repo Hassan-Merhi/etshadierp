@@ -425,7 +425,7 @@ export function registerFactoryReportRoutes(app: Express, requireAuth: any, db: 
           "Total Bales",
         ];
     const colWidths = hideAllCosts ? [160, 100, 105, 95, 105, 90] : [140, 85, 90, 80, 90, 70, 70, 70];
-    let startX = 40;
+    const startX = 40;
     let y = doc.y;
 
     doc.fontSize(8);

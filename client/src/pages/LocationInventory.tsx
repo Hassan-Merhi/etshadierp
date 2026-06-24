@@ -153,7 +153,7 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
     queryClient.invalidateQueries({ queryKey: ["/api/locations"] });
     queryClient.invalidateQueries({ queryKey: ["/api/inventory"] });
     queryClient.invalidateQueries({ queryKey: ["/api/stock-categories"] });
-  }, [companyId]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [companyId]);
 
   const handlePrintWithOption = async (withCost: boolean) => {
     if (!selectedLocationLocal) return;
@@ -837,9 +837,15 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                               size="icon"
                               onClick={() => openWaGroupDialog(selectedLocationLocal)}
                               data-testid="button-wa-location"
-                              title={(selectedLocationLocal as any)?.whatsappGroupChatId ? "WhatsApp group assigned" : "Assign WhatsApp group"}
+                              title={
+                                (selectedLocationLocal as any)?.whatsappGroupChatId
+                                  ? "WhatsApp group assigned"
+                                  : "Assign WhatsApp group"
+                              }
                             >
-                              <MessageCircle className={`h-4 w-4 ${(selectedLocationLocal as any)?.whatsappGroupChatId ? "text-green-500" : ""}`} />
+                              <MessageCircle
+                                className={`h-4 w-4 ${(selectedLocationLocal as any)?.whatsappGroupChatId ? "text-green-500" : ""}`}
+                              />
                             </Button>
                           </>
                         )}

@@ -273,8 +273,18 @@ export function registerInventoryRoutes(app: Express) {
   // ── Stock Movement helpers ──────────────────────────────────────────────────
 
   const MONTH_NAMES_INV = [
-    "January","February","March","April","May","June",
-    "July","August","September","October","November","December",
+    "January",
+    "February",
+    "March",
+    "April",
+    "May",
+    "June",
+    "July",
+    "August",
+    "September",
+    "October",
+    "November",
+    "December",
   ];
 
   interface StockMovementTx {
@@ -300,7 +310,7 @@ export function registerInventoryRoutes(app: Express) {
     locationId: number | null,
     fromDate: string | null,
     toDate: string | null,
-    toDateExclusive = false,
+    toDateExclusive = false
   ): Promise<StockMovementTx[]> {
     const results: StockMovementTx[] = [];
 
@@ -312,35 +322,46 @@ export function registerInventoryRoutes(app: Express) {
     };
 
     // 1. Sales (outward)
-    const salesRows = await db.select({
-      date: vouchers.voucherDate,
-      voucherNumber: vouchers.voucherNumber,
-      voucherType: vouchers.voucherType,
-      voucherId: vouchers.id,
-      qty: salesItems.quantity,
-      costPrice: salesItems.costPrice,
-      totalCost: salesItems.totalCost,
-      sellingPrice: salesItems.sellingPrice,
-      totalSales: salesItems.totalSales,
-    }).from(salesItems)
+    const salesRows = await db
+      .select({
+        date: vouchers.voucherDate,
+        voucherNumber: vouchers.voucherNumber,
+        voucherType: vouchers.voucherType,
+        voucherId: vouchers.id,
+        qty: salesItems.quantity,
+        costPrice: salesItems.costPrice,
+        totalCost: salesItems.totalCost,
+        sellingPrice: salesItems.sellingPrice,
+        totalSales: salesItems.totalSales,
+      })
+      .from(salesItems)
       .innerJoin(vouchers, eq(salesItems.voucherId, vouchers.id))
-      .where(and(
-        eq(vouchers.companyId, companyId),
-        isNull(vouchers.deletedAt),
-        eq(salesItems.stockItemId, stockItemId),
-        ...(locationId !== null ? [eq(vouchers.locationId, locationId)] : []),
-        ...dateConds(vouchers.voucherDate),
-      ));
+      .where(
+        and(
+          eq(vouchers.companyId, companyId),
+          isNull(vouchers.deletedAt),
+          eq(salesItems.stockItemId, stockItemId),
+          ...(locationId !== null ? [eq(vouchers.locationId, locationId)] : []),
+          ...dateConds(vouchers.voucherDate)
+        )
+      );
 
     for (const r of salesRows) {
       const qty = parseFloat(r.qty || "0");
       const value = parseFloat(r.totalCost || "0");
       const vt = r.voucherType || "Sales";
       results.push({
-        date: r.date, particulars: r.voucherNumber, vchType: vt,
-        voucherId: r.voucherId, poId: null,
-        inwardQty: 0, inwardRate: 0, inwardValue: 0,
-        outwardQty: qty, outwardRate: qty > 0 ? value / qty : 0, outwardValue: value,
+        date: r.date,
+        particulars: r.voucherNumber,
+        vchType: vt,
+        voucherId: r.voucherId,
+        poId: null,
+        inwardQty: 0,
+        inwardRate: 0,
+        inwardValue: 0,
+        outwardQty: qty,
+        outwardRate: qty > 0 ? value / qty : 0,
+        outwardValue: value,
         isPOS: vt.toLowerCase().includes("pos"),
         posSellingRate: parseFloat(r.sellingPrice || "0"),
         posSellingValue: parseFloat(r.totalSales || "0"),
@@ -348,106 +369,143 @@ export function registerInventoryRoutes(app: Express) {
     }
 
     // 2. Credit Notes (inward = returns)
-    const cnRows = await db.select({
-      date: vouchers.voucherDate,
-      voucherNumber: vouchers.voucherNumber,
-      voucherType: vouchers.voucherType,
-      voucherId: vouchers.id,
-      qty: creditNoteItems.quantity,
-      totalValue: creditNoteItems.totalValue,
-      inventoryCost: creditNoteItems.inventoryCost,
-    }).from(creditNoteItems)
+    const cnRows = await db
+      .select({
+        date: vouchers.voucherDate,
+        voucherNumber: vouchers.voucherNumber,
+        voucherType: vouchers.voucherType,
+        voucherId: vouchers.id,
+        qty: creditNoteItems.quantity,
+        totalValue: creditNoteItems.totalValue,
+        inventoryCost: creditNoteItems.inventoryCost,
+      })
+      .from(creditNoteItems)
       .innerJoin(vouchers, eq(creditNoteItems.voucherId, vouchers.id))
-      .where(and(
-        eq(vouchers.companyId, companyId),
-        isNull(vouchers.deletedAt),
-        eq(creditNoteItems.stockItemId, stockItemId),
-        ...(locationId !== null ? [eq(creditNoteItems.locationId, locationId)] : []),
-        ...dateConds(vouchers.voucherDate),
-      ));
+      .where(
+        and(
+          eq(vouchers.companyId, companyId),
+          isNull(vouchers.deletedAt),
+          eq(creditNoteItems.stockItemId, stockItemId),
+          ...(locationId !== null ? [eq(creditNoteItems.locationId, locationId)] : []),
+          ...dateConds(vouchers.voucherDate)
+        )
+      );
 
     for (const r of cnRows) {
       const qty = parseFloat(r.qty || "0");
       const value = parseFloat(r.totalValue || "0");
       results.push({
-        date: r.date, particulars: r.voucherNumber, vchType: r.voucherType || "Credit Note",
-        voucherId: r.voucherId, poId: null,
-        inwardQty: qty, inwardRate: qty > 0 ? value / qty : 0, inwardValue: value,
-        outwardQty: 0, outwardRate: 0, outwardValue: 0,
-        isPOS: false, posSellingRate: 0, posSellingValue: 0,
+        date: r.date,
+        particulars: r.voucherNumber,
+        vchType: r.voucherType || "Credit Note",
+        voucherId: r.voucherId,
+        poId: null,
+        inwardQty: qty,
+        inwardRate: qty > 0 ? value / qty : 0,
+        inwardValue: value,
+        outwardQty: 0,
+        outwardRate: 0,
+        outwardValue: 0,
+        isPOS: false,
+        posSellingRate: 0,
+        posSellingValue: 0,
       });
     }
 
     // 3. Stock Adjustments (positive qty = inward, negative = outward)
-    const adjRows = await db.select({
-      date: vouchers.voucherDate,
-      voucherNumber: vouchers.voucherNumber,
-      voucherType: vouchers.voucherType,
-      voucherId: vouchers.id,
-      adjustmentType: stockAdjustmentVouchers.adjustmentType,
-      qty: stockAdjustmentItems.quantity,
-      rate: stockAdjustmentItems.rate,
-    }).from(stockAdjustmentItems)
+    const adjRows = await db
+      .select({
+        date: vouchers.voucherDate,
+        voucherNumber: vouchers.voucherNumber,
+        voucherType: vouchers.voucherType,
+        voucherId: vouchers.id,
+        adjustmentType: stockAdjustmentVouchers.adjustmentType,
+        qty: stockAdjustmentItems.quantity,
+        rate: stockAdjustmentItems.rate,
+      })
+      .from(stockAdjustmentItems)
       .innerJoin(stockAdjustmentVouchers, eq(stockAdjustmentItems.adjustmentId, stockAdjustmentVouchers.id))
       .innerJoin(vouchers, eq(stockAdjustmentVouchers.voucherId, vouchers.id))
-      .where(and(
-        eq(vouchers.companyId, companyId),
-        isNull(vouchers.deletedAt),
-        eq(stockAdjustmentItems.stockItemId, stockItemId),
-        ...(locationId !== null ? [eq(stockAdjustmentVouchers.locationId, locationId)] : []),
-        ...dateConds(vouchers.voucherDate),
-      ));
+      .where(
+        and(
+          eq(vouchers.companyId, companyId),
+          isNull(vouchers.deletedAt),
+          eq(stockAdjustmentItems.stockItemId, stockItemId),
+          ...(locationId !== null ? [eq(stockAdjustmentVouchers.locationId, locationId)] : []),
+          ...dateConds(vouchers.voucherDate)
+        )
+      );
 
     for (const r of adjRows) {
       const qty = parseFloat(r.qty || "0");
       const rate = parseFloat(r.rate || "0");
       if (qty > 0) {
         results.push({
-          date: r.date, particulars: r.voucherNumber,
+          date: r.date,
+          particulars: r.voucherNumber,
           vchType: r.voucherType || r.adjustmentType || "Production",
-          voucherId: r.voucherId, poId: null,
-          inwardQty: qty, inwardRate: rate, inwardValue: qty * rate,
-          outwardQty: 0, outwardRate: 0, outwardValue: 0,
-          isPOS: false, posSellingRate: 0, posSellingValue: 0,
+          voucherId: r.voucherId,
+          poId: null,
+          inwardQty: qty,
+          inwardRate: rate,
+          inwardValue: qty * rate,
+          outwardQty: 0,
+          outwardRate: 0,
+          outwardValue: 0,
+          isPOS: false,
+          posSellingRate: 0,
+          posSellingValue: 0,
         });
       } else if (qty < 0) {
         const absQty = Math.abs(qty);
         results.push({
-          date: r.date, particulars: r.voucherNumber,
+          date: r.date,
+          particulars: r.voucherNumber,
           vchType: r.voucherType || r.adjustmentType || "Consumption",
-          voucherId: r.voucherId, poId: null,
-          inwardQty: 0, inwardRate: 0, inwardValue: 0,
-          outwardQty: absQty, outwardRate: rate, outwardValue: absQty * rate,
-          isPOS: false, posSellingRate: 0, posSellingValue: 0,
+          voucherId: r.voucherId,
+          poId: null,
+          inwardQty: 0,
+          inwardRate: 0,
+          inwardValue: 0,
+          outwardQty: absQty,
+          outwardRate: rate,
+          outwardValue: absQty * rate,
+          isPOS: false,
+          posSellingRate: 0,
+          posSellingValue: 0,
         });
       }
     }
 
     // 4. Stock Transfers (only when a specific location is requested)
     if (locationId !== null) {
-      const tfRows = await db.select({
-        date: vouchers.voucherDate,
-        voucherNumber: vouchers.voucherNumber,
-        voucherType: vouchers.voucherType,
-        voucherId: vouchers.id,
-        sourceLocId: stockTransferItems.sourceLocationId,
-        destLocId: stockTransferVouchers.destinationLocationId,
-        qty: stockTransferItems.quantity,
-        rate: stockTransferItems.rate,
-        totalAmount: stockTransferItems.totalAmount,
-      }).from(stockTransferItems)
+      const tfRows = await db
+        .select({
+          date: vouchers.voucherDate,
+          voucherNumber: vouchers.voucherNumber,
+          voucherType: vouchers.voucherType,
+          voucherId: vouchers.id,
+          sourceLocId: stockTransferItems.sourceLocationId,
+          destLocId: stockTransferVouchers.destinationLocationId,
+          qty: stockTransferItems.quantity,
+          rate: stockTransferItems.rate,
+          totalAmount: stockTransferItems.totalAmount,
+        })
+        .from(stockTransferItems)
         .innerJoin(stockTransferVouchers, eq(stockTransferItems.transferId, stockTransferVouchers.id))
         .innerJoin(vouchers, eq(stockTransferVouchers.voucherId, vouchers.id))
-        .where(and(
-          eq(vouchers.companyId, companyId),
-          isNull(vouchers.deletedAt),
-          eq(stockTransferItems.stockItemId, stockItemId),
-          or(
-            eq(stockTransferItems.sourceLocationId, locationId),
-            eq(stockTransferVouchers.destinationLocationId, locationId),
-          ),
-          ...dateConds(vouchers.voucherDate),
-        ));
+        .where(
+          and(
+            eq(vouchers.companyId, companyId),
+            isNull(vouchers.deletedAt),
+            eq(stockTransferItems.stockItemId, stockItemId),
+            or(
+              eq(stockTransferItems.sourceLocationId, locationId),
+              eq(stockTransferVouchers.destinationLocationId, locationId)
+            ),
+            ...dateConds(vouchers.voucherDate)
+          )
+        );
 
       for (const r of tfRows) {
         const qty = parseFloat(r.qty || "0");
@@ -455,57 +513,87 @@ export function registerInventoryRoutes(app: Express) {
         const amount = parseFloat(r.totalAmount || "0");
         if (r.sourceLocId === locationId) {
           results.push({
-            date: r.date, particulars: r.voucherNumber, vchType: "Stock Transfer Out",
-            voucherId: r.voucherId, poId: null,
-            inwardQty: 0, inwardRate: 0, inwardValue: 0,
-            outwardQty: qty, outwardRate: rate, outwardValue: amount,
-            isPOS: false, posSellingRate: 0, posSellingValue: 0,
+            date: r.date,
+            particulars: r.voucherNumber,
+            vchType: "Stock Transfer Out",
+            voucherId: r.voucherId,
+            poId: null,
+            inwardQty: 0,
+            inwardRate: 0,
+            inwardValue: 0,
+            outwardQty: qty,
+            outwardRate: rate,
+            outwardValue: amount,
+            isPOS: false,
+            posSellingRate: 0,
+            posSellingValue: 0,
           });
         } else {
           results.push({
-            date: r.date, particulars: r.voucherNumber, vchType: "Stock Transfer In",
-            voucherId: r.voucherId, poId: null,
-            inwardQty: qty, inwardRate: rate, inwardValue: amount,
-            outwardQty: 0, outwardRate: 0, outwardValue: 0,
-            isPOS: false, posSellingRate: 0, posSellingValue: 0,
+            date: r.date,
+            particulars: r.voucherNumber,
+            vchType: "Stock Transfer In",
+            voucherId: r.voucherId,
+            poId: null,
+            inwardQty: qty,
+            inwardRate: rate,
+            inwardValue: amount,
+            outwardQty: 0,
+            outwardRate: 0,
+            outwardValue: 0,
+            isPOS: false,
+            posSellingRate: 0,
+            posSellingValue: 0,
           });
         }
       }
     }
 
     // 5. PO Line Items (inward = container imports)
-    const poRows = await db.select({
-      date: vouchers.voucherDate,
-      voucherNumber: vouchers.voucherNumber,
-      voucherType: vouchers.voucherType,
-      voucherId: vouchers.id,
-      poId: purchaseOrders.id,
-      qty: poLineItems.quantity,
-      rate: poLineItems.rate,
-      lineTotal: poLineItems.lineTotal,
-    }).from(poLineItems)
+    const poRows = await db
+      .select({
+        date: vouchers.voucherDate,
+        voucherNumber: vouchers.voucherNumber,
+        voucherType: vouchers.voucherType,
+        voucherId: vouchers.id,
+        poId: purchaseOrders.id,
+        qty: poLineItems.quantity,
+        rate: poLineItems.rate,
+        lineTotal: poLineItems.lineTotal,
+      })
+      .from(poLineItems)
       .innerJoin(purchaseOrders, eq(poLineItems.poId, purchaseOrders.id))
       .innerJoin(vouchers, eq(purchaseOrders.voucherId, vouchers.id))
-      .where(and(
-        eq(purchaseOrders.companyId, companyId),
-        isNull(vouchers.deletedAt),
-        isNotNull(purchaseOrders.voucherId),
-        eq(poLineItems.stockItemId, stockItemId),
-        ...(locationId !== null ? [eq(vouchers.locationId, locationId)] : []),
-        ...dateConds(vouchers.voucherDate),
-      ));
+      .where(
+        and(
+          eq(purchaseOrders.companyId, companyId),
+          isNull(vouchers.deletedAt),
+          isNotNull(purchaseOrders.voucherId),
+          eq(poLineItems.stockItemId, stockItemId),
+          ...(locationId !== null ? [eq(vouchers.locationId, locationId)] : []),
+          ...dateConds(vouchers.voucherDate)
+        )
+      );
 
     for (const r of poRows) {
       const qty = parseFloat(r.qty || "0");
       const rate = parseFloat(r.rate || "0");
       const lineTotal = parseFloat(r.lineTotal || "0");
       results.push({
-        date: r.date, particulars: r.voucherNumber,
+        date: r.date,
+        particulars: r.voucherNumber,
         vchType: r.voucherType || "Purchase Import",
-        voucherId: r.voucherId, poId: r.poId,
-        inwardQty: qty, inwardRate: rate, inwardValue: lineTotal,
-        outwardQty: 0, outwardRate: 0, outwardValue: 0,
-        isPOS: false, posSellingRate: 0, posSellingValue: 0,
+        voucherId: r.voucherId,
+        poId: r.poId,
+        inwardQty: qty,
+        inwardRate: rate,
+        inwardValue: lineTotal,
+        outwardQty: 0,
+        outwardRate: 0,
+        outwardValue: 0,
+        isPOS: false,
+        posSellingRate: 0,
+        posSellingValue: 0,
       });
     }
 
@@ -526,11 +614,17 @@ export function registerInventoryRoutes(app: Express) {
       const sd = (startDate as string) || null;
       const ed = (endDate as string) || null;
 
-      if (!sd || !ed) return res.json({ months: [], grandTotal: { inwardQty: 0, inwardValue: 0, outwardQty: 0, outwardValue: 0, closingQty: 0, closingValue: 0 } });
+      if (!sd || !ed)
+        return res.json({
+          months: [],
+          grandTotal: { inwardQty: 0, inwardValue: 0, outwardQty: 0, outwardValue: 0, closingQty: 0, closingValue: 0 },
+        });
 
       // Opening balance = stockItem master + all pre-period movements
-      const [item] = await db.select({ openingQty: stockItems.openingQty, openingRate: stockItems.openingRate })
-        .from(stockItems).where(eq(stockItems.id, stockItemId));
+      const [item] = await db
+        .select({ openingQty: stockItems.openingQty, openingRate: stockItems.openingRate })
+        .from(stockItems)
+        .where(eq(stockItems.id, stockItemId));
       const baseQty = parseFloat(item?.openingQty ?? "0");
       const baseRate = parseFloat(item?.openingRate ?? "0");
 
@@ -545,13 +639,20 @@ export function registerInventoryRoutes(app: Express) {
       periodMovements.sort((a, b) => a.date.localeCompare(b.date));
 
       // Build list of months in the range
-      const startY = parseInt(sd.slice(0, 4)), startM = parseInt(sd.slice(5, 7));
-      const endY = parseInt(ed.slice(0, 4)), endM = parseInt(ed.slice(5, 7));
+      const startY = parseInt(sd.slice(0, 4)),
+        startM = parseInt(sd.slice(5, 7));
+      const endY = parseInt(ed.slice(0, 4)),
+        endM = parseInt(ed.slice(5, 7));
       const months: { year: number; month: number; monthName: string }[] = [];
-      let y = startY, m = startM;
+      let y = startY,
+        m = startM;
       while (y < endY || (y === endY && m <= endM)) {
         months.push({ year: y, month: m, monthName: MONTH_NAMES_INV[m - 1] });
-        m++; if (m > 12) { m = 1; y++; }
+        m++;
+        if (m > 12) {
+          m = 1;
+          y++;
+        }
       }
 
       const monthlySummary = months.map(({ year, month, monthName }) => {
@@ -563,16 +664,28 @@ export function registerInventoryRoutes(app: Express) {
         const inVal = mTx.reduce((s, t) => s + t.inwardValue, 0);
         const outQty = mTx.reduce((s, t) => s + t.outwardQty, 0);
         const outVal = mTx.reduce((s, t) => s + t.outwardValue, 0);
-        const oQty = runQty, oVal = runValue;
+        const oQty = runQty,
+          oVal = runValue;
         const cQty = oQty + inQty - outQty;
         const cVal = oVal + inVal - outVal;
-        runQty = cQty; runValue = cVal;
+        runQty = cQty;
+        runValue = cVal;
         return {
-          year, month, monthName,
-          openingQty: oQty, openingRate: oQty !== 0 ? oVal / oQty : 0, openingValue: oVal,
-          inwardQty: inQty, inwardRate: inQty > 0 ? inVal / inQty : 0, inwardValue: inVal,
-          outwardQty: outQty, outwardRate: outQty > 0 ? outVal / outQty : 0, outwardValue: outVal,
-          closingQty: cQty, closingRate: cQty !== 0 ? cVal / cQty : 0, closingValue: cVal,
+          year,
+          month,
+          monthName,
+          openingQty: oQty,
+          openingRate: oQty !== 0 ? oVal / oQty : 0,
+          openingValue: oVal,
+          inwardQty: inQty,
+          inwardRate: inQty > 0 ? inVal / inQty : 0,
+          inwardValue: inVal,
+          outwardQty: outQty,
+          outwardRate: outQty > 0 ? outVal / outQty : 0,
+          outwardValue: outVal,
+          closingQty: cQty,
+          closingRate: cQty !== 0 ? cVal / cQty : 0,
+          closingValue: cVal,
         };
       });
 
@@ -598,7 +711,8 @@ export function registerInventoryRoutes(app: Express) {
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const { stockItemId: siStr, locationId: locStr, year: yearStr, month: monthStr } = req.query;
-      if (!siStr || !yearStr || !monthStr) return res.status(400).json({ message: "stockItemId, year, month required" });
+      if (!siStr || !yearStr || !monthStr)
+        return res.status(400).json({ message: "stockItemId, year, month required" });
 
       const stockItemId = parseInt(siStr as string);
       const locationId = locStr ? parseInt(locStr as string) : null;
@@ -609,8 +723,10 @@ export function registerInventoryRoutes(app: Express) {
       const lastDay = new Date(year, month, 0).getDate();
       const mEnd = `${year}-${String(month).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
 
-      const [item] = await db.select({ openingQty: stockItems.openingQty, openingRate: stockItems.openingRate })
-        .from(stockItems).where(eq(stockItems.id, stockItemId));
+      const [item] = await db
+        .select({ openingQty: stockItems.openingQty, openingRate: stockItems.openingRate })
+        .from(stockItems)
+        .where(eq(stockItems.id, stockItemId));
       const baseQty = parseFloat(item?.openingQty ?? "0");
       const baseRate = parseFloat(item?.openingRate ?? "0");
 
@@ -627,30 +743,54 @@ export function registerInventoryRoutes(app: Express) {
       const transactions: any[] = [];
       if (runQty !== 0 || runValue !== 0) {
         transactions.push({
-          date: mStart, particulars: "Opening Balance", vchType: "", voucherId: null, poId: null,
-          inwardQty: 0, inwardRate: 0, inwardValue: 0,
-          outwardQty: 0, outwardRate: 0, outwardValue: 0,
-          closingQty: runQty, closingRate: runQty !== 0 ? runValue / runQty : 0, closingValue: runValue,
-          isOpeningBalance: true, isPOS: false, posSellingRate: 0, posSellingValue: 0,
+          date: mStart,
+          particulars: "Opening Balance",
+          vchType: "",
+          voucherId: null,
+          poId: null,
+          inwardQty: 0,
+          inwardRate: 0,
+          inwardValue: 0,
+          outwardQty: 0,
+          outwardRate: 0,
+          outwardValue: 0,
+          closingQty: runQty,
+          closingRate: runQty !== 0 ? runValue / runQty : 0,
+          closingValue: runValue,
+          isOpeningBalance: true,
+          isPOS: false,
+          posSellingRate: 0,
+          posSellingValue: 0,
         });
       }
 
-      let totInQty = 0, totInVal = 0, totOutQty = 0, totOutVal = 0;
+      let totInQty = 0,
+        totInVal = 0,
+        totOutQty = 0,
+        totOutVal = 0;
       for (const m of monthMovements) {
         runQty += m.inwardQty - m.outwardQty;
         runValue += m.inwardValue - m.outwardValue;
-        totInQty += m.inwardQty; totInVal += m.inwardValue;
-        totOutQty += m.outwardQty; totOutVal += m.outwardValue;
+        totInQty += m.inwardQty;
+        totInVal += m.inwardValue;
+        totOutQty += m.outwardQty;
+        totOutVal += m.outwardValue;
         transactions.push({
           ...m,
-          closingQty: runQty, closingRate: runQty !== 0 ? runValue / runQty : 0, closingValue: runValue,
+          closingQty: runQty,
+          closingRate: runQty !== 0 ? runValue / runQty : 0,
+          closingValue: runValue,
           isOpeningBalance: false,
         });
       }
 
       const totals = {
-        inwardQty: totInQty, inwardRate: totInQty > 0 ? totInVal / totInQty : 0, inwardValue: totInVal,
-        outwardQty: totOutQty, outwardRate: totOutQty > 0 ? totOutVal / totOutQty : 0, outwardValue: totOutVal,
+        inwardQty: totInQty,
+        inwardRate: totInQty > 0 ? totInVal / totInQty : 0,
+        inwardValue: totInVal,
+        outwardQty: totOutQty,
+        outwardRate: totOutQty > 0 ? totOutVal / totOutQty : 0,
+        outwardValue: totOutVal,
       };
 
       res.json({ transactions, totals });

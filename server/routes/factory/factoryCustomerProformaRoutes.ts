@@ -181,7 +181,7 @@ export function registerFactoryCustomerProformaRoutes(app: Express) {
         createdAt: l.created_at,
       }));
       const articleCodes = [...new Set(lines.map((l: any) => l.articleCode).filter(Boolean))];
-      let weightMap = new Map<string, string>();
+      const weightMap = new Map<string, string>();
       if (articleCodes.length > 0) {
         const baleProds = await db
           .select({
@@ -263,8 +263,8 @@ export function registerFactoryCustomerProformaRoutes(app: Express) {
 
       // Enrich lines with weightPerBaleKg and correct productName from factoryBaleProducts
       const articleCodes = [...new Set(lines.map((l: any) => l.articleCode).filter(Boolean))];
-      let weightMap = new Map<string, string>();
-      let nameMap = new Map<string, string>();
+      const weightMap = new Map<string, string>();
+      const nameMap = new Map<string, string>();
       if (articleCodes.length > 0) {
         const baleProds = await db
           .select({
@@ -1212,7 +1212,7 @@ export function registerFactoryCustomerProformaRoutes(app: Express) {
       const allArticleCodes = [
         ...new Set([...inStockCounts.map((s: any) => s.articleCode), ...allLines.map((l: any) => l.articleCode)]),
       ];
-      let productNamesMap: Record<string, string> = {};
+      const productNamesMap: Record<string, string> = {};
       if (allArticleCodes.length > 0) {
         const prodRaw = await db.execute(
           sql`SELECT DISTINCT ON (article_code) article_code as "articleCode", name
@@ -1339,7 +1339,7 @@ export function registerFactoryCustomerProformaRoutes(app: Express) {
 
       // 4. Customer names
       const customerIds = [...new Set(loadings.map((l: any) => l.customerId))].filter((id): id is number => id != null);
-      let customerMap = new Map<number, string>();
+      const customerMap = new Map<number, string>();
       if (customerIds.length > 0) {
         const custRows = await db
           .select({ id: customers.id, legalName: customers.legalName })

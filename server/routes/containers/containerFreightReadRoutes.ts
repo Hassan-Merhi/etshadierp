@@ -566,7 +566,7 @@ export function registerContainerFreightReadRoutes(app: Express) {
       const poDiscount = parseFloat(po.discount?.toString() || "0");
       const poOtherCharges = parseFloat(po.otherCharges?.toString() || "0");
 
-      let finalCharges = {
+      const finalCharges = {
         freight: poFreight.toString(),
         surcharge: poSurcharge.toString(),
         fumigation: poFumigation.toString(),

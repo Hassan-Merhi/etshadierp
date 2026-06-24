@@ -1044,7 +1044,7 @@ export function registerImportRoutes(app: Express) {
         const validatedItem: any = { ...item };
 
         // Find stock item by barcode (code or alias)
-        let stockItem = await storage.getStockItemByCodeOrAlias(item.barcode, req.session.currentCompanyId!);
+        const stockItem = await storage.getStockItemByCodeOrAlias(item.barcode, req.session.currentCompanyId!);
 
         if (!stockItem) {
           validatedItem.error = `Barcode '${item.barcode}' not found in stock items`;
@@ -1484,7 +1484,7 @@ export function registerImportRoutes(app: Express) {
       for (const item of items) {
         const validatedItem: any = { ...item };
 
-        let stockItem = await storage.getStockItemByCodeOrAlias(item.barcode, req.session.currentCompanyId!);
+        const stockItem = await storage.getStockItemByCodeOrAlias(item.barcode, req.session.currentCompanyId!);
 
         if (!stockItem) {
           validatedItem.error = `Barcode '${item.barcode}' not found in stock items`;
@@ -1958,7 +1958,7 @@ export function registerImportRoutes(app: Express) {
         const validatedItem: any = { ...item };
 
         // Find stock item by barcode (code or alias)
-        let stockItem = await storage.getStockItemByCodeOrAlias(item.barcode, req.session.currentCompanyId!);
+        const stockItem = await storage.getStockItemByCodeOrAlias(item.barcode, req.session.currentCompanyId!);
 
         if (!stockItem) {
           validatedItem.error = `Barcode '${item.barcode}' not found in stock items`;
@@ -2379,7 +2379,7 @@ export function registerImportRoutes(app: Express) {
         validatedItem.sourceLocationId = sourceLocationId;
 
         // Find stock item by barcode (code or alias)
-        let stockItem = await storage.getStockItemByCodeOrAlias(item.barcode, req.session.currentCompanyId!);
+        const stockItem = await storage.getStockItemByCodeOrAlias(item.barcode, req.session.currentCompanyId!);
 
         if (!stockItem) {
           validatedItem.error = `Barcode '${item.barcode}' not found in stock items`;

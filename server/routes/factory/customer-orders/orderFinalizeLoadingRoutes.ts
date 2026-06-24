@@ -156,7 +156,7 @@ export function registerOrderFinalizeLoadingRoutes(app: Express) {
           }
         }
 
-        let seqRows = await tx.execute(
+        const seqRows = await tx.execute(
           sql`SELECT * FROM customer_invoice_sequences WHERE company_id = ${companyId} FOR UPDATE`
         );
         let seqRow = seqRows.rows?.[0] || seqRows[0];

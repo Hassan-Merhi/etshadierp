@@ -271,7 +271,7 @@ export function registerAuthRoutes(app: Express) {
 
       // Cross-reference login_history to get city/country for each session ip
       const uniqueIps = [...new Set(rows.map((r: any) => r.sess?.ip).filter(Boolean))];
-      let ipGeoMap: Record<string, { city: string | null; country: string | null }> = {};
+      const ipGeoMap: Record<string, { city: string | null; country: string | null }> = {};
       if (uniqueIps.length > 0) {
         try {
           const geoRows = await db
@@ -651,9 +651,7 @@ export function registerAuthRoutes(app: Express) {
         db
           .selectDistinct({ tableName: auditLog.tableName })
           .from(auditLog)
-          .where(
-            and(...baseConditions)
-          )
+          .where(and(...baseConditions))
           .orderBy(auditLog.tableName),
       ]);
 

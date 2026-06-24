@@ -46,9 +46,7 @@ export function InventoryPicker({
     if (syncTerm !== undefined) setLocalSearch(syncTerm);
   }, [syncTerm]);
 
-  const filteredInventory = localSearch
-    ? inventory.filter((item) => matches(item, localSearch))
-    : inventory;
+  const filteredInventory = localSearch ? inventory.filter((item) => matches(item, localSearch)) : inventory;
 
   return (
     <Card className="w-full lg:w-96 flex flex-col overflow-hidden h-[300px] lg:h-auto shrink-0">
@@ -76,9 +74,7 @@ export function InventoryPicker({
             <button
               key={item.code}
               className={`w-full text-left px-3 py-1.5 flex items-center justify-between gap-2 border-b border-muted/40 transition-colors duration-100 ${
-                index === highlightedIndex
-                  ? "bg-primary/10"
-                  : "hover:bg-muted/40"
+                index === highlightedIndex ? "bg-primary/10" : "hover:bg-muted/40"
               }`}
               onClick={() => {
                 selectItem(item);

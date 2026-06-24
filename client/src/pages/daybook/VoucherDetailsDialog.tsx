@@ -82,9 +82,9 @@ export function VoucherDetailsDialog({
         </DialogHeader>
 
         <div className="space-y-6 py-4">
-          {(selectedVoucher.voucherType === "Purchase" ||
-            selectedVoucher.voucherType === "Sales" ||
-            selectedVoucher.voucherType === "POS") ? (
+          {selectedVoucher.voucherType === "Purchase" ||
+          selectedVoucher.voucherType === "Sales" ||
+          selectedVoucher.voucherType === "POS" ? (
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1">
@@ -175,7 +175,11 @@ export function VoucherDetailsDialog({
                                 <p className="text-xs text-muted-foreground">
                                   Balance:{" "}
                                   <span className="font-mono">
-                                    $ {parseFloat(poSupplierBalance).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                                    ${" "}
+                                    {parseFloat(poSupplierBalance).toLocaleString(undefined, {
+                                      minimumFractionDigits: 0,
+                                      maximumFractionDigits: 0,
+                                    })}
                                   </span>
                                 </p>
                               )}
@@ -188,7 +192,10 @@ export function VoucherDetailsDialog({
                             <div className="flex items-center gap-2 shrink-0">
                               <Button
                                 size="sm"
-                                onClick={() => { onOpenChange(false); navigate(`/containers/${purchaseOrderData.containerId}`); }}
+                                onClick={() => {
+                                  onOpenChange(false);
+                                  navigate(`/containers/${purchaseOrderData.containerId}`);
+                                }}
                                 data-testid="button-open-po"
                               >
                                 Open
@@ -196,7 +203,10 @@ export function VoucherDetailsDialog({
                               <Button
                                 variant="outline"
                                 size="sm"
-                                onClick={() => { onOpenChange(false); navigate(`/containers/${purchaseOrderData.containerId}?tab=compare`); }}
+                                onClick={() => {
+                                  onOpenChange(false);
+                                  navigate(`/containers/${purchaseOrderData.containerId}?tab=compare`);
+                                }}
                                 data-testid="button-compare-po"
                               >
                                 Compare
@@ -205,7 +215,10 @@ export function VoucherDetailsDialog({
                                 <Button
                                   variant="outline"
                                   size="sm"
-                                  onClick={() => { onOpenChange(false); navigate(`/purchase-orders/${purchaseOrderData.id}/edit`); }}
+                                  onClick={() => {
+                                    onOpenChange(false);
+                                    navigate(`/purchase-orders/${purchaseOrderData.id}/edit`);
+                                  }}
                                   data-testid="button-edit-po"
                                 >
                                   Edit PO
@@ -248,7 +261,8 @@ export function VoucherDetailsDialog({
                           </TableBody>
                         </Table>
                         {/* Charges summary */}
-                        {!isPOSUser && purchaseOrderData && (
+                        {!isPOSUser &&
+                          purchaseOrderData &&
                           (() => {
                             const charges = [
                               { label: "Items Total", value: purchaseOrderData.itemsTotal },
@@ -270,8 +284,7 @@ export function VoucherDetailsDialog({
                                 ))}
                               </div>
                             );
-                          })()
-                        )}
+                          })()}
                       </div>
                     );
                   })()
@@ -286,15 +299,19 @@ export function VoucherDetailsDialog({
                       if (viewProfitFilter === "loss") return profit < -0.01;
                       return Math.abs(profit) <= 0.01;
                     });
-                    const paymentEntry = ledgerEntries.find(
-                      (e) => parseFloat(e.debitAmount || "0") > 0
-                    ) || ledgerEntries[0];
-                    const hasHassans = !isPOSUser && salesItems.some(
-                      (e) => e.hassansPrice != null || e.hassansProfit != null
-                    );
+                    const paymentEntry =
+                      ledgerEntries.find((e) => parseFloat(e.debitAmount || "0") > 0) || ledgerEntries[0];
+                    const hasHassans =
+                      !isPOSUser && salesItems.some((e) => e.hassansPrice != null || e.hassansProfit != null);
                     const totalQty = filteredItems.reduce((s, e) => s + parseFloat(e.quantity || "0"), 0);
-                    const totalAmt = filteredItems.reduce((s, e) => s + parseFloat(e.totalAmount || e.totalSales || "0"), 0);
-                    const totalCost = filteredItems.reduce((s, e) => s + parseFloat(e.costPrice || "0") * parseFloat(e.quantity || "0"), 0);
+                    const totalAmt = filteredItems.reduce(
+                      (s, e) => s + parseFloat(e.totalAmount || e.totalSales || "0"),
+                      0
+                    );
+                    const totalCost = filteredItems.reduce(
+                      (s, e) => s + parseFloat(e.costPrice || "0") * parseFloat(e.quantity || "0"),
+                      0
+                    );
                     const totalProfit = filteredItems.reduce((s, e) => s + parseFloat(e.profit || "0"), 0);
 
                     return (
@@ -307,8 +324,10 @@ export function VoucherDetailsDialog({
                               <div className="text-sm text-right">
                                 <span className="text-xs text-muted-foreground mr-1">Balance</span>
                                 <span className="font-mono font-semibold">
-                                  $ {parseFloat(cashAccountBalance || entryBalances[paymentEntry.id] || "0")
-                                    .toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                                  ${" "}
+                                  {parseFloat(
+                                    cashAccountBalance || entryBalances[paymentEntry.id] || "0"
+                                  ).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
                                 </span>
                               </div>
                             )}
@@ -340,12 +359,12 @@ export function VoucherDetailsDialog({
                               const isSelected = selectedDialogRow === idx;
                               const profit = parseFloat(entry.profit || "0");
                               const pColor =
-                                profit > 0.01 ? "text-emerald-600 dark:text-emerald-400"
-                                : profit < -0.01 ? "text-destructive"
-                                : "text-muted-foreground";
-                              const costPerUnit = entry.costPrice != null
-                                ? parseFloat(entry.costPrice)
-                                : null;
+                                profit > 0.01
+                                  ? "text-emerald-600 dark:text-emerald-400"
+                                  : profit < -0.01
+                                    ? "text-destructive"
+                                    : "text-muted-foreground";
+                              const costPerUnit = entry.costPrice != null ? parseFloat(entry.costPrice) : null;
                               return (
                                 <TableRow
                                   key={entry.id}
@@ -409,7 +428,15 @@ export function VoucherDetailsDialog({
                               <span className="text-muted-foreground">{totalQty}</span>
                               <span className="text-muted-foreground">{formatAmount(totalCost)}</span>
                               <span>{formatAmount(totalAmt)}</span>
-                              <span className={totalProfit > 0.01 ? "text-emerald-600 dark:text-emerald-400" : totalProfit < -0.01 ? "text-destructive" : "text-muted-foreground"}>
+                              <span
+                                className={
+                                  totalProfit > 0.01
+                                    ? "text-emerald-600 dark:text-emerald-400"
+                                    : totalProfit < -0.01
+                                      ? "text-destructive"
+                                      : "text-muted-foreground"
+                                }
+                              >
                                 {formatAmount(totalProfit)}
                               </span>
                               {hasHassans && <span className="text-muted-foreground">$ 0</span>}

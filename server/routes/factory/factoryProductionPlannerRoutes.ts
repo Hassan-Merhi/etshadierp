@@ -47,7 +47,7 @@ export function registerProductionPlannerRoutes(app: Express) {
         categoryIds = [];
       }
 
-      let actuals: Record<number, number> = {};
+      const actuals: Record<number, number> = {};
       if (workerIds.length > 0) {
         let teamWorkerFilter = sql``;
         let skipActuals = false;

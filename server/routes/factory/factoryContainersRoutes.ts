@@ -741,7 +741,6 @@ export function registerFactoryContainersRoutes(app: Express) {
       res.json({ deleted: ownedIds.length, ids: ownedIds });
       return;
 
-      // eslint-disable-next-line no-unreachable
       await db.transaction(async (tx: any) => {
         // 1. Gather commission record IDs and raw stock IDs before deleting (needed for daybook cleanup)
         const commRows = await tx

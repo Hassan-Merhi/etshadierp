@@ -674,7 +674,7 @@ export function registerWorkerStatementRoutes(app: Express) {
         doc.fillColor("#000000").font("Helvetica").fontSize(7.5);
       };
 
-      let tableY = doc.y + 4;
+      const tableY = doc.y + 4;
       drawHdr(tableY);
       let y = tableY + HDR_H;
 

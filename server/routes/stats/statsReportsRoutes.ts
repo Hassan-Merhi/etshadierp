@@ -153,7 +153,7 @@ export function registerStatsReportsRoutes(app: Express) {
         conditions.push(eq(vouchers.locationId, parseInt(locationId as string)));
       }
 
-      let salesQuery = db
+      const salesQuery = db
         .select({
           id: salesItems.id,
           voucherNumber: vouchers.voucherNumber,

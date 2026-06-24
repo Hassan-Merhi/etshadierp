@@ -19,12 +19,7 @@ interface SystemToolsTabProps {
   companies: any[];
 }
 
-export function SystemToolsTab({
-  appMode,
-  currentUser,
-  selectedCompany,
-  companies,
-}: SystemToolsTabProps) {
+export function SystemToolsTab({ appMode, currentUser, selectedCompany, companies }: SystemToolsTabProps) {
   const { toast } = useToast();
   const isDev = currentUser?.role === "Developer";
 
@@ -41,8 +36,7 @@ export function SystemToolsTab({
   });
 
   const setParentCompanyMutation = useMutation({
-    mutationFn: async (companyId: number | null) =>
-      apiRequest("POST", "/api/system/parent-company", { companyId }),
+    mutationFn: async (companyId: number | null) => apiRequest("POST", "/api/system/parent-company", { companyId }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/system/parent-company"] });
       toast({ title: "Saved", description: "Parent company updated." });

@@ -980,7 +980,7 @@ export function registerBaleRoutes(app: Express) {
 
       // Enrich each label print with bale status so non-admin users can see deleted bales
       const refNumbers = labelPrints.map((lp) => lp.referenceNumber).filter(Boolean);
-      let baleStatusMap: Record<string, string> = {};
+      const baleStatusMap: Record<string, string> = {};
       if (refNumbers.length > 0) {
         const baleRows = await db
           .select({ referenceNumber: factoryBales.referenceNumber, status: factoryBales.status })

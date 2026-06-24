@@ -338,8 +338,8 @@ export function registerStockTransferAdjRoutes(app: Express) {
       }
 
       // Attach cost data for privileged users
-      let dubaiMap = new Map<number, string>();
-      let offloadMap = new Map<number, string>();
+      const dubaiMap = new Map<number, string>();
+      const offloadMap = new Map<number, string>();
       if (isPrivileged && items.length > 0) {
         const [dubaiCostRes, offloadCostRes] = await Promise.all([
           db.execute(sql`

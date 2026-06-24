@@ -20,7 +20,14 @@ interface DaybookFiltersProps {
   onNextDay?: () => void;
 }
 
-export function DaybookFilters({ periodFilter, setPeriodFilter, filters, setFilters, onPrevDay, onNextDay }: DaybookFiltersProps) {
+export function DaybookFilters({
+  periodFilter,
+  setPeriodFilter,
+  filters,
+  setFilters,
+  onPrevDay,
+  onNextDay,
+}: DaybookFiltersProps) {
   const hasActiveFilters =
     periodFilter.preset !== "today" ||
     filters.voucherType !== "all" ||
@@ -33,25 +40,13 @@ export function DaybookFilters({ periodFilter, setPeriodFilter, filters, setFilt
     <div className="rounded-lg border bg-muted/30 px-3 sm:px-4 py-3 flex flex-col gap-2.5">
       {/* Row 1: date navigation + period filter */}
       <div className="flex items-center gap-2">
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={onPrevDay}
-          title="Previous day (−)"
-          data-testid="button-prev-day"
-        >
+        <Button variant="ghost" size="icon" onClick={onPrevDay} title="Previous day (−)" data-testid="button-prev-day">
           <ChevronLeft className="h-4 w-4" />
         </Button>
         <div className="flex-1">
           <PeriodFilter value={periodFilter} onChange={setPeriodFilter} data-testid="period-filter" />
         </div>
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={onNextDay}
-          title="Next day (+)"
-          data-testid="button-next-day"
-        >
+        <Button variant="ghost" size="icon" onClick={onNextDay} title="Next day (+)" data-testid="button-next-day">
           <ChevronRight className="h-4 w-4" />
         </Button>
       </div>
@@ -59,7 +54,11 @@ export function DaybookFilters({ periodFilter, setPeriodFilter, filters, setFilt
       {/* Row 2: type + status selects + search */}
       <div className="flex flex-wrap gap-2">
         <Select value={filters.voucherType} onValueChange={(value) => setFilters({ ...filters, voucherType: value })}>
-          <SelectTrigger id="voucher-type" data-testid="select-voucher-type" className="flex-1 min-w-[120px] sm:w-[130px] sm:flex-none">
+          <SelectTrigger
+            id="voucher-type"
+            data-testid="select-voucher-type"
+            className="flex-1 min-w-[120px] sm:w-[130px] sm:flex-none"
+          >
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -78,7 +77,11 @@ export function DaybookFilters({ periodFilter, setPeriodFilter, filters, setFilt
           value={filters.statusFilter}
           onValueChange={(value) => setFilters({ ...filters, statusFilter: value as "all" | "active" | "optional" })}
         >
-          <SelectTrigger id="status-filter" data-testid="select-status-filter" className="flex-1 min-w-[120px] sm:w-[130px] sm:flex-none">
+          <SelectTrigger
+            id="status-filter"
+            data-testid="select-status-filter"
+            className="flex-1 min-w-[120px] sm:w-[130px] sm:flex-none"
+          >
             <SelectValue />
           </SelectTrigger>
           <SelectContent>

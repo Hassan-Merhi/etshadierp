@@ -333,7 +333,7 @@ export function registerSupplierProfitCheckRoutes(app: Express, requireAuth: any
 
         const totalCost = configPrice + offloadingCost;
 
-        let estimatedProfit: number | null = costProfit;
+        const estimatedProfit: number | null = costProfit;
         let profitPercent: number | null = null;
         let status: string;
 

@@ -4,7 +4,13 @@ import type { Express } from "express";
 import { db } from "../db";
 import { storage } from "../storage";
 import { requireAuth, requireRole, canDelete, requireNonPOS, checkPOSLocation } from "../auth";
-import { upload, logAudit, getCurrentExchangeRate, syncEmployeeBalancesFromEntries, calculateHistoricalLocationInventory } from "./_helpers";
+import {
+  upload,
+  logAudit,
+  getCurrentExchangeRate,
+  syncEmployeeBalancesFromEntries,
+  calculateHistoricalLocationInventory,
+} from "./_helpers";
 import {
   locations,
   inventory,
@@ -495,7 +501,11 @@ export function registerLocationRoutes(app: Express) {
       }
 
       const companyId = req.session.currentCompanyId!;
-      const [co] = await db.select({ name: companies.name }).from(companies).where(eq(companies.id, companyId)).limit(1);
+      const [co] = await db
+        .select({ name: companies.name })
+        .from(companies)
+        .where(eq(companies.id, companyId))
+        .limit(1);
       const companyName = co?.name || "Company";
 
       const includeCost = req.query.includeCost !== "0" && req.query.includeCost !== "false";

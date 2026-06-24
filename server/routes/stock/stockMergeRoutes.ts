@@ -819,7 +819,7 @@ export function registerStockMergeRoutes(app: Express) {
             };
           }
 
-          let snapshotAfter: Record<string, unknown> = {};
+          const snapshotAfter: Record<string, unknown> = {};
 
           await db.transaction(async (tx) => {
             const keptMap = new Map(keptInvBefore.map((r) => [r.locationId, r]));

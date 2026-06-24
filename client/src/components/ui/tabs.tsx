@@ -95,28 +95,27 @@ const TabsTrigger = React.forwardRef<
 });
 TabsTrigger.displayName = "TabsTrigger";
 
-const TabsContent = React.forwardRef<
-  HTMLDivElement,
-  React.HTMLAttributes<HTMLDivElement> & { value: string }
->(({ className, value, children, ...props }, ref) => {
-  const ctx = React.useContext(TabsContext);
+const TabsContent = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement> & { value: string }>(
+  ({ className, value, children, ...props }, ref) => {
+    const ctx = React.useContext(TabsContext);
 
-  if (ctx.value !== undefined && ctx.value !== value) return null;
+    if (ctx.value !== undefined && ctx.value !== value) return null;
 
-  return (
-    <div
-      ref={ref}
-      data-state={ctx.value === value ? "active" : "inactive"}
-      className={cn(
-        "mt-4 ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
-        className
-      )}
-      {...props}
-    >
-      {children}
-    </div>
-  );
-});
+    return (
+      <div
+        ref={ref}
+        data-state={ctx.value === value ? "active" : "inactive"}
+        className={cn(
+          "mt-4 ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+          className
+        )}
+        {...props}
+      >
+        {children}
+      </div>
+    );
+  }
+);
 TabsContent.displayName = "TabsContent";
 
 export { Tabs, TabsList, TabsTrigger, TabsContent };

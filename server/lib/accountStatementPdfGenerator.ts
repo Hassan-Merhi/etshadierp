@@ -431,7 +431,7 @@ export async function generateAccountStatementPdf(opts: StatementPdfOptions): Pr
   doc.on("data", (chunk: Buffer) => chunks.push(chunk));
 
   // Header
-  let headerY = 40;
+  const headerY = 40;
   let logoWidth = 0;
   if (logoUrl && logoUrl.startsWith("/") && fs.existsSync(`.${logoUrl}`)) {
     try {
@@ -487,7 +487,7 @@ export async function generateAccountStatementPdf(opts: StatementPdfOptions): Pr
     doc.fillColor("#000000").font(normalFont).fontSize(FONT_SIZE);
   };
 
-  let tableY = doc.y + 4;
+  const tableY = doc.y + 4;
   drawTableHeader(tableY);
   let y = tableY + HDR_H;
 

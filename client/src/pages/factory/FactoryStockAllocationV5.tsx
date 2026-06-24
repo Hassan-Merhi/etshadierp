@@ -468,7 +468,7 @@ export default function FactoryStockAllocationV5() {
     if (!openEditOnLoad || !focusProformaId || rows.length === 0 || editOpenedRef.current) return;
     editOpenedRef.current = true;
     setEditDrawerProformaId(focusProformaId);
-  }, [openEditOnLoad, focusProformaId, rows.length]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [openEditOnLoad, focusProformaId, rows.length]);
 
   const handleRefresh = useCallback(() => {
     query.refetch().then(() => {

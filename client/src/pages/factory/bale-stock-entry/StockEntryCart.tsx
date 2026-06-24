@@ -48,11 +48,7 @@ export function StockEntryCart({
 }) {
   // Navigate between qty/weight cells with arrow keys
   const handleCellKeyDown = useCallback(
-    (
-      e: React.KeyboardEvent<HTMLInputElement>,
-      productId: number,
-      col: "qty" | "weight"
-    ) => {
+    (e: React.KeyboardEvent<HTMLInputElement>, productId: number, col: "qty" | "weight") => {
       const rowIndex = cart.findIndex((i) => i.productId === productId);
       if (rowIndex === -1) return;
 
@@ -60,18 +56,20 @@ export function StockEntryCart({
         const next = cart[rowIndex + 1];
         if (next) {
           e.preventDefault();
-          const selector = col === "qty"
-            ? `[data-testid="input-qty-${next.productId}"]`
-            : `[data-testid="input-weight-${next.productId}"]`;
+          const selector =
+            col === "qty"
+              ? `[data-testid="input-qty-${next.productId}"]`
+              : `[data-testid="input-weight-${next.productId}"]`;
           (document.querySelector(selector) as HTMLInputElement | null)?.focus();
         }
       } else if (e.key === "ArrowUp") {
         const prev = cart[rowIndex - 1];
         if (prev) {
           e.preventDefault();
-          const selector = col === "qty"
-            ? `[data-testid="input-qty-${prev.productId}"]`
-            : `[data-testid="input-weight-${prev.productId}"]`;
+          const selector =
+            col === "qty"
+              ? `[data-testid="input-qty-${prev.productId}"]`
+              : `[data-testid="input-weight-${prev.productId}"]`;
           (document.querySelector(selector) as HTMLInputElement | null)?.focus();
         }
       } else if (e.key === "ArrowRight" && col === "qty") {

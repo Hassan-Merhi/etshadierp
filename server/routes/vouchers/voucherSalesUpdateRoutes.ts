@@ -1037,7 +1037,7 @@ export function registerVoucherSalesUpdateRoutes(app: Express) {
       if (finalPaymentAccountId && finalPaymentAccountType) {
         // EARLY VALIDATION: Check Sales account type BEFORE any destructive operations
         const allAccountsForValidation = await storage.getAllLedgerAccounts(existingVoucher.companyId);
-        let salesAccountCheck = allAccountsForValidation.find((a: any) => a.code === "SALES");
+        const salesAccountCheck = allAccountsForValidation.find((a: any) => a.code === "SALES");
 
         if (salesAccountCheck && salesAccountCheck.accountType !== "Income") {
           return res.status(400).json({

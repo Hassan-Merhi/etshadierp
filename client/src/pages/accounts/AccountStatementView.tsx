@@ -112,9 +112,7 @@ export function AccountStatementView({
           <span className="text-xs text-muted-foreground shrink-0">Account</span>
           <span className="font-semibold truncate max-w-[240px]">{selectedAccount?.name}</span>
           {selectedAccount?.accountId && (
-            <span className="font-mono text-xs text-muted-foreground shrink-0">
-              #{selectedAccount.accountId}
-            </span>
+            <span className="font-mono text-xs text-muted-foreground shrink-0">#{selectedAccount.accountId}</span>
           )}
           {!hideBalances && (
             <>
@@ -130,7 +128,13 @@ export function AccountStatementView({
         </div>
         <div className="flex items-center gap-1 shrink-0">
           {(appMode === "factory" || appMode === "erp") && (
-            <Button size="icon" variant="ghost" onClick={openWaRuleDialog} title="WhatsApp rule" data-testid="button-wa-rule">
+            <Button
+              size="icon"
+              variant="ghost"
+              onClick={openWaRuleDialog}
+              title="WhatsApp rule"
+              data-testid="button-wa-rule"
+            >
               <MessageCircle className="h-4 w-4" />
             </Button>
           )}

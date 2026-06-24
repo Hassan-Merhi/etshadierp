@@ -909,7 +909,7 @@ export function registerSupplierCrudRoutes(app: Express) {
       const supplierId = req.query.supplierId ? parseOptionalId(req.query.supplierId) : null;
 
       // Also fetch all sub-accounts of the supplier to include their payments
-      let supplierIds: number[] = supplierId ? [supplierId] : [];
+      const supplierIds: number[] = supplierId ? [supplierId] : [];
       if (supplierId) {
         const children = await db
           .select({ id: factorySuppliers.id })

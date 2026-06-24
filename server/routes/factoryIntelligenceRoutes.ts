@@ -606,7 +606,7 @@ export function registerFactoryIntelligenceRoutes(app: Express, requireAuth: any
         const laborCost = weightKg * laborCostPerKg;
         const overheadCost = weightKg * overheadPerKg;
 
-        let freightAllocated = 0;
+        const freightAllocated = 0;
         const totalCost = materialCost + laborCost + overheadCost + freightAllocated;
 
         const ob = orderBaleMap.get(bale.id);
@@ -1239,7 +1239,7 @@ export function registerFactoryIntelligenceRoutes(app: Express, requireAuth: any
         }
       }
 
-      let shippingContainer = null;
+      const shippingContainer = null;
 
       const [orderBale] = await db.select().from(customerOrderBales).where(eq(customerOrderBales.baleId, baleId));
 
