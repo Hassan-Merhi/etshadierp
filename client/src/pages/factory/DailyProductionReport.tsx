@@ -60,6 +60,18 @@ function lastMonthRange(): [string, string] {
   const last = new Date(now.getFullYear(), now.getMonth(), 0);
   return [first.toISOString().slice(0, 10), last.toISOString().slice(0, 10)];
 }
+function weekStart() {
+  const d = new Date();
+  const day = d.getDay(); // 0=Sun, 1=Mon...
+  const diff = d.getDate() - day + (day === 0 ? -6 : 1); // Monday
+  return new Date(d.setDate(diff)).toISOString().slice(0, 10);
+}
+function weekEnd() {
+  const d = new Date();
+  const day = d.getDay();
+  const diff = d.getDate() - day + (day === 0 ? 0 : 7); // Sunday
+  return new Date(d.setDate(diff)).toISOString().slice(0, 10);
+}
 function yearStart() {
   return `${new Date().getFullYear()}-01-01`;
 }
@@ -113,7 +125,7 @@ function computeWorkerExpectedSalary(
   return earned;
 }
 
-type Preset = "today" | "yesterday" | "month" | "lastmonth" | "year" | "alltime" | "custom";
+type Preset = "today" | "yesterday" | "week" | "month" | "lastmonth" | "year" | "alltime" | "custom";
 
 interface ReportData {
   from: string | null;
@@ -1064,6 +1076,7 @@ export default function DailyProductionReport() {
   const { from, to } = useMemo(() => {
     if (preset === "today") return { from: todayStr(), to: todayStr() };
     if (preset === "yesterday") return { from: yesterdayStr(), to: yesterdayStr() };
+    if (preset === "week") return { from: weekStart(), to: weekEnd() };
     if (preset === "month") return { from: monthStart(), to: monthEnd() };
     if (preset === "lastmonth") {
       const [f, t] = lastMonthRange();
@@ -1209,6 +1222,7 @@ export default function DailyProductionReport() {
   const presets: { key: Preset; label: string }[] = [
     { key: "today", label: "Today" },
     { key: "yesterday", label: "Yesterday" },
+    { key: "week", label: "This Week" },
     { key: "month", label: "This Month" },
     { key: "lastmonth", label: "Last Month" },
     { key: "year", label: "This Year" },
