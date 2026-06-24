@@ -924,9 +924,16 @@ export default function Analytics() {
         </TableRow>
       );
 
-    const acctIds = new Set(nonZero.map((a) => a.id));
-    const parents = nonZero.filter((a) => !a.parentId || !acctIds.has(a.parentId));
-    const childrenList = nonZero.filter((a) => a.parentId && acctIds.has(a.parentId));
+    // Include group-parent accounts (zero-balance containers) when they have non-zero children
+    const nonZeroParentIds = new Set(nonZero.filter((a) => a.parentId).map((a) => a.parentId!));
+    const groupParents = accts.filter(
+      (a) => nonZeroParentIds.has(a.id) && Number(a.debit) === 0 && Number(a.credit) === 0
+    );
+    const allVisible = [...nonZero, ...groupParents];
+
+    const acctIds = new Set(allVisible.map((a) => a.id));
+    const parents = allVisible.filter((a) => !a.parentId || !acctIds.has(a.parentId));
+    const childrenList = allVisible.filter((a) => a.parentId && acctIds.has(a.parentId));
     const childMap = new Map<number, NetProfitAccount[]>();
     childrenList.forEach((c) => {
       if (!childMap.has(c.parentId!)) childMap.set(c.parentId!, []);
