@@ -21,7 +21,7 @@ import {
 import { eq, and, sql, desc, inArray, isNull, isNotNull, ne } from "drizzle-orm";
 import { z } from "zod";
 
-type RentalModule = "PROPERTIES" | "ERP" | "FACTORY";
+export type RentalModule = "PROPERTIES" | "ERP" | "FACTORY";
 
 export function getCompanyId(req: Request): number | null {
   return req.session.currentCompanyId ?? null;

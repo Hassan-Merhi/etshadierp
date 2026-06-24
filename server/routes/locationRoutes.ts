@@ -4,7 +4,7 @@ import type { Express } from "express";
 import { db } from "../db";
 import { storage } from "../storage";
 import { requireAuth, requireRole, canDelete, requireNonPOS, checkPOSLocation } from "../auth";
-import { upload, logAudit, getCurrentExchangeRate, syncEmployeeBalancesFromEntries } from "./_helpers";
+import { upload, logAudit, getCurrentExchangeRate, syncEmployeeBalancesFromEntries, calculateHistoricalLocationInventory } from "./_helpers";
 import {
   locations,
   inventory,

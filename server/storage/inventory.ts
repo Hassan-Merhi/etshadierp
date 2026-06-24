@@ -552,16 +552,16 @@ export async function getStockItemsWithInventory(companyId: number, locationId?:
       totalValue: schema.inventory.totalValue,
       locationId: schema.inventory.locationId,
       locationName: schema.locations.name,
-      sellingPrice: schema.locationPrices.sellingPrice,
+      sellingPrice: schema.stockItemLocationPrices.sellingPrice,
     })
     .from(schema.inventory)
     .leftJoin(schema.stockItems, eq(schema.inventory.stockItemId, schema.stockItems.id))
     .leftJoin(schema.locations, eq(schema.inventory.locationId, schema.locations.id))
     .leftJoin(
-      schema.locationPrices,
+      schema.stockItemLocationPrices,
       and(
-        eq(schema.locationPrices.stockItemId, schema.inventory.stockItemId),
-        eq(schema.locationPrices.locationId, schema.inventory.locationId)
+        eq(schema.stockItemLocationPrices.stockItemId, schema.inventory.stockItemId),
+        eq(schema.stockItemLocationPrices.locationId, schema.inventory.locationId)
       )
     )
     .where(and(...conditions, isNull(schema.stockItems.deletedAt)));
