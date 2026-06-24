@@ -37,6 +37,16 @@ export function StockMovementDialog({
       ? ["/api/inventory/movement", stockMovementItem.stockItemId, stockMovementItem.locationId, stockMovementPeriod]
       : [],
     enabled: stockMovementOpen && !!stockMovementItem,
+    queryFn: async () => {
+      if (!stockMovementItem) throw new Error("No item");
+      let url = `/api/inventory/movement?stockItemId=${stockMovementItem.stockItemId}`;
+      if (stockMovementItem.locationId != null) url += `&locationId=${stockMovementItem.locationId}`;
+      if (stockMovementPeriod?.fromDate) url += `&startDate=${stockMovementPeriod.fromDate}`;
+      if (stockMovementPeriod?.toDate) url += `&endDate=${stockMovementPeriod.toDate}`;
+      const res = await fetch(url, { credentials: "include" });
+      if (!res.ok) throw new Error(await res.text());
+      return res.json();
+    },
   });
 
   const { data: smDrillData, isLoading: smDrillLoading } = useQuery<any>({
@@ -51,6 +61,14 @@ export function StockMovementDialog({
           ]
         : [],
     enabled: stockMovementOpen && !!stockMovementItem && !!drillMonth,
+    queryFn: async () => {
+      if (!stockMovementItem || !drillMonth) throw new Error("No item or month");
+      let url = `/api/inventory/movement/drill?stockItemId=${stockMovementItem.stockItemId}&year=${drillMonth.year}&month=${drillMonth.month}`;
+      if (stockMovementItem.locationId != null) url += `&locationId=${stockMovementItem.locationId}`;
+      const res = await fetch(url, { credentials: "include" });
+      if (!res.ok) throw new Error(await res.text());
+      return res.json();
+    },
   });
 
   const smRowsWithYear = stockMovementData?.months || [];
