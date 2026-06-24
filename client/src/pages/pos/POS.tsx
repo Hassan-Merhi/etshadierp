@@ -1240,29 +1240,31 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
 
       <div className="flex-1 overflow-hidden p-4">
         <div className="flex flex-col lg:flex-row gap-4 h-full">
-          <div className="flex-1 flex flex-col overflow-hidden min-w-0">
-            <SaleGrid
-              rows={rows}
-              columns={columns}
-              selectedCell={selectedCell}
-              setSelectedCell={setSelectedCell}
-              updateRow={updateRow}
-              handleDeleteRow={(i) => setRows(rows.filter((_, idx) => idx !== i))}
-              handleKeyDown={handleKeyDown}
-              setActiveRow={setActiveRow}
-              setSearchTerm={setSearchTerm}
-              setHighlightedIndex={setHighlightedIndex}
-              getStockWarning={() => null}
-              formatDisplayAmount={formatDisplayAmount}
-              activeCurrency={activeCurrency}
-              exchangeRate={exchangeRate}
-              inputRefs={inputRefs}
-              clearActiveRowTimerRef={clearActiveRowTimerRef}
-              focusCell={focusCell}
-              toast={toast}
-            />
+          <div className="flex-1 flex flex-col overflow-hidden min-w-0 min-h-0">
+            <div className="flex-1 min-h-0 overflow-hidden">
+              <SaleGrid
+                rows={rows}
+                columns={columns}
+                selectedCell={selectedCell}
+                setSelectedCell={setSelectedCell}
+                updateRow={updateRow}
+                handleDeleteRow={(i) => setRows(rows.filter((_, idx) => idx !== i))}
+                handleKeyDown={handleKeyDown}
+                setActiveRow={setActiveRow}
+                setSearchTerm={setSearchTerm}
+                setHighlightedIndex={setHighlightedIndex}
+                getStockWarning={() => null}
+                formatDisplayAmount={formatDisplayAmount}
+                activeCurrency={activeCurrency}
+                exchangeRate={exchangeRate}
+                inputRefs={inputRefs}
+                clearActiveRowTimerRef={clearActiveRowTimerRef}
+                focusCell={focusCell}
+                toast={toast}
+              />
+            </div>
 
-            <div className="mt-2 flex flex-wrap items-center gap-3 px-1">
+            <div className="flex-shrink-0 mt-2 flex flex-wrap items-center gap-3 px-1">
               <span className="text-sm text-muted-foreground">
                 <span className="font-semibold text-foreground">{validItemCount}</span> items&nbsp;&nbsp;Qty{" "}
                 <span className="font-semibold text-foreground font-mono">{totalQty.toFixed(2)}</span>
@@ -1274,7 +1276,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
             </div>
 
             {/* Collapsible notes — hidden by default to match production layout */}
-            <div className="mt-1 px-1">
+            <div className="flex-shrink-0 mt-1 px-1">
               {notes ? (
                 <Textarea
                   placeholder="Notes (optional)"
