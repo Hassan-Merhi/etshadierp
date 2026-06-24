@@ -67,7 +67,7 @@ export function ContainerDrawerForm({
           <div>
             <p className="text-xs text-muted-foreground">Days Delayed</p>
             <p className={cn("text-sm font-medium", daysDelayed ? "text-red-600" : "text-muted-foreground")}>
-              {daysDelayed ? `-\${daysDelayed}d` : "—"}
+              {daysDelayed ? `-${daysDelayed}d` : "—"}
             </p>
           </div>
           <div>
