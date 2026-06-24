@@ -148,7 +148,7 @@ export function registerVoucherCreateRoutes(app: Express) {
     try {
       const isPOS = (req as any).user?.role === "POS";
       const voucherType = req.body.voucherType;
-      if (isPOS && voucherType !== "StockTransfer" && voucherType !== "Stock Transfer") {
+      if (isPOS && voucherType !== "StockTransfer" && voucherType !== "Stock Transfer" && voucherType !== "Transfer") {
         return res.status(403).json({ message: "Access denied: This resource is not available for POS users" });
       }
       const companyId = req.session.currentCompanyId;
