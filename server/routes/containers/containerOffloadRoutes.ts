@@ -1,6 +1,7 @@
 import { parseId, parseOptionalId } from "../../lib/parseId";
 import { getClientDate } from "../../lib/dateUtils";
 import type { Express, Request, Response, NextFunction } from "express";
+import { logger } from "../../lib/logger";
 import { db } from "../../db";
 import { storage } from "../../storage";
 import { requireAuth, requireRole, canDelete, requireNonPOS, checkPOSLocation } from "../../auth";
@@ -76,6 +77,10 @@ import { adjustInventory, reverseInventoryByExactValue } from "../../inventoryHe
 
 export function registerContainerOffloadRoutes(app: Express) {
   app.post("/api/containers/:id/offload", requireAuth, requireNonPOS, async (req, res) => {
+    const _t = Date.now();
+    const _uid = (req as any).user?.id;
+    const _cid = req.session.currentCompanyId;
+    logger.info("Container offload started", { module: "containers", action: "offload", userId: _uid, companyId: _cid, containerId: req.params.id });
     try {
       const containerId = parseId(req.params.id);
       if (containerId === null) return res.status(400).json({ message: "Invalid id" });
@@ -542,8 +547,10 @@ export function registerContainerOffloadRoutes(app: Express) {
         });
       }
 
+      logger.info("Container offload succeeded", { module: "containers", action: "offload", userId: _uid, companyId: _cid, containerId: req.params.id, durationMs: Date.now() - _t });
       res.json(offload);
     } catch (error: any) {
+      logger.error("Container offload failed", { module: "containers", action: "offload", userId: _uid, companyId: _cid, containerId: req.params.id, durationMs: Date.now() - _t, error });
       console.error("Container offload error:", error);
       res.status(500).json({ message: error.message });
     }

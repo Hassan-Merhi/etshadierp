@@ -14,6 +14,8 @@ import { setupVite, log } from "./vite";
 import type { User } from "@shared/schema";
 import { db, pool } from "./db";
 import { Client } from "pg";
+import { requestLogger } from "./middleware/requestLogger";
+import { logger } from "./lib/logger";
 
 // Global error handlers
 // In production: log and exit so the process manager (Render/Replit) restarts cleanly.
@@ -214,6 +216,9 @@ app.use((_req, res, next) => {
   res.setHeader("X-Build-Version", BUILD_VERSION);
   next();
 });
+
+// Structured HTTP request logger — fires on res.finish, never logs secrets
+app.use(requestLogger);
 
 // Disable HTTP-level caching for all API routes.
 // Without this, Express generates ETags and the browser returns 304 "Not Modified"
@@ -4266,7 +4271,11 @@ END $$`,
       err?.cause?.message?.includes("canceling statement due to lock timeout") ||
       err?.message?.includes("canceling statement due to lock timeout");
     if (isPoolTimeout || isLockTimeout) {
-      console.error("[DB Pool] Connection/lock timeout — pool exhausted or DDL lock contention");
+      logger.error("DB connection/lock timeout — pool exhausted or DDL lock contention", {
+        module: "db",
+        action: "poolTimeout",
+        error: err,
+      });
       return res.status(503).json({ message: "Service temporarily unavailable — please retry." });
     }
 
@@ -4274,7 +4283,7 @@ END $$`,
     const isProduction = process.env.NODE_ENV === "production";
 
     if (status >= 500) {
-      console.error("[Server Error]", isProduction ? err.message : err);
+      logger.error("Unhandled server error", { module: "server", action: "errorHandler", status, error: err });
     }
 
     const message =

@@ -1,6 +1,7 @@
 import type { Express, Request, Response } from "express";
 import { pool } from "../db";
 import { requireAuth, requireRole } from "../auth";
+import { logger } from "../lib/logger";
 import { fetchAllCompanies } from "../services/exportDataService";
 import { sendExportEmail } from "../services/emailService";
 import { buildFullExportZip } from "../helpers/buildFullExportZip";
@@ -134,6 +135,9 @@ export function registerExportRoutes(app: Express) {
       return res.status(400).json({ message: "mode must be 'download' or 'email'" });
     }
 
+    const _t = Date.now();
+    logger.info("Export start requested", { module: "export", action: "start", status: mode });
+
     const job = createJob(mode);
     res.json({ jobId: job.id });
 
@@ -202,6 +206,7 @@ export function registerExportRoutes(app: Express) {
           if (emailRes.result.success) {
             addStep(job, `Email sent successfully to all recipients (attempt ${emailRes.attempts})`, "success");
             finishJob(job);
+            logger.info("Export job completed", { module: "export", action: "start", status: "success", durationMs: Date.now() - _t });
             await finishExportRun(runId, {
               status: "success",
               emailSuccess: true,
@@ -210,6 +215,7 @@ export function registerExportRoutes(app: Express) {
           } else {
             const errMsg = emailRes.result.error || "Email send failed";
             failJob(job, errMsg);
+            logger.warn("Export job email failed", { module: "export", action: "start", status: "emailFailed", durationMs: Date.now() - _t });
             await finishExportRun(runId, {
               status: "failed",
               emailSuccess: false,
@@ -220,9 +226,11 @@ export function registerExportRoutes(app: Express) {
         } else {
           finishJob(job, zipBuf);
           addStep(job, "Ready to download — starting download now", "success");
+          logger.info("Export job completed", { module: "export", action: "start", status: "download_ready", durationMs: Date.now() - _t });
           await finishExportRun(runId, { status: "success" });
         }
       } catch (err: any) {
+        logger.error("Export job failed", { module: "export", action: "start", durationMs: Date.now() - _t, error: err });
         failJob(job, err.message || "Unexpected error");
         await finishExportRun(runId, { status: "failed", skippedReason: err.message || "Unexpected error" }).catch(
           () => {}

@@ -1,5 +1,6 @@
 import { getClientDate } from "../lib/dateUtils";
 import express, { type Express } from "express";
+import { logger } from "../lib/logger";
 import { db } from "../db";
 import { storage } from "../storage";
 import { requireAuth, requireRole, canDelete, requireNonPOS, checkPOSLocation, canModifyDate } from "../auth";
@@ -429,6 +430,10 @@ export function registerPosRoutes(app: Express) {
   });
 
   app.post("/api/pos/sales", requireAuth, canModifyDate("voucherDate"), async (req, res) => {
+    const _t = Date.now();
+    const _uid = (req as any).user?.id;
+    const _cid = req.session.currentCompanyId;
+    logger.info("POS sale create started", { module: "pos", action: "createSale", userId: _uid, companyId: _cid });
     try {
       if (!req.session.currentCompanyId) {
         return res.status(400).json({ message: "No company selected" });
@@ -1152,6 +1157,7 @@ export function registerPosRoutes(app: Express) {
       }
 
       // Return complete sale details
+      logger.info("POS sale create succeeded", { module: "pos", action: "createSale", userId: _uid, companyId: _cid, voucherId: result.voucher?.id, durationMs: Date.now() - _t });
       res.json({
         voucher: result.voucher,
         location,
@@ -1169,6 +1175,7 @@ export function registerPosRoutes(app: Express) {
           : null,
       });
     } catch (error: any) {
+      logger.error("POS sale create failed", { module: "pos", action: "createSale", userId: _uid, companyId: _cid, durationMs: Date.now() - _t, error });
       // Return appropriate status codes for different error types
       if (error.message.includes("Inventory not found")) {
         return res.status(404).json({ message: error.message });
@@ -2427,8 +2434,10 @@ export function registerPosRoutes(app: Express) {
         return res.status(502).json({ message: result.error ?? "Failed to send WhatsApp PDF" });
       }
 
+      logger.info("WhatsApp invoice send succeeded", { module: "pos", action: "sendInvoiceWhatsApp", userId: (req as any).user?.id, companyId: req.session.currentCompanyId, voucherId });
       res.json({ success: true, message: "Invoice PDF sent to WhatsApp" });
     } catch (error: any) {
+      logger.error("WhatsApp invoice send failed", { module: "pos", action: "sendInvoiceWhatsApp", userId: (req as any).user?.id, companyId: req.session.currentCompanyId, error });
       console.error("[/api/pos/send-invoice-whatsapp]", error);
       res.status(500).json({ message: error.message });
     }

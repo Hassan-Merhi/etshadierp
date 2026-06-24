@@ -1,6 +1,7 @@
 import type { Express } from "express";
 import { pool } from "../../db";
 import { requireAuth } from "../../auth";
+import { logger } from "../../lib/logger";
 
 export function registerFactoryDailyScanRoutes(app: Express) {
   // All bales produced on a given date (for verification UI)
@@ -74,10 +75,12 @@ export function registerFactoryDailyScanRoutes(app: Express) {
 
   // Record a scan — only allowed if bale was produced on that day
   app.post("/api/factory/daily-bale-scans", requireAuth, async (req: any, res: any) => {
+    const _t = Date.now();
     try {
       const companyId = req.session.factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const userId = req.session.userId;
+      logger.info("Factory bale scan started", { module: "factory", action: "dailyBaleScan", userId, factoryCompanyId: companyId });
       const { scanDate, referenceNumber, articleCode, productName, weightKg } = req.body;
       if (!scanDate || !referenceNumber) {
         return res.status(400).json({ message: "scanDate and referenceNumber are required" });
@@ -111,8 +114,10 @@ export function registerFactoryDailyScanRoutes(app: Express) {
                    product_name, weight_kg, scanned_at, scanned_by_user_id`,
         [companyId, scanDate, ref, articleCode || null, productName || null, weightKg || null, userId]
       );
+      logger.info("Factory bale scan succeeded", { module: "factory", action: "dailyBaleScan", userId, factoryCompanyId: companyId, durationMs: Date.now() - _t });
       return res.status(201).json(result.rows[0]);
     } catch (e: any) {
+      logger.error("Factory bale scan failed", { module: "factory", action: "dailyBaleScan", durationMs: Date.now() - _t, error: e });
       return res.status(500).json({ message: e.message });
     }
   });

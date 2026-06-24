@@ -1,6 +1,7 @@
 import cron from "node-cron";
 import archiver from "archiver";
 import { PassThrough } from "stream";
+import { logger } from "../lib/logger";
 import { fetchAllCompanies } from "./exportDataService";
 import { sendExportEmail } from "./emailService";
 import { pool } from "../db";
@@ -951,16 +952,18 @@ export function startScheduler() {
     }
   );
 
-  console.log(
-    "[ContainerTracking] Auto-tracking scheduler started — runs every 6 hours (00:00, 06:00, 12:00, 18:00 EST)."
-  );
-  console.log("[DailyExport] Scheduler started — time-configurable via export settings (checked every hour).");
-  console.log("[WhatsApp] Monthly net-position scheduler started — runs on the 1st of each month at 7:00 AM EST.");
-  console.log("[RentalAccrual] Monthly auto-accrual scheduler started — runs on the 2nd of each month at 6:00 AM EST.");
-  console.log("[StockReport] Independent scheduler started — checks every hour.");
-  console.log("[NetPositionExport] Scheduled export checker started — checks every hour.");
-  console.log("[OverdueCheck] Payment reminder scheduler started — runs daily at 9:00 AM EST.");
-  console.log("[Purge] 30-day soft-delete purge scheduler started — runs daily at 2:00 AM EST.");
+  logger.info("All scheduled jobs registered", {
+    module: "scheduler",
+    action: "start",
+    jobs: [
+      "monthlyNetPositionWhatsApp(1st 07:00 EST)",
+      "monthlyRentalAccrual(2nd 06:00 EST)",
+      "hourlyChecks(stock/export/containers)",
+      "overdueCustomers(daily 09:00 EST)",
+      "softDeletePurge(daily 02:00 EST)",
+      "containerTracking(every 6h EST)",
+    ],
+  });
 }
 
 /**

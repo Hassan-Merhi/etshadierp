@@ -1,4 +1,5 @@
 import type { Express } from "express";
+import { logger } from "../lib/logger";
 import { db } from "../db";
 import { storage } from "../storage";
 import { requireAuth, requireRole, canDelete, requireNonPOS, checkPOSLocation } from "../auth";
@@ -150,6 +151,7 @@ export function registerInventoryRoutes(app: Express) {
         totalPages: Math.ceil(total / pageSizeNum),
       });
     } catch (error: any) {
+      logger.error("Inventory fetch failed", { module: "inventory", action: "getInventory", companyId: req.session.currentCompanyId, error });
       res.status(500).json({ message: error.message });
     }
   });

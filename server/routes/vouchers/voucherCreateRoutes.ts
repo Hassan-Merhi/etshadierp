@@ -1,6 +1,7 @@
 import type { Express } from "express";
 import { db } from "../../db";
 import { storage } from "../../storage";
+import { logger } from "../../lib/logger";
 import { requireAuth, requireRole, canDelete, requireNonPOS, checkPOSLocation } from "../../auth";
 import { requireActionAccess } from "../../lib/permissionMiddleware";
 import {
@@ -161,6 +162,10 @@ export function registerVoucherCreateRoutes(app: Express) {
 
   // Create a voucher with entries in one transaction
   app.post("/api/vouchers/with-entries", requireAuth, requireNonPOS, async (req, res) => {
+    const _t = Date.now();
+    const _uid = (req as any).user?.id;
+    const _cid = req.session.currentCompanyId;
+    logger.info("Voucher with-entries create started", { module: "vouchers", action: "createWithEntries", userId: _uid, companyId: _cid });
     try {
       const { voucher, entries } = req.body;
 
@@ -317,8 +322,10 @@ export function registerVoucherCreateRoutes(app: Express) {
         createdEntries.map((e) => e.ledgerAccountId)
       ).catch(() => {});
 
+      logger.info("Voucher with-entries create succeeded", { module: "vouchers", action: "createWithEntries", userId: _uid, companyId: _cid, voucherId: createdVoucher.id, durationMs: Date.now() - _t });
       res.json(result);
     } catch (error: any) {
+      logger.error("Voucher with-entries create failed", { module: "vouchers", action: "createWithEntries", userId: _uid, companyId: _cid, durationMs: Date.now() - _t, error });
       res.status(500).json({ message: error.message });
     }
   });
