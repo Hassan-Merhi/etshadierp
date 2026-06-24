@@ -399,6 +399,7 @@ export function registerReportsRoutes(app: Express) {
           debit: balance.debit,
           credit: balance.credit,
           balance: netBalance,
+          parentId: acc.parentId ?? undefined,
         };
       });
 
@@ -566,6 +567,7 @@ export function registerReportsRoutes(app: Express) {
           debit: balance.debit,
           credit: balance.credit,
           balance: netBalance,
+          parentId: acc.parentId ?? undefined,
         };
       });
 

@@ -236,6 +236,7 @@ interface NetProfitAccount {
   debit: number;
   credit: number;
   balance: number;
+  parentId?: number;
 }
 
 interface NetProfitStatementData {
@@ -911,7 +912,7 @@ export default function Analytics() {
   const totalIndirectExpense = Math.abs(calculatePLTotal(indirectExpenseAccounts));
   const totalExpenses = totalDirectExpense + totalIndirectExpense;
 
-  // Render a flat list of date-filtered NetProfitAccounts (from net-profit-statement)
+  // Render hierarchical NetProfitAccounts (groups collapse/expand)
   const renderNetProfitAccountsList = (accts: NetProfitAccount[]) => {
     const nonZero = accts.filter((a) => Number(a.debit) !== 0 || Number(a.credit) !== 0);
     if (nonZero.length === 0)
@@ -922,18 +923,64 @@ export default function Analytics() {
           </TableCell>
         </TableRow>
       );
-    return nonZero.map((acc) => (
-      <TableRow
-        key={acc.id}
-        className="hover-elevate cursor-pointer"
-        onClick={() => goToStatement(acc.id, undefined, "ledger")}
-      >
-        <TableCell className="text-sm font-medium hover:underline">{acc.name}</TableCell>
-        <TableCell className="text-right font-mono text-sm text-green-600 dark:text-green-400">
-          {formatSmartCurrency(Number(acc.balance))}
-        </TableCell>
-      </TableRow>
-    ));
+
+    const acctIds = new Set(nonZero.map((a) => a.id));
+    const parents = nonZero.filter((a) => !a.parentId || !acctIds.has(a.parentId));
+    const childrenList = nonZero.filter((a) => a.parentId && acctIds.has(a.parentId));
+    const childMap = new Map<number, NetProfitAccount[]>();
+    childrenList.forEach((c) => {
+      if (!childMap.has(c.parentId!)) childMap.set(c.parentId!, []);
+      childMap.get(c.parentId!)!.push(c);
+    });
+
+    return parents.map((acc) => {
+      const kids = childMap.get(acc.id) || [];
+      const hasKids = kids.length > 0;
+      const isExpanded = expandedAccounts.has(acc.id);
+      const displayBalance = hasKids
+        ? kids.reduce((s, k) => s + Math.abs(Number(k.balance)), 0)
+        : Math.abs(Number(acc.balance));
+
+      return (
+        <Fragment key={acc.id}>
+          <TableRow
+            className="hover-elevate cursor-pointer"
+            onClick={() => {
+              if (hasKids) toggleAccount(acc.id);
+              else goToStatement(acc.id, undefined, "ledger");
+            }}
+          >
+            <TableCell className="text-sm font-medium">
+              <div className="flex items-center gap-2">
+                {hasKids && (
+                  <span className="text-muted-foreground">
+                    {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                  </span>
+                )}
+                <span className={hasKids ? "font-semibold" : "hover:underline"}>{acc.name}</span>
+              </div>
+            </TableCell>
+            <TableCell className="text-right font-mono text-sm text-green-600 dark:text-green-400">
+              {formatSmartCurrency(displayBalance)}
+            </TableCell>
+          </TableRow>
+          {hasKids &&
+            isExpanded &&
+            kids.map((child) => (
+              <TableRow
+                key={child.id}
+                className="hover-elevate cursor-pointer"
+                onClick={() => goToStatement(child.id, undefined, "ledger")}
+              >
+                <TableCell className="pl-8 text-sm text-muted-foreground hover:underline">{child.name}</TableCell>
+                <TableCell className="text-right font-mono text-sm">
+                  {formatSmartCurrency(Math.abs(Number(child.balance)))}
+                </TableCell>
+              </TableRow>
+            ))}
+        </Fragment>
+      );
+    });
   };
   const netProfit = totalIncome - totalExpenses;
 

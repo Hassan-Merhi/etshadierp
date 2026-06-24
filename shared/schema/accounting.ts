@@ -67,7 +67,7 @@ export const insertLedgerAccountSchema = createInsertSchema(ledgerAccounts)
       "Accounts Payable",
       "Profit",
     ]),
-    subType: z.string().optional(),
+    subType: z.string().nullable().optional(),
     openingBalance: z.string().optional(),
     openingBalanceSide: z.enum(["Dr", "Cr"]).optional().or(z.literal("")),
     parentId: z.number().nullable().optional(),

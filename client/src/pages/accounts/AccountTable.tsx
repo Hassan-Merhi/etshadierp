@@ -1,5 +1,6 @@
+import { Fragment } from "react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
+import { ChevronDown, ChevronRight } from "lucide-react";
 import { AccountTableProps } from "./accountTypes";
 
 const TYPE_LABELS: Record<string, string> = {
@@ -12,63 +13,121 @@ const TYPE_LABELS: Record<string, string> = {
   factoryWorker: "Worker",
 };
 
-const TYPE_VARIANTS: Record<string, string> = {
-  ledger: "secondary",
-  supplier: "outline",
-  customer: "outline",
-  bank: "outline",
-  employee: "outline",
-  fixedAsset: "outline",
-  factoryWorker: "outline",
-};
+export function AccountTable({
+  filteredAccounts,
+  expandedParents,
+  toggleParent,
+  handleAccountChange,
+  hideBalances,
+  formatAmount,
+}: AccountTableProps) {
+  const accountIds = new Set(filteredAccounts.map((a: any) => a.accountId as number));
 
-export function AccountTable({ filteredAccounts, handleAccountChange, hideBalances, formatAmount }: AccountTableProps) {
+  const parents = filteredAccounts.filter(
+    (a: any) => !a.parentId || !accountIds.has(a.parentId)
+  );
+  const childrenList = filteredAccounts.filter(
+    (a: any) => a.parentId && accountIds.has(a.parentId)
+  );
+  const childMap = new Map<number, any[]>();
+  childrenList.forEach((c: any) => {
+    if (!childMap.has(c.parentId)) childMap.set(c.parentId, []);
+    childMap.get(c.parentId)!.push(c);
+  });
+
   return (
     <div className="rounded-xl border overflow-hidden">
       <Table>
         <TableHeader>
           <TableRow className="bg-muted/40 hover:bg-muted/40">
             <TableHead>Account</TableHead>
-            <TableHead className="w-[110px]">Type</TableHead>
             {!hideBalances && <TableHead className="text-right w-[160px]">Balance</TableHead>}
           </TableRow>
         </TableHeader>
         <TableBody>
-          {filteredAccounts.map((account) => (
-            <TableRow
-              key={account.id}
-              className="cursor-pointer hover:bg-muted/30"
-              onClick={() => handleAccountChange(account.id)}
-              data-testid={`row-account-${account.id}`}
-            >
-              <TableCell className="font-medium py-2.5">
-                <span className="flex items-center gap-2 min-w-0">
-                  <span className="truncate max-w-[400px]">{account.name}</span>
-                  {account.accountId && (
-                    <span className="ml-0.5 text-[11px] text-muted-foreground font-mono font-normal shrink-0">
-                      #{account.accountId}
+          {parents.map((account: any) => {
+            const kids = childMap.get(account.accountId) || [];
+            const hasKids = kids.length > 0;
+            const isExpanded = expandedParents.has(account.id);
+
+            return (
+              <Fragment key={account.id}>
+                <TableRow
+                  className="cursor-pointer hover:bg-muted/30"
+                  onClick={() => {
+                    if (hasKids) toggleParent(account.id);
+                    else handleAccountChange(account.id);
+                  }}
+                  data-testid={`row-account-${account.id}`}
+                >
+                  <TableCell className="font-medium py-2.5">
+                    <span className="flex items-center gap-2 min-w-0">
+                      {hasKids && (
+                        <span className="text-muted-foreground shrink-0">
+                          {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                        </span>
+                      )}
+                      <span className="truncate max-w-[380px]">{account.name}</span>
+                      {!hasKids && account.accountId && (
+                        <span className="ml-0.5 text-[11px] text-muted-foreground font-mono font-normal shrink-0">
+                          #{account.accountId}
+                        </span>
+                      )}
                     </span>
+                  </TableCell>
+                  {!hideBalances && (
+                    <TableCell className="text-right font-mono tabular-nums text-sm py-2.5">
+                      {hasKids ? (
+                        <span className="text-muted-foreground text-xs">
+                          {kids.length} {kids.length === 1 ? "account" : "accounts"}
+                        </span>
+                      ) : (
+                        <>
+                          {formatAmount(Math.abs(account.balance))}
+                          <span className="ml-1 text-[10px] opacity-70">
+                            {account.balanceSide || (account.balance >= 0 ? "Dr" : "Cr")}
+                          </span>
+                        </>
+                      )}
+                    </TableCell>
                   )}
-                </span>
-              </TableCell>
-              <TableCell className="py-2.5">
-                <Badge variant={(TYPE_VARIANTS[account.type] ?? "outline") as any} className="text-[10px]">
-                  {TYPE_LABELS[account.type] ?? account.type}
-                </Badge>
-              </TableCell>
-              {!hideBalances && (
-                <TableCell className="text-right font-mono tabular-nums text-sm py-2.5">
-                  {formatAmount(Math.abs(account.balance))}
-                  <span className="ml-1 text-[10px] opacity-70">
-                    {account.balanceSide || (account.balance >= 0 ? "Dr" : "Cr")}
-                  </span>
-                </TableCell>
-              )}
-            </TableRow>
-          ))}
+                </TableRow>
+
+                {hasKids &&
+                  isExpanded &&
+                  kids.map((child: any) => (
+                    <TableRow
+                      key={child.id}
+                      className="cursor-pointer hover:bg-muted/20"
+                      onClick={() => handleAccountChange(child.id)}
+                      data-testid={`row-account-${child.id}`}
+                    >
+                      <TableCell className="py-2.5 pl-9">
+                        <span className="flex items-center gap-2 min-w-0">
+                          <span className="truncate max-w-[360px] text-muted-foreground">{child.name}</span>
+                          {child.accountId && (
+                            <span className="ml-0.5 text-[11px] text-muted-foreground font-mono font-normal shrink-0">
+                              #{child.accountId}
+                            </span>
+                          )}
+                        </span>
+                      </TableCell>
+                      {!hideBalances && (
+                        <TableCell className="text-right font-mono tabular-nums text-sm py-2.5 text-muted-foreground">
+                          {formatAmount(Math.abs(child.balance))}
+                          <span className="ml-1 text-[10px] opacity-70">
+                            {child.balanceSide || (child.balance >= 0 ? "Dr" : "Cr")}
+                          </span>
+                        </TableCell>
+                      )}
+                    </TableRow>
+                  ))}
+              </Fragment>
+            );
+          })}
           {filteredAccounts.length === 0 && (
             <TableRow>
-              <TableCell colSpan={hideBalances ? 2 : 3} className="text-center py-8 text-muted-foreground text-sm">
+              <TableCell colSpan={hideBalances ? 1 : 2} className="text-center py-8 text-muted-foreground text-sm">
                 No accounts found matching your search.
               </TableCell>
             </TableRow>
