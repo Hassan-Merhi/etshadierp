@@ -1,4 +1,4 @@
-import { eq, and, or, isNull, asc, desc, sql, inArray, ne, ilike } from "drizzle-orm";
+import { eq, and, or, isNull, asc, desc, sql, ne, ilike } from "drizzle-orm";
 import { db } from "../db";
 import * as schema from "@shared/schema";
 import { adjustInventory } from "../inventoryHelper";

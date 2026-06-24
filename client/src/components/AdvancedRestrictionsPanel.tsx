@@ -24,7 +24,6 @@ import { Loader2, ChevronDown, ChevronRight, Search, Shield, Info } from "lucide
 import {
   PERMISSION_CATALOG,
   PERMISSION_TYPE_LABELS,
-  PERMISSION_TYPES,
   UNCONFIGURED_PERMISSIONS,
   type PermissionEntry,
   type PermissionType,
@@ -142,7 +141,8 @@ export function AdvancedRestrictionsPanel({ role, companyId, companyName }: Adva
   const toggleSection = (section: string) => {
     setOpenSections((prev) => {
       const next = new Set(prev);
-      next.has(section) ? next.delete(section) : next.add(section);
+      if (next.has(section)) next.delete(section);
+      else next.add(section);
       return next;
     });
   };
