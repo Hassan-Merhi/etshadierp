@@ -2,7 +2,7 @@ import { useState, useRef, useCallback, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation, useSearch } from "wouter";
 import { Button } from "@/components/ui/button";
-import { Plus, Search, Edit, FileText, ChevronsUpDown, Check } from "lucide-react";
+import { Plus, Search, Edit, FileText, ChevronsUpDown, Check, X, ArrowRight, TrendingUp, TrendingDown } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from "@/components/ui/command";
 import { cn } from "@/lib/utils";
@@ -378,20 +378,82 @@ export default function Accounts() {
         <TabsContent value="view" className="space-y-4">
           {!selectedAccount ? (
             <div className="space-y-4">
+              {/* Search — command-palette style */}
               <div className="relative">
-                <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
                 <Input
-                  placeholder="Search accounts..."
+                  placeholder="Search accounts by name or code…"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-9"
+                  className="pl-9 pr-9"
+                  data-testid="input-accounts-search"
                 />
+                {searchTerm && (
+                  <button
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                    onClick={() => setSearchTerm("")}
+                    data-testid="button-accounts-search-clear"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                )}
               </div>
+
               {accountsLoading ? (
                 <div className="flex items-center justify-center py-16 text-muted-foreground text-sm">
                   Loading accounts…
                 </div>
+              ) : searchTerm ? (
+                /* Command-palette result list when searching */
+                filteredAccounts.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
+                    <Search className="w-8 h-8 mb-3 opacity-30" />
+                    <p className="text-sm font-medium">No accounts found</p>
+                    <p className="text-xs mt-1 opacity-70">Try a different name or account code</p>
+                  </div>
+                ) : (
+                  <div className="rounded-xl border overflow-hidden divide-y">
+                    {filteredAccounts.map((acc) => {
+                      const balanceSide = acc.balanceSide || (acc.balance >= 0 ? "Dr" : "Cr");
+                      return (
+                        <button
+                          key={acc.id}
+                          data-testid={`button-search-account-${acc.accountId}`}
+                          className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-muted/40 transition-colors group"
+                          onClick={() => {
+                            handleAccountChange(acc.id);
+                            setSearchTerm("");
+                          }}
+                        >
+                          <div className="flex-1 min-w-0 flex items-center gap-2.5">
+                            <span className="text-sm font-medium truncate">{acc.name}</span>
+                            {acc.accountId && (
+                              <span className="text-[10px] text-muted-foreground font-mono shrink-0">
+                                #{acc.accountId}
+                              </span>
+                            )}
+                          </div>
+                          {!hideBalances && (
+                            <span
+                              className={cn(
+                                "font-mono tabular-nums text-sm font-medium shrink-0",
+                                balanceSide === "Dr"
+                                  ? "text-emerald-600 dark:text-emerald-400"
+                                  : "text-amber-600 dark:text-amber-400"
+                              )}
+                            >
+                              {formatAmount(Math.abs(acc.balance))}
+                              <span className="ml-1 text-[10px] opacity-60">{balanceSide}</span>
+                            </span>
+                          )}
+                          <ArrowRight className="h-3.5 w-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
+                        </button>
+                      );
+                    })}
+                  </div>
+                )
               ) : (
+                /* Full account table when not searching */
                 <AccountTable
                   filteredAccounts={filteredAccounts}
                   expandedParents={expandedParents}
