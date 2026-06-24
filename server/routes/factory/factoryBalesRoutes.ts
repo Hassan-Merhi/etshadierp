@@ -1719,6 +1719,29 @@ export function registerFactoryBalesRoutes(app: Express) {
       if (!ALLOWED.includes(status))
         return res.status(400).json({ message: `Invalid status. Allowed: ${ALLOWED.join(", ")}` });
 
+      // Guard: prevent resetting a bale to IN_STOCK if it's on a finalized order.
+      // The correct flow is to use the "Return to Stock" action which removes it from the order first.
+      if (status === "IN_STOCK") {
+        const [orderBaleCheck] = await db
+          .select({ orderId: customerOrderBales.orderId })
+          .from(customerOrderBales)
+          .where(eq(customerOrderBales.baleId, id))
+          .limit(1);
+        if (orderBaleCheck) {
+          const [orderCheck] = await db
+            .select({ status: customerOrders.status })
+            .from(customerOrders)
+            .where(eq(customerOrders.id, orderBaleCheck.orderId))
+            .limit(1);
+          if (orderCheck && ["FINALIZED", "DISPATCHED", "SOLD"].includes(orderCheck.status)) {
+            return res.status(409).json({
+              message:
+                "Cannot set status to IN_STOCK: this bale is on a finalized order. Use the Return to Stock action to remove it from the order first.",
+            });
+          }
+        }
+      }
+
       const [updated] = await db
         .update(factoryBales)
         .set({ status, updatedAt: new Date() })

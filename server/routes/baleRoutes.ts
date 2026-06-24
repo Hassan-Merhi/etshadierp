@@ -1074,6 +1074,16 @@ export function registerBaleRoutes(app: Express) {
           directLoadedOnOrder = directOrder || null;
         }
 
+        // If the bale's stored status is IN_STOCK but it's already on a finalized order,
+        // derive the correct effective status so the Bale Explorer shows it accurately.
+        const _finalizedStatuses = ["FINALIZED", "DISPATCHED", "SOLD"];
+        const directEffectiveStatus =
+          directBale.status === "IN_STOCK" &&
+          directLoadedOnOrder?.status &&
+          _finalizedStatuses.includes(directLoadedOnOrder.status)
+            ? "SOLD"
+            : directBale.status;
+
         // Fetch audit history for this bale
         const directAuditHistory = await db
           .select({
@@ -1096,7 +1106,7 @@ export function registerBaleRoutes(app: Express) {
             baleCode: directBale.baleCode,
             articleCode: product?.articleCode || directBale.articleCode || null,
             productName: directBale.productName,
-            status: directBale.status,
+            status: directEffectiveStatus,
             isInLoadingOrder: directIsInLoadingOrder,
             weightKg: directBale.weightKg,
             costPerKg: directBale.costPerKg,
@@ -1332,6 +1342,17 @@ export function registerBaleRoutes(app: Express) {
       // Mark isInLoadingOrder on baleInfo so callers (e.g. Ground Scan) can show the right status
       if (baleInfo && loadedOnOrder?.status === "LOADING") {
         baleInfo.isInLoadingOrder = true;
+      }
+
+      // If the bale's stored status is IN_STOCK but it's already on a finalized order,
+      // derive the correct effective status so the Bale Explorer shows it accurately.
+      if (
+        baleInfo &&
+        baleInfo.status === "IN_STOCK" &&
+        loadedOnOrder?.status &&
+        ["FINALIZED", "DISPATCHED", "SOLD"].includes(loadedOnOrder.status)
+      ) {
+        baleInfo.status = "SOLD";
       }
 
       // Fetch audit history for this bale
