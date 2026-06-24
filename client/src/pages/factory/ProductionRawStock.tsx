@@ -2,13 +2,14 @@ import { useState, useMemo, useRef } from "react";
 import { useAdminOverride } from "@/hooks/use-admin-override";
 import { useDateFormat } from "@/contexts/DateFormatContext";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { FlaskConical, ArrowDown, Plus, Tag } from "lucide-react";
+import { FlaskConical, ArrowDown, Plus, Tag, Layers } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 import { useAppMode } from "@/contexts/AppModeContext";
 import { getApiRequest } from "@/lib/factoryApi";
 import { formatNumber } from "@/lib/formatNumber";
+import type { FactoryMixBatch } from "@shared/schema";
 
 import { SupplierCategoriesDialog } from "./production-raw-stock/ProductionRawStockHelpers";
 import { RawStockTable } from "./production-raw-stock/RawStockTable";
@@ -19,6 +20,8 @@ import { OpeningBalanceDialog } from "./production-raw-stock/OpeningBalanceDialo
 import { StockAdjustmentDialog } from "./production-raw-stock/StockAdjustmentDialog";
 import { DeductStockDialog } from "./production-raw-stock/DeductStockDialog";
 import { AddToBatchDialog } from "./production-raw-stock/AddToBatchDialog";
+import { CreateMixBatchDialog } from "@/components/CreateMixBatchDialog";
+import { EditMixBatchDialog } from "@/components/EditMixBatchDialog";
 
 export default function ProductionRawStock() {
   const { wrapAdminAction, AdminDialog } = useAdminOverride();
@@ -34,6 +37,8 @@ export default function ProductionRawStock() {
   const [adjustDialogOpen, setAdjustDialogOpen] = useState(false);
   const [deductDialogOpen, setDeductDialogOpen] = useState(false);
   const [addToBatchOpen, setAddToBatchOpen] = useState(false);
+  const [createMixBatchOpen, setCreateMixBatchOpen] = useState(false);
+  const [editBatch, setEditBatch] = useState<FactoryMixBatch | null>(null);
 
   // Data States
   const [adjustingRow, setAdjustingRow] = useState<any>(null);
@@ -41,6 +46,9 @@ export default function ProductionRawStock() {
   const [deductingRow, setDeductingRow] = useState<any>(null);
   const [addToBatchSource, setAddToBatchSource] = useState<any>(null);
   const [mixBatchDate, setMixBatchDate] = useState(() => new Date().toISOString().substring(0, 10));
+
+  // Ref for WhatsApp printable card
+  const mixBatchPrintRef = useRef<HTMLDivElement>(null);
 
   // Queries
   const { data: rawStock, isLoading: rawStockLoading } = useQuery<any[]>({
@@ -151,6 +159,44 @@ export default function ProductionRawStock() {
     },
   });
 
+  const deleteMixBatchMutation = useMutation({
+    mutationFn: async (id: number) => {
+      const res = await modeApiRequest("DELETE", `/api/factory/mix-batches/${id}`);
+      if (!res.ok) throw new Error((await res.json()).message || "Failed to delete batch");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/mix-batches"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/raw-stock"] });
+      toast({ title: "Deleted", description: "Mix batch deleted." });
+    },
+    onError: (err: any) => {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const sendWhatsAppMutation = useMutation({
+    mutationFn: async () => {
+      if (!mixBatchPrintRef.current) throw new Error("Nothing to capture");
+      const html2canvas = (await import("html2canvas")).default;
+      const canvas = await html2canvas(mixBatchPrintRef.current, { backgroundColor: "#111827", scale: 2 });
+      const imageBase64 = canvas.toDataURL("image/png");
+      const res = await modeApiRequest("POST", "/api/factory/send-mix-batch-image-whatsapp", {
+        imageBase64,
+        date: mixBatchDate,
+        fileName: `MixBatch_${mixBatchDate}.png`,
+      });
+      if (!res.ok) throw new Error((await res.json()).message || "Failed to send");
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Sent", description: "Mix batch details sent to WhatsApp group." });
+    },
+    onError: (err: any) => {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    },
+  });
+
   const kpiData = useMemo(() => {
     const rs = rawStock || [];
     return {
@@ -183,7 +229,14 @@ export default function ProductionRawStock() {
             </p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          <Button
+            onClick={() => setCreateMixBatchOpen(true)}
+            className="gap-2"
+            data-testid="button-create-mix-batch"
+          >
+            <Layers className="h-4 w-4" /> New Mix Batch
+          </Button>
           <Button
             onClick={() => setOffloadDialogOpen(true)}
             className="bg-emerald-600 hover:bg-emerald-600 text-white gap-2"
@@ -235,16 +288,37 @@ export default function ProductionRawStock() {
           <MixBatchList
             mixBatches={mixBatches || []}
             isLoading={mixBatchesLoading}
+            onEdit={(batch) => setEditBatch(batch as unknown as FactoryMixBatch)}
+            onDelete={(id) => deleteMixBatchMutation.mutate(id)}
+            onViewDetail={(batch) => setEditBatch(batch as unknown as FactoryMixBatch)}
+            onSendWhatsApp={() => sendWhatsAppMutation.mutate()}
+            isSendingWhatsApp={sendWhatsAppMutation.isPending}
             mixBatchDate={mixBatchDate}
             setMixBatchDate={setMixBatchDate}
             mixBatchesByDate={mixBatchesByDate}
             mixBatchesByDateLoading={mixBatchesByDateLoading}
+            mixBatchPrintRef={mixBatchPrintRef}
             formatDisplayDate={formatDisplayDate}
           />
         </section>
       </div>
 
       {/* Dialogs */}
+      <CreateMixBatchDialog
+        open={createMixBatchOpen}
+        onOpenChange={setCreateMixBatchOpen}
+        onCreated={() => {
+          queryClient.invalidateQueries({ queryKey: ["/api/factory/mix-batches"] });
+          queryClient.invalidateQueries({ queryKey: ["/api/factory/raw-stock"] });
+        }}
+      />
+
+      <EditMixBatchDialog
+        batch={editBatch}
+        open={editBatch !== null}
+        onOpenChange={(open) => { if (!open) setEditBatch(null); }}
+      />
+
       <OffloadDialog
         open={offloadDialogOpen}
         onOpenChange={setOffloadDialogOpen}
