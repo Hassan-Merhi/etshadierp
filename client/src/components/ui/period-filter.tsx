@@ -129,7 +129,6 @@ export function PeriodFilter({
   function buildLabel(): string {
     if (value.preset === "all_time") return "All Time";
     if (value.preset === "yesterday") return "Yesterday";
-    if (value.preset === "custom") return "Custom Range";
     if (fromDateObj && toDateObj) {
       const from = formatDisplayDate(fromDateObj);
       const to = formatDisplayDate(toDateObj);
@@ -137,6 +136,7 @@ export function PeriodFilter({
       return `${from} – ${to}`;
     }
     if (fromDateObj) return formatDisplayDate(fromDateObj);
+    if (value.preset === "custom") return "Custom Range";
     return "Select period";
   }
 
