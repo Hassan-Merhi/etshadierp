@@ -111,9 +111,7 @@ export function StockEntryScanner({
                 <div className="flex items-center gap-3">
                   <div
                     className={`h-8 w-8 rounded-lg flex items-center justify-center font-bold text-[10px] ${
-                      idx === activeIndex
-                        ? "bg-primary text-primary-foreground"
-                        : "bg-primary/10 text-primary"
+                      idx === activeIndex ? "bg-primary text-primary-foreground" : "bg-primary/10 text-primary"
                     }`}
                   >
                     {p.grade || "STK"}
