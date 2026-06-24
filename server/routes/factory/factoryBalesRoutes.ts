@@ -1578,7 +1578,7 @@ export function registerFactoryBalesRoutes(app: Express) {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const { status, mixBatchId, pressingBatchId, locationId, productId, limit: limitQ, offset: offsetQ } = req.query;
+      const { status, mixBatchId, pressingBatchId, locationId, productId, limit: limitQ, offset: offsetQ, date } = req.query;
 
       // Hard cap: never return more than 2000 rows in one call to prevent OOM.
       // Callers that need everything should page with ?limit=N&offset=M.
@@ -1596,6 +1596,14 @@ export function registerFactoryBalesRoutes(app: Express) {
       if (pressingBatchId) conditions.push(eq(factoryBales.pressingBatchId, parseInt(pressingBatchId as string)));
       if (locationId) conditions.push(eq(factoryBales.erpLocationId, parseInt(locationId as string)));
       if (productId) conditions.push(eq(factoryBales.productId, parseInt(productId as string)));
+
+      // Date filter: match against stockEntryDate first (set on all stock-entry/waste-dispatch bales),
+      // falling back to the date portion of createdAt for pressing-batch bales.
+      if (date && typeof date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(date)) {
+        conditions.push(
+          sql`COALESCE(${factoryBales.stockEntryDate}, ${factoryBales.createdAt}::date) = ${date}::date`
+        );
+      }
 
       const bales = await db
         .select()

@@ -164,7 +164,15 @@ export default function BalesHistory() {
   const hiddenCost = myAccess?.hiddenCostFields ?? [];
 
   const { data: balesData, isLoading } = useQuery<any[]>({
-    queryKey: ["/api/factory/bales"],
+    queryKey: ["/api/factory/bales", dateFilter],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (dateFilter) params.set("date", dateFilter);
+      const path = `/api/factory/bales${params.toString() ? `?${params}` : ""}`;
+      const res = await modeApiRequest("GET", path);
+      if (!res.ok) throw new Error("Failed to fetch bales");
+      return res.json();
+    },
   });
 
   const { data: mixBatches } = useQuery<FactoryMixBatch[]>({
@@ -522,7 +530,14 @@ export default function BalesHistory() {
     // When the user is actively searching by text, skip the date filter so
     // bales from any date are included (e.g. searching an old reference number).
     if (dateFilter && !searchTerm) {
-      const baleDate = bale.createdAt ? new Date(bale.createdAt).toLocaleDateString("en-CA") : null;
+      // Prefer stockEntryDate (set on all stock-entry/waste-dispatch bales) so
+      // backdated entries appear on the correct day. Fall back to createdAt for
+      // pressing-batch bales that don't carry a stockEntryDate.
+      const baleDate = bale.stockEntryDate
+        ? bale.stockEntryDate
+        : bale.createdAt
+        ? new Date(bale.createdAt).toLocaleDateString("en-CA")
+        : null;
       if (baleDate !== dateFilter) return false;
     }
 
@@ -599,7 +614,11 @@ export default function BalesHistory() {
   const todayInStock = (balesData || []).filter((row: any) => {
     const bale = row.bale;
     if (bale.status !== "IN_STOCK") return false;
-    const baleDate = bale.createdAt ? new Date(bale.createdAt).toLocaleDateString("en-CA") : null;
+    const baleDate = bale.stockEntryDate
+      ? bale.stockEntryDate
+      : bale.createdAt
+      ? new Date(bale.createdAt).toLocaleDateString("en-CA")
+      : null;
     return baleDate === summaryDate;
   });
 
