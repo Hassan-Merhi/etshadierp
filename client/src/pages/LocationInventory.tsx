@@ -385,14 +385,15 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
           stockGroupName: item.stockGroupName || "Unassigned",
           categoryId: item.categoryId ?? null,
           categoryName: item.categoryName ?? null,
-          qtyByLocation: {},
+          qtyByLocationName: {} as Record<string, number>,
           totalQty: 0,
           weightedCostSum: 0,
           totalValue: 0,
         });
       }
       const row = itemMap.get(item.stockItemId)!;
-      row.qtyByLocation[item.locationId] = (row.qtyByLocation[item.locationId] || 0) + qty;
+      const locName = item.locationName || "";
+      row.qtyByLocationName[locName] = (row.qtyByLocationName[locName] || 0) + qty;
       row.totalQty += qty;
       const avgRate = parseFloat(item.averageRate || "0");
       row.weightedCostSum += qty * avgRate;
@@ -419,9 +420,7 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
           if (!allStockCategoryFilter.includes(rowCatId)) return false;
         }
         if (allStockLocationFilter) {
-          const matchingIds = allInventoryLocations.filter((l) => l.name === allStockLocationFilter).map((l) => l.id);
-          const hasQty = matchingIds.some((id) => (row.qtyByLocation[id] || 0) > 0);
-          if (!hasQty) return false;
+          if (!((row.qtyByLocationName[allStockLocationFilter] || 0) > 0)) return false;
         }
         if (allStockSearchTerm) {
           const s = allStockSearchTerm.toLowerCase();

@@ -59,15 +59,15 @@ export function CombinedStockView({
   posUser,
   allStockTableRef,
 }: CombinedStockViewProps) {
-  // Deduplicate locations by name for the dropdown
+  // Deduplicate locations by name — used for both dropdown and table columns
   const uniqueLocationNames = Array.from(new Map(allInventoryLocations.map((l) => [l.name, l])).values());
   // Deduplicate categories by id (guard against any API-level duplicates)
   const uniqueCategories = Array.from(new Map(categoriesList.map((c) => [c.id, c])).values());
 
-  // When a location filter is active, only show columns for locations matching that name
+  // Columns are always deduplicated by name so same-name locations never produce duplicate headers
   const visibleLocations = allStockLocationFilter
-    ? allInventoryLocations.filter((l) => l.name === allStockLocationFilter)
-    : allInventoryLocations;
+    ? uniqueLocationNames.filter((l) => l.name === allStockLocationFilter)
+    : uniqueLocationNames;
 
   return (
     <div className="space-y-4">
@@ -230,7 +230,7 @@ export function CombinedStockView({
                   )}
                   {visibleLocations.map((loc) => (
                     <th
-                      key={loc.id}
+                      key={loc.name}
                       className="text-right px-4 py-2.5 font-medium text-muted-foreground whitespace-nowrap"
                     >
                       {loc.name}
@@ -320,27 +320,30 @@ export function CombinedStockView({
                             )}
                           </td>
                         )}
-                        {visibleLocations.map((loc) => (
-                          <td
-                            key={loc.id}
-                            className="px-4 py-2 text-right font-mono whitespace-nowrap text-muted-foreground hover:text-foreground hover:underline"
-                            title={`View movement for ${loc.name}`}
-                            onClick={(e) => {
-                              if (row.qtyByLocation[loc.id] != null)
-                                openMovement(loc.id, loc.name, row.stockItemId, row.stockItemName, e);
-                              else e.stopPropagation();
-                            }}
-                          >
-                            {row.qtyByLocation[loc.id] != null && row.qtyByLocation[loc.id] > 0 ? (
-                              row.qtyByLocation[loc.id].toLocaleString(undefined, {
-                                minimumFractionDigits: 0,
-                                maximumFractionDigits: 2,
-                              })
-                            ) : (
-                              <span className="text-muted-foreground/30">—</span>
-                            )}
-                          </td>
-                        ))}
+                        {visibleLocations.map((loc) => {
+                          const cellQty = row.qtyByLocationName[loc.name] || 0;
+                          return (
+                            <td
+                              key={loc.name}
+                              className="px-4 py-2 text-right font-mono whitespace-nowrap text-muted-foreground hover:text-foreground hover:underline"
+                              title={`View movement for ${loc.name}`}
+                              onClick={(e) => {
+                                if (cellQty > 0)
+                                  openMovement(loc.id, loc.name, row.stockItemId, row.stockItemName, e);
+                                else e.stopPropagation();
+                              }}
+                            >
+                              {cellQty > 0 ? (
+                                cellQty.toLocaleString(undefined, {
+                                  minimumFractionDigits: 0,
+                                  maximumFractionDigits: 2,
+                                })
+                              ) : (
+                                <span className="text-muted-foreground/30">—</span>
+                              )}
+                            </td>
+                          );
+                        })}
                         <td className="px-4 py-2 text-right font-mono font-semibold whitespace-nowrap border-l">
                           {row.totalQty.toLocaleString(undefined, {
                             minimumFractionDigits: 0,
@@ -375,10 +378,10 @@ export function CombinedStockView({
                   </td>
                   {uniqueCategories.length > 0 && <td className="px-4 py-2.5" />}
                   {visibleLocations.map((loc) => {
-                    const locTotal = filteredCombinedRows.reduce((s, r) => s + (r.qtyByLocation[loc.id] || 0), 0);
+                    const locTotal = filteredCombinedRows.reduce((s, r) => s + (r.qtyByLocationName[loc.name] || 0), 0);
                     return (
                       <td
-                        key={loc.id}
+                        key={loc.name}
                         className="px-4 py-2.5 text-right font-mono whitespace-nowrap text-muted-foreground"
                       >
                         {locTotal > 0 ? (
