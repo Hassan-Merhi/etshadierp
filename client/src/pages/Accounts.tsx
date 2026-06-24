@@ -2,7 +2,10 @@ import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation, useSearch } from "wouter";
 import { Button } from "@/components/ui/button";
-import { Plus, Search, Edit, FileText } from "lucide-react";
+import { Plus, Search, Edit, FileText, ChevronsUpDown, Check } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from "@/components/ui/command";
+import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent } from "@/components/ui/card";
@@ -133,6 +136,7 @@ export default function Accounts() {
   const [selectedVoucherIds, setSelectedVoucherIds] = useState<Set<number>>(new Set());
   const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false);
   const [showDeletedVouchers, setShowDeletedVouchers] = useState(false);
+  const [parentGroupOpen, setParentGroupOpen] = useState(false);
 
   const bulkDeleteMutation = useMutation({
     mutationFn: async (ids: number[]) => apiRequest("POST", "/api/vouchers/bulk-delete", { voucherIds: ids }),
@@ -199,6 +203,23 @@ export default function Accounts() {
   // Queries (Simplified for brevity, but logically same as original)
   const { data: allAccounts = [], isLoading: accountsLoading } = useQuery<Account[]>({
     queryKey: ["/api/accounts/all", selectedCompany?.id],
+    enabled: !!selectedCompany,
+  });
+
+  // Dedicated query for Group accounts used by the Parent Group combobox.
+  // Uses /api/ledger-accounts directly (same source as Account Groups page) so
+  // groups created there always appear here without needing /api/accounts/all to refresh.
+  const { data: groupOptions = [] } = useQuery<any[]>({
+    queryKey: ["/api/ledger-accounts", selectedCompany?.id],
+    queryFn: async () => {
+      const url = selectedCompany?.id
+        ? `/api/ledger-accounts?companyId=${selectedCompany.id}`
+        : "/api/ledger-accounts";
+      const res = await fetch(url, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch ledger accounts");
+      return res.json();
+    },
+    select: (data) => data.filter((a: any) => a.subType === "Group"),
     enabled: !!selectedCompany,
   });
 
@@ -573,32 +594,71 @@ export default function Accounts() {
                             control={editForm.control}
                             name="parentId"
                             render={({ field }) => {
-                              const groupAccounts = allAccounts.filter(
-                                (a) => a.subType === "Group" && a.accountId !== alterSelectedAccount?.accountId,
+                              const filteredGroups = groupOptions.filter(
+                                (g: any) => g.id !== alterSelectedAccount?.accountId,
                               );
+                              const selectedGroup = filteredGroups.find((g: any) => g.id === field.value);
                               return (
-                                <FormItem>
+                                <FormItem className="flex flex-col">
                                   <FormLabel>Parent Group</FormLabel>
-                                  <Select
-                                    onValueChange={(val) =>
-                                      field.onChange(val === "__none__" ? null : Number(val))
-                                    }
-                                    value={field.value != null ? String(field.value) : "__none__"}
-                                  >
-                                    <FormControl>
-                                      <SelectTrigger data-testid="select-alter-parent-group">
-                                        <SelectValue placeholder="No group" />
-                                      </SelectTrigger>
-                                    </FormControl>
-                                    <SelectContent>
-                                      <SelectItem value="__none__">— No group —</SelectItem>
-                                      {groupAccounts.map((g) => (
-                                        <SelectItem key={g.accountId} value={String(g.accountId)}>
-                                          {g.name}
-                                        </SelectItem>
-                                      ))}
-                                    </SelectContent>
-                                  </Select>
+                                  <Popover open={parentGroupOpen} onOpenChange={setParentGroupOpen}>
+                                    <PopoverTrigger asChild>
+                                      <FormControl>
+                                        <Button
+                                          variant="outline"
+                                          role="combobox"
+                                          className="w-full justify-between font-normal"
+                                          data-testid="select-alter-parent-group"
+                                        >
+                                          <span className="truncate">
+                                            {selectedGroup ? selectedGroup.name : "— No group —"}
+                                          </span>
+                                          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                        </Button>
+                                      </FormControl>
+                                    </PopoverTrigger>
+                                    <PopoverContent className="w-[300px] p-0">
+                                      <Command>
+                                        <CommandInput placeholder="Search groups…" />
+                                        <CommandEmpty>No groups found.</CommandEmpty>
+                                        <CommandGroup>
+                                          <CommandItem
+                                            value="__none__"
+                                            onSelect={() => {
+                                              field.onChange(null);
+                                              setParentGroupOpen(false);
+                                            }}
+                                          >
+                                            <Check
+                                              className={cn(
+                                                "mr-2 h-4 w-4",
+                                                field.value == null ? "opacity-100" : "opacity-0",
+                                              )}
+                                            />
+                                            — No group —
+                                          </CommandItem>
+                                          {filteredGroups.map((g: any) => (
+                                            <CommandItem
+                                              key={g.id}
+                                              value={g.name}
+                                              onSelect={() => {
+                                                field.onChange(g.id);
+                                                setParentGroupOpen(false);
+                                              }}
+                                            >
+                                              <Check
+                                                className={cn(
+                                                  "mr-2 h-4 w-4",
+                                                  field.value === g.id ? "opacity-100" : "opacity-0",
+                                                )}
+                                              />
+                                              {g.name}
+                                            </CommandItem>
+                                          ))}
+                                        </CommandGroup>
+                                      </Command>
+                                    </PopoverContent>
+                                  </Popover>
                                   <FormMessage />
                                 </FormItem>
                               );

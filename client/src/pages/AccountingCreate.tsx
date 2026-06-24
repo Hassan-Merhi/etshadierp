@@ -18,13 +18,15 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
 import { useAppMode } from "@/contexts/AppModeContext";
 import { getApiRequest } from "@/lib/factoryApi";
-import { Plus, MapPin, BookOpen, Users, Truck, FolderTree, Package, type LucideIcon } from "lucide-react";
+import { Plus, MapPin, BookOpen, Users, Truck, FolderTree, Package, ChevronsUpDown, Check, type LucideIcon } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from "@/components/ui/command";
+import { cn } from "@/lib/utils";
 import {
   insertLocationSchema,
   insertLedgerAccountSchema,
@@ -444,8 +446,6 @@ function LedgerAccountForm({
   const modeApiRequest = getApiRequest(appMode);
   const accountType = form.watch("accountType");
   const openingBalance = form.watch("openingBalance");
-  const [isParentDialogOpen, setIsParentDialogOpen] = useState(false);
-
   // Get available subtypes based on account type
   const getSubTypes = () => {
     switch (accountType) {
@@ -464,61 +464,22 @@ function LedgerAccountForm({
 
   const subTypes = getSubTypes();
 
-  // Fetch parent ledger accounts for dropdown
+  // Fetch Group accounts for the Parent Group combobox
   const { data: allLedgerAccounts = [] } = useQuery<any[]>({
-    queryKey: ["/api/ledger-accounts"],
+    queryKey: ["/api/ledger-accounts", selectedCompany?.id],
+    queryFn: async () => {
+      const url = selectedCompany?.id
+        ? `/api/ledger-accounts?companyId=${selectedCompany.id}`
+        : "/api/ledger-accounts";
+      const res = await fetch(url, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch accounts");
+      return res.json();
+    },
+    enabled: !!selectedCompany,
   });
 
-  // Filter to show only parent accounts (accounts with no parent themselves)
-  // Use strict comparison to handle 0, null, undefined correctly
-  const ledgerAccounts = allLedgerAccounts.filter((acc: any) => acc.parentId === null || acc.parentId === undefined);
-
-  // Form for creating parent account
-  const parentForm = useForm({
-    resolver: zodResolver(insertLedgerAccountSchema.omit({ companyId: true })),
-    defaultValues: {
-      code: "",
-      name: "",
-      accountType: "" as any,
-      active: true,
-    },
-  });
-
-  // Mutation for creating parent account
-  const createParentMutation = useMutation({
-    mutationFn: async (data: any) => {
-      if (!selectedCompany?.id) {
-        throw new Error("No company selected");
-      }
-      const res = await modeApiRequest("POST", "/api/ledger-accounts", {
-        ...data,
-        companyId: selectedCompany.id,
-      });
-      return await res.json();
-    },
-    onSuccess: (data: any) => {
-      toast({
-        title: "Success",
-        description: `Parent account "${data.name}" created successfully`,
-      });
-      queryClient.invalidateQueries({ queryKey: ["/api/ledger-accounts"] });
-      form.setValue("parentId", data.id);
-      setIsParentDialogOpen(false);
-      parentForm.reset({ name: "", accountType: "" as any, active: true });
-    },
-    onError: (error: any) => {
-      if ((error as any)?._handledGlobally) return;
-      toast({
-        title: "Error",
-        description: error.message || "Failed to create parent account",
-        variant: "destructive",
-      });
-    },
-  });
-
-  const handleCreateParent = (data: any) => {
-    createParentMutation.mutate(data);
-  };
+  const groupAccounts = allLedgerAccounts.filter((acc: any) => acc.subType === "Group");
+  const [parentGroupOpen, setParentGroupOpen] = useState(false);
 
   return (
     <Card className="p-4 md:p-6">
@@ -605,116 +566,70 @@ function LedgerAccountForm({
             <FormField
               control={form.control}
               name="parentId"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Parent Account</FormLabel>
-                  <div className="flex gap-2">
-                    <Select
-                      onValueChange={(v) => field.onChange(v === "none" ? undefined : parseInt(v))}
-                      value={field.value?.toString() || "none"}
-                    >
-                      <FormControl>
-                        <SelectTrigger data-testid="select-parent">
-                          <SelectValue placeholder="None" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="none">None</SelectItem>
-                        {ledgerAccounts.map((acc: any) => (
-                          <SelectItem key={acc.id} value={acc.id.toString()}>
-                            {acc.name} ({acc.code})
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <Dialog open={isParentDialogOpen} onOpenChange={setIsParentDialogOpen}>
-                      <DialogTrigger asChild>
-                        <Button type="button" size="icon" variant="outline" data-testid="button-add-parent">
-                          <Plus className="h-4 w-4" />
-                        </Button>
-                      </DialogTrigger>
-                      <DialogContent className="w-[95vw] max-w-2xl">
-                        <DialogHeader>
-                          <DialogTitle>Create Parent Account</DialogTitle>
-                        </DialogHeader>
-                        <Form {...parentForm}>
-                          <form noValidate onSubmit={parentForm.handleSubmit(handleCreateParent)} className="space-y-4">
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                              <FormField
-                                control={parentForm.control}
-                                name="name"
-                                render={({ field }) => (
-                                  <FormItem>
-                                    <FormLabel>Name *</FormLabel>
-                                    <FormControl>
-                                      <Input {...field} placeholder="Purchases" data-testid="input-parent-name" />
-                                    </FormControl>
-                                    <FormDescription>Code will be auto-generated</FormDescription>
-                                    <FormMessage />
-                                  </FormItem>
-                                )}
+              render={({ field }) => {
+                const selectedGroup = groupAccounts.find((g: any) => g.id === field.value);
+                return (
+                  <FormItem className="flex flex-col">
+                    <FormLabel>Parent Group</FormLabel>
+                    <Popover open={parentGroupOpen} onOpenChange={setParentGroupOpen}>
+                      <PopoverTrigger asChild>
+                        <FormControl>
+                          <Button
+                            variant="outline"
+                            role="combobox"
+                            className="w-full justify-between font-normal"
+                            data-testid="select-parent"
+                          >
+                            <span className="truncate">
+                              {selectedGroup ? selectedGroup.name : "— No group —"}
+                            </span>
+                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                          </Button>
+                        </FormControl>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-[300px] p-0">
+                        <Command>
+                          <CommandInput placeholder="Search groups…" />
+                          <CommandEmpty>No groups found.</CommandEmpty>
+                          <CommandGroup>
+                            <CommandItem
+                              value="__none__"
+                              onSelect={() => {
+                                field.onChange(undefined);
+                                setParentGroupOpen(false);
+                              }}
+                            >
+                              <Check
+                                className={cn("mr-2 h-4 w-4", field.value == null ? "opacity-100" : "opacity-0")}
                               />
-                              <FormField
-                                control={parentForm.control}
-                                name="accountType"
-                                render={({ field }) => (
-                                  <FormItem>
-                                    <FormLabel>Account Type *</FormLabel>
-                                    <Select onValueChange={field.onChange} value={field.value}>
-                                      <FormControl>
-                                        <SelectTrigger data-testid="select-parent-account-type">
-                                          <SelectValue placeholder="Select type" />
-                                        </SelectTrigger>
-                                      </FormControl>
-                                      <SelectContent>
-                                        <SelectItem value="Asset">Asset</SelectItem>
-                                        <SelectItem value="Liability">Liability</SelectItem>
-                                        <SelectItem value="Equity">Equity</SelectItem>
-                                        <SelectItem value="Income">Income</SelectItem>
-                                        <SelectItem value="Expense">Expense</SelectItem>
-                                        <SelectItem value="Bank">Bank</SelectItem>
-                                        <SelectItem value="Cash">Cash</SelectItem>
-                                        <SelectItem value="Indirect Expense">Indirect Expense</SelectItem>
-                                        <SelectItem value="Direct Expense">Direct Expense</SelectItem>
-                                        <SelectItem value="Government Taxes">Government Taxes</SelectItem>
-                                        <SelectItem value="Loans">Loans</SelectItem>
-                                        <SelectItem value="Duty Agent">Duty Agent</SelectItem>
-                                        <SelectItem value="Transporter Agent">Transporter Agent</SelectItem>
-                                        <SelectItem value="Accounts Payable">Accounts Payable</SelectItem>
-                                        <SelectItem value="Profit">Profit</SelectItem>
-                                      </SelectContent>
-                                    </Select>
-                                    <FormMessage />
-                                  </FormItem>
-                                )}
-                              />
-                            </div>
-                            <div className="flex flex-wrap gap-2 justify-end border-t pt-4">
-                              <Button
-                                type="button"
-                                variant="outline"
-                                onClick={() => setIsParentDialogOpen(false)}
-                                disabled={createParentMutation.isPending}
-                                data-testid="button-cancel-parent"
+                              — No group —
+                            </CommandItem>
+                            {groupAccounts.map((g: any) => (
+                              <CommandItem
+                                key={g.id}
+                                value={g.name}
+                                onSelect={() => {
+                                  field.onChange(g.id);
+                                  setParentGroupOpen(false);
+                                }}
                               >
-                                Cancel
-                              </Button>
-                              <Button
-                                type="submit"
-                                disabled={createParentMutation.isPending}
-                                data-testid="button-save-parent"
-                              >
-                                {createParentMutation.isPending ? "Creating..." : "Create"}
-                              </Button>
-                            </div>
-                          </form>
-                        </Form>
-                      </DialogContent>
-                    </Dialog>
-                  </div>
-                  <FormMessage />
-                </FormItem>
-              )}
+                                <Check
+                                  className={cn(
+                                    "mr-2 h-4 w-4",
+                                    field.value === g.id ? "opacity-100" : "opacity-0",
+                                  )}
+                                />
+                                {g.name}
+                              </CommandItem>
+                            ))}
+                          </CommandGroup>
+                        </Command>
+                      </PopoverContent>
+                    </Popover>
+                    <FormMessage />
+                  </FormItem>
+                );
+              }}
             />
 
             <FormField
