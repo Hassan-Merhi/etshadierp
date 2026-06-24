@@ -240,6 +240,8 @@ export function registerLedgerRoutes(app: Express) {
       }
 
       // Validate subType based on accountType
+      // "Group" is a universal special subType used to mark an account as a parent group
+      // and bypasses the per-type validation intentionally.
       const validSubTypes: Record<string, string[]> = {
         Income: ["Direct Income", "Indirect Income"],
         Expense: ["Direct Expense", "Indirect Expense"],
@@ -247,7 +249,7 @@ export function registerLedgerRoutes(app: Express) {
         Asset: ["Current Asset", "Fixed Asset", "Input Tax", "Tax Receivable"],
       };
 
-      if (parsed.subType && validSubTypes[parsed.accountType]) {
+      if (parsed.subType && parsed.subType !== "Group" && validSubTypes[parsed.accountType]) {
         if (!validSubTypes[parsed.accountType].includes(parsed.subType)) {
           return res.status(400).json({
             message: `Invalid subType "${parsed.subType}" for accountType "${parsed.accountType}". Valid options: ${validSubTypes[parsed.accountType].join(", ")}`,
@@ -339,7 +341,7 @@ export function registerLedgerRoutes(app: Express) {
         Asset: ["Current Asset", "Fixed Asset", "Input Tax", "Tax Receivable"],
       };
 
-      if (parsed.subType && validSubTypes[accountType]) {
+      if (parsed.subType && parsed.subType !== "Group" && validSubTypes[accountType]) {
         if (!validSubTypes[accountType].includes(parsed.subType)) {
           return res.status(400).json({
             message: `Invalid subType "${parsed.subType}" for accountType "${accountType}". Valid options: ${validSubTypes[accountType].join(", ")}`,

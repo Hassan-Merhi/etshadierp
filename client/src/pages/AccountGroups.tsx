@@ -1,6 +1,5 @@
 import { useState, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { useLocation } from "wouter";
 import { queryClient } from "@/lib/queryClient";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -15,7 +14,17 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { PageHeader } from "@/components/PageHeader";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Layers, Plus, ArrowLeft, Trash2, UserPlus, Search, FolderOpen, Folder } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Layers, Plus, Trash2, UserPlus, Search, FolderOpen, Folder, Pencil, X } from "lucide-react";
 import type { LedgerAccount } from "@shared/schema";
 
 const ACCOUNT_TYPES = [
@@ -37,25 +46,28 @@ const ACCOUNT_TYPES = [
 ] as const;
 
 export default function AccountGroups() {
-  const [, navigate] = useLocation();
   const { toast } = useToast();
   const { selectedCompany } = useCompany();
 
   const [selectedGroupId, setSelectedGroupId] = useState<number | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
   const [addAccountsOpen, setAddAccountsOpen] = useState(false);
+  const [dissolveConfirmId, setDissolveConfirmId] = useState<number | null>(null);
+  const [renameOpen, setRenameOpen] = useState(false);
   const [groupSearch, setGroupSearch] = useState("");
   const [accountSearch, setAccountSearch] = useState("");
   const [selectedToAdd, setSelectedToAdd] = useState<Set<number>>(new Set());
 
-  // Create group form state
   const [newGroupName, setNewGroupName] = useState("");
   const [newGroupType, setNewGroupType] = useState<string>("");
+  const [renameName, setRenameName] = useState("");
 
   const { data: allAccounts = [], isLoading } = useQuery<LedgerAccount[]>({
     queryKey: ["/api/ledger-accounts", selectedCompany?.id],
     queryFn: async () => {
-      const url = selectedCompany?.id ? `/api/ledger-accounts?companyId=${selectedCompany.id}` : "/api/ledger-accounts";
+      const url = selectedCompany?.id
+        ? `/api/ledger-accounts?companyId=${selectedCompany.id}`
+        : "/api/ledger-accounts";
       const res = await fetch(url, { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch accounts");
       return res.json();
@@ -63,8 +75,8 @@ export default function AccountGroups() {
     enabled: !!selectedCompany,
   });
 
-  // Derive parent groups: accounts that have at least one child OR we create them explicitly
-  // A "group" is identified by having children pointing to it
+  // Groups = accounts marked with subType "Group" OR accounts that happen to have children
+  // (backward-compat: groups created before subType tagging still show up)
   const childAccountIds = useMemo(() => {
     const set = new Set<number>();
     allAccounts.forEach((a) => {
@@ -74,7 +86,7 @@ export default function AccountGroups() {
   }, [allAccounts]);
 
   const parentGroups = useMemo(
-    () => allAccounts.filter((a) => childAccountIds.has(a.id)),
+    () => allAccounts.filter((a) => a.subType === "Group" || childAccountIds.has(a.id)),
     [allAccounts, childAccountIds]
   );
 
@@ -98,15 +110,20 @@ export default function AccountGroups() {
     [allAccounts, selectedGroupId]
   );
 
-  // Accounts not yet in this group (eligible to add)
+  // Eligible accounts to add: exclude the group itself, already-children, other groups
+  const groupIds = useMemo(() => new Set(parentGroups.map((g) => g.id)), [parentGroups]);
+
   const eligibleToAdd = useMemo(() => {
     if (!selectedGroupId) return [];
     const childIds = new Set(childrenOfSelected.map((c) => c.id));
     return allAccounts.filter(
       (a) =>
-        a.id !== selectedGroupId && !childIds.has(a.id) && a.name.toLowerCase().includes(accountSearch.toLowerCase())
+        a.id !== selectedGroupId &&
+        !childIds.has(a.id) &&
+        !groupIds.has(a.id) &&
+        a.name.toLowerCase().includes(accountSearch.toLowerCase())
     );
-  }, [allAccounts, selectedGroupId, childrenOfSelected, accountSearch]);
+  }, [allAccounts, selectedGroupId, childrenOfSelected, accountSearch, groupIds]);
 
   // --- Mutations ---
   const createGroupMutation = useMutation({
@@ -115,6 +132,7 @@ export default function AccountGroups() {
       return apiRequest("POST", "/api/ledger-accounts", {
         name,
         accountType,
+        subType: "Group",
         companyId: selectedCompany.id,
       });
     },
@@ -123,10 +141,32 @@ export default function AccountGroups() {
       setCreateOpen(false);
       setNewGroupName("");
       setNewGroupType("");
-      toast({ title: "Group account created", description: `"${data.name}" is ready to receive child accounts.` });
+      setSelectedGroupId(data.id);
+      toast({ title: "Group created", description: `"${data.name}" is ready — add accounts to it.` });
     },
     onError: (err: any) => {
       toast({ title: "Failed to create group", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const renameMutation = useMutation({
+    mutationFn: async ({ id, name }: { id: number; name: string }) => {
+      if (!selectedGroup) throw new Error("No group selected");
+      return apiRequest("PUT", `/api/ledger-accounts/${id}`, {
+        id,
+        name,
+        accountType: selectedGroup.accountType,
+        subType: "Group",
+        companyId: selectedCompany?.id,
+      });
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["/api/ledger-accounts"] });
+      setRenameOpen(false);
+      toast({ title: "Group renamed" });
+    },
+    onError: (err: any) => {
+      toast({ title: "Failed to rename", description: err.message, variant: "destructive" });
     },
   });
 
@@ -138,7 +178,7 @@ export default function AccountGroups() {
       setAddAccountsOpen(false);
       setSelectedToAdd(new Set());
       setAccountSearch("");
-      toast({ title: "Accounts assigned", description: "Selected accounts have been added to the group." });
+      toast({ title: "Accounts added to group" });
     },
     onError: (err: any) => {
       toast({ title: "Failed to assign accounts", description: err.message, variant: "destructive" });
@@ -154,6 +194,37 @@ export default function AccountGroups() {
     },
     onError: (err: any) => {
       toast({ title: "Failed to remove account", description: err.message, variant: "destructive" });
+    },
+  });
+
+  // Dissolve = unlink all children + remove Group subType so it disappears from the groups list
+  const dissolveMutation = useMutation({
+    mutationFn: async (groupId: number) => {
+      const children = allAccounts.filter((a) => a.parentId === groupId);
+      if (children.length > 0) {
+        await apiRequest("PATCH", "/api/ledger-accounts/bulk-assign-parent", {
+          accountIds: children.map((c) => c.id),
+          parentId: null,
+        });
+      }
+      const group = allAccounts.find((a) => a.id === groupId);
+      if (!group) return;
+      await apiRequest("PUT", `/api/ledger-accounts/${groupId}`, {
+        id: groupId,
+        name: group.name,
+        accountType: group.accountType,
+        subType: null,
+        companyId: selectedCompany?.id,
+      });
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["/api/ledger-accounts"] });
+      setDissolveConfirmId(null);
+      setSelectedGroupId(null);
+      toast({ title: "Group dissolved", description: "All accounts have been unlinked." });
+    },
+    onError: (err: any) => {
+      toast({ title: "Failed to dissolve group", description: err.message, variant: "destructive" });
     },
   });
 
@@ -180,29 +251,23 @@ export default function AccountGroups() {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Header */}
       <div className="border-b px-6 py-4">
-        <div className="flex items-center gap-3">
-          <Button variant="ghost" size="icon" onClick={() => navigate("/settings")} data-testid="button-back-settings">
-            <ArrowLeft className="h-4 w-4" />
-          </Button>
-          <div className="flex items-center gap-2">
-            <Layers className="h-5 w-5 text-primary" />
-            <PageHeader title="Account Groups" />
-          </div>
+        <div className="flex items-center gap-2">
+          <Layers className="h-5 w-5 text-primary shrink-0" />
+          <PageHeader title="Account Groups" />
           <p className="text-sm text-muted-foreground ml-2 hidden sm:block">
-            Organise ledger accounts under parent groups for better reporting
+            Group ledger accounts together for better reporting
           </p>
         </div>
       </div>
 
       <div className="flex h-[calc(100vh-73px)]">
-        {/* Left panel — group list */}
+        {/* Left panel */}
         <div className="w-72 border-r flex flex-col shrink-0">
           <div className="p-4 border-b space-y-3">
             <Button className="w-full" onClick={() => setCreateOpen(true)} data-testid="button-create-group">
               <Plus className="h-4 w-4 mr-2" />
-              Create Group
+              New Group
             </Button>
             <div className="relative">
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
@@ -221,7 +286,7 @@ export default function AccountGroups() {
               [1, 2, 3].map((i) => <Skeleton key={i} className="h-14 w-full" />)
             ) : filteredGroups.length === 0 ? (
               <div className="p-4 text-center text-sm text-muted-foreground">
-                {groupSearch ? "No groups match your search" : "No groups yet — create one to get started"}
+                {groupSearch ? "No groups match your search" : "No groups yet — click New Group to start"}
               </div>
             ) : (
               filteredGroups.map((group) => (
@@ -229,7 +294,7 @@ export default function AccountGroups() {
                   key={group.id}
                   onClick={() => setSelectedGroupId(group.id)}
                   className={`w-full text-left rounded-md p-3 transition-colors hover-elevate ${
-                    selectedGroupId === group.id ? "bg-primary/10 text-primary" : "hover:bg-muted/60"
+                    selectedGroupId === group.id ? "bg-primary/10 text-primary" : ""
                   }`}
                   data-testid={`button-group-${group.id}`}
                 >
@@ -243,7 +308,7 @@ export default function AccountGroups() {
                       <div className="font-medium text-sm truncate">{group.name}</div>
                       <div className="text-xs text-muted-foreground truncate">{group.accountType}</div>
                     </div>
-                    <Badge variant="secondary" className="shrink-0 text-xs">
+                    <Badge variant="secondary" className="shrink-0 text-xs no-default-hover-elevate no-default-active-elevate">
                       {childCount(group.id)}
                     </Badge>
                   </div>
@@ -253,41 +318,66 @@ export default function AccountGroups() {
           </div>
         </div>
 
-        {/* Right panel — selected group */}
+        {/* Right panel */}
         <div className="flex-1 overflow-y-auto p-6">
           {!selectedGroup ? (
             <div className="flex flex-col items-center justify-center h-full gap-4 text-muted-foreground">
               <Folder className="h-12 w-12 opacity-30" />
               <div className="text-center">
                 <p className="font-medium">Select a group</p>
-                <p className="text-sm mt-1">Choose a group from the left panel to manage its accounts</p>
+                <p className="text-sm mt-1">Choose a group from the left to manage its accounts</p>
               </div>
             </div>
           ) : (
             <div className="max-w-2xl space-y-4">
               <div className="flex items-start justify-between gap-4 flex-wrap">
                 <div>
-                  <h2 className="text-lg font-semibold">{selectedGroup.name}</h2>
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-lg font-semibold">{selectedGroup.name}</h2>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => {
+                        setRenameName(selectedGroup.name);
+                        setRenameOpen(true);
+                      }}
+                      data-testid="button-rename-group"
+                    >
+                      <Pencil className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
                   <p className="text-sm text-muted-foreground">
                     {selectedGroup.accountType} · Code: {selectedGroup.code}
                   </p>
                 </div>
-                <Button
-                  onClick={() => {
-                    setSelectedToAdd(new Set());
-                    setAccountSearch("");
-                    setAddAccountsOpen(true);
-                  }}
-                  data-testid="button-add-accounts"
-                >
-                  <UserPlus className="h-4 w-4 mr-2" />
-                  Add Accounts
-                </Button>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <Button
+                    variant="outline"
+                    onClick={() => setDissolveConfirmId(selectedGroup.id)}
+                    data-testid="button-dissolve-group"
+                  >
+                    <X className="h-4 w-4 mr-2" />
+                    Dissolve Group
+                  </Button>
+                  <Button
+                    onClick={() => {
+                      setSelectedToAdd(new Set());
+                      setAccountSearch("");
+                      setAddAccountsOpen(true);
+                    }}
+                    data-testid="button-add-accounts"
+                  >
+                    <UserPlus className="h-4 w-4 mr-2" />
+                    Add Accounts
+                  </Button>
+                </div>
               </div>
 
               <Card>
                 <CardHeader className="pb-3">
-                  <CardTitle className="text-sm font-medium">Member Accounts ({childrenOfSelected.length})</CardTitle>
+                  <CardTitle className="text-sm font-medium">
+                    Member Accounts ({childrenOfSelected.length})
+                  </CardTitle>
                 </CardHeader>
                 <CardContent>
                   {childrenOfSelected.length === 0 ? (
@@ -307,7 +397,7 @@ export default function AccountGroups() {
                             <span className="text-xs text-muted-foreground ml-2">{child.code}</span>
                           </div>
                           <div className="flex items-center gap-2">
-                            <Badge variant="outline" className="text-xs shrink-0">
+                            <Badge variant="outline" className="text-xs shrink-0 no-default-hover-elevate no-default-active-elevate">
                               {child.accountType}
                             </Badge>
                             <Button
@@ -336,7 +426,7 @@ export default function AccountGroups() {
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Create Parent Group</DialogTitle>
+            <DialogTitle>Create Account Group</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div className="space-y-1.5">
@@ -346,6 +436,7 @@ export default function AccountGroups() {
                 placeholder="e.g. Fixed Assets, Operating Expenses"
                 value={newGroupName}
                 onChange={(e) => setNewGroupName(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleCreateGroup()}
                 data-testid="input-group-name"
               />
             </div>
@@ -375,6 +466,43 @@ export default function AccountGroups() {
               data-testid="button-confirm-create-group"
             >
               {createGroupMutation.isPending ? "Creating…" : "Create Group"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Rename Dialog */}
+      <Dialog open={renameOpen} onOpenChange={setRenameOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Rename Group</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-1.5 py-2">
+            <Label htmlFor="rename-group">Group Name</Label>
+            <Input
+              id="rename-group"
+              value={renameName}
+              onChange={(e) => setRenameName(e.target.value)}
+              onKeyDown={(e) =>
+                e.key === "Enter" &&
+                selectedGroup &&
+                renameMutation.mutate({ id: selectedGroup.id, name: renameName.trim() })
+              }
+              data-testid="input-rename-group"
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRenameOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={() =>
+                selectedGroup && renameMutation.mutate({ id: selectedGroup.id, name: renameName.trim() })
+              }
+              disabled={!renameName.trim() || renameMutation.isPending}
+              data-testid="button-confirm-rename"
+            >
+              {renameMutation.isPending ? "Saving…" : "Save"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -420,9 +548,9 @@ export default function AccountGroups() {
                         {acc.code} · {acc.accountType}
                       </div>
                     </div>
-                    {acc.parentId && (
-                      <Badge variant="outline" className="text-xs shrink-0">
-                        In group
+                    {acc.parentId && acc.parentId !== selectedGroupId && (
+                      <Badge variant="outline" className="text-xs shrink-0 no-default-hover-elevate no-default-active-elevate">
+                        In another group
                       </Badge>
                     )}
                   </label>
@@ -445,12 +573,37 @@ export default function AccountGroups() {
               data-testid="button-confirm-add-accounts"
             >
               {assignMutation.isPending
-                ? "Assigning…"
+                ? "Adding…"
                 : `Add ${selectedToAdd.size > 0 ? selectedToAdd.size : ""} Account${selectedToAdd.size !== 1 ? "s" : ""}`}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Dissolve confirm */}
+      <AlertDialog open={dissolveConfirmId !== null} onOpenChange={(o) => !o && setDissolveConfirmId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Dissolve this group?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will remove the group and unlink all{" "}
+              {dissolveConfirmId ? childCount(dissolveConfirmId) : 0} account
+              {(dissolveConfirmId ? childCount(dissolveConfirmId) : 0) !== 1 ? "s" : ""} from it. The
+              accounts themselves are not deleted — they just won't be grouped anymore.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => dissolveConfirmId && dissolveMutation.mutate(dissolveConfirmId)}
+              className="bg-destructive text-destructive-foreground"
+              data-testid="button-confirm-dissolve"
+            >
+              {dissolveMutation.isPending ? "Dissolving…" : "Dissolve Group"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
