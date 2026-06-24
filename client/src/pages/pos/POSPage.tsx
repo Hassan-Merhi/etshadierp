@@ -477,11 +477,24 @@ function SpPOS() {
               </div>
             )}
           </div>
+
+          {/* Mobile-only: total bar pinned below the cart rows */}
+          {rows.length > 0 && (
+            <div className="md:hidden flex items-center justify-between px-4 py-3 border-t bg-card flex-shrink-0">
+              <span className="text-sm text-muted-foreground">
+                {rows.length} line{rows.length !== 1 ? "s" : ""}
+              </span>
+              <div className="flex items-center gap-1.5">
+                <span className="text-sm text-muted-foreground">Total</span>
+                <span className="text-xl font-semibold tabular-nums">${formatNumber(grandTotal)}</span>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* ── Right: Checkout panel ────────────────────────────────────────── */}
-        <div className="w-full md:w-72 md:flex-shrink-0 border-t md:border-t-0 md:border-l flex flex-col overflow-y-auto">
-          <div className="p-4 space-y-4 flex-1">
+        <div className="w-full md:w-72 md:flex-shrink-0 border-t md:border-t-0 md:border-l flex flex-col overflow-hidden">
+          <div className="p-4 space-y-4 flex-1 overflow-y-auto">
             {/* Date */}
             <div>
               <Label htmlFor="sp-sale-date" className="text-xs text-muted-foreground mb-1 block">
@@ -561,8 +574,11 @@ function SpPOS() {
               />
             </div>
 
-            {/* Grand total */}
-            <div className="rounded-md border p-3">
+          </div>
+
+          {/* Grand total + action buttons — always visible, never scrolled away */}
+          <div className="p-4 border-t space-y-2 flex-shrink-0">
+            <div className="rounded-md border p-3 mb-1">
               <div className="flex items-center justify-between">
                 <span className="text-sm text-muted-foreground">Grand Total</span>
                 <span className="text-xl font-semibold tabular-nums" data-testid="text-grand-total">
@@ -575,10 +591,6 @@ function SpPOS() {
                 </p>
               )}
             </div>
-          </div>
-
-          {/* Action buttons */}
-          <div className="p-4 border-t space-y-2 flex-shrink-0">
             <Button
               className="w-full"
               disabled={!hasItems || checkoutMutation.isPending}
