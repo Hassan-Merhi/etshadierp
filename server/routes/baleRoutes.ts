@@ -1271,39 +1271,61 @@ export function registerBaleRoutes(app: Express) {
       }
 
       // ── Check if this bale was loaded onto an outbound customer order ──
+      // Fetch ALL assignments for this bale reference and pick the best-status one.
+      // A bale can appear in multiple orders (e.g. moved from a cancelled order to a
+      // finalized invoice). Without ordering we'd show the oldest/cancelled one first.
+      const statusPriority: Record<string, number> = {
+        FINALIZED: 0,
+        SOLD: 1,
+        DISPATCHED: 2,
+        VERIFIED: 3,
+        PENDING_VERIFICATION: 4,
+        LOADING: 5,
+        DRAFT: 6,
+        CANCELLED: 7,
+      };
       let loadedOnOrder: any = null;
-      const [orderBaleRow] = await db
+      const orderBaleRows = await db
         .select()
         .from(customerOrderBales)
-        .where(eq(customerOrderBales.baleReference, referenceNumber))
-        .limit(1);
+        .where(eq(customerOrderBales.baleReference, referenceNumber));
 
-      if (orderBaleRow) {
-        const [order] = await db
+      if (orderBaleRows.length > 0) {
+        // Fetch all matching orders in one query
+        const orderIds = orderBaleRows.map((r) => r.orderId);
+        const orders = await db
           .select()
           .from(customerOrders)
           .leftJoin(customers, eq(customerOrders.customerId, customers.id))
-          .where(eq(customerOrders.id, orderBaleRow.orderId))
-          .limit(1);
+          .where(inArray(customerOrders.id, orderIds));
 
-        if (order) {
-          loadedOnOrder = {
-            orderId: order.customer_orders.id,
-            invoiceNumber: order.customer_orders.invoiceNumber,
-            orderDate: order.customer_orders.orderDate,
-            status: order.customer_orders.status,
-            containerNumber: order.customer_orders.containerNumber,
-            shippingCompany: order.customer_orders.shippingCompany,
-            containerNotes: order.customer_orders.containerNotes,
-            loadingStartedAt: order.customer_orders.loadingStartedAt,
-            loadingFinalizedAt: order.customer_orders.loadingFinalizedAt,
-            grandTotal: order.customer_orders.grandTotal,
-            totalQtyBales: order.customer_orders.totalQtyBales,
-            customerName: order.customers?.legalName || null,
-            priceUsed: orderBaleRow.priceUsed,
-            baleWeight: orderBaleRow.weight,
-            scannedBy: orderBaleRow.scannedBy || null,
-          };
+        if (orders.length > 0) {
+          // Pick the order with the best (lowest priority number) status
+          const bestOrder = orders.sort((a, b) => {
+            const pa = statusPriority[a.customer_orders.status] ?? 99;
+            const pb = statusPriority[b.customer_orders.status] ?? 99;
+            return pa - pb;
+          })[0];
+          const matchingBaleRow = orderBaleRows.find((r) => r.orderId === bestOrder.customer_orders.id);
+          if (matchingBaleRow) {
+            loadedOnOrder = {
+              orderId: bestOrder.customer_orders.id,
+              invoiceNumber: bestOrder.customer_orders.invoiceNumber,
+              orderDate: bestOrder.customer_orders.orderDate,
+              status: bestOrder.customer_orders.status,
+              containerNumber: bestOrder.customer_orders.containerNumber,
+              shippingCompany: bestOrder.customer_orders.shippingCompany,
+              containerNotes: bestOrder.customer_orders.containerNotes,
+              loadingStartedAt: bestOrder.customer_orders.loadingStartedAt,
+              loadingFinalizedAt: bestOrder.customer_orders.loadingFinalizedAt,
+              grandTotal: bestOrder.customer_orders.grandTotal,
+              totalQtyBales: bestOrder.customer_orders.totalQtyBales,
+              customerName: bestOrder.customers?.legalName || null,
+              priceUsed: matchingBaleRow.priceUsed,
+              baleWeight: matchingBaleRow.weight,
+              scannedBy: matchingBaleRow.scannedBy || null,
+            };
+          }
         }
       }
 
