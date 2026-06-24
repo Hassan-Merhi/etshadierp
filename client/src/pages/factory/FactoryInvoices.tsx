@@ -758,6 +758,7 @@ export default function FactoryInvoices() {
                           <TableCell />
                           <TableCell />
                           <TableCell />
+                          <TableCell />
                           <TableCell className="text-right font-mono">{totalBales}</TableCell>
                           <TableCell className="text-right font-mono text-sm">{fmtKg(totalWeightKg)}</TableCell>
                           <TableCell className="text-right font-mono">
