@@ -180,6 +180,10 @@ export default function ERPRunPayroll() {
     noGroups: number;
     noVoucher: number;
     total: number;
+    depositsMigrated: number;
+    depositsAlreadyCorrect: number;
+    bonusesMigrated: number;
+    bonusesAlreadyCorrect: number;
   } | null>(null);
 
   // ── Queries ───────────────────────────────────────────────────────────────
@@ -481,6 +485,10 @@ export default function ERPRunPayroll() {
         noGroups: number;
         noVoucher: number;
         total: number;
+        depositsMigrated: number;
+        depositsAlreadyCorrect: number;
+        bonusesMigrated: number;
+        bonusesAlreadyCorrect: number;
       }>;
     },
     onSuccess: (data) => {
@@ -1065,24 +1073,22 @@ export default function ERPRunPayroll() {
             </div>
           ) : (
             <>
-              {isDeveloper && (
-                <div className="flex justify-end mb-3">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => setMigrateConfirmOpen(true)}
-                    disabled={migrateGroupExpensesMutation.isPending}
-                    data-testid="button-migrate-group-expenses"
-                  >
-                    {migrateGroupExpensesMutation.isPending ? (
-                      <Loader2 className="h-3.5 w-3.5 mr-2 animate-spin" />
-                    ) : (
-                      <RefreshCw className="h-3.5 w-3.5 mr-2" />
-                    )}
-                    Fix Historical Runs
-                  </Button>
-                </div>
-              )}
+              <div className="flex justify-end mb-3">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setMigrateConfirmOpen(true)}
+                  disabled={migrateGroupExpensesMutation.isPending}
+                  data-testid="button-migrate-group-expenses"
+                >
+                  {migrateGroupExpensesMutation.isPending ? (
+                    <Loader2 className="h-3.5 w-3.5 mr-2 animate-spin" />
+                  ) : (
+                    <RefreshCw className="h-3.5 w-3.5 mr-2" />
+                  )}
+                  Fix Old Expense Accounts
+                </Button>
+              </div>
               <div className="border rounded-md overflow-x-auto">
                 <Table>
                   <TableHeader>
@@ -1373,12 +1379,17 @@ export default function ERPRunPayroll() {
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Fix Historical Payroll Runs?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This will scan all paid payroll runs and re-post any that used old-style expense accounts ("Salary
-              Expense" or "{Group} Worker Payroll Expense"). They will be split into per-group accounts (e.g. "Salary
-              Expense - Kolwezi Workers") based on the worker groups recorded in each run. The old accounting entries
-              will be replaced — totals stay the same, only the expense account breakdown changes.
+            <AlertDialogTitle>Fix Old Expense Accounts?</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-2 text-sm">
+                <p>This one-time fix will scan all historical payroll records and reclassify any that used old-style expense accounts:</p>
+                <ul className="list-disc pl-4 space-y-1 text-muted-foreground">
+                  <li><strong>Worker payroll runs</strong> — split "Salary Expense" into "Salary Expense - {"{Group}"}"</li>
+                  <li><strong>Employee salary deposits</strong> — move "Payroll Deposit Expense" → "Salary Expense - {"{Group}"}"</li>
+                  <li><strong>Employee bonuses</strong> — move "Salary Expense" (wrong) → "Bonus Expense - {"{Group}"}"</li>
+                </ul>
+                <p className="text-muted-foreground">Totals stay the same — only the expense account breakdown changes. Safe to run more than once.</p>
+              </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -1403,38 +1414,72 @@ export default function ERPRunPayroll() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
-              {migrateResult && migrateResult.migrated > 0 ? "Runs Updated" : "Check Complete"}
+              {migrateResult &&
+              (migrateResult.migrated > 0 || migrateResult.depositsMigrated > 0 || migrateResult.bonusesMigrated > 0)
+                ? "Records Updated"
+                : "Check Complete"}
             </AlertDialogTitle>
             <AlertDialogDescription asChild>
-              <div className="space-y-2 text-sm">
+              <div className="space-y-3 text-sm">
                 {migrateResult && (
                   <>
-                    {migrateResult.total === 0 && <p>No paid payroll runs found for this company.</p>}
-                    {migrateResult.migrated > 0 && (
-                      <p className="text-green-700 dark:text-green-400">
-                        <strong>{migrateResult.migrated}</strong> run{migrateResult.migrated !== 1 ? "s" : ""}{" "}
-                        successfully updated to use per-group expense accounts.
-                      </p>
-                    )}
-                    {migrateResult.alreadyCorrect > 0 && (
-                      <p>
-                        <strong>{migrateResult.alreadyCorrect}</strong> run
-                        {migrateResult.alreadyCorrect !== 1 ? "s" : ""} already using per-group expense accounts
-                        correctly — no changes needed.
-                      </p>
-                    )}
-                    {migrateResult.noGroups > 0 && (
-                      <p className="text-muted-foreground">
-                        <strong>{migrateResult.noGroups}</strong> run{migrateResult.noGroups !== 1 ? "s" : ""} have
-                        workers with no group assigned — kept as single "Salary Expense" account.
-                      </p>
-                    )}
-                    {migrateResult.noVoucher > 0 && (
-                      <p className="text-muted-foreground">
-                        <strong>{migrateResult.noVoucher}</strong> run{migrateResult.noVoucher !== 1 ? "s" : ""} had no
-                        payment voucher found — skipped.
-                      </p>
-                    )}
+                    {/* Worker payroll runs */}
+                    <div>
+                      <p className="font-medium mb-1">Worker Payroll Runs</p>
+                      {migrateResult.total === 0 && <p className="text-muted-foreground">No paid payroll runs found.</p>}
+                      {migrateResult.migrated > 0 && (
+                        <p className="text-green-700 dark:text-green-400">
+                          <strong>{migrateResult.migrated}</strong> run{migrateResult.migrated !== 1 ? "s" : ""} updated to per-group expense accounts.
+                        </p>
+                      )}
+                      {migrateResult.alreadyCorrect > 0 && (
+                        <p className="text-muted-foreground">
+                          <strong>{migrateResult.alreadyCorrect}</strong> already correct — no changes.
+                        </p>
+                      )}
+                      {migrateResult.noGroups > 0 && (
+                        <p className="text-muted-foreground">
+                          <strong>{migrateResult.noGroups}</strong> kept as "Salary Expense" (workers have no group).
+                        </p>
+                      )}
+                      {migrateResult.noVoucher > 0 && (
+                        <p className="text-muted-foreground">
+                          <strong>{migrateResult.noVoucher}</strong> skipped — no voucher found.
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Employee deposits */}
+                    <div>
+                      <p className="font-medium mb-1">Employee Salary Deposits</p>
+                      {migrateResult.depositsMigrated > 0 ? (
+                        <p className="text-green-700 dark:text-green-400">
+                          <strong>{migrateResult.depositsMigrated}</strong> deposit{migrateResult.depositsMigrated !== 1 ? "s" : ""} moved to correct expense accounts.
+                        </p>
+                      ) : (
+                        <p className="text-muted-foreground">
+                          {migrateResult.depositsAlreadyCorrect > 0
+                            ? `${migrateResult.depositsAlreadyCorrect} already correct.`
+                            : "None found."}
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Bonuses */}
+                    <div>
+                      <p className="font-medium mb-1">Employee Bonuses</p>
+                      {migrateResult.bonusesMigrated > 0 ? (
+                        <p className="text-green-700 dark:text-green-400">
+                          <strong>{migrateResult.bonusesMigrated}</strong> bonus{migrateResult.bonusesMigrated !== 1 ? "es" : ""} moved from "Salary Expense" to "Bonus Expense" accounts.
+                        </p>
+                      ) : (
+                        <p className="text-muted-foreground">
+                          {migrateResult.bonusesAlreadyCorrect > 0
+                            ? `${migrateResult.bonusesAlreadyCorrect} already correct.`
+                            : "None found."}
+                        </p>
+                      )}
+                    </div>
                   </>
                 )}
               </div>

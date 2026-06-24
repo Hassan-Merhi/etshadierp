@@ -1,5 +1,5 @@
 import type { Express } from "express";
-import { db } from "../db";
+import { db, pool } from "../db";
 import { storage } from "../storage";
 import { requireAuth, requireRole, canDelete, requireNonPOS, checkPOSLocation } from "../auth";
 import { upload, logAudit, getCurrentExchangeRate, syncEmployeeBalancesFromEntries } from "./_helpers";
@@ -2080,21 +2080,7 @@ export function registerEmployeeRoutes(app: Express) {
       const companyId = req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const allAccounts = await storage.getAllLedgerAccounts(companyId);
-      // Old-style account codes: the single SALARY_EXPENSE and any WORKER_PAY_* codes
-      const oldStyleAccountIds = new Set(
-        allAccounts
-          .filter((a: any) => a.code === "SALARY_EXPENSE" || a.code.startsWith("WORKER_PAY_"))
-          .map((a: any) => a.id)
-      );
-
-      const paidRuns = await db
-        .select()
-        .from(erpPayrollRuns)
-        .where(and(eq(erpPayrollRuns.companyId, companyId), eq(erpPayrollRuns.status, "PAID")));
-
-      // Build a current group-membership lookup: employeeId → groupName
-      // Used as fallback when run items were created before groupName was stored
+      // Shared group-membership lookup: employeeId → groupName (current assignments)
       const groupMemberships = await db
         .select({ employeeId: employeeGroupMembers.employeeId, groupName: employeeGroups.name })
         .from(employeeGroupMembers)
@@ -2105,111 +2091,91 @@ export function registerEmployeeRoutes(app: Express) {
         if (!empGroupMap.has(row.employeeId)) empGroupMap.set(row.employeeId, row.groupName);
       }
 
+      // Helper: get or create a ledger account by code
+      async function getOrCreateAccount(code: string, name: string): Promise<any> {
+        const accs = await storage.getAllLedgerAccounts(companyId);
+        let acc = accs.find((a: any) => a.code === code);
+        if (!acc) {
+          acc = await storage.createLedgerAccount({
+            companyId,
+            code,
+            name,
+            accountType: "Expense",
+            openingBalance: "0",
+            active: true,
+          });
+        }
+        return acc;
+      }
+
+      // ── 1. Worker payroll runs (SAL-{runId}-*) ───────────────────────────────
+      const allAccounts = await storage.getAllLedgerAccounts(companyId);
+      const oldSalaryIds = new Set(
+        allAccounts
+          .filter((a: any) => a.code === "SALARY_EXPENSE" || a.code.startsWith("WORKER_PAY_"))
+          .map((a: any) => a.id)
+      );
+
+      const paidRuns = await db
+        .select()
+        .from(erpPayrollRuns)
+        .where(and(eq(erpPayrollRuns.companyId, companyId), eq(erpPayrollRuns.status, "PAID")));
+
       let migrated = 0;
       let alreadyCorrect = 0;
       let noGroups = 0;
       let noVoucher = 0;
 
       for (const run of paidRuns) {
-        // Find the active SAL-{runId}-* voucher for this run
-        const salVouchers = await db
-          .select()
-          .from(vouchers)
-          .where(
-            and(
-              eq(vouchers.companyId, companyId),
-              sql`${vouchers.voucherNumber} LIKE ${"SAL-" + run.id + "-%"}`,
-              isNull(vouchers.deletedAt)
-            )
-          );
-        if (salVouchers.length === 0) {
-          noVoucher++;
-          continue;
-        }
-        const oldVoucher = salVouchers[0];
+        const salVouchers = await pool.query(
+          `SELECT * FROM vouchers WHERE company_id = $1 AND voucher_number LIKE $2 AND deleted_at IS NULL`,
+          [companyId, `SAL-${run.id}-%`]
+        );
+        if (salVouchers.rows.length === 0) { noVoucher++; continue; }
+        const oldVoucher = salVouchers.rows[0];
 
-        // Check if any debit entry uses an old-style account
-        const debitEntries = await db
-          .select()
-          .from(voucherEntries)
-          .where(and(eq(voucherEntries.voucherId, oldVoucher.id), sql`${voucherEntries.debitAmount}::numeric > 0`));
+        const debitRes = await pool.query(
+          `SELECT * FROM voucher_entries WHERE voucher_id = $1 AND debit_amount::numeric > 0`,
+          [oldVoucher.id]
+        );
+        const hasOldDebit = debitRes.rows.some((e: any) => oldSalaryIds.has(e.ledger_account_id));
+        if (!hasOldDebit) { alreadyCorrect++; continue; }
 
-        const hasOldStyleDebit = debitEntries.some((e) => oldStyleAccountIds.has(e.ledgerAccountId));
-        if (!hasOldStyleDebit) {
-          alreadyCorrect++;
-          continue;
-        }
-
-        // Get run items and group them — fall back to current group membership if groupName not stored
         const runItems = await db.select().from(erpPayrollRunItems).where(eq(erpPayrollRunItems.runId, run.id));
         const totalAmount = runItems.reduce((s, i) => s + parseFloat(i.netPay), 0);
-
         const itemsByGroup = new Map<string, number>();
         for (const item of runItems) {
           const stored = (item.groupName || "").trim();
           const grp = stored || (item.employeeId ? empGroupMap.get(item.employeeId) || "__default__" : "__default__");
           itemsByGroup.set(grp, (itemsByGroup.get(grp) || 0) + parseFloat(item.netPay));
         }
-
-        // Skip if all workers have no group (nothing to split into named accounts)
         const hasNamedGroups = [...itemsByGroup.keys()].some((k) => k !== "__default__");
-        if (!hasNamedGroups) {
-          noGroups++;
-          continue;
-        }
+        if (!hasNamedGroups) { noGroups++; continue; }
 
-        // Soft-delete old voucher
         await db.update(vouchers).set({ deletedAt: new Date() }).where(eq(vouchers.id, oldVoucher.id));
-
-        // Create replacement voucher
         const newVoucherNumber = `SAL-${run.id}-${Date.now()}`;
-        const [newVoucher] = await db
-          .insert(vouchers)
-          .values({
-            companyId,
-            voucherNumber: newVoucherNumber,
-            voucherType: "Payment",
-            voucherDate: run.date,
-            description: run.notes || `Payroll run #${run.id}`,
-            totalAmount: totalAmount.toFixed(2),
-          })
-          .returning();
+        const [newVoucher] = await db.insert(vouchers).values({
+          companyId,
+          voucherNumber: newVoucherNumber,
+          voucherType: "Payment",
+          voucherDate: run.date,
+          description: run.notes || `Payroll run #${run.id}`,
+          totalAmount: totalAmount.toFixed(2),
+        }).returning();
 
-        // Create per-group debit entries using new Salary Expense - {Group} naming
-        const freshAccounts = await storage.getAllLedgerAccounts(companyId);
         for (const [grp, grpTotal] of itemsByGroup) {
           const isDefault = grp === "__default__";
-          const expCode = isDefault
-            ? "SALARY_EXPENSE"
-            : `SAL_EXP_${grp
-                .toUpperCase()
-                .replace(/[^A-Z0-9]/g, "_")
-                .substring(0, 25)}`;
-          const expName = isDefault ? "Salary Expense" : `Salary Expense - ${grp}`;
-
-          let expAccount = freshAccounts.find((a: any) => a.code === expCode);
-          if (!expAccount) {
-            expAccount = await storage.createLedgerAccount({
-              companyId,
-              code: expCode,
-              name: expName,
-              accountType: "Expense",
-              openingBalance: "0",
-              active: true,
-            });
-          }
+          const code = isDefault ? "SALARY_EXPENSE" : `SAL_EXP_${grp.toUpperCase().replace(/[^A-Z0-9]/g, "_").substring(0, 25)}`;
+          const name = isDefault ? "Salary Expense" : `Salary Expense - ${grp}`;
+          const acc = await getOrCreateAccount(code, name);
           await db.insert(voucherEntries).values({
             voucherId: newVoucher.id,
-            ledgerAccountId: expAccount.id,
+            ledgerAccountId: acc.id,
             debitAmount: grpTotal.toFixed(2),
             creditAmount: "0",
-            narration: isDefault
-              ? `Salary expense — payroll run #${run.id}`
-              : `Salary expense - ${grp} — run #${run.id}`,
+            narration: isDefault ? `Salary expense — payroll run #${run.id}` : `Salary expense - ${grp} — run #${run.id}`,
           });
         }
-
-        // Re-create the credit entry using the run's recorded payment account
         if (run.paymentAccountId) {
           await db.insert(voucherEntries).values({
             voucherId: newVoucher.id,
@@ -2219,11 +2185,156 @@ export function registerEmployeeRoutes(app: Express) {
             narration: `Cash paid — payroll run #${run.id}`,
           });
         }
-
         migrated++;
       }
 
-      res.json({ migrated, alreadyCorrect, noGroups, noVoucher, total: paidRuns.length });
+      // ── 2. Salary deposit vouchers (SAL-DEP-*) ───────────────────────────────
+      // Old codes: PAYROLL_DEPOSIT_EXPENSE (very old) or a single SALARY_EXPENSE (no per-group split)
+      const freshAccs2 = await storage.getAllLedgerAccounts(companyId);
+      const oldDepIds = new Set(
+        freshAccs2
+          .filter((a: any) => a.code === "PAYROLL_DEPOSIT_EXPENSE" || a.code === "SALARY_EXPENSE")
+          .map((a: any) => a.id)
+      );
+      const accCodeById = new Map(freshAccs2.map((a: any) => [a.id, a.code]));
+
+      const depVouchersRes = await pool.query(
+        `SELECT * FROM vouchers WHERE company_id = $1 AND voucher_number LIKE 'SAL-DEP-%' AND deleted_at IS NULL ORDER BY id`,
+        [companyId]
+      );
+
+      let depositsMigrated = 0;
+      let depositsAlreadyCorrect = 0;
+
+      for (const dv of depVouchersRes.rows) {
+        const debitRes = await pool.query(
+          `SELECT * FROM voucher_entries WHERE voucher_id = $1 AND debit_amount::numeric > 0`,
+          [dv.id]
+        );
+        const creditRes = await pool.query(
+          `SELECT * FROM voucher_entries WHERE voucher_id = $1 AND credit_amount::numeric > 0`,
+          [dv.id]
+        );
+
+        const hasOldDebit = debitRes.rows.some((e: any) => oldDepIds.has(e.ledger_account_id));
+        if (!hasOldDebit) { depositsAlreadyCorrect++; continue; }
+
+        // Determine if any old debit is truly wrong (PAYROLL_DEPOSIT_EXPENSE, or SALARY_EXPENSE without per-group)
+        const hasPayrollDepExpense = debitRes.rows.some((e: any) => accCodeById.get(e.ledger_account_id) === "PAYROLL_DEPOSIT_EXPENSE");
+
+        // Group employees from credit entries to determine new per-group debits
+        const byGroup = new Map<string, number>();
+        for (const entry of creditRes.rows) {
+          const empId = entry.employee_id ? parseInt(entry.employee_id) : null;
+          const grp = empId ? (empGroupMap.get(empId) || "__default__") : "__default__";
+          byGroup.set(grp, (byGroup.get(grp) || 0) + parseFloat(entry.credit_amount));
+        }
+
+        const hasNamedDepGroups = [...byGroup.keys()].some((k) => k !== "__default__");
+
+        // Skip if already SALARY_EXPENSE (not PAYROLL_DEPOSIT_EXPENSE) and no named groups
+        if (!hasPayrollDepExpense && !hasNamedDepGroups) {
+          depositsAlreadyCorrect++;
+          continue;
+        }
+
+        // Delete old debit entries that use old-style accounts
+        for (const de of debitRes.rows) {
+          if (oldDepIds.has(de.ledger_account_id)) {
+            await pool.query(`DELETE FROM voucher_entries WHERE id = $1`, [de.id]);
+          }
+        }
+
+        // Insert new per-group debit entries
+        for (const [grp, grpTotal] of byGroup) {
+          const isDefault = grp === "__default__";
+          const code = isDefault ? "SALARY_EXPENSE" : `SAL_EXP_${grp.toUpperCase().replace(/[^A-Z0-9]/g, "_").substring(0, 25)}`;
+          const name = isDefault ? "Salary Expense" : `Salary Expense - ${grp}`;
+          const acc = await getOrCreateAccount(code, name);
+          await db.insert(voucherEntries).values({
+            voucherId: dv.id,
+            ledgerAccountId: acc.id,
+            debitAmount: grpTotal.toFixed(2),
+            creditAmount: "0",
+            narration: isDefault ? `Salary deposit - ${dv.voucher_number}` : `Salary deposit - ${grp} - ${dv.voucher_number}`,
+          });
+        }
+        depositsMigrated++;
+      }
+
+      // ── 3. Bonus vouchers (BONUS-*) ───────────────────────────────────────────
+      // Old code: SALARY_EXPENSE used for bonuses (wrong account before Phase 5)
+      const freshAccs3 = await storage.getAllLedgerAccounts(companyId);
+      const oldBonusIds = new Set(
+        freshAccs3
+          .filter((a: any) => a.code === "SALARY_EXPENSE")
+          .map((a: any) => a.id)
+      );
+
+      const bonusVouchersRes = await pool.query(
+        `SELECT * FROM vouchers WHERE company_id = $1 AND voucher_number LIKE 'BONUS-%' AND deleted_at IS NULL ORDER BY id`,
+        [companyId]
+      );
+
+      let bonusesMigrated = 0;
+      let bonusesAlreadyCorrect = 0;
+
+      for (const bv of bonusVouchersRes.rows) {
+        const debitRes = await pool.query(
+          `SELECT * FROM voucher_entries WHERE voucher_id = $1 AND debit_amount::numeric > 0`,
+          [bv.id]
+        );
+        const creditRes = await pool.query(
+          `SELECT * FROM voucher_entries WHERE voucher_id = $1 AND credit_amount::numeric > 0`,
+          [bv.id]
+        );
+
+        const hasOldDebit = debitRes.rows.some((e: any) => oldBonusIds.has(e.ledger_account_id));
+        if (!hasOldDebit) { bonusesAlreadyCorrect++; continue; }
+
+        // Group employees from credit entries
+        const byGroup = new Map<string, number>();
+        for (const entry of creditRes.rows) {
+          const empId = entry.employee_id ? parseInt(entry.employee_id) : null;
+          const grp = empId ? (empGroupMap.get(empId) || "__default__") : "__default__";
+          byGroup.set(grp, (byGroup.get(grp) || 0) + parseFloat(entry.credit_amount));
+        }
+
+        // Delete old SALARY_EXPENSE debit entries
+        for (const de of debitRes.rows) {
+          if (oldBonusIds.has(de.ledger_account_id)) {
+            await pool.query(`DELETE FROM voucher_entries WHERE id = $1`, [de.id]);
+          }
+        }
+
+        // Insert new BONUS_EXPENSE / BONUS_EXP_* debit entries
+        for (const [grp, grpTotal] of byGroup) {
+          const isDefault = grp === "__default__";
+          const code = isDefault ? "BONUS_EXPENSE" : `BONUS_EXP_${grp.toUpperCase().replace(/[^A-Z0-9]/g, "_").substring(0, 25)}`;
+          const name = isDefault ? "Bonus Expense" : `Bonus Expense - ${grp}`;
+          const acc = await getOrCreateAccount(code, name);
+          await db.insert(voucherEntries).values({
+            voucherId: bv.id,
+            ledgerAccountId: acc.id,
+            debitAmount: grpTotal.toFixed(2),
+            creditAmount: "0",
+            narration: isDefault ? `Bonus expense - ${bv.voucher_number}` : `Bonus expense - ${grp} - ${bv.voucher_number}`,
+          });
+        }
+        bonusesMigrated++;
+      }
+
+      res.json({
+        migrated,
+        alreadyCorrect,
+        noGroups,
+        noVoucher,
+        total: paidRuns.length,
+        depositsMigrated,
+        depositsAlreadyCorrect,
+        bonusesMigrated,
+        bonusesAlreadyCorrect,
+      });
     } catch (e: any) {
       res.status(500).json({ message: e.message });
     }
