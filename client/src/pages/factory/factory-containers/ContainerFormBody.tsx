@@ -256,19 +256,37 @@ export function ContainerFormBody({
           const kg = parseFloat(formData.totalKg || "0");
           if (!rate || !kg || isNaN(rate) || isNaN(kg)) return null;
           const total = rate * kg;
+          const fx = parseFloat(fxRate || "0");
+          const totalUsd = currency !== "USD" && fx > 0 ? total * fx : null;
+          const SYMBOLS: Record<string, string> = { USD: "$", EUR: "€", AUD: "A$", GBP: "£", LBP: "LL" };
+          const sym = SYMBOLS[currency] ?? currency + " ";
           return (
             <div
-              className="flex items-center justify-between rounded-md bg-muted/50 border px-3 py-2 text-sm"
+              className="rounded-md bg-muted/50 border px-3 py-2 text-sm space-y-0.5"
               data-testid="text-edit-container-value-preview"
             >
-              <span className="text-muted-foreground">Estimated total value</span>
-              <span className="font-semibold font-mono tabular-nums">
-                ${total.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                <span className="text-xs text-muted-foreground font-normal ml-1.5">
-                  ({rate.toLocaleString("en-US", { maximumFractionDigits: 7 })} ×{" "}
-                  {kg.toLocaleString("en-US", { maximumFractionDigits: 2 })} kg)
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">Estimated total value</span>
+                <span className="font-semibold font-mono tabular-nums">
+                  {sym}{total.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  {currency !== "USD" && <span className="text-xs text-muted-foreground font-normal ml-1"> {currency}</span>}
+                  <span className="text-xs text-muted-foreground font-normal ml-1.5">
+                    ({rate.toLocaleString("en-US", { maximumFractionDigits: 7 })} ×{" "}
+                    {kg.toLocaleString("en-US", { maximumFractionDigits: 2 })} kg)
+                  </span>
                 </span>
-              </span>
+              </div>
+              {totalUsd !== null && (
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground text-xs">≈ in USD</span>
+                  <span className="font-mono tabular-nums text-xs text-muted-foreground">
+                    ${totalUsd.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD
+                    <span className="ml-1.5 opacity-70">
+                      ({sym}{total.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} × {fx} FX)
+                    </span>
+                  </span>
+                </div>
+              )}
             </div>
           );
         })()}
