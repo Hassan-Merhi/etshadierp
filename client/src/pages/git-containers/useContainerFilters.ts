@@ -4,6 +4,7 @@ import { EnrichedContainerRow } from "./gitContainerTypes";
 interface UseContainerFiltersProps {
   allContainers: EnrichedContainerRow[];
   companyFilter: string;
+  containerFilters: string[];
   supplierFilters: string[];
   transporterFilters: string[];
   agentFilters: string[];
@@ -21,6 +22,7 @@ interface UseContainerFiltersProps {
 export function useContainerFilters({
   allContainers,
   companyFilter,
+  containerFilters,
   supplierFilters,
   transporterFilters,
   agentFilters,
@@ -38,6 +40,7 @@ export function useContainerFilters({
     return allContainers
       .filter((c) => {
         if (companyFilter !== "ALL" && c.companyName !== companyFilter) return false;
+        if (containerFilters.length > 0 && !containerFilters.includes(c.containerNumber)) return false;
         if (supplierFilters.length > 0 && !supplierFilters.includes(c.supplierCode ?? "")) return false;
         if (transporterFilters.length > 0 && !transporterFilters.includes(c.transporter ?? "")) return false;
         if (agentFilters.length > 0 && !agentFilters.includes(c.agent ?? "")) return false;
@@ -100,6 +103,7 @@ export function useContainerFilters({
   }, [
     allContainers,
     companyFilter,
+    containerFilters,
     supplierFilters,
     transporterFilters,
     agentFilters,

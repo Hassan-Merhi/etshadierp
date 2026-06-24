@@ -62,6 +62,7 @@ export default function GITContainers({ embedded = false }: { embedded?: boolean
 
   const [allCompanies, setAllCompanies] = useState(false);
   const [companyFilter, setCompanyFilter] = useState("ALL");
+  const [containerFilters, setContainerFilters] = useState<string[]>([]);
   const [supplierFilters, setSupplierFilters] = useState<string[]>([]);
   const [transporterFilters, setTransporterFilters] = useState<string[]>([]);
   const [agentFilters, setAgentFilters] = useState<string[]>([]);
@@ -145,6 +146,7 @@ export default function GITContainers({ embedded = false }: { embedded?: boolean
   const filteredContainers = useContainerFilters({
     allContainers,
     companyFilter,
+    containerFilters,
     supplierFilters,
     transporterFilters,
     agentFilters,
@@ -163,6 +165,7 @@ export default function GITContainers({ embedded = false }: { embedded?: boolean
     useContainerSummaryStats({ filteredContainers });
 
   const companies = [...new Set(allContainers.map((c) => c.companyName))].sort();
+  const containerNumbers = [...new Set(allContainers.map((c) => c.containerNumber))].sort();
   const suppliers = [...new Set(allContainers.map((c) => c.supplierCode).filter(Boolean))].sort() as string[];
   const transporters = [...new Set(allContainers.map((c) => c.transporter).filter(Boolean))].sort() as string[];
   const agents = [...new Set(allContainers.map((c) => c.agent).filter(Boolean))].sort() as string[];
@@ -183,6 +186,7 @@ export default function GITContainers({ embedded = false }: { embedded?: boolean
 
   function clearFilters() {
     setCompanyFilter("ALL");
+    setContainerFilters([]);
     setSupplierFilters([]);
     setTransporterFilters([]);
     setAgentFilters([]);
@@ -472,6 +476,9 @@ export default function GITContainers({ embedded = false }: { embedded?: boolean
           companyFilter={companyFilter}
           setCompanyFilter={setCompanyFilter}
           companies={companies}
+          containerNumbers={containerNumbers}
+          containerFilters={containerFilters}
+          setContainerFilters={setContainerFilters}
           suppliers={suppliers}
           supplierFilters={supplierFilters}
           setSupplierFilters={setSupplierFilters}

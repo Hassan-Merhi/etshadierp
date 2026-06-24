@@ -10,6 +10,9 @@ interface FilterBarProps {
   companyFilter: string;
   setCompanyFilter: (v: string) => void;
   companies: string[];
+  containerNumbers: string[];
+  containerFilters: string[];
+  setContainerFilters: (v: string[]) => void;
   suppliers: string[];
   supplierFilters: string[];
   setSupplierFilters: (v: string[]) => void;
@@ -40,11 +43,22 @@ interface FilterBarProps {
   clearFilters: () => void;
 }
 
+function FilterLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <Label className="text-[10px] text-muted-foreground uppercase font-semibold tracking-widest mb-1 block">
+      {children}
+    </Label>
+  );
+}
+
 export function FilterBar({
   showFilters,
   companyFilter,
   setCompanyFilter,
   companies,
+  containerNumbers,
+  containerFilters,
+  setContainerFilters,
   suppliers,
   supplierFilters,
   setSupplierFilters,
@@ -76,28 +90,55 @@ export function FilterBar({
 }: FilterBarProps) {
   if (!showFilters) return null;
 
+  const activeCount = [
+    companyFilter !== "ALL" ? 1 : 0,
+    containerFilters.length,
+    supplierFilters.length,
+    transporterFilters.length,
+    agentFilters.length,
+    truckFilters.length,
+    locationFilters.length,
+    docsFilter !== "ALL" ? 1 : 0,
+    delayedFilter !== "ALL" ? 1 : 0,
+    freightFilter !== "ALL" ? 1 : 0,
+    etaFilter !== "ALL" ? 1 : 0,
+    notesFilter !== "ALL" ? 1 : 0,
+  ].reduce((a, b) => a + b, 0);
+
   return (
-    <Card className="bg-muted/30 border-dashed animate-in fade-in slide-in-from-top-2 duration-200">
-      <CardContent className="p-3">
-        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
-          <div className="space-y-1">
-            <Label className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">Company</Label>
+    <Card className="border border-border/60 shadow-none rounded-md animate-in fade-in slide-in-from-top-2 duration-200">
+      <CardContent className="p-3 space-y-3">
+        {/* Row 1 — entity filters */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-2">
+          <div>
+            <FilterLabel>Company</FilterLabel>
             <Select value={companyFilter} onValueChange={setCompanyFilter}>
-              <SelectTrigger className="h-8 text-xs px-2" data-testid="select-filter-company">
+              <SelectTrigger className="h-8 text-xs" data-testid="select-filter-company">
                 <SelectValue placeholder="All Companies" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="ALL">All Companies</SelectItem>
                 {companies.map((c) => (
-                  <SelectItem key={c} value={c}>
-                    {c}
-                  </SelectItem>
+                  <SelectItem key={c} value={c}>{c}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
-          <div className="space-y-1">
-            <Label className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">Supplier</Label>
+
+          <div>
+            <FilterLabel>Container #</FilterLabel>
+            <MultiFilterSelect
+              allLabel="All Containers"
+              options={containerNumbers.map((n) => ({ label: n, value: n }))}
+              selected={containerFilters}
+              onChange={setContainerFilters}
+              testId="multi-filter-container"
+              searchable
+            />
+          </div>
+
+          <div>
+            <FilterLabel>Supplier</FilterLabel>
             <MultiFilterSelect
               allLabel="All Suppliers"
               options={suppliers.map((s) => ({ label: s, value: s }))}
@@ -106,8 +147,9 @@ export function FilterBar({
               testId="multi-filter-supplier"
             />
           </div>
-          <div className="space-y-1">
-            <Label className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">Transporter</Label>
+
+          <div>
+            <FilterLabel>Transporter</FilterLabel>
             <MultiFilterSelect
               allLabel="All Transporters"
               options={transporters.map((t) => ({ label: t, value: t }))}
@@ -116,8 +158,9 @@ export function FilterBar({
               testId="multi-filter-transporter"
             />
           </div>
-          <div className="space-y-1">
-            <Label className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">Agent</Label>
+
+          <div>
+            <FilterLabel>Agent</FilterLabel>
             <MultiFilterSelect
               allLabel="All Agents"
               options={agents.map((a) => ({ label: a, value: a }))}
@@ -126,8 +169,9 @@ export function FilterBar({
               testId="multi-filter-agent"
             />
           </div>
-          <div className="space-y-1">
-            <Label className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">Truck</Label>
+
+          <div>
+            <FilterLabel>Truck</FilterLabel>
             <MultiFilterSelect
               allLabel="All Trucks"
               options={[
@@ -141,8 +185,9 @@ export function FilterBar({
               testId="multi-filter-truck"
             />
           </div>
-          <div className="space-y-1">
-            <Label className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">Location</Label>
+
+          <div>
+            <FilterLabel>Location</FilterLabel>
             <MultiFilterSelect
               allLabel="All Locations"
               options={[
@@ -156,10 +201,17 @@ export function FilterBar({
               testId="multi-filter-location"
             />
           </div>
-          <div className="space-y-1">
-            <Label className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">Docs</Label>
+        </div>
+
+        {/* Divider */}
+        <div className="border-t border-border/40" />
+
+        {/* Row 2 — status/boolean filters + sort */}
+        <div className="flex flex-wrap items-end gap-2">
+          <div className="w-32">
+            <FilterLabel>Docs</FilterLabel>
             <Select value={docsFilter} onValueChange={setDocsFilter}>
-              <SelectTrigger className="h-8 text-xs px-2" data-testid="select-filter-docs">
+              <SelectTrigger className="h-8 text-xs" data-testid="select-filter-docs">
                 <SelectValue placeholder="All" />
               </SelectTrigger>
               <SelectContent>
@@ -169,23 +221,25 @@ export function FilterBar({
               </SelectContent>
             </Select>
           </div>
-          <div className="space-y-1">
-            <Label className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">Delayed</Label>
+
+          <div className="w-36">
+            <FilterLabel>Delayed</FilterLabel>
             <Select value={delayedFilter} onValueChange={setDelayedFilter}>
-              <SelectTrigger className="h-8 text-xs px-2" data-testid="select-filter-delayed">
+              <SelectTrigger className="h-8 text-xs" data-testid="select-filter-delayed">
                 <SelectValue placeholder="All" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="ALL">All</SelectItem>
-                <SelectItem value="YES">Yes (ETA passed)</SelectItem>
+                <SelectItem value="YES">ETA Passed</SelectItem>
                 <SelectItem value="OVERDUE">Offload Overdue</SelectItem>
               </SelectContent>
             </Select>
           </div>
-          <div className="space-y-1">
-            <Label className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">Freight</Label>
+
+          <div className="w-32">
+            <FilterLabel>Freight</FilterLabel>
             <Select value={freightFilter} onValueChange={setFreightFilter}>
-              <SelectTrigger className="h-8 text-xs px-2" data-testid="select-filter-freight">
+              <SelectTrigger className="h-8 text-xs" data-testid="select-filter-freight">
                 <SelectValue placeholder="All" />
               </SelectTrigger>
               <SelectContent>
@@ -195,10 +249,11 @@ export function FilterBar({
               </SelectContent>
             </Select>
           </div>
-          <div className="space-y-1">
-            <Label className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">ETA</Label>
+
+          <div className="w-28">
+            <FilterLabel>ETA</FilterLabel>
             <Select value={etaFilter} onValueChange={setEtaFilter}>
-              <SelectTrigger className="h-8 text-xs px-2" data-testid="select-filter-eta">
+              <SelectTrigger className="h-8 text-xs" data-testid="select-filter-eta">
                 <SelectValue placeholder="All" />
               </SelectTrigger>
               <SelectContent>
@@ -208,10 +263,11 @@ export function FilterBar({
               </SelectContent>
             </Select>
           </div>
-          <div className="space-y-1">
-            <Label className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">Notes</Label>
+
+          <div className="w-32">
+            <FilterLabel>Notes</FilterLabel>
             <Select value={notesFilter} onValueChange={setNotesFilter}>
-              <SelectTrigger className="h-8 text-xs px-2" data-testid="select-filter-notes">
+              <SelectTrigger className="h-8 text-xs" data-testid="select-filter-notes">
                 <SelectValue placeholder="All" />
               </SelectTrigger>
               <SelectContent>
@@ -221,28 +277,31 @@ export function FilterBar({
               </SelectContent>
             </Select>
           </div>
-          <div className="space-y-1">
-            <Label className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">Sort</Label>
+
+          <div className="flex-1 min-w-40">
+            <FilterLabel>Sort</FilterLabel>
             <Select value={sortOrder} onValueChange={setSortOrder}>
-              <SelectTrigger className="h-8 text-xs px-2" data-testid="select-filter-sort">
+              <SelectTrigger className="h-8 text-xs" data-testid="select-filter-sort">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="DEFAULT">Default (Company + Shop)</SelectItem>
-                <SelectItem value="ETA_ASC">ETA (Earliest First)</SelectItem>
-                <SelectItem value="ETA_DESC">ETA (Latest First)</SelectItem>
+                <SelectItem value="ETA_ASC">ETA — Earliest First</SelectItem>
+                <SelectItem value="ETA_DESC">ETA — Latest First</SelectItem>
               </SelectContent>
             </Select>
           </div>
-          <div className="col-span-full pt-1">
+
+          <div className="ml-auto">
             <Button
               variant="ghost"
               size="sm"
-              className="h-7 text-xs text-muted-foreground hover:text-foreground px-2"
+              className="h-8 text-xs gap-1.5 text-muted-foreground"
               onClick={clearFilters}
+              data-testid="button-reset-filters"
             >
-              <RefreshCw className="h-3 w-3 mr-1.5" />
-              Reset All Filters
+              <RefreshCw className="h-3 w-3" />
+              Reset{activeCount > 0 ? ` (${activeCount})` : ""}
             </Button>
           </div>
         </div>
