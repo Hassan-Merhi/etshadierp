@@ -178,6 +178,7 @@ export default function Accounts() {
       id: number;
       name?: string;
       accountType?: string;
+      subType?: string | null;
       openingBalance?: string;
       openingBalanceSide?: string;
       active?: boolean;
@@ -332,6 +333,7 @@ export default function Accounts() {
   const editForm = useForm({
     resolver: zodResolver(updateLedgerAccountSchema.omit({ id: true, companyId: true })),
   });
+  const alterAccountType = editForm.watch("accountType") as string | undefined;
 
   return (
     <div className="space-y-6">
@@ -552,6 +554,8 @@ export default function Accounts() {
                         editForm.reset({
                           code: a.code,
                           name: a.name,
+                          accountType: (a.accountType || a.type || "") as any,
+                          subType: a.subType || "",
                           openingBalance: String(Math.abs(a.openingBalance || 0)),
                           openingBalanceSide: (a.openingBalanceSide as "Dr" | "Cr") || "Dr",
                           active: a.active !== false,
@@ -616,6 +620,77 @@ export default function Accounts() {
                             </FormItem>
                           )}
                         />
+
+                        {/* Account Type */}
+                        <FormField
+                          control={editForm.control}
+                          name="accountType"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Account Type</FormLabel>
+                              <Select onValueChange={(v) => { field.onChange(v); editForm.setValue("subType", ""); }} value={field.value || ""}>
+                                <FormControl>
+                                  <SelectTrigger data-testid="select-alter-account-type">
+                                    <SelectValue placeholder="Select type" />
+                                  </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                  <SelectItem value="Asset">Asset</SelectItem>
+                                  <SelectItem value="Liability">Liability</SelectItem>
+                                  <SelectItem value="Equity">Equity</SelectItem>
+                                  <SelectItem value="Income">Income</SelectItem>
+                                  <SelectItem value="Expense">Expense</SelectItem>
+                                  <SelectItem value="Bank">Bank</SelectItem>
+                                  <SelectItem value="Cash">Cash</SelectItem>
+                                  <SelectItem value="Indirect Expense">Indirect Expense</SelectItem>
+                                  <SelectItem value="Direct Expense">Direct Expense</SelectItem>
+                                  <SelectItem value="Government Taxes">Government Taxes</SelectItem>
+                                  <SelectItem value="Loans">Loans</SelectItem>
+                                  <SelectItem value="Duty Agent">Duty Agent</SelectItem>
+                                  <SelectItem value="Transporter Agent">Transporter Agent</SelectItem>
+                                  <SelectItem value="Accounts Payable">Accounts Payable</SelectItem>
+                                  <SelectItem value="Profit">Profit</SelectItem>
+                                </SelectContent>
+                              </Select>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+
+                        {/* Sub Type — only for types that have sub-types */}
+                        {["Income", "Expense", "Liability", "Asset"].includes(alterAccountType || "") && (
+                          <FormField
+                            control={editForm.control}
+                            name="subType"
+                            render={({ field }) => {
+                              const subTypeOptions: Record<string, string[]> = {
+                                Income: ["Direct Income", "Indirect Income"],
+                                Expense: ["Direct Expense", "Indirect Expense"],
+                                Liability: ["Current Liability", "Long-term Liability", "Loans Payable", "Output Tax", "Tax Payable"],
+                                Asset: ["Current Asset", "Fixed Asset", "Input Tax", "Tax Receivable"],
+                              };
+                              const opts = subTypeOptions[alterAccountType || ""] || [];
+                              return (
+                                <FormItem>
+                                  <FormLabel>Sub Type</FormLabel>
+                                  <Select onValueChange={field.onChange} value={field.value || ""}>
+                                    <FormControl>
+                                      <SelectTrigger data-testid="select-alter-sub-type">
+                                        <SelectValue placeholder="Select sub type (optional)" />
+                                      </SelectTrigger>
+                                    </FormControl>
+                                    <SelectContent>
+                                      {opts.map((t) => (
+                                        <SelectItem key={t} value={t}>{t}</SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                  <FormMessage />
+                                </FormItem>
+                              );
+                            }}
+                          />
+                        )}
 
                         {/* Opening Balance */}
                         <div className="grid grid-cols-2 gap-4">
