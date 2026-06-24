@@ -906,7 +906,7 @@ export function registerInventoryRoutes(app: Express) {
   });
 
   // Get today vouchers for a location (for POS dashboard)
-  app.get("/api/locations/:locationId/vouchers/today", requireAuth, async (req, res) => {
+  app.get("/api/locations/:locationId/vouchers/today", requireAuth, checkPOSLocation, async (req, res) => {
     try {
       const locationId = parseInt(req.params.locationId);
       if (isNaN(locationId)) {

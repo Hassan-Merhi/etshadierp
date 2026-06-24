@@ -17,6 +17,7 @@ import multer from "multer";
 import { db } from "../../db";
 import { labelDesignColors } from "../../../shared/schema";
 import { eq, asc } from "drizzle-orm";
+import { requireNonPOS } from "../../auth";
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -100,7 +101,7 @@ export function registerLabelBannersRoutes(app: any, requireAuth: any) {
   });
 
   // ── POST /api/factory/label-design-colors — create new color (+ image) ─────
-  app.post("/api/factory/label-design-colors", requireAuth, (req: any, res: any) => {
+  app.post("/api/factory/label-design-colors", requireAuth, requireNonPOS, (req: any, res: any) => {
     upload.single("image")(req, res, async (err: any) => {
       if (err) return res.status(400).json({ message: err.message });
 
@@ -156,7 +157,7 @@ export function registerLabelBannersRoutes(app: any, requireAuth: any) {
   });
 
   // ── PATCH /api/factory/label-design-colors/:slug — update label and/or hex ─
-  app.patch("/api/factory/label-design-colors/:slug", requireAuth, async (req: any, res: any) => {
+  app.patch("/api/factory/label-design-colors/:slug", requireAuth, requireNonPOS, async (req: any, res: any) => {
     const { slug } = req.params;
     const { label, colorHex } = req.body;
     if (!label && !colorHex) return res.status(400).json({ message: "Nothing to update" });
@@ -179,7 +180,7 @@ export function registerLabelBannersRoutes(app: any, requireAuth: any) {
   });
 
   // ── DELETE /api/factory/label-design-colors/:slug — remove custom color ────
-  app.delete("/api/factory/label-design-colors/:slug", requireAuth, async (req: any, res: any) => {
+  app.delete("/api/factory/label-design-colors/:slug", requireAuth, requireNonPOS, async (req: any, res: any) => {
     const { slug } = req.params;
     try {
       const [row] = await db.select().from(labelDesignColors).where(eq(labelDesignColors.slug, slug));
@@ -194,7 +195,7 @@ export function registerLabelBannersRoutes(app: any, requireAuth: any) {
   });
 
   // ── POST /api/factory/label-banners/:slug — upload/replace banner image ────
-  app.post("/api/factory/label-banners/:slug", requireAuth, (req: any, res: any) => {
+  app.post("/api/factory/label-banners/:slug", requireAuth, requireNonPOS, (req: any, res: any) => {
     const { slug } = req.params;
     if (!/^[a-z0-9-]+$/.test(slug)) return res.status(400).json({ message: "Invalid slug" });
 
@@ -223,7 +224,7 @@ export function registerLabelBannersRoutes(app: any, requireAuth: any) {
   });
 
   // ── DELETE /api/factory/label-banners/:slug — revert to default image ──────
-  app.delete("/api/factory/label-banners/:slug", requireAuth, async (req: any, res: any) => {
+  app.delete("/api/factory/label-banners/:slug", requireAuth, requireNonPOS, async (req: any, res: any) => {
     const { slug } = req.params;
     try {
       await db

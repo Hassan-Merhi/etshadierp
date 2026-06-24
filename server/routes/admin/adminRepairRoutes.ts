@@ -1007,7 +1007,7 @@ export function registerAdminRepairRoutes(app: Express) {
     }
   });
 
-  app.post("/api/dev/seed", async (req, res) => {
+  app.post("/api/dev/seed", requireAuth, requireRole("Admin"), async (req, res) => {
     if (process.env.NODE_ENV !== "development") {
       return res.status(403).json({ message: "Dev seed only available in development" });
     }

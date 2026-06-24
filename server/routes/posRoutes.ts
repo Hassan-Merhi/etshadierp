@@ -1778,6 +1778,18 @@ export function registerPosRoutes(app: Express) {
         return res.status(403).json({ message: "Access denied: Invalid location" });
       }
 
+      // POS users may only open shifts at their assigned location(s)
+      if (req.user?.role === "POS") {
+        const assignedLocs = await db
+          .select({ locationId: userLocations.locationId })
+          .from(userLocations)
+          .where(and(eq(userLocations.userId, req.user.id), eq(userLocations.companyId, req.session.currentCompanyId!)));
+        const allowedIds = assignedLocs.map((l) => l.locationId);
+        if (!allowedIds.includes(locationId)) {
+          return res.status(403).json({ message: "You can only open shifts at your assigned location" });
+        }
+      }
+
       // Check if user already has an open shift at this location
       const existingShift = await storage.getCurrentShift(userId, locationId);
       if (existingShift) {
@@ -1852,10 +1864,21 @@ export function registerPosRoutes(app: Express) {
       if (!locationId || isNaN(locationId)) {
         return res.status(400).json({ message: "Location ID is required" });
       }
-      // Get the location to find its company
+      // Get the location and verify it belongs to the current company
       const location = await storage.getLocationById(locationId);
-      if (!location) {
-        return res.status(404).json({ message: "Location not found" });
+      if (!location || location.companyId !== req.session.currentCompanyId) {
+        return res.status(403).json({ message: "Access denied: Invalid location" });
+      }
+      // POS users may only query prices for their assigned location(s)
+      if (req.user?.role === "POS") {
+        const assignedLocs = await db
+          .select({ locationId: userLocations.locationId })
+          .from(userLocations)
+          .where(and(eq(userLocations.userId, req.user.id), eq(userLocations.companyId, req.session.currentCompanyId!)));
+        const allowedIds = assignedLocs.map((l) => l.locationId);
+        if (!allowedIds.includes(locationId)) {
+          return res.status(403).json({ message: "You can only access data for your assigned locations" });
+        }
       }
       const prices = await storage.getLastSoldPrices(location.companyId);
       res.json(prices);

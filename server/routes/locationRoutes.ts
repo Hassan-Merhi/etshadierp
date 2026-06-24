@@ -416,7 +416,7 @@ export function registerLocationRoutes(app: Express) {
   });
 
   // Location Inventory Export - Export full inventory details to Excel
-  app.get("/api/locations/:locationId/inventory/export", requireAuth, async (req, res) => {
+  app.get("/api/locations/:locationId/inventory/export", requireAuth, checkPOSLocation, async (req, res) => {
     try {
       const locationId = parseInt(req.params.locationId);
       if (isNaN(locationId)) {
@@ -489,7 +489,7 @@ export function registerLocationRoutes(app: Express) {
   });
 
   // Location Inventory PDF — Godown Summary (with or without cost)
-  app.get("/api/locations/:locationId/inventory/pdf", requireAuth, async (req, res) => {
+  app.get("/api/locations/:locationId/inventory/pdf", requireAuth, checkPOSLocation, async (req, res) => {
     try {
       const locationId = parseInt(req.params.locationId);
       if (isNaN(locationId)) return res.status(400).json({ message: "Invalid location ID" });
