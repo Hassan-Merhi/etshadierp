@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from "react";
 import { ScanLine, AlertCircle, Plus } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { FactoryBaleProduct } from "@shared/schema";
@@ -23,6 +24,53 @@ export function StockEntryScanner({
   filteredProducts,
   onSelectProduct,
 }: StockEntryScannerProps) {
+  const [activeIndex, setActiveIndex] = useState(-1);
+  const listRef = useRef<HTMLDivElement>(null);
+  const itemRefs = useRef<(HTMLDivElement | null)[]>([]);
+
+  // Reset highlight whenever the list changes
+  useEffect(() => {
+    setActiveIndex(-1);
+  }, [filteredProducts]);
+
+  // Scroll active item into view
+  useEffect(() => {
+    if (activeIndex >= 0 && itemRefs.current[activeIndex]) {
+      itemRefs.current[activeIndex]?.scrollIntoView({ block: "nearest" });
+    }
+  }, [activeIndex]);
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    const isOpen = showDropdown && filteredProducts.length > 0;
+
+    if (isOpen && e.key === "ArrowDown") {
+      e.preventDefault();
+      setActiveIndex((i) => Math.min(i + 1, filteredProducts.length - 1));
+      return;
+    }
+
+    if (isOpen && e.key === "ArrowUp") {
+      e.preventDefault();
+      setActiveIndex((i) => Math.max(i - 1, 0));
+      return;
+    }
+
+    if (isOpen && e.key === "Enter" && activeIndex >= 0) {
+      e.preventDefault();
+      onSelectProduct(filteredProducts[activeIndex]);
+      setActiveIndex(-1);
+      return;
+    }
+
+    if (e.key === "Escape" && isOpen) {
+      e.preventDefault();
+      setActiveIndex(-1);
+      return;
+    }
+
+    onScanKeyDown(e);
+  };
+
   return (
     <div className="flex flex-col gap-3">
       <div className="relative group">
@@ -34,7 +82,7 @@ export function StockEntryScanner({
           placeholder="Scan article code or type product name..."
           value={scanInput}
           onChange={(e) => onScanInputChange(e.target.value)}
-          onKeyDown={onScanKeyDown}
+          onKeyDown={handleKeyDown}
           className="pl-10 h-12 text-base rounded-xl border-2 focus-visible:ring-primary/20 transition-all shadow-sm"
           data-testid="input-scan-product"
         />
@@ -45,15 +93,29 @@ export function StockEntryScanner({
           </div>
         )}
         {showDropdown && filteredProducts.length > 0 && (
-          <div className="absolute z-50 w-full mt-1 bg-background border rounded-xl shadow-xl overflow-hidden max-h-72 overflow-y-auto">
-            {filteredProducts.map((p) => (
+          <div
+            ref={listRef}
+            className="absolute z-50 w-full mt-1 bg-background border rounded-xl shadow-xl overflow-hidden max-h-72 overflow-y-auto"
+          >
+            {filteredProducts.map((p, idx) => (
               <div
                 key={p.id}
-                className="px-4 py-2.5 cursor-pointer flex items-center justify-between border-b last:border-0 hover:bg-muted/50 transition-colors"
+                ref={(el) => {
+                  itemRefs.current[idx] = el;
+                }}
+                className={`px-4 py-2.5 cursor-pointer flex items-center justify-between border-b last:border-0 transition-colors ${
+                  idx === activeIndex ? "bg-primary/10" : "hover:bg-muted/50"
+                }`}
                 onClick={() => onSelectProduct(p)}
               >
                 <div className="flex items-center gap-3">
-                  <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center font-bold text-primary text-[10px]">
+                  <div
+                    className={`h-8 w-8 rounded-lg flex items-center justify-center font-bold text-[10px] ${
+                      idx === activeIndex
+                        ? "bg-primary text-primary-foreground"
+                        : "bg-primary/10 text-primary"
+                    }`}
+                  >
                     {p.grade || "STK"}
                   </div>
                   <div>
@@ -61,7 +123,7 @@ export function StockEntryScanner({
                     <div className="text-[10px] text-muted-foreground font-mono">{p.articleCode || p.code}</div>
                   </div>
                 </div>
-                <Plus className="h-4 w-4 text-muted-foreground" />
+                <Plus className={`h-4 w-4 ${idx === activeIndex ? "text-primary" : "text-muted-foreground"}`} />
               </div>
             ))}
           </div>
