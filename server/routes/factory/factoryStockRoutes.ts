@@ -233,7 +233,8 @@ export function registerFactoryStockRoutes(app: Express) {
 
         for (const item of items) {
           const qty = parseInt(item.quantity || item.qty || "1");
-          const weight = parseFloat(item.weightPerBale || "25");
+          const rawWeight = item.weightPerBale ?? item.weightPerBaleKg ?? "25";
+          const weight = parseFloat(String(rawWeight)) || 25;
           const product = productMap.get(item.productId);
           if (!product) throw new Error(`Product ID ${item.productId} not found`);
           const categoryName: string | null = product.categoryId

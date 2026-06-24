@@ -1,3 +1,4 @@
+import { useCallback } from "react";
 import { Trash2, Plus, Minus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -45,6 +46,45 @@ export function StockEntryCart({
   onLogoPickerOpenChange: (productId: number | null) => void;
   filteredWorkers: any[];
 }) {
+  // Navigate between qty/weight cells with arrow keys
+  const handleCellKeyDown = useCallback(
+    (
+      e: React.KeyboardEvent<HTMLInputElement>,
+      productId: number,
+      col: "qty" | "weight"
+    ) => {
+      const rowIndex = cart.findIndex((i) => i.productId === productId);
+      if (rowIndex === -1) return;
+
+      if (e.key === "ArrowDown") {
+        const next = cart[rowIndex + 1];
+        if (next) {
+          e.preventDefault();
+          const selector = col === "qty"
+            ? `[data-testid="input-qty-${next.productId}"]`
+            : `[data-testid="input-weight-${next.productId}"]`;
+          (document.querySelector(selector) as HTMLInputElement | null)?.focus();
+        }
+      } else if (e.key === "ArrowUp") {
+        const prev = cart[rowIndex - 1];
+        if (prev) {
+          e.preventDefault();
+          const selector = col === "qty"
+            ? `[data-testid="input-qty-${prev.productId}"]`
+            : `[data-testid="input-weight-${prev.productId}"]`;
+          (document.querySelector(selector) as HTMLInputElement | null)?.focus();
+        }
+      } else if (e.key === "ArrowRight" && col === "qty") {
+        e.preventDefault();
+        (document.querySelector(`[data-testid="input-weight-${productId}"]`) as HTMLInputElement | null)?.focus();
+      } else if (e.key === "ArrowLeft" && col === "weight") {
+        e.preventDefault();
+        (document.querySelector(`[data-testid="input-qty-${productId}"]`) as HTMLInputElement | null)?.focus();
+      }
+    },
+    [cart]
+  );
+
   return (
     <div className="rounded-xl border bg-card/50 overflow-hidden">
       <Table>
@@ -101,6 +141,7 @@ export function StockEntryCart({
                     type="number"
                     value={item.qty}
                     onChange={(e) => onSetQty(item.productId, parseInt(e.target.value) || 0)}
+                    onKeyDown={(e) => handleCellKeyDown(e, item.productId, "qty")}
                     className="h-7 w-12 text-center p-0 font-bold"
                     data-testid={`input-qty-${item.productId}`}
                   />
@@ -121,6 +162,7 @@ export function StockEntryCart({
                     type="number"
                     value={item.weightPerBaleKg}
                     onChange={(e) => onUpdateWeight(item.productId, parseFloat(e.target.value) || 0)}
+                    onKeyDown={(e) => handleCellKeyDown(e, item.productId, "weight")}
                     className="h-7 w-16 text-right font-medium"
                     step="0.1"
                     data-testid={`input-weight-${item.productId}`}
