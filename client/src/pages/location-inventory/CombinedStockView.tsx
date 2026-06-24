@@ -61,6 +61,8 @@ export function CombinedStockView({
 }: CombinedStockViewProps) {
   // Deduplicate locations by name for the dropdown
   const uniqueLocationNames = Array.from(new Map(allInventoryLocations.map((l) => [l.name, l])).values());
+  // Deduplicate categories by id (guard against any API-level duplicates)
+  const uniqueCategories = Array.from(new Map(categoriesList.map((c) => [c.id, c])).values());
 
   // When a location filter is active, only show columns for locations matching that name
   const visibleLocations = allStockLocationFilter
@@ -138,7 +140,7 @@ export function CombinedStockView({
               ))}
             </SelectContent>
           </Select>
-          {categoriesList.length > 0 && (
+          {uniqueCategories.length > 0 && (
             <Popover>
               <PopoverTrigger asChild>
                 <Button
@@ -150,10 +152,10 @@ export function CombinedStockView({
                     {allStockCategoryFilter.length === 0
                       ? "All Categories"
                       : allStockCategoryFilter.length === 1
-                        ? (categoriesList.find((c) => String(c.id) === allStockCategoryFilter[0])?.name ??
-                          allStockCategoryFilter[0] === "none")
+                        ? allStockCategoryFilter[0] === "none"
                           ? "No Category"
-                          : allStockCategoryFilter[0]
+                          : (uniqueCategories.find((c) => String(c.id) === allStockCategoryFilter[0])?.name ??
+                            allStockCategoryFilter[0])
                         : `${allStockCategoryFilter.length} Categories`}
                   </span>
                   <ChevronDown className="h-4 w-4 shrink-0 opacity-50" />
@@ -161,7 +163,7 @@ export function CombinedStockView({
               </PopoverTrigger>
               <PopoverContent className="w-56 p-2" align="start">
                 <div className="space-y-1 max-h-64 overflow-y-auto">
-                  {categoriesList.map((cat) => {
+                  {uniqueCategories.map((cat) => {
                     const val = String(cat.id);
                     const checked = allStockCategoryFilter.includes(val);
                     return (
@@ -221,7 +223,7 @@ export function CombinedStockView({
                   <th className="text-left px-4 py-2.5 font-medium text-muted-foreground whitespace-nowrap sticky left-0 bg-muted/60 z-10">
                     Item Name
                   </th>
-                  {categoriesList.length > 0 && (
+                  {uniqueCategories.length > 0 && (
                     <th className="text-left px-4 py-2.5 font-medium text-muted-foreground whitespace-nowrap">
                       Category
                     </th>
@@ -261,7 +263,7 @@ export function CombinedStockView({
                       rows.push(
                         <tr key={`group-${row.stockGroupName}`} className="bg-muted/30">
                           <td
-                            colSpan={visibleLocations.length + 4 + (categoriesList.length > 0 ? 1 : 0)}
+                            colSpan={visibleLocations.length + 4 + (uniqueCategories.length > 0 ? 1 : 0)}
                             className="px-4 py-1.5 sticky left-0 bg-muted/30 z-10"
                           >
                             <div className="flex items-center justify-between gap-4">
@@ -304,7 +306,7 @@ export function CombinedStockView({
                         >
                           {row.stockItemName}
                         </td>
-                        {categoriesList.length > 0 && (
+                        {uniqueCategories.length > 0 && (
                           <td
                             className="px-4 py-2 whitespace-nowrap"
                             data-testid={`allstock-category-${row.stockItemId}`}
@@ -371,7 +373,7 @@ export function CombinedStockView({
                   <td className="px-4 py-2.5 whitespace-nowrap sticky left-0 bg-muted/50 z-10">
                     Total ({filteredCombinedRows.length} items)
                   </td>
-                  {categoriesList.length > 0 && <td className="px-4 py-2.5" />}
+                  {uniqueCategories.length > 0 && <td className="px-4 py-2.5" />}
                   {visibleLocations.map((loc) => {
                     const locTotal = filteredCombinedRows.reduce((s, r) => s + (r.qtyByLocation[loc.id] || 0), 0);
                     return (
