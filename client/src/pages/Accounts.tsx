@@ -209,6 +209,8 @@ export default function Accounts() {
   // Dedicated query for Group accounts used by the Parent Group combobox.
   // Uses /api/ledger-accounts directly (same source as Account Groups page) so
   // groups created there always appear here without needing /api/accounts/all to refresh.
+  // Groups = accounts marked with subType "Group" OR accounts that happen to have children
+  // (backward-compat: groups created before subType tagging still show up)
   const { data: groupOptions = [] } = useQuery<any[]>({
     queryKey: ["/api/ledger-accounts", selectedCompany?.id],
     queryFn: async () => {
@@ -219,7 +221,11 @@ export default function Accounts() {
       if (!res.ok) throw new Error("Failed to fetch ledger accounts");
       return res.json();
     },
-    select: (data) => data.filter((a: any) => a.subType === "Group"),
+    select: (data: any[]) => {
+      const parentIdSet = new Set<number>();
+      data.forEach((a) => { if (a.parentId) parentIdSet.add(a.parentId); });
+      return data.filter((a) => a.subType === "Group" || parentIdSet.has(a.id));
+    },
     enabled: !!selectedCompany,
   });
 
