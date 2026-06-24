@@ -28,7 +28,7 @@ const CLR_NEG_TEXT = "#c2272d"; // red        — negative qty text
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function fmtQty(n: number): string {
-  return Math.floor(Math.abs(n)).toLocaleString("en-US");
+  return (n < 0 ? "-" : "") + Math.floor(Math.abs(n)).toLocaleString("en-US");
 }
 function fmtAmt(n: number): string {
   return n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
