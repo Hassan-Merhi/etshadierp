@@ -137,9 +137,9 @@ export function OtwTrackingPanel({ containers, isLoading, trackingNowId, setTrac
             })}
           </div>
         </div>
-        <div className="overflow-x-auto">
-          <Table>
-            <TableHeader>
+        <div className="overflow-auto max-h-[calc(100vh-280px)]">
+          <Table wrapperClassName="overflow-visible border-0 rounded-none">
+            <TableHeader className="sticky top-0 z-30 bg-background">
               <TableRow className="bg-muted border-b-2 border-border/60 hover:bg-muted">
                 <TableHead className="pl-4 text-xs font-semibold text-muted-foreground uppercase tracking-wide py-2">
                   Container

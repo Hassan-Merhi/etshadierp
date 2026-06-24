@@ -190,10 +190,10 @@ export function ContainerListView({
         </div>
       </div>
 
-      <div>
+      <div className="overflow-auto max-h-[calc(100vh-280px)]">
         {filteredContainers && filteredContainers.length > 0 ? (
-          <Table wrapperClassName="overflow-visible">
-            <TableHeader className="sticky top-0 z-30">
+          <Table wrapperClassName="overflow-visible border-0 rounded-none">
+            <TableHeader className="sticky top-0 z-30 bg-background">
               <TableRow className="bg-muted border-b-2 border-border/60 hover:bg-muted">
                 <TableHead className="w-10 py-2">
                   <Checkbox
