@@ -1678,9 +1678,10 @@ export function registerFactoryBalesRoutes(app: Express) {
       if (!ALLOWED.includes(status))
         return res.status(400).json({ message: `Invalid status. Allowed: ${ALLOWED.join(", ")}` });
 
+      const now = new Date();
       const result = await db
         .update(factoryBales)
-        .set({ status, updatedAt: new Date() })
+        .set({ status, updatedAt: now, deletedAt: status === "DELETED" ? now : null })
         .where(and(eq(factoryBales.companyId, companyId), inArray(factoryBales.id, ids.map(Number))))
         .returning({ id: factoryBales.id });
 
@@ -1742,9 +1743,10 @@ export function registerFactoryBalesRoutes(app: Express) {
         }
       }
 
+      const now = new Date();
       const [updated] = await db
         .update(factoryBales)
-        .set({ status, updatedAt: new Date() })
+        .set({ status, updatedAt: now, deletedAt: status === "DELETED" ? now : null })
         .where(and(eq(factoryBales.id, id), eq(factoryBales.companyId, companyId)))
         .returning({ id: factoryBales.id, status: factoryBales.status });
 

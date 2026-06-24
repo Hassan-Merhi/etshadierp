@@ -5134,6 +5134,27 @@ END $mig$`;
       }
     }, 30000);
 
+    // ── Fix bales where deletedAt is set but status is not DELETED ────────────
+    void (async () => {
+      try {
+        const r = await pool.query(`
+          UPDATE factory_bales
+             SET status = 'DELETED', updated_at = NOW()
+           WHERE deleted_at IS NOT NULL
+             AND status != 'DELETED'
+          RETURNING id, reference_number
+        `);
+        if (r.rowCount && r.rowCount > 0) {
+          console.log(
+            `[BaleStatusFix] Fixed ${r.rowCount} bale(s) with deletedAt set but status != DELETED:`,
+            r.rows.map((x: any) => x.reference_number).join(", ")
+          );
+        }
+      } catch (e: any) {
+        console.warn("[BaleStatusFix] Could not fix inconsistent bale statuses:", e.message);
+      }
+    })();
+
     // ── Clean up orphaned export runs ────────────────────────────────────────
     const cleanupOrphanedRuns = async () => {
       try {
