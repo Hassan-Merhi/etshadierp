@@ -1,5 +1,5 @@
 import { eq, and, isNull, sql, inArray } from "drizzle-orm";
-import { db } from "../db";
+import { db, pool } from "../db";
 import * as schema from "@shared/schema";
 import type { StockTransferItem, StockAdjustmentItem } from "@shared/schema";
 import { getStockItemByCodeOrAlias } from "./inventory";
@@ -982,18 +982,14 @@ export async function getLastSaleForItem(stockItemId: number, companyId: number)
   return result.length > 0 ? result[0] : null;
 }
 
-export async function getLastSoldPrices(companyId: number): Promise<Record<number, string>> {
-  const result = await db.execute(sql`
-    WITH latest_sales AS (
-      SELECT DISTINCT ON (si.stock_item_id)
-        si.stock_item_id,
-        si.selling_price
-      FROM sales_items si
-      INNER JOIN vouchers v ON si.voucher_id = v.id
-      WHERE v.company_id = ${companyId}
-      ORDER BY si.stock_item_id, v.voucher_date DESC, si.created_at DESC
-    )
-    SELECT stock_item_id, selling_price FROM latest_sales
+export async function getLastSoldPrices(): Promise<Record<number, string>> {
+  const result = await pool.query(`
+    SELECT DISTINCT ON (si.stock_item_id)
+      si.stock_item_id,
+      si.selling_price
+    FROM sales_items si
+    INNER JOIN vouchers v ON si.voucher_id = v.id
+    ORDER BY si.stock_item_id, v.voucher_date DESC, si.created_at DESC
   `);
   const priceMap: Record<number, string> = {};
   for (const row of result.rows as any[]) {

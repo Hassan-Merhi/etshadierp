@@ -1880,7 +1880,7 @@ export function registerPosRoutes(app: Express) {
           return res.status(403).json({ message: "You can only access data for your assigned locations" });
         }
       }
-      const prices = await storage.getLastSoldPrices(location.companyId);
+      const prices = await storage.getLastSoldPrices();
       res.json(prices);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
