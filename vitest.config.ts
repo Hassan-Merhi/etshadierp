@@ -9,11 +9,7 @@ export default defineConfig({
     hookTimeout: 30000,
     include: ["tests/**/*.test.ts"],
     pool: "forks",
-    poolOptions: {
-      forks: {
-        singleFork: true,
-      },
-    },
+    singleFork: true,
   },
   resolve: {
     alias: {

@@ -2,6 +2,7 @@ import express from "express";
 import session from "express-session";
 import { registerRoutes } from "../server/routes";
 import { db } from "../server/db";
+import { pool } from "../server/db";
 import { eq, and, sql } from "drizzle-orm";
 import * as schema from "../shared/schema";
 
@@ -49,6 +50,8 @@ export async function cleanupTestData(prefix: string): Promise<void> {
     .where(sql`${schema.companies.name} LIKE ${"%" + prefix + "%"}`);
 
   for (const company of companies) {
+    await pool.query("DELETE FROM audit_log WHERE company_id = $1", [company.id]);
+    await pool.query("DELETE FROM login_history WHERE company_id = $1", [company.id]);
     await db
       .delete(schema.inventory)
       .where(eq(schema.inventory.companyId, company.id));
@@ -90,12 +93,21 @@ export async function cleanupTestData(prefix: string): Promise<void> {
     await db
       .delete(schema.userCompanyRoles)
       .where(eq(schema.userCompanyRoles.companyId, company.id));
+    await db
+      .delete(schema.userLocations)
+      .where(eq(schema.userLocations.companyId, company.id));
     await db.delete(schema.companies).where(eq(schema.companies.id, company.id));
   }
 
-  await db
-    .delete(schema.users)
+  const usersToDelete = await db
+    .select({ id: schema.users.id })
+    .from(schema.users)
     .where(sql`${schema.users.username} LIKE ${"%" + prefix + "%"}`);
+
+  for (const u of usersToDelete) {
+    await pool.query("DELETE FROM login_history WHERE user_id = $1", [u.id]);
+    await db.delete(schema.users).where(eq(schema.users.id, u.id));
+  }
 }
 
 export async function seedTestData(prefix: string): Promise<TestContext> {

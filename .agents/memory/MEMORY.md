@@ -12,3 +12,5 @@
 - [PageHeader uses children not actions](page-header-api.md) — PageHeader renders actions as children prop (line 89), NOT an "actions" prop; also uses showBackButton (not showBack) and window.history.back() — no onBack prop.
 - [SW cache stale chunks crash React](sw-stale-chunks.md) — service worker staleWhileRevalidate caches Vite dep chunks; after Vite cache clear, old SW cache serves stale chunks with mismatched React instance → null dispatcher. Fix: bump CACHE_VERSION to force cache eviction.
 - [Drizzle db.execute crashes on complex queries](drizzle-execute-crash.md) — db.execute(sql`...`) throws "Cannot convert undefined or null to object" on multi-join queries; use pool.query(text, params) instead.
+- [Test cleanup FK order](test-cleanup-fk.md) — cleanupTestData must delete audit_log + login_history (by company_id) before deleting companies; login_history has two FKs (user_id + company_id), both must be cleared.
+- [Vitest integration test patterns](vitest-integration-patterns.md) — journal vouchers use /api/vouchers/journal; accounts/all returns IDs as "ledger-{n}" strings; /api/accounts/ledger/{id}/balance does not enforce company isolation.
