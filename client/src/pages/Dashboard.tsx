@@ -45,7 +45,7 @@ import { useLocation } from "wouter";
 import { cn } from "@/lib/utils";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useCompany } from "@/contexts/CompanyContext";
-import { useState, useRef } from "react";
+import { useState, useRef, useMemo } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 import { useAppMode, useModePrefix } from "@/contexts/AppModeContext";
@@ -456,23 +456,31 @@ export default function Dashboard() {
     dragPayableRef.current = null;
   };
 
-  const availableCashAccounts = allAccounts
-    .filter((acc) => {
-      const alreadyAdded = dashboardCashAccounts.some(
-        (dca) => dca.accountType === (acc.type || "").toLowerCase() && dca.accountId === acc.accountId
-      );
-      return !alreadyAdded;
-    })
-    .sort((a, b) => (a.name || "").localeCompare(b.name || ""));
+  const availableCashAccounts = useMemo(
+    () =>
+      allAccounts
+        .filter((acc) => {
+          const alreadyAdded = dashboardCashAccounts.some(
+            (dca) => dca.accountType === (acc.type || "").toLowerCase() && dca.accountId === acc.accountId
+          );
+          return !alreadyAdded;
+        })
+        .sort((a, b) => (a.name || "").localeCompare(b.name || "")),
+    [allAccounts, dashboardCashAccounts]
+  );
 
   const displayedCashAccounts = dashboardCashAccounts;
 
-  const availablePayableAccounts = allPayableAccounts
-    .filter((acc) => {
-      const alreadyAdded = dashboardPayableAccounts.some((dpa) => dpa.accountId === acc.accountId);
-      return !alreadyAdded;
-    })
-    .sort((a, b) => (a.name || "").localeCompare(b.name || ""));
+  const availablePayableAccounts = useMemo(
+    () =>
+      allPayableAccounts
+        .filter((acc) => {
+          const alreadyAdded = dashboardPayableAccounts.some((dpa) => dpa.accountId === acc.accountId);
+          return !alreadyAdded;
+        })
+        .sort((a, b) => (a.name || "").localeCompare(b.name || "")),
+    [allPayableAccounts, dashboardPayableAccounts]
+  );
 
   if (isError) {
     return (
@@ -485,11 +493,14 @@ export default function Dashboard() {
   const importCycleBalance = importCycleData?.netImportCycleBalance ?? null;
   const isImportCycleBalanced = importCycleBalance !== null && Math.abs(importCycleBalance) < 1;
 
-  const totalAvailable = displayedCashAccounts.reduce(
-    (s, d) => s + parseFloat(String(d.account.balance || d.account.currentBalance || 0)),
-    0
+  const totalAvailable = useMemo(
+    () => displayedCashAccounts.reduce((s, d) => s + parseFloat(String(d.account.balance || d.account.currentBalance || 0)), 0),
+    [displayedCashAccounts]
   );
-  const totalPayable = dashboardPayableAccounts.reduce((s, a) => s + Math.abs(a.balance), 0);
+  const totalPayable = useMemo(
+    () => dashboardPayableAccounts.reduce((s, a) => s + Math.abs(a.balance), 0),
+    [dashboardPayableAccounts]
+  );
   const netCashPosition = totalAvailable - totalPayable;
 
   return (

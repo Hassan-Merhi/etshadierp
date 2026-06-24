@@ -48,10 +48,12 @@ export function useVoucherQueries({
 
   const { data: bankAccounts = [] } = useQuery<BankAccount[]>({
     queryKey: ["/api/bank-accounts", selectedCompany?.id],
+    enabled: !!selectedCompany?.id,
   });
 
   const { data: ledgerAccounts = [] } = useQuery<LedgerAccount[]>({
     queryKey: ["/api/ledger-accounts", selectedCompany?.id],
+    enabled: !!selectedCompany?.id,
   });
 
   const { data: suppliers = [] } = useQuery<Supplier[]>({
@@ -91,10 +93,12 @@ export function useVoucherQueries({
 
   const { data: employees = [] } = useQuery<Employee[]>({
     queryKey: ["/api/employees", selectedCompany?.id],
+    enabled: !!selectedCompany?.id,
   });
 
   const { data: fixedAssets = [] } = useQuery<FixedAsset[]>({
     queryKey: ["/api/fixed-assets", selectedCompany?.id],
+    enabled: !!selectedCompany?.id,
   });
 
   const { data: supplierSearchResults = [] } = useQuery<Supplier[]>({
@@ -125,6 +129,7 @@ export function useVoucherQueries({
 
   const { data: sidebarAccounts = [] } = useQuery<Account[]>({
     queryKey: ["/api/accounts/voucher-sidebar", selectedCompany?.id],
+    enabled: !!selectedCompany?.id,
   });
 
   const { data: voucherToEdit, isLoading: loadingVoucher } = useQuery({

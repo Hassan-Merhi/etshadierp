@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback, useMemo } from "react";
+import { useState, useRef, useCallback, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation, useSearch } from "wouter";
 import { Button } from "@/components/ui/button";
@@ -85,13 +85,7 @@ export default function Accounts() {
       : null
   );
 
-  useEffect(() => {
-    if (selectedCompany?.id) {
-      queryClient.invalidateQueries({
-        queryKey: ["/api/accounts/all", selectedCompany.id],
-      });
-    }
-  }, [selectedCompany?.id]);
+  // Query key includes selectedCompany?.id so React Query refetches automatically on company switch — no manual useEffect needed.
 
   const [searchTerm, setSearchTerm] = useState("");
   const [periodFilter, setPeriodFilter] = useState<PeriodFilterValue>(() => {

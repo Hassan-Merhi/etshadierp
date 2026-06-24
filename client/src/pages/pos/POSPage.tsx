@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation as useLocationContext } from "@/contexts/LocationContext";
 import { useCompany } from "@/contexts/CompanyContext";
@@ -114,12 +114,14 @@ function SpPOS() {
   });
 
   // ── Derived: stock items at active location ─────────────────────────────────
-  const stockAtLocation = selectedLocation
-    ? (Array.isArray(spStock) ? spStock : []).filter((m) => m.locationId === selectedLocation.id)
-    : [];
+  const stockAtLocation = useMemo(
+    () =>
+      selectedLocation ? (Array.isArray(spStock) ? spStock : []).filter((m) => m.locationId === selectedLocation.id) : [],
+    [spStock, selectedLocation]
+  );
 
   // Group by articleCode → sum qtyRemaining
-  const stockItems: SpStockItem[] = (() => {
+  const stockItems: SpStockItem[] = useMemo(() => {
     const map = new Map<string, SpStockItem>();
     for (const m of stockAtLocation) {
       const qty = parseFloat(m.qtyRemaining) || 0;
@@ -138,7 +140,7 @@ function SpPOS() {
       }
     }
     return Array.from(map.values());
-  })();
+  }, [stockAtLocation]);
 
   // ── Cart state ──────────────────────────────────────────────────────────────
   const [rows, setRows] = useState<CartRow[]>([]);
