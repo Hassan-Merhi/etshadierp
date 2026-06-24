@@ -148,7 +148,7 @@ export async function getStockItemByCodeOrAlias(
     .innerJoin(schema.stockItems, eq(schema.stockItemCodeAliases.stockItemId, schema.stockItems.id))
     .where(
       and(
-        eq(schema.stockItemCodeAliases.alias, codeOrAlias),
+        eq(schema.stockItemCodeAliases.aliasCode, codeOrAlias),
         eq(schema.stockItems.companyId, companyId),
         isNull(schema.stockItems.deletedAt)
       )
