@@ -1,6 +1,7 @@
-import { Package, AlertTriangle } from "lucide-react";
+import { Package, AlertTriangle, ShieldCheck, Layers } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { useLocation } from "wouter";
 
 export function DiagnosticsSection({
   setOrphanedChargesDiagnostic,
@@ -9,6 +10,8 @@ export function DiagnosticsSection({
   setOrphanedChargesDiagnostic: (v: any) => void;
   toast: any;
 }) {
+  const [, navigate] = useLocation();
+
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-2 px-1">
@@ -67,8 +70,33 @@ export function DiagnosticsSection({
       <Card className="p-6">
         <div className="flex items-center justify-between gap-4">
           <div className="flex items-center gap-4">
+            <div className="p-3 bg-green-500/10 rounded-lg">
+              <ShieldCheck className="h-6 w-6 text-green-600" />
+            </div>
+            <div>
+              <h4 className="font-semibold" data-testid="text-net-position-check-title">
+                Net Position Check
+              </h4>
+              <p className="text-sm text-muted-foreground">
+                Scan account balances for discrepancies and repair ledger drift
+              </p>
+            </div>
+          </div>
+          <Button
+            variant="outline"
+            onClick={() => navigate("/balance-repair")}
+            data-testid="button-net-position-check"
+          >
+            Open Check
+          </Button>
+        </div>
+      </Card>
+
+      <Card className="p-6">
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
             <div className="p-3 bg-purple-500/10 rounded-lg">
-              <Package className="h-6 w-6 text-purple-500" />
+              <Layers className="h-6 w-6 text-purple-500" />
             </div>
             <div>
               <h4 className="font-semibold" data-testid="text-container-analysis-title">
@@ -79,11 +107,10 @@ export function DiagnosticsSection({
           </div>
           <Button
             variant="outline"
-            onClick={() => {
-              // This is just a scroll to the analysis section in this simplified view
-            }}
+            onClick={() => navigate("/containers")}
+            data-testid="button-container-analysis"
           >
-            Go to Analysis
+            View Containers
           </Button>
         </div>
       </Card>

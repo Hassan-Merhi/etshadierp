@@ -1,3 +1,7 @@
+import { useState } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
 import { Plus, Building2, Search, Edit, Trash2 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -16,44 +20,91 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { UseFormReturn } from "react-hook-form";
-import { UseMutationResult } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { queryClient, apiRequest } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
+import { insertCompanySchema } from "@shared/schema";
 
-interface CompaniesTabProps {
-  companies: any[];
-  isLoadingCompanies: boolean;
-  isCompanyDialogOpen: boolean;
-  setIsCompanyDialogOpen: (open: boolean) => void;
-  editingCompany: any;
-  setEditingCompany: (company: any) => void;
-  companyForm: UseFormReturn<any>;
-  handleSubmitCompany: (data: any) => void;
-  createCompanyMutation: UseMutationResult<any, any, any>;
-  companySearch: string;
-  setCompanySearch: (q: string) => void;
-  companyToDelete: any;
-  setCompanyToDelete: (company: any) => void;
-  deleteCompanyMutation: UseMutationResult<any, any, any>;
-  handleEditCompany: (company: any) => void;
-}
+type CompanyFormValues = z.infer<typeof insertCompanySchema>;
 
-export function CompaniesTab({
-  companies,
-  isLoadingCompanies,
-  isCompanyDialogOpen,
-  setIsCompanyDialogOpen,
-  editingCompany,
-  setEditingCompany,
-  companyForm,
-  handleSubmitCompany,
-  createCompanyMutation,
-  companySearch,
-  setCompanySearch,
-  companyToDelete,
-  setCompanyToDelete,
-  deleteCompanyMutation,
-  handleEditCompany,
-}: CompaniesTabProps) {
+export function CompaniesTab() {
+  const { toast } = useToast();
+  const [isCompanyDialogOpen, setIsCompanyDialogOpen] = useState(false);
+  const [editingCompany, setEditingCompany] = useState<any>(null);
+  const [companySearch, setCompanySearch] = useState("");
+  const [companyToDelete, setCompanyToDelete] = useState<any>(null);
+
+  const { data: companies = [], isLoading: isLoadingCompanies } = useQuery<any[]>({
+    queryKey: ["/api/companies"],
+  });
+
+  const companyForm = useForm<CompanyFormValues>({
+    resolver: zodResolver(insertCompanySchema),
+    defaultValues: {
+      name: "",
+      code: "",
+      companyType: "erp",
+      active: true,
+      baseCurrency: "USD",
+      displayCurrency: "none",
+    },
+  });
+
+  const createCompanyMutation = useMutation({
+    mutationFn: async (data: CompanyFormValues) => {
+      const payload = { ...data, displayCurrency: data.displayCurrency === "none" ? null : data.displayCurrency };
+      if (editingCompany) {
+        const res = await apiRequest("PATCH", `/api/companies/${editingCompany.id}`, payload);
+        return res.json();
+      } else {
+        const res = await apiRequest("POST", "/api/companies", payload);
+        return res.json();
+      }
+    },
+    onSuccess: () => {
+      toast({ title: "Success", description: editingCompany ? "Company updated." : "Company created." });
+      queryClient.invalidateQueries({ queryKey: ["/api/companies"] });
+      setIsCompanyDialogOpen(false);
+      setEditingCompany(null);
+      companyForm.reset({ name: "", code: "", companyType: "erp", active: true, baseCurrency: "USD", displayCurrency: "none" });
+    },
+    onError: (error: any) => {
+      toast({ title: "Error", description: error.message || "Failed to save company.", variant: "destructive" });
+    },
+  });
+
+  const deleteCompanyMutation = useMutation({
+    mutationFn: async (id: number) => {
+      const res = await apiRequest("DELETE", `/api/companies/${id}`, {});
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Deleted", description: "Company deleted successfully." });
+      queryClient.invalidateQueries({ queryKey: ["/api/companies"] });
+      setCompanyToDelete(null);
+    },
+    onError: (error: any) => {
+      toast({ title: "Error", description: error.message || "Failed to delete company.", variant: "destructive" });
+    },
+  });
+
+  function handleEditCompany(company: any) {
+    setEditingCompany(company);
+    companyForm.reset({
+      name: company.name,
+      code: company.code,
+      companyType: company.companyType || "erp",
+      active: company.active ?? true,
+      baseCurrency: company.baseCurrency || "USD",
+      displayCurrency: company.displayCurrency || "none",
+    });
+    setIsCompanyDialogOpen(true);
+  }
+
+  function handleSubmitCompany(data: CompanyFormValues) {
+    createCompanyMutation.mutate(data);
+  }
+
   return (
     <div className="space-y-5">
       {/* Header */}
@@ -67,12 +118,18 @@ export function CompaniesTab({
             {companies.length} {companies.length === 1 ? "company" : "companies"} configured
           </p>
         </div>
-        <Dialog open={isCompanyDialogOpen} onOpenChange={setIsCompanyDialogOpen}>
+        <Dialog open={isCompanyDialogOpen} onOpenChange={(open) => {
+          setIsCompanyDialogOpen(open);
+          if (!open) {
+            setEditingCompany(null);
+            companyForm.reset({ name: "", code: "", companyType: "erp", active: true, baseCurrency: "USD", displayCurrency: "none" });
+          }
+        }}>
           <DialogTrigger asChild>
             <Button
               onClick={() => {
                 setEditingCompany(null);
-                companyForm.reset({ name: "", code: "", companyType: "erp", active: true });
+                companyForm.reset({ name: "", code: "", companyType: "erp", active: true, baseCurrency: "USD", displayCurrency: "none" });
               }}
               data-testid="button-add-company"
             >
@@ -294,11 +351,9 @@ export function CompaniesTab({
                     className="rounded-md border bg-card flex flex-col overflow-hidden"
                     data-testid={`card-company-${company.id}`}
                   >
-                    {/* Colored top accent bar */}
                     <div className={`h-1.5 w-full ${accentClass}`} />
 
                     <div className="flex flex-col gap-3 p-4 flex-1">
-                      {/* Name + badges */}
                       <div className="flex items-start justify-between gap-2">
                         <p
                           className="font-semibold text-base leading-tight"
@@ -326,7 +381,6 @@ export function CompaniesTab({
                         </div>
                       </div>
 
-                      {/* Currency row */}
                       <p className="text-xs text-muted-foreground">
                         {company.baseCurrency || "USD"}
                         {company.displayCurrency && company.displayCurrency !== "none"
@@ -335,7 +389,6 @@ export function CompaniesTab({
                       </p>
                     </div>
 
-                    {/* Action footer */}
                     <div className="border-t px-4 py-2 flex justify-end gap-1">
                       <Button
                         size="icon"
