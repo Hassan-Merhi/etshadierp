@@ -1375,10 +1375,10 @@ export default function ERPRunPayroll() {
           <AlertDialogHeader>
             <AlertDialogTitle>Fix Historical Payroll Runs?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will scan all paid payroll runs and re-post any that used the old single "Salary Expense" account.
-              They will be split into per-group expense accounts (e.g. "Kolwezi Worker Payroll Expense") based on the
-              worker groups recorded in each run. The old accounting entries will be replaced — totals stay the same,
-              only the expense account breakdown changes.
+              This will scan all paid payroll runs and re-post any that used old-style expense accounts ("Salary
+              Expense" or "{Group} Worker Payroll Expense"). They will be split into per-group accounts (e.g. "Salary
+              Expense - Kolwezi Workers") based on the worker groups recorded in each run. The old accounting entries
+              will be replaced — totals stay the same, only the expense account breakdown changes.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
