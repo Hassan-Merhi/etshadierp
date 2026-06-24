@@ -1,10 +1,10 @@
 import { useState, useMemo } from "react";
-import { useLocation } from "wouter";
 import { formatNumber } from "@/lib/formatNumber";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ChevronRight, ChevronDown, FlaskRound, Plus, MinusCircle, Layers } from "lucide-react";
+import { SupplierMixBatchHistoryDialog } from "./SupplierMixBatchHistoryDialog";
 
 interface RawStockRow {
   supplierName: string;
@@ -33,8 +33,8 @@ interface RawStockTableProps {
 }
 
 export function RawStockTable({ rawStock, onAdjust, onDeduct, onAddToBatch }: RawStockTableProps) {
-  const [, navigate] = useLocation();
   const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({ Uncategorized: true });
+  const [historyDialog, setHistoryDialog] = useState<{ supplierId: number; supplierName: string } | null>(null);
 
   const groupedStock = useMemo(() => {
     const groups: Record<string, RawStockRow[]> = {};
@@ -53,6 +53,7 @@ export function RawStockTable({ rawStock, onAdjust, onDeduct, onAddToBatch }: Ra
   };
 
   return (
+    <>
     <div className="border rounded-md overflow-hidden bg-card shadow-sm">
       <Table>
         <TableHeader className="bg-muted/50">
@@ -135,7 +136,8 @@ export function RawStockTable({ rawStock, onAdjust, onDeduct, onAddToBatch }: Ra
                               className="font-medium text-sm text-foreground hover:text-primary hover:underline text-left w-fit cursor-pointer"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                if (row.supplierId) navigate(`/factory/suppliers?supplierId=${row.supplierId}`);
+                                if (row.supplierId)
+                                  setHistoryDialog({ supplierId: row.supplierId, supplierName: row.supplierName });
                               }}
                               data-testid={`link-supplier-name-${row.supplierId}`}
                             >
@@ -214,5 +216,15 @@ export function RawStockTable({ rawStock, onAdjust, onDeduct, onAddToBatch }: Ra
         </TableBody>
       </Table>
     </div>
+
+      {historyDialog && (
+        <SupplierMixBatchHistoryDialog
+          supplierId={historyDialog.supplierId}
+          supplierName={historyDialog.supplierName}
+          open={!!historyDialog}
+          onClose={() => setHistoryDialog(null)}
+        />
+      )}
+    </>
   );
 }

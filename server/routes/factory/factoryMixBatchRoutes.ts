@@ -1402,4 +1402,44 @@ export function registerFactoryMixBatchRoutes(app: Express) {
       res.status(500).json({ message: error.message });
     }
   });
+
+  app.get("/api/factory/suppliers/:id/mix-batch-history", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const supplierId = parseId(req.params.id);
+      if (supplierId === null) return res.status(400).json({ message: "Invalid id" });
+
+      const rows = await db
+        .select({
+          batchId: factoryMixBatches.id,
+          batchCode: factoryMixBatches.batchCode,
+          batchName: factoryMixBatches.name,
+          batchDate: factoryMixBatches.batchDate,
+          batchStatus: factoryMixBatches.status,
+          deletedAt: factoryMixBatches.deletedAt,
+          batchCreatedAt: factoryMixBatches.createdAt,
+          sourceId: factoryMixBatchSources.id,
+          weightKg: factoryMixBatchSources.weightKg,
+          costPerKg: factoryMixBatchSources.costPerKg,
+          totalCost: factoryMixBatchSources.totalCost,
+          sourceCreatedAt: factoryMixBatchSources.createdAt,
+        })
+        .from(factoryMixBatchSources)
+        .innerJoin(factoryMixBatches, eq(factoryMixBatchSources.mixBatchId, factoryMixBatches.id))
+        .where(
+          and(
+            eq(factoryMixBatchSources.supplierId, supplierId),
+            eq(factoryMixBatches.companyId, companyId)
+          )
+        )
+        .orderBy(desc(factoryMixBatches.createdAt));
+
+      res.json(rows);
+    } catch (error: any) {
+      console.error("Error fetching supplier mix batch history:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
 }
