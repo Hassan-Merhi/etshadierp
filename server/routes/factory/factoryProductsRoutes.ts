@@ -952,13 +952,23 @@ export function registerFactoryProductsRoutes(app: Express) {
           month: sql<number>`EXTRACT(MONTH FROM ${factoryBales.createdAt})`.as("month"),
           balesIn: sql<number>`COUNT(*)::int`.as("bales_in"),
           balesOut:
-            sql<number>`SUM(CASE WHEN ${factoryBales.status} IN ('SOLD','REMOVED','DELETED','DISPATCHED') THEN 1 ELSE 0 END)::int`.as(
-              "bales_out"
-            ),
-          // balesInStock = all IN_STOCK bales from this month
-          balesInStock: sql<number>`SUM(CASE WHEN ${factoryBales.status} = 'IN_STOCK' THEN 1 ELSE 0 END)::int`.as(
-            "bales_in_stock"
-          ),
+            sql<number>`SUM(CASE WHEN ${factoryBales.status} IN ('SOLD','REMOVED','DELETED','DISPATCHED')
+              OR (${factoryBales.status} = 'IN_STOCK' AND EXISTS (
+                SELECT 1 FROM customer_order_bales cob
+                JOIN customer_orders co ON co.id = cob.order_id
+                WHERE cob.bale_id = ${sql.raw("factory_bales.id")}
+                  AND co.status IN ('FINALIZED','DISPATCHED','SOLD')
+                  AND co.company_id = ${companyId}
+              ))
+            THEN 1 ELSE 0 END)::int`.as("bales_out"),
+          // balesInStock = IN_STOCK bales not on a finalized order
+          balesInStock: sql<number>`SUM(CASE WHEN ${factoryBales.status} = 'IN_STOCK' AND NOT EXISTS (
+            SELECT 1 FROM customer_order_bales cob
+            JOIN customer_orders co ON co.id = cob.order_id
+            WHERE cob.bale_id = ${sql.raw("factory_bales.id")}
+              AND co.status IN ('FINALIZED','DISPATCHED','SOLD')
+              AND co.company_id = ${companyId}
+          ) THEN 1 ELSE 0 END)::int`.as("bales_in_stock"),
           // balesLoading = IN_STOCK bales that are assigned to a LOADING order
           balesLoading: sql<number>`SUM(CASE WHEN ${factoryBales.status} = 'IN_STOCK' AND EXISTS (
             SELECT 1 FROM customer_order_bales cob
@@ -1187,13 +1197,22 @@ export function registerFactoryProductsRoutes(app: Express) {
         // (V5 bales stay IN_STOCK during loading — need cross-reference to detect)
         const inStockIds = bales.filter((b) => b.status === "IN_STOCK").map((b) => b.id);
         const loadingBaleIds = new Set<number>();
+        const finalizedOrderBaleIds = new Set<number>();
         if (inStockIds.length > 0) {
-          const loadingRows = await db
-            .select({ baleId: customerOrderBales.baleId })
+          const orderRows = await db
+            .select({ baleId: customerOrderBales.baleId, orderStatus: customerOrders.status })
             .from(customerOrderBales)
             .innerJoin(customerOrders, eq(customerOrderBales.orderId, customerOrders.id))
-            .where(and(eq(customerOrders.status, "LOADING"), inArray(customerOrderBales.baleId, inStockIds)));
-          for (const r of loadingRows) loadingBaleIds.add(r.baleId);
+            .where(
+              and(
+                inArray(customerOrders.status, ["LOADING", "FINALIZED", "DISPATCHED", "SOLD"]),
+                inArray(customerOrderBales.baleId, inStockIds)
+              )
+            );
+          for (const r of orderRows) {
+            if (r.orderStatus === "LOADING") loadingBaleIds.add(r.baleId);
+            else finalizedOrderBaleIds.add(r.baleId);
+          }
         }
 
         const [product] = await db
@@ -1202,7 +1221,12 @@ export function registerFactoryProductsRoutes(app: Express) {
           .where(and(eq(factoryBaleProducts.id, productId), eq(factoryBaleProducts.companyId, companyId)));
 
         res.json({
-          bales: bales.map((b) => ({ ...b, isInLoadingOrder: loadingBaleIds.has(b.id) })),
+          bales: bales.map((b) => ({
+            ...b,
+            isInLoadingOrder: loadingBaleIds.has(b.id),
+            // Derive effective status for stale IN_STOCK bales on finalized orders
+            status: b.status === "IN_STOCK" && finalizedOrderBaleIds.has(b.id) ? "SOLD" : b.status,
+          })),
           sellingPrice: product?.sellingPrice || "0",
         });
       } catch (error: any) {
