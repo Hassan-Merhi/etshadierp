@@ -448,7 +448,7 @@ export default function WipersReEntry() {
                   <SelectItem value="none">— None —</SelectItem>
                   {workers.map((w: any) => (
                     <SelectItem key={w.id} value={w.id.toString()}>
-                      {w.name}
+                      {w.fullName || w.name}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -577,7 +577,7 @@ export default function WipersReEntry() {
                               <SelectItem value="none">None</SelectItem>
                               {workers.map((w: any) => (
                                 <SelectItem key={w.id} value={w.id.toString()}>
-                                  {w.name}
+                                  {w.fullName || w.name}
                                 </SelectItem>
                               ))}
                             </SelectContent>

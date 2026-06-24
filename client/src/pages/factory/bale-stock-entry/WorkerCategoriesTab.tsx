@@ -138,7 +138,7 @@ export function WorkerCategoriesTab() {
                         .filter((w) => (cat.workerIds || []).includes(w.id))
                         .map((w) => (
                           <Badge key={w.id} variant="secondary" className="text-[10px]">
-                            {w.name}
+                            {w.fullName || w.name}
                           </Badge>
                         ))}
                       {(cat.workerIds || []).length === 0 && (
@@ -210,7 +210,7 @@ export function WorkerCategoriesTab() {
                       >
                         {catWorkerIds.includes(w.id) && <CheckCircle className="h-3 w-3 text-white" />}
                       </div>
-                      <span className="text-xs font-medium truncate">{w.name}</span>
+                      <span className="text-xs font-medium truncate">{w.fullName || w.name}</span>
                     </div>
                   ))}
               </div>

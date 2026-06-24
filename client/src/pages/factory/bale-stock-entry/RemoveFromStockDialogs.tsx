@@ -141,7 +141,7 @@ export function AssignWorkerDialog({
                   .filter((w: any) => w.active !== false)
                   .map((w: any) => (
                     <SelectItem key={w.id} value={String(w.id)}>
-                      {w.name}
+                      {w.fullName || w.name}
                     </SelectItem>
                   ))}
               </SelectContent>
