@@ -143,7 +143,7 @@ import {
  */
 
 export function registerVoucherSalesUpdateRoutes(app: Express) {
-  app.patch("/api/vouchers/:id", requireAuth, requireNonPOS, async (req, res) => {
+  app.patch("/api/vouchers/:id", requireAuth, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       if (isNaN(id)) {
@@ -162,6 +162,21 @@ export function registerVoucherSalesUpdateRoutes(app: Express) {
         return res.status(403).json({
           message: "Access denied: Voucher belongs to a different company",
         });
+      }
+
+      // POS users may only update the date on their own StockTransfer vouchers.
+      // All other voucher types and complex accounting paths remain admin-only.
+      const isPOS = req.session.currentRole === "POS";
+      if (isPOS) {
+        if (existingVoucher.voucherType !== "Stock Transfer") {
+          return res.status(403).json({ message: "Access denied: This resource is not available for POS users" });
+        }
+        const updates: Partial<any> = {};
+        if (req.body.voucherDate !== undefined) updates.voucherDate = req.body.voucherDate;
+        if (Object.keys(updates).length > 0) {
+          await db.update(vouchers).set(updates).where(eq(vouchers.id, id));
+        }
+        return res.json({ id, ...updates });
       }
 
       // Check edit permissions based on role

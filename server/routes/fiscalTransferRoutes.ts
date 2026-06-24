@@ -1757,7 +1757,7 @@ export function registerFiscalTransferRoutes(app: Express) {
   });
 
   // Stock Transfers - PUT endpoint (update)
-  app.put("/api/stock-transfers/:id", requireAuth, requireNonPOS, async (req, res) => {
+  app.put("/api/stock-transfers/:id", requireAuth, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       if (!id) {
