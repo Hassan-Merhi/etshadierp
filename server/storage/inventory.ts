@@ -144,11 +144,11 @@ export async function getStockItemByCodeOrAlias(
 
   const [aliasMatch] = await db
     .select({ stockItem: schema.stockItems })
-    .from(schema.codeAliases)
-    .innerJoin(schema.stockItems, eq(schema.codeAliases.stockItemId, schema.stockItems.id))
+    .from(schema.stockItemCodeAliases)
+    .innerJoin(schema.stockItems, eq(schema.stockItemCodeAliases.stockItemId, schema.stockItems.id))
     .where(
       and(
-        eq(schema.codeAliases.alias, codeOrAlias),
+        eq(schema.stockItemCodeAliases.alias, codeOrAlias),
         eq(schema.stockItems.companyId, companyId),
         isNull(schema.stockItems.deletedAt)
       )
