@@ -1291,18 +1291,6 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
         </div>
       )}
 
-      {/* Summary bar — frozen just below the checkout strip */}
-      <div className="flex-shrink-0 flex flex-wrap items-center gap-3 px-4 py-2 border-b bg-muted/5">
-        <span className="text-sm text-muted-foreground">
-          <span className="font-semibold text-foreground">{validItemCount}</span> items&nbsp;&nbsp;Qty{" "}
-          <span className="font-semibold text-foreground font-mono">{totalQty.toFixed(2)}</span>
-        </span>
-        <span className="text-sm ml-auto flex items-baseline gap-1">
-          <span className="text-muted-foreground">Total</span>
-          <span className="font-mono font-bold text-2xl">{formatDisplayAmount(total)}</span>
-        </span>
-      </div>
-
       <div className="flex-1 overflow-hidden p-4">
         <div className="flex flex-col lg:flex-row gap-4 h-full">
           <div className="flex-1 flex flex-col overflow-hidden min-w-0 min-h-0">
@@ -1327,6 +1315,18 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
                 focusCell={focusCell}
                 toast={toast}
               />
+            </div>
+
+            {/* Summary bar — pinned below rows, above notes */}
+            <div className="flex-shrink-0 flex flex-wrap items-center gap-3 px-1 pt-2 pb-1 border-t mt-1">
+              <span className="text-sm text-muted-foreground">
+                <span className="font-semibold text-foreground">{validItemCount}</span> items&nbsp;&nbsp;Qty{" "}
+                <span className="font-semibold text-foreground font-mono">{totalQty.toFixed(2)}</span>
+              </span>
+              <span className="text-sm ml-auto flex items-baseline gap-1">
+                <span className="text-muted-foreground">Total</span>
+                <span className="font-mono font-bold text-2xl">{formatDisplayAmount(total)}</span>
+              </span>
             </div>
 
             {/* Collapsible notes — hidden by default to match production layout */}
