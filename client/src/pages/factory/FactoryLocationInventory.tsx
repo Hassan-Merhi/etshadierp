@@ -49,6 +49,8 @@ import {
   Weight,
   DollarSign,
   SlidersHorizontal,
+  ChevronDown,
+  ListFilter,
 } from "lucide-react";
 import { useReactToPrint } from "react-to-print";
 import { useEscapeBack } from "@/hooks/use-escape-back";
@@ -1941,31 +1943,76 @@ export default function FactoryLocationInventory() {
             />
           </div>
           <div className="flex items-center gap-2 flex-wrap">
-            <div className="flex items-center gap-1.5 flex-wrap" data-testid="category-filter-buttons">
-              <Badge
-                variant={categoryFilter.length === 0 ? "default" : "outline"}
-                className="cursor-pointer"
-                onClick={() => setCategoryFilter([])}
-                data-testid="badge-category-all"
-              >
-                All
-              </Badge>
-              {allCategoryNames.map((name) => (
-                <Badge
-                  key={name}
-                  variant={categoryFilter.includes(name) ? "default" : "outline"}
-                  className="cursor-pointer"
-                  onClick={() =>
-                    setCategoryFilter((prev) =>
-                      prev.includes(name) ? prev.filter((c) => c !== name) : [...prev, name]
-                    )
-                  }
-                  data-testid={`badge-category-${name}`}
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-1.5 h-8"
+                  data-testid="button-category-filter"
                 >
-                  {name}
-                </Badge>
-              ))}
-            </div>
+                  <ListFilter className="h-3.5 w-3.5" />
+                  {categoryFilter.length === 0
+                    ? "All Categories"
+                    : categoryFilter.length === 1
+                      ? categoryFilter[0]
+                      : `${categoryFilter.length} categories`}
+                  <ChevronDown className="h-3 w-3 opacity-50 ml-0.5" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-60 p-1" align="start">
+                <div className="max-h-64 overflow-y-auto">
+                  <div
+                    className="flex items-center gap-2 px-2 py-1.5 rounded-sm cursor-pointer hover-elevate text-xs"
+                    onClick={() => setCategoryFilter([])}
+                    data-testid="badge-category-all"
+                  >
+                    <Checkbox
+                      checked={categoryFilter.length === 0}
+                      onCheckedChange={() => setCategoryFilter([])}
+                      className="h-3 w-3 shrink-0"
+                    />
+                    <span className="font-medium">All Categories</span>
+                  </div>
+                  <div className="border-t my-1" />
+                  {allCategoryNames.map((name) => (
+                    <div
+                      key={name}
+                      className="flex items-center gap-2 px-2 py-1.5 rounded-sm cursor-pointer hover-elevate text-xs"
+                      onClick={() =>
+                        setCategoryFilter((prev) =>
+                          prev.includes(name) ? prev.filter((c) => c !== name) : [...prev, name]
+                        )
+                      }
+                      data-testid={`badge-category-${name}`}
+                    >
+                      <Checkbox
+                        checked={categoryFilter.includes(name)}
+                        onCheckedChange={() =>
+                          setCategoryFilter((prev) =>
+                            prev.includes(name) ? prev.filter((c) => c !== name) : [...prev, name]
+                          )
+                        }
+                        className="h-3 w-3 shrink-0"
+                      />
+                      <span className="truncate">{name}</span>
+                    </div>
+                  ))}
+                </div>
+                {categoryFilter.length > 0 && (
+                  <div className="border-t mt-1 pt-1">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 w-full text-xs text-muted-foreground"
+                      onClick={() => setCategoryFilter([])}
+                    >
+                      Clear selection
+                    </Button>
+                  </div>
+                )}
+              </PopoverContent>
+            </Popover>
             <div className="flex items-center gap-1">
               {(["name", "bales", "kg", "value"] as SortField[]).map((field) => (
                 <Badge
