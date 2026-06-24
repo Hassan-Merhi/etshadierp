@@ -639,18 +639,34 @@ export function registerEmployeeRoutes(app: Express) {
         return res.status(404).json({ message: "Employee not found" });
       }
 
-      // Get or create PAYROLL_DEPOSIT_EXPENSE ledger account (Indirect Expense type)
-      // This is used when employee deposits wages during payroll - it IS an expense
-      // because the deposit happens at payroll time as part of paying the employee
-      const allAccounts = await storage.getAllLedgerAccounts(req.session.currentCompanyId);
-      let payrollDepositExpenseAccount = allAccounts.find((a: any) => a.code === "PAYROLL_DEPOSIT_EXPENSE");
+      // Look up the employee's group for per-group salary expense splitting
+      const depGroupRows = await db
+        .select({ groupName: employeeGroups.name })
+        .from(employeeGroupMembers)
+        .innerJoin(employeeGroups, eq(employeeGroupMembers.employeeGroupId, employeeGroups.id))
+        .where(
+          and(
+            eq(employeeGroupMembers.employeeId, employee.id),
+            eq(employeeGroups.companyId, req.session.currentCompanyId!),
+            eq(employeeGroups.active, true)
+          )
+        )
+        .limit(1);
+      const depGrp = depGroupRows[0]?.groupName?.trim() || "__default__";
+      const depIsDefault = depGrp === "__default__";
+      const depExpCode = depIsDefault
+        ? "SALARY_EXPENSE"
+        : `SAL_EXP_${depGrp.toUpperCase().replace(/[^A-Z0-9]/g, "_").substring(0, 25)}`;
+      const depExpName = depIsDefault ? "Salary Expense" : `Salary Expense - ${depGrp}`;
 
-      if (!payrollDepositExpenseAccount) {
-        payrollDepositExpenseAccount = await storage.createLedgerAccount({
-          companyId: req.session.currentCompanyId,
-          code: "PAYROLL_DEPOSIT_EXPENSE",
-          name: "Payroll Deposit Expense",
-          accountType: "Indirect Expense",
+      const allDepAccounts = await storage.getAllLedgerAccounts(req.session.currentCompanyId);
+      let depSalaryAccount = allDepAccounts.find((a: any) => a.code === depExpCode);
+      if (!depSalaryAccount) {
+        depSalaryAccount = await storage.createLedgerAccount({
+          companyId: req.session.currentCompanyId!,
+          code: depExpCode,
+          name: depExpName,
+          accountType: "Expense",
           openingBalance: "0",
           active: true,
         });
@@ -671,10 +687,10 @@ export function registerEmployeeRoutes(app: Express) {
         .returning();
 
       // Create voucher entries (double-entry)
-      // Debit: Payroll Deposit Expense (this IS an expense - affects Net Profit)
+      // Debit: Salary Expense - {Group} (or Salary Expense for ungrouped)
       await db.insert(voucherEntries).values({
         voucherId: voucher.id,
-        ledgerAccountId: payrollDepositExpenseAccount.id,
+        ledgerAccountId: depSalaryAccount.id,
         debitAmount: depositAmount.toFixed(2),
         creditAmount: "0",
         narration: `Salary deposit - ${voucherNumber}`,
@@ -743,21 +759,15 @@ export function registerEmployeeRoutes(app: Express) {
         }
       }
 
-      // Get or create PAYROLL_DEPOSIT_EXPENSE ledger account (Indirect Expense type)
-      // This is used when employee deposits wages during payroll - it IS an expense
-      // because the deposit happens at payroll time as part of paying the employee
-      const allAccounts = await storage.getAllLedgerAccounts(req.session.currentCompanyId);
-      let payrollDepositExpenseAccount = allAccounts.find((a: any) => a.code === "PAYROLL_DEPOSIT_EXPENSE");
-
-      if (!payrollDepositExpenseAccount) {
-        payrollDepositExpenseAccount = await storage.createLedgerAccount({
-          companyId: req.session.currentCompanyId,
-          code: "PAYROLL_DEPOSIT_EXPENSE",
-          name: "Payroll Deposit Expense",
-          accountType: "Indirect Expense",
-          openingBalance: "0",
-          active: true,
-        });
+      // Build group-membership lookup: employeeId → groupName
+      const bulkDepGroupMemberships = await db
+        .select({ employeeId: employeeGroupMembers.employeeId, groupName: employeeGroups.name })
+        .from(employeeGroupMembers)
+        .innerJoin(employeeGroups, eq(employeeGroupMembers.employeeGroupId, employeeGroups.id))
+        .where(and(eq(employeeGroups.companyId, req.session.currentCompanyId!), eq(employeeGroups.active, true)));
+      const bulkDepEmpGroupMap = new Map<number, string>();
+      for (const row of bulkDepGroupMemberships) {
+        if (!bulkDepEmpGroupMap.has(row.employeeId)) bulkDepEmpGroupMap.set(row.employeeId, row.groupName);
       }
 
       // Calculate total amount
@@ -777,14 +787,40 @@ export function registerEmployeeRoutes(app: Express) {
         })
         .returning();
 
-      // Create debit entry for payroll deposit expense (this IS an expense - affects Net Profit)
-      await db.insert(voucherEntries).values({
-        voucherId: voucher.id,
-        ledgerAccountId: payrollDepositExpenseAccount.id,
-        debitAmount: totalAmount.toFixed(2),
-        creditAmount: "0",
-        narration: `Bulk salary deposit - ${deposits.length} employees - ${voucherNumber}`,
-      });
+      // Group deposits by employee group and create one debit per group
+      const bulkDepByGroup = new Map<string, number>();
+      for (const d of deposits) {
+        const grp = (bulkDepEmpGroupMap.get(d.employeeId) || "").trim() || "__default__";
+        bulkDepByGroup.set(grp, (bulkDepByGroup.get(grp) || 0) + parseFloat(d.amount));
+      }
+      const bulkDepFreshAccounts = await storage.getAllLedgerAccounts(req.session.currentCompanyId);
+      for (const [grp, grpTotal] of bulkDepByGroup) {
+        const isDefault = grp === "__default__";
+        const expCode = isDefault
+          ? "SALARY_EXPENSE"
+          : `SAL_EXP_${grp.toUpperCase().replace(/[^A-Z0-9]/g, "_").substring(0, 25)}`;
+        const expName = isDefault ? "Salary Expense" : `Salary Expense - ${grp}`;
+        let expAccount = bulkDepFreshAccounts.find((a: any) => a.code === expCode);
+        if (!expAccount) {
+          expAccount = await storage.createLedgerAccount({
+            companyId: req.session.currentCompanyId!,
+            code: expCode,
+            name: expName,
+            accountType: "Expense",
+            openingBalance: "0",
+            active: true,
+          });
+        }
+        await db.insert(voucherEntries).values({
+          voucherId: voucher.id,
+          ledgerAccountId: expAccount.id,
+          debitAmount: grpTotal.toFixed(2),
+          creditAmount: "0",
+          narration: isDefault
+            ? `Bulk salary deposit - ${deposits.length} employees - ${voucherNumber}`
+            : `Salary expense - ${grp} - ${voucherNumber}`,
+        });
+      }
 
       // Process each employee deposit
       const results = [];
@@ -1223,15 +1259,33 @@ export function registerEmployeeRoutes(app: Express) {
         return res.status(404).json({ message: "Employee not found" });
       }
 
-      // Get or create SALARY_EXPENSE ledger account
-      const allAccounts = await storage.getAllLedgerAccounts(req.session.currentCompanyId);
-      let salaryExpenseAccount = allAccounts.find((a: any) => a.code === "SALARY_EXPENSE");
+      // Look up the employee's group for per-group bonus expense splitting
+      const bonusDepGroupRows = await db
+        .select({ groupName: employeeGroups.name })
+        .from(employeeGroupMembers)
+        .innerJoin(employeeGroups, eq(employeeGroupMembers.employeeGroupId, employeeGroups.id))
+        .where(
+          and(
+            eq(employeeGroupMembers.employeeId, employee.id),
+            eq(employeeGroups.companyId, req.session.currentCompanyId!),
+            eq(employeeGroups.active, true)
+          )
+        )
+        .limit(1);
+      const bonusSingleGrp = bonusDepGroupRows[0]?.groupName?.trim() || "__default__";
+      const bonusSingleIsDefault = bonusSingleGrp === "__default__";
+      const bonusSingleCode = bonusSingleIsDefault
+        ? "BONUS_EXPENSE"
+        : `BONUS_EXP_${bonusSingleGrp.toUpperCase().replace(/[^A-Z0-9]/g, "_").substring(0, 25)}`;
+      const bonusSingleName = bonusSingleIsDefault ? "Bonus Expense" : `Bonus Expense - ${bonusSingleGrp}`;
 
-      if (!salaryExpenseAccount) {
-        salaryExpenseAccount = await storage.createLedgerAccount({
-          companyId: req.session.currentCompanyId,
-          code: "SALARY_EXPENSE",
-          name: "Salary Expense",
+      const bonusSingleAccounts = await storage.getAllLedgerAccounts(req.session.currentCompanyId);
+      let bonusSingleAccount = bonusSingleAccounts.find((a: any) => a.code === bonusSingleCode);
+      if (!bonusSingleAccount) {
+        bonusSingleAccount = await storage.createLedgerAccount({
+          companyId: req.session.currentCompanyId!,
+          code: bonusSingleCode,
+          name: bonusSingleName,
           accountType: "Expense",
           openingBalance: "0",
           active: true,
@@ -1253,10 +1307,10 @@ export function registerEmployeeRoutes(app: Express) {
         .returning();
 
       // Create voucher entries (double-entry)
-      // Debit: Salary Expense
+      // Debit: Bonus Expense - {Group} (or Bonus Expense for ungrouped)
       await db.insert(voucherEntries).values({
         voucherId: voucher.id,
-        ledgerAccountId: salaryExpenseAccount.id,
+        ledgerAccountId: bonusSingleAccount.id,
         debitAmount: bonusAmount.toFixed(2),
         creditAmount: "0",
         narration: `Bonus payment - ${voucherNumber}`,
@@ -1509,19 +1563,15 @@ export function registerEmployeeRoutes(app: Express) {
         }
       }
 
-      // Get or create SALARY_EXPENSE ledger account
-      const allAccounts = await storage.getAllLedgerAccounts(req.session.currentCompanyId);
-      let salaryExpenseAccount = allAccounts.find((a: any) => a.code === "SALARY_EXPENSE");
-
-      if (!salaryExpenseAccount) {
-        salaryExpenseAccount = await storage.createLedgerAccount({
-          companyId: req.session.currentCompanyId,
-          code: "SALARY_EXPENSE",
-          name: "Salary Expense",
-          accountType: "Expense",
-          openingBalance: "0",
-          active: true,
-        });
+      // Build group-membership lookup: employeeId → groupName
+      const bulkPayGroupMemberships = await db
+        .select({ employeeId: employeeGroupMembers.employeeId, groupName: employeeGroups.name })
+        .from(employeeGroupMembers)
+        .innerJoin(employeeGroups, eq(employeeGroupMembers.employeeGroupId, employeeGroups.id))
+        .where(and(eq(employeeGroups.companyId, req.session.currentCompanyId!), eq(employeeGroups.active, true)));
+      const bulkPayEmpGroupMap = new Map<number, string>();
+      for (const row of bulkPayGroupMemberships) {
+        if (!bulkPayEmpGroupMap.has(row.employeeId)) bulkPayEmpGroupMap.set(row.employeeId, row.groupName);
       }
 
       // Calculate total amount
@@ -1541,14 +1591,40 @@ export function registerEmployeeRoutes(app: Express) {
         })
         .returning();
 
-      // Create debit entry for total salary expense
-      await db.insert(voucherEntries).values({
-        voucherId: voucher.id,
-        ledgerAccountId: salaryExpenseAccount.id,
-        debitAmount: totalAmount.toFixed(2),
-        creditAmount: "0",
-        narration: `Bulk salary payment - ${payments.length} workers - ${voucherNumber}`,
-      });
+      // Group payments by employee group and create one debit per group
+      const bulkPayByGroup = new Map<string, number>();
+      for (const p of payments) {
+        const grp = (bulkPayEmpGroupMap.get(p.employeeId) || "").trim() || "__default__";
+        bulkPayByGroup.set(grp, (bulkPayByGroup.get(grp) || 0) + parseFloat(p.amount));
+      }
+      const bulkPayFreshAccounts = await storage.getAllLedgerAccounts(req.session.currentCompanyId);
+      for (const [grp, grpTotal] of bulkPayByGroup) {
+        const isDefault = grp === "__default__";
+        const expCode = isDefault
+          ? "SALARY_EXPENSE"
+          : `SAL_EXP_${grp.toUpperCase().replace(/[^A-Z0-9]/g, "_").substring(0, 25)}`;
+        const expName = isDefault ? "Salary Expense" : `Salary Expense - ${grp}`;
+        let expAccount = bulkPayFreshAccounts.find((a: any) => a.code === expCode);
+        if (!expAccount) {
+          expAccount = await storage.createLedgerAccount({
+            companyId: req.session.currentCompanyId!,
+            code: expCode,
+            name: expName,
+            accountType: "Expense",
+            openingBalance: "0",
+            active: true,
+          });
+        }
+        await db.insert(voucherEntries).values({
+          voucherId: voucher.id,
+          ledgerAccountId: expAccount.id,
+          debitAmount: grpTotal.toFixed(2),
+          creditAmount: "0",
+          narration: isDefault
+            ? `Bulk salary payment - ${payments.length} workers - ${voucherNumber}`
+            : `Salary expense - ${grp} - ${voucherNumber}`,
+        });
+      }
 
       // Create credit entry for bank/cash account
       const creditEntry: any = {

@@ -7,7 +7,8 @@ import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Plus, Trash2, Users, HardHat, ChevronRight, ChevronDown } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Plus, Trash2, Users, HardHat, Briefcase, ChevronRight, ChevronDown } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 import { getApiRequest } from "@/lib/factoryApi";
@@ -43,11 +44,13 @@ export function GroupsTab() {
     enabled: !!selectedCompany,
   });
 
-  const { data: workerStaff = [] } = useQuery<Employee[]>({
+  const { data: allStaff = [] } = useQuery<Employee[]>({
     queryKey: ["/api/payroll/employees-with-balances", selectedCompany?.id],
     enabled: !!selectedCompany,
-    select: (data: any[]) => data.filter((e) => e.employeeType === "Worker"),
   });
+
+  const workers = allStaff.filter((e) => e.employeeType === "Worker");
+  const employees = allStaff.filter((e) => e.employeeType !== "Worker");
 
   const createWorkerGroupMutation = useMutation({
     mutationFn: async () => {
@@ -58,14 +61,14 @@ export function GroupsTab() {
       return res.json();
     },
     onSuccess: () => {
-      toast({ title: "Success", description: "Worker group created successfully" });
+      toast({ title: "Success", description: "Group created successfully" });
       queryClient.invalidateQueries({ queryKey: ["/api/worker-groups/with-members", selectedCompany?.id] });
       setNewWorkerGroupName("");
       setNewWorkerGroupDescription("");
       setCreateWorkerGroupDialogOpen(false);
     },
     onError: (error: any) => {
-      toast({ title: "Error", description: error.message || "Failed to create worker group", variant: "destructive" });
+      toast({ title: "Error", description: error.message || "Failed to create group", variant: "destructive" });
     },
   });
 
@@ -74,39 +77,39 @@ export function GroupsTab() {
       await modeApiRequest("DELETE", `/api/worker-groups/${groupId}`);
     },
     onSuccess: () => {
-      toast({ title: "Success", description: "Worker group deleted successfully" });
+      toast({ title: "Success", description: "Group deleted successfully" });
       queryClient.invalidateQueries({ queryKey: ["/api/worker-groups/with-members", selectedCompany?.id] });
     },
     onError: (error: any) => {
-      toast({ title: "Error", description: error.message || "Failed to delete worker group", variant: "destructive" });
+      toast({ title: "Error", description: error.message || "Failed to delete group", variant: "destructive" });
     },
   });
 
-  const addWorkerToWorkerGroupMutation = useMutation({
-    mutationFn: async ({ groupId, workerId }: { groupId: number; workerId: number }) => {
-      await modeApiRequest("POST", `/api/worker-groups/${groupId}/members/${workerId}`);
+  const addMemberMutation = useMutation({
+    mutationFn: async ({ groupId, memberId }: { groupId: number; memberId: number }) => {
+      await modeApiRequest("POST", `/api/worker-groups/${groupId}/members/${memberId}`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/worker-groups/with-members", selectedCompany?.id] });
-      toast({ title: "Success", description: "Worker added to group" });
+      toast({ title: "Success", description: "Member added to group" });
     },
     onError: (error: any) => {
-      toast({ title: "Error", description: error.message || "Failed to add worker to group", variant: "destructive" });
+      toast({ title: "Error", description: error.message || "Failed to add member to group", variant: "destructive" });
     },
   });
 
-  const removeWorkerFromWorkerGroupMutation = useMutation({
-    mutationFn: async ({ groupId, workerId }: { groupId: number; workerId: number }) => {
-      await modeApiRequest("DELETE", `/api/worker-groups/${groupId}/members/${workerId}`);
+  const removeMemberMutation = useMutation({
+    mutationFn: async ({ groupId, memberId }: { groupId: number; memberId: number }) => {
+      await modeApiRequest("DELETE", `/api/worker-groups/${groupId}/members/${memberId}`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/worker-groups/with-members", selectedCompany?.id] });
-      toast({ title: "Success", description: "Worker removed from group" });
+      toast({ title: "Success", description: "Member removed from group" });
     },
     onError: (error: any) => {
       toast({
         title: "Error",
-        description: error.message || "Failed to remove worker from group",
+        description: error.message || "Failed to remove member from group",
         variant: "destructive",
       });
     },
@@ -116,8 +119,8 @@ export function GroupsTab() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold tracking-tight">Worker Groups</h2>
-          <p className="text-muted-foreground">Manage production worker teams and group assignments</p>
+          <h2 className="text-2xl font-bold tracking-tight">Groups</h2>
+          <p className="text-muted-foreground">Manage groups for workers and employees to split payroll expenses</p>
         </div>
         <Button onClick={() => setCreateWorkerGroupDialogOpen(true)} data-testid="button-create-worker-group">
           <Plus className="mr-2 h-4 w-4" />
@@ -128,6 +131,8 @@ export function GroupsTab() {
       <div className="grid gap-4">
         {workerGroups.map((group) => {
           const isExpanded = !!workerGroupsExpanded[group.id];
+          const workerMembers = group.members.filter((m) => m.employeeType === "Worker");
+          const employeeMembers = group.members.filter((m) => m.employeeType !== "Worker");
           return (
             <Card key={group.id} className="overflow-hidden">
               <CardHeader className="py-4 px-6 flex flex-row items-center justify-between space-y-0 bg-muted/30">
@@ -141,10 +146,24 @@ export function GroupsTab() {
                     <CardTitle className="text-lg">{group.name}</CardTitle>
                     {group.description && <CardDescription>{group.description}</CardDescription>}
                   </div>
-                  <div className="ml-2">
-                    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-primary/10 text-primary">
-                      {group.members.length} members
-                    </span>
+                  <div className="ml-2 flex items-center gap-1.5">
+                    {workerMembers.length > 0 && (
+                      <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-primary/10 text-primary">
+                        <HardHat className="h-3 w-3 mr-1" />
+                        {workerMembers.length} workers
+                      </span>
+                    )}
+                    {employeeMembers.length > 0 && (
+                      <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-500/10 text-blue-600 dark:text-blue-400">
+                        <Briefcase className="h-3 w-3 mr-1" />
+                        {employeeMembers.length} employees
+                      </span>
+                    )}
+                    {group.members.length === 0 && (
+                      <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-muted text-muted-foreground">
+                        0 members
+                      </span>
+                    )}
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
@@ -189,37 +208,50 @@ export function GroupsTab() {
                       <TableHeader>
                         <TableRow>
                           <TableHead className="w-[100px]">Code</TableHead>
-                          <TableHead>Worker Name</TableHead>
+                          <TableHead>Name</TableHead>
+                          <TableHead>Type</TableHead>
                           <TableHead>Department</TableHead>
                           <TableHead className="text-right">Actions</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {group.members.map((member) => (
-                          <TableRow key={member.id}>
-                            <TableCell className="font-medium">{member.code}</TableCell>
-                            <TableCell>
-                              <div className="flex items-center gap-2">
-                                <HardHat className="h-4 w-4 text-muted-foreground" />
-                                {[member.firstName, member.lastName].filter(Boolean).join(" ")}
-                              </div>
-                            </TableCell>
-                            <TableCell>{member.department || "—"}</TableCell>
-                            <TableCell className="text-right">
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="text-muted-foreground hover:text-destructive"
-                                onClick={() =>
-                                  removeWorkerFromWorkerGroupMutation.mutate({ groupId: group.id, workerId: member.id })
-                                }
-                                data-testid={`button-remove-member-${member.id}`}
-                              >
-                                Remove
-                              </Button>
-                            </TableCell>
-                          </TableRow>
-                        ))}
+                        {group.members.map((member) => {
+                          const isWorker = member.employeeType === "Worker";
+                          return (
+                            <TableRow key={member.id}>
+                              <TableCell className="font-medium">{member.code}</TableCell>
+                              <TableCell>
+                                <div className="flex items-center gap-2">
+                                  {isWorker ? (
+                                    <HardHat className="h-4 w-4 text-muted-foreground" />
+                                  ) : (
+                                    <Briefcase className="h-4 w-4 text-blue-500" />
+                                  )}
+                                  {[member.firstName, member.lastName].filter(Boolean).join(" ")}
+                                </div>
+                              </TableCell>
+                              <TableCell>
+                                <Badge variant="outline" className="text-xs no-default-active-elevate">
+                                  {member.employeeType || "Employee"}
+                                </Badge>
+                              </TableCell>
+                              <TableCell>{member.department || "—"}</TableCell>
+                              <TableCell className="text-right">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="text-muted-foreground hover:text-destructive"
+                                  onClick={() =>
+                                    removeMemberMutation.mutate({ groupId: group.id, memberId: member.id })
+                                  }
+                                  data-testid={`button-remove-member-${member.id}`}
+                                >
+                                  Remove
+                                </Button>
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
                       </TableBody>
                     </Table>
                   )}
@@ -233,8 +265,8 @@ export function GroupsTab() {
           <Card className="border-dashed border-2">
             <CardContent className="py-12 flex flex-col items-center justify-center text-center">
               <Users className="h-12 w-12 text-muted-foreground/50 mb-4" />
-              <h3 className="text-lg font-semibold">No worker groups found</h3>
-              <p className="text-muted-foreground mb-6">Create groups to organize your production workers.</p>
+              <h3 className="text-lg font-semibold">No groups found</h3>
+              <p className="text-muted-foreground mb-6">Create groups to split payroll expenses by team.</p>
               <Button variant="outline" onClick={() => setCreateWorkerGroupDialogOpen(true)}>
                 <Plus className="mr-2 h-4 w-4" />
                 Create First Group
@@ -247,8 +279,8 @@ export function GroupsTab() {
       <Dialog open={createWorkerGroupDialogOpen} onOpenChange={setCreateWorkerGroupDialogOpen}>
         <DialogContent data-testid="dialog-create-worker-group">
           <DialogHeader>
-            <DialogTitle>Create Worker Group</DialogTitle>
-            <DialogDescription>Define a new production group/team.</DialogDescription>
+            <DialogTitle>Create Group</DialogTitle>
+            <DialogDescription>Define a new group for workers and/or employees.</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div className="space-y-2">
@@ -257,7 +289,7 @@ export function GroupsTab() {
                 id="group-name"
                 value={newWorkerGroupName}
                 onChange={(e) => setNewWorkerGroupName(e.target.value)}
-                placeholder="e.g. Night Shift Team A"
+                placeholder="e.g. Lubumbashi Workers"
                 data-testid="input-group-name"
               />
             </div>
@@ -295,51 +327,113 @@ export function GroupsTab() {
         <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle>Manage Group Members: {selectedWorkerGroupForMembers?.name}</DialogTitle>
-            <DialogDescription>Add or remove workers from this group</DialogDescription>
+            <DialogDescription>
+              Add workers and employees to this group. Their payroll expenses will be split under this group's accounts.
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
-            <div className="max-h-[400px] overflow-auto border rounded-md">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-12">Member</TableHead>
-                    <TableHead>Worker Name</TableHead>
-                    <TableHead>Department</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {workerStaff.map((worker: Employee) => {
-                    const isMember = selectedWorkerGroupForMembers?.members.some((m: any) => m.id === worker.id);
-                    return (
-                      <TableRow key={worker.id}>
-                        <TableCell>
-                          <Checkbox
-                            checked={isMember}
-                            onCheckedChange={(checked) => {
-                              if (!selectedWorkerGroupForMembers) return;
-                              if (checked) {
-                                addWorkerToWorkerGroupMutation.mutate({
-                                  groupId: selectedWorkerGroupForMembers.id,
-                                  workerId: worker.id,
-                                });
-                              } else {
-                                removeWorkerFromWorkerGroupMutation.mutate({
-                                  groupId: selectedWorkerGroupForMembers.id,
-                                  workerId: worker.id,
-                                });
-                              }
-                            }}
-                            data-testid={`checkbox-member-${worker.id}`}
-                          />
-                        </TableCell>
-                        <TableCell>{[worker.firstName, worker.lastName].filter(Boolean).join(" ")}</TableCell>
-                        <TableCell>{worker.department || "—"}</TableCell>
+            {workers.length > 0 && (
+              <div>
+                <div className="flex items-center gap-2 mb-2 px-1">
+                  <HardHat className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm font-medium text-muted-foreground uppercase tracking-wide">Workers</span>
+                </div>
+                <div className="max-h-48 overflow-auto border rounded-md">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="w-12">In Group</TableHead>
+                        <TableHead>Name</TableHead>
+                        <TableHead>Department</TableHead>
                       </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-            </div>
+                    </TableHeader>
+                    <TableBody>
+                      {workers.map((worker: Employee) => {
+                        const isMember = selectedWorkerGroupForMembers?.members.some((m: any) => m.id === worker.id);
+                        return (
+                          <TableRow key={worker.id}>
+                            <TableCell>
+                              <Checkbox
+                                checked={isMember}
+                                onCheckedChange={(checked) => {
+                                  if (!selectedWorkerGroupForMembers) return;
+                                  if (checked) {
+                                    addMemberMutation.mutate({
+                                      groupId: selectedWorkerGroupForMembers.id,
+                                      memberId: worker.id,
+                                    });
+                                  } else {
+                                    removeMemberMutation.mutate({
+                                      groupId: selectedWorkerGroupForMembers.id,
+                                      memberId: worker.id,
+                                    });
+                                  }
+                                }}
+                                data-testid={`checkbox-member-${worker.id}`}
+                              />
+                            </TableCell>
+                            <TableCell>{[worker.firstName, worker.lastName].filter(Boolean).join(" ")}</TableCell>
+                            <TableCell>{worker.department || "—"}</TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </div>
+              </div>
+            )}
+
+            {employees.length > 0 && (
+              <div>
+                <div className="flex items-center gap-2 mb-2 px-1">
+                  <Briefcase className="h-4 w-4 text-blue-500" />
+                  <span className="text-sm font-medium text-muted-foreground uppercase tracking-wide">Employees</span>
+                </div>
+                <div className="max-h-48 overflow-auto border rounded-md">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="w-12">In Group</TableHead>
+                        <TableHead>Name</TableHead>
+                        <TableHead>Department</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {employees.map((emp: Employee) => {
+                        const isMember = selectedWorkerGroupForMembers?.members.some((m: any) => m.id === emp.id);
+                        return (
+                          <TableRow key={emp.id}>
+                            <TableCell>
+                              <Checkbox
+                                checked={isMember}
+                                onCheckedChange={(checked) => {
+                                  if (!selectedWorkerGroupForMembers) return;
+                                  if (checked) {
+                                    addMemberMutation.mutate({
+                                      groupId: selectedWorkerGroupForMembers.id,
+                                      memberId: emp.id,
+                                    });
+                                  } else {
+                                    removeMemberMutation.mutate({
+                                      groupId: selectedWorkerGroupForMembers.id,
+                                      memberId: emp.id,
+                                    });
+                                  }
+                                }}
+                                data-testid={`checkbox-member-${emp.id}`}
+                              />
+                            </TableCell>
+                            <TableCell>{[emp.firstName, emp.lastName].filter(Boolean).join(" ")}</TableCell>
+                            <TableCell>{emp.department || "—"}</TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </div>
+              </div>
+            )}
+
             <div className="flex justify-end">
               <Button onClick={() => setWorkerGroupMembersDialogOpen(false)} data-testid="button-close-members">
                 Done
