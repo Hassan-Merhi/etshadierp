@@ -150,7 +150,7 @@ export default function FactorySuppliers() {
   });
 
   const [collapsedStmtSections, setCollapsedStmtSections] = useState<Set<string>>(
-    new Set(["supplierDetails", "currencyPools"])
+    new Set(["currencyPools"])
   );
   const toggleStmtSection = (key: string) =>
     setCollapsedStmtSections((prev) => {
