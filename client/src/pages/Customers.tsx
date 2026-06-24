@@ -2,7 +2,8 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { queryClient } from "@/lib/queryClient";
+import { customersApi } from "@/api/customersApi";
 import { formatNumber, drCrClass } from "@/lib/formatNumber";
 import { useCompany } from "@/contexts/CompanyContext";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
@@ -98,7 +99,7 @@ export default function Customers() {
 
   const createMutation = useMutation({
     mutationFn: async (data: z.infer<typeof formSchema>) => {
-      return await apiRequest("POST", "/api/customers", data);
+      return await customersApi.create(data);
     },
     onSuccess: () => {
       toast({ title: "Success", description: "Customer created successfully" });
@@ -123,7 +124,7 @@ export default function Customers() {
 
   const updateMutation = useMutation({
     mutationFn: async (data: z.infer<typeof formSchema> & { id: number }) => {
-      return await apiRequest("PUT", `/api/customers/${data.id}`, data);
+      return await customersApi.update(data.id, data);
     },
     onSuccess: () => {
       toast({ title: "Success", description: "Customer updated successfully" });

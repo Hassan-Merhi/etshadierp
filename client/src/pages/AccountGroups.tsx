@@ -1,7 +1,7 @@
 import { useState, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
-import { apiRequest } from "@/lib/queryClient";
+import { accountsApi } from "@/api/accountsApi";
 import { useToast } from "@/hooks/use-toast";
 import { useCompany } from "@/contexts/CompanyContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -129,7 +129,7 @@ export default function AccountGroups() {
   const createGroupMutation = useMutation({
     mutationFn: async ({ name, accountType }: { name: string; accountType: string }) => {
       if (!selectedCompany?.id) throw new Error("No company selected");
-      return apiRequest("POST", "/api/ledger-accounts", {
+      return accountsApi.createLedgerAccount({
         name,
         accountType,
         subType: "Group",
@@ -152,7 +152,7 @@ export default function AccountGroups() {
   const renameMutation = useMutation({
     mutationFn: async ({ id, name }: { id: number; name: string }) => {
       if (!selectedGroup) throw new Error("No group selected");
-      return apiRequest("PUT", `/api/ledger-accounts/${id}`, {
+      return accountsApi.updateLedgerAccount(id, {
         id,
         name,
         accountType: selectedGroup.accountType,
@@ -172,7 +172,7 @@ export default function AccountGroups() {
 
   const assignMutation = useMutation({
     mutationFn: async ({ accountIds, parentId }: { accountIds: number[]; parentId: number | null }) =>
-      apiRequest("PATCH", "/api/ledger-accounts/bulk-assign-parent", { accountIds, parentId }),
+      accountsApi.bulkAssignParent(accountIds, parentId),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["/api/ledger-accounts"] });
       setAddAccountsOpen(false);
@@ -187,7 +187,7 @@ export default function AccountGroups() {
 
   const removeMutation = useMutation({
     mutationFn: async (accountId: number) =>
-      apiRequest("PATCH", "/api/ledger-accounts/bulk-assign-parent", { accountIds: [accountId], parentId: null }),
+      accountsApi.bulkAssignParent([accountId], null),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["/api/ledger-accounts"] });
       toast({ title: "Account removed from group" });
@@ -202,14 +202,14 @@ export default function AccountGroups() {
     mutationFn: async (groupId: number) => {
       const children = allAccounts.filter((a) => a.parentId === groupId);
       if (children.length > 0) {
-        await apiRequest("PATCH", "/api/ledger-accounts/bulk-assign-parent", {
-          accountIds: children.map((c) => c.id),
-          parentId: null,
-        });
+        await accountsApi.bulkAssignParent(
+          children.map((c) => c.id),
+          null
+        );
       }
       const group = allAccounts.find((a) => a.id === groupId);
       if (!group) return;
-      await apiRequest("PUT", `/api/ledger-accounts/${groupId}`, {
+      await accountsApi.updateLedgerAccount(groupId, {
         id: groupId,
         name: group.name,
         accountType: group.accountType,

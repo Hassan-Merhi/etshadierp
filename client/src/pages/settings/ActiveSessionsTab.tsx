@@ -1,5 +1,6 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { queryClient, apiRequest } from "@/lib/queryClient";
+import { queryClient } from "@/lib/queryClient";
+import { settingsApi } from "@/api/settingsApi";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -62,7 +63,7 @@ export function ActiveSessionsTab({ isAdmin }: { isAdmin: boolean }) {
 
   const revokeMutation = useMutation({
     mutationFn: async (sid: string) => {
-      await apiRequest("DELETE", `/api/sessions/${sid}`);
+      await settingsApi.deleteSession(sid);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/sessions"] });
@@ -75,7 +76,7 @@ export function ActiveSessionsTab({ isAdmin }: { isAdmin: boolean }) {
 
   const revokeAllMutation = useMutation({
     mutationFn: async () => {
-      await apiRequest("DELETE", "/api/sessions");
+      await settingsApi.deleteAllSessions();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/sessions"] });

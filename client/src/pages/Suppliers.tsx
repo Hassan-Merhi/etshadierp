@@ -39,6 +39,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useCompany } from "@/contexts/CompanyContext";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
 import { apiRequest } from "@/lib/queryClient";
+import { suppliersApi } from "@/api/suppliersApi";
 import { format } from "date-fns";
 import { utils, writeFile } from "@/lib/excelHelper";
 import { useEscapeBack } from "@/hooks/use-escape-back";
@@ -76,7 +77,7 @@ export default function Suppliers() {
   const [_location, navigate] = useLocation();
 
   const deleteMutation = useMutation({
-    mutationFn: (id: number) => apiRequest("DELETE", `/api/suppliers/${id}`),
+    mutationFn: (id: number) => suppliersApi.delete(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/suppliers"] });
       queryClient.invalidateQueries({ queryKey: ["/api/suppliers/stats"] });
