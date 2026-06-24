@@ -221,10 +221,7 @@ export function AccountTable({
 
             {parents.length === 0 && (
               <TableRow>
-                <TableCell
-                  colSpan={hideBalances ? 1 : 2}
-                  className="text-center py-12 text-muted-foreground text-sm"
-                >
+                <TableCell colSpan={hideBalances ? 1 : 2} className="text-center py-12 text-muted-foreground text-sm">
                   No accounts found.
                 </TableCell>
               </TableRow>

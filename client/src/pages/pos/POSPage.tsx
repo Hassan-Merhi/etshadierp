@@ -116,7 +116,9 @@ function SpPOS() {
   // ── Derived: stock items at active location ─────────────────────────────────
   const stockAtLocation = useMemo(
     () =>
-      selectedLocation ? (Array.isArray(spStock) ? spStock : []).filter((m) => m.locationId === selectedLocation.id) : [],
+      selectedLocation
+        ? (Array.isArray(spStock) ? spStock : []).filter((m) => m.locationId === selectedLocation.id)
+        : [],
     [spStock, selectedLocation]
   );
 
@@ -573,7 +575,6 @@ function SpPOS() {
                 data-testid="textarea-notes"
               />
             </div>
-
           </div>
 
           {/* Grand total + action buttons — always visible, never scrolled away */}

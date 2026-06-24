@@ -2,7 +2,18 @@ import { useState, useRef, useCallback, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation, useSearch } from "wouter";
 import { Button } from "@/components/ui/button";
-import { Plus, Search, Edit, FileText, ChevronsUpDown, Check, X, ArrowRight, TrendingUp, TrendingDown } from "lucide-react";
+import {
+  Plus,
+  Search,
+  Edit,
+  FileText,
+  ChevronsUpDown,
+  Check,
+  X,
+  ArrowRight,
+  TrendingUp,
+  TrendingDown,
+} from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from "@/components/ui/command";
 import { cn } from "@/lib/utils";
@@ -208,16 +219,16 @@ export default function Accounts() {
   const { data: groupOptions = [] } = useQuery<any[]>({
     queryKey: ["/api/ledger-accounts", selectedCompany?.id],
     queryFn: async () => {
-      const url = selectedCompany?.id
-        ? `/api/ledger-accounts?companyId=${selectedCompany.id}`
-        : "/api/ledger-accounts";
+      const url = selectedCompany?.id ? `/api/ledger-accounts?companyId=${selectedCompany.id}` : "/api/ledger-accounts";
       const res = await fetch(url, { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch ledger accounts");
       return res.json();
     },
     select: (data: any[]) => {
       const parentIdSet = new Set<number>();
-      data.forEach((a) => { if (a.parentId) parentIdSet.add(a.parentId); });
+      data.forEach((a) => {
+        if (a.parentId) parentIdSet.add(a.parentId);
+      });
       return data.filter((a) => a.subType === "Group" || parentIdSet.has(a.id));
     },
     enabled: !!selectedCompany,
@@ -657,7 +668,7 @@ export default function Accounts() {
                             name="parentId"
                             render={({ field }) => {
                               const filteredGroups = groupOptions.filter(
-                                (g: any) => g.id !== alterSelectedAccount?.accountId,
+                                (g: any) => g.id !== alterSelectedAccount?.accountId
                               );
                               const selectedGroup = filteredGroups.find((g: any) => g.id === field.value);
                               return (
@@ -694,7 +705,7 @@ export default function Accounts() {
                                             <Check
                                               className={cn(
                                                 "mr-2 h-4 w-4",
-                                                field.value == null ? "opacity-100" : "opacity-0",
+                                                field.value == null ? "opacity-100" : "opacity-0"
                                               )}
                                             />
                                             — No group —
@@ -711,7 +722,7 @@ export default function Accounts() {
                                               <Check
                                                 className={cn(
                                                   "mr-2 h-4 w-4",
-                                                  field.value === g.id ? "opacity-100" : "opacity-0",
+                                                  field.value === g.id ? "opacity-100" : "opacity-0"
                                                 )}
                                               />
                                               {g.name}

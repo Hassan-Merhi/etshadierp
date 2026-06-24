@@ -482,6 +482,20 @@ export default function Dashboard() {
     [allPayableAccounts, dashboardPayableAccounts]
   );
 
+  const totalAvailable = useMemo(
+    () =>
+      displayedCashAccounts.reduce(
+        (s, d) => s + parseFloat(String(d.account.balance || d.account.currentBalance || 0)),
+        0
+      ),
+    [displayedCashAccounts]
+  );
+  const totalPayable = useMemo(
+    () => dashboardPayableAccounts.reduce((s, a) => s + Math.abs(a.balance), 0),
+    [dashboardPayableAccounts]
+  );
+  const netCashPosition = totalAvailable - totalPayable;
+
   if (isError) {
     return (
       <div className="space-y-6">
@@ -492,16 +506,6 @@ export default function Dashboard() {
 
   const importCycleBalance = importCycleData?.netImportCycleBalance ?? null;
   const isImportCycleBalanced = importCycleBalance !== null && Math.abs(importCycleBalance) < 1;
-
-  const totalAvailable = useMemo(
-    () => displayedCashAccounts.reduce((s, d) => s + parseFloat(String(d.account.balance || d.account.currentBalance || 0)), 0),
-    [displayedCashAccounts]
-  );
-  const totalPayable = useMemo(
-    () => dashboardPayableAccounts.reduce((s, a) => s + Math.abs(a.balance), 0),
-    [dashboardPayableAccounts]
-  );
-  const netCashPosition = totalAvailable - totalPayable;
 
   return (
     <div className="space-y-4 sm:space-y-6">
