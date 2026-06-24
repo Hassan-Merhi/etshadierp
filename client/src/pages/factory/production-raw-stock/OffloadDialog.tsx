@@ -279,9 +279,9 @@ export function OffloadDialog({
                 <Label>Freight Account</Label>
                 <AccountCombobox
                   value={freightAccountId}
-                  onChange={setFreightAccountId}
-                  ledgerAccounts={ledgerAccounts}
-                  factorySuppliers={factorySuppliers}
+                  onValueChange={setFreightAccountId}
+                  accounts={ledgerAccounts}
+                  suppliers={factorySuppliers}
                   disabled={freightFromContainer}
                 />
               </div>
