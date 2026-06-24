@@ -969,7 +969,7 @@ export function registerBaleRoutes(app: Express) {
   // Lookup by ARTICLE code
   app.get("/api/lookup/article/:articleCode", requireAuth, async (req, res) => {
     try {
-      const companyId = req.session.currentCompanyId || (req.session as any).factoryCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) {
         return res.status(400).json({ message: "No company selected" });
       }
@@ -1006,7 +1006,7 @@ export function registerBaleRoutes(app: Express) {
   // Lookup by REFERENCE number
   app.get("/api/lookup/reference/:referenceNumber", requireAuth, async (req, res) => {
     try {
-      const companyId = req.session.currentCompanyId || (req.session as any).factoryCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) {
         return res.status(400).json({ message: "No company selected" });
       }
@@ -1392,7 +1392,7 @@ export function registerBaleRoutes(app: Express) {
   // Mark a label as scanned
   app.post("/api/lookup/reference/:referenceNumber/scan", requireAuth, async (req, res) => {
     try {
-      const companyId = req.session.currentCompanyId || (req.session as any).factoryCompanyId;
+      const companyId = (req.session as any).factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) {
         return res.status(400).json({ message: "No company selected" });
       }
@@ -1427,7 +1427,7 @@ export function registerBaleRoutes(app: Express) {
     requireRole("Admin", "Owner", "Developer"),
     async (req, res) => {
       try {
-        const companyId = req.session.currentCompanyId || (req.session as any).factoryCompanyId;
+        const companyId = (req.session as any).factoryCompanyId || req.session.currentCompanyId;
         if (!companyId) return res.status(400).json({ message: "No company selected" });
 
         const referenceNumber = decodeURIComponent(req.params.referenceNumber).toUpperCase();
@@ -1493,7 +1493,7 @@ export function registerBaleRoutes(app: Express) {
     requireRole("Admin", "Owner", "Developer"),
     async (req, res) => {
       try {
-        const companyId = req.session.currentCompanyId || (req.session as any).factoryCompanyId;
+        const companyId = (req.session as any).factoryCompanyId || req.session.currentCompanyId;
         if (!companyId) return res.status(400).json({ message: "No company selected" });
 
         const referenceNumber = decodeURIComponent(req.params.referenceNumber).toUpperCase();
