@@ -13,6 +13,9 @@ export interface Account {
   openingBalanceSide?: string | null;
   active: boolean;
   isHidden?: boolean;
+  subType?: string;
+  parentId?: number;
+  accountType?: string;
 }
 
 export interface Transaction {

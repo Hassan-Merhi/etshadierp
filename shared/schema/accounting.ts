@@ -70,7 +70,7 @@ export const insertLedgerAccountSchema = createInsertSchema(ledgerAccounts)
     subType: z.string().optional(),
     openingBalance: z.string().optional(),
     openingBalanceSide: z.enum(["Dr", "Cr"]).optional().or(z.literal("")),
-    parentId: z.number().optional(),
+    parentId: z.number().nullable().optional(),
   });
 
 export const updateLedgerAccountSchema = insertLedgerAccountSchema

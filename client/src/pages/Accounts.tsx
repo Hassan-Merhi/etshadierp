@@ -172,6 +172,7 @@ export default function Accounts() {
       openingBalance?: string;
       openingBalanceSide?: string;
       active?: boolean;
+      parentId?: number | null | undefined;
     }) => {
       const { id, ...rest } = data;
       return apiRequest("PUT", `/api/ledger-accounts/${id}`, rest);
@@ -460,12 +461,13 @@ export default function Accounts() {
                           openingBalance: String(Math.abs(a.openingBalance || 0)),
                           openingBalanceSide: (a.openingBalanceSide as "Dr" | "Cr") || "Dr",
                           active: a.active !== false,
+                          parentId: a.parentId ?? undefined,
                         });
                       }}
                     >
                       <span className="text-sm truncate">{a.name}</span>
                       <Badge variant="outline" className="text-[10px] shrink-0 ml-2">
-                        Ledger
+                        {a.subType === "Group" ? "Group" : "Ledger"}
                       </Badge>
                     </button>
                   ))}
@@ -564,6 +566,45 @@ export default function Accounts() {
                             )}
                           />
                         </div>
+
+                        {/* Parent Group */}
+                        {alterSelectedAccount?.subType !== "Group" && (
+                          <FormField
+                            control={editForm.control}
+                            name="parentId"
+                            render={({ field }) => {
+                              const groupAccounts = allAccounts.filter(
+                                (a) => a.subType === "Group" && a.accountId !== alterSelectedAccount?.accountId,
+                              );
+                              return (
+                                <FormItem>
+                                  <FormLabel>Parent Group</FormLabel>
+                                  <Select
+                                    onValueChange={(val) =>
+                                      field.onChange(val === "__none__" ? null : Number(val))
+                                    }
+                                    value={field.value != null ? String(field.value) : "__none__"}
+                                  >
+                                    <FormControl>
+                                      <SelectTrigger data-testid="select-alter-parent-group">
+                                        <SelectValue placeholder="No group" />
+                                      </SelectTrigger>
+                                    </FormControl>
+                                    <SelectContent>
+                                      <SelectItem value="__none__">— No group —</SelectItem>
+                                      {groupAccounts.map((g) => (
+                                        <SelectItem key={g.accountId} value={String(g.accountId)}>
+                                          {g.name}
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                  <FormMessage />
+                                </FormItem>
+                              );
+                            }}
+                          />
+                        )}
 
                         {/* Active toggle */}
                         <FormField
