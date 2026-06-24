@@ -13,6 +13,8 @@ import {
   format,
   startOfDay,
   endOfDay,
+  startOfWeek,
+  endOfWeek,
   startOfMonth,
   endOfMonth,
   subMonths,
@@ -25,6 +27,7 @@ export type PeriodPreset =
   | "all_time"
   | "today"
   | "yesterday"
+  | "this_week"
   | "this_month"
   | "last_1_month"
   | "last_6_months"
@@ -65,6 +68,11 @@ function getPresetDates(preset: PeriodPreset): { fromDate: string; toDate: strin
         toDate: formatDate(endOfDay(yesterday)),
       };
     }
+    case "this_week":
+      return {
+        fromDate: formatDate(startOfWeek(today, { weekStartsOn: 1 })),
+        toDate: formatDate(endOfWeek(today, { weekStartsOn: 1 })),
+      };
     case "this_month":
       return {
         fromDate: formatDate(startOfMonth(today)),
@@ -129,6 +137,7 @@ export function PeriodFilter({
   function buildLabel(): string {
     if (value.preset === "all_time") return "All Time";
     if (value.preset === "yesterday") return "Yesterday";
+    if (value.preset === "this_week") return "This Week";
     if (fromDateObj && toDateObj) {
       const from = formatDisplayDate(fromDateObj);
       const to = formatDisplayDate(toDateObj);
@@ -163,6 +172,9 @@ export function PeriodFilter({
           </DropdownMenuItem>
           <DropdownMenuItem onClick={() => handlePresetChange("yesterday")} data-testid="period-preset-yesterday">
             Yesterday
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={() => handlePresetChange("this_week")} data-testid="period-preset-this-week">
+            This Week
           </DropdownMenuItem>
           <DropdownMenuItem onClick={() => handlePresetChange("this_month")} data-testid="period-preset-this-month">
             This Month
