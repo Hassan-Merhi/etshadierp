@@ -1,4 +1,5 @@
 import { parseId, parseOptionalId } from "../lib/parseId";
+import { logger } from "../lib/logger";
 /**
  * Factory Account WhatsApp Auto-Statement Routes
  *
@@ -106,7 +107,11 @@ export function registerFactoryWhatsappRoutes(app: Express, requireAuth: any) {
 
   // ── POST manual send ──────────────────────────────────────────────────────
   app.post("/api/factory/accounts/:accountId/send-statement-whatsapp", requireAuth, async (req: any, res: any) => {
+    const _t = Date.now();
+    const _uid = req.session?.userId;
+    const _cid = req.session?.currentCompanyId;
     try {
+      logger.info("factory whatsapp send-statement started", { module: "factoryWhatsapp", action: "sendStatement", userId: _uid, companyId: _cid });
       const accountId = parseId(req.params.accountId);
       if (accountId === null) return res.status(400).json({ message: "Invalid id" });
       const companyId = req.session?.currentCompanyId;
@@ -170,8 +175,10 @@ export function registerFactoryWhatsappRoutes(app: Express, requireAuth: any) {
         return res.status(502).json({ message: result.error ?? "WhatsApp send failed" });
       }
 
+      logger.info("factory whatsapp send-statement succeeded", { module: "factoryWhatsapp", action: "sendStatement", userId: _uid, companyId: _cid, durationMs: Date.now() - _t });
       res.json({ success: true, fileName });
     } catch (err: any) {
+      logger.error("factory whatsapp send-statement failed", { module: "factoryWhatsapp", action: "sendStatement", userId: _uid, companyId: _cid, durationMs: Date.now() - _t, error: err });
       console.error("[factory-wa] POST send error", err);
       res.status(500).json({ message: err.message });
     }

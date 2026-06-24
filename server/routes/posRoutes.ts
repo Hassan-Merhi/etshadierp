@@ -1189,7 +1189,11 @@ export function registerPosRoutes(app: Express) {
 
   // Update existing sales voucher
   app.put("/api/vouchers/:id/sales", requireAuth, canModifyDate("voucherDate"), async (req, res) => {
+    const _t = Date.now();
+    const _uid = req.session.userId;
+    const _cid = req.session.currentCompanyId;
     try {
+      logger.info("POS sale update started", { module: "pos", action: "updateSale", userId: _uid, companyId: _cid });
       const voucherId = parseInt(req.params.id);
       if (isNaN(voucherId)) {
         return res.status(400).json({ message: "Invalid voucher ID" });
@@ -1643,6 +1647,7 @@ export function registerPosRoutes(app: Express) {
       } catch {
         /* non-fatal */
       }
+      logger.info("POS sale update succeeded", { module: "pos", action: "updateSale", userId: _uid, companyId: _cid, voucherId: updatedVoucher.id, durationMs: Date.now() - _t });
       res.json({
         voucher: updatedVoucher,
         location: updatedLocation,
@@ -1656,6 +1661,7 @@ export function registerPosRoutes(app: Express) {
           : null,
       });
     } catch (error: any) {
+      logger.error("POS sale update failed", { module: "pos", action: "updateSale", userId: _uid, companyId: _cid, durationMs: Date.now() - _t, error });
       if (error.message.includes("Inventory not found")) {
         return res.status(404).json({ message: error.message });
       }

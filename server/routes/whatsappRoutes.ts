@@ -14,6 +14,7 @@
 import type { Express } from "express";
 import { requireAuth } from "../auth";
 import { pool } from "../db";
+import { logger } from "../lib/logger";
 import { storage } from "../storage";
 import {
   getWaSettings,
@@ -266,7 +267,11 @@ export function registerWhatsAppRoutes(app: Express) {
   // ── Send net-position Excel manually ───────────────────────────────────────
 
   app.post("/api/whatsapp/send-net-position", requireAuth, async (req, res) => {
+    const _t = Date.now();
+    const _uid = req.session.userId;
+    const _cid = req.session.currentCompanyId;
     try {
+      logger.info("whatsapp send-net-position started", { module: "whatsapp", action: "sendNetPosition", userId: _uid, companyId: _cid });
       const user = req.session.user as any;
       const isAdmin = user?.role === "Admin" || user?.role === "Developer";
       const requestedCompanyId = req.body.companyId ? parseInt(req.body.companyId) : null;
@@ -299,11 +304,13 @@ export function registerWhatsAppRoutes(app: Express) {
       const result = await sendWhatsAppFile(buffer, fileName, caption);
 
       if (result.success) {
+        logger.info("whatsapp send-net-position succeeded", { module: "whatsapp", action: "sendNetPosition", userId: _uid, companyId: _cid, durationMs: Date.now() - _t });
         res.json({ message: `Sent to ${result.sent} recipient(s)`, ...result });
       } else {
         res.status(502).json({ message: result.errors[0] || "Send failed", ...result });
       }
     } catch (err: any) {
+      logger.error("whatsapp send-net-position failed", { module: "whatsapp", action: "sendNetPosition", userId: _uid, companyId: _cid, durationMs: Date.now() - _t, error: err });
       console.error("[WhatsApp] send-net-position error:", err);
       res.status(500).json({ message: err.message });
     }
@@ -465,7 +472,11 @@ export function registerWhatsAppRoutes(app: Express) {
   });
 
   app.post("/api/whatsapp/send-np-all-now", requireAuth, async (req, res) => {
+    const _t = Date.now();
+    const _uid = req.session.userId;
+    const _cid = req.session.currentCompanyId;
     try {
+      logger.info("whatsapp send-np-all-now started", { module: "whatsapp", action: "sendNpAllNow", userId: _uid, companyId: _cid });
       const { recipientId: reqRecipientId } = req.body as Record<string, any>;
 
       const allCompanies = (await storage.getAllCompanies()) as any[];
@@ -537,8 +548,10 @@ export function registerWhatsAppRoutes(app: Express) {
       );
       messages.push(`Email: ${emailResult.success ? "sent" : emailResult.error || "failed"}`);
 
+      logger.info("whatsapp send-np-all-now succeeded", { module: "whatsapp", action: "sendNpAllNow", userId: _uid, companyId: _cid, durationMs: Date.now() - _t });
       res.json({ message: messages.join(" | ") });
     } catch (err: any) {
+      logger.error("whatsapp send-np-all-now failed", { module: "whatsapp", action: "sendNpAllNow", userId: _uid, companyId: _cid, durationMs: Date.now() - _t, error: err });
       console.error("[NpAllNow] Error:", err?.message || err);
       res.status(500).json({ message: err.message });
     }
@@ -547,7 +560,11 @@ export function registerWhatsAppRoutes(app: Express) {
   // ── Send Stock + Net Position to one specific group ─────────────────────────
 
   app.post("/api/whatsapp/send-stock-report", requireAuth, async (req, res) => {
+    const _t = Date.now();
+    const _uid = req.session.userId;
+    const _cid = req.session.currentCompanyId;
     try {
+      logger.info("whatsapp send-stock-report started", { module: "whatsapp", action: "sendStockReport", userId: _uid, companyId: _cid });
       const { companyId: reqCompanyId, recipientId: reqRecipientId } = req.body as Record<string, any>;
 
       // Resolve company
@@ -623,8 +640,10 @@ export function registerWhatsAppRoutes(app: Express) {
         return res.status(502).json({ message: xlsRes.error || "Failed to send net position Excel" });
       }
 
+      logger.info("whatsapp send-stock-report succeeded", { module: "whatsapp", action: "sendStockReport", userId: _uid, companyId: _cid, durationMs: Date.now() - _t });
       res.json({ message: `Stock PDF + Net Position Excel sent to ${chatId}` });
     } catch (err: any) {
+      logger.error("whatsapp send-stock-report failed", { module: "whatsapp", action: "sendStockReport", userId: _uid, companyId: _cid, durationMs: Date.now() - _t, error: err });
       console.error("[WhatsApp] send-stock-report error:", err);
       res.status(500).json({ message: err.message });
     }

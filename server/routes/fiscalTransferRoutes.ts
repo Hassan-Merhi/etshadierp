@@ -10,6 +10,7 @@ import {
   calculateHistoricalLocationInventory,
   syncEmployeeBalancesFromEntries,
 } from "./_helpers";
+import { logger } from "../lib/logger";
 import {
   inventory,
   stockItems,
@@ -699,7 +700,11 @@ export function registerFiscalTransferRoutes(app: Express) {
 
   // Stock Transfers - POST endpoint (supports both creating new and using existing voucher)
   app.post("/api/stock-transfers", requireAuth, async (req, res) => {
+    const _t = Date.now();
+    const _uid = req.session.userId;
+    const _cid = req.session.currentCompanyId;
     try {
+      logger.info("stock transfer create started", { module: "stockTransfer", action: "create", userId: _uid, companyId: _cid });
       const {
         voucherId,
         sourceLocationId,
@@ -998,6 +1003,7 @@ export function registerFiscalTransferRoutes(app: Express) {
         transferId: transfer.transfer.id,
         itemsCount: transfer.items.length,
       });
+      logger.info("stock transfer create succeeded", { module: "stockTransfer", action: "create", userId: _uid, companyId: _cid, durationMs: Date.now() - _t });
       res.status(201).json(transfer);
 
       // Fire-and-forget: send transfer image to destination WA group (POS users only, original-flow / voucherId path)
@@ -1031,6 +1037,7 @@ export function registerFiscalTransferRoutes(app: Express) {
           }
         });
     } catch (error: any) {
+      logger.error("stock transfer create failed", { module: "stockTransfer", action: "create", userId: _uid, companyId: _cid, durationMs: Date.now() - _t, error });
       console.error("[Stock Transfer] Error creating transfer:", error.message, error.stack);
       res.status(500).json({ message: error.message });
     }
@@ -1831,6 +1838,9 @@ export function registerFiscalTransferRoutes(app: Express) {
 
   // Stock Adjustments - POST endpoint
   app.post("/api/stock-adjustments", requireAuth, requireNonPOS, async (req, res) => {
+    const _t = Date.now();
+    const _uid = req.session.userId;
+    const _cid = req.session.currentCompanyId;
     try {
       const { voucherId, locationId, adjustmentType, notes, items } = req.body;
 
@@ -1879,22 +1889,14 @@ export function registerFiscalTransferRoutes(app: Express) {
         }
       }
 
-      console.log("[Stock Adjustment] Creating adjustment:", {
-        voucherId,
-        locationId,
-        adjustmentType,
-        itemCount: items.length,
-      });
+      logger.info("stock adjustment create started", { module: "stockAdjustment", action: "create", userId: _uid, companyId: _cid, adjustmentType, itemCount: items.length });
 
       const adjustment = await storage.createStockAdjustment(voucherId, locationId, adjustmentType, notes || "", items);
 
-      console.log("[Stock Adjustment] Adjustment created successfully:", {
-        adjustmentId: adjustment.adjustment.id,
-        itemsCount: adjustment.items.length,
-      });
+      logger.info("stock adjustment create succeeded", { module: "stockAdjustment", action: "create", userId: _uid, companyId: _cid, durationMs: Date.now() - _t, adjustmentId: adjustment.adjustment.id });
       res.status(201).json(adjustment);
     } catch (error: any) {
-      console.error("[Stock Adjustment] Error creating adjustment:", error.message, error.stack);
+      logger.error("stock adjustment create failed", { module: "stockAdjustment", action: "create", userId: _uid, companyId: _cid, durationMs: Date.now() - _t, error });
       res.status(500).json({ message: error.message });
     }
   });

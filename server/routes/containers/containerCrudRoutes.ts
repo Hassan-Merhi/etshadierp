@@ -5,6 +5,7 @@ import { db } from "../../db";
 import { storage } from "../../storage";
 import { requireAuth, requireRole, canDelete, requireNonPOS, checkPOSLocation } from "../../auth";
 import { upload, logAudit, getCurrentExchangeRate } from "../_helpers";
+import { logger } from "../../lib/logger";
 import {
   inventory,
   stockItems,
@@ -117,7 +118,11 @@ export function registerContainerCrudRoutes(app: Express) {
   // Update container tracking fields (OTW tracking)
 
   app.post("/api/containers", requireAuth, requireNonPOS, requireNonSP, async (req, res) => {
+    const _t = Date.now();
+    const _uid = req.session.userId;
+    const _cid = req.session.currentCompanyId;
     try {
+      logger.info("container create started", { module: "containers", action: "create", userId: _uid, companyId: _cid });
       if (!req.session.currentCompanyId) {
         return res.status(400).json({ message: "No company selected" });
       }
@@ -218,8 +223,10 @@ export function registerContainerCrudRoutes(app: Express) {
       } catch {
         /* non-fatal */
       }
+      logger.info("container create succeeded", { module: "containers", action: "create", userId: _uid, companyId: _cid, containerId: container.id, durationMs: Date.now() - _t });
       res.status(201).json(container);
     } catch (error: any) {
+      logger.error("container create failed", { module: "containers", action: "create", userId: _uid, companyId: _cid, durationMs: Date.now() - _t, error });
       if (error.name === "ZodError") {
         return res.status(400).json({
           message: "Validation error",

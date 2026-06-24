@@ -5,6 +5,7 @@ import { db } from "../../db";
 import { storage } from "../../storage";
 import { requireAuth, requireRole, canDelete, requireNonPOS, checkPOSLocation } from "../../auth";
 import { upload, logAudit, getCurrentExchangeRate } from "../_helpers";
+import { logger } from "../../lib/logger";
 import {
   inventory,
   stockItems,
@@ -76,7 +77,11 @@ import { adjustInventory, reverseInventoryByExactValue } from "../../inventoryHe
 
 export function registerContainerTrackingRoutes(app: Express) {
   app.patch("/api/containers/:id/tracking", requireAuth, requireNonPOS, async (req, res) => {
+    const _t = Date.now();
+    const _uid = req.session.userId;
+    const _cid = req.session.currentCompanyId;
     try {
+      logger.info("container tracking update started", { module: "containers", action: "updateTracking", userId: _uid, companyId: _cid });
       if (!req.session.currentCompanyId) {
         return res.status(400).json({ message: "No company selected" });
       }
@@ -156,8 +161,10 @@ export function registerContainerTrackingRoutes(app: Express) {
         return res.status(404).json({ message: "Container not found" });
       }
 
+      logger.info("container tracking update succeeded", { module: "containers", action: "updateTracking", userId: _uid, companyId: _cid, containerId: id, durationMs: Date.now() - _t });
       res.json(updated);
     } catch (error: any) {
+      logger.error("container tracking update failed", { module: "containers", action: "updateTracking", userId: _uid, companyId: _cid, durationMs: Date.now() - _t, error });
       res.status(500).json({ message: error.message });
     }
   });

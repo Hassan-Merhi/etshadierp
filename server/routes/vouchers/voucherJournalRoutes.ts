@@ -16,6 +16,7 @@ import {
 } from "../_helpers";
 import { triggerIntercompanyNotifications } from "../intercompanyNotificationRoutes";
 import { autoReallocateLoansAccounts } from "../../lib/transporterAllocation";
+import { logger } from "../../lib/logger";
 import {
   inventory,
   stockItems,
@@ -266,7 +267,11 @@ async function syncJournalToOrderCharge(
 
 export function registerVoucherJournalRoutes(app: Express) {
   app.post("/api/vouchers/journal", requireAuth, requireNonPOS, async (req, res) => {
+    const _t = Date.now();
+    const _uid = req.session.userId;
+    const _cid = req.session.currentCompanyId;
     try {
+      logger.info("journal voucher create started", { module: "vouchers", action: "createJournal", userId: _uid, companyId: _cid });
       if (!req.session.currentCompanyId) {
         return res.status(400).json({ message: "No company selected" });
       }
@@ -453,8 +458,10 @@ export function registerVoucherJournalRoutes(app: Express) {
       } catch {
         /* non-fatal */
       }
+      logger.info("journal voucher create succeeded", { module: "vouchers", action: "createJournal", userId: _uid, companyId: _cid, voucherId: result.voucher.id, durationMs: Date.now() - _t });
       res.json({ ...result, whatsapp: waJournalResult });
     } catch (error: any) {
+      logger.error("journal voucher create failed", { module: "vouchers", action: "createJournal", userId: _uid, companyId: _cid, durationMs: Date.now() - _t, error });
       console.error("Error creating journal voucher:", error);
       res.status(500).json({ message: error.message });
     }
@@ -462,7 +469,11 @@ export function registerVoucherJournalRoutes(app: Express) {
 
   // Update Journal voucher with all entries in one batch
   app.patch("/api/vouchers/:id/journal", requireAuth, requireNonPOS, async (req, res) => {
+    const _t = Date.now();
+    const _uid = req.session.userId;
+    const _cid = req.session.currentCompanyId;
     try {
+      logger.info("journal voucher update started", { module: "vouchers", action: "updateJournal", userId: _uid, companyId: _cid });
       const voucherId = parseInt(req.params.id);
       if (isNaN(voucherId)) {
         return res.status(400).json({ message: "Invalid voucher ID" });
@@ -722,8 +733,10 @@ export function registerVoucherJournalRoutes(app: Express) {
       } catch {
         /* non-fatal */
       }
+      logger.info("journal voucher update succeeded", { module: "vouchers", action: "updateJournal", userId: _uid, companyId: _cid, voucherId: result.voucher.id, durationMs: Date.now() - _t });
       res.json({ voucher: result.voucher, entries: result.entries, whatsapp: waJournalPatch });
     } catch (error: any) {
+      logger.error("journal voucher update failed", { module: "vouchers", action: "updateJournal", userId: _uid, companyId: _cid, durationMs: Date.now() - _t, error });
       console.error("Error updating journal voucher:", error);
       res.status(500).json({ message: error.message });
     }

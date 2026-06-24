@@ -871,7 +871,14 @@ export function startScheduler() {
   cron.schedule(
     "0 7 1 * *",
     async () => {
-      await runMonthlyWhatsAppNetPosition();
+      const _t = Date.now();
+      logger.info("cron monthlyNetPosition started", { module: "scheduler", action: "monthlyNetPosition" });
+      try {
+        await runMonthlyWhatsAppNetPosition();
+        logger.info("cron monthlyNetPosition succeeded", { module: "scheduler", action: "monthlyNetPosition", durationMs: Date.now() - _t });
+      } catch (err: any) {
+        logger.error("cron monthlyNetPosition failed", { module: "scheduler", action: "monthlyNetPosition", durationMs: Date.now() - _t, error: err });
+      }
     },
     {
       timezone: "America/New_York",
@@ -882,7 +889,14 @@ export function startScheduler() {
   cron.schedule(
     "0 6 2 * *",
     async () => {
-      await runMonthlyRentalAccrual();
+      const _t = Date.now();
+      logger.info("cron monthlyRentalAccrual started", { module: "scheduler", action: "monthlyRentalAccrual" });
+      try {
+        await runMonthlyRentalAccrual();
+        logger.info("cron monthlyRentalAccrual succeeded", { module: "scheduler", action: "monthlyRentalAccrual", durationMs: Date.now() - _t });
+      } catch (err: any) {
+        logger.error("cron monthlyRentalAccrual failed", { module: "scheduler", action: "monthlyRentalAccrual", durationMs: Date.now() - _t, error: err });
+      }
     },
     {
       timezone: "America/New_York",
@@ -895,10 +909,17 @@ export function startScheduler() {
   cron.schedule(
     "0 * * * *",
     async () => {
-      await checkAndRunStockReport();
-      await checkAndRunNetPositionExport();
-      await checkAndRunScheduledDailyExport();
-      await checkAndRunContainersWhatsApp();
+      const _t = Date.now();
+      logger.info("cron hourlyChecks started", { module: "scheduler", action: "hourlyChecks" });
+      try {
+        await checkAndRunStockReport();
+        await checkAndRunNetPositionExport();
+        await checkAndRunScheduledDailyExport();
+        await checkAndRunContainersWhatsApp();
+        logger.info("cron hourlyChecks succeeded", { module: "scheduler", action: "hourlyChecks", durationMs: Date.now() - _t });
+      } catch (err: any) {
+        logger.error("cron hourlyChecks failed", { module: "scheduler", action: "hourlyChecks", durationMs: Date.now() - _t, error: err });
+      }
     },
     {
       timezone: "America/New_York",
@@ -909,8 +930,14 @@ export function startScheduler() {
   cron.schedule(
     "0 9 * * *",
     async () => {
-      console.log("[OverdueCheck] 9 AM cron fired.");
-      await checkOverdueCustomers();
+      const _t = Date.now();
+      logger.info("cron overdueCheck started", { module: "scheduler", action: "overdueCheck" });
+      try {
+        await checkOverdueCustomers();
+        logger.info("cron overdueCheck succeeded", { module: "scheduler", action: "overdueCheck", durationMs: Date.now() - _t });
+      } catch (err: any) {
+        logger.error("cron overdueCheck failed", { module: "scheduler", action: "overdueCheck", durationMs: Date.now() - _t, error: err });
+      }
     },
     {
       timezone: "America/New_York",
@@ -921,8 +948,14 @@ export function startScheduler() {
   cron.schedule(
     "0 2 * * *",
     async () => {
-      console.log("[Purge] 30-day soft-delete purge started.");
-      await purgeOldSoftDeletes();
+      const _t = Date.now();
+      logger.info("cron softDeletePurge started", { module: "scheduler", action: "softDeletePurge" });
+      try {
+        await purgeOldSoftDeletes();
+        logger.info("cron softDeletePurge succeeded", { module: "scheduler", action: "softDeletePurge", durationMs: Date.now() - _t });
+      } catch (err: any) {
+        logger.error("cron softDeletePurge failed", { module: "scheduler", action: "softDeletePurge", durationMs: Date.now() - _t, error: err });
+      }
     },
     {
       timezone: "America/New_York",
@@ -933,18 +966,20 @@ export function startScheduler() {
   cron.schedule(
     "0 */6 * * *",
     async () => {
-      console.log("[ContainerTracking] 6-hour auto-tracking cron fired.");
+      const _t = Date.now();
+      logger.info("cron containerTracking started", { module: "scheduler", action: "containerTracking" });
       try {
         const { trackDueContainers } = await import("./containerTrackingService");
         await trackDueContainers();
       } catch (err: any) {
-        console.error("[ContainerTracking] Cron error:", err?.message);
+        logger.error("cron containerTracking (ERP) failed", { module: "scheduler", action: "containerTracking", durationMs: Date.now() - _t, error: err });
       }
       try {
         const { trackDueFactoryContainers } = await import("./factoryContainerTrackingService");
         await trackDueFactoryContainers();
+        logger.info("cron containerTracking succeeded", { module: "scheduler", action: "containerTracking", durationMs: Date.now() - _t });
       } catch (err: any) {
-        console.error("[FactoryTracking] Cron error:", err?.message);
+        logger.error("cron containerTracking (factory) failed", { module: "scheduler", action: "containerTracking", durationMs: Date.now() - _t, error: err });
       }
     },
     {

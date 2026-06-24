@@ -1,5 +1,6 @@
 import { parseId, parseOptionalId } from "../../lib/parseId";
 import { getClientDate } from "../../lib/dateUtils";
+import { logger } from "../../lib/logger";
 import type { Express } from "express";
 import { db } from "../../db";
 import { requireAuth } from "../../auth";
@@ -276,7 +277,11 @@ export function registerFactoryContainersRoutes(app: Express) {
   });
 
   app.post("/api/factory/containers", requireAuth, async (req: any, res: any) => {
+    const _t = Date.now();
+    const _uid = (req.session as any).userId;
+    const _cid = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
     try {
+      logger.info("factory container create started", { module: "factoryContainers", action: "create", userId: _uid, companyId: _cid });
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
@@ -462,15 +467,21 @@ export function registerFactoryContainersRoutes(app: Express) {
         }
       }
 
+      logger.info("factory container create succeeded", { module: "factoryContainers", action: "create", userId: _uid, companyId: _cid, containerId: container.id, durationMs: Date.now() - _t });
       res.json(container);
     } catch (error: any) {
+      logger.error("factory container create failed", { module: "factoryContainers", action: "create", userId: _uid, companyId: _cid, durationMs: Date.now() - _t, error });
       console.error("Error creating factory container:", error);
       res.status(400).json({ message: error.message });
     }
   });
 
   app.patch("/api/factory/containers/:id", requireAuth, async (req: any, res: any) => {
+    const _t = Date.now();
+    const _uid = (req.session as any).userId;
+    const _cid = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
     try {
+      logger.info("factory container update started", { module: "factoryContainers", action: "update", userId: _uid, companyId: _cid });
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
@@ -691,8 +702,10 @@ export function registerFactoryContainersRoutes(app: Express) {
         await db.delete(vouchers).where(eq(vouchers.id, existingFV.id));
       }
 
+      logger.info("factory container update succeeded", { module: "factoryContainers", action: "update", userId: _uid, companyId: _cid, containerId: id, durationMs: Date.now() - _t });
       res.json(updated);
     } catch (error: any) {
+      logger.error("factory container update failed", { module: "factoryContainers", action: "update", userId: _uid, companyId: _cid, durationMs: Date.now() - _t, error });
       const pgErr = error?.cause ?? error;
       const pgMsg = pgErr?.message ?? error?.message ?? "Unknown error";
       const pgCode = pgErr?.code;
