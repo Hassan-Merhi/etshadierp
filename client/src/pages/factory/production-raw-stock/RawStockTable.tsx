@@ -1,4 +1,5 @@
 import { useState, useMemo } from "react";
+import { useLocation } from "wouter";
 import { formatNumber } from "@/lib/formatNumber";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
@@ -32,6 +33,7 @@ interface RawStockTableProps {
 }
 
 export function RawStockTable({ rawStock, onAdjust, onDeduct, onAddToBatch }: RawStockTableProps) {
+  const [, navigate] = useLocation();
   const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({ Uncategorized: true });
 
   const groupedStock = useMemo(() => {
@@ -129,7 +131,16 @@ export function RawStockTable({ rawStock, onAdjust, onDeduct, onAddToBatch }: Ra
                       >
                         <TableCell className="pl-12 py-3">
                           <div className="flex flex-col">
-                            <span className="font-medium text-sm text-foreground">{row.supplierName}</span>
+                            <button
+                              className="font-medium text-sm text-foreground hover:text-primary hover:underline text-left w-fit cursor-pointer"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (row.supplierId) navigate(`/factory/suppliers?supplierId=${row.supplierId}`);
+                              }}
+                              data-testid={`link-supplier-name-${row.supplierId}`}
+                            >
+                              {row.supplierName}
+                            </button>
                             <span className="text-[10px] text-muted-foreground flex items-center gap-2 mt-0.5">
                               Last offload: {new Date(row.lastOffloaded).toLocaleDateString()}
                               {row.sourceType === "OPENING_BALANCE" && (

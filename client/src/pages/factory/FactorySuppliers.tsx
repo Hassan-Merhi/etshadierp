@@ -72,7 +72,10 @@ export default function FactorySuppliers() {
   const [createOpen, setCreateOpen] = useState(false);
   const [editingSupplier, setEditingSupplier] = useState<FactorySupplier | null>(null);
   const [pendingDelete, setPendingDelete] = useState<(() => void) | null>(null);
-  const [statementSupplierId, setStatementSupplierId] = useState<number | null>(null);
+  const [statementSupplierId, setStatementSupplierId] = useState<number | null>(() => {
+    const id = new URLSearchParams(window.location.search).get("supplierId");
+    return id ? Number(id) : null;
+  });
   const [statementReturnToParent, setStatementReturnToParent] = useState(false);
   const [statDateFilter, setStatDateFilter] = useState<"all" | "today" | "yesterday" | "this_month" | "this_year">(
     "all"
