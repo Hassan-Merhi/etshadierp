@@ -1317,18 +1317,6 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
               />
             </div>
 
-            {/* Summary bar — pinned below rows, above notes */}
-            <div className="flex-shrink-0 flex flex-wrap items-center gap-3 px-1 pt-2 pb-1 border-t mt-1">
-              <span className="text-sm text-muted-foreground">
-                <span className="font-semibold text-foreground">{validItemCount}</span> items&nbsp;&nbsp;Qty{" "}
-                <span className="font-semibold text-foreground font-mono">{totalQty.toFixed(2)}</span>
-              </span>
-              <span className="text-sm ml-auto flex items-baseline gap-1">
-                <span className="text-muted-foreground">Total</span>
-                <span className="font-mono font-bold text-2xl">{formatDisplayAmount(total)}</span>
-              </span>
-            </div>
-
             {/* Collapsible notes — hidden by default to match production layout */}
             <div className="flex-shrink-0 mt-1 px-1">
               {notes ? (

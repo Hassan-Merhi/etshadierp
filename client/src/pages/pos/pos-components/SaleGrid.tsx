@@ -64,7 +64,7 @@ export function SaleGrid({
           </div>
 
           {/* Rows */}
-          <div className="max-h-[calc(100vh-24rem)] overflow-y-auto">
+          <div className="overflow-y-auto" style={{ maxHeight: "calc(100vh - 22rem)" }}>
             {rows.map((row, rowIndex) => (
               <div key={row.id}>
                 <div className="group flex border-b border-muted/50 hover-elevate">
@@ -202,6 +202,25 @@ export function SaleGrid({
               </div>
             ))}
           </div>
+
+          {/* Summary bar — sits immediately below the last row */}
+          {(() => {
+            const validCount = rows.filter((r) => r.amount > 0).length;
+            const qty = rows.reduce((s, r) => s + (r.quantity || 0), 0);
+            const total = rows.reduce((s, r) => s + (r.amount || 0), 0);
+            return (
+              <div className="flex flex-wrap items-center gap-3 px-2 py-2 border-t border-border bg-muted/20">
+                <span className="text-sm text-muted-foreground">
+                  <span className="font-semibold text-foreground">{validCount}</span> items&nbsp;&nbsp;Qty{" "}
+                  <span className="font-semibold text-foreground font-mono">{qty.toFixed(2)}</span>
+                </span>
+                <span className="text-sm ml-auto flex items-baseline gap-1">
+                  <span className="text-muted-foreground">Total</span>
+                  <span className="font-mono font-bold text-2xl">{formatDisplayAmount(total)}</span>
+                </span>
+              </div>
+            );
+          })()}
         </div>
       </div>
     </Card>
