@@ -1141,21 +1141,26 @@ function AuthenticatedApp() {
                 </div>
               </header>
               <OfflineBanner />
-              <main className="flex-1 overflow-y-auto p-3 sm:p-6">
-                <div className="w-full">
-                  <ErrorBoundary resetKey={currentLocation}>
-                    <Suspense
-                      fallback={
-                        <div className="flex items-center justify-center h-48 text-muted-foreground text-sm">
-                          Loading...
-                        </div>
-                      }
-                    >
-                      <Router user={user} posImportEnabled={posImportEnabled} />
-                    </Suspense>
-                  </ErrorBoundary>
-                </div>
-              </main>
+              {(() => {
+                const isPosRoute = currentLocation === "/pos" || currentLocation.startsWith("/pos/");
+                return (
+                  <main className={isPosRoute ? "flex-1 overflow-hidden" : "flex-1 overflow-y-auto p-3 sm:p-6"}>
+                    <div className={isPosRoute ? "h-full" : "w-full"}>
+                      <ErrorBoundary resetKey={currentLocation}>
+                        <Suspense
+                          fallback={
+                            <div className="flex items-center justify-center h-48 text-muted-foreground text-sm">
+                              Loading...
+                            </div>
+                          }
+                        >
+                          <Router user={user} posImportEnabled={posImportEnabled} />
+                        </Suspense>
+                      </ErrorBoundary>
+                    </div>
+                  </main>
+                );
+              })()}
             </div>
           </div>
         </SidebarProvider>
