@@ -485,17 +485,35 @@ export function registerPayrollCoreRoutes(app: Express) {
         deductionAmtByWorker[ded.workerId] = (deductionAmtByWorker[ded.workerId] || 0) + parseFloat(ded.amount || "0");
       }
 
-      // Pre-resolve ledger accounts OUTSIDE the transaction to prevent concurrent insert conflicts
-      const [expenseAcc, payableAccGen, advancesAccGen] = await Promise.all([
-        findOrCreateLedger(companyId, "Factory Worker Payroll", "Expense"),
+      // Pre-resolve city-specific ledger accounts OUTSIDE the transaction
+      const uniqueCityKeys = [...new Set(targetWorkers.map((w: any) => (w.city as string | null)?.trim() || ""))];
+      const [payableAccGen, advancesAccGen] = await Promise.all([
         findOrCreateLedger(companyId, "Payroll Payable", "Liability"),
         findOrCreateLedger(companyId, "Factory Worker Advances", "Asset"),
       ]);
+      // Map: cityKey → { salaryId, bonusId }. Empty key = no city → legacy "Factory Worker Payroll"
+      const cityAccCache = new Map<string, { salaryId: number; bonusId: number }>();
+      for (const ck of uniqueCityKeys) {
+        if (ck) {
+          const capCity = ck.charAt(0).toUpperCase() + ck.slice(1).toLowerCase();
+          const [sa, ba] = await Promise.all([
+            findOrCreateLedger(companyId, `Salary Expense - ${capCity}`, "Expense"),
+            findOrCreateLedger(companyId, `Bonus Expense - ${capCity}`, "Expense"),
+          ]);
+          cityAccCache.set(ck, { salaryId: sa.id, bonusId: ba.id });
+        } else {
+          const fa = await findOrCreateLedger(companyId, "Factory Worker Payroll", "Expense");
+          cityAccCache.set("", { salaryId: fa.id, bonusId: fa.id });
+        }
+      }
 
       const created = await db.transaction(async (tx: any) => {
         let count = 0;
         let totalNet = 0;
         let totalAdvanceDeductions = 0;
+        // Track salary and bonus expense per city for split accounting
+        const salaryByCity = new Map<string, number>();
+        const bonusByCity = new Map<string, number>();
         for (const worker of targetWorkers) {
           const baseSal = parseFloat(worker.baseSalary || "0");
           const freq = (worker as any).payFrequency || worker.salaryType || "Monthly";
@@ -548,6 +566,10 @@ export function registerPayrollCoreRoutes(app: Express) {
           // Include pending worker deductions
           const workerPendingDeductions = deductionAmtByWorker[worker.id] || 0;
           const net = base + bonus + transport - advanceDeduction - workerPendingDeductions;
+          // Accumulate per-city expense amounts for split accounting
+          const cityKey = (worker.city as string | null)?.trim() || "";
+          salaryByCity.set(cityKey, (salaryByCity.get(cityKey) || 0) + base + transport - workerPendingDeductions);
+          bonusByCity.set(cityKey, (bonusByCity.get(cityKey) || 0) + bonus);
           const [newPayroll] = await tx
             .insert(factoryPayrolls)
             .values({
@@ -585,10 +607,9 @@ export function registerPayrollCoreRoutes(app: Express) {
           totalAdvanceDeductions += advanceDeduction;
           count++;
         }
-        // Accounting: Dr Payroll Expense (gross) / Cr Payroll Payable (net) / Cr Factory Worker Advances (deductions)
+        // Accounting: Dr city-split Salary/Bonus Expense / Cr Payroll Payable (net) / Cr Factory Worker Advances
         const totalGross = totalNet + totalAdvanceDeductions;
         if (totalGross > 0) {
-          const payableAcc = payableAccGen;
           const desc = `Payroll expense: ${count} worker${count !== 1 ? "s" : ""} (${periodStart} – ${periodEnd})`;
           const [genVoucher] = await tx
             .insert(vouchers)
@@ -603,19 +624,63 @@ export function registerPayrollCoreRoutes(app: Express) {
               sourceModule: "FACTORY",
             })
             .returning();
-          const journalEntries: any[] = [
-            {
-              voucherId: genVoucher.id,
-              ledgerAccountId: expenseAcc.id,
-              debitAmount: totalGross.toFixed(2),
-              creditAmount: "0",
-              narration: desc,
-            },
-          ];
+          const journalEntries: any[] = [];
+          // DR entries per city (salary and bonus split by city)
+          for (const [ck, salAmt] of salaryByCity) {
+            const bonAmt = bonusByCity.get(ck) || 0;
+            const accs = cityAccCache.get(ck) ?? cityAccCache.get("")!;
+            if (ck) {
+              const capCity = ck.charAt(0).toUpperCase() + ck.slice(1).toLowerCase();
+              if (salAmt > 0) {
+                journalEntries.push({
+                  voucherId: genVoucher.id,
+                  ledgerAccountId: accs.salaryId,
+                  debitAmount: salAmt.toFixed(2),
+                  creditAmount: "0",
+                  narration: `Salary expense - ${capCity} (${periodStart} – ${periodEnd})`,
+                });
+              }
+              if (bonAmt > 0) {
+                journalEntries.push({
+                  voucherId: genVoucher.id,
+                  ledgerAccountId: accs.bonusId,
+                  debitAmount: bonAmt.toFixed(2),
+                  creditAmount: "0",
+                  narration: `Bonus expense - ${capCity} (${periodStart} – ${periodEnd})`,
+                });
+              }
+            } else {
+              // Workers with no city: combine into legacy "Factory Worker Payroll" account
+              const totalForCity = salAmt + bonAmt;
+              if (totalForCity > 0) {
+                journalEntries.push({
+                  voucherId: genVoucher.id,
+                  ledgerAccountId: accs.salaryId,
+                  debitAmount: totalForCity.toFixed(2),
+                  creditAmount: "0",
+                  narration: desc,
+                });
+              }
+            }
+          }
+          // Handle cities present only in bonusByCity (edge case: bonus with no salary)
+          for (const [ck, bonAmt] of bonusByCity) {
+            if (!salaryByCity.has(ck) && bonAmt > 0) {
+              const accs = cityAccCache.get(ck) ?? cityAccCache.get("")!;
+              const capCity = ck ? ck.charAt(0).toUpperCase() + ck.slice(1).toLowerCase() : "";
+              journalEntries.push({
+                voucherId: genVoucher.id,
+                ledgerAccountId: ck ? accs.bonusId : accs.salaryId,
+                debitAmount: bonAmt.toFixed(2),
+                creditAmount: "0",
+                narration: ck ? `Bonus expense - ${capCity} (${periodStart} – ${periodEnd})` : desc,
+              });
+            }
+          }
           if (totalNet > 0) {
             journalEntries.push({
               voucherId: genVoucher.id,
-              ledgerAccountId: payableAcc.id,
+              ledgerAccountId: payableAccGen.id,
               debitAmount: "0",
               creditAmount: totalNet.toFixed(2),
               narration: desc,
@@ -1149,4 +1214,197 @@ export function registerPayrollCoreRoutes(app: Express) {
   });
 
   // GET /api/factory/workers/:id/stats - Get worker productivity stats
+
+  // POST /api/factory/payroll/migrate-city-split
+  // One-time migration: splits historical "Factory Worker Payroll" expense entries by city,
+  // and creates missing accounting entries for paid worker bonuses.
+  app.post("/api/factory/payroll/migrate-city-split", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = req.body.companyId || getFactoryCompanyId(req);
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      // --- Step 1: Resolve city-specific accounts ---
+      const cities = await db.execute(sql`
+        SELECT DISTINCT TRIM(city) as city
+        FROM factory_workers
+        WHERE company_id = ${companyId} AND city IS NOT NULL AND TRIM(city) <> ''
+      `);
+      const cityRows = cities.rows as { city: string }[];
+
+      const salaryAccByCity = new Map<string, number>();
+      const bonusAccByCity = new Map<string, number>();
+      for (const { city } of cityRows) {
+        const capCity = city.charAt(0).toUpperCase() + city.slice(1).toLowerCase();
+        const [sa, ba] = await Promise.all([
+          findOrCreateLedger(companyId, `Salary Expense - ${capCity}`, "Expense"),
+          findOrCreateLedger(companyId, `Bonus Expense - ${capCity}`, "Expense"),
+        ]);
+        salaryAccByCity.set(city.trim(), sa.id);
+        bonusAccByCity.set(city.trim(), ba.id);
+      }
+      const legacyAcc = await findOrCreateLedger(companyId, "Factory Worker Payroll", "Expense");
+
+      // --- Step 2: Migrate PAYROLL-GEN-* vouchers ---
+      const genVouchers = await db.execute(sql`
+        SELECT v.id, v.voucher_date, v.description, ve.id as entry_id, ve.debit_amount
+        FROM vouchers v
+        JOIN voucher_entries ve ON ve.voucher_id = v.id
+        WHERE v.company_id = ${companyId}
+          AND v.voucher_number LIKE 'PAYROLL-GEN-%'
+          AND ve.ledger_account_id = ${legacyAcc.id}
+          AND CAST(ve.debit_amount AS numeric) > 0
+      `);
+
+      let vouchersUpdated = 0;
+      for (const row of genVouchers.rows as any[]) {
+        const voucherDate = row.voucher_date as string;
+        // Parse period end from description: "Payroll expense: N workers (YYYY-MM-DD – YYYY-MM-DD)"
+        const periodMatch = (row.description as string).match(/\((\d{4}-\d{2}-\d{2})\s*[–-]\s*(\d{4}-\d{2}-\d{2})\)/);
+        if (!periodMatch) continue;
+        const periodStart = periodMatch[1];
+        const periodEnd = periodMatch[2];
+
+        // Find factory_payrolls for this period
+        const payrollData = await db.execute(sql`
+          SELECT fp.base_salary, fp.bonuses, fp.transport, fp.deductions,
+                 fw.city
+          FROM factory_payrolls fp
+          JOIN factory_workers fw ON fw.id = fp.worker_id
+          WHERE fp.company_id = ${companyId}
+            AND fp.period_start = ${periodStart}
+            AND fp.period_end = ${periodEnd}
+        `);
+
+        if (payrollData.rows.length === 0) continue;
+
+        // Aggregate by city
+        const salByCity = new Map<string, number>();
+        const bonByCity = new Map<string, number>();
+        for (const pr of payrollData.rows as any[]) {
+          const city = (pr.city as string | null)?.trim() || "";
+          const sal = parseFloat(pr.base_salary || "0") + parseFloat(pr.transport || "0") - parseFloat(pr.deductions || "0");
+          const bon = parseFloat(pr.bonuses || "0");
+          salByCity.set(city, (salByCity.get(city) || 0) + sal);
+          bonByCity.set(city, (bonByCity.get(city) || 0) + bon);
+        }
+
+        // Delete the old single-city debit entry
+        await db.execute(sql`DELETE FROM voucher_entries WHERE id = ${row.entry_id}`);
+
+        // Insert new split entries
+        const newEntries: any[] = [];
+        const allCities = new Set([...salByCity.keys(), ...bonByCity.keys()]);
+        for (const city of allCities) {
+          const salAmt = salByCity.get(city) || 0;
+          const bonAmt = bonByCity.get(city) || 0;
+          if (city) {
+            const capCity = city.charAt(0).toUpperCase() + city.slice(1).toLowerCase();
+            if (salAmt > 0) {
+              const salAccId = salaryAccByCity.get(city) ?? legacyAcc.id;
+              newEntries.push({
+                voucherId: row.id,
+                ledgerAccountId: salAccId,
+                debitAmount: salAmt.toFixed(2),
+                creditAmount: "0",
+                narration: `Salary expense - ${capCity} (${periodStart} – ${periodEnd})`,
+              });
+            }
+            if (bonAmt > 0) {
+              const bonAccId = bonusAccByCity.get(city) ?? legacyAcc.id;
+              newEntries.push({
+                voucherId: row.id,
+                ledgerAccountId: bonAccId,
+                debitAmount: bonAmt.toFixed(2),
+                creditAmount: "0",
+                narration: `Bonus expense - ${capCity} (${periodStart} – ${periodEnd})`,
+              });
+            }
+          } else {
+            const total = salAmt + bonAmt;
+            if (total > 0) {
+              newEntries.push({
+                voucherId: row.id,
+                ledgerAccountId: legacyAcc.id,
+                debitAmount: total.toFixed(2),
+                creditAmount: "0",
+                narration: `Payroll expense (no city) (${periodStart} – ${periodEnd})`,
+              });
+            }
+          }
+        }
+        if (newEntries.length > 0) {
+          await db.insert(voucherEntries).values(newEntries);
+        }
+        vouchersUpdated++;
+      }
+
+      // --- Step 3: Create missing accounting for paid worker bonuses ---
+      const paidBonuses = await db.execute(sql`
+        SELECT wb.id, wb.worker_id, wb.bonus_date, wb.amount, wb.notes,
+               wb.cash_account_id, wb.paid_date,
+               fw.city, fw.full_name
+        FROM worker_bonuses wb
+        JOIN factory_workers fw ON fw.id = wb.worker_id
+        WHERE wb.company_id = ${companyId}
+          AND wb.status = 'paid'
+          AND wb.cash_account_id IS NOT NULL
+          AND NOT EXISTS (
+            SELECT 1 FROM vouchers v
+            WHERE v.company_id = ${companyId}
+              AND v.voucher_number LIKE 'WBONUS-' || wb.id || '-%'
+          )
+      `);
+
+      let bonusesRecorded = 0;
+      for (const wb of paidBonuses.rows as any[]) {
+        const amt = parseFloat(wb.amount || "0");
+        if (amt <= 0) continue;
+        const city = (wb.city as string | null)?.trim() || "";
+        const capCity = city ? city.charAt(0).toUpperCase() + city.slice(1).toLowerCase() : "";
+        const expAccId = city ? (bonusAccByCity.get(city) ?? legacyAcc.id) : legacyAcc.id;
+        const paidDate = wb.paid_date || wb.bonus_date;
+        const narration = wb.notes || `Bonus for ${wb.full_name}`;
+
+        const [bVoucher] = await db
+          .insert(vouchers)
+          .values({
+            companyId,
+            voucherNumber: `WBONUS-${wb.id}-${Date.now()}`,
+            voucherType: "Journal",
+            voucherDate: paidDate,
+            description: narration,
+            totalAmount: amt.toFixed(2),
+            currency: "USD",
+            sourceModule: "FACTORY",
+          })
+          .returning();
+
+        await db.insert(voucherEntries).values([
+          {
+            voucherId: bVoucher.id,
+            ledgerAccountId: expAccId,
+            debitAmount: amt.toFixed(2),
+            creditAmount: "0",
+            narration: city ? `Bonus expense - ${capCity}: ${narration}` : narration,
+          },
+          {
+            voucherId: bVoucher.id,
+            ledgerAccountId: parseInt(wb.cash_account_id),
+            debitAmount: "0",
+            creditAmount: amt.toFixed(2),
+            narration,
+          },
+        ]);
+        bonusesRecorded++;
+      }
+
+      res.json({
+        message: "Migration complete",
+        vouchersUpdated,
+        bonusEntriesCreated: bonusesRecorded,
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
 }

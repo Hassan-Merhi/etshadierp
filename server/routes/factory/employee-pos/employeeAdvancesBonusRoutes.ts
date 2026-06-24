@@ -434,10 +434,83 @@ export function registerEmployeeAdvancesBonusRoutes(app: Express) {
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const { cashAccountId, paidDate } = req.body;
       if (!cashAccountId) return res.status(400).json({ message: "cashAccountId required" });
-      await db.execute(sql`
-        UPDATE worker_bonuses SET status = 'paid', cash_account_id = ${parseInt(cashAccountId)}, paid_date = ${paidDate || getClientDate(req)}
-        WHERE id = ${parseInt(req.params.id)} AND company_id = ${companyId} AND status = 'pending'
+      const cashId = parseInt(cashAccountId);
+      const payDate = paidDate || getClientDate(req);
+
+      // Fetch the bonus and worker city for accounting
+      const bonusRows = await db.execute(sql`
+        SELECT wb.*, fw.city, fw.full_name
+        FROM worker_bonuses wb
+        JOIN factory_workers fw ON fw.id = wb.worker_id
+        WHERE wb.id = ${parseInt(req.params.id)} AND wb.company_id = ${companyId} AND wb.status = 'pending'
       `);
+      if (!bonusRows.rows.length) return res.status(404).json({ message: "Bonus not found or already paid" });
+      const wb = bonusRows.rows[0] as any;
+      const amt = parseFloat(wb.amount || "0");
+
+      // Determine the city-split bonus expense account
+      const city = (wb.city as string | null)?.trim() || "";
+      const capCity = city ? city.charAt(0).toUpperCase() + city.slice(1).toLowerCase() : "";
+      const accName = city ? `Bonus Expense - ${capCity}` : "Factory Worker Payroll";
+
+      // Get or create the expense account
+      let [expAcc] = await db
+        .select({ id: ledgerAccounts.id })
+        .from(ledgerAccounts)
+        .where(and(eq(ledgerAccounts.companyId, companyId), eq(ledgerAccounts.name, accName)));
+      if (!expAcc) {
+        const maxCode = await db.execute(sql`
+          SELECT MAX(CAST(code AS INTEGER)) as m FROM ledger_accounts
+          WHERE company_id = ${companyId} AND code ~ '^[0-9]+$'
+        `);
+        const nextCode = String(((maxCode.rows[0] as any)?.m || 0) + 1);
+        [expAcc] = await db
+          .insert(ledgerAccounts)
+          .values({ companyId, code: nextCode, name: accName, accountType: "Expense", active: true, openingBalance: "0" })
+          .returning({ id: ledgerAccounts.id });
+      }
+
+      // Mark bonus as paid and create journal entry in a transaction
+      await db.transaction(async (tx: any) => {
+        await tx.execute(sql`
+          UPDATE worker_bonuses SET status = 'paid', cash_account_id = ${cashId}, paid_date = ${payDate}
+          WHERE id = ${parseInt(req.params.id)} AND company_id = ${companyId} AND status = 'pending'
+        `);
+
+        if (amt > 0) {
+          const narration = wb.notes || `Bonus for ${wb.full_name}`;
+          const [bVoucher] = await tx
+            .insert(vouchers)
+            .values({
+              companyId,
+              voucherNumber: `WBONUS-${req.params.id}-${Date.now()}`,
+              voucherType: "Journal",
+              voucherDate: payDate,
+              description: narration,
+              totalAmount: amt.toFixed(2),
+              currency: "USD",
+              sourceModule: "FACTORY",
+            })
+            .returning();
+          await tx.insert(voucherEntries).values([
+            {
+              voucherId: bVoucher.id,
+              ledgerAccountId: expAcc.id,
+              debitAmount: amt.toFixed(2),
+              creditAmount: "0",
+              narration: city ? `Bonus expense - ${capCity}: ${narration}` : narration,
+            },
+            {
+              voucherId: bVoucher.id,
+              ledgerAccountId: cashId,
+              debitAmount: "0",
+              creditAmount: amt.toFixed(2),
+              narration,
+            },
+          ]);
+        }
+      });
+
       res.json({ message: "Bonus marked as paid" });
     } catch (err: any) {
       res.status(500).json({ message: err.message });

@@ -12,6 +12,7 @@ import {
   Upload,
   Table2,
   CheckCircle2,
+  GitMerge,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
@@ -146,6 +147,7 @@ export default function FactoryPayrollPage() {
 
   const [exportingPdf, setExportingPdf] = useState(false);
   const [exportingExcel, setExportingExcel] = useState(false);
+  const [migrating, setMigrating] = useState(false);
 
   const [workerSearch, setWorkerSearch] = useState("");
   const [workerImporting, setWorkerImporting] = useState(false);
@@ -324,6 +326,30 @@ export default function FactoryPayrollPage() {
     });
   };
 
+  const handleMigrateCitySplit = async () => {
+    if (!selectedCompanyId) return;
+    if (!window.confirm("This will split historical salary/bonus expense entries by city (Lubumbashi / Kolwezi). Run once only. Continue?")) return;
+    setMigrating(true);
+    try {
+      const res = await fetch("/api/factory/payroll/migrate-city-split", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ companyId: selectedCompanyId }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || "Migration failed");
+      toast({
+        title: "Migration complete",
+        description: `${data.vouchersUpdated} payroll vouchers split by city, ${data.bonusEntriesCreated} bonus entries created.`,
+      });
+    } catch (e: any) {
+      toast({ title: "Migration failed", description: e.message, variant: "destructive" });
+    } finally {
+      setMigrating(false);
+    }
+  };
+
   const handleExportPdf = async () => {
     if (!selectedCompanyId) return;
     if (!navigator.onLine) {
@@ -462,6 +488,16 @@ export default function FactoryPayrollPage() {
                 <Download className="h-4 w-4 mr-1" />
               )}
               Export Excel
+            </Button>
+            <Button
+              variant="outline"
+              onClick={handleMigrateCitySplit}
+              disabled={!selectedCompanyId || migrating}
+              data-testid="button-migrate-city-split"
+              title="One-time: split historical salary/bonus by city"
+            >
+              {migrating ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <GitMerge className="h-4 w-4 mr-1" />}
+              Split by City
             </Button>
           </div>
         </div>
