@@ -154,6 +154,13 @@ export default function Payroll() {
   const [selectedGroupForMembers, setSelectedGroupForMembers] = useState<any | null>(null);
   const [groupMembersDialogOpen, setGroupMembersDialogOpen] = useState(false);
 
+  // Worker tab state
+  const [workerGroupsExpanded, setWorkerGroupsExpanded] = useState<Record<number, boolean>>({});
+  const [createWorkerGroupDialogOpen, setCreateWorkerGroupDialogOpen] = useState(false);
+  const [selectedWorkerGroupForMembers, setSelectedWorkerGroupForMembers] = useState<any | null>(null);
+  const [workerGroupMembersDialogOpen, setWorkerGroupMembersDialogOpen] = useState(false);
+  const [workerGroupMemberSelections, setWorkerGroupMemberSelections] = useState<Record<number, boolean>>({});
+
   // Queries
   const { data: employees = [], isLoading: employeesLoading } = useQuery<
     Array<Employee & { calculatedBalance: string }>
@@ -205,8 +212,49 @@ export default function Payroll() {
     enabled: otherCompanies.length > 0,
   });
 
+  const { data: workerPaymentSummary = null } = useQuery<any>({
+    queryKey: ["/api/payroll/worker-payments-summary", selectedCompany?.id],
+    enabled: !!selectedCompany,
+  });
+
+  const { data: workerGroupsData = [] } = useQuery<any[]>({
+    queryKey: ["/api/worker-groups/with-members", selectedCompany?.id],
+    enabled: !!selectedCompany,
+  });
+
   const employeeStaff = useMemo(() => employees.filter((e) => e.employeeType === "Employee"), [employees]);
   const workerStaff = useMemo(() => employees.filter((e) => e.employeeType === "Worker"), [employees]);
+
+  // Derived worker payment state (merges monthlySalary defaults with manual overrides)
+  const workerPayments = useMemo(() => {
+    const map: Record<number, { selected: boolean; amount: string; manuallyEdited: boolean }> = {};
+    workerStaff.forEach((w) => {
+      const override = workerOverrides[w.id] || {};
+      map[w.id] = {
+        selected: override.selected ?? false,
+        amount: override.amount ?? (w.monthlySalary || "0"),
+        manuallyEdited: override.manuallyEdited ?? false,
+      };
+    });
+    return map;
+  }, [workerStaff, workerOverrides]);
+
+  const ungroupedWorkers = useMemo(() => {
+    const groupedIds = new Set(
+      workerGroupsData.flatMap((g: any) => (g.members || []).map((m: any) => m.id))
+    );
+    return workerStaff.filter((w) => !groupedIds.has(w.id));
+  }, [workerStaff, workerGroupsData]);
+
+  const selectedPayments = useMemo(
+    () => workerStaff.filter((w) => workerPayments[w.id]?.selected),
+    [workerStaff, workerPayments]
+  );
+
+  const totalAmount = useMemo(
+    () => selectedPayments.reduce((s, w) => s + parseFloat(workerPayments[w.id]?.amount || "0"), 0),
+    [selectedPayments, workerPayments]
+  );
 
   const filteredEmployeeStaff = useMemo(() => {
     return employeeStaff.filter((emp) => {
@@ -275,6 +323,82 @@ export default function Payroll() {
     }
   };
 
+  // Worker tab handlers
+  const handleToggleWorker = (id: number) => {
+    setWorkerOverrides((prev: any) => ({
+      ...prev,
+      [id]: { ...prev[id], selected: !prev[id]?.selected },
+    }));
+  };
+
+  const handleUpdateAmount = (id: number, val: string) => {
+    setWorkerOverrides((prev: any) => ({
+      ...prev,
+      [id]: { ...prev[id], amount: val, manuallyEdited: true },
+    }));
+  };
+
+  const handleDeleteWorker = (worker: Employee) => {
+    if (confirm(`Delete worker ${worker.firstName} ${worker.lastName}?`)) {
+      modeApiRequest("DELETE", `/api/employees/${worker.id}`, undefined).then(() => {
+        toast({ title: "Deleted", description: "Worker deleted" });
+        queryClient.invalidateQueries({ queryKey: ["/api/employees", selectedCompany?.id] });
+      }).catch((e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }));
+    }
+  };
+
+  const createWorkerMutation = useMutation({
+    mutationFn: async (data: any) =>
+      modeApiRequest("POST", "/api/employees", { ...data, companyId: selectedCompany?.id, employeeType: "Worker" }),
+    onSuccess: () => {
+      toast({ title: "Worker created" });
+      queryClient.invalidateQueries({ queryKey: ["/api/employees", selectedCompany?.id] });
+      setNewWorkerDialogOpen(false);
+      newWorkerForm.reset();
+    },
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
+  const updateWorkerMutation = useMutation({
+    mutationFn: async (data: any) => {
+      if (!selectedWorkerForEdit) throw new Error("No worker selected");
+      return modeApiRequest("PATCH", `/api/employees/${selectedWorkerForEdit.id}`, data);
+    },
+    onSuccess: () => {
+      toast({ title: "Worker updated" });
+      queryClient.invalidateQueries({ queryKey: ["/api/employees", selectedCompany?.id] });
+      setEditWorkerDialogOpen(false);
+    },
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
+  const handleForceDeleteWorker = () => {
+    if (!deleteWorkerConflict) return;
+    modeApiRequest("DELETE", `/api/employees/${deleteWorkerConflict.employee.id}?force=true`, undefined)
+      .then(() => {
+        toast({ title: "Deleted", description: "Worker force-deleted" });
+        queryClient.invalidateQueries({ queryKey: ["/api/employees", selectedCompany?.id] });
+        setDeleteWorkerConflict(null);
+      })
+      .catch((e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }));
+  };
+
+  const deleteWorkerGroupMutation = useMutation({
+    mutationFn: async (groupId: number) => modeApiRequest("DELETE", `/api/worker-groups/${groupId}`, undefined),
+    onSuccess: () => {
+      toast({ title: "Group deleted" });
+      queryClient.invalidateQueries({ queryKey: ["/api/worker-groups/with-members", selectedCompany?.id] });
+    },
+  });
+
+  const addWorkerToWorkerGroupMutation = useMutation({
+    mutationFn: async ({ groupId, workerId }: { groupId: number; workerId: number }) =>
+      modeApiRequest("POST", `/api/worker-groups/${groupId}/members`, { employeeId: workerId }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/worker-groups/with-members", selectedCompany?.id] });
+    },
+  });
+
   const workerDeductionMutation = useMutation({
     mutationFn: async () => {
       if (!workerDeductionTarget) throw new Error("No worker selected");
@@ -337,30 +461,30 @@ export default function Payroll() {
         <TabsContent value="workers">
           <WorkersTab
             workerStaff={workerStaff}
-            workerPaymentSummary={null}
-            selectedPayments={[]}
-            totalAmount={0}
-            workerGroups={[]}
-            workerGroupsExpanded={{}}
-            setWorkerGroupsExpanded={() => {}}
-            workerPayments={{}}
+            workerPaymentSummary={workerPaymentSummary}
+            selectedPayments={selectedPayments}
+            totalAmount={totalAmount}
+            workerGroups={workerGroupsData}
+            workerGroupsExpanded={workerGroupsExpanded}
+            setWorkerGroupsExpanded={setWorkerGroupsExpanded}
+            workerPayments={workerPayments}
             setWorkerOverrides={setWorkerOverrides}
             setBulkPaymentDialogOpen={setBulkPaymentDialogOpen}
             setNewWorkerDialogOpen={setNewWorkerDialogOpen}
             setWorkerDeductionTarget={setWorkerDeductionTarget}
             setSelectedWorkerForEdit={setSelectedWorkerForEdit}
             setEditWorkerDialogOpen={setEditWorkerDialogOpen}
-            setCreateWorkerGroupDialogOpen={() => {}}
-            setSelectedWorkerGroupForMembers={() => {}}
-            setWorkerGroupMembersDialogOpen={() => {}}
-            setWorkerGroupMemberSelections={() => {}}
-            deleteWorkerGroupMutation={null}
-            handleToggleWorker={() => {}}
-            handleUpdateAmount={() => {}}
-            handleDeleteWorker={() => {}}
-            setStatementEmployee={() => {}}
-            ungroupedWorkers={[]}
-            addWorkerToWorkerGroupMutation={null}
+            setCreateWorkerGroupDialogOpen={setCreateWorkerGroupDialogOpen}
+            setSelectedWorkerGroupForMembers={setSelectedWorkerGroupForMembers}
+            setWorkerGroupMembersDialogOpen={setWorkerGroupMembersDialogOpen}
+            setWorkerGroupMemberSelections={setWorkerGroupMemberSelections}
+            deleteWorkerGroupMutation={deleteWorkerGroupMutation}
+            handleToggleWorker={handleToggleWorker}
+            handleUpdateAmount={handleUpdateAmount}
+            handleDeleteWorker={handleDeleteWorker as any}
+            setStatementEmployee={setStatementEmployee}
+            ungroupedWorkers={ungroupedWorkers}
+            addWorkerToWorkerGroupMutation={addWorkerToWorkerGroupMutation}
           />
         </TabsContent>
 
@@ -409,7 +533,20 @@ export default function Payroll() {
         mutation={workerDeductionMutation}
       />
 
-      {/* Other dialogs would be here as well, kept slim for orchestrator */}
+      <WorkerDialogs
+        newWorkerDialogOpen={newWorkerDialogOpen}
+        setNewWorkerDialogOpen={setNewWorkerDialogOpen}
+        newWorkerForm={newWorkerForm}
+        createWorkerMutation={createWorkerMutation}
+        editWorkerDialogOpen={editWorkerDialogOpen}
+        setEditWorkerDialogOpen={setEditWorkerDialogOpen}
+        selectedWorkerForEdit={selectedWorkerForEdit}
+        editWorkerForm={editWorkerForm}
+        updateWorkerMutation={updateWorkerMutation}
+        deleteWorkerConflict={deleteWorkerConflict}
+        setDeleteWorkerConflict={setDeleteWorkerConflict}
+        handleForceDeleteWorker={handleForceDeleteWorker}
+      />
       </div>
     </div>
   );
