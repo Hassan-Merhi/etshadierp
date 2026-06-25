@@ -1,5 +1,5 @@
 import type { Express } from "express";
-import { db } from "../../db";
+import { db, pool } from "../../db";
 import { requireAuth } from "../../auth";
 import {
   customerOrders,
@@ -198,58 +198,61 @@ export function registerFactoryShippingContainerRoutes(app: Express) {
       const companyId = getCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const rows = await db
-        .select({
-          // Row fields
-          id: factoryShippingContainerRows.id,
-          companyId: factoryShippingContainerRows.companyId,
-          customerOrderId: factoryShippingContainerRows.customerOrderId,
-          orderDate: factoryShippingContainerRows.orderDate,
-          eta: factoryShippingContainerRows.eta,
-          containerArrivedDate: factoryShippingContainerRows.containerArrivedDate,
-          note: factoryShippingContainerRows.note,
-          ciNumber: factoryShippingContainerRows.ciNumber,
-          isDone: factoryShippingContainerRows.isDone,
-          doneAt: factoryShippingContainerRows.doneAt,
-          doneBy: factoryShippingContainerRows.doneBy,
-          whatsappSentAt: factoryShippingContainerRows.whatsappSentAt,
-          createdAt: factoryShippingContainerRows.createdAt,
-          // Live from customer_orders (source of truth)
-          invoiceNumber: customerOrders.invoiceNumber,
-          customerId: customerOrders.customerId,
-          clientName: customers.legalName,
-          customerPhone: customers.phone,
-          status: customerOrders.status,
-          loadingDate: customerOrders.loadingStartedAt,
-          finalizedDate: customerOrders.loadingFinalizedAt,
-          containerNumber: customerOrders.containerNumber,
-          shippingCompany: customerOrders.shippingCompany,
-          destination: customerOrders.destination,
-          documentCount: sql<number>`(
-            SELECT COUNT(*)::int FROM factory_shipping_container_documents fscd
-            WHERE fscd.scr_id = ${factoryShippingContainerRows.id}
-              AND fscd.file_data IS NOT NULL
-              AND length(fscd.file_data) > 0
-              AND fscd.file_name IS NOT NULL
-              AND trim(fscd.file_name) <> ''
-              AND fscd.file_name <> '-'
-              AND (
-                (fscd.display_name IS NOT NULL AND trim(fscd.display_name) <> '')
-                OR (fscd.original_name IS NOT NULL AND trim(fscd.original_name) <> '')
-              )
-          )`,
-          shippingInvoiceFileName: factoryShippingContainerRows.shippingInvoiceFileName,
-          shippingInvoiceOriginalName: factoryShippingContainerRows.shippingInvoiceOriginalName,
-          shippingInvoiceFileUrl: factoryShippingContainerRows.shippingInvoiceFileUrl,
-          shippingInvoiceFileType: factoryShippingContainerRows.shippingInvoiceFileType,
-          trackingLink: factoryShippingContainerRows.trackingLink,
-          grandTotal: customerOrders.grandTotal,
-        })
-        .from(factoryShippingContainerRows)
-        .innerJoin(customerOrders, eq(factoryShippingContainerRows.customerOrderId, customerOrders.id))
-        .leftJoin(customers, eq(customerOrders.customerId, customers.id))
-        .where(eq(factoryShippingContainerRows.companyId, companyId))
-        .orderBy(desc(factoryShippingContainerRows.createdAt));
+      // Pre-aggregate document counts in ONE pass instead of a correlated subquery per row.
+      // The old approach called length(file_data) inside a correlated SELECT — that forced
+      // PostgreSQL to dereference TOAST storage for every document blob on every row (N×M reads).
+      // Now we join a pre-aggregated subquery so the whole list resolves in one query plan.
+      const { rows } = await pool.query(
+        `SELECT
+           r.id,
+           r.company_id        AS "companyId",
+           r.customer_order_id AS "customerOrderId",
+           r.order_date        AS "orderDate",
+           r.eta,
+           r.container_arrived_date AS "containerArrivedDate",
+           r.note,
+           r.ci_number         AS "ciNumber",
+           r.is_done           AS "isDone",
+           r.done_at           AS "doneAt",
+           r.done_by           AS "doneBy",
+           r.whatsapp_sent_at  AS "whatsappSentAt",
+           r.created_at        AS "createdAt",
+           r.shipping_invoice_file_name     AS "shippingInvoiceFileName",
+           r.shipping_invoice_original_name AS "shippingInvoiceOriginalName",
+           r.shipping_invoice_file_url      AS "shippingInvoiceFileUrl",
+           r.shipping_invoice_file_type     AS "shippingInvoiceFileType",
+           r.tracking_link     AS "trackingLink",
+           co.invoice_number   AS "invoiceNumber",
+           co.customer_id      AS "customerId",
+           c.legal_name        AS "clientName",
+           c.phone             AS "customerPhone",
+           co.status,
+           co.loading_started_at   AS "loadingDate",
+           co.loading_finalized_at AS "finalizedDate",
+           co.container_number     AS "containerNumber",
+           co.shipping_company     AS "shippingCompany",
+           co.destination,
+           co.grand_total      AS "grandTotal",
+           COALESCE(dc.doc_count, 0)::int AS "documentCount"
+         FROM factory_shipping_container_rows r
+         INNER JOIN customer_orders co ON r.customer_order_id = co.id
+         LEFT JOIN customers c ON co.customer_id = c.id
+         LEFT JOIN (
+           SELECT scr_id, COUNT(*)::int AS doc_count
+           FROM factory_shipping_container_documents
+           WHERE file_name IS NOT NULL
+             AND trim(file_name) <> ''
+             AND file_name <> '-'
+             AND (
+               (display_name IS NOT NULL AND trim(display_name) <> '')
+               OR (original_name IS NOT NULL AND trim(original_name) <> '')
+             )
+           GROUP BY scr_id
+         ) dc ON dc.scr_id = r.id
+         WHERE r.company_id = $1
+         ORDER BY r.created_at DESC`,
+        [companyId]
+      );
 
       res.json(rows);
     } catch (error: any) {
@@ -1182,68 +1185,73 @@ export function registerFactoryShippingContainerRoutes(app: Express) {
         archive.on("end", () => resolve(Buffer.concat(chunks)));
         archive.on("error", (err) => reject(err));
 
-        // Kick off all appends, then finalize
+        // Kick off all fetches in parallel, then append and finalize.
+        // Previously the Excel fetch and PDF fetch were awaited sequentially — each
+        // can take 5-15 s, so sequential = 10-30 s total. Running them concurrently
+        // means total wait ≈ max(Excel, PDF, DB) instead of sum.
         (async () => {
           try {
-            // 1. Commercial invoice Excel
-            if (fileIds.includes("invoice_excel")) {
-              const buf = await fetchInternalBuffer(
-                req,
-                `/api/factory/customer-orders/${row.customerOrderId}/export-excel`
-              );
-              if (buf) {
-                const excelName = buildZipFilename([row.containerNumber, row.clientName, row.destination], "xlsx");
-                archive.append(buf, { name: excelName });
-              }
-            }
-
-            // 2. Customer statement PDF
-            if (fileIds.includes("statement_pdf") && row.customerId) {
-              const safeClient = (row.clientName || "client").replace(/[^\w\-]/g, "_");
-              const buf = await fetchInternalBuffer(
-                req,
-                `/api/factory/customers/${row.customerId}/statement/export-pdf`
-              );
-              if (buf) archive.append(buf, { name: `Customer_Statement_${safeClient}.pdf` });
-            }
-
-            // 3. Uploaded documents
             const docIdNumbers = fileIds
               .filter((f) => f.startsWith("doc_"))
               .map((f) => parseInt(f.slice(4)))
               .filter((n) => !isNaN(n));
 
-            if (docIdNumbers.length > 0) {
-              const docs = await db
-                .select({
-                  id: factoryShippingContainerDocuments.id,
-                  fileName: factoryShippingContainerDocuments.fileName,
-                  originalName: factoryShippingContainerDocuments.originalName,
-                  fileData: factoryShippingContainerDocuments.fileData,
-                })
-                .from(factoryShippingContainerDocuments)
-                .where(
-                  and(
-                    inArray(factoryShippingContainerDocuments.id, docIdNumbers),
-                    eq(factoryShippingContainerDocuments.scrId, id),
-                    eq(factoryShippingContainerDocuments.companyId, companyId)
-                  )
-                );
+            // Fan out all slow operations simultaneously
+            const [excelBuf, pdfBuf, docs] = await Promise.all([
+              // 1. Commercial invoice Excel
+              fileIds.includes("invoice_excel")
+                ? fetchInternalBuffer(req, `/api/factory/customer-orders/${row.customerOrderId}/export-excel`)
+                : Promise.resolve(null),
 
-              for (const doc of docs) {
-                const entryName = doc.originalName?.trim() || doc.fileName?.trim() || `document_${doc.id}`;
-                const diskPath = path.join(
-                  process.cwd(),
-                  "uploads",
-                  "shipping-container-docs",
-                  doc.fileName || ""
-                );
-                if (doc.fileName && fs.existsSync(diskPath)) {
-                  archive.file(diskPath, { name: entryName });
-                } else if (doc.fileData) {
-                  const buf = Buffer.from(doc.fileData, "base64");
-                  archive.append(buf, { name: entryName });
-                }
+              // 2. Customer statement PDF
+              fileIds.includes("statement_pdf") && row.customerId
+                ? fetchInternalBuffer(req, `/api/factory/customers/${row.customerId}/statement/export-pdf`)
+                : Promise.resolve(null),
+
+              // 3. Uploaded documents from DB
+              docIdNumbers.length > 0
+                ? db
+                    .select({
+                      id: factoryShippingContainerDocuments.id,
+                      fileName: factoryShippingContainerDocuments.fileName,
+                      originalName: factoryShippingContainerDocuments.originalName,
+                      fileData: factoryShippingContainerDocuments.fileData,
+                    })
+                    .from(factoryShippingContainerDocuments)
+                    .where(
+                      and(
+                        inArray(factoryShippingContainerDocuments.id, docIdNumbers),
+                        eq(factoryShippingContainerDocuments.scrId, id),
+                        eq(factoryShippingContainerDocuments.companyId, companyId)
+                      )
+                    )
+                : Promise.resolve([] as Array<{ id: number; fileName: string | null; originalName: string | null; fileData: string | null }>),
+            ]);
+
+            // Append results into the archive (order doesn't matter for ZIP)
+            if (excelBuf) {
+              const excelName = buildZipFilename([row.containerNumber, row.clientName, row.destination], "xlsx");
+              archive.append(excelBuf, { name: excelName });
+            }
+
+            if (pdfBuf) {
+              const safeClient = (row.clientName || "client").replace(/[^\w\-]/g, "_");
+              archive.append(pdfBuf, { name: `Customer_Statement_${safeClient}.pdf` });
+            }
+
+            for (const doc of docs) {
+              const entryName = doc.originalName?.trim() || doc.fileName?.trim() || `document_${doc.id}`;
+              const diskPath = path.join(
+                process.cwd(),
+                "uploads",
+                "shipping-container-docs",
+                doc.fileName || ""
+              );
+              if (doc.fileName && fs.existsSync(diskPath)) {
+                archive.file(diskPath, { name: entryName });
+              } else if (doc.fileData) {
+                const buf = Buffer.from(doc.fileData, "base64");
+                archive.append(buf, { name: entryName });
               }
             }
 
