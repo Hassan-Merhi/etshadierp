@@ -1371,6 +1371,35 @@ export default function FactoryContainerLoadingScan() {
                 </Table>
               </div>
 
+              {/* ── Loaded Bales summary table ── */}
+              {orderedGroups.length > 0 && (
+                <div className="border-t pt-3">
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2 px-1">
+                    Loaded Bales
+                  </p>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="text-xs py-1.5">Article</TableHead>
+                        <TableHead className="text-xs py-1.5">Product</TableHead>
+                        <TableHead className="text-xs text-right py-1.5">Qty</TableHead>
+                        <TableHead className="text-xs text-right py-1.5">Weight (kg)</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {orderedGroups.map((group) => (
+                        <TableRow key={group.articleCode} data-testid={`row-loaded-summary-${group.articleCode}`}>
+                          <TableCell className="text-xs font-mono py-1.5">{group.articleCode}</TableCell>
+                          <TableCell className="text-xs py-1.5">{group.baleName}</TableCell>
+                          <TableCell className="text-xs text-right font-mono py-1.5">{group.bales.length}</TableCell>
+                          <TableCell className="text-xs text-right font-mono py-1.5">{group.totalWeight.toFixed(1)}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+
               <div className="border-t pt-2 text-xs text-muted-foreground flex items-center justify-between gap-2">
                 <span>
                   {bales.length} bales scanned · {totalWeight.toFixed(1)} kg
