@@ -430,6 +430,38 @@ export default function FactoryPendingInvoiceVerify() {
     },
   });
 
+  const applyProductionPricesMutation = useMutation({
+    mutationFn: async () => {
+      const res = await modeApiRequest("POST", `/api/factory/customer-orders/${orderId}/reprice-production`, {});
+      return res.json();
+    },
+    onSuccess: (data: any) => {
+      const updated = data?.updated ?? data?.repriced ?? 0;
+      toast({ title: "Production Prices Applied", description: `${updated} bale(s) updated` });
+      queryClient.invalidateQueries({ predicate: keyStartsWith("/api/factory/customer-orders") });
+    },
+    onError: (error: Error) => {
+      if (error?._handledGlobally) return;
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const applySellingPricesMutation = useMutation({
+    mutationFn: async () => {
+      const res = await modeApiRequest("POST", `/api/factory/customer-orders/${orderId}/reprice`, {});
+      return res.json();
+    },
+    onSuccess: (data: any) => {
+      const updated = data?.updated ?? data?.repriced ?? 0;
+      toast({ title: "Selling Prices Applied", description: `${updated} bale(s) updated` });
+      queryClient.invalidateQueries({ predicate: keyStartsWith("/api/factory/customer-orders") });
+    },
+    onError: (error: Error) => {
+      if (error?._handledGlobally) return;
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
   const repairPerKgMutation = useMutation({
     mutationFn: async () => {
       const res = await modeApiRequest("POST", "/api/factory/repair-perkg-prices", {});
@@ -1327,6 +1359,24 @@ export default function FactoryPendingInvoiceVerify() {
           >
             <RefreshCw className="mr-2 h-4 w-4" />
             {repairPerKgMutation.isPending ? "Repairing..." : "Repair Per-KG Prices"}
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => applyProductionPricesMutation.mutate()}
+            disabled={applyProductionPricesMutation.isPending}
+            data-testid="button-apply-production-prices"
+            title="Set all bale prices to the production (cost) price from the catalogue"
+          >
+            Apply Production Price
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => applySellingPricesMutation.mutate()}
+            disabled={applySellingPricesMutation.isPending}
+            data-testid="button-apply-selling-prices"
+            title="Set all bale prices to the selling price from the catalogue"
+          >
+            Apply Selling Price
           </Button>
         </div>
 
