@@ -1,6 +1,6 @@
 import { getClientDate } from "../lib/dateUtils";
 import type { Express } from "express";
-import { db } from "../db";
+import { db, pool } from "../db";
 import { storage } from "../storage";
 import bcrypt from "bcryptjs";
 import rateLimit from "express-rate-limit";
@@ -1332,7 +1332,7 @@ export function registerAuthRoutes(app: Express) {
         return res.status(401).json({ message: "Unauthorized" });
       }
 
-      // Developer sees all companies automatically
+      // Developer sees all companies — single query, no per-company lookup needed.
       if (req.user.role === "Developer") {
         const allCompanies = await storage.getAllCompanies();
         const companiesWithRoles = allCompanies.map((company: any) => ({
@@ -1355,21 +1355,35 @@ export function registerAuthRoutes(app: Express) {
         return res.json(companiesWithRoles);
       }
 
-      const userCompanies = await storage.getUserCompaniesWithRoles(req.user.id);
-      // Join with companies to include company details
-      const companiesWithRoles = await Promise.all(
-        userCompanies.map(async (uc) => {
-          const company = await storage.getCompanyById(uc.companyId);
-          return {
-            ...uc,
-            companyCode: company?.code,
-            companyName: company?.name,
-            companyActive: company?.active,
-            companyType: company?.companyType || "erp",
-          };
-        })
+      // Replace the old N+1 pattern (1 query for roles + 1 query per company) with
+      // a single JOIN so this endpoint stays O(1) regardless of how many companies
+      // the user belongs to.
+      const { rows } = await pool.query(
+        `SELECT
+           ucr.id,
+           ucr.user_id                  AS "userId",
+           ucr.company_id               AS "companyId",
+           ucr.role,
+           ucr.assigned_location_id     AS "assignedLocationId",
+           ucr.cash_account_id          AS "cashAccountId",
+           ucr.pos_station              AS "posStation",
+           ucr.can_sell_negative_stock  AS "canSellNegativeStock",
+           ucr.daybook_edit_days        AS "daybookEditDays",
+           ucr.can_access_customers     AS "canAccessCustomers",
+           ucr.can_delete_records       AS "canDeleteRecords",
+           ucr.pos_view_only            AS "posViewOnly",
+           ucr.created_at               AS "createdAt",
+           c.code                       AS "companyCode",
+           c.name                       AS "companyName",
+           c.active                     AS "companyActive",
+           COALESCE(c.company_type, 'erp') AS "companyType"
+         FROM user_company_roles ucr
+         INNER JOIN companies c ON c.id = ucr.company_id
+         WHERE ucr.user_id = $1
+         ORDER BY c.name`,
+        [req.user.id]
       );
-      res.json(companiesWithRoles);
+      res.json(rows);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }

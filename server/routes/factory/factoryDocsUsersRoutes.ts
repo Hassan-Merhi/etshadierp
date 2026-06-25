@@ -1638,9 +1638,33 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
       const userId = (req.session as any).userId;
       const currentCompanyId = (req.session as any).currentCompanyId;
       const pinnedFactoryId = (req.session as any).factoryCompanyId;
+      const cachedFactoryName = (req.session as any).factoryCompanyName as string | undefined;
+      const role = (req.session as any).currentRole;
+
+      // Fast-path: if the session already has the resolved factory company AND the role
+      // is admin/owner/developer (full access, no per-user DB lookup needed), return
+      // immediately without touching the database. This fires on every page navigation
+      // (staleTime=30s), so eliminating the DB round-trip matters a lot.
+      if (
+        pinnedFactoryId &&
+        cachedFactoryName &&
+        userId &&
+        (role === "Admin" || role === "Owner" || role === "Developer")
+      ) {
+        return res.json({
+          fullAccess: true,
+          pageKeys: [],
+          hasErpAccess: true,
+          hasFactoryAccess: true,
+          hiddenCostFields: [],
+          hideAllCosts: false,
+          companyId: pinnedFactoryId,
+          companyName: cachedFactoryName,
+        });
+      }
 
       // Resolve the factory company ID:
-      // Priority 1: already-pinned factoryCompanyId — but only if it points to a factory-type company
+      // Priority 1: already-pinned factoryCompanyId — verify it is factory type
       // Priority 2: currentCompanyId if it is factory type
       // Priority 3: first active factory-type company in the DB
       // Priority 4: fall back to currentCompanyId (legacy / single-company setups)
@@ -1695,11 +1719,10 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
 
       if (!companyId || !userId) return res.status(400).json({ message: "No company or user" });
 
-      // Pin the resolved factory company ID to the session so cross-tab ERP company
-      // switches don't corrupt factory API calls made from other tabs.
+      // Pin both the ID and name into the session — subsequent calls use the fast-path above.
       (req.session as any).factoryCompanyId = companyId;
+      (req.session as any).factoryCompanyName = companyName;
 
-      const role = (req.session as any).currentRole;
       if (role === "Admin" || role === "Owner" || role === "Developer") {
         return res.json({
           fullAccess: true,

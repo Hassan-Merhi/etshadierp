@@ -2036,6 +2036,7 @@ let migrationsDone = false;
     // ── F-Phase 1 (May 2026) — companyId indexes for multi-tenant tables (security/data-integrity audit) ──
     `CREATE INDEX IF NOT EXISTS exchange_rates_company_idx ON exchange_rates (company_id)`,
     `CREATE INDEX IF NOT EXISTS user_company_roles_company_idx ON user_company_roles (company_id)`,
+    `CREATE INDEX IF NOT EXISTS user_company_roles_user_idx ON user_company_roles (user_id)`,
     `CREATE INDEX IF NOT EXISTS user_locations_company_idx ON user_locations (company_id)`,
     `CREATE INDEX IF NOT EXISTS locations_company_idx ON locations (company_id)`,
     `CREATE INDEX IF NOT EXISTS employees_company_idx ON employees (company_id)`,
