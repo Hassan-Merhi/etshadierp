@@ -76,6 +76,11 @@ export function AdvancesTab() {
     enabled: !!selectedCompany,
   });
 
+  const { data: workerDeductions = [], isLoading: deductionsLoading } = useQuery<any[]>({
+    queryKey: ["/api/factory/worker-deductions", selectedCompany?.id],
+    enabled: !!selectedCompany,
+  });
+
   const advanceForm = useForm<SalaryAdvanceFormData>({
     resolver: zodResolver(salaryAdvanceSchema),
     defaultValues: {
@@ -186,10 +191,7 @@ export function AdvancesTab() {
     rows.map((advance) => (
       <TableRow key={advance.id}>
         <TableCell>
-          <div className="flex flex-col">
-            <span className="font-medium">{advance.employeeName}</span>
-            <span className="text-xs text-muted-foreground">{advance.employeeCode}</span>
-          </div>
+          <span className="font-medium">{advance.employeeName}</span>
         </TableCell>
         <TableCell>{formatDisplayDate(advance.advanceDate)}</TableCell>
         <TableCell className="text-right font-mono">{formatAmount(parseFloat(advance.amount))}</TableCell>
@@ -445,86 +447,58 @@ export function AdvancesTab() {
 
         {/* ── Worker Deductions sub-tab ── */}
         <TabsContent value="worker-deductions" className="pt-4">
-          <div className="border rounded-md">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Worker</TableHead>
-                  <TableHead className="text-right">Advance Amount</TableHead>
-                  <TableHead className="text-right">Total Repaid</TableHead>
-                  <TableHead className="text-right">Still Owed</TableHead>
-                  <TableHead>Status</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {workerStaff.length === 0 ? (
+          {deductionsLoading ? (
+            <div className="flex items-center justify-center p-12">
+              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+            </div>
+          ) : (
+            <div className="border rounded-md">
+              <Table>
+                <TableHeader>
                   <TableRow>
-                    <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
-                      No workers found
-                    </TableCell>
+                    <TableHead>Worker</TableHead>
+                    <TableHead>Date</TableHead>
+                    <TableHead>Reason</TableHead>
+                    <TableHead className="text-right">Amount</TableHead>
+                    <TableHead>Status</TableHead>
                   </TableRow>
-                ) : (
-                  (() => {
-                    const workerMap = new Map<
-                      number,
-                      { name: string; code: string; totalAdvanced: number; totalRepaid: number; owed: number }
-                    >();
-                    salaryAdvances.forEach((a) => {
-                      const existing = workerMap.get(a.employeeId) || {
-                        name: a.employeeName,
-                        code: a.employeeCode,
-                        totalAdvanced: 0,
-                        totalRepaid: 0,
-                        owed: 0,
-                      };
-                      existing.totalAdvanced += parseFloat(a.amount || "0");
-                      existing.totalRepaid += parseFloat(a.amount || "0") - parseFloat(a.remainingBalance || "0");
-                      existing.owed += parseFloat(a.remainingBalance || "0");
-                      workerMap.set(a.employeeId, existing);
-                    });
-                    const rows = Array.from(workerMap.values()).filter((r) => r.totalAdvanced > 0);
-                    if (rows.length === 0) {
-                      return (
-                        <TableRow>
-                          <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
-                            No advance deductions on record
-                          </TableCell>
-                        </TableRow>
-                      );
-                    }
-                    return rows.map((r, i) => (
-                      <TableRow key={i}>
+                </TableHeader>
+                <TableBody>
+                  {workerDeductions.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                        No worker deductions recorded
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    workerDeductions.map((d) => (
+                      <TableRow key={d.id}>
                         <TableCell>
-                          <div className="flex flex-col">
-                            <span className="font-medium">{r.name}</span>
-                            <span className="text-xs text-muted-foreground">{r.code}</span>
-                          </div>
+                          <span className="font-medium">{d.workerName || `Worker #${d.workerId}`}</span>
                         </TableCell>
-                        <TableCell className="text-right font-mono">{formatAmount(r.totalAdvanced)}</TableCell>
-                        <TableCell className="text-right font-mono text-green-600 dark:text-green-400">
-                          {formatAmount(r.totalRepaid)}
+                        <TableCell className="text-muted-foreground text-sm">
+                          {d.deductionDate ? formatDisplayDate(d.deductionDate) : "—"}
                         </TableCell>
-                        <TableCell className="text-right font-mono font-bold text-amber-600 dark:text-amber-400">
-                          {formatAmount(r.owed)}
+                        <TableCell className="text-sm text-muted-foreground max-w-[200px] truncate">
+                          {d.reason || "—"}
+                        </TableCell>
+                        <TableCell className="text-right font-mono font-bold text-red-600 dark:text-red-400">
+                          {formatAmount(parseFloat(d.amount || "0"))}
                         </TableCell>
                         <TableCell>
-                          {r.owed <= 0 ? (
-                            <Badge variant="default" className="bg-green-500">
-                              Clear
-                            </Badge>
+                          {d.applied ? (
+                            <Badge variant="default" className="bg-green-600">Applied</Badge>
                           ) : (
-                            <Badge variant="outline" className="border-amber-500 text-amber-500">
-                              Owes
-                            </Badge>
+                            <Badge variant="outline" className="border-amber-500 text-amber-500">Pending</Badge>
                           )}
                         </TableCell>
                       </TableRow>
-                    ));
-                  })()
-                )}
-              </TableBody>
-            </Table>
-          </div>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          )}
         </TabsContent>
       </Tabs>
 
