@@ -787,7 +787,7 @@ export function DaybookTable({
       {/* ── Mobile card list (hidden on sm+) ── */}
       <div className="sm:hidden -mx-4 overflow-y-auto max-h-[calc(100vh-260px)]">
         {mobileItems.length === 0 ? (
-          <p className="text-sm text-muted-foreground text-center py-8">No transactions</p>
+          <p className="text-sm text-muted-foreground text-center py-12">No transactions found. Create your first voucher to get started.</p>
         ) : (
           mobileItems
         )}

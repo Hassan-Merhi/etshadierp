@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useRef, useCallback } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { hasAnyOpenDialog } from "@/hooks/use-escape-back";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm, useFieldArray } from "react-hook-form";
@@ -7,9 +7,7 @@ import { useLocation } from "wouter";
 import { useCompany } from "@/contexts/CompanyContext";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
 import { PageHeader } from "@/components/PageHeader";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -28,7 +26,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Book, Eye, EyeOff, Plus, ChevronDown, FileDown, X, LayoutList, Layers } from "lucide-react";
+import { EyeOff, Plus, ChevronDown, FileDown, LayoutList, Layers } from "lucide-react";
 import { format, parseISO, addDays } from "date-fns";
 import { useDateFormat } from "@/contexts/DateFormatContext";
 import { cn } from "@/lib/utils";
@@ -394,7 +392,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
     }
   }, [voucherToEdit, voucherEntries, entriesLoading, editFormInitialized, editForm]);
 
-  const [accountNameCache, setAccountNameCache] = useState<Record<number, string>>({});
+  const [accountNameCache] = useState<Record<number, string>>({});
   const { data: vouchers = [], isLoading } = useQuery<Voucher[]>({
     queryKey: ["/api/vouchers", selectedCompany?.id, periodFilter.fromDate, periodFilter.toDate],
     queryFn: async () => {
@@ -421,36 +419,6 @@ export default function Daybook({ user }: { user?: any } = {}) {
     enabled: !!selectedCompany,
   });
 
-  useEffect(() => {
-    const vList = vouchers.filter((v) => ["Payment", "Receipt", "Journal"].includes(v.voucherType));
-    if (vList.length === 0) return;
-    const newCache = { ...accountNameCache };
-    let changed = false;
-    Promise.all(
-      vList.map(async (v) => {
-        if (newCache[v.id]) return;
-        try {
-          const res = await fetch(`/api/vouchers/${v.id}/entries`, { credentials: "include" });
-          if (res.ok) {
-            const entries = await res.json();
-            const first = entries.find((e: any) =>
-              v.voucherType === "Payment"
-                ? parseFloat(e.debitAmount) > 0
-                : v.voucherType === "Receipt"
-                  ? parseFloat(e.creditAmount) > 0
-                  : true
-            );
-            if (first) {
-              newCache[v.id] = first.accountName;
-              changed = true;
-            }
-          }
-        } catch {}
-      })
-    ).then(() => {
-      if (changed) setAccountNameCache(newCache);
-    });
-  }, [vouchers]);
 
   const filteredVouchers = useMemo(() => {
     return vouchers
@@ -571,28 +539,29 @@ export default function Daybook({ user }: { user?: any } = {}) {
 
   return (
     <div className="flex flex-col gap-4 md:gap-6 p-3 md:p-6">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <PageHeader title="Daybook" icon={<Book className="h-5 w-5" />} />
-        <div className="flex items-center gap-2">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" className="gap-2">
-                <FileDown className="w-4 h-4" />
-                Export
-                <ChevronDown className="w-4 h-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent>
-              <DropdownMenuItem onClick={handleExportToExcel}>Summary</DropdownMenuItem>
-              <DropdownMenuItem onClick={handleExportDetailedToExcel}>Detailed</DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-          <Button onClick={() => navigate("/vouchers")} className="gap-2">
-            <Plus className="w-4 h-4" />
-            New Voucher
-          </Button>
-        </div>
-      </div>
+      <PageHeader
+        title="Daybook"
+        subtitle="View all accounting transactions chronologically"
+        showBackButton
+      >
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" className="gap-2">
+              <FileDown className="w-4 h-4" />
+              Export
+              <ChevronDown className="w-4 h-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent>
+            <DropdownMenuItem onClick={handleExportToExcel}>Summary</DropdownMenuItem>
+            <DropdownMenuItem onClick={handleExportDetailedToExcel}>Detailed</DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+        <Button onClick={() => navigate("/vouchers")} className="gap-2">
+          <Plus className="w-4 h-4" />
+          New Voucher
+        </Button>
+      </PageHeader>
 
       <DaybookFilters
         periodFilter={periodFilter}
@@ -603,45 +572,48 @@ export default function Daybook({ user }: { user?: any } = {}) {
         onNextDay={() => shiftDay(1)}
       />
 
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between gap-2 flex-wrap">
-            <CardTitle>
-              Transactions{" "}
-              <span className="ml-2 text-sm font-normal text-muted-foreground">({visibleRows.length})</span>
-            </CardTitle>
-            <div className="flex items-center gap-2">
+      <div>
+        <div className="flex items-center justify-between gap-2 flex-wrap mb-3">
+          <div>
+            <h2 className="text-base font-semibold">Transactions</h2>
+            <p className="text-sm text-muted-foreground">All accounting vouchers and transactions</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowHidden(!showHidden)}
+              disabled={hiddenRowIds.size === 0}
+              className={cn("gap-1.5", showHidden && "text-foreground")}
+              data-testid="button-show-hidden"
+            >
+              <EyeOff className="w-4 h-4" />
+              {showHidden ? "Showing hidden" : "Show hidden"}
+            </Button>
+            <div className="flex border rounded-md overflow-hidden">
               <Button
-                variant={showHidden ? "secondary" : "outline"}
+                variant="ghost"
                 size="sm"
-                onClick={() => setShowHidden(!showHidden)}
-                disabled={hiddenRowIds.size === 0}
+                onClick={() => { setViewMode("detailed"); saveDaybookState({ viewMode: "detailed" }); }}
+                className={cn("rounded-none gap-1.5", viewMode === "detailed" && "bg-muted font-medium")}
+                data-testid="button-view-detailed"
               >
-                {showHidden ? <Eye className="w-4 h-4 mr-1" /> : <EyeOff className="w-4 h-4 mr-1" />}{" "}
-                {showHidden ? "Showing hidden" : "Show hidden"}
+                <LayoutList className="w-4 h-4" />
+                Detailed
               </Button>
-              <div className="flex border rounded-md overflow-hidden h-8">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setViewMode("detailed")}
-                  className={cn("rounded-none px-3", viewMode === "detailed" && "bg-muted")}
-                >
-                  <LayoutList className="w-4 h-4" />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setViewMode("condensed")}
-                  className={cn("rounded-none px-3", viewMode === "condensed" && "bg-muted")}
-                >
-                  <Layers className="w-4 h-4" />
-                </Button>
-              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => { setViewMode("condensed"); saveDaybookState({ viewMode: "condensed" }); }}
+                className={cn("rounded-none gap-1.5", viewMode === "condensed" && "bg-muted font-medium")}
+                data-testid="button-view-condensed"
+              >
+                <Layers className="w-4 h-4" />
+                Condensed
+              </Button>
             </div>
           </div>
-        </CardHeader>
-        <CardContent>
+        </div>
           <DaybookTable
             displayedRows={displayedRows}
             visibleRows={visibleRows}
@@ -675,8 +647,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
             DAYBOOK_PAGE_SIZE={DAYBOOK_PAGE_SIZE}
             navigate={navigate}
           />
-        </CardContent>
-      </Card>
+      </div>
 
       <VoucherDetailsDialog
         open={viewDialogOpen}
