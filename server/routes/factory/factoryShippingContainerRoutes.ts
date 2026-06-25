@@ -1168,6 +1168,7 @@ export function registerFactoryShippingContainerRoutes(app: Express) {
       archive.on("error", (err) => {
         console.error("Archiver error:", err);
         if (!res.headersSent) res.status(500).end();
+        else res.end();
       });
       archive.pipe(res);
 
@@ -1196,6 +1197,7 @@ export function registerFactoryShippingContainerRoutes(app: Express) {
       if (docIdNumbers.length > 0) {
         const docs = await db
           .select({
+            id: factoryShippingContainerDocuments.id,
             fileName: factoryShippingContainerDocuments.fileName,
             originalName: factoryShippingContainerDocuments.originalName,
             fileData: factoryShippingContainerDocuments.fileData,
@@ -1210,12 +1212,13 @@ export function registerFactoryShippingContainerRoutes(app: Express) {
           );
 
         for (const doc of docs) {
-          const diskPath = path.join(process.cwd(), "uploads", "shipping-container-docs", doc.fileName);
-          if (fs.existsSync(diskPath)) {
-            archive.file(diskPath, { name: doc.originalName });
+          const entryName = doc.originalName?.trim() || doc.fileName?.trim() || `document_${doc.id}`;
+          const diskPath = path.join(process.cwd(), "uploads", "shipping-container-docs", doc.fileName || "");
+          if (doc.fileName && fs.existsSync(diskPath)) {
+            archive.file(diskPath, { name: entryName });
           } else if (doc.fileData) {
             const buf = Buffer.from(doc.fileData, "base64");
-            archive.append(buf, { name: doc.originalName });
+            archive.append(buf, { name: entryName });
           }
         }
       }
