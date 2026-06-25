@@ -63,14 +63,19 @@ function safeDownloadName(name: string | null | undefined): string {
   return safe || "download";
 }
 
-/** Internal HTTP fetch — reuses session cookie so requireAuth passes. */
+/** Internal HTTP fetch — reuses session cookie so requireAuth passes.
+ *  Uses process.env.PORT (reliable in production) rather than req.socket.localPort
+ *  which is unreliable behind reverse proxies.
+ */
 function fetchInternalBuffer(req: any, urlPath: string): Promise<Buffer | null> {
   return new Promise((resolve) => {
     try {
-      const localPort = (req.socket as any)?.localPort || process.env.PORT || 5000;
+      // Always use the app's own bind port. process.env.PORT is set by Replit/production.
+      // req.socket.localPort is unreliable behind TLS-terminating reverse proxies.
+      const appPort = Number(process.env.PORT) || 5000;
       const options: http.RequestOptions = {
         hostname: "127.0.0.1",
-        port: Number(localPort),
+        port: appPort,
         path: urlPath,
         method: "GET",
         headers: { cookie: req.headers.cookie || "" },
@@ -78,6 +83,7 @@ function fetchInternalBuffer(req: any, urlPath: string): Promise<Buffer | null> 
       const chunks: Buffer[] = [];
       const r = http.request(options, (res2) => {
         if ((res2.statusCode ?? 0) >= 400) {
+          res2.resume(); // drain so connection is released
           resolve(null);
           return;
         }
@@ -86,7 +92,7 @@ function fetchInternalBuffer(req: any, urlPath: string): Promise<Buffer | null> 
         res2.on("error", () => resolve(null));
       });
       r.on("error", () => resolve(null));
-      r.setTimeout(30000, () => {
+      r.setTimeout(45000, () => {
         r.destroy();
         resolve(null);
       });
@@ -1161,69 +1167,96 @@ export function registerFactoryShippingContainerRoutes(app: Express) {
       }
 
       const zipFilename = buildZipFilename([row.containerNumber, row.clientName, row.destination], "zip");
+
+      // Build the entire ZIP in memory before touching the response.
+      // This prevents ERR_INVALID_RESPONSE: if we pipe archiver to res immediately
+      // and then something fails mid-stream, the response is unrecoverably corrupted.
+      const zipBuffer = await new Promise<Buffer>((resolve, reject) => {
+        const archive = archiver("zip", { zlib: { level: 6 } });
+        const chunks: Buffer[] = [];
+
+        archive.on("data", (chunk: Buffer) => chunks.push(chunk));
+        archive.on("end", () => resolve(Buffer.concat(chunks)));
+        archive.on("error", (err) => reject(err));
+
+        // Kick off all appends, then finalize
+        (async () => {
+          try {
+            // 1. Commercial invoice Excel
+            if (fileIds.includes("invoice_excel")) {
+              const buf = await fetchInternalBuffer(
+                req,
+                `/api/factory/customer-orders/${row.customerOrderId}/export-excel`
+              );
+              if (buf) {
+                const excelName = buildZipFilename([row.containerNumber, row.clientName, row.destination], "xlsx");
+                archive.append(buf, { name: excelName });
+              }
+            }
+
+            // 2. Customer statement PDF
+            if (fileIds.includes("statement_pdf") && row.customerId) {
+              const safeClient = (row.clientName || "client").replace(/[^\w\-]/g, "_");
+              const buf = await fetchInternalBuffer(
+                req,
+                `/api/factory/customers/${row.customerId}/statement/export-pdf`
+              );
+              if (buf) archive.append(buf, { name: `Customer_Statement_${safeClient}.pdf` });
+            }
+
+            // 3. Uploaded documents
+            const docIdNumbers = fileIds
+              .filter((f) => f.startsWith("doc_"))
+              .map((f) => parseInt(f.slice(4)))
+              .filter((n) => !isNaN(n));
+
+            if (docIdNumbers.length > 0) {
+              const docs = await db
+                .select({
+                  id: factoryShippingContainerDocuments.id,
+                  fileName: factoryShippingContainerDocuments.fileName,
+                  originalName: factoryShippingContainerDocuments.originalName,
+                  fileData: factoryShippingContainerDocuments.fileData,
+                })
+                .from(factoryShippingContainerDocuments)
+                .where(
+                  and(
+                    inArray(factoryShippingContainerDocuments.id, docIdNumbers),
+                    eq(factoryShippingContainerDocuments.scrId, id),
+                    eq(factoryShippingContainerDocuments.companyId, companyId)
+                  )
+                );
+
+              for (const doc of docs) {
+                const entryName = doc.originalName?.trim() || doc.fileName?.trim() || `document_${doc.id}`;
+                const diskPath = path.join(
+                  process.cwd(),
+                  "uploads",
+                  "shipping-container-docs",
+                  doc.fileName || ""
+                );
+                if (doc.fileName && fs.existsSync(diskPath)) {
+                  archive.file(diskPath, { name: entryName });
+                } else if (doc.fileData) {
+                  const buf = Buffer.from(doc.fileData, "base64");
+                  archive.append(buf, { name: entryName });
+                }
+              }
+            }
+
+            await archive.finalize();
+          } catch (innerErr) {
+            archive.abort();
+            reject(innerErr);
+          }
+        })();
+      });
+
+      // Only send response after the ZIP is fully built — clean, no partial writes
       res.setHeader("Content-Type", "application/zip");
       res.setHeader("Content-Disposition", `attachment; filename="${zipFilename}"`);
-
-      const archive = archiver("zip", { zlib: { level: 6 } });
-      archive.on("error", (err) => {
-        console.error("Archiver error:", err);
-        if (!res.headersSent) res.status(500).end();
-        else res.end();
-      });
-      archive.pipe(res);
-
-      // 1. Commercial invoice Excel
-      if (fileIds.includes("invoice_excel")) {
-        const buf = await fetchInternalBuffer(req, `/api/factory/customer-orders/${row.customerOrderId}/export-excel`);
-        if (buf) {
-          const excelName = buildZipFilename([row.containerNumber, row.clientName, row.destination], "xlsx");
-          archive.append(buf, { name: excelName });
-        }
-      }
-
-      // 2. Customer statement PDF
-      if (fileIds.includes("statement_pdf") && row.customerId) {
-        const safeClient = (row.clientName || "client").replace(/[^\w\-]/g, "_");
-        const buf = await fetchInternalBuffer(req, `/api/factory/customers/${row.customerId}/statement/export-pdf`);
-        if (buf) archive.append(buf, { name: `Customer_Statement_${safeClient}.pdf` });
-      }
-
-      // 3. Uploaded documents
-      const docIdNumbers = fileIds
-        .filter((f) => f.startsWith("doc_"))
-        .map((f) => parseInt(f.slice(4)))
-        .filter((n) => !isNaN(n));
-
-      if (docIdNumbers.length > 0) {
-        const docs = await db
-          .select({
-            id: factoryShippingContainerDocuments.id,
-            fileName: factoryShippingContainerDocuments.fileName,
-            originalName: factoryShippingContainerDocuments.originalName,
-            fileData: factoryShippingContainerDocuments.fileData,
-          })
-          .from(factoryShippingContainerDocuments)
-          .where(
-            and(
-              inArray(factoryShippingContainerDocuments.id, docIdNumbers),
-              eq(factoryShippingContainerDocuments.scrId, id),
-              eq(factoryShippingContainerDocuments.companyId, companyId)
-            )
-          );
-
-        for (const doc of docs) {
-          const entryName = doc.originalName?.trim() || doc.fileName?.trim() || `document_${doc.id}`;
-          const diskPath = path.join(process.cwd(), "uploads", "shipping-container-docs", doc.fileName || "");
-          if (doc.fileName && fs.existsSync(diskPath)) {
-            archive.file(diskPath, { name: entryName });
-          } else if (doc.fileData) {
-            const buf = Buffer.from(doc.fileData, "base64");
-            archive.append(buf, { name: entryName });
-          }
-        }
-      }
-
-      await archive.finalize();
+      res.setHeader("Content-Length", zipBuffer.length);
+      res.end(zipBuffer);
     } catch (error: any) {
       console.error("Error generating ZIP package:", error);
       if (!res.headersSent) res.status(500).json({ message: error.message });

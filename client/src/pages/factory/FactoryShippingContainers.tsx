@@ -669,6 +669,7 @@ function WhatsAppModal({
   const [files, setFiles] = useState<WaFileWithChecked[]>([]);
   const [message, setMessage] = useState("");
   const [initialised, setInitialised] = useState(false);
+  const [isZipDownloading, setIsZipDownloading] = useState(false);
 
   const previewUrl = rowId ? `${LIST_KEY}/${rowId}/whatsapp-preview` : null;
   const {
@@ -726,7 +727,7 @@ function WhatsAppModal({
     navigator.clipboard.writeText(message).then(() => toast({ title: "Message copied to clipboard" }));
   }
 
-  function handleDownloadZip() {
+  async function handleDownloadZip() {
     const selected = files
       .filter((f) => f.checked && f.available)
       .map((f) => f.id)
@@ -735,7 +736,31 @@ function WhatsAppModal({
       toast({ title: "No files selected", variant: "destructive" });
       return;
     }
-    window.open(`${LIST_KEY}/${rowId}/zip-package?fileIds=${encodeURIComponent(selected)}`, "_blank");
+    setIsZipDownloading(true);
+    try {
+      const url = `${LIST_KEY}/${rowId}/zip-package?fileIds=${encodeURIComponent(selected)}`;
+      const res = await fetch(url, { credentials: "include" });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ message: "Download failed" }));
+        throw new Error(err.message || "Download failed");
+      }
+      const blob = await res.blob();
+      const disposition = res.headers.get("Content-Disposition") || "";
+      const nameMatch = disposition.match(/filename="([^"]+)"/);
+      const filename = nameMatch ? nameMatch[1] : "shipping-package.zip";
+      const blobUrl = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = blobUrl;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(blobUrl);
+    } catch (err: any) {
+      toast({ title: "Download failed", description: err.message, variant: "destructive" });
+    } finally {
+      setIsZipDownloading(false);
+    }
   }
 
   function handleOpenWhatsApp() {
@@ -895,8 +920,9 @@ function WhatsAppModal({
               </div>
 
               <div className="flex flex-wrap gap-2">
-                <Button onClick={handleDownloadZip} data-testid="button-download-zip">
-                  <Download className="h-3.5 w-3.5 mr-1" /> Download ZIP Package
+                <Button onClick={handleDownloadZip} disabled={isZipDownloading} data-testid="button-download-zip">
+                  <Download className="h-3.5 w-3.5 mr-1" />
+                  {isZipDownloading ? "Building ZIP…" : "Download ZIP Package"}
                 </Button>
                 <Button variant="outline" onClick={handleCopyMessage} data-testid="button-copy-message">
                   <Copy className="h-3.5 w-3.5 mr-1" /> Copy Message
