@@ -263,7 +263,7 @@ export function AgentCard({
   const hasBalance = ledgerBalance !== null;
   const isCustomOrder = !!(customOrder && customOrder.length > 0);
   const netAdjustment = adjustments.reduce((s, a) => s + (a.type === "debit" ? a.amount : -a.amount), 0);
-  const adjustedBalance = ledgerBalance !== null ? ledgerBalance : null;
+  const adjustedBalance = ledgerBalance !== null ? ledgerBalance - netAdjustment : null;
   const hasAdjustments = adjustments.length > 0;
   const isReconciled = hasAdjustments && adjustedBalance !== null && Math.abs(adjustedBalance) <= 0.01;
   const isMismatch =
