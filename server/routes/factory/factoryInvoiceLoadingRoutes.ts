@@ -685,7 +685,7 @@ export function registerFactoryInvoiceLoadingRoutes(app: Express) {
       const summary = await buildLoadingSummary(invoiceId, companyId);
       if (!summary) return res.status(404).json({ message: "Invoice not found" });
 
-      const ExcelJS = await import("exceljs");
+      const ExcelJS = (await import("exceljs")).default;
       const wb = new ExcelJS.Workbook();
       wb.creator = "HMD International Group";
       wb.created = new Date();
@@ -1095,7 +1095,7 @@ ${
 
       const remainingBales = invoiceSummary?.invoiceBales.filter((b) => !b.loaded) ?? [];
 
-      const ExcelJS = await import("exceljs");
+      const ExcelJS = (await import("exceljs")).default;
       const wb = new ExcelJS.Workbook();
       wb.creator = "HMD International Group";
 
