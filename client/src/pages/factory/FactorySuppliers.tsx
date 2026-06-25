@@ -428,6 +428,15 @@ export default function FactorySuppliers() {
     return val < 0 ? sum + Math.abs(val) : sum;
   }, 0);
 
+  const filteredTopLevel = displayedTopLevel.filter((s) => {
+    if (activeFilter === "brokers") return !!subAccountsByParent[s.id]?.length;
+    if (activeFilter === "standalone") return !subAccountsByParent[s.id]?.length;
+    if (activeFilter === "with-balance") return parseFloat(s.totalValue || "0") > 0;
+    if (activeFilter === "zero-balance") return parseFloat(s.totalValue || "0") === 0;
+    if (activeFilter === "has-foreign") return (s.currencyBalances || []).some((c) => c.currencyCode !== "USD");
+    return true;
+  });
+
   const resetForm = () => {
     setFormData({
       name: "",
@@ -626,96 +635,191 @@ export default function FactorySuppliers() {
           <div className="text-2xl font-bold mt-1">{brokerCount}</div>
         </div>
         <div className="rounded-xl border p-4">
-          <div className="text-xs text-muted-foreground">Standalone</div>
+          <div className="text-xs text-muted-foreground">Standalone Suppliers</div>
           <div className="text-2xl font-bold mt-1">{standaloneCount}</div>
         </div>
         <div className="rounded-xl border p-4">
-          <div className="text-xs text-muted-foreground">Total USD Owed</div>
-          <div className="text-2xl font-bold mt-1">${formatNum(String(totalUsdOwed))}</div>
+          <div className="text-xs text-muted-foreground">Total Containers</div>
+          <div className="text-2xl font-bold mt-1">{totalContainers}</div>
         </div>
         <div className="rounded-xl border p-4">
-          <div className="text-xs text-muted-foreground">Overpaid</div>
-          <div className="text-2xl font-bold mt-1 text-green-600">${formatNum(String(totalUsdOverpaid))}</div>
+          <div className="text-xs text-muted-foreground">Total USD</div>
+          <div className="text-sm font-semibold mt-1">
+            <span className="text-muted-foreground">We owe </span>${formatNum(String(totalUsdOwed))}
+          </div>
+          <div className="text-sm">
+            <span className="text-muted-foreground">Overpaid </span>
+            <span className="text-green-600">${formatNum(String(totalUsdOverpaid))}</span>
+          </div>
+        </div>
+      </div>
+
+      <div className="flex items-center gap-3 flex-wrap">
+        <Select value={activeFilter} onValueChange={(v) => setActiveFilter(v as SupplierFilter)}>
+          <SelectTrigger className="w-36" data-testid="select-supplier-filter">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All</SelectItem>
+            <SelectItem value="brokers">Brokers</SelectItem>
+            <SelectItem value="standalone">Standalone</SelectItem>
+            <SelectItem value="with-balance">With Balance</SelectItem>
+            <SelectItem value="zero-balance">Zero Balance</SelectItem>
+            <SelectItem value="has-foreign">Has Foreign Currency</SelectItem>
+          </SelectContent>
+        </Select>
+        <div className="flex items-center gap-2">
+          <Switch
+            checked={listIncludeOtw}
+            onCheckedChange={setListIncludeOtw}
+            id="list-otw-toggle"
+            data-testid="switch-include-otw"
+          />
+          <label htmlFor="list-otw-toggle" className="text-sm cursor-pointer select-none">
+            Include OTW
+          </label>
         </div>
       </div>
 
       <div className="rounded-xl border divide-y">
-        {displayedTopLevel.map((s) => (
-          <div key={s.id} className="p-4 flex items-center justify-between">
-            <div>
-              <div className="font-semibold flex items-center gap-2">
-                {s.name}
-                {subAccountsByParent[s.id]?.length > 0 && <Badge variant="secondary">Broker</Badge>}
+        {filteredTopLevel.map((s) => {
+          const balVal = parseFloat(s.totalValue || "0");
+          const isBroker = !!subAccountsByParent[s.id]?.length;
+          const otwCount = s.otwByCurrency
+            ? Object.values(s.otwByCurrency).reduce((a, b) => a + b, 0)
+            : s.pendingContainers || 0;
+          const kgNum = parseFloat(s.totalKg || "0");
+          const nonUsdBalances = (s.currencyBalances || []).filter((c) => c.currencyCode !== "USD" && Math.abs(c.balance) > 0.005);
+          return (
+            <div key={s.id} className="p-4 flex items-center justify-between gap-4">
+              <div className="flex-1 min-w-0">
+                <div className="font-semibold flex items-center gap-2 flex-wrap">
+                  {s.name}
+                  {isBroker && <Badge variant="secondary">Broker</Badge>}
+                </div>
+                <div className="text-sm text-muted-foreground flex items-center gap-2 flex-wrap mt-0.5">
+                  <span className="flex items-center gap-1">
+                    <Package className="h-3 w-3" />
+                    {s.totalContainers} containers
+                  </span>
+                  {otwCount > 0 && (
+                    <Badge variant="outline" className="text-amber-600 border-amber-400 text-[10px]">
+                      {otwCount} OTW
+                    </Badge>
+                  )}
+                  {kgNum > 0 && (
+                    <span className="flex items-center gap-1">
+                      <Weight className="h-3 w-3" />
+                      {formatKg(s.totalKg)}
+                    </span>
+                  )}
+                  <span className="flex items-center gap-1">
+                    <Calendar className="h-3 w-3" />
+                    Last: {s.lastContainerDate ? formatDate(s.lastContainerDate) : "—"}
+                  </span>
+                </div>
               </div>
-              <div className="text-sm text-muted-foreground">
-                {s.totalContainers} containers · Last: {s.lastContainerDate ? formatDate(s.lastContainerDate) : "—"}
+
+              <div className="text-right shrink-0">
+                {(Math.abs(balVal) > 0.005 || nonUsdBalances.length > 0) && (
+                  <div className="text-xs text-muted-foreground mb-0.5">Balance</div>
+                )}
+                <div className={`font-semibold text-sm ${balVal < 0 ? "text-green-600" : balVal > 0 ? "" : "text-muted-foreground"}`}>
+                  {balVal === 0 && nonUsdBalances.length === 0
+                    ? <span className="text-muted-foreground text-xs">$-</span>
+                    : `$${formatNum(String(Math.abs(balVal)))}${balVal < 0 ? " CR" : ""}`}
+                </div>
+                {nonUsdBalances.map((cb) => (
+                  <div key={cb.currencyCode} className="text-xs text-muted-foreground">
+                    {cb.currencyCode}{" "}
+                    {cb.balance.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}{" "}
+                    × {cb.fxRateToUsd ? parseFloat(String(cb.fxRateToUsd)).toFixed(4) : "1.0000"}
+                  </div>
+                ))}
+                {s.brokerPoolUsd && parseFloat(s.brokerPoolUsd) !== 0 && (
+                  <div className="text-xs text-muted-foreground">
+                    ${formatNum(s.brokerPoolUsd)} pool
+                  </div>
+                )}
               </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => {
-                  if (subAccountsByParent[s.id]?.length) setParentViewSupplierId(s.id);
-                  else setStatementSupplierId(s.id);
-                }}
-              >
-                View
-              </Button>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="icon">
-                    <MoreVertical className="h-4 w-4" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem
-                    onClick={() => {
-                      setEditingSupplier(s);
-                      setFormData({
-                        name: s.name,
-                        contactPerson: s.contactPerson || "",
-                        phone: s.phone || "",
-                        email: s.email || "",
-                        address: s.address || "",
-                        notes: s.notes || "",
-                        parentId: s.parentId,
-                      });
-                      setFormRole(s.parentId ? "linked" : subAccountsByParent[s.id]?.length ? "broker" : "standalone");
-                    }}
-                  >
-                    <Pencil className="h-4 w-4 mr-2" />
-                    Edit
-                  </DropdownMenuItem>
-                  {s.isActive ? (
+
+              <div className="flex items-center gap-1 shrink-0">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    if (isBroker) setParentViewSupplierId(s.id);
+                    else setStatementSupplierId(s.id);
+                  }}
+                  data-testid={`btn-view-supplier-${s.id}`}
+                >
+                  View
+                </Button>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="icon" data-testid={`btn-menu-supplier-${s.id}`}>
+                      <MoreVertical className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem
+                      onClick={() => {
+                        setEditingSupplier(s);
+                        setFormData({
+                          name: s.name,
+                          contactPerson: s.contactPerson || "",
+                          phone: s.phone || "",
+                          email: s.email || "",
+                          address: s.address || "",
+                          notes: s.notes || "",
+                          parentId: s.parentId,
+                        });
+                        setFormRole(s.parentId ? "linked" : isBroker ? "broker" : "standalone");
+                      }}
+                    >
+                      <Pencil className="h-4 w-4 mr-2" />
+                      Edit
+                    </DropdownMenuItem>
+                    {s.isActive ? (
+                      <DropdownMenuItem
+                        className="text-destructive"
+                        onClick={() => wrapAdminAction(() => deactivateMutation.mutate(s.id), "Deactivate Supplier")}
+                      >
+                        <EyeOff className="h-4 w-4 mr-2" />
+                        Deactivate
+                      </DropdownMenuItem>
+                    ) : (
+                      <DropdownMenuItem
+                        onClick={() => wrapAdminAction(() => reactivateMutation.mutate(s.id), "Reactivate Supplier")}
+                      >
+                        <Eye className="h-4 w-4 mr-2" />
+                        Reactivate
+                      </DropdownMenuItem>
+                    )}
+                    <DropdownMenuSeparator />
                     <DropdownMenuItem
                       className="text-destructive"
-                      onClick={() => wrapAdminAction(() => deactivateMutation.mutate(s.id), "Deactivate Supplier")}
+                      onClick={() => setPendingDelete(() => () => permanentDeleteMutation.mutate(s.id))}
                     >
-                      <EyeOff className="h-4 w-4 mr-2" />
-                      Deactivate
+                      <Trash2 className="h-4 w-4 mr-2" />
+                      Delete Permanently
                     </DropdownMenuItem>
-                  ) : (
-                    <DropdownMenuItem
-                      onClick={() => wrapAdminAction(() => reactivateMutation.mutate(s.id), "Reactivate Supplier")}
-                    >
-                      <Eye className="h-4 w-4 mr-2" />
-                      Reactivate
-                    </DropdownMenuItem>
-                  )}
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem
-                    className="text-destructive"
-                    onClick={() => setPendingDelete(() => () => permanentDeleteMutation.mutate(s.id))}
-                  >
-                    <Trash2 className="h-4 w-4 mr-2" />
-                    Delete Permanently
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+                <ChevronRight
+                  className="h-4 w-4 text-muted-foreground cursor-pointer"
+                  onClick={() => {
+                    if (isBroker) setParentViewSupplierId(s.id);
+                    else setStatementSupplierId(s.id);
+                  }}
+                />
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
+        {filteredTopLevel.length === 0 && !isLoading && (
+          <div className="p-8 text-center text-muted-foreground text-sm">No suppliers found.</div>
+        )}
       </div>
 
       <SupplierDialogs
