@@ -55,11 +55,14 @@ export function StockEntryScanner({
       return;
     }
 
-    if (isOpen && e.key === "Enter" && activeIndex >= 0) {
-      e.preventDefault();
-      onSelectProduct(filteredProducts[activeIndex]);
-      setActiveIndex(-1);
-      return;
+    if (isOpen && (e.key === "Enter" || e.key === "Tab")) {
+      const target = activeIndex >= 0 ? filteredProducts[activeIndex] : filteredProducts[0];
+      if (target) {
+        e.preventDefault();
+        onSelectProduct(target);
+        setActiveIndex(-1);
+        return;
+      }
     }
 
     if (e.key === "Escape" && isOpen) {
