@@ -37,6 +37,9 @@ import {
   MapPin,
   Container,
   Plus,
+  Upload,
+  X,
+  FileSpreadsheet,
 } from "lucide-react";
 
 // ─── Column definitions ───────────────────────────────────────────────────────
@@ -260,6 +263,14 @@ export default function SupplierProfitCheck() {
   const [qtyVersion, setQtyVersion] = useState(0);
   const autosaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Excel import
+  const [showImportDialog, setShowImportDialog] = useState(false);
+  const [importedRows, setImportedRows] = useState<AnalysisRow[]>([]);
+  const [importParsed, setImportParsed] = useState<{ code: string; costPrice?: number; sellPrice?: number; qty?: number }[]>([]);
+  const [importPreview, setImportPreview] = useState<{ rows: AnalysisRow[]; notFound: string[] } | null>(null);
+  const [importLoading, setImportLoading] = useState(false);
+  const importFileRef = useRef<HTMLInputElement>(null);
+
   // ─── Queries ─────────────────────────────────────────────────────────────
   const { data: suppliers = [] } = useQuery<any[]>({
     queryKey: ["/api/suppliers", companyId],
@@ -390,6 +401,120 @@ export default function SupplierProfitCheck() {
     },
   });
 
+  // ─── Excel import handler ─────────────────────────────────────────────────
+  const handleExcelFile = useCallback(
+    async (file: File) => {
+      try {
+        const XLSX = await import("xlsx");
+        const data = await file.arrayBuffer();
+        const wb = XLSX.read(data, { type: "array" });
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        const raw: any[][] = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "" });
+        if (raw.length < 2) {
+          toast({ title: "Empty file", description: "The Excel file has no data rows.", variant: "destructive" });
+          return;
+        }
+        // Detect header row — first row is headers (case-insensitive)
+        const headers = (raw[0] as any[]).map((h: any) => String(h).toLowerCase().trim());
+        const colCode = headers.findIndex((h) => h.includes("code") || h === "item" || h === "barcode");
+        const colCost = headers.findIndex((h) => h.includes("cost") || h.includes("dubai") || h.includes("po"));
+        const colSell = headers.findIndex((h) => h.includes("sell") || h.includes("price") || h.includes("avg"));
+        const colQty = headers.findIndex((h) => h.includes("qty") || h.includes("quantity"));
+
+        const codeIdx = colCode >= 0 ? colCode : 0;
+        const parsed: { code: string; costPrice?: number; sellPrice?: number; qty?: number }[] = [];
+        for (let i = 1; i < raw.length; i++) {
+          const row = raw[i] as any[];
+          const code = String(row[codeIdx] ?? "").trim();
+          if (!code) continue;
+          const costPrice = colCost >= 0 ? parseFloat(String(row[colCost] ?? "")) : NaN;
+          const sellPrice = colSell >= 0 && colSell !== codeIdx ? parseFloat(String(row[colSell] ?? "")) : NaN;
+          const qty = colQty >= 0 ? parseFloat(String(row[colQty] ?? "")) : NaN;
+          parsed.push({
+            code,
+            costPrice: !isNaN(costPrice) && costPrice > 0 ? costPrice : undefined,
+            sellPrice: !isNaN(sellPrice) && sellPrice > 0 ? sellPrice : undefined,
+            qty: !isNaN(qty) && qty > 0 ? qty : undefined,
+          });
+        }
+        if (parsed.length === 0) {
+          toast({ title: "No valid codes found", variant: "destructive" });
+          return;
+        }
+        setImportParsed(parsed);
+        setImportPreview(null);
+        setShowImportDialog(true);
+
+        // Auto-fetch analysis
+        setImportLoading(true);
+        try {
+          const res = await apiRequest("POST", "/api/supplier-profit-check/import-by-codes", {
+            codes: parsed.map((p) => p.code),
+            supplierId: supplierId ? Number(supplierId) : undefined,
+            fromDate: periodFilter.fromDate || undefined,
+            toDate: periodFilter.toDate || undefined,
+            sellPriceSource,
+            locationId: sellPriceSource === "location_group" && selectedLocationId ? Number(selectedLocationId) : undefined,
+          });
+          const result = await res.json();
+          setImportPreview(result);
+        } catch (err: any) {
+          toast({ title: "Import failed", description: err.message, variant: "destructive" });
+        } finally {
+          setImportLoading(false);
+        }
+      } catch (err: any) {
+        toast({ title: "Failed to parse file", description: err.message, variant: "destructive" });
+      }
+    },
+    [supplierId, periodFilter, sellPriceSource, selectedLocationId, toast]
+  );
+
+  const handleConfirmImport = useCallback(() => {
+    if (!importPreview) return;
+    const newRows = importPreview.rows;
+    setImportedRows((prev) => {
+      const existingIds = new Set(prev.map((r) => r.stockItemId));
+      const merged = [...prev];
+      for (const r of newRows) {
+        if (!existingIds.has(r.stockItemId)) merged.push(r);
+      }
+      return merged;
+    });
+    // Apply qty / price overrides from Excel
+    const parsedByCode = new Map(importParsed.map((p) => [p.code.toLowerCase(), p]));
+    setQtyMap((prev) => {
+      const next = { ...prev };
+      for (const r of newRows) {
+        const p = parsedByCode.get(r.code.toLowerCase());
+        if (p?.qty && p.qty > 0 && !next[r.stockItemId]) next[r.stockItemId] = String(p.qty);
+      }
+      return next;
+    });
+    setManualPoPrices((prev) => {
+      const next = { ...prev };
+      for (const r of newRows) {
+        const p = parsedByCode.get(r.code.toLowerCase());
+        if (p?.costPrice && p.costPrice > 0 && !next[r.stockItemId]) next[r.stockItemId] = String(p.costPrice);
+      }
+      return next;
+    });
+    setManualAvgPrices((prev) => {
+      const next = { ...prev };
+      for (const r of newRows) {
+        const p = parsedByCode.get(r.code.toLowerCase());
+        if (p?.sellPrice && p.sellPrice > 0 && !next[r.stockItemId]) next[r.stockItemId] = String(p.sellPrice);
+      }
+      return next;
+    });
+    setShowImportDialog(false);
+    setImportPreview(null);
+    toast({
+      title: "Items imported",
+      description: `${newRows.length} item(s) added to the analysis${importPreview.notFound.length > 0 ? ` (${importPreview.notFound.length} code(s) not found)` : ""}`,
+    });
+  }, [importPreview, importParsed, toast]);
+
   const addItemMutation = useMutation({
     mutationFn: async (payload: {
       code: string;
@@ -517,7 +642,10 @@ export default function SupplierProfitCheck() {
 
   // ─── Computed rows ────────────────────────────────────────────────────────
   const computedRows = useMemo((): ComputedRow[] => {
-    return rows.map((row) => {
+    // Merge rows from query + importedRows (deduplicated by stockItemId)
+    const existingIds = new Set(rows.map((r) => r.stockItemId));
+    const allRows = [...rows, ...importedRows.filter((r) => !existingIds.has(r.stockItemId))];
+    return allRows.map((row) => {
       const manualPoNum = parseFloat(manualPoPrices[row.stockItemId] ?? "");
       const poP = !isNaN(manualPoNum) && manualPoNum > 0 ? manualPoNum : row.poPrice;
       const manualAvgNum = parseFloat(manualAvgPrices[row.stockItemId] ?? "");
@@ -539,7 +667,7 @@ export default function SupplierProfitCheck() {
       const hassanProfit = row.configPrice - row.inventoryAvgCost;
       return { ...row, landingCost, costProfit, costProfitPct, computedStatus, hassanProfit };
     });
-  }, [rows, extraCostPerBale, manualPoPrices, manualAvgPrices, sellPriceSource]);
+  }, [rows, importedRows, extraCostPerBale, manualPoPrices, manualAvgPrices, sellPriceSource]);
 
   // ─── Multi-status filter ──────────────────────────────────────────────────
   const toggleStatus = useCallback((val: string) => {
@@ -751,6 +879,40 @@ export default function SupplierProfitCheck() {
               >
                 <Plus className="w-4 h-4 mr-1.5" />
                 Add Item
+              </Button>
+            )}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => importFileRef.current?.click()}
+              className="shrink-0"
+              data-testid="button-import-excel"
+              title="Import item codes from Excel to check profit"
+            >
+              <FileSpreadsheet className="w-4 h-4 mr-1.5" />
+              Import Excel
+            </Button>
+            <input
+              ref={importFileRef}
+              type="file"
+              accept=".xlsx,.xls,.csv"
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) { handleExcelFile(file); e.target.value = ""; }
+              }}
+            />
+            {importedRows.length > 0 && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => { setImportedRows([]); }}
+                className="shrink-0 text-muted-foreground"
+                data-testid="button-clear-import"
+                title="Clear imported items"
+              >
+                <X className="w-4 h-4 mr-1.5" />
+                Clear Import ({importedRows.length})
               </Button>
             )}
             {loaded && !savedProforma && !(sourceType === "proforma" && proformaId) && (
@@ -1747,6 +1909,115 @@ export default function SupplierProfitCheck() {
                   Add Item
                 </>
               )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Excel Import Dialog ── */}
+      <Dialog open={showImportDialog} onOpenChange={(open) => { if (!open) { setShowImportDialog(false); setImportPreview(null); } }}>
+        <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Upload className="w-5 h-5" /> Import Items from Excel
+            </DialogTitle>
+          </DialogHeader>
+          <div className="flex-1 overflow-y-auto space-y-4">
+            <div className="rounded-lg border bg-muted/30 p-3 text-sm text-muted-foreground space-y-1">
+              <p className="font-medium text-foreground">Expected Excel format:</p>
+              <p>Row 1 = headers. Supported column names (case-insensitive):</p>
+              <ul className="list-disc list-inside space-y-0.5 ml-1">
+                <li><strong>Code</strong> (required) — item code from ERP</li>
+                <li><strong>Cost / Dubai / PO Price</strong> (optional) — overrides cost price</li>
+                <li><strong>Sell / Avg Price</strong> (optional) — overrides selling price</li>
+                <li><strong>Qty / Quantity</strong> (optional) — pre-fills order qty</li>
+              </ul>
+            </div>
+
+            {importParsed.length > 0 && (
+              <div className="text-sm text-muted-foreground">
+                Parsed <strong className="text-foreground">{importParsed.length}</strong> code(s) from file.
+              </div>
+            )}
+
+            {importLoading && (
+              <div className="flex items-center justify-center py-8 gap-2 text-muted-foreground">
+                <Loader2 className="w-5 h-5 animate-spin" />
+                Looking up items…
+              </div>
+            )}
+
+            {importPreview && !importLoading && (
+              <div className="space-y-3">
+                {importPreview.notFound.length > 0 && (
+                  <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3">
+                    <p className="text-sm font-medium text-amber-600 dark:text-amber-400 mb-1">
+                      {importPreview.notFound.length} code(s) not found in ERP:
+                    </p>
+                    <p className="text-xs text-muted-foreground font-mono">{importPreview.notFound.join(", ")}</p>
+                  </div>
+                )}
+                {importPreview.rows.length > 0 ? (
+                  <div className="rounded-lg border overflow-hidden">
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="bg-muted/50 border-b">
+                            <th className="text-left px-3 py-2 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Code</th>
+                            <th className="text-left px-3 py-2 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Name</th>
+                            <th className="text-right px-3 py-2 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Cost Price</th>
+                            <th className="text-right px-3 py-2 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Avg Sell</th>
+                            <th className="text-right px-3 py-2 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Profit</th>
+                            <th className="text-center px-3 py-2 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Status</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {importPreview.rows.map((r, i) => {
+                            const parsedItem = importParsed.find((p) => p.code.toLowerCase() === r.code.toLowerCase());
+                            const costP = parsedItem?.costPrice ?? r.poPrice;
+                            const sellP = parsedItem?.sellPrice ?? r.avgSellingPrice;
+                            const profit = sellP != null && costP != null ? sellP - costP : null;
+                            const isGaining = profit != null && profit > 0;
+                            const isLosing = profit != null && profit < 0;
+                            return (
+                              <tr key={r.stockItemId} className={`border-b last:border-0 ${i % 2 === 1 ? "bg-muted/20" : ""}`}>
+                                <td className="px-3 py-2 font-mono text-xs">{r.code}</td>
+                                <td className="px-3 py-2 text-xs max-w-[200px] truncate">{r.name}</td>
+                                <td className="px-3 py-2 text-right text-xs tabular-nums">{costP != null ? `$${costP.toFixed(2)}` : "—"}</td>
+                                <td className="px-3 py-2 text-right text-xs tabular-nums">{sellP != null ? `$${sellP.toFixed(2)}` : "—"}</td>
+                                <td className={`px-3 py-2 text-right text-xs tabular-nums font-semibold ${isGaining ? "text-emerald-500" : isLosing ? "text-red-500" : "text-muted-foreground"}`}>
+                                  {profit != null ? `${profit < 0 ? "-" : ""}$${Math.abs(profit).toFixed(2)}` : "—"}
+                                </td>
+                                <td className="px-3 py-2 text-center">
+                                  <StatusBadge status={r.status} />
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-center py-8 text-muted-foreground text-sm">
+                    <Package className="w-8 h-8 mx-auto mb-2 opacity-30" />
+                    None of the codes matched items in the ERP.
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+          <DialogFooter className="gap-2 border-t pt-4">
+            <Button variant="outline" onClick={() => { setShowImportDialog(false); setImportPreview(null); }}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleConfirmImport}
+              disabled={!importPreview || importPreview.rows.length === 0 || importLoading}
+              data-testid="button-confirm-import"
+            >
+              <Upload className="w-4 h-4 mr-2" />
+              Add {importPreview?.rows.length ?? 0} Item(s) to Analysis
             </Button>
           </DialogFooter>
         </DialogContent>
