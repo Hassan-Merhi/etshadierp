@@ -1327,9 +1327,14 @@ export default function FactoryContainerLoadingScan() {
                                   Over Loaded
                                 </Badge>
                               )}
-                              {(line.status === "short" || line.status === "none") && (
+                              {line.status === "short" && (
                                 <Badge variant="outline" className="text-[10px] bg-yellow-50 dark:bg-yellow-950 text-yellow-700 dark:text-yellow-300 border-yellow-200 dark:border-yellow-800 no-default-hover-elevate no-default-active-elevate">
                                   Under Loaded
+                                </Badge>
+                              )}
+                              {line.status === "none" && (
+                                <Badge variant="outline" className="text-[10px] bg-red-50 dark:bg-red-950 text-red-700 dark:text-red-300 border-red-200 dark:border-red-800 no-default-hover-elevate no-default-active-elevate">
+                                  Missing
                                 </Badge>
                               )}
                             </TableCell>
