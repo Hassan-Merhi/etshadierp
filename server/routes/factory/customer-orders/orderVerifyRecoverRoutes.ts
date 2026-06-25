@@ -734,8 +734,8 @@ export function registerOrderVerifyRecoverRoutes(app: Express) {
         .from(customerOrders)
         .where(and(eq(customerOrders.id, orderId), eq(customerOrders.companyId, companyId)));
       if (!order) return res.status(404).json({ message: "Order not found" });
-      if (order.status !== "PENDING_VERIFICATION")
-        return res.status(400).json({ message: "Only PENDING_VERIFICATION orders can be verified" });
+      if (!["PENDING_VERIFICATION", "VERIFIED"].includes(order.status))
+        return res.status(400).json({ message: "Only PENDING_VERIFICATION or VERIFIED orders can be verified" });
 
       if (approved) {
         const [updated] = await db

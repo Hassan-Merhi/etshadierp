@@ -573,11 +573,11 @@ export function registerOrderFinalizeLoadingRoutes(app: Express) {
             .where(and(eq(factoryBales.id, b.baleId), eq(factoryBales.status, "SOLD")));
         }
 
-        // Reset order to PENDING_VERIFICATION, clear invoice number
+        // Reset order to VERIFIED (skip Pending step), clear invoice number
         await tx
           .update(customerOrders)
           .set({
-            status: "PENDING_VERIFICATION",
+            status: "VERIFIED",
             invoiceNumber: null,
             updatedAt: new Date(),
           })
@@ -886,15 +886,16 @@ export function registerOrderFinalizeLoadingRoutes(app: Express) {
       const [updated] = await db
         .update(customerOrders)
         .set({
-          status: "PENDING_VERIFICATION",
+          status: "VERIFIED",
           loadingFinalizedAt: new Date(),
+          verifiedAt: new Date(),
           updatedAt: new Date(),
         })
         .where(eq(customerOrders.id, orderId))
         .returning();
 
       // V5 guard: proformaIdUsed IS NOT NULL
-      // Move all linked bales to SOLD when a V5 order reaches PENDING_VERIFICATION.
+      // Move all linked bales to SOLD when a V5 order reaches VERIFIED.
       // This is idempotent — bales already SOLD are unaffected by the update.
       // Legacy V2/V3 orders keep bales in RESERVED_FOR_ORDER until FINALIZED.
       if (order.proformaIdUsed) {
@@ -917,24 +918,35 @@ export function registerOrderFinalizeLoadingRoutes(app: Express) {
         txDate: lsToday,
         txType: "LOADING_SUBMITTED",
         referenceId: orderId,
-        description: `Loading submitted for verification: ${lsCustomer?.legalName || "Customer"}, ${bales.length} bale${bales.length !== 1 ? "s" : ""} scanned`,
+        description: `Loading submitted: ${lsCustomer?.legalName || "Customer"}, ${bales.length} bale${bales.length !== 1 ? "s" : ""} scanned`,
         amountCurrency: lsTotalValue,
         amountUsd: lsTotalValue,
       });
+      // Also write ORDER_VERIFIED immediately since we skip the Pending step
+      const verifyTotalValue = parseFloat(updated?.grandTotal || "0") || lsTotalValue;
+      await db
+        .delete(factoryDaybookEntries)
+        .where(
+          and(
+            eq(factoryDaybookEntries.companyId, companyId),
+            eq(factoryDaybookEntries.txType, "ORDER_VERIFIED"),
+            eq(factoryDaybookEntries.referenceId, orderId)
+          )
+        );
+      await writeDaybookEntry(db, {
+        companyId,
+        txDate: lsToday,
+        txType: "ORDER_VERIFIED",
+        referenceId: orderId,
+        description: `Order verified for customer: ${lsCustomer?.legalName || "Customer"}`,
+        amountCurrency: verifyTotalValue,
+        amountUsd: verifyTotalValue,
+      });
 
-      const lsMsg = `${bales.length} bale${bales.length !== 1 ? "s" : ""} submitted for ${lsCustomer?.legalName || "customer"}`;
+      const lsMsg = `${bales.length} bale${bales.length !== 1 ? "s" : ""} verified for ${lsCustomer?.legalName || "customer"}`;
       dispatchNotification({
         eventType: "LOADING_FINALIZED",
         title: "Loading Finalized",
-        message: lsMsg,
-        entityType: "customer_order",
-        entityId: orderId,
-        triggeredByUserId: (req.session as any)?.userId ?? null,
-        companyId,
-      }).catch(() => {});
-      dispatchNotification({
-        eventType: "INVOICE_PENDING",
-        title: "Invoice Pending Verification",
         message: lsMsg,
         entityType: "customer_order",
         entityId: orderId,

@@ -572,8 +572,8 @@ export default function FactoryPendingInvoiceVerify() {
   const isLoading = verificationLoading || orderLoading;
   const charges = orderDetail?.charges || [];
   const orderStatus = verification?.order?.status || orderDetail?.status || "";
-  const isPending = orderStatus === "PENDING_VERIFICATION";
-  const isVerified = orderStatus === "VERIFIED";
+  const isPending = false; // PENDING_VERIFICATION is now treated as VERIFIED directly
+  const isVerified = orderStatus === "VERIFIED" || orderStatus === "PENDING_VERIFICATION";
   const isLoadingStatus = orderStatus === "LOADING";
 
   const totalNotLoadedBales = (verification?.comparison ?? []).reduce((sum, item) => {
@@ -626,15 +626,6 @@ export default function FactoryPendingInvoiceVerify() {
               data-testid="badge-order-status"
             >
               Loading
-            </Badge>
-          )}
-          {isPending && (
-            <Badge
-              variant="outline"
-              className="bg-yellow-50 dark:bg-yellow-950 text-yellow-700 dark:text-yellow-300 border-yellow-200 dark:border-yellow-800"
-              data-testid="badge-order-status"
-            >
-              Pending Verification
             </Badge>
           )}
           {isVerified && (

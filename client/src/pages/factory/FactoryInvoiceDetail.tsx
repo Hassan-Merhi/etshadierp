@@ -299,15 +299,6 @@ export default function FactoryInvoiceDetail() {
           </Badge>
         );
       case "PENDING_VERIFICATION":
-        return (
-          <Badge
-            variant="outline"
-            className="bg-yellow-50 dark:bg-yellow-950 text-yellow-700 dark:text-yellow-300 border-yellow-200 dark:border-yellow-800"
-            data-testid="badge-status-pending"
-          >
-            Pending Verification
-          </Badge>
-        );
       case "VERIFIED":
         return (
           <Badge

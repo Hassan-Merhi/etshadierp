@@ -139,7 +139,7 @@ const LIST_KEY = "/api/factory/shipping-container-rows";
 
 const STATUS_LABEL: Record<string, string> = {
   LOADING: "Loading",
-  PENDING_VERIFICATION: "Pending",
+  PENDING_VERIFICATION: "Verified",
   VERIFIED: "Verified",
   FINALIZED: "Finalized",
   DRAFT: "Draft",
@@ -148,7 +148,7 @@ const STATUS_LABEL: Record<string, string> = {
 
 const STATUS_COLORS: Record<string, string> = {
   LOADING: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300",
-  PENDING_VERIFICATION: "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300",
+  PENDING_VERIFICATION: "bg-violet-100 text-violet-800 dark:bg-violet-900/30 dark:text-violet-300",
   VERIFIED: "bg-violet-100 text-violet-800 dark:bg-violet-900/30 dark:text-violet-300",
   FINALIZED: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300",
   DRAFT: "bg-gray-100 text-gray-600 dark:bg-gray-800/50 dark:text-gray-400",
@@ -1419,7 +1419,10 @@ export default function FactoryShippingContainers() {
         }
         if (filterDocs === "has" && r.documentCount === 0) return false;
         if (filterDocs === "missing" && r.documentCount > 0) return false;
-        if (filterStatus !== "all" && r.status !== filterStatus) return false;
+        if (filterStatus !== "all") {
+          const effectiveStatus = r.status === "PENDING_VERIFICATION" ? "VERIFIED" : r.status;
+          if (effectiveStatus !== filterStatus) return false;
+        }
         return true;
       }),
     [allDisplayRows, search, filterDocs, filterStatus]
@@ -1521,7 +1524,6 @@ export default function FactoryShippingContainers() {
                 <SelectContent>
                   <SelectItem value="all">All Statuses</SelectItem>
                   <SelectItem value="LOADING">Loading</SelectItem>
-                  <SelectItem value="PENDING_VERIFICATION">Pending</SelectItem>
                   <SelectItem value="VERIFIED">Verified</SelectItem>
                   <SelectItem value="FINALIZED">Finalized</SelectItem>
                 </SelectContent>

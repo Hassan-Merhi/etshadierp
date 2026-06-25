@@ -390,7 +390,7 @@ export default function FactoryStockAllocation() {
             <Card>
               <CardContent className="p-8 text-center text-muted-foreground">
                 No active loadings. Containers currently in <strong>Loading</strong> or{" "}
-                <strong>Pending Verification</strong> status will appear here automatically.
+                <strong>Verified</strong> status will appear here automatically.
               </CardContent>
             </Card>
           ) : loadingComputed.articleRows.length === 0 ? (

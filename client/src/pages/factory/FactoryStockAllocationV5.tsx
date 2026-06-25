@@ -97,7 +97,7 @@ interface V5Data {
 const STATUS_LABELS: Record<string, string> = {
   DRAFT: "Draft",
   LOADING: "Loading",
-  PENDING_VERIFICATION: "Pending",
+  PENDING_VERIFICATION: "Verified",
   VERIFIED: "Verified",
   FINALIZED: "Finalized",
   CANCELLED: "Cancelled",

@@ -73,7 +73,7 @@ interface CustomerOrder {
   isHidden?: boolean;
 }
 
-type StatusFilter = "LOADING" | "PENDING" | "VERIFIED" | "FINALIZED" | "ALL";
+type StatusFilter = "LOADING" | "VERIFIED" | "FINALIZED" | "ALL";
 
 export default function FactoryInvoices() {
   const { toast } = useToast();
@@ -164,7 +164,7 @@ export default function FactoryInvoices() {
     },
     onSuccess: () => {
       toast({
-        title: "Reverted to Pending",
+        title: "Reverted to Verified",
         description: "Invoice has been reverted. You can now edit and re-finalize it.",
       });
       queryClient.invalidateQueries({ predicate: keyStartsWith("/api/factory/customer-orders") });
@@ -177,24 +177,20 @@ export default function FactoryInvoices() {
   });
 
   const loadingCount = allOrders.filter((o) => o.status === "LOADING").length;
-  const pendingCount = allOrders.filter((o) => o.status === "PENDING_VERIFICATION").length;
-  const verifiedCount = allOrders.filter((o) => o.status === "VERIFIED").length;
+  const verifiedCount = allOrders.filter((o) => o.status === "VERIFIED" || o.status === "PENDING_VERIFICATION").length;
   const finalizedCount = allOrders.filter((o) => o.status === "FINALIZED").length;
 
   const filteredOrders =
     statusFilter === "LOADING"
       ? allOrders.filter((o) => o.status === "LOADING")
-      : statusFilter === "PENDING"
-        ? allOrders.filter((o) => o.status === "PENDING_VERIFICATION")
-        : statusFilter === "VERIFIED"
-          ? allOrders.filter((o) => o.status === "VERIFIED")
-          : statusFilter === "FINALIZED"
-            ? allOrders.filter((o) => o.status === "FINALIZED")
-            : allOrders;
+      : statusFilter === "VERIFIED"
+        ? allOrders.filter((o) => o.status === "VERIFIED" || o.status === "PENDING_VERIFICATION")
+        : statusFilter === "FINALIZED"
+          ? allOrders.filter((o) => o.status === "FINALIZED")
+          : allOrders;
 
   const statusFilters: { key: StatusFilter; label: string; count: number }[] = [
     { key: "LOADING", label: "Loading", count: loadingCount },
-    { key: "PENDING", label: "Pending", count: pendingCount },
     { key: "VERIFIED", label: "Verified", count: verifiedCount },
     { key: "FINALIZED", label: "Finalized", count: finalizedCount },
   ];
@@ -210,14 +206,6 @@ export default function FactoryInvoices() {
           </Badge>
         );
       case "PENDING_VERIFICATION":
-        return (
-          <Badge
-            variant="outline"
-            className="border-yellow-300 text-yellow-700 dark:border-yellow-600 dark:text-yellow-400"
-          >
-            Pending
-          </Badge>
-        );
       case "VERIFIED":
         return (
           <Badge
@@ -660,10 +648,10 @@ export default function FactoryInvoices() {
                                   </AlertDialogTrigger>
                                   <AlertDialogContent>
                                     <AlertDialogHeader>
-                                      <AlertDialogTitle>Revert to Pending</AlertDialogTitle>
+                                      <AlertDialogTitle>Revert to Verified</AlertDialogTitle>
                                       <AlertDialogDescription>
                                         This will revert invoice {order.invoiceNumber} for {order.customerName} back to
-                                        Pending Verification status. The invoice number will be voided, all bales will
+                                        Verified status. The invoice number will be voided, all bales will
                                         return to stock, and the customer balance entry will be removed. This cannot be
                                         done if any payment has been recorded against this invoice.
                                       </AlertDialogDescription>
@@ -676,7 +664,7 @@ export default function FactoryInvoices() {
                                         onClick={() => unfinalizeMutation.mutate(order.id)}
                                         data-testid={`button-confirm-revert-${order.id}`}
                                       >
-                                        Revert to Pending
+                                        Revert to Verified
                                       </AlertDialogAction>
                                     </AlertDialogFooter>
                                   </AlertDialogContent>
