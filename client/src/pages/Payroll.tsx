@@ -293,11 +293,12 @@ export default function Payroll() {
   });
 
   return (
-    <div className="container mx-auto p-4 space-y-4">
+    <div className="flex flex-col h-full overflow-hidden">
       <PageHeader title="Payroll Management" />
 
+      <div className="flex-1 overflow-y-auto p-4">
       <Tabs value={selectedTab} onValueChange={setSelectedTab}>
-        <TabsList className="grid grid-cols-5 w-full max-w-2xl">
+        <TabsList className="grid grid-cols-5 w-full">
           <TabsTrigger value="employees">Employees</TabsTrigger>
           <TabsTrigger value="workers">Workers</TabsTrigger>
           <TabsTrigger value="advances">Advances + Deductions</TabsTrigger>
@@ -409,6 +410,7 @@ export default function Payroll() {
       />
 
       {/* Other dialogs would be here as well, kept slim for orchestrator */}
+      </div>
     </div>
   );
 }
