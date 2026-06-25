@@ -26,7 +26,7 @@ export function ContainerTable({ containers, colVis, sessionCompanyId, onOpenDra
         <div ref={printRef}>
           <Table className="text-xs" wrapperClassName="overflow-visible border-0 rounded-none">
             <TableHeader className="sticky top-0 z-[50] bg-teal-800 dark:bg-teal-950">
-              <TableRow className="bg-transparent hover:bg-transparent border-b border-teal-600 dark:border-teal-700">
+              <TableRow className="!bg-transparent hover:!bg-transparent border-b border-teal-600 dark:border-teal-700">
                 <TableHead className="w-[40px] font-bold h-9 text-teal-50 text-center">#</TableHead>
                 <TableHead className="w-[110px] font-bold h-9 text-teal-50">Container #</TableHead>
                 {colVis.supplier && <TableHead className="w-[100px] font-bold h-9 text-teal-50">Supplier</TableHead>}
