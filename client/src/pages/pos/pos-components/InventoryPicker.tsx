@@ -9,6 +9,7 @@ export interface InventoryPickerProps {
   itemListRef: React.RefObject<HTMLDivElement>;
   highlightedIndex: number;
   syncTerm?: string;
+  mobile?: boolean;
 }
 
 // Keep spaces so "GS HAND" doesn't bleed into adjacent words.
@@ -39,6 +40,7 @@ export function InventoryPicker({
   itemListRef,
   highlightedIndex,
   syncTerm,
+  mobile = false,
 }: InventoryPickerProps) {
   const [localSearch, setLocalSearch] = useState("");
 
@@ -49,19 +51,28 @@ export function InventoryPicker({
   const filteredInventory = localSearch ? inventory.filter((item) => matches(item, localSearch)) : inventory;
 
   return (
-    <Card className="w-full lg:w-96 flex flex-col overflow-hidden h-[300px] lg:h-auto shrink-0">
+    <Card className={`flex flex-col overflow-hidden ${mobile ? "flex-1 rounded-none border-0 shadow-none" : "w-full lg:w-96 h-[300px] lg:h-auto shrink-0"}`}>
       {/* Header */}
-      <div className="px-3 pt-3 pb-2 shrink-0">
+      <div className={`shrink-0 ${mobile ? "px-4 pt-4 pb-3" : "px-3 pt-3 pb-2"}`}>
         <p className="text-xs font-semibold text-muted-foreground tracking-wide mb-2">Items</p>
-        <div className="flex items-center gap-2 rounded-md border border-input bg-muted/30 px-2.5 h-9 focus-within:ring-2 focus-within:ring-ring focus-within:border-transparent transition-all">
-          <Search className="h-4 w-4 text-muted-foreground shrink-0" />
+        <div className={`flex items-center gap-2 rounded-md border border-input bg-muted/30 px-2.5 focus-within:ring-2 focus-within:ring-ring focus-within:border-transparent transition-all ${mobile ? "h-11" : "h-9"}`}>
+          <Search className={`text-muted-foreground shrink-0 ${mobile ? "h-5 w-5" : "h-4 w-4"}`} />
           <input
-            className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+            className={`flex-1 bg-transparent outline-none placeholder:text-muted-foreground ${mobile ? "text-base" : "text-sm"}`}
             placeholder="Scan barcode or search..."
             value={localSearch}
             onChange={(e) => setLocalSearch(e.target.value)}
             data-testid="input-product-search"
           />
+          {localSearch && (
+            <button
+              className="text-muted-foreground"
+              onClick={() => setLocalSearch("")}
+              aria-label="Clear search"
+            >
+              ×
+            </button>
+          )}
         </div>
       </div>
 
@@ -73,9 +84,9 @@ export function InventoryPicker({
           return (
             <button
               key={item.code}
-              className={`w-full text-left px-3 py-1.5 flex items-center justify-between gap-2 border-b border-muted/40 transition-colors duration-100 ${
-                index === highlightedIndex ? "bg-primary/10" : "hover:bg-muted/40"
-              }`}
+              className={`w-full text-left flex items-center justify-between gap-2 border-b border-muted/40 transition-colors duration-100 ${
+                mobile ? "px-4 py-3 active:bg-primary/10" : "px-3 py-1.5"
+              } ${index === highlightedIndex ? "bg-primary/10" : "hover:bg-muted/40"}`}
               onClick={() => {
                 selectItem(item);
                 setLocalSearch("");
@@ -83,11 +94,13 @@ export function InventoryPicker({
               data-testid={`button-select-item-${item.code}`}
             >
               <div className="min-w-0">
-                <p className="text-sm font-semibold leading-tight truncate">{item.name}</p>
-                <p className="text-[11px] text-muted-foreground font-mono">{item.code}</p>
+                <p className={`font-semibold leading-tight truncate ${mobile ? "text-base" : "text-sm"}`}>{item.name}</p>
+                <p className={`text-muted-foreground font-mono ${mobile ? "text-xs mt-0.5" : "text-[11px]"}`}>{item.code}</p>
               </div>
               <span
-                className={`shrink-0 text-[10px] font-bold px-1.5 py-0.5 rounded ${
+                className={`shrink-0 font-bold rounded ${
+                  mobile ? "text-xs px-2 py-1" : "text-[10px] px-1.5 py-0.5"
+                } ${
                   isOut
                     ? "bg-red-500/15 text-red-500"
                     : isLow
