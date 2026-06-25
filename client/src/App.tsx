@@ -789,25 +789,79 @@ function AuthenticatedApp() {
         target.tagName === "SELECT" ||
         target.isContentEditable;
 
-      // Arrow key / page scrolling
-      const scrollKeys = ["ArrowUp", "ArrowDown", "PageUp", "PageDown", "Home", "End"];
+      // Arrow key / page scrolling — works on every page including
+      // full-height layouts where <main> has overflow-hidden.
+      const scrollKeys = ["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "PageUp", "PageDown", "Home", "End"];
       if (scrollKeys.includes(e.key) && !isInput) {
-        const main = document.querySelector("main");
-        if (main) {
+        const isHorizontal = e.key === "ArrowLeft" || e.key === "ArrowRight";
+
+        // Walk up from the active element to find the nearest ancestor
+        // that can actually scroll in the required direction.
+        function findScrollTarget(horizontal: boolean): Element | null {
+          // 1. Walk upward from currently focused element
+          let el: Element | null = document.activeElement;
+          while (el && el !== document.body && el !== document.documentElement) {
+            const s = window.getComputedStyle(el);
+            if (horizontal) {
+              const ov = s.overflowX;
+              if ((ov === "auto" || ov === "scroll") && el.scrollWidth > el.clientWidth + 2) return el;
+            } else {
+              const ov = s.overflowY;
+              if ((ov === "auto" || ov === "scroll") && el.scrollHeight > el.clientHeight + 2) return el;
+            }
+            el = el.parentElement;
+          }
+
+          // 2. Try <main> directly (works for standard non-full-height pages)
+          const main = document.querySelector("main");
+          if (main) {
+            const s = window.getComputedStyle(main);
+            if (horizontal) {
+              if ((s.overflowX === "auto" || s.overflowX === "scroll") && main.scrollWidth > main.clientWidth + 2) return main;
+            } else {
+              if ((s.overflowY === "auto" || s.overflowY === "scroll") && main.scrollHeight > main.clientHeight + 2) return main;
+            }
+          }
+
+          // 3. Scan inside <main> (or body) for Tailwind overflow-auto/scroll
+          //    elements that actually have scrollable content — covers full-height
+          //    pages like Tracking where the inner table div scrolls.
+          const root = main || document.body;
+          const selector = horizontal
+            ? ".overflow-auto, .overflow-x-auto, .overflow-x-scroll"
+            : ".overflow-auto, .overflow-y-auto, .custom-scrollbar";
+          const candidates = root.querySelectorAll<HTMLElement>(selector);
+          for (const c of candidates) {
+            if (horizontal ? c.scrollWidth > c.clientWidth + 2 : c.scrollHeight > c.clientHeight + 2) return c;
+          }
+
+          // 4. Final fallback
+          return main || document.body;
+        }
+
+        const container = findScrollTarget(isHorizontal);
+        if (container) {
           e.preventDefault();
-          const amount =
-            e.key === "ArrowDown"
-              ? 80
-              : e.key === "ArrowUp"
-                ? -80
-                : e.key === "PageDown"
-                  ? window.innerHeight * 0.85
-                  : e.key === "PageUp"
-                    ? -window.innerHeight * 0.85
-                    : e.key === "End"
-                      ? 99999
-                      : -99999;
-          main.scrollBy({ top: amount, behavior: "smooth" });
+          const step = 80;
+          const pageFraction = 0.85;
+          if (isHorizontal) {
+            const amount = e.key === "ArrowRight" ? step : -step;
+            container.scrollBy({ left: amount, behavior: "smooth" });
+          } else {
+            const amount =
+              e.key === "ArrowDown"
+                ? step
+                : e.key === "ArrowUp"
+                  ? -step
+                  : e.key === "PageDown"
+                    ? window.innerHeight * pageFraction
+                    : e.key === "PageUp"
+                      ? -window.innerHeight * pageFraction
+                      : e.key === "End"
+                        ? 99999
+                        : -99999;
+            container.scrollBy({ top: amount, behavior: "smooth" });
+          }
         }
         return;
       }
