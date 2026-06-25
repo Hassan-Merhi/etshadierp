@@ -9,14 +9,10 @@ import {
   BookOpen,
   Building2,
   ChevronDown,
-  ChevronRight,
-  DollarSign,
   FileText,
-  Globe,
   Link2,
   Mail,
   MapPin,
-  Pencil,
   Phone,
   Trash2,
   Users,
@@ -365,76 +361,6 @@ export function SupplierStatement({
           openFxConversionDialog={openFxConversionDialog}
         />
       )}
-
-      <div className="rounded-xl border overflow-hidden">
-        <div
-          className="flex items-center justify-between gap-2 px-4 py-3 border-b bg-muted/20 cursor-pointer hover-elevate"
-          onClick={() => toggleStmtSection("paymentsList")}
-        >
-          <span className="flex items-center gap-2 flex-1">
-            <DollarSign className="h-4 w-4" />
-            <span className="text-sm font-semibold">Payment History</span>
-            <ChevronDown
-              className={`h-4 w-4 text-muted-foreground transition-transform ${collapsedStmtSections.has("paymentsList") ? "" : "rotate-180"}`}
-            />
-          </span>
-        </div>
-        {!collapsedStmtSections.has("paymentsList") && (
-          <div>
-            {statementData.payments && statementData.payments.length > 0 ? (
-              <div className="table-responsive">
-                <Table>
-                  <TableHeader>
-                    <TableRow className="bg-muted/50">
-                      <TableHead className="w-32">Date</TableHead>
-                      <TableHead>Account</TableHead>
-                      <TableHead className="text-right">Amount</TableHead>
-                      <TableHead className="text-right w-24">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {statementData.payments.map((p) => (
-                      <TableRow key={p.id}>
-                        <TableCell className="text-sm">{formatDate(p.date)}</TableCell>
-                        <TableCell className="text-sm">
-                          {subAccountsByParent[statementSupplierId]?.find((c) => c.id === p.supplierId)?.name ||
-                            "Primary Account"}
-                        </TableCell>
-                        <TableCell className="text-right text-sm font-medium tabular-nums">
-                          {p.currencyCode !== "USD" ? `${p.currencyCode} ` : "$"}
-                          {formatNum(p.amount)}
-                          {p.currencyCode !== "USD" && (
-                            <div className="text-[10px] text-muted-foreground">
-                              @ {parseFloat(p.fxRateToUsd).toFixed(4)} = ${formatNum(p.amountUsd)}
-                            </div>
-                          )}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex justify-end gap-1">
-                            <Button variant="ghost" size="icon" onClick={() => onEditPayment(p)}>
-                              <Pencil className="h-3.5 w-3.5" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="text-destructive"
-                              onClick={() => onDeletePayment(p.id)}
-                            >
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            ) : (
-              <div className="text-center py-10 text-muted-foreground italic text-sm">No payments recorded yet.</div>
-            )}
-          </div>
-        )}
-      </div>
 
       {statementData.fxTransfers && statementData.fxTransfers.length > 0 && (
         <div className="rounded-xl border overflow-hidden">

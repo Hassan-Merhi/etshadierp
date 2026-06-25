@@ -481,11 +481,13 @@ export default function FactorySuppliers() {
         key: `p-${p.id}`,
         date: p.date,
         type: "payment",
-        ref: `Payment (${p.currencyCode})`,
+        ref: p.currencyCode !== "USD"
+          ? `Payment #${p.id} (${p.currencyCode} ${formatNum(p.amount)} @ ${parseFloat(p.fxRateToUsd).toFixed(4)})`
+          : `Payment #${p.id}`,
+        detail: p.notes || undefined,
         amount: formatNum(p.amount),
         amountVal: parseFloat(p.amountUsd),
         rowCc: "USD",
-        onEdit: () => {},
         onDelete: () => wrapAdminAction(() => deletePaymentMutation.mutate(p.id), "Delete Payment"),
       })
     );
@@ -495,6 +497,7 @@ export default function FactorySuppliers() {
         date: f.date,
         type: "fx",
         ref: "FX Settlement",
+        detail: f.notes || undefined,
         amount: formatNum(f.toAmountUsd),
         amountVal: parseFloat(f.toAmountUsd),
         rowCc: "USD",
@@ -513,10 +516,45 @@ export default function FactorySuppliers() {
         onDelete: () => wrapAdminAction(() => deleteObCommissionMutation.mutate(o.rawStockId), "Delete OB Commission"),
       })
     );
-    allRows.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
+    // Compute running balance oldest→newest
+    const sortedForBalance = [...allRows].sort(
+      (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
+    );
+    let runningBal = 0;
     const balanceByKey: Record<string, { bal: number; cc: string }> = {};
-    const currencyTotals: Record<string, number> = {};
+    for (const row of sortedForBalance) {
+      if (row.type === "purchase" || row.type === "commission") {
+        runningBal += row.amountVal;
+      } else if (row.type === "payment" || row.type === "fx") {
+        runningBal -= row.amountVal;
+      }
+      balanceByKey[row.key] = { bal: runningBal, cc: "USD" };
+    }
+    const currencyTotals: Record<string, number> = { USD: runningBal };
+
+    // Summary stats (over all rows, not filtered)
+    const sfTotalPurchases = allRows.filter((r) => r.type === "purchase").reduce((s, r) => s + r.amountVal, 0);
+    const sfTotalPayments = allRows.filter((r) => r.type === "payment").reduce((s, r) => s + r.amountVal, 0);
+    const sfPurchasesQty = allRows.filter((r) => r.type === "purchase").length;
+
+    // Apply date filter for display only
+    const todayStr = today;
+    const yesterdayStr = (() => {
+      const d = new Date(todayStr);
+      d.setDate(d.getDate() - 1);
+      return d.toLocaleDateString("en-CA");
+    })();
+    const filteredRows = allRows.filter((r) => {
+      if (statDateFilter === "all") return true;
+      const d = r.date?.slice(0, 10) ?? "";
+      if (statDateFilter === "today") return d === todayStr;
+      if (statDateFilter === "yesterday") return d === yesterdayStr;
+      if (statDateFilter === "this_month") return d.slice(0, 7) === todayStr.slice(0, 7);
+      if (statDateFilter === "this_year") return d.slice(0, 4) === todayStr.slice(0, 4);
+      return true;
+    });
+    filteredRows.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
     return (
       <SupplierStatement
@@ -570,12 +608,12 @@ export default function FactorySuppliers() {
         statusColor={statusColor}
         statusDisplayLabel={statusDisplayLabel}
         typeBadge={typeBadge}
-        displayedRows={allRows}
+        displayedRows={filteredRows}
         balanceByKey={balanceByKey}
-        sfTotalPurchases={0}
-        sfTotalPayments={0}
-        sfPurchasesQty={0}
-        sfTxCount={allRows.length}
+        sfTotalPurchases={sfTotalPurchases}
+        sfTotalPayments={sfTotalPayments}
+        sfPurchasesQty={sfPurchasesQty}
+        sfTxCount={filteredRows.length}
         currencyTotals={currencyTotals}
         primaryCc="USD"
       />
