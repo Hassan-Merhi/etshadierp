@@ -56,8 +56,9 @@ function scrUpload(req: any, res: any, next: any) {
 function safeDownloadName(name: string | null | undefined): string {
   if (!name) return "download";
   const safe = name
+    .replace(/[^\x20-\x7E]/g, "") // strip non-ASCII (prevents ERR_INVALID_CHAR in headers)
     .replace(/[\r\n]+/g, "")
-    .replace(/"/g, "'")
+    .replace(/"/g, "")
     .replace(/;/g, "")
     .trim();
   return safe || "download";
@@ -1157,6 +1158,8 @@ export function registerFactoryShippingContainerRoutes(app: Express) {
 
       function safeFilePart(s: string | null | undefined): string {
         return (s || "")
+          .replace(/[^\x20-\x7E]/g, "") // strip non-ASCII (prevents ERR_INVALID_CHAR in headers)
+          .replace(/"/g, "")
           .replace(/[\\/*?:[\]<>|]/g, "")
           .replace(/\s+/g, "_")
           .trim();

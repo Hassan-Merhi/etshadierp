@@ -898,10 +898,12 @@ export function registerFactoryCustomersRoutes(app: Express) {
       res.setHeader("Content-Type", "application/pdf");
       res.setHeader(
         "Content-Disposition",
-        `attachment; filename=${(customer.legalName || customer.code || customerId)
-          .toString()
+        `attachment; filename="${(customer.legalName || customer.code || String(customerId))
+          .replace(/[^\x20-\x7E]/g, "")
+          .replace(/"/g, "")
           .replace(/[^\w\s.()\-]/g, "_")
-          .replace(/\s+/g, "_")}_Statement.pdf`
+          .replace(/\s+/g, "_")
+          .trim() || "customer"}_Statement.pdf"`
       );
       doc.pipe(res);
 
@@ -1554,7 +1556,11 @@ export function registerFactoryCustomersRoutes(app: Express) {
       res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
       res.setHeader(
         "Content-Disposition",
-        `attachment; filename=${(customer.legalName || "customer").replace(/\s+/g, "_")}_Statement.xlsx`
+        `attachment; filename="${(customer.legalName || "customer")
+          .replace(/[^\x20-\x7E]/g, "")
+          .replace(/"/g, "")
+          .replace(/\s+/g, "_")
+          .trim() || "customer"}_Statement.xlsx"`
       );
             res.end(await workbook.xlsx.writeBuffer());
     } catch (error: any) {

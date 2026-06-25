@@ -129,7 +129,9 @@ export function buildExportFilename(parts: (string | null | undefined)[], ext: s
     .filter((p): p is string => Boolean(p && p.trim()))
     .map((p) =>
       p
-        .replace(/[\\/*?:[\]<>|]/g, "")
+        .replace(/[^\x20-\x7E]/g, "")  // strip non-ASCII / non-printable (prevents ERR_INVALID_CHAR in headers)
+        .replace(/["]/g, "")            // strip double-quotes (would break the quoted header value)
+        .replace(/[\\/*?:[\]<>|]/g, "") // strip filesystem-unsafe chars
         .replace(/\s+/g, "_")
         .trim()
     )
