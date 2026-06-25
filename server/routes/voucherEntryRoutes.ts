@@ -432,7 +432,7 @@ export function registerVoucherEntryRoutes(app: Express) {
       }
 
       // For Stock Transfer vouchers, get stock transfer items
-      if (voucher.voucherType === "Stock Transfer" || voucher.voucherType === "StockTransfer") {
+      if (voucher.voucherType === "Stock Transfer" || voucher.voucherType === "StockTransfer" || voucher.voucherType === "Transfer") {
         const transferVoucher = await db.query.stockTransferVouchers.findFirst({
           where: eq(stockTransferVouchers.voucherId, id),
         });
@@ -651,8 +651,8 @@ export function registerVoucherEntryRoutes(app: Express) {
       // Wrap balance sync and deletion in a transaction
       await db.transaction(async (tx) => {
         // IMPORTANT: Reverse inventory movements for Stock Transfer vouchers
-        // Note: Database stores as "StockTransfer" (no space), but some code uses "Stock Transfer"
-        if (voucher.voucherType === "Stock Transfer" || voucher.voucherType === "StockTransfer") {
+        // Note: Database stores as "StockTransfer" (no space), "Stock Transfer", or "Transfer" (POS-created)
+        if (voucher.voucherType === "Stock Transfer" || voucher.voucherType === "StockTransfer" || voucher.voucherType === "Transfer") {
           // Get the stock transfer record
           const [transferVoucher] = await tx
             .select()
@@ -1001,7 +1001,7 @@ export function registerVoucherEntryRoutes(app: Express) {
           // Use the same transaction-wrapped deletion logic as the single delete endpoint
           await db.transaction(async (tx) => {
             // IMPORTANT: Reverse inventory movements for Stock Transfer vouchers
-            if (voucher.voucherType === "Stock Transfer" || voucher.voucherType === "StockTransfer") {
+            if (voucher.voucherType === "Stock Transfer" || voucher.voucherType === "StockTransfer" || voucher.voucherType === "Transfer") {
               const [transferVoucher] = await tx
                 .select()
                 .from(stockTransferVouchers)

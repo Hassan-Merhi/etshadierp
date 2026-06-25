@@ -503,6 +503,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
       Contra: "contra",
       StockTransfer: "transfer",
       "Stock Transfer": "transfer",
+      Transfer: "transfer",
       "Credit Note": "credit-note",
       "Debit Note": "credit-note",
     };
