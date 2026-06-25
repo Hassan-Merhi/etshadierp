@@ -199,7 +199,7 @@ export default function StockItemDetail() {
       const normalizedDate = sale.saleDate.split(" ")[0];
       navigate(`/pos-daybook?date=${normalizedDate}&voucherId=${sale.voucherId}`);
     } else {
-      navigate(`/daybook?voucherId=${sale.voucherId}`);
+      navigate(`/vouchers/${sale.voucherId}/edit`);
     }
   };
 
