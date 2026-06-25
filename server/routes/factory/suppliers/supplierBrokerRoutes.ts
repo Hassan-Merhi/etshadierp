@@ -821,8 +821,7 @@ export function registerSupplierBrokerRoutes(app: Express) {
         "Content-Disposition",
         `attachment; filename="broker-statement-${(data.supplier as any).name?.replace(/\s+/g, "-") || brokerId}-${getClientDate(req)}.xlsx"`
       );
-      await wb.xlsx.write(res);
-      res.end();
+            res.end(await wb.xlsx.writeBuffer());
     } catch (err: any) {
       console.error("Broker statement export error:", err);
       res.status(500).json({ message: err.message });

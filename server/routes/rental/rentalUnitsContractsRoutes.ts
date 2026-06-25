@@ -796,8 +796,7 @@ export function registerRentalUnitsContractsRoutes(
       const filename = `Rental_${unit.unitNumber.replace(/\s+/g, "_")}_${contract.tenantName.replace(/\s+/g, "_")}.xlsx`;
       res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
       res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
-      await wb.xlsx.write(res);
-      res.end();
+            res.end(await wb.xlsx.writeBuffer());
     } catch (e: any) {
       console.error(`${tag} statement export:`, e);
       res.status(500).json({ message: e.message });

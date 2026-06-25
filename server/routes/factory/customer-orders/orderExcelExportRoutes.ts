@@ -467,8 +467,7 @@ export function registerOrderExcelExportRoutes(app: Express) {
       const fileName = buildExportFilename([order.containerNumber, customer?.legalName, order.destination], "xlsx");
       res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
       res.setHeader("Content-Disposition", `attachment; filename="${fileName}"`);
-      await workbook.xlsx.write(res);
-      res.end();
+            res.end(await workbook.xlsx.writeBuffer());
     } catch (error: any) {
       console.error("Error exporting order to Excel:", error);
       res.status(500).json({ message: error.message });
@@ -787,8 +786,7 @@ export function registerOrderExcelExportRoutes(app: Express) {
       const fileName = buildExportFilename([order.containerNumber, order.customerName, order.destination], "xlsx");
       res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
       res.setHeader("Content-Disposition", `attachment; filename="${fileName}"`);
-      await workbook.xlsx.write(res);
-      res.end();
+            res.end(await workbook.xlsx.writeBuffer());
     } catch (error: any) {
       console.error("Error exporting order to Excel:", error);
       res.status(500).json({ message: error.message });

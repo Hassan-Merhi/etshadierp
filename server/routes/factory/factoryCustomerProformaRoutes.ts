@@ -1679,8 +1679,7 @@ export function registerFactoryCustomerProformaRoutes(app: Express) {
 
       res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
       res.setHeader("Content-Disposition", `attachment; filename=proforma_${proforma.name.replace(/\s+/g, "_")}.xlsx`);
-      await workbook.xlsx.write(res);
-      res.end();
+            res.end(await workbook.xlsx.writeBuffer());
     } catch (error: any) {
       console.error("Error exporting proforma to Excel:", error);
       res.status(500).json({ message: error.message });

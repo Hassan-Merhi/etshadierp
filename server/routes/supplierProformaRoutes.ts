@@ -1052,8 +1052,7 @@ export function registerSupplierProformaRoutes(app: Express, requireAuth: any) {
         const safeContainer = (container?.containerNumber || String(containerId)).replace(/[^a-zA-Z0-9]/g, "");
         const fileName = `Verification ${safeSupplier} ${safeContainer}.xlsx`;
         res.setHeader("Content-Disposition", `attachment; filename="${fileName}"`);
-        await workbook.xlsx.write(res);
-        res.end();
+                res.end(await workbook.xlsx.writeBuffer());
       } catch (error: any) {
         console.error("Export error:", error);
         res.status(500).json({ message: error.message });
@@ -1384,8 +1383,7 @@ export function registerSupplierProformaRoutes(app: Express, requireAuth: any) {
         const safeContainerS = (container?.containerNumber || String(containerId)).replace(/[^a-zA-Z0-9]/g, "");
         const summaryFileName = `Verification Summary ${safeSupplierS} ${safeContainerS}.xlsx`;
         res.setHeader("Content-Disposition", `attachment; filename="${summaryFileName}"`);
-        await wb.xlsx.write(res);
-        res.end();
+                res.end(await wb.xlsx.writeBuffer());
       } catch (error: any) {
         console.error("Summary export error:", error);
         res.status(500).json({ message: error.message });

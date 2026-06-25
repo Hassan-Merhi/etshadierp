@@ -611,8 +611,7 @@ export function registerFactoryBaleExportRoutes(app: Express) {
 
         res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
         res.setHeader("Content-Disposition", `attachment; filename="raw-production-report-${filenameDate}.xlsx"`);
-        await workbook.xlsx.write(res);
-        return res.end();
+                return res.end(await workbook.xlsx.writeBuffer());
       }
 
       if (format === "pdf") {
@@ -942,8 +941,7 @@ export function registerFactoryBaleExportRoutes(app: Express) {
           sh.addRow(["No data found"]);
           res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
           res.setHeader("Content-Disposition", `attachment; filename="weekly-production-report.xlsx"`);
-          await wb.xlsx.write(res);
-          return res.end();
+                    return res.end(await wb.xlsx.writeBuffer());
         }
         return res.json({ message: "No data" });
       }
@@ -1196,8 +1194,7 @@ export function registerFactoryBaleExportRoutes(app: Express) {
 
         res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
         res.setHeader("Content-Disposition", `attachment; filename="weekly-production-report.xlsx"`);
-        await wb.xlsx.write(res);
-        return res.end();
+                return res.end(await wb.xlsx.writeBuffer());
       }
 
       // PDF format

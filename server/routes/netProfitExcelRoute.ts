@@ -1081,8 +1081,7 @@ export function registerNetProfitExcelRoute(app: Express) {
       const safePeriod = periodLabel.replace(/[^a-z0-9]/gi, "_");
       res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
       res.setHeader("Content-Disposition", `attachment; filename="NetProfit_${safeCompanyName}_${safePeriod}.xlsx"`);
-      await workbook.xlsx.write(res);
-      res.end();
+            res.end(await workbook.xlsx.writeBuffer());
     } catch (error: any) {
       console.error("Net profit Excel export error:", error);
       res.status(500).json({ message: error.message });

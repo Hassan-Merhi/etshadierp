@@ -226,8 +226,7 @@ export function registerOrderPdfExportRoutes(app: Express) {
       const safeName = customerName.replace(/[^a-zA-Z0-9_\-]/g, "_");
       res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
       res.setHeader("Content-Disposition", `attachment; filename="loading_${orderId}_${safeName}.xlsx"`);
-      await workbook.xlsx.write(res);
-      res.end();
+            res.end(await workbook.xlsx.writeBuffer());
     } catch (error: any) {
       console.error("Error exporting pending loading:", error);
       res.status(500).json({ message: error.message });
@@ -900,8 +899,7 @@ export function registerOrderPdfExportRoutes(app: Express) {
         "Content-Disposition",
         `attachment; filename="${buildExportFilename([order.containerNumber, order.customerName, order.destination], "xlsx")}"`
       );
-      await workbook.xlsx.write(res);
-      res.end();
+            res.end(await workbook.xlsx.writeBuffer());
     } catch (error: any) {
       console.error("Error exporting loading status:", error);
       res.status(500).json({ message: error.message });

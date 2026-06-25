@@ -1556,8 +1556,7 @@ export function registerFactoryCustomersRoutes(app: Express) {
         "Content-Disposition",
         `attachment; filename=${(customer.legalName || "customer").replace(/\s+/g, "_")}_Statement.xlsx`
       );
-      await workbook.xlsx.write(res);
-      res.end();
+            res.end(await workbook.xlsx.writeBuffer());
     } catch (error: any) {
       console.error("Error exporting customer statement Excel:", error);
       res.status(500).json({ message: error.message });

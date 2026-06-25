@@ -921,8 +921,7 @@ export function registerFactoryInvoiceLoadingRoutes(app: Express) {
       const filename = buildExportFilename([inv.containerNumber, inv.customerName, inv.destination], "xlsx");
       res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
       res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
-      await wb.xlsx.write(res);
-      res.end();
+            res.end(await wb.xlsx.writeBuffer());
     } catch (error: any) {
       console.error("loading report excel error:", error);
       res.status(500).json({ message: error.message });
@@ -1241,8 +1240,7 @@ ${
       );
       res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
       res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
-      await wb.xlsx.write(res);
-      res.end();
+            res.end(await wb.xlsx.writeBuffer());
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }

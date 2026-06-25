@@ -1528,8 +1528,7 @@ export function registerFactoryStockRoutes(app: Express) {
       const dateStr = getClientDate(req);
       res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
       res.setHeader("Content-Disposition", `attachment; filename="inventory_location_${locationId}_${dateStr}.xlsx"`);
-      await workbook.xlsx.write(res);
-      res.end();
+            res.end(await workbook.xlsx.writeBuffer());
     } catch (error: any) {
       console.error("Error exporting inventory Excel:", error);
       res.status(500).json({ message: error.message });
@@ -1936,8 +1935,7 @@ export function registerFactoryStockRoutes(app: Express) {
       const dateStr = getClientDate(req);
       res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
       res.setHeader("Content-Disposition", `attachment; filename="inventory_all_locations_${dateStr}.xlsx"`);
-      await workbook.xlsx.write(res);
-      res.end();
+            res.end(await workbook.xlsx.writeBuffer());
     } catch (error: any) {
       console.error("Error exporting all-locations inventory Excel:", error);
       res.status(500).json({ message: error.message });

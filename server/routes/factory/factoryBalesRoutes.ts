@@ -979,8 +979,7 @@ export function registerFactoryBalesRoutes(app: Express) {
 
       res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
       res.setHeader("Content-Disposition", `attachment; filename="bales_export_${date}.xlsx"`);
-      await workbook.xlsx.write(res);
-      res.end();
+            res.end(await workbook.xlsx.writeBuffer());
     } catch (error: any) {
       console.error("Error exporting full bales:", error);
       res.status(500).json({ message: error.message });
@@ -1131,8 +1130,7 @@ export function registerFactoryBalesRoutes(app: Express) {
       const dateSuffix = from && to ? `_${from}_to_${to}` : `_all`;
       res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
       res.setHeader("Content-Disposition", `attachment; filename="stock_register${dateSuffix}.xlsx"`);
-      await workbook.xlsx.write(res);
-      res.end();
+            res.end(await workbook.xlsx.writeBuffer());
     } catch (error: any) {
       console.error("Error exporting stock register:", error);
       res.status(500).json({ message: error.message });
@@ -1500,8 +1498,7 @@ export function registerFactoryBalesRoutes(app: Express) {
 
       res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
       res.setHeader("Content-Disposition", `attachment; filename="bale_names_${companyId}.xlsx"`);
-      await workbook.xlsx.write(res);
-      res.end();
+            res.end(await workbook.xlsx.writeBuffer());
     } catch (error: any) {
       console.error("Error exporting bale names:", error);
       res.status(500).json({ message: error.message });

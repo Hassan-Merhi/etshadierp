@@ -381,8 +381,7 @@ export function registerFactoryReportRoutes(app: Express, requireAuth: any, db: 
 
     res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
     res.setHeader("Content-Disposition", `attachment; filename="supplier_usage_report_${startDate}_${endDate}.xlsx"`);
-    await workbook.xlsx.write(res);
-    res.end();
+        res.end(await workbook.xlsx.writeBuffer());
   }
 
   async function generatePdf(
@@ -760,8 +759,7 @@ export function registerFactoryReportRoutes(app: Express, requireAuth: any, db: 
 
     res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
     res.setHeader("Content-Disposition", `attachment; filename="supplier_usage_report_${startDate}_${endDate}.xlsx"`);
-    await workbook.xlsx.write(res);
-    res.end();
+        res.end(await workbook.xlsx.writeBuffer());
   }
 
   // ── Mix batches by date ───────────────────────────────────────────────────

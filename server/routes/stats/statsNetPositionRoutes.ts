@@ -654,8 +654,7 @@ export function registerStatsNetPositionRoutes(app: Express) {
       const dateTag = getClientDate(req);
       res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
       res.setHeader("Content-Disposition", `attachment; filename="Net_Position_${dateTag}.xlsx"`);
-      await wb.xlsx.write(res);
-      res.end();
+            res.end(await wb.xlsx.writeBuffer());
     } catch (error: any) {
       console.error("Net position Excel error:", error);
       res.status(500).json({ message: error.message });

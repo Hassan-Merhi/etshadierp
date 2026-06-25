@@ -443,8 +443,7 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
       });
       res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
       res.setHeader("Content-Disposition", 'attachment; filename="worker_import_template.xlsx"');
-      await wb.xlsx.write(res);
-      res.end();
+            res.end(await wb.xlsx.writeBuffer());
     } catch (error: any) {
       console.error("Error generating template:", error);
       res.status(500).json({ message: error.message });
