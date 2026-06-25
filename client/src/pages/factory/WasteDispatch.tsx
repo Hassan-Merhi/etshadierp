@@ -90,6 +90,7 @@ export default function WasteDispatch() {
   const [showAllHistory, setShowAllHistory] = useState(false);
   const [confirming, setConfirming] = useState(false);
   const [printData, setPrintData] = useState<any | null>(null);
+  const [deleteDispatchId, setDeleteDispatchId] = useState<number | null>(null);
   const printRef = useRef<HTMLDivElement>(null);
 
   // ── Bale Entry tab state ───────────────────────────────────────
@@ -389,6 +390,28 @@ export default function WasteDispatch() {
       if (err?._handledGlobally) return;
       toast({ title: "Error", description: err.message, variant: "destructive" });
       setConfirming(false);
+    },
+  });
+
+  // ── Delete dispatch mutation ───────────────────────────────────
+  const deleteDispatchMutation = useMutation({
+    mutationFn: async (id: number) => {
+      const res = await apiRequest("DELETE", `/api/factory/waste-dispatch/${id}`);
+      return res.json();
+    },
+    onSuccess: (result) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/waste-dispatch/bales"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/waste-dispatch/history"] });
+      setDeleteDispatchId(null);
+      toast({
+        title: "Dispatch deleted",
+        description: `${result.restoredBales} bale(s) restored to stock.`,
+      });
+    },
+    onError: (err: any) => {
+      if (err?._handledGlobally) return;
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+      setDeleteDispatchId(null);
     },
   });
 
@@ -897,6 +920,19 @@ export default function WasteDispatch() {
                               <Printer className="w-3 h-3" />
                               Print
                             </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="gap-1 h-6 px-2 text-xs text-destructive hover:text-destructive"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setDeleteDispatchId(d.id);
+                              }}
+                              data-testid={`button-delete-dispatch-${d.id}`}
+                            >
+                              <Trash2 className="w-3 h-3" />
+                              Delete
+                            </Button>
                           </div>
                         </div>
 
@@ -1266,6 +1302,39 @@ export default function WasteDispatch() {
                   <Trash2 className="w-4 h-4 mr-2" />
                   Confirm Disposal
                 </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── DELETE DISPATCH CONFIRMATION ───────────────────────────── */}
+      <Dialog open={deleteDispatchId !== null} onOpenChange={(open) => { if (!open) setDeleteDispatchId(null); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-destructive">
+              <Trash2 className="w-5 h-5" />
+              Delete Waste Dispatch?
+            </DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            This will permanently delete the dispatch record and restore all linked bales back to stock.
+            The daybook entry will also be removed. This cannot be undone.
+          </p>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setDeleteDispatchId(null)} disabled={deleteDispatchMutation.isPending}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={deleteDispatchMutation.isPending}
+              onClick={() => { if (deleteDispatchId !== null) deleteDispatchMutation.mutate(deleteDispatchId); }}
+              data-testid="button-confirm-delete-dispatch"
+            >
+              {deleteDispatchMutation.isPending ? (
+                <><Loader2 className="w-4 h-4 animate-spin mr-2" />Deleting...</>
+              ) : (
+                <><Trash2 className="w-4 h-4 mr-2" />Delete &amp; Restore Stock</>
               )}
             </Button>
           </DialogFooter>

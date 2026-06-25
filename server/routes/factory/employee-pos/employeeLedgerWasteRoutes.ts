@@ -488,6 +488,73 @@ export function registerEmployeeLedgerWasteRoutes(app: Express) {
     }
   });
 
+  // ── DELETE /api/factory/waste-dispatch/:id ─────────────────────────────────
+  // Reverses a waste dispatch: restores bales to IN_STOCK, reverses ERP stock, deletes daybook entry.
+  app.delete("/api/factory/waste-dispatch/:id", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const dispatchId = parseInt(req.params.id);
+      if (isNaN(dispatchId)) return res.status(400).json({ message: "Invalid dispatch id" });
+
+      const [dispatch] = await db
+        .select()
+        .from(factoryBaleWasteDispatches)
+        .where(and(eq(factoryBaleWasteDispatches.id, dispatchId), eq(factoryBaleWasteDispatches.companyId, companyId)));
+
+      if (!dispatch) return res.status(404).json({ message: "Dispatch not found" });
+
+      // Fetch all bales linked to this dispatch
+      const linkedBales = await db.execute(sql`
+        SELECT id, erp_location_id AS "erpLocationId", product_id AS "productId", article_code AS "articleCode"
+        FROM factory_bales
+        WHERE company_id = ${companyId} AND waste_dispatch_id = ${dispatchId}
+      `);
+      const bales: any[] = Array.isArray(linkedBales) ? linkedBales : (linkedBales as any).rows || [];
+
+      await db.transaction(async (tx: any) => {
+        const now = new Date();
+
+        // 1. Restore each bale to IN_STOCK and clear waste_dispatch_id
+        for (const bale of bales) {
+          await tx.execute(
+            sql`UPDATE factory_bales SET status = 'IN_STOCK', waste_dispatch_id = NULL, updated_at = ${now} WHERE id = ${bale.id}`
+          );
+
+          // 2. Reverse the ERP stock adjustment (+1 per bale)
+          if (bale.articleCode && bale.erpLocationId) {
+            const [existing] = await tx
+              .select({ id: stockItems.id })
+              .from(stockItems)
+              .where(and(eq(stockItems.companyId, companyId), eq(stockItems.code, bale.articleCode)));
+            if (existing) {
+              await adjustInventory(tx, bale.erpLocationId, existing.id, 1, companyId);
+            }
+          }
+        }
+
+        // 3. Delete the daybook entry for this dispatch
+        await tx
+          .delete(factoryDaybookEntries)
+          .where(
+            and(
+              eq(factoryDaybookEntries.referenceTable, "factory_bale_waste_dispatches"),
+              eq(factoryDaybookEntries.referenceId, dispatchId)
+            )
+          );
+
+        // 4. Delete the dispatch record
+        await tx.delete(factoryBaleWasteDispatches).where(eq(factoryBaleWasteDispatches.id, dispatchId));
+      });
+
+      res.json({ message: "Waste dispatch deleted and bales restored to stock", restoredBales: bales.length });
+    } catch (error: any) {
+      console.error("[Waste Dispatch DELETE]", error.message);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   app.post("/api/factory/waste-dispatch/submit", requireAuth, async (req: any, res: any) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
