@@ -2012,8 +2012,9 @@ export function registerFactoryBalesRoutes(app: Express) {
         ? sql`AND LOWER(fb.reference_number) LIKE ${"%" + search.toLowerCase() + "%"}`
         : sql``;
       const unassignedFilter = includeUnassigned === "false" ? sql`AND fb.finalized_by IS NOT NULL` : sql``;
-      // Privileged users can see deleted bales when searching by ref code
-      const deletedFilter = isPrivileged && search ? sql`` : sql`AND fb.deleted_at IS NULL`;
+      // Privileged users can see deleted bales when searching by ref code;
+      // otherwise exclude deleted/removed bales (consistent with daily-summary)
+      const deletedFilter = isPrivileged && search ? sql`` : sql`AND fb.status NOT IN ('DELETED', 'REMOVED')`;
 
       const rows = await db.execute(sql`
         SELECT
@@ -2093,7 +2094,7 @@ export function registerFactoryBalesRoutes(app: Express) {
         ? sql`AND LOWER(fb.reference_number) LIKE ${"%" + search.toLowerCase() + "%"}`
         : sql``;
       const unassignedFilter = includeUnassigned === "false" ? sql`AND fb.finalized_by IS NOT NULL` : sql``;
-      const deletedFilter = isPrivileged && search ? sql`` : sql`AND fb.deleted_at IS NULL`;
+      const deletedFilter = isPrivileged && search ? sql`` : sql`AND fb.status NOT IN ('DELETED', 'REMOVED')`;
 
       const rows = await db.execute(sql`
         SELECT
