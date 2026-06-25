@@ -250,7 +250,7 @@ function BatchRow({
                           onCheckedChange={() =>
                             setSelectedIds((prev) => {
                               const n = new Set(prev);
-                              n.has(p.id) ? n.delete(p.id) : n.add(p.id);
+                              if (n.has(p.id)) n.delete(p.id); else n.add(p.id);
                               return n;
                             })
                           }

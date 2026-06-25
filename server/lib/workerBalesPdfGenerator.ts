@@ -174,7 +174,6 @@ export async function generateWorkerBalesPdf(groups: GroupRow[], date: string, c
       doc.text("Product", x + 3, y + 6, { width: COL_PROD - 6, lineBreak: false });
       x += COL_PROD;
       doc.text("Weight (kg)", x + 3, y + 6, { width: COL_WT - 4, align: "right", lineBreak: false });
-      x += COL_WT;
       doc.text("Total / Person", LM + PAGE_W - COL_TOT, y + 6, {
         width: COL_TOT - 4,
         align: "right",
@@ -250,7 +249,6 @@ export async function generateWorkerBalesPdf(groups: GroupRow[], date: string, c
         doc.font("Helvetica").fontSize(8.5);
         fill(doc, SLATE);
         doc.text(wt, x + 2, y + 4, { width: COL_WT - 4, align: "right", lineBreak: false });
-        x += COL_WT;
 
         // Total / Person — on last bale row for this worker
         if (isLast) {

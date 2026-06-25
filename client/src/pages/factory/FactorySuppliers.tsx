@@ -155,7 +155,7 @@ export default function FactorySuppliers() {
   const toggleStmtSection = (key: string) =>
     setCollapsedStmtSections((prev) => {
       const n = new Set(prev);
-      n.has(key) ? n.delete(key) : n.add(key);
+      if (n.has(key)) n.delete(key); else n.add(key);
       return n;
     });
 

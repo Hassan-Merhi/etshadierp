@@ -51,7 +51,8 @@ async function getConnection(): Promise<any> {
       throw new Error(
         "Cannot connect to QZ Tray. Make sure QZ Tray is installed and running on this computer. " +
           "Download from https://qz.io/download/. Error: " +
-          (err.message || err)
+          (err.message || err),
+        { cause: err }
       );
     }
   }

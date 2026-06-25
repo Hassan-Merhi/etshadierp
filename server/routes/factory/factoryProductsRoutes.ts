@@ -745,7 +745,7 @@ export function registerFactoryProductsRoutes(app: Express) {
           const isCodeDup = combined.includes("unique") || combined.includes("duplicate");
           if (!isCodeDup || !retryPrefix || retryAttempts >= 100) {
             const realMsg = insertErr?.cause?.message || insertErr?.message || "Insert failed";
-            throw new Error(realMsg);
+            throw new Error(realMsg, { cause: insertErr });
           }
           retryAttempts++;
           const currentNum = parseInt(articleCode.slice(retryPrefix.length)) || 0;

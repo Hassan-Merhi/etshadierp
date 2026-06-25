@@ -200,7 +200,7 @@ export function registerContainerCrudRoutes(app: Express) {
         } catch (voucherError: any) {
           // Rollback: Delete container if voucher creation fails
           await storage.deleteContainer(container.id);
-          throw new Error(`Failed to create purchase voucher: ${voucherError.message}`);
+          throw new Error(`Failed to create purchase voucher: ${voucherError.message}`, { cause: voucherError });
         }
       }
 

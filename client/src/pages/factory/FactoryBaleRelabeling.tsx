@@ -393,7 +393,7 @@ export default function FactoryBaleRelabeling() {
     let opened = 0;
     const formatsToOpen = Array.from(printFormats);
     for (const fmt of formatsToOpen) {
-      let html = "";
+      let html: string;
       if (fmt === "A4") html = generateCombinedLabelsHtml(labels, designColor);
       else if (fmt === "A5") html = generateA5LabelsHtml(labels);
       else html = generateStickerLabelsHtml(labels);

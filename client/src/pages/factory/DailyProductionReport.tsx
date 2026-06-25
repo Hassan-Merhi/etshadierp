@@ -532,7 +532,7 @@ function classifyDetailed(name: string): string {
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "");
   if (/ABO\s*SAMAR/.test(u)) return "__skip__";
-  let cat = "Other";
+  let cat: string;
   if (/SUMMER/.test(u)) cat = "Summer";
   else if (/WINTER/.test(u)) cat = "Winter";
   else if (/BAG/.test(u)) cat = "Bags";

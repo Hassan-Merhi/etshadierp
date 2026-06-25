@@ -345,7 +345,7 @@ export function registerSpMigrationRoutes(app: Express) {
     }
 
     // Log the attempt immediately (even if it fails later)
-    let runId: string = "";
+    let runId: string;
     try {
       runId = await logRun(
         sourceId,
@@ -842,7 +842,7 @@ export function registerSpMigrationRoutes(app: Express) {
       return res.status(400).json({ message: `Company name confirmation must match exactly: "${sourceComp.name}"` });
     }
 
-    let runId = "";
+    let runId: string;
     try {
       runId = await logRun(
         sourceId,

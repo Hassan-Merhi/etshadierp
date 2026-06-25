@@ -320,7 +320,7 @@ export default function ERPRunPayroll() {
   function toggleWorker(id: number) {
     setSelectedWorkers((p) => {
       const n = new Set(p);
-      n.has(id) ? n.delete(id) : n.add(id);
+      if (n.has(id)) n.delete(id); else n.add(id);
       return n;
     });
   }
@@ -329,7 +329,7 @@ export default function ERPRunPayroll() {
     const allSel = visible.every((id) => selectedWorkers.has(id));
     setSelectedWorkers((p) => {
       const n = new Set(p);
-      allSel ? visible.forEach((id) => n.delete(id)) : visible.forEach((id) => n.add(id));
+      if (allSel) visible.forEach((id) => n.delete(id)); else visible.forEach((id) => n.add(id));
       return n;
     });
   }

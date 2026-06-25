@@ -706,7 +706,7 @@ export function registerContainerFreightWriteRoutes(app: Express) {
                 // Strategy: keep first DR (purchases), keep first non-freight CR (supplier),
                 // keep/create freight CR at freightParentAccountId, delete extras.
                 let purchasesEntryId: number | null = null;
-                let freightCrEntryId: number | null = null;
+                let freightCrEntryId: number | null;
                 let mainCrEntryId: number | null = null;
                 const toDeleteIds: number[] = [];
                 const freightCrCandidatesPatch: number[] = [];

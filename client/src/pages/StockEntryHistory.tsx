@@ -344,7 +344,7 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
   function toggleExpand(key: string) {
     setExpandedKeys((prev) => {
       const next = new Set(prev);
-      next.has(key) ? next.delete(key) : next.add(key);
+      if (next.has(key)) next.delete(key); else next.add(key);
       return next;
     });
   }

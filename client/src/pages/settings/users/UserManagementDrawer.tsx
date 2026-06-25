@@ -141,7 +141,7 @@ export function UserManagementDrawer({ user, open, onClose, companies, onUserDel
   const togglePage = (key: string) => {
     setPageAccess((prev) => {
       const next = new Set(prev);
-      next.has(key) ? next.delete(key) : next.add(key);
+      if (next.has(key)) next.delete(key); else next.add(key);
       return next;
     });
   };
@@ -188,7 +188,7 @@ export function UserManagementDrawer({ user, open, onClose, companies, onUserDel
   const toggleTabGroup = (group: string) => {
     setOpenTabGroups((prev) => {
       const next = new Set(prev);
-      next.has(group) ? next.delete(group) : next.add(group);
+      if (next.has(group)) next.delete(group); else next.add(group);
       return next;
     });
   };

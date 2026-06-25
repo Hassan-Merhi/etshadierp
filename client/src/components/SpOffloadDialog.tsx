@@ -452,7 +452,7 @@ export function SpOffloadDialog({ open, onOpenChange, container, onSuccess }: Sp
                 </div>
                 {activeCharges.map((c, idx) => {
                   const amt = parseFloat(c.amountUsd || "0");
-                  let creditLabel = "";
+                  let creditLabel: string;
                   if (c.chargeType === "prepaid_used") {
                     const p = (container.prepaid || []).find((x: any) => String(x.id) === c.prepaidChargeId);
                     creditLabel = prepaidAcct?.name ?? "SP Prepaid Charges";

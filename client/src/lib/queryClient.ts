@@ -255,7 +255,7 @@ export async function apiRequest(
   } catch (error: any) {
     clearTimeout(timeoutId);
     if (error.name === "AbortError" && intentionalAbort) {
-      throw new Error(`Request timeout after ${Math.round(timeoutMs / 1000)} seconds for ${method} ${url}`);
+      throw new Error(`Request timeout after ${Math.round(timeoutMs / 1000)} seconds for ${method} ${url}`, { cause: error });
     }
     const networkFail = error.name === "AbortError" ? true : isNetworkError(error);
     if (OFFLINE_MODE_ENABLED && networkFail && isSafeToQueue(method, url)) {
@@ -310,7 +310,7 @@ export const getQueryFn: <T>(options: { on401: UnauthorizedBehavior }) => QueryF
     } catch (error: any) {
       clearTimeout(timeoutId);
       if (timedOut && error?.name === "AbortError") {
-        throw new Error(`Request timed out after 30 seconds: GET ${url}`);
+        throw new Error(`Request timed out after 30 seconds: GET ${url}`, { cause: error });
       }
       throw error;
     }

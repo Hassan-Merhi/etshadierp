@@ -1180,7 +1180,7 @@ function ViewEntryModal({
                       const srcTotal = parseFloat(src.totalCost || "0");
                       const pct = sourcesTotalKg > 0 ? (srcKg / sourcesTotalKg) * 100 : 0;
 
-                      let sourceLabel = "";
+                      let sourceLabel: string;
                       let sourceSubLabel = "";
                       if (src.sourceType === "batch" && src.sourceBatchCode) {
                         sourceLabel = src.sourceBatchCode;

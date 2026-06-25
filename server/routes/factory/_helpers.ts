@@ -139,7 +139,7 @@ export async function getOrFetchFxRateToUsd(companyId: number, currencyCode: str
       .limit(1);
 
     if (fallback) return fallback.rateToUsd;
-    throw new Error(`No FX rate available for ${dateISO}/${currencyCode}. External API error: ${err.message}`);
+    throw new Error(`No FX rate available for ${dateISO}/${currencyCode}. External API error: ${err.message}`, { cause: err });
   }
 }
 

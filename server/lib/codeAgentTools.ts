@@ -135,7 +135,7 @@ export async function grepProjectFiles(pattern: string, relDir: string = "."): P
     return stdout.replace(new RegExp(rootPfx.replace(/\//g, "\\/"), "g"), "");
   } catch (e: any) {
     if (e.code === 1) return "(no matches found)";
-    throw new Error(`grep failed: ${e.message}`);
+    throw new Error(`grep failed: ${e.message}`, { cause: e });
   }
 }
 

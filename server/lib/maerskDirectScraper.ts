@@ -613,7 +613,7 @@ export async function scrapeMaerskDirect(containerNumber: string): Promise<Carri
     console.log(`[MaerskDirect] ${containerNumber}: no tracking data found — 0 JSON captured, no ETA in DOM`);
     return emptyResult(containerNumber, "no_tracking_data_found");
   } catch (err: any) {
-    const msg = err?.message ?? String(err) ?? "unknown error";
+    const msg = err?.message ?? String(err);
     console.error(`[MaerskDirect] ${containerNumber}: unexpected error —`, msg);
 
     // If the browser crashed mid-scrape, clear the shared instance so next

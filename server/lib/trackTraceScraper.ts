@@ -508,7 +508,7 @@ export async function scrapeTrackTrace(containerNumber: string): Promise<TrackTr
       rawResponse: { extracted, capturedJson, finalUrl, debugBodyText: debugBodyText.slice(0, 1000) },
     };
   } catch (err: any) {
-    const msg = err?.message ?? String(err) ?? "unknown error";
+    const msg = err?.message ?? String(err);
     console.error(`[TrackTrace] ${containerNumber}: unexpected error —`, msg);
     return {
       success: false,

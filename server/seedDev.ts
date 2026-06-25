@@ -76,7 +76,7 @@ export async function runDevSeed() {
   const batchId = activeBatches[0].id;
 
   const seqRow = await db.select().from(baleSequences).where(eq(baleSequences.companyId, COMPANY_ID)).limit(1);
-  let nextNum = 1;
+  let nextNum: number;
   if (seqRow.length > 0) {
     nextNum = seqRow[0].nextNumber;
   } else {

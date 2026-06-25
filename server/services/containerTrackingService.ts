@@ -1041,7 +1041,7 @@ async function trackViaParcelsApp(
 
       // Hoist finalEta so the early-return guard below can see it regardless of events branch
       let finalEta: string | null = null;
-      let etaSrc: string | null = null;
+      let etaSrc: string | null;
 
       // Save events
       if (mdResult.events?.length) {
