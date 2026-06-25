@@ -1,5 +1,5 @@
 import type { Express } from "express";
-import { db } from "../db";
+import { db, pool } from "../db";
 import { storage } from "../storage";
 import { requireAuth, requireRole, canDelete, requireNonPOS, checkPOSLocation } from "../auth";
 import { upload, logAudit, getCurrentExchangeRate, syncEmployeeBalancesFromEntries } from "./_helpers";
@@ -69,6 +69,51 @@ export function registerSupplierRoutes(app: Express) {
   app.get("/api/suppliers", requireAuth, async (req, res) => {
     try {
       const search = (req.query.search as string | undefined)?.trim() || undefined;
+      const companyId = req.query.companyId ? parseInt(req.query.companyId as string) : null;
+
+      if (companyId && !isNaN(companyId)) {
+        // Determine the company type so we can isolate ERP vs factory suppliers
+        const companyRow = await pool.query(`SELECT company_type FROM companies WHERE id = $1`, [companyId]);
+        const companyType: string = companyRow.rows[0]?.company_type ?? "erp";
+        const isFactory = companyType === "factory" || companyType === "factory_v2";
+        const peerTypes = isFactory ? ["factory", "factory_v2"] : ["erp", "properties", "supplier_partner"];
+        const peerTypesParam = peerTypes.map((_, i) => `$${i + 2}`).join(", ");
+
+        // Return suppliers that:
+        //   a) have at least one PO with a company of the same type group, OR
+        //   b) have NO purchase orders at all (new/uncategorised suppliers)
+        // This keeps factory and ERP supplier lists isolated while allowing new
+        // suppliers to appear until their first PO assigns them to a type.
+        const searchClause = search ? `AND lower(s.legal_name) LIKE lower($${peerTypes.length + 2})` : "";
+        const params: any[] = [companyId, ...peerTypes];
+        if (search) params.push(`%${search}%`);
+
+        const result = await pool.query(
+          `SELECT s.*
+           FROM suppliers s
+           WHERE s.deleted_at IS NULL
+             ${searchClause}
+             AND (
+               EXISTS (
+                 SELECT 1 FROM purchase_orders po
+                 JOIN companies c ON c.id = po.company_id
+                 WHERE po.supplier_id = s.id
+                   AND c.company_type IN (${peerTypesParam})
+               )
+               OR NOT EXISTS (
+                 SELECT 1 FROM purchase_orders po2
+                 WHERE po2.supplier_id = s.id
+               )
+             )
+           ORDER BY s.legal_name
+           ${search ? `LIMIT 50` : ""}`,
+          params
+        );
+        return res.json(result.rows);
+      }
+
+      // No companyId — fall back to returning all suppliers (existing behaviour for
+      // other callers like stats, chatbot, admin pages)
       const limit = search ? 50 : undefined;
       const result = await storage.getAllSuppliers(search, limit);
       res.json(result);
