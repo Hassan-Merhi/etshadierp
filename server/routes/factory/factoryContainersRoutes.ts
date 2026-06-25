@@ -653,15 +653,20 @@ export function registerFactoryContainersRoutes(app: Express) {
             }
           }
         } else {
-          // Create new freight voucher
+          // Create new freight voucher — use arrivalDate if set, else fall back to the
+          // container's own createdAt (NOT today) so an edit made months later doesn't
+          // stamp a brand-new voucher with the current date.
           const today = getClientDate(req);
+          const containerCreatedDate = updated.createdAt
+            ? new Date(updated.createdAt).toISOString().slice(0, 10)
+            : today;
           const [newFV] = await db
             .insert(vouchers)
             .values({
               companyId,
               voucherType: newFreightPaidBy === "own" ? "Payment" : "Journal",
               voucherNumber: `FACTORY-FREIGHT-${id}`,
-              voucherDate: updated.arrivalDate || today,
+              voucherDate: updated.arrivalDate || containerCreatedDate,
               description: `Freight on container ${updated.containerNumber}`,
               totalAmount: String(newFreightAmt),
               currency: freightCcy,
@@ -1188,13 +1193,17 @@ export function registerFactoryContainersRoutes(app: Express) {
             currencyCode: factoryContainers.currencyCode,
             fxRateToUsd: factoryContainers.fxRateToUsd,
             arrivalDate: factoryContainers.arrivalDate,
+            createdAt: factoryContainers.createdAt,
           })
           .from(factoryContainers)
           .where(and(eq(factoryContainers.id, containerId), eq(factoryContainers.companyId, companyId)));
 
         if (container) {
           const today = getClientDate(req);
-          const voucherDate = container.arrivalDate || today;
+          const containerCreatedDate = container.createdAt
+            ? new Date(container.createdAt).toISOString().slice(0, 10)
+            : today;
+          const voucherDate = container.arrivalDate || containerCreatedDate;
           for (const charge of newCharges) {
             const chargeAmt = parseFloat(charge.amount || "0");
             if (chargeAmt <= 0 || !charge.ledgerAccountId) continue;
@@ -1429,13 +1438,16 @@ export function registerFactoryContainersRoutes(app: Express) {
           }
 
           const [container] = await db
-            .select({ containerNumber: factoryContainers.containerNumber, arrivalDate: factoryContainers.arrivalDate })
+            .select({ containerNumber: factoryContainers.containerNumber, arrivalDate: factoryContainers.arrivalDate, createdAt: factoryContainers.createdAt })
             .from(factoryContainers)
             .where(and(eq(factoryContainers.id, containerId), eq(factoryContainers.companyId, companyId)));
 
           if (container) {
             const today = getClientDate(req);
-            const voucherDate = container.arrivalDate || today;
+            const containerCreatedDate = container.createdAt
+              ? new Date(container.createdAt).toISOString().slice(0, 10)
+              : today;
+            const voucherDate = container.arrivalDate || containerCreatedDate;
             const payableAccId = await getOrCreateLedgerAccount(
               companyId,
               "FACTORY_CHARGES_PAYABLE",
