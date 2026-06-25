@@ -18,8 +18,6 @@ import {
   Zap,
   ShoppingCart,
   TrendingUp,
-  CheckCircle2,
-  AlertTriangle,
   Wrench,
   Clock,
   Search,
@@ -52,8 +50,6 @@ import { SystemToolsTab } from "./settings/SystemToolsTab";
 import { PreferencesTab } from "./settings/PreferencesTab";
 import { EditLogTab } from "./settings/EditLogTab";
 import { SessionsHub } from "./settings/SessionsHub";
-import { ApprovalsPage } from "./settings/ApprovalsPage";
-import { BusinessAlertsPage } from "./settings/BusinessAlertsPage";
 import { DataToolsTab } from "./settings/DataToolsTab";
 import { PosSetupHub } from "./settings/PosSetupHub";
 import { FileStorageAndExport } from "./settings/FileStorageAndExport";
@@ -139,13 +135,6 @@ export default function Settings() {
       items: appMode === "factory" ? [{ key: "fx-rates", label: "FX Rates", icon: TrendingUp }] : [],
     },
     {
-      label: "Controls",
-      items: [
-        { key: "approvals", label: "Approvals", icon: CheckCircle2 },
-        { key: "business-alerts", label: "Business Alerts", icon: AlertTriangle },
-      ],
-    },
-    {
       label: "System",
       items: [{ key: "system", label: "System Tools", icon: Wrench }],
     },
@@ -208,8 +197,6 @@ export default function Settings() {
           <SessionsHub isAdmin={true} isDev={true} />
         )}
         {activeSection === "edit-log" && <EditLogTab selectedCompany={selectedCompany} />}
-        {activeSection === "approvals" && <ApprovalsPage currentUser={currentUser} />}
-        {activeSection === "business-alerts" && <BusinessAlertsPage currentUser={currentUser} />}
         {activeSection === "data-tools" && currentUser?.role === "Developer" && <DataToolsTab />}
         {activeSection === "pos-setup" && currentUser?.role === "Developer" && (
           <PosSetupHub userRole={currentUser?.role} />
