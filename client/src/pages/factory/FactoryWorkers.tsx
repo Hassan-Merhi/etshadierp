@@ -17,6 +17,9 @@ import {
   Layers,
   Trash2,
   ChevronDown,
+  Check,
+  ChevronsUpDown,
+  PlusCircle,
 } from "lucide-react";
 import { ExcelJS, writeFile } from "@/lib/excelHelper";
 import { Button } from "@/components/ui/button";
@@ -41,6 +44,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
@@ -151,6 +156,7 @@ export default function FactoryWorkers() {
   const [editingWorker, setEditingWorker] = useState<FactoryWorker | null>(null);
   const [formData, setFormData] = useState({ ...emptyForm });
   const [importLoading, setImportLoading] = useState(false);
+  const [nationalityOpen, setNationalityOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [endContractWorker, setEndContractWorker] = useState<FactoryWorker | null>(null);
@@ -192,6 +198,16 @@ export default function FactoryWorkers() {
       return res.json();
     },
     staleTime: 15000,
+  });
+
+  const { data: savedNationalities = [] } = useQuery<string[]>({
+    queryKey: ["/api/factory/workers/nationalities"],
+    queryFn: async () => {
+      const res = await fetch("/api/factory/workers/nationalities", { credentials: "include" });
+      if (!res.ok) return [];
+      return res.json();
+    },
+    staleTime: 30000,
   });
 
   // ── Categories ─────────────────────────────────────────────────────────────
@@ -667,11 +683,59 @@ export default function FactoryWorkers() {
           </div>
           <div className="space-y-1">
             <Label className="text-xs">Nationality</Label>
-            <Input
-              value={formData.nationality}
-              onChange={(e) => updateField("nationality", e.target.value)}
-              data-testid="input-nationality"
-            />
+            <Popover open={nationalityOpen} onOpenChange={setNationalityOpen}>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  role="combobox"
+                  aria-expanded={nationalityOpen}
+                  className="w-full justify-between font-normal"
+                  data-testid="input-nationality"
+                >
+                  <span className={formData.nationality ? "" : "text-muted-foreground"}>
+                    {formData.nationality || "Select or create…"}
+                  </span>
+                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-[240px] p-0" align="start">
+                <Command>
+                  <CommandInput
+                    placeholder="Search or type new…"
+                    value={formData.nationality}
+                    onValueChange={(v) => updateField("nationality", v)}
+                  />
+                  <CommandList>
+                    <CommandEmpty>
+                      {formData.nationality.trim() ? (
+                        <button
+                          className="flex items-center gap-2 px-3 py-2 text-sm w-full hover-elevate text-left"
+                          onClick={() => { updateField("nationality", formData.nationality.trim()); setNationalityOpen(false); }}
+                          data-testid="btn-create-nationality"
+                        >
+                          <PlusCircle className="h-4 w-4 text-primary" />
+                          Create "{formData.nationality.trim()}"
+                        </button>
+                      ) : (
+                        <span className="px-3 py-2 text-xs text-muted-foreground">Type to search or create</span>
+                      )}
+                    </CommandEmpty>
+                    <CommandGroup>
+                      {savedNationalities.map((nat) => (
+                        <CommandItem
+                          key={nat}
+                          value={nat}
+                          onSelect={() => { updateField("nationality", nat); setNationalityOpen(false); }}
+                        >
+                          <Check className={`mr-2 h-4 w-4 ${formData.nationality === nat ? "opacity-100" : "opacity-0"}`} />
+                          {nat}
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
           </div>
           <div className="space-y-1">
             <Label className="text-xs">Marital Status</Label>

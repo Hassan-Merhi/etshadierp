@@ -254,6 +254,23 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
     }
   });
 
+  // GET /api/factory/workers/nationalities - Distinct nationalities saved for this company
+  app.get("/api/factory/workers/nationalities", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = req.query.companyId ? parseOptionalId(req.query.companyId) : getFactoryCompanyId(req);
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      const rows = await db
+        .selectDistinct({ nationality: factoryWorkers.nationality })
+        .from(factoryWorkers)
+        .where(and(eq(factoryWorkers.companyId, companyId), isNotNull(factoryWorkers.nationality), sql`${factoryWorkers.nationality} <> ''`))
+        .orderBy(factoryWorkers.nationality);
+      const list = rows.map((r: any) => r.nationality as string).filter(Boolean);
+      res.json(list);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // GET /api/factory/workers/document-counts - Document count per worker
   app.get("/api/factory/workers/document-counts", requireAuth, async (req: any, res: any) => {
     try {
