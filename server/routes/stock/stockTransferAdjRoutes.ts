@@ -110,19 +110,23 @@ export function registerStockTransferAdjRoutes(app: Express) {
       const { groups } = req.body as { groups: { masterLocationId: number; followerLocationIds: number[] }[] };
       if (!Array.isArray(groups)) return res.status(400).json({ message: "groups must be an array" });
 
-      // Delete all existing for this company, then re-insert
-      await db.delete(locationPriceGroups).where(eq(locationPriceGroups.companyId, companyId));
+      // Delete all existing for this company, then re-insert.
+      // Wrapped in a transaction so a failed insert does not leave the
+      // company with zero price groups after the delete succeeded.
+      await db.transaction(async (tx) => {
+        await tx.delete(locationPriceGroups).where(eq(locationPriceGroups.companyId, companyId));
 
-      const toInsert = groups.flatMap((g) =>
-        g.followerLocationIds.map((fid) => ({
-          companyId,
-          masterLocationId: g.masterLocationId,
-          followerLocationId: fid,
-        }))
-      );
-      if (toInsert.length > 0) {
-        await db.insert(locationPriceGroups).values(toInsert);
-      }
+        const toInsert = groups.flatMap((g) =>
+          g.followerLocationIds.map((fid) => ({
+            companyId,
+            masterLocationId: g.masterLocationId,
+            followerLocationId: fid,
+          }))
+        );
+        if (toInsert.length > 0) {
+          await tx.insert(locationPriceGroups).values(toInsert);
+        }
+      });
 
       res.json({ message: "Price groups saved" });
     } catch (error: any) {

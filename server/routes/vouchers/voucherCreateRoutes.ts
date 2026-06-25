@@ -189,14 +189,14 @@ export function registerVoucherCreateRoutes(app: Express) {
         });
       }
 
-      // Create voucher with error handling
-      let createdVoucher;
-      const createdEntries = [];
+      // Get current exchange rate before starting the transaction
+      const exchangeRate = await getCurrentExchangeRate(req.session.currentCompanyId!);
 
-      try {
-        // Get current exchange rate for multi-currency companies
-        const exchangeRate = await getCurrentExchangeRate(req.session.currentCompanyId!);
-        [createdVoucher] = await db
+      // Create voucher + all entries atomically inside a single transaction.
+      // Any thrown error automatically rolls back both the voucher row and
+      // all entry rows — no manual cleanup required.
+      const { createdVoucher, createdEntries } = await db.transaction(async (tx) => {
+        const [txVoucher] = await tx
           .insert(vouchers)
           .values({
             companyId: req.session.currentCompanyId!,
@@ -210,6 +210,8 @@ export function registerVoucherCreateRoutes(app: Express) {
           })
           .returning();
 
+        const txEntries: (typeof voucherEntries.$inferSelect)[] = [];
+
         // Create voucher entries
         for (const entry of entries) {
           // Cross-field validation: when an entry references a customer/
@@ -222,7 +224,7 @@ export function registerVoucherCreateRoutes(app: Express) {
           if (entry.customerId) {
             // Scope the customer lookup by current company to prevent
             // cross-company customer IDs from being used in this voucher.
-            const [linkedCust] = await db
+            const [linkedCust] = await tx
               .select({ ledgerAccountId: customers.ledgerAccountId })
               .from(customers)
               .where(and(eq(customers.id, entry.customerId), eq(customers.companyId, req.session.currentCompanyId!)))
@@ -243,10 +245,10 @@ export function registerVoucherCreateRoutes(app: Express) {
             }
           }
 
-          const [createdEntry] = await db
+          const [txEntry] = await tx
             .insert(voucherEntries)
             .values({
-              voucherId: createdVoucher.id,
+              voucherId: txVoucher.id,
               ledgerAccountId,
               bankAccountId: entry.bankAccountId || null,
               fixedAssetId: entry.fixedAssetId || null,
@@ -259,22 +261,11 @@ export function registerVoucherCreateRoutes(app: Express) {
               narration: entry.narration || null,
             })
             .returning();
-          createdEntries.push(createdEntry);
+          txEntries.push(txEntry);
         }
-      } catch (error: any) {
-        // Cleanup: Delete voucher and entries if anything failed
-        if (createdVoucher?.id) {
-          await db
-            .delete(voucherEntries)
-            .where(eq(voucherEntries.voucherId, createdVoucher.id))
-            .catch(() => {});
-          await db
-            .delete(vouchers)
-            .where(eq(vouchers.id, createdVoucher.id))
-            .catch(() => {});
-        }
-        throw error;
-      }
+
+        return { createdVoucher: txVoucher, createdEntries: txEntries };
+      });
 
       // Sync employee balances from voucher entries (only for non-optional vouchers)
       if (!createdVoucher.optional) {
