@@ -415,7 +415,7 @@ export default function FactoryPendingInvoiceVerify() {
       const res = await modeApiRequest("POST", `/api/factory/customer-orders/${orderId}/apply-proforma-prices`, {
         proformaId,
       });
-      return res;
+      return res.json();
     },
     onSuccess: (data: any) => {
       const repriced = data?.repriced ?? 0;
