@@ -582,9 +582,34 @@ export default function FactoryProformas() {
       });
       const msg =
         result.skipped > 0
-          ? `${result.updated} line(s) updated, ${result.skipped} skipped (no catalog price)`
-          : `${result.updated} line(s) updated with catalog prices`;
-      toast({ title: "Prices Applied", description: msg });
+          ? `${result.updated} line(s) updated, ${result.skipped} skipped (no selling price)`
+          : `${result.updated} line(s) updated with selling prices`;
+      toast({ title: "Selling Prices Applied", description: msg });
+    },
+    onError: (error: Error) => {
+      if (error?._handledGlobally) return;
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const applyProductionPricesMutation = useMutation({
+    mutationFn: async (proformaId: number) => {
+      const res = await modeApiRequest(
+        "POST",
+        `/api/factory/customer-proformas/${proformaId}/apply-production-prices`,
+        {}
+      );
+      return res.json();
+    },
+    onSuccess: (result) => {
+      queryClient.invalidateQueries({
+        queryKey: [`/api/factory/customer-proformas?customerId=${customerId}`, customerId],
+      });
+      const msg =
+        result.skipped > 0
+          ? `${result.updated} line(s) updated, ${result.skipped} skipped (no production price)`
+          : `${result.updated} line(s) updated with production prices`;
+      toast({ title: "Production Prices Applied", description: msg });
     },
     onError: (error: Error) => {
       if (error?._handledGlobally) return;
@@ -1016,6 +1041,26 @@ export default function FactoryProformas() {
                           >
                             <BookmarkCheck className="mr-1.5 h-3.5 w-3.5" />
                             Save as Agreed Prices
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => applyProductionPricesMutation.mutate(proforma.id)}
+                            disabled={applyProductionPricesMutation.isPending}
+                            data-testid={`button-apply-production-prices-${proforma.id}`}
+                            title="Set all line prices to the production (cost) price from the catalogue"
+                          >
+                            Apply Production Price
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => applyCatalogPricesMutation.mutate(proforma.id)}
+                            disabled={applyCatalogPricesMutation.isPending}
+                            data-testid={`button-apply-selling-prices-${proforma.id}`}
+                            title="Set all line prices to the selling price from the catalogue"
+                          >
+                            Apply Selling Price
                           </Button>
                           <Button
                             size="sm"

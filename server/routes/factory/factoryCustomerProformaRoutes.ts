@@ -1023,6 +1023,47 @@ export function registerFactoryCustomerProformaRoutes(app: Express) {
     }
   });
 
+  // Apply production price from catalogue to all non-fixed lines
+  app.post("/api/factory/customer-proformas/:id/apply-production-prices", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const id = parseId(req.params.id);
+      if (id === null) return res.status(400).json({ message: "Invalid id" });
+
+      const lines = await db.select().from(customerProformaLines).where(eq(customerProformaLines.proformaId, id));
+      if (!lines.length) return res.json({ updated: 0, skipped: 0 });
+
+      const products = await db.select().from(factoryBaleProducts).where(eq(factoryBaleProducts.companyId, companyId));
+      const priceByArticleCode = new Map<string, string>();
+      for (const p of products) {
+        if (p.articleCode && p.productionPrice && parseFloat(String(p.productionPrice)) > 0) {
+          priceByArticleCode.set(p.articleCode.toLowerCase(), String(p.productionPrice));
+        }
+      }
+
+      let updated = 0;
+      let skipped = 0;
+      let fixed = 0;
+      for (const line of lines) {
+        if ((line as any).priceFixed) { fixed++; continue; }
+        const newPrice = priceByArticleCode.get((line.articleCode || "").toLowerCase());
+        if (newPrice) {
+          await db.update(customerProformaLines).set({ pricePerBale: newPrice }).where(eq(customerProformaLines.id, line.id));
+          updated++;
+        } else {
+          skipped++;
+        }
+      }
+
+      res.json({ updated, skipped, fixed });
+    } catch (error: any) {
+      console.error("Error applying production prices:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Transfer a proforma to a different customer
   app.patch("/api/factory/customer-proformas/:id/transfer", requireAuth, async (req: any, res: any) => {
     try {
