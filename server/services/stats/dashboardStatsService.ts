@@ -8,15 +8,8 @@
 
 import { db } from "../../db";
 import { storage } from "../../storage";
-import {
-  vouchers,
-  voucherEntries,
-  salesItems,
-  stockItems,
-  locations,
-  stockItemLocationPrices,
-} from "@shared/schema";
-import { eq, and, isNull, inArray, sql, isNotNull } from "drizzle-orm";
+import { vouchers, voucherEntries } from "@shared/schema";
+import { eq, and, isNull, inArray } from "drizzle-orm";
 import { _getCached, _setCached } from "../shared/ttlCache";
 
 // ---------------------------------------------------------------------------

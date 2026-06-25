@@ -158,7 +158,7 @@ export async function getBalanceSheet(
   }
 
   // Parallel fetch: all accounts + all entries (JOIN replaces two-step inArray)
-  const [ledgers, banks, assets, employees, suppliers, allEntries] = await Promise.all([
+  const [ledgers, banks, assets, _employees, suppliers, allEntries] = await Promise.all([
     storage.getAllLedgerAccounts(companyId),
     storage.getAllBankAccounts(companyId),
     storage.getAllFixedAssets(companyId),
