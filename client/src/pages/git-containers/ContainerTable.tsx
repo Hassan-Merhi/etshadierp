@@ -24,9 +24,10 @@ export function ContainerTable({ containers, colVis, sessionCompanyId, onOpenDra
     <div className="rounded-md border bg-card overflow-hidden h-full flex flex-col shadow-sm">
       <div className="flex-1 overflow-auto custom-scrollbar relative">
         <div ref={printRef}>
-          <Table className="text-xs border-collapse">
-            <TableHeader className="sticky top-0 z-20 bg-teal-900/90 dark:bg-teal-950/95 backdrop-blur-sm">
-              <TableRow className="hover:bg-transparent border-b border-teal-700/60">
+          <Table className="text-xs" wrapperClassName="overflow-visible">
+            <TableHeader className="sticky top-0 z-30 bg-teal-800 dark:bg-teal-950">
+              <TableRow className="hover:bg-transparent border-b border-teal-600 dark:border-teal-700">
+                <TableHead className="w-[40px] font-bold h-9 text-teal-50 text-center">#</TableHead>
                 <TableHead className="w-[110px] font-bold h-9 text-teal-50">Container #</TableHead>
                 {colVis.supplier && <TableHead className="w-[100px] font-bold h-9 text-teal-50">Supplier</TableHead>}
                 {colVis.company && <TableHead className="w-[120px] font-bold h-9 text-teal-50">Company</TableHead>}
@@ -52,12 +53,12 @@ export function ContainerTable({ containers, colVis, sessionCompanyId, onOpenDra
             <TableBody>
               {containers.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={24} className="h-32 text-center text-muted-foreground italic">
+                  <TableCell colSpan={25} className="h-32 text-center text-muted-foreground italic">
                     No active containers found matching filters.
                   </TableCell>
                 </TableRow>
               ) : (
-                containers.map((c) => {
+                containers.map((c, idx) => {
                   const freight = parseFloat(c.poFreight ?? "0");
                   const canEditRow = sessionCompanyId === null || c.companyId === sessionCompanyId;
 
@@ -78,6 +79,9 @@ export function ContainerTable({ containers, colVis, sessionCompanyId, onOpenDra
                       onClick={() => onOpenDrawer(c)}
                       data-testid={`row-container-${c.id}`}
                     >
+                      <TableCell className="text-center text-muted-foreground font-mono text-[10px] h-10 select-none">
+                        {idx + 1}
+                      </TableCell>
                       <TableCell className="font-mono font-bold text-[11px] h-10">
                         <span className="group-hover:text-primary transition-colors">{c.containerNumber}</span>
                       </TableCell>
