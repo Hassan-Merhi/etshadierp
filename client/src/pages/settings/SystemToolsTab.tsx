@@ -43,6 +43,7 @@ interface ToolCard {
   actionLabel: string;
   onAction: () => void;
   testId?: string;
+  devOnly?: boolean;
 }
 
 export function SystemToolsTab({ appMode, currentUser, selectedCompany, companies }: SystemToolsTabProps) {
@@ -110,6 +111,7 @@ export function SystemToolsTab({ appMode, currentUser, selectedCompany, companie
       actionLabel: "Zero Balances",
       onAction: () => setIsZeroBalanceDialogOpen(true),
       testId: "card-zero-balances",
+      devOnly: true,
     },
     {
       category: "Accounting",
@@ -121,6 +123,7 @@ export function SystemToolsTab({ appMode, currentUser, selectedCompany, companie
       actionLabel: "Initialize",
       onAction: () => setIsInitBalancesDialogOpen(true),
       testId: "card-init-accounting",
+      devOnly: true,
     },
     {
       category: "Diagnostics",
@@ -141,6 +144,7 @@ export function SystemToolsTab({ appMode, currentUser, selectedCompany, companie
       title: "Orphaned Vouchers",
       description: "Find and clean up charge vouchers for OTW containers.",
       actionLabel: "Diagnose",
+      devOnly: true,
       onAction: async () => {
         try {
           const response = await fetch("/api/debug/orphaned-charge-vouchers", {
@@ -173,6 +177,7 @@ export function SystemToolsTab({ appMode, currentUser, selectedCompany, companie
       actionLabel: "Go to Analysis",
       onAction: () => navigate("/containers"),
       testId: "card-container-analysis",
+      devOnly: true,
     },
     {
       category: "Financials",
@@ -213,7 +218,7 @@ export function SystemToolsTab({ appMode, currentUser, selectedCompany, companie
 
       {/* Tool cards grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        {cards.map((card) => (
+        {cards.filter((card) => isDev || !card.devOnly).map((card) => (
           <div
             key={card.testId}
             className="relative rounded-xl border bg-card p-5 flex flex-col gap-4"
@@ -250,7 +255,7 @@ export function SystemToolsTab({ appMode, currentUser, selectedCompany, companie
       </div>
 
       {/* Global Settings */}
-      {["Admin", "Owner", "Developer"].includes(currentUser?.role || "") && (
+      {isDev && (
         <div className="rounded-xl border bg-card p-6 space-y-4">
           <div className="flex items-center gap-2">
             <Building2 className="h-5 w-5 text-muted-foreground" />
