@@ -15,6 +15,7 @@ import type { User } from "@shared/schema";
 import { db, pool } from "./db";
 import { Client } from "pg";
 import { requestLogger } from "./middleware/requestLogger";
+import { bandwidthDebugMiddleware } from "./middleware/bandwidthDebug";
 import { logger } from "./lib/logger";
 
 // Global error handlers
@@ -219,6 +220,11 @@ app.use((_req, res, next) => {
 
 // Structured HTTP request logger — fires on res.finish, never logs secrets
 app.use(requestLogger);
+
+// Bandwidth debug logging — only active when BANDWIDTH_DEBUG=true.
+// Logs any response ≥ 500 KB: method, path, status, size, duration.
+// Never logs body content, cookies, auth headers, or sensitive data.
+app.use(bandwidthDebugMiddleware);
 
 // Disable HTTP-level caching for all API routes.
 // Without this, Express generates ETags and the browser returns 304 "Not Modified"
