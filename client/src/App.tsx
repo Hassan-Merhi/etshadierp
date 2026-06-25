@@ -1143,9 +1143,10 @@ function AuthenticatedApp() {
               <OfflineBanner />
               {(() => {
                 const isPosRoute = currentLocation === "/pos" || currentLocation.startsWith("/pos/");
+                const isFullHeightRoute = isPosRoute || currentLocation === "/tracking" || currentLocation === "/";
                 return (
-                  <main className={isPosRoute ? "flex-1 overflow-hidden" : "flex-1 overflow-y-auto p-3 sm:p-6"}>
-                    <div className={isPosRoute ? "h-full" : "w-full"}>
+                  <main className={isFullHeightRoute ? "flex-1 overflow-hidden" : "flex-1 overflow-y-auto p-3 sm:p-6"}>
+                    <div className={isFullHeightRoute ? "h-full" : "w-full"}>
                       <ErrorBoundary resetKey={currentLocation}>
                         <Suspense
                           fallback={
