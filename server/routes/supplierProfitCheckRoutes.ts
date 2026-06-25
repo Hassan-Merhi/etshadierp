@@ -100,13 +100,12 @@ export function registerSupplierProfitCheckRoutes(app: Express, requireAuth: any
             si.code as proforma_barcode
           FROM supplier_container_loaded_items scli
           JOIN stock_items si ON lower(si.code) = lower(scli.barcode)
+            AND si.deleted_at IS NULL
           LEFT JOIN stock_groups sg ON sg.id = si.stock_group_id
           WHERE scli.container_id = ANY($1::int[])
-            AND si.company_id = $2
-            AND si.deleted_at IS NULL
           ORDER BY si.id, si.code
         `,
-          [containerIds, companyId]
+          [containerIds]
         );
       } else {
         // Look up the supplier's linked stock group (if any)
