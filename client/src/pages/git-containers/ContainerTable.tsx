@@ -21,12 +21,12 @@ interface ContainerTableProps {
 
 export function ContainerTable({ containers, colVis, sessionCompanyId, onOpenDrawer, printRef }: ContainerTableProps) {
   return (
-    <div className="rounded-md border bg-card overflow-hidden h-full flex flex-col shadow-sm">
+    <div className="rounded-md border bg-card h-full flex flex-col shadow-sm overflow-clip">
       <div className="flex-1 overflow-auto custom-scrollbar relative">
         <div ref={printRef}>
-          <Table className="text-xs" wrapperClassName="overflow-visible">
-            <TableHeader className="sticky top-0 z-30 bg-teal-800 dark:bg-teal-950">
-              <TableRow className="hover:bg-transparent border-b border-teal-600 dark:border-teal-700">
+          <Table className="text-xs" wrapperClassName="overflow-visible border-0 rounded-none">
+            <TableHeader className="sticky top-0 z-[50] bg-teal-800 dark:bg-teal-950">
+              <TableRow className="bg-transparent hover:bg-transparent border-b border-teal-600 dark:border-teal-700">
                 <TableHead className="w-[40px] font-bold h-9 text-teal-50 text-center">#</TableHead>
                 <TableHead className="w-[110px] font-bold h-9 text-teal-50">Container #</TableHead>
                 {colVis.supplier && <TableHead className="w-[100px] font-bold h-9 text-teal-50">Supplier</TableHead>}
