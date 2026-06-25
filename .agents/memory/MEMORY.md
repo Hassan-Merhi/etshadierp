@@ -14,3 +14,4 @@
 - [Drizzle db.execute crashes on complex queries](drizzle-execute-crash.md) — db.execute(sql`...`) throws "Cannot convert undefined or null to object" on multi-join queries; use pool.query(text, params) instead.
 - [Test cleanup FK order](test-cleanup-fk.md) — cleanupTestData must delete audit_log + login_history (by company_id) before deleting companies; login_history has two FKs (user_id + company_id), both must be cleared.
 - [Vitest integration test patterns](vitest-integration-patterns.md) — journal vouchers use /api/vouchers/journal; accounts/all returns IDs as "ledger-{n}" strings; /api/accounts/ledger/{id}/balance does not enforce company isolation.
+- [Accounting engine audit — Phase 10](accounting-engine-audit.md) — 31 flows mapped; service layer at server/services/accounting/; most flows are NEEDS VERIFICATION/LEAVE ALONE; safe extract is insertVoucherWithEntriesTx only.
