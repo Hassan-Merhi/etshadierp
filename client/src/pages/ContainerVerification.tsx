@@ -76,6 +76,7 @@ export default function ContainerVerification() {
   const [, navigate] = useLocation();
   const searchString = useSearch();
   const autoCompare = new URLSearchParams(searchString).get("autoCompare") === "true";
+  const autoSupplierId = new URLSearchParams(searchString).get("supplierId") || "";
   const params = useParams<{ containerId: string }>();
   useEscapeToParent();
   const containerId = parseInt(params.containerId);
@@ -331,6 +332,13 @@ export default function ContainerVerification() {
       autoPopulateMutation.mutate();
     }
   }, [loadedItems, loadingItems, containerData]);
+
+  // Auto-select supplier when opened via "Compare" from Daybook (supplierId URL param).
+  useEffect(() => {
+    if (!autoSupplierId || selectedSupplierId || suppliers.length === 0) return;
+    const found = suppliers.find((s: any) => String(s.id) === autoSupplierId);
+    if (found) setSelectedSupplierId(autoSupplierId);
+  }, [autoSupplierId, selectedSupplierId, suppliers]);
 
   // Auto-select proforma when opened via "Compare" button from Daybook.
   // Prefers the starred proforma; falls back to the most recent if none is starred.

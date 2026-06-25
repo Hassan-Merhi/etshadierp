@@ -205,7 +205,9 @@ export function VoucherDetailsDialog({
                                 size="sm"
                                 onClick={() => {
                                   onOpenChange(false);
-                                  navigate(`/containers/${purchaseOrderData.containerId}?tab=compare`);
+                                  navigate(
+                                    `/containers/${purchaseOrderData.containerId}/verification?autoCompare=true&supplierId=${purchaseOrderData.supplierId}`
+                                  );
                                 }}
                                 data-testid="button-compare-po"
                               >

@@ -480,8 +480,22 @@ export default function Daybook({ user }: { user?: any } = {}) {
       navigate(`/pos/edit/${v.id}`);
       return;
     }
+    // Purchase lock icon → navigate directly to the container page for that PO
+    if (v.voucherType === "Purchase") {
+      fetch(`/api/vouchers/${v.id}/view-entries`, { credentials: "include" })
+        .then((r) => (r.ok ? r.json() : null))
+        .then((data) => {
+          const po = data && !Array.isArray(data) ? data.purchaseOrder : null;
+          if (po?.containerId) {
+            navigate(`/containers/${po.containerId}`);
+          } else {
+            navigate(`/vouchers?edit=${v.id}&tab=purchase&from=daybook`);
+          }
+        })
+        .catch(() => navigate(`/vouchers?edit=${v.id}&tab=purchase&from=daybook`));
+      return;
+    }
     const map: Record<string, string> = {
-      Purchase: "purchase",
       PurchaseOrder: "purchase-order",
       Payment: "payment",
       Receipt: "receipt",
