@@ -81,6 +81,8 @@ export default function ProformaAddLine() {
 
   const { data: allItems = [], isLoading: itemsLoading } = useQuery<StockItem[]>({
     queryKey: ["/api/stock-items"],
+    staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
   });
 
   const { data: baleProducts = [] } = useQuery<BaleProductWeight[]>({

@@ -75,6 +75,8 @@ export function StockAdjustmentForm({ voucherIdToEdit }: StockAdjustmentFormProp
 
   const { data: stockItems = [] } = useQuery<StockItem[]>({
     queryKey: ["/api/stock-items", selectedCompany?.id],
+    staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
   });
   const { data: locations = [] } = useQuery<Location[]>({
     queryKey: ["/api/locations", selectedCompany?.id],

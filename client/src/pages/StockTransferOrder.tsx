@@ -302,6 +302,8 @@ export default function StockTransferOrder() {
 
   const { data: stockItems = [] } = useQuery<Array<{ id: number; name: string; code: string; uom: string }>>({
     queryKey: ["/api/stock-items"],
+    staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
   });
 
   const { data: revisions = [] } = useQuery<any[]>({

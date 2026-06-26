@@ -17,6 +17,8 @@ export function useAccountBalance({
   const { data: accountBalance = 0 } = useQuery({
     queryKey: ["/api/accounts", paymentAccountType, paymentAccountId, "balance"],
     enabled: paymentAccountId > 0,
+    staleTime: 30 * 1000,
+    refetchOnWindowFocus: false,
     queryFn: async () => {
       if (paymentAccountType === "bank") {
         const account = bankAccounts.find((b) => b.id === paymentAccountId);
@@ -75,6 +77,8 @@ export function useAccountBalance({
   const { data: accountCurrencyBalances } = useQuery<{ currency: string; balance: number }[] | null>({
     queryKey: ["/api/accounts", paymentAccountType, paymentAccountId, "currencyBalances"],
     enabled: paymentAccountId > 0 && (paymentAccountType === "supplier" || paymentAccountType === "factorySupplier"),
+    staleTime: 30 * 1000,
+    refetchOnWindowFocus: false,
     queryFn: async () => {
       if (paymentAccountType === "supplier") {
         const [supplierRes, transRes] = await Promise.all([

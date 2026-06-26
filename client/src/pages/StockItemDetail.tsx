@@ -156,6 +156,8 @@ export default function StockItemDetail() {
 
   const { data: stockItems = [] } = useQuery<StockItem[]>({
     queryKey: ["/api/stock-items"],
+    staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
   });
 
   const selectedItem = stockItems.find((item) => item.id === itemId);

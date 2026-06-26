@@ -168,6 +168,8 @@ export default function SalesReport() {
   // Fetch stock items
   const { data: stockItems = [] } = useQuery<any[]>({
     queryKey: ["/api/stock-items"],
+    staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
   });
 
   // Fetch stock groups

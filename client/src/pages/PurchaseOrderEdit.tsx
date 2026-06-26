@@ -147,6 +147,8 @@ export default function PurchaseOrderEdit() {
 
   const { data: stockItems } = useQuery<any[]>({
     queryKey: ["/api/stock-items"],
+    staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
   });
 
   const {

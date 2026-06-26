@@ -104,6 +104,8 @@ export default function VoucherEdit() {
 
   const { data: stockItems = [] } = useQuery<StockItem[]>({
     queryKey: ["/api/stock-items"],
+    staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
   });
 
   const { data: locations = [] } = useQuery<Location[]>({

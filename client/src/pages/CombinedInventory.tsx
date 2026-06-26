@@ -93,6 +93,8 @@ export default function CombinedInventory() {
   const { data: allStockItems = [], isLoading: loadingStockItems } = useQuery<StockItem[]>({
     queryKey: ["/api/stock-items"],
     enabled: includeZero,
+    staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
   });
 
   // Only block on containers list + inventory — OTW details load progressively

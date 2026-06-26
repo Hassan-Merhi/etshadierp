@@ -165,6 +165,8 @@ export default function FactoryProformas() {
   const { data: allStockItems = [] } = useQuery<any[]>({
     queryKey: ["/api/stock-items"],
     enabled: isAddLineOpen || expandedProformaIds.size > 0,
+    staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
   });
 
   // Customer price list — used to auto-fill price when adding a new line

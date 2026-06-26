@@ -262,6 +262,8 @@ export default function Accounts() {
       return await response.json();
     },
     enabled: !!selectedAccount,
+    staleTime: 30 * 1000,
+    refetchOnWindowFocus: false,
   });
 
   // Derived state
