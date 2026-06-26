@@ -79,7 +79,7 @@ export function POSHeader({
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="icon" data-testid="button-pos-options">
+              <Button variant="outline" size="icon" className="hidden sm:inline-flex" data-testid="button-pos-options">
                 <MoreHorizontal className="h-4 w-4" />
               </Button>
             </DropdownMenuTrigger>

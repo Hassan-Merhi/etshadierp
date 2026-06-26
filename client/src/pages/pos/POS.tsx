@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Textarea } from "@/components/ui/textarea";
-import { MapPin, AlertCircle, Search, Check, Plus, Trash2, Pencil, X, ChevronDown, User, ShoppingCart, List, Minus } from "lucide-react";
+import { MapPin, AlertCircle, Search, Check, Plus, Trash2, Pencil, X, ChevronDown, User, ShoppingCart, List } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { apiRequest, queryClient, getAppDate, invalidateCustomerBalances } from "@/lib/queryClient";
@@ -1528,9 +1528,6 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
                         <div className="flex-1 min-w-0">
                           <p className="font-semibold text-sm leading-tight truncate">{row.itemName}</p>
                           <p className="text-xs text-muted-foreground font-mono">{row.stockItemCode}</p>
-                          <p className="text-xs text-muted-foreground mt-0.5">
-                            Rate: {formatDisplayAmount(row.rate)}
-                          </p>
                         </div>
                         <Button
                           variant="ghost"
@@ -1542,41 +1539,33 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
                           <Trash2 className="h-4 w-4" />
                         </Button>
                       </div>
-                      <div className="flex items-center justify-between mt-3">
-                        <div className="flex items-center gap-2">
-                          <Button
-                            variant="outline"
-                            size="icon"
-                            onClick={() => {
-                              const newQty = Math.max(0, (row.quantity || 0) - 1);
-                              if (newQty === 0) {
-                                setRows(rows.filter((_, i) => i !== actualIdx));
-                              } else {
-                                updateRow(actualIdx, "quantity", newQty);
-                              }
-                            }}
-                            data-testid={`button-mobile-qty-minus-${actualIdx}`}
-                          >
-                            <Minus className="h-4 w-4" />
-                          </Button>
+                      <div className="flex items-center gap-3 mt-3">
+                        <div className="flex-1 flex flex-col gap-1">
+                          <span className="text-[11px] text-muted-foreground uppercase tracking-wide">Qty</span>
                           <input
                             type="number"
                             inputMode="decimal"
                             value={row.quantity || ""}
                             onChange={(e) => updateRow(actualIdx, "quantity", e.target.value)}
-                            className="w-16 h-9 text-center border border-input rounded-md bg-background text-sm font-mono focus:outline-none focus:ring-2 focus:ring-ring"
+                            className="w-full h-10 text-center border border-input rounded-md bg-background text-sm font-mono focus:outline-none focus:ring-2 focus:ring-ring"
                             data-testid={`input-mobile-qty-${actualIdx}`}
                           />
-                          <Button
-                            variant="outline"
-                            size="icon"
-                            onClick={() => updateRow(actualIdx, "quantity", (row.quantity || 0) + 1)}
-                            data-testid={`button-mobile-qty-plus-${actualIdx}`}
-                          >
-                            <Plus className="h-4 w-4" />
-                          </Button>
                         </div>
-                        <span className="font-mono font-bold text-base">{formatDisplayAmount(row.amount)}</span>
+                        <div className="flex-1 flex flex-col gap-1">
+                          <span className="text-[11px] text-muted-foreground uppercase tracking-wide">Rate</span>
+                          <input
+                            type="number"
+                            inputMode="decimal"
+                            value={row.rate || ""}
+                            onChange={(e) => updateRow(actualIdx, "rate", e.target.value)}
+                            className="w-full h-10 text-center border border-input rounded-md bg-background text-sm font-mono focus:outline-none focus:ring-2 focus:ring-ring"
+                            data-testid={`input-mobile-rate-${actualIdx}`}
+                          />
+                        </div>
+                        <div className="flex flex-col gap-1 items-end">
+                          <span className="text-[11px] text-muted-foreground uppercase tracking-wide">Total</span>
+                          <span className="h-10 flex items-center font-mono font-bold text-base">{formatDisplayAmount(row.amount)}</span>
+                        </div>
                       </div>
                     </Card>
                   );
