@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import {
   FileText,
   TrendingUp,
@@ -56,6 +56,26 @@ export function AccountStatementView({
   brokerStatementLoading,
 }: AccountStatementViewProps) {
   const isFactorySupplierAccount = selectedAccount?.type === "factorySupplier";
+  const [pdfLang, setPdfLang] = useState<"en" | "fr" | "ar">("en");
+
+  const pdfTypeMap: Record<string, string> = {
+    ledger: "ledger",
+    bank: "bank",
+    "bank-account": "bank",
+    supplier: "supplier",
+    employee: "employee",
+    customer: "customer",
+    "fixed-asset": "fixed-asset",
+  };
+
+  const buildPdfUrl = () => {
+    if (!selectedAccount) return null;
+    const serverType = pdfTypeMap[selectedAccount.type] || "ledger";
+    const params = new URLSearchParams({ lang: pdfLang });
+    if (periodFilter?.fromDate) params.set("startDate", periodFilter.fromDate);
+    if (periodFilter?.toDate) params.set("endDate", periodFilter.toDate);
+    return `/api/accounts/${serverType}/${selectedAccount.accountId}/statement-pdf?${params.toString()}`;
+  };
 
   const totalDebit = useMemo(
     () => vouchersWithBalance.reduce((s, v) => s + (v.totalDebit || 0), 0),
@@ -193,7 +213,30 @@ export function AccountStatementView({
               <FileSpreadsheet className="h-4 w-4 text-green-600" />
             </Button>
           )}
-          <Button size="icon" variant="ghost" onClick={handlePrint} title="Print / Export" data-testid="button-print">
+          {/* Language toggle for PDF */}
+          <div className="flex items-center rounded border text-[10px] font-semibold overflow-hidden">
+            {(["en", "fr", "ar"] as const).map((l) => (
+              <button
+                key={l}
+                onClick={() => setPdfLang(l)}
+                data-testid={`button-lang-${l}`}
+                className={`px-1.5 py-0.5 leading-none transition-colors ${pdfLang === l ? "bg-primary text-primary-foreground" : "hover:bg-muted text-muted-foreground"}`}
+              >
+                {l === "en" ? "EN" : l === "fr" ? "FR" : "عر"}
+              </button>
+            ))}
+          </div>
+          {/* PDF download */}
+          <Button
+            size="icon"
+            variant="ghost"
+            title="Download PDF Statement"
+            data-testid="button-pdf-download"
+            onClick={() => {
+              const url = buildPdfUrl();
+              if (url) window.open(url, "_blank");
+            }}
+          >
             <FileDown className="h-4 w-4" />
           </Button>
           <Button size="icon" variant="ghost" onClick={onClose} title="Close" data-testid="button-close-ledger">
