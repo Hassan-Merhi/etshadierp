@@ -486,9 +486,10 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
     return groups.sort((a, b) => a.groupName.localeCompare(b.groupName));
   }, [inventory]);
 
-  // Filter stock groups by search + category
+  // Filter stock groups by search + category + negative stock toggle
   const filteredStockGroups = useMemo(() => {
     return stockGroups.filter((g) => {
+      if (showNegativeStock && !g.items.some((item) => parseFloat(item.quantity || "0") < 0)) return false;
       if (groupSearchTerm && !g.groupName.toLowerCase().includes(groupSearchTerm.toLowerCase())) return false;
       if (groupCategoryFilter) {
         if (
@@ -501,13 +502,14 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
       }
       return true;
     });
-  }, [stockGroups, groupSearchTerm, groupCategoryFilter]);
+  }, [stockGroups, groupSearchTerm, groupCategoryFilter, showNegativeStock]);
 
-  // Items within the selected group, with search + category
+  // Items within the selected group, with search + category + negative stock toggle
   const filteredStockItems = useMemo(() => {
     if (!selectedGroup) return [];
     return selectedGroup.items
       .filter((item) => {
+        if (showNegativeStock && parseFloat(item.quantity || "0") >= 0) return false;
         if (itemCategoryFilter.length > 0) {
           const itemCatId = item.categoryId == null ? "none" : String(item.categoryId);
           if (!itemCategoryFilter.includes(itemCatId)) return false;
@@ -519,12 +521,13 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
         );
       })
       .sort((a, b) => a.stockItemName.localeCompare(b.stockItemName));
-  }, [selectedGroup, itemSearchTerm, itemCategoryFilter]);
+  }, [selectedGroup, itemSearchTerm, itemCategoryFilter, showNegativeStock]);
 
   // All items flat list (for view-all mode)
   const allItemsFiltered = useMemo(() => {
     return inventory
       .filter((item) => {
+        if (showNegativeStock && parseFloat(item.quantity || "0") >= 0) return false;
         if (!itemSearchTerm) return true;
         const s = itemSearchTerm.toLowerCase();
         return (
