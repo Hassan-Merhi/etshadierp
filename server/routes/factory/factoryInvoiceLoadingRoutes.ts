@@ -179,8 +179,13 @@ async function buildLoadingSummary(invoiceId: number, companyId: number, activeS
   });
 
   // 8. Totals
+  // Only count bales that are in the invoice's official bale list (not overloaded extras).
+  // loadedBaleIdSet may include bales scanned in overloading scenarios that are not
+  // part of this invoice; using .size directly would inflate alreadyLoaded and shrink
+  // remaining incorrectly (e.g. 18 not loaded – 7 overloaded = 11 instead of 18).
   const totalInvoiceBales = invoiceBalesRaw.length || invoiceRow.totalQtyBales || 0;
-  const totalAlreadyLoaded = loadedBaleIdSet.size;
+  const invoiceBaleIdSet = new Set(invoiceBalesRaw.map((b) => b.baleId));
+  const totalAlreadyLoaded = [...loadedBaleIdSet].filter((id) => invoiceBaleIdSet.has(id)).length;
   const totalRemaining = totalInvoiceBales - totalAlreadyLoaded;
 
   // 9. Per-session totals
