@@ -216,9 +216,9 @@ export default function Accounts() {
   const selectedAccountId = selectedAccount?.accountId ?? null;
 
   const { data: waChatsRaw = [], isLoading: waChatsLoading } = useQuery<WaChat[]>({
-    queryKey: ["/api/whatsapp/chats"],
+    queryKey: ["/api/whatsapp/chats/pos"],
     queryFn: async () => {
-      const res = await fetch("/api/whatsapp/chats", { credentials: "include" });
+      const res = await fetch("/api/whatsapp/chats/pos", { credentials: "include" });
       if (!res.ok) return [];
       return res.json();
     },
