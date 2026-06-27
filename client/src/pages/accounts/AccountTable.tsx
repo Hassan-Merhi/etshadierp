@@ -5,6 +5,9 @@ import { Button } from "@/components/ui/button";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { AccountTableProps } from "./accountTypes";
 import { cn } from "@/lib/utils";
+import { useCurrencyContext } from "@/contexts/CurrencyContext";
+
+const RATE_CONVERTED_TYPES = new Set(["bank"]);
 
 const TYPE_LABELS: Record<string, string> = {
   ledger: "Ledger",
@@ -36,6 +39,11 @@ export function AccountTable({
   hideBalances,
   formatAmount,
 }: AccountTableProps) {
+  const { formatAmountRaw } = useCurrencyContext();
+
+  function fmtBalance(amount: number, type: string): string {
+    return RATE_CONVERTED_TYPES.has(type) ? formatAmount(amount) : formatAmountRaw(amount);
+  }
   const [typeFilter, setTypeFilter] = useState("all");
 
   const presentTypes = useMemo(() => {
@@ -168,7 +176,7 @@ export function AccountTable({
                                 : "text-amber-600 dark:text-amber-400"
                             )}
                           >
-                            {formatAmount(Math.abs(account.balance))}
+                            {fmtBalance(Math.abs(account.balance), account.type)}
                             <span className="ml-1 text-[10px] opacity-60">{balanceSide}</span>
                           </span>
                         )}
@@ -207,7 +215,7 @@ export function AccountTable({
                                     : "text-amber-600/80 dark:text-amber-400/80"
                                 )}
                               >
-                                {formatAmount(Math.abs(child.balance))}
+                                {fmtBalance(Math.abs(child.balance), child.type)}
                                 <span className="ml-1 text-[10px] opacity-60">{childSide}</span>
                               </span>
                             </TableCell>

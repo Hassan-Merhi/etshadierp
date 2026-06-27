@@ -71,7 +71,7 @@ function getInitialPeriodValue(year: number | null, month: number | null): Perio
 export default function LedgerVouchers() {
   const [, navigate] = useLocation();
   const [, params] = useRoute("/ledger-vouchers/:accountId/:year/:month");
-  const { formatAmount } = useCurrencyContext();
+  const { formatAmountRaw: formatAmount } = useCurrencyContext();
   const { formatShortDate } = useDateFormat();
   const appMode = useAppMode();
   const modeApiRequest = getApiRequest(appMode);

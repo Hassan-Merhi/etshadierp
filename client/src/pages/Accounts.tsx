@@ -68,7 +68,13 @@ export default function Accounts() {
   const { selectedCompany } = useCompany();
   const { toast } = useToast();
   const { formatDisplayDate } = useDateFormat();
-  const { formatAmount, isMultiCurrency } = useCurrencyContext();
+  const { formatAmount, formatAmountRaw, isMultiCurrency } = useCurrencyContext();
+
+  const RATE_CONVERTED_ACCOUNT_TYPES = new Set(["bank"]);
+
+  function formatAmountForAccount(amount: number, accountType?: string): string {
+    return RATE_CONVERTED_ACCOUNT_TYPES.has(accountType || "") ? formatAmount(amount) : formatAmountRaw(amount);
+  }
   const { data: myErpPages } = useQuery<{ hiddenErpCostFields?: string[] }>({ queryKey: ["/api/my-erp-pages"] });
   const hideBalances = (myErpPages?.hiddenErpCostFields ?? []).includes("accounts_balances");
   const appMode = useAppMode();
@@ -526,7 +532,7 @@ export default function Accounts() {
                                   : "text-amber-600 dark:text-amber-400"
                               )}
                             >
-                              {formatAmount(Math.abs(acc.balance))}
+                              {formatAmountForAccount(Math.abs(acc.balance), acc.type)}
                               <span className="ml-1 text-[10px] opacity-60">{balanceSide}</span>
                             </span>
                           )}
@@ -544,7 +550,7 @@ export default function Accounts() {
                   toggleParent={toggleParent}
                   handleAccountChange={handleAccountChange}
                   hideBalances={hideBalances}
-                  formatAmount={formatAmount}
+                  formatAmount={(amt) => formatAmountForAccount(amt, undefined)}
                 />
               )}
             </div>
@@ -566,7 +572,7 @@ export default function Accounts() {
               showDeletedVouchers={showDeletedVouchers}
               setShowDeletedVouchers={setShowDeletedVouchers as any}
               currentUser={currentUser}
-              formatAmount={formatAmount}
+              formatAmount={(amt) => formatAmountForAccount(amt, selectedAccount?.type)}
               hideBalances={hideBalances}
               printRef={printRef}
               appMode={appMode}

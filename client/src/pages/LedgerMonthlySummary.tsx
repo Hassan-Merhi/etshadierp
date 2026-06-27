@@ -66,7 +66,7 @@ function formatFullNumber(value: number): string {
 }
 
 export default function LedgerMonthlySummary() {
-  const { formatAmount } = useCurrencyContext();
+  const { formatAmountRaw: formatAmount } = useCurrencyContext();
   const { formatShortDate } = useDateFormat();
   const appMode = useAppMode();
   const modeApiRequest = getApiRequest(appMode);

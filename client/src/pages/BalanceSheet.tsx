@@ -37,7 +37,11 @@ interface SidebarGroup {
 
 export default function BalanceSheet() {
   const { selectedCompany } = useCompany();
-  const { formatAmount } = useCurrencyContext();
+  const { formatAmount, formatAmountRaw } = useCurrencyContext();
+
+  function fmtAccountBalance(amount: number, type: string): string {
+    return type === "bank" ? formatAmount(amount) : formatAmountRaw(amount);
+  }
   const [activeSection, setActiveSection] = useState<SectionKey>("assets");
 
   const { data: accounts = [], isLoading } = useQuery<Account[]>({
@@ -112,7 +116,7 @@ export default function BalanceSheet() {
               <TableRow key={account.id} data-testid={`row-account-${account.id}`}>
                 <TableCell>{account.name}</TableCell>
                 <TableCell className="text-right font-mono">
-                  {formatAmount(account.balance)}
+                  {fmtAccountBalance(account.balance, account.type)}
                   {account.balanceSide ? (
                     <span className={`ml-1 ${drCrClass(account.balanceSide)}`}>{account.balanceSide}</span>
                   ) : (
@@ -125,7 +129,7 @@ export default function BalanceSheet() {
               <TableRow className="font-semibold bg-muted/50">
                 <TableCell>Total</TableCell>
                 <TableCell className="text-right font-mono" data-testid="text-total">
-                  {formatAmount(total)}
+                  {formatAmountRaw(total)}
                 </TableCell>
               </TableRow>
             )}
@@ -160,7 +164,7 @@ export default function BalanceSheet() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold" data-testid="text-total-assets">
-              {isLoading ? "Loading..." : formatAmount(totalAssets)}
+              {isLoading ? "Loading..." : formatAmountRaw(totalAssets)}
             </div>
           </CardContent>
         </Card>
@@ -172,7 +176,7 @@ export default function BalanceSheet() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold" data-testid="text-total-liabilities">
-              {isLoading ? "Loading..." : formatAmount(totalLiabilities)}
+              {isLoading ? "Loading..." : formatAmountRaw(totalLiabilities)}
             </div>
           </CardContent>
         </Card>
@@ -184,7 +188,7 @@ export default function BalanceSheet() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold" data-testid="text-total-equity">
-              {isLoading ? "Loading..." : formatAmount(totalEquity)}
+              {isLoading ? "Loading..." : formatAmountRaw(totalEquity)}
             </div>
           </CardContent>
         </Card>
