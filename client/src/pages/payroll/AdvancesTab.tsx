@@ -78,6 +78,12 @@ export function AdvancesTab() {
 
   const { data: workerDeductions = [], isLoading: deductionsLoading } = useQuery<any[]>({
     queryKey: ["/api/factory/worker-deductions", selectedCompany?.id],
+    queryFn: async () => {
+      if (!selectedCompany?.id) return [];
+      const res = await fetch(`/api/factory/worker-deductions?companyId=${selectedCompany.id}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch worker deductions");
+      return res.json();
+    },
     enabled: !!selectedCompany,
   });
 
