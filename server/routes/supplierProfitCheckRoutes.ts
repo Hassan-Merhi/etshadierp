@@ -79,7 +79,15 @@ export function registerSupplierProfitCheckRoutes(app: Express, requireAuth: any
             spl.barcode as proforma_barcode
           FROM supplier_proforma_lines spl
           JOIN supplier_proformas sp ON sp.id = spl.proforma_id
-          JOIN stock_items si ON lower(si.code) = lower(spl.barcode)
+          JOIN stock_items si ON (
+            lower(si.code) = lower(spl.barcode)
+            OR EXISTS (
+              SELECT 1 FROM stock_item_code_aliases sica
+              WHERE sica.stock_item_id = si.id
+                AND lower(sica.alias_code) = lower(spl.barcode)
+                AND sica.company_id = $2
+            )
+          )
           LEFT JOIN stock_groups sg ON sg.id = si.stock_group_id
           WHERE sp.id = $1
             AND sp.company_id = $2
@@ -99,7 +107,15 @@ export function registerSupplierProfitCheckRoutes(app: Express, requireAuth: any
             scli.price_per_bale as proforma_price,
             si.code as proforma_barcode
           FROM supplier_container_loaded_items scli
-          JOIN stock_items si ON lower(si.code) = lower(scli.barcode)
+          JOIN stock_items si ON (
+            lower(si.code) = lower(scli.barcode)
+            OR EXISTS (
+              SELECT 1 FROM stock_item_code_aliases sica
+              WHERE sica.stock_item_id = si.id
+                AND lower(sica.alias_code) = lower(scli.barcode)
+                AND sica.company_id = si.company_id
+            )
+          )
             AND si.deleted_at IS NULL
           LEFT JOIN stock_groups sg ON sg.id = si.stock_group_id
           WHERE scli.container_id = ANY($1::int[])
@@ -917,9 +933,9 @@ export function registerSupplierProfitCheckRoutes(app: Express, requireAuth: any
       const lowerCodes = codes.map((c: string) => c.toLowerCase().trim()).filter(Boolean);
       if (lowerCodes.length === 0) return res.status(400).json({ message: "No valid codes provided" });
 
-      // 1. Look up stock items by code
+      // 1. Look up stock items by code (including alias codes)
       const itemsResult = await pool.query(
-        `SELECT si.id, si.code, si.name, si.stock_group_id,
+        `SELECT DISTINCT ON (si.id) si.id, si.code, si.name, si.stock_group_id,
             sg.name as stock_group_name,
             NULL::integer as proforma_qty,
             NULL::numeric as proforma_price,
@@ -928,15 +944,36 @@ export function registerSupplierProfitCheckRoutes(app: Express, requireAuth: any
           LEFT JOIN stock_groups sg ON sg.id = si.stock_group_id
           WHERE si.company_id = $1
             AND si.deleted_at IS NULL
-            AND lower(si.code) = ANY($2::text[])
-          ORDER BY si.code`,
+            AND (
+              lower(si.code) = ANY($2::text[])
+              OR EXISTS (
+                SELECT 1 FROM stock_item_code_aliases sica
+                WHERE sica.stock_item_id = si.id
+                  AND lower(sica.alias_code) = ANY($2::text[])
+                  AND sica.company_id = $1
+              )
+            )
+          ORDER BY si.id, si.code`,
         [companyId, lowerCodes]
       );
 
       const items = itemsResult.rows;
       if (items.length === 0) return res.json({ rows: [], notFound: codes });
 
-      const foundCodes = new Set(items.map((r: any) => r.code.toLowerCase()));
+      // Build found set from direct codes plus any matched alias codes
+      const foundDirectCodes = new Set(items.map((r: any) => r.code.toLowerCase()));
+      const aliasMatchResult = await pool.query(
+        `SELECT lower(sica.alias_code) as alias_code
+         FROM stock_item_code_aliases sica
+         JOIN stock_items si ON si.id = sica.stock_item_id
+         WHERE sica.company_id = $1
+           AND si.company_id = $1
+           AND si.deleted_at IS NULL
+           AND lower(sica.alias_code) = ANY($2::text[])`,
+        [companyId, lowerCodes]
+      );
+      const foundAliasCodes = new Set(aliasMatchResult.rows.map((r: any) => r.alias_code));
+      const foundCodes = new Set([...foundDirectCodes, ...foundAliasCodes]);
       const notFound = codes.filter((c: string) => !foundCodes.has(c.toLowerCase().trim()));
 
       const stockItemIds = items.map((r: any) => Number(r.id));
