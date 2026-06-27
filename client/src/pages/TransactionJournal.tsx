@@ -1462,6 +1462,50 @@ export default function TransactionJournal() {
                               </div>
                             )}
                           </div>
+                          <div className="flex flex-wrap gap-2 pt-1">
+                            {po.containerId && (
+                              <Button
+                                size="sm"
+                                onClick={() =>
+                                  openInCompany(
+                                    detailData.voucher.companyId,
+                                    `/containers/${po.containerId}`
+                                  )
+                                }
+                                data-testid="button-open-po"
+                              >
+                                Open
+                              </Button>
+                            )}
+                            {po.containerId && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() =>
+                                  openInCompany(
+                                    detailData.voucher.companyId,
+                                    `/containers/${po.containerId}/verification?autoCompare=true&supplierId=${po.supplierId}`
+                                  )
+                                }
+                                data-testid="button-compare-po"
+                              >
+                                Compare
+                              </Button>
+                            )}
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() =>
+                                openInCompany(
+                                  detailData.voucher.companyId,
+                                  `/purchase-orders/${po.id}/edit`
+                                )
+                              }
+                              data-testid="button-edit-po"
+                            >
+                              Edit PO
+                            </Button>
+                          </div>
                         </div>
 
                         {viewPurchaseItems.length > 0 && (
