@@ -1,4 +1,6 @@
 import type { Express } from "express";
+import path from "path";
+import fs from "fs";
 import { db } from "../db";
 import { storage } from "../storage";
 import { requireAuth, requireRole, canDelete, requireNonPOS, checkPOSLocation } from "../auth";
@@ -1747,6 +1749,254 @@ export function registerAccountRoutes(app: Express) {
       // Legacy code below is unreachable — kept for reference only
     } catch (err: any) {
       console.error("Statement PDF error:", err);
+      if (!res.headersSent) res.status(500).json({ message: err.message });
+    }
+  });
+
+  // ── Ledger / Account Statement — Excel export ────────────────────────────
+  app.get("/api/accounts/statement/export-excel", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = req.session.currentCompanyId as number;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const accountType = (req.query.accountType as string) || "ledger";
+      const accountId = parseInt(req.query.accountId as string);
+      if (isNaN(accountId)) return res.status(400).json({ message: "Invalid accountId" });
+      const startDate = (req.query.startDate as string) || undefined;
+      const endDate = (req.query.endDate as string) || undefined;
+
+      // Resolve account name and opening balance
+      let accountName = "Account";
+      let openingBalance = 0;
+      let openingBalanceSide = "Dr";
+
+      const [company] = await db.select({ name: companies.name }).from(companies).where(eq(companies.id, companyId));
+
+      if (accountType === "ledger") {
+        const [acct] = await db
+          .select({ name: ledgerAccounts.name, openingBalance: ledgerAccounts.openingBalance, openingBalanceSide: ledgerAccounts.openingBalanceSide })
+          .from(ledgerAccounts)
+          .where(and(eq(ledgerAccounts.id, accountId), eq(ledgerAccounts.companyId, companyId)));
+        if (!acct) return res.status(404).json({ message: "Account not found" });
+        accountName = acct.name;
+        openingBalance = parseFloat(acct.openingBalance || "0");
+        openingBalanceSide = (acct as any).openingBalanceSide || "Dr";
+      } else if (accountType === "bank") {
+        const [acct] = await db
+          .select({ name: bankAccounts.name })
+          .from(bankAccounts)
+          .where(and(eq(bankAccounts.id, accountId), eq(bankAccounts.companyId, companyId)));
+        if (!acct) return res.status(404).json({ message: "Bank account not found" });
+        accountName = acct.name;
+      } else if (accountType === "supplier") {
+        const [acct] = await db
+          .select({ name: suppliers.legalName })
+          .from(suppliers)
+          .where(and(eq(suppliers.id, accountId), eq(suppliers.companyId, companyId)));
+        if (!acct) return res.status(404).json({ message: "Supplier not found" });
+        accountName = acct.name ?? "Supplier";
+      } else if (accountType === "employee") {
+        const [acct] = await db
+          .select({ firstName: employees.firstName, lastName: employees.lastName })
+          .from(employees)
+          .where(and(eq(employees.id, accountId), eq(employees.companyId, companyId)));
+        if (!acct) return res.status(404).json({ message: "Employee not found" });
+        accountName = `${acct.firstName} ${acct.lastName}`.trim();
+      }
+
+      // Fetch transactions
+      let txRows: any[] = [];
+      if (accountType === "ledger") {
+        txRows = await storage.getVoucherEntriesByLedger(accountId, startDate, endDate);
+      } else if (accountType === "bank") {
+        txRows = await storage.getVoucherEntriesByBankAccount(accountId, startDate, endDate);
+      } else if (accountType === "supplier") {
+        txRows = await storage.getVoucherEntriesBySupplier(accountId, startDate, endDate);
+      } else if (accountType === "employee") {
+        txRows = await storage.getVoucherEntriesByEmployee(accountId, startDate, endDate);
+      }
+
+      // Compute brought-forward balance (entries before startDate when filtering)
+      let allTxForBF: any[] = [];
+      if (startDate && accountType === "ledger") {
+        allTxForBF = await storage.getVoucherEntriesByLedger(accountId, undefined, undefined);
+      }
+      let bfBalance = openingBalanceSide === "Dr" ? openingBalance : -openingBalance;
+      if (startDate && allTxForBF.length > 0) {
+        for (const r of allTxForBF) {
+          const rDate = (r.voucherDate || "").toString().slice(0, 10);
+          if (rDate < startDate) bfBalance += parseFloat(r.debitAmount || "0") - parseFloat(r.creditAmount || "0");
+        }
+      }
+
+      // Build running balance rows
+      let runBal = startDate ? bfBalance : (openingBalanceSide === "Dr" ? openingBalance : -openingBalance);
+      const enrichedRows = txRows.map((r: any) => {
+        const dr = parseFloat(r.debitAmount || "0");
+        const cr = parseFloat(r.creditAmount || "0");
+        runBal += dr - cr;
+        return { ...r, dr, cr, runBal };
+      });
+
+      const totalDr = enrichedRows.reduce((s: number, r: any) => s + r.dr, 0);
+      const totalCr = enrichedRows.reduce((s: number, r: any) => s + r.cr, 0);
+      const closingRaw = runBal;
+      const closingBalance2 = Math.abs(closingRaw);
+      const closingBalanceSide2 = closingRaw >= 0 ? "Dr" : "Cr";
+
+      const numFmt = "#,##0.00";
+      const navyFill = { type: "pattern" as const, pattern: "solid" as const, fgColor: { argb: "FF1F3864" } };
+      const lightBlueFill = { type: "pattern" as const, pattern: "solid" as const, fgColor: { argb: "FFEFF3FB" } };
+      const greyFill = { type: "pattern" as const, pattern: "solid" as const, fgColor: { argb: "FFF5F5F5" } };
+      const allBorders = {
+        top: { style: "thin" as const }, bottom: { style: "thin" as const },
+        left: { style: "thin" as const }, right: { style: "thin" as const },
+      };
+
+      const ExcelJS = (await import("exceljs")).default;
+      const workbook = new ExcelJS.Workbook();
+      const sheet = workbook.addWorksheet("Statement");
+
+      sheet.columns = [
+        { key: "date", width: 13 },
+        { key: "voucher", width: 18 },
+        { key: "particulars", width: 38 },
+        { key: "dr", width: 16 },
+        { key: "cr", width: 16 },
+        { key: "balance", width: 18 },
+      ];
+
+      // Logo row
+      try {
+        const logoPath = path.join(process.cwd(), "server", "hmd-logo.png");
+        if (fs.existsSync(logoPath)) {
+          const logoBuf = fs.readFileSync(logoPath);
+          const logoId = workbook.addImage({ buffer: logoBuf as Buffer, extension: "jpeg" });
+          const logoRow = sheet.addRow([]);
+          logoRow.height = 80;
+          sheet.addImage(logoId, { tl: { col: 2.5, row: 0 }, ext: { width: 260, height: 80 } });
+          sheet.mergeCells(`A1:F1`);
+        }
+      } catch {}
+
+      // Header block
+      const rComp = sheet.addRow([company?.name || "Company"]);
+      rComp.getCell(1).font = { bold: true, size: 14, color: { argb: "FF1F3864" } };
+      sheet.mergeCells(`A${rComp.number}:F${rComp.number}`);
+
+      const rTitle = sheet.addRow(["Account Statement"]);
+      rTitle.getCell(1).font = { bold: true, size: 11 };
+      sheet.mergeCells(`A${rTitle.number}:F${rTitle.number}`);
+
+      const rAcct = sheet.addRow([`Account: ${accountName}   |   Type: ${accountType.charAt(0).toUpperCase() + accountType.slice(1)}`]);
+      sheet.mergeCells(`A${rAcct.number}:F${rAcct.number}`);
+
+      if (openingBalance !== 0 && accountType === "ledger") {
+        const rOb = sheet.addRow([`Opening Balance: ${openingBalance.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${openingBalanceSide}`]);
+        sheet.mergeCells(`A${rOb.number}:F${rOb.number}`);
+      }
+
+      if (startDate || endDate) {
+        const rPeriod = sheet.addRow([`Period: ${startDate || "Start"} to ${endDate || "End"}`]);
+        rPeriod.getCell(1).font = { italic: true, color: { argb: "FF555555" } };
+        sheet.mergeCells(`A${rPeriod.number}:F${rPeriod.number}`);
+      }
+
+      const rPrinted = sheet.addRow([`Printed: ${new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}`]);
+      sheet.mergeCells(`A${rPrinted.number}:F${rPrinted.number}`);
+      sheet.addRow([]);
+
+      // Column headers
+      const hdr = sheet.addRow(["Date", "Voucher No.", "Particulars", "Debit (Dr)", "Credit (Cr)", "Balance"]);
+      hdr.eachCell((cell) => {
+        cell.fill = navyFill;
+        cell.font = { bold: true, color: { argb: "FFFFFFFF" } };
+        cell.border = allBorders;
+        cell.alignment = { horizontal: "center" };
+      });
+
+      // Opening balance row (no filter) or B/F row (filtered)
+      if (!startDate && openingBalance > 0 && accountType === "ledger") {
+        const obBal = openingBalanceSide === "Dr" ? openingBalance : -openingBalance;
+        const obRow = sheet.addRow([
+          new Date().toLocaleDateString("en-GB"),
+          "—",
+          "Opening Balance",
+          openingBalanceSide === "Dr" ? openingBalance : null,
+          openingBalanceSide === "Cr" ? openingBalance : null,
+          `${openingBalance.toFixed(2)} ${openingBalanceSide}`,
+        ]);
+        obRow.eachCell((cell) => { cell.fill = lightBlueFill; cell.border = allBorders; });
+        obRow.getCell(4).numFmt = numFmt; obRow.getCell(5).numFmt = numFmt;
+        obRow.getCell(4).alignment = { horizontal: "right" }; obRow.getCell(5).alignment = { horizontal: "right" };
+        obRow.getCell(6).alignment = { horizontal: "right" };
+      } else if (startDate && Math.abs(bfBalance) > 0.005 && accountType === "ledger") {
+        const bfAbs = Math.abs(bfBalance);
+        const bfSide = bfBalance >= 0 ? "Dr" : "Cr";
+        const bfRow = sheet.addRow([
+          new Date(startDate + "T00:00:00"),
+          "—",
+          "Balance Brought Forward",
+          bfSide === "Dr" ? bfAbs : null,
+          bfSide === "Cr" ? bfAbs : null,
+          `${bfAbs.toFixed(2)} ${bfSide}`,
+        ]);
+        bfRow.eachCell((cell) => { cell.fill = lightBlueFill; cell.font = { bold: true }; cell.border = allBorders; });
+        bfRow.getCell(1).numFmt = "dd/mm/yyyy";
+        bfRow.getCell(4).numFmt = numFmt; bfRow.getCell(5).numFmt = numFmt;
+        bfRow.getCell(4).alignment = { horizontal: "right" }; bfRow.getCell(5).alignment = { horizontal: "right" };
+        bfRow.getCell(6).alignment = { horizontal: "right" };
+      }
+
+      // Data rows
+      enrichedRows.forEach((row: any, idx: number) => {
+        const dr = row.dr > 0 ? row.dr : null;
+        const cr = row.cr > 0 ? row.cr : null;
+        const dateVal = row.voucherDate ? new Date(row.voucherDate + "T00:00:00") : "";
+        const particulars = row.narration || row.voucherDescription || row.voucherType || "—";
+        const balAbs = Math.abs(row.runBal);
+        const balSide = row.runBal >= 0 ? "Dr" : "Cr";
+        const dataRow = sheet.addRow([
+          dateVal,
+          row.voucherNumber || "—",
+          particulars,
+          dr,
+          cr,
+          balAbs > 0 ? `${balAbs.toFixed(2)} ${balSide}` : "—",
+        ]);
+        dataRow.eachCell((cell) => { cell.border = allBorders; });
+        if (idx % 2 === 0) dataRow.eachCell((cell) => { cell.fill = greyFill; });
+        dataRow.getCell(1).numFmt = "dd/mm/yyyy";
+        dataRow.getCell(4).numFmt = numFmt; dataRow.getCell(5).numFmt = numFmt;
+        dataRow.getCell(4).alignment = { horizontal: "right" }; dataRow.getCell(5).alignment = { horizontal: "right" };
+        dataRow.getCell(6).alignment = { horizontal: "right" };
+      });
+
+      // Totals row
+      const totRow = sheet.addRow(["", "", "TOTAL", totalDr, totalCr, ""]);
+      totRow.eachCell((cell) => { cell.fill = navyFill; cell.font = { bold: true, color: { argb: "FFFFFFFF" } }; cell.border = allBorders; });
+      totRow.getCell(4).numFmt = numFmt; totRow.getCell(5).numFmt = numFmt;
+      totRow.getCell(4).alignment = { horizontal: "right" }; totRow.getCell(5).alignment = { horizontal: "right" };
+
+      // Closing balance row
+      const cbRow = sheet.addRow([
+        "", "", "Closing Balance",
+        closingBalanceSide2 === "Dr" ? closingBalance2 : null,
+        closingBalanceSide2 === "Cr" ? closingBalance2 : null,
+        `${closingBalance2.toFixed(2)} ${closingBalanceSide2}`,
+      ]);
+      cbRow.eachCell((cell) => { cell.fill = lightBlueFill; cell.font = { bold: true }; cell.border = allBorders; });
+      cbRow.getCell(4).numFmt = numFmt; cbRow.getCell(5).numFmt = numFmt;
+      cbRow.getCell(4).alignment = { horizontal: "right" }; cbRow.getCell(5).alignment = { horizontal: "right" };
+      cbRow.getCell(6).alignment = { horizontal: "right" };
+
+      const safeAccName = accountName.replace(/[^\w\s.()\-]/g, "_").replace(/\s+/g, "_");
+      const buf = await workbook.xlsx.writeBuffer();
+      res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+      res.setHeader("Content-Disposition", `attachment; filename="${safeAccName}_Statement.xlsx"`);
+      res.end(buf);
+    } catch (err: any) {
+      console.error("Account statement Excel error:", err);
       if (!res.headersSent) res.status(500).json({ message: err.message });
     }
   });

@@ -8,6 +8,7 @@ import {
   History,
   MessageCircle,
   FileDown,
+  FileSpreadsheet,
   X,
   Clock,
   Send,
@@ -167,6 +168,30 @@ export function AccountStatementView({
                 </Button>
               )}
             </>
+          )}
+          {selectedAccount && (["ledger", "bank-account", "bank", "supplier", "employee"].includes(selectedAccount.type)) && (
+            <Button
+              size="icon"
+              variant="ghost"
+              title="Export Excel Statement"
+              data-testid="button-export-excel"
+              onClick={() => {
+                const typeMap: Record<string, string> = {
+                  "ledger": "ledger",
+                  "bank": "bank",
+                  "bank-account": "bank",
+                  "supplier": "supplier",
+                  "employee": "employee",
+                };
+                const serverType = typeMap[selectedAccount.type] || "ledger";
+                const params = new URLSearchParams({ accountType: serverType, accountId: String(selectedAccount.accountId) });
+                if (periodFilter?.fromDate) params.set("startDate", periodFilter.fromDate);
+                if (periodFilter?.toDate) params.set("endDate", periodFilter.toDate);
+                window.open(`/api/accounts/statement/export-excel?${params.toString()}`, "_blank");
+              }}
+            >
+              <FileSpreadsheet className="h-4 w-4 text-green-600" />
+            </Button>
           )}
           <Button size="icon" variant="ghost" onClick={handlePrint} title="Print / Export" data-testid="button-print">
             <FileDown className="h-4 w-4" />
