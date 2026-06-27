@@ -457,7 +457,8 @@ export function VoucherDetailsDialog({
                           selectedVoucher.voucherType === "Production" ||
                           selectedVoucher.voucherType === "Mixed" ||
                           selectedVoucher.voucherType === "Stock Transfer" ||
-                          selectedVoucher.voucherType === "StockTransfer" ? (
+                          selectedVoucher.voucherType === "StockTransfer" ||
+                          selectedVoucher.voucherType === "Transfer" ? (
                             <>
                               <TableHead>Item Name</TableHead>
                               {selectedVoucher.voucherType === "Mixed" && <TableHead>Type</TableHead>}
@@ -493,7 +494,8 @@ export function VoucherDetailsDialog({
                             selectedVoucher.voucherType === "Production" ||
                             selectedVoucher.voucherType === "Mixed" ||
                             selectedVoucher.voucherType === "Stock Transfer" ||
-                            selectedVoucher.voucherType === "StockTransfer"
+                            selectedVoucher.voucherType === "StockTransfer" ||
+                            selectedVoucher.voucherType === "Transfer"
                           ) {
                             return viewVoucherEntries.map((entry) => {
                               const qty = parseFloat(entry.quantity || "0");
@@ -585,7 +587,8 @@ export function VoucherDetailsDialog({
                             {selectedVoucher.voucherType === "Consumption" ||
                             selectedVoucher.voucherType === "Production" ||
                             selectedVoucher.voucherType === "Stock Transfer" ||
-                            selectedVoucher.voucherType === "StockTransfer" ? (
+                            selectedVoucher.voucherType === "StockTransfer" ||
+                            selectedVoucher.voucherType === "Transfer" ? (
                               <>
                                 <TableCell>Total</TableCell>
                                 <TableCell className="text-right font-mono">

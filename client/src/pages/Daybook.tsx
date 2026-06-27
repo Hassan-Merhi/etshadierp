@@ -214,7 +214,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
 
   const isStockTransferVoucher = !!(
     selectedVoucher &&
-    (selectedVoucher.voucherType === "Stock Transfer" || selectedVoucher.voucherType === "StockTransfer")
+    (selectedVoucher.voucherType === "Stock Transfer" || selectedVoucher.voucherType === "StockTransfer" || selectedVoucher.voucherType === "Transfer")
   );
   const { data: voucherRevisions = [], isLoading: revisionsLoading } = useQuery<any[]>({
     queryKey:
