@@ -559,7 +559,7 @@ export default function Payroll() {
         </TabsContent>
 
         <TabsContent value="advances">
-          <AdvancesTab />
+          <AdvancesTab cashAccounts={cashAccounts} />
         </TabsContent>
 
         <TabsContent value="groups">

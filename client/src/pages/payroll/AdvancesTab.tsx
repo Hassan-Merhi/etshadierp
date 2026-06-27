@@ -40,7 +40,11 @@ import {
   type SalaryAdvance,
 } from "./payrollSchemas";
 
-export function AdvancesTab() {
+interface AdvancesTabProps {
+  cashAccounts?: any[];
+}
+
+export function AdvancesTab({ cashAccounts = [] }: AdvancesTabProps) {
   const appMode = useAppMode();
   const modeApiRequest = getApiRequest(appMode);
   const { selectedCompany } = useCompany();
@@ -71,10 +75,6 @@ export function AdvancesTab() {
     enabled: !!selectedCompany,
   });
 
-  const { data: cashAccounts = [] } = useQuery<any[]>({
-    queryKey: ["/api/cash-accounts"],
-    enabled: !!selectedCompany,
-  });
 
   const { data: workerDeductions = [], isLoading: deductionsLoading } = useQuery<any[]>({
     queryKey: ["/api/factory/worker-deductions", selectedCompany?.id],
