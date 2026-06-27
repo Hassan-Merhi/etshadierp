@@ -569,7 +569,7 @@ function ViewEntryModal({
           <DialogDescription>View voucher information</DialogDescription>
         </DialogHeader>
         <div className="space-y-4 md:space-y-6">
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <p className="text-sm text-muted-foreground">Date</p>
               <p className="font-medium">{formatDisplayDate(entry.txDate + "T00:00:00")}</p>
@@ -1126,7 +1126,7 @@ function ViewEntryModal({
                   </div>
                 </div>
 
-                <div className="grid grid-cols-3 gap-3 pt-1">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
                   <div className="rounded-md bg-muted/40 px-3 py-2 text-center">
                     <p className="text-xs text-muted-foreground">Total Weight</p>
                     <p className="font-semibold font-mono">{formatNumber(totalKg)} kg</p>
@@ -1310,7 +1310,7 @@ function ViewEntryModal({
               </div>
 
               {/* Stats grid */}
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div className="rounded-md bg-muted/40 px-3 py-2 text-center">
                   <p className="text-xs text-muted-foreground">Expected Bales</p>
                   <p className="font-semibold font-mono text-lg">{expectedBalesTotal > 0 ? expectedBalesTotal : "—"}</p>

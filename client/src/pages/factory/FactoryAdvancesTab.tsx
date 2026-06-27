@@ -925,7 +925,7 @@ function AdvancesView() {
           </DialogHeader>
           <div className="space-y-4 py-2">
             {/* Shared fields */}
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Date</Label>
                 <Input
@@ -954,7 +954,7 @@ function AdvancesView() {
                 </Select>
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Repayment Type</Label>
                 <Select
@@ -1133,7 +1133,7 @@ function AdvancesView() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Date</Label>
                 <Input
@@ -1318,7 +1318,7 @@ function AdvancesView() {
               return (
                 <div className="space-y-4">
                   {/* Summary */}
-                  <div className="grid grid-cols-4 gap-3 text-sm">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
                     <div className="rounded-md bg-muted/40 px-3 py-2 text-center">
                       <p className="text-xs text-muted-foreground mb-1">Total Advances</p>
                       <p className="font-bold">{summary.total}</p>
@@ -1346,7 +1346,7 @@ function AdvancesView() {
                   ) : (
                     <>
                       {/* Controls */}
-                      <div className="grid grid-cols-2 gap-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div className="space-y-2">
                           <Label>
                             Default Cash Account <span className="text-destructive">*</span>
@@ -1390,7 +1390,7 @@ function AdvancesView() {
                           <div className="px-4 py-2 bg-muted/20 text-xs font-medium text-muted-foreground border-b">
                             Posting Impact — Journal: DR Factory Workers Salary Payable / CR Factory Worker Advances
                           </div>
-                          <div className="grid grid-cols-3 divide-x">
+                          <div className="grid grid-cols-1 sm:grid-cols-3 divide-x">
                             <div className="px-4 py-3 text-center">
                               <p className="text-xs text-muted-foreground mb-1">Cash Account Balance</p>
                               <p className="font-mono font-bold">
@@ -1556,7 +1556,7 @@ function AdvancesView() {
               </Select>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>
                   Adjustment Amount <span className="text-destructive">*</span>
@@ -1694,7 +1694,7 @@ function AdvancesView() {
           </DialogHeader>
 
           {/* Shared repayment fields */}
-          <div className="grid grid-cols-2 gap-4 py-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 py-2">
             <div className="space-y-2">
               <Label>Repayment Date</Label>
               <Input
@@ -2023,7 +2023,7 @@ function AdvancesView() {
                 return (
                   <div className="space-y-4">
                     {/* Summary boxes */}
-                    <div className="grid grid-cols-3 gap-3 text-sm">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
                       <div className="rounded-md bg-muted/40 px-3 py-2 text-center">
                         <p className="text-xs text-muted-foreground mb-1">Advances to Post</p>
                         <p className="font-bold">{unvouchered.length}</p>
@@ -2157,7 +2157,7 @@ function AdvancesView() {
               return (
                 <div className="space-y-4">
                   {/* Summary */}
-                  <div className="grid grid-cols-3 gap-3 text-sm">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
                     <div className="rounded-md bg-muted/40 px-3 py-2 text-center">
                       <p className="text-xs text-muted-foreground mb-1">Total Advances</p>
                       <p className="font-bold">{reconcilePreview.totalAdvances}</p>

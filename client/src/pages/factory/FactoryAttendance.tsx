@@ -953,7 +953,7 @@ function PerWorkerView() {
 
       {/* Summary */}
       {workerIdNum && dates.length > 0 && (
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <SummaryCard
             icon={<CalendarDays className="h-4 w-4" />}
             label="Days in Range"

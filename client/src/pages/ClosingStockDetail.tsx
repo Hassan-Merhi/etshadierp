@@ -88,7 +88,8 @@ export default function ClosingStockDetail() {
       </div>
 
       <Card className="overflow-hidden">
-        <div className="bg-primary text-primary-foreground">
+        <div className="overflow-x-auto">
+        <div className="bg-primary text-primary-foreground min-w-[420px]">
           <div className="grid grid-cols-5 p-3 font-semibold text-sm">
             <div className="col-span-2">Item Name</div>
             <div className="col-span-3 text-center border-l border-primary-foreground/30">Closing Balance</div>
@@ -128,7 +129,7 @@ export default function ClosingStockDetail() {
         </div>
 
         {data?.totals && (
-          <div className="bg-muted/50 border-t-2 border-primary">
+          <div className="bg-muted/50 border-t-2 border-primary min-w-[420px]">
             <div className="grid grid-cols-5 p-3 font-bold">
               <div className="col-span-2">Total</div>
               <div className="text-right font-mono">{formatNumber(data.totals.quantity)} BL</div>
@@ -137,6 +138,7 @@ export default function ClosingStockDetail() {
             </div>
           </div>
         )}
+        </div>
       </Card>
     </div>
   );

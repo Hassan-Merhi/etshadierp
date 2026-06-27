@@ -495,7 +495,7 @@ export default function FactoryEmployees() {
             <DialogTitle>{editingEmployee ? "Edit Employee" : "New Employee"}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-1">
                 <Label>First Name *</Label>
                 <Input
@@ -544,7 +544,7 @@ export default function FactoryEmployees() {
                 data-testid="input-phone"
               />
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-1">
                 <Label>Monthly Salary</Label>
                 <Input

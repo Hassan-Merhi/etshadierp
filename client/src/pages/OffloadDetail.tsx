@@ -340,7 +340,7 @@ export default function OffloadDetail() {
                 </table>
               </div>
 
-              <div className="grid grid-cols-2 gap-4 text-sm mt-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm mt-3">
                 <div>
                   <p className="text-muted-foreground">Total Bales</p>
                   <p className="font-medium font-mono">{formatNumber(Number(offload.totalBales))}</p>

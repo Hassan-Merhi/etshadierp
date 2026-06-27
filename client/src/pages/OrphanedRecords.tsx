@@ -265,7 +265,7 @@ export default function OrphanedRecordsPage() {
                     <Badge variant="outline">{voucher.voucherType}</Badge>
                   </div>
                   <p className="text-sm text-muted-foreground">{voucher.voucherDate}</p>
-                  <div className="grid grid-cols-3 gap-2 mt-2 text-sm">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mt-2 text-sm">
                     <div>
                       <p className="text-xs text-muted-foreground">Debits</p>
                       <p className="font-mono">{formatAmount(voucher.totalDebits)}</p>
@@ -528,7 +528,7 @@ export default function OrphanedRecordsPage() {
                     <span className="font-medium text-sm">{archive.stockGroupName}</span>
                     <span className="text-sm text-muted-foreground">{archive.locationName}</span>
                   </div>
-                  <div className="grid grid-cols-3 gap-2 text-sm mb-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-sm mb-2">
                     <div>
                       <p className="text-xs text-muted-foreground">Items</p>
                       <p>{archive.itemCount}</p>

@@ -139,7 +139,8 @@ export default function SpAliases() {
         ) : (
           <Card>
             <CardContent className="py-3">
-              <div className="space-y-0.5">
+              <div className="overflow-x-auto">
+              <div className="space-y-0.5 min-w-[480px]">
                 <div className="grid grid-cols-12 text-xs font-medium text-muted-foreground pb-1 border-b border-border/40">
                   <span className="col-span-3">Alias Code</span>
                   <span className="col-span-1 flex justify-center">
@@ -184,6 +185,7 @@ export default function SpAliases() {
                     </div>
                   </div>
                 ))}
+              </div>
               </div>
             </CardContent>
           </Card>

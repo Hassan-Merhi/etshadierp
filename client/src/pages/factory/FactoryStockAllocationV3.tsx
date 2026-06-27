@@ -361,7 +361,7 @@ function ScanningPanel({ load, onClose }: { load: V3Load; onClose: () => void })
         </Card>
 
         {/* Totals strip */}
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <Card>
             <CardContent className="p-3 text-center">
               <p className="text-xs text-muted-foreground">Expected</p>

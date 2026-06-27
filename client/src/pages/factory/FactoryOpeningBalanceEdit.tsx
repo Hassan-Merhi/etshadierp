@@ -244,7 +244,7 @@ export default function FactoryOpeningBalanceEdit() {
             )}
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Received (kg)</Label>
               <Input
@@ -273,7 +273,7 @@ export default function FactoryOpeningBalanceEdit() {
             </p>
           </div>
 
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div className="space-y-2">
               <Label>Currency</Label>
               <Select value={form.currencyCode} onValueChange={(v) => handleFieldChange("currencyCode", v)}>

@@ -98,7 +98,7 @@ export function ContainerFormBody({
             data-testid="input-container-origin"
           />
         </div>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
             <Label>Arrival Date</Label>
             <Input
@@ -227,7 +227,7 @@ export function ContainerFormBody({
           <p className="text-sm font-semibold">Money &amp; Commission</p>
           <Separator className="flex-1" />
         </div>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
             <Label>Total Kg</Label>
             <Input
@@ -290,7 +290,7 @@ export function ContainerFormBody({
             </div>
           );
         })()}
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
             <Label>Currency</Label>
             <Select value={currency} onValueChange={setCurrency}>
@@ -353,7 +353,7 @@ export function ContainerFormBody({
             )}
           </div>
         )}
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
             <Label>Commission Amount</Label>
             <Input
@@ -427,7 +427,7 @@ export function ContainerFormBody({
           <p className="text-sm font-semibold">Freight &amp; Other Charges</p>
           <Separator className="flex-1" />
         </div>
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <div>
             <Label>
               Freight Amount <span className="text-muted-foreground text-xs font-normal">(optional)</span>

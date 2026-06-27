@@ -288,7 +288,7 @@ export function AdvancesTab({ cashAccounts = [] }: AdvancesTabProps) {
         {/* ── Advances sub-tab ── */}
         <TabsContent value="advances" className="space-y-4 pt-4">
           {/* Stats */}
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div className="border rounded-md p-4 flex items-center gap-3">
               <Banknote className="h-8 w-8 text-blue-500 shrink-0" />
               <div>
@@ -541,7 +541,7 @@ export function AdvancesTab({ cashAccounts = [] }: AdvancesTabProps) {
                   </FormItem>
                 )}
               />
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <FormField
                   control={advanceForm.control}
                   name="amount"

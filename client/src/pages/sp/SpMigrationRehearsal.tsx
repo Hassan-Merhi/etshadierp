@@ -93,7 +93,7 @@ function PreviewPanel({ sourceId, targetId }: { sourceId: number; targetId: numb
       </div>
 
       {/* Totals */}
-      <div className="grid grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
           { label: "Items", value: data.totals.itemCount, icon: Package },
           { label: "Total Qty", value: data.totals.totalQty.toLocaleString(), icon: BarChart3 },

@@ -351,7 +351,7 @@ function TransporterStatement({ transporterId, onBack }: { transporterId: number
       </div>
 
       {/* Summary cards */}
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-xs text-muted-foreground font-normal">TOTAL CHARGED</CardTitle>
@@ -611,7 +611,7 @@ export default function FactoryTransporters() {
 
       {/* Summary cards */}
       {!isLoading && transporters.length > 0 && (
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-xs text-muted-foreground font-normal">TOTAL TRANSPORTERS</CardTitle>
@@ -663,6 +663,7 @@ export default function FactoryTransporters() {
               <p className="text-xs">Add your first transporter to start tracking charges and payments.</p>
             </div>
           ) : (
+            <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="sticky top-0 z-30 bg-muted/50">
                 <tr className="border-b text-left text-muted-foreground">
@@ -698,6 +699,7 @@ export default function FactoryTransporters() {
                 ))}
               </tbody>
             </table>
+            </div>
           )}
         </CardContent>
       </Card>

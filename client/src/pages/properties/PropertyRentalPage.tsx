@@ -854,7 +854,7 @@ function CreateUnitDialog({
               data-testid={`input-${testIdPrefix}-location`}
             />
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <Label>Size</Label>
               <Input
@@ -1118,7 +1118,7 @@ function VacantUnitInfoForm({ unit, testIdPrefix }: { unit: Unit; testIdPrefix: 
 
   return (
     <div className="space-y-4 pt-3">
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
           <Label>Unit Name</Label>
           <Input
@@ -1189,7 +1189,7 @@ function StartContractForm({
   return (
     <div className="space-y-3">
       <p className="text-sm text-muted-foreground">This unit is vacant. Start a new lease:</p>
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div>
           <Label>Tenant Name *</Label>
           <Input
@@ -1431,7 +1431,7 @@ function BulkPaymentDialog({
           </DialogTitle>
         </DialogHeader>
 
-        <div className="grid grid-cols-2 gap-3 pt-1">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
           <div>
             <Label>Account</Label>
             <AccountSearchSelect
@@ -1674,7 +1674,7 @@ function PaymentForm({
 
   return (
     <div className="space-y-3 pt-3">
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div>
           <Label>Account</Label>
           <AccountSearchSelect
@@ -1819,7 +1819,7 @@ function ModifyRentForm({
         <span className="text-muted-foreground">Current Rental Amount: </span>
         <span className="font-bold">{fmtMoneyCurrency(contract.rentalAmount, contract.currency)}</span>
       </div>
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div>
           <Label>New Rental Amount ({contract.currency || "USD"}) *</Label>
           <Input
@@ -2064,7 +2064,7 @@ function GuaranteeForm({
             </>
           )}
         </p>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
             <Label>Amount ($)</Label>
             <Input
@@ -2123,7 +2123,7 @@ function GuaranteeForm({
             ? "Recovers guarantee returned by landlord: Dr Cash / Cr Security Deposits Paid"
             : "Releases guarantee from Tenant Deposits: Dr Tenant Deposits / Cr Cash Account"}
         </p>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
             <Label>Amount ($)</Label>
             <Input
@@ -2203,7 +2203,7 @@ function GuaranteeForm({
             Guarantee fully applied as rent — nothing left to apply.
           </p>
         )}
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
             <div className="flex items-center justify-between mb-1">
               <Label>Amount</Label>
@@ -2457,7 +2457,7 @@ function EndContractForm({
           </div>
 
           {refundGuarantee && (
-            <div className="grid grid-cols-2 gap-3 pt-1 border-t border-border/40">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1 border-t border-border/40">
               <div>
                 <Label>Refund amount</Label>
                 <Input
@@ -2613,7 +2613,7 @@ function EditInfoForm({
     <div className="space-y-5 pt-3">
       <div className="space-y-3">
         <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Unit</p>
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <Label>Unit Name</Label>
             <Input
@@ -2645,7 +2645,7 @@ function EditInfoForm({
 
       <div className="border-t pt-4 space-y-3">
         <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Contract</p>
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <Label>Tenant Name *</Label>
             <Input
@@ -2960,7 +2960,7 @@ function LedgerView({
   return (
     <div className="space-y-3 pt-3">
       <div className="flex items-center justify-between gap-2 flex-wrap">
-        <div className="grid grid-cols-4 gap-3 text-sm flex-1 min-w-0">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm flex-1 min-w-0">
           <div className="bg-muted/40 rounded p-2">
             <div className="text-xs text-muted-foreground">Tenant</div>
             <div className="font-semibold truncate">{contract.tenantName}</div>

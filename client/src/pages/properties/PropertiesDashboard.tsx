@@ -725,7 +725,7 @@ export default function PropertiesDashboard() {
       {/* Liquidity Management — Available & To Pay */}
       <Card className="p-0 overflow-hidden">
         {/* KPI summary bar */}
-        <div className="grid grid-cols-3 divide-x border-b">
+        <div className="grid grid-cols-1 sm:grid-cols-3 divide-x border-b">
           <div className="p-4 text-center">
             <p className="text-xs text-muted-foreground mb-1">Available</p>
             <p className="text-xl font-bold font-mono text-green-600" data-testid="text-total-available">

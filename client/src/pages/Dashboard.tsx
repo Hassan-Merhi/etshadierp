@@ -921,7 +921,7 @@ export default function Dashboard() {
         {!isFactoryMode && (
           <Card className="p-0 overflow-hidden">
             {/* Summary bar */}
-            <div className="grid grid-cols-3 divide-x border-b">
+            <div className="grid grid-cols-1 sm:grid-cols-3 divide-x border-b">
               <div className="p-4 sm:p-5 text-center bg-chart-2/5">
                 <p className="text-[11px] font-semibold uppercase tracking-wider text-chart-2/70 mb-1">Available</p>
                 <p className="text-xl sm:text-2xl font-bold font-mono text-chart-2" data-testid="text-total-available">

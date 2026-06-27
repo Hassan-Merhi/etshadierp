@@ -1381,11 +1381,11 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
       )}
 
       {charges.length > 0 && (
-        <div className="rounded-lg border bg-card overflow-hidden">
+        <div className="rounded-lg border bg-card overflow-x-auto">
           <div className="px-4 py-3 bg-muted/40 border-b">
             <p className="text-sm font-semibold">Extra Charges</p>
           </div>
-          <table className="w-full text-sm">
+          <table className="w-full text-sm min-w-[360px]">
             <thead>
               <tr className="border-b">
                 <th className="text-left px-4 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">

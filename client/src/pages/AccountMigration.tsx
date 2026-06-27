@@ -625,7 +625,7 @@ export default function AccountMigration() {
             </div>
 
             {/* Aggregate stats */}
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div className="p-3 rounded-md bg-muted/40 space-y-0.5">
                 <p className="text-xs text-muted-foreground">Accounts</p>
                 <p className="text-lg font-semibold">{preview.accounts.length}</p>

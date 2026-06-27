@@ -141,8 +141,9 @@ export default function OpeningStockDetail() {
       </div>
 
       <Card className="overflow-hidden">
+        <div className="overflow-x-auto">
         {/* Header */}
-        <div className="bg-primary text-primary-foreground">
+        <div className="bg-primary text-primary-foreground min-w-[560px]">
           <div className="grid grid-cols-7 p-3 font-semibold text-sm">
             <div className="col-span-1">Particulars</div>
             <div className="col-span-3 text-center border-l border-primary-foreground/30">Opening Balance</div>
@@ -204,7 +205,7 @@ export default function OpeningStockDetail() {
 
         {/* Grand Total */}
         {data?.grandTotal && (
-          <div className="bg-muted/50 border-t-2 border-primary">
+          <div className="bg-muted/50 border-t-2 border-primary min-w-[560px]">
             <div className="grid grid-cols-7 p-3 font-bold">
               <div>Grand Total</div>
               {/* Opening Total */}
@@ -220,6 +221,7 @@ export default function OpeningStockDetail() {
             </div>
           </div>
         )}
+        </div>
       </Card>
 
       {/* Debug Dialog */}

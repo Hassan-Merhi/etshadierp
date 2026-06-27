@@ -353,7 +353,7 @@ export function SalesReportPanel({
                         <span className="font-medium">{location.locationName}</span>
                         <ChevronRight className="h-4 w-4 text-muted-foreground" />
                       </div>
-                      <div className="grid grid-cols-3 mt-2 text-sm gap-2">
+                      <div className="grid grid-cols-1 sm:grid-cols-3 mt-2 text-sm gap-2">
                         <span className="text-muted-foreground">
                           Bales:{" "}
                           <span className="font-mono text-foreground">{formatNumber(location.totalQuantity ?? 0)}</span>
@@ -371,7 +371,7 @@ export function SalesReportPanel({
               <Card className="bg-muted/40">
                 <CardContent className="p-4">
                   <div className="font-semibold mb-2">Total</div>
-                  <div className="grid grid-cols-3 text-sm gap-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 text-sm gap-2">
                     <span className="text-muted-foreground">
                       Bales:{" "}
                       <span className="font-mono text-foreground font-semibold">

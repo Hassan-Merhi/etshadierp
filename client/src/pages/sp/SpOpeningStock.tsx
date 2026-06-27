@@ -224,7 +224,8 @@ export default function SpOpeningStock() {
         ) : (
           <Card>
             <CardContent className="py-3">
-              <div className="space-y-0.5">
+              <div className="overflow-x-auto">
+              <div className="space-y-0.5 min-w-[360px]">
                 <div className="grid grid-cols-6 text-xs font-medium text-muted-foreground pb-1 border-b border-border/40">
                   <span className="col-span-2">Article</span>
                   <span className="text-right">Qty In</span>
@@ -254,6 +255,7 @@ export default function SpOpeningStock() {
                     </span>
                   </div>
                 ))}
+              </div>
               </div>
             </CardContent>
           </Card>

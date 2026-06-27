@@ -223,7 +223,7 @@ export default function FactoryDispatchBatchScan() {
     return (
       <div className="p-6 space-y-4">
         <Skeleton className="h-12 w-full" />
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           {[...Array(3)].map((_, i) => (
             <Skeleton key={i} className="h-24" />
           ))}
@@ -317,7 +317,7 @@ export default function FactoryDispatchBatchScan() {
       <div className="flex flex-1 overflow-hidden">
         <div className="flex-1 flex flex-col overflow-hidden">
           <div className="p-4 space-y-3">
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <Card>
                 <CardContent className="pt-3 pb-3">
                   <div className="flex items-center gap-1.5 text-muted-foreground text-xs mb-1">
