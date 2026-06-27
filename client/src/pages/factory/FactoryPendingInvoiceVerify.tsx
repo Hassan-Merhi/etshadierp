@@ -612,11 +612,22 @@ export default function FactoryPendingInvoiceVerify() {
     const remaining = item.expectedQty - item.loadedQty;
     return sum + (remaining > 0 ? remaining : 0);
   }, 0);
-  const avgWeightPerBale =
+
+  // Use per-article average weight where available so different article types are
+  // weighted correctly. Fall back to the global average only for articles that
+  // have no loaded bales yet (MISSING_FROM_LOADED), where we have no per-article
+  // weight data.
+  const globalAvgWeightPerBale =
     (verification?.totalLoadedBales ?? 0) > 0
       ? (verification?.totalLoadedWeight ?? 0) / (verification?.totalLoadedBales ?? 1)
       : 0;
-  const totalNotLoadedWeight = avgWeightPerBale * totalNotLoadedBales;
+  const totalNotLoadedWeight = (verification?.comparison ?? []).reduce((sum, item) => {
+    const remaining = item.expectedQty - item.loadedQty;
+    if (remaining <= 0) return sum;
+    const articleAvg =
+      item.loadedQty > 0 ? item.totalWeight / item.loadedQty : globalAvgWeightPerBale;
+    return sum + articleAvg * remaining;
+  }, 0);
 
   if (isLoading) {
     return (
