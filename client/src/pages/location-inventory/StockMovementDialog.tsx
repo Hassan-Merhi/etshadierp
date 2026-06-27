@@ -92,7 +92,7 @@ export function StockMovementDialog({
             </div>
             {!drillMonth && (
               <div className="flex items-center gap-2">
-                <PeriodFilter value={stockMovementPeriod} onValueChange={setStockMovementPeriod} compact />
+                <PeriodFilter value={stockMovementPeriod} onChange={setStockMovementPeriod} />
               </div>
             )}
           </div>
