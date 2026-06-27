@@ -51,6 +51,7 @@ export function SystemToolsTab({ appMode, currentUser, selectedCompany, companie
   const [, navigate] = useLocation();
   const isDev = currentUser?.role === "Developer";
   const isFactory = appMode === "factory";
+  const isProperties = appMode === "properties";
 
   const [isZeroBalanceDialogOpen, setIsZeroBalanceDialogOpen] = useState(false);
   const [isInitBalancesDialogOpen, setIsInitBalancesDialogOpen] = useState(false);
@@ -87,7 +88,11 @@ export function SystemToolsTab({ appMode, currentUser, selectedCompany, companie
     },
   });
 
-  const netPositionPath = isFactory ? "/factory/net-position-details" : "/net-position-details";
+  const netPositionPath = isFactory
+    ? "/factory/net-position-details"
+    : isProperties
+    ? "/properties/net-position-details"
+    : "/net-position-details";
 
   const cards: ToolCard[] = [
     {
