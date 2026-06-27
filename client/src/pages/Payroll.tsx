@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { PageHeader } from "@/components/PageHeader";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
@@ -174,9 +174,32 @@ export default function Payroll() {
     enabled: !!selectedCompany,
   });
 
-  const { data: cashAccounts = [] } = useQuery<any[]>({
-    queryKey: ["/api/cash-accounts"],
+  const { data: ledgerAccountsList = [] } = useQuery<any[]>({
+    queryKey: ["/api/ledger-accounts", selectedCompany?.id],
+    queryFn: async () => {
+      if (!selectedCompany?.id) return [];
+      const res = await fetch(`/api/ledger-accounts?companyId=${selectedCompany.id}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch ledger accounts");
+      return res.json();
+    },
     enabled: !!selectedCompany,
+  });
+  const cashAccounts = useMemo(
+    () => ledgerAccountsList.filter((a: any) => a.accountType === "Cash"),
+    [ledgerAccountsList]
+  );
+
+  const { data: employeeTransactions = [], isLoading: transactionsLoading } = useQuery<any[]>({
+    queryKey: ["/api/accounts/employee", statementEmployee?.id],
+    queryFn: async () => {
+      if (!statementEmployee) return [];
+      const res = await fetch(`/api/accounts/employee/${statementEmployee.id}/transactions`, {
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Failed to fetch employee transactions");
+      return res.json();
+    },
+    enabled: !!statementEmployee,
   });
 
   const { data: employeeGroups = [] } = useQuery<any[]>({
@@ -278,15 +301,36 @@ export default function Payroll() {
   const createEmployeeForm = useForm<any>();
   const editEmployeeForm = useForm<any>();
 
+  // Reset statementExpanded whenever a new employee statement is opened
+  useEffect(() => {
+    if (statementEmployee) setStatementExpanded(false);
+  }, [statementEmployee?.id]);
+
+  const cleanTxnDesc = (desc: string) => {
+    if (!desc) return "-";
+    return (
+      desc
+        .replace(/^(SAL-DEP|SAL-WD|SAL-BON)-[\w-]+\s*/i, "")
+        .replace(/\s*-\s*(SAL-DEP|SAL-WD|SAL-BON)-[\w-]+$/i, "")
+        .trim() || desc
+    );
+  };
+
   // Mutations (Logic simplified for orchestrator)
   const depositMutation = useMutation({
     mutationFn: async (data: DepositFormData) => {
       if (!selectedEmployee) throw new Error("No employee selected");
-      return await modeApiRequest("POST", `/api/employees/${selectedEmployee.id}/deposit`, data);
+      return await modeApiRequest("POST", "/api/payroll/deposit-employee", {
+        employeeId: selectedEmployee.id,
+        amount: data.amount,
+        date: data.date,
+        notes: data.notes || "",
+      });
     },
     onSuccess: () => {
       toast({ title: "Success", description: "Deposit recorded successfully" });
       queryClient.invalidateQueries({ queryKey: ["/api/employees", selectedCompany?.id] });
+      queryClient.invalidateQueries({ queryKey: ["/api/accounts/employee", selectedEmployee?.id] });
       setDepositDialogOpen(false);
       depositForm.reset();
     },
@@ -295,11 +339,19 @@ export default function Payroll() {
   const withdrawalMutation = useMutation({
     mutationFn: async (data: WithdrawalFormData) => {
       if (!selectedEmployee) throw new Error("No employee selected");
-      return await modeApiRequest("POST", `/api/employees/${selectedEmployee.id}/withdraw`, data);
+      return await modeApiRequest("POST", "/api/payroll/withdraw-employee", {
+        employeeId: selectedEmployee.id,
+        amount: data.amount,
+        paymentAccountType: data.paymentAccountType,
+        paymentAccountId: data.paymentAccountId,
+        date: data.date,
+        notes: data.notes || "",
+      });
     },
     onSuccess: () => {
       toast({ title: "Success", description: "Withdrawal recorded successfully" });
       queryClient.invalidateQueries({ queryKey: ["/api/employees", selectedCompany?.id] });
+      queryClient.invalidateQueries({ queryKey: ["/api/accounts/employee", selectedEmployee?.id] });
       setWithdrawalDialogOpen(false);
       withdrawalForm.reset();
     },
@@ -314,6 +366,13 @@ export default function Payroll() {
 
   const handleWithdrawal = (emp: Employee) => {
     setSelectedEmployee(emp);
+    withdrawalForm.reset({
+      amount: "",
+      paymentAccountType: "cash",
+      paymentAccountId: "",
+      date: new Date().toLocaleDateString("en-CA"),
+      notes: "",
+    });
     setWithdrawalDialogOpen(true);
   };
 
@@ -519,6 +578,16 @@ export default function Payroll() {
         cashAccounts={cashAccounts}
         bankAccounts={bankAccounts}
         bankAccountsLoading={bankAccountsLoading}
+      />
+
+      <EmployeeStatementDialog
+        statementEmployee={statementEmployee}
+        setStatementEmployee={setStatementEmployee}
+        transactionsLoading={transactionsLoading}
+        employeeTransactions={employeeTransactions}
+        statementExpanded={statementExpanded}
+        setStatementExpanded={setStatementExpanded as any}
+        cleanTxnDesc={cleanTxnDesc}
       />
 
       <WorkerDeductionDialog
