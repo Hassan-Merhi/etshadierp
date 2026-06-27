@@ -10,6 +10,8 @@ import {
   FileDown,
   X,
   Clock,
+  Send,
+  Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -43,6 +45,8 @@ export function AccountStatementView({
   toggleVoucherSelection,
   handleOpenVoucher,
   openWaRuleDialog,
+  waRule,
+  sendWaStatementMutation,
   handlePrint,
   isBrokerSupplier,
   brokerStatementData,
@@ -128,15 +132,41 @@ export function AccountStatementView({
         </div>
         <div className="flex items-center gap-1 shrink-0">
           {(appMode === "factory" || appMode === "erp") && (
-            <Button
-              size="icon"
-              variant="ghost"
-              onClick={openWaRuleDialog}
-              title="WhatsApp rule"
-              data-testid="button-wa-rule"
-            >
-              <MessageCircle className="h-4 w-4" />
-            </Button>
+            <>
+              <Button
+                size="icon"
+                variant="ghost"
+                onClick={openWaRuleDialog}
+                title="Configure WhatsApp rule"
+                data-testid="button-wa-rule"
+              >
+                <MessageCircle className={`h-4 w-4 ${waRule?.enabled ? "text-green-500" : ""}`} />
+              </Button>
+              {waRule?.enabled && (
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  disabled={sendWaStatementMutation?.isPending}
+                  onClick={() => {
+                    const month = periodFilter?.toDate
+                      ? periodFilter.toDate.substring(0, 7)
+                      : new Date().toISOString().substring(0, 7);
+                    sendWaStatementMutation?.mutate({
+                      accountId: selectedAccount.accountId,
+                      month,
+                    });
+                  }}
+                  title="Send statement via WhatsApp"
+                  data-testid="button-wa-send"
+                >
+                  {sendWaStatementMutation?.isPending ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Send className="h-4 w-4 text-green-500" />
+                  )}
+                </Button>
+              )}
+            </>
           )}
           <Button size="icon" variant="ghost" onClick={handlePrint} title="Print / Export" data-testid="button-print">
             <FileDown className="h-4 w-4" />
