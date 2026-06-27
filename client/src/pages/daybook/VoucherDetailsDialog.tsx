@@ -12,7 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { getVoucherTypeBadge } from "@/lib/voucherTypeBadge";
-import { Voucher, ViewVoucherEntry } from "./types";
+import { Voucher, ViewVoucherEntry, Employee, LedgerAccount, BankAccount } from "./types";
 
 interface VoucherDetailsDialogProps {
   open: boolean;
@@ -32,6 +32,9 @@ interface VoucherDetailsDialogProps {
   poSupplierBalance: string | null;
   selectedDialogRow: number | null;
   setSelectedDialogRow: (n: number | null) => void;
+  employees?: Employee[];
+  ledgerAccounts?: LedgerAccount[];
+  bankAccounts?: BankAccount[];
   viewProfitFilter: "all" | "gain" | "loss" | "even";
   setViewProfitFilter: (v: "all" | "gain" | "loss" | "even") => void;
   user: any;
@@ -64,10 +67,30 @@ export function VoucherDetailsDialog({
   handleEdit,
   canEdit,
   navigate,
+  employees = [],
+  ledgerAccounts = [],
+  bankAccounts = [],
 }: VoucherDetailsDialogProps) {
   if (!selectedVoucher) return null;
 
   const isPOSUser = !user || user?.role === "POS";
+
+  function resolveEntryName(entry: ViewVoucherEntry): string {
+    if (entry.accountName && entry.accountName !== "Unknown Account") return entry.accountName;
+    if (entry.employeeId) {
+      const emp = employees.find((e) => e.id === entry.employeeId);
+      if (emp) return `${emp.firstName} ${emp.lastName}`;
+    }
+    if (entry.ledgerAccountId) {
+      const acct = ledgerAccounts.find((a) => a.id === entry.ledgerAccountId);
+      if (acct) return acct.name;
+    }
+    if (entry.bankAccountId) {
+      const bank = bankAccounts.find((b) => b.id === entry.bankAccountId);
+      if (bank) return bank.name;
+    }
+    return entry.accountName || "Unknown Account";
+  }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -449,6 +472,29 @@ export function VoucherDetailsDialog({
                     );
                   })()
                 ) : (
+                  <div className="space-y-3">
+                    {(selectedVoucher.voucherType === "Payment" || selectedVoucher.voucherType === "Receipt") && !isPOSUser && (() => {
+                      const isPayment = selectedVoucher.voucherType === "Payment";
+                      const counterEntry = isPayment
+                        ? viewVoucherEntries.find((e) => parseFloat(e.creditAmount || "0") > 0)
+                        : viewVoucherEntries.find((e) => parseFloat(e.debitAmount || "0") > 0 && (e.ledgerAccountId || e.bankAccountId));
+                      if (!counterEntry) return null;
+                      const counterName = resolveEntryName(counterEntry);
+                      return (
+                        <div className="flex items-center justify-between rounded-md border bg-muted/30 px-4 py-2.5 text-sm">
+                          <div>
+                            <span className="text-xs text-muted-foreground uppercase tracking-wide mr-2">
+                              {isPayment ? "Paid from" : "Received into"}
+                            </span>
+                            <span className="font-medium">{counterName}</span>
+                          </div>
+                          <div className="text-right">
+                            <span className="text-xs text-muted-foreground mr-1">Balance:</span>
+                            <span className="font-mono font-medium">{formatAmount(cashAccountBalance)}</span>
+                          </div>
+                        </div>
+                      );
+                    })()}
                   <div className="border rounded-md">
                     <Table>
                       <TableHeader className="sticky top-0 z-30 bg-background">
@@ -546,7 +592,7 @@ export function VoucherDetailsDialog({
                           return displayEntries.map((entry) => (
                             <TableRow key={entry.id}>
                               <TableCell>
-                                <div className="font-medium">{entry.accountName}</div>
+                                <div className="font-medium">{resolveEntryName(entry)}</div>
                                 {(selectedVoucher.voucherType === "Payment" ||
                                   selectedVoucher.voucherType === "Receipt" ||
                                   selectedVoucher.voucherType === "Journal") && (
@@ -682,6 +728,7 @@ export function VoucherDetailsDialog({
                         )}
                       </div>
                     )}
+                  </div>
                   </div>
                 )}
               </div>

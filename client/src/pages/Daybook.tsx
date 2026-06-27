@@ -688,6 +688,9 @@ export default function Daybook({ user }: { user?: any } = {}) {
         handleEdit={handleEdit}
         canEdit={canEdit}
         navigate={navigate}
+        employees={employees}
+        ledgerAccounts={ledgerAccounts}
+        bankAccounts={bankAccounts}
       />
 
       <VoucherEditDialog
