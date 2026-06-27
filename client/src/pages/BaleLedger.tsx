@@ -340,7 +340,8 @@ function SectionTable({
 export default function BaleLedger() {
   const { data, isLoading, refetch, isFetching } = useQuery<LedgerData>({
     queryKey: ["/api/factory/bale-ledger"],
-    staleTime: 30_000,
+    staleTime: 60_000,
+    refetchOnWindowFocus: false,
   });
 
   const grand = data?.totals.grand;

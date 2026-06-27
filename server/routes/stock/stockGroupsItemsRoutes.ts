@@ -1,5 +1,5 @@
 import type { Express } from "express";
-import { db } from "../../db";
+import { db, pool } from "../../db";
 import { storage } from "../../storage";
 import { requireAuth, requireRole, canDelete, requireNonPOS, checkPOSLocation } from "../../auth";
 import { requireActionAccess } from "../../lib/permissionMiddleware";
@@ -967,6 +967,30 @@ export function registerStockGroupsItemsRoutes(app: Express) {
       `);
 
       res.json(rows.rows);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // ── Lightweight stock-items list ─────────────────────────────────────────────
+  // Returns only id, code, name, stockGroupId, gradeId, categoryId, uom.
+  // Intended for dropdowns/searches that do not need full stock details.
+  // MUST be defined before /api/stock-items/:id to avoid route conflict.
+
+  app.get("/api/stock-items/light", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = req.session.currentCompanyId || (req.session as any).factoryCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const rows = await pool.query(
+        `SELECT id, code, name, stock_group_id AS "stockGroupId",
+                grade_id AS "gradeId", category_id AS "categoryId", uom
+         FROM stock_items
+         WHERE company_id = $1 AND deleted_at IS NULL
+         ORDER BY name`,
+        [companyId]
+      );
+      return res.json(rows.rows);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }

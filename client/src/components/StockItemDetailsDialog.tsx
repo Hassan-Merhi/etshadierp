@@ -147,6 +147,8 @@ export function StockItemDetailsDialog({
   const { data: allStockItems = [] } = useQuery<StockItem[]>({
     queryKey: ["/api/stock-items"],
     enabled: open && editingTransaction !== null,
+    staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
   });
 
   // Fetch transactions
