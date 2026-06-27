@@ -88,6 +88,7 @@ interface PreviewWorkerRow {
   advanceDeduction: number;
   totalAdvanceBalance: number;
   pendingAdvances: PendingAdvance[];
+  pendingDeductions: number;
   net: number;
   totalWorkingDays: number;
   presentDays: number;
@@ -231,6 +232,8 @@ function BatchRow({
                 <TableHead className="text-xs h-9 font-semibold">Worker</TableHead>
                 <TableHead className="text-center text-xs h-9 font-semibold">Present</TableHead>
                 <TableHead className="text-center text-xs h-9 font-semibold">Absent</TableHead>
+                <TableHead className="text-right text-xs h-9 font-semibold">Deductions</TableHead>
+                <TableHead className="text-right text-xs h-9 font-semibold">Advances</TableHead>
                 <TableHead className="text-right text-xs h-9 font-semibold">Net</TableHead>
                 <TableHead className="text-xs h-9 font-semibold">Status</TableHead>
                 <TableHead className="text-xs h-9 font-semibold">Paid On</TableHead>
@@ -277,6 +280,20 @@ function BatchRow({
                           ? Number(p.absentDays).toFixed(0)
                           : p.absentDays
                         : "—"}
+                    </TableCell>
+                    <TableCell className="text-right font-mono text-sm" data-testid={`text-deductions-${p.id}`}>
+                      {parseFloat(p.deductions || "0") > 0 ? (
+                        <span className="text-destructive">-${fmt(p.deductions)}</span>
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-right font-mono text-sm" data-testid={`text-advances-${p.id}`}>
+                      {parseFloat(p.advances || "0") > 0 ? (
+                        <span className="text-amber-600 dark:text-amber-400">-${fmt(p.advances)}</span>
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
+                      )}
                     </TableCell>
                     <TableCell className="text-right font-mono text-sm font-semibold">${fmt(p.netSalary)}</TableCell>
                     <TableCell>
@@ -1081,7 +1098,8 @@ export default function FactoryPayrollTab() {
               const monthlyRate = parseFloat(transportOverrides[r.id] ?? r.transportMonthly.toFixed(2));
               const proratedTransport =
                 hasAtt && r.totalWorkingDays > 0 ? (r.presentDays / r.totalWorkingDays) * monthlyRate : monthlyRate;
-              const computedNet = r.base + r.bonus + proratedTransport - deductAmt;
+              const salaryDeductions = r.pendingDeductions || 0;
+              const computedNet = r.base + r.bonus + proratedTransport - deductAmt - salaryDeductions;
               const isExpanded = expandedAdvanceWorkers.has(r.id);
               return (
                 <div key={r.id} className="border rounded-md" data-testid={`row-preview-${r.id}`}>
@@ -1161,6 +1179,19 @@ export default function FactoryPayrollTab() {
                       <span className="font-semibold">Net: ${computedNet.toFixed(2)}</span>
                     </div>
                   </div>
+
+                  {/* Salary Deductions section */}
+                  {salaryDeductions > 0 && (
+                    <div className="border-t bg-red-50/50 dark:bg-red-950/20 px-3 py-2">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-muted-foreground">Salary Deduction:</span>
+                        <span className="text-sm font-mono font-semibold text-destructive">
+                          -${salaryDeductions.toFixed(2)}
+                        </span>
+                        <span className="text-xs text-muted-foreground italic">(pending, applied at generation)</span>
+                      </div>
+                    </div>
+                  )}
 
                   {/* Advances section */}
                   {r.totalAdvanceBalance > 0 && (
@@ -1263,7 +1294,8 @@ export default function FactoryPayrollTab() {
                   const transportAmt =
                     rHasAtt && r.totalWorkingDays > 0 ? (r.presentDays / r.totalWorkingDays) * mRate : mRate;
                   const deductAmt = parseFloat(advanceOverrides[r.id] || "0");
-                  const net = r.base + r.bonus + transportAmt - deductAmt;
+                  const salDed = r.pendingDeductions || 0;
+                  const net = r.base + r.bonus + transportAmt - deductAmt - salDed;
                   return {
                     Name: r.name,
                     Position: r.position || "",
@@ -1274,6 +1306,7 @@ export default function FactoryPayrollTab() {
                     "Bonus ($)": r.bonus.toFixed(2),
                     "Transport/mo ($)": mRate.toFixed(2),
                     "Transport Paid ($)": transportAmt.toFixed(2),
+                    "Salary Deduction ($)": salDed.toFixed(2),
                     "Advance Deduction ($)": deductAmt.toFixed(2),
                     "Net Pay ($)": net.toFixed(2),
                   };
@@ -1284,7 +1317,8 @@ export default function FactoryPayrollTab() {
                   const transportAmt =
                     rHasAtt && r.totalWorkingDays > 0 ? (r.presentDays / r.totalWorkingDays) * mRate : mRate;
                   const deductAmt = parseFloat(advanceOverrides[r.id] || "0");
-                  return s + r.base + r.bonus + transportAmt - deductAmt;
+                  const salDed = r.pendingDeductions || 0;
+                  return s + r.base + r.bonus + transportAmt - deductAmt - salDed;
                 }, 0);
                 rows.push({
                   Name: "TOTAL",

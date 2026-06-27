@@ -283,6 +283,16 @@ export function registerPayrollCoreRoutes(app: Express) {
         advanceListByWorker[adv.workerId].push(adv);
       }
 
+      // Pending one-time salary deductions (factoryWorkerDeductions table)
+      const allPendingDeductions = await db
+        .select()
+        .from(factoryWorkerDeductions)
+        .where(and(eq(factoryWorkerDeductions.companyId, companyId), eq(factoryWorkerDeductions.applied, false)));
+      const pendingDeductionByWorker: Record<number, number> = {};
+      for (const ded of allPendingDeductions) {
+        pendingDeductionByWorker[ded.workerId] = (pendingDeductionByWorker[ded.workerId] || 0) + parseFloat(ded.amount || "0");
+      }
+
       // Transport denominator = total days in the MONTH of periodStart.
       // This ensures two half-month runs (e.g. Apr 1-15 + Apr 16-30) add up to
       // exactly the full monthly transport allowance for a fully-present worker.
@@ -355,7 +365,8 @@ export function registerPayrollCoreRoutes(app: Express) {
 
         const totalAdvanceBalance = advanceByWorker[worker.id] || 0;
         const advanceDeduction = Math.min(totalAdvanceBalance, base + bonus + transport);
-        const net = base + bonus + transport - advanceDeduction;
+        const pendingDeductions = pendingDeductionByWorker[worker.id] || 0;
+        const net = base + bonus + transport - advanceDeduction - pendingDeductions;
         const pendingAdvances = (advanceListByWorker[worker.id] || []).map((a) => ({
           id: a.id,
           advanceDate: a.advanceDate,
@@ -375,6 +386,7 @@ export function registerPayrollCoreRoutes(app: Express) {
           advanceDeduction,
           totalAdvanceBalance,
           pendingAdvances,
+          pendingDeductions,
           net,
           totalWorkingDays: transportMonthDays, // full month days — denominator used for proration
           presentDays,
