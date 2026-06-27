@@ -197,7 +197,18 @@ export default function Payroll() {
         credentials: "include",
       });
       if (!res.ok) throw new Error("Failed to fetch employee transactions");
-      return res.json();
+      const raw: any[] = await res.json();
+      return raw.map((txn: any) => {
+        const dr = parseFloat(txn.debitAmount ?? txn.debit ?? "0") || 0;
+        const cr = parseFloat(txn.creditAmount ?? txn.credit ?? "0") || 0;
+        const isDebit = dr > 0;
+        return {
+          ...txn,
+          amount: isDebit ? dr : cr,
+          isDebit,
+          date: txn.voucherDate ?? txn.date ?? "",
+        };
+      });
     },
     enabled: !!statementEmployee,
   });
