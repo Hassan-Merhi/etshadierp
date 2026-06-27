@@ -30,8 +30,7 @@ interface CombinedStockViewProps {
     locId: number | null,
     locName: string | null,
     stockItemId: number,
-    stockItemName: string,
-    e?: any
+    stockItemName: string
   ) => void;
   formatAmount: (amt: number) => string;
   posUser?: any;
@@ -291,20 +290,22 @@ export function CombinedStockView({
                       <tr
                         key={row.stockItemId}
                         className={cn(
-                          "cursor-pointer transition-colors",
+                          "transition-colors",
                           isSelected ? "bg-accent text-accent-foreground" : "hover-elevate"
                         )}
                         data-testid={`row-allstock-${row.stockItemId}`}
                         data-allstock-row-index={currentIdx}
-                        onClick={() => openMovement(null, null, row.stockItemId, row.stockItemName)}
                       >
                         <td
                           className={cn(
-                            "px-4 py-2 font-medium whitespace-nowrap sticky left-0 z-10 transition-colors",
+                            "px-4 py-2 font-medium whitespace-nowrap sticky left-0 z-10 transition-colors cursor-pointer",
                             isSelected ? "bg-accent" : "bg-background"
                           )}
+                          title="View stock movement across all locations"
+                          onClick={() => openMovement(null, null, row.stockItemId, row.stockItemName)}
+                          data-testid={`button-allstock-name-${row.stockItemId}`}
                         >
-                          {row.stockItemName}
+                          <span className="hover:underline">{row.stockItemName}</span>
                         </td>
                         {uniqueCategories.length > 0 && (
                           <td
@@ -326,10 +327,10 @@ export function CombinedStockView({
                             <td
                               key={loc.name}
                               className="px-4 py-2 text-right font-mono whitespace-nowrap text-muted-foreground hover:text-foreground hover:underline"
-                              title={`View movement for ${loc.name}`}
+                              title={cellQty > 0 ? `View movement at ${loc.name}` : undefined}
                               onClick={(e) => {
-                                if (cellQty > 0) openMovement(loc.id, loc.name, row.stockItemId, row.stockItemName, e);
-                                else e.stopPropagation();
+                                e.stopPropagation();
+                                if (cellQty > 0) openMovement(loc.id, loc.name, row.stockItemId, row.stockItemName);
                               }}
                             >
                               {cellQty > 0 ? (
