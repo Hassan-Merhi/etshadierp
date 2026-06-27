@@ -200,6 +200,75 @@ export default function Accounts() {
   const { data: currentUser } = useQuery<{ role?: string }>({ queryKey: ["/api/auth/me"] });
   const [exportLang, setExportLang] = useState<"en" | "fr" | "ar">("en");
 
+  // ─── WhatsApp rule state ─────────────────────────────────────────────────
+  const defaultWaRule: WaRule = { enabled: false, whatsappChatId: "", sendOnPayment: true, sendOnReceipt: true, sendOnJournal: true };
+  const [waRuleDialogOpen, setWaRuleDialogOpen] = useState(false);
+  const [waRuleDraft, setWaRuleDraft] = useState<WaRule>(defaultWaRule);
+  const [waChatSearch, setWaChatSearch] = useState("");
+
+  const selectedAccountIsLedger = selectedAccount?.type === "ledger";
+  const selectedAccountId = selectedAccount?.accountId ?? null;
+
+  const { data: waChatsRaw = [], isLoading: waChatsLoading } = useQuery<WaChat[]>({
+    queryKey: ["/api/whatsapp/chats"],
+    queryFn: async () => {
+      const res = await fetch("/api/whatsapp/chats", { credentials: "include" });
+      if (!res.ok) return [];
+      return res.json();
+    },
+    staleTime: 60_000,
+    enabled: waRuleDialogOpen,
+  });
+
+  const { data: waRule = null } = useQuery<WaRule | null>({
+    queryKey: ["/api/factory/accounts", selectedAccountId, "whatsapp-rule"],
+    queryFn: async () => {
+      const res = await fetch(`/api/factory/accounts/${selectedAccountId}/whatsapp-rule`, { credentials: "include" });
+      if (!res.ok) return null;
+      return res.json();
+    },
+    enabled: selectedAccountIsLedger && !!selectedAccountId,
+    staleTime: 30_000,
+  });
+
+  const filteredWaChats = useMemo(() => {
+    if (!waChatSearch.trim()) return waChatsRaw;
+    const s = waChatSearch.toLowerCase();
+    return waChatsRaw.filter((c) => c.name.toLowerCase().includes(s));
+  }, [waChatsRaw, waChatSearch]);
+
+  const openWaRuleDialog = () => {
+    setWaRuleDraft(waRule ?? defaultWaRule);
+    setWaChatSearch("");
+    setWaRuleDialogOpen(true);
+  };
+
+  const saveWaRuleMutation = useMutation({
+    mutationFn: async (rule: WaRule) => {
+      const res = await apiRequest("PUT", `/api/factory/accounts/${selectedAccountId}/whatsapp-rule`, rule);
+      if (!res.ok) throw new Error(await res.text());
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "WhatsApp rule saved" });
+      setWaRuleDialogOpen(false);
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/accounts", selectedAccountId, "whatsapp-rule"] });
+    },
+    onError: (err: any) => {
+      toast({ title: "Save failed", description: err?.message ?? "Unknown error", variant: "destructive" });
+    },
+  });
+
+  const sendWaStatementMutation = useMutation({
+    mutationFn: async ({ accountId, month }: { accountId: number; month: string }) => {
+      const res = await apiRequest("POST", `/api/factory/accounts/${accountId}/send-statement-whatsapp`, { month });
+      if (!res.ok) throw new Error((await res.json()).message || "Send failed");
+      return res.json();
+    },
+    onSuccess: () => { toast({ title: "Statement sent to WhatsApp" }); },
+    onError: (err: any) => { toast({ title: "WhatsApp send failed", description: err?.message, variant: "destructive" }); },
+  });
+
   const printRef = useRef<HTMLDivElement>(null);
   const handlePrint = useReactToPrint({
     contentRef: printRef,
@@ -372,15 +441,15 @@ export default function Accounts() {
         handleDeleteAccount={() => {}}
         pendingDelete={pendingDelete}
         setPendingDelete={setPendingDelete}
-        waRuleDialogOpen={false}
-        setWaRuleDialogOpen={() => {}}
-        waChatSearch=""
-        setWaChatSearch={() => {}}
-        waRuleDraft={{} as WaRule}
-        setWaRuleDraft={() => {}}
-        filteredWaChats={[]}
-        saveWaRuleMutation={{}}
-        waChatsLoading={false}
+        waRuleDialogOpen={waRuleDialogOpen}
+        setWaRuleDialogOpen={setWaRuleDialogOpen}
+        waChatSearch={waChatSearch}
+        setWaChatSearch={setWaChatSearch}
+        waRuleDraft={waRuleDraft}
+        setWaRuleDraft={setWaRuleDraft}
+        filteredWaChats={filteredWaChats}
+        saveWaRuleMutation={saveWaRuleMutation}
+        waChatsLoading={waChatsLoading}
       />
 
       <Tabs defaultValue="view" className="space-y-6">
@@ -504,9 +573,9 @@ export default function Accounts() {
               formatDisplayDate={formatDisplayDate}
               toggleVoucherSelection={toggleVoucherSelection}
               handleOpenVoucher={handleOpenVoucher}
-              waRule={null}
-              openWaRuleDialog={() => {}}
-              sendWaStatementMutation={{}}
+              waRule={selectedAccountIsLedger ? (waRule ?? null) : null}
+              openWaRuleDialog={selectedAccountIsLedger ? openWaRuleDialog : () => {}}
+              sendWaStatementMutation={sendWaStatementMutation}
               isMultiCurrency={isMultiCurrency}
               isBrokerSupplier={false}
               brokerStatementData={null}
