@@ -1376,6 +1376,7 @@ function AuthenticatedApp() {
                         <Route path="/properties/vouchers">{() => <PropertiesVouchers />}</Route>
                         <Route path="/properties/create" component={PropertiesCreate} />
                         <Route path="/properties/analytics" component={PropertiesAnalytics} />
+                        <Route path="/properties/agents" component={Agents} />
                         <Route path="/properties/daybook" component={PropertiesDaybook} />
                         <Route path="/properties/rental/warehouses" component={PropertiesRentalWarehouses} />
                         <Route path="/properties/rental/shops" component={PropertiesRentalShops} />

@@ -9,6 +9,7 @@ import {
   ArrowLeftRight,
   KeyRound,
   BarChart2,
+  UserRound,
 } from "lucide-react";
 import { Sidebar, SidebarContent } from "@/components/ui/sidebar";
 import { useMemo } from "react";
@@ -47,6 +48,7 @@ export const PROPERTIES_NAV_SECTIONS: NavSection[] = [
       { title: "Accounts", url: "/properties/accounts", icon: Landmark },
       { title: "Vouchers", url: "/properties/vouchers", icon: FileText },
       { title: "Analytics", url: "/properties/analytics", icon: BarChart2 },
+      { title: "Agent Ledger", url: "/properties/agents", icon: UserRound },
     ],
   },
 ];
