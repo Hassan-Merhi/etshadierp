@@ -263,24 +263,32 @@ export function registerPayrollCoreRoutes(app: Express) {
         attendanceByWorker.set(att.workerId, list);
       }
 
-      // Outstanding advances (salary deduction type)
+      // Outstanding advances — all unpaid (both salary_deduction and manual_repayment/loan)
       const allAdvances = await db
         .select()
         .from(factoryWorkerAdvances)
         .where(
           and(
             eq(factoryWorkerAdvances.companyId, companyId),
-            eq(factoryWorkerAdvances.fullyPaid, false),
-            eq(factoryWorkerAdvances.repaymentType, "salary_deduction")
+            eq(factoryWorkerAdvances.fullyPaid, false)
           )
         )
         .orderBy(factoryWorkerAdvances.advanceDate);
+      // Separate salary-deduction advances (auto-deducted from pay) from loans (informational only)
       const advanceByWorker: Record<number, number> = {};
       const advanceListByWorker: Record<number, typeof allAdvances> = {};
+      const loanListByWorker: Record<number, typeof allAdvances> = {};
+      const loanBalByWorker: Record<number, number> = {};
       for (const adv of allAdvances) {
-        advanceByWorker[adv.workerId] = (advanceByWorker[adv.workerId] || 0) + parseFloat(adv.remainingBalance || "0");
-        if (!advanceListByWorker[adv.workerId]) advanceListByWorker[adv.workerId] = [];
-        advanceListByWorker[adv.workerId].push(adv);
+        if (adv.repaymentType === "salary_deduction") {
+          advanceByWorker[adv.workerId] = (advanceByWorker[adv.workerId] || 0) + parseFloat(adv.remainingBalance || "0");
+          if (!advanceListByWorker[adv.workerId]) advanceListByWorker[adv.workerId] = [];
+          advanceListByWorker[adv.workerId].push(adv);
+        } else {
+          loanBalByWorker[adv.workerId] = (loanBalByWorker[adv.workerId] || 0) + parseFloat(adv.remainingBalance || "0");
+          if (!loanListByWorker[adv.workerId]) loanListByWorker[adv.workerId] = [];
+          loanListByWorker[adv.workerId].push(adv);
+        }
       }
 
       // Pending one-time salary deductions (factoryWorkerDeductions table)
@@ -373,7 +381,17 @@ export function registerPayrollCoreRoutes(app: Express) {
           amount: a.amount,
           remainingBalance: a.remainingBalance,
           notes: a.notes,
+          repaymentType: a.repaymentType,
         }));
+        const outstandingLoans = (loanListByWorker[worker.id] || []).map((a) => ({
+          id: a.id,
+          advanceDate: a.advanceDate,
+          amount: a.amount,
+          remainingBalance: a.remainingBalance,
+          notes: a.notes,
+          repaymentType: a.repaymentType,
+        }));
+        const totalLoanBalance = loanBalByWorker[worker.id] || 0;
 
         return {
           id: worker.id,
@@ -387,6 +405,8 @@ export function registerPayrollCoreRoutes(app: Express) {
           totalAdvanceBalance,
           pendingAdvances,
           pendingDeductions,
+          outstandingLoans,
+          totalLoanBalance,
           net,
           totalWorkingDays: transportMonthDays, // full month days — denominator used for proration
           presentDays,

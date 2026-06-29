@@ -89,6 +89,8 @@ interface PreviewWorkerRow {
   totalAdvanceBalance: number;
   pendingAdvances: PendingAdvance[];
   pendingDeductions: number;
+  outstandingLoans: PendingAdvance[];
+  totalLoanBalance: number;
   net: number;
   totalWorkingDays: number;
   presentDays: number;
@@ -1275,6 +1277,29 @@ export default function FactoryPayrollTab() {
                           ))}
                         </div>
                       )}
+                    </div>
+                  )}
+
+                  {/* Outstanding Loans section (informational — not deducted from salary) */}
+                  {(r.outstandingLoans?.length ?? 0) > 0 && (
+                    <div className="border-t bg-blue-50/40 dark:bg-blue-950/20 px-3 py-2 space-y-1">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-muted-foreground">
+                          Outstanding Loan{(r.outstandingLoans?.length ?? 0) !== 1 ? "s" : ""} (manual repayment — not deducted from salary):
+                        </span>
+                        <span className="text-sm font-mono font-medium text-blue-700 dark:text-blue-400">
+                          ${(r.totalLoanBalance ?? 0).toFixed(2)}
+                        </span>
+                      </div>
+                      <div className="space-y-0.5">
+                        {r.outstandingLoans?.map((loan) => (
+                          <div key={loan.id} className="flex flex-wrap gap-2 text-xs text-muted-foreground">
+                            <span className="font-mono">{loan.advanceDate}</span>
+                            <span>Remaining: <span className="font-mono font-medium">${parseFloat(loan.remainingBalance).toFixed(2)}</span></span>
+                            {loan.notes && <span className="italic truncate max-w-[200px]">{loan.notes}</span>}
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   )}
                 </div>
