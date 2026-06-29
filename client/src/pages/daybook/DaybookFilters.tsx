@@ -1,6 +1,5 @@
-import { Search, X, ChevronLeft, ChevronRight } from "lucide-react";
+import { Search, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { PeriodFilter, PeriodFilterValue, getDefaultPeriodValue } from "@/components/ui/period-filter";
@@ -25,11 +24,8 @@ export function DaybookFilters({
   setPeriodFilter,
   filters,
   setFilters,
-  onPrevDay,
-  onNextDay,
 }: DaybookFiltersProps) {
   const hasActiveFilters =
-    periodFilter.preset !== "today" ||
     filters.voucherType !== "all" ||
     !!filters.searchQuery ||
     !!filters.minAmount ||
@@ -38,15 +34,14 @@ export function DaybookFilters({
 
   return (
     <div className="flex flex-col gap-2">
-      {/* Single row: prev | date | next | types | status | search */}
+      {/* Single row: date | types | status | search */}
       <div className="flex flex-wrap items-center gap-2">
-        <Button variant="ghost" size="icon" onClick={onPrevDay} title="Previous day (−)" data-testid="button-prev-day">
-          <ChevronLeft className="h-4 w-4" />
-        </Button>
-        <PeriodFilter value={periodFilter} onChange={setPeriodFilter} data-testid="period-filter" />
-        <Button variant="ghost" size="icon" onClick={onNextDay} title="Next day (+)" data-testid="button-next-day">
-          <ChevronRight className="h-4 w-4" />
-        </Button>
+        <PeriodFilter
+          value={periodFilter}
+          onChange={setPeriodFilter}
+          hideCustomInputs
+          data-testid="period-filter"
+        />
 
         <Select value={filters.voucherType} onValueChange={(value) => setFilters({ ...filters, voucherType: value })}>
           <SelectTrigger
@@ -102,19 +97,6 @@ export function DaybookFilters({
       {hasActiveFilters && (
         <div className="flex flex-wrap items-center gap-1.5">
           <span className="text-xs text-muted-foreground">Active:</span>
-          {periodFilter.preset !== "today" && (
-            <Badge
-              variant="secondary"
-              className="gap-1 cursor-pointer text-xs"
-              onClick={() => setPeriodFilter(getDefaultPeriodValue("today"))}
-              data-testid="chip-period"
-            >
-              {periodFilter.preset === "custom"
-                ? `${periodFilter.fromDate} – ${periodFilter.toDate}`
-                : periodFilter.preset}
-              <X className="h-3 w-3" />
-            </Badge>
-          )}
           {filters.voucherType !== "all" && (
             <Badge
               variant="secondary"
