@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { db } from "../../db";
 import { requireAuth } from "../../auth";
-import { eq, and, desc, sql } from "drizzle-orm";
+import { eq, and, desc, sql, asc } from "drizzle-orm";
 import {
   insuranceMembers,
   insertInsuranceMemberSchema,
@@ -10,6 +10,11 @@ import {
   voucherEntries,
 } from "@shared/schema";
 import { z } from "zod";
+
+/** Derive the active company for this request from the session (mirrors payroll pattern). */
+function getFactoryCompanyId(req: any): number | undefined {
+  return (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+}
 
 /** Find or create a ledger account by name for a company. */
 async function findOrCreateLedger(
@@ -40,12 +45,14 @@ export function registerFactoryInsuranceRoutes(app: Express) {
   // GET /api/insurance/members — list members for a company
   app.get("/api/insurance/members", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = parseInt(req.query.companyId as string);
+      const companyId = req.query.companyId
+        ? parseInt(req.query.companyId as string)
+        : getFactoryCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "companyId required" });
 
       const includeInactive = req.query.includeInactive === "true";
 
-      const conditions = [eq(insuranceMembers.companyId, companyId)];
+      const conditions: any[] = [eq(insuranceMembers.companyId, companyId)];
       if (!includeInactive) conditions.push(eq(insuranceMembers.active, true));
 
       const rows = await db
@@ -61,10 +68,57 @@ export function registerFactoryInsuranceRoutes(app: Express) {
     }
   });
 
+  // GET /api/insurance/members/:id/entries — ledger entries for a member
+  app.get("/api/insurance/members/:id/entries", requireAuth, async (req: any, res: any) => {
+    try {
+      const id = parseInt(req.params.id);
+      const companyId = req.query.companyId
+        ? parseInt(req.query.companyId as string)
+        : getFactoryCompanyId(req);
+      if (!companyId) return res.status(400).json({ message: "companyId required" });
+
+      const [member] = await db
+        .select()
+        .from(insuranceMembers)
+        .where(and(eq(insuranceMembers.id, id), eq(insuranceMembers.companyId, companyId)));
+      if (!member) return res.status(404).json({ message: "Member not found" });
+      if (!member.ledgerAccountId) return res.json([]);
+
+      const entries = await db
+        .select({
+          id: voucherEntries.id,
+          voucherId: voucherEntries.voucherId,
+          voucherNumber: vouchers.voucherNumber,
+          voucherDate: vouchers.voucherDate,
+          description: vouchers.description,
+          debitAmount: voucherEntries.debitAmount,
+          creditAmount: voucherEntries.creditAmount,
+          narration: voucherEntries.narration,
+        })
+        .from(voucherEntries)
+        .innerJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
+        .where(
+          and(
+            eq(voucherEntries.ledgerAccountId, member.ledgerAccountId),
+            eq(vouchers.companyId, companyId)
+          )
+        )
+        .orderBy(desc(vouchers.voucherDate), desc(vouchers.id));
+
+      res.json(entries);
+    } catch (err: any) {
+      console.error("GET /api/insurance/members/:id/entries error:", err);
+      res.status(500).json({ message: err.message || "Failed to fetch entries" });
+    }
+  });
+
   // POST /api/insurance/members — create a new member
   app.post("/api/insurance/members", requireAuth, async (req: any, res: any) => {
     try {
-      const parsed = insertInsuranceMemberSchema.safeParse(req.body);
+      const companyId = req.body.companyId || getFactoryCompanyId(req);
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const parsed = insertInsuranceMemberSchema.safeParse({ ...req.body, companyId });
       if (!parsed.success) {
         return res.status(400).json({ message: "Validation failed", errors: parsed.error.errors });
       }
@@ -87,16 +141,20 @@ export function registerFactoryInsuranceRoutes(app: Express) {
     }
   });
 
-  // PATCH /api/insurance/members/:id — update a member
+  // PATCH /api/insurance/members/:id — update a member (enforces company ownership)
   app.patch("/api/insurance/members/:id", requireAuth, async (req: any, res: any) => {
     try {
       const id = parseInt(req.params.id);
       if (!id) return res.status(400).json({ message: "Invalid id" });
 
+      const companyId = req.body.companyId || getFactoryCompanyId(req);
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      // Enforce company ownership
       const [existing] = await db
         .select()
         .from(insuranceMembers)
-        .where(eq(insuranceMembers.id, id));
+        .where(and(eq(insuranceMembers.id, id), eq(insuranceMembers.companyId, companyId)));
       if (!existing) return res.status(404).json({ message: "Member not found" });
 
       const updateSchema = insertInsuranceMemberSchema.partial().omit({ companyId: true });
@@ -112,13 +170,18 @@ export function registerFactoryInsuranceRoutes(app: Express) {
         await db
           .update(ledgerAccounts)
           .set({ name: `Insurance - ${data.name}` })
-          .where(eq(ledgerAccounts.id, existing.ledgerAccountId));
+          .where(
+            and(
+              eq(ledgerAccounts.id, existing.ledgerAccountId),
+              eq(ledgerAccounts.companyId, companyId)
+            )
+          );
       }
 
       const [updated] = await db
         .update(insuranceMembers)
         .set(data)
-        .where(eq(insuranceMembers.id, id))
+        .where(and(eq(insuranceMembers.id, id), eq(insuranceMembers.companyId, companyId)))
         .returning();
 
       res.json(updated);
@@ -128,20 +191,24 @@ export function registerFactoryInsuranceRoutes(app: Express) {
     }
   });
 
-  // PATCH /api/insurance/members/:id/toggle — toggle active status
+  // PATCH /api/insurance/members/:id/toggle — toggle active status (enforces company ownership)
   app.patch("/api/insurance/members/:id/toggle", requireAuth, async (req: any, res: any) => {
     try {
       const id = parseInt(req.params.id);
+      const companyId = req.body?.companyId || getFactoryCompanyId(req);
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      // Enforce company ownership
       const [existing] = await db
         .select()
         .from(insuranceMembers)
-        .where(eq(insuranceMembers.id, id));
+        .where(and(eq(insuranceMembers.id, id), eq(insuranceMembers.companyId, companyId)));
       if (!existing) return res.status(404).json({ message: "Member not found" });
 
       const [updated] = await db
         .update(insuranceMembers)
         .set({ active: !existing.active })
-        .where(eq(insuranceMembers.id, id))
+        .where(and(eq(insuranceMembers.id, id), eq(insuranceMembers.companyId, companyId)))
         .returning();
 
       res.json(updated);
@@ -164,14 +231,16 @@ export function registerFactoryInsuranceRoutes(app: Express) {
         return res.status(400).json({ message: "Validation failed", errors: parsed.error.errors });
       }
 
-      const { companyId, month, year } = parsed.data;
+      const { month, year } = parsed.data;
+      const companyId = parsed.data.companyId || getFactoryCompanyId(req);
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       // Period: first and last day of the chosen month
       const periodStart = `${year}-${String(month).padStart(2, "0")}-01`;
       const lastDay = new Date(year, month, 0).getDate();
       const periodEnd = `${year}-${String(month).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
 
-      // Fetch active members whose startDate <= periodEnd
+      // Fetch active members whose startDate <= periodEnd, scoped to company
       const members = await db
         .select()
         .from(insuranceMembers)
@@ -200,16 +269,15 @@ export function registerFactoryInsuranceRoutes(app: Express) {
           await db
             .update(insuranceMembers)
             .set({ ledgerAccountId: ledgerId })
-            .where(eq(insuranceMembers.id, member.id));
+            .where(and(eq(insuranceMembers.id, member.id), eq(insuranceMembers.companyId, companyId)));
         }
 
         // Prorate for partial first month
         let memberAmount = parseFloat(member.amount);
         if (member.startDate > periodStart && member.startDate <= periodEnd) {
           const startDay = parseInt(member.startDate.split("-")[2]);
-          const daysInMonth = lastDay;
-          const daysActive = daysInMonth - startDay + 1;
-          memberAmount = parseFloat(((memberAmount / daysInMonth) * daysActive).toFixed(2));
+          const daysActive = lastDay - startDay + 1;
+          memberAmount = parseFloat(((memberAmount / lastDay) * daysActive).toFixed(2));
         }
 
         memberLedgers.push({ memberId: member.id, ledgerId, amount: memberAmount });
@@ -223,15 +291,6 @@ export function registerFactoryInsuranceRoutes(app: Express) {
       const voucherNumber = `INS-${year}-${String(month).padStart(2, "0")}-${Date.now()}`;
       const narration = `Insurance entries for ${monthLabel}`;
 
-      // Build journal entries: Dr Insurance Expense (total) + Cr each member account
-      const journalEntries: {
-        voucherId: number;
-        ledgerAccountId: number;
-        debitAmount: string;
-        creditAmount: string;
-        narration: string;
-      }[] = [];
-
       const result = await db.transaction(async (tx) => {
         const [newVoucher] = await tx
           .insert(vouchers)
@@ -244,38 +303,37 @@ export function registerFactoryInsuranceRoutes(app: Express) {
             totalAmount: totalAmount.toFixed(2),
             sourceModule: "ERP",
           })
-          .returning({ id: vouchers.id });
+          .returning({ id: vouchers.id, voucherNumber: vouchers.voucherNumber });
 
         const vId = newVoucher.id;
 
-        // Debit: Insurance Expense (total)
-        journalEntries.push({
-          voucherId: vId,
-          ledgerAccountId: expenseAccount.id,
-          debitAmount: totalAmount.toFixed(2),
-          creditAmount: "0",
-          narration,
-        });
-
-        // Credit: each member's personal account
-        for (const ml of memberLedgers) {
-          journalEntries.push({
+        const journalEntries = [
+          // Debit: Insurance Expense (total)
+          {
+            voucherId: vId,
+            ledgerAccountId: expenseAccount.id,
+            debitAmount: totalAmount.toFixed(2),
+            creditAmount: "0",
+            narration,
+          },
+          // Credit: each member's personal account
+          ...memberLedgers.map((ml) => ({
             voucherId: vId,
             ledgerAccountId: ml.ledgerId,
             debitAmount: "0",
             creditAmount: ml.amount.toFixed(2),
             narration,
-          });
-        }
+          })),
+        ];
 
         await tx.insert(voucherEntries).values(journalEntries);
 
-        return { voucherId: vId };
+        return { voucherId: vId, voucherNumber: newVoucher.voucherNumber };
       });
 
       res.json({
         voucherId: result.voucherId,
-        voucherNumber,
+        voucherNumber: result.voucherNumber,
         totalAmount,
         membersCount: eligibleMembers.length,
         period: monthLabel,
