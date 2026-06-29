@@ -8,7 +8,7 @@ import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
-import { MessageSquare, Plus, Trash2, Users, CheckCircle, XCircle, ChevronDown, ChevronRight } from "lucide-react";
+import { MessageSquare, Plus, Trash2, Users, CheckCircle, XCircle, ChevronDown, ChevronRight, RefreshCw, Loader2, AlertTriangle, Moon } from "lucide-react";
 
 interface WaSettings {
   instanceId: string;
@@ -31,6 +31,15 @@ interface GreenChat {
   type: string;
 }
 
+type InstanceState =
+  | "authorized"
+  | "notAuthorized"
+  | "sleepMode"
+  | "starting"
+  | "yellowCard"
+  | "notConfigured"
+  | "unknown";
+
 export function WhatsAppExportSection() {
   const { toast } = useToast();
   const [expanded, setExpanded] = useState(false);
@@ -39,10 +48,22 @@ export function WhatsAppExportSection() {
   const [showGroupPicker, setShowGroupPicker] = useState(false);
   const [newChatId, setNewChatId] = useState("");
   const [newName, setNewName] = useState("");
+  const [checkStateEnabled, setCheckStateEnabled] = useState(false);
 
   const { data: settings } = useQuery<WaSettings>({
     queryKey: ["/api/whatsapp/settings"],
     enabled: expanded,
+  });
+
+  const {
+    data: instanceStateData,
+    isLoading: instanceStateLoading,
+    refetch: refetchInstanceState,
+  } = useQuery<{ state: InstanceState }>({
+    queryKey: ["/api/whatsapp/instance-state/main"],
+    enabled: checkStateEnabled && expanded,
+    staleTime: 10_000,
+    retry: false,
   });
 
   const { data: recipients = [], isLoading: loadingRecipients } = useQuery<Recipient[]>({
@@ -187,14 +208,81 @@ export function WhatsAppExportSection() {
                 />
               </div>
             </div>
-            <Button
-              size="default"
-              onClick={() => saveSettings.mutate()}
-              disabled={saveSettings.isPending}
-              data-testid="button-wa-save-credentials"
-            >
-              {saveSettings.isPending ? "Saving…" : "Save Credentials"}
-            </Button>
+            <div className="flex items-center gap-2 flex-wrap">
+              <Button
+                size="default"
+                onClick={() => saveSettings.mutate()}
+                disabled={saveSettings.isPending}
+                data-testid="button-wa-save-credentials"
+              >
+                {saveSettings.isPending ? "Saving…" : "Save Credentials"}
+              </Button>
+              {settings?.hasCredentials && (
+                <Button
+                  size="default"
+                  variant="outline"
+                  onClick={() => {
+                    setCheckStateEnabled(true);
+                    refetchInstanceState();
+                  }}
+                  disabled={instanceStateLoading}
+                  data-testid="button-check-main-instance-state"
+                >
+                  {instanceStateLoading ? (
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  ) : (
+                    <RefreshCw className="h-4 w-4 mr-2" />
+                  )}
+                  Check Status
+                </Button>
+              )}
+              {instanceStateData && (
+                instanceStateData.state === "authorized" ? (
+                  <Badge variant="secondary" className="gap-1 text-green-700 bg-green-100 dark:bg-green-950 dark:text-green-300">
+                    <CheckCircle className="h-3 w-3" />
+                    Authorized
+                  </Badge>
+                ) : instanceStateData.state === "sleepMode" ? (
+                  <Badge variant="secondary" className="gap-1 text-amber-700 bg-amber-100 dark:bg-amber-950 dark:text-amber-300">
+                    <Moon className="h-3 w-3" />
+                    Sleeping
+                  </Badge>
+                ) : instanceStateData.state === "notAuthorized" ? (
+                  <Badge variant="secondary" className="gap-1 text-red-700 bg-red-100 dark:bg-red-950 dark:text-red-300">
+                    <XCircle className="h-3 w-3" />
+                    Not authorized
+                  </Badge>
+                ) : instanceStateData.state === "yellowCard" ? (
+                  <Badge variant="secondary" className="gap-1 text-orange-700 bg-orange-100 dark:bg-orange-950 dark:text-orange-300">
+                    <AlertTriangle className="h-3 w-3" />
+                    Warning
+                  </Badge>
+                ) : (
+                  <Badge variant="secondary" className="gap-1">
+                    <XCircle className="h-3 w-3 text-muted-foreground" />
+                    Unknown
+                  </Badge>
+                )
+              )}
+            </div>
+            {instanceStateData?.state === "sleepMode" && (
+              <p className="text-xs text-amber-700 dark:text-amber-400 mt-2 bg-amber-50 dark:bg-amber-950/40 rounded px-2 py-1.5">
+                Your Green API instance is in sleep mode. Log in to{" "}
+                <a href="https://console.green-api.com" target="_blank" rel="noreferrer" className="underline font-medium">
+                  console.green-api.com
+                </a>{" "}
+                and wake up your instance — messages won't be delivered while asleep.
+              </p>
+            )}
+            {instanceStateData?.state === "notAuthorized" && (
+              <p className="text-xs text-red-700 dark:text-red-400 mt-2 bg-red-50 dark:bg-red-950/40 rounded px-2 py-1.5">
+                Your WhatsApp session has expired. Go to{" "}
+                <a href="https://console.green-api.com" target="_blank" rel="noreferrer" className="underline font-medium">
+                  console.green-api.com
+                </a>{" "}
+                and scan the QR code to reconnect.
+              </p>
+            )}
           </div>
 
           <Separator />

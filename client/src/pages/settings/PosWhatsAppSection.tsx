@@ -27,6 +27,8 @@ import {
   RefreshCw,
   CheckCircle,
   XCircle,
+  AlertTriangle,
+  Moon,
   Save,
   Eye,
   EyeOff,
@@ -51,6 +53,81 @@ interface PosInstanceSettings {
   hasCredentials: boolean;
 }
 
+type InstanceState =
+  | "authorized"
+  | "notAuthorized"
+  | "sleepMode"
+  | "starting"
+  | "yellowCard"
+  | "notConfigured"
+  | "unknown";
+
+function InstanceStateBadge({ state, loading }: { state: InstanceState | undefined; loading: boolean }) {
+  if (loading) {
+    return (
+      <Badge variant="secondary" className="gap-1" data-testid="badge-instance-state">
+        <Loader2 className="h-3 w-3 animate-spin" />
+        Checking…
+      </Badge>
+    );
+  }
+  if (!state) return null;
+  if (state === "authorized") {
+    return (
+      <Badge variant="secondary" className="gap-1 text-green-700 bg-green-100 dark:bg-green-950 dark:text-green-300" data-testid="badge-instance-state">
+        <CheckCircle className="h-3 w-3" />
+        Authorized
+      </Badge>
+    );
+  }
+  if (state === "sleepMode") {
+    return (
+      <Badge variant="secondary" className="gap-1 text-amber-700 bg-amber-100 dark:bg-amber-950 dark:text-amber-300" data-testid="badge-instance-state">
+        <Moon className="h-3 w-3" />
+        Sleeping — messages won't send
+      </Badge>
+    );
+  }
+  if (state === "notAuthorized") {
+    return (
+      <Badge variant="secondary" className="gap-1 text-red-700 bg-red-100 dark:bg-red-950 dark:text-red-300" data-testid="badge-instance-state">
+        <XCircle className="h-3 w-3" />
+        Not authorized — scan QR code
+      </Badge>
+    );
+  }
+  if (state === "yellowCard") {
+    return (
+      <Badge variant="secondary" className="gap-1 text-orange-700 bg-orange-100 dark:bg-orange-950 dark:text-orange-300" data-testid="badge-instance-state">
+        <AlertTriangle className="h-3 w-3" />
+        Warning — account at risk
+      </Badge>
+    );
+  }
+  if (state === "starting") {
+    return (
+      <Badge variant="secondary" className="gap-1 text-blue-700 bg-blue-100 dark:bg-blue-950 dark:text-blue-300" data-testid="badge-instance-state">
+        <Loader2 className="h-3 w-3 animate-spin" />
+        Starting up…
+      </Badge>
+    );
+  }
+  if (state === "notConfigured") {
+    return (
+      <Badge variant="secondary" className="gap-1" data-testid="badge-instance-state">
+        <XCircle className="h-3 w-3 text-muted-foreground" />
+        Not configured
+      </Badge>
+    );
+  }
+  return (
+    <Badge variant="secondary" className="gap-1" data-testid="badge-instance-state">
+      <XCircle className="h-3 w-3 text-muted-foreground" />
+      Unknown
+    </Badge>
+  );
+}
+
 export function PosWhatsAppSection() {
   const { toast } = useToast();
 
@@ -60,6 +137,7 @@ export function PosWhatsAppSection() {
   const [enabled, setEnabled] = useState(true);
   const [showToken, setShowToken] = useState(false);
   const [credsDirty, setCredsDirty] = useState(false);
+  const [checkStateEnabled, setCheckStateEnabled] = useState(false);
 
   // ── Group picker dialog state ──
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -70,6 +148,17 @@ export function PosWhatsAppSection() {
   // ── Queries ──
   const { data: posSettings, isLoading: settingsLoading } = useQuery<PosInstanceSettings>({
     queryKey: ["/api/whatsapp/settings/pos"],
+  });
+
+  const {
+    data: instanceStateData,
+    isLoading: instanceStateLoading,
+    refetch: refetchInstanceState,
+  } = useQuery<{ state: InstanceState }>({
+    queryKey: ["/api/whatsapp/instance-state/pos"],
+    enabled: checkStateEnabled,
+    staleTime: 10_000,
+    retry: false,
   });
 
   useEffect(() => {
@@ -189,20 +278,61 @@ export function PosWhatsAppSection() {
                 WhatsApp API instance will be used as a fallback.
               </CardDescription>
             </div>
-            {settingsLoading ? (
-              <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-            ) : isConfigured ? (
-              <Badge variant="secondary" className="gap-1" data-testid="badge-pos-api-status">
-                <CheckCircle className="h-3 w-3 text-green-600 dark:text-green-400" />
-                Connected
-              </Badge>
-            ) : (
-              <Badge variant="secondary" className="gap-1" data-testid="badge-pos-api-status">
-                <XCircle className="h-3 w-3 text-muted-foreground" />
-                Not configured
-              </Badge>
-            )}
+            <div className="flex items-center gap-2 flex-wrap">
+              {instanceStateData ? (
+                <InstanceStateBadge state={instanceStateData.state} loading={instanceStateLoading} />
+              ) : settingsLoading ? (
+                <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+              ) : isConfigured ? (
+                <Badge variant="secondary" className="gap-1" data-testid="badge-pos-api-status">
+                  <CheckCircle className="h-3 w-3 text-muted-foreground" />
+                  Credentials saved
+                </Badge>
+              ) : (
+                <Badge variant="secondary" className="gap-1" data-testid="badge-pos-api-status">
+                  <XCircle className="h-3 w-3 text-muted-foreground" />
+                  Not configured
+                </Badge>
+              )}
+              {isConfigured && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    setCheckStateEnabled(true);
+                    refetchInstanceState();
+                  }}
+                  disabled={instanceStateLoading}
+                  data-testid="button-check-instance-state"
+                >
+                  {instanceStateLoading ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />
+                  ) : (
+                    <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
+                  )}
+                  Check Status
+                </Button>
+              )}
+            </div>
           </div>
+          {instanceStateData?.state === "sleepMode" && (
+            <p className="text-xs text-amber-700 dark:text-amber-400 mt-2 bg-amber-50 dark:bg-amber-950/40 rounded px-2 py-1.5">
+              Your Green API instance is in sleep mode. Log in to{" "}
+              <a href="https://console.green-api.com" target="_blank" rel="noreferrer" className="underline font-medium">
+                console.green-api.com
+              </a>{" "}
+              and wake up your instance — messages are queued but not delivered while asleep.
+            </p>
+          )}
+          {instanceStateData?.state === "notAuthorized" && (
+            <p className="text-xs text-red-700 dark:text-red-400 mt-2 bg-red-50 dark:bg-red-950/40 rounded px-2 py-1.5">
+              Your WhatsApp session has expired. Go to{" "}
+              <a href="https://console.green-api.com" target="_blank" rel="noreferrer" className="underline font-medium">
+                console.green-api.com
+              </a>{" "}
+              and scan the QR code to reconnect.
+            </p>
+          )}
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

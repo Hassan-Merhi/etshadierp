@@ -85,6 +85,44 @@ export interface GreenChat {
   type: "group" | "contact" | string;
 }
 
+/** Green API instance states returned by getStateInstance */
+export type GreenInstanceState =
+  | "authorized"
+  | "notAuthorized"
+  | "sleepMode"
+  | "starting"
+  | "yellowCard"
+  | "unknown";
+
+/**
+ * Call Green API's getStateInstance to get the real connection state.
+ * Returns "unknown" on any network/parse error.
+ */
+export async function getGreenInstanceState(
+  instanceId: string,
+  apiToken: string
+): Promise<GreenInstanceState> {
+  try {
+    const url = baseUrl(instanceId, apiToken, "getStateInstance");
+    const response = await fetch(url, { method: "GET", signal: AbortSignal.timeout(8000) });
+    if (!response.ok) return "unknown";
+    const json = (await response.json().catch(() => null)) as any;
+    const state: string = json?.stateInstance ?? "unknown";
+    const validStates: GreenInstanceState[] = [
+      "authorized",
+      "notAuthorized",
+      "sleepMode",
+      "starting",
+      "yellowCard",
+    ];
+    return validStates.includes(state as GreenInstanceState)
+      ? (state as GreenInstanceState)
+      : "unknown";
+  } catch {
+    return "unknown";
+  }
+}
+
 export async function fetchGreenApiChats(instanceId: string, apiToken: string): Promise<GreenChat[]> {
   const url = baseUrl(instanceId, apiToken, "getChats");
   const response = await fetch(url, { method: "GET" });

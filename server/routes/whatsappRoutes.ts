@@ -24,6 +24,7 @@ import {
   fetchGreenApiChats,
   sendWhatsAppFile,
   sendWhatsAppFileToChatId,
+  getGreenInstanceState,
 } from "../services/whatsappService";
 import { generateNetPositionExcel, generateMonthEnds } from "../helpers/generateNetPositionExcel";
 import { generateStockPdf } from "../helpers/generateStockPdf";
@@ -259,6 +260,36 @@ export function registerWhatsAppRoutes(app: Express) {
       }
       const chats = await fetchGreenApiChats(s.instanceId, s.apiToken);
       res.json(chats);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  // ── Instance state checks ──────────────────────────────────────────────────
+
+  /** Real-time state of the main WhatsApp instance (id=1). */
+  app.get("/api/whatsapp/instance-state/main", requireAuth, async (_req, res) => {
+    try {
+      const s = await getWaSettings();
+      if (!s?.instanceId || !s?.apiToken) {
+        return res.json({ state: "notConfigured" });
+      }
+      const state = await getGreenInstanceState(s.instanceId, s.apiToken);
+      res.json({ state });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  /** Real-time state of the POS WhatsApp instance (id=2, with fallback to id=1). */
+  app.get("/api/whatsapp/instance-state/pos", requireAuth, async (_req, res) => {
+    try {
+      const s = await getPosWaSettings();
+      if (!s?.instanceId || !s?.apiToken) {
+        return res.json({ state: "notConfigured" });
+      }
+      const state = await getGreenInstanceState(s.instanceId, s.apiToken);
+      res.json({ state });
     } catch (err: any) {
       res.status(500).json({ message: err.message });
     }
