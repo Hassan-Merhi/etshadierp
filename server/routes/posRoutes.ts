@@ -848,6 +848,10 @@ export function registerPosRoutes(app: Express) {
         });
       }
 
+      // Sort by stockItemId so all concurrent transactions acquire inventory row locks
+      // in the same order — prevents deadlocks when two cashiers sell the same items.
+      inventoryValidation.sort((a, b) => a.item.stockItemId - b.item.stockItemId);
+
       // ── SP company: fetch configured POS accounts & pre-compute supplier cost ──
       let spPosPayableAccountId: number | null = null;
       let spPosProfitAccountId: number | null = null;
@@ -1052,7 +1056,7 @@ export function registerPosRoutes(app: Express) {
           // Use FOR UPDATE OF i (not the whole JOIN) because PostgreSQL rejects
           // FOR UPDATE on the nullable side of a LEFT JOIN.
           const stockLockResult = await (tx as any).execute(sql`
-            SELECT i.quantity, si.name AS item_name
+            SELECT i.quantity, i.average_rate, si.name AS item_name
             FROM inventory i
             LEFT JOIN stock_items si ON si.id = i.stock_item_id
             WHERE i.location_id = ${parsedLocationId} AND i.stock_item_id = ${item.stockItemId}
@@ -1072,7 +1076,9 @@ export function registerPosRoutes(app: Express) {
 
           const qty = parseFloat(item.quantity);
           const sellingPrice = parseFloat(item.rate) || 0;
-          const costPrice = currentRate;
+          // Use the freshly-locked average_rate so two concurrent cashiers both
+          // record the correct cost basis rather than a stale pre-read value.
+          const costPrice = lockedRow ? parseFloat(lockedRow.average_rate ?? "0") : currentRate;
           const totalSales = qty * sellingPrice;
           const totalCost = qty * costPrice;
           const profit = totalSales - totalCost;
@@ -1348,6 +1354,9 @@ export function registerPosRoutes(app: Express) {
 
       // Get old sales items to reverse inventory and preserve historical cost
       const oldSalesItems = await db.select().from(salesItems).where(eq(salesItems.voucherId, voucherId));
+      // Sort by stockItemId so the reversal loop always acquires locks in a
+      // consistent order — prevents deadlocks with concurrent sale transactions.
+      oldSalesItems.sort((a, b) => a.stockItemId - b.stockItemId);
 
       // Create map of old items by line ID for cost preservation (not stockItemId to handle duplicates)
       const oldItemsMap = new Map(oldSalesItems.map((item) => [item.id, item]));
@@ -1381,10 +1390,12 @@ export function registerPosRoutes(app: Express) {
         const canSellNegativeStock = req.user?.canSellNegativeStock || false;
 
         // Create new sales items and apply new inventory movements
+        // Sort by stockItemId for consistent lock ordering (same reason as reversal above).
+        const sortedNewItems = [...items].sort((a: any, b: any) => a.stockItemId - b.stockItemId);
         let grandTotal = 0;
         let totalSupplierCostEdit = 0;
         let totalQtySoldEdit = 0;
-        for (const item of items) {
+        for (const item of sortedNewItems) {
           const { id, stockItemId, quantity, sellingPrice } = item;
 
           // Get inventory record for validation and deduction

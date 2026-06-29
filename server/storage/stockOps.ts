@@ -131,6 +131,10 @@ export async function createStockTransfer(
 
     if (!items || items.length === 0) throw new Error("No items provided for stock transfer");
 
+    // Sort by stockItemId so concurrent transfers always lock rows in the same
+    // order — prevents deadlocks when two operations touch the same items.
+    const sortedTransferItems = [...items].sort((a, b) => a.stockItemId - b.stockItemId);
+
     const [transfer] = await tx
       .insert(schema.stockTransferVouchers)
       .values({
@@ -143,7 +147,7 @@ export async function createStockTransfer(
       .returning();
 
     const transferItems: StockTransferItem[] = [];
-    for (const item of items) {
+    for (const item of sortedTransferItems) {
       const quantity = parseFloat(item.quantity);
       const rate = parseFloat(item.rate);
       const totalAmount = quantity * rate;
@@ -311,8 +315,10 @@ export async function createStockAdjustment(
     let totalProductionValue = 0;
     let totalConsumptionValue = 0;
 
+    // Sort by stockItemId — consistent lock order prevents deadlocks with concurrent ops.
+    const sortedAdjItems = [...items].sort((a, b) => a.stockItemId - b.stockItemId);
     const adjustmentItems: StockAdjustmentItem[] = [];
-    for (const item of items) {
+    for (const item of sortedAdjItems) {
       const quantity = parseFloat(item.quantity);
       const rate = parseFloat(item.rate);
       const isProduction = adjustmentType === "Production" || (adjustmentType === "Mixed" && quantity > 0);
@@ -491,6 +497,8 @@ export async function updateStockTransfer(
     }
 
     if (existingTransfer.inventoryApplied || !isOptional) {
+      // Consistent lock order for reversal — prevents deadlocks with concurrent ops.
+      existingItems.sort((a, b) => a.stockItemId - b.stockItemId);
       for (const oldItem of existingItems) {
         const quantity = parseFloat(oldItem.quantity);
         const rate = parseFloat(oldItem.rate);
@@ -570,8 +578,10 @@ export async function updateStockTransfer(
       .where(eq(schema.stockTransferVouchers.id, id))
       .returning();
 
+    // Consistent lock order for new items — prevents deadlocks with concurrent ops.
+    const sortedNewTransferItems = [...items].sort((a, b) => a.stockItemId - b.stockItemId);
     const transferItems: StockTransferItem[] = [];
-    for (const item of items) {
+    for (const item of sortedNewTransferItems) {
       const quantity = parseFloat(item.quantity);
       const rate = parseFloat(item.rate);
       const totalAmount = quantity * rate;
@@ -693,6 +703,8 @@ export async function updateStockAdjustment(
     if (!location) throw new Error(`Location ${existingAdjustment.locationId} not found`);
 
     if (!isOptional) {
+      // Consistent lock order for reversal — prevents deadlocks with concurrent ops.
+      existingItems.sort((a, b) => a.stockItemId - b.stockItemId);
       for (const oldItem of existingItems) {
         const quantity = parseFloat(oldItem.quantity);
         const rate = parseFloat(oldItem.rate);
@@ -842,8 +854,10 @@ export async function updateStockAdjustment(
     let totalProductionValue = 0;
     let totalConsumptionValue = 0;
 
+    // Consistent lock order for new items — prevents deadlocks with concurrent ops.
+    const sortedUpdAdjItems = [...items].sort((a, b) => a.stockItemId - b.stockItemId);
     const adjustmentItems: StockAdjustmentItem[] = [];
-    for (const item of items) {
+    for (const item of sortedUpdAdjItems) {
       const quantity = parseFloat(item.quantity);
       const rate = parseFloat(item.rate);
       const isProduction = adjustmentType === "Production" || (adjustmentType === "Mixed" && quantity > 0);
