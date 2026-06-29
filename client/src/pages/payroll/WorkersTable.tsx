@@ -1,12 +1,20 @@
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Input } from "@/components/ui/input";
+import { Card, CardContent } from "@/components/ui/card";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { DollarSign, Trash2, AlertCircle } from "lucide-react";
+import { MinusCircle, Pencil, Trash2, ChevronDown, AlertCircle } from "lucide-react";
 import { ConfirmationDialog } from "@/components/ConfirmationDialog";
 import { cn } from "@/lib/utils";
 import type { Employee } from "@shared/schema";
+import { getEmpAvatarColor, getEmpInitials } from "./payrollSchemas";
 
 interface WorkersTableProps {
   workers: Employee[];
@@ -20,6 +28,9 @@ interface WorkersTableProps {
   formatAmount: (amt: number) => string;
   addWorkerToWorkerGroupMutation?: any;
   groupId?: number;
+  setWorkerDeductionTarget?: (val: Employee | null) => void;
+  setSelectedWorkerForEdit?: (val: Employee | null) => void;
+  setEditWorkerDialogOpen?: (val: boolean) => void;
 }
 
 export function WorkersTable({
@@ -34,133 +45,173 @@ export function WorkersTable({
   formatAmount,
   addWorkerToWorkerGroupMutation,
   groupId,
+  setWorkerDeductionTarget,
+  setSelectedWorkerForEdit,
+  setEditWorkerDialogOpen,
 }: WorkersTableProps) {
-  return (
-    <Table>
-      <TableHeader>
-        <TableRow>
-          <TableHead className="w-12">
-            <Checkbox
-              checked={workers.length > 0 && workers.every((m: Employee) => workerPayments[m.id]?.selected)}
-              onCheckedChange={(checked) => {
-                workers.forEach((member: Employee) => {
-                  setWorkerOverrides((prev: any) => ({
-                    ...prev,
-                    [member.id]: {
-                      ...prev[member.id],
-                      selected: !!checked,
-                    },
-                  }));
-                });
-              }}
-              data-testid={groupId ? `checkbox-select-all-group-${groupId}` : "checkbox-select-all-ungrouped"}
-            />
-          </TableHead>
-          <TableHead data-testid="header-name">Name</TableHead>
-          <TableHead data-testid="header-monthly-salary" className="text-right">
-            Monthly Salary
-          </TableHead>
-          <TableHead data-testid="header-advances" className="text-right">
-            Advances
-          </TableHead>
-          <TableHead data-testid="header-payment-amount" className="text-right">
-            Payment Amount
-          </TableHead>
-          <TableHead data-testid="header-actions" className="w-16">
-            Actions
-          </TableHead>
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {workers.map((worker: Employee) => {
-          const advanceInfo = (worker as any).advanceInfo || { total: 0, count: 0 };
-          const monthlySalary = parseFloat(worker.monthlySalary || "0");
-          const paymentAmount = parseFloat(workerPayments[worker.id]?.amount || "0");
-          const hasNegativePayment = paymentAmount < 0;
+  if (workers.length === 0) {
+    return (
+      <div className="py-6 text-center text-sm text-muted-foreground">
+        No workers in this group
+      </div>
+    );
+  }
 
-          return (
-            <TableRow
-              key={worker.id}
-              data-testid={`row-worker-${worker.id}`}
-              className={workerPayments[worker.id]?.selected ? "bg-muted/50" : ""}
-            >
-              <TableCell>
-                <Checkbox
-                  checked={workerPayments[worker.id]?.selected || false}
-                  onCheckedChange={() => handleToggleWorker(worker.id)}
-                  data-testid={`checkbox-worker-${worker.id}`}
-                />
-              </TableCell>
-              <TableCell data-testid={`cell-name-${worker.id}`}>
-                <button
-                  onClick={() => setStatementEmployee(worker)}
-                  className="flex items-center gap-1 text-primary hover:underline cursor-pointer whitespace-nowrap"
-                  data-testid={`link-worker-statement-${worker.id}`}
-                >
-                  {[worker.firstName, worker.lastName].filter(Boolean).join(" ")}
-                  <DollarSign className="h-3 w-3" />
-                </button>
-              </TableCell>
-              <TableCell
-                data-testid={`cell-monthly-salary-${worker.id}`}
-                className="text-right font-mono text-muted-foreground"
-              >
-                {formatAmount(monthlySalary)}
-              </TableCell>
-              <TableCell data-testid={`cell-advances-${worker.id}`} className="text-right font-mono">
-                {advanceInfo.total > 0 ? (
-                  <span className="text-destructive">
-                    {formatAmount(advanceInfo.total)}
-                    {advanceInfo.count > 0 && (
-                      <span className="text-xs text-muted-foreground ml-1">({advanceInfo.count})</span>
-                    )}
-                  </span>
-                ) : (
-                  "-"
-                )}
-              </TableCell>
-              <TableCell data-testid={`cell-amount-${worker.id}`} className="text-right">
-                <div className="flex items-center justify-end gap-2">
-                  <Input
-                    type="number"
-                    step="0.01"
-                    value={workerPayments[worker.id]?.amount || "0"}
-                    onChange={(e) => handleUpdateAmount(worker.id, e.target.value)}
-                    className={cn("w-32 text-right font-mono", hasNegativePayment && "border-destructive")}
-                    data-testid={`input-amount-${worker.id}`}
+  return (
+    <div className="space-y-2 p-3">
+      {workers.map((worker: Employee) => {
+        const advanceInfo = (worker as any).advanceInfo || { total: 0, count: 0 };
+        const deductionInfo = (worker as any).deductionInfo || { total: 0, count: 0 };
+        const monthlySalary = parseFloat(worker.monthlySalary || "0");
+        const balance = parseFloat((worker as any).calculatedBalance || "0");
+        const paymentAmount = parseFloat(workerPayments[worker.id]?.amount || "0");
+        const isSelected = workerPayments[worker.id]?.selected || false;
+        const hasNegativePayment = paymentAmount < 0;
+        const initials = getEmpInitials(worker.firstName, worker.lastName);
+        const avatarColor = getEmpAvatarColor(`${worker.firstName}${worker.lastName}`);
+
+        return (
+          <Card
+            key={worker.id}
+            data-testid={`card-worker-${worker.id}`}
+            className={cn(isSelected && "ring-1 ring-primary/40 bg-primary/5")}
+          >
+            <CardContent className="p-3">
+              <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+
+                {/* Checkbox + Avatar + Name */}
+                <div className="flex items-center gap-3 w-52 shrink-0 min-w-0">
+                  <Checkbox
+                    checked={isSelected}
+                    onCheckedChange={() => handleToggleWorker(worker.id)}
+                    data-testid={`checkbox-worker-${worker.id}`}
                   />
-                  {hasNegativePayment && <AlertCircle className="h-4 w-4 text-destructive" />}
+                  <Avatar className="h-9 w-9 shrink-0">
+                    <AvatarFallback className={`text-xs font-bold ${avatarColor}`}>{initials}</AvatarFallback>
+                  </Avatar>
+                  <div className="min-w-0">
+                    <button
+                      onClick={() => setStatementEmployee(worker)}
+                      className="font-semibold text-sm hover:underline cursor-pointer truncate block text-left"
+                      data-testid={`link-worker-statement-${worker.id}`}
+                    >
+                      {[worker.firstName, worker.lastName].filter(Boolean).join(" ")}
+                    </button>
+                    {worker.code && (
+                      <p className="text-xs text-muted-foreground font-mono">{worker.code}</p>
+                    )}
+                  </div>
                 </div>
-              </TableCell>
-              <TableCell>
-                <div className="flex items-center gap-1">
+
+                {/* Stats grid */}
+                <div className="grid grid-cols-3 sm:grid-cols-5 flex-1 min-w-0 gap-2">
+                  <div>
+                    <p className="text-xs text-muted-foreground">Salary</p>
+                    <p className="font-mono text-sm font-medium">{formatAmount(monthlySalary)}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Balance</p>
+                    <p className={cn(
+                      "font-mono text-sm font-bold",
+                      balance >= 0 ? "text-green-500 dark:text-green-400" : "text-destructive"
+                    )}>
+                      {formatAmount(balance)}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Advances</p>
+                    <p className={cn("font-mono text-sm", advanceInfo.total > 0 ? "text-destructive" : "text-muted-foreground")}>
+                      {advanceInfo.total > 0 ? (
+                        <>
+                          {formatAmount(advanceInfo.total)}
+                          {advanceInfo.count > 0 && (
+                            <span className="text-xs ml-1 opacity-70">({advanceInfo.count})</span>
+                          )}
+                        </>
+                      ) : "—"}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Deductions</p>
+                    <p className={cn("font-mono text-sm", deductionInfo.total > 0 ? "text-orange-500" : "text-muted-foreground")}>
+                      {deductionInfo.total > 0 ? (
+                        <>
+                          {formatAmount(deductionInfo.total)}
+                          {deductionInfo.count > 0 && (
+                            <span className="text-xs ml-1 opacity-70">({deductionInfo.count})</span>
+                          )}
+                        </>
+                      ) : "—"}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Pay Amount</p>
+                    <div className="flex items-center gap-1">
+                      <Input
+                        type="number"
+                        step="0.01"
+                        value={workerPayments[worker.id]?.amount || "0"}
+                        onChange={(e) => handleUpdateAmount(worker.id, e.target.value)}
+                        className={cn(
+                          "w-24 h-7 text-xs text-right font-mono px-2",
+                          hasNegativePayment && "border-destructive"
+                        )}
+                        data-testid={`input-amount-${worker.id}`}
+                      />
+                      {hasNegativePayment && <AlertCircle className="h-3 w-3 text-destructive shrink-0" />}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Actions */}
+                <div className="flex items-center gap-1 shrink-0">
                   {!groupId && workerGroups.length > 0 && addWorkerToWorkerGroupMutation && (
                     <Select
-                      onValueChange={(gid) => {
-                        addWorkerToWorkerGroupMutation.mutate({
-                          groupId: parseInt(gid),
-                          workerId: worker.id,
-                        });
-                      }}
+                      onValueChange={(gid) => addWorkerToWorkerGroupMutation.mutate({ groupId: parseInt(gid), workerId: worker.id })}
                     >
-                      <SelectTrigger className="h-8 w-32 text-xs" data-testid={`select-move-group-${worker.id}`}>
+                      <SelectTrigger className="h-8 w-28 text-xs" data-testid={`select-move-group-${worker.id}`}>
                         <SelectValue placeholder="Move to group" />
                       </SelectTrigger>
                       <SelectContent>
                         {workerGroups.map((g) => (
-                          <SelectItem key={g.id} value={String(g.id)}>
-                            {g.name}
-                          </SelectItem>
+                          <SelectItem key={g.id} value={String(g.id)}>{g.name}</SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
                   )}
+
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button size="sm" variant="outline" data-testid={`button-actions-worker-${worker.id}`}>
+                        Actions <ChevronDown className="h-3.5 w-3.5 ml-1" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      {setWorkerDeductionTarget && (
+                        <DropdownMenuItem
+                          onClick={() => setWorkerDeductionTarget(worker)}
+                          data-testid={`button-deduction-${worker.id}`}
+                        >
+                          <MinusCircle className="h-4 w-4 mr-2" /> Add Deduction
+                        </DropdownMenuItem>
+                      )}
+                      {setSelectedWorkerForEdit && setEditWorkerDialogOpen && (
+                        <DropdownMenuItem
+                          onClick={() => { setSelectedWorkerForEdit(worker); setEditWorkerDialogOpen(true); }}
+                          data-testid={`button-edit-worker-${worker.id}`}
+                        >
+                          <Pencil className="h-4 w-4 mr-2" /> Edit
+                        </DropdownMenuItem>
+                      )}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+
                   <ConfirmationDialog
                     trigger={
                       <Button
                         size="icon"
                         variant="ghost"
-                        className="text-destructive hover:text-destructive"
+                        className="text-destructive"
                         data-testid={`button-delete-worker-${worker.id}`}
                       >
                         <Trash2 className="h-4 w-4" />
@@ -173,11 +224,11 @@ export function WorkersTable({
                     onConfirm={() => handleDeleteWorker(worker)}
                   />
                 </div>
-              </TableCell>
-            </TableRow>
-          );
-        })}
-      </TableBody>
-    </Table>
+              </div>
+            </CardContent>
+          </Card>
+        );
+      })}
+    </div>
   );
 }
