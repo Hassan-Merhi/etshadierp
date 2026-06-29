@@ -517,6 +517,196 @@ export default function Payroll() {
     bonusMutation.mutate({ employeeId: selectedEmployee.id, amount });
   };
 
+  // ── Bulk deposit helpers ─────────────────────────────────────────────────
+  const handleSelectAllEmployees = (checked: any) => {
+    if (checked) {
+      const all: Record<number, boolean> = {};
+      employeeStaff.forEach((e) => { all[e.id] = true; });
+      setBulkDepositSelections(all);
+    } else {
+      setBulkDepositSelections({});
+    }
+  };
+
+  const handleToggleEmployeeDeposit = (id: number) => {
+    setBulkDepositSelections((prev: Record<number, boolean>) => ({ ...prev, [id]: !prev[id] }));
+  };
+
+  const validSelectedEmployees = useMemo(
+    () => employeeStaff.filter((e) => bulkDepositSelections[e.id] && parseFloat(e.monthlySalary || "0") > 0),
+    [employeeStaff, bulkDepositSelections]
+  );
+
+  const bulkDepositTotal = useMemo(
+    () => validSelectedEmployees.reduce((s, e) => s + parseFloat(e.monthlySalary || "0"), 0),
+    [validSelectedEmployees]
+  );
+
+  const bulkDepositMutation = useMutation({
+    mutationFn: async () => {
+      const deposits = validSelectedEmployees.map((e) => ({ employeeId: e.id, amount: e.monthlySalary }));
+      return modeApiRequest("POST", "/api/payroll/bulk-deposit-employees", {
+        deposits,
+        date: bulkDepositDate,
+        notes: bulkDepositNotes || "",
+      });
+    },
+    onSuccess: () => {
+      toast({ title: "Success", description: `Deposited salary for ${validSelectedEmployees.length} employees` });
+      queryClient.invalidateQueries({ queryKey: ["/api/employees", selectedCompany?.id] });
+      setBulkDepositDialogOpen(false);
+      setBulkDepositSelections({});
+    },
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
+  const bulkWithdrawalMutation = useMutation({
+    mutationFn: async () => {
+      const withdrawals = Object.entries(bulkWithdrawalAmounts)
+        .filter(([, amt]) => parseFloat(amt) > 0)
+        .map(([empId, amount]) => ({ employeeId: parseInt(empId), amount }));
+      return modeApiRequest("POST", "/api/payroll/bulk-withdraw-employees", {
+        withdrawals,
+        date: bulkWithdrawalDate,
+        notes: bulkWithdrawalNotes || "",
+        paymentAccountType: bulkWithdrawalAccountType,
+        paymentAccountId: bulkWithdrawalAccountId,
+      });
+    },
+    onSuccess: () => {
+      const count = Object.values(bulkWithdrawalAmounts).filter((amt) => parseFloat(amt) > 0).length;
+      toast({ title: "Success", description: `Processed withdrawals for ${count} employees` });
+      queryClient.invalidateQueries({ queryKey: ["/api/employees", selectedCompany?.id] });
+      setBulkWithdrawalDialogOpen(false);
+      setBulkWithdrawalAmounts({});
+    },
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
+  const bulkBonusMutation = useMutation({
+    mutationFn: async () => {
+      const bonuses = Object.entries(bulkBonusAmounts)
+        .filter(([, amt]) => parseFloat(amt) > 0)
+        .map(([empId, amount]) => ({ employeeId: parseInt(empId), amount }));
+      return modeApiRequest("POST", "/api/payroll/bulk-bonus-employees", {
+        bonuses,
+        date: bulkBonusDate,
+        notes: bulkBonusNotes || "",
+      });
+    },
+    onSuccess: () => {
+      const count = Object.values(bulkBonusAmounts).filter((amt) => parseFloat(amt) > 0).length;
+      toast({ title: "Success", description: `Bonus deposited for ${count} employees` });
+      queryClient.invalidateQueries({ queryKey: ["/api/employees", selectedCompany?.id] });
+      setBulkBonusDialogOpen(false);
+      setBulkBonusAmounts({});
+      setBulkBonusBreakdowns({});
+      setPendingBonuses({});
+      setBulkBonusStep("edit");
+    },
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
+  const autoCalculateBonuses = async () => {
+    setBulkBonusAutoLoading(true);
+    try {
+      const { getThisMonthRange: tmr } = await import("./payroll/payrollSchemas");
+      const range = bulkBonusAutoMonth === "thisMonth" ? tmr() : { start: bulkBonusAutoStart, end: bulkBonusAutoEnd };
+      const amounts: Record<number, string> = { ...bulkBonusAmounts };
+      const breakdowns: Record<number, string[]> = { ...bulkBonusBreakdowns };
+
+      await Promise.all(
+        employeeStaff.map(async (emp) => {
+          const lines: string[] = [];
+          let total = 0;
+
+          // Bales bonus
+          if (emp.balesBonusRate != null && parseFloat(emp.balesBonusRate) > 0) {
+            const locId = emp.salesBonusPctLocationId;
+            const sourceCompId = emp.salesBonusPctSourceCompanyId;
+            if (locId) {
+              try {
+                const srcParam = sourceCompId ? `&sourceCompanyId=${sourceCompId}` : "";
+                const res = await fetch(
+                  `/api/payroll/sales-summary?locationId=${locId}&startDate=${range.start}&endDate=${range.end}${srcParam}`,
+                  { credentials: "include" }
+                );
+                if (res.ok) {
+                  const data = await res.json();
+                  const qty = parseFloat(data.totalQuantity || "0");
+                  const rate = parseFloat(emp.balesBonusRate);
+                  if (qty > 0) {
+                    const sub = qty * rate;
+                    total += sub;
+                    lines.push(`${qty} bales × $${rate} (${data.locationName}) = $${sub.toFixed(2)}`);
+                  }
+                }
+              } catch {}
+            }
+          }
+
+          // Sales % bonus
+          if (bulkBonusAutoPctLocationId && emp.salesBonusPct != null && parseFloat(emp.salesBonusPct) > 0) {
+            try {
+              const res = await fetch(
+                `/api/payroll/sales-summary?locationId=${bulkBonusAutoPctLocationId}&startDate=${range.start}&endDate=${range.end}`,
+                { credentials: "include" }
+              );
+              if (res.ok) {
+                const data = await res.json();
+                const sales = parseFloat(data.totalSalesAmount || "0");
+                const pct = parseFloat(emp.salesBonusPct);
+                if (sales > 0) {
+                  const sub = (sales * pct) / 100;
+                  total += sub;
+                  lines.push(`$${sales.toFixed(2)} sales × ${pct}% (${data.locationName}) = $${sub.toFixed(2)}`);
+                }
+              }
+            } catch {}
+          }
+
+          if (total > 0) {
+            amounts[emp.id] = total.toFixed(2);
+            breakdowns[emp.id] = lines;
+          }
+        })
+      );
+
+      setBulkBonusAmounts(amounts as any);
+      setBulkBonusBreakdowns(breakdowns);
+      toast({ title: "Done", description: "Bonuses calculated from saved rates" });
+    } catch (e: any) {
+      toast({ title: "Error", description: e.message, variant: "destructive" });
+    } finally {
+      setBulkBonusAutoLoading(false);
+    }
+  };
+
+  const handlePrintBulkBonus = () => {
+    const rows = employeeStaff
+      .filter((emp) => parseFloat(bulkBonusAmounts[emp.id] || "0") > 0)
+      .map((emp) => {
+        const pending = pendingBonuses[emp.id];
+        const amount = parseFloat(bulkBonusAmounts[emp.id] || "0");
+        return `${emp.firstName} ${emp.lastName}: $${amount.toFixed(2)}${pending?.description ? ` — ${pending.description}` : ""}`;
+      });
+    const total = employeeStaff.reduce((s, e) => s + parseFloat(bulkBonusAmounts[e.id] || "0"), 0);
+    const win = window.open("", "_blank");
+    if (!win) return;
+    win.document.write(`
+      <html><head><title>Bulk Bonus — ${bulkBonusDate}</title>
+      <style>body{font-family:sans-serif;padding:24px}h2{margin-bottom:8px}ul{list-style:none;padding:0}li{padding:6px 0;border-bottom:1px solid #eee}.total{font-weight:bold;margin-top:12px}</style>
+      </head><body>
+      <h2>Bulk Bonus Deposit</h2>
+      <p>Date: ${bulkBonusDate}${bulkBonusNotes ? ` &nbsp;·&nbsp; ${bulkBonusNotes}` : ""}</p>
+      <ul>${rows.map((r) => `<li>${r}</li>`).join("")}</ul>
+      <p class="total">Total: $${total.toFixed(2)}</p>
+      </body></html>
+    `);
+    win.document.close();
+    win.print();
+  };
+
   const handleDeleteEmployee = (emp: Employee) => {
     if (confirm(`Are you sure you want to delete ${emp.firstName}?`)) {
       // call mutation
@@ -702,6 +892,62 @@ export default function Payroll() {
       </Tabs>
 
       {/* Dialogs */}
+      <BulkDialogs
+        bulkDepositDialogOpen={bulkDepositDialogOpen}
+        setBulkDepositDialogOpen={setBulkDepositDialogOpen}
+        bulkDepositDate={bulkDepositDate}
+        setBulkDepositDate={setBulkDepositDate}
+        bulkDepositNotes={bulkDepositNotes}
+        setBulkDepositNotes={setBulkDepositNotes}
+        employeeStaff={employeeStaff as any}
+        bulkDepositSelections={bulkDepositSelections}
+        handleSelectAllEmployees={handleSelectAllEmployees}
+        handleToggleEmployeeDeposit={handleToggleEmployeeDeposit}
+        bulkDepositTotal={bulkDepositTotal}
+        validSelectedEmployees={validSelectedEmployees}
+        bulkDepositMutation={bulkDepositMutation}
+        bulkWithdrawalDialogOpen={bulkWithdrawalDialogOpen}
+        setBulkWithdrawalDialogOpen={setBulkWithdrawalDialogOpen}
+        bulkWithdrawalDate={bulkWithdrawalDate}
+        setBulkWithdrawalDate={setBulkWithdrawalDate}
+        bulkWithdrawalAccountType={bulkWithdrawalAccountType}
+        setBulkWithdrawalAccountType={setBulkWithdrawalAccountType}
+        bulkWithdrawalAccountId={bulkWithdrawalAccountId}
+        setBulkWithdrawalAccountId={setBulkWithdrawalAccountId}
+        bulkWithdrawalNotes={bulkWithdrawalNotes}
+        setBulkWithdrawalNotes={setBulkWithdrawalNotes}
+        bulkWithdrawalAmounts={bulkWithdrawalAmounts}
+        setBulkWithdrawalAmounts={setBulkWithdrawalAmounts as any}
+        bulkWithdrawalMutation={bulkWithdrawalMutation}
+        cashAccounts={cashAccounts}
+        bankAccounts={bankAccounts}
+        bulkBonusDialogOpen={bulkBonusDialogOpen}
+        setBulkBonusDialogOpen={setBulkBonusDialogOpen}
+        bulkBonusStep={bulkBonusStep}
+        setBulkBonusStep={setBulkBonusStep}
+        bulkBonusDate={bulkBonusDate}
+        setBulkBonusDate={setBulkBonusDate}
+        bulkBonusNotes={bulkBonusNotes}
+        setBulkBonusNotes={setBulkBonusNotes}
+        bulkBonusAutoMonth={bulkBonusAutoMonth}
+        setBulkBonusAutoMonth={setBulkBonusAutoMonth}
+        bulkBonusAutoStart={bulkBonusAutoStart}
+        setBulkBonusAutoStart={setBulkBonusAutoStart}
+        bulkBonusAutoEnd={bulkBonusAutoEnd}
+        setBulkBonusAutoEnd={setBulkBonusAutoEnd}
+        autoCalculateBonuses={autoCalculateBonuses}
+        bulkBonusAutoLoading={bulkBonusAutoLoading}
+        bulkBonusAutoPctLocationId={bulkBonusAutoPctLocationId}
+        setBulkBonusAutoPctLocationId={setBulkBonusAutoPctLocationId}
+        bulkBonusAmounts={bulkBonusAmounts}
+        setBulkBonusAmounts={setBulkBonusAmounts as any}
+        pendingBonuses={pendingBonuses}
+        bulkBonusBreakdowns={bulkBonusBreakdowns}
+        bulkBonusMutation={bulkBonusMutation}
+        handlePrintBulkBonus={handlePrintBulkBonus}
+        locations={locations}
+      />
+
       <DepositDialog
         open={depositDialogOpen}
         onOpenChange={setDepositDialogOpen}
