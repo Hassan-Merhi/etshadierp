@@ -1298,8 +1298,8 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
       {/* ── Desktop layout ── */}
       <div className="hidden lg:flex flex-1 overflow-hidden p-4">
         <div className="flex flex-row gap-4 h-full w-full">
-          <div className="flex-1 flex flex-col overflow-hidden min-w-0 min-h-0">
-            <div className="flex-1 min-h-0 overflow-hidden">
+          <div className="flex-1 flex flex-col overflow-y-auto min-w-0">
+            <div>
               <SaleGrid
                 rows={rows}
                 columns={columns}
@@ -1321,24 +1321,14 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
                 toast={toast}
               />
             </div>
-            <div className="flex-shrink-0 mt-1 px-1">
-              {notes ? (
-                <Textarea
-                  placeholder="Notes (optional)"
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  className="resize-none h-12 min-h-[48px] text-sm"
-                  data-testid="input-notes"
-                />
-              ) : (
-                <button
-                  className="text-xs text-muted-foreground hover:text-foreground transition-colors"
-                  onClick={() => setNotes(" ")}
-                  data-testid="button-add-note"
-                >
-                  + Add note
-                </button>
-              )}
+            <div className="mt-2 px-1 pb-2">
+              <Textarea
+                placeholder="Notes (optional)"
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                className="resize-none h-12 min-h-[48px] text-sm"
+                data-testid="input-notes"
+              />
             </div>
           </div>
           <InventoryPicker
@@ -1622,23 +1612,13 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
 
         {/* Notes */}
         <div className="px-4 pb-2">
-          {notes ? (
-            <Textarea
-              placeholder="Notes (optional)"
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              className="resize-none h-12 min-h-[48px] text-sm"
-              data-testid="input-mobile-notes"
-            />
-          ) : (
-            <button
-              className="text-xs text-muted-foreground hover:text-foreground transition-colors"
-              onClick={() => setNotes(" ")}
-              data-testid="button-mobile-add-note"
-            >
-              + Add note
-            </button>
-          )}
+          <Textarea
+            placeholder="Notes (optional)"
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            className="resize-none h-12 min-h-[48px] text-sm"
+            data-testid="input-mobile-notes"
+          />
         </div>
 
         {/* Total + checkout — pinned to bottom of scroll */}
