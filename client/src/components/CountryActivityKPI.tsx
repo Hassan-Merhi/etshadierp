@@ -48,7 +48,10 @@ interface ActivityResponse {
 }
 
 function toDateStr(d: Date) {
-  return d.toISOString().substring(0, 10);
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
 }
 
 function addDays(d: Date, n: number) {
@@ -233,17 +236,18 @@ export function CountryActivityKPI() {
 
   const canGoForward = offset > 0;
 
-  const { data, isLoading } = useQuery<ActivityResponse>({
+  const { data, isLoading, isError } = useQuery<ActivityResponse>({
     queryKey: ["/api/stats/country-activity", startStr, endStr],
     queryFn: async () => {
       const res = await fetch(
         `/api/stats/country-activity?startDate=${startStr}&endDate=${endStr}`,
         { credentials: "include" }
       );
-      if (!res.ok) throw new Error("Failed");
+      if (!res.ok) throw new Error(`Failed (${res.status})`);
       return res.json();
     },
     staleTime: 60_000,
+    retry: 1,
   });
 
   const summary = useMemo(() => {
@@ -338,6 +342,10 @@ export function CountryActivityKPI() {
             <div className="flex items-center justify-center py-8">
               <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
             </div>
+          ) : isError ? (
+            <p className="text-sm text-destructive text-center py-8">
+              Failed to load activity data — please refresh.
+            </p>
           ) : !data || data.companies.length === 0 ? (
             <p className="text-sm text-muted-foreground text-center py-8">
               No ERP companies found.
