@@ -48,12 +48,14 @@ export const PROPERTIES_NAV_SECTIONS: NavSection[] = [
       { title: "Accounts", url: "/properties/accounts", icon: Landmark },
       { title: "Vouchers", url: "/properties/vouchers", icon: FileText },
       { title: "Analytics", url: "/properties/analytics", icon: BarChart2 },
-      { title: "Agent Ledger", url: "/properties/agents", icon: UserRound },
     ],
   },
 ];
 
-const PROPERTIES_PINNED_DEFAULTS: NavItem[] = [{ title: "Daybook", url: "/properties/daybook", icon: BookOpen }];
+const PROPERTIES_PINNED_DEFAULTS: NavItem[] = [
+  { title: "Daybook", url: "/properties/daybook", icon: BookOpen },
+  { title: "Agent Ledger", url: "/properties/agents", icon: UserRound },
+];
 
 export function PropertiesSidebar({ user }: { user?: any }) {
   const isAdmin = user?.role === "Admin" || user?.role === "Developer";
