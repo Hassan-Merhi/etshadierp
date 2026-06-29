@@ -164,7 +164,8 @@ export default function Agents() {
       const url = `/api/accounts/${accountTypeUrl}/${selectedAccount.accountId}/transactions${params.toString() ? `?${params.toString()}` : ""}`;
       const res = await fetch(url, { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch transactions");
-      return res.json();
+      const data = await res.json();
+      return Array.isArray(data) ? data : (data.transactions ?? []);
     },
     enabled: !!selectedAccount,
   });
