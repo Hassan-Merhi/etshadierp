@@ -83,7 +83,7 @@ export function InventoryPicker({
               key={item.code}
               className={`w-full text-left flex items-center justify-between gap-2 border-b border-muted/40 transition-colors duration-100 ${
                 mobile ? "px-4 py-3 active:bg-primary/10" : "px-3 py-3"
-              } ${index === highlightedIndex ? "bg-primary/10" : "hover:bg-muted/40"}`}
+              } ${index === highlightedIndex ? "bg-primary/10" : "hover:bg-muted/40"} ${isOut ? "opacity-50" : ""}`}
               onClick={() => {
                 selectItem(item);
                 setLocalSearch("");
