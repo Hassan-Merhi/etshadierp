@@ -339,6 +339,17 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
     staleTime: 30000,
   });
 
+  const { data: allNegativeStock = [], isLoading: negativeStockLoading } = useQuery<any[]>({
+    queryKey: companyId ? ["/api/inventory/negative", companyId] : [],
+    queryFn: async () => {
+      const res = await fetch("/api/inventory/negative", { credentials: "include" });
+      if (!res.ok) throw new Error(await res.text());
+      return res.json();
+    },
+    enabled: !posUser && !!companyId && showNegativeStock && !selectedLocationLocal,
+    staleTime: 30000,
+  });
+
   const { data: categoriesList = [] } = useQuery<{ id: number; name: string; active: boolean }[]>({
     queryKey: companyId ? ["/api/stock-categories", companyId] : [],
     queryFn: async () => {
@@ -622,7 +633,7 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
           <h1 className="text-2xl font-bold">Location Inventory</h1>
           <p className="text-sm text-muted-foreground">Manage inventory across all locations</p>
         </div>
-        {!posUser && selectedLocationLocal && (
+        {!posUser && (
           <Button
             variant={showNegativeStock ? "destructive" : "outline"}
             size="sm"
@@ -1262,6 +1273,68 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
               Create
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Negative stock across all locations dialog ───────────────────── */}
+      <Dialog open={showNegativeStock && !selectedLocationLocal} onOpenChange={(open) => { if (!open) setShowNegativeStock(false); }}>
+        <DialogContent className="max-w-2xl max-h-[80vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-destructive">
+              <AlertCircle className="h-5 w-5" /> Negative Stock — All Locations
+            </DialogTitle>
+          </DialogHeader>
+          <div className="relative shrink-0">
+            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground pointer-events-none" />
+            <Input
+              placeholder="Search by item or location..."
+              className="pl-8"
+              value={negativeSearchTerm}
+              onChange={(e) => setNegativeSearchTerm(e.target.value)}
+              data-testid="input-negative-stock-search"
+            />
+          </div>
+          <div className="flex-1 overflow-auto min-h-0">
+            {negativeStockLoading ? (
+              <p className="text-sm text-muted-foreground p-4">Loading…</p>
+            ) : allNegativeStock.length === 0 ? (
+              <p className="text-sm text-muted-foreground p-4">No negative stock found.</p>
+            ) : (
+              <table className="w-full text-sm">
+                <thead className="sticky top-0 bg-background border-b">
+                  <tr>
+                    <th className="text-left py-2 px-3 font-semibold">Item</th>
+                    <th className="text-right py-2 px-3 font-semibold">Qty</th>
+                    <th className="text-left py-2 px-3 font-semibold">Location</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {allNegativeStock
+                    .filter((item) => {
+                      if (!negativeSearchTerm) return true;
+                      const s = negativeSearchTerm.toLowerCase();
+                      return (
+                        item.name.toLowerCase().includes(s) ||
+                        item.code.toLowerCase().includes(s) ||
+                        item.locationName.toLowerCase().includes(s)
+                      );
+                    })
+                    .map((item) => (
+                      <tr key={`${item.stockItemId}-${item.locationId}`} className="border-b border-muted/30 hover:bg-muted/20">
+                        <td className="py-2 px-3 font-medium">
+                          <div>{item.name}</div>
+                          <div className="text-[11px] text-muted-foreground font-mono">{item.code}</div>
+                        </td>
+                        <td className="py-2 px-3 text-right font-bold text-destructive">
+                          {parseFloat(item.quantity).toFixed(2)}
+                        </td>
+                        <td className="py-2 px-3 text-muted-foreground">{item.locationName}</td>
+                      </tr>
+                    ))}
+                </tbody>
+              </table>
+            )}
+          </div>
         </DialogContent>
       </Dialog>
 
