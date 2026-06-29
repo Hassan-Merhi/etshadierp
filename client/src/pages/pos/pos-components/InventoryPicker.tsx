@@ -12,25 +12,19 @@ export interface InventoryPickerProps {
   mobile?: boolean;
 }
 
-// Keep spaces so "GS HAND" doesn't bleed into adjacent words.
-// Only strip dots and dashes (common in codes like BL.K.001).
-function normalizeName(s: string) {
-  return (s || "").toLowerCase().replace(/[.\-]/g, "");
-}
-
-// For codes, strip everything (spaces + dots + dashes) so "BL K 001" and "BL.K.001" both match "blk001".
-function normalizeCode(s: string) {
-  return (s || "").toLowerCase().replace(/[.\-\s]/g, "");
+// Strip all non-alphanumeric characters so dots, dashes, spaces, parentheses,
+// brackets, # and any other punctuation never block a match.
+// e.g. "SH MEN T-SHIRT (SHORT)" → "shmentshirtshort"
+//      "sh men tshirt"          → "shmentshirt"   → still matches as a substring
+function normalize(s: string) {
+  return (s || "").toLowerCase().replace(/[^a-z0-9]/g, "");
 }
 
 function matches(item: InventoryItem, raw: string): boolean {
-  const term = raw.toLowerCase().replace(/[.\-]/g, "").trim();
+  const term = normalize(raw);
   if (!term) return true;
-  const termNoSpace = term.replace(/\s/g, "");
-  // Name: search with spaces kept (prevents cross-word false positives)
-  if (normalizeName(item.name).includes(term)) return true;
-  // Code: strip spaces for compact entry (e.g. "blk001" or "BL.K.001")
-  if (normalizeCode(item.code).includes(termNoSpace)) return true;
+  if (normalize(item.name).includes(term)) return true;
+  if (normalize(item.code).includes(term)) return true;
   return false;
 }
 
