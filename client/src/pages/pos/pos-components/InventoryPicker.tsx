@@ -54,8 +54,11 @@ export function InventoryPicker({
     <Card className={`flex flex-col overflow-hidden ${mobile ? "flex-1 rounded-none border-0 shadow-none" : "w-full lg:w-96 h-[300px] lg:h-auto shrink-0"}`}>
       {/* Header */}
       <div className={`shrink-0 ${mobile ? "px-4 pt-4 pb-3" : "px-3 pt-3 pb-2"}`}>
-        <p className="text-xs font-semibold text-muted-foreground tracking-wide mb-2">Items</p>
-        <div className={`flex items-center gap-2 rounded-md border border-input bg-muted/30 px-2.5 focus-within:ring-2 focus-within:ring-ring focus-within:border-transparent transition-all ${mobile ? "h-11" : "h-9"}`}>
+        <div className="flex items-center gap-1.5 mb-2">
+          <Search className={`text-foreground shrink-0 ${mobile ? "h-5 w-5" : "h-4 w-4"}`} />
+          <p className={`font-bold text-foreground tracking-wide ${mobile ? "text-base" : "text-sm"}`}>Items</p>
+        </div>
+        <div className={`flex items-center gap-2 rounded-md border border-primary bg-background px-2.5 focus-within:ring-2 focus-within:ring-primary/40 transition-all ${mobile ? "h-11" : "h-9"}`}>
           <Search className={`text-muted-foreground shrink-0 ${mobile ? "h-5 w-5" : "h-4 w-4"}`} />
           <input
             className={`flex-1 bg-transparent outline-none placeholder:text-muted-foreground ${mobile ? "text-base" : "text-sm"}`}
@@ -85,7 +88,7 @@ export function InventoryPicker({
             <button
               key={item.code}
               className={`w-full text-left flex items-center justify-between gap-2 border-b border-muted/40 transition-colors duration-100 ${
-                mobile ? "px-4 py-3 active:bg-primary/10" : "px-3 py-1.5"
+                mobile ? "px-4 py-3 active:bg-primary/10" : "px-3 py-3"
               } ${index === highlightedIndex ? "bg-primary/10" : "hover:bg-muted/40"}`}
               onClick={() => {
                 selectItem(item);
