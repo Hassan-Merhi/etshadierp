@@ -70,7 +70,8 @@ const VOUCHER_TYPE_ORDER: Record<string, number> = {
 
 export default function Daybook({ user }: { user?: any } = {}) {
   const { toast } = useToast();
-  const { selectedCompany } = useCompany();
+  const { selectedCompany, companyType } = useCompany();
+  const vouchersBase = companyType === "properties" ? "/properties/vouchers" : "/vouchers";
   const { formatDisplayDate, formatDisplayTime } = useDateFormat();
   const { formatAmount } = useCurrencyContext();
   const [, navigate] = useLocation();
@@ -489,10 +490,10 @@ export default function Daybook({ user }: { user?: any } = {}) {
           if (po?.containerId) {
             navigate(`/containers/${po.containerId}`);
           } else {
-            navigate(`/vouchers?edit=${v.id}&tab=purchase&from=daybook`);
+            navigate(`${vouchersBase}?edit=${v.id}&tab=purchase&from=daybook`);
           }
         })
-        .catch(() => navigate(`/vouchers?edit=${v.id}&tab=purchase&from=daybook`));
+        .catch(() => navigate(`${vouchersBase}?edit=${v.id}&tab=purchase&from=daybook`));
       return;
     }
     const map: Record<string, string> = {
@@ -508,7 +509,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
       "Debit Note": "credit-note",
     };
     const tab = map[v.voucherType];
-    if (tab) navigate(`/vouchers?edit=${v.id}&tab=${tab}&from=daybook`);
+    if (tab) navigate(`${vouchersBase}?edit=${v.id}&tab=${tab}&from=daybook`);
     else toast({ title: "Info", description: `Editing ${v.voucherType} not supported.`, variant: "destructive" });
   };
 
@@ -572,7 +573,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
             <DropdownMenuItem onClick={handleExportDetailedToExcel}>Detailed</DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
-        <Button onClick={() => navigate("/vouchers")} className="gap-2">
+        <Button onClick={() => navigate(vouchersBase)} className="gap-2">
           <Plus className="w-4 h-4" />
           New Voucher
         </Button>
