@@ -290,7 +290,24 @@ export function registerBaleScanningRoutes(app: Express) {
           };
         }
 
+        // Resolve the product record first so its articleCode can be used as a
+        // fallback when bale.articleCode is null.  Bales pressed before the
+        // articleCode column was added (or imported without it) can otherwise
+        // bypass the proforma overload check entirely.
+        let productForBale: any = null;
+        if (bale.productId) {
+          const [p] = await tx.select().from(factoryBaleProducts).where(eq(factoryBaleProducts.id, bale.productId));
+          productForBale = p || null;
+        }
+
+        // Effective article code: prefer the bale's own field, fall back to the
+        // product master's articleCode so the proforma check is consistent.
+        const effectiveArticleCode: string =
+          bale.articleCode || productForBale?.articleCode || "";
+
         let priceUsed = "0";
+        if (productForBale?.sellingPrice) priceUsed = productForBale.sellingPrice;
+
         let proformaLine: any = null;
         if (order.proformaIdUsed) {
           const [pl] = await tx
@@ -299,7 +316,7 @@ export function registerBaleScanningRoutes(app: Express) {
             .where(
               and(
                 eq(customerProformaLines.proformaId, order.proformaIdUsed),
-                eq(customerProformaLines.articleCode, bale.articleCode || "")
+                eq(customerProformaLines.articleCode, effectiveArticleCode)
               )
             );
           proformaLine = pl || null;
@@ -313,7 +330,10 @@ export function registerBaleScanningRoutes(app: Express) {
             } else {
               priceUsed = proformaLine.pricePerBale;
             }
-            // Overload check: count existing bales of this article in the order
+            // Overload check: count existing bales of this article in the order.
+            // Use effectiveArticleCode (not bale.articleCode) so bales that were
+            // stored without an articleCode are still counted correctly via the
+            // product master's code.
             if (!req.body.allowBypassOverload) {
               const [countResult] = await tx
                 .select({ count: sql<number>`COUNT(*)::int` })
@@ -321,7 +341,7 @@ export function registerBaleScanningRoutes(app: Express) {
                 .where(
                   and(
                     eq(customerOrderBales.orderId, orderId),
-                    eq(customerOrderBales.articleCode, bale.articleCode || "")
+                    eq(customerOrderBales.articleCode, effectiveArticleCode)
                   )
                 );
               const currentCount = countResult?.count || 0;
@@ -348,15 +368,6 @@ export function registerBaleScanningRoutes(app: Express) {
           }
         }
 
-        let productForBale: any = null;
-        if (bale.productId) {
-          const [p] = await tx.select().from(factoryBaleProducts).where(eq(factoryBaleProducts.id, bale.productId));
-          productForBale = p || null;
-          if (productForBale && priceUsed === "0" && productForBale.sellingPrice) {
-            priceUsed = productForBale.sellingPrice;
-          }
-        }
-
         // Always prefer the canonical product name from factoryBaleProducts
         const resolvedBaleName = productForBale?.name || bale.productName || bale.articleCode || bale.baleCode;
 
@@ -366,7 +377,7 @@ export function registerBaleScanningRoutes(app: Express) {
           baleReference: bale.referenceNumber,
           locationId: parseInt(locationId),
           weight: bale.weightKg,
-          articleCode: bale.articleCode,
+          articleCode: effectiveArticleCode || bale.articleCode,
           baleName: resolvedBaleName,
           priceUsed,
           scannedBy: scannerName,
