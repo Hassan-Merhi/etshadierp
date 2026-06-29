@@ -1,4 +1,5 @@
 import { KPICard } from "@/components/KPICard";
+import { CountryActivityKPI } from "@/components/CountryActivityKPI";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/PageHeader";
@@ -741,6 +742,9 @@ export default function Dashboard() {
           </div>
         </Card>
       )}
+
+      {/* ── Country Activity KPI (expandable) ── */}
+      {!isFactoryMode && <CountryActivityKPI />}
 
       {/* ── Main content area: 2-col on XL ── */}
       <div className={cn("grid gap-4 sm:gap-6", !isFactoryMode ? "grid-cols-1 xl:grid-cols-2" : "grid-cols-1")}>
