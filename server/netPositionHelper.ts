@@ -167,6 +167,10 @@ export function classifyNetPositionAccounts(
     if (acc.code === "PRODUCTION_ADJUSTMENT" || acc.code === "CONSUMPTION_EXPENSE") return true;
     if (!includeSupplierTypeAccounts && acc.accountType === "Supplier") return true;
     if (additionalExcludedCodes.has((acc.code || "").trim().toUpperCase())) return true;
+    // Deferred Rent Revenue is an internal accrual account; it offsets Rent Income
+    // when rent is prepaid and should not appear as a net-position liability.
+    if ((acc.code || "").toUpperCase() === "DEF-RENT-REV") return true;
+    if ((acc.name || "").toLowerCase() === "deferred rent revenue") return true;
 
     const nameLower = (acc.name || "").toLowerCase();
     const codeLower = (acc.code || "").toLowerCase();
