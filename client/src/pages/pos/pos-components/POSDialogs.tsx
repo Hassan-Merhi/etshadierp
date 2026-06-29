@@ -111,13 +111,28 @@ export function POSDialogs({
                 className="flex items-center justify-between p-3 border rounded-md hover:bg-muted/50 transition-colors"
               >
                 <div className="flex-1 min-w-0 mr-4 cursor-pointer" onClick={() => handleLoadDraft(draft.id)}>
-                  <p className="text-sm font-medium truncate">
-                    {draft.items?.[0]?.stockItemName || "No items"}
-                    {draft.items?.length > 1 && ` (+${draft.items.length - 1} more)`}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    {new Date(draft.updatedAt || draft.createdAt).toLocaleString()}
-                  </p>
+                  {(() => {
+                    const items: any[] = draft.items ?? [];
+                    const totalBales = items.reduce((s: number, i: any) => s + (parseFloat(i.quantity) || 0), 0);
+                    const totalAmount = items.reduce((s: number, i: any) => s + (parseFloat(i.amount) || 0), 0);
+                    return (
+                      <>
+                        <p className="text-sm font-medium">
+                          {items.length === 0
+                            ? "Empty draft"
+                            : `${items.length} item${items.length !== 1 ? "s" : ""} · ${totalBales % 1 === 0 ? totalBales : totalBales.toFixed(2)} bales`}
+                        </p>
+                        {items.length > 0 && (
+                          <p className="text-xs text-muted-foreground font-medium">
+                            Total: ${totalAmount.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </p>
+                        )}
+                        <p className="text-xs text-muted-foreground">
+                          {new Date(draft.updatedAt || draft.createdAt).toLocaleString()}
+                        </p>
+                      </>
+                    );
+                  })()}
                 </div>
                 <div className="flex items-center gap-1">
                   <Button
