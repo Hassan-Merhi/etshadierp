@@ -354,6 +354,7 @@ export function registerOrderVerifyRecoverRoutes(app: Express) {
       // filtered by the order's locationId so the number matches what the
       // Location Inventory page shows for that location.
       const stockQtyMap: Record<string, number> = {};
+      const stockWeightMap: Record<string, number> = {};
       if (allCodes.length > 0) {
         const codesList = sql.join(
           allCodes.map((c: string) => sql`${c}`),
@@ -361,7 +362,9 @@ export function registerOrderVerifyRecoverRoutes(app: Express) {
         );
         const locationFilter = order.locationId ? sql`AND fb.erp_location_id = ${order.locationId}` : sql``;
         const inStockRaw = await db.execute(
-          sql`SELECT fb.article_code AS "articleCode", SUM(COALESCE(fb.quantity, 1))::int AS count
+          sql`SELECT fb.article_code AS "articleCode",
+                     SUM(COALESCE(fb.quantity, 1))::int AS count,
+                     SUM(fb.weight_kg::numeric) AS total_weight
               FROM factory_bales fb
               WHERE fb.company_id = ${companyId}
                 AND fb.status = 'IN_STOCK'
@@ -372,13 +375,18 @@ export function registerOrderVerifyRecoverRoutes(app: Express) {
         );
         const inStockRows = (inStockRaw as any).rows ?? (inStockRaw as unknown as any[]);
         for (const r of inStockRows) {
-          if (r.articleCode) stockQtyMap[r.articleCode] = Number(r.count);
+          if (r.articleCode) {
+            stockQtyMap[r.articleCode] = Number(r.count);
+            stockWeightMap[r.articleCode] = Number(r.total_weight ?? 0);
+          }
         }
 
         // Subtract bales already scanned into any active LOADING order
         // (V5 bales stay IN_STOCK during loading, so we must deduct them manually)
         const loadingRaw = await db.execute(
-          sql`SELECT fb.article_code AS "articleCode", SUM(COALESCE(fb.quantity, 1))::int AS count
+          sql`SELECT fb.article_code AS "articleCode",
+                     SUM(COALESCE(fb.quantity, 1))::int AS count,
+                     SUM(fb.weight_kg::numeric) AS total_weight
               FROM factory_bales fb
               JOIN customer_order_bales cob ON cob.bale_id = fb.id
               JOIN customer_orders co ON co.id = cob.order_id
@@ -394,6 +402,7 @@ export function registerOrderVerifyRecoverRoutes(app: Express) {
         for (const r of loadingRows) {
           if (r.articleCode && stockQtyMap[r.articleCode] !== undefined) {
             stockQtyMap[r.articleCode] = Math.max(0, stockQtyMap[r.articleCode] - Number(r.count));
+            stockWeightMap[r.articleCode] = Math.max(0, (stockWeightMap[r.articleCode] ?? 0) - Number(r.total_weight ?? 0));
           }
         }
       }
@@ -431,6 +440,8 @@ export function registerOrderVerifyRecoverRoutes(app: Express) {
           pricePerBale: proforma?.pricePerBale || "0",
           inProforma: !!proforma,
           status,
+          stockQty: stockQtyMap[code] ?? 0,
+          stockTotalWeight: stockWeightMap[code] ?? 0,
         });
       }
 

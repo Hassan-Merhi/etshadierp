@@ -613,10 +613,10 @@ export default function FactoryPendingInvoiceVerify() {
     return sum + (remaining > 0 ? remaining : 0);
   }, 0);
 
-  // Use per-article average weight where available so different article types are
-  // weighted correctly. Fall back to the global average only for articles that
-  // have no loaded bales yet (MISSING_FROM_LOADED), where we have no per-article
-  // weight data.
+  // Compute the not-loaded weight using actual IN-STOCK bale weights where
+  // available (stockTotalWeight / stockQty), so the number reflects reality
+  // rather than an average of already-loaded bales (which can introduce
+  // fractions even when every physical bale has a whole-number weight).
   const globalAvgWeightPerBale =
     (verification?.totalLoadedBales ?? 0) > 0
       ? (verification?.totalLoadedWeight ?? 0) / (verification?.totalLoadedBales ?? 1)
@@ -624,9 +624,19 @@ export default function FactoryPendingInvoiceVerify() {
   const totalNotLoadedWeight = (verification?.comparison ?? []).reduce((sum, item) => {
     const remaining = item.expectedQty - item.loadedQty;
     if (remaining <= 0) return sum;
-    const articleAvg =
-      item.loadedQty > 0 ? item.totalWeight / item.loadedQty : globalAvgWeightPerBale;
-    return sum + articleAvg * remaining;
+    // Priority 1: actual average weight of IN-STOCK bales for this article
+    const stockQty: number = item.stockQty ?? 0;
+    const stockTotalWeight: number = item.stockTotalWeight ?? 0;
+    if (stockQty > 0 && stockTotalWeight > 0) {
+      const stockAvg = stockTotalWeight / stockQty;
+      return sum + stockAvg * remaining;
+    }
+    // Priority 2: average of already-loaded bales of this article
+    if (item.loadedQty > 0) {
+      return sum + (item.totalWeight / item.loadedQty) * remaining;
+    }
+    // Priority 3: global average across all loaded bales
+    return sum + globalAvgWeightPerBale * remaining;
   }, 0);
 
   if (isLoading) {
