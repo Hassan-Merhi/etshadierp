@@ -217,7 +217,14 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
 
   const { data: lastSoldPrices = {} } = useQuery<Record<number, string>>({
     queryKey: activeLocation ? [`/api/pos/last-sold-prices`, { locationId: activeLocation.id }] : [],
+    queryFn: async () => {
+      if (!activeLocation) return {};
+      const res = await fetch(`/api/pos/last-sold-prices?locationId=${activeLocation.id}`, { credentials: "include" });
+      if (!res.ok) return {};
+      return res.json();
+    },
     enabled: !!activeLocation,
+    staleTime: 60_000,
   });
 
   const { data: posCustomers = [] } = useQuery<any[]>({

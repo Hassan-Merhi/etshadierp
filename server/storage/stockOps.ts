@@ -982,15 +982,16 @@ export async function getLastSaleForItem(stockItemId: number, companyId: number)
   return result.length > 0 ? result[0] : null;
 }
 
-export async function getLastSoldPrices(): Promise<Record<number, string>> {
+export async function getLastSoldPrices(companyId: number): Promise<Record<number, string>> {
   const result = await pool.query(`
     SELECT DISTINCT ON (si.stock_item_id)
       si.stock_item_id,
       si.selling_price
     FROM sales_items si
     INNER JOIN vouchers v ON si.voucher_id = v.id
+    WHERE v.company_id = $1
     ORDER BY si.stock_item_id, v.voucher_date DESC, si.created_at DESC
-  `);
+  `, [companyId]);
   const priceMap: Record<number, string> = {};
   for (const row of result.rows as any[]) {
     priceMap[row.stock_item_id] = row.selling_price;
