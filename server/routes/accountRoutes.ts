@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import path from "path";
 import fs from "fs";
-import { db } from "../db";
+import { db, pool } from "../db";
 import { storage } from "../storage";
 import { requireAuth, requireRole, canDelete, requireNonPOS, checkPOSLocation } from "../auth";
 import { upload, logAudit, getCurrentExchangeRate, calculateHistoricalLocationInventory } from "./_helpers";
@@ -1293,6 +1293,20 @@ export function registerAccountRoutes(app: Express) {
         endDate as string | undefined
       );
 
+      if (startDate) {
+        const bfResult = await pool.query(
+          `SELECT COALESCE(SUM(ve.debit_amount::numeric - ve.credit_amount::numeric), 0) AS net
+           FROM voucher_entries ve
+           JOIN vouchers v ON ve.voucher_id = v.id
+           WHERE ve.ledger_account_id = $1
+             AND v.optional = false
+             AND v.deleted_at IS NULL
+             AND v.voucher_date < $2`,
+          [ledgerAccountId, startDate]
+        );
+        return res.json({ transactions, preNetBalance: parseFloat(bfResult.rows[0]?.net ?? "0") });
+      }
+
       res.json(transactions);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
@@ -1316,6 +1330,20 @@ export function registerAccountRoutes(app: Express) {
         endDate as string | undefined
       );
 
+      if (startDate) {
+        const bfResult = await pool.query(
+          `SELECT COALESCE(SUM(ve.debit_amount::numeric - ve.credit_amount::numeric), 0) AS net
+           FROM voucher_entries ve
+           JOIN vouchers v ON ve.voucher_id = v.id
+           WHERE ve.bank_account_id = $1
+             AND v.optional = false
+             AND v.deleted_at IS NULL
+             AND v.voucher_date < $2`,
+          [bankAccountId, startDate]
+        );
+        return res.json({ transactions, preNetBalance: parseFloat(bfResult.rows[0]?.net ?? "0") });
+      }
+
       res.json(transactions);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
@@ -1338,6 +1366,20 @@ export function registerAccountRoutes(app: Express) {
         startDate as string | undefined,
         endDate as string | undefined
       );
+
+      if (startDate) {
+        const bfResult = await pool.query(
+          `SELECT COALESCE(SUM(ve.debit_amount::numeric - ve.credit_amount::numeric), 0) AS net
+           FROM voucher_entries ve
+           JOIN vouchers v ON ve.voucher_id = v.id
+           WHERE ve.fixed_asset_id = $1
+             AND v.optional = false
+             AND v.deleted_at IS NULL
+             AND v.voucher_date < $2`,
+          [fixedAssetId, startDate]
+        );
+        return res.json({ transactions, preNetBalance: parseFloat(bfResult.rows[0]?.net ?? "0") });
+      }
 
       res.json(transactions);
     } catch (error: any) {
@@ -1366,6 +1408,20 @@ export function registerAccountRoutes(app: Express) {
         endDate as string | undefined
       );
 
+      if (startDate) {
+        const bfResult = await pool.query(
+          `SELECT COALESCE(SUM(ve.debit_amount::numeric - ve.credit_amount::numeric), 0) AS net
+           FROM voucher_entries ve
+           JOIN vouchers v ON ve.voucher_id = v.id
+           WHERE ve.supplier_id = $1
+             AND v.optional = false
+             AND v.deleted_at IS NULL
+             AND v.voucher_date < $2`,
+          [supplierId, startDate]
+        );
+        return res.json({ transactions, preNetBalance: parseFloat(bfResult.rows[0]?.net ?? "0") });
+      }
+
       res.json(transactions);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
@@ -1392,6 +1448,20 @@ export function registerAccountRoutes(app: Express) {
         startDate as string | undefined,
         endDate as string | undefined
       );
+
+      if (startDate) {
+        const bfResult = await pool.query(
+          `SELECT COALESCE(SUM(ve.debit_amount::numeric - ve.credit_amount::numeric), 0) AS net
+           FROM voucher_entries ve
+           JOIN vouchers v ON ve.voucher_id = v.id
+           WHERE ve.employee_id = $1
+             AND v.optional = false
+             AND v.deleted_at IS NULL
+             AND v.voucher_date < $2`,
+          [employeeId, startDate]
+        );
+        return res.json({ transactions, preNetBalance: parseFloat(bfResult.rows[0]?.net ?? "0") });
+      }
 
       res.json(transactions);
     } catch (error: any) {
@@ -1429,6 +1499,19 @@ export function registerAccountRoutes(app: Express) {
         debitAmount: row.debitAmount,
         creditAmount: row.creditAmount,
       }));
+
+      if (startDate) {
+        const bfResult = await pool.query(
+          `SELECT COALESCE(SUM(cb.debit_amount::numeric - cb.credit_amount::numeric), 0) AS net
+           FROM customer_balances cb
+           WHERE cb.customer_id = $1
+             AND cb.company_id = $2
+             AND cb.transaction_date < $3`,
+          [customerId, companyId, startDate]
+        );
+        return res.json({ transactions: mapped, preNetBalance: parseFloat(bfResult.rows[0]?.net ?? "0") });
+      }
+
       res.json(mapped);
     } catch (error: any) {
       res.status(500).json({ message: error.message });

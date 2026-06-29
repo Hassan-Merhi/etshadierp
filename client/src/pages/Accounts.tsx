@@ -310,7 +310,7 @@ export default function Accounts() {
     enabled: !!selectedCompany,
   });
 
-  const { data: transactions = [], isLoading: transactionsLoading } = useQuery<Transaction[]>({
+  const { data: rawTransactionData, isLoading: transactionsLoading } = useQuery<any>({
     queryKey: selectedAccount
       ? [
           selectedAccount.type === "factoryWorker"
@@ -341,24 +341,39 @@ export default function Accounts() {
     refetchOnWindowFocus: false,
   });
 
+  // Unwrap response — when a startDate filter is active the backend returns
+  // { transactions, preNetBalance } so we can compute the correct opening balance.
+  const transactions: Transaction[] = useMemo(() => {
+    if (!rawTransactionData) return [];
+    if (Array.isArray(rawTransactionData)) return rawTransactionData;
+    return rawTransactionData.transactions ?? [];
+  }, [rawTransactionData]);
+
+  // broughtForwardBalance = stored account opening balance + net of all entries before the period start.
+  const broughtForwardBalance = useMemo(() => {
+    const storedOB = selectedAccount?.openingBalance || 0;
+    if (!rawTransactionData || Array.isArray(rawTransactionData)) return storedOB;
+    return storedOB + (rawTransactionData.preNetBalance ?? 0);
+  }, [rawTransactionData, selectedAccount]);
+
   // Derived state
   const vouchersWithBalance = useMemo(() => {
     if (!transactions.length) return [];
-    let runBal = selectedAccount?.openingBalance || 0;
+    let runBal = broughtForwardBalance;
     return transactions.map((t) => {
       const dr = parseFloat(t.debitAmount) || 0;
       const cr = parseFloat(t.creditAmount) || 0;
       runBal += dr - cr;
       return { ...t, totalDebit: dr, totalCredit: cr, runningBalance: runBal };
     });
-  }, [transactions, selectedAccount]);
+  }, [transactions, broughtForwardBalance]);
 
   const closingBalance = useMemo(() => {
     if (vouchersWithBalance.length > 0) {
       return vouchersWithBalance[vouchersWithBalance.length - 1].runningBalance;
     }
-    return selectedAccount?.openingBalance || 0;
-  }, [vouchersWithBalance, selectedAccount]);
+    return broughtForwardBalance;
+  }, [vouchersWithBalance, broughtForwardBalance]);
 
   const filteredAccounts = useMemo(() => {
     const searchLower = searchTerm.toLowerCase();
@@ -562,7 +577,7 @@ export default function Accounts() {
               setPeriodFilter={setPeriodFilter}
               vouchersWithBalance={vouchersWithBalance}
               closingBalance={closingBalance}
-              openingBalance={selectedAccount.openingBalance || 0}
+              openingBalance={broughtForwardBalance}
               transactionsLoading={transactionsLoading}
               selectedVoucherIds={selectedVoucherIds}
               toggleSelectAll={toggleSelectAll}
