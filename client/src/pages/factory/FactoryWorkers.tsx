@@ -1167,49 +1167,51 @@ export default function FactoryWorkers() {
 
           {/* Table */}
           <div className="border rounded-xl overflow-auto max-h-[calc(100vh-220px)]">
-            <Table wrapperClassName="overflow-visible">
+            <Table wrapperClassName="overflow-visible" className="w-full table-fixed">
               <TableHeader className="sticky top-0 z-30">
                 <TableRow className="bg-muted border-b-2 border-border/60 hover:bg-muted">
+                  <TableHead className="w-10 text-center text-xs font-semibold uppercase tracking-wide text-muted-foreground py-2 pl-3 pr-1">
+                    #
+                  </TableHead>
                   <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground py-2">
                     Worker
                   </TableHead>
-                  <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground py-2">
+                  <TableHead className="w-[22%] text-xs font-semibold uppercase tracking-wide text-muted-foreground py-2">
                     Position
                   </TableHead>
-                  <TableHead className="text-right text-xs font-semibold uppercase tracking-wide text-muted-foreground py-2">
+                  <TableHead className="w-[16%] text-xs font-semibold uppercase tracking-wide text-muted-foreground py-2">
+                    Location
+                  </TableHead>
+                  <TableHead className="w-[11%] text-right text-xs font-semibold uppercase tracking-wide text-muted-foreground py-2">
                     Salary
                   </TableHead>
-                  <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground py-2">
+                  <TableHead className="w-[90px] text-xs font-semibold uppercase tracking-wide text-muted-foreground py-2">
                     Status
                   </TableHead>
-                  <TableHead className="w-[80px] py-2"></TableHead>
+                  <TableHead className="w-[72px] py-2"></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {isLoading ? (
                   [...Array(6)].map((_, i) => (
                     <TableRow key={i}>
+                      <TableCell className="pl-3 pr-1"><Skeleton className="h-4 w-5 mx-auto" /></TableCell>
                       <TableCell>
                         <div className="flex items-center gap-3">
-                          <Skeleton className="h-8 w-8 rounded-full" />
+                          <Skeleton className="h-8 w-8 rounded-full shrink-0" />
                           <Skeleton className="h-4 w-36" />
                         </div>
                       </TableCell>
-                      <TableCell>
-                        <Skeleton className="h-4 w-24" />
-                      </TableCell>
-                      <TableCell>
-                        <Skeleton className="h-4 w-20 ml-auto" />
-                      </TableCell>
-                      <TableCell>
-                        <Skeleton className="h-5 w-16 rounded-full" />
-                      </TableCell>
+                      <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+                      <TableCell><Skeleton className="h-4 w-20" /></TableCell>
+                      <TableCell><Skeleton className="h-4 w-16 ml-auto" /></TableCell>
+                      <TableCell><Skeleton className="h-5 w-14 rounded-full" /></TableCell>
                       <TableCell></TableCell>
                     </TableRow>
                   ))
                 ) : filteredWorkers.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={5}>
+                    <TableCell colSpan={7}>
                       <div className="flex flex-col items-center gap-2 py-10 text-center">
                         <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center">
                           <Users className="h-5 w-5 text-muted-foreground" />
@@ -1226,15 +1228,18 @@ export default function FactoryWorkers() {
                     </TableCell>
                   </TableRow>
                 ) : (
-                  filteredWorkers.map((worker) => (
+                  filteredWorkers.map((worker, idx) => (
                     <TableRow
                       key={worker.id}
                       className="group cursor-pointer hover:bg-muted/40"
                       onClick={() => setLocation(`/factory/workers/${worker.id}`)}
                       data-testid={`row-worker-${worker.id}`}
                     >
+                      <TableCell className="py-3 pl-3 pr-1 text-center text-xs text-muted-foreground font-mono tabular-nums">
+                        {idx + 1}
+                      </TableCell>
                       <TableCell className="py-3">
-                        <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-3 min-w-0">
                           <div className="relative shrink-0">
                             <Avatar className={`h-8 w-8 text-xs font-semibold ${getAvatarColor(worker.fullName)}`}>
                               {worker.photoUrl ? <AvatarImage src={worker.photoUrl} /> : null}
@@ -1261,14 +1266,19 @@ export default function FactoryWorkers() {
                                 {worker.employeeCode}
                               </span>
                             )}
-                            <span className="font-medium text-sm leading-tight" data-testid={`text-name-${worker.id}`}>
+                            <span className="font-medium text-sm leading-tight truncate" data-testid={`text-name-${worker.id}`}>
                               {worker.fullName}
                             </span>
                           </div>
                         </div>
                       </TableCell>
-                      <TableCell className="py-3 text-sm text-muted-foreground">
+                      <TableCell className="py-3 text-sm text-muted-foreground truncate">
                         {worker.position || <span className="text-muted-foreground/40">—</span>}
+                      </TableCell>
+                      <TableCell className="py-3 text-sm text-muted-foreground truncate">
+                        {(worker as any).city || (worker as any).country
+                          ? <span>{(worker as any).city || (worker as any).country}</span>
+                          : <span className="text-muted-foreground/40">—</span>}
                       </TableCell>
                       <TableCell className="py-3 text-right font-mono text-sm text-muted-foreground">
                         {worker.baseSalary ? (
