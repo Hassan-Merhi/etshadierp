@@ -387,6 +387,136 @@ export default function Payroll() {
     setWithdrawalDialogOpen(true);
   };
 
+  const handleBonus = (emp: Employee) => {
+    setSelectedEmployee(emp);
+    setBonusTab("sales");
+    setBonusSalesPreview(null);
+    setBonusSalesCustomPct(emp.salesBonusPct ? String(emp.salesBonusPct) : "");
+    setBonusSalesLocationId(emp.salesBonusPctLocationId ? String(emp.salesBonusPctLocationId) : "");
+    setBonusSalesPeriod("thisMonth");
+    setBonusSalesStart("");
+    setBonusSalesEnd("");
+    setBalesRows([{
+      locationId: "",
+      sourceCompanyId: "",
+      qty: "",
+      rate: emp.balesBonusRate != null ? String(emp.balesBonusRate) : "",
+      preview: null,
+      loading: false,
+    }]);
+    setBalesPeriod("thisMonth");
+    setBonusDate(new Date().toLocaleDateString("en-CA"));
+    setBonusNotes("");
+    setBonusDialogOpen(true);
+  };
+
+  const fetchSalesPreview = async () => {
+    if (!bonusSalesLocationId) return;
+    setBonusSalesLoading(true);
+    setBonusSalesPreview(null);
+    try {
+      const { getThisMonthRange: tmr } = await import("./payroll/payrollSchemas");
+      const range = bonusSalesPeriod === "thisMonth" ? tmr() : { start: bonusSalesStart, end: bonusSalesEnd };
+      const otherLoc = allCompanyLocations.find((l: any) => l.id === parseInt(bonusSalesLocationId));
+      const sourceParam = otherLoc ? `&sourceCompanyId=${otherLoc.companyId}` : "";
+      const res = await fetch(
+        `/api/payroll/sales-summary?locationId=${bonusSalesLocationId}&startDate=${range.start}&endDate=${range.end}${sourceParam}`,
+        { credentials: "include" }
+      );
+      if (!res.ok) throw new Error(await res.text());
+      const data = await res.json();
+      setBonusSalesPreview(data);
+    } catch (e: any) {
+      toast({ title: "Error", description: e.message, variant: "destructive" });
+    } finally {
+      setBonusSalesLoading(false);
+    }
+  };
+
+  const fetchBalesQty = async (idx: number) => {
+    const row = balesRows[idx];
+    if (!row.locationId) return;
+    setBalesRows((prev: any[]) => prev.map((r: any, i: number) => i === idx ? { ...r, loading: true } : r));
+    try {
+      const { getThisMonthRange: tmr } = await import("./payroll/payrollSchemas");
+      const range = balesPeriod === "thisMonth" ? tmr() : { start: balesStart, end: balesEnd };
+      const sourceParam = row.sourceCompanyId ? `&sourceCompanyId=${row.sourceCompanyId}` : "";
+      const res = await fetch(
+        `/api/payroll/sales-summary?locationId=${row.locationId}&startDate=${range.start}&endDate=${range.end}${sourceParam}`,
+        { credentials: "include" }
+      );
+      if (!res.ok) throw new Error(await res.text());
+      const data = await res.json();
+      setBalesRows((prev: any[]) => prev.map((r: any, i: number) =>
+        i === idx ? { ...r, qty: data.totalQuantity, loading: false } : r
+      ));
+    } catch (e: any) {
+      setBalesRows((prev: any[]) => prev.map((r: any, i: number) => i === idx ? { ...r, loading: false } : r));
+      toast({ title: "Error fetching qty", description: e.message, variant: "destructive" });
+    }
+  };
+
+  const getBonusAmount = (): number => {
+    if (bonusTab === "sales") {
+      if (!bonusSalesPreview) return 0;
+      return (parseFloat(bonusSalesPreview.totalSalesAmount || "0") * parseFloat(bonusSalesCustomPct || "0")) / 100;
+    } else {
+      return balesRows.reduce((s: number, r: any) => s + parseFloat(r.qty || "0") * parseFloat(r.rate || "0"), 0);
+    }
+  };
+
+  const saveBonusToPending = () => {
+    if (!selectedEmployee) return;
+    const amount = getBonusAmount();
+    if (amount <= 0) return;
+    const descParts: string[] = [];
+    if (bonusTab === "sales" && bonusSalesPreview) {
+      descParts.push(`Sales bonus ${bonusSalesCustomPct}% on ${bonusSalesPreview.locationName}`);
+    } else {
+      balesRows.filter((r: any) => parseFloat(r.qty || "0") > 0 && parseFloat(r.rate || "0") > 0).forEach((r: any) => {
+        const loc = locations.find((l: any) => l.id === parseInt(r.locationId)) ?? allCompanyLocations.find((l: any) => l.id === parseInt(r.locationId));
+        descParts.push(`${parseFloat(r.qty)} bales @ ${r.rate} (${loc?.name ?? r.locationId})`);
+      });
+    }
+    setPendingBonuses((prev: any) => ({
+      ...prev,
+      [selectedEmployee.id]: {
+        amount,
+        description: descParts.join(", ") || "Bonus",
+        employeeName: `${selectedEmployee.firstName} ${selectedEmployee.lastName}`,
+      },
+    }));
+    setBonusDialogOpen(false);
+    toast({ title: "Saved to bulk", description: `Bonus of ${amount.toFixed(2)} saved for ${selectedEmployee.firstName}` });
+  };
+
+  const bonusMutation = useMutation({
+    mutationFn: async ({ employeeId, amount }: { employeeId: number; amount: number }) => {
+      return await modeApiRequest("POST", "/api/payroll/bonus-employee", {
+        employeeId,
+        amount: amount.toFixed(2),
+        date: bonusDate,
+        notes: bonusNotes || "",
+      });
+    },
+    onSuccess: () => {
+      toast({ title: "Success", description: "Bonus recorded successfully" });
+      queryClient.invalidateQueries({ queryKey: ["/api/employees", selectedCompany?.id] });
+      if (selectedEmployee) queryClient.invalidateQueries({ queryKey: ["/api/accounts/employee", selectedEmployee.id] });
+      setBonusDialogOpen(false);
+    },
+    onError: (e: any) => {
+      toast({ title: "Error", description: e.message, variant: "destructive" });
+    },
+  });
+
+  const submitSmartBonus = () => {
+    if (!selectedEmployee) return;
+    const amount = getBonusAmount();
+    if (amount <= 0) return;
+    bonusMutation.mutate({ employeeId: selectedEmployee.id, amount });
+  };
+
   const handleDeleteEmployee = (emp: Employee) => {
     if (confirm(`Are you sure you want to delete ${emp.firstName}?`)) {
       // call mutation
@@ -520,7 +650,7 @@ export default function Payroll() {
             setBulkWithdrawalDialogOpen={setBulkWithdrawalDialogOpen}
             setStatementEmployee={setStatementEmployee}
             handleDeposit={handleDeposit}
-            handleBonus={() => {}} // simplified
+            handleBonus={handleBonus}
             handleWithdrawal={handleWithdrawal}
             setEditingEmployee={setEditingEmployee}
             setEditEmployeeDialogOpen={setEditEmployeeDialogOpen}
@@ -589,6 +719,45 @@ export default function Payroll() {
         cashAccounts={cashAccounts}
         bankAccounts={bankAccounts}
         bankAccountsLoading={bankAccountsLoading}
+      />
+
+      <BonusDialog
+        open={bonusDialogOpen}
+        onOpenChange={setBonusDialogOpen}
+        selectedEmployee={selectedEmployee}
+        bonusTab={bonusTab}
+        setBonusTab={setBonusTab}
+        bonusSalesPreview={bonusSalesPreview}
+        setBonusSalesPreview={setBonusSalesPreview}
+        bonusSalesCustomPct={bonusSalesCustomPct}
+        setBonusSalesCustomPct={setBonusSalesCustomPct}
+        bonusSalesLocationId={bonusSalesLocationId}
+        setBonusSalesLocationId={setBonusSalesLocationId}
+        bonusSalesPeriod={bonusSalesPeriod}
+        setBonusSalesPeriod={setBonusSalesPeriod}
+        bonusSalesStart={bonusSalesStart}
+        setBonusSalesStart={setBonusSalesStart}
+        bonusSalesEnd={bonusSalesEnd}
+        setBonusSalesEnd={setBonusSalesEnd}
+        bonusSalesLoading={bonusSalesLoading}
+        fetchSalesPreview={fetchSalesPreview}
+        balesRows={balesRows}
+        setBalesRows={setBalesRows}
+        balesPeriod={balesPeriod}
+        setBalesPeriod={setBalesPeriod}
+        balesStart={balesStart}
+        setBalesStart={setBalesStart}
+        balesEnd={balesEnd}
+        setBalesEnd={setBalesEnd}
+        fetchBalesQty={fetchBalesQty}
+        bonusDate={bonusDate}
+        setBonusDate={setBonusDate}
+        bonusNotes={bonusNotes}
+        setBonusNotes={setBonusNotes}
+        saveBonusToPending={saveBonusToPending}
+        submitSmartBonus={submitSmartBonus}
+        locations={locations}
+        allCompanyLocations={allCompanyLocations}
       />
 
       <EmployeeStatementDialog
