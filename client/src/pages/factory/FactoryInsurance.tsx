@@ -483,21 +483,26 @@ export default function FactoryInsurance() {
         />
         <div className="flex items-center gap-2 flex-wrap">
           {companies.length > 1 && (
-            <Select
-              value={selectedCompanyId ? String(selectedCompanyId) : ""}
-              onValueChange={(v) => setCompanyId(parseInt(v))}
-            >
-              <SelectTrigger className="w-44" data-testid="select-company">
-                <SelectValue placeholder="Select company" />
-              </SelectTrigger>
-              <SelectContent>
-                {companies.map((c) => (
-                  <SelectItem key={c.id} value={String(c.id)}>
-                    {c.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <div className="flex items-center gap-1.5">
+              <span className="text-sm text-muted-foreground whitespace-nowrap">Company:</span>
+              <Select
+                value={selectedCompanyId ? String(selectedCompanyId) : ""}
+                onValueChange={(v) => setCompanyId(parseInt(v))}
+              >
+                <SelectTrigger className="w-44" data-testid="select-company">
+                  <SelectValue>
+                    {companies.find((c) => c.id === selectedCompanyId)?.name ?? "Select company"}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  {companies.map((c) => (
+                    <SelectItem key={c.id} value={String(c.id)}>
+                      {c.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           )}
           <Button
             onClick={() => setShowGenDialog(true)}
