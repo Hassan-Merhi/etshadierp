@@ -1,6 +1,5 @@
 import { Fragment, useState, useMemo } from "react";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
+import { Table, TableBody, TableCell, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { AccountTableProps } from "./accountTypes";
@@ -19,15 +18,6 @@ const TYPE_LABELS: Record<string, string> = {
   factoryWorker: "Worker",
 };
 
-const TYPE_COLORS: Record<string, string> = {
-  ledger: "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20",
-  supplier: "bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20",
-  customer: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20",
-  bank: "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20",
-  employee: "bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border-cyan-500/20",
-  fixedAsset: "bg-slate-500/10 text-slate-600 dark:text-slate-400 border-slate-500/20",
-  factoryWorker: "bg-orange-500/10 text-orange-600 dark:text-orange-400 border-orange-500/20",
-};
 
 const TYPE_ORDER = ["ledger", "supplier", "customer", "bank", "employee", "fixedAsset", "factoryWorker"];
 
@@ -101,25 +91,12 @@ export function AccountTable({
 
       <div className="rounded-xl border overflow-hidden">
         <Table>
-          <TableHeader>
-            <TableRow className="bg-muted/50 hover:bg-muted/50">
-              <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                Account
-              </TableHead>
-              {!hideBalances && (
-                <TableHead className="text-right w-[200px] text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                  Balance
-                </TableHead>
-              )}
-            </TableRow>
-          </TableHeader>
           <TableBody>
             {parents.map((account: any) => {
               const kids = childMap.get(account.accountId) || [];
               const hasKids = kids.length > 0;
               const isExpanded = expandedParents.has(account.id);
               const isGroup = account.subType === "Group" || hasKids;
-              const typeColor = TYPE_COLORS[account.type] ?? "bg-muted text-muted-foreground border-border";
               const balanceSide = account.balanceSide || (account.balance >= 0 ? "Dr" : "Cr");
 
               return (
@@ -150,14 +127,6 @@ export function AccountTable({
                           <span className="text-[10px] text-muted-foreground font-mono shrink-0">
                             #{account.accountId}
                           </span>
-                        )}
-                        {!isGroup && (
-                          <Badge
-                            variant="outline"
-                            className={cn("text-[10px] shrink-0 py-0 px-1.5 h-[18px] font-normal", typeColor)}
-                          >
-                            {TYPE_LABELS[account.type] || account.type}
-                          </Badge>
                         )}
                       </div>
                     </TableCell>
