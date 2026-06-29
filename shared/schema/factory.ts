@@ -3151,3 +3151,36 @@ export const insertBaleRecodeItemSchema = createInsertSchema(baleRecodeItems)
 
 export type InsertBaleRecodeItem = z.infer<typeof insertBaleRecodeItemSchema>;
 export type BaleRecodeItem = typeof baleRecodeItems.$inferSelect;
+
+// ─── Insurance Members ────────────────────────────────────────────────────────
+export const insuranceMembers = pgTable("insurance_members", {
+  id: serial("id").primaryKey(),
+  companyId: integer("company_id").notNull(),
+  name: text("name").notNull(),
+  nationality: text("nationality"),
+  positionWorking: text("position_working"),
+  startDate: date("start_date").notNull(),
+  amount: decimal("amount", { precision: 15, scale: 2 }).notNull(),
+  dob: date("dob"),
+  notes: text("notes"),
+  active: boolean("active").notNull().default(true),
+  ledgerAccountId: integer("ledger_account_id"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertInsuranceMemberSchema = createInsertSchema(insuranceMembers)
+  .omit({ id: true, createdAt: true, ledgerAccountId: true })
+  .extend({
+    companyId: z.number().min(1, "Company is required"),
+    name: z.string().min(1, "Name is required"),
+    startDate: z.string().min(1, "Start date is required"),
+    amount: z.string().refine((v) => !isNaN(parseFloat(v)) && parseFloat(v) >= 0, "Amount must be a non-negative number"),
+    nationality: z.string().optional().nullable(),
+    positionWorking: z.string().optional().nullable(),
+    dob: z.string().optional().nullable(),
+    notes: z.string().optional().nullable(),
+    active: z.boolean().optional(),
+  });
+
+export type InsertInsuranceMember = z.infer<typeof insertInsuranceMemberSchema>;
+export type InsuranceMember = typeof insuranceMembers.$inferSelect;

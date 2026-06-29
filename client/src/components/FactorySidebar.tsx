@@ -43,6 +43,7 @@ import {
   Building2,
   CreditCard,
   QrCode,
+  Shield,
 } from "lucide-react";
 import { Sidebar, SidebarContent } from "@/components/ui/sidebar";
 import { useQuery } from "@tanstack/react-query";
@@ -116,6 +117,7 @@ export const FACTORY_NAV_SECTIONS: FactoryNavSection[] = [
     items: [
       { title: "Parties", url: "/factory/parties", icon: Users },
       { title: "Payroll", url: "/factory/payroll-hub", icon: HardHat },
+      { title: "Insurance", url: "/factory/insurance", icon: Shield },
       { title: "Vouchers", url: "/factory/vouchers", icon: FileText },
       { title: "Accounts", url: "/factory/accounts", icon: Landmark },
       { title: "Analytics", url: "/factory/analytics", icon: TrendingUp, adminOnly: true },

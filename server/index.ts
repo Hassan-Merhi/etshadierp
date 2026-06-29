@@ -4230,6 +4230,22 @@ END $$`,
      FROM locations loc
      WHERE inv.location_id = loc.id
        AND (inv.company_id IS NULL OR inv.company_id <> loc.company_id)`,
+    // Insurance Members table (June 2026)
+    `CREATE TABLE IF NOT EXISTS insurance_members (
+      id serial PRIMARY KEY,
+      company_id integer NOT NULL,
+      name text NOT NULL,
+      nationality text,
+      position_working text,
+      start_date date NOT NULL,
+      amount decimal(15,2) NOT NULL DEFAULT 0,
+      dob date,
+      notes text,
+      active boolean NOT NULL DEFAULT true,
+      ledger_account_id integer,
+      created_at timestamptz NOT NULL DEFAULT now()
+    )`,
+    `CREATE INDEX IF NOT EXISTS idx_insurance_members_company ON insurance_members (company_id)`,
   ];
 
   // /api/health/db — reports migration status but does NOT block deployment.
