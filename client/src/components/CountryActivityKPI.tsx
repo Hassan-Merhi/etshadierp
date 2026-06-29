@@ -8,6 +8,7 @@ import {
   ShoppingCart,
   Globe,
   Loader2,
+  MapPin,
 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -16,10 +17,17 @@ import { cn } from "@/lib/utils";
 
 const WINDOW_DAYS = 14;
 
+interface LocationCount {
+  locationId: number;
+  locationName: string;
+  count: number;
+}
+
 interface DayEntry {
   date: string;
   offloads: number;
   purchases: number;
+  locations: LocationCount[];
 }
 
 interface CompanyActivity {
@@ -39,12 +47,10 @@ interface ActivityResponse {
   dateSeries: string[];
 }
 
-// Returns YYYY-MM-DD for a Date
 function toDateStr(d: Date) {
   return d.toISOString().substring(0, 10);
 }
 
-// Returns a Date offset by N days
 function addDays(d: Date, n: number) {
   const r = new Date(d);
   r.setDate(r.getDate() + n);
@@ -74,6 +80,25 @@ function isToday(dateStr: string) {
   return dateStr === new Date().toISOString().substring(0, 10);
 }
 
+// ── Location tags shown inline under an offload cell ─────────────────────────
+function LocationTags({ locations }: { locations: LocationCount[] }) {
+  if (!locations || locations.length === 0) return null;
+  return (
+    <div className="flex flex-wrap gap-1 mt-1 justify-center">
+      {locations.map((loc) => (
+        <span
+          key={loc.locationId}
+          className="inline-flex items-center gap-0.5 text-[10px] bg-primary/10 text-primary rounded px-1.5 py-0.5 whitespace-nowrap"
+        >
+          <MapPin className="h-2.5 w-2.5 shrink-0" />
+          {loc.locationName}
+          {loc.count > 1 && <span className="font-mono ml-0.5">×{loc.count}</span>}
+        </span>
+      ))}
+    </div>
+  );
+}
+
 // ── Day grid for one company ──────────────────────────────────────────────────
 function CompanyDayGrid({ days }: { days: DayEntry[] }) {
   const active = days.filter((d) => d.offloads > 0 || d.purchases > 0);
@@ -94,12 +119,12 @@ function CompanyDayGrid({ days }: { days: DayEntry[] }) {
             <th className="text-left font-medium py-1.5 pr-4 w-28">Date</th>
             <th className="text-center font-medium py-1.5 px-3">
               <span className="flex items-center justify-center gap-1">
-                <Container className="h-3 w-3" /> Offloads
+                <Container className="h-3 w-3" /> Offloaded
               </span>
             </th>
             <th className="text-center font-medium py-1.5 px-3">
               <span className="flex items-center justify-center gap-1">
-                <ShoppingCart className="h-3 w-3" /> Purchases
+                <ShoppingCart className="h-3 w-3" /> POs Imported
               </span>
             </th>
           </tr>
@@ -111,16 +136,21 @@ function CompanyDayGrid({ days }: { days: DayEntry[] }) {
               className={cn("border-b last:border-0", isToday(d.date) && "bg-primary/5")}
               data-testid={`row-activity-day-${d.date}`}
             >
-              <td className="py-1.5 pr-4 text-muted-foreground whitespace-nowrap">
+              <td className="py-2 pr-4 text-muted-foreground whitespace-nowrap align-top">
                 {formatDayShort(d.date)}
                 {isToday(d.date) && <span className="ml-1 text-primary font-semibold">·</span>}
               </td>
-              <td className="py-1.5 px-3 text-center">
-                {d.offloads > 0
-                  ? <span className="font-semibold text-foreground">{d.offloads}</span>
-                  : <span className="text-muted-foreground/50">—</span>}
+              <td className="py-2 px-3 text-center align-top">
+                {d.offloads > 0 ? (
+                  <div>
+                    <span className="font-semibold text-foreground">{d.offloads}</span>
+                    <LocationTags locations={d.locations} />
+                  </div>
+                ) : (
+                  <span className="text-muted-foreground/50">—</span>
+                )}
               </td>
-              <td className="py-1.5 px-3 text-center">
+              <td className="py-2 px-3 text-center align-top">
                 {d.purchases > 0
                   ? <span className="font-semibold text-foreground">{d.purchases}</span>
                   : <span className="text-muted-foreground/50">—</span>}
@@ -193,7 +223,6 @@ export function CountryActivityKPI() {
     return d;
   }, []);
 
-  // offset: 0 = current window, 1 = previous window, etc.
   const [offset, setOffset] = useState(0);
   const [expanded, setExpanded] = useState(false);
 
@@ -202,7 +231,6 @@ export function CountryActivityKPI() {
   const endStr    = toDateStr(endDate);
   const startStr  = toDateStr(startDate);
 
-  // Can't go forward past today's window
   const canGoForward = offset > 0;
 
   const { data, isLoading } = useQuery<ActivityResponse>({
@@ -244,12 +272,12 @@ export function CountryActivityKPI() {
           <div className="min-w-0">
             <p className="text-sm font-semibold leading-none">Activity by Country</p>
             <p className="text-xs text-muted-foreground mt-0.5">
-              Offloaded containers &amp; purchases per day
+              Offloaded containers &amp; POs imported per day
             </p>
           </div>
         </div>
 
-        {/* KPI badges — always shown */}
+        {/* KPI badges */}
         {isLoading ? (
           <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
         ) : (

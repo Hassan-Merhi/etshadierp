@@ -26,7 +26,6 @@ export function registerStatsCountryActivityRoutes(app: Express) {
       } else {
         const rawDays = parseInt((_req.query.days as string) || "14");
         days = Math.min(Math.max(rawDays, 1), 90);
-        // compute dates server-side so everything is consistent
         const today = new Date();
         endDateStr   = today.toISOString().substring(0, 10);
         const start  = new Date(today);
@@ -53,7 +52,7 @@ export function registerStatsCountryActivityRoutes(app: Express) {
         return res.json({ companies: [], days, startDate: startDateStr, endDate: endDateStr, dateSeries: [] });
       }
 
-      // Build a date series for the window (most recent first)
+      // Build a date series for the window
       const dateSeriesSQL = `
         SELECT gs::date AS day
         FROM generate_series(
@@ -64,7 +63,7 @@ export function registerStatsCountryActivityRoutes(app: Express) {
         ORDER BY day DESC
       `;
 
-      // ── 2. Offloaded containers per company per day ──────────────────────
+      // ── 2. Offloaded containers per company per day (from container_offloads) ──
       const offloadsResult = await pool.query<{
         company_id: number;
         day: string;
@@ -72,16 +71,41 @@ export function registerStatsCountryActivityRoutes(app: Express) {
       }>(`
         SELECT
           c.company_id,
-          c.offload_date::date AS day,
+          co.offloaded_at::date AS day,
           COUNT(*)::text        AS cnt
-        FROM containers c
+        FROM container_offloads co
+        JOIN containers c ON c.id = co.container_id
         WHERE c.company_id = ANY($1::int[])
-          AND c.offload_date::date BETWEEN $2::date AND $3::date
-          AND c.offload_date IS NOT NULL
-        GROUP BY c.company_id, c.offload_date::date
+          AND co.offloaded_at::date BETWEEN $2::date AND $3::date
+          AND co.optional = false
+        GROUP BY c.company_id, co.offloaded_at::date
       `, [companyIds, startDateStr, endDateStr]);
 
-      // ── 3. Purchases per company per day ─────────────────────────────────
+      // ── 3. Offload location breakdown per company per day ────────────────
+      const locationOffloadsResult = await pool.query<{
+        company_id: number;
+        day: string;
+        location_id: number;
+        location_name: string;
+        cnt: string;
+      }>(`
+        SELECT
+          c.company_id,
+          co.offloaded_at::date AS day,
+          co.location_id,
+          l.name                AS location_name,
+          COUNT(*)::text        AS cnt
+        FROM container_offloads co
+        JOIN containers c ON c.id = co.container_id
+        JOIN locations l  ON l.id  = co.location_id
+        WHERE c.company_id = ANY($1::int[])
+          AND co.offloaded_at::date BETWEEN $2::date AND $3::date
+          AND co.optional = false
+        GROUP BY c.company_id, co.offloaded_at::date, co.location_id, l.name
+        ORDER BY cnt DESC
+      `, [companyIds, startDateStr, endDateStr]);
+
+      // ── 4. Purchases (POs imported) per company per day ──────────────────
       const purchasesResult = await pool.query<{
         company_id: number;
         day: string;
@@ -97,42 +121,59 @@ export function registerStatsCountryActivityRoutes(app: Express) {
         GROUP BY po.company_id, po.created_at::date
       `, [companyIds, startDateStr, endDateStr]);
 
-      // ── 4. Build per-company lookup maps ─────────────────────────────────
-      type DayMap = Map<string, { offloads: number; purchases: number }>;
+      // ── 5. Build per-company lookup maps ─────────────────────────────────
+      type LocationEntry = { locationId: number; locationName: string; count: number };
+      type DayEntry = { offloads: number; purchases: number; locations: LocationEntry[] };
+      type DayMap = Map<string, DayEntry>;
+
       const companyDayMap = new Map<number, DayMap>();
       for (const c of companies) {
         companyDayMap.set(c.id, new Map());
       }
 
-      const ensureDay = (companyId: number, day: string) => {
+      const ensureDay = (companyId: number, day: string): DayEntry => {
         const m = companyDayMap.get(companyId)!;
-        if (!m.has(day)) m.set(day, { offloads: 0, purchases: 0 });
+        if (!m.has(day)) m.set(day, { offloads: 0, purchases: 0, locations: [] });
         return m.get(day)!;
       };
 
+      const toDateKey = (raw: any): string =>
+        typeof raw === "string" ? raw.substring(0, 10) : (raw as Date).toISOString().substring(0, 10);
+
       for (const row of offloadsResult.rows) {
-        const dayKey = typeof row.day === "string" ? row.day.substring(0, 10) : (row.day as any).toISOString().substring(0, 10);
-        const entry = ensureDay(row.company_id, dayKey);
+        const entry = ensureDay(row.company_id, toDateKey(row.day));
         entry.offloads = parseInt(row.cnt);
       }
+
+      for (const row of locationOffloadsResult.rows) {
+        const entry = ensureDay(row.company_id, toDateKey(row.day));
+        entry.locations.push({
+          locationId: row.location_id,
+          locationName: row.location_name,
+          count: parseInt(row.cnt),
+        });
+      }
+
       for (const row of purchasesResult.rows) {
-        const dayKey = typeof row.day === "string" ? row.day.substring(0, 10) : (row.day as any).toISOString().substring(0, 10);
-        const entry = ensureDay(row.company_id, dayKey);
+        const entry = ensureDay(row.company_id, toDateKey(row.day));
         entry.purchases = parseInt(row.cnt);
       }
 
-      // ── 5. Build date spine ──────────────────────────────────────────────
+      // ── 6. Build date spine ──────────────────────────────────────────────
       const datesResult = await pool.query<{ day: string }>(dateSeriesSQL, [startDateStr, endDateStr]);
-      const dateSeries = datesResult.rows.map((r) =>
-        typeof r.day === "string" ? r.day.substring(0, 10) : (r.day as any).toISOString().substring(0, 10)
-      );
+      const dateSeries = datesResult.rows.map((r) => toDateKey(r.day));
 
-      // ── 6. Assemble response ─────────────────────────────────────────────
+      // ── 7. Assemble response ─────────────────────────────────────────────
       const result = companies.map((c) => {
         const dayMap = companyDayMap.get(c.id)!;
         const dailyData = dateSeries.map((day) => {
-          const entry = dayMap.get(day) ?? { offloads: 0, purchases: 0 };
-          return { date: day, offloads: entry.offloads, purchases: entry.purchases };
+          const entry = dayMap.get(day) ?? { offloads: 0, purchases: 0, locations: [] };
+          return {
+            date: day,
+            offloads: entry.offloads,
+            purchases: entry.purchases,
+            locations: entry.locations,
+          };
         });
 
         const totalOffloads  = dailyData.reduce((s, d) => s + d.offloads,  0);
