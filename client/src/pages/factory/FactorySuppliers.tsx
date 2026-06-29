@@ -767,18 +767,6 @@ export default function FactorySuppliers() {
                     ? <span className="text-muted-foreground text-xs">$-</span>
                     : `$${formatNum(String(Math.abs(balVal)))}${balVal < 0 ? " CR" : ""}`}
                 </div>
-                {nonUsdBalances.map((cb) => (
-                  <div key={cb.currencyCode} className="text-xs text-muted-foreground">
-                    {cb.currencyCode}{" "}
-                    {cb.balance.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}{" "}
-                    × {cb.fxRateToUsd ? parseFloat(String(cb.fxRateToUsd)).toFixed(4) : "1.0000"}
-                  </div>
-                ))}
-                {s.brokerPoolUsd && parseFloat(s.brokerPoolUsd) !== 0 && (
-                  <div className="text-xs text-muted-foreground">
-                    ${formatNum(s.brokerPoolUsd)} pool
-                  </div>
-                )}
               </div>
 
               <div className="flex items-center gap-1 shrink-0">
