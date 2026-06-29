@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import {
   ChevronDown,
   ChevronRight,
+  ChevronLeft,
   Container,
   ShoppingCart,
   Globe,
@@ -11,14 +12,9 @@ import {
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { cn } from "@/lib/utils";
+
+const WINDOW_DAYS = 14;
 
 interface DayEntry {
   date: string;
@@ -38,18 +34,30 @@ interface CompanyActivity {
 interface ActivityResponse {
   companies: CompanyActivity[];
   days: number;
+  startDate: string;
+  endDate: string;
   dateSeries: string[];
 }
 
-const DAY_OPTIONS = [
-  { label: "Last 7 days", value: "7" },
-  { label: "Last 14 days", value: "14" },
-  { label: "Last 30 days", value: "30" },
-];
+// Returns YYYY-MM-DD for a Date
+function toDateStr(d: Date) {
+  return d.toISOString().substring(0, 10);
+}
 
-function formatDay(dateStr: string) {
-  const d = new Date(dateStr + "T00:00:00");
-  return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+// Returns a Date offset by N days
+function addDays(d: Date, n: number) {
+  const r = new Date(d);
+  r.setDate(r.getDate() + n);
+  return r;
+}
+
+function formatRange(startStr: string, endStr: string) {
+  const start = new Date(startStr + "T00:00:00");
+  const end   = new Date(endStr   + "T00:00:00");
+  const sameYear = start.getFullYear() === end.getFullYear();
+  const fmtStart = start.toLocaleDateString("en-US", { month: "short", day: "numeric", year: sameYear ? undefined : "numeric" });
+  const fmtEnd   = end.toLocaleDateString("en-US",   { month: "short", day: "numeric", year: "numeric" });
+  return `${fmtStart} – ${fmtEnd}`;
 }
 
 function formatDayShort(dateStr: string) {
@@ -63,22 +71,14 @@ function formatDayShort(dateStr: string) {
 }
 
 function isToday(dateStr: string) {
-  const today = new Date();
-  return dateStr === today.toISOString().substring(0, 10);
+  return dateStr === new Date().toISOString().substring(0, 10);
 }
 
-// ── Day grid for one company ─────────────────────────────────────────────────
-function CompanyDayGrid({
-  days,
-  dateRange,
-}: {
-  days: DayEntry[];
-  dateRange: number;
-}) {
-  const visibleDays = days.slice(0, dateRange);
-  const hasSomeActivity = visibleDays.some((d) => d.offloads > 0 || d.purchases > 0);
+// ── Day grid for one company ──────────────────────────────────────────────────
+function CompanyDayGrid({ days }: { days: DayEntry[] }) {
+  const active = days.filter((d) => d.offloads > 0 || d.purchases > 0);
 
-  if (!hasSomeActivity) {
+  if (active.length === 0) {
     return (
       <p className="text-xs text-muted-foreground py-2 pl-1">
         No activity in this period.
@@ -105,53 +105,36 @@ function CompanyDayGrid({
           </tr>
         </thead>
         <tbody>
-          {visibleDays
-            .filter((d) => d.offloads > 0 || d.purchases > 0)
-            .map((d) => (
-              <tr
-                key={d.date}
-                className={cn(
-                  "border-b last:border-0",
-                  isToday(d.date) && "bg-primary/5"
-                )}
-                data-testid={`row-activity-day-${d.date}`}
-              >
-                <td className="py-1.5 pr-4 text-muted-foreground whitespace-nowrap">
-                  {formatDayShort(d.date)}
-                  {isToday(d.date) && (
-                    <span className="ml-1 text-primary font-semibold">·</span>
-                  )}
-                </td>
-                <td className="py-1.5 px-3 text-center">
-                  {d.offloads > 0 ? (
-                    <span className="font-semibold text-foreground">{d.offloads}</span>
-                  ) : (
-                    <span className="text-muted-foreground/50">—</span>
-                  )}
-                </td>
-                <td className="py-1.5 px-3 text-center">
-                  {d.purchases > 0 ? (
-                    <span className="font-semibold text-foreground">{d.purchases}</span>
-                  ) : (
-                    <span className="text-muted-foreground/50">—</span>
-                  )}
-                </td>
-              </tr>
-            ))}
+          {active.map((d) => (
+            <tr
+              key={d.date}
+              className={cn("border-b last:border-0", isToday(d.date) && "bg-primary/5")}
+              data-testid={`row-activity-day-${d.date}`}
+            >
+              <td className="py-1.5 pr-4 text-muted-foreground whitespace-nowrap">
+                {formatDayShort(d.date)}
+                {isToday(d.date) && <span className="ml-1 text-primary font-semibold">·</span>}
+              </td>
+              <td className="py-1.5 px-3 text-center">
+                {d.offloads > 0
+                  ? <span className="font-semibold text-foreground">{d.offloads}</span>
+                  : <span className="text-muted-foreground/50">—</span>}
+              </td>
+              <td className="py-1.5 px-3 text-center">
+                {d.purchases > 0
+                  ? <span className="font-semibold text-foreground">{d.purchases}</span>
+                  : <span className="text-muted-foreground/50">—</span>}
+              </td>
+            </tr>
+          ))}
         </tbody>
       </table>
     </div>
   );
 }
 
-// ── Single company row ───────────────────────────────────────────────────────
-function CompanyRow({
-  company,
-  dateRange,
-}: {
-  company: CompanyActivity;
-  dateRange: number;
-}) {
+// ── Single company row ────────────────────────────────────────────────────────
+function CompanyRow({ company }: { company: CompanyActivity }) {
   const [expanded, setExpanded] = useState(false);
   const hasActivity = company.totalOffloads > 0 || company.totalPurchases > 0;
 
@@ -166,64 +149,69 @@ function CompanyRow({
         onClick={() => setExpanded((v) => !v)}
         data-testid={`button-country-expand-${company.id}`}
       >
-        {expanded ? (
-          <ChevronDown className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-        ) : (
-          <ChevronRight className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-        )}
+        {expanded
+          ? <ChevronDown className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+          : <ChevronRight className="h-3.5 w-3.5 text-muted-foreground shrink-0" />}
 
         <span className="font-medium flex-1 truncate">{company.name}</span>
-        <span className="text-xs text-muted-foreground font-mono shrink-0 mr-2">
-          {company.code}
-        </span>
+        <span className="text-xs text-muted-foreground font-mono shrink-0 mr-2">{company.code}</span>
 
         <div className="flex items-center gap-2 shrink-0">
-          {company.totalOffloads > 0 && (
-            <Badge
-              variant="secondary"
-              className="gap-1 text-xs font-mono"
-              data-testid={`badge-offloads-${company.id}`}
-            >
-              <Container className="h-2.5 w-2.5" />
-              {company.totalOffloads}
-            </Badge>
-          )}
-          {company.totalPurchases > 0 && (
-            <Badge
-              variant="secondary"
-              className="gap-1 text-xs font-mono"
-              data-testid={`badge-purchases-${company.id}`}
-            >
-              <ShoppingCart className="h-2.5 w-2.5" />
-              {company.totalPurchases}
-            </Badge>
-          )}
-          {!hasActivity && (
-            <span className="text-xs text-muted-foreground">No activity</span>
-          )}
+          <Badge
+            variant="secondary"
+            className="gap-1 text-xs font-mono"
+            data-testid={`badge-offloads-${company.id}`}
+          >
+            <Container className="h-2.5 w-2.5" />
+            {company.totalOffloads}
+          </Badge>
+          <Badge
+            variant="secondary"
+            className="gap-1 text-xs font-mono"
+            data-testid={`badge-purchases-${company.id}`}
+          >
+            <ShoppingCart className="h-2.5 w-2.5" />
+            {company.totalPurchases}
+          </Badge>
         </div>
       </button>
 
       {expanded && (
         <div className="pl-8 pr-3 pb-3">
-          <CompanyDayGrid days={company.days} dateRange={dateRange} />
+          <CompanyDayGrid days={company.days} />
         </div>
       )}
     </div>
   );
 }
 
-// ── Main exported component ──────────────────────────────────────────────────
+// ── Main exported component ───────────────────────────────────────────────────
 export function CountryActivityKPI() {
-  const [days, setDays] = useState("14");
+  const today = useMemo(() => {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    return d;
+  }, []);
+
+  // offset: 0 = current window, 1 = previous window, etc.
+  const [offset, setOffset] = useState(0);
   const [expanded, setExpanded] = useState(false);
 
+  const endDate   = useMemo(() => addDays(today, -offset * WINDOW_DAYS),         [today, offset]);
+  const startDate = useMemo(() => addDays(endDate, -(WINDOW_DAYS - 1)),           [endDate]);
+  const endStr    = toDateStr(endDate);
+  const startStr  = toDateStr(startDate);
+
+  // Can't go forward past today's window
+  const canGoForward = offset > 0;
+
   const { data, isLoading } = useQuery<ActivityResponse>({
-    queryKey: ["/api/stats/country-activity", days],
+    queryKey: ["/api/stats/country-activity", startStr, endStr],
     queryFn: async () => {
-      const res = await fetch(`/api/stats/country-activity?days=${days}`, {
-        credentials: "include",
-      });
+      const res = await fetch(
+        `/api/stats/country-activity?startDate=${startStr}&endDate=${endStr}`,
+        { credentials: "include" }
+      );
       if (!res.ok) throw new Error("Failed");
       return res.json();
     },
@@ -231,15 +219,13 @@ export function CountryActivityKPI() {
   });
 
   const summary = useMemo(() => {
-    if (!data) return { totalOffloads: 0, totalPurchases: 0, activeCompanies: 0 };
+    if (!data) return { totalOffloads: 0, totalPurchases: 0 };
     return data.companies.reduce(
       (acc, c) => ({
-        totalOffloads: acc.totalOffloads + c.totalOffloads,
+        totalOffloads:  acc.totalOffloads  + c.totalOffloads,
         totalPurchases: acc.totalPurchases + c.totalPurchases,
-        activeCompanies:
-          acc.activeCompanies + (c.totalOffloads > 0 || c.totalPurchases > 0 ? 1 : 0),
       }),
-      { totalOffloads: 0, totalPurchases: 0, activeCompanies: 0 }
+      { totalOffloads: 0, totalPurchases: 0 }
     );
   }, [data]);
 
@@ -263,54 +249,58 @@ export function CountryActivityKPI() {
           </div>
         </div>
 
+        {/* KPI badges — always shown */}
         {isLoading ? (
           <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
         ) : (
-          <div className="flex items-center gap-2 flex-wrap">
-            {summary.totalOffloads > 0 && (
-              <Badge variant="secondary" className="gap-1 text-xs" data-testid="badge-total-offloads">
-                <Container className="h-3 w-3" />
-                {summary.totalOffloads} offloaded
-              </Badge>
-            )}
-            {summary.totalPurchases > 0 && (
-              <Badge variant="secondary" className="gap-1 text-xs" data-testid="badge-total-purchases">
-                <ShoppingCart className="h-3 w-3" />
-                {summary.totalPurchases} purchases
-              </Badge>
-            )}
-            {summary.totalOffloads === 0 && summary.totalPurchases === 0 && !isLoading && (
-              <span className="text-xs text-muted-foreground">No activity</span>
-            )}
+          <div className="flex items-center gap-2">
+            <Badge variant="secondary" className="gap-1 text-xs" data-testid="badge-total-offloads">
+              <Container className="h-3 w-3" />
+              {summary.totalOffloads} offloaded
+            </Badge>
+            <Badge variant="secondary" className="gap-1 text-xs" data-testid="badge-total-purchases">
+              <ShoppingCart className="h-3 w-3" />
+              {summary.totalPurchases} purchases
+            </Badge>
           </div>
         )}
 
+        {/* Date navigator */}
         <div
-          className="flex items-center gap-2 shrink-0"
+          className="flex items-center gap-1 shrink-0"
           onClick={(e) => e.stopPropagation()}
         >
-          <Select value={days} onValueChange={setDays}>
-            <SelectTrigger
-              className="h-7 text-xs w-32"
-              data-testid="select-activity-days"
-            >
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {DAY_OPTIONS.map((o) => (
-                <SelectItem key={o.value} value={o.value}>
-                  {o.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <Button
+            size="icon"
+            variant="ghost"
+            className="h-7 w-7"
+            onClick={() => setOffset((o) => o + 1)}
+            data-testid="button-activity-prev"
+            title="Previous period"
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
 
-          {expanded ? (
-            <ChevronDown className="h-4 w-4 text-muted-foreground" />
-          ) : (
-            <ChevronRight className="h-4 w-4 text-muted-foreground" />
-          )}
+          <span className="text-xs text-muted-foreground whitespace-nowrap min-w-[120px] text-center select-none">
+            {formatRange(startStr, endStr)}
+          </span>
+
+          <Button
+            size="icon"
+            variant="ghost"
+            className="h-7 w-7"
+            onClick={() => setOffset((o) => Math.max(0, o - 1))}
+            disabled={!canGoForward}
+            data-testid="button-activity-next"
+            title="Next period"
+          >
+            <ChevronRight className="h-4 w-4" />
+          </Button>
         </div>
+
+        {expanded
+          ? <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" />
+          : <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />}
       </button>
 
       {/* Expandable body */}
@@ -327,7 +317,7 @@ export function CountryActivityKPI() {
           ) : (
             <div className="px-2 py-1">
               {data.companies.map((c) => (
-                <CompanyRow key={c.id} company={c} dateRange={parseInt(days)} />
+                <CompanyRow key={c.id} company={c} />
               ))}
             </div>
           )}
