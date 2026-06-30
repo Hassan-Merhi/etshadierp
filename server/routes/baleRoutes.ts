@@ -980,6 +980,7 @@ export function registerBaleRoutes(app: Express) {
 
       // Enrich each label print with bale status so non-admin users can see deleted bales
       const refNumbers = labelPrints.map((lp) => lp.referenceNumber).filter(Boolean);
+      const coveredRefs = new Set(refNumbers);
       const baleStatusMap: Record<string, string> = {};
       if (refNumbers.length > 0) {
         const baleRows = await db
@@ -996,7 +997,57 @@ export function registerBaleRoutes(app: Express) {
         baleStatus: baleStatusMap[lp.referenceNumber] ?? null,
       }));
 
-      res.json({ product: product || null, labelPrints: enrichedLabelPrints });
+      // Also find bales in factory_bales that have this articleCode (or are linked via productId)
+      // but have NO corresponding bale_label_prints entry — these are manually imported or
+      // system-created bales that were never printed.
+      const directConditions = [eq(factoryBales.companyId, companyId)];
+      if (product?.id) {
+        directConditions.push(or(
+          eq(factoryBales.articleCode, articleCode),
+          eq(factoryBales.productId, product.id)
+        ) as any);
+      } else {
+        directConditions.push(eq(factoryBales.articleCode, articleCode));
+      }
+
+      const directBalesRaw = await db
+        .select({
+          id: factoryBales.id,
+          referenceNumber: factoryBales.referenceNumber,
+          weightKg: factoryBales.weightKg,
+          status: factoryBales.status,
+          createdAt: factoryBales.createdAt,
+        })
+        .from(factoryBales)
+        .where(and(...directConditions));
+
+      // Only include bales not already covered by a label print
+      const uncoveredBales = directBalesRaw.filter(
+        (b) => b.referenceNumber && !coveredRefs.has(b.referenceNumber)
+      );
+
+      // Synthesize label-print-like entries (id is negative to avoid collision with real print IDs)
+      const syntheticEntries = uncoveredBales.map((b) => ({
+        id: -(b.id),
+        referenceNumber: b.referenceNumber,
+        approxWeightKg: b.weightKg,
+        articleCode,
+        companyId,
+        printedAt: null,
+        scannedAt: null,
+        scannedByUserId: null,
+        scannedByName: null,
+        baleStatus: b.status,
+        _synthetic: true,
+      }));
+
+      // Merge: real label prints first, then synthetic entries (sorted by reference number)
+      const allEntries = [
+        ...enrichedLabelPrints,
+        ...syntheticEntries.sort((a, b) => a.referenceNumber.localeCompare(b.referenceNumber)),
+      ];
+
+      res.json({ product: product || null, labelPrints: allEntries });
     } catch (error: any) {
       console.error("Error looking up article:", error);
       res.status(500).json({ message: error.message });
