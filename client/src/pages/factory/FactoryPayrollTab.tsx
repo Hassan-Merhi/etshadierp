@@ -89,6 +89,7 @@ interface PreviewWorkerRow {
   totalAdvanceBalance: number;
   pendingAdvances: PendingAdvance[];
   pendingDeductions: number;
+  pendingDeductionRecords: { id: number; amount: string; reason: string | null; deductionDate: string }[];
   outstandingLoans: PendingAdvance[];
   totalLoanBalance: number;
   net: number;
@@ -1184,14 +1185,45 @@ export default function FactoryPayrollTab() {
 
                   {/* Salary Deductions section */}
                   {salaryDeductions > 0 && (
-                    <div className="border-t bg-red-50/50 dark:bg-red-950/20 px-3 py-2">
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs text-muted-foreground">Salary Deduction:</span>
-                        <span className="text-sm font-mono font-semibold text-destructive">
-                          -${salaryDeductions.toFixed(2)}
-                        </span>
-                        <span className="text-xs text-muted-foreground italic">(pending, applied at generation)</span>
-                      </div>
+                    <div className="border-t bg-red-50/50 dark:bg-red-950/20 px-3 py-2 space-y-1">
+                      {(r.pendingDeductionRecords || []).map((ded) => (
+                        <div key={ded.id} className="flex items-center gap-2 flex-wrap">
+                          <span className="text-xs text-muted-foreground">Salary Deduction:</span>
+                          <span className="text-sm font-mono font-semibold text-destructive">
+                            -${parseFloat(ded.amount).toFixed(2)}
+                          </span>
+                          {ded.reason && (
+                            <span className="text-xs text-muted-foreground">· {ded.reason}</span>
+                          )}
+                          <span className="text-xs text-muted-foreground italic">(pending, applied at generation)</span>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-5 w-5 text-destructive"
+                            title="Remove this deduction"
+                            data-testid={`button-delete-deduction-${ded.id}`}
+                            onClick={async (e) => {
+                              e.stopPropagation();
+                              try {
+                                const res = await fetch(`/api/factory/workers/${r.id}/deductions/${ded.id}`, {
+                                  method: "DELETE",
+                                  credentials: "include",
+                                });
+                                if (!res.ok) {
+                                  const err = await res.json();
+                                  toast({ title: "Failed to remove deduction", description: err.message, variant: "destructive" });
+                                } else {
+                                  queryClient.invalidateQueries({ queryKey: ["/api/factory/payrolls/preview"] });
+                                }
+                              } catch {
+                                toast({ title: "Failed to remove deduction", variant: "destructive" });
+                              }
+                            }}
+                          >
+                            <X className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      ))}
                     </div>
                   )}
 

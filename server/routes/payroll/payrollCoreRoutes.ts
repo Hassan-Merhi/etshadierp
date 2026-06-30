@@ -297,8 +297,11 @@ export function registerPayrollCoreRoutes(app: Express) {
         .from(factoryWorkerDeductions)
         .where(and(eq(factoryWorkerDeductions.companyId, companyId), eq(factoryWorkerDeductions.applied, false)));
       const pendingDeductionByWorker: Record<number, number> = {};
+      const pendingDeductionRecordsByWorker: Record<number, { id: number; amount: string; reason: string | null; deductionDate: string }[]> = {};
       for (const ded of allPendingDeductions) {
         pendingDeductionByWorker[ded.workerId] = (pendingDeductionByWorker[ded.workerId] || 0) + parseFloat(ded.amount || "0");
+        if (!pendingDeductionRecordsByWorker[ded.workerId]) pendingDeductionRecordsByWorker[ded.workerId] = [];
+        pendingDeductionRecordsByWorker[ded.workerId].push({ id: ded.id, amount: ded.amount, reason: ded.reason, deductionDate: ded.deductionDate });
       }
 
       // Transport denominator = total days in the MONTH of periodStart.
@@ -374,6 +377,7 @@ export function registerPayrollCoreRoutes(app: Express) {
         const totalAdvanceBalance = advanceByWorker[worker.id] || 0;
         const advanceDeduction = Math.min(totalAdvanceBalance, base + bonus + transport);
         const pendingDeductions = pendingDeductionByWorker[worker.id] || 0;
+        const pendingDeductionRecords = pendingDeductionRecordsByWorker[worker.id] || [];
         const net = base + bonus + transport - advanceDeduction - pendingDeductions;
         const pendingAdvances = (advanceListByWorker[worker.id] || []).map((a) => ({
           id: a.id,
@@ -405,6 +409,7 @@ export function registerPayrollCoreRoutes(app: Express) {
           totalAdvanceBalance,
           pendingAdvances,
           pendingDeductions,
+          pendingDeductionRecords,
           outstandingLoans,
           totalLoanBalance,
           net,
