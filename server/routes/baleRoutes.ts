@@ -975,8 +975,25 @@ export function registerBaleRoutes(app: Express) {
       }
 
       const articleCode = decodeURIComponent(req.params.articleCode);
-      const product = await storage.getBaleProductByArticleCode(articleCode, companyId);
-      const labelPrints = await storage.getBaleLabelPrintsByArticle(articleCode, companyId);
+
+      // Search for a matching product in BOTH catalogs in parallel
+      const [erpProduct, labelPrints, factoryProductRows] = await Promise.all([
+        storage.getBaleProductByArticleCode(articleCode, companyId),
+        storage.getBaleLabelPrintsByArticle(articleCode, companyId),
+        // factoryBales.productId points to factory_bale_products, not bale_products
+        // Use case-insensitive match so article codes with mixed case are still found.
+        db
+          .select({ id: factoryBaleProducts.id, name: factoryBaleProducts.name, code: factoryBaleProducts.code, articleCode: factoryBaleProducts.articleCode, active: factoryBaleProducts.active })
+          .from(factoryBaleProducts)
+          .where(and(eq(factoryBaleProducts.companyId, companyId), ilike(factoryBaleProducts.articleCode, articleCode))),
+      ]);
+
+      // Use ERP product for display if found; fall back to factory product
+      const factoryProduct = factoryProductRows[0] ?? null;
+      const displayProduct = erpProduct || (factoryProduct ? { ...factoryProduct, weightPerBaleKg: null, description: null, categoryId: null } : null);
+
+      // IDs in factory_bale_products that match this article code
+      const factoryProductIds = factoryProductRows.map((p) => p.id);
 
       // Enrich each label print with bale status so non-admin users can see deleted bales
       const refNumbers = labelPrints.map((lp) => lp.referenceNumber).filter(Boolean);
@@ -997,17 +1014,23 @@ export function registerBaleRoutes(app: Express) {
         baleStatus: baleStatusMap[lp.referenceNumber] ?? null,
       }));
 
-      // Also find bales in factory_bales that have this articleCode (or are linked via productId)
-      // but have NO corresponding bale_label_prints entry — these are manually imported or
-      // system-created bales that were never printed.
-      const directConditions = [eq(factoryBales.companyId, companyId)];
-      if (product?.id) {
-        directConditions.push(or(
-          eq(factoryBales.articleCode, articleCode),
-          eq(factoryBales.productId, product.id)
-        ) as any);
+      // Also find bales in factory_bales that have this articleCode (directly on the bale row,
+      // or via productId → factory_bale_products) but have NO label print entry yet.
+      // These are manually imported bales, system-created bales, or produced bales never printed.
+      let directBalesWhereClause;
+      if (factoryProductIds.length > 0) {
+        directBalesWhereClause = and(
+          eq(factoryBales.companyId, companyId),
+          or(
+            sql`LOWER(${factoryBales.articleCode}) = LOWER(${articleCode})`,
+            inArray(factoryBales.productId, factoryProductIds)
+          )
+        );
       } else {
-        directConditions.push(eq(factoryBales.articleCode, articleCode));
+        directBalesWhereClause = and(
+          eq(factoryBales.companyId, companyId),
+          sql`LOWER(${factoryBales.articleCode}) = LOWER(${articleCode})`
+        );
       }
 
       const directBalesRaw = await db
@@ -1019,14 +1042,14 @@ export function registerBaleRoutes(app: Express) {
           createdAt: factoryBales.createdAt,
         })
         .from(factoryBales)
-        .where(and(...directConditions));
+        .where(directBalesWhereClause);
 
       // Only include bales not already covered by a label print
       const uncoveredBales = directBalesRaw.filter(
         (b) => b.referenceNumber && !coveredRefs.has(b.referenceNumber)
       );
 
-      // Synthesize label-print-like entries (id is negative to avoid collision with real print IDs)
+      // Synthesize label-print-like entries (negative ID to avoid collision with real print IDs)
       const syntheticEntries = uncoveredBales.map((b) => ({
         id: -(b.id),
         referenceNumber: b.referenceNumber,
@@ -1041,13 +1064,13 @@ export function registerBaleRoutes(app: Express) {
         _synthetic: true,
       }));
 
-      // Merge: real label prints first, then synthetic entries (sorted by reference number)
+      // Merge: real label prints first, then synthetic entries sorted by reference number
       const allEntries = [
         ...enrichedLabelPrints,
         ...syntheticEntries.sort((a, b) => a.referenceNumber.localeCompare(b.referenceNumber)),
       ];
 
-      res.json({ product: product || null, labelPrints: allEntries });
+      res.json({ product: displayProduct || null, labelPrints: allEntries });
     } catch (error: any) {
       console.error("Error looking up article:", error);
       res.status(500).json({ message: error.message });
@@ -1067,11 +1090,15 @@ export function registerBaleRoutes(app: Express) {
 
       // If no label print exists, try to find the bale directly in factory_bales
       // (bales can exist without a label print if entered manually / imported)
+      // Use case-insensitive comparison so lowercase refs in DB are still found.
       if (!labelPrint) {
         const [directBale] = await db
           .select()
           .from(factoryBales)
-          .where(and(eq(factoryBales.referenceNumber, referenceNumber), eq(factoryBales.companyId, companyId)))
+          .where(and(
+            eq(factoryBales.companyId, companyId),
+            sql`LOWER(${factoryBales.referenceNumber}) = LOWER(${referenceNumber})`
+          ))
           .limit(1);
 
         if (!directBale) {

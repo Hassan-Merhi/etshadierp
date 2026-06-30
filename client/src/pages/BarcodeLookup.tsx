@@ -573,29 +573,47 @@ export default function BarcodeLookup() {
       {/* ── ARTICLE LOOKUP ── */}
       {articleResult && (
         <div className="space-y-4">
-          {articleResult.product ? (
+          {(articleResult.product || articleResult.labelPrints.length > 0) ? (
             <div className="rounded-xl border overflow-hidden">
-              <div className="flex items-center justify-between gap-3 px-4 py-3 border-b bg-muted/20 flex-wrap">
-                <div className="flex items-center gap-2">
-                  <Package className="h-4 w-4 text-muted-foreground shrink-0" />
-                  <span className="font-bold text-base">{(articleResult.product as any).name}</span>
-                  <Badge variant={(articleResult.product as any).active ? "default" : "secondary"} className="text-xs">
-                    {(articleResult.product as any).active ? "Active" : "Inactive"}
-                  </Badge>
-                </div>
-                <div className="flex items-center gap-4 text-sm">
-                  <div>
-                    <span className="text-xs text-muted-foreground uppercase tracking-wide mr-1.5">Article Code</span>
-                    <span className="font-mono font-semibold">
-                      {(articleResult.product as any).articleCode || (articleResult.product as any).code}
-                    </span>
+              {/* Product header — shown if a matching product was found */}
+              {articleResult.product ? (
+                <div className="flex items-center justify-between gap-3 px-4 py-3 border-b bg-muted/20 flex-wrap">
+                  <div className="flex items-center gap-2">
+                    <Package className="h-4 w-4 text-muted-foreground shrink-0" />
+                    <span className="font-bold text-base">{(articleResult.product as any).name}</span>
+                    <Badge variant={(articleResult.product as any).active ? "default" : "secondary"} className="text-xs">
+                      {(articleResult.product as any).active ? "Active" : "Inactive"}
+                    </Badge>
                   </div>
-                  <div>
-                    <span className="text-xs text-muted-foreground uppercase tracking-wide mr-1.5">References</span>
-                    <span className="font-semibold font-mono">{articleResult.labelPrints.length.toLocaleString()}</span>
+                  <div className="flex items-center gap-4 text-sm">
+                    <div>
+                      <span className="text-xs text-muted-foreground uppercase tracking-wide mr-1.5">Article Code</span>
+                      <span className="font-mono font-semibold">
+                        {(articleResult.product as any).articleCode || (articleResult.product as any).code}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-xs text-muted-foreground uppercase tracking-wide mr-1.5">References</span>
+                      <span className="font-semibold font-mono">{articleResult.labelPrints.length.toLocaleString()}</span>
+                    </div>
                   </div>
                 </div>
-              </div>
+              ) : (
+                /* Minimal header when bales exist but no named product is registered */
+                <div className="flex items-center justify-between gap-3 px-4 py-3 border-b bg-muted/20 flex-wrap">
+                  <div className="flex items-center gap-2">
+                    <Package className="h-4 w-4 text-muted-foreground shrink-0" />
+                    <span className="font-bold text-base font-mono">{searchValue}</span>
+                    <Badge variant="outline" className="text-xs">Unregistered Product</Badge>
+                  </div>
+                  <div className="flex items-center gap-4 text-sm">
+                    <div>
+                      <span className="text-xs text-muted-foreground uppercase tracking-wide mr-1.5">References</span>
+                      <span className="font-semibold font-mono">{articleResult.labelPrints.length.toLocaleString()}</span>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {articleResult.labelPrints.length > 0 ? (
                 <Table>
@@ -671,7 +689,7 @@ export default function BarcodeLookup() {
             </div>
           ) : (
             <div className="rounded-xl border p-6 text-center text-sm text-muted-foreground">
-              No product found for article code "<span className="font-mono">{searchValue}</span>"
+              No product or bales found for article code "<span className="font-mono">{searchValue}</span>"
             </div>
           )}
         </div>
