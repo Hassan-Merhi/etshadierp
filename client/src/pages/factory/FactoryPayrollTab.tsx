@@ -936,14 +936,14 @@ export default function FactoryPayrollTab() {
 
       {/* Run Payroll Dialog */}
       <Dialog open={runOpen} onOpenChange={setRunOpen}>
-        <DialogContent className="max-w-2xl" data-testid="dialog-run-payroll">
-          <DialogHeader>
+        <DialogContent className="max-w-2xl flex flex-col max-h-[90vh]" data-testid="dialog-run-payroll">
+          <DialogHeader className="flex-shrink-0">
             <DialogTitle>Run Payroll</DialogTitle>
             <DialogDescription>
               Configure the payroll period and settings, then preview before generating.
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-1">
+          <div className="flex-1 overflow-y-auto space-y-4 pr-1 min-h-0">
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
                 <Label className="text-xs">Period Start</Label>
@@ -1059,7 +1059,7 @@ export default function FactoryPayrollTab() {
               />
             </div>
           </div>
-          <DialogFooter>
+          <DialogFooter className="flex-shrink-0">
             <Button variant="outline" onClick={() => setRunOpen(false)}>
               Cancel
             </Button>
@@ -1077,8 +1077,8 @@ export default function FactoryPayrollTab() {
 
       {/* Preview Dialog */}
       <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
-        <DialogContent className="max-w-4xl" data-testid="dialog-preview-payroll">
-          <DialogHeader>
+        <DialogContent className="max-w-4xl flex flex-col max-h-[90vh]" data-testid="dialog-preview-payroll">
+          <DialogHeader className="flex-shrink-0">
             <DialogTitle>Payroll Preview</DialogTitle>
             <DialogDescription>
               {previewRows.length} workers · {runForm.periodStart} to {runForm.periodEnd} · Net Total: $
@@ -1093,7 +1093,7 @@ export default function FactoryPayrollTab() {
                 .toFixed(2)}
             </DialogDescription>
           </DialogHeader>
-          <div className="max-h-[60vh] overflow-y-auto space-y-2">
+          <div className="flex-1 overflow-y-auto space-y-2 min-h-0">
             {previewRows.map((r) => {
               const hasAtt = r.presentDates.length > 0 || r.absentDates.length > 0 || r.halfDayDates.length > 0;
               const deductAmt = parseFloat(advanceOverrides[r.id] || "0");
@@ -1306,7 +1306,7 @@ export default function FactoryPayrollTab() {
               );
             })}
           </div>
-          <DialogFooter>
+          <DialogFooter className="flex-shrink-0">
             <Button variant="outline" onClick={() => setPreviewOpen(false)}>
               Back
             </Button>
