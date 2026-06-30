@@ -4241,11 +4241,13 @@ END $$`,
       amount decimal(15,2) NOT NULL DEFAULT 0,
       dob date,
       notes text,
+      insurance_number text,
       active boolean NOT NULL DEFAULT true,
       ledger_account_id integer,
       created_at timestamptz NOT NULL DEFAULT now()
     )`,
     `CREATE INDEX IF NOT EXISTS idx_insurance_members_company ON insurance_members (company_id)`,
+    `ALTER TABLE insurance_members ADD COLUMN IF NOT EXISTS insurance_number text`,
   ];
 
   // /api/health/db — reports migration status but does NOT block deployment.

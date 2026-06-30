@@ -43,6 +43,7 @@ interface InsuranceMember {
   name: string;
   nationality: string | null;
   positionWorking: string | null;
+  insuranceNumber: string | null;
   startDate: string;
   amount: string;
   dob: string | null;
@@ -87,6 +88,7 @@ function MemberFormDialog({
   const [name, setName] = useState(existing?.name ?? "");
   const [nationality, setNationality] = useState(existing?.nationality ?? "");
   const [positionWorking, setPositionWorking] = useState(existing?.positionWorking ?? "");
+  const [insuranceNumber, setInsuranceNumber] = useState(existing?.insuranceNumber ?? "");
   const [startDate, setStartDate] = useState(existing?.startDate ?? "");
   const [amount, setAmount] = useState(existing?.amount ?? "");
   const [dob, setDob] = useState(existing?.dob ?? "");
@@ -134,6 +136,7 @@ function MemberFormDialog({
       name: name.trim(),
       nationality: nationality || null,
       positionWorking: positionWorking || null,
+      insuranceNumber: insuranceNumber || null,
       startDate,
       amount,
       dob: dob || null,
@@ -176,6 +179,15 @@ function MemberFormDialog({
                 data-testid="input-member-position"
               />
             </div>
+          </div>
+          <div className="space-y-1">
+            <Label>Insurance Number</Label>
+            <Input
+              value={insuranceNumber}
+              onChange={(e) => setInsuranceNumber(e.target.value)}
+              placeholder="e.g. INS-00123"
+              data-testid="input-member-insurance-number"
+            />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
@@ -613,6 +625,7 @@ export default function FactoryInsurance() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Name</TableHead>
+                  <TableHead>Insurance No.</TableHead>
                   <TableHead>Nationality</TableHead>
                   <TableHead>Position</TableHead>
                   <TableHead>Start Date</TableHead>
@@ -631,6 +644,7 @@ export default function FactoryInsurance() {
                     data-testid={`row-member-${m.id}`}
                   >
                     <TableCell className="font-medium">{m.name}</TableCell>
+                    <TableCell className="font-mono text-sm">{m.insuranceNumber || "—"}</TableCell>
                     <TableCell className="text-muted-foreground">{m.nationality || "—"}</TableCell>
                     <TableCell className="text-muted-foreground">{m.positionWorking || "—"}</TableCell>
                     <TableCell>{formatDisplayDate(m.startDate)}</TableCell>
