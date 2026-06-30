@@ -507,6 +507,9 @@ export default function Daybook({ user }: { user?: any } = {}) {
       Transfer: "transfer",
       "Credit Note": "credit-note",
       "Debit Note": "credit-note",
+      Production: "adjustment",
+      Consumption: "adjustment",
+      Mixed: "adjustment",
     };
     const tab = map[v.voucherType];
     if (tab) navigate(`${vouchersBase}?edit=${v.id}&tab=${tab}&from=daybook`);
