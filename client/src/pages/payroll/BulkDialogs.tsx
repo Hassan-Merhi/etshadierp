@@ -217,7 +217,7 @@ export function BulkDialogs({
               </div>
             </div>
 
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-2 border-t">
+            <div className="flex-shrink-0 flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-2 border-t">
               <div className="text-sm">
                 <span className="text-muted-foreground">Total deposit: </span>
                 <span className="font-semibold font-mono">{formatAmount(bulkDepositTotal)}</span>
@@ -363,7 +363,7 @@ export function BulkDialogs({
               </div>
             </div>
 
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-2 border-t">
+            <div className="flex-shrink-0 flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-2 border-t">
               <div className="text-sm">
                 <span className="text-muted-foreground">Total Withdrawal: </span>
                 <span className="font-semibold font-mono">
@@ -584,7 +584,7 @@ export function BulkDialogs({
                 </div>
               </div>
 
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-2 border-t">
+              <div className="flex-shrink-0 flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-2 border-t">
                 <div className="text-sm">
                   <span className="text-muted-foreground">Total: </span>
                   <span className="font-semibold font-mono">
@@ -650,7 +650,7 @@ export function BulkDialogs({
                 </div>
               </div>
 
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-2 border-t">
+              <div className="flex-shrink-0 flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-2 border-t">
                 <div className="text-sm">
                   <span className="text-muted-foreground">Total: </span>
                   <span className="font-semibold font-mono">
