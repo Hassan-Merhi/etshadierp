@@ -1,5 +1,5 @@
 import { eq, and, or, isNull, asc, desc, sql, ne, ilike } from "drizzle-orm";
-import { db } from "../db";
+import { db, pool } from "../db";
 import * as schema from "@shared/schema";
 import { adjustInventory } from "../inventoryHelper";
 import type {
@@ -338,30 +338,44 @@ export async function getVoucherEntriesByLedger(
   startDate?: string,
   endDate?: string
 ): Promise<any[]> {
-  const conditions = [
-    eq(schema.voucherEntries.ledgerAccountId, ledgerAccountId),
-    eq(schema.vouchers.optional, false),
-    isNull(schema.vouchers.deletedAt),
-  ];
-  if (startDate) conditions.push(sql`${schema.vouchers.voucherDate} >= ${startDate}`);
-  if (endDate) conditions.push(sql`${schema.vouchers.voucherDate} <= ${endDate}`);
+  const params: any[] = [ledgerAccountId];
+  let dateFilters = "";
+  if (startDate) {
+    params.push(startDate);
+    dateFilters += ` AND v.voucher_date >= $${params.length}`;
+  }
+  if (endDate) {
+    params.push(endDate);
+    dateFilters += ` AND v.voucher_date <= $${params.length}`;
+  }
 
-  return await db
-    .select({
-      entryId: schema.voucherEntries.id,
-      voucherId: schema.voucherEntries.voucherId,
-      debitAmount: schema.voucherEntries.debitAmount,
-      creditAmount: schema.voucherEntries.creditAmount,
-      narration: schema.voucherEntries.narration,
-      voucherNumber: schema.vouchers.voucherNumber,
-      voucherType: schema.vouchers.voucherType,
-      voucherDate: schema.vouchers.voucherDate,
-      voucherDescription: schema.vouchers.description,
-      currency: schema.vouchers.currency,
-    })
-    .from(schema.voucherEntries)
-    .leftJoin(schema.vouchers, eq(schema.voucherEntries.voucherId, schema.vouchers.id))
-    .where(and(...conditions));
+  // GROUP BY voucher so that a single voucher with multiple lines all posting
+  // to the same ledger account appears as ONE row (with summed debit/credit),
+  // not as one row per entry line.
+  const result = await pool.query(
+    `SELECT
+       v.id                                                        AS "voucherId",
+       MIN(ve.id)                                                  AS "entryId",
+       COALESCE(SUM(ve.debit_amount::numeric),  0)::text           AS "debitAmount",
+       COALESCE(SUM(ve.credit_amount::numeric), 0)::text           AS "creditAmount",
+       STRING_AGG(DISTINCT NULLIF(TRIM(ve.narration), ''), ' | ') AS narration,
+       v.voucher_number                                            AS "voucherNumber",
+       v.voucher_type                                              AS "voucherType",
+       v.voucher_date                                              AS "voucherDate",
+       v.description                                               AS "voucherDescription",
+       v.currency
+     FROM voucher_entries ve
+     JOIN vouchers v ON ve.voucher_id = v.id
+     WHERE ve.ledger_account_id = $1
+       AND v.optional = false
+       AND v.deleted_at IS NULL
+       ${dateFilters}
+     GROUP BY v.id, v.voucher_number, v.voucher_type, v.voucher_date, v.description, v.currency
+     ORDER BY v.voucher_date, v.id`,
+    params
+  );
+
+  return result.rows;
 }
 
 export async function getVoucherEntriesByCustomer(
