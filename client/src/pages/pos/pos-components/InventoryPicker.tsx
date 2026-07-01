@@ -42,7 +42,11 @@ export function InventoryPicker({
     if (syncTerm !== undefined) setLocalSearch(syncTerm);
   }, [syncTerm]);
 
-  const filteredInventory = localSearch ? inventory.filter((item) => matches(item, localSearch)) : inventory;
+  const filteredInventory = inventory.filter((item) => {
+    const isOut = item.stock === 0;
+    if (!localSearch) return !isOut;
+    return matches(item, localSearch);
+  });
 
   return (
     <Card className={`flex flex-col overflow-hidden ${mobile ? "flex-1 rounded-none border-0 shadow-none" : "w-full lg:w-96 h-[300px] lg:h-auto shrink-0"}`}>
