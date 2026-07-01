@@ -402,11 +402,11 @@ export function EmployeeCrudDialogs({
                     checked={isMember}
                     onCheckedChange={(checked) => {
                       if (checked && selectedGroupForMembers) {
-                        addWorkerToGroupMutation.mutate({ groupId: selectedGroupForMembers.id, workerId: worker.id });
+                        addWorkerToGroupMutation.mutate({ groupId: selectedGroupForMembers.id, employeeId: worker.id });
                       } else if (!checked && selectedGroupForMembers) {
                         removeWorkerFromGroupMutation.mutate({
                           groupId: selectedGroupForMembers.id,
-                          workerId: worker.id,
+                          employeeId: worker.id,
                         });
                       }
                     }}

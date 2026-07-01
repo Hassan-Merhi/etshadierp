@@ -349,7 +349,8 @@ export function GroupsTab() {
                     </TableHeader>
                     <TableBody>
                       {workers.map((worker: Employee) => {
-                        const isMember = selectedWorkerGroupForMembers?.members.some((m: any) => m.id === worker.id);
+                        const liveGroup = workerGroups.find((g) => g.id === selectedWorkerGroupForMembers?.id);
+                        const isMember = liveGroup?.members.some((m: any) => m.id === worker.id);
                         return (
                           <TableRow key={worker.id}>
                             <TableCell>
@@ -400,7 +401,8 @@ export function GroupsTab() {
                     </TableHeader>
                     <TableBody>
                       {employees.map((emp: Employee) => {
-                        const isMember = selectedWorkerGroupForMembers?.members.some((m: any) => m.id === emp.id);
+                        const liveGroup = workerGroups.find((g) => g.id === selectedWorkerGroupForMembers?.id);
+                        const isMember = liveGroup?.members.some((m: any) => m.id === emp.id);
                         return (
                           <TableRow key={emp.id}>
                             <TableCell>
