@@ -6,6 +6,18 @@ function getFactoryCompanyId(req: any): number | undefined {
   return (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
 }
 
+async function hasWriteAccess(req: any, companyId: number): Promise<boolean> {
+  const role = req.user?.role;
+  if (role === "Admin" || role === "Owner" || role === "Developer") return true;
+  const userId = req.user?.id;
+  if (!userId) return false;
+  const { rows } = await pool.query(
+    `SELECT 1 FROM factory_user_page_access WHERE user_id = $1 AND company_id = $2 AND page_key = 'factory/sheets-sacks'`,
+    [userId, companyId]
+  );
+  return rows.length > 0;
+}
+
 export function registerFactorySheetsAndSacksRoutes(app: Express) {
   // GET /api/factory/sheets-sacks — list all items
   app.get("/api/factory/sheets-sacks", requireAuth, async (req: any, res: any) => {
@@ -32,6 +44,7 @@ export function registerFactorySheetsAndSacksRoutes(app: Express) {
     try {
       const companyId = getFactoryCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
+      if (!(await hasWriteAccess(req, companyId))) return res.status(403).json({ message: "Access denied" });
 
       const { type, name, size, quantity, unitPrice, notes } = req.body;
       if (!name || !type) return res.status(400).json({ message: "name and type are required" });
@@ -55,6 +68,7 @@ export function registerFactorySheetsAndSacksRoutes(app: Express) {
       const companyId = getFactoryCompanyId(req);
       const id = parseInt(req.params.id);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
+      if (!(await hasWriteAccess(req, companyId))) return res.status(403).json({ message: "Access denied" });
 
       const { type, name, size, quantity, unitPrice, notes } = req.body;
 
@@ -84,6 +98,7 @@ export function registerFactorySheetsAndSacksRoutes(app: Express) {
       const companyId = getFactoryCompanyId(req);
       const id = parseInt(req.params.id);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
+      if (!(await hasWriteAccess(req, companyId))) return res.status(403).json({ message: "Access denied" });
 
       const { rowCount } = await pool.query(
         `DELETE FROM factory_sheets_sacks WHERE id = $1 AND company_id = $2`,

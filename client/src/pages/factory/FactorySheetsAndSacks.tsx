@@ -188,6 +188,16 @@ export default function FactorySheetsAndSacks() {
     queryKey: ["/api/factory/sheets-sacks"],
   });
 
+  const { data: myAccess } = useQuery<{ fullAccess: boolean; pageKeys: string[] }>({
+    queryKey: ["/api/factory/my-access"],
+    staleTime: 30000,
+  });
+
+  const canEdit =
+    !myAccess ||
+    myAccess.fullAccess ||
+    myAccess.pageKeys.includes("factory/sheets-sacks");
+
   const deleteMutation = useMutation({
     mutationFn: (id: number) => apiRequest("DELETE", `/api/factory/sheets-sacks/${id}`),
     onSuccess: () => {
@@ -241,10 +251,12 @@ export default function FactorySheetsAndSacks() {
           title="Sheets & Sacks"
           subtitle="Track packaging materials inventory"
         />
-        <Button onClick={() => setShowAddDialog(true)} data-testid="button-add-item">
-          <Plus className="h-4 w-4 mr-1" />
-          Add Item
-        </Button>
+        {canEdit && (
+          <Button onClick={() => setShowAddDialog(true)} data-testid="button-add-item">
+            <Plus className="h-4 w-4 mr-1" />
+            Add Item
+          </Button>
+        )}
       </div>
 
       {/* Stats */}
@@ -327,7 +339,7 @@ export default function FactorySheetsAndSacks() {
               <p className="text-sm font-medium">
                 {items.length === 0 ? "No items yet. Add your first sheet or sack." : "No items match your search."}
               </p>
-              {items.length === 0 && (
+              {items.length === 0 && canEdit && (
                 <Button variant="outline" className="mt-4" onClick={() => setShowAddDialog(true)}>
                   <Plus className="h-4 w-4 mr-1" />
                   Add Item
@@ -345,7 +357,7 @@ export default function FactorySheetsAndSacks() {
                   <TableHead className="text-right">Unit Price</TableHead>
                   <TableHead className="text-right">Total Value</TableHead>
                   <TableHead>Notes</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
+                  {canEdit && <TableHead className="text-right">Actions</TableHead>}
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -376,28 +388,30 @@ export default function FactorySheetsAndSacks() {
                       <TableCell className="text-muted-foreground text-sm max-w-xs truncate">
                         {item.notes || "—"}
                       </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex items-center justify-end gap-1">
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            onClick={() => setEditItem(item)}
-                            title="Edit"
-                            data-testid={`button-edit-${item.id}`}
-                          >
-                            <Pencil className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            onClick={() => setDeleteItem(item)}
-                            title="Delete"
-                            data-testid={`button-delete-${item.id}`}
-                          >
-                            <Trash2 className="h-4 w-4 text-destructive" />
-                          </Button>
-                        </div>
-                      </TableCell>
+                      {canEdit && (
+                        <TableCell className="text-right">
+                          <div className="flex items-center justify-end gap-1">
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              onClick={() => setEditItem(item)}
+                              title="Edit"
+                              data-testid={`button-edit-${item.id}`}
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              onClick={() => setDeleteItem(item)}
+                              title="Delete"
+                              data-testid={`button-delete-${item.id}`}
+                            >
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      )}
                     </TableRow>
                   );
                 })}

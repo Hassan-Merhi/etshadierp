@@ -76,6 +76,7 @@ interface FactoryNavItem extends NavItem {
   featureFlagDefaultOn?: boolean;
   hideKey?: string;
   requiresExplicitAccess?: boolean;
+  viewableByAll?: boolean;
 }
 
 interface FactoryNavSection extends NavSection {
@@ -119,7 +120,7 @@ export const FACTORY_NAV_SECTIONS: FactoryNavSection[] = [
       { title: "Parties", url: "/factory/parties", icon: Users },
       { title: "Payroll", url: "/factory/payroll-hub", icon: HardHat },
       { title: "Insurance", url: "/factory/insurance", icon: Shield },
-      { title: "Sheets & Sacks", url: "/factory/sheets-sacks", icon: Layers },
+      { title: "Sheets & Sacks", url: "/factory/sheets-sacks", icon: Layers, viewableByAll: true },
       { title: "Vouchers", url: "/factory/vouchers", icon: FileText },
       { title: "Accounts", url: "/factory/accounts", icon: Landmark },
       { title: "Analytics", url: "/factory/analytics", icon: TrendingUp, adminOnly: true },
@@ -236,7 +237,9 @@ export function useFactoryVisibleSections(user?: any): {
             if (!settings || settings[item.featureFlag] !== true) return false;
           }
         }
-        if (myAccess && !myAccess.fullAccess && myAccess.pageKeys.length > 0)
+        if (item.viewableByAll) {
+          // always show in sidebar — access guard handled at the page level
+        } else if (myAccess && !myAccess.fullAccess && myAccess.pageKeys.length > 0)
           if (!myAccess.pageKeys.includes(item.url.replace(/^\//, ""))) return false;
         if (item.hideKey && myAccess?.hiddenCostFields?.includes(item.hideKey)) return false;
         if (item.requiresExplicitAccess && !isAdmin && myAccess) {
