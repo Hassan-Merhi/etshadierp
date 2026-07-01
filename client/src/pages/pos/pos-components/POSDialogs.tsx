@@ -112,23 +112,23 @@ export function POSDialogs({
               >
                 <div className="flex-1 min-w-0 mr-4 cursor-pointer" onClick={() => handleLoadDraft(draft.id)}>
                   {(() => {
-                    const items: any[] = draft.items ?? [];
-                    const totalBales = items.reduce((s: number, i: any) => s + (parseFloat(i.quantity) || 0), 0);
-                    const totalAmount = items.reduce((s: number, i: any) => s + (parseFloat(i.amount) || 0), 0);
+                    const count = parseInt(draft.item_count ?? draft.itemCount ?? 0);
+                    const totalQty = parseFloat(draft.total_qty ?? draft.totalQty ?? 0);
+                    const totalAmount = parseFloat(draft.total_amount ?? draft.totalAmount ?? 0);
                     return (
                       <>
                         <p className="text-sm font-medium">
-                          {items.length === 0
+                          {count === 0
                             ? "Empty draft"
-                            : `${items.length} item${items.length !== 1 ? "s" : ""} · ${totalBales % 1 === 0 ? totalBales : totalBales.toFixed(2)} bales`}
+                            : `${count} item${count !== 1 ? "s" : ""} · ${totalQty % 1 === 0 ? totalQty : totalQty.toFixed(2)} qty`}
                         </p>
-                        {items.length > 0 && (
+                        {count > 0 && (
                           <p className="text-xs text-muted-foreground font-medium">
                             Total: ${totalAmount.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                           </p>
                         )}
                         <p className="text-xs text-muted-foreground">
-                          {new Date(draft.updatedAt || draft.createdAt).toLocaleString()}
+                          {new Date(draft.updated_at || draft.updatedAt || draft.created_at || draft.createdAt).toLocaleString()}
                         </p>
                       </>
                     );

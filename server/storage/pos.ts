@@ -4,19 +4,31 @@ import * as schema from "@shared/schema";
 
 // Draft POS Sales
 
-export async function getAllDraftPosSales(userId: string, locationId?: number): Promise<schema.DraftPosSale[]> {
-  if (locationId) {
-    return await db
-      .select()
-      .from(schema.draftPosSales)
-      .where(and(eq(schema.draftPosSales.userId, userId), eq(schema.draftPosSales.locationId, locationId)))
-      .orderBy(sql`${schema.draftPosSales.updatedAt} DESC`);
-  }
-  return await db
-    .select()
-    .from(schema.draftPosSales)
-    .where(eq(schema.draftPosSales.userId, userId))
-    .orderBy(sql`${schema.draftPosSales.updatedAt} DESC`);
+export async function getAllDraftPosSales(userId: string, locationId?: number): Promise<any[]> {
+  const { pool } = await import("../db");
+  const locationFilter = locationId
+    ? "AND d.location_id = $2"
+    : "";
+  const params: any[] = locationId ? [userId, locationId] : [userId];
+  const { rows } = await pool.query(
+    `SELECT d.*,
+            COALESCE(s.item_count, 0)::int  AS item_count,
+            COALESCE(s.total_qty, 0)        AS total_qty,
+            COALESCE(s.total_amount, 0)     AS total_amount
+     FROM draft_pos_sales d
+     LEFT JOIN (
+       SELECT draft_id,
+              COUNT(*)              AS item_count,
+              SUM(quantity::numeric) AS total_qty,
+              SUM(amount::numeric)   AS total_amount
+       FROM draft_pos_sale_items
+       GROUP BY draft_id
+     ) s ON s.draft_id = d.id
+     WHERE d.user_id = $1 ${locationFilter}
+     ORDER BY COALESCE(d.updated_at, d.created_at) DESC`,
+    params
+  );
+  return rows;
 }
 
 export async function getDraftPosSaleById(id: number): Promise<any | undefined> {
