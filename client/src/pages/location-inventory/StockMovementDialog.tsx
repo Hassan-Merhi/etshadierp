@@ -32,6 +32,15 @@ export function StockMovementDialog({
   formatAmount,
   navigate,
 }: StockMovementDialogProps) {
+  const fmtN = (n: number, dec = 2) =>
+    n === 0 ? (
+      <span className="text-muted-foreground/30">—</span>
+    ) : (
+      <>{n.toLocaleString(undefined, { minimumFractionDigits: dec, maximumFractionDigits: dec })}</>
+    );
+  const fmtA = (n: number) =>
+    n === 0 ? <span className="text-muted-foreground/30">—</span> : <>{formatAmount(n)}</>;
+
   const { data: stockMovementData, isLoading: stockMovementLoading } = useQuery<any>({
     queryKey: stockMovementItem
       ? ["/api/inventory/movement", stockMovementItem.stockItemId, stockMovementItem.locationId, stockMovementPeriod]
@@ -163,14 +172,6 @@ export function StockMovementDialog({
                     </tr>
                   )}
                   {smDrillData?.transactions?.map((txn: any, idx: number) => {
-                    const fmtN = (n: number, dec = 2) =>
-                      n === 0 ? (
-                        <span className="text-muted-foreground/30">—</span>
-                      ) : (
-                        <>{n.toLocaleString(undefined, { minimumFractionDigits: dec, maximumFractionDigits: dec })}</>
-                      );
-                    const fmtA = (n: number) =>
-                      n === 0 ? <span className="text-muted-foreground/30">—</span> : <>{formatAmount(n)}</>;
                     const editUrl = (() => {
                       if (txn.isOpeningBalance) return null;
                       const vt = (txn.vchType || "").toLowerCase();
