@@ -75,7 +75,7 @@ export function ContainerBulkActions({
             Import Tracking Excel
           </DropdownMenuItem>
           <DropdownMenuItem asChild data-testid="menu-download-template">
-            <a href="/api/git/containers/import-excel-template" target="_blank">
+            <a href="/api/git/containers/import-template.xlsx" target="_blank">
               <Download className="h-4 w-4 mr-2" />
               Download Excel Template
             </a>
