@@ -1459,7 +1459,7 @@ export function registerAuthRoutes(app: Express) {
       const rateDate = new Date(latestRate.effectiveDate).toISOString().split("T")[0];
       const hasRate = rateDate === today;
 
-      res.json({ hasRate, latestRate: hasRate ? latestRate : null });
+      res.json({ hasRate, latestRate });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
