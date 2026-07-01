@@ -212,7 +212,7 @@ export default function Accounts() {
   const [waRuleDraft, setWaRuleDraft] = useState<WaRule>(defaultWaRule);
   const [waChatSearch, setWaChatSearch] = useState("");
 
-  const selectedAccountIsLedger = selectedAccount?.type === "ledger";
+  const selectedAccountIsLedger = !!selectedAccount?.accountId;
   const selectedAccountId = selectedAccount?.accountId ?? null;
 
   const { data: waChatsRaw = [], isLoading: waChatsLoading } = useQuery<WaChat[]>({
