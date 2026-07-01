@@ -33,8 +33,11 @@ import { useDateFormat } from "@/contexts/DateFormatContext";
 
 interface Company {
   id: number;
-  name: string;
-  code: string;
+  companyId: number;
+  companyName: string;
+  companyCode: string;
+  name?: string;
+  code?: string;
 }
 
 interface InsuranceMember {
@@ -382,7 +385,7 @@ export default function FactoryInsurance() {
   const [genYear, setGenYear] = useState(new Date().getFullYear());
 
   const { data: companies = [] } = useQuery<Company[]>({ queryKey: ["/api/user/companies"] });
-  const firstCompanyId = companies.length > 0 ? companies[0].id : null;
+  const firstCompanyId = companies.length > 0 ? companies[0].companyId : null;
   const selectedCompanyId = companyId ?? firstCompanyId;
 
   const { data: members = [], isLoading } = useQuery<InsuranceMember[]>({
@@ -478,13 +481,13 @@ export default function FactoryInsurance() {
               >
                 <SelectTrigger className="w-44" data-testid="select-company">
                   <SelectValue>
-                    {companies.find((c) => c.id === selectedCompanyId)?.name ?? "Select company"}
+                    {companies.find((c) => c.companyId === selectedCompanyId)?.companyName ?? "Select company"}
                   </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   {companies.map((c) => (
-                    <SelectItem key={c.id} value={String(c.id)}>
-                      {c.name}
+                    <SelectItem key={c.companyId} value={String(c.companyId)}>
+                      {c.companyName}
                     </SelectItem>
                   ))}
                 </SelectContent>
