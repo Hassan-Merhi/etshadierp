@@ -1235,6 +1235,130 @@ export function registerEmployeeRoutes(app: Express) {
     }
   });
 
+  // Payroll - Auto-calculate bonuses server-side (single call instead of N×M client fetches)
+  app.post("/api/payroll/auto-calculate-bonuses", requireAuth, requireNonPOS, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      const { startDate, endDate, pctLocationId } = req.body;
+      if (!startDate || !endDate) return res.status(400).json({ message: "startDate and endDate are required" });
+
+      // Fetch all active employees
+      const allEmployees = await storage.getAllEmployees(companyId);
+      const activeEmployees = allEmployees.filter((e: any) => e.status !== "inactive");
+
+      // Cache sales queries by "companyId|locationId"
+      const salesCache = new Map<string, { totalQuantity: string; totalSalesAmount: string; locationName: string }>();
+      const querySales = async (locId: number, srcCompanyId: number) => {
+        const cacheKey = `${srcCompanyId}|${locId}`;
+        if (salesCache.has(cacheKey)) return salesCache.get(cacheKey)!;
+        const conds = [
+          eq(vouchers.companyId, srcCompanyId),
+          eq(vouchers.locationId, locId),
+          eq(vouchers.voucherType, "Sales"),
+          isNull(vouchers.deletedAt),
+          eq(vouchers.optional, false),
+          eq(vouchers.isCreditSale, false),
+          sql`${vouchers.voucherDate} >= ${startDate}`,
+          sql`${vouchers.voucherDate} <= ${endDate}`,
+        ];
+        const [result] = await db
+          .select({
+            totalSalesAmount: sql<string>`COALESCE(SUM(${salesItems.totalSales}), 0)`,
+            totalQuantity: sql<string>`COALESCE(SUM(${salesItems.quantity}), 0)`,
+          })
+          .from(salesItems)
+          .innerJoin(vouchers, eq(salesItems.voucherId, vouchers.id))
+          .where(and(...conds));
+        const [loc] = await db.select({ name: locations.name }).from(locations).where(eq(locations.id, locId)).limit(1);
+        const entry = {
+          totalQuantity: result?.totalQuantity ?? "0",
+          totalSalesAmount: result?.totalSalesAmount ?? "0",
+          locationName: loc?.name ?? "",
+        };
+        salesCache.set(cacheKey, entry);
+        return entry;
+      };
+
+      // Prefetch pct location if provided
+      let pctSales: { totalSalesAmount: string; locationName: string } | null = null;
+      if (pctLocationId) {
+        try {
+          // Determine company for the pct location
+          const [locRow] = await db
+            .select({ companyId: locations.companyId })
+            .from(locations)
+            .where(eq(locations.id, parseInt(pctLocationId)))
+            .limit(1);
+          const pctCompanyId = locRow?.companyId ?? companyId;
+          pctSales = await querySales(parseInt(pctLocationId), pctCompanyId);
+        } catch {}
+      }
+
+      const results: Array<{ employeeId: number; amount: string; breakdown: string[] }> = [];
+
+      for (const emp of activeEmployees) {
+        const lines: string[] = [];
+        let total = 0;
+
+        // Per-location bale rates (employee_bale_rates table)
+        const baleRates = await storage.getEmployeeBaleRates(emp.id, companyId);
+        for (const entry of baleRates) {
+          const rate = parseFloat(entry.rate as string);
+          if (!rate || rate <= 0 || !entry.locationId) continue;
+          try {
+            const srcId = (entry.sourceCompanyId as number | null) ?? companyId;
+            const data = await querySales(entry.locationId as number, srcId);
+            const qty = parseFloat(data.totalQuantity);
+            if (qty > 0) {
+              const sub = qty * rate;
+              total += sub;
+              lines.push(`${qty} bales × $${rate} (${data.locationName}) = $${sub.toFixed(2)}`);
+            }
+          } catch {}
+        }
+
+        // Legacy single bale rate field — only if no per-location rates
+        if (lines.length === 0 && emp.balesBonusRate != null && parseFloat(emp.balesBonusRate as string) > 0) {
+          const locId = emp.salesBonusPctLocationId as number | null;
+          const srcId = (emp.salesBonusPctSourceCompanyId as number | null) ?? companyId;
+          if (locId) {
+            try {
+              const data = await querySales(locId, srcId);
+              const qty = parseFloat(data.totalQuantity);
+              const rate = parseFloat(emp.balesBonusRate as string);
+              if (qty > 0) {
+                const sub = qty * rate;
+                total += sub;
+                lines.push(`${qty} bales × $${rate} (${data.locationName}) = $${sub.toFixed(2)}`);
+              }
+            } catch {}
+          }
+        }
+
+        // Sales % bonus
+        if (pctSales && emp.salesBonusPct != null && parseFloat(emp.salesBonusPct as string) > 0) {
+          const sales = parseFloat(pctSales.totalSalesAmount);
+          const pct = parseFloat(emp.salesBonusPct as string);
+          if (sales > 0) {
+            const sub = (sales * pct) / 100;
+            total += sub;
+            lines.push(`$${sales.toFixed(2)} sales × ${pct}% (${pctSales.locationName}) = $${sub.toFixed(2)}`);
+          }
+        }
+
+        if (total > 0) {
+          results.push({ employeeId: emp.id, amount: total.toFixed(2), breakdown: lines });
+        }
+      }
+
+      return res.json({ results });
+    } catch (error: any) {
+      console.error("[/api/payroll/auto-calculate-bonuses]", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Payroll - Employee Bonus
   app.post("/api/payroll/bonus-employee", requireAuth, requireNonPOS, async (req, res) => {
     try {

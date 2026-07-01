@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import FactoryContainerLoadingScan from "./FactoryContainerLoadingScan";
 import FactoryPendingLoadings from "./FactoryPendingLoadings";
@@ -9,7 +9,7 @@ type LoadingsTab = "loadings" | "pending";
 export default function FactoryLoadingsHub() {
   const hash = typeof window !== "undefined" ? window.location.hash.replace("#", "") : "";
 
-  const { data: settings } = useQuery<any>({
+  const { data: settings, isSuccess: settingsLoaded } = useQuery<any>({
     queryKey: ["/api/factory/settings"],
     queryFn: async () => {
       const r = await fetch("/api/factory/settings");
@@ -18,13 +18,30 @@ export default function FactoryLoadingsHub() {
     staleTime: 60000,
   });
 
-  const { data: myAccess } = useQuery<any>({ queryKey: ["/api/factory/my-access"], staleTime: 60000 });
+  const { data: myAccess, isSuccess: accessLoaded } = useQuery<any>({ queryKey: ["/api/factory/my-access"], staleTime: 60000 });
   const hiddenTabs = myAccess?.hiddenCostFields ?? [];
 
   const showPending =
     settings?.loadingsTabPendingEnabled !== false && !hiddenTabs.includes("hide_tab_loadings_pending");
 
-  const [activeTab, setActiveTab] = useState<LoadingsTab>(hash === "pending" && showPending ? "pending" : "loadings");
+  const [activeTab, setActiveTab] = useState<LoadingsTab>("loadings");
+
+  // Once both queries resolve, honour the URL hash (if allowed)
+  useEffect(() => {
+    if (!settingsLoaded || !accessLoaded) return;
+    if (hash === "pending" && showPending) {
+      setActiveTab("pending");
+    } else {
+      setActiveTab("loadings");
+    }
+  }, [settingsLoaded, accessLoaded]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // If showPending turns false while the pending tab is active, fall back
+  useEffect(() => {
+    if (!showPending && activeTab === "pending") {
+      setActiveTab("loadings");
+    }
+  }, [showPending, activeTab]);
 
   function handleTabChange(value: LoadingsTab) {
     setActiveTab(value);

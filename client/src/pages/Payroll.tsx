@@ -700,103 +700,31 @@ export default function Payroll() {
     try {
       const { getThisMonthRange: tmr } = await import("./payroll/payrollSchemas");
       const range = bulkBonusAutoMonth === "thisMonth" ? tmr() : { start: bulkBonusAutoStart, end: bulkBonusAutoEnd };
+
+      const res = await modeApiRequest("POST", "/api/payroll/auto-calculate-bonuses", {
+        startDate: range.start,
+        endDate: range.end,
+        pctLocationId: bulkBonusAutoPctLocationId || null,
+      });
+      const { results } = await res.json() as { results: Array<{ employeeId: number; amount: string; breakdown: string[] }> };
+
       const amounts: Record<number, string> = { ...bulkBonusAmounts };
       const breakdowns: Record<number, string[]> = { ...bulkBonusBreakdowns };
 
-      // Cache sales-summary fetches to avoid duplicate requests for same location+date range
-      const salesCache = new Map<string, any>();
-      const fetchSales = async (locationId: number, sourceCompanyId?: number | null) => {
-        const key = `${locationId}|${sourceCompanyId ?? ""}|${range.start}|${range.end}`;
-        if (salesCache.has(key)) return salesCache.get(key);
-        const srcParam = sourceCompanyId ? `&sourceCompanyId=${sourceCompanyId}` : "";
-        const res = await fetch(
-          `/api/payroll/sales-summary?locationId=${locationId}&startDate=${range.start}&endDate=${range.end}${srcParam}`,
-          { credentials: "include" }
-        );
-        const data = res.ok ? await res.json() : null;
-        salesCache.set(key, data);
-        return data;
-      };
-
-      await Promise.all(
-        employeeStaff.map(async (emp) => {
-          const lines: string[] = [];
-          let total = 0;
-
-          // ── Per-location bale rates (new table: /api/employees/:id/bale-rates) ──
-          try {
-            const ratesRes = await fetch(`/api/employees/${emp.id}/bale-rates`, { credentials: "include" });
-            if (ratesRes.ok) {
-              const perLocRates: Array<{ locationId: number; rate: string; sourceCompanyId?: number | null }> = await ratesRes.json();
-              for (const entry of perLocRates) {
-                const rate = parseFloat(entry.rate);
-                if (!rate || rate <= 0 || !entry.locationId) continue;
-                try {
-                  const data = await fetchSales(entry.locationId, entry.sourceCompanyId);
-                  if (data) {
-                    const qty = parseFloat(data.totalQuantity || "0");
-                    if (qty > 0) {
-                      const sub = qty * rate;
-                      total += sub;
-                      lines.push(`${qty} bales × $${rate} (${data.locationName}) = $${sub.toFixed(2)}`);
-                    }
-                  }
-                } catch {}
-              }
-            }
-          } catch {}
-
-          // ── Legacy single bale rate field (emp.balesBonusRate) ──
-          // Only use if no per-location rates were configured above
-          if (lines.length === 0 && emp.balesBonusRate != null && parseFloat(emp.balesBonusRate) > 0) {
-            const locId = emp.salesBonusPctLocationId;
-            const sourceCompId = emp.salesBonusPctSourceCompanyId;
-            if (locId) {
-              try {
-                const data = await fetchSales(locId, sourceCompId);
-                if (data) {
-                  const qty = parseFloat(data.totalQuantity || "0");
-                  const rate = parseFloat(emp.balesBonusRate);
-                  if (qty > 0) {
-                    const sub = qty * rate;
-                    total += sub;
-                    lines.push(`${qty} bales × $${rate} (${data.locationName}) = $${sub.toFixed(2)}`);
-                  }
-                }
-              } catch {}
-            }
-          }
-
-          // ── Sales % bonus (emp.salesBonusPct) ──
-          if (bulkBonusAutoPctLocationId && emp.salesBonusPct != null && parseFloat(emp.salesBonusPct) > 0) {
-            try {
-              const data = await fetchSales(parseInt(bulkBonusAutoPctLocationId), null);
-              if (data) {
-                const sales = parseFloat(data.totalSalesAmount || "0");
-                const pct = parseFloat(emp.salesBonusPct);
-                if (sales > 0) {
-                  const sub = (sales * pct) / 100;
-                  total += sub;
-                  lines.push(`$${sales.toFixed(2)} sales × ${pct}% (${data.locationName}) = $${sub.toFixed(2)}`);
-                }
-              }
-            } catch {}
-          }
-
-          if (total > 0) {
-            amounts[emp.id] = total.toFixed(2);
-            breakdowns[emp.id] = lines;
-          }
-        })
-      );
+      for (const r of results) {
+        if (parseFloat(r.amount) > 0) {
+          amounts[r.employeeId] = r.amount;
+          breakdowns[r.employeeId] = r.breakdown;
+        }
+      }
 
       setBulkBonusAmounts(amounts as any);
       setBulkBonusBreakdowns(breakdowns);
-      const calculatedCount = Object.values(amounts).filter((v) => parseFloat(v) > 0).length;
+      const calculatedCount = results.filter((r) => parseFloat(r.amount) > 0).length;
       if (calculatedCount === 0) {
         toast({
           title: "Nothing calculated",
-          description: "No employees have bonus rates configured. Set bale or sales % rates on each employee first.",
+          description: "No bale sales found for the configured locations in this date range. Check that sales vouchers exist for June.",
           variant: "destructive",
         });
       } else {

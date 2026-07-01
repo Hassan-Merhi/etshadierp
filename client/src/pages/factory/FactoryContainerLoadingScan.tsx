@@ -694,10 +694,10 @@ export default function FactoryContainerLoadingScan() {
       }
     >
   >((acc, bale) => {
-    const key = bale.articleCode;
+    const key = bale.articleCode ?? "__unknown__";
     if (!acc[key]) {
       acc[key] = {
-        articleCode: bale.articleCode,
+        articleCode: bale.articleCode ?? "",
         baleName: bale.baleName,
         bales: [],
         totalWeight: 0,
@@ -720,7 +720,7 @@ export default function FactoryContainerLoadingScan() {
   const proformaArticleCodesForStock = useMemo(() => {
     if (!orderDetail?.proformaIdUsed) return [];
     const pf = proformas.find((p) => p.id === orderDetail.proformaIdUsed) || proformas.find((p) => p.isActive);
-    return pf?.lines.map((l: any) => l.articleCode).filter(Boolean) || [];
+    return (Array.isArray(pf?.lines) ? pf!.lines : []).map((l: any) => l.articleCode).filter(Boolean);
   }, [orderDetail?.proformaIdUsed, proformas]);
   const stockLocationId = orderDetail?.locationId || (selectedLocationId ? parseInt(selectedLocationId) : null);
   const { data: stockCounts = {} } = useQuery<Record<string, number>>({
@@ -743,12 +743,13 @@ export default function FactoryContainerLoadingScan() {
     : proformas.find((p) => p.isActive) || null;
 
   const loadedByArticle = bales.reduce<Record<string, number>>((map, b) => {
-    map[b.articleCode] = (map[b.articleCode] || 0) + 1;
+    const key = b.articleCode ?? "__unknown__";
+    map[key] = (map[key] || 0) + 1;
     return map;
   }, {});
 
   const proformaProgress =
-    linkedProforma?.lines.map((line) => {
+    (Array.isArray(linkedProforma?.lines) ? linkedProforma!.lines : []).map((line) => {
       const loaded = loadedByArticle[line.articleCode] || 0;
       const remaining = line.quantity - loaded;
       const status: "fulfilled" | "overloaded" | "short" | "none" =
@@ -773,7 +774,7 @@ export default function FactoryContainerLoadingScan() {
   const totalLines = proformaProgress.length;
 
   // Extra bales not in proforma
-  const proformaArticleCodes = new Set(linkedProforma?.lines.map((l) => l.articleCode) || []);
+  const proformaArticleCodes = new Set((Array.isArray(linkedProforma?.lines) ? linkedProforma!.lines : []).map((l) => l.articleCode));
   const extraArticles = Object.keys(loadedByArticle).filter((code) => !proformaArticleCodes.has(code));
 
   const scanInputClass =
