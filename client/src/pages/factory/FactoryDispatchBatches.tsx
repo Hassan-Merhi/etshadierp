@@ -119,7 +119,7 @@ export default function FactoryDispatchBatches() {
       if (!res.ok) throw new Error((await res.json()).message);
       return res.json();
     },
-    refetchInterval: 30_000,
+    refetchInterval: 60_000,
   });
 
   const { data: customers = [] } = useQuery<Customer[]>({ queryKey: ["/api/factory/customers"] });
@@ -153,7 +153,7 @@ export default function FactoryDispatchBatches() {
       return res.json();
     },
     enabled: activeTab === "reports",
-    refetchInterval: 30_000,
+    refetchInterval: 60_000,
   });
 
   const activeProformas = proformas.filter((p) => p.isActive);

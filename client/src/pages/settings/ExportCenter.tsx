@@ -74,7 +74,7 @@ export function ExportCenter() {
     refetch: refetchBackup,
   } = useQuery<BackupStatus>({
     queryKey: ["/api/export/backup-status"],
-    refetchInterval: 15000,
+    refetchInterval: 60000,
   });
   const { data: waSettings } = useQuery<WaSettings>({ queryKey: ["/api/whatsapp/settings"] });
   const { data: waRecipients = [] } = useQuery<WaRecipient[]>({ queryKey: ["/api/whatsapp/recipients"] });

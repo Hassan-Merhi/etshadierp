@@ -178,7 +178,7 @@ export function DailyExportSection() {
     refetch: refetchBackup,
   } = useQuery<BackupStatus>({
     queryKey: ["/api/export/backup-status"],
-    refetchInterval: 15000,
+    refetchInterval: 60000,
   });
 
   const [sendingWa, setSendingWa] = useState(false);

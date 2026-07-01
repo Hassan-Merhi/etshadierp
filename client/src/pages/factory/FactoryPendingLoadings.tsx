@@ -139,7 +139,7 @@ export default function FactoryPendingLoadings() {
 
   const { data: loads = [], isLoading } = useQuery<PendingLoad[]>({
     queryKey: ["/api/factory/customer-orders?status=LOADING"],
-    refetchInterval: 30000,
+    refetchInterval: 60000,
   });
 
   const { data: proformas = [], isLoading: proformasLoading } = useQuery<Proforma[]>({

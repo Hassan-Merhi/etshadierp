@@ -12,10 +12,16 @@ const MAX_FRAME_SIZE = 1_500_000;
 
 const isDev = process.env.NODE_ENV !== "production";
 
+// When DISABLE_SCREEN_FEED=true, the feature is fully disabled server-side:
+// being-watched always returns false (no captures start) and POST frames are dropped.
+const SCREEN_FEED_DISABLED = process.env.DISABLE_SCREEN_FEED === "true";
+
 export function registerScreenFeedRoutes(app: Express) {
   // GET: watched user asks "is anyone watching me right now?"
   // Must be registered BEFORE /:userId to avoid route conflict.
   app.get("/api/screen-feed/being-watched", requireLogin, (req, res) => {
+    if (SCREEN_FEED_DISABLED) return res.json({ watched: false });
+
     const userId = String(req.session.userId!);
     const lastPoll = watcherPollStore.get(userId) ?? 0;
     const ageMs = Date.now() - lastPoll;
@@ -44,6 +50,8 @@ export function registerScreenFeedRoutes(app: Express) {
 
   // POST: watched user uploads their screenshot frame + recent clicks.
   app.post("/api/screen-feed", requireLogin, (req, res) => {
+    if (SCREEN_FEED_DISABLED) return res.status(204).end();
+
     if (isDev) {
       console.log(
         `[ScreenFeed] POST /api/screen-feed received from userId=${String(req.session.userId!)} body_keys=${Object.keys(req.body ?? {}).join(",")}`

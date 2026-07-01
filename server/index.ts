@@ -370,6 +370,11 @@ let migrationsDone = false;
 
 (async () => {
   const migrations = [
+    // ── One-time migration log (idempotency guard for destructive DML) ────────
+    `CREATE TABLE IF NOT EXISTS migrations_log (
+      key text PRIMARY KEY,
+      applied_at timestamp NOT NULL DEFAULT now()
+    )`,
     // ── Create missing tables ──────────────────────────────────────────────────
     `CREATE TABLE IF NOT EXISTS user_presence (
       id serial PRIMARY KEY,
@@ -447,7 +452,13 @@ let migrationsDone = false;
     `ALTER TABLE users ADD COLUMN IF NOT EXISTS hidden_erp_cost_fields text[] NOT NULL DEFAULT '{}'`,
     `ALTER TABLE users ADD COLUMN IF NOT EXISTS chatbot_enabled boolean NOT NULL DEFAULT false`,
     // Enable chatbot for all existing users (column was added with DEFAULT false — flip to opt-out model)
-    `UPDATE users SET chatbot_enabled = true WHERE chatbot_enabled = false`,
+    // Wrapped in migrations_log so a user turning off their chatbot is not re-enabled on next restart.
+    `DO $$ BEGIN
+      IF NOT EXISTS (SELECT 1 FROM migrations_log WHERE key = 'chatbot-enable-all-v1') THEN
+        UPDATE users SET chatbot_enabled = true WHERE chatbot_enabled = false;
+        INSERT INTO migrations_log(key) VALUES ('chatbot-enable-all-v1');
+      END IF;
+    END $$`,
     `ALTER TABLE user_company_roles ADD COLUMN IF NOT EXISTS can_sell_negative_stock boolean NOT NULL DEFAULT false`,
     `ALTER TABLE user_company_roles ADD COLUMN IF NOT EXISTS daybook_edit_days integer NOT NULL DEFAULT 0`,
     `ALTER TABLE user_company_roles ADD COLUMN IF NOT EXISTS can_access_customers boolean NOT NULL DEFAULT false`,
@@ -3060,7 +3071,13 @@ let migrationsDone = false;
     `CREATE INDEX IF NOT EXISTS fscd_company_idx ON factory_shipping_container_documents (company_id)`,
 
     // Enable auto-tracking on all existing containers so "Track All Now" works immediately
-    `UPDATE containers SET tracking_enabled = true WHERE tracking_enabled = false AND status NOT IN ('Offloaded','Closed','Completed')`,
+    // One-time init — wrapped so manual per-container disables are not reset on restart.
+    `DO $$ BEGIN
+      IF NOT EXISTS (SELECT 1 FROM migrations_log WHERE key = 'containers-tracking-enable-initial-v1') THEN
+        UPDATE containers SET tracking_enabled = true WHERE tracking_enabled = false AND status NOT IN ('Offloaded','Closed','Completed');
+        INSERT INTO migrations_log(key) VALUES ('containers-tracking-enable-initial-v1');
+      END IF;
+    END $$`,
     // Stock Grades and Categories (May 2026)
     `CREATE TABLE IF NOT EXISTS stock_grades (
       id serial PRIMARY KEY,
@@ -3084,7 +3101,13 @@ let migrationsDone = false;
     `ALTER TABLE containers ADD COLUMN IF NOT EXISTS tracking_fallback_reason text`,
     // P0 data fix (May 2026): disable tracking on offloaded/closed/completed containers
     // Case-insensitive so it handles OFFLOADED, Offloaded, offloaded, CLOSED, COMPLETED, etc.
-    `UPDATE containers SET tracking_enabled = false, tracking_auto_update = false WHERE LOWER(status) IN ('offloaded','closed','completed') AND (tracking_enabled = true OR tracking_auto_update = true)`,
+    // Wrapped so manually re-enabled tracking on a specific closed container is not reset on restart.
+    `DO $$ BEGIN
+      IF NOT EXISTS (SELECT 1 FROM migrations_log WHERE key = 'containers-tracking-disable-offloaded-v1') THEN
+        UPDATE containers SET tracking_enabled = false, tracking_auto_update = false WHERE LOWER(status) IN ('offloaded','closed','completed') AND (tracking_enabled = true OR tracking_auto_update = true);
+        INSERT INTO migrations_log(key) VALUES ('containers-tracking-disable-offloaded-v1');
+      END IF;
+    END $$`,
     // Smart priority scheduler columns (May 2026)
     `ALTER TABLE containers ADD COLUMN IF NOT EXISTS tracking_next_check_at timestamptz`,
     `ALTER TABLE containers ADD COLUMN IF NOT EXISTS tracking_last_skip_reason text`,
@@ -3858,6 +3881,8 @@ let migrationsDone = false;
     // ORDER BY created_at DESC with no index → full sequential scan on a large table.
     `CREATE INDEX IF NOT EXISTS factory_bales_company_status_date_idx
        ON factory_bales (company_id, status, created_at DESC)`,
+    // factory_bales: finalized_by is used in worker stats / UPDATE joins; no index existed.
+    `CREATE INDEX IF NOT EXISTS factory_bales_finalized_by_idx ON factory_bales(finalized_by)`,
     // bale_label_prints: print-history look-up uses inArray(production_bale_id, [...])
     // with no index → sequential scan of the full prints table for every bale page-load.
     `CREATE INDEX IF NOT EXISTS bale_label_prints_production_bale_idx
