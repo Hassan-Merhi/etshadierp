@@ -964,7 +964,12 @@ export default function Payroll() {
 
   const createWorkerMutation = useMutation({
     mutationFn: async (data: any) =>
-      modeApiRequest("POST", "/api/employees", { ...data, companyId: selectedCompany?.id, employeeType: "Worker" }),
+      modeApiRequest("POST", "/api/employees", {
+        ...data,
+        companyId: selectedCompany?.id,
+        employeeType: "Worker",
+        joinDate: data.joinDate || new Date().toLocaleDateString("en-CA"),
+      }),
     onSuccess: () => {
       toast({ title: "Worker created" });
       queryClient.invalidateQueries({ queryKey: ["/api/employees", selectedCompany?.id] });
