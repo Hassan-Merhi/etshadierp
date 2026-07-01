@@ -282,8 +282,11 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
     if (!Array.isArray(drafts) || drafts.length === 0) return;
     const todayUTC = new Date().toISOString().slice(0, 10);
     const todayDraft = drafts.find((d: any) => {
-      const ds = new Date(d.updatedAt || d.createdAt).toISOString().slice(0, 10);
-      return ds === todayUTC;
+      const rawDate = d.updatedAt || d.createdAt;
+      if (!rawDate) return false;
+      const dateObj = new Date(rawDate);
+      if (isNaN(dateObj.getTime())) return false;
+      return dateObj.toISOString().slice(0, 10) === todayUTC;
     });
     if (todayDraft) setCurrentDraftId(todayDraft.id);
   }, [drafts]);

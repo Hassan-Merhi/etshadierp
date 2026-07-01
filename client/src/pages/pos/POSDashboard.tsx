@@ -33,10 +33,19 @@ import {
 } from "lucide-react";
 import { format } from "date-fns";
 import { useDateFormat } from "@/contexts/DateFormatContext";
+
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
 import { PageHeader } from "@/components/PageHeader";
+
+/** Safely format a date-time value as "hh:mm a". Returns "—" for null/invalid values. */
+function safeFmtTime(dt: string | null | undefined): string {
+  if (!dt) return "—";
+  const d = new Date(dt);
+  if (isNaN(d.getTime())) return "—";
+  return format(d, "hh:mm a");
+}
 
 interface PosShift {
   id: number;
@@ -299,7 +308,7 @@ export default function POSDashboard({ posUser }: POSDashboardProps) {
               <Badge variant="default">Active Shift</Badge>
               <p className="text-sm text-muted-foreground">
                 Started {formatDisplayDate(currentShift.openedAt)} at{" "}
-                {format(new Date(currentShift.openedAt), "hh:mm a")}
+                {safeFmtTime(currentShift.openedAt)}
               </p>
               <p className="text-sm">
                 Opening Cash:{" "}
@@ -396,11 +405,11 @@ export default function POSDashboard({ posUser }: POSDashboardProps) {
                         <TableCell className="text-sm hidden sm:table-cell text-muted-foreground">
                           {shift.closedAt ? (
                             <>
-                              {format(new Date(shift.openedAt), "hh:mm a")} –{" "}
-                              {format(new Date(shift.closedAt), "hh:mm a")}
+                              {safeFmtTime(shift.openedAt)} –{" "}
+                              {safeFmtTime(shift.closedAt)}
                             </>
                           ) : (
-                            format(new Date(shift.openedAt), "hh:mm a") + " – Active"
+                            safeFmtTime(shift.openedAt) + " – Active"
                           )}
                         </TableCell>
                         <TableCell className="text-right font-mono text-sm">
@@ -506,7 +515,7 @@ export default function POSDashboard({ posUser }: POSDashboardProps) {
                 </div>
                 <div className="flex justify-between text-sm">
                   <span>Shift Started:</span>
-                  <span>{format(new Date(currentShift.openedAt), "hh:mm a")}</span>
+                  <span>{safeFmtTime(currentShift.openedAt)}</span>
                 </div>
               </div>
             )}

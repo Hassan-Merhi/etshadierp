@@ -691,7 +691,11 @@ export default function POSDaybook() {
                         className={isHidden && showHidden ? "opacity-50" : ""}
                       >
                         <TableCell className="font-mono text-xs">
-                          {format(new Date(voucher.createdAt), "MMM dd, hh:mm a")}
+                          {(() => {
+                            if (!voucher.createdAt) return "—";
+                            const d = new Date(voucher.createdAt);
+                            return isNaN(d.getTime()) ? "—" : format(d, "MMM dd, hh:mm a");
+                          })()}
                         </TableCell>
                         <TableCell>
                           <Badge variant={voucher.voucherType === "Sales" ? "default" : "outline"} className="text-xs">
@@ -1209,7 +1213,11 @@ export default function POSDaybook() {
             <div className="flex flex-wrap items-center gap-2 sm:gap-4 pt-2 text-sm text-muted-foreground">
               <span>
                 {selectedVoucher &&
-                  `${formatDisplayDate(new Date(selectedVoucher.createdAt))} at ${format(new Date(selectedVoucher.createdAt), "hh:mm a")}`}
+                  `${formatDisplayDate(selectedVoucher.createdAt)} at ${(() => {
+                    if (!selectedVoucher.createdAt) return "—";
+                    const d = new Date(selectedVoucher.createdAt);
+                    return isNaN(d.getTime()) ? "—" : format(d, "hh:mm a");
+                  })()}`}
               </span>
               <span>•</span>
               <span>{selectedVoucher?.locationName || `Location ${selectedVoucher?.locationId}`}</span>
