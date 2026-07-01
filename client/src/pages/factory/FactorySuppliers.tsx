@@ -758,7 +758,7 @@ export default function FactorySuppliers() {
                 </div>
               </div>
 
-              <div className="text-right shrink-0">
+              <div className="text-right shrink-0 space-y-0.5">
                 {(Math.abs(balVal) > 0.005 || nonUsdBalances.length > 0) && (
                   <div className="text-xs text-muted-foreground mb-0.5">Balance</div>
                 )}
@@ -767,6 +767,44 @@ export default function FactorySuppliers() {
                     ? <span className="text-muted-foreground text-xs">$-</span>
                     : `$${formatNum(String(Math.abs(balVal)))}${balVal < 0 ? " CR" : ""}`}
                 </div>
+                {nonUsdBalances.map((cb) => (
+                  <div key={cb.currencyCode} className="flex items-center justify-end gap-1">
+                    <span className={`text-xs tabular-nums ${cb.balance < 0 ? "text-green-600 dark:text-green-400" : "text-muted-foreground"}`}>
+                      {cb.currencyCode} {formatNum(String(Math.abs(cb.balance).toFixed(2)))}{cb.balance < 0 ? " CR" : ""}
+                    </span>
+                    {cb.balance > 0.005 && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-5 w-5 text-muted-foreground hover:text-foreground"
+                        title={`Settle ${cb.currencyCode} → USD`}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          const toId = (s as any).parentId || s.id;
+                          const balStr = cb.balance.toFixed(2);
+                          setFxConversionForm({
+                            fromSupplierId: s.id,
+                            toSupplierId: toId,
+                            selectedCurrency: cb.currencyCode,
+                            amount: balStr,
+                            availableBalance: balStr,
+                            supplierBalance: balStr,
+                            commissionBalance: "0",
+                            fxRateToUsd: "",
+                            date: today,
+                            notes: "",
+                            effectiveDate: "",
+                          });
+                          setFxSourceType("supplier");
+                          setFxConversionOpen(true);
+                        }}
+                        data-testid={`btn-fx-settle-${s.id}-${cb.currencyCode}`}
+                      >
+                        <ArrowRightLeft className="h-3 w-3" />
+                      </Button>
+                    )}
+                  </div>
+                ))}
               </div>
 
               <div className="flex items-center gap-1 shrink-0">

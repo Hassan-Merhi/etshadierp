@@ -261,14 +261,14 @@ export function SupplierPaymentFxDialogs({
                   {fxConversionForm.selectedCurrency === "USD"
                     ? parseFloat(fxConversionForm.commissionBalance || "0") > 0
                       ? isSelf
-                        ? "Settle Commission to EUR"
+                        ? "Settle Commission"
                         : "Transfer Commission to Broker"
                       : isSelf
-                        ? "Settle Freight to EUR"
+                        ? "Settle Freight"
                         : "Transfer Freight to Broker"
                     : isSelf
-                      ? `FX Settlement to EUR`
-                      : "FX Settlement to Broker (EUR)"}
+                      ? `Settle ${fxConversionForm.selectedCurrency} → USD`
+                      : `Settle ${fxConversionForm.selectedCurrency} to Broker`}
                 </DialogTitle>
                 <DialogDescription>
                   {fxConversionForm.selectedCurrency === "USD"
