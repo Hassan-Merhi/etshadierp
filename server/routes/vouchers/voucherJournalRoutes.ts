@@ -283,6 +283,7 @@ export function registerVoucherJournalRoutes(app: Express) {
         optional,
         currency,
         exchangeRate,
+        effectiveDate,
         mainAccountId, // optional: ledger account ID to use for WhatsApp auto-statement
         mainAccountType, // optional: account type for the main account (default: "ledger")
       } = req.body;
@@ -327,6 +328,7 @@ export function registerVoucherJournalRoutes(app: Express) {
             optional: optional ?? false,
             currency: currency || "USD",
             exchangeRate: exchangeRate || null,
+            effectiveDate: effectiveDate || null,
           })
           .returning();
 
@@ -490,6 +492,7 @@ export function registerVoucherJournalRoutes(app: Express) {
         optional,
         currency,
         exchangeRate,
+        effectiveDate,
         mainAccountId: mainAccountIdPatch,
         mainAccountType: mainAccountTypePatch,
       } = req.body;
@@ -540,6 +543,7 @@ export function registerVoucherJournalRoutes(app: Express) {
             description: notes || null,
             totalAmount: Math.max(totalDebits, totalCredits).toFixed(2),
             optional: optional ?? false,
+            effectiveDate: effectiveDate || null,
           })
           .where(eq(vouchers.id, voucherId))
           .returning();

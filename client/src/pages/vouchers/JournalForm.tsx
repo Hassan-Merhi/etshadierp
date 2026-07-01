@@ -133,6 +133,7 @@ export function JournalForm({ voucherIdToEdit, isPOS }: JournalFormProps) {
   const [, setLocation] = useLocation();
   const { formatAmount, selectedCurrency, convertToUSD } = useCurrencyContext();
   const [transactionRate, setTransactionRate] = useState<number | null>(null);
+  const [journalEffectiveDate, setJournalEffectiveDate] = useState<string>("");
   const [isAutoCreating, setIsAutoCreating] = useState(false);
   const [waPendingPrompt, setWaPendingPrompt] = useState<{ accountId: number; month: string } | null>(null);
   const [accountPickersNeeded, setAccountPickersNeeded] = useState(() => !!voucherIdToEdit);
@@ -444,6 +445,7 @@ export function JournalForm({ voucherIdToEdit, isPOS }: JournalFormProps) {
       notes: voucherToEdit.notes || "",
       optional: voucherToEdit.optional || false,
     });
+    setJournalEffectiveDate(voucherToEdit.effectiveDate || "");
     hydratedVoucherIdRef.current = voucherToEdit.id;
   }, [
     voucherToEdit,
@@ -469,6 +471,7 @@ export function JournalForm({ voucherIdToEdit, isPOS }: JournalFormProps) {
         optional: formData.optional,
         currency: selectedCurrency,
         exchangeRate: transactionRate ? transactionRate.toString() : undefined,
+        effectiveDate: journalEffectiveDate || null,
       };
       if (isEditMode) {
         const res = await modeApiRequest("PATCH", `/api/vouchers/${voucherIdToEdit}/journal`, payload);
@@ -848,6 +851,17 @@ export function JournalForm({ voucherIdToEdit, isPOS }: JournalFormProps) {
                       </FormItem>
                     )}
                   />
+                  <div className="shrink-0 flex items-center gap-1.5">
+                    <span className="text-xs text-muted-foreground whitespace-nowrap">Eff.</span>
+                    <Input
+                      type="date"
+                      className="w-36"
+                      value={journalEffectiveDate}
+                      onChange={(e) => setJournalEffectiveDate(e.target.value)}
+                      data-testid="input-journal-effective-date"
+                      title="Effective Date (optional — used for ledger/accounts)"
+                    />
+                  </div>
                 </div>
 
                 {/* Mobile journal cards */}
