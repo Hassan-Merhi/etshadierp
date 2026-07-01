@@ -322,6 +322,51 @@ export default function Payroll() {
     if (statementEmployee) setStatementExpanded(false);
   }, [statementEmployee?.id]);
 
+  // Pre-populate edit employee form + load bale rates when editingEmployee changes
+  useEffect(() => {
+    if (!editingEmployee) return;
+    editEmployeeForm.reset({
+      firstName: editingEmployee.firstName || "",
+      lastName: editingEmployee.lastName || "",
+      code: editingEmployee.code || "",
+      monthlySalary: editingEmployee.monthlySalary || "",
+      employeeGroupId: editingEmployee.employeeGroupId ? String(editingEmployee.employeeGroupId) : "",
+      salesBonusPct: editingEmployee.salesBonusPct ? String(editingEmployee.salesBonusPct) : "",
+      salesBonusPctLocationId: editingEmployee.salesBonusPctLocationId
+        ? String(editingEmployee.salesBonusPctLocationId)
+        : "",
+      salesBonusPctSourceCompanyId: editingEmployee.salesBonusPctSourceCompanyId
+        ? String(editingEmployee.salesBonusPctSourceCompanyId)
+        : "",
+    });
+    // Load bale rates
+    fetch(`/api/employees/${editingEmployee.id}/bale-rates`, { credentials: "include" })
+      .then((r) => r.ok ? r.json() : [])
+      .then((data: any[]) =>
+        setEditBaleRates(
+          data.map((r: any) => ({
+            locationId: String(r.locationId),
+            rate: String(r.rate),
+            sourceCompanyId: r.sourceCompanyId ? String(r.sourceCompanyId) : "",
+          }))
+        )
+      )
+      .catch(() => setEditBaleRates([]));
+    // Load pct rates
+    fetch(`/api/employees/${editingEmployee.id}/bale-pct-rates`, { credentials: "include" })
+      .then((r) => r.ok ? r.json() : [])
+      .then((data: any[]) =>
+        setEditBalePctRates(
+          data.map((r: any) => ({
+            locationId: String(r.locationId),
+            pct: String(r.pct),
+            sourceCompanyId: r.sourceCompanyId ? String(r.sourceCompanyId) : "",
+          }))
+        )
+      )
+      .catch(() => setEditBalePctRates([]));
+  }, [editingEmployee?.id]);
+
   const cleanTxnDesc = (desc: string) => {
     if (!desc) return "-";
     return (
@@ -747,9 +792,137 @@ export default function Payroll() {
 
   const handleDeleteEmployee = (emp: Employee) => {
     if (confirm(`Are you sure you want to delete ${emp.firstName}?`)) {
-      // call mutation
+      modeApiRequest("DELETE", `/api/employees/${emp.id}`, undefined)
+        .then(() => {
+          toast({ title: "Deleted", description: "Employee deleted" });
+          queryClient.invalidateQueries({ queryKey: ["/api/employees", selectedCompany?.id] });
+        })
+        .catch((e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }));
     }
   };
+
+  const handleForceDeleteEmployee = () => {
+    if (!deleteConflict) return;
+    modeApiRequest("DELETE", `/api/employees/${deleteConflict.employee.id}?force=true`, undefined)
+      .then(() => {
+        toast({ title: "Deleted", description: "Employee force-deleted" });
+        queryClient.invalidateQueries({ queryKey: ["/api/employees", selectedCompany?.id] });
+        setDeleteConflict(null);
+      })
+      .catch((e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }));
+  };
+
+  const editEmployeeMutation = useMutation({
+    mutationFn: async (data: any) => {
+      if (!editingEmployee) throw new Error("No employee selected");
+      await modeApiRequest("PATCH", `/api/employees/${editingEmployee.id}`, data);
+      // Save bale rates
+      await fetch(`/api/employees/${editingEmployee.id}/bale-rates`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(
+          editBaleRates
+            .filter((r) => r.locationId && r.rate)
+            .map((r) => ({
+              locationId: parseInt(r.locationId),
+              rate: parseFloat(r.rate),
+              sourceCompanyId: r.sourceCompanyId ? parseInt(r.sourceCompanyId) : null,
+            }))
+        ),
+      });
+      // Save pct rates
+      await fetch(`/api/employees/${editingEmployee.id}/bale-pct-rates`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(
+          editBalePctRates
+            .filter((r) => r.locationId && r.pct)
+            .map((r) => ({
+              locationId: parseInt(r.locationId),
+              pct: parseFloat(r.pct),
+              sourceCompanyId: r.sourceCompanyId ? parseInt(r.sourceCompanyId) : null,
+            }))
+        ),
+      });
+    },
+    onSuccess: () => {
+      toast({ title: "Employee updated" });
+      queryClient.invalidateQueries({ queryKey: ["/api/employees", selectedCompany?.id] });
+      setEditEmployeeDialogOpen(false);
+      setEditingEmployee(null);
+    },
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
+  const createEmployeeMutation = useMutation({
+    mutationFn: async (data: any) =>
+      modeApiRequest("POST", "/api/employees", {
+        ...data,
+        companyId: selectedCompany?.id,
+        employeeType: "Employee",
+      }),
+    onSuccess: () => {
+      toast({ title: "Employee created" });
+      queryClient.invalidateQueries({ queryKey: ["/api/employees", selectedCompany?.id] });
+      setCreateEmployeeDialogOpen(false);
+      createEmployeeForm.reset();
+    },
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
+  const createGroupMutation = useMutation({
+    mutationFn: async () =>
+      modeApiRequest("POST", "/api/employee-groups", {
+        name: newGroupName,
+        description: newGroupDescription,
+        companyId: selectedCompany?.id,
+      }),
+    onSuccess: () => {
+      toast({ title: "Group created" });
+      queryClient.invalidateQueries({ queryKey: ["/api/employee-groups", selectedCompany?.id] });
+      setCreateGroupDialogOpen(false);
+      setNewGroupName("");
+      setNewGroupDescription("");
+    },
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
+  const { data: groupMembers = [] } = useQuery<any[]>({
+    queryKey: ["/api/employee-groups", selectedGroupForMembers?.id, "members"],
+    queryFn: async () => {
+      if (!selectedGroupForMembers) return [];
+      const res = await fetch(`/api/employee-groups/${selectedGroupForMembers.id}/members`, {
+        credentials: "include",
+      });
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: !!selectedGroupForMembers,
+  });
+
+  const addWorkerToGroupMutation = useMutation({
+    mutationFn: async ({ groupId, employeeId }: { groupId: number; employeeId: number }) =>
+      modeApiRequest("POST", `/api/employee-groups/${groupId}/members/${employeeId}`, undefined),
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: ["/api/employee-groups", selectedGroupForMembers?.id, "members"],
+      });
+    },
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
+  const removeWorkerFromGroupMutation = useMutation({
+    mutationFn: async ({ groupId, employeeId }: { groupId: number; employeeId: number }) =>
+      modeApiRequest("DELETE", `/api/employee-groups/${groupId}/members/${employeeId}`, undefined),
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: ["/api/employee-groups", selectedGroupForMembers?.id, "members"],
+      });
+    },
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
 
   // Worker tab handlers
   const handleToggleWorker = (id: number) => {
@@ -1092,6 +1265,49 @@ export default function Payroll() {
         deleteWorkerConflict={deleteWorkerConflict}
         setDeleteWorkerConflict={setDeleteWorkerConflict}
         handleForceDeleteWorker={handleForceDeleteWorker}
+      />
+
+      <EditEmployeeDialog
+        open={editEmployeeDialogOpen}
+        onOpenChange={setEditEmployeeDialogOpen}
+        setEditingEmployee={setEditingEmployee}
+        editEmployeeForm={editEmployeeForm}
+        editEmployeeMutation={editEmployeeMutation}
+        employeeGroups={employeeGroups}
+        otherCompanies={otherCompanies}
+        selectedCompany={selectedCompany}
+        locations={locations}
+        allCompanyLocations={allCompanyLocations}
+        editBaleRates={editBaleRates}
+        setEditBaleRates={setEditBaleRates}
+        editBalePctRates={editBalePctRates}
+        setEditBalePctRates={setEditBalePctRates}
+        pctLocations={allCompanyLocations}
+      />
+
+      <EmployeeCrudDialogs
+        createEmployeeDialogOpen={createEmployeeDialogOpen}
+        setCreateEmployeeDialogOpen={setCreateEmployeeDialogOpen}
+        createEmployeeForm={createEmployeeForm}
+        createEmployeeMutation={createEmployeeMutation}
+        employeeGroups={employeeGroups}
+        deleteConflict={deleteConflict}
+        setDeleteConflict={setDeleteConflict}
+        handleForceDeleteEmployee={handleForceDeleteEmployee}
+        createGroupDialogOpen={createGroupDialogOpen}
+        setCreateGroupDialogOpen={setCreateGroupDialogOpen}
+        newGroupName={newGroupName}
+        setNewGroupName={setNewGroupName}
+        newGroupDescription={newGroupDescription}
+        setNewGroupDescription={setNewGroupDescription}
+        createGroupMutation={createGroupMutation}
+        groupMembersDialogOpen={groupMembersDialogOpen}
+        setGroupMembersDialogOpen={setGroupMembersDialogOpen}
+        selectedGroupForMembers={selectedGroupForMembers}
+        employeeStaff={employeeStaff as any}
+        groupMembers={groupMembers}
+        addWorkerToGroupMutation={addWorkerToGroupMutation}
+        removeWorkerFromGroupMutation={removeWorkerFromGroupMutation}
       />
       </div>
     </div>
