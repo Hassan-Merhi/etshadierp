@@ -4248,6 +4248,19 @@ END $$`,
     )`,
     `CREATE INDEX IF NOT EXISTS idx_insurance_members_company ON insurance_members (company_id)`,
     `ALTER TABLE insurance_members ADD COLUMN IF NOT EXISTS insurance_number text`,
+    // Sheets & Sacks inventory (July 2026)
+    `CREATE TABLE IF NOT EXISTS factory_sheets_sacks (
+      id         SERIAL PRIMARY KEY,
+      company_id INTEGER NOT NULL,
+      type       TEXT NOT NULL DEFAULT 'Sheet',
+      name       TEXT NOT NULL,
+      size       TEXT,
+      quantity   DECIMAL(15,3) NOT NULL DEFAULT 0,
+      unit_price DECIMAL(15,2) NOT NULL DEFAULT 0,
+      notes      TEXT,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )`,
+    `CREATE INDEX IF NOT EXISTS idx_factory_sheets_sacks_company ON factory_sheets_sacks (company_id)`,
   ];
 
   // /api/health/db — reports migration status but does NOT block deployment.

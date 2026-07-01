@@ -118,6 +118,7 @@ export const FACTORY_NAV_SECTIONS: FactoryNavSection[] = [
       { title: "Parties", url: "/factory/parties", icon: Users },
       { title: "Payroll", url: "/factory/payroll-hub", icon: HardHat },
       { title: "Insurance", url: "/factory/insurance", icon: Shield },
+      { title: "Sheets & Sacks", url: "/factory/sheets-sacks", icon: Layers },
       { title: "Vouchers", url: "/factory/vouchers", icon: FileText },
       { title: "Accounts", url: "/factory/accounts", icon: Landmark },
       { title: "Analytics", url: "/factory/analytics", icon: TrendingUp, adminOnly: true },

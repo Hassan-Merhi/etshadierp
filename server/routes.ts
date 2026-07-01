@@ -76,6 +76,7 @@ import { registerDispatchBatchRoutes } from "./routes/factory/factoryDispatchBat
 import { registerLabelBannersRoutes } from "./routes/factory/labelBannersRoutes";
 import { registerFactoryTransporterRoutes } from "./routes/factory/factoryTransporterRoutes";
 import { registerFactoryInsuranceRoutes } from "./routes/factory/factoryInsuranceRoutes";
+import { registerFactorySheetsAndSacksRoutes } from "./routes/factory/factorySheetsAndSacksRoutes";
 import { registerSpRoutes } from "./routes/spRoutes";
 import { registerSpMigrationRoutes } from "./routes/spMigrationRoutes";
 import { registerAiImportRoutes } from "./routes/aiImportRoutes";
@@ -1188,6 +1189,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   registerLabelBannersRoutes(app, requireAuth);
   registerFactoryTransporterRoutes(app);
   registerFactoryInsuranceRoutes(app);
+  registerFactorySheetsAndSacksRoutes(app);
 
   // Lightweight health check for offline ping detection
   app.get("/api/health", (_req, res) => {
