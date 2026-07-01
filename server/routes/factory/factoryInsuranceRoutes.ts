@@ -1,5 +1,5 @@
 import type { Express } from "express";
-import { db } from "../../db";
+import { db, pool } from "../../db";
 import { requireAuth } from "../../auth";
 import { eq, and, desc, sql, asc } from "drizzle-orm";
 import {
@@ -22,23 +22,31 @@ async function findOrCreateLedger(
   name: string,
   accountType: string
 ): Promise<{ id: number }> {
-  const [existing] = await db
-    .select({ id: ledgerAccounts.id })
-    .from(ledgerAccounts)
-    .where(and(eq(ledgerAccounts.companyId, companyId), eq(ledgerAccounts.name, name)));
-  if (existing) return existing;
+  // Check if it already exists
+  const existing = await pool.query(
+    `SELECT id FROM ledger_accounts WHERE company_id = $1 AND name = $2 AND deleted_at IS NULL LIMIT 1`,
+    [companyId, name]
+  );
+  if (existing.rows.length > 0) return { id: existing.rows[0].id };
 
-  const [maxCodeRow] = await db
-    .select({ maxCode: sql`MAX(CAST(code AS INTEGER))` })
-    .from(ledgerAccounts)
-    .where(and(eq(ledgerAccounts.companyId, companyId), sql`code ~ '^\\d+$'`));
-  const nextCode = String((parseInt((maxCodeRow as any)?.maxCode || "0") || 0) + 1);
+  // Generate the next available numeric code for this company
+  const maxRow = await pool.query(
+    `SELECT MAX(CAST(code AS INTEGER)) AS max_code
+     FROM ledger_accounts
+     WHERE company_id = $1 AND code ~ '^[0-9]+$'`,
+    [companyId]
+  );
+  const nextCode = String((parseInt(maxRow.rows[0]?.max_code || "0") || 0) + 1);
 
-  const [created] = await db
-    .insert(ledgerAccounts)
-    .values({ companyId, code: nextCode, name, accountType, active: true, isHidden: false })
-    .returning({ id: ledgerAccounts.id });
-  return created;
+  // Insert, falling back gracefully if there's a code collision
+  const inserted = await pool.query(
+    `INSERT INTO ledger_accounts (company_id, code, name, account_type, active, is_hidden)
+     VALUES ($1, $2, $3, $4, true, false)
+     ON CONFLICT (company_id, code) DO UPDATE SET name = EXCLUDED.name
+     RETURNING id`,
+    [companyId, nextCode, name, accountType]
+  );
+  return { id: inserted.rows[0].id };
 }
 
 export function registerFactoryInsuranceRoutes(app: Express) {
