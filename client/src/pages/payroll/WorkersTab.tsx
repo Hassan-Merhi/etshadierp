@@ -65,31 +65,55 @@ export function WorkersTab({
 }: WorkersTabProps) {
   const { formatAmount } = useCurrencyContext();
 
+  const allSelected = workerStaff.length > 0 && workerStaff.every((w) => workerPayments[w.id]?.selected);
+
+  const handleSelectAll = () => {
+    const shouldSelectAll = !allSelected;
+    setWorkerOverrides((prev: any) => {
+      const next = { ...prev };
+      workerStaff.forEach((w) => {
+        next[w.id] = { ...next[w.id], selected: shouldSelectAll };
+      });
+      return next;
+    });
+  };
+
   return (
     <div className="space-y-4 pt-2">
       {/* Top toolbar */}
       <div className="flex items-center justify-between flex-wrap gap-2">
         <div className="flex items-center gap-2">
-          <Button onClick={() => setNewWorkerDialogOpen(true)} data-testid="button-create-worker">
+          <Button size="sm" onClick={() => setNewWorkerDialogOpen(true)} data-testid="button-create-worker">
             <Plus className="h-4 w-4 mr-1" />
             New Worker
           </Button>
           <Button
+            size="sm"
             variant="outline"
             onClick={() => setCreateWorkerGroupDialogOpen(true)}
             data-testid="button-create-worker-group"
           >
-            <Plus className="h-4 w-4 mr-2" />
+            <Plus className="h-4 w-4 mr-1" />
             Create Group
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={handleSelectAll}
+            disabled={workerStaff.length === 0}
+            data-testid="button-select-all-workers"
+          >
+            {allSelected ? "Deselect All" : "Select All"}
           </Button>
         </div>
         <Button
+          size="sm"
           onClick={() => setBulkPaymentDialogOpen(true)}
           disabled={selectedPayments.length === 0}
           data-testid="button-bulk-payment"
         >
-          <Users className="h-4 w-4 mr-2" />
-          Pay Selected ({selectedPayments.length})
+          <Users className="h-4 w-4 mr-1" />
+          Pay ({selectedPayments.length})
         </Button>
       </div>
 
