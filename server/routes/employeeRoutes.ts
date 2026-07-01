@@ -2263,11 +2263,20 @@ export function registerEmployeeRoutes(app: Express) {
       }
 
       // ── 3. Bonus vouchers (BONUS-*) ───────────────────────────────────────────
-      // Old code: SALARY_EXPENSE used for bonuses (wrong account before Phase 5)
+      // Handles two cases:
+      //   A) Old code: SALARY_EXPENSE used for bonuses (pre-Phase 5)
+      //   B) Generic BONUS_EXPENSE used (Phase 5) but not yet split per group
       const freshAccs3 = await storage.getAllLedgerAccounts(companyId);
+      // IDs that need replacing: both the old SALARY_EXPENSE and the unsplit generic BONUS_EXPENSE
       const oldBonusIds = new Set(
         freshAccs3
-          .filter((a: any) => a.code === "SALARY_EXPENSE")
+          .filter((a: any) => a.code === "SALARY_EXPENSE" || a.code === "BONUS_EXPENSE")
+          .map((a: any) => a.id)
+      );
+      // IDs that are already per-group (BONUS_EXP_*) — vouchers with only these are already correct
+      const perGroupBonusIds = new Set(
+        freshAccs3
+          .filter((a: any) => a.code.startsWith("BONUS_EXP_"))
           .map((a: any) => a.id)
       );
 
@@ -2289,10 +2298,11 @@ export function registerEmployeeRoutes(app: Express) {
           [bv.id]
         );
 
-        const hasOldDebit = debitRes.rows.some((e: any) => oldBonusIds.has(e.ledger_account_id));
-        if (!hasOldDebit) { bonusesAlreadyCorrect++; continue; }
+        // Skip if all debit entries are already per-group accounts (nothing old/generic)
+        const hasOldOrGenericDebit = debitRes.rows.some((e: any) => oldBonusIds.has(e.ledger_account_id));
+        if (!hasOldOrGenericDebit) { bonusesAlreadyCorrect++; continue; }
 
-        // Group employees from credit entries
+        // Group employees from credit entries by their current group membership
         const byGroup = new Map<string, number>();
         for (const entry of creditRes.rows) {
           const empId = entry.employee_id ? parseInt(entry.employee_id) : null;
@@ -2300,14 +2310,26 @@ export function registerEmployeeRoutes(app: Express) {
           byGroup.set(grp, (byGroup.get(grp) || 0) + parseFloat(entry.credit_amount));
         }
 
-        // Delete old SALARY_EXPENSE debit entries
+        // If no named groups found in credits, fall back to the debit amount total
+        // so we at least move it to BONUS_EXPENSE (correct account, even if not split)
+        if (byGroup.size === 0) {
+          const totalDebit = debitRes.rows
+            .filter((e: any) => oldBonusIds.has(e.ledger_account_id))
+            .reduce((s: number, e: any) => s + parseFloat(e.debit_amount), 0);
+          if (totalDebit > 0) byGroup.set("__default__", totalDebit);
+        }
+
+        // Check if there are any named groups — if only __default__, still fix account code
+        const hasNamedGroups = [...byGroup.keys()].some((k) => k !== "__default__");
+
+        // Delete old/generic debit entries (SALARY_EXPENSE or unsplit BONUS_EXPENSE)
         for (const de of debitRes.rows) {
           if (oldBonusIds.has(de.ledger_account_id)) {
             await pool.query(`DELETE FROM voucher_entries WHERE id = $1`, [de.id]);
           }
         }
 
-        // Insert new BONUS_EXPENSE / BONUS_EXP_* debit entries
+        // Insert new per-group BONUS_EXP_* debit entries (or BONUS_EXPENSE if no groups)
         for (const [grp, grpTotal] of byGroup) {
           const isDefault = grp === "__default__";
           const code = isDefault ? "BONUS_EXPENSE" : `BONUS_EXP_${grp.toUpperCase().replace(/[^A-Z0-9]/g, "_").substring(0, 25)}`;
