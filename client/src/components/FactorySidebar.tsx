@@ -44,6 +44,7 @@ import {
   CreditCard,
   QrCode,
   Shield,
+  Layers,
 } from "lucide-react";
 import { Sidebar, SidebarContent } from "@/components/ui/sidebar";
 import { useQuery } from "@tanstack/react-query";
