@@ -314,6 +314,20 @@ export default function Payroll() {
   const deductionForm = useForm<any>();
   const newWorkerForm = useForm<any>();
   const editWorkerForm = useForm<any>();
+
+  // Pre-populate edit worker form when a worker is selected for editing
+  useEffect(() => {
+    if (selectedWorkerForEdit) {
+      editWorkerForm.reset({
+        firstName: selectedWorkerForEdit.firstName ?? "",
+        lastName: selectedWorkerForEdit.lastName ?? "",
+        code: selectedWorkerForEdit.code ?? "",
+        monthlySalary: selectedWorkerForEdit.monthlySalary ?? "",
+        department: selectedWorkerForEdit.department ?? "",
+        active: selectedWorkerForEdit.active ?? true,
+      });
+    }
+  }, [selectedWorkerForEdit]);
   const createEmployeeForm = useForm<any>();
   const editEmployeeForm = useForm<any>();
 
@@ -1000,6 +1014,14 @@ export default function Payroll() {
     },
   });
 
+  const removeWorkerFromWorkerGroupMutation = useMutation({
+    mutationFn: async ({ groupId, workerId }: { groupId: number; workerId: number }) =>
+      modeApiRequest("DELETE", `/api/worker-groups/${groupId}/members/${workerId}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/worker-groups/with-members", selectedCompany?.id] });
+    },
+  });
+
   const workerDeductionMutation = useMutation({
     mutationFn: async () => {
       if (!workerDeductionTarget) throw new Error("No worker selected");
@@ -1265,6 +1287,12 @@ export default function Payroll() {
         deleteWorkerConflict={deleteWorkerConflict}
         setDeleteWorkerConflict={setDeleteWorkerConflict}
         handleForceDeleteWorker={handleForceDeleteWorker}
+        workerGroupMembersDialogOpen={workerGroupMembersDialogOpen}
+        setWorkerGroupMembersDialogOpen={setWorkerGroupMembersDialogOpen}
+        selectedWorkerGroupForMembers={selectedWorkerGroupForMembers}
+        allWorkers={workerStaff}
+        addWorkerToWorkerGroupMutation={addWorkerToWorkerGroupMutation}
+        removeWorkerFromWorkerGroupMutation={removeWorkerFromWorkerGroupMutation}
       />
 
       <EditEmployeeDialog

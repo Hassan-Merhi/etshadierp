@@ -9,11 +9,13 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
+import type { Employee } from "@shared/schema";
 
 interface WorkerDialogsProps {
   newWorkerDialogOpen: boolean;
@@ -28,6 +30,12 @@ interface WorkerDialogsProps {
   deleteWorkerConflict: any;
   setDeleteWorkerConflict: (v: any) => void;
   handleForceDeleteWorker: () => void;
+  workerGroupMembersDialogOpen: boolean;
+  setWorkerGroupMembersDialogOpen: (open: boolean) => void;
+  selectedWorkerGroupForMembers: any;
+  allWorkers: Employee[];
+  addWorkerToWorkerGroupMutation: any;
+  removeWorkerFromWorkerGroupMutation: any;
 }
 
 export function WorkerDialogs({
@@ -43,6 +51,12 @@ export function WorkerDialogs({
   deleteWorkerConflict,
   setDeleteWorkerConflict,
   handleForceDeleteWorker,
+  workerGroupMembersDialogOpen,
+  setWorkerGroupMembersDialogOpen,
+  selectedWorkerGroupForMembers,
+  allWorkers,
+  addWorkerToWorkerGroupMutation,
+  removeWorkerFromWorkerGroupMutation,
 }: WorkerDialogsProps) {
   const { formatAmount } = useCurrencyContext();
 
@@ -297,6 +311,72 @@ export function WorkerDialogs({
               </div>
             </form>
           </Form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Manage Group Members Dialog */}
+      <Dialog open={workerGroupMembersDialogOpen} onOpenChange={setWorkerGroupMembersDialogOpen}>
+        <DialogContent className="max-w-lg" data-testid="dialog-worker-group-members">
+          <DialogHeader>
+            <DialogTitle>Manage Group: {selectedWorkerGroupForMembers?.name}</DialogTitle>
+            <DialogDescription>
+              Toggle workers in or out of this group.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="max-h-80 overflow-auto border rounded-md">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-12">In Group</TableHead>
+                  <TableHead>Name</TableHead>
+                  <TableHead>Department</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {allWorkers.map((worker) => {
+                  const isMember = selectedWorkerGroupForMembers?.members?.some((m: any) => m.id === worker.id);
+                  return (
+                    <TableRow key={worker.id}>
+                      <TableCell>
+                        <Checkbox
+                          checked={!!isMember}
+                          onCheckedChange={(checked) => {
+                            if (!selectedWorkerGroupForMembers) return;
+                            if (checked) {
+                              addWorkerToWorkerGroupMutation.mutate({
+                                groupId: selectedWorkerGroupForMembers.id,
+                                workerId: worker.id,
+                              });
+                            } else {
+                              removeWorkerFromWorkerGroupMutation.mutate({
+                                groupId: selectedWorkerGroupForMembers.id,
+                                workerId: worker.id,
+                              });
+                            }
+                          }}
+                          data-testid={`checkbox-group-member-${worker.id}`}
+                        />
+                      </TableCell>
+                      <TableCell>{[worker.firstName, worker.lastName].filter(Boolean).join(" ")}</TableCell>
+                      <TableCell className="text-muted-foreground">{worker.department || "—"}</TableCell>
+                    </TableRow>
+                  );
+                })}
+                {allWorkers.length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={3} className="text-center text-muted-foreground py-6">
+                      No workers found
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </div>
+          <div className="flex justify-end pt-2">
+            <Button onClick={() => setWorkerGroupMembersDialogOpen(false)} data-testid="button-close-group-members">
+              Done
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
 

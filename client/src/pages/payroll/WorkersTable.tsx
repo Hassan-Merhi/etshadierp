@@ -97,26 +97,14 @@ export function WorkersTable({
                     >
                       {[worker.firstName, worker.lastName].filter(Boolean).join(" ")}
                     </button>
-                    {worker.code && (
-                      <p className="text-xs text-muted-foreground font-mono">{worker.code}</p>
-                    )}
                   </div>
                 </div>
 
                 {/* Stats grid */}
-                <div className="grid grid-cols-3 sm:grid-cols-5 flex-1 min-w-0 gap-2">
+                <div className="grid grid-cols-2 sm:grid-cols-4 flex-1 min-w-0 gap-2">
                   <div>
                     <p className="text-xs text-muted-foreground">Salary</p>
                     <p className="font-mono text-sm font-medium">{formatAmount(monthlySalary)}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-muted-foreground">Balance</p>
-                    <p className={cn(
-                      "font-mono text-sm font-bold",
-                      balance >= 0 ? "text-green-500 dark:text-green-400" : "text-destructive"
-                    )}>
-                      {formatAmount(balance)}
-                    </p>
                   </div>
                   <div>
                     <p className="text-xs text-muted-foreground">Advances</p>
