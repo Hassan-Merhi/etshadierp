@@ -703,7 +703,16 @@ export default function Payroll() {
 
       setBulkBonusAmounts(amounts as any);
       setBulkBonusBreakdowns(breakdowns);
-      toast({ title: "Done", description: "Bonuses calculated from saved rates" });
+      const calculatedCount = Object.values(amounts).filter((v) => parseFloat(v) > 0).length;
+      if (calculatedCount === 0) {
+        toast({
+          title: "Nothing calculated",
+          description: "No employees have bonus rates configured. Set bale or sales % rates on each employee first.",
+          variant: "destructive",
+        });
+      } else {
+        toast({ title: "Done", description: `Bonuses calculated for ${calculatedCount} employee${calculatedCount !== 1 ? "s" : ""}` });
+      }
     } catch (e: any) {
       toast({ title: "Error", description: e.message, variant: "destructive" });
     } finally {
