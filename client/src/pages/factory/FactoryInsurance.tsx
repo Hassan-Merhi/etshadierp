@@ -16,7 +16,7 @@ import {
   ExternalLink,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { queryClient } from "@/lib/queryClient";
+import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -97,23 +97,9 @@ function MemberFormDialog({
   const saveMutation = useMutation({
     mutationFn: async (data: any) => {
       if (existing) {
-        const res = await fetch(`/api/insurance/members/${existing.id}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          credentials: "include",
-          body: JSON.stringify({ ...data, companyId }),
-        });
-        if (!res.ok) throw new Error((await res.json()).message || "Failed");
-        return res.json();
+        return apiRequest("PATCH", `/api/insurance/members/${existing.id}`, { ...data, companyId });
       } else {
-        const res = await fetch("/api/insurance/members", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          credentials: "include",
-          body: JSON.stringify(data),
-        });
-        if (!res.ok) throw new Error((await res.json()).message || "Failed");
-        return res.json();
+        return apiRequest("POST", "/api/insurance/members", data);
       }
     },
     onSuccess: () => {
@@ -416,14 +402,7 @@ export default function FactoryInsurance() {
 
   const toggleMutation = useMutation({
     mutationFn: async (member: InsuranceMember) => {
-      const res = await fetch(`/api/insurance/members/${member.id}/toggle`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ companyId: member.companyId }),
-      });
-      if (!res.ok) throw new Error((await res.json()).message || "Failed");
-      return res.json();
+      return apiRequest("PATCH", `/api/insurance/members/${member.id}/toggle`, { companyId: member.companyId });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/insurance/members"] });
@@ -436,15 +415,11 @@ export default function FactoryInsurance() {
 
   const generateMutation = useMutation({
     mutationFn: async () => {
-      const res = await fetch("/api/insurance/generate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ companyId: selectedCompanyId, month: genMonth, year: genYear }),
+      return apiRequest("POST", "/api/insurance/generate", {
+        companyId: selectedCompanyId,
+        month: genMonth,
+        year: genYear,
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.message || "Failed");
-      return data;
     },
     onSuccess: (data) => {
       setShowGenDialog(false);
