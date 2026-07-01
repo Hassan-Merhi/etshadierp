@@ -964,7 +964,7 @@ export function registerEmployeeRoutes(app: Express) {
             companyId: req.session.currentCompanyId!,
             code: bonusCode,
             name: bonusName,
-            accountType: "Expense",
+            accountType: "Indirect Expense",
             openingBalance: "0",
             active: true,
           });
@@ -1427,7 +1427,7 @@ export function registerEmployeeRoutes(app: Express) {
           companyId: req.session.currentCompanyId!,
           code: bonusSingleCode,
           name: bonusSingleName,
-          accountType: "Expense",
+          accountType: "Indirect Expense",
           openingBalance: "0",
           active: true,
         });
@@ -2237,11 +2237,12 @@ export function registerEmployeeRoutes(app: Express) {
         const accs = await storage.getAllLedgerAccounts(companyId);
         let acc = accs.find((a: any) => a.code === code);
         if (!acc) {
+          const isBonus = code === "BONUS_EXPENSE" || code.startsWith("BONUS_EXP_");
           acc = await storage.createLedgerAccount({
             companyId,
             code,
             name,
-            accountType: "Expense",
+            accountType: isBonus ? "Indirect Expense" : "Expense",
             openingBalance: "0",
             active: true,
           });

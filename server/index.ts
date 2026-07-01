@@ -4979,6 +4979,22 @@ END $mig$`;
         console.error("[StockAdjFix] Error:", e.message);
       }
 
+      // ── Fix bonus expense accounts: update accountType → "Indirect Expense" ──
+      try {
+        const bonusFix = await migrationClient.query(`
+          UPDATE ledger_accounts
+          SET account_type = 'Indirect Expense'
+          WHERE (code = 'BONUS_EXPENSE' OR code LIKE 'BONUS_EXP_%')
+            AND account_type != 'Indirect Expense'
+          RETURNING id
+        `);
+        if (bonusFix.rowCount && bonusFix.rowCount > 0) {
+          console.log(`[BonusExpFix] Updated ${bonusFix.rowCount} bonus expense account(s) → Indirect Expense`);
+        }
+      } catch (e: any) {
+        console.error("[BonusExpFix] Error:", e.message);
+      }
+
       // ── Auto-fix credit note variance entries posted to wrong account ────────
       // Voucher entries narrated "Variance between refund and inventory cost"
       // used to fall back to a random Indirect Expense account when no
