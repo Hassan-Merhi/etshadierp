@@ -997,8 +997,7 @@ export default function Analytics() {
       return;
     }
     const basePath = appMode === "factory" ? "/factory" : "";
-    const typeParam = accountType ? `&accountType=${encodeURIComponent(accountType.toLowerCase())}` : "";
-    window.open(`${basePath}/accounts?accountId=${accountId}${typeParam}`, "_blank");
+    window.open(`${basePath}/ledger-monthly/${accountId}`, "_blank");
   };
 
   // Render hierarchical accounts (filters out zero-balance accounts)

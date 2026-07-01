@@ -74,6 +74,5 @@ export const goToStatement = (accountId: number, appMode: string, customerId?: n
     return;
   }
   const basePath = appMode === "factory" ? "/factory" : "";
-  const typeParam = accountType ? `&accountType=${encodeURIComponent(accountType.toLowerCase())}` : "";
-  window.open(`${basePath}/accounts?accountId=${accountId}${typeParam}`, "_blank");
+  window.open(`${basePath}/ledger-monthly/${accountId}`, "_blank");
 };
