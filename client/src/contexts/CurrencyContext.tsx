@@ -135,7 +135,7 @@ export function CurrencyProvider({ children }: { children: ReactNode }) {
     if (amount === null || amount === undefined) return "";
     const numAmount = typeof amount === "string" ? parseFloat(amount) : amount;
     if (isNaN(numAmount)) return "";
-    if (selectedCurrency === "CFA") {
+    if (selectedCurrency === "CFA" && isMultiCurrency) {
       return `CFA ${Math.round(numAmount).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
     }
     const isWhole = Math.abs(numAmount) % 1 === 0;
