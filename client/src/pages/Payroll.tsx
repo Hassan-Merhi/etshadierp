@@ -703,24 +703,58 @@ export default function Payroll() {
       const amounts: Record<number, string> = { ...bulkBonusAmounts };
       const breakdowns: Record<number, string[]> = { ...bulkBonusBreakdowns };
 
+      // Cache sales-summary fetches to avoid duplicate requests for same location+date range
+      const salesCache = new Map<string, any>();
+      const fetchSales = async (locationId: number, sourceCompanyId?: number | null) => {
+        const key = `${locationId}|${sourceCompanyId ?? ""}|${range.start}|${range.end}`;
+        if (salesCache.has(key)) return salesCache.get(key);
+        const srcParam = sourceCompanyId ? `&sourceCompanyId=${sourceCompanyId}` : "";
+        const res = await fetch(
+          `/api/payroll/sales-summary?locationId=${locationId}&startDate=${range.start}&endDate=${range.end}${srcParam}`,
+          { credentials: "include" }
+        );
+        const data = res.ok ? await res.json() : null;
+        salesCache.set(key, data);
+        return data;
+      };
+
       await Promise.all(
         employeeStaff.map(async (emp) => {
           const lines: string[] = [];
           let total = 0;
 
-          // Bales bonus
-          if (emp.balesBonusRate != null && parseFloat(emp.balesBonusRate) > 0) {
+          // ── Per-location bale rates (new table: /api/employees/:id/bale-rates) ──
+          try {
+            const ratesRes = await fetch(`/api/employees/${emp.id}/bale-rates`, { credentials: "include" });
+            if (ratesRes.ok) {
+              const perLocRates: Array<{ locationId: number; rate: string; sourceCompanyId?: number | null }> = await ratesRes.json();
+              for (const entry of perLocRates) {
+                const rate = parseFloat(entry.rate);
+                if (!rate || rate <= 0 || !entry.locationId) continue;
+                try {
+                  const data = await fetchSales(entry.locationId, entry.sourceCompanyId);
+                  if (data) {
+                    const qty = parseFloat(data.totalQuantity || "0");
+                    if (qty > 0) {
+                      const sub = qty * rate;
+                      total += sub;
+                      lines.push(`${qty} bales × $${rate} (${data.locationName}) = $${sub.toFixed(2)}`);
+                    }
+                  }
+                } catch {}
+              }
+            }
+          } catch {}
+
+          // ── Legacy single bale rate field (emp.balesBonusRate) ──
+          // Only use if no per-location rates were configured above
+          if (lines.length === 0 && emp.balesBonusRate != null && parseFloat(emp.balesBonusRate) > 0) {
             const locId = emp.salesBonusPctLocationId;
             const sourceCompId = emp.salesBonusPctSourceCompanyId;
             if (locId) {
               try {
-                const srcParam = sourceCompId ? `&sourceCompanyId=${sourceCompId}` : "";
-                const res = await fetch(
-                  `/api/payroll/sales-summary?locationId=${locId}&startDate=${range.start}&endDate=${range.end}${srcParam}`,
-                  { credentials: "include" }
-                );
-                if (res.ok) {
-                  const data = await res.json();
+                const data = await fetchSales(locId, sourceCompId);
+                if (data) {
                   const qty = parseFloat(data.totalQuantity || "0");
                   const rate = parseFloat(emp.balesBonusRate);
                   if (qty > 0) {
@@ -733,15 +767,11 @@ export default function Payroll() {
             }
           }
 
-          // Sales % bonus
+          // ── Sales % bonus (emp.salesBonusPct) ──
           if (bulkBonusAutoPctLocationId && emp.salesBonusPct != null && parseFloat(emp.salesBonusPct) > 0) {
             try {
-              const res = await fetch(
-                `/api/payroll/sales-summary?locationId=${bulkBonusAutoPctLocationId}&startDate=${range.start}&endDate=${range.end}`,
-                { credentials: "include" }
-              );
-              if (res.ok) {
-                const data = await res.json();
+              const data = await fetchSales(parseInt(bulkBonusAutoPctLocationId), null);
+              if (data) {
                 const sales = parseFloat(data.totalSalesAmount || "0");
                 const pct = parseFloat(emp.salesBonusPct);
                 if (sales > 0) {
