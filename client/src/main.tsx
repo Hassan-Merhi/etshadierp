@@ -86,6 +86,13 @@ if ("serviceWorker" in navigator) {
       });
     }
   });
+
+  // On every app startup, trigger an update check on any existing SW registration.
+  // This ensures users pick up the new SW (and fresh cache) as fast as possible
+  // after a production deployment — without waiting for the next manual offline-prep run.
+  navigator.serviceWorker.getRegistration("/").then((reg) => {
+    if (reg) reg.update().catch(() => {});
+  }).catch(() => {});
 }
 
 createRoot(document.getElementById("root")!).render(<App />);

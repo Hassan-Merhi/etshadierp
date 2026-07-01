@@ -282,7 +282,7 @@ async function ensureServiceWorker(): Promise<void> {
   if (!("serviceWorker" in navigator)) return;
   const reg = await navigator.serviceWorker.getRegistration("/");
   if (!reg) {
-    await navigator.serviceWorker.register("/sw.js");
+    await navigator.serviceWorker.register("/sw.js", { updateViaCache: "none" });
     // Give SW time to install
     await new Promise((r) => setTimeout(r, 1000));
   }
