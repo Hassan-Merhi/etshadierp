@@ -1,4 +1,4 @@
-const CACHE_VERSION = "erp-v6";
+const CACHE_VERSION = "erp-v7";
 const APP_SHELL = ["/", "/manifest.json"];
 
 // ── Install: cache app shell ──────────────────────────────────────────────────
