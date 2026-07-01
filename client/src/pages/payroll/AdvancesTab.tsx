@@ -58,6 +58,7 @@ export function AdvancesTab({ cashAccounts = [] }: AdvancesTabProps) {
   const [showPaid, setShowPaid] = useState(false);
   const [workerFilter, setWorkerFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [addWorkerDeductionDialogOpen, setAddWorkerDeductionDialogOpen] = useState(false);
 
   const { data: workerStaff = [] } = useQuery<Employee[]>({
     queryKey: ["/api/payroll/employees-with-balances", selectedCompany?.id],
@@ -103,6 +104,15 @@ export function AdvancesTab({ cashAccounts = [] }: AdvancesTabProps) {
     defaultValues: {
       deductionAmount: "",
       payrollMonth: format(new Date(), "yyyy-MM"),
+    },
+  });
+
+  const addWorkerDeductionForm = useForm<any>({
+    defaultValues: {
+      workerId: "",
+      amount: "",
+      reason: "",
+      deductionDate: new Date().toLocaleDateString("en-CA"),
     },
   });
 
@@ -154,6 +164,45 @@ export function AdvancesTab({ cashAccounts = [] }: AdvancesTabProps) {
       setDeductionDialogOpen(false);
       deductionForm.reset();
       setSelectedAdvance(null);
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const addWorkerDeductionMutation = useMutation({
+    mutationFn: async (data: any) => {
+      return await modeApiRequest("POST", `/api/factory/workers/${data.workerId}/deductions`, {
+        amount: data.amount,
+        reason: data.reason || null,
+        deductionDate: data.deductionDate,
+      });
+    },
+    onSuccess: () => {
+      toast({ title: "Deduction added", description: "Worker deduction recorded successfully." });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/worker-deductions", selectedCompany?.id] });
+      queryClient.invalidateQueries({ queryKey: ["/api/payroll/employees-with-balances", selectedCompany?.id] });
+      setAddWorkerDeductionDialogOpen(false);
+      addWorkerDeductionForm.reset({
+        workerId: "",
+        amount: "",
+        reason: "",
+        deductionDate: new Date().toLocaleDateString("en-CA"),
+      });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const deleteWorkerDeductionMutation = useMutation({
+    mutationFn: async ({ workerId, deductionId }: { workerId: number; deductionId: number }) => {
+      return await modeApiRequest("DELETE", `/api/factory/workers/${workerId}/deductions/${deductionId}`, undefined);
+    },
+    onSuccess: () => {
+      toast({ title: "Deleted", description: "Worker deduction deleted." });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/worker-deductions", selectedCompany?.id] });
+      queryClient.invalidateQueries({ queryKey: ["/api/payroll/employees-with-balances", selectedCompany?.id] });
     },
     onError: (error: Error) => {
       toast({ title: "Error", description: error.message, variant: "destructive" });
@@ -452,7 +501,13 @@ export function AdvancesTab({ cashAccounts = [] }: AdvancesTabProps) {
         </TabsContent>
 
         {/* ── Worker Deductions sub-tab ── */}
-        <TabsContent value="worker-deductions" className="pt-4">
+        <TabsContent value="worker-deductions" className="pt-4 space-y-4">
+          <div className="flex justify-end">
+            <Button onClick={() => setAddWorkerDeductionDialogOpen(true)} data-testid="button-add-worker-deduction">
+              <Plus className="mr-2 h-4 w-4" />
+              Add Deduction
+            </Button>
+          </div>
           {deductionsLoading ? (
             <div className="flex items-center justify-center p-12">
               <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
@@ -467,12 +522,13 @@ export function AdvancesTab({ cashAccounts = [] }: AdvancesTabProps) {
                     <TableHead>Reason</TableHead>
                     <TableHead className="text-right">Amount</TableHead>
                     <TableHead>Status</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {workerDeductions.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                      <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
                         No worker deductions recorded
                       </TableCell>
                     </TableRow>
@@ -497,6 +553,22 @@ export function AdvancesTab({ cashAccounts = [] }: AdvancesTabProps) {
                           ) : (
                             <Badge variant="outline" className="border-amber-500 text-amber-500">Pending</Badge>
                           )}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="text-destructive"
+                            disabled={deleteWorkerDeductionMutation.isPending}
+                            onClick={() => {
+                              if (confirm(`Delete this deduction of ${formatAmount(parseFloat(d.amount || "0"))} for ${d.workerName || "this worker"}?`)) {
+                                deleteWorkerDeductionMutation.mutate({ workerId: d.workerId, deductionId: d.id });
+                              }
+                            }}
+                            data-testid={`button-delete-deduction-${d.id}`}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
                         </TableCell>
                       </TableRow>
                     ))
@@ -645,6 +717,105 @@ export function AdvancesTab({ cashAccounts = [] }: AdvancesTabProps) {
                 {advanceMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 Save Advance
               </Button>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Add Worker Deduction Dialog ── */}
+      <Dialog open={addWorkerDeductionDialogOpen} onOpenChange={setAddWorkerDeductionDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Add Worker Deduction</DialogTitle>
+            <DialogDescription>Record a deduction from a worker's salary.</DialogDescription>
+          </DialogHeader>
+          <Form {...addWorkerDeductionForm}>
+            <form
+              noValidate
+              onSubmit={addWorkerDeductionForm.handleSubmit((data: any) => addWorkerDeductionMutation.mutate(data))}
+              className="space-y-4"
+            >
+              <FormField
+                control={addWorkerDeductionForm.control}
+                name="workerId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Worker</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger data-testid="select-deduction-worker">
+                          <SelectValue placeholder="Select worker" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {workerStaff.map((w) => (
+                          <SelectItem key={w.id} value={String(w.id)}>
+                            {w.firstName} {w.lastName}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={addWorkerDeductionForm.control}
+                name="amount"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Amount</FormLabel>
+                    <FormControl>
+                      <Input type="number" step="0.01" min="0.01" placeholder="0.00" {...field} data-testid="input-deduction-amount" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={addWorkerDeductionForm.control}
+                name="deductionDate"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Date</FormLabel>
+                    <FormControl>
+                      <Input type="date" {...field} data-testid="input-deduction-date" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={addWorkerDeductionForm.control}
+                name="reason"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Reason (Optional)</FormLabel>
+                    <FormControl>
+                      <Textarea placeholder="e.g. Damage, absence, etc." {...field} data-testid="textarea-deduction-reason" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <div className="flex justify-end gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setAddWorkerDeductionDialogOpen(false)}
+                  data-testid="button-cancel-deduction"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={addWorkerDeductionMutation.isPending}
+                  data-testid="button-save-deduction"
+                >
+                  {addWorkerDeductionMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  Save Deduction
+                </Button>
+              </div>
             </form>
           </Form>
         </DialogContent>
