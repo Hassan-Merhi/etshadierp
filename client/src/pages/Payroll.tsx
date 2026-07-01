@@ -290,6 +290,11 @@ export default function Payroll() {
     [selectedPayments, workerPayments]
   );
 
+  const selectedPaymentsSummary = useMemo(
+    () => selectedPayments.map((w) => ({ workerId: w.id, amount: workerPayments[w.id]?.amount || "0" })),
+    [selectedPayments, workerPayments]
+  );
+
   const filteredEmployeeStaff = useMemo(() => {
     return employeeStaff.filter((emp) => {
       const matchesSearch =
@@ -603,6 +608,30 @@ export default function Payroll() {
       setBulkBonusBreakdowns({});
       setPendingBonuses({});
       setBulkBonusStep("edit");
+    },
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
+  const bulkPaymentMutation = useMutation({
+    mutationFn: async (data: BulkPaymentFormData) => {
+      const payments = selectedPayments.map((w) => ({
+        workerId: w.id,
+        amount: workerPayments[w.id]?.amount || "0",
+      }));
+      return modeApiRequest("POST", "/api/payroll/bulk-pay-workers", {
+        payments,
+        paymentAccountType: data.paymentAccountType,
+        paymentAccountId: data.paymentAccountId,
+        date: data.date,
+        notes: data.notes || "",
+      });
+    },
+    onSuccess: () => {
+      toast({ title: "Success", description: `Paid ${selectedPayments.length} workers` });
+      queryClient.invalidateQueries({ queryKey: ["/api/employees", selectedCompany?.id] });
+      setBulkPaymentDialogOpen(false);
+      bulkPaymentForm.reset();
+      setWorkerOverrides({});
     },
     onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
@@ -1026,6 +1055,19 @@ export default function Payroll() {
         date={workerDeductionDate}
         setDate={setWorkerDeductionDate}
         mutation={workerDeductionMutation}
+      />
+
+      <BulkPaymentDialog
+        open={bulkPaymentDialogOpen}
+        onOpenChange={setBulkPaymentDialogOpen}
+        selectedPayments={selectedPaymentsSummary}
+        totalAmount={totalAmount}
+        workerStaff={workerStaff}
+        form={bulkPaymentForm}
+        mutation={bulkPaymentMutation}
+        cashAccounts={cashAccounts}
+        bankAccounts={bankAccounts}
+        bankAccountsLoading={bankAccountsLoading}
       />
 
       <WorkerDialogs
