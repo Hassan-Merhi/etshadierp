@@ -1523,7 +1523,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Invalid salary advance ID" });
       }
 
-      const parsed = insertSalaryAdvanceDeductionSchema.parse(req.body);
+      const parsed = insertSalaryAdvanceDeductionSchema.omit({ salaryAdvanceId: true }).parse(req.body);
 
       // Verify salary advance exists and belongs to current company
       const advance = await storage.getSalaryAdvanceById(advanceId);
