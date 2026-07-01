@@ -1301,7 +1301,7 @@ export function registerEmployeeRoutes(app: Express) {
         const lines: string[] = [];
         let total = 0;
 
-        // Per-location bale rates (employee_bale_rates table)
+        // Per-location bale rates (employee_bale_rates table) — flat $/bale
         const baleRates = await storage.getEmployeeBaleRates(emp.id, companyId);
         for (const entry of baleRates) {
           const rate = parseFloat(entry.rate as string);
@@ -1318,8 +1318,25 @@ export function registerEmployeeRoutes(app: Express) {
           } catch {}
         }
 
+        // Per-location sales % rates (employee_bale_pct_rates table) — % of sales amount
+        const balePctRates = await storage.getEmployeeBalePctRates(emp.id, companyId);
+        for (const entry of balePctRates) {
+          const pct = parseFloat(entry.pct as string);
+          if (!pct || pct <= 0 || !entry.locationId) continue;
+          try {
+            const srcId = (entry.sourceCompanyId as number | null) ?? companyId;
+            const data = await querySales(entry.locationId as number, srcId);
+            const sales = parseFloat(data.totalSalesAmount);
+            if (sales > 0) {
+              const sub = (sales * pct) / 100;
+              total += sub;
+              lines.push(`$${sales.toFixed(2)} sales × ${pct}% (${data.locationName}) = $${sub.toFixed(2)}`);
+            }
+          } catch {}
+        }
+
         // Legacy single bale rate field — only if no per-location rates
-        if (lines.length === 0 && emp.balesBonusRate != null && parseFloat(emp.balesBonusRate as string) > 0) {
+        if (baleRates.length === 0 && emp.balesBonusRate != null && parseFloat(emp.balesBonusRate as string) > 0) {
           const locId = emp.salesBonusPctLocationId as number | null;
           const srcId = (emp.salesBonusPctSourceCompanyId as number | null) ?? companyId;
           if (locId) {
@@ -1336,7 +1353,7 @@ export function registerEmployeeRoutes(app: Express) {
           }
         }
 
-        // Sales % bonus
+        // Legacy single-location sales % bonus (emp.salesBonusPct + pctLocationId from UI dropdown)
         if (pctSales && emp.salesBonusPct != null && parseFloat(emp.salesBonusPct as string) > 0) {
           const sales = parseFloat(pctSales.totalSalesAmount);
           const pct = parseFloat(emp.salesBonusPct as string);
