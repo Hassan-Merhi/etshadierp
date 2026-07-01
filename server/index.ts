@@ -4382,6 +4382,9 @@ END $$`,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )`,
     `CREATE INDEX IF NOT EXISTS idx_factory_sheets_sacks_company ON factory_sheets_sacks (company_id)`,
+    `ALTER TABLE factory_sheets_sacks ADD COLUMN IF NOT EXISTS pack_qty INTEGER`,
+    `ALTER TABLE factory_sheets_sacks ADD COLUMN IF NOT EXISTS pcs_per_pack INTEGER`,
+    `ALTER TABLE factory_sheets_sacks ADD COLUMN IF NOT EXISTS row_color TEXT`,
   ];
 
   // /api/health/db — reports migration status but does NOT block deployment.

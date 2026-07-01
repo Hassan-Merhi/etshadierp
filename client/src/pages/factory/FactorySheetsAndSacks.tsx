@@ -13,10 +13,24 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { PageHeader } from "@/components/PageHeader";
-import { Layers, Plus, Pencil, Trash2, Search, Loader2, Package, ShoppingBag } from "lucide-react";
+import { Layers, Plus, Pencil, Trash2, Search, Loader2, Package, ShoppingBag, Check } from "lucide-react";
 
 const TYPES = ["Sheet", "Sack", "Other"] as const;
-type ItemType = (typeof TYPES)[number];
+
+// Preset color palette matching typical packaging material colors
+const COLOR_PRESETS = [
+  { label: "None", value: "" },
+  { label: "Purple", value: "#9b59b6" },
+  { label: "Green", value: "#27ae60" },
+  { label: "Yellow", value: "#f1c40f" },
+  { label: "Orange", value: "#e67e22" },
+  { label: "Red", value: "#e74c3c" },
+  { label: "Blue", value: "#2980b9" },
+  { label: "White", value: "#dde3ea" },
+  { label: "Black", value: "#2c3e50" },
+  { label: "Olive", value: "#6d7d3b" },
+  { label: "Teal", value: "#16a085" },
+] as const;
 
 interface SheetsAndSacksItem {
   id: number;
@@ -26,6 +40,9 @@ interface SheetsAndSacksItem {
   size: string | null;
   quantity: string;
   unitPrice: string;
+  packQty: number | null;
+  pcsPerPack: number | null;
+  rowColor: string | null;
   notes: string | null;
   createdAt: string;
 }
@@ -33,11 +50,76 @@ interface SheetsAndSacksItem {
 function fmt(n: string | number) {
   return parseFloat(String(n) || "0").toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
-function fmtQty(n: string | number) {
-  return parseFloat(String(n) || "0").toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 3 });
+function fmtInt(n: string | number | null | undefined) {
+  if (n == null || n === "") return "—";
+  const v = parseInt(String(n));
+  return isNaN(v) ? "—" : v.toLocaleString("en-US");
 }
 
-// ─── Item Form Dialog ─────────────────────────────────────────────────────────
+// ─── Color Picker ──────────────────────────────────────────────────────────────
+function ColorPicker({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  return (
+    <div className="space-y-2">
+      <div className="flex flex-wrap gap-2">
+        {COLOR_PRESETS.map((c) => (
+          <button
+            key={c.value}
+            type="button"
+            title={c.label}
+            onClick={() => onChange(c.value)}
+            className="relative rounded-full border-2 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            style={{
+              width: 28,
+              height: 28,
+              backgroundColor: c.value || "transparent",
+              borderColor: value === c.value ? "#000" : c.value ? c.value : "#cbd5e1",
+              boxShadow: value === c.value ? "0 0 0 2px rgba(0,0,0,0.25)" : undefined,
+            }}
+            data-testid={`color-preset-${c.label.toLowerCase()}`}
+          >
+            {!c.value && (
+              <span className="absolute inset-0 flex items-center justify-center text-muted-foreground text-xs font-medium">✕</span>
+            )}
+            {value === c.value && c.value && (
+              <span className="absolute inset-0 flex items-center justify-center">
+                <Check className="h-3 w-3" style={{ color: isLight(c.value) ? "#000" : "#fff" }} />
+              </span>
+            )}
+          </button>
+        ))}
+        {/* Custom color input */}
+        <div className="relative flex items-center" title="Custom color">
+          <input
+            type="color"
+            value={value && !COLOR_PRESETS.some((c) => c.value === value) ? value : "#888888"}
+            onChange={(e) => onChange(e.target.value)}
+            className="rounded-full border-2 border-border cursor-pointer"
+            style={{ width: 28, height: 28, padding: 2 }}
+            data-testid="color-custom"
+          />
+        </div>
+      </div>
+      {value && (
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          <span
+            className="inline-block rounded-full border border-border"
+            style={{ width: 12, height: 12, backgroundColor: value }}
+          />
+          {COLOR_PRESETS.find((c) => c.value === value)?.label ?? value}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function isLight(hex: string): boolean {
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  return (r * 299 + g * 587 + b * 114) / 1000 > 155;
+}
+
+// ─── Item Form Dialog ──────────────────────────────────────────────────────────
 function ItemFormDialog({
   open,
   onClose,
@@ -51,9 +133,21 @@ function ItemFormDialog({
   const [type, setType] = useState<string>(existing?.type ?? "Sheet");
   const [name, setName] = useState(existing?.name ?? "");
   const [size, setSize] = useState(existing?.size ?? "");
-  const [quantity, setQuantity] = useState(existing?.quantity ?? "");
+  const [packQty, setPackQty] = useState(existing?.packQty != null ? String(existing.packQty) : "");
+  const [pcsPerPack, setPcsPerPack] = useState(existing?.pcsPerPack != null ? String(existing.pcsPerPack) : "");
   const [unitPrice, setUnitPrice] = useState(existing?.unitPrice ?? "");
+  const [rowColor, setRowColor] = useState(existing?.rowColor ?? "");
   const [notes, setNotes] = useState(existing?.notes ?? "");
+
+  const totalPcs = useMemo(() => {
+    const q = parseInt(packQty) || 0;
+    const p = parseInt(pcsPerPack) || 0;
+    return q * p;
+  }, [packQty, pcsPerPack]);
+
+  const totalValue = useMemo(() => {
+    return totalPcs * (parseFloat(unitPrice) || 0);
+  }, [totalPcs, unitPrice]);
 
   const saveMutation = useMutation({
     mutationFn: async (data: any) => {
@@ -81,8 +175,11 @@ function ItemFormDialog({
       type,
       name: name.trim(),
       size: size.trim() || null,
-      quantity: parseFloat(quantity) || 0,
+      quantity: totalPcs,
+      packQty: packQty !== "" ? parseInt(packQty) : null,
+      pcsPerPack: pcsPerPack !== "" ? parseInt(pcsPerPack) : null,
       unitPrice: parseFloat(unitPrice) || 0,
+      rowColor: rowColor || null,
       notes: notes.trim() || null,
     });
   };
@@ -94,6 +191,7 @@ function ItemFormDialog({
           <DialogTitle>{existing ? "Edit Item" : "Add Item"}</DialogTitle>
         </DialogHeader>
         <div className="space-y-4">
+          {/* Type */}
           <div className="space-y-1.5">
             <Label>Type</Label>
             <Select value={type} onValueChange={setType}>
@@ -107,15 +205,19 @@ function ItemFormDialog({
               </SelectContent>
             </Select>
           </div>
+
+          {/* Name */}
           <div className="space-y-1.5">
             <Label>Name <span className="text-destructive">*</span></Label>
             <Input
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="e.g. White Sheet 50kg"
+              placeholder="e.g. Purple Sheet 50kg"
               data-testid="input-name"
             />
           </div>
+
+          {/* Size */}
           <div className="space-y-1.5">
             <Label>Size / Weight</Label>
             <Input
@@ -125,32 +227,68 @@ function ItemFormDialog({
               data-testid="input-size"
             />
           </div>
+
+          {/* Pack qty + pcs per pack + auto total */}
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
-              <Label>Quantity</Label>
+              <Label>Qty (packs)</Label>
               <Input
                 type="number"
                 min="0"
-                step="0.001"
-                value={quantity}
-                onChange={(e) => setQuantity(e.target.value)}
+                step="1"
+                value={packQty}
+                onChange={(e) => setPackQty(e.target.value)}
                 placeholder="0"
-                data-testid="input-quantity"
+                data-testid="input-pack-qty"
               />
             </div>
             <div className="space-y-1.5">
-              <Label>Unit Price ($)</Label>
+              <Label># / Pack (pcs)</Label>
               <Input
                 type="number"
                 min="0"
-                step="0.01"
-                value={unitPrice}
-                onChange={(e) => setUnitPrice(e.target.value)}
-                placeholder="0.00"
-                data-testid="input-unit-price"
+                step="1"
+                value={pcsPerPack}
+                onChange={(e) => setPcsPerPack(e.target.value)}
+                placeholder="0"
+                data-testid="input-pcs-per-pack"
               />
             </div>
           </div>
+
+          {/* Total pcs (read-only) */}
+          <div className="rounded-md bg-muted/50 px-3 py-2 flex items-center justify-between text-sm">
+            <span className="text-muted-foreground">Total pcs</span>
+            <span className="font-mono font-semibold">{totalPcs.toLocaleString("en-US")}</span>
+          </div>
+
+          {/* Unit price */}
+          <div className="space-y-1.5">
+            <Label>Price per piece ($)</Label>
+            <Input
+              type="number"
+              min="0"
+              step="0.001"
+              value={unitPrice}
+              onChange={(e) => setUnitPrice(e.target.value)}
+              placeholder="0.000"
+              data-testid="input-unit-price"
+            />
+          </div>
+
+          {/* Total value (read-only) */}
+          <div className="rounded-md bg-muted/50 px-3 py-2 flex items-center justify-between text-sm">
+            <span className="text-muted-foreground">Total value</span>
+            <span className="font-mono font-semibold">${fmt(totalValue)}</span>
+          </div>
+
+          {/* Row color */}
+          <div className="space-y-1.5">
+            <Label>Row Color</Label>
+            <ColorPicker value={rowColor} onChange={setRowColor} />
+          </div>
+
+          {/* Notes */}
           <div className="space-y-1.5">
             <Label>Notes</Label>
             <Textarea
@@ -175,7 +313,7 @@ function ItemFormDialog({
   );
 }
 
-// ─── Main Page ────────────────────────────────────────────────────────────────
+// ─── Main Page ─────────────────────────────────────────────────────────────────
 export default function FactorySheetsAndSacks() {
   const { toast } = useToast();
   const [search, setSearch] = useState("");
@@ -347,76 +485,107 @@ export default function FactorySheetsAndSacks() {
               )}
             </div>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Type</TableHead>
-                  <TableHead>Size / Weight</TableHead>
-                  <TableHead className="text-right">Quantity</TableHead>
-                  <TableHead className="text-right">Unit Price</TableHead>
-                  <TableHead className="text-right">Total Value</TableHead>
-                  <TableHead>Notes</TableHead>
-                  {canEdit && <TableHead className="text-right">Actions</TableHead>}
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filtered.map((item) => {
-                  const total = parseFloat(item.quantity || "0") * parseFloat(item.unitPrice || "0");
-                  return (
-                    <TableRow key={item.id} data-testid={`row-item-${item.id}`}>
-                      <TableCell className="font-medium">{item.name}</TableCell>
-                      <TableCell>
-                        <Badge
-                          variant="secondary"
-                          className={
-                            item.type === "Sheet"
-                              ? "bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
-                              : item.type === "Sack"
-                              ? "bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
-                              : "bg-muted text-muted-foreground"
-                          }
-                          data-testid={`badge-type-${item.id}`}
-                        >
-                          {item.type}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-muted-foreground">{item.size || "—"}</TableCell>
-                      <TableCell className="text-right font-mono">{fmtQty(item.quantity)}</TableCell>
-                      <TableCell className="text-right font-mono">${fmt(item.unitPrice)}</TableCell>
-                      <TableCell className="text-right font-mono font-medium">${fmt(total)}</TableCell>
-                      <TableCell className="text-muted-foreground text-sm max-w-xs truncate">
-                        {item.notes || "—"}
-                      </TableCell>
-                      {canEdit && (
-                        <TableCell className="text-right">
-                          <div className="flex items-center justify-end gap-1">
-                            <Button
-                              size="icon"
-                              variant="ghost"
-                              onClick={() => setEditItem(item)}
-                              title="Edit"
-                              data-testid={`button-edit-${item.id}`}
-                            >
-                              <Pencil className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              size="icon"
-                              variant="ghost"
-                              onClick={() => setDeleteItem(item)}
-                              title="Delete"
-                              data-testid={`button-delete-${item.id}`}
-                            >
-                              <Trash2 className="h-4 w-4 text-destructive" />
-                            </Button>
-                          </div>
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-6" />
+                    <TableHead>Name</TableHead>
+                    <TableHead>Type</TableHead>
+                    <TableHead>Size / Weight</TableHead>
+                    <TableHead className="text-right">Qty (packs)</TableHead>
+                    <TableHead className="text-right"># / Pack</TableHead>
+                    <TableHead className="text-right">Total Pcs</TableHead>
+                    <TableHead className="text-right">Price / Pc</TableHead>
+                    <TableHead className="text-right">Total Value</TableHead>
+                    <TableHead>Notes</TableHead>
+                    {canEdit && <TableHead className="text-right">Actions</TableHead>}
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filtered.map((item) => {
+                    const totalPcs = parseFloat(item.quantity || "0");
+                    const totalVal = totalPcs * parseFloat(item.unitPrice || "0");
+                    const bg = item.rowColor ? `${item.rowColor}18` : undefined;
+                    return (
+                      <TableRow
+                        key={item.id}
+                        data-testid={`row-item-${item.id}`}
+                        style={bg ? { backgroundColor: bg } : undefined}
+                      >
+                        {/* Color swatch */}
+                        <TableCell className="px-2">
+                          {item.rowColor ? (
+                            <span
+                              className="inline-block rounded-full border border-border/50"
+                              style={{ width: 14, height: 14, backgroundColor: item.rowColor }}
+                              title={COLOR_PRESETS.find((c) => c.value === item.rowColor)?.label ?? item.rowColor}
+                            />
+                          ) : (
+                            <span className="inline-block rounded-full border border-border/30 bg-transparent" style={{ width: 14, height: 14 }} />
+                          )}
                         </TableCell>
-                      )}
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
+                        <TableCell className="font-medium">{item.name}</TableCell>
+                        <TableCell>
+                          <Badge
+                            variant="secondary"
+                            className={
+                              item.type === "Sheet"
+                                ? "bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
+                                : item.type === "Sack"
+                                ? "bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
+                                : "bg-muted text-muted-foreground"
+                            }
+                            data-testid={`badge-type-${item.id}`}
+                          >
+                            {item.type}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-muted-foreground">{item.size || "—"}</TableCell>
+                        <TableCell className="text-right font-mono">
+                          {fmtInt(item.packQty)}
+                        </TableCell>
+                        <TableCell className="text-right font-mono">
+                          {fmtInt(item.pcsPerPack)}
+                        </TableCell>
+                        <TableCell className="text-right font-mono">
+                          {totalPcs > 0 ? totalPcs.toLocaleString("en-US") : "0"}
+                        </TableCell>
+                        <TableCell className="text-right font-mono">${fmt(item.unitPrice)}</TableCell>
+                        <TableCell className="text-right font-mono font-medium">${fmt(totalVal)}</TableCell>
+                        <TableCell className="text-muted-foreground text-sm max-w-xs truncate">
+                          {item.notes || "—"}
+                        </TableCell>
+                        {canEdit && (
+                          <TableCell className="text-right">
+                            <div className="flex items-center justify-end gap-1">
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                onClick={() => setEditItem(item)}
+                                title="Edit"
+                                data-testid={`button-edit-${item.id}`}
+                              >
+                                <Pencil className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                onClick={() => setDeleteItem(item)}
+                                title="Delete"
+                                data-testid={`button-delete-${item.id}`}
+                              >
+                                <Trash2 className="h-4 w-4 text-destructive" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        )}
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </div>
           )}
         </CardContent>
       </Card>
