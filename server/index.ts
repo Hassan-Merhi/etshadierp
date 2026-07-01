@@ -893,7 +893,12 @@ let migrationsDone = false;
     `ALTER TABLE factory_containers ADD COLUMN IF NOT EXISTS other_charges decimal(20,2) DEFAULT 0`,
     `ALTER TABLE factory_containers ADD COLUMN IF NOT EXISTS other_charges_currency_code varchar(10)`,
     // Backfill: existing rows that had no other_charges_currency_code set should use USD (not container currency)
-    `UPDATE factory_containers SET other_charges_currency_code = 'USD' WHERE other_charges_currency_code IS NULL AND COALESCE(other_charges::numeric, 0) > 0`,
+    `DO $$ BEGIN
+      IF NOT EXISTS (SELECT 1 FROM migrations_log WHERE key = 'factory-containers-currency-backfill-v1') THEN
+        UPDATE factory_containers SET other_charges_currency_code = 'USD' WHERE other_charges_currency_code IS NULL AND COALESCE(other_charges::numeric, 0) > 0;
+        INSERT INTO migrations_log(key) VALUES ('factory-containers-currency-backfill-v1');
+      END IF;
+    END $$`,
     `ALTER TABLE factory_containers ADD COLUMN IF NOT EXISTS other_charges_account_id integer`,
     `ALTER TABLE factory_containers ADD COLUMN IF NOT EXISTS other_charges_supplier_id integer`,
     `ALTER TABLE factory_containers ADD COLUMN IF NOT EXISTS commission_amount decimal(20,2) DEFAULT 0`,
@@ -1083,16 +1088,21 @@ let migrationsDone = false;
     // The offloadContainer() function previously set status=OFFLOADED but never wrote offload_date.
     // Pull the date from the container_offloads record (offloaded_at) so the Container Report
     // date filter and all ERP displays show the correct offload date for historical data.
-    `UPDATE containers c
-     SET offload_date = (
-       SELECT DATE(co.offloaded_at)
-       FROM container_offloads co
-       WHERE co.container_id = c.id
-       ORDER BY co.id DESC
-       LIMIT 1
-     )
-     WHERE c.status = 'OFFLOADED'
-       AND c.offload_date IS NULL`,
+    `DO $$ BEGIN
+      IF NOT EXISTS (SELECT 1 FROM migrations_log WHERE key = 'containers-offload-date-backfill-v1') THEN
+        UPDATE containers c
+        SET offload_date = (
+          SELECT DATE(co.offloaded_at)
+          FROM container_offloads co
+          WHERE co.container_id = c.id
+          ORDER BY co.id DESC
+          LIMIT 1
+        )
+        WHERE c.status = 'OFFLOADED'
+          AND c.offload_date IS NULL;
+        INSERT INTO migrations_log(key) VALUES ('containers-offload-date-backfill-v1');
+      END IF;
+    END $$`,
     // Financial Snapshot pinned accounts per company/card (Apr 2026)
     `CREATE TABLE IF NOT EXISTS snapshot_pinned_accounts (
       id serial PRIMARY KEY,
@@ -1174,7 +1184,12 @@ let migrationsDone = false;
     // Tenant isolation (May 2026): scope every recipient to a company
     `ALTER TABLE whatsapp_recipients ADD COLUMN IF NOT EXISTS company_id integer`,
     // Backfill any pre-existing rows to the lowest companyId (parent company convention)
-    `UPDATE whatsapp_recipients SET company_id = (SELECT MIN(id) FROM companies) WHERE company_id IS NULL`,
+    `DO $$ BEGIN
+      IF NOT EXISTS (SELECT 1 FROM migrations_log WHERE key = 'whatsapp-recipients-company-backfill-v1') THEN
+        UPDATE whatsapp_recipients SET company_id = (SELECT MIN(id) FROM companies) WHERE company_id IS NULL;
+        INSERT INTO migrations_log(key) VALUES ('whatsapp-recipients-company-backfill-v1');
+      END IF;
+    END $$`,
     // Drop the old global UNIQUE on chat_id; replace with per-tenant uniqueness
     `ALTER TABLE whatsapp_recipients DROP CONSTRAINT IF EXISTS whatsapp_recipients_chat_id_key`,
     `CREATE UNIQUE INDEX IF NOT EXISTS whatsapp_recipients_company_chat_unique ON whatsapp_recipients (company_id, chat_id)`,
@@ -1197,44 +1212,48 @@ let migrationsDone = false;
 
     // Update ALL existing credit sale voucher entries to use new narration format:
     // "POS - [Customer Name] - [Location Name]" instead of old "Credit Sale - POSXXX"
-    // Debit entries (customer receivable — Asset account) — use CTE to avoid ambiguity
-    `WITH debit_narrations AS (
-       SELECT ve.id AS entry_id,
-              'POS - ' || la.name || ' - ' || COALESCE(v.location_name, '') AS new_narration
-       FROM voucher_entries ve
-       JOIN vouchers v ON v.id = ve.voucher_id
-       JOIN ledger_accounts la ON la.id = ve.ledger_account_id
-       WHERE v.is_credit_sale = true
-         AND ve.debit_amount::numeric > 0
-         AND la.account_type = 'Asset'
-     )
-     UPDATE voucher_entries
-     SET narration = debit_narrations.new_narration
-     FROM debit_narrations
-     WHERE voucher_entries.id = debit_narrations.entry_id
-       AND (voucher_entries.narration IS NULL OR voucher_entries.narration = '')`,
-
-    // Credit entries (SALES account side of credit sale vouchers) — use CTE
-    `WITH credit_narrations AS (
-       SELECT credit_ve.id AS entry_id,
-              'POS - ' || la.name || ' - ' || COALESCE(v.location_name, '') AS new_narration
-       FROM vouchers v
-       JOIN voucher_entries debit_ve ON (
-         debit_ve.voucher_id = v.id AND debit_ve.debit_amount::numeric > 0
-       )
-       JOIN ledger_accounts la ON (
-         la.id = debit_ve.ledger_account_id AND la.account_type = 'Asset'
-       )
-       JOIN voucher_entries credit_ve ON (
-         credit_ve.voucher_id = v.id AND credit_ve.credit_amount::numeric > 0
-       )
-       WHERE v.is_credit_sale = true
-     )
-     UPDATE voucher_entries
-     SET narration = credit_narrations.new_narration
-     FROM credit_narrations
-     WHERE voucher_entries.id = credit_narrations.entry_id
-       AND (voucher_entries.narration IS NULL OR voucher_entries.narration = '')`,
+    `DO $$ BEGIN
+      IF NOT EXISTS (SELECT 1 FROM migrations_log WHERE key = 'credit-sale-narration-backfill-v1') THEN
+        -- Debit entries (customer receivable — Asset account)
+        WITH debit_narrations AS (
+           SELECT ve.id AS entry_id,
+                  'POS - ' || la.name || ' - ' || COALESCE(v.location_name, '') AS new_narration
+           FROM voucher_entries ve
+           JOIN vouchers v ON v.id = ve.voucher_id
+           JOIN ledger_accounts la ON la.id = ve.ledger_account_id
+           WHERE v.is_credit_sale = true
+             AND ve.debit_amount::numeric > 0
+             AND la.account_type = 'Asset'
+        )
+        UPDATE voucher_entries
+        SET narration = debit_narrations.new_narration
+        FROM debit_narrations
+        WHERE voucher_entries.id = debit_narrations.entry_id
+          AND (voucher_entries.narration IS NULL OR voucher_entries.narration = '');
+        -- Credit entries (SALES account side)
+        WITH credit_narrations AS (
+           SELECT credit_ve.id AS entry_id,
+                  'POS - ' || la.name || ' - ' || COALESCE(v.location_name, '') AS new_narration
+           FROM vouchers v
+           JOIN voucher_entries debit_ve ON (
+             debit_ve.voucher_id = v.id AND debit_ve.debit_amount::numeric > 0
+           )
+           JOIN ledger_accounts la ON (
+             la.id = debit_ve.ledger_account_id AND la.account_type = 'Asset'
+           )
+           JOIN voucher_entries credit_ve ON (
+             credit_ve.voucher_id = v.id AND credit_ve.credit_amount::numeric > 0
+           )
+           WHERE v.is_credit_sale = true
+        )
+        UPDATE voucher_entries
+        SET narration = credit_narrations.new_narration
+        FROM credit_narrations
+        WHERE voucher_entries.id = credit_narrations.entry_id
+          AND (voucher_entries.narration IS NULL OR voucher_entries.narration = '');
+        INSERT INTO migrations_log(key) VALUES ('credit-sale-narration-backfill-v1');
+      END IF;
+    END $$`,
 
     // Net position scheduled export — configurable group + frequency
     `CREATE TABLE IF NOT EXISTS net_position_export_settings (
@@ -2251,8 +2270,13 @@ let migrationsDone = false;
     // Pre-cleanup: hard-delete orphan rows (point to deleted stock_items 1989/2003/2004/2261, etc).
     // Idempotent: after first run, FK below prevents new orphans, so DELETE is a no-op forever.
     // Acceptable to delete because the rows already reference dead parents — data was already broken.
-    `DELETE FROM po_line_items WHERE stock_item_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM stock_items p WHERE p.id = po_line_items.stock_item_id)`,
-    `DELETE FROM container_offload_items WHERE stock_item_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM stock_items p WHERE p.id = container_offload_items.stock_item_id)`,
+    `DO $$ BEGIN
+      IF NOT EXISTS (SELECT 1 FROM migrations_log WHERE key = 'orphan-po-container-items-cleanup-v1') THEN
+        DELETE FROM po_line_items WHERE stock_item_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM stock_items p WHERE p.id = po_line_items.stock_item_id);
+        DELETE FROM container_offload_items WHERE stock_item_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM stock_items p WHERE p.id = container_offload_items.stock_item_id);
+        INSERT INTO migrations_log(key) VALUES ('orphan-po-container-items-cleanup-v1');
+      END IF;
+    END $$`,
     `DO $$ BEGIN ALTER TABLE po_line_items ADD CONSTRAINT po_line_items_stock_item_id_fkey FOREIGN KEY (stock_item_id) REFERENCES stock_items(id) ON DELETE RESTRICT; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
     `DO $$ BEGIN ALTER TABLE container_offload_items ADD CONSTRAINT container_offload_items_stock_item_id_fkey FOREIGN KEY (stock_item_id) REFERENCES stock_items(id) ON DELETE RESTRICT; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
 
@@ -2347,7 +2371,12 @@ let migrationsDone = false;
     // In prod this guarantees the FK ALTER below succeeds even if prod has different/additional orphan refs.
     // NULL preserves voucher accounting balance (debit/credit untouched); only the dangling pointer is severed.
     // The sweep is idempotent — once enforced by the FK, no rows will ever match the WHERE again.
-    `UPDATE voucher_entries SET factory_supplier_id = NULL WHERE factory_supplier_id IS NOT NULL AND factory_supplier_id NOT IN (SELECT id FROM factory_suppliers);`,
+    `DO $$ BEGIN
+      IF NOT EXISTS (SELECT 1 FROM migrations_log WHERE key = 'orphan-factory-supplier-id-sweep-v1') THEN
+        UPDATE voucher_entries SET factory_supplier_id = NULL WHERE factory_supplier_id IS NOT NULL AND factory_supplier_id NOT IN (SELECT id FROM factory_suppliers);
+        INSERT INTO migrations_log(key) VALUES ('orphan-factory-supplier-id-sweep-v1');
+      END IF;
+    END $$`,
     `DO $$ BEGIN ALTER TABLE voucher_entries ADD CONSTRAINT voucher_entries_factory_supplier_id_fkey FOREIGN KEY (factory_supplier_id) REFERENCES factory_suppliers(id) ON DELETE RESTRICT; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
 
     // ── F-Phase 4g (May 2026) — cash_account_id columns → ledger_accounts ──
@@ -2372,7 +2401,12 @@ let migrationsDone = false;
     // employees has 66 rows (ids 51–119); 10 of 11 children had 0 orphans.
     // voucher_entries.employee_id (nullable) had 32 orphan rows pointing at deleted employee ids 43–50 (all below current min). Defensive sweep NULLs them — preserves voucher accounting balance, only severs the dangling pointer.
     // RESTRICT on all — HR/payroll/audit history; deleting an employee with payroll/advances/bonuses/attendance must be blocked.
-    `UPDATE voucher_entries SET employee_id = NULL WHERE employee_id IS NOT NULL AND employee_id NOT IN (SELECT id FROM employees);`,
+    `DO $$ BEGIN
+      IF NOT EXISTS (SELECT 1 FROM migrations_log WHERE key = 'orphan-employee-id-sweep-v1') THEN
+        UPDATE voucher_entries SET employee_id = NULL WHERE employee_id IS NOT NULL AND employee_id NOT IN (SELECT id FROM employees);
+        INSERT INTO migrations_log(key) VALUES ('orphan-employee-id-sweep-v1');
+      END IF;
+    END $$`,
     `DO $$ BEGIN ALTER TABLE employee_advance_repayments ADD CONSTRAINT employee_advance_repayments_employee_id_fkey FOREIGN KEY (employee_id) REFERENCES employees(id) ON DELETE RESTRICT; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
     `DO $$ BEGIN ALTER TABLE employee_advances ADD CONSTRAINT employee_advances_employee_id_fkey FOREIGN KEY (employee_id) REFERENCES employees(id) ON DELETE RESTRICT; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
     `DO $$ BEGIN ALTER TABLE employee_attendance ADD CONSTRAINT employee_attendance_employee_id_fkey FOREIGN KEY (employee_id) REFERENCES employees(id) ON DELETE RESTRICT; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
@@ -2389,7 +2423,12 @@ let migrationsDone = false;
     // vouchers has 3,787 rows (ids 28–5416); 12 of 13 candidate child columns clean. purchase_orders.voucher_id had 3 orphans (ids 56/57/104 → missing voucher_ids 67/68/120, all PO-36 from Nov 2025) — defensive sweep NULLs them.
     // DEFERRED: stock_transfer_vouchers.voucher_id has 17 orphan rows but the column is NOT NULL — can't sweep, would need user decision to DELETE the orphan stock_transfer_vouchers rows. Skipped this batch.
     // RESTRICT on all — vouchers are accounting source-of-truth (Receipt/Payment/Journal postings); a referenced voucher must not be deleted while child records still point at it.
-    `UPDATE purchase_orders SET voucher_id = NULL WHERE voucher_id IS NOT NULL AND voucher_id NOT IN (SELECT id FROM vouchers);`,
+    `DO $$ BEGIN
+      IF NOT EXISTS (SELECT 1 FROM migrations_log WHERE key = 'orphan-po-voucher-id-sweep-v1') THEN
+        UPDATE purchase_orders SET voucher_id = NULL WHERE voucher_id IS NOT NULL AND voucher_id NOT IN (SELECT id FROM vouchers);
+        INSERT INTO migrations_log(key) VALUES ('orphan-po-voucher-id-sweep-v1');
+      END IF;
+    END $$`,
     `DO $$ BEGIN ALTER TABLE container_sales ADD CONSTRAINT container_sales_voucher_id_fkey FOREIGN KEY (voucher_id) REFERENCES vouchers(id) ON DELETE RESTRICT; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
     `DO $$ BEGIN ALTER TABLE customer_order_charges ADD CONSTRAINT customer_order_charges_voucher_id_fkey FOREIGN KEY (voucher_id) REFERENCES vouchers(id) ON DELETE RESTRICT; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
     `DO $$ BEGIN ALTER TABLE employee_bonuses ADD CONSTRAINT employee_bonuses_voucher_id_fkey FOREIGN KEY (voucher_id) REFERENCES vouchers(id) ON DELETE RESTRICT; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
@@ -2410,8 +2449,13 @@ let migrationsDone = false;
     // ORDER MATTERS: delete child line items FIRST (stock_transfer_items.transfer_id is a logical reference but no FK enforced yet — F-Phase 4l queued), THEN delete parents.
     // Idempotent: both DELETE filters return 0 rows after first run; ALTER guarded by EXCEPTION.
     // Note: this only cleans items whose parent is in the orphan-parent set. The broader stock_transfer_items orphan backlog (~953 pre-existing) is queued for F-Phase 4l alongside the FK on stock_transfer_items.transfer_id.
-    `DELETE FROM stock_transfer_items WHERE transfer_id IN (SELECT id FROM stock_transfer_vouchers WHERE voucher_id NOT IN (SELECT id FROM vouchers));`,
-    `DELETE FROM stock_transfer_vouchers WHERE voucher_id NOT IN (SELECT id FROM vouchers);`,
+    `DO $$ BEGIN
+      IF NOT EXISTS (SELECT 1 FROM migrations_log WHERE key = 'orphan-stock-transfer-cleanup-v1') THEN
+        DELETE FROM stock_transfer_items WHERE transfer_id IN (SELECT id FROM stock_transfer_vouchers WHERE voucher_id NOT IN (SELECT id FROM vouchers));
+        DELETE FROM stock_transfer_vouchers WHERE voucher_id NOT IN (SELECT id FROM vouchers);
+        INSERT INTO migrations_log(key) VALUES ('orphan-stock-transfer-cleanup-v1');
+      END IF;
+    END $$`,
     `DO $$ BEGIN ALTER TABLE stock_transfer_vouchers ADD CONSTRAINT stock_transfer_vouchers_voucher_id_fkey FOREIGN KEY (voucher_id) REFERENCES vouchers(id) ON DELETE RESTRICT; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
 
     // ── F-Phase 4j (May 2026) — customers long-tail FKs (5 clean, 0 orphans) ──
@@ -2544,7 +2588,12 @@ let migrationsDone = false;
     `DO $$ BEGIN ALTER TABLE factory_fx_allocations ADD CONSTRAINT factory_fx_allocations_company_id_fkey FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE RESTRICT; EXCEPTION WHEN duplicate_object THEN NULL;  END $$;`,
     `DO $$ BEGIN ALTER TABLE factory_fx_rates ADD CONSTRAINT factory_fx_rates_company_id_fkey FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE RESTRICT; EXCEPTION WHEN duplicate_object THEN NULL;  END $$;`,
     `ALTER TABLE factory_fx_rates ADD COLUMN IF NOT EXISTS source VARCHAR(10) NOT NULL DEFAULT 'auto'`,
-    `UPDATE ledger_accounts SET deleted_at = NOW() WHERE (name ILIKE '%Accrued Rent Payable%' OR code = 'ACCR-RENT-PAY') AND deleted_at IS NULL`,
+    `DO $$ BEGIN
+      IF NOT EXISTS (SELECT 1 FROM migrations_log WHERE key = 'accrued-rent-soft-delete-v1') THEN
+        UPDATE ledger_accounts SET deleted_at = NOW() WHERE (name ILIKE '%Accrued Rent Payable%' OR code = 'ACCR-RENT-PAY') AND deleted_at IS NULL;
+        INSERT INTO migrations_log(key) VALUES ('accrued-rent-soft-delete-v1');
+      END IF;
+    END $$`,
     `DO $$ BEGIN ALTER TABLE factory_invoice_loading_bales ADD CONSTRAINT factory_invoice_loading_bales_company_id_fkey FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE RESTRICT; EXCEPTION WHEN duplicate_object THEN NULL;  END $$;`,
     `DO $$ BEGIN ALTER TABLE factory_invoice_loading_sessions ADD CONSTRAINT factory_invoice_loading_sessions_company_id_fkey FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE RESTRICT; EXCEPTION WHEN duplicate_object THEN NULL;  END $$;`,
     `DO $$ BEGIN ALTER TABLE factory_mix_batches ADD CONSTRAINT factory_mix_batches_company_id_fkey FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE RESTRICT; EXCEPTION WHEN duplicate_object THEN NULL;  END $$;`,
@@ -2715,7 +2764,12 @@ let migrationsDone = false;
     `ALTER TABLE factory_mix_batches ADD COLUMN IF NOT EXISTS deleted_at timestamp`,
     `ALTER TABLE factory_bales ADD COLUMN IF NOT EXISTS deleted_at timestamp`,
     `ALTER TABLE factory_bales ADD COLUMN IF NOT EXISTS worker_name TEXT`,
-    `UPDATE factory_bales fb SET worker_name = fw.full_name FROM factory_workers fw WHERE fb.finalized_by = fw.id AND fb.worker_name IS NULL`,
+    `DO $$ BEGIN
+      IF NOT EXISTS (SELECT 1 FROM migrations_log WHERE key = 'factory-bales-worker-name-backfill-v1') THEN
+        UPDATE factory_bales fb SET worker_name = fw.full_name FROM factory_workers fw WHERE fb.finalized_by = fw.id AND fb.worker_name IS NULL;
+        INSERT INTO migrations_log(key) VALUES ('factory-bales-worker-name-backfill-v1');
+      END IF;
+    END $$`,
     `ALTER TABLE customer_proformas ADD COLUMN IF NOT EXISTS deleted_at timestamp`,
     `ALTER TABLE customer_orders ADD COLUMN IF NOT EXISTS deleted_at timestamp`,
 
@@ -3159,17 +3213,21 @@ let migrationsDone = false;
     // These are rows created before the file_data column was added (so file_data IS NULL)
     // and that have no recoverable content (disk is ephemeral). They show up as broken
     // "1 file" entries in the Documents column.
-    `DELETE FROM factory_shipping_container_documents
-       WHERE file_data IS NULL
-         AND (
-           file_name  IS NULL OR trim(file_name)  = '' OR file_name  = '-'
-           OR display_name IS NULL OR trim(display_name) = ''
-           OR original_name IS NULL OR trim(original_name) = ''
-           OR file_url IS NULL OR trim(file_url) = '' OR file_url = '-'
-         )`,
-    // Broader ghost sweep: delete any row where file_data IS NULL regardless of metadata,
-    // because without stored file_data the file cannot be served (disk is ephemeral).
-    `DELETE FROM factory_shipping_container_documents WHERE file_data IS NULL`,
+    `DO $$ BEGIN
+      IF NOT EXISTS (SELECT 1 FROM migrations_log WHERE key = 'shipping-docs-ghost-cleanup-v1') THEN
+        DELETE FROM factory_shipping_container_documents
+          WHERE file_data IS NULL
+            AND (
+              file_name  IS NULL OR trim(file_name)  = '' OR file_name  = '-'
+              OR display_name IS NULL OR trim(display_name) = ''
+              OR original_name IS NULL OR trim(original_name) = ''
+              OR file_url IS NULL OR trim(file_url) = '' OR file_url = '-'
+            );
+        -- Broader ghost sweep: delete any row where file_data IS NULL
+        DELETE FROM factory_shipping_container_documents WHERE file_data IS NULL;
+        INSERT INTO migrations_log(key) VALUES ('shipping-docs-ghost-cleanup-v1');
+      END IF;
+    END $$`,
     // Archive table: bale links saved at cancellation time so restore can bring back exact references
     `CREATE TABLE IF NOT EXISTS customer_order_bales_history (
       id serial PRIMARY KEY,
@@ -3214,7 +3272,12 @@ let migrationsDone = false;
     // customerProformas: add status column (ACTIVE / PARTIALLY_DISPATCHED / FULLY_INVOICED / CANCELLED)
     `ALTER TABLE customer_proformas ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'ACTIVE'`,
     // Backfill: inactive proformas → CANCELLED, active ones stay ACTIVE
-    `UPDATE customer_proformas SET status = 'CANCELLED' WHERE is_active = false AND status = 'ACTIVE'`,
+    `DO $$ BEGIN
+      IF NOT EXISTS (SELECT 1 FROM migrations_log WHERE key = 'customer-proformas-status-backfill-v1') THEN
+        UPDATE customer_proformas SET status = 'CANCELLED' WHERE is_active = false AND status = 'ACTIVE';
+        INSERT INTO migrations_log(key) VALUES ('customer-proformas-status-backfill-v1');
+      END IF;
+    END $$`,
     // customerOrders: back-link to the dispatch batch that generated this invoice
     `ALTER TABLE customer_orders ADD COLUMN IF NOT EXISTS dispatch_batch_id INTEGER`,
     // Batch number sequences (one row per company)
@@ -3747,7 +3810,12 @@ let migrationsDone = false;
     // Add parent_company_id to companies so SP companies know their parent.
     `ALTER TABLE companies ADD COLUMN IF NOT EXISTS parent_company_id integer`,
     // SP Test Co (id=14) parent is HADI L'SHI (id=1)
-    `UPDATE companies SET parent_company_id = 1 WHERE id = 14 AND parent_company_id IS NULL`,
+    `DO $$ BEGIN
+      IF NOT EXISTS (SELECT 1 FROM migrations_log WHERE key = 'sp-parent-company-id-v1') THEN
+        UPDATE companies SET parent_company_id = 1 WHERE id = 14 AND parent_company_id IS NULL;
+        INSERT INTO migrations_log(key) VALUES ('sp-parent-company-id-v1');
+      END IF;
+    END $$`,
 
     // Prepaid Expenses account in SP Test Co — opening $21,300 Dr
     `INSERT INTO ledger_accounts (company_id, code, name, account_type, sub_type, opening_balance, opening_balance_side, active, is_hidden)
@@ -3769,7 +3837,12 @@ let migrationsDone = false;
     // It is NOT a normal postable ledger account; showing it alongside user accounts
     // causes confusion and apparent double-counting. isHidden=true removes it from
     // the Accounts page and voucher dropdowns while preserving all ledger history.
-    `UPDATE ledger_accounts SET is_hidden = true WHERE sub_type = 'sp_stock' AND is_hidden = false`,
+    `DO $$ BEGIN
+      IF NOT EXISTS (SELECT 1 FROM migrations_log WHERE key = 'sp-stock-ledger-hidden-v1') THEN
+        UPDATE ledger_accounts SET is_hidden = true WHERE sub_type = 'sp_stock' AND is_hidden = false;
+        INSERT INTO migrations_log(key) VALUES ('sp-stock-ledger-hidden-v1');
+      END IF;
+    END $$`,
 
     // SP: per-location supplier payable deduction per qty (silent payable reduction, not income/expense)
     `ALTER TABLE locations ADD COLUMN IF NOT EXISTS supplier_partner_payable_deduction_per_qty DECIMAL(20,4) NOT NULL DEFAULT 0`,
@@ -3924,52 +3997,58 @@ let migrationsDone = false;
       reverted_at       TIMESTAMP
     )`,
     `CREATE INDEX IF NOT EXISTS code_patch_history_company_idx ON code_patch_history (company_id)`,
-    // Clean up orphaned OFFLOAD_RAW_STOCK daybook entries for already soft-deleted raw stock receipts
-    `DELETE FROM factory_daybook_entries
-       WHERE tx_type = 'OFFLOAD_RAW_STOCK'
-         AND reference_id IN (SELECT id FROM factory_raw_stock WHERE deleted_at IS NOT NULL)`,
-    // Clean up orphaned OFFLOAD_RAW_STOCK daybook entries for already soft-deleted adjustments
-    `DELETE FROM factory_daybook_entries
-       WHERE tx_type = 'OFFLOAD_RAW_STOCK'
-         AND reference_id IN (SELECT id FROM factory_raw_material_adjustments WHERE deleted_at IS NOT NULL)`,
-    // Clean up vouchers for already soft-deleted adjustments (FACTORY-MANUAL-{id}-* pattern)
-    `DELETE FROM voucher_entries
-       WHERE voucher_id IN (
-         SELECT v.id FROM vouchers v
-         JOIN factory_raw_material_adjustments a ON v.voucher_number LIKE 'FACTORY-MANUAL-' || a.id || '-%'
-         WHERE v.source_module = 'FACTORY' AND a.deleted_at IS NOT NULL
-       )`,
-    `DELETE FROM vouchers
-       WHERE source_module = 'FACTORY'
-         AND id IN (
-           SELECT v.id FROM vouchers v
-           JOIN factory_raw_material_adjustments a ON v.voucher_number LIKE 'FACTORY-MANUAL-' || a.id || '-%'
-           WHERE a.deleted_at IS NOT NULL
-         )`,
-    // Clean up orphaned factory daybook entries for already soft-deleted containers
-    `DELETE FROM factory_daybook_entries
-       WHERE tx_type IN ('FREIGHT','OTHER_CHARGE','DUTY','CONTAINER_IMPORT','PURCHASE')
-         AND reference_id IN (SELECT id FROM factory_containers WHERE deleted_at IS NOT NULL)`,
-    // Clean up orphaned factory vouchers for already soft-deleted containers
-    `DELETE FROM voucher_entries
-       WHERE voucher_id IN (
-         SELECT v.id FROM vouchers v
-         JOIN factory_containers fc ON v.voucher_number LIKE 'FACTORY-IMPORT-' || fc.id || '-%'
-                                    OR v.voucher_number LIKE 'FACTORY-COMM-'   || fc.id || '-%'
-                                    OR v.voucher_number LIKE 'FACTORY-FREIGHT-'|| fc.id || '-%'
-                                    OR v.voucher_number LIKE 'FACTORY-OC-'     || fc.id || '-%'
-         WHERE v.source_module = 'FACTORY' AND fc.deleted_at IS NOT NULL
-       )`,
-    `DELETE FROM vouchers
-       WHERE source_module = 'FACTORY'
-         AND id IN (
-           SELECT v.id FROM vouchers v
-           JOIN factory_containers fc ON v.voucher_number LIKE 'FACTORY-IMPORT-' || fc.id || '-%'
-                                      OR v.voucher_number LIKE 'FACTORY-COMM-'   || fc.id || '-%'
-                                      OR v.voucher_number LIKE 'FACTORY-FREIGHT-'|| fc.id || '-%'
-                                      OR v.voucher_number LIKE 'FACTORY-OC-'     || fc.id || '-%'
-           WHERE fc.deleted_at IS NOT NULL
-         )`,
+    // Clean up orphaned factory daybook/voucher entries for soft-deleted receipts, adjustments, and containers
+    `DO $$ BEGIN
+      IF NOT EXISTS (SELECT 1 FROM migrations_log WHERE key = 'orphan-factory-daybook-cleanup-v1') THEN
+        -- Orphaned OFFLOAD_RAW_STOCK daybook entries for soft-deleted raw stock receipts
+        DELETE FROM factory_daybook_entries
+          WHERE tx_type = 'OFFLOAD_RAW_STOCK'
+            AND reference_id IN (SELECT id FROM factory_raw_stock WHERE deleted_at IS NOT NULL);
+        -- Orphaned OFFLOAD_RAW_STOCK daybook entries for soft-deleted adjustments
+        DELETE FROM factory_daybook_entries
+          WHERE tx_type = 'OFFLOAD_RAW_STOCK'
+            AND reference_id IN (SELECT id FROM factory_raw_material_adjustments WHERE deleted_at IS NOT NULL);
+        -- Orphaned voucher_entries for soft-deleted adjustments (FACTORY-MANUAL-{id}-* pattern)
+        DELETE FROM voucher_entries
+          WHERE voucher_id IN (
+            SELECT v.id FROM vouchers v
+            JOIN factory_raw_material_adjustments a ON v.voucher_number LIKE 'FACTORY-MANUAL-' || a.id || '-%'
+            WHERE v.source_module = 'FACTORY' AND a.deleted_at IS NOT NULL
+          );
+        DELETE FROM vouchers
+          WHERE source_module = 'FACTORY'
+            AND id IN (
+              SELECT v.id FROM vouchers v
+              JOIN factory_raw_material_adjustments a ON v.voucher_number LIKE 'FACTORY-MANUAL-' || a.id || '-%'
+              WHERE a.deleted_at IS NOT NULL
+            );
+        -- Orphaned factory daybook entries for soft-deleted containers
+        DELETE FROM factory_daybook_entries
+          WHERE tx_type IN ('FREIGHT','OTHER_CHARGE','DUTY','CONTAINER_IMPORT','PURCHASE')
+            AND reference_id IN (SELECT id FROM factory_containers WHERE deleted_at IS NOT NULL);
+        -- Orphaned voucher_entries for soft-deleted containers
+        DELETE FROM voucher_entries
+          WHERE voucher_id IN (
+            SELECT v.id FROM vouchers v
+            JOIN factory_containers fc ON v.voucher_number LIKE 'FACTORY-IMPORT-' || fc.id || '-%'
+                                       OR v.voucher_number LIKE 'FACTORY-COMM-'   || fc.id || '-%'
+                                       OR v.voucher_number LIKE 'FACTORY-FREIGHT-'|| fc.id || '-%'
+                                       OR v.voucher_number LIKE 'FACTORY-OC-'     || fc.id || '-%'
+            WHERE v.source_module = 'FACTORY' AND fc.deleted_at IS NOT NULL
+          );
+        DELETE FROM vouchers
+          WHERE source_module = 'FACTORY'
+            AND id IN (
+              SELECT v.id FROM vouchers v
+              JOIN factory_containers fc ON v.voucher_number LIKE 'FACTORY-IMPORT-' || fc.id || '-%'
+                                         OR v.voucher_number LIKE 'FACTORY-COMM-'   || fc.id || '-%'
+                                         OR v.voucher_number LIKE 'FACTORY-FREIGHT-'|| fc.id || '-%'
+                                         OR v.voucher_number LIKE 'FACTORY-OC-'     || fc.id || '-%'
+              WHERE fc.deleted_at IS NOT NULL
+            );
+        INSERT INTO migrations_log(key) VALUES ('orphan-factory-daybook-cleanup-v1');
+      END IF;
+    END $$`,
     // Factory worker deductions — pending deductions applied at payroll time
     `CREATE TABLE IF NOT EXISTS factory_worker_deductions (
       id serial PRIMARY KEY,
@@ -4032,28 +4111,30 @@ let migrationsDone = false;
     )`,
     `CREATE INDEX IF NOT EXISTS intercompany_payment_requests_status_idx ON intercompany_payment_requests(status)`,
     `CREATE INDEX IF NOT EXISTS intercompany_payment_requests_link_idx ON intercompany_payment_requests(link_id)`,
-    // Backfill pass 1: re-point po_line_items using stock_item_merge_logs (logged merges).
-    // Idempotent — once pli.stock_item_id is already keptId the WHERE never matches again.
-    `UPDATE po_line_items pli
-       SET stock_item_id = sml.kept_item_id,
-           item_name     = si.name
-       FROM stock_item_merge_logs sml
-       JOIN stock_items si ON si.id = sml.kept_item_id AND si.deleted_at IS NULL
-      WHERE pli.stock_item_id = sml.merged_item_id`,
-    // Backfill pass 2: re-point po_line_items using alias breadcrumbs for historical
-    // merges that predate stock_item_merge_logs. The merge logic always writes an alias
-    // row: aliasCode = merged item code, description = "Merged from: …".
-    // Idempotent for the same reason as pass 1.
-    `UPDATE po_line_items pli
-       SET stock_item_id = a.stock_item_id,
-           item_name     = si_kept.name
-       FROM stock_item_code_aliases a
-       JOIN stock_items si_merged ON si_merged.code = a.alias_code
-                                 AND si_merged.active = false
-       JOIN stock_items si_kept   ON si_kept.id = a.stock_item_id
-                                 AND si_kept.deleted_at IS NULL
-      WHERE a.description LIKE 'Merged from:%'
-        AND pli.stock_item_id = si_merged.id`,
+    // Backfill po_line_items stock_item_id after stock item merges (two-pass)
+    `DO $$ BEGIN
+      IF NOT EXISTS (SELECT 1 FROM migrations_log WHERE key = 'po-line-items-stock-merge-backfill-v1') THEN
+        -- Pass 1: re-point using stock_item_merge_logs (logged merges)
+        UPDATE po_line_items pli
+          SET stock_item_id = sml.kept_item_id,
+              item_name     = si.name
+          FROM stock_item_merge_logs sml
+          JOIN stock_items si ON si.id = sml.kept_item_id AND si.deleted_at IS NULL
+         WHERE pli.stock_item_id = sml.merged_item_id;
+        -- Pass 2: re-point using alias breadcrumbs for historical merges predating merge_logs
+        UPDATE po_line_items pli
+          SET stock_item_id = a.stock_item_id,
+              item_name     = si_kept.name
+          FROM stock_item_code_aliases a
+          JOIN stock_items si_merged ON si_merged.code = a.alias_code
+                                    AND si_merged.active = false
+          JOIN stock_items si_kept   ON si_kept.id = a.stock_item_id
+                                    AND si_kept.deleted_at IS NULL
+         WHERE a.description LIKE 'Merged from:%'
+           AND pli.stock_item_id = si_merged.id;
+        INSERT INTO migrations_log(key) VALUES ('po-line-items-stock-merge-backfill-v1');
+      END IF;
+    END $$`,
 
     // Make the stock_items (company_id, code) unique index partial so that
     // soft-deleted items don't block re-use of the same code in the same company.
