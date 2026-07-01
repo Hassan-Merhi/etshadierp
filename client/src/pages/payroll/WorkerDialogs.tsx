@@ -33,6 +33,7 @@ interface WorkerDialogsProps {
   workerGroupMembersDialogOpen: boolean;
   setWorkerGroupMembersDialogOpen: (open: boolean) => void;
   selectedWorkerGroupForMembers: any;
+  allWorkerGroups: any[];
   allWorkers: Employee[];
   addWorkerToWorkerGroupMutation: any;
   removeWorkerFromWorkerGroupMutation: any;
@@ -54,6 +55,7 @@ export function WorkerDialogs({
   workerGroupMembersDialogOpen,
   setWorkerGroupMembersDialogOpen,
   selectedWorkerGroupForMembers,
+  allWorkerGroups,
   allWorkers,
   addWorkerToWorkerGroupMutation,
   removeWorkerFromWorkerGroupMutation,
@@ -334,7 +336,8 @@ export function WorkerDialogs({
               </TableHeader>
               <TableBody>
                 {allWorkers.map((worker) => {
-                  const isMember = selectedWorkerGroupForMembers?.members?.some((m: any) => m.id === worker.id);
+                  const liveGroup = allWorkerGroups.find((g: any) => g.id === selectedWorkerGroupForMembers?.id);
+                  const isMember = liveGroup?.members?.some((m: any) => m.id === worker.id);
                   return (
                     <TableRow key={worker.id}>
                       <TableCell>

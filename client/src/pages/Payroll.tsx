@@ -1295,6 +1295,7 @@ export default function Payroll() {
         workerGroupMembersDialogOpen={workerGroupMembersDialogOpen}
         setWorkerGroupMembersDialogOpen={setWorkerGroupMembersDialogOpen}
         selectedWorkerGroupForMembers={selectedWorkerGroupForMembers}
+        allWorkerGroups={workerGroupsData}
         allWorkers={workerStaff}
         addWorkerToWorkerGroupMutation={addWorkerToWorkerGroupMutation}
         removeWorkerFromWorkerGroupMutation={removeWorkerFromWorkerGroupMutation}
