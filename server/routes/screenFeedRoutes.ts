@@ -50,7 +50,7 @@ export function registerScreenFeedRoutes(app: Express) {
 
   // POST: watched user uploads their screenshot frame + recent clicks.
   app.post("/api/screen-feed", requireLogin, (req, res) => {
-    if (SCREEN_FEED_DISABLED) return res.status(204).end();
+    if (SCREEN_FEED_DISABLED) return res.status(200).end();
 
     if (isDev) {
       console.log(

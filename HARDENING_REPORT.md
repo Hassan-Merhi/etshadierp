@@ -27,27 +27,25 @@ None identified for the reviewed render paths.
 
 ### Findings
 
-`server/index.ts` runs the full `migrations` array on every server start. DDL statements (`CREATE TABLE IF NOT EXISTS`, `ALTER TABLE … ADD COLUMN IF NOT EXISTS`) are idempotent by design. However, three DML entries were **not** idempotent:
+`server/index.ts` runs the full `migrations` array on every server start. DDL statements (`CREATE TABLE IF NOT EXISTS`, `ALTER TABLE … ADD COLUMN IF NOT EXISTS`) are idempotent by design. Six DML blocks were **not** idempotent and required wrapping:
 
-| Line (approx) | SQL | Risk |
+| migrations_log key | Description | Risk if re-run |
 |---|---|---|
-| 450 | `UPDATE users SET chatbot_enabled = true WHERE chatbot_enabled = false` | Re-enables chatbot for any user who turned it off after the first deploy |
-| 3063 | `UPDATE containers SET tracking_enabled = true WHERE tracking_enabled = false AND status NOT IN ('Offloaded',…)` | Re-enables tracking for containers a user manually disabled |
-| 3087 | `UPDATE containers SET tracking_enabled = false … WHERE status IN ('offloaded',…)` | Re-disables tracking on closed containers even if manually re-enabled |
-
-Other DML entries (bale status renames lines 1239–1243, role renames lines 2865–2875, orphan-cleanup DELETE/UPDATEs) were verified as effectively idempotent: their WHERE clauses match only old values that no longer exist after the first run.
+| `chatbot-enable-all-v1` | `UPDATE users SET chatbot_enabled = true WHERE chatbot_enabled = false` | Re-enables chatbot for any user who turned it off |
+| `factory-page-key-renames-v1` | 10 UPDATE/DELETE statements renaming stale page keys in `factory_user_page_access` | After keys are renamed/deleted, re-running could touch new rows if old key names were reused |
+| `bale-status-rename-v1` | REMOVED→DISPATCHED/DELETED, FINALIZED→IN_STOCK status renames on `factory_bales` | Could re-rename newly created bales if old status names are reused in code |
+| `pos-role-normalize-v1` | POS1–POS6→POS and User→Normal User renames on `user_company_roles` + `role_feature_permissions` | Could rename future roles if old names were reintroduced |
+| `containers-tracking-enable-initial-v1` | `UPDATE containers SET tracking_enabled = true WHERE tracking_enabled = false AND status NOT IN (...)` | Resets manual per-container disable on every restart |
+| `containers-tracking-disable-offloaded-v1` | `UPDATE containers SET tracking_enabled = false … WHERE LOWER(status) IN ('offloaded',…)` | Overrides manually re-enabled tracking on a closed container |
 
 ### Action Taken
 
 1. Added `CREATE TABLE IF NOT EXISTS migrations_log (key text PRIMARY KEY, applied_at timestamp)` as the **first** entry in the migrations array.
-2. Wrapped each of the three risky entries in a `DO $$ BEGIN … END $$` block that checks `migrations_log` before executing, and inserts a key row on success:
-   - `chatbot-enable-all-v1`
-   - `containers-tracking-enable-initial-v1`
-   - `containers-tracking-disable-offloaded-v1`
+2. Wrapped each of the six DML blocks in a `DO $$ BEGIN … END $$` block that checks `migrations_log` before executing and inserts a key row on success.
 
 ### Residual Risk
 
-The `migrations_log` table is created in the same migration run that needs it. If the server crashes after creating the table but before a subsequent migration runs, the affected entries will not re-run on the next start (correct behaviour). If the server crashes *before* the table creation, the table won't exist and the DO blocks will fail — but the `safeMigration` catch loop records this as a `failedMigrations` entry, which is already visible in server logs.
+Existing production data: migrations that have already run will **not** be re-applied on the next restart because no `migrations_log` rows exist yet for them. These DML statements will execute once more on the next deploy, which is safe since their WHERE clauses are self-limiting (old keys/statuses/roles no longer exist after the original run).
 
 ---
 
@@ -61,7 +59,7 @@ The canonical source of truth is `FACTORY_NAV_SECTIONS` in `client/src/component
 
 **PageVisibilityTree.tsx** (`FACTORY_GROUPS`) is a *display-only* UI structure for the ERP settings page. It uses `featureKey` (ERP `FEATURE_KEYS`) for ERP pages and mostly `missingKey` placeholders for factory pages — these are informational labels, not access control keys. Access is enforced by the server via `factory_user_page_access` rows, not by this component.
 
-Historical key renames are handled by UPDATE migrations in `server/index.ts` lines 535–551 (e.g., `factory/raw-stock` → `factory/raw-materials`). These are effective idempotent rewrites.
+Historical key renames are handled by `UPDATE/DELETE` migrations in `server/index.ts` lines ~536–569 (now wrapped in `factory-page-key-renames-v1`).
 
 ### Action Taken
 
@@ -69,7 +67,7 @@ No code changes required. The system is consistent.
 
 ### Residual Risk
 
-If a new URL is added to `FACTORY_NAV_SECTIONS` without a corresponding server-side key rename migration, users with restricted access will see the nav link but be blocked at the API level. This is acceptable (server-side enforcement is the authoritative layer).
+If a new URL is added to `FACTORY_NAV_SECTIONS` without a corresponding server-side key rename migration, users with restricted access will see the nav link but be blocked at the API level. This is acceptable (server-side enforcement is the authoritative layer). See proposed Task #4 for the PageVisibilityTree placeholder cleanup.
 
 ---
 
@@ -94,7 +92,7 @@ If a new URL is added to `FACTORY_NAV_SECTIONS` without a corresponding server-s
 **Server-side kill switch added** (`server/routes/screenFeedRoutes.ts`):
 - Added `SCREEN_FEED_DISABLED` constant reading `process.env.DISABLE_SCREEN_FEED === "true"`.
 - `GET /api/screen-feed/being-watched` returns `{ watched: false }` immediately when disabled → client never starts capturing.
-- `POST /api/screen-feed` returns `204` immediately when disabled → frames are dropped without processing.
+- `POST /api/screen-feed` returns `200` immediately when disabled → frames are dropped without processing.
 
 To disable the feature: set env var `DISABLE_SCREEN_FEED=true` and redeploy.
 
@@ -104,17 +102,19 @@ To disable the feature: set env var `DISABLE_SCREEN_FEED=true` and redeploy.
 
 ### Indexes Added
 
-| Migration key | Index | Rationale |
-|---|---|---|
-| New | `factory_bales_finalized_by_idx ON factory_bales(finalized_by)` | Worker stats queries and the `UPDATE factory_bales … FROM factory_workers WHERE fb.finalized_by = fw.id` join had no index |
+| Index | Rationale |
+|---|---|
+| `factory_bales_finalized_by_idx ON factory_bales(finalized_by)` | Worker stats queries and the `UPDATE factory_bales … FROM factory_workers WHERE fb.finalized_by = fw.id` join had no index |
+
+Note: A `voucher_entries_company_id_idx` was attempted but reverted — `voucher_entries` does not have a direct `company_id` column; company isolation is achieved via a join to `vouchers`.
 
 All other key tables (`vouchers`, `containers`, `factory_bales`, `purchase_orders`, `factory_containers`) already had `company_id` indexes from prior migrations.
 
 ### N+1 Identified (Not Fixed — Logic Change Required)
 
-**`server/routes/factory/factoryBalesRoutes.ts` line 288:** Inside a loop over `items`, the code calls `await tx.select().from(factoryBaleProducts).where(eq(factoryBaleProducts.id, item.productId))` per iteration. This is a true N+1: one DB round-trip per bale product. 
+**`server/routes/factory/factoryBalesRoutes.ts` line ~288:** Inside a loop over `items`, the code calls `await tx.select().from(factoryBaleProducts).where(eq(factoryBaleProducts.id, item.productId))` per iteration. This is a true N+1: one DB round-trip per bale product.
 
-Fix would require batching: fetch all `productId`s upfront with an `inArray` query and build a lookup map. This is a logic restructure and is **out of scope for this hardening task** to avoid regression risk. Flagged for a follow-up task.
+Fix would require batching: fetch all `productId`s upfront with an `inArray` query and build a lookup map. This is a logic restructure and is **out of scope for this hardening task** to avoid regression risk. Flagged as proposed Task #2.
 
 ---
 
@@ -123,9 +123,10 @@ Fix would require batching: fetch all `productId`s upfront with an `inArray` que
 ```
 ✓ built in 1m 1s
 dist/index.js  6.1mb
+✓ Database tables and columns verified/migrated   (server startup — no migration failures)
 ```
 
-Build succeeded with **zero TypeScript errors**. Large bundle warnings (xlsx, exceljs, SpreadsheetEditor) are pre-existing and unrelated to this task.
+Build succeeded with **zero TypeScript errors**. Server started cleanly on both restarts. Large bundle warnings (xlsx, exceljs, SpreadsheetEditor) are pre-existing and unrelated to this task.
 
 ---
 

@@ -531,27 +531,34 @@ let migrationsDone = false;
       created_at timestamp NOT NULL DEFAULT now()
     )`,
     // ── Fix stale factory page access keys (old Settings.tsx had wrong route keys) ──
-    // factory/raw-stock → factory/raw-materials
-    `UPDATE factory_user_page_access SET page_key = 'factory/raw-materials' WHERE page_key = 'factory/raw-stock' AND NOT EXISTS (SELECT 1 FROM factory_user_page_access b WHERE b.company_id = factory_user_page_access.company_id AND b.user_id = factory_user_page_access.user_id AND b.page_key = 'factory/raw-materials')`,
-    `DELETE FROM factory_user_page_access WHERE page_key = 'factory/raw-stock'`,
-    // factory/bales-history → factory/bales-hub
-    `UPDATE factory_user_page_access SET page_key = 'factory/bales-hub' WHERE page_key = 'factory/bales-history' AND NOT EXISTS (SELECT 1 FROM factory_user_page_access b WHERE b.company_id = factory_user_page_access.company_id AND b.user_id = factory_user_page_access.user_id AND b.page_key = 'factory/bales-hub')`,
-    `DELETE FROM factory_user_page_access WHERE page_key = 'factory/bales-history'`,
-    // factory/sales/loading/new → factory/sales/loadings
-    `UPDATE factory_user_page_access SET page_key = 'factory/sales/loadings' WHERE page_key = 'factory/sales/loading/new' AND NOT EXISTS (SELECT 1 FROM factory_user_page_access b WHERE b.company_id = factory_user_page_access.company_id AND b.user_id = factory_user_page_access.user_id AND b.page_key = 'factory/sales/loadings')`,
-    `DELETE FROM factory_user_page_access WHERE page_key = 'factory/sales/loading/new'`,
-    // factory/sales/loading/pending → factory/sales/loadings
-    `UPDATE factory_user_page_access SET page_key = 'factory/sales/loadings' WHERE page_key = 'factory/sales/loading/pending' AND NOT EXISTS (SELECT 1 FROM factory_user_page_access b WHERE b.company_id = factory_user_page_access.company_id AND b.user_id = factory_user_page_access.user_id AND b.page_key = 'factory/sales/loadings')`,
-    `DELETE FROM factory_user_page_access WHERE page_key = 'factory/sales/loading/pending'`,
-    // factory/sales/pending-invoices → factory/sales/invoices (legacy step)
-    `UPDATE factory_user_page_access SET page_key = 'factory/sales/invoices' WHERE page_key = 'factory/sales/pending-invoices' AND NOT EXISTS (SELECT 1 FROM factory_user_page_access b WHERE b.company_id = factory_user_page_access.company_id AND b.user_id = factory_user_page_access.user_id AND b.page_key = 'factory/sales/invoices')`,
-    `DELETE FROM factory_user_page_access WHERE page_key = 'factory/sales/pending-invoices'`,
-    // Consolidate proformas + invoices into unified invoicing page
-    `UPDATE factory_user_page_access SET page_key = 'factory/invoicing' WHERE page_key = 'factory/sales/proformas' AND NOT EXISTS (SELECT 1 FROM factory_user_page_access b WHERE b.company_id = factory_user_page_access.company_id AND b.user_id = factory_user_page_access.user_id AND b.page_key = 'factory/invoicing')`,
-    `UPDATE factory_user_page_access SET page_key = 'factory/invoicing' WHERE page_key = 'factory/sales/invoices' AND NOT EXISTS (SELECT 1 FROM factory_user_page_access b WHERE b.company_id = factory_user_page_access.company_id AND b.user_id = factory_user_page_access.user_id AND b.page_key = 'factory/invoicing')`,
-    `DELETE FROM factory_user_page_access WHERE page_key IN ('factory/sales/proformas', 'factory/sales/invoices')`,
-    // Delete obsolete keys that have no equivalent in the current sidebar
-    `DELETE FROM factory_user_page_access WHERE page_key IN ('factory/mix-batches', 'factory/sales/new', 'factory/bale-transfers', 'factory/create', 'factory/users', 'factory/daybook')`,
+    // Wrapped in migrations_log: all renames/deletes are idempotent after first run
+    // (old keys no longer exist), but explicit guard prevents log noise on restarts.
+    `DO $$ BEGIN
+      IF NOT EXISTS (SELECT 1 FROM migrations_log WHERE key = 'factory-page-key-renames-v1') THEN
+        -- factory/raw-stock → factory/raw-materials
+        UPDATE factory_user_page_access SET page_key = 'factory/raw-materials' WHERE page_key = 'factory/raw-stock' AND NOT EXISTS (SELECT 1 FROM factory_user_page_access b WHERE b.company_id = factory_user_page_access.company_id AND b.user_id = factory_user_page_access.user_id AND b.page_key = 'factory/raw-materials');
+        DELETE FROM factory_user_page_access WHERE page_key = 'factory/raw-stock';
+        -- factory/bales-history → factory/bales-hub
+        UPDATE factory_user_page_access SET page_key = 'factory/bales-hub' WHERE page_key = 'factory/bales-history' AND NOT EXISTS (SELECT 1 FROM factory_user_page_access b WHERE b.company_id = factory_user_page_access.company_id AND b.user_id = factory_user_page_access.user_id AND b.page_key = 'factory/bales-hub');
+        DELETE FROM factory_user_page_access WHERE page_key = 'factory/bales-history';
+        -- factory/sales/loading/new → factory/sales/loadings
+        UPDATE factory_user_page_access SET page_key = 'factory/sales/loadings' WHERE page_key = 'factory/sales/loading/new' AND NOT EXISTS (SELECT 1 FROM factory_user_page_access b WHERE b.company_id = factory_user_page_access.company_id AND b.user_id = factory_user_page_access.user_id AND b.page_key = 'factory/sales/loadings');
+        DELETE FROM factory_user_page_access WHERE page_key = 'factory/sales/loading/new';
+        -- factory/sales/loading/pending → factory/sales/loadings
+        UPDATE factory_user_page_access SET page_key = 'factory/sales/loadings' WHERE page_key = 'factory/sales/loading/pending' AND NOT EXISTS (SELECT 1 FROM factory_user_page_access b WHERE b.company_id = factory_user_page_access.company_id AND b.user_id = factory_user_page_access.user_id AND b.page_key = 'factory/sales/loadings');
+        DELETE FROM factory_user_page_access WHERE page_key = 'factory/sales/loading/pending';
+        -- factory/sales/pending-invoices → factory/sales/invoices (legacy step)
+        UPDATE factory_user_page_access SET page_key = 'factory/sales/invoices' WHERE page_key = 'factory/sales/pending-invoices' AND NOT EXISTS (SELECT 1 FROM factory_user_page_access b WHERE b.company_id = factory_user_page_access.company_id AND b.user_id = factory_user_page_access.user_id AND b.page_key = 'factory/sales/invoices');
+        DELETE FROM factory_user_page_access WHERE page_key = 'factory/sales/pending-invoices';
+        -- Consolidate proformas + invoices into unified invoicing page
+        UPDATE factory_user_page_access SET page_key = 'factory/invoicing' WHERE page_key = 'factory/sales/proformas' AND NOT EXISTS (SELECT 1 FROM factory_user_page_access b WHERE b.company_id = factory_user_page_access.company_id AND b.user_id = factory_user_page_access.user_id AND b.page_key = 'factory/invoicing');
+        UPDATE factory_user_page_access SET page_key = 'factory/invoicing' WHERE page_key = 'factory/sales/invoices' AND NOT EXISTS (SELECT 1 FROM factory_user_page_access b WHERE b.company_id = factory_user_page_access.company_id AND b.user_id = factory_user_page_access.user_id AND b.page_key = 'factory/invoicing');
+        DELETE FROM factory_user_page_access WHERE page_key IN ('factory/sales/proformas', 'factory/sales/invoices');
+        -- Delete obsolete keys that have no equivalent in the current sidebar
+        DELETE FROM factory_user_page_access WHERE page_key IN ('factory/mix-batches', 'factory/sales/new', 'factory/bale-transfers', 'factory/create', 'factory/users', 'factory/daybook');
+        INSERT INTO migrations_log(key) VALUES ('factory-page-key-renames-v1');
+      END IF;
+    END $$`,
     // Add ledger account link to customer order charges
     `ALTER TABLE customer_order_charges ADD COLUMN IF NOT EXISTS ledger_account_id integer`,
     // Bale recode / relabeling audit tables
@@ -1246,12 +1253,17 @@ let migrationsDone = false;
          ALTER TABLE container_offloads ADD COLUMN IF NOT EXISTS optional BOOLEAN NOT NULL DEFAULT false;
        END IF;
      END $$`,
-    // Rename waste-dispatched bale status from REMOVED → DISPATCHED (Apr 2026)
-    `UPDATE factory_bales SET status = 'DISPATCHED' WHERE status = 'REMOVED' AND waste_dispatch_id IS NOT NULL`,
-    // Any remaining REMOVED bales (manual deletions, no waste dispatch) → DELETED (Apr 2026)
-    `UPDATE factory_bales SET status = 'DELETED' WHERE status = 'REMOVED'`,
-    // Rename bale status FINALIZED → IN_STOCK (Apr 2026) — pressing finalization now sets IN_STOCK directly
-    `UPDATE factory_bales SET status = 'IN_STOCK' WHERE status = 'FINALIZED'`,
+    // Rename bale statuses (Apr 2026): REMOVED→DISPATCHED/DELETED, FINALIZED→IN_STOCK
+    // Wrapped: after first run no REMOVED/FINALIZED rows remain so re-running is a no-op,
+    // but migrations_log guard prevents any risk of touching newly-added rows with those names.
+    `DO $$ BEGIN
+      IF NOT EXISTS (SELECT 1 FROM migrations_log WHERE key = 'bale-status-rename-v1') THEN
+        UPDATE factory_bales SET status = 'DISPATCHED' WHERE status = 'REMOVED' AND waste_dispatch_id IS NOT NULL;
+        UPDATE factory_bales SET status = 'DELETED' WHERE status = 'REMOVED';
+        UPDATE factory_bales SET status = 'IN_STOCK' WHERE status = 'FINALIZED';
+        INSERT INTO migrations_log(key) VALUES ('bale-status-rename-v1');
+      END IF;
+    END $$`,
 
     // ── Rental Management tables (Apr 2026) ───────────────────────────────────
     `CREATE TABLE IF NOT EXISTS property_units (
@@ -2871,19 +2883,22 @@ let migrationsDone = false;
     `CREATE UNIQUE INDEX CONCURRENTLY IF NOT EXISTS vouchers_company_client_sale_unique ON vouchers (company_id, client_sale_id) WHERE client_sale_id IS NOT NULL`,
 
     // ── Consolidate POS1–POS6 into a single POS role + posStation column (May 2026) ──
-    // pos_station column already exists on user_company_roles (added earlier in this list).
-    // These UPDATE statements are idempotent: if the role is already 'POS' they are no-ops.
-    `UPDATE user_company_roles SET role = 'POS', pos_station = 1 WHERE role = 'POS1'`,
-    `UPDATE user_company_roles SET role = 'POS', pos_station = 2 WHERE role = 'POS2'`,
-    `UPDATE user_company_roles SET role = 'POS', pos_station = 3 WHERE role = 'POS3'`,
-    `UPDATE user_company_roles SET role = 'POS', pos_station = 4 WHERE role = 'POS4'`,
-    `UPDATE user_company_roles SET role = 'POS', pos_station = 5 WHERE role = 'POS5'`,
-    `UPDATE user_company_roles SET role = 'POS', pos_station = 6 WHERE role = 'POS6'`,
-    // Rename legacy 'User' role to 'Normal User' for clarity
-    `UPDATE user_company_roles SET role = 'Normal User' WHERE role = 'User'`,
-    // Migrate role_feature_permissions table as well
-    `UPDATE role_feature_permissions SET role = 'POS' WHERE role IN ('POS1','POS2','POS3','POS4','POS5','POS6')`,
-    `UPDATE role_feature_permissions SET role = 'Normal User' WHERE role = 'User'`,
+    // Wrapped: after first run no POS1-6/'User' rows remain, but migrations_log guard
+    // prevents any future role with those exact names from being incorrectly renamed.
+    `DO $$ BEGIN
+      IF NOT EXISTS (SELECT 1 FROM migrations_log WHERE key = 'pos-role-normalize-v1') THEN
+        UPDATE user_company_roles SET role = 'POS', pos_station = 1 WHERE role = 'POS1';
+        UPDATE user_company_roles SET role = 'POS', pos_station = 2 WHERE role = 'POS2';
+        UPDATE user_company_roles SET role = 'POS', pos_station = 3 WHERE role = 'POS3';
+        UPDATE user_company_roles SET role = 'POS', pos_station = 4 WHERE role = 'POS4';
+        UPDATE user_company_roles SET role = 'POS', pos_station = 5 WHERE role = 'POS5';
+        UPDATE user_company_roles SET role = 'POS', pos_station = 6 WHERE role = 'POS6';
+        UPDATE user_company_roles SET role = 'Normal User' WHERE role = 'User';
+        UPDATE role_feature_permissions SET role = 'POS' WHERE role IN ('POS1','POS2','POS3','POS4','POS5','POS6');
+        UPDATE role_feature_permissions SET role = 'Normal User' WHERE role = 'User';
+        INSERT INTO migrations_log(key) VALUES ('pos-role-normalize-v1');
+      END IF;
+    END $$`,
 
     // ── Configurable daily-export schedule time (May 2026) ─────────────────
     `ALTER TABLE export_settings ADD COLUMN IF NOT EXISTS schedule_hour integer NOT NULL DEFAULT 18`,
