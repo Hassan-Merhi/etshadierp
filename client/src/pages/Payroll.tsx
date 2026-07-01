@@ -1013,7 +1013,7 @@ export default function Payroll() {
 
   const addWorkerToWorkerGroupMutation = useMutation({
     mutationFn: async ({ groupId, workerId }: { groupId: number; workerId: number }) =>
-      modeApiRequest("POST", `/api/worker-groups/${groupId}/members`, { employeeId: workerId }),
+      modeApiRequest("POST", `/api/worker-groups/${groupId}/members/${workerId}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/worker-groups/with-members", selectedCompany?.id] });
     },
