@@ -137,12 +137,27 @@ export function registerFactoryInsuranceRoutes(app: Express) {
       const ledgerName = `Insurance - ${data.name}`;
       const ledger = await findOrCreateLedger(data.companyId, ledgerName, "Liability");
 
-      const [member] = await db
-        .insert(insuranceMembers)
-        .values({ ...data, ledgerAccountId: ledger.id })
-        .returning();
-
-      res.status(201).json(member);
+      const inserted = await pool.query(
+        `INSERT INTO insurance_members
+           (company_id, name, nationality, position_working, insurance_number,
+            start_date, amount, dob, notes, active, ledger_account_id)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+         RETURNING *`,
+        [
+          data.companyId,
+          data.name,
+          data.nationality ?? null,
+          data.positionWorking ?? null,
+          data.insuranceNumber ?? null,
+          data.startDate,
+          data.amount,
+          data.dob ?? null,
+          data.notes ?? null,
+          data.active ?? true,
+          ledger.id,
+        ]
+      );
+      res.status(201).json(inserted.rows[0]);
     } catch (err: any) {
       console.error("POST /api/insurance/members error:", err);
       res.status(500).json({ message: err.message || "Failed to create insurance member" });
@@ -230,7 +245,6 @@ export function registerFactoryInsuranceRoutes(app: Express) {
   app.post("/api/insurance/generate", requireAuth, async (req: any, res: any) => {
     try {
       const schema = z.object({
-        companyId: z.number().min(1),
         month: z.number().min(1).max(12),
         year: z.number().min(2000).max(2100),
       });
@@ -240,7 +254,7 @@ export function registerFactoryInsuranceRoutes(app: Express) {
       }
 
       const { month, year } = parsed.data;
-      const companyId = parsed.data.companyId || getFactoryCompanyId(req);
+      const companyId = getFactoryCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       // Period: first and last day of the chosen month

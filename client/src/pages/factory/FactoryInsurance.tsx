@@ -31,14 +31,6 @@ import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { useDateFormat } from "@/contexts/DateFormatContext";
 
-interface Company {
-  id: number;
-  companyId: number;
-  companyName: string;
-  companyCode: string;
-  name?: string;
-  code?: string;
-}
 
 interface InsuranceMember {
   id: number;
@@ -79,12 +71,10 @@ const YEARS = Array.from({ length: 5 }, (_, i) => currentYear - 2 + i);
 function MemberFormDialog({
   open,
   onClose,
-  companyId,
   existing,
 }: {
   open: boolean;
   onClose: () => void;
-  companyId: number;
   existing?: InsuranceMember | null;
 }) {
   const { toast } = useToast();
@@ -100,7 +90,7 @@ function MemberFormDialog({
   const saveMutation = useMutation({
     mutationFn: async (data: any) => {
       if (existing) {
-        return apiRequest("PATCH", `/api/insurance/members/${existing.id}`, { ...data, companyId });
+        return apiRequest("PATCH", `/api/insurance/members/${existing.id}`, data);
       } else {
         return apiRequest("POST", "/api/insurance/members", data);
       }
@@ -121,7 +111,6 @@ function MemberFormDialog({
       return;
     }
     saveMutation.mutate({
-      companyId,
       name: name.trim(),
       nationality: nationality || null,
       positionWorking: positionWorking || null,
@@ -243,20 +232,18 @@ function MemberFormDialog({
 // ─── Member Statement Drawer ──────────────────────────────────────────────────
 function MemberStatementDrawer({
   member,
-  companyId,
   onClose,
 }: {
   member: InsuranceMember;
-  companyId: number;
   onClose: () => void;
 }) {
   const { formatDisplayDate } = useDateFormat();
 
   const { data: entries = [], isLoading } = useQuery<LedgerEntry[]>({
-    queryKey: ["/api/insurance/members", member.id, "entries", companyId],
+    queryKey: ["/api/insurance/members", member.id, "entries"],
     queryFn: async () => {
       const res = await fetch(
-        `/api/insurance/members/${member.id}/entries?companyId=${companyId}`,
+        `/api/insurance/members/${member.id}/entries`,
         { credentials: "include" }
       );
       if (!res.ok) return [];
@@ -373,7 +360,6 @@ export default function FactoryInsurance() {
   const { formatDisplayDate } = useDateFormat();
   const [, navigate] = useLocation();
 
-  const [companyId, setCompanyId] = useState<number | null>(null);
   const [includeInactive, setIncludeInactive] = useState(false);
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [editMember, setEditMember] = useState<InsuranceMember | null>(null);
@@ -384,28 +370,19 @@ export default function FactoryInsurance() {
   const [genMonth, setGenMonth] = useState(new Date().getMonth() + 1);
   const [genYear, setGenYear] = useState(new Date().getFullYear());
 
-  const { data: companies = [] } = useQuery<Company[]>({ queryKey: ["/api/user/companies"] });
-  const firstCompanyId = companies.length > 0 ? companies[0].companyId : null;
-  const selectedCompanyId = companyId ?? firstCompanyId;
-
   const { data: members = [], isLoading } = useQuery<InsuranceMember[]>({
-    queryKey: ["/api/insurance/members", selectedCompanyId, includeInactive],
+    queryKey: ["/api/insurance/members", includeInactive],
     queryFn: async () => {
-      if (!selectedCompanyId) return [];
-      const params = new URLSearchParams({
-        companyId: String(selectedCompanyId),
-        includeInactive: String(includeInactive),
-      });
+      const params = new URLSearchParams({ includeInactive: String(includeInactive) });
       const res = await fetch(`/api/insurance/members?${params}`, { credentials: "include" });
       if (!res.ok) return [];
       return res.json();
     },
-    enabled: !!selectedCompanyId,
   });
 
   const toggleMutation = useMutation({
     mutationFn: async (member: InsuranceMember) => {
-      return apiRequest("PATCH", `/api/insurance/members/${member.id}/toggle`, { companyId: member.companyId });
+      return apiRequest("PATCH", `/api/insurance/members/${member.id}/toggle`, {});
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/insurance/members"] });
@@ -419,7 +396,6 @@ export default function FactoryInsurance() {
   const generateMutation = useMutation({
     mutationFn: async () => {
       return apiRequest("POST", "/api/insurance/generate", {
-        companyId: selectedCompanyId,
         month: genMonth,
         year: genYear,
       });
@@ -472,31 +448,8 @@ export default function FactoryInsurance() {
           subtitle="Manage insurance members and generate monthly entries"
         />
         <div className="flex items-center gap-2 flex-wrap">
-          {companies.length > 1 && (
-            <div className="flex items-center gap-1.5">
-              <span className="text-sm text-muted-foreground whitespace-nowrap">Company:</span>
-              <Select
-                value={selectedCompanyId ? String(selectedCompanyId) : ""}
-                onValueChange={(v) => setCompanyId(parseInt(v))}
-              >
-                <SelectTrigger className="w-44" data-testid="select-company">
-                  <SelectValue>
-                    {companies.find((c) => c.companyId === selectedCompanyId)?.companyName ?? "Select company"}
-                  </SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                  {companies.map((c) => (
-                    <SelectItem key={c.companyId} value={String(c.companyId)}>
-                      {c.companyName}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          )}
           <Button
             onClick={() => setShowGenDialog(true)}
-            disabled={!selectedCompanyId}
             data-testid="button-generate-entries"
           >
             <DollarSign className="h-4 w-4 mr-1" />
@@ -505,7 +458,6 @@ export default function FactoryInsurance() {
           <Button
             variant="outline"
             onClick={() => setShowAddDialog(true)}
-            disabled={!selectedCompanyId}
             data-testid="button-add-member"
           >
             <Plus className="h-4 w-4 mr-1" />
@@ -683,23 +635,21 @@ export default function FactoryInsurance() {
       </Card>
 
       {/* Member Statement Drawer */}
-      {statementMember && selectedCompanyId && (
+      {statementMember && (
         <MemberStatementDrawer
           member={statementMember}
-          companyId={selectedCompanyId}
           onClose={() => setStatementMember(null)}
         />
       )}
 
       {/* Add / Edit Member Dialog */}
-      {(showAddDialog || editMember) && selectedCompanyId && (
+      {(showAddDialog || editMember) && (
         <MemberFormDialog
           open={showAddDialog || !!editMember}
           onClose={() => {
             setShowAddDialog(false);
             setEditMember(null);
           }}
-          companyId={selectedCompanyId}
           existing={editMember}
         />
       )}
