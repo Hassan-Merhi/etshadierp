@@ -1470,7 +1470,7 @@ export default function ERPRunPayroll() {
                       <p className="font-medium mb-1">Employee Bonuses</p>
                       {migrateResult.bonusesMigrated > 0 ? (
                         <p className="text-green-700 dark:text-green-400">
-                          <strong>{migrateResult.bonusesMigrated}</strong> bonus{migrateResult.bonusesMigrated !== 1 ? "es" : ""} moved from "Salary Expense" to "Bonus Expense" accounts.
+                          <strong>{migrateResult.bonusesMigrated}</strong> bonus{migrateResult.bonusesMigrated !== 1 ? "es" : ""} corrected — moved to per-group "Bonus Expense" accounts.
                         </p>
                       ) : (
                         <p className="text-muted-foreground">

@@ -2422,9 +2422,18 @@ export function registerEmployeeRoutes(app: Express) {
           [bv.id]
         );
 
-        // Skip if all debit entries are already per-group accounts (nothing old/generic)
+        // Determine what kind of debit entries exist on this voucher
         const hasOldOrGenericDebit = debitRes.rows.some((e: any) => oldBonusIds.has(e.ledger_account_id));
-        if (!hasOldOrGenericDebit) { bonusesAlreadyCorrect++; continue; }
+        const hasPerGroupDebit = debitRes.rows.some((e: any) => perGroupBonusIds.has(e.ledger_account_id));
+        const creditTotal = creditRes.rows.reduce((s: number, e: any) => s + parseFloat(e.credit_amount), 0);
+
+        // Skip only when per-group debits exist AND no old/generic debit remains
+        // (vouchers with NO debit entries at all must be processed — previous migration may have
+        //  deleted the old entry but failed to insert the replacement)
+        if (!hasOldOrGenericDebit && (hasPerGroupDebit || creditTotal <= 0)) {
+          bonusesAlreadyCorrect++;
+          continue;
+        }
 
         // Group employees from credit entries by their current group membership
         const byGroup = new Map<string, number>();
@@ -2434,13 +2443,14 @@ export function registerEmployeeRoutes(app: Express) {
           byGroup.set(grp, (byGroup.get(grp) || 0) + parseFloat(entry.credit_amount));
         }
 
-        // If no named groups found in credits, fall back to the debit amount total
-        // so we at least move it to BONUS_EXPENSE (correct account, even if not split)
+        // If no groups derived from credits, fall back to debit total (or credit total if
+        // debit entries were already deleted by a previous failed migration run)
         if (byGroup.size === 0) {
-          const totalDebit = debitRes.rows
+          const totalFromDebits = debitRes.rows
             .filter((e: any) => oldBonusIds.has(e.ledger_account_id))
             .reduce((s: number, e: any) => s + parseFloat(e.debit_amount), 0);
-          if (totalDebit > 0) byGroup.set("__default__", totalDebit);
+          const fallbackTotal = totalFromDebits > 0 ? totalFromDebits : creditTotal;
+          if (fallbackTotal > 0) byGroup.set("__default__", fallbackTotal);
         }
 
         // Check if there are any named groups — if only __default__, still fix account code
