@@ -158,6 +158,59 @@ function SupplierRow({ acc, accentClass, index }: { acc: AccountItem; accentClas
   );
 }
 
+/** Extract the prefix before " - " in an account name, or return null if none. */
+function getNamePrefix(name: string): string | null {
+  const idx = name.indexOf(" - ");
+  return idx > 0 ? name.slice(0, idx).trim() : null;
+}
+
+/** A collapsible sub-group for accounts that share the same name prefix. */
+function PrefixGroup({
+  prefix,
+  accounts,
+  accentClass,
+  startIndex,
+}: {
+  prefix: string;
+  accounts: AccountItem[];
+  accentClass: string;
+  startIndex: number;
+}) {
+  const [open, setOpen] = useState(false);
+  const total = accounts.reduce((s, a) => s + a.value, 0);
+
+  return (
+    <div className="divide-y divide-border">
+      <button
+        type="button"
+        className="w-full flex items-center justify-between px-4 py-2 hover-elevate text-sm"
+        onClick={() => setOpen((o) => !o)}
+        data-testid={`toggle-prefix-${prefix.toLowerCase().replace(/\s+/g, "-")}`}
+      >
+        <div className="flex items-center gap-2 min-w-0">
+          {open ? (
+            <ChevronDown className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+          ) : (
+            <ChevronRight className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+          )}
+          <span className="font-medium truncate">{prefix}</span>
+          <Badge variant="outline" className="text-[10px] shrink-0">
+            {accounts.length}
+          </Badge>
+        </div>
+        <span className={`font-mono text-sm font-semibold ml-4 shrink-0 ${accentClass}`}>{fmt(total)}</span>
+      </button>
+      {open && (
+        <div className="divide-y divide-border bg-muted/10">
+          {accounts.map((acc, i) => (
+            <SupplierRow key={i} acc={acc} accentClass={accentClass} index={startIndex + i} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function CategoryGroup({
   title,
   accounts,
@@ -170,6 +223,29 @@ function CategoryGroup({
   const [open, setOpen] = useState(false);
   const total = accounts.reduce((s, a) => s + a.value, 0);
   if (accounts.length === 0) return null;
+
+  // Group accounts by name prefix (part before " - ").
+  // Prefixes shared by ≥2 accounts get a collapsible sub-group row;
+  // single accounts (or those with no prefix) render directly.
+  const prefixMap = new Map<string, AccountItem[]>();
+  const noPrefixAccounts: AccountItem[] = [];
+  for (const acc of accounts) {
+    const prefix = getNamePrefix(acc.name);
+    if (prefix) {
+      if (!prefixMap.has(prefix)) prefixMap.set(prefix, []);
+      prefixMap.get(prefix)!.push(acc);
+    } else {
+      noPrefixAccounts.push(acc);
+    }
+  }
+  // Prefixes with only 1 account fall back to a plain row.
+  const singleFromPrefix: AccountItem[] = [];
+  const multiPrefixes: [string, AccountItem[]][] = [];
+  for (const [prefix, accs] of prefixMap) {
+    if (accs.length === 1) singleFromPrefix.push(accs[0]);
+    else multiPrefixes.push([prefix, accs]);
+  }
+  const plainAccounts = [...noPrefixAccounts, ...singleFromPrefix];
 
   return (
     <div className="border border-border rounded-md overflow-hidden">
@@ -194,8 +270,17 @@ function CategoryGroup({
       </button>
       {open && (
         <div className="divide-y divide-border">
-          {accounts.map((acc, i) => (
-            <SupplierRow key={i} acc={acc} accentClass={accentClass} index={i} />
+          {multiPrefixes.map(([prefix, accs], gi) => (
+            <PrefixGroup
+              key={prefix}
+              prefix={prefix}
+              accounts={accs}
+              accentClass={accentClass}
+              startIndex={gi * 100}
+            />
+          ))}
+          {plainAccounts.map((acc, i) => (
+            <SupplierRow key={acc.name} acc={acc} accentClass={accentClass} index={i} />
           ))}
         </div>
       )}
