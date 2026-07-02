@@ -235,10 +235,6 @@ export function registerLedgerRoutes(app: Express) {
         return res.status(400).json({ message: "Opening balance requires Dr/Cr side" });
       }
 
-      if (!hasBalance && hasSide) {
-        return res.status(400).json({ message: "Dr/Cr side requires opening balance amount" });
-      }
-
       // Validate subType based on accountType
       // "Group" is a universal special subType used to mark an account as a parent group
       // and bypasses the per-type validation intentionally.
@@ -326,10 +322,6 @@ export function registerLedgerRoutes(app: Express) {
 
       if (hasBalance && !hasSide) {
         return res.status(400).json({ message: "Opening balance requires Dr/Cr side" });
-      }
-
-      if (!hasBalance && hasSide) {
-        return res.status(400).json({ message: "Dr/Cr side requires opening balance amount" });
       }
 
       // Validate subType based on accountType if accountType is being updated
