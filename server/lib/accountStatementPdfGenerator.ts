@@ -303,9 +303,10 @@ export async function generateAccountStatementPdf(opts: StatementPdfOptions): Pr
     const formatted = abs % 1 === 0 ? abs.toLocaleString("en") : abs.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
     return currSym + formatted;
   };
-  const fmtDate = (s: string) => {
+  const fmtDate = (s: any) => {
     if (!s) return "";
-    const d = new Date(s.split("T")[0] + "T00:00:00");
+    const str = typeof s === "string" ? s : s instanceof Date ? s.toISOString() : String(s);
+    const d = new Date(str.split("T")[0] + "T00:00:00");
     return d.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
   };
   const periodStr =
