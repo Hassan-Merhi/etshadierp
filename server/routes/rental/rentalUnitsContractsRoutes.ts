@@ -1079,6 +1079,16 @@ export function registerRentalUnitsContractsRoutes(
           })
           .where(eq(propertyContracts.id, id));
 
+        // Guard against duplicate accounting: if a guarantee voucher already exists
+        // for this contract (e.g. "Reset Status" was clicked but didn't delete it),
+        // skip creating a new one — just the flag update above is enough.
+        const existingGuar = await tx.execute(
+          sql`SELECT id FROM vouchers WHERE company_id = ${companyId} AND voucher_number LIKE ${'GUAR-%-' + id} AND deleted_at IS NULL LIMIT 1`
+        );
+        if ((existingGuar.rows ?? existingGuar).length > 0) {
+          return; // voucher already in ledger — flag restored, no duplicate needed
+        }
+
         if (cashAccountId) {
           const tenantPays = module === "ERP" || module === "FACTORY";
           if (tenantPays) {
