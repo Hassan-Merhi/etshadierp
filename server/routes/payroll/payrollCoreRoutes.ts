@@ -3,7 +3,7 @@ import { getClientDate } from "../../lib/dateUtils";
 import type { Express } from "express";
 import { db } from "../../db";
 import { requireAuth } from "../../auth";
-import { eq, and, desc, sql, ilike, gte, lte, inArray, isNotNull } from "drizzle-orm";
+import { eq, and, desc, sql, ilike, gte, lte, inArray, isNotNull, isNull } from "drizzle-orm";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
@@ -72,25 +72,40 @@ async function writeDaybookEntry(
   });
 }
 
-/** Find or create a ledger account by name for a company. Returns the account row. */
+/** Find or create a ledger account by name for a company. Returns the account row.
+ *  Skips soft-deleted accounts and handles race-condition unique-constraint failures. */
 async function findOrCreateLedger(companyId: number, name: string, accountType: string): Promise<{ id: number }> {
   const [existing] = await db
     .select({ id: ledgerAccounts.id })
     .from(ledgerAccounts)
-    .where(and(eq(ledgerAccounts.companyId, companyId), eq(ledgerAccounts.name, name)));
+    .where(and(eq(ledgerAccounts.companyId, companyId), eq(ledgerAccounts.name, name), isNull(ledgerAccounts.deletedAt)));
   if (existing) return existing;
 
-  const [maxCodeRow] = await db
-    .select({ maxCode: sql`MAX(CAST(code AS INTEGER))` })
-    .from(ledgerAccounts)
-    .where(and(eq(ledgerAccounts.companyId, companyId), sql`code ~ '^\d+$'`));
-  const nextCode = String((parseInt((maxCodeRow as any)?.maxCode || "0") || 0) + 1);
-
-  const [created] = await db
-    .insert(ledgerAccounts)
-    .values({ companyId, code: nextCode, name, accountType, active: true, isHidden: false })
-    .returning({ id: ledgerAccounts.id });
-  return created;
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const [maxCodeRow] = await db
+      .select({ maxCode: sql`MAX(CAST(code AS INTEGER))` })
+      .from(ledgerAccounts)
+      .where(and(eq(ledgerAccounts.companyId, companyId), sql`code ~ '^\\d+$'`));
+    const nextCode = String((parseInt((maxCodeRow as any)?.maxCode || "0") || 0) + 1 + attempt);
+    try {
+      const [created] = await db
+        .insert(ledgerAccounts)
+        .values({ companyId, code: nextCode, name, accountType, active: true, isHidden: false })
+        .returning({ id: ledgerAccounts.id });
+      return created;
+    } catch (err: any) {
+      if (err?.code === "23505" || err?.message?.includes("unique")) {
+        const [nowFound] = await db
+          .select({ id: ledgerAccounts.id })
+          .from(ledgerAccounts)
+          .where(and(eq(ledgerAccounts.companyId, companyId), eq(ledgerAccounts.name, name), isNull(ledgerAccounts.deletedAt)));
+        if (nowFound) return nowFound;
+        continue;
+      }
+      throw err;
+    }
+  }
+  throw new Error(`Unable to create ledger account "${name}" after multiple attempts`);
 }
 
 const workerUpload = multer({
@@ -524,19 +539,16 @@ export function registerPayrollCoreRoutes(app: Express) {
 
       // Pre-resolve city-specific ledger accounts OUTSIDE the transaction
       const uniqueCityKeys = [...new Set(targetWorkers.map((w: any) => (w.city as string | null)?.trim() || ""))];
-      const [payableAccGen, advancesAccGen] = await Promise.all([
-        findOrCreateLedger(companyId, "Payroll Payable", "Liability"),
-        findOrCreateLedger(companyId, "Factory Worker Advances", "Asset"),
-      ]);
+      // Sequential calls to avoid simultaneous MAX(code) reads returning the same nextCode
+      const payableAccGen = await findOrCreateLedger(companyId, "Payroll Payable", "Liability");
+      const advancesAccGen = await findOrCreateLedger(companyId, "Factory Worker Advances", "Asset");
       // Map: cityKey → { salaryId, bonusId }. Empty key = no city → legacy "Factory Worker Payroll"
       const cityAccCache = new Map<string, { salaryId: number; bonusId: number }>();
       for (const ck of uniqueCityKeys) {
         if (ck) {
           const capCity = ck.charAt(0).toUpperCase() + ck.slice(1).toLowerCase();
-          const [sa, ba] = await Promise.all([
-            findOrCreateLedger(companyId, `Salary Expense - ${capCity}`, "Expense"),
-            findOrCreateLedger(companyId, `Bonus Expense - ${capCity}`, "Expense"),
-          ]);
+          const sa = await findOrCreateLedger(companyId, `Salary Expense - ${capCity}`, "Expense");
+          const ba = await findOrCreateLedger(companyId, `Bonus Expense - ${capCity}`, "Expense");
           cityAccCache.set(ck, { salaryId: sa.id, bonusId: ba.id });
         } else {
           const fa = await findOrCreateLedger(companyId, "Factory Worker Payroll", "Expense");
