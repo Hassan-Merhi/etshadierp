@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useMemo } from "react";
+import { useState, useRef, useCallback, useMemo, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation, useSearch } from "wouter";
 import { Button } from "@/components/ui/button";
@@ -286,6 +286,19 @@ export default function Accounts() {
     queryKey: ["/api/accounts/all", selectedCompany?.id],
     enabled: !!selectedCompany,
   });
+
+  // Auto-select account when navigated here from ledger monthly summary (or any deep-link with ?accountId=)
+  useEffect(() => {
+    if (!urlAccountId || !allAccounts.length || selectedAccount) return;
+    const numId = parseInt(urlAccountId, 10);
+    const found = urlAccountType
+      ? allAccounts.find((a) => a.accountId === numId && a.type === urlAccountType)
+      : allAccounts.find((a) => a.accountId === numId);
+    if (found) {
+      fromExternalNavRef.current = true;
+      setSelectedAccount(found);
+    }
+  }, [allAccounts, urlAccountId, urlAccountType]);
 
   // Dedicated query for Group accounts used by the Parent Group combobox.
   // Uses /api/ledger-accounts directly (same source as Account Groups page) so

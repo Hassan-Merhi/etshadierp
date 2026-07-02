@@ -3,7 +3,7 @@ import { useLocation, useRoute } from "wouter";
 import { useBackToParent } from "@/hooks/use-back-to-parent";
 import { useEscapeToParent } from "@/hooks/use-escape-to-parent";
 import { useQuery } from "@tanstack/react-query";
-import { useAppMode } from "@/contexts/AppModeContext";
+import { useAppMode, getModePrefix } from "@/contexts/AppModeContext";
 import { getApiRequest } from "@/lib/factoryApi";
 import { formatNumber, drCrClass } from "@/lib/formatNumber";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
@@ -109,7 +109,10 @@ export default function LedgerMonthlySummary() {
     })) || [];
 
   const handleMonthClick = (month: number, year: number) => {
-    window.open(`/ledger-vouchers/${accountId}/${year}/${month}`, "_blank");
+    const prefix = getModePrefix(appMode);
+    const startDate = format(new Date(year, month - 1, 1), "yyyy-MM-dd");
+    const endDate = format(new Date(year, month, 0), "yyyy-MM-dd");
+    navigate(`${prefix}/accounts?accountId=${accountId}&accountType=ledger&startDate=${startDate}&endDate=${endDate}`);
   };
 
   if (!accountId) {
@@ -219,8 +222,11 @@ export default function LedgerMonthlySummary() {
                       </TableRow>
 
                       {/* Monthly rows */}
-                      {(Array.isArray(data.months) ? data.months : []).map((month) => {
-                        const year = parseISO(data.dateRange.startDate).getFullYear();
+                      {(() => {
+                        const startYear = parseISO(data.dateRange.startDate).getFullYear();
+                        const startMonthNum = parseISO(data.dateRange.startDate).getMonth() + 1;
+                        return (Array.isArray(data.months) ? data.months : []).map((month) => {
+                        const year = month.month >= startMonthNum ? startYear : startYear + 1;
                         return (
                           <TableRow
                             key={month.month}
@@ -246,7 +252,8 @@ export default function LedgerMonthlySummary() {
                             </TableCell>
                           </TableRow>
                         );
-                      })}
+                      });
+                      })()}
 
                       {/* Grand Total */}
                       <TableRow className="bg-primary/10 font-bold border-t-2">
