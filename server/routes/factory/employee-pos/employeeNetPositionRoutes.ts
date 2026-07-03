@@ -1209,28 +1209,11 @@ export function registerEmployeeNetPositionRoutes(app: Express) {
         }
       }
 
-      // ── Employee L'shi (Worker) Advances Outstanding ──────────────────────────
-      // Advances given to factory workers are money they owe back to the company → asset (forUs).
-      // Only count advances dated on or before asOf and not yet fully repaid.
-      const workerAdvancesAgg = await db
-        .select({
-          total: sql<string>`COALESCE(SUM(CAST(${factoryWorkerAdvances.remainingBalance} AS numeric)), 0)`,
-        })
-        .from(factoryWorkerAdvances)
-        .where(
-          and(
-            eq(factoryWorkerAdvances.companyId, companyId),
-            eq(factoryWorkerAdvances.fullyPaid, false),
-            sql`${factoryWorkerAdvances.advanceDate} <= ${asOf}::date`
-          )
-        );
-      const workerOutstandingAdvances = round2(parseFloat((workerAdvancesAgg[0] as any)?.total || "0"));
 
       // forUsTotal: ledger assets + inventory + raw material + balance on table + stock OTW
       //             + customer receivables (DR) + pending orders + verified orders + loading orders
       //             + overpaid suppliers (they owe us the overpayment back)
       //             + prepaidRent (we overpaid our landlord → asset)
-      //             + worker advances outstanding (employees owe this back to the company)
       //             (bales are reserved/excluded from baleInventoryValue — no double-count)
       const totalSupplierOverpaymentsRounded = round2(totalSupplierOverpayments);
       const forUsTotal = round2(
@@ -1244,8 +1227,7 @@ export function registerEmployeeNetPositionRoutes(app: Express) {
           verifiedTotal +
           loadingTotal +
           totalSupplierOverpaymentsRounded +
-          prepaidRent +
-          workerOutstandingAdvances
+          prepaidRent
       );
       // ── Employee Salaries Payable — directly from employees.currentBalance ───────
       // Employee balances are tracked via employees.currentBalance (not through a
@@ -1338,9 +1320,6 @@ export function registerEmployeeNetPositionRoutes(app: Express) {
           : []),
         ...(prepaidRent > 0
           ? [{ name: "Prepaid Rent", code: "PREPAID_RENT", value: prepaidRent, category: "Prepaid Rent" }]
-          : []),
-        ...(workerOutstandingAdvances > 0
-          ? [{ name: "Employee Advances (L'shi)", code: "WORKER_ADVANCES", value: workerOutstandingAdvances, category: "Employee Advances" }]
           : []),
       ];
 
