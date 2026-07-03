@@ -363,8 +363,12 @@ export default function Accounts() {
   }, [rawTransactionData]);
 
   // broughtForwardBalance = stored account opening balance + net of all entries before the period start.
+  // openingBalance from the API is always an unsigned positive number; openingBalanceSide carries the sign.
+  // Cr opening balances must be negated (convention: positive = Dr, negative = Cr).
   const broughtForwardBalance = useMemo(() => {
-    const storedOB = selectedAccount?.openingBalance || 0;
+    const rawOB = parseFloat(String(selectedAccount?.openingBalance ?? 0)) || 0;
+    const obSide = (selectedAccount as any)?.openingBalanceSide || "Dr";
+    const storedOB = obSide === "Cr" ? -rawOB : rawOB;
     if (!rawTransactionData || Array.isArray(rawTransactionData)) return storedOB;
     return storedOB + (rawTransactionData.preNetBalance ?? 0);
   }, [rawTransactionData, selectedAccount]);
