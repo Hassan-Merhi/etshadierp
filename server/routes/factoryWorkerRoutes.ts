@@ -1,5 +1,6 @@
 import { parseId, parseOptionalId } from "../lib/parseId";
 import { getClientDate } from "../lib/dateUtils";
+import { db, pool } from "../db";
 import type { Express } from "express";
 import { checkFactoryAdmin } from "./factory/_helpers";
 import { eq, and, desc, sql, ilike, gte, lte, inArray, isNotNull } from "drizzle-orm";
@@ -247,7 +248,23 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
         .where(and(...conditions))
         .orderBy(factoryWorkers.fullName);
 
-      res.json(results);
+      // Attach pending advance balance per worker
+      const advRows = await pool.query(
+        `SELECT worker_id, COALESCE(SUM(remaining_balance), 0) AS pending_balance
+         FROM factory_worker_advances
+         WHERE company_id = $1 AND remaining_balance > 0
+         GROUP BY worker_id`,
+        [companyId]
+      );
+      const advMap: Record<number, number> = {};
+      for (const r of advRows.rows) advMap[r.worker_id] = parseFloat(r.pending_balance);
+
+      const enriched = results.map((w) => ({
+        ...w,
+        pendingAdvanceBalance: (advMap[w.id] ?? 0).toFixed(2),
+      }));
+
+      res.json(enriched);
     } catch (error: any) {
       console.error("Error fetching factory workers:", error);
       res.status(500).json({ message: error.message });

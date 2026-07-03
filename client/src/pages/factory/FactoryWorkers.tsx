@@ -20,6 +20,8 @@ import {
   Check,
   ChevronsUpDown,
   PlusCircle,
+  Bus,
+  Banknote,
 } from "lucide-react";
 import { ExcelJS, writeFile } from "@/lib/excelHelper";
 import { Button } from "@/components/ui/button";
@@ -1039,6 +1041,8 @@ export default function FactoryWorkers() {
   const balance = endResult ? parseFloat(endResult.balance) : 0;
 
   const totalSalary = (workers ?? []).filter((w) => w.active).reduce((s, w) => s + parseFloat(w.baseSalary || "0"), 0);
+  const totalTransport = (workers ?? []).filter((w) => w.active).reduce((s, w) => s + parseFloat((w as any).transportAllowance || "0"), 0);
+  const totalAdvances = (workers ?? []).reduce((s, w) => s + parseFloat((w as any).pendingAdvanceBalance || "0"), 0);
 
   return (
     <div className="space-y-5">
@@ -1093,6 +1097,16 @@ export default function FactoryWorkers() {
                   <Download className="h-4 w-4 text-muted-foreground" />
                   <span className="text-muted-foreground">Total Salary</span>
                   <span className="font-semibold font-mono">${totalSalary.toLocaleString()}</span>
+                </div>
+                <div className="flex items-center gap-2 rounded-lg border bg-muted/40 px-4 py-2 text-sm">
+                  <Bus className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-muted-foreground">Transport</span>
+                  <span className="font-semibold font-mono">${totalTransport.toLocaleString()}</span>
+                </div>
+                <div className="flex items-center gap-2 rounded-lg border bg-muted/40 px-4 py-2 text-sm">
+                  <Banknote className="h-4 w-4 text-amber-500" />
+                  <span className="text-muted-foreground">Advances</span>
+                  <span className="font-semibold font-mono">${totalAdvances.toLocaleString()}</span>
                 </div>
               </>
             )}
@@ -1184,6 +1198,12 @@ export default function FactoryWorkers() {
                   </TableHead>
                   <TableHead className="w-[11%] text-right text-xs font-semibold uppercase tracking-wide text-muted-foreground py-2">
                     Salary
+                  </TableHead>
+                  <TableHead className="w-[9%] text-right text-xs font-semibold uppercase tracking-wide text-muted-foreground py-2">
+                    Transport
+                  </TableHead>
+                  <TableHead className="w-[9%] text-right text-xs font-semibold uppercase tracking-wide text-muted-foreground py-2">
+                    Advance
                   </TableHead>
                   <TableHead className="w-[90px] text-xs font-semibold uppercase tracking-wide text-muted-foreground py-2">
                     Status
@@ -1283,6 +1303,22 @@ export default function FactoryWorkers() {
                       <TableCell className="py-3 text-right font-mono text-sm text-muted-foreground">
                         {worker.baseSalary ? (
                           `$${parseFloat(worker.baseSalary).toLocaleString()}`
+                        ) : (
+                          <span className="text-muted-foreground/40">—</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="py-3 text-right font-mono text-sm text-muted-foreground">
+                        {parseFloat((worker as any).transportAllowance || "0") > 0 ? (
+                          `$${parseFloat((worker as any).transportAllowance).toLocaleString()}`
+                        ) : (
+                          <span className="text-muted-foreground/40">—</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="py-3 text-right font-mono text-sm">
+                        {parseFloat((worker as any).pendingAdvanceBalance || "0") > 0 ? (
+                          <span className="text-amber-600 dark:text-amber-400">
+                            ${parseFloat((worker as any).pendingAdvanceBalance).toLocaleString()}
+                          </span>
                         ) : (
                           <span className="text-muted-foreground/40">—</span>
                         )}
