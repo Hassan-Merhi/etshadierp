@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import {
   ArrowLeft,
+  ArrowRightLeft,
   Building2,
   Calendar,
   ChevronRight,
@@ -27,6 +28,7 @@ interface BrokerOverviewPanelProps {
   setParentViewSupplierId: (id: number | null) => void;
   openChildStatement: (id: number) => void;
   openPaymentDialog: (sup: SupplierWithBalance) => void;
+  openFxConversionDialog: (sup: SupplierWithBalance, currencyCode: string, balance: number) => void;
   formatNum: (val: string) => string;
   formatDate: (val: string) => string;
 }
@@ -42,6 +44,7 @@ export function BrokerOverviewPanel({
   setParentViewSupplierId,
   openChildStatement,
   openPaymentDialog,
+  openFxConversionDialog,
   formatNum,
   formatDate,
 }: BrokerOverviewPanelProps) {
@@ -255,7 +258,24 @@ export function BrokerOverviewPanel({
                       )}
                     </div>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1">
+                    {child.isActive && (() => {
+                      const childNonUsd = (child.currencyBalances || []).filter(
+                        (c: CurrencyBalance) => c.currencyCode !== "USD" && c.balance > 0.005
+                      );
+                      return childNonUsd.map((cb: CurrencyBalance) => (
+                        <Button
+                          key={cb.currencyCode}
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => openFxConversionDialog(child, cb.currencyCode, cb.balance)}
+                          title={`FX Settlement: settle ${cb.currencyCode} → USD`}
+                          data-testid={`button-fx-child-${child.id}-${cb.currencyCode}`}
+                        >
+                          <ArrowRightLeft className="h-4 w-4 text-blue-500 dark:text-blue-400" />
+                        </Button>
+                      ));
+                    })()}
                     {child.isActive && (
                       <Button
                         variant="ghost"

@@ -622,26 +622,104 @@ export default function FactorySuppliers() {
 
   if (parentViewSupplierId) {
     return (
-      <BrokerOverviewPanel
-        parentViewSupplierId={parentViewSupplierId}
-        allSuppliers={allSuppliers}
-        subAccountsByParent={subAccountsByParent}
-        brokerOverviewStatement={brokerOverviewStatement}
-        brokerOverviewLoading={brokerOverviewLoading}
-        brokerIncludeOtw={brokerIncludeOtw}
-        setBrokerIncludeOtw={setBrokerIncludeOtw}
-        setParentViewSupplierId={setParentViewSupplierId}
-        openChildStatement={(id) => {
-          setStatementSupplierId(id);
-          setStatementReturnToParent(true);
-        }}
-        openPaymentDialog={(s) => {
-          setPaymentDialogSupplier(s);
-          setPaymentForm({ ...paymentForm, supplierId: s.id });
-        }}
-        formatNum={formatNum}
-        formatDate={formatDate}
-      />
+      <>
+        <BrokerOverviewPanel
+          parentViewSupplierId={parentViewSupplierId}
+          allSuppliers={allSuppliers}
+          subAccountsByParent={subAccountsByParent}
+          brokerOverviewStatement={brokerOverviewStatement}
+          brokerOverviewLoading={brokerOverviewLoading}
+          brokerIncludeOtw={brokerIncludeOtw}
+          setBrokerIncludeOtw={setBrokerIncludeOtw}
+          setParentViewSupplierId={setParentViewSupplierId}
+          openChildStatement={(id) => {
+            setStatementSupplierId(id);
+            setStatementReturnToParent(true);
+          }}
+          openPaymentDialog={(s) => {
+            setPaymentDialogSupplier(s);
+            setPaymentForm({ ...paymentForm, supplierId: s.id });
+          }}
+          openFxConversionDialog={(s, currencyCode, balance) => {
+            const toId = (s as any).parentId || s.id;
+            const balStr = balance.toFixed(2);
+            setFxConversionForm({
+              fromSupplierId: s.id,
+              toSupplierId: toId,
+              selectedCurrency: currencyCode,
+              amount: balStr,
+              availableBalance: balStr,
+              supplierBalance: balStr,
+              commissionBalance: "0",
+              fxRateToUsd: "",
+              date: today,
+              notes: "",
+              effectiveDate: "",
+            });
+            setFxSourceType("supplier");
+            setFxConversionOpen(true);
+          }}
+          formatNum={formatNum}
+          formatDate={formatDate}
+        />
+        <SupplierDialogs
+          createOpen={createOpen}
+          setCreateOpen={setCreateOpen}
+          editingSupplier={editingSupplier}
+          setEditingSupplier={setEditingSupplier}
+          formData={formData}
+          setFormData={setFormData}
+          formRole={formRole}
+          setFormRole={setFormRole}
+          allSuppliers={allSuppliers}
+          createSubAccountParentId={createSubAccountParentId}
+          setCreateSubAccountParentId={setCreateSubAccountParentId}
+          createMutation={createMutation as any}
+          updateMutation={updateMutation as any}
+          resetForm={resetForm}
+          paymentDialogSupplier={paymentDialogSupplier}
+          setPaymentDialogSupplier={setPaymentDialogSupplier}
+          paymentForm={paymentForm}
+          setPaymentForm={setPaymentForm}
+          ledgerAccounts={ledgerAccounts}
+          paymentMutation={paymentMutation as any}
+          paymentAmtUsd={0}
+          paymentBalanceUsd={0}
+          isOverpayment={false}
+          overpaymentUsd={0}
+          fxConversionOpen={fxConversionOpen}
+          setFxConversionOpen={setFxConversionOpen}
+          fxConversionForm={fxConversionForm}
+          setFxConversionForm={setFxConversionForm}
+          fxSourceType={fxSourceType}
+          setFxSourceType={setFxSourceType}
+          fxConversionMutation={fxConversionMutation as any}
+          wrapAdminAction={wrapAdminAction}
+          bulkFxOpen={bulkFxOpen}
+          setBulkFxOpen={setBulkFxOpen}
+          bulkFxBrokerId={bulkFxBrokerId}
+          bulkFxBrokerName={bulkFxBrokerName}
+          bulkFxForm={bulkFxForm}
+          setBulkFxForm={setBulkFxForm}
+          bulkFxPreview={bulkFxPreview}
+          setBulkFxPreview={setBulkFxPreview}
+          bulkFxPreviewMutation={bulkFxPreviewMutation as any}
+          bulkFxMutation={bulkFxMutation as any}
+          obEditSupplier={obEditSupplier}
+          setObEditSupplier={setObEditSupplier}
+          obEditValue={obEditValue}
+          setObEditValue={setObEditValue}
+          obEditMutation={obEditMutation as any}
+          dueDialogSupplier={dueDialogSupplier}
+          setDueDialogSupplier={setDueDialogSupplier}
+          formatDate={formatDate}
+          formatNum={formatNum}
+          editObComm={editObComm}
+          setEditObComm={setEditObComm}
+          updateObCommissionMutation={updateObCommissionMutation as any}
+        />
+        {AdminDialog}
+      </>
     );
   }
 
@@ -844,6 +922,33 @@ export default function FactorySuppliers() {
                       <Pencil className="h-4 w-4 mr-2" />
                       Edit
                     </DropdownMenuItem>
+                    {nonUsdBalances.filter((cb) => cb.balance > 0.005).map((cb) => (
+                      <DropdownMenuItem
+                        key={cb.currencyCode}
+                        onClick={() => {
+                          const toId = (s as any).parentId || s.id;
+                          const balStr = cb.balance.toFixed(2);
+                          setFxConversionForm({
+                            fromSupplierId: s.id,
+                            toSupplierId: toId,
+                            selectedCurrency: cb.currencyCode,
+                            amount: balStr,
+                            availableBalance: balStr,
+                            supplierBalance: balStr,
+                            commissionBalance: "0",
+                            fxRateToUsd: "",
+                            date: today,
+                            notes: "",
+                            effectiveDate: "",
+                          });
+                          setFxSourceType("supplier");
+                          setFxConversionOpen(true);
+                        }}
+                      >
+                        <ArrowRightLeft className="h-4 w-4 mr-2 text-blue-500" />
+                        FX Settlement ({cb.currencyCode})
+                      </DropdownMenuItem>
+                    ))}
                     {s.isActive ? (
                       <DropdownMenuItem
                         className="text-destructive"
