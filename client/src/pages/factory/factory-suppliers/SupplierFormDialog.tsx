@@ -42,7 +42,7 @@ export function SupplierFormDialog({
   resetForm,
   wrapAdminAction,
 }: SupplierFormDialogProps) {
-  const brokers = allSuppliers.filter((s) => !s.parentId && s.totalContainers > 0);
+  const brokers = allSuppliers.filter((s) => !s.parentId && s.isActive !== false);
 
   const handleSubmit = () => {
     if (editingSupplier) {
