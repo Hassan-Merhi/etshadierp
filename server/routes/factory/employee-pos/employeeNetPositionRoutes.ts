@@ -1413,7 +1413,6 @@ export function registerEmployeeNetPositionRoutes(app: Express) {
         loadingTotal,
         ledgerLiabilities: round2(ledgerOnUsTotal),
         payrollPayable: employeeSalariesPayable,
-        workerAdvances: workerOutstandingAdvances,
       });
     } catch (error: any) {
       console.error("Factory net-position error:", error);
