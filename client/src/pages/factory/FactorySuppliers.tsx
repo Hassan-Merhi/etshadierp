@@ -234,12 +234,15 @@ export default function FactorySuppliers() {
         dryRun: true,
       });
       if (!res.ok) {
-        const err = await res.json();
+        const err = await res.json().catch(() => ({}));
         throw new Error(err.message || "Preview failed");
       }
       return res.json() as Promise<BulkFxPreview>;
     },
     onSuccess: (data) => setBulkFxPreview(data),
+    onError: (err: Error) => {
+      toast({ title: "Preview failed", description: err.message, variant: "destructive" });
+    },
   });
 
   const bulkFxMutation = useMutation({
@@ -261,6 +264,9 @@ export default function FactorySuppliers() {
       setBulkFxPreview(null);
       queryClient.invalidateQueries({ queryKey: ["/api/factory/suppliers"] });
       toast({ title: "Bulk FX Settlement recorded" });
+    },
+    onError: (err: Error) => {
+      toast({ title: "Settlement failed", description: err.message, variant: "destructive" });
     },
   });
 
