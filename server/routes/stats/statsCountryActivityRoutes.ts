@@ -52,11 +52,11 @@ export function registerStatsCountryActivityRoutes(app: Express) {
         return String(raw).substring(0, 10);
       };
 
-      type LocationEntry = { locationId: number; locationName: string; count: number };
-      type DayEntry = { offloads: number; purchases: number; locations: LocationEntry[] };
-      type DayMap = Map<string, DayEntry>;
+      type ContainerEntry = { id: number; containerNumber: string; supplierName: string | null };
+      type LocationEntry  = { locationId: number; locationName: string; count: number };
+      type DayEntry       = { offloads: number; purchases: number; locations: LocationEntry[]; containers: ContainerEntry[] };
+      type DayMap         = Map<string, DayEntry>;
 
-      // Use numeric company ids as keys (always compare as numbers)
       const companyDayMap = new Map<number, DayMap>();
       for (const c of companies) companyDayMap.set(Number(c.id), new Map());
 
@@ -64,24 +64,36 @@ export function registerStatsCountryActivityRoutes(app: Express) {
         const companyId = Number(rawCompanyId);
         const m = companyDayMap.get(companyId);
         if (!m) return null;
-        if (!m.has(day)) m.set(day, { offloads: 0, purchases: 0, locations: [] });
+        if (!m.has(day)) m.set(day, { offloads: 0, purchases: 0, locations: [], containers: [] });
         return m.get(day)!;
       };
 
-      // ── 2. Offloaded containers per company per day ──────────────────────
+      // ── 2. Offloaded containers per company per day (with container details) ──
       try {
         const companyIdList = companyIds.join(",");
+
+        // Aggregate with container details via json_agg
         const offloadsResult = await pool.query<{
           company_id: string;
           day: any;
           cnt: string;
+          containers: any;
         }>(`
           SELECT
             c.company_id::text,
             co.offloaded_at::date AS day,
-            COUNT(*)::text        AS cnt
+            COUNT(*)::text        AS cnt,
+            json_agg(
+              json_build_object(
+                'id',              c.id,
+                'containerNumber', COALESCE(c.container_number, ''),
+                'supplierName',    s.legal_name
+              )
+              ORDER BY c.container_number
+            ) AS containers
           FROM container_offloads co
           JOIN containers c ON c.id = co.container_id
+          LEFT JOIN suppliers s ON s.id = c.supplier_id
           WHERE c.company_id IN (${companyIdList})
             AND co.offloaded_at::date BETWEEN $1::date AND $2::date
           GROUP BY c.company_id, co.offloaded_at::date
@@ -89,10 +101,22 @@ export function registerStatsCountryActivityRoutes(app: Express) {
 
         for (const row of offloadsResult.rows) {
           const entry = ensureDay(row.company_id, toDateKey(row.day));
-          if (entry) entry.offloads = parseInt(row.cnt);
+          if (entry) {
+            entry.offloads = parseInt(row.cnt);
+            const rawContainers = typeof row.containers === "string"
+              ? JSON.parse(row.containers)
+              : row.containers;
+            if (Array.isArray(rawContainers)) {
+              entry.containers = rawContainers.map((c: any) => ({
+                id:              Number(c.id),
+                containerNumber: c.containerNumber || "",
+                supplierName:    c.supplierName ?? null,
+              }));
+            }
+          }
         }
 
-        // Location breakdown — inner query, also fallback-safe
+        // Location breakdown
         try {
           const locResult = await pool.query<{
             company_id: string;
@@ -120,9 +144,9 @@ export function registerStatsCountryActivityRoutes(app: Express) {
             const entry = ensureDay(row.company_id, toDateKey(row.day));
             if (entry) {
               entry.locations.push({
-                locationId: parseInt(row.location_id),
+                locationId:   parseInt(row.location_id),
                 locationName: row.location_name,
-                count: parseInt(row.cnt),
+                count:        parseInt(row.cnt),
               });
             }
           }
@@ -134,7 +158,6 @@ export function registerStatsCountryActivityRoutes(app: Express) {
       }
 
       // ── 3. Containers imported per company per day ────────────────────────
-      // Count containers created (one container = one import), not raw POs.
       try {
         const companyIdList = companyIds.join(",");
         const purchasesResult = await pool.query<{
@@ -170,7 +193,6 @@ export function registerStatsCountryActivityRoutes(app: Express) {
         `, [startDateStr, endDateStr]);
         dateSeries = datesResult.rows.map((r) => toDateKey(r.day));
       } catch (_dsErr: any) {
-        // Fallback: build date spine in JavaScript
         console.error("[country-activity] generate_series failed, using JS fallback:", _dsErr.message);
         const cur = new Date(endDateStr + "T00:00:00");
         const start = new Date(startDateStr + "T00:00:00");
@@ -184,8 +206,14 @@ export function registerStatsCountryActivityRoutes(app: Express) {
       const result = companies.map((c) => {
         const dayMap = companyDayMap.get(Number(c.id));
         const dailyData = dateSeries.map((day) => {
-          const entry = dayMap?.get(day) ?? { offloads: 0, purchases: 0, locations: [] };
-          return { date: day, offloads: entry.offloads, purchases: entry.purchases, locations: entry.locations };
+          const entry = dayMap?.get(day) ?? { offloads: 0, purchases: 0, locations: [], containers: [] };
+          return {
+            date:       day,
+            offloads:   entry.offloads,
+            purchases:  entry.purchases,
+            locations:  entry.locations,
+            containers: entry.containers,
+          };
         });
 
         const totalOffloads  = dailyData.reduce((s, d) => s + d.offloads,  0);

@@ -17,6 +17,12 @@ import { cn } from "@/lib/utils";
 
 const WINDOW_DAYS = 14;
 
+interface ContainerEntry {
+  id: number;
+  containerNumber: string;
+  supplierName: string | null;
+}
+
 interface LocationCount {
   locationId: number;
   locationName: string;
@@ -28,6 +34,7 @@ interface DayEntry {
   offloads: number;
   purchases: number;
   locations: LocationCount[];
+  containers: ContainerEntry[];
 }
 
 interface CompanyActivity {
@@ -83,6 +90,31 @@ function isToday(dateStr: string) {
   return dateStr === new Date().toISOString().substring(0, 10);
 }
 
+// ── Container tags shown inline under an offload cell ─────────────────────────
+function ContainerTags({ containers }: { containers: ContainerEntry[] }) {
+  if (!containers || containers.length === 0) return null;
+  return (
+    <div className="flex flex-col gap-0.5 mt-1 items-center">
+      {containers.map((c) => (
+        <span
+          key={c.id}
+          className="inline-flex items-center gap-1 text-[10px] bg-primary/10 text-primary rounded px-1.5 py-0.5 whitespace-nowrap"
+          data-testid={`tag-container-${c.id}`}
+        >
+          <Container className="h-2.5 w-2.5 shrink-0" />
+          <span className="font-mono font-medium">{c.containerNumber || "—"}</span>
+          {c.supplierName && (
+            <>
+              <span className="text-primary/50">·</span>
+              <span className="truncate max-w-[120px]">{c.supplierName}</span>
+            </>
+          )}
+        </span>
+      ))}
+    </div>
+  );
+}
+
 // ── Location tags shown inline under an offload cell ─────────────────────────
 function LocationTags({ locations }: { locations: LocationCount[] }) {
   if (!locations || locations.length === 0) return null;
@@ -91,7 +123,7 @@ function LocationTags({ locations }: { locations: LocationCount[] }) {
       {locations.map((loc) => (
         <span
           key={loc.locationId}
-          className="inline-flex items-center gap-0.5 text-[10px] bg-primary/10 text-primary rounded px-1.5 py-0.5 whitespace-nowrap"
+          className="inline-flex items-center gap-0.5 text-[10px] bg-muted text-muted-foreground rounded px-1.5 py-0.5 whitespace-nowrap"
         >
           <MapPin className="h-2.5 w-2.5 shrink-0" />
           {loc.locationName}
@@ -147,6 +179,7 @@ function CompanyDayGrid({ days }: { days: DayEntry[] }) {
                 {d.offloads > 0 ? (
                   <div>
                     <span className="font-semibold text-foreground">{d.offloads}</span>
+                    <ContainerTags containers={d.containers ?? []} />
                     <LocationTags locations={d.locations} />
                   </div>
                 ) : (
@@ -226,11 +259,12 @@ export function CountryActivityKPI() {
     return d;
   }, []);
 
+  // offset is in days (1 = move back 1 day), not weeks
   const [offset, setOffset] = useState(0);
   const [expanded, setExpanded] = useState(false);
 
-  const endDate   = useMemo(() => addDays(today, -offset * WINDOW_DAYS),         [today, offset]);
-  const startDate = useMemo(() => addDays(endDate, -(WINDOW_DAYS - 1)),           [endDate]);
+  const endDate   = useMemo(() => addDays(today, -offset),              [today, offset]);
+  const startDate = useMemo(() => addDays(endDate, -(WINDOW_DAYS - 1)), [endDate]);
   const endStr    = toDateStr(endDate);
   const startStr  = toDateStr(startDate);
 
@@ -297,7 +331,7 @@ export function CountryActivityKPI() {
           </div>
         )}
 
-        {/* Date navigator */}
+        {/* Date navigator — moves 1 day at a time */}
         <div
           className="flex items-center gap-1 shrink-0"
           onClick={(e) => e.stopPropagation()}
@@ -308,7 +342,7 @@ export function CountryActivityKPI() {
             className="h-7 w-7"
             onClick={() => setOffset((o) => o + 1)}
             data-testid="button-activity-prev"
-            title="Previous period"
+            title="Previous day"
           >
             <ChevronLeft className="h-4 w-4" />
           </Button>
@@ -324,7 +358,7 @@ export function CountryActivityKPI() {
             onClick={() => setOffset((o) => Math.max(0, o - 1))}
             disabled={!canGoForward}
             data-testid="button-activity-next"
-            title="Next period"
+            title="Next day"
           >
             <ChevronRight className="h-4 w-4" />
           </Button>
