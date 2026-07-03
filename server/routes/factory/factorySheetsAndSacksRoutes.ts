@@ -121,6 +121,48 @@ export function registerFactorySheetsAndSacksRoutes(app: Express) {
     }
   });
 
+  // PATCH /api/factory/sheets-sacks/:id/deduct — reduce stock
+  app.patch("/api/factory/sheets-sacks/:id/deduct", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = getFactoryCompanyId(req);
+      const id = parseInt(req.params.id);
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      if (!(await hasWriteAccess(req, companyId))) return res.status(403).json({ message: "Access denied" });
+
+      const pieces = parseInt(req.body.pieces) || 0;
+      const packs = req.body.packs != null ? parseInt(req.body.packs) : null;
+      if (pieces <= 0) return res.status(400).json({ message: "Pieces to deduct must be greater than 0" });
+
+      // Fetch current values
+      const { rows: existing } = await pool.query(
+        `SELECT quantity, pack_qty FROM factory_sheets_sacks WHERE id = $1 AND company_id = $2`,
+        [id, companyId]
+      );
+      if (existing.length === 0) return res.status(404).json({ message: "Item not found" });
+
+      const currentQty = parseFloat(existing[0].quantity || "0");
+      const currentPackQty = existing[0].pack_qty != null ? parseInt(existing[0].pack_qty) : null;
+
+      const newQty = Math.max(0, currentQty - pieces);
+      const newPackQty =
+        packs != null && currentPackQty != null
+          ? Math.max(0, currentPackQty - packs)
+          : currentPackQty;
+
+      const { rows } = await pool.query(
+        `UPDATE factory_sheets_sacks
+         SET quantity = $1, pack_qty = $2
+         WHERE id = $3 AND company_id = $4
+         RETURNING ${SELECT_COLS}`,
+        [newQty, newPackQty, id, companyId]
+      );
+      res.json(rows[0]);
+    } catch (err: any) {
+      console.error("PATCH /api/factory/sheets-sacks/:id/deduct error:", err);
+      res.status(500).json({ message: err.message || "Failed to deduct" });
+    }
+  });
+
   // DELETE /api/factory/sheets-sacks/:id
   app.delete("/api/factory/sheets-sacks/:id", requireAuth, async (req: any, res: any) => {
     try {

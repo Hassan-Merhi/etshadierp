@@ -13,7 +13,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { PageHeader } from "@/components/PageHeader";
-import { Layers, Plus, Pencil, Trash2, Search, Loader2, Package, ShoppingBag, Check } from "lucide-react";
+import { Layers, Plus, Pencil, Trash2, Search, Loader2, Package, ShoppingBag, Check, MinusCircle } from "lucide-react";
 
 const TYPES = ["Sheet", "Sack", "Other"] as const;
 
@@ -313,6 +313,139 @@ function ItemFormDialog({
   );
 }
 
+// ─── Deduct Dialog ─────────────────────────────────────────────────────────────
+function DeductDialog({
+  open,
+  onClose,
+  item,
+}: {
+  open: boolean;
+  onClose: () => void;
+  item: SheetsAndSacksItem;
+}) {
+  const { toast } = useToast();
+  const hasPacks = item.pcsPerPack != null && item.pcsPerPack > 0;
+  const [packsStr, setPacksStr] = useState("");
+  const [pcsStr, setPcsStr] = useState("");
+  const [notes, setNotes] = useState("");
+
+  // Derive pieces from packs if pcsPerPack is set, otherwise use direct pcs input
+  const pcsToDeduct = useMemo(() => {
+    if (hasPacks && packsStr !== "") {
+      return (parseInt(packsStr) || 0) * (item.pcsPerPack as number);
+    }
+    return parseInt(pcsStr) || 0;
+  }, [hasPacks, packsStr, pcsStr, item.pcsPerPack]);
+
+  const currentQty = parseFloat(item.quantity || "0");
+  const remaining = Math.max(0, currentQty - pcsToDeduct);
+  const invalid = pcsToDeduct <= 0;
+
+  const deductMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("PATCH", `/api/factory/sheets-sacks/${item.id}/deduct`, {
+        pieces: pcsToDeduct,
+        packs: hasPacks && packsStr !== "" ? parseInt(packsStr) || 0 : null,
+        notes: notes.trim() || null,
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.message || "Deduction failed");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/sheets-sacks"] });
+      toast({ title: "Deduction recorded", description: `${pcsToDeduct.toLocaleString()} pcs removed from ${item.name}` });
+      onClose();
+    },
+    onError: (e: Error) => {
+      toast({ title: "Deduction failed", description: e.message, variant: "destructive" });
+    },
+  });
+
+  return (
+    <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
+      <DialogContent className="max-w-sm">
+        <DialogHeader>
+          <DialogTitle>Deduct from {item.name}</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4">
+          {/* Current stock */}
+          <div className="rounded-md bg-muted/50 px-3 py-2 flex items-center justify-between text-sm">
+            <span className="text-muted-foreground">Current stock</span>
+            <span className="font-mono font-semibold">{currentQty.toLocaleString("en-US")} pcs</span>
+          </div>
+
+          {/* Packs input (only if pcsPerPack is known) */}
+          {hasPacks && (
+            <div className="space-y-1.5">
+              <Label>Packs to deduct <span className="text-muted-foreground text-xs">(× {item.pcsPerPack} pcs/pack)</span></Label>
+              <Input
+                type="number"
+                min="0"
+                step="1"
+                value={packsStr}
+                onChange={(e) => { setPacksStr(e.target.value); setPcsStr(""); }}
+                placeholder="0"
+                data-testid="input-deduct-packs"
+              />
+            </div>
+          )}
+
+          {/* Pieces input */}
+          <div className="space-y-1.5">
+            <Label>{hasPacks ? "Or pieces to deduct" : "Pieces to deduct"}</Label>
+            <Input
+              type="number"
+              min="0"
+              step="1"
+              value={hasPacks ? (packsStr !== "" ? String(pcsToDeduct) : pcsStr) : pcsStr}
+              onChange={(e) => { setPcsStr(e.target.value); if (hasPacks) setPacksStr(""); }}
+              readOnly={hasPacks && packsStr !== ""}
+              placeholder="0"
+              data-testid="input-deduct-pcs"
+            />
+          </div>
+
+          {/* Remaining */}
+          <div className={`rounded-md px-3 py-2 flex items-center justify-between text-sm ${remaining === 0 && pcsToDeduct > 0 ? "bg-destructive/10" : "bg-muted/50"}`}>
+            <span className="text-muted-foreground">Remaining after deduction</span>
+            <span className={`font-mono font-semibold ${remaining === 0 && pcsToDeduct > 0 ? "text-destructive" : ""}`}>
+              {remaining.toLocaleString("en-US")} pcs
+            </span>
+          </div>
+
+          {/* Notes */}
+          <div className="space-y-1.5">
+            <Label>Reason / Notes <span className="text-muted-foreground text-xs">(optional)</span></Label>
+            <Textarea
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="e.g. Used in production batch #42"
+              className="resize-none"
+              rows={2}
+              data-testid="input-deduct-notes"
+            />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose} data-testid="button-deduct-cancel">Cancel</Button>
+          <Button
+            variant="destructive"
+            onClick={() => deductMutation.mutate()}
+            disabled={invalid || deductMutation.isPending}
+            data-testid="button-deduct-confirm"
+          >
+            {deductMutation.isPending && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}
+            Deduct {pcsToDeduct > 0 ? `${pcsToDeduct.toLocaleString()} pcs` : ""}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 // ─── Main Page ─────────────────────────────────────────────────────────────────
 export default function FactorySheetsAndSacks() {
   const { toast } = useToast();
@@ -321,9 +454,12 @@ export default function FactorySheetsAndSacks() {
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [editItem, setEditItem] = useState<SheetsAndSacksItem | null>(null);
   const [deleteItem, setDeleteItem] = useState<SheetsAndSacksItem | null>(null);
+  const [deductItem, setDeductItem] = useState<SheetsAndSacksItem | null>(null);
 
   const { data: items = [], isLoading } = useQuery<SheetsAndSacksItem[]>({
     queryKey: ["/api/factory/sheets-sacks"],
+    staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
   });
 
   const { data: myAccess } = useQuery<{ fullAccess: boolean; pageKeys: string[] }>({
@@ -562,6 +698,15 @@ export default function FactorySheetsAndSacks() {
                               <Button
                                 size="icon"
                                 variant="ghost"
+                                onClick={() => setDeductItem(item)}
+                                title="Deduct"
+                                data-testid={`button-deduct-${item.id}`}
+                              >
+                                <MinusCircle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                              </Button>
+                              <Button
+                                size="icon"
+                                variant="ghost"
                                 onClick={() => setEditItem(item)}
                                 title="Edit"
                                 data-testid={`button-edit-${item.id}`}
@@ -599,6 +744,15 @@ export default function FactorySheetsAndSacks() {
             setEditItem(null);
           }}
           existing={editItem}
+        />
+      )}
+
+      {/* Deduct Dialog */}
+      {deductItem && (
+        <DeductDialog
+          open={!!deductItem}
+          onClose={() => setDeductItem(null)}
+          item={deductItem}
         />
       )}
 
