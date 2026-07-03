@@ -50,6 +50,65 @@ interface FactoryNetPositionData {
   ledgerLiabilities: number;
 }
 
+function InsuranceSubGroup({
+  accounts,
+  amountColor,
+  formatAmount,
+}: {
+  accounts: AccountItem[];
+  amountColor: string;
+  formatAmount: (n: number) => string;
+}) {
+  const [open, setOpen] = useState(false);
+  const total = accounts.reduce((s, a) => s + Math.abs(a.value), 0);
+
+  return (
+    <>
+      <div className="flex items-center justify-between px-4 py-2 text-sm border-t border-border">
+        <button
+          type="button"
+          onClick={() => setOpen((v) => !v)}
+          className="flex items-center gap-1.5 font-medium text-foreground hover-elevate rounded px-1 -ml-1"
+          data-testid="button-insurance-group-toggle"
+        >
+          {open ? (
+            <ChevronDown className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+          ) : (
+            <ChevronRight className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+          )}
+          Insurance
+          <Badge variant="outline" className="text-xs font-normal ml-0.5">
+            {accounts.length}
+          </Badge>
+        </button>
+        <span className={`font-mono tabular-nums ${amountColor}`}>{formatAmount(total)}</span>
+      </div>
+      {open &&
+        accounts.map((acc, i) => (
+          <div
+            key={i}
+            className="flex items-center justify-between pl-10 pr-4 py-2 text-sm border-t border-border bg-muted/20"
+            data-testid={`row-insurance-${i}`}
+          >
+            {acc.id ? (
+              <button
+                type="button"
+                onClick={() => window.open(`/factory/ledger-monthly/${acc.id}`, "_blank")}
+                className="font-medium text-foreground hover:underline text-left flex items-center gap-1"
+              >
+                {acc.name.replace(/^Insurance\s*[-–]\s*/i, "")}
+                <ExternalLink className="h-3 w-3 text-muted-foreground shrink-0" />
+              </button>
+            ) : (
+              <span className="font-medium text-foreground">{acc.name.replace(/^Insurance\s*[-–]\s*/i, "")}</span>
+            )}
+            <span className={`font-mono tabular-nums ${amountColor}`}>{formatAmount(Math.abs(acc.value))}</span>
+          </div>
+        ))}
+    </>
+  );
+}
+
 function CategoryGroup({
   category,
   accounts,
@@ -65,6 +124,10 @@ function CategoryGroup({
 }) {
   const [open, setOpen] = useState(true);
   const total = accounts.reduce((s, a) => s + Math.abs(a.value), 0);
+
+  const insuranceAccounts = accounts.filter((a) => /^Insurance\s*[-–]/i.test(a.name));
+  const otherAccounts = accounts.filter((a) => !/^Insurance\s*[-–]/i.test(a.name));
+  const displayCount = otherAccounts.length + (insuranceAccounts.length > 0 ? 1 : 0);
 
   return (
     <div className="border border-border rounded-md overflow-hidden">
@@ -82,14 +145,14 @@ function CategoryGroup({
           )}
           <span>{category}</span>
           <Badge variant="outline" className="text-xs font-normal">
-            {accounts.length}
+            {displayCount}
           </Badge>
         </div>
         <span className={`font-mono font-bold ${accentColor}`}>{formatAmount(total)}</span>
       </button>
       {open && (
         <div className="divide-y divide-border">
-          {accounts.map((acc, i) => (
+          {otherAccounts.map((acc, i) => (
             <div
               key={i}
               className="flex items-center justify-between px-4 py-2 text-sm"
@@ -110,6 +173,13 @@ function CategoryGroup({
               <span className={`font-mono tabular-nums ${amountColor}`}>{formatAmount(Math.abs(acc.value))}</span>
             </div>
           ))}
+          {insuranceAccounts.length > 0 && (
+            <InsuranceSubGroup
+              accounts={insuranceAccounts}
+              amountColor={amountColor}
+              formatAmount={formatAmount}
+            />
+          )}
         </div>
       )}
     </div>
