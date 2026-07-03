@@ -241,6 +241,32 @@ export function registerFactoryInsuranceRoutes(app: Express) {
     }
   });
 
+  // DELETE /api/insurance/members/:id — permanently delete a member
+  app.delete("/api/insurance/members/:id", requireAuth, async (req: any, res: any) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (!id) return res.status(400).json({ message: "Invalid id" });
+
+      const companyId = getFactoryCompanyId(req);
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const [existing] = await db
+        .select()
+        .from(insuranceMembers)
+        .where(and(eq(insuranceMembers.id, id), eq(insuranceMembers.companyId, companyId)));
+      if (!existing) return res.status(404).json({ message: "Member not found" });
+
+      await db
+        .delete(insuranceMembers)
+        .where(and(eq(insuranceMembers.id, id), eq(insuranceMembers.companyId, companyId)));
+
+      res.json({ success: true });
+    } catch (err: any) {
+      console.error("DELETE /api/insurance/members/:id error:", err);
+      res.status(500).json({ message: err.message || "Failed to delete insurance member" });
+    }
+  });
+
   // POST /api/insurance/generate — generate journal entries for a month/year
   app.post("/api/insurance/generate", requireAuth, async (req: any, res: any) => {
     try {

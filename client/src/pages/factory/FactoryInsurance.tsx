@@ -7,6 +7,7 @@ import {
   Edit,
   ToggleLeft,
   ToggleRight,
+  Trash2,
   DollarSign,
   Users,
   UserCheck,
@@ -364,6 +365,7 @@ export default function FactoryInsurance() {
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [editMember, setEditMember] = useState<InsuranceMember | null>(null);
   const [statementMember, setStatementMember] = useState<InsuranceMember | null>(null);
+  const [deleteMember, setDeleteMember] = useState<InsuranceMember | null>(null);
   const [search, setSearch] = useState("");
 
   const [showGenDialog, setShowGenDialog] = useState(false);
@@ -390,6 +392,20 @@ export default function FactoryInsurance() {
     },
     onError: (e: any) => {
       toast({ title: "Failed", description: e.message, variant: "destructive" });
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: number) => {
+      return apiRequest("DELETE", `/api/insurance/members/${id}`, undefined);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/insurance/members"] });
+      toast({ title: "Member deleted" });
+      setDeleteMember(null);
+    },
+    onError: (e: any) => {
+      toast({ title: "Failed to delete", description: e.message, variant: "destructive" });
     },
   });
 
@@ -624,6 +640,15 @@ export default function FactoryInsurance() {
                             <ToggleLeft className="h-4 w-4 text-muted-foreground" />
                           )}
                         </Button>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          onClick={() => setDeleteMember(m)}
+                          title="Delete member"
+                          data-testid={`button-delete-${m.id}`}
+                        >
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
                       </div>
                     </TableCell>
                   </TableRow>
@@ -653,6 +678,30 @@ export default function FactoryInsurance() {
           existing={editMember}
         />
       )}
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={!!deleteMember} onOpenChange={(v) => !v && setDeleteMember(null)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Delete Member</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            Permanently delete <span className="font-semibold text-foreground">{deleteMember?.name}</span>?
+            This cannot be undone.
+          </p>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteMember(null)}>Cancel</Button>
+            <Button
+              variant="destructive"
+              onClick={() => deleteMember && deleteMutation.mutate(deleteMember.id)}
+              disabled={deleteMutation.isPending}
+              data-testid="button-confirm-delete"
+            >
+              {deleteMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Delete"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Generate Entries Dialog */}
       <Dialog open={showGenDialog} onOpenChange={(v) => !v && setShowGenDialog(false)}>
