@@ -181,19 +181,22 @@ export function registerOrderFinalizeLoadingRoutes(app: Express) {
 
         const [recalcOrder] = await tx.select().from(customerOrders).where(eq(customerOrders.id, orderId));
 
+        const finalizedAt = new Date();
+
         await tx
           .update(customerOrders)
           .set({
             invoiceNumber,
             status: "FINALIZED",
-            updatedAt: new Date(),
+            finalizedAt,
+            updatedAt: finalizedAt,
           })
           .where(eq(customerOrders.id, orderId));
 
         const grandTotal = parseFloat(recalcOrder.grandTotal || "0");
-        // Use the order's stored date for the customer balance (not server "today"),
-        // so re-finalising a reverted draft keeps the user-chosen invoice date.
-        const today = recalcOrder.orderDate || getClientDate(req);
+        // Use the client's current date (finalization date) as the statement date,
+        // not the orderDate (which is the loading/shipment date).
+        const today = getClientDate(req);
 
         await tx.insert(customerBalances).values({
           companyId,

@@ -438,6 +438,7 @@ export function registerFactoryCustomersRoutes(app: Express) {
           id: customerOrders.id,
           invoiceNumber: customerOrders.invoiceNumber,
           orderDate: customerOrders.orderDate,
+          finalizedAt: customerOrders.finalizedAt,
           grandTotal: customerOrders.grandTotal,
           subtotalBales: customerOrders.subtotalBales,
           freightAmount: customerOrders.freightAmount,
@@ -477,6 +478,14 @@ export function registerFactoryCustomersRoutes(app: Express) {
       // INVOICE rows on the fly (read-only — no DB writes from a GET).
       const invoiceGrandTotalMap = new Map<number, string>(invoices.map((inv: any) => [inv.id, inv.grandTotal]));
 
+      // Map orderId → finalized date (date portion of finalizedAt, or orderDate fallback for legacy rows)
+      const invoiceFinalizedDateMap = new Map<number, string>(
+        invoices.map((inv: any) => {
+          const d: Date | null = inv.finalizedAt ?? null;
+          return [inv.id, d ? d.toISOString().slice(0, 10) : (inv.orderDate as string)];
+        })
+      );
+
       // Get all balance history entries ordered by date
       const rawBalanceRows = await db
         .select()
@@ -485,9 +494,17 @@ export function registerFactoryCustomersRoutes(app: Express) {
         .orderBy(customerBalances.transactionDate, customerBalances.id);
 
       const balanceRows = rawBalanceRows.map((row: any) => {
-        if (row.referenceType === "INVOICE" && row.referenceId && invoiceGrandTotalMap.has(row.referenceId)) {
-          const actualAmt = invoiceGrandTotalMap.get(row.referenceId)!;
-          return { ...row, debitAmount: actualAmt, balance: actualAmt };
+        if (row.referenceType === "INVOICE" && row.referenceId) {
+          const overrides: Record<string, unknown> = {};
+          if (invoiceGrandTotalMap.has(row.referenceId)) {
+            const actualAmt = invoiceGrandTotalMap.get(row.referenceId)!;
+            overrides.debitAmount = actualAmt;
+            overrides.balance = actualAmt;
+          }
+          if (invoiceFinalizedDateMap.has(row.referenceId)) {
+            overrides.transactionDate = invoiceFinalizedDateMap.get(row.referenceId);
+          }
+          return { ...row, ...overrides };
         }
         return row;
       });

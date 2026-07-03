@@ -2909,6 +2909,8 @@ let migrationsDone = false;
     `ALTER TABLE customer_orders ADD COLUMN IF NOT EXISTS verified_at TIMESTAMP`,
     `ALTER TABLE customer_orders ADD COLUMN IF NOT EXISTS loading_started_at TIMESTAMP`,
     `ALTER TABLE customer_orders ADD COLUMN IF NOT EXISTS loading_finalized_at TIMESTAMP`,
+    `ALTER TABLE customer_orders ADD COLUMN IF NOT EXISTS finalized_at TIMESTAMP`,
+    `UPDATE customer_orders SET finalized_at = updated_at WHERE status = 'FINALIZED' AND finalized_at IS NULL`,
     `ALTER TABLE customer_orders ADD COLUMN IF NOT EXISTS location_id INTEGER`,
     `ALTER TABLE customer_orders ADD COLUMN IF NOT EXISTS invoice_number VARCHAR(50)`,
     `ALTER TABLE customer_orders ADD COLUMN IF NOT EXISTS subtotal_bales NUMERIC(20,2) NOT NULL DEFAULT 0`,
