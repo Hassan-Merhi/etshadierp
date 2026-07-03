@@ -431,9 +431,19 @@ export default function Accounts() {
     else setSelectedVoucherIds(new Set(vouchersWithBalance.map((v) => v.voucherId)));
   };
 
+  const voucherTypeToTab = (type: string): string => {
+    const t = (type || "").toLowerCase().replace(/\s+/g, "");
+    if (t === "payment") return "payment";
+    if (t === "receipt") return "receipt";
+    if (t === "journal") return "journal";
+    if (t === "stocktransfer") return "transfer";
+    if (t === "creditnote") return "creditnote";
+    return "journal";
+  };
+
   const handleOpenVoucher = (v: any) => {
-    // Navigate to voucher edit
-    navigate(`${modePrefix}/vouchers/${v.voucherId}/edit`);
+    const tab = voucherTypeToTab(v.voucherType || "");
+    navigate(`${modePrefix}/vouchers?edit=${v.voucherId}&tab=${tab}`);
   };
 
   const bankForm = useForm({
@@ -1010,7 +1020,7 @@ export default function Accounts() {
                     key={v.id}
                     data-testid={`button-voucher-result-${v.id}`}
                     className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-muted/40 transition-colors"
-                    onClick={() => navigate(`${modePrefix}/vouchers/${v.id}/edit`)}
+                    onClick={() => navigate(`${modePrefix}/vouchers?edit=${v.id}&tab=${voucherTypeToTab(v.voucherType || "")}`)}
                   >
                     <FileText className="w-4 h-4 shrink-0 text-muted-foreground" />
                     <div className="flex-1 min-w-0">
