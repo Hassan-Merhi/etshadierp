@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { CalendarIcon, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -7,6 +8,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
 import { useDateFormat } from "@/contexts/DateFormatContext";
 import { cn } from "@/lib/utils";
 import {
@@ -22,6 +25,7 @@ import {
   endOfYear,
   subDays,
 } from "date-fns";
+import type { DateRange } from "react-day-picker";
 
 export type PeriodPreset =
   | "all_time"
@@ -120,19 +124,33 @@ export function PeriodFilter({
   "data-testid": testId,
 }: PeriodFilterProps) {
   const { formatDisplayDate } = useDateFormat();
+  const [calendarOpen, setCalendarOpen] = useState(false);
+
+  const fromDateObj = value.fromDate ? new Date(value.fromDate + "T12:00:00") : undefined;
+  const toDateObj = value.toDate ? new Date(value.toDate + "T12:00:00") : undefined;
+
+  const calendarRange: DateRange | undefined =
+    fromDateObj || toDateObj ? { from: fromDateObj, to: toDateObj } : undefined;
 
   const handlePresetChange = (preset: PeriodPreset) => {
     if (preset === "custom") {
-      const dates = getPresetDates("custom");
-      onChange({ ...dates, preset: "custom" });
+      setCalendarOpen(true);
     } else {
       const dates = getPresetDates(preset);
       onChange({ ...dates, preset });
     }
   };
 
-  const fromDateObj = value.fromDate ? new Date(value.fromDate + "T12:00:00") : undefined;
-  const toDateObj = value.toDate ? new Date(value.toDate + "T12:00:00") : undefined;
+  const handleRangeSelect = (range: DateRange | undefined) => {
+    if (!range) return;
+    const formatDate = (d: Date) => format(d, "yyyy-MM-dd");
+    const fromDate = range.from ? formatDate(range.from) : value.fromDate;
+    const toDate = range.to ? formatDate(range.to) : "";
+    onChange({ fromDate, toDate, preset: "custom" });
+    if (range.from && range.to) {
+      setCalendarOpen(false);
+    }
+  };
 
   function buildLabel(): string {
     if (value.preset === "all_time") return "All Time";
@@ -150,7 +168,6 @@ export function PeriodFilter({
   }
 
   const displayLabel = buildLabel();
-  const isCustom = value.preset === "custom";
 
   return (
     <div className={cn("flex flex-wrap items-center gap-2", className)}>
@@ -198,24 +215,31 @@ export function PeriodFilter({
         </DropdownMenuContent>
       </DropdownMenu>
 
-      {isCustom && !hideCustomInputs && (
-        <div className="flex items-center gap-1.5">
-          <input
-            type="date"
-            value={value.fromDate}
-            data-testid="period-filter-from"
-            onChange={(e) => onChange({ ...value, fromDate: e.target.value })}
-            className="h-8 rounded-md border border-input bg-background px-2 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
-          />
-          <span className="text-xs text-muted-foreground">–</span>
-          <input
-            type="date"
-            value={value.toDate}
-            data-testid="period-filter-to"
-            onChange={(e) => onChange({ ...value, toDate: e.target.value })}
-            className="h-8 rounded-md border border-input bg-background px-2 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
-          />
-        </div>
+      {/* Calendar popover for custom range — always mounted so open state is controlled */}
+      {!hideCustomInputs && (
+        <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
+          <PopoverTrigger asChild>
+            <span className="sr-only">Custom range calendar</span>
+          </PopoverTrigger>
+          <PopoverContent className="w-auto p-0" align="start">
+            <div className="p-3 border-b">
+              <p className="text-sm font-medium">Select date range</p>
+              <p className="text-xs text-muted-foreground mt-0.5">Click a start date, then an end date</p>
+            </div>
+            <Calendar
+              mode="range"
+              selected={calendarRange}
+              onSelect={handleRangeSelect}
+              numberOfMonths={2}
+              defaultMonth={fromDateObj ?? new Date()}
+            />
+            {calendarRange?.from && !calendarRange?.to && (
+              <div className="p-3 border-t text-xs text-muted-foreground text-center">
+                Now click an end date
+              </div>
+            )}
+          </PopoverContent>
+        </Popover>
       )}
     </div>
   );
