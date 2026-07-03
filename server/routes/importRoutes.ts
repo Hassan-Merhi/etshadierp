@@ -126,6 +126,12 @@ export function registerImportRoutes(app: Express) {
         errors.push("Selected supplier not found");
       }
 
+      // Reject if container number already exists
+      const existingContainer = await storage.getContainerByNumber(containerNumber);
+      if (existingContainer) {
+        errors.push(`Container number "${containerNumber}" already exists — it cannot be imported again`);
+      }
+
       // Get all stock items for validation
       const allStockItems = await storage.getAllStockItems(req.session.currentCompanyId!);
 
@@ -274,32 +280,25 @@ export function registerImportRoutes(app: Express) {
         return res.status(400).json({ message: "This file has already been imported" });
       }
 
-      // Check if container already exists (after validation)
-      let container = await storage.getContainerByNumber(containerNumber);
-
-      // containerPreview is already defined in validation section above
-      // No need to re-check since we just validated it
-
-      if (!container) {
-        // Create new container
-        container = await storage.createContainer({
-          companyId: req.session.currentCompanyId!,
-          containerNumber,
-          supplierId,
-          status: "OTW",
-          importDate,
-          itemsTotal: containerPreview.itemsTotal.toString(),
-          chargesTotal: containerPreview.chargesTotal.toString(),
-          grandTotal: containerPreview.grandTotal.toString(),
-        });
-      } else {
-        // Update existing container totals
-        await storage.updateContainer(container.id, {
-          itemsTotal: (parseFloat(container.itemsTotal || "0") + containerPreview.itemsTotal).toString(),
-          chargesTotal: (parseFloat(container.chargesTotal || "0") + containerPreview.chargesTotal).toString(),
-          grandTotal: (parseFloat(container.grandTotal || "0") + containerPreview.grandTotal).toString(),
+      // Hard block: container number must be unique
+      const existingContainerCheck = await storage.getContainerByNumber(containerNumber);
+      if (existingContainerCheck) {
+        return res.status(400).json({
+          message: `Container "${containerNumber}" already exists in the system. Each container number can only be imported once.`,
         });
       }
+
+      // Create new container
+      let container = await storage.createContainer({
+        companyId: req.session.currentCompanyId!,
+        containerNumber,
+        supplierId,
+        status: "OTW",
+        importDate,
+        itemsTotal: containerPreview.itemsTotal.toString(),
+        chargesTotal: containerPreview.chargesTotal.toString(),
+        grandTotal: containerPreview.grandTotal.toString(),
+      });
 
       // Group items by PO
       const poGroups = containerPreview.items.reduce((acc: any, item: any) => {
