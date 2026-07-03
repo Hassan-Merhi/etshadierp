@@ -1,8 +1,11 @@
+import { useState } from "react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 import {
   ArrowLeft,
   ArrowRightLeft,
@@ -13,6 +16,7 @@ import {
   Link2,
   Mail,
   MapPin,
+  Pencil,
   Phone,
   Trash2,
   Users,
@@ -73,6 +77,8 @@ interface SupplierStatementProps {
   sfTxCount: number;
   currencyTotals: Record<string, number>;
   primaryCc: string;
+  onRenameSupplier?: (id: number, newName: string) => void;
+  onDeleteSupplier?: (id: number) => void;
 }
 
 export function SupplierStatement({
@@ -119,7 +125,12 @@ export function SupplierStatement({
   sfTxCount,
   currencyTotals,
   primaryCc,
+  onRenameSupplier,
+  onDeleteSupplier,
 }: SupplierStatementProps) {
+  const [showRename, setShowRename] = useState(false);
+  const [renameDraft, setRenameDraft] = useState("");
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   if (statementLoading) {
     return (
       <div className="space-y-4">
@@ -222,10 +233,37 @@ export function SupplierStatement({
               {statementData.supplier.name}
             </h1>
             {statementData.supplier.parentId ? (
-              <Badge variant="outline" className="text-xs">
-                <Link2 className="h-3 w-3 mr-1" />
-                Linked Supplier
-              </Badge>
+              <>
+                <Badge variant="outline" className="text-xs">
+                  <Link2 className="h-3 w-3 mr-1" />
+                  Linked Supplier
+                </Badge>
+                {onRenameSupplier && (
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    title="Rename supplier"
+                    data-testid="button-rename-linked-supplier"
+                    onClick={() => {
+                      setRenameDraft(statementData.supplier.name);
+                      setShowRename(true);
+                    }}
+                  >
+                    <Pencil className="h-4 w-4" />
+                  </Button>
+                )}
+                {onDeleteSupplier && (
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    title="Delete supplier"
+                    data-testid="button-delete-linked-supplier"
+                    onClick={() => setShowDeleteConfirm(true)}
+                  >
+                    <Trash2 className="h-4 w-4 text-destructive" />
+                  </Button>
+                )}
+              </>
             ) : statementData?.supplier &&
               !statementData.supplier.parentId &&
               subAccountsByParent[statementData.supplier.id]?.length ? (
@@ -468,6 +506,68 @@ export function SupplierStatement({
           </div>
         )}
       </div>
+
+      {/* Rename dialog */}
+      <Dialog open={showRename} onOpenChange={(v) => !v && setShowRename(false)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Rename Supplier</DialogTitle>
+          </DialogHeader>
+          <Input
+            value={renameDraft}
+            onChange={(e) => setRenameDraft(e.target.value)}
+            placeholder="New name"
+            data-testid="input-rename-supplier"
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && renameDraft.trim()) {
+                onRenameSupplier!(statementSupplierId, renameDraft.trim());
+                setShowRename(false);
+              }
+            }}
+          />
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowRename(false)}>Cancel</Button>
+            <Button
+              onClick={() => {
+                if (renameDraft.trim()) {
+                  onRenameSupplier!(statementSupplierId, renameDraft.trim());
+                  setShowRename(false);
+                }
+              }}
+              disabled={!renameDraft.trim()}
+              data-testid="button-confirm-rename"
+            >
+              Save
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete confirm dialog */}
+      <Dialog open={showDeleteConfirm} onOpenChange={(v) => !v && setShowDeleteConfirm(false)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Delete Supplier</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            Permanently delete <span className="font-semibold text-foreground">{statementData.supplier.name}</span>?
+            This cannot be undone.
+          </p>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowDeleteConfirm(false)}>Cancel</Button>
+            <Button
+              variant="destructive"
+              onClick={() => {
+                onDeleteSupplier!(statementSupplierId);
+                setShowDeleteConfirm(false);
+              }}
+              data-testid="button-confirm-delete-supplier"
+            >
+              Delete
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

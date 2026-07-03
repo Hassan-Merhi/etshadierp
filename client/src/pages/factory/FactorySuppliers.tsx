@@ -377,6 +377,15 @@ export default function FactorySuppliers() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/factory/suppliers"] }),
   });
 
+  const renameSupplierMutation = useMutation({
+    mutationFn: async ({ id, name }: { id: number; name: string }) =>
+      factoryApiRequest("PATCH", `/api/factory/suppliers/${id}`, { name }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/suppliers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/suppliers", statementSupplierId, "statement"] });
+    },
+  });
+
   const [editObComm, setEditObComm] = useState<null | {
     rawStockId: number;
     amount: string;
@@ -616,6 +625,14 @@ export default function FactorySuppliers() {
         sfTxCount={filteredRows.length}
         currencyTotals={currencyTotals}
         primaryCc="USD"
+        onRenameSupplier={(id, newName) => renameSupplierMutation.mutate({ id, name: newName })}
+        onDeleteSupplier={(id) =>
+          wrapAdminAction(() => {
+            permanentDeleteMutation.mutate(id);
+            setStatementSupplierId(null);
+            if (statementReturnToParent) setStatementReturnToParent(false);
+          }, "Delete Supplier")
+        }
       />
     );
   }
