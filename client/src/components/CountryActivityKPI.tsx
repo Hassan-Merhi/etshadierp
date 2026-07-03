@@ -220,7 +220,6 @@ function CompanyRow({ company }: { company: CompanyActivity }) {
           : <ChevronRight className="h-3.5 w-3.5 text-muted-foreground shrink-0" />}
 
         <span className="font-medium flex-1 truncate">{company.name}</span>
-        <span className="text-xs text-muted-foreground font-mono shrink-0 mr-2">{company.code}</span>
 
         <div className="flex items-center gap-2 shrink-0">
           <Badge
