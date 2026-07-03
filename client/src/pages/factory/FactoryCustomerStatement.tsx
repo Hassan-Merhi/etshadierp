@@ -30,7 +30,7 @@ interface CustomerInfo {
 }
 
 interface BalanceEntry {
-  id: number;
+  id: number | string; // numeric for customerBalances rows, "ve-{n}" for voucher-entry rows
   transactionDate: string;
   transactionType: string;
   description: string | null;
@@ -186,7 +186,9 @@ export default function FactoryCustomerStatement() {
     },
   });
 
-  const saveRowNote = async (entryId: number, note: string) => {
+  const saveRowNote = async (entryId: number | string, note: string) => {
+    // Voucher-entry rows have string IDs ("ve-N") — they have no customerBalances record to update
+    if (typeof entryId === "string") return;
     const original = statement?.balanceHistory.find((e) => e.id === entryId)?.rowNote ?? "";
     if (note === original) return;
     setSavingRowNote(entryId);
@@ -637,10 +639,10 @@ export default function FactoryCustomerStatement() {
                           <input
                             type="text"
                             value={rowNotes[entry.id] ?? ""}
-                            onChange={(e) => setRowNotes((prev) => ({ ...prev, [entry.id]: e.target.value }))}
+                            onChange={(e) => typeof entry.id === "number" && setRowNotes((prev) => ({ ...prev, [entry.id]: e.target.value }))}
                             onBlur={() => saveRowNote(entry.id, rowNotes[entry.id] ?? "")}
-                            placeholder="Add note…"
-                            disabled={savingRowNote === entry.id}
+                            placeholder={typeof entry.id === "string" ? "—" : "Add note…"}
+                            disabled={savingRowNote === entry.id || typeof entry.id === "string"}
                             className="w-full text-xs bg-transparent border border-border rounded px-2 py-1 placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-ring disabled:opacity-50"
                             data-testid={`input-row-note-${entry.id}`}
                           />
