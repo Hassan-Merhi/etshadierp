@@ -42,15 +42,9 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: "24"
-          cache: "npm"
 
       - name: Install dependencies
-        run: |
-          if [ -f package-lock.json ]; then
-            npm ci
-          else
-            npm install
-          fi
+        run: npm install --no-audit
 
       # ── Blocking gates ─────────────────────────────────────────────────────
       # These three MUST pass. A failure here stops the workflow.
