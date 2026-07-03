@@ -966,6 +966,28 @@ export default function FactorySuppliers() {
                         FX Settlement ({cb.currencyCode})
                       </DropdownMenuItem>
                     ))}
+                    {isBroker && (
+                      <DropdownMenuItem
+                        data-testid={`btn-bulk-fx-${s.id}`}
+                        onClick={() => {
+                          setBulkFxBrokerId(s.id);
+                          setBulkFxBrokerName(s.name);
+                          setBulkFxForm({
+                            fromCurrencyCode: nonUsdBalances.length > 0 ? nonUsdBalances[0].currencyCode : "EUR",
+                            totalAmount: "",
+                            fxRateToUsd: "",
+                            date: today,
+                            notes: "",
+                            order: "oldest",
+                          });
+                          setBulkFxPreview(null);
+                          setBulkFxOpen(true);
+                        }}
+                      >
+                        <Layers className="h-4 w-4 mr-2 text-blue-500" />
+                        Bulk FX Settlement
+                      </DropdownMenuItem>
+                    )}
                     {s.isActive ? (
                       <DropdownMenuItem
                         className="text-destructive"
