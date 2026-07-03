@@ -234,9 +234,21 @@ export function classifyNetPositionAccounts(
         });
       }
     } else {
-      // Asset-type (and other) accounts: positive = asset, negative = liability (overdraft)
+      // Asset-type (and other) accounts: positive = asset, negative = liability (overdraft).
+      // Exception: accounts whose names contain "prepaid" are always balance-sheet assets.
+      // When they carry a credit balance they REDUCE the asset total rather than creating
+      // a separate liability entry (which is confusing and typically indicates a timing
+      // difference rather than a true liability).
+      const isPrepaid = (acc.name || "").toLowerCase().includes("prepaid");
+
       if (netBalance > 0) {
         forUsTotal += netBalance;
+        categoryTotals[`asset_${category}`] = (categoryTotals[`asset_${category}`] || 0) + netBalance;
+        forUsAccounts.push({ id: acc.id, name: acc.name, code: acc.code || "", value: round2(netBalance), category });
+      } else if (isPrepaid) {
+        // Credit-balance prepaid: add as a negative entry on the asset side so it
+        // reduces the prepaid total without appearing on the liability side.
+        forUsTotal += netBalance; // netBalance is negative, so this reduces forUsTotal
         categoryTotals[`asset_${category}`] = (categoryTotals[`asset_${category}`] || 0) + netBalance;
         forUsAccounts.push({ id: acc.id, name: acc.name, code: acc.code || "", value: round2(netBalance), category });
       } else {

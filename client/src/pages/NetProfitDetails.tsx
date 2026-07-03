@@ -81,7 +81,8 @@ function CategoryGroup({
   formatAmount: (n: number) => string;
 }) {
   const [open, setOpen] = useState(true);
-  const total = accounts.reduce((s, a) => s + Math.abs(a.value), 0);
+  // Use signed sum so credit-balance prepaid entries (negative) reduce the total
+  const total = accounts.reduce((s, a) => s + a.value, 0);
   const color = side === "asset" ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400";
   const headerBg = side === "asset" ? "bg-emerald-50/60 dark:bg-emerald-950/30" : "bg-rose-50/60 dark:bg-rose-950/30";
 
@@ -104,7 +105,7 @@ function CategoryGroup({
             {accounts.length}
           </span>
         </div>
-        <span className={`font-mono font-bold tabular-nums ${color}`}>{formatAmount(total)}</span>
+        <span className={`font-mono font-bold tabular-nums ${color}`}>{formatAmount(Math.abs(total))}</span>
       </button>
       {open && (
         <div className="divide-y divide-border/50">
@@ -112,6 +113,10 @@ function CategoryGroup({
             const ledgerBase = window.location.pathname.startsWith("/properties")
               ? "/properties/ledger-monthly"
               : "/ledger-monthly";
+            const isCreditOnAsset = side === "asset" && acc.value < 0;
+            const rowColor = isCreditOnAsset
+              ? "text-rose-600 dark:text-rose-400"
+              : color;
             return (
               <div
                 key={i}
@@ -125,12 +130,20 @@ function CategoryGroup({
                     className="text-foreground hover:text-foreground/80 text-left flex items-center gap-1 group"
                   >
                     <span>{acc.name}</span>
+                    {isCreditOnAsset && (
+                      <span className="text-xs text-rose-500 dark:text-rose-400 font-normal ml-1">(Cr)</span>
+                    )}
                     <ExternalLink className="h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-100 shrink-0 transition-opacity" />
                   </button>
                 ) : (
-                  <span className="text-foreground">{acc.name}</span>
+                  <span className="text-foreground flex items-center gap-1">
+                    {acc.name}
+                    {isCreditOnAsset && (
+                      <span className="text-xs text-rose-500 dark:text-rose-400 font-normal">(Cr)</span>
+                    )}
+                  </span>
                 )}
-                <span className={`font-mono tabular-nums font-medium ${color}`}>
+                <span className={`font-mono tabular-nums font-medium ${rowColor}`}>
                   {formatAmount(Math.abs(acc.value))}
                 </span>
               </div>
