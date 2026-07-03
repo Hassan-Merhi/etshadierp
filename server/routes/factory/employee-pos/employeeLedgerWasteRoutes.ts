@@ -384,7 +384,16 @@ export function registerEmployeeLedgerWasteRoutes(app: Express) {
           and(
             eq(factoryBales.companyId, companyId),
             eq(factoryBales.status, "IN_STOCK"),
-            inArray(factoryBales.productId, Array.from(wasteProductIds) as number[])
+            inArray(factoryBales.productId, Array.from(wasteProductIds) as number[]),
+            // Exclude bales already sold through a container order
+            // (mirrors the same guard used in location-inventory)
+            sql`NOT EXISTS (
+              SELECT 1 FROM customer_order_bales cob
+              INNER JOIN customer_orders co ON co.id = cob.order_id
+              WHERE cob.bale_id = ${factoryBales.id}
+                AND co.status IN ('FINALIZED','DISPATCHED','SOLD')
+                AND co.company_id = ${companyId}
+            )`
           )
         )
         .orderBy(desc(factoryBales.id));
