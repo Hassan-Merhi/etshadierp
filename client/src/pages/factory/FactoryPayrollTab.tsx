@@ -377,6 +377,7 @@ export default function FactoryPayrollTab() {
   const [undoTargetId, setUndoTargetId] = useState<number | null>(null);
   const [deleteBatchGroup, setDeleteBatchGroup] = useState<PayrollGroup | null>(null);
   const [showCompletedBatches, setShowCompletedBatches] = useState(false);
+  const [projectionPeriod, setProjectionPeriod] = useState<"daily" | "weekly" | "biweekly" | "monthly">("monthly");
   const [repairOpen, setRepairOpen] = useState(false);
   const [repairResult, setRepairResult] = useState<{
     deletedPayrollVouchers: number;
@@ -452,6 +453,47 @@ export default function FactoryPayrollTab() {
   });
 
   const activeWorkers = useMemo(() => workers?.filter((w) => w.active) || [], [workers]);
+
+  // Projection: auto-compute date range from selected period
+  const projDates = useMemo(() => {
+    const now = new Date();
+    const pad = (n: number) => String(n).padStart(2, "0");
+    const fmtD = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+    if (projectionPeriod === "daily") {
+      const t = fmtD(now);
+      return { start: t, end: t };
+    }
+    if (projectionPeriod === "weekly") {
+      const s = new Date(now); s.setDate(now.getDate() - 6);
+      return { start: fmtD(s), end: fmtD(now) };
+    }
+    if (projectionPeriod === "biweekly") {
+      const s = new Date(now); s.setDate(now.getDate() - 13);
+      return { start: fmtD(s), end: fmtD(now) };
+    }
+    // monthly — first to last of current month
+    const first = new Date(now.getFullYear(), now.getMonth(), 1);
+    const last = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+    return { start: fmtD(first), end: fmtD(last) };
+  }, [projectionPeriod]);
+
+  const { data: projectionRows, isFetching: projectionFetching } = useQuery<PreviewWorkerRow[]>({
+    queryKey: ["/api/factory/payrolls/preview/projection", projDates.start, projDates.end],
+    queryFn: async () => {
+      const res = await apiRequest("POST", "/api/factory/payrolls/preview", {
+        periodStart: projDates.start,
+        periodEnd: projDates.end,
+      });
+      if (!res.ok) return [];
+      return res.json();
+    },
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const projectionTotal = useMemo(
+    () => (projectionRows ?? []).reduce((s, r) => s + (r.net ?? 0), 0),
+    [projectionRows]
+  );
 
   // Group payrolls by period
   const payrollGroups = useMemo((): PayrollGroup[] => {
@@ -774,6 +816,7 @@ export default function FactoryPayrollTab() {
             <Skeleton className="h-10 w-36 rounded-lg" />
             <Skeleton className="h-10 w-44 rounded-lg" />
             <Skeleton className="h-10 w-40 rounded-lg" />
+            <Skeleton className="h-10 w-52 rounded-lg" />
           </>
         ) : (
           <>
@@ -802,6 +845,34 @@ export default function FactoryPayrollTab() {
               <span className="font-semibold font-mono text-emerald-600 dark:text-emerald-400" data-testid="stat-paid">
                 ${stats.paid.toFixed(2)}
               </span>
+            </div>
+            <div className="flex items-center gap-2 rounded-lg border bg-muted/40 px-4 py-2 text-sm" data-testid="stat-projection">
+              <CalendarDays className="h-4 w-4 text-muted-foreground shrink-0" />
+              <Select
+                value={projectionPeriod}
+                onValueChange={(v) => setProjectionPeriod(v as typeof projectionPeriod)}
+              >
+                <SelectTrigger
+                  className="h-auto border-0 p-0 shadow-none focus:ring-0 text-muted-foreground text-sm gap-1 min-w-0 w-auto"
+                  data-testid="select-projection-period"
+                >
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="daily">Daily</SelectItem>
+                  <SelectItem value="weekly">Weekly</SelectItem>
+                  <SelectItem value="biweekly">Bi-weekly</SelectItem>
+                  <SelectItem value="monthly">Monthly</SelectItem>
+                </SelectContent>
+              </Select>
+              <span className="text-muted-foreground">Total</span>
+              {projectionFetching ? (
+                <span className="font-mono text-muted-foreground/50 text-sm">···</span>
+              ) : (
+                <span className="font-semibold font-mono text-blue-600 dark:text-blue-400" data-testid="stat-projection-total">
+                  ${projectionTotal.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </span>
+              )}
             </div>
           </>
         )}
