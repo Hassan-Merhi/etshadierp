@@ -327,7 +327,14 @@ export default function VoucherDetail() {
                       <TableBody>
                         {(Array.isArray(data.entries) ? data.entries : []).map((entry, index) => (
                           <TableRow key={entry.id || index}>
-                            <TableCell className="font-medium">{entry.ledgerAccountName}</TableCell>
+                            <TableCell>
+                              <div className="font-medium">{entry.ledgerAccountName}</div>
+                              {entry.narration && (
+                                <div className="text-xs text-muted-foreground/80 mt-0.5 italic">
+                                  {entry.narration}
+                                </div>
+                              )}
+                            </TableCell>
                             <TableCell className="text-right font-mono">
                               {entry.debitAmount > 0 ? formatAmount(entry.debitAmount) : ""}
                             </TableCell>

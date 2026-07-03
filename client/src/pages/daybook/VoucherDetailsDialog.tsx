@@ -600,6 +600,11 @@ export function VoucherDetailsDialog({
                                     Balance: {formatAmount(entryBalances[entry.id] ?? "0")}
                                   </div>
                                 )}
+                                {entry.narration && (
+                                  <div className="text-xs text-muted-foreground/80 mt-0.5 italic">
+                                    {entry.narration}
+                                  </div>
+                                )}
                               </TableCell>
                               {selectedVoucher.voucherType === "Payment" ||
                               selectedVoucher.voucherType === "Receipt" ||
