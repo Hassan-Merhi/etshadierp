@@ -276,7 +276,7 @@ export function CountryActivityKPI() {
           <div className="min-w-0">
             <p className="text-sm font-semibold leading-none">Activity by Country</p>
             <p className="text-xs text-muted-foreground mt-0.5">
-              Offloaded containers &amp; POs imported per day
+              Offloaded containers &amp; imports per day
             </p>
           </div>
         </div>
@@ -292,7 +292,7 @@ export function CountryActivityKPI() {
             </Badge>
             <Badge variant="secondary" className="gap-1 text-xs" data-testid="badge-total-purchases">
               <ShoppingCart className="h-3 w-3" />
-              {summary.totalPurchases} purchases
+              {summary.totalPurchases} imported
             </Badge>
           </div>
         )}

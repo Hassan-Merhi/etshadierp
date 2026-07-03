@@ -38,84 +38,93 @@ export function registerStatsCountryActivityRoutes(app: Express) {
         ORDER BY name ASC
       `);
       const companies = companiesResult.rows;
-      const companyIds = companies.map((c) => c.id);
+      const companyIds = companies.map((c) => Number(c.id));
 
       if (companyIds.length === 0) {
         return res.json({ companies: [], days, startDate: startDateStr, endDate: endDateStr, dateSeries: [] });
       }
 
-      const toDateKey = (raw: any): string =>
-        typeof raw === "string" ? raw.substring(0, 10) : (raw as Date).toISOString().substring(0, 10);
+      // Helper: normalize any date value from pg to a YYYY-MM-DD string
+      const toDateKey = (raw: any): string => {
+        if (!raw) return "";
+        if (raw instanceof Date) return raw.toISOString().substring(0, 10);
+        if (typeof raw === "string") return raw.substring(0, 10);
+        return String(raw).substring(0, 10);
+      };
 
       type LocationEntry = { locationId: number; locationName: string; count: number };
       type DayEntry = { offloads: number; purchases: number; locations: LocationEntry[] };
       type DayMap = Map<string, DayEntry>;
 
+      // Use numeric company ids as keys (always compare as numbers)
       const companyDayMap = new Map<number, DayMap>();
-      for (const c of companies) companyDayMap.set(c.id, new Map());
+      for (const c of companies) companyDayMap.set(Number(c.id), new Map());
 
-      const ensureDay = (companyId: number, day: string): DayEntry => {
-        const m = companyDayMap.get(companyId)!;
+      const ensureDay = (rawCompanyId: any, day: string): DayEntry | null => {
+        const companyId = Number(rawCompanyId);
+        const m = companyDayMap.get(companyId);
+        if (!m) return null;
         if (!m.has(day)) m.set(day, { offloads: 0, purchases: 0, locations: [] });
         return m.get(day)!;
       };
 
       // ── 2. Offloaded containers per company per day ──────────────────────
-      // Use container_offloads table (actual offload event records).
-      // Falls back silently if the table doesn't exist on this deployment.
       try {
+        const companyIdList = companyIds.join(",");
         const offloadsResult = await pool.query<{
-          company_id: number;
-          day: string;
+          company_id: string;
+          day: any;
           cnt: string;
         }>(`
           SELECT
-            c.company_id,
+            c.company_id::text,
             co.offloaded_at::date AS day,
             COUNT(*)::text        AS cnt
           FROM container_offloads co
           JOIN containers c ON c.id = co.container_id
-          WHERE c.company_id = ANY($1::int[])
-            AND co.offloaded_at::date BETWEEN $2::date AND $3::date
+          WHERE c.company_id IN (${companyIdList})
+            AND co.offloaded_at::date BETWEEN $1::date AND $2::date
           GROUP BY c.company_id, co.offloaded_at::date
-        `, [companyIds, startDateStr, endDateStr]);
+        `, [startDateStr, endDateStr]);
 
         for (const row of offloadsResult.rows) {
           const entry = ensureDay(row.company_id, toDateKey(row.day));
-          entry.offloads = parseInt(row.cnt);
+          if (entry) entry.offloads = parseInt(row.cnt);
         }
 
         // Location breakdown — inner query, also fallback-safe
         try {
           const locResult = await pool.query<{
-            company_id: number;
-            day: string;
-            location_id: number;
+            company_id: string;
+            day: any;
+            location_id: string;
             location_name: string;
             cnt: string;
           }>(`
             SELECT
-              c.company_id,
+              c.company_id::text,
               co.offloaded_at::date AS day,
-              co.location_id,
+              co.location_id::text,
               l.name                AS location_name,
               COUNT(*)::text        AS cnt
             FROM container_offloads co
             JOIN containers c ON c.id = co.container_id
             JOIN locations l  ON l.id  = co.location_id
-            WHERE c.company_id = ANY($1::int[])
-              AND co.offloaded_at::date BETWEEN $2::date AND $3::date
+            WHERE c.company_id IN (${companyIdList})
+              AND co.offloaded_at::date BETWEEN $1::date AND $2::date
             GROUP BY c.company_id, co.offloaded_at::date, co.location_id, l.name
             ORDER BY co.offloaded_at::date DESC, COUNT(*) DESC
-          `, [companyIds, startDateStr, endDateStr]);
+          `, [startDateStr, endDateStr]);
 
           for (const row of locResult.rows) {
             const entry = ensureDay(row.company_id, toDateKey(row.day));
-            entry.locations.push({
-              locationId: row.location_id,
-              locationName: row.location_name,
-              count: parseInt(row.cnt),
-            });
+            if (entry) {
+              entry.locations.push({
+                locationId: parseInt(row.location_id),
+                locationName: row.location_name,
+                count: parseInt(row.cnt),
+              });
+            }
           }
         } catch (_locErr: any) {
           console.error("[country-activity] location breakdown failed (non-fatal):", _locErr.message);
@@ -124,44 +133,58 @@ export function registerStatsCountryActivityRoutes(app: Express) {
         console.error("[country-activity] offloads query failed (non-fatal):", _offloadErr.message);
       }
 
-      // ── 3. Purchases (POs imported) per company per day ──────────────────
+      // ── 3. Containers imported per company per day ────────────────────────
+      // Count containers created (one container = one import), not raw POs.
       try {
+        const companyIdList = companyIds.join(",");
         const purchasesResult = await pool.query<{
-          company_id: number;
-          day: string;
+          company_id: string;
+          day: any;
           cnt: string;
         }>(`
           SELECT
-            po.company_id,
-            po.created_at::date AS day,
-            COUNT(*)::text       AS cnt
-          FROM purchase_orders po
-          WHERE po.company_id = ANY($1::int[])
-            AND po.created_at::date BETWEEN $2::date AND $3::date
-          GROUP BY po.company_id, po.created_at::date
-        `, [companyIds, startDateStr, endDateStr]);
+            c.company_id::text,
+            c.created_at::date AS day,
+            COUNT(*)::text     AS cnt
+          FROM containers c
+          WHERE c.company_id IN (${companyIdList})
+            AND c.created_at::date BETWEEN $1::date AND $2::date
+          GROUP BY c.company_id, c.created_at::date
+        `, [startDateStr, endDateStr]);
 
         for (const row of purchasesResult.rows) {
           const entry = ensureDay(row.company_id, toDateKey(row.day));
-          entry.purchases = parseInt(row.cnt);
+          if (entry) entry.purchases = parseInt(row.cnt);
         }
       } catch (_poErr: any) {
-        console.error("[country-activity] purchases query failed (non-fatal):", _poErr.message);
+        console.error("[country-activity] containers (imports) query failed (non-fatal):", _poErr.message);
       }
 
       // ── 4. Build date spine ──────────────────────────────────────────────
-      const datesResult = await pool.query<{ day: string }>(`
-        SELECT gs::date AS day
-        FROM generate_series($1::date, $2::date, INTERVAL '1 day') AS gs
-        ORDER BY day DESC
-      `, [startDateStr, endDateStr]);
-      const dateSeries = datesResult.rows.map((r) => toDateKey(r.day));
+      let dateSeries: string[] = [];
+      try {
+        const datesResult = await pool.query<{ day: any }>(`
+          SELECT gs::date AS day
+          FROM generate_series($1::date, $2::date, INTERVAL '1 day') AS gs
+          ORDER BY day DESC
+        `, [startDateStr, endDateStr]);
+        dateSeries = datesResult.rows.map((r) => toDateKey(r.day));
+      } catch (_dsErr: any) {
+        // Fallback: build date spine in JavaScript
+        console.error("[country-activity] generate_series failed, using JS fallback:", _dsErr.message);
+        const cur = new Date(endDateStr + "T00:00:00");
+        const start = new Date(startDateStr + "T00:00:00");
+        while (cur >= start) {
+          dateSeries.push(cur.toISOString().substring(0, 10));
+          cur.setDate(cur.getDate() - 1);
+        }
+      }
 
       // ── 5. Assemble response ─────────────────────────────────────────────
       const result = companies.map((c) => {
-        const dayMap = companyDayMap.get(c.id)!;
+        const dayMap = companyDayMap.get(Number(c.id));
         const dailyData = dateSeries.map((day) => {
-          const entry = dayMap.get(day) ?? { offloads: 0, purchases: 0, locations: [] };
+          const entry = dayMap?.get(day) ?? { offloads: 0, purchases: 0, locations: [] };
           return { date: day, offloads: entry.offloads, purchases: entry.purchases, locations: entry.locations };
         });
 
