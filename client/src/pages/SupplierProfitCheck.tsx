@@ -273,12 +273,12 @@ export default function SupplierProfitCheck() {
 
   // ─── Queries ─────────────────────────────────────────────────────────────
   const { data: suppliers = [] } = useQuery<any[]>({
-    queryKey: ["/api/suppliers", companyId],
-    enabled: !!companyId,
+    queryKey: ["/api/suppliers-all-spc"],
     queryFn: async () => {
-      const res = await fetch(`/api/suppliers?companyId=${companyId}`, { credentials: "include" });
+      const res = await fetch("/api/suppliers", { credentials: "include" });
       return res.ok ? res.json() : [];
     },
+    staleTime: 5 * 60 * 1000,
   });
 
   const { data: stockGroups = [] } = useQuery<any[]>({
