@@ -64,7 +64,7 @@ export function registerFactoryStockAllocationV5Routes(app: Express) {
         hideZero,
       } = req.query;
 
-      // 0. Build set of excluded article codes — products whose category is Wiper or Garbage
+      // 0. Build set of excluded article codes — products whose category OR name is Wiper/Garbage/Rag
       const excludedCodesRaw = await db.execute(
         sql`SELECT COALESCE(fbp.article_code, fbp.code) AS "articleCode"
             FROM factory_bale_products fbp
@@ -73,6 +73,9 @@ export function registerFactoryStockAllocationV5Routes(app: Express) {
               AND (
                 LOWER(fc.name) LIKE '%wiper%'
                 OR LOWER(fc.name) LIKE '%garbage%'
+                OR LOWER(fc.name) LIKE '%rag%'
+                OR LOWER(fbp.name) LIKE '%wiper%'
+                OR LOWER(fbp.name) LIKE '%garbage%'
               )`
       );
       const excludedCodes = new Set<string>(

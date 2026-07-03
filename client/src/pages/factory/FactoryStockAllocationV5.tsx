@@ -427,7 +427,7 @@ export default function FactoryStockAllocationV5() {
   });
 
   function isGarbageOrWipers(row: V5Row) {
-    if (row.isGarbageOrWipers !== undefined) return row.isGarbageOrWipers;
+    if (row.isGarbageOrWipers) return true;
     const n = row.productName.toLowerCase();
     return n.includes("wiper") || n.includes("garbage");
   }
