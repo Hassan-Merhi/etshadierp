@@ -360,7 +360,7 @@ export function CountryActivityKPI() {
             <Globe className="h-4 w-4 text-primary" />
           </div>
           <div className="min-w-0">
-            <p className="text-sm font-semibold leading-none">Activity by Country</p>
+            <p className="text-sm font-semibold leading-none">Activity by Company</p>
             <p className="text-xs text-muted-foreground mt-0.5">
               Offloaded containers &amp; imports per day
             </p>
