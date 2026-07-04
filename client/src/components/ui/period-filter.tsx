@@ -8,7 +8,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Calendar } from "@/components/ui/calendar";
 import { useDateFormat } from "@/contexts/DateFormatContext";
 import { cn } from "@/lib/utils";
@@ -215,17 +215,14 @@ export function PeriodFilter({
         </DropdownMenuContent>
       </DropdownMenu>
 
-      {/* Calendar popover for custom range — always mounted so open state is controlled */}
+      {/* Calendar dialog for custom range */}
       {!hideCustomInputs && (
-        <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
-          <PopoverTrigger asChild>
-            <span className="sr-only">Custom range calendar</span>
-          </PopoverTrigger>
-          <PopoverContent className="w-auto p-0" align="start">
-            <div className="p-3 border-b">
-              <p className="text-sm font-medium">Select date range</p>
+        <Dialog open={calendarOpen} onOpenChange={setCalendarOpen}>
+          <DialogContent className="w-auto max-w-[95vw] p-0">
+            <DialogHeader className="p-3 border-b">
+              <DialogTitle className="text-sm font-medium">Select date range</DialogTitle>
               <p className="text-xs text-muted-foreground mt-0.5">Click a start date, then an end date</p>
-            </div>
+            </DialogHeader>
             <Calendar
               mode="range"
               selected={calendarRange}
@@ -238,8 +235,8 @@ export function PeriodFilter({
                 Now click an end date
               </div>
             )}
-          </PopoverContent>
-        </Popover>
+          </DialogContent>
+        </Dialog>
       )}
     </div>
   );
