@@ -108,6 +108,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
   const [showDraftDialog, setShowDraftDialog] = useState(false);
   const [currentDraftId, setCurrentDraftId] = useState<number | null>(null);
   const [customerComboOpen, setCustomerComboOpen] = useState(false);
+  const [mobileCustomerComboOpen, setMobileCustomerComboOpen] = useState(false);
   const [saleJustCompleted, setSaleJustCompleted] = useState(false);
   const [showStockPrompt, setShowStockPrompt] = useState(false);
   const [invoiceWaStatus, setInvoiceWaStatus] = useState<"idle" | "sending" | "sent" | "failed">("idle");
@@ -1477,7 +1478,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
             </div>
 
             {isCreditSale ? (
-              <Popover open={customerComboOpen} onOpenChange={setCustomerComboOpen}>
+              <Popover open={mobileCustomerComboOpen} onOpenChange={setMobileCustomerComboOpen}>
                 <PopoverTrigger asChild>
                   <Button variant="outline" className="flex-1 gap-2 font-normal justify-start" data-testid="select-mobile-customer">
                     <User className="h-4 w-4 text-muted-foreground shrink-0" />
@@ -1501,7 +1502,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
                             value={acc.name}
                             onSelect={() => {
                               setSelectedCustomerId(String(acc.id));
-                              setCustomerComboOpen(false);
+                              setMobileCustomerComboOpen(false);
                             }}
                           >
                             <Check className={`mr-2 h-4 w-4 shrink-0 ${selectedCustomerId === String(acc.id) ? "opacity-100" : "opacity-0"}`} />
