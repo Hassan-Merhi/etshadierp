@@ -17,13 +17,15 @@ import { enqueueRequest } from "@/lib/offlineQueue";
 type CompanyType = "erp" | "factory" | "properties" | string;
 
 const TYPE_META: Record<string, { color: string; label: string }> = {
-  erp: { color: "#3b82f6", label: "ERP" },
-  factory: { color: "#f97316", label: "Factory" },
-  properties: { color: "#6366f1", label: "Properties" },
+  erp:              { color: "#3b82f6", label: "ERP" },
+  factory:          { color: "#f97316", label: "Factory" },
+  factory_v2:       { color: "#f97316", label: "Factory V2" },
+  properties:       { color: "#6366f1", label: "Properties" },
+  supplier_partner: { color: "#f43f5e", label: "Supplier Partner" },
 };
 
 function getTypeMeta(type: CompanyType) {
-  return TYPE_META[type] ?? { color: "#6b7280", label: "ERP" };
+  return TYPE_META[type] ?? { color: "#6b7280", label: type ?? "Unknown" };
 }
 
 function getInitials(name: string) {

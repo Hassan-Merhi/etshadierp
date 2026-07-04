@@ -99,6 +99,7 @@ export function CompanyDialog({ open, onOpenChange, editingCompany, onSubmit, is
                       <SelectItem value="erp">ERP (Accounting)</SelectItem>
                       <SelectItem value="factory">Factory (Production)</SelectItem>
                       <SelectItem value="properties">Properties</SelectItem>
+                      <SelectItem value="supplier_partner">Supplier Partner</SelectItem>
                     </SelectContent>
                   </Select>
                   <FormMessage />

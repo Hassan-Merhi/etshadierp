@@ -335,15 +335,18 @@ export function CompaniesTab() {
               {filtered.map((company: any) => {
                 const isFactory = company.companyType === "factory" || company.companyType === "factory_v2";
                 const isProperties = company.companyType === "properties";
-                const typeLabel = isFactory ? "Factory" : isProperties ? "Properties" : "ERP";
+                const isSupplierPartner = company.companyType === "supplier_partner";
+                const typeLabel = isFactory ? "Factory" : isProperties ? "Properties" : isSupplierPartner ? "Supplier Partner" : "ERP";
 
-                const accentClass = isFactory ? "bg-orange-500" : isProperties ? "bg-green-500" : "bg-indigo-500";
+                const accentClass = isFactory ? "bg-orange-500" : isProperties ? "bg-green-500" : isSupplierPartner ? "bg-rose-500" : "bg-indigo-500";
 
                 const typeBadgeClass = isFactory
                   ? "border-orange-200 text-orange-700 bg-orange-50 dark:border-orange-800 dark:text-orange-300 dark:bg-orange-950"
                   : isProperties
                     ? "border-green-200 text-green-700 bg-green-50 dark:border-green-800 dark:text-green-300 dark:bg-green-950"
-                    : "border-indigo-200 text-indigo-700 bg-indigo-50 dark:border-indigo-800 dark:text-indigo-300 dark:bg-indigo-950";
+                    : isSupplierPartner
+                      ? "border-rose-200 text-rose-700 bg-rose-50 dark:border-rose-800 dark:text-rose-300 dark:bg-rose-950"
+                      : "border-indigo-200 text-indigo-700 bg-indigo-50 dark:border-indigo-800 dark:text-indigo-300 dark:bg-indigo-950";
 
                 return (
                   <div
