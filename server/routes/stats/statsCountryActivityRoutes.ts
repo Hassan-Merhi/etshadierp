@@ -52,19 +52,20 @@ export function registerStatsCountryActivityRoutes(app: Express) {
         return String(raw).substring(0, 10);
       };
 
-      type ContainerEntry = { id: number; containerNumber: string; supplierName: string | null };
-      type LocationEntry  = { locationId: number; locationName: string; count: number };
-      type DayEntry       = { offloads: number; purchases: number; locations: LocationEntry[]; containers: ContainerEntry[] };
-      type DayMap         = Map<string, DayEntry>;
+      type ContainerEntry         = { id: number; containerNumber: string; supplierCode: string | null };
+      type ImportedContainerEntry = { id: number; containerNumber: string; supplierCode: string | null; shopName: string | null };
+      type LocationEntry          = { locationId: number; locationName: string; count: number };
+      type DayEntry               = { offloads: number; purchases: number; locations: LocationEntry[]; containers: ContainerEntry[]; importedContainers: ImportedContainerEntry[] };
+      type DayMap                 = Map<string, DayEntry>;
 
       const companyDayMap = new Map<number, DayMap>();
-      for (const c of companies) companyDayMap.set(Number(c.id), new Map());
+      for (const c of companies) companyDayMap.set(Number(c.id), new Map<string, DayEntry>());
 
       const ensureDay = (rawCompanyId: any, day: string): DayEntry | null => {
         const companyId = Number(rawCompanyId);
         const m = companyDayMap.get(companyId);
         if (!m) return null;
-        if (!m.has(day)) m.set(day, { offloads: 0, purchases: 0, locations: [], containers: [] });
+        if (!m.has(day)) m.set(day, { offloads: 0, purchases: 0, locations: [], containers: [], importedContainers: [] });
         return m.get(day)!;
       };
 
@@ -87,7 +88,7 @@ export function registerStatsCountryActivityRoutes(app: Express) {
               json_build_object(
                 'id',              c.id,
                 'containerNumber', COALESCE(c.container_number, ''),
-                'supplierName',    s.legal_name
+                'supplierCode',    s.code
               )
               ORDER BY c.container_number
             ) AS containers
@@ -110,7 +111,7 @@ export function registerStatsCountryActivityRoutes(app: Express) {
               entry.containers = rawContainers.map((c: any) => ({
                 id:              Number(c.id),
                 containerNumber: c.containerNumber || "",
-                supplierName:    c.supplierName ?? null,
+                supplierCode:    c.supplierCode ?? null,
               }));
             }
           }
@@ -164,12 +165,23 @@ export function registerStatsCountryActivityRoutes(app: Express) {
           company_id: string;
           day: any;
           cnt: string;
+          containers: any;
         }>(`
           SELECT
             c.company_id::text,
             c.created_at::date AS day,
-            COUNT(*)::text     AS cnt
+            COUNT(*)::text     AS cnt,
+            json_agg(
+              json_build_object(
+                'id',              c.id,
+                'containerNumber', COALESCE(c.container_number, ''),
+                'supplierCode',    s.code,
+                'shopName',        c.shop_name
+              )
+              ORDER BY c.container_number
+            ) AS containers
           FROM containers c
+          LEFT JOIN suppliers s ON s.id = c.supplier_id
           WHERE c.company_id IN (${companyIdList})
             AND c.created_at::date BETWEEN $1::date AND $2::date
           GROUP BY c.company_id, c.created_at::date
@@ -177,7 +189,20 @@ export function registerStatsCountryActivityRoutes(app: Express) {
 
         for (const row of purchasesResult.rows) {
           const entry = ensureDay(row.company_id, toDateKey(row.day));
-          if (entry) entry.purchases = parseInt(row.cnt);
+          if (entry) {
+            entry.purchases = parseInt(row.cnt);
+            const rawContainers = typeof row.containers === "string"
+              ? JSON.parse(row.containers)
+              : row.containers;
+            if (Array.isArray(rawContainers)) {
+              entry.importedContainers = rawContainers.map((c: any) => ({
+                id:              Number(c.id),
+                containerNumber: c.containerNumber || "",
+                supplierCode:    c.supplierCode ?? null,
+                shopName:        c.shopName ?? null,
+              }));
+            }
+          }
         }
       } catch (_poErr: any) {
         console.error("[country-activity] containers (imports) query failed (non-fatal):", _poErr.message);
@@ -206,13 +231,14 @@ export function registerStatsCountryActivityRoutes(app: Express) {
       const result = companies.map((c) => {
         const dayMap = companyDayMap.get(Number(c.id));
         const dailyData = dateSeries.map((day) => {
-          const entry = dayMap?.get(day) ?? { offloads: 0, purchases: 0, locations: [], containers: [] };
+          const entry = dayMap?.get(day) ?? { offloads: 0, purchases: 0, locations: [], containers: [], importedContainers: [] };
           return {
-            date:       day,
-            offloads:   entry.offloads,
-            purchases:  entry.purchases,
-            locations:  entry.locations,
-            containers: entry.containers,
+            date:               day,
+            offloads:           entry.offloads,
+            purchases:          entry.purchases,
+            locations:          entry.locations,
+            containers:         entry.containers,
+            importedContainers: entry.importedContainers,
           };
         });
 

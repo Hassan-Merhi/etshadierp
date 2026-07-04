@@ -15,12 +15,19 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
-const WINDOW_DAYS = 14;
+const WINDOW_DAYS = 1;
 
 interface ContainerEntry {
   id: number;
   containerNumber: string;
-  supplierName: string | null;
+  supplierCode: string | null;
+}
+
+interface ImportedContainerEntry {
+  id: number;
+  containerNumber: string;
+  supplierCode: string | null;
+  shopName: string | null;
 }
 
 interface LocationCount {
@@ -35,6 +42,7 @@ interface DayEntry {
   purchases: number;
   locations: LocationCount[];
   containers: ContainerEntry[];
+  importedContainers: ImportedContainerEntry[];
 }
 
 interface CompanyActivity {
@@ -68,6 +76,14 @@ function addDays(d: Date, n: number) {
 }
 
 function formatRange(startStr: string, endStr: string) {
+  if (startStr === endStr) {
+    const d = new Date(startStr + "T00:00:00");
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const diff = Math.round((today.getTime() - d.getTime()) / 86400000);
+    if (diff === 0) return "Today";
+    if (diff === 1) return "Yesterday";
+    return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+  }
   const start = new Date(startStr + "T00:00:00");
   const end   = new Date(endStr   + "T00:00:00");
   const sameYear = start.getFullYear() === end.getFullYear();
@@ -103,13 +119,45 @@ function ContainerTags({ containers }: { containers: ContainerEntry[] }) {
         >
           <Container className="h-2.5 w-2.5 shrink-0" />
           <span className="font-mono font-medium">{c.containerNumber || "—"}</span>
-          {c.supplierName && (
+          {c.supplierCode && (
             <>
               <span className="text-primary/50">·</span>
-              <span className="truncate max-w-[120px]">{c.supplierName}</span>
+              <span className="truncate max-w-[100px]">{c.supplierCode}</span>
             </>
           )}
         </span>
+      ))}
+    </div>
+  );
+}
+
+// ── Imported container tags shown under a POs Imported cell ───────────────────
+function ImportedContainerTags({ containers }: { containers: ImportedContainerEntry[] }) {
+  if (!containers || containers.length === 0) return null;
+  return (
+    <div className="flex flex-col gap-0.5 mt-1 items-center">
+      {containers.map((c) => (
+        <div key={c.id} className="flex flex-col items-center gap-0">
+          <span
+            className="inline-flex items-center gap-1 text-[10px] bg-primary/10 text-primary rounded px-1.5 py-0.5 whitespace-nowrap"
+            data-testid={`tag-imported-${c.id}`}
+          >
+            <Container className="h-2.5 w-2.5 shrink-0" />
+            <span className="font-mono font-medium">{c.containerNumber || "—"}</span>
+            {c.supplierCode && (
+              <>
+                <span className="text-primary/50">·</span>
+                <span className="truncate max-w-[100px]">{c.supplierCode}</span>
+              </>
+            )}
+          </span>
+          {c.shopName && (
+            <span className="inline-flex items-center gap-0.5 text-[10px] bg-muted text-muted-foreground rounded px-1.5 py-0.5 whitespace-nowrap mt-0.5">
+              <MapPin className="h-2.5 w-2.5 shrink-0" />
+              {c.shopName}
+            </span>
+          )}
+        </div>
       ))}
     </div>
   );
@@ -187,9 +235,14 @@ function CompanyDayGrid({ days }: { days: DayEntry[] }) {
                 )}
               </td>
               <td className="py-2 px-3 text-center align-top">
-                {d.purchases > 0
-                  ? <span className="font-semibold text-foreground">{d.purchases}</span>
-                  : <span className="text-muted-foreground/50">—</span>}
+                {d.purchases > 0 ? (
+                  <div>
+                    <span className="font-semibold text-foreground">{d.purchases}</span>
+                    <ImportedContainerTags containers={d.importedContainers ?? []} />
+                  </div>
+                ) : (
+                  <span className="text-muted-foreground/50">—</span>
+                )}
               </td>
             </tr>
           ))}
