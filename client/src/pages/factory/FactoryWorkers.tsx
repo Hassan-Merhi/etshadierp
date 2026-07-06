@@ -1527,7 +1527,7 @@ export default function FactoryWorkers() {
                     Due Today
                   </TableHead>
                   <TableHead className="w-[10%] text-right text-xs font-semibold uppercase tracking-wide text-muted-foreground py-2">
-                    Adv − Due
+                    Due − Adv
                   </TableHead>
                   <TableHead className="w-[80px] text-xs font-semibold uppercase tracking-wide text-muted-foreground py-2">
                     Status
@@ -1729,17 +1729,17 @@ export default function FactoryWorkers() {
                         })()}
                       </TableCell>
 
-                      {/* ── Advance − Due Today ────────────────────────── */}
+                      {/* ── Due Today − Advance ────────────────────────── */}
                       <TableCell className="py-3 text-right font-mono text-sm">
                         {(() => {
                           const advance = parseFloat((worker as any).pendingAdvanceBalance || "0");
                           const dueNet = amountDue[worker.id]?.net ?? 0;
                           if (advance === 0 && dueNet === 0) return <span className="text-muted-foreground/40">—</span>;
-                          const diff = advance - dueNet;
+                          const diff = dueNet - advance;
                           const fmt = (n: number) =>
                             n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
                           return (
-                            <span className={diff > 0 ? "text-amber-600 dark:text-amber-400" : diff < 0 ? "text-rose-600 dark:text-rose-400" : "text-muted-foreground/40"}>
+                            <span className={diff > 0 ? "text-emerald-600 dark:text-emerald-400" : diff < 0 ? "text-amber-600 dark:text-amber-400" : "text-muted-foreground/40"}>
                               {diff >= 0 ? "" : "−"}${fmt(Math.abs(diff))}
                             </span>
                           );
