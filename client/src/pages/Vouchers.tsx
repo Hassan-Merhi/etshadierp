@@ -28,6 +28,8 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 import { useAppMode, useModePrefix } from "@/contexts/AppModeContext";
+import { resolveWhatsAppPrompt } from "@/lib/whatsapp-prompt";
+import type { WhatsAppPromptState } from "@/lib/whatsapp-prompt";
 import { getApiRequest } from "@/lib/factoryApi";
 import { useFormDraft } from "@/hooks/useFormDraft";
 import { DraftRestorePrompt } from "@/components/DraftRestorePrompt";
@@ -121,7 +123,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
   const [selectedAccountId, setSelectedAccountId] = useState<number | null>(null);
   const [selectedAccountType, setSelectedAccountType] = useState<string | null>(null);
   const [activeRowIndex, setActiveRowIndex] = useState<number | null>(null);
-  const [waPendingPrompt, setWaPendingPrompt] = useState<{ accountId: number; month: string } | null>(null);
+  const [waPendingPrompt, setWaPendingPrompt] = useState<WhatsAppPromptState>(null);
   const [showCreateAccountModal, setShowCreateAccountModal] = useState(false);
   const [createAccountContext, setCreateAccountContext] = useState<{
     tab: "payment" | "receipt" | "journal";
@@ -314,9 +316,8 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
         title: "Success",
         description: `${activeTab === "payment" ? "Payment" : "Receipt"} voucher ${isEditMode ? "updated" : "created"} successfully`,
       });
-      if (data?.whatsapp?.prompt && data.whatsapp.accountId && data.whatsapp.month) {
-        setWaPendingPrompt({ accountId: data.whatsapp.accountId, month: data.whatsapp.month });
-      }
+      const waPrompt = resolveWhatsAppPrompt(data);
+      if (waPrompt) setWaPendingPrompt(waPrompt);
       discardPaymentDraft();
       queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] });
       queryClient.invalidateQueries({ queryKey: ["/api/daybook"] });

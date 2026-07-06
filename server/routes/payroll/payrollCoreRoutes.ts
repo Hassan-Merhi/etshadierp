@@ -224,9 +224,11 @@ export function registerPayrollCoreRoutes(app: Express) {
         : getFactoryCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const today = new Date();
+      // Use the client's local date (from X-Client-Date header) so the
+      // period boundary is correct across timezone offsets. Falls back to
+      // UTC today when the header is absent.
+      const todayStr = getClientDate(req);
       const pad = (n: number) => String(n).padStart(2, "0");
-      const todayStr = `${today.getFullYear()}-${pad(today.getMonth() + 1)}-${pad(today.getDate())}`;
 
       // Helper: days in the month containing dateStr
       const getDIM = (dateStr: string) => {

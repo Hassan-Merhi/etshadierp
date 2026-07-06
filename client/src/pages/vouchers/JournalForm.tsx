@@ -1,4 +1,6 @@
 import { useState, useRef, useEffect, useMemo } from "react";
+import { resolveWhatsAppPrompt } from "@/lib/whatsapp-prompt";
+import type { WhatsAppPromptState } from "@/lib/whatsapp-prompt";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -135,7 +137,7 @@ export function JournalForm({ voucherIdToEdit, isPOS }: JournalFormProps) {
   const [transactionRate, setTransactionRate] = useState<number | null>(null);
   const [journalEffectiveDate, setJournalEffectiveDate] = useState<string>("");
   const [isAutoCreating, setIsAutoCreating] = useState(false);
-  const [waPendingPrompt, setWaPendingPrompt] = useState<{ accountId: number; month: string } | null>(null);
+  const [waPendingPrompt, setWaPendingPrompt] = useState<WhatsAppPromptState>(null);
   const [accountPickersNeeded, setAccountPickersNeeded] = useState(() => !!voucherIdToEdit);
   const hydratedVoucherIdRef = useRef<number | null>(null);
 
@@ -484,9 +486,8 @@ export function JournalForm({ voucherIdToEdit, isPOS }: JournalFormProps) {
     onSuccess: async (data: any) => {
       const isEditMode = !!voucherIdToEdit;
       toast({ title: "Success", description: `Journal voucher ${isEditMode ? "updated" : "created"} successfully` });
-      if (data?.whatsapp?.prompt && data.whatsapp.accountId && data.whatsapp.month) {
-        setWaPendingPrompt({ accountId: data.whatsapp.accountId, month: data.whatsapp.month });
-      }
+      const waPrompt = resolveWhatsAppPrompt(data);
+      if (waPrompt) setWaPendingPrompt(waPrompt);
       discardJournalDraft();
       queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] });
       queryClient.invalidateQueries({ queryKey: ["/api/daybook"] });
