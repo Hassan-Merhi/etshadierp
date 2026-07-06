@@ -394,6 +394,7 @@ export default function FactoryInsurance() {
     mutationFn: async () => {
       const amt = parseFloat(ecAmount);
       if (!ecDrId || !ecCrId || isNaN(amt) || amt <= 0) throw new Error("Fill in all fields with a valid amount.");
+      if (ecDrId === ecCrId) throw new Error("Debit and credit accounts must be different.");
       return apiRequest("POST", "/api/vouchers/with-entries", {
         voucher: {
           voucherType: "Journal",
@@ -859,7 +860,7 @@ export default function FactoryInsurance() {
             <Button variant="outline" onClick={() => setShowExtraCharges(false)}>Cancel</Button>
             <Button
               onClick={() => extraChargesMutation.mutate()}
-              disabled={extraChargesMutation.isPending || !ecDrId || !ecCrId || !ecAmount}
+              disabled={extraChargesMutation.isPending || !ecDrId || !ecCrId || !ecAmount || ecDrId === ecCrId}
               data-testid="button-extra-charges-submit"
             >
               {extraChargesMutation.isPending && <Loader2 className="h-4 w-4 animate-spin mr-1" />}

@@ -1,16 +1,16 @@
 import { defineConfig } from "vitest/config";
+import react from "@vitejs/plugin-react";
 import path from "path";
 
 export default defineConfig({
+  plugins: [react()],
   test: {
     globals: true,
-    environment: "node",
-    testTimeout: 30000,
-    hookTimeout: 30000,
-    include: ["tests/**/*.test.ts"],
-    exclude: ["tests/ui/**"],
-    pool: "forks",
-    singleFork: true,
+    environment: "jsdom",
+    setupFiles: ["tests/ui/setup.ts"],
+    testTimeout: 15000,
+    include: ["tests/ui/**/*.test.{ts,tsx}"],
+    // No pool/fork overrides — jsdom runs in the same process
   },
   resolve: {
     alias: {
