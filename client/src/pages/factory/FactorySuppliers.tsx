@@ -368,8 +368,11 @@ export default function FactorySuppliers() {
     mutationFn: async (data: any) => factoryApiRequest("POST", "/api/factory/suppliers", data),
     onSuccess: () => {
       setCreateOpen(false);
+      resetForm();
       queryClient.invalidateQueries({ queryKey: ["/api/factory/suppliers"] });
+      toast({ title: "Supplier created" });
     },
+    onError: (err: Error) => toast({ title: "Failed to create supplier", description: err.message, variant: "destructive" }),
   });
 
   const updateMutation = useMutation({
@@ -463,7 +466,12 @@ export default function FactorySuppliers() {
       queryClient.invalidateQueries({ queryKey: ["/api/factory/suppliers", parentViewSupplierId, "direct-containers"] });
       toast({ title: `${results.length} container${results.length !== 1 ? "s" : ""} assigned to ${results[0]?.toSupplierName}` });
     },
-    onError: (err: Error) => toast({ title: "Assignment failed", description: err.message, variant: "destructive" }),
+    onError: (err: Error) => {
+      // Invalidate even on partial failure so UI reflects any containers that did move
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/suppliers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/suppliers", parentViewSupplierId, "direct-containers"] });
+      toast({ title: "Assignment failed", description: err.message, variant: "destructive" });
+    },
   });
 
   const [editObComm, setEditObComm] = useState<null | {
@@ -526,7 +534,10 @@ export default function FactorySuppliers() {
     return true;
   });
 
-  const resetForm = () => {
+  // overrideParentId lets callers pass the new parentId directly to avoid
+  // the stale-closure problem when setCreateSubAccountParentId hasn't flushed yet.
+  const resetForm = (overrideParentId?: number | null) => {
+    const pid = overrideParentId !== undefined ? overrideParentId : createSubAccountParentId;
     setFormData({
       name: "",
       contactPerson: "",
@@ -534,9 +545,9 @@ export default function FactorySuppliers() {
       email: "",
       address: "",
       notes: "",
-      parentId: createSubAccountParentId,
+      parentId: pid,
     });
-    setFormRole(createSubAccountParentId ? "linked" : "standalone");
+    setFormRole(pid ? "linked" : "standalone");
   };
 
   const statusColor = (s: string) => (s === "OFFLOADED" ? "secondary" : s === "OTW" ? "outline" : "default");
@@ -827,7 +838,7 @@ export default function FactorySuppliers() {
           directContainersLoading={directContainersLoading}
           onAddLinkedSupplier={() => {
             setCreateSubAccountParentId(parentViewSupplierId);
-            resetForm();
+            resetForm(parentViewSupplierId);  // pass directly to avoid stale-closure
             setCreateOpen(true);
           }}
           onAssignContainersTo={(supplierId, supplierName) =>
@@ -1120,7 +1131,7 @@ export default function FactorySuppliers() {
                       <DropdownMenuItem
                         onClick={() => {
                           setCreateSubAccountParentId(s.id);
-                          resetForm();
+                          resetForm(s.id);  // pass directly to avoid stale-closure
                           setCreateOpen(true);
                         }}
                         data-testid={`btn-add-linked-${s.id}`}
