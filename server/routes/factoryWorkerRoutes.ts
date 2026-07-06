@@ -682,6 +682,10 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
     }
   });
 
+  // Register payroll sub-routes (includes /amount-due, /payrolls, advances, etc.)
+  // MUST come before /:id so that /amount-due is not captured as a wildcard ID.
+  registerFactoryWorkerPayrollRoutes(app);
+
   // GET /api/factory/workers/:id - Get single worker with computed stats
   app.get("/api/factory/workers/:id", requireAuth, async (req: any, res: any) => {
     try {
@@ -1507,6 +1511,5 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
     }
   });
 
-  // GET /api/factory/cash-accounts - Get ledger accounts for cash account picker
-  registerFactoryWorkerPayrollRoutes(app);
+  // (payroll routes already registered above, before /:id)
 }

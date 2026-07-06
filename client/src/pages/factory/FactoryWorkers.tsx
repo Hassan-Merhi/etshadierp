@@ -1419,7 +1419,7 @@ export default function FactoryWorkers() {
                   <TableHead className="w-10 text-center text-xs font-semibold uppercase tracking-wide text-muted-foreground py-2 pl-3 pr-1">
                     #
                   </TableHead>
-                  <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground py-2">
+                  <TableHead className="w-[22%] text-xs font-semibold uppercase tracking-wide text-muted-foreground py-2">
                     Worker
                   </TableHead>
                   <TableHead className="w-[22%] text-xs font-semibold uppercase tracking-wide text-muted-foreground py-2">
@@ -1466,7 +1466,7 @@ export default function FactoryWorkers() {
                   ))
                 ) : filteredWorkers.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={8}>
+                    <TableCell colSpan={10}>
                       <div className="flex flex-col items-center gap-2 py-10 text-center">
                         <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center">
                           <Users className="h-5 w-5 text-muted-foreground" />
@@ -1521,7 +1521,7 @@ export default function FactoryWorkers() {
                                 {worker.employeeCode}
                               </span>
                             )}
-                            <span className="font-medium text-sm leading-tight truncate" data-testid={`text-name-${worker.id}`}>
+                            <span className="font-medium text-sm leading-snug break-words" data-testid={`text-name-${worker.id}`}>
                               {worker.fullName}
                             </span>
                           </div>
