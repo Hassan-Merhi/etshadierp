@@ -493,6 +493,20 @@ let migrationsDone = false;
     )`,
     // Factory supplier hierarchy
     `ALTER TABLE factory_suppliers ADD COLUMN IF NOT EXISTS parent_id integer`,
+    `ALTER TABLE factory_suppliers ADD COLUMN IF NOT EXISTS linked_supplier_id integer`,
+    `ALTER TABLE factory_suppliers ADD COLUMN IF NOT EXISTS is_broker boolean NOT NULL DEFAULT false`,
+    // Factory supplier categories table (referenced by factory_suppliers.supplier_category_id)
+    `CREATE TABLE IF NOT EXISTS factory_supplier_categories (
+       id serial PRIMARY KEY,
+       company_id integer NOT NULL,
+       name varchar(200) NOT NULL,
+       display_order integer NOT NULL DEFAULT 0,
+       created_at timestamp NOT NULL DEFAULT now(),
+       updated_at timestamp NOT NULL DEFAULT now()
+    )`,
+    `CREATE UNIQUE INDEX IF NOT EXISTS factory_supplier_categories_company_name_unique
+       ON factory_supplier_categories(company_id, name)`,
+    `ALTER TABLE factory_suppliers ADD COLUMN IF NOT EXISTS supplier_category_id integer`,
     // Factory supplier support in voucher entries
     `ALTER TABLE voucher_entries ADD COLUMN IF NOT EXISTS factory_supplier_id integer`,
     // Factory raw stock OB commission fields
