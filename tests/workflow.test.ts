@@ -10,7 +10,7 @@
  *   - Payment/receipt DR=CR                                                (accounting.test.ts)
  *   - Ledger balance 200, P&L 200, balance-sheet 200 (status only)        (reports.test.ts)
  *   - Basic company isolation for accounts endpoint                        (accounting.test.ts)
- *   - Factory container lifecycle                                          (factory-container-lifecycle.test.ts)
+ *   - Factory/SP container → offload → inventory → voucher lifecycle       (factory-container-lifecycle.test.ts)
  *
  * What this file adds:
  *   - POS sale → cash ledger balance increases by sale total
@@ -24,9 +24,16 @@
  *   - Journal edit (PATCH) → DB entries reflect the new amount
  *   - Journal delete → voucher soft-deleted (no longer active)
  *   - Ledger balance API value matches DB sum of DR − CR entries
- *   - P&L: non-NaN result after a real POS sale
+ *   - P&L totalIncome equals the known sale amount (not just non-NaN)
  *   - Balance-sheet: no NaN strings in response
+ *   - Balance sheet cash account balance reflects a known receipt
  *   - GET /api/vouchers: no NaN totalAmounts
+ *   - Stock transfer: inventory moves from source to destination; voucher created
+ *   - Stock transfer: source = destination rejected 400
+ *   - Stock transfer: invalid quantity (0) rejected; no partial voucher or inventory change
+ *   - Stock transfer voucher entries balanced (DR = CR) when entries exist
+ *   - Daybook (GET /api/vouchers?startDate&endDate): payment/receipt/journal all appear
+ *   - Daybook: deleted voucher no longer appears as active
  *   - Company isolation: voucher list, ledger balance, and inventory don't bleed across companies
  */
 
@@ -154,6 +161,71 @@ function paymentBody(voucherType: "Payment" | "Receipt", amount: number) {
 async function getLedgerBalance(accountId: number): Promise<number> {
   const res = await agent.get(`/api/accounts/ledger/${accountId}/balance`);
   return parseFloat(res.body?.balance ?? "0");
+}
+
+/**
+ * FK-safe cleanup that handles stock transfer child records before deleting
+ * vouchers. Use in describe blocks that create stock transfers.
+ */
+async function cleanupStockTransfersAndVouchers() {
+  const vRows = await db
+    .select({ id: schema.vouchers.id })
+    .from(schema.vouchers)
+    .where(eq(schema.vouchers.companyId, ctx.companyId));
+
+  for (const v of vRows) {
+    const stvRows = await db
+      .select({ id: schema.stockTransferVouchers.id })
+      .from(schema.stockTransferVouchers)
+      .where(eq(schema.stockTransferVouchers.voucherId, v.id));
+
+    for (const stv of stvRows) {
+      // Delete revision items then revisions (transferId = stockTransferVouchers.id)
+      const revRows = await db
+        .select({ id: schema.stockTransferRevisions.id })
+        .from(schema.stockTransferRevisions)
+        .where(eq(schema.stockTransferRevisions.transferId, stv.id));
+      for (const rev of revRows) {
+        await db
+          .delete(schema.stockTransferRevisionItems)
+          .where(eq(schema.stockTransferRevisionItems.revisionId, rev.id));
+      }
+      await db
+        .delete(schema.stockTransferRevisions)
+        .where(eq(schema.stockTransferRevisions.transferId, stv.id));
+      // Delete transfer items
+      await db
+        .delete(schema.stockTransferItems)
+        .where(eq(schema.stockTransferItems.transferId, stv.id));
+    }
+    await db
+      .delete(schema.stockTransferVouchers)
+      .where(eq(schema.stockTransferVouchers.voucherId, v.id));
+    await db.delete(schema.salesItems).where(eq(schema.salesItems.voucherId, v.id));
+    await db.delete(schema.voucherEntries).where(eq(schema.voucherEntries.voucherId, v.id));
+  }
+  await db.delete(schema.vouchers).where(eq(schema.vouchers.companyId, ctx.companyId));
+}
+
+/** Remove all inventory for location2 (returns it to the 0-stock starting state). */
+async function resetLocation2Inventory() {
+  await db
+    .delete(schema.inventory)
+    .where(
+      and(
+        eq(schema.inventory.locationId, ctx.location2Id),
+        eq(schema.inventory.companyId, ctx.companyId),
+      ),
+    );
+}
+
+function stockTransferBody(qty = 10) {
+  return {
+    sourceLocationId: ctx.locationId,
+    destinationLocationId: ctx.location2Id,
+    items: [{ stockItemId: ctx.stockItemIds[0], quantity: qty }],
+    voucherDate: TODAY,
+  };
 }
 
 // ── setup / teardown ──────────────────────────────────────────────────────────
@@ -473,10 +545,237 @@ describe("Workflow — Reports reflect seeded transactions", () => {
       }
     }
   });
+
+  it("P&L totalIncome matches the exact POS sale amount (clean-state precision check)", async () => {
+    // beforeEach clears all vouchers + resets inventory; both accounts have openingBalance=0.
+    // After one POS sale of 3 × 40 = 120, the Sales (Income) account is CR-ed by 120.
+    // P&L totalIncome = sum of income-account CR balances = 120 exactly.
+    await agent.post("/api/pos/sales").send(posSaleBody(3, 40)); // 120
+
+    const res = await agent.get("/api/reports/profit-loss");
+    expect(res.status).toBe(200);
+    const totalIncome: unknown = res.body?.totalIncome;
+    expect(totalIncome, "P&L response must include totalIncome").not.toBeUndefined();
+    expect(typeof totalIncome === "number" ? isNaN(totalIncome) : isNaN(parseFloat(String(totalIncome)))).toBe(false);
+    // With a clean ledger the only income entry is the 120 from the POS sale.
+    const incomeNum = typeof totalIncome === "number" ? totalIncome : parseFloat(String(totalIncome));
+    expect(incomeNum).toBeCloseTo(120, 1);
+  });
+
+  it("balance sheet cash account balance reflects a known receipt voucher", async () => {
+    // After cleanupVouchers (beforeEach) + Receipt of 400:
+    //   cashAccount (openingBalance=0, Dr) DR-ed by 400 → balance = 400.
+    await agent.post("/api/vouchers/payment-receipt").send(paymentBody("Receipt", 400));
+
+    const res = await agent.get("/api/reports/balance-sheet");
+    expect(res.status).toBe(200);
+
+    // Cash ledger account appears in assets.ledgers — find it by our known ID.
+    const ledgers: any[] = res.body?.assets?.ledgers ?? [];
+    const cashEntry = ledgers.find((l: any) => l.id === ctx.cashAccountId);
+
+    if (cashEntry !== undefined) {
+      // Direct balance sheet check: cash DR 400, opening 0 → balance 400.
+      expect(cashEntry.balance).toBeCloseTo(400, 1);
+    } else {
+      // Fallback: balance sheet may group cash differently; use ledger balance API.
+      const balRes = await agent.get(`/api/accounts/ledger/${ctx.cashAccountId}/balance`);
+      expect(balRes.status).toBe(200);
+      expect(parseFloat(balRes.body?.balance ?? "NaN")).toBeCloseTo(400, 1);
+    }
+  });
 });
 
 // ═════════════════════════════════════════════════════════════════════════════
-// 5. COMPANY ISOLATION WORKFLOW
+// 5. STOCK TRANSFER WORKFLOW
+// ═════════════════════════════════════════════════════════════════════════════
+
+describe("Workflow — Stock transfer inventory movement", () => {
+  // Use the extended cleanup so FK constraints on stock_transfer_* tables are
+  // respected when vouchers are deleted.
+  beforeEach(async () => {
+    await resetInventory();
+    await resetLocation2Inventory();
+    await cleanupStockTransfersAndVouchers();
+  });
+
+  it("moves stock from source to destination and creates a Stock Transfer voucher", async () => {
+    const srcBefore = await getInventoryQty(ctx.locationId, ctx.stockItemIds[0]);
+    const dstBefore = await getInventoryQty(ctx.location2Id, ctx.stockItemIds[0]);
+
+    const res = await agent.post("/api/stock-transfers").send(stockTransferBody(15));
+    expect(
+      res.status,
+      `Stock transfer POST failed: ${JSON.stringify(res.body)}`,
+    ).toBeGreaterThanOrEqual(200);
+    expect(res.status).toBeLessThan(300);
+
+    // Source inventory decreases
+    const srcAfter = await getInventoryQty(ctx.locationId, ctx.stockItemIds[0]);
+    expect(srcAfter).toBeCloseTo(srcBefore - 15, 1);
+
+    // Destination inventory increases
+    const dstAfter = await getInventoryQty(ctx.location2Id, ctx.stockItemIds[0]);
+    expect(dstAfter).toBeCloseTo(dstBefore + 15, 1);
+
+    // A voucher of type "Stock Transfer" was created
+    const voucherId = res.body?.voucher?.id ?? res.body?.transfer?.voucherId;
+    expect(voucherId, "Response must include a voucher ID").toBeDefined();
+    const [vRow] = await db
+      .select({ voucherType: schema.vouchers.voucherType })
+      .from(schema.vouchers)
+      .where(eq(schema.vouchers.id, voucherId));
+    expect(vRow?.voucherType).toBe("Stock Transfer");
+  });
+
+  it("stock transfer voucher entries are balanced and inventory is marked applied", async () => {
+    const res = await agent.post("/api/stock-transfers").send(stockTransferBody(5));
+    expect(res.status).toBeGreaterThanOrEqual(200);
+    const voucherId = res.body?.voucher?.id ?? res.body?.transfer?.voucherId;
+    expect(voucherId).toBeDefined();
+
+    // Entries, if present, must balance
+    const entries = await db
+      .select()
+      .from(schema.voucherEntries)
+      .where(eq(schema.voucherEntries.voucherId, voucherId));
+    if (entries.length > 0) {
+      const dr = entries.reduce((s, e) => s + parseFloat(e.debitAmount ?? "0"), 0);
+      const cr = entries.reduce((s, e) => s + parseFloat(e.creditAmount ?? "0"), 0);
+      expect(Math.abs(dr - cr)).toBeLessThan(0.01);
+    }
+
+    // The stock_transfer_vouchers record must exist and have inventoryApplied = true
+    const [stv] = await db
+      .select({ inventoryApplied: schema.stockTransferVouchers.inventoryApplied })
+      .from(schema.stockTransferVouchers)
+      .where(eq(schema.stockTransferVouchers.voucherId, voucherId));
+    expect(stv).toBeDefined();
+    expect(stv.inventoryApplied).toBe(true);
+  });
+
+  it("source = destination is rejected with 400", async () => {
+    const res = await agent.post("/api/stock-transfers").send({
+      sourceLocationId: ctx.locationId,
+      destinationLocationId: ctx.locationId, // same as source
+      items: [{ stockItemId: ctx.stockItemIds[0], quantity: 5 }],
+    });
+    expect(res.status).toBe(400);
+    // Response body must mention the constraint
+    expect(JSON.stringify(res.body)).toMatch(/source.*destination|different/i);
+  });
+
+  it("invalid quantity (0) is rejected with 400; no partial voucher or inventory change", async () => {
+    const srcBefore = await getInventoryQty(ctx.locationId, ctx.stockItemIds[0]);
+    const stVouchersBefore = await db
+      .select({ id: schema.vouchers.id })
+      .from(schema.vouchers)
+      .where(
+        and(
+          eq(schema.vouchers.companyId, ctx.companyId),
+          eq(schema.vouchers.voucherType, "Stock Transfer"),
+        ),
+      );
+
+    const res = await agent.post("/api/stock-transfers").send({
+      sourceLocationId: ctx.locationId,
+      destinationLocationId: ctx.location2Id,
+      items: [{ stockItemId: ctx.stockItemIds[0], quantity: 0 }],
+    });
+    expect(res.status).toBe(400);
+
+    // Inventory must be unchanged
+    const srcAfter = await getInventoryQty(ctx.locationId, ctx.stockItemIds[0]);
+    expect(srcAfter).toBeCloseTo(srcBefore, 1);
+
+    // No new Stock Transfer voucher created
+    const stVouchersAfter = await db
+      .select({ id: schema.vouchers.id })
+      .from(schema.vouchers)
+      .where(
+        and(
+          eq(schema.vouchers.companyId, ctx.companyId),
+          eq(schema.vouchers.voucherType, "Stock Transfer"),
+        ),
+      );
+    expect(stVouchersAfter.length).toBe(stVouchersBefore.length);
+  });
+});
+
+// ═════════════════════════════════════════════════════════════════════════════
+// 6. DAYBOOK WORKFLOW
+// ═════════════════════════════════════════════════════════════════════════════
+
+describe("Workflow — Daybook shows vouchers posted today", () => {
+  // ERP daybook = GET /api/vouchers?startDate=TODAY&endDate=TODAY
+  beforeEach(cleanupVouchers);
+
+  it("payment, receipt, and journal vouchers all appear in the daybook for today", async () => {
+    const payRes = await agent
+      .post("/api/vouchers/payment-receipt")
+      .send(paymentBody("Payment", 100));
+    expect(payRes.status).toBeGreaterThanOrEqual(200);
+    const payId = extractId(payRes.body);
+
+    const recRes = await agent
+      .post("/api/vouchers/payment-receipt")
+      .send(paymentBody("Receipt", 200));
+    expect(recRes.status).toBeGreaterThanOrEqual(200);
+    const recId = extractId(recRes.body);
+
+    const jrnRes = await agent
+      .post("/api/vouchers/journal")
+      .send(journalBody(300, "Daybook test journal"));
+    expect(jrnRes.status).toBeGreaterThanOrEqual(200);
+    const jrnId = extractId(jrnRes.body);
+
+    expect(payId, "Payment voucher ID must be defined").toBeDefined();
+    expect(recId, "Receipt voucher ID must be defined").toBeDefined();
+    expect(jrnId, "Journal voucher ID must be defined").toBeDefined();
+
+    const dbRes = await agent.get(`/api/vouchers?startDate=${TODAY}&endDate=${TODAY}`);
+    expect(dbRes.status).toBe(200);
+    const list: any[] = Array.isArray(dbRes.body) ? dbRes.body : dbRes.body?.vouchers ?? [];
+    const ids = list.map((v: any) => v.id);
+
+    expect(ids, `Payment ${payId} not in daybook. IDs: ${ids}`).toContain(payId);
+    expect(ids, `Receipt ${recId} not in daybook. IDs: ${ids}`).toContain(recId);
+    expect(ids, `Journal ${jrnId} not in daybook. IDs: ${ids}`).toContain(jrnId);
+  });
+
+  it("deleted voucher no longer appears as active in the daybook response", async () => {
+    const createRes = await agent
+      .post("/api/vouchers/journal")
+      .send(journalBody(150, "Daybook delete test"));
+    expect(createRes.status).toBeGreaterThanOrEqual(200);
+    const voucherId = extractId(createRes.body);
+    expect(voucherId).toBeDefined();
+
+    // Confirm it appears before deletion
+    const beforeDel = await agent.get(`/api/vouchers?startDate=${TODAY}&endDate=${TODAY}`);
+    const listBefore: any[] = Array.isArray(beforeDel.body)
+      ? beforeDel.body
+      : beforeDel.body?.vouchers ?? [];
+    expect(listBefore.some((v: any) => v.id === voucherId)).toBe(true);
+
+    const delRes = await agent.delete(`/api/vouchers/${voucherId}`);
+    expect(delRes.status).toBeGreaterThanOrEqual(200);
+
+    // After delete: must NOT appear as an active (non-deleted) entry
+    const afterDel = await agent.get(`/api/vouchers?startDate=${TODAY}&endDate=${TODAY}`);
+    const listAfter: any[] = Array.isArray(afterDel.body)
+      ? afterDel.body
+      : afterDel.body?.vouchers ?? [];
+    const foundActive = listAfter.some((v: any) => v.id === voucherId && !v.deletedAt);
+    expect(
+      foundActive,
+      `Deleted voucher ${voucherId} must not appear as active in daybook`,
+    ).toBe(false);
+  });
+});
+
+// ═════════════════════════════════════════════════════════════════════════════
+// 7. COMPANY ISOLATION WORKFLOW
 // ═════════════════════════════════════════════════════════════════════════════
 
 describe("Workflow — Company isolation (vouchers, ledger, inventory)", () => {
@@ -671,25 +970,50 @@ describe("Workflow — Company isolation (vouchers, ledger, inventory)", () => {
 
 /*
  * What this file protects:
- * - POS sale → cash ledger balance increases by sale total (DB + API agree)
- * - POS sale → ledger transactions list includes an entry for the sale voucher
- * - POS sale delete → inventory restored AND ledger balance reversed
- * - POS sale voucher entries: DR = CR in DB
- * - Payment voucher → payment account balance changes
+ *
+ * POS sale workflow:
+ * - Cash ledger balance increases by sale total (DB + API agree)
+ * - Ledger transactions list includes an entry for the sale voucher
+ * - Sale delete → inventory restored AND ledger balance reversed
+ * - Sale voucher entries: DR = CR in DB
+ *
+ * Payment/receipt voucher workflow:
+ * - Creating a Payment voucher shifts the payment account balance
  * - Payment voucher delete → balance reverts to pre-creation level
  * - Receipt voucher: entries balanced in DB; retrievable via GET /api/vouchers/:id
  * - Payment voucher: appears in GET /api/vouchers list
- * - Journal edit (PATCH /api/vouchers/:id/journal): entries reflect new amount
- * - Journal delete: voucher soft-deleted (deletedAt set); no longer returned as active
- * - Ledger balance API matches DB net (DR − CR) for Company A entries only
- * - P&L: no NaN after a POS sale
- * - Balance-sheet: no NaN strings in JSON response
- * - GET /api/vouchers: no NaN totalAmounts
- * - Company isolation (voucher list): Company B voucher excluded by exact ID check
- * - Company isolation (ledger balance): Company B 88888 entry on Company A's account does not bleed
- * - Company isolation (inventory): Company A inventory endpoint does not show Company B stock item by ID
  *
- * Not covered (by design):
- * - Factory/SP full accounting workflow: factory-container-lifecycle.test.ts covers offload/inventory
- * - Basic POS flow, DR=CR validation, report HTTP-200 status: already in existing test files
+ * Journal voucher workflow:
+ * - Edit (PATCH /api/vouchers/:id/journal): DB entries reflect the new amount
+ * - Delete: voucher soft-deleted (deletedAt set); no longer returned as active
+ *
+ * Reports workflow:
+ * - Ledger balance API matches DB net (DR − CR) for Company A entries only
+ * - P&L totalIncome equals the exact POS sale amount (clean-state precision check)
+ * - P&L: no NaN strings after a POS sale
+ * - Balance-sheet: no NaN strings in JSON response
+ * - Balance sheet cash account balance reflects a known receipt (exact value)
+ * - GET /api/vouchers: no NaN totalAmounts
+ *
+ * Stock transfer workflow:
+ * - Source inventory decreases by transfer quantity
+ * - Destination inventory increases by transfer quantity
+ * - Stock Transfer voucher created and recorded in DB
+ * - Stock transfer voucher entries balanced (DR = CR) when entries exist
+ * - inventoryApplied = true on the stock_transfer_vouchers record
+ * - Source = destination rejected with 400
+ * - Invalid quantity (0) rejected with 400; no partial voucher or inventory change
+ *
+ * Daybook workflow (GET /api/vouchers?startDate&endDate):
+ * - Payment, receipt, and journal vouchers all appear by ID
+ * - Deleted voucher no longer appears as active
+ *
+ * Company isolation:
+ * - Voucher list: Company B voucher excluded by exact ID check
+ * - Ledger balance: Company B 88888 entry does not bleed into Company A session
+ * - Inventory: Company A endpoint does not show Company B stock item by ID
+ *
+ * Not covered here (by design — already tested elsewhere):
+ * - Factory/SP container → offload → inventory → voucher lifecycle  (factory-container-lifecycle.test.ts)
+ * - Basic POS flow, DR=CR validation, report HTTP-200 status         (pos.test.ts, accounting.test.ts, reports.test.ts)
  */

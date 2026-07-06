@@ -38,7 +38,7 @@ Run with **Vitest + Node** (`vitest.config.ts`). No browser or DOM.
 | `accounting.test.ts` | Voucher debit/credit balance, journal posting rules |
 | `api-smoke.test.ts` | Every registered route returns a response (not 500) |
 | `excel-export.test.ts` | ExcelJS workbook generation (writeBuffer pattern) |
-| `factory-container-lifecycle.test.ts` | Container create → offload → duty payment flow |
+| `factory-container-lifecycle.test.ts` | SP container create → offload → duty payment; ledger DR=CR; inventory cost-basis |
 | `import-regression.test.ts` | Stock-transfer import CSV parsing |
 | `inventory.test.ts` | Stock movement, location transfer |
 | `permissions.test.ts` | Role-based access checks |
@@ -46,6 +46,8 @@ Run with **Vitest + Node** (`vitest.config.ts`). No browser or DOM.
 | `reports.test.ts` | Balance-sheet, profit-loss, net-position accuracy |
 | `vouchers.test.ts` | Voucher CRUD with entries |
 | `whatsapp-triggers.test.ts` | WhatsApp send-trigger conditions |
+| `workflow.test.ts` | End-to-end multi-subsystem workflows (see Phase 5 below) |
+| `xlsx-export.test.ts` | Real XLSX buffer validation for factory and SP export endpoints |
 
 ### Static / Pure-logic Frontend Tests (also in backend tier)
 
@@ -103,6 +105,38 @@ Uses a minimal harness component mirroring the dialog structure in `JournalForm.
 | Click Skip | dialog closes (removed from DOM) |
 | Click Send | `onSend` callback fires; dialog closes |
 | Open imperatively | simulates API response returning `prompt=true` |
+
+---
+
+---
+
+## Phase 5 — End-to-End Workflow Tests (`tests/workflow.test.ts`)
+
+These tests verify that **multiple subsystems work correctly together** — not just that individual endpoints return 200, but that the full data chain (API → DB writes → ledger → reports) is coherent.
+
+### What `workflow.test.ts` protects
+
+| Workflow | Assertions |
+|----------|-----------|
+| **POS sale** | Cash ledger balance increases by exact sale total; ledger transaction entry references sale voucher; delete reverses both inventory and ledger; voucher entries DR = CR in DB |
+| **Payment / Receipt** | Payment shifts account balance; delete reverts it; receipt entries balanced; voucher retrievable by ID; payment appears in voucher list |
+| **Journal edit + delete** | PATCH updates DB entries to new amount; delete sets `deletedAt`; voucher no longer active |
+| **Reports (strengthened)** | Ledger balance API matches DB net (DR − CR); P&L `totalIncome` equals exact POS sale amount; balance-sheet cash account balance matches known receipt (exact value); no NaN strings anywhere |
+| **Stock transfer** | Source inventory decreases; destination inventory increases; "Stock Transfer" voucher created; `inventoryApplied = true`; entries balanced; source = destination → 400; qty = 0 → 400 with no partial write |
+| **Daybook** | Payment, receipt, and journal all appear in `GET /api/vouchers?startDate&endDate`; deleted voucher no longer returned as active |
+| **Company isolation** | Voucher list excludes another company's voucher by exact DB ID; ledger balance ignores another company's 88888 entry; inventory endpoint excludes another company's stock item |
+
+### What is intentionally NOT duplicated here
+
+| Coverage | Covered in |
+|----------|-----------|
+| SP/Factory container → offload → inventory → voucher DR=CR | `factory-container-lifecycle.test.ts` |
+| Basic POS shift open/close, sale HTTP 200 | `pos.test.ts` |
+| Journal/payment DR=CR enforcement | `accounting.test.ts`, `vouchers.test.ts` |
+| Report HTTP-200 status (smoke) | `reports.test.ts` |
+| SP Sales Form Excel export correctness | `xlsx-export.test.ts` |
+
+The factory/SP lifecycle is covered by `factory-container-lifecycle.test.ts` (SP Lifecycle phases 1–4: setup, container creation, offload, reverse/re-offload). Duplicating it in `workflow.test.ts` would require an SP company with containers seeded, adding significant test-setup complexity with no new coverage gain.
 
 ---
 
