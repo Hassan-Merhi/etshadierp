@@ -91,7 +91,9 @@ describe("Smoke — Inventory", () => {
 
   it("GET /api/inventory without locationId returns 400 or 200 (not 500)", async () => {
     const res = await agent.get("/api/inventory");
-    expect(res.status).toBeLessThan(500);
+    // Inventory route validates locationId: returns 400 (missing param) or 200 (empty).
+    // Both are correct; any 5xx means a crash/unhandled error.
+    expect([200, 400]).toContain(res.status);
   });
 
   it("GET /api/inventory/movement returns 200 with required params", async () => {
@@ -170,14 +172,15 @@ describe("Smoke — Reports", () => {
 });
 
 describe("Smoke — WhatsApp settings", () => {
-  it("GET /api/whatsapp/settings returns 200 (not 500)", async () => {
+  it("GET /api/whatsapp/settings returns non-500 (may be 404 when no row exists in test DB)", async () => {
     const res = await agent.get("/api/whatsapp/settings");
-    // Settings row may not exist in test DB — 404 is acceptable; 500 is not
+    // Settings row may not exist in test DB — 404 is acceptable; 500 = broken import/crash.
     expect(res.status).toBeLessThan(500);
   });
 
-  it("GET /api/whatsapp/recipients returns 200", async () => {
+  it("GET /api/whatsapp/recipients returns non-500", async () => {
     const res = await agent.get("/api/whatsapp/recipients");
+    // Recipients table may be empty in test DB — 200 with [] is also acceptable.
     expect(res.status).toBeLessThan(500);
   });
 });
