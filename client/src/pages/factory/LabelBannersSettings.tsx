@@ -306,11 +306,18 @@ export default function LabelBannersSettings() {
 
                 <CardContent className="space-y-3">
                   <div className="relative rounded-md overflow-hidden border bg-muted h-20 flex items-center justify-center">
+                    {/* Use small WebP preview for screen display when no custom image is uploaded.
+                        Custom images use the original URL with stable ?t= cache key (now immutable-cached). */}
                     <img
                       key={ts}
-                      src={`/labels/hmd-${c.slug}.jpg?t=${ts}`}
+                      src={
+                        ts > 0
+                          ? `/labels/hmd-${c.slug}.jpg?t=${ts}`
+                          : `/labels/previews/hmd-${c.slug}-preview.webp`
+                      }
                       alt={`${c.label} banner`}
                       className="w-full h-full object-cover"
+                      loading="lazy"
                       onError={(e) => {
                         (e.target as HTMLImageElement).style.display = "none";
                       }}

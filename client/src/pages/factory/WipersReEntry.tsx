@@ -45,6 +45,7 @@ import {
   generateCombinedLabelsHtml,
   generateA5LabelsHtml,
   generateStickerLabelsHtml,
+  prefetchBannersForPrint,
   type LabelData,
   type A4DesignColor,
   formatLabelNum,
@@ -281,6 +282,7 @@ export default function WipersReEntry() {
     }));
 
   const openBrowserPrint = (labels: LabelData[], format: "A4" | "A5" | "sticker", designColor?: A4DesignColor) => {
+    prefetchBannersForPrint();
     if (format === "sticker") {
       const w = window.open("", "_blank");
       if (w) {

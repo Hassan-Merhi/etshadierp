@@ -63,7 +63,16 @@ export function registerLabelBannersRoutes(app: any, requireAuth: any) {
         if (match) {
           const mimeType = match[1];
           const buffer = Buffer.from(match[2], "base64");
-          res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+          // If the caller passed ?t=<imageUpdatedAt ms> the URL is content-addressed:
+          // serve as immutable so the browser caches it indefinitely.
+          // Without ?t= (rare / legacy) give a short 10-minute TTL.
+          const hasTimestamp = !!req.query.t;
+          res.setHeader(
+            "Cache-Control",
+            hasTimestamp
+              ? "public, max-age=31536000, immutable"
+              : "public, max-age=600"
+          );
           res.setHeader("Content-Type", mimeType);
           return res.send(buffer);
         }

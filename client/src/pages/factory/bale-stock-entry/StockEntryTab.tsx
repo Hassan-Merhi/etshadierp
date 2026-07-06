@@ -16,7 +16,7 @@ import { DraftRestorePrompt } from "@/components/DraftRestorePrompt";
 import { isZebraMode } from "@/lib/zebraPrint";
 import { getPaperFormat } from "@/components/LabelPrintSettings";
 import { useLabelDesignColors } from "@/hooks/useLabelDesignColors";
-import { generateCombinedLabelsHtml, generateA5LabelsHtml, type LabelData, type A4DesignColor } from "@/lib/labelHtml";
+import { generateCombinedLabelsHtml, generateA5LabelsHtml, prefetchBannersForPrint, type LabelData, type A4DesignColor } from "@/lib/labelHtml";
 import type { FactoryBaleProduct, Location, FactoryCategory } from "@shared/schema";
 
 import { StockEntryCart } from "./StockEntryCart";
@@ -547,6 +547,7 @@ export function StockEntryTab() {
           if (pendingPrintLabels) {
             const labels = pendingPrintLabels;
             setPendingPrintLabels(null);
+            prefetchBannersForPrint();
             const paperFormat = getPaperFormat();
             const labelHtml = paperFormat === "A5" ? generateA5LabelsHtml(labels) : generateCombinedLabelsHtml(labels);
             const win = window.open("", "_blank");

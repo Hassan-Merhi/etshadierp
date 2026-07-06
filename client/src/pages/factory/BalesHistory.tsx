@@ -60,6 +60,7 @@ import {
   generateCombinedLabelsHtml,
   generateA5LabelsHtml,
   generateStickerLabelsHtml,
+  prefetchBannersForPrint,
   formatLabelNum,
   type LabelData,
   type A4DesignColor,
@@ -474,6 +475,7 @@ export default function BalesHistory() {
   };
 
   const openBrowserReprint = (labels: LabelData[], designColor?: A4DesignColor) => {
+    prefetchBannersForPrint();
     const fmt = getPaperFormat();
     if (fmt === "A4" && !designColor) {
       setPendingReprintLabels(labels);
@@ -1413,6 +1415,7 @@ export default function BalesHistory() {
                 if (pendingReprintLabels) {
                   const labels = pendingReprintLabels;
                   setPendingReprintLabels(null);
+                  prefetchBannersForPrint();
                   const paperHtml = generateCombinedLabelsHtml(labels);
                   const stickerHtml = generateStickerLabelsHtml(labels);
                   const w1 = window.open("", "_blank", "width=800,height=900");

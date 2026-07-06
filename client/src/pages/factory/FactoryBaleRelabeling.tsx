@@ -31,6 +31,7 @@ import {
   generateCombinedLabelsHtml,
   generateA5LabelsHtml,
   generateStickerLabelsHtml,
+  prefetchBannersForPrint,
   type A4DesignColor,
   type LabelData,
 } from "@/lib/labelHtml";
@@ -390,6 +391,7 @@ export default function FactoryBaleRelabeling() {
       productName: item.productName || "",
     }));
 
+    prefetchBannersForPrint();
     let opened = 0;
     const formatsToOpen = Array.from(printFormats);
     for (const fmt of formatsToOpen) {

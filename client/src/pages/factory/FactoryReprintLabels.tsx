@@ -28,6 +28,7 @@ import {
   generateCombinedLabelsHtml,
   generateA5LabelsHtml,
   generateStickerLabelsHtml,
+  prefetchBannersForPrint,
   type LabelData,
   type A4DesignColor,
 } from "@/lib/labelHtml";
@@ -140,6 +141,7 @@ export default function FactoryReprintLabels() {
   };
 
   const openBrowserPrint = (labels: LabelData[], designColor?: A4DesignColor) => {
+    prefetchBannersForPrint();
     const fmt = getPaperFormat();
     if (fmt === "A4" && !designColor) {
       setPendingLabels(labels);

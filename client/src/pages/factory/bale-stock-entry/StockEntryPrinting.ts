@@ -4,6 +4,7 @@ import {
   generateA5LabelsHtml,
   generateCombinedLabelsHtml,
   generateStickerLabelsHtml,
+  prefetchBannersForPrint,
 } from "@/lib/labelHtml";
 import { getPaperFormat } from "@/components/LabelPrintSettings";
 import { isZebraMode, printRawZpl } from "@/lib/zebraPrint";
@@ -14,6 +15,9 @@ export const openBrowserPrint = (
   designColor: A4DesignColor | undefined,
   preOpenedWindowsRef: React.MutableRefObject<{ a4: Window | null; sticker: Window | null } | null>
 ) => {
+  // Kick off banner prefetch now (user has clicked Print) so high-res images
+  // are ready by the time the print window tries to render them.
+  prefetchBannersForPrint();
   const paperFormat = getPaperFormat();
   const hasPerLabelColors = labels.some((l) => l.designColor);
   const hasPerLabelLogos = labels.some((l) => l.customerLogoUrl);

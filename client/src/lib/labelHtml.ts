@@ -154,12 +154,14 @@ const detailBlockCss = `
 export type A4DesignColor = string;
 
 // Static fallback used when the API hasn't loaded yet and as seed data.
+// previewUrl → small WebP thumbnail used for UI/screen display only.
+// Print paths always use the full-res /labels/hmd-*.jpg originals (via getDesignBannerUrl).
 export const A4_DESIGN_OPTIONS: { value: string; label: string; color: string; previewUrl: string }[] = [
-  { value: "purple", label: "Purple (#1)", color: "#5B21B6", previewUrl: "/labels/hmd-purple.jpg" },
-  { value: "green", label: "Green (#2)", color: "#047857", previewUrl: "/labels/hmd-green.jpg" },
-  { value: "gold", label: "Gold (#3)", color: "#B8860B", previewUrl: "/labels/hmd-gold.jpg" },
-  { value: "white", label: "White (#4)", color: "#F5F5F5", previewUrl: "/labels/hmd-white.jpg" },
-  { value: "red", label: "HMD Intl (#5)", color: "#B91C1C", previewUrl: "/labels/hmd-red.jpg" },
+  { value: "purple", label: "Purple (#1)", color: "#5B21B6", previewUrl: "/labels/previews/hmd-purple-preview.webp" },
+  { value: "green",  label: "Green (#2)",  color: "#047857", previewUrl: "/labels/previews/hmd-green-preview.webp"  },
+  { value: "gold",   label: "Gold (#3)",   color: "#B8860B", previewUrl: "/labels/previews/hmd-gold-preview.webp"   },
+  { value: "white",  label: "White (#4)",  color: "#F5F5F5", previewUrl: "/labels/previews/hmd-white-preview.webp"  },
+  { value: "red",    label: "HMD Intl (#5)", color: "#B91C1C", previewUrl: "/labels/previews/hmd-red-preview.webp" },
 ];
 
 // Cache-busting timestamps for custom banner images.
@@ -197,16 +199,20 @@ function _prefetchBanner(slug: string): void {
 
 export function setBannerTimestamps(ts: Record<string, number | null>) {
   _bannerTimestamps = ts;
-  // Clear stale cache for any slug whose timestamp changed, then re-prefetch all
+  // Clear stale base64 cache for any slug whose timestamp changed.
+  // Do NOT eagerly prefetch here — wait until user explicitly requests print.
   for (const slug of Object.keys(ts)) delete _bannerBase64Cache[slug];
-  const allSlugs = new Set([...A4_DESIGN_OPTIONS.map((o) => o.value), ...Object.keys(ts)]);
-  for (const slug of allSlugs) _prefetchBanner(slug);
 }
 
-// Kick off prefetch for static banners immediately on module load (browser only).
-// This means images are almost always cached before the user clicks Print.
-if (typeof window !== "undefined") {
-  for (const opt of A4_DESIGN_OPTIONS) _prefetchBanner(opt.value);
+/**
+ * Prefetch all banner images into the base64 cache so the print window
+ * can render them instantly without a second network round-trip.
+ * Call this when the user opens the print dialog or clicks Print, NOT on page load.
+ */
+export function prefetchBannersForPrint(): void {
+  if (typeof window === "undefined") return;
+  const allSlugs = new Set([...A4_DESIGN_OPTIONS.map((o) => o.value), ...Object.keys(_bannerTimestamps)]);
+  for (const slug of allSlugs) _prefetchBanner(slug);
 }
 
 function getDesignBannerUrl(design: string): string {

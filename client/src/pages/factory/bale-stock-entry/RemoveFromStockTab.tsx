@@ -17,6 +17,7 @@ import {
   generateCombinedLabelsHtml,
   generateA5LabelsHtml,
   generateStickerLabelsHtml,
+  prefetchBannersForPrint,
   type LabelData,
   type A4DesignColor,
 } from "@/lib/labelHtml";
@@ -110,6 +111,7 @@ export function RemoveFromStockTab() {
   });
 
   const openBrowserPrint = (labels: LabelData[], designColor?: A4DesignColor) => {
+    prefetchBannersForPrint();
     const paperFormat = getPaperFormat();
     const labelsForA4 = designColor ? labels : labels.filter((l) => l.designColor);
 

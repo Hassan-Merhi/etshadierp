@@ -61,6 +61,7 @@ import {
   generateCombinedLabelsHtml,
   generateA5LabelsHtml,
   generateStickerLabelsHtml,
+  prefetchBannersForPrint,
   type LabelData,
   type A4DesignColor,
 } from "@/lib/labelHtml";
@@ -260,6 +261,7 @@ export default function FactoryLocationInventory() {
   const handlePrint = useReactToPrint({ contentRef: printRef });
 
   const openBrowserReprintLabels = (labels: LabelData[], designColor?: A4DesignColor) => {
+    prefetchBannersForPrint();
     const fmt = getPaperFormat();
     if (fmt === "A4" && !designColor) {
       setReprintPendingLabels(labels);

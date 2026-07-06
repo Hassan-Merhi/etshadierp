@@ -23,6 +23,12 @@ const STATIC_FALLBACK: DesignColorOption[] = A4_DESIGN_OPTIONS.map((o) => ({
 
 function rowToOption(r: any): DesignColorOption {
   const ts: number | null = r.hasCustom && r.lastModified ? r.lastModified : null;
+  // previewUrl is for screen/UI display only (small WebP thumbnail).
+  // Custom images use the original URL (stable ?t= timestamp → browser caches correctly).
+  // Print always uses getDesignBannerUrl() from labelHtml.ts which uses the full-res original.
+  const previewUrl = ts
+    ? `/labels/hmd-${r.slug}.jpg?t=${ts}`                       // custom image, stable cache key
+    : `/labels/previews/hmd-${r.slug}-preview.webp`;            // default → small preview
   return {
     id: r.id,
     slug: r.slug,
@@ -30,7 +36,7 @@ function rowToOption(r: any): DesignColorOption {
     label: r.label,
     color: r.colorHex,
     colorHex: r.colorHex,
-    previewUrl: ts ? `/labels/hmd-${r.slug}.jpg?t=${ts}` : `/labels/hmd-${r.slug}.jpg`,
+    previewUrl,
     isDefault: r.isDefault,
     hasCustom: r.hasCustom,
     lastModified: r.lastModified,
