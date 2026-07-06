@@ -3,7 +3,7 @@ services:
     name: erp-pos-system
     runtime: node
     plan: starter
-    buildCommand: npm ci && npm run build
+    buildCommand: rm -rf node_modules && npm ci && npm run build
     startCommand: npm start
     envVars:
       - key: NODE_ENV
