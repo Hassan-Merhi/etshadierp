@@ -135,6 +135,8 @@ import {
   factoryPosSaleItems,
   proformaStockReservations,
   factoryBaleImportBatches,
+  factoryV3LoadBales,
+  factoryInvoiceLoadingBales,
 } from "@shared/schema";
 import { eq, and, or, asc, desc, sql, inArray, ilike, ne, isNull, not, gte, lte, lt, gt } from "drizzle-orm";
 import bcrypt from "bcryptjs";
@@ -1878,6 +1880,89 @@ export function registerFactoryBalesRoutes(app: Express) {
       res.json({ updated: numericIds.length, workerId: numericWorkerId });
     } catch (error: any) {
       console.error("Error bulk-assigning worker:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // ── Correct bale weight (cascades to load bales, invoice bales, order bales) ──
+  app.patch("/api/factory/bales/:id/weight", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const id = parseId(req.params.id);
+      if (id === null) return res.status(400).json({ message: "Invalid id" });
+
+      const rawWeight = parseFloat(req.body.weightKg);
+      if (isNaN(rawWeight) || rawWeight <= 0) {
+        return res.status(400).json({ message: "weightKg must be a positive number" });
+      }
+      const newWeightStr = rawWeight.toFixed(3);
+
+      const result = await db.transaction(async (tx: any) => {
+        // Fetch bale and verify ownership
+        const [bale] = await tx
+          .select()
+          .from(factoryBales)
+          .where(and(eq(factoryBales.id, id), eq(factoryBales.companyId, companyId)));
+
+        if (!bale) throw new Error("Bale not found");
+
+        const costPerKg = parseFloat(bale.costPerKg || "0");
+        const newTotalCost = (rawWeight * costPerKg).toFixed(2);
+        const oldWeight = parseFloat(bale.weightKg || "0");
+
+        // 1. Update the bale itself
+        const [updatedBale] = await tx
+          .update(factoryBales)
+          .set({
+            weightKg: newWeightStr,
+            totalCost: newTotalCost,
+            updatedAt: new Date(),
+          })
+          .where(eq(factoryBales.id, id))
+          .returning();
+
+        // 2. Update factory_v3_load_bales (loading order scans)
+        const loadBalesResult = await tx
+          .update(factoryV3LoadBales)
+          .set({ weightKg: newWeightStr })
+          .where(eq(factoryV3LoadBales.baleId, id));
+
+        // 3. Update factory_invoice_loading_bales (invoice loading session scans)
+        const invoiceBalesResult = await tx
+          .update(factoryInvoiceLoadingBales)
+          .set({ weightKg: newWeightStr })
+          .where(eq(factoryInvoiceLoadingBales.baleId, id));
+
+        // 4. Update customer_order_bales (weight column is "weight", not "weightKg")
+        const orderBalesResult = await tx
+          .update(customerOrderBales)
+          .set({ weight: newWeightStr })
+          .where(eq(customerOrderBales.baleId, id));
+
+        return {
+          bale: updatedBale,
+          oldWeight,
+          newWeight: rawWeight,
+          updatedLoadBales: loadBalesResult?.rowCount ?? 0,
+          updatedInvoiceBales: invoiceBalesResult?.rowCount ?? 0,
+          updatedOrderBales: orderBalesResult?.rowCount ?? 0,
+        };
+      });
+
+      res.json({
+        success: true,
+        baleId: id,
+        referenceNumber: result.bale.referenceNumber,
+        oldWeight: result.oldWeight,
+        newWeight: result.newWeight,
+        updatedLoadBales: result.updatedLoadBales,
+        updatedInvoiceBales: result.updatedInvoiceBales,
+        updatedOrderBales: result.updatedOrderBales,
+      });
+    } catch (error: any) {
+      console.error("Error correcting bale weight:", error);
       res.status(500).json({ message: error.message });
     }
   });
