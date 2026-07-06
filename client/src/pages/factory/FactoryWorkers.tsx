@@ -25,6 +25,7 @@ import {
   Info,
   SlidersHorizontal,
   Clock,
+  WalletCards,
 } from "lucide-react";
 import { ExcelJS, writeFile } from "@/lib/excelHelper";
 import { Button } from "@/components/ui/button";
@@ -1142,6 +1143,14 @@ export default function FactoryWorkers() {
   const totalTransport = (workers ?? []).filter((w) => w.active).reduce((s, w) => s + parseFloat((w as any).transportAllowance || "0"), 0);
   const totalAdvances = (workers ?? []).reduce((s, w) => s + parseFloat((w as any).pendingAdvanceBalance || "0"), 0);
   const totalDueToday = Object.values(amountDue).reduce((s, d) => s + (d.net > 0 ? d.net : 0), 0);
+  // Full-period payroll obligation: monthly salary + transport − pending advances − absences already recorded
+  const totalRemainingToBePaid = (workers ?? []).filter((w) => w.active).reduce((s, w) => {
+    const salary   = parseFloat(w.baseSalary || "0");
+    const transport = parseFloat((w as any).transportAllowance || "0");
+    const advance  = parseFloat((w as any).pendingAdvanceBalance || "0");
+    const absences = amountDue[w.id]?.absenceDeducted ?? 0;
+    return s + Math.max(0, salary + transport - advance - absences);
+  }, 0);
 
   return (
     <div className="space-y-5">
@@ -1212,6 +1221,13 @@ export default function FactoryWorkers() {
                   <span className="text-muted-foreground">Due Today</span>
                   <span className="font-semibold font-mono text-emerald-600 dark:text-emerald-400">
                     ${totalDueToday.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2 rounded-lg border bg-muted/40 px-4 py-2 text-sm">
+                  <WalletCards className="h-4 w-4 text-violet-500" />
+                  <span className="text-muted-foreground">Total Remaining</span>
+                  <span className="font-semibold font-mono text-violet-600 dark:text-violet-400">
+                    ${totalRemainingToBePaid.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </span>
                 </div>
               </>
