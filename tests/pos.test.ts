@@ -154,7 +154,7 @@ describe("POS Sale — Core Flow", () => {
     expect(res.status).toBeLessThan(300);
 
     const voucherId = res.body?.voucher?.id ?? res.body?.voucherId ?? res.body?.id;
-    if (!voucherId) return;
+    expect(voucherId).toBeDefined();
 
     const items = await db
       .select()
@@ -265,7 +265,7 @@ describe("POS Sale — Edit", () => {
     expect(qtyAfterCreate).toBe(95);
 
     const voucherId = createRes.body?.voucher?.id ?? createRes.body?.voucherId ?? createRes.body?.id;
-    if (!voucherId) return;
+    expect(voucherId).toBeDefined();
 
     const editRes = await agent.put(`/api/vouchers/${voucherId}/sales`).send({
       locationId: ctx.locationId,
@@ -278,6 +278,9 @@ describe("POS Sale — Edit", () => {
     if (editRes.status >= 200 && editRes.status < 300) {
       const qtyAfterEdit = await getInventoryQty(ctx.locationId, ctx.stockItemIds[0]);
       expect(qtyAfterEdit).toBe(90);
+    } else {
+      // PUT /api/vouchers/:id/sales may not be implemented; mark clearly
+      expect(editRes.status, `Expected edit endpoint to succeed, got ${editRes.status}: ${JSON.stringify(editRes.body)}`).toBeGreaterThanOrEqual(200);
     }
   });
 
@@ -304,3 +307,10 @@ describe("POS Sale — Edit", () => {
     expect(qtyAfterDelete).toBe(100);
   });
 });
+
+/*
+ * What this file protects:
+ * - POS Core Flow: sale creation, inventory deduction, voucher creation, sales_items rows, multi-item
+ * - POS Validation: missing/invalid locationId, stockItemId, empty items, unauthenticated access
+ * - POS Edit: editing restores old inventory and applies new; deleting restores inventory
+ */

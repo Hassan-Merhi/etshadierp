@@ -210,20 +210,13 @@ describe("Stock Transfer Tests", () => {
       voucherDate: new Date().toISOString().split("T")[0],
     });
 
-    if (res.status === 200 || res.status === 201) {
-      const srcQty = await getInventoryQty(
-        ctx.locationId,
-        ctx.stockItemIds[0],
-      );
-      const dstQty = await getInventoryQty(
-        ctx.location2Id,
-        ctx.stockItemIds[0],
-      );
-      expect(srcQty).toBe(90);
-      expect(dstQty).toBe(60);
-    } else {
-      console.log("Transfer response:", res.status, res.body);
-    }
+    expect(res.status).toBeGreaterThanOrEqual(200);
+    expect(res.status).toBeLessThan(300);
+
+    const srcQty = await getInventoryQty(ctx.locationId, ctx.stockItemIds[0]);
+    const dstQty = await getInventoryQty(ctx.location2Id, ctx.stockItemIds[0]);
+    expect(srcQty).toBe(90);
+    expect(dstQty).toBe(60);
   });
 
   it("should handle multi-item transfers atomically", async () => {
@@ -246,28 +239,17 @@ describe("Stock Transfer Tests", () => {
       voucherDate: new Date().toISOString().split("T")[0],
     });
 
-    if (res.status === 200 || res.status === 201) {
-      const srcQty0 = await getInventoryQty(
-        ctx.locationId,
-        ctx.stockItemIds[0],
-      );
-      const srcQty1 = await getInventoryQty(
-        ctx.locationId,
-        ctx.stockItemIds[1],
-      );
-      const dstQty0 = await getInventoryQty(
-        ctx.location2Id,
-        ctx.stockItemIds[0],
-      );
-      const dstQty1 = await getInventoryQty(
-        ctx.location2Id,
-        ctx.stockItemIds[1],
-      );
-      expect(srcQty0).toBe(95);
-      expect(srcQty1).toBe(92);
-      expect(dstQty0).toBe(55);
-      expect(dstQty1).toBe(58);
-    }
+    expect(res.status).toBeGreaterThanOrEqual(200);
+    expect(res.status).toBeLessThan(300);
+
+    const srcQty0 = await getInventoryQty(ctx.locationId, ctx.stockItemIds[0]);
+    const srcQty1 = await getInventoryQty(ctx.locationId, ctx.stockItemIds[1]);
+    const dstQty0 = await getInventoryQty(ctx.location2Id, ctx.stockItemIds[0]);
+    const dstQty1 = await getInventoryQty(ctx.location2Id, ctx.stockItemIds[1]);
+    expect(srcQty0).toBe(95);
+    expect(srcQty1).toBe(92);
+    expect(dstQty0).toBe(55);
+    expect(dstQty1).toBe(58);
   });
 
   it("should reject transfer with same source and destination", async () => {
@@ -300,10 +282,11 @@ describe("Quick Adjust Tests", () => {
       type: "add",
     });
 
-    if (res.status === 200) {
-      const qty = await getInventoryQty(ctx.locationId, ctx.stockItemIds[0]);
-      expect(qty).toBe(125);
-    }
+    expect(res.status).toBeGreaterThanOrEqual(200);
+    expect(res.status).toBeLessThan(300);
+
+    const qty = await getInventoryQty(ctx.locationId, ctx.stockItemIds[0]);
+    expect(qty).toBe(125);
   });
 
   it("should decrease inventory on subtract", async () => {
@@ -314,10 +297,11 @@ describe("Quick Adjust Tests", () => {
       type: "subtract",
     });
 
-    if (res.status === 200) {
-      const qty = await getInventoryQty(ctx.locationId, ctx.stockItemIds[0]);
-      expect(qty).toBe(70);
-    }
+    expect(res.status).toBeGreaterThanOrEqual(200);
+    expect(res.status).toBeLessThan(300);
+
+    const qty = await getInventoryQty(ctx.locationId, ctx.stockItemIds[0]);
+    expect(qty).toBe(70);
   });
 
   it("should reject subtract that exceeds available stock", async () => {

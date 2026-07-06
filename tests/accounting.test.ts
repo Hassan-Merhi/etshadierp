@@ -50,6 +50,24 @@ function journalBody(amount: number, cashId: number, salesId: number) {
   };
 }
 
+function paymentReceiptBody(
+  voucherType: "Payment" | "Receipt",
+  amount: number,
+  paymentAccountId: number,
+  entryAccountId: number,
+) {
+  return {
+    voucherType,
+    voucherDate: new Date().toISOString().split("T")[0],
+    paymentAccountType: "ledger",
+    paymentAccountId,
+    paymentAccountName: "Cash",
+    entries: [{ accountType: "ledger", accountId: entryAccountId, accountName: "Sales", amount: String(amount) }],
+    notes: `${voucherType} test entry`,
+    currency: "USD",
+  };
+}
+
 beforeAll(async () => {
   ctx = await seedTestData(TEST_PREFIX);
   agent = request.agent(ctx.app);
@@ -136,15 +154,17 @@ describe("Accounting — Voucher DR=CR Invariant", () => {
     await cleanupVouchers();
   });
 
-  it("persisted entries always balance (debit = credit)", async () => {
+  it("persisted entries always balance (debit = credit) — Journal", async () => {
     const createRes = await agent
       .post("/api/vouchers/journal")
       .send(journalBody(1500, ctx.cashAccountId, ctx.salesAccountId));
 
-    if (createRes.status < 200 || createRes.status >= 300) return;
+    // Must not silently pass on failure
+    expect(createRes.status).toBeGreaterThanOrEqual(200);
+    expect(createRes.status).toBeLessThan(300);
 
-    const voucherId = createRes.body?.id ?? createRes.body?.voucherId;
-    if (!voucherId) return;
+    const voucherId = createRes.body?.voucher?.id ?? createRes.body?.id ?? createRes.body?.voucherId;
+    expect(voucherId).toBeDefined();
 
     const entries = await db
       .select()
@@ -157,26 +177,62 @@ describe("Accounting — Voucher DR=CR Invariant", () => {
     expect(Math.abs(totalDebit - totalCredit)).toBeLessThan(0.01);
   });
 
-  it("a POS sale creates balanced voucher entries", async () => {
-    const existingInv = await db
-      .select()
-      .from(schema.inventory)
-      .where(eq(schema.inventory.stockItemId, ctx.stockItemIds[0]))
-      .limit(1);
+  it("Payment voucher entries balance (debit = credit)", async () => {
+    const createRes = await agent
+      .post("/api/vouchers/payment-receipt")
+      .send(paymentReceiptBody("Payment", 750, ctx.cashAccountId, ctx.salesAccountId));
 
-    if (existingInv.length === 0 || parseFloat(existingInv[0].quantity) < 3) {
-      await db
-        .insert(schema.inventory)
-        .values({
-          companyId: ctx.companyId,
-          locationId: ctx.locationId,
-          stockItemId: ctx.stockItemIds[0],
-          quantity: "200.000",
-          averageRate: "10.00",
-          totalValue: "2000.00",
-        })
-        .onConflictDoNothing();
-    }
+    expect(createRes.status).toBeGreaterThanOrEqual(200);
+    expect(createRes.status).toBeLessThan(300);
+
+    const voucherId = createRes.body?.voucher?.id ?? createRes.body?.id ?? createRes.body?.voucherId;
+    expect(voucherId).toBeDefined();
+
+    const entries = await db
+      .select()
+      .from(schema.voucherEntries)
+      .where(eq(schema.voucherEntries.voucherId, voucherId));
+
+    expect(entries.length).toBeGreaterThan(0);
+    const totalDebit = entries.reduce((s, e) => s + parseFloat(e.debitAmount ?? "0"), 0);
+    const totalCredit = entries.reduce((s, e) => s + parseFloat(e.creditAmount ?? "0"), 0);
+    expect(Math.abs(totalDebit - totalCredit)).toBeLessThan(0.01);
+  });
+
+  it("Receipt voucher entries balance (debit = credit)", async () => {
+    const createRes = await agent
+      .post("/api/vouchers/payment-receipt")
+      .send(paymentReceiptBody("Receipt", 400, ctx.cashAccountId, ctx.salesAccountId));
+
+    expect(createRes.status).toBeGreaterThanOrEqual(200);
+    expect(createRes.status).toBeLessThan(300);
+
+    const voucherId = createRes.body?.voucher?.id ?? createRes.body?.id ?? createRes.body?.voucherId;
+    expect(voucherId).toBeDefined();
+
+    const entries = await db
+      .select()
+      .from(schema.voucherEntries)
+      .where(eq(schema.voucherEntries.voucherId, voucherId));
+
+    expect(entries.length).toBeGreaterThan(0);
+    const totalDebit = entries.reduce((s, e) => s + parseFloat(e.debitAmount ?? "0"), 0);
+    const totalCredit = entries.reduce((s, e) => s + parseFloat(e.creditAmount ?? "0"), 0);
+    expect(Math.abs(totalDebit - totalCredit)).toBeLessThan(0.01);
+  });
+
+  it("a POS sale creates balanced voucher entries", async () => {
+    await db
+      .insert(schema.inventory)
+      .values({
+        companyId: ctx.companyId,
+        locationId: ctx.locationId,
+        stockItemId: ctx.stockItemIds[0],
+        quantity: "200.000",
+        averageRate: "10.00",
+        totalValue: "2000.00",
+      })
+      .onConflictDoNothing();
 
     const saleRes = await agent.post("/api/pos/sales").send({
       locationId: ctx.locationId,
@@ -186,17 +242,18 @@ describe("Accounting — Voucher DR=CR Invariant", () => {
       voucherDate: new Date().toISOString().split("T")[0],
     });
 
-    if (saleRes.status < 200 || saleRes.status >= 300) return;
+    expect(saleRes.status).toBeGreaterThanOrEqual(200);
+    expect(saleRes.status).toBeLessThan(300);
 
-    const voucherId = saleRes.body?.voucher?.id ?? saleRes.body?.voucherId ?? saleRes.body?.id;
-    if (!voucherId) return;
+    const voucherId = saleRes.body?.voucher?.id ?? saleRes.body?.id ?? saleRes.body?.voucherId;
+    expect(voucherId).toBeDefined();
 
     const entries = await db
       .select()
       .from(schema.voucherEntries)
       .where(eq(schema.voucherEntries.voucherId, voucherId));
 
-    if (entries.length === 0) return;
+    expect(entries.length).toBeGreaterThan(0);
 
     const totalDebit = entries.reduce((s, e) => s + parseFloat(e.debitAmount ?? "0"), 0);
     const totalCredit = entries.reduce((s, e) => s + parseFloat(e.creditAmount ?? "0"), 0);
@@ -211,11 +268,12 @@ describe("Accounting — Ledger Transactions", () => {
   });
 
   it("cash account shows transactions after a journal entry", async () => {
-    const res = await agent
+    const createRes = await agent
       .post("/api/vouchers/journal")
       .send(journalBody(200, ctx.cashAccountId, ctx.salesAccountId));
 
-    if (res.status < 200 || res.status >= 300) return;
+    expect(createRes.status).toBeGreaterThanOrEqual(200);
+    expect(createRes.status).toBeLessThan(300);
 
     const txRes = await agent.get(
       `/api/accounts/ledger/${ctx.cashAccountId}/transactions`,
@@ -245,7 +303,8 @@ describe("Accounting — Ledger Transactions", () => {
       .post("/api/vouchers/journal")
       .send(journalBody(999, ctx.cashAccountId, ctx.salesAccountId));
 
-    if (createRes.status < 200 || createRes.status >= 300) return;
+    expect(createRes.status).toBeGreaterThanOrEqual(200);
+    expect(createRes.status).toBeLessThan(300);
 
     const after = await agent.get(
       `/api/accounts/ledger/${ctx.salesAccountId}/balance`,
@@ -285,4 +344,111 @@ describe("Accounting — Company Isolation", () => {
 
     expect(codes).not.toContain(uniqueCode);
   });
+
+  it("GET /api/vouchers does not return vouchers from another company", async () => {
+    // Insert a voucher for a different company directly into DB
+    const [otherCompany] = await db
+      .insert(schema.companies)
+      .values({ code: "VCHLEAKCO", name: `${TEST_PREFIX}_VchLeakCo`, baseCurrency: "USD" })
+      .returning();
+
+    const today = new Date();
+    const [otherVoucher] = await db
+      .insert(schema.vouchers)
+      .values({
+        companyId: otherCompany.id,
+        voucherType: "Journal",
+        voucherDate: today,
+        description: "Leak test voucher",
+        voucherNumber: `LEAK-${Date.now()}`,
+        totalAmount: "0",
+        currency: "USD",
+      })
+      .returning();
+
+    const res = await agent.get("/api/vouchers");
+    expect(res.status).toBe(200);
+
+    const vouchers = Array.isArray(res.body) ? res.body : res.body?.vouchers ?? [];
+    const leakFound = vouchers.some((v: any) => v.id === otherVoucher.id);
+
+    // cleanup before asserting so the other company is always removed
+    await db.delete(schema.vouchers).where(eq(schema.vouchers.id, otherVoucher.id));
+    await db.delete(schema.companies).where(eq(schema.companies.id, otherCompany.id));
+
+    expect(leakFound).toBe(false);
+  });
+
+  it("balance-sheet report returns 200 and does not expose other company account codes", async () => {
+    const [otherCompany] = await db
+      .insert(schema.companies)
+      .values({ code: "BSLEAKCO", name: `${TEST_PREFIX}_BsLeakCo`, baseCurrency: "USD" })
+      .returning();
+
+    const uniqueCode = `${TEST_PREFIX}_BS_LEAK_${Date.now()}`;
+    const [otherAccount] = await db
+      .insert(schema.ledgerAccounts)
+      .values({
+        companyId: otherCompany.id,
+        code: uniqueCode,
+        name: "Balance Sheet Leak Account",
+        accountType: "Cash",
+        subType: "Cash",
+        openingBalance: "0",
+        openingBalanceSide: "Dr",
+      })
+      .returning();
+
+    const res = await agent.get("/api/reports/balance-sheet");
+    expect(res.status).toBe(200);
+
+    // Flatten body to a string and confirm our unique sentinel code is not present
+    const bodyStr = JSON.stringify(res.body);
+
+    await db.delete(schema.ledgerAccounts).where(eq(schema.ledgerAccounts.id, otherAccount.id));
+    await db.delete(schema.companies).where(eq(schema.companies.id, otherCompany.id));
+
+    expect(bodyStr).not.toContain(uniqueCode);
+  });
+
+  it("profit-loss report returns 200 and does not expose other company account codes", async () => {
+    const [otherCompany] = await db
+      .insert(schema.companies)
+      .values({ code: "PLLEAKCO", name: `${TEST_PREFIX}_PlLeakCo`, baseCurrency: "USD" })
+      .returning();
+
+    const uniqueCode = `${TEST_PREFIX}_PL_LEAK_${Date.now()}`;
+    const [otherAccount] = await db
+      .insert(schema.ledgerAccounts)
+      .values({
+        companyId: otherCompany.id,
+        code: uniqueCode,
+        name: "P&L Leak Account",
+        accountType: "Income",
+        subType: "Sales",
+        openingBalance: "0",
+        openingBalanceSide: "Cr",
+      })
+      .returning();
+
+    const today = new Date().toISOString().split("T")[0];
+    const res = await agent.get(`/api/reports/profit-loss?fromDate=2024-01-01&toDate=${today}`);
+    expect(res.status).toBe(200);
+
+    const bodyStr = JSON.stringify(res.body);
+
+    await db.delete(schema.ledgerAccounts).where(eq(schema.ledgerAccounts.id, otherAccount.id));
+    await db.delete(schema.companies).where(eq(schema.companies.id, otherCompany.id));
+
+    expect(bodyStr).not.toContain(uniqueCode);
+  });
 });
+
+/*
+ * What this file protects:
+ * - Ledger Accounts API: CRUD + company-scoped listing of accounts
+ * - Voucher DR=CR Invariant: Journal, Payment, Receipt, and POS sale vouchers must always balance
+ * - Ledger Transactions: balance endpoint returns numeric value; transactions appear after posting
+ * - Company Isolation: accounts/all, GET /api/vouchers, balance-sheet, and profit-loss must never
+ *   return data belonging to a different company than the authenticated session
+ */
