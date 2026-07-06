@@ -23,6 +23,7 @@ import {
   Bus,
   Banknote,
   Info,
+  SlidersHorizontal,
 } from "lucide-react";
 import { ExcelJS, writeFile } from "@/lib/excelHelper";
 import { Button } from "@/components/ui/button";
@@ -154,6 +155,15 @@ export default function FactoryWorkers() {
 
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("Active");
+
+  // ── Column filters ──────────────────────────────────────────────────────
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [positionFilter, setPositionFilter]   = useState("all");
+  const [locationFilter, setLocationFilter]   = useState("all");
+  const [salaryTypeFilter, setSalaryTypeFilter] = useState("all");
+  const [salaryMin, setSalaryMin] = useState("");
+  const [salaryMax, setSalaryMax] = useState("");
+  const [advanceFilter, setAdvanceFilter]     = useState("all"); // all | has | none
 
   const [createOpen, setCreateOpen] = useState(false);
   const [editingWorker, setEditingWorker] = useState<FactoryWorker | null>(null);
@@ -537,26 +547,77 @@ export default function FactoryWorkers() {
     return m ? parseInt(m[1], 10) : Infinity;
   }
 
+  // Unique option lists derived from the full worker roster
+  const uniquePositions = useMemo(() =>
+    [...new Set((workers ?? []).map((w) => w.position).filter(Boolean))].sort() as string[],
+    [workers]);
+  const uniqueLocations = useMemo(() =>
+    [...new Set((workers ?? []).map((w) => (w as any).city || (w as any).country).filter(Boolean))].sort() as string[],
+    [workers]);
+  const uniqueSalaryTypes = useMemo(() =>
+    [...new Set((workers ?? []).map((w) => w.salaryType).filter(Boolean))].sort() as string[],
+    [workers]);
+
+  const activeFilterCount = [
+    positionFilter !== "all",
+    locationFilter !== "all",
+    salaryTypeFilter !== "all",
+    salaryMin !== "",
+    salaryMax !== "",
+    advanceFilter !== "all",
+  ].filter(Boolean).length;
+
+  const clearAllFilters = () => {
+    setPositionFilter("all");
+    setLocationFilter("all");
+    setSalaryTypeFilter("all");
+    setSalaryMin("");
+    setSalaryMax("");
+    setAdvanceFilter("all");
+  };
+
   const filteredWorkers = useMemo(() => {
     if (!workers) return [];
     return workers
       .filter((w) => {
         if (statusFilter === "Active" && !w.active) return false;
         if (statusFilter === "Inactive" && w.active) return false;
+
+        // ── Text search ────────────────────────────────────────────────
         if (searchQuery) {
           const q = searchQuery.toLowerCase();
-          return (
+          const matches =
             w.fullName?.toLowerCase().includes(q) ||
             w.employeeCode?.toLowerCase().includes(q) ||
             w.position?.toLowerCase().includes(q) ||
             w.department?.toLowerCase().includes(q) ||
-            w.phone1?.toLowerCase().includes(q)
-          );
+            w.phone1?.toLowerCase().includes(q) ||
+            (w as any).city?.toLowerCase().includes(q) ||
+            (w as any).country?.toLowerCase().includes(q) ||
+            w.salaryType?.toLowerCase().includes(q) ||
+            w.nationality?.toLowerCase().includes(q);
+          if (!matches) return false;
         }
+
+        // ── Column filters ─────────────────────────────────────────────
+        if (positionFilter !== "all" && w.position !== positionFilter) return false;
+        if (locationFilter !== "all") {
+          const loc = (w as any).city || (w as any).country || "";
+          if (loc !== locationFilter) return false;
+        }
+        if (salaryTypeFilter !== "all" && w.salaryType !== salaryTypeFilter) return false;
+
+        const salary = parseFloat(w.baseSalary || "0");
+        if (salaryMin !== "" && salary < parseFloat(salaryMin)) return false;
+        if (salaryMax !== "" && salary > parseFloat(salaryMax)) return false;
+
+        if (advanceFilter === "has" && !((w as any).pendingAdvanceBalance > 0 || parseFloat((w as any).pendingAdvanceBalance || "0") > 0)) return false;
+        if (advanceFilter === "none" && parseFloat((w as any).pendingAdvanceBalance || "0") > 0) return false;
+
         return true;
       })
       .sort((a, b) => parseCodeNumber(a.employeeCode) - parseCodeNumber(b.employeeCode));
-  }, [workers, statusFilter, searchQuery]);
+  }, [workers, statusFilter, searchQuery, positionFilter, locationFilter, salaryTypeFilter, salaryMin, salaryMax, advanceFilter]);
 
   const activeCount = workers?.filter((w) => w.active).length ?? 0;
   const inactiveCount = workers?.filter((w) => !w.active).length ?? 0;
@@ -1134,7 +1195,7 @@ export default function FactoryWorkers() {
             <div className="relative flex-1 min-w-[200px]">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="Search by name, code, position..."
+                placeholder="Search by name, code, position, nationality..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-9"
@@ -1151,6 +1212,31 @@ export default function FactoryWorkers() {
                 <SelectItem value="Inactive">Inactive</SelectItem>
               </SelectContent>
             </Select>
+
+            {/* Filter toggle */}
+            <Button
+              variant={filtersOpen || activeFilterCount > 0 ? "default" : "outline"}
+              size="sm"
+              onClick={() => setFiltersOpen((o) => !o)}
+              className="relative"
+              data-testid="button-toggle-filters"
+            >
+              <SlidersHorizontal className="h-4 w-4 mr-1.5" />
+              Filter
+              {activeFilterCount > 0 && (
+                <span className="ml-1.5 bg-background text-foreground text-[10px] font-bold rounded-full w-4 h-4 flex items-center justify-center">
+                  {activeFilterCount}
+                </span>
+              )}
+            </Button>
+            {activeFilterCount > 0 && (
+              <button
+                onClick={clearAllFilters}
+                className="text-xs text-muted-foreground hover:text-foreground underline underline-offset-2"
+              >
+                Clear all
+              </button>
+            )}
             <input ref={fileInputRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={handleImportFile} />
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -1195,6 +1281,135 @@ export default function FactoryWorkers() {
               Add Worker
             </Button>
           </div>
+
+          {/* ── Collapsible filter panel ─────────────────────────────── */}
+          {filtersOpen && (
+            <div className="rounded-xl border bg-muted/30 p-4 flex flex-wrap gap-4">
+              {/* Position */}
+              <div className="flex flex-col gap-1 min-w-[150px]">
+                <label className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Position</label>
+                <Select value={positionFilter} onValueChange={setPositionFilter}>
+                  <SelectTrigger className="h-8 text-sm bg-background">
+                    <SelectValue placeholder="All" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All positions</SelectItem>
+                    {uniquePositions.map((p) => (
+                      <SelectItem key={p} value={p}>{p}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Location */}
+              <div className="flex flex-col gap-1 min-w-[150px]">
+                <label className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Location</label>
+                <Select value={locationFilter} onValueChange={setLocationFilter}>
+                  <SelectTrigger className="h-8 text-sm bg-background">
+                    <SelectValue placeholder="All" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All locations</SelectItem>
+                    {uniqueLocations.map((l) => (
+                      <SelectItem key={l} value={l}>{l}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Salary type */}
+              <div className="flex flex-col gap-1 min-w-[150px]">
+                <label className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Salary Type</label>
+                <Select value={salaryTypeFilter} onValueChange={setSalaryTypeFilter}>
+                  <SelectTrigger className="h-8 text-sm bg-background">
+                    <SelectValue placeholder="All" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All types</SelectItem>
+                    {uniqueSalaryTypes.map((t) => (
+                      <SelectItem key={t} value={t}>{t}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Salary range */}
+              <div className="flex flex-col gap-1 min-w-[190px]">
+                <label className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Salary Range ($)</label>
+                <div className="flex items-center gap-2">
+                  <Input
+                    type="number"
+                    placeholder="Min"
+                    value={salaryMin}
+                    onChange={(e) => setSalaryMin(e.target.value)}
+                    className="h-8 text-sm bg-background w-[82px]"
+                  />
+                  <span className="text-muted-foreground text-xs">–</span>
+                  <Input
+                    type="number"
+                    placeholder="Max"
+                    value={salaryMax}
+                    onChange={(e) => setSalaryMax(e.target.value)}
+                    className="h-8 text-sm bg-background w-[82px]"
+                  />
+                </div>
+              </div>
+
+              {/* Advance status */}
+              <div className="flex flex-col gap-1 min-w-[150px]">
+                <label className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Advance</label>
+                <Select value={advanceFilter} onValueChange={setAdvanceFilter}>
+                  <SelectTrigger className="h-8 text-sm bg-background">
+                    <SelectValue placeholder="All" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All</SelectItem>
+                    <SelectItem value="has">Has outstanding advance</SelectItem>
+                    <SelectItem value="none">No advance</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          )}
+
+          {/* ── Active filter chips ───────────────────────────────────── */}
+          {activeFilterCount > 0 && (
+            <div className="flex flex-wrap gap-2">
+              {positionFilter !== "all" && (
+                <span className="inline-flex items-center gap-1 text-xs bg-primary/10 text-primary rounded-full px-2.5 py-1 font-medium">
+                  Position: {positionFilter}
+                  <button onClick={() => setPositionFilter("all")} className="hover:opacity-70"><X className="h-3 w-3" /></button>
+                </span>
+              )}
+              {locationFilter !== "all" && (
+                <span className="inline-flex items-center gap-1 text-xs bg-primary/10 text-primary rounded-full px-2.5 py-1 font-medium">
+                  Location: {locationFilter}
+                  <button onClick={() => setLocationFilter("all")} className="hover:opacity-70"><X className="h-3 w-3" /></button>
+                </span>
+              )}
+              {salaryTypeFilter !== "all" && (
+                <span className="inline-flex items-center gap-1 text-xs bg-primary/10 text-primary rounded-full px-2.5 py-1 font-medium">
+                  Type: {salaryTypeFilter}
+                  <button onClick={() => setSalaryTypeFilter("all")} className="hover:opacity-70"><X className="h-3 w-3" /></button>
+                </span>
+              )}
+              {(salaryMin !== "" || salaryMax !== "") && (
+                <span className="inline-flex items-center gap-1 text-xs bg-primary/10 text-primary rounded-full px-2.5 py-1 font-medium">
+                  Salary: {salaryMin || "0"}–{salaryMax || "∞"}
+                  <button onClick={() => { setSalaryMin(""); setSalaryMax(""); }} className="hover:opacity-70"><X className="h-3 w-3" /></button>
+                </span>
+              )}
+              {advanceFilter !== "all" && (
+                <span className="inline-flex items-center gap-1 text-xs bg-primary/10 text-primary rounded-full px-2.5 py-1 font-medium">
+                  {advanceFilter === "has" ? "Has advance" : "No advance"}
+                  <button onClick={() => setAdvanceFilter("all")} className="hover:opacity-70"><X className="h-3 w-3" /></button>
+                </span>
+              )}
+              <span className="text-xs text-muted-foreground self-center">
+                {filteredWorkers.length} result{filteredWorkers.length !== 1 ? "s" : ""}
+              </span>
+            </div>
+          )}
 
           {/* Table */}
           <div className="border rounded-xl overflow-auto max-h-[calc(100vh-220px)]">
