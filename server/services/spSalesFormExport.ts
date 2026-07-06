@@ -75,6 +75,13 @@ function colLetter(n: number): string {
   return s;
 }
 
+/**
+ * Normalised lookup key: lowercase + collapse whitespace.
+ * Used for case-insensitive, whitespace-tolerant item matching between
+ * template display names and DB article codes / stock item names.
+ */
+const nk = (s: string) => s.toLowerCase().replace(/\s+/g, " ").trim();
+
 /** Excel formula error strings we scan for after export. */
 const EXCEL_ERRORS = ["#REF!", "#DIV/0!", "#VALUE!", "#NAME?", "#N/A"];
 
@@ -104,9 +111,11 @@ const S_DATE_ROW = 1;
 const S_DATA_START = 2;
 const S_NAME_COL = 3; // C – item name
 const S_DATE_START = 6; // F – first date column
-// The Sales date row is a mix: F1 is plain, G1–L1 are formulas (=F1+1 chain),
-// then further cols (13, 14 … 36) revert to plain values in the template.
-// We must write ALL plain cells in row 1, not just F1.
+// Sales date row structure (confirmed from template):
+//   F1 = plain date (day 0)
+//   G1 = {formula:"F1+1"}, H1 = {formula:"G1+1"}, ..., L1 = {formula:"K1+1"}  (days 1–6)
+//   M1 onward = plain stale dates (not chained)
+// We must write F1 (day 0) and clear ALL cells from dayCount onward, including formula cells.
 
 // ── Main export function ──────────────────────────────────────────────────────
 
@@ -130,9 +139,12 @@ export async function generateSpSalesFormExcel(params: SpSalesFormParams): Promi
     // • article_code normalized via stock_item_code_aliases → stock_items.code
     // • per-qty deduction: sp_sale_lines.movement_id → sp_stock_movements.location_id
     //     → locations.supplier_partner_payable_deduction_per_qty
+    // • raw_article_code + item_name returned for multi-key alias lookup
     db.execute(sql`
       SELECT
         COALESCE(si.code, sl.article_code)                                            AS item_code,
+        MAX(sl.article_code)                                                          AS raw_article_code,
+        MAX(si.name)                                                                  AS item_name,
         s.sale_date::text                                                             AS sale_date,
         SUM(sl.qty_sold)::numeric                                                     AS qty,
         SUM(sl.qty_sold * sl.sale_price_per_unit)::numeric                            AS total_sales,
@@ -154,12 +166,14 @@ export async function generateSpSalesFormExcel(params: SpSalesFormParams): Promi
       ORDER BY s.sale_date
     `),
 
-    // ── Query 2: point-in-time opening stock at END of fromDate ─────────────
-    // For every lot created on or before fromDate:
-    //   opening_qty = MAX(qty_in − qty_sold_on_or_before_fromDate, 0)
-    // Correct for any date range (not just current month).
+    // ── Query 2: point-in-time opening stock at START of fromDate ───────────
+    // Opening stock = stock available BEFORE fromDate begins.
+    // Uses s.sale_date < fromDate (strict less-than) so sales on fromDate itself
+    // are NOT deducted from opening stock — they belong to the export period.
+    // For every lot created on or before the day before fromDate:
+    //   opening_qty = MAX(qty_in − qty_sold_before_fromDate, 0)
     db.execute(sql`
-      WITH sold_on_or_before AS (
+      WITH sold_before AS (
         SELECT
           sl.movement_id,
           SUM(sl.qty_sold) AS qty
@@ -167,7 +181,7 @@ export async function generateSpSalesFormExcel(params: SpSalesFormParams): Promi
         JOIN  sp_sales       s ON sl.sale_id = s.id
         WHERE sl.company_id = ${companyId}
           AND s.status      = 'posted'
-          AND s.sale_date  <= ${fromDate}::date
+          AND s.sale_date   < ${fromDate}::date
         GROUP BY sl.movement_id
       ),
       lot_opening AS (
@@ -176,16 +190,18 @@ export async function generateSpSalesFormExcel(params: SpSalesFormParams): Promi
           sm.company_id,
           sm.final_unit_cost_usd,
           GREATEST(
-            sm.qty_in::numeric - COALESCE(sob.qty, 0)::numeric,
+            sm.qty_in::numeric - COALESCE(sb.qty, 0)::numeric,
             0
           ) AS opening_qty
         FROM  sp_stock_movements sm
-        LEFT  JOIN sold_on_or_before sob ON sob.movement_id = sm.id
+        LEFT  JOIN sold_before sb ON sb.movement_id = sm.id
         WHERE sm.company_id     = ${companyId}
           AND sm.created_at::date <= ${fromDate}::date
       )
       SELECT
         COALESCE(si.code, lo.article_code)  AS item_code,
+        MAX(lo.article_code)                AS raw_article_code,
+        MAX(si.name)                        AS item_name,
         SUM(lo.opening_qty)::numeric        AS qty,
         CASE WHEN SUM(lo.opening_qty) > 0
              THEN SUM(lo.opening_qty * lo.final_unit_cost_usd::numeric)
@@ -205,40 +221,88 @@ export async function generateSpSalesFormExcel(params: SpSalesFormParams): Promi
   const openingRows = (openingRes as any).rows ?? (openingRes as any[]);
 
   // ── Build in-memory data structures ──────────────────────────────────────
+  //
+  // Strategy: store primary data under the resolved item_code, then build
+  // alias maps (resolved/raw/name → canonical key, normalized variants too)
+  // for multi-key lookup.  This avoids double-counting while supporting
+  // matching by article_code, stock_items.code, stock_items.name, or any
+  // normalized case variant.
 
-  // salesMap: resolvedItemCode → dateStr → DaySales
-  const salesMap = new Map<string, Map<string, DaySales>>();
+  // ── Sales data ──────────────────────────────────────────────────────────
+  // Primary: resolved item_code → dateStr → DaySales
+  const salesData = new Map<string, Map<string, DaySales>>();
+  // Alias: any key variant → canonical resolved item_code
+  const salesAlias = new Map<string, string>();
+
   for (const r of salesRows) {
-    const code = String(r.item_code ?? "").trim();
-    if (!code) continue;
-    if (!salesMap.has(code)) salesMap.set(code, new Map());
-    const dm = salesMap.get(code)!;
-    const key = String(r.sale_date).slice(0, 10);
-    const prev = dm.get(key) ?? { qty: 0, totalSales: 0, totalCost: 0, totalDeduction: 0 };
-    dm.set(key, {
-      qty: prev.qty + pn(r.qty),
-      totalSales: prev.totalSales + pn(r.total_sales),
-      totalCost: prev.totalCost + pn(r.total_cost),
+    const resolved = String(r.item_code ?? "").trim();
+    if (!resolved) continue;
+    const dateKey = String(r.sale_date).slice(0, 10);
+
+    if (!salesData.has(resolved)) salesData.set(resolved, new Map());
+    const dm = salesData.get(resolved)!;
+    const prev = dm.get(dateKey) ?? { qty: 0, totalSales: 0, totalCost: 0, totalDeduction: 0 };
+    dm.set(dateKey, {
+      qty:            prev.qty            + pn(r.qty),
+      totalSales:     prev.totalSales     + pn(r.total_sales),
+      totalCost:      prev.totalCost      + pn(r.total_cost),
       totalDeduction: prev.totalDeduction + pn(r.total_deduction),
     });
+
+    // Register all alias variants (resolved code, raw article code, item name)
+    for (const k of [resolved, String(r.raw_article_code ?? "").trim(), String(r.item_name ?? "").trim()]) {
+      if (!k) continue;
+      salesAlias.set(k, resolved);
+      salesAlias.set(nk(k), resolved);
+    }
   }
 
-  // openingMap: resolvedItemCode → { qty, avgCost } at end of fromDate
-  const openingMap = new Map<string, { qty: number; avgCost: number }>();
+  // ── Opening data ─────────────────────────────────────────────────────────
+  const openingData = new Map<string, { qty: number; avgCost: number }>();
+  const openingAlias = new Map<string, string>();
+
   for (const r of openingRows) {
-    openingMap.set(String(r.item_code).trim(), {
-      qty: pn(r.qty),
-      avgCost: pn(r.avg_cost),
-    });
+    const resolved = String(r.item_code ?? "").trim();
+    if (!resolved) continue;
+    openingData.set(resolved, { qty: pn(r.qty), avgCost: pn(r.avg_cost) });
+
+    for (const k of [resolved, String(r.raw_article_code ?? "").trim(), String(r.item_name ?? "").trim()]) {
+      if (!k) continue;
+      openingAlias.set(k, resolved);
+      openingAlias.set(nk(k), resolved);
+    }
   }
 
-  /** Opening stock — try displayName first, then systemCode fallback. */
-  const getOpening = (displayName: string, systemCode: string) =>
-    openingMap.get(displayName) ?? openingMap.get(systemCode) ?? { qty: 0, avgCost: 0 };
+  /**
+   * Resolve any lookup key to a value, trying:
+   *   1. Direct hit in map
+   *   2. Via alias map (original key)
+   *   3. Via alias map (normalized key)
+   *   4. Direct hit on normalized key
+   * Falls through all keys in order.
+   */
+  function resolveFromMap<V>(
+    map: Map<string, V>,
+    alias: Map<string, string>,
+    ...keys: string[]
+  ): V | undefined {
+    for (const k of keys) {
+      if (!k) continue;
+      if (map.has(k)) return map.get(k);
+      const c = alias.get(k) ?? alias.get(nk(k));
+      if (c && map.has(c)) return map.get(c);
+      if (map.has(nk(k))) return map.get(nk(k));
+    }
+    return undefined;
+  }
 
-  /** DaySales map — try displayName first, then systemCode fallback. */
+  /** Opening stock for an item — try all key variants. */
+  const getOpening = (displayName: string, systemCode: string) =>
+    resolveFromMap(openingData, openingAlias, displayName, systemCode) ?? { qty: 0, avgCost: 0 };
+
+  /** DaySales map for an item — try all key variants. */
   const getSalesMap = (displayName: string, systemCode: string) =>
-    salesMap.get(displayName) ?? salesMap.get(systemCode);
+    resolveFromMap(salesData, salesAlias, displayName, systemCode);
 
   // ── Load workbook ─────────────────────────────────────────────────────────
   const wb = new ExcelJS.Workbook();
@@ -278,6 +342,8 @@ export async function generateSpSalesFormExcel(params: SpSalesFormParams): Promi
     const systemCode = typeof codeCell === "string" && codeCell.trim() ? codeCell.trim() : rawName;
 
     nameToSystemCode.set(rawName, systemCode);
+    // Also store under normalized key for case-insensitive Costing/Sales lookups
+    if (nk(rawName) !== rawName) nameToSystemCode.set(nk(rawName), systemCode);
     itemRows.set(rawName, r);
   }
 
@@ -298,9 +364,22 @@ export async function generateSpSalesFormExcel(params: SpSalesFormParams): Promi
         : typeof (nameRaw as any)?.result === "string"
           ? (nameRaw as any).result.trim()
           : "";
-    if (!displayName || displayName.startsWith("Total ") || displayName === "Inventory") continue;
 
-    const systemCode = nameToSystemCode.get(displayName) ?? displayName;
+    // For rows with no readable name (formula-name with null result), still
+    // guard the avgCostCell to prevent #DIV/0! from an untouched =H/E formula.
+    if (!displayName) {
+      const avgCell = row.getCell(C_AVG_COL);
+      if (isFormula(avgCell)) {
+        avgCell.value = 0;
+        row.commit();
+      }
+      continue;
+    }
+
+    if (displayName.startsWith("Total ") || displayName === "Inventory") continue;
+
+    const systemCode =
+      nameToSystemCode.get(displayName) ?? nameToSystemCode.get(nk(displayName)) ?? displayName;
     const stock = getOpening(displayName, systemCode);
 
     const qtyCell = row.getCell(C_QTY_COL);
@@ -328,23 +407,38 @@ export async function generateSpSalesFormExcel(params: SpSalesFormParams): Promi
     row.commit();
   }
 
-  // ── 2. Sales sheet: write ALL plain date cells in row 1, then item qty ─────
-  // FIX: The Sales date row is not a single plain + formula chain.
-  // The template has: F1 plain, G1–L1 formulas, then cols 13–18 and 36 also
-  // plain (stale Jan-2024 dates left from the template). Writing only F1 leaves
-  // those stale dates intact. Fix: iterate every cell in row 1 and write the
-  // correct date to any non-formula cell, clear anything beyond the export range.
+  // ── 2. Sales sheet: write date row and item qty ───────────────────────────
+  //
+  // Sales date row structure (from template inspection):
+  //   Col F (6)  = plain date (day 0) — we write fromDate here
+  //   Cols G–L (7–12) = formula chain =F1+1, =G1+1, … — auto-compute dates 1–6
+  //   Col M (13) onward = plain stale dates (2024-01-xx leftover from template)
+  //
+  // For days WITHIN the export range: only F1 needs to be written; formula
+  // cells auto-chain from there.
+  //
+  // For days BEYOND the export range: ALL cells must be cleared, including the
+  // formula chain cells (col 12 onward for a 6-day export).
+  // The old code had `if (!isFormula(cell)) cell.value = null` which SKIPPED
+  // the formula cells, leaving the chain alive and showing July 7, 8, 9…
+  // Fix: always set value = null regardless of formula status.
+  //
+  // Sales data rows:
+  //   No-sale days must be null (blank), not 0.  Writing 0 causes ambiguity
+  //   when ENTRY SUMIFS formulas read the hidden Sales sheet — a 0-qty day
+  //   is indistinguishable from a truly missing day.
   if (salesWs) {
     const sDateRow = salesWs.getRow(S_DATE_ROW);
-    // Write dates to all non-formula cells within the export range
+    // Write fromDate to the plain anchor cell (F1 = col S_DATE_START).
+    // Formula cells for d=1… auto-chain from F1 — do not overwrite them.
     for (let d = 0; d < dayCount; d++) {
       const cell = sDateRow.getCell(S_DATE_START + d);
       if (!isFormula(cell)) cell.value = addDays(startDate, d);
     }
-    // Clear any stale plain date cells beyond the export range
+    // Clear ALL cells beyond the export range — including formula-chain cells.
+    // Using +40 to safely cover any template day-column extent.
     for (let d = dayCount; d < dayCount + 40; d++) {
-      const cell = sDateRow.getCell(S_DATE_START + d);
-      if (!isFormula(cell)) cell.value = null;
+      sDateRow.getCell(S_DATE_START + d).value = null;
     }
     sDateRow.commit();
 
@@ -361,18 +455,21 @@ export async function generateSpSalesFormExcel(params: SpSalesFormParams): Promi
             : "";
       if (!displayName || displayName.startsWith("Total ")) continue;
 
-      const systemCode = nameToSystemCode.get(displayName) ?? displayName;
+      const systemCode =
+        nameToSystemCode.get(displayName) ?? nameToSystemCode.get(nk(displayName)) ?? displayName;
       const daySalesMap = getSalesMap(displayName, systemCode);
 
+      // Within export range: write qty or null (never 0)
       for (let d = 0; d < dayCount; d++) {
         const cell = row.getCell(S_DATE_START + d);
         if (isFormula(cell)) continue;
         const ds = daySalesMap?.get(dates[d]);
-        cell.value = ds && ds.qty > 0 ? r3(ds.qty) : 0;
+        cell.value = (ds && ds.qty > 0) ? r3(ds.qty) : null;
       }
+      // Beyond export range: clear everything (null, not 0)
       for (let d = dayCount; d < dayCount + 40; d++) {
         const cell = row.getCell(S_DATE_START + d);
-        if (!isFormula(cell)) cell.value = 0;
+        if (!isFormula(cell)) cell.value = null;
       }
       row.commit();
     }
@@ -425,8 +522,22 @@ export async function generateSpSalesFormExcel(params: SpSalesFormParams): Promi
   }
 
   // 3a. Date row (row 3)
-  // G3/H3/I3 are the only plain cells; J3 onward are formula/shared-formula.
-  // isFormula() now correctly detects both, so only G3/H3/I3 get written.
+  //
+  // Template structure (confirmed from inspection):
+  //   Day 0: cols G, H, I (7, 8, 9) = plain date cells → we write fromDate
+  //   Day 1: cols J, K, L (10,11,12) = {formula:"G3+1"} → auto-compute fromDate+1
+  //   Day 2: cols M, N, O (13,14,15) = {formula:"J3+1"} → auto-compute fromDate+2
+  //   …each triplet references the previous triplet's first column (+1 day)
+  //
+  // Within export range (d < dayCount):
+  //   Only write to plain cells (d=0 anchor); formula cells auto-chain.
+  //
+  // Beyond export range (d >= dayCount):
+  //   MUST clear ALL cells including formula-chain cells.
+  //   Old code had `if (!isFormula(cell)) cell.value = null` which SKIPPED the
+  //   formula cells (since d>0 cells are formulas), leaving July 7, 8, 9…
+  //   visible in the exported workbook.
+  //   Fix: always null the cell regardless of formula status for d >= dayCount.
   const eDateRow = entryWs.getRow(E_DATE_ROW);
   for (let d = 0; d < dayCount; d++) {
     const dateVal = addDays(startDate, d);
@@ -436,11 +547,12 @@ export async function generateSpSalesFormExcel(params: SpSalesFormParams): Promi
       if (!isFormula(cell)) cell.value = dateVal;
     }
   }
-  for (let d = dayCount; d < dayCount + 15; d++) {
+  // Clear everything beyond the export range — no isFormula guard.
+  // Using +40 to safely cover any template date-column extent.
+  for (let d = dayCount; d < dayCount + 40; d++) {
     const baseCol = E_DATE_START + d * 3;
     for (let c = baseCol; c < baseCol + 3; c++) {
-      const cell = eDateRow.getCell(c);
-      if (!isFormula(cell)) cell.value = null;
+      eDateRow.getCell(c).value = null;
     }
   }
   eDateRow.commit();
@@ -496,15 +608,12 @@ export async function generateSpSalesFormExcel(params: SpSalesFormParams): Promi
       }
     }
 
-    // Clear stale data beyond the export range
-    for (let d = dayCount; d < dayCount + 15; d++) {
+    // Clear stale data beyond the export range (+40 for full template coverage)
+    for (let d = dayCount; d < dayCount + 40; d++) {
       const baseCol = E_DATE_START + d * 3;
-      const qtyCell   = row.getCell(baseCol);
-      const priceCell = row.getCell(baseCol + 1);
-      const profitCell = row.getCell(baseCol + 2);
-      if (!isFormula(qtyCell))   qtyCell.value   = null;
-      if (!isFormula(priceCell)) priceCell.value = null;
-      profitCell.value = null;
+      row.getCell(baseCol).value     = null; // qty
+      row.getCell(baseCol + 1).value = null; // price
+      row.getCell(baseCol + 2).value = null; // profit (pre-sweep handled sharedFormula slaves)
     }
 
     row.commit();
@@ -583,7 +692,7 @@ export async function generateSpSalesFormExcel(params: SpSalesFormParams): Promi
       const v = bmCell.value as any;
       const fmla: string = v?.formula ?? v?.sharedFormula ?? "";
       if (fmla) {
-        if (!fmla.includes("Sales!") && !fmla.includes("Sales!")) {
+        if (!fmla.includes("Sales!")) {
           mismatches.push(
             `ENTRY!BM${r} formula "${fmla}" does not reference "Sales!" — ` +
             `sheet may have been renamed or formula structure changed`
