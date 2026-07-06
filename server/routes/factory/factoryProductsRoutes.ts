@@ -896,18 +896,17 @@ export function registerFactoryProductsRoutes(app: Express) {
     }
   });
 
-  app.get("/api/factory/bale-product-history/:productId/:locationId", requireAuth, async (req: any, res: any) => {
+  // Shared implementation for the monthly-overview query (year-level view).
+  // Called by both the 2-segment route (year from ?year=) and the 3-segment route (year from path).
+  async function baleProductHistoryByYear(
+    req: any,
+    res: any,
+    companyId: number,
+    productId: number,
+    locationId: number,
+    year: number
+  ) {
     try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
-      if (!companyId) return res.status(400).json({ message: "No company selected" });
-
-      const productId = parseId(req.params.productId);
-
-      if (productId === null) return res.status(400).json({ message: "Invalid id" });
-      const locationId = parseId(req.params.locationId);
-      if (locationId === null) return res.status(400).json({ message: "Invalid id" });
-      const year = parseOptionalId(req.query.year) || new Date().getFullYear();
-
       const [product] = await db
         .select({
           id: factoryBaleProducts.id,
@@ -1089,6 +1088,34 @@ export function registerFactoryProductsRoutes(app: Express) {
       console.error("Error fetching bale product history:", error);
       res.status(500).json({ message: error.message });
     }
+  }
+
+  // 2-segment route: year from ?year= query param (legacy / default-year usage)
+  app.get("/api/factory/bale-product-history/:productId/:locationId", requireAuth, async (req: any, res: any) => {
+    const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+    if (!companyId) return res.status(400).json({ message: "No company selected" });
+    const productId = parseId(req.params.productId);
+    if (productId === null) return res.status(400).json({ message: "Invalid id" });
+    const locationId = parseId(req.params.locationId);
+    if (locationId === null) return res.status(400).json({ message: "Invalid id" });
+    const year = parseOptionalId(req.query.year) || new Date().getFullYear();
+    return baleProductHistoryByYear(req, res, companyId, productId, locationId, year);
+  });
+
+  // 3-segment route: year in path — this is what the frontend actually calls
+  // e.g. GET /api/factory/bale-product-history/3538/142/2026
+  // NOTE: constrained to digits-only (\d+) so static 3-segment routes like
+  // /:productId/:locationId/all-bales are NOT consumed by this handler.
+  app.get("/api/factory/bale-product-history/:productId/:locationId/:year(\\d+)", requireAuth, async (req: any, res: any) => {
+    const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+    if (!companyId) return res.status(400).json({ message: "No company selected" });
+    const productId = parseId(req.params.productId);
+    if (productId === null) return res.status(400).json({ message: "Invalid id" });
+    const locationId = parseId(req.params.locationId);
+    if (locationId === null) return res.status(400).json({ message: "Invalid id" });
+    const year = parseInt(req.params.year, 10);
+    if (isNaN(year) || year < 2000 || year > 2100) return res.status(400).json({ message: "Invalid year" });
+    return baleProductHistoryByYear(req, res, companyId, productId, locationId, year);
   });
 
   app.get(
