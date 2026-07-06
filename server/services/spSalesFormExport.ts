@@ -132,6 +132,7 @@ const S_DATE_START = 6; // F – first date column
 // ── Main export function ──────────────────────────────────────────────────────
 
 export async function generateSpSalesFormExcel(params: SpSalesFormParams): Promise<Buffer> {
+  console.log("RUNNING NEW SP EXPORT FIX 2026-07-06 DIRECT ENTRY WRITE");
   const { companyId, fromDate, toDate, locationId } = params;
 
   // Build conditional location SQL fragments — injected into both queries below.
