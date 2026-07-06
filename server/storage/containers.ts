@@ -1267,10 +1267,12 @@ export async function getContainerSalesByCustomer(
     .orderBy(desc(schema.containerSales.saleDate));
 }
 
-export async function getContainerCountBySupplier(supplierId: number): Promise<number> {
+export async function getContainerCountBySupplier(supplierId: number, companyId?: number): Promise<number> {
+  const conditions = [eq(schema.containers.supplierId, supplierId)];
+  if (companyId) conditions.push(eq(schema.containers.companyId, companyId));
   const result = await db
     .select({ count: sql<number>`count(*)` })
     .from(schema.containers)
-    .where(eq(schema.containers.supplierId, supplierId));
+    .where(and(...conditions));
   return Number(result[0]?.count || 0);
 }
