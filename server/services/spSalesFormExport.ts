@@ -94,11 +94,23 @@ const E_DATA_START = 5;
 // The template (55 Lubumbashi) has 173 rows; the old hardcoded 128 skipped items after that.
 const E_NAME_COL = 3; // C – display name (matches article_code / canonical stock code)
 const E_CODE_COL = 4; // D – optional system code override
+const E_OPENING_QTY_COL = 5;  // E – Opening Stock qty  (written directly; never rely on Costing SUMIFS)
+const E_COST_BAG_COL    = 6;  // F – Avg Cost per Bag   (written directly; also $F ref in profit formula)
 const E_DATE_START = 7; // G – first date block
 // Pattern per day d: baseCol = E_DATE_START + d*3
 //   baseCol   = Qty          (plain)
 //   baseCol+1 = Sale Price   (plain)
 //   baseCol+2 = Profit/Bag   (formula – see below)
+//
+// Template date capacity: days 0-17 → cols G(7)–BI(60).  After that:
+//   col 61 (BI+1) = empty separator
+//   col 62 (BJ)   = Closing Stock Qty
+//   col 63 (BK)   = Closing Stock Value
+// The "beyond range" clearing loops MUST stop before col 61 to avoid wiping
+// these fixed columns.
+const E_TEMPLATE_MAX_DAYS = 18; // number of date-day slots in this template
+const E_CLOSING_QTY_COL   = 62; // BJ – Closing Stock Qty  (written directly)
+const E_CLOSING_VAL_COL   = 63; // BK – Closing Stock Value (written directly)
 
 // Costing sheet
 const C_NAME_COL = 4; // D – item name (same as ENTRY col C)
@@ -138,6 +150,28 @@ export async function generateSpSalesFormExcel(params: SpSalesFormParams): Promi
   const endDate = toUtcDate(toDate);
   const dayCount = Math.max(1, Math.round((endDate.getTime() - startDate.getTime()) / 86_400_000) + 1);
   const dates: string[] = Array.from({ length: dayCount }, (_, i) => dateStr(addDays(startDate, i)));
+
+  // ── Capacity guard ─────────────────────────────────────────────────────────
+  // The ENTRY template has exactly E_TEMPLATE_MAX_DAYS date slots.  Writing
+  // beyond that would corrupt the fixed columns (Closing Stock, Ageing, etc.)
+  // that follow immediately.  Clamp the effective write count; log a warning
+  // if the requested range is longer so the caller can investigate.
+  const effectiveDayCount = Math.min(dayCount, E_TEMPLATE_MAX_DAYS);
+  if (dayCount > E_TEMPLATE_MAX_DAYS) {
+    console.warn(
+      `[spSalesFormExport] WARNING: requested ${dayCount} days exceeds template ` +
+      `capacity (${E_TEMPLATE_MAX_DAYS} days). Export will be clamped to ` +
+      `${E_TEMPLATE_MAX_DAYS} days; data beyond ${dates[E_TEMPLATE_MAX_DAYS - 1]} is dropped.`
+    );
+  }
+
+  // ── Diagnostic log (confirms the server is running the latest code) ────────
+  console.log(
+    `[spSalesFormExport] fromDate=${fromDate} toDate=${toDate} dayCount=${dayCount}` +
+    ` effectiveDayCount=${effectiveDayCount} locationId=${locationId ?? "none"}` +
+    ` firstClearedENTRYdateBlockCol=${E_DATE_START + effectiveDayCount * 3} (dayIndex=${effectiveDayCount})` +
+    ` firstClearedSalesDateCol=${S_DATE_START + effectiveDayCount}`
+  );
 
   // ── DB queries ─────────────────────────────────────────────────────────────
   const [salesRes, openingRes] = await Promise.all([
@@ -466,13 +500,13 @@ export async function generateSpSalesFormExcel(params: SpSalesFormParams): Promi
     const sDateRow = salesWs.getRow(S_DATE_ROW);
     // Write fromDate to the plain anchor cell (F1 = col S_DATE_START).
     // Formula cells for d=1… auto-chain from F1 — do not overwrite them.
-    for (let d = 0; d < dayCount; d++) {
+    for (let d = 0; d < effectiveDayCount; d++) {
       const cell = sDateRow.getCell(S_DATE_START + d);
       if (!isFormula(cell)) cell.value = addDays(startDate, d);
     }
     // Clear ALL cells beyond the export range — including formula-chain cells.
     // Using +40 to safely cover any template day-column extent.
-    for (let d = dayCount; d < dayCount + 40; d++) {
+    for (let d = effectiveDayCount; d < effectiveDayCount + 40; d++) {
       sDateRow.getCell(S_DATE_START + d).value = null;
     }
     sDateRow.commit();
@@ -511,16 +545,18 @@ export async function generateSpSalesFormExcel(params: SpSalesFormParams): Promi
           nameToSystemCode.get(displayName) ?? nameToSystemCode.get(nk(displayName)) ?? displayName;
         const daySalesMap = getSalesMap(displayName, systemCode);
 
-        for (let d = 0; d < dayCount; d++) {
+        for (let d = 0; d < effectiveDayCount; d++) {
           const cell = row.getCell(S_DATE_START + d);
-          if (isFormula(cell)) continue; // leave template formula intact within range
+          // Always overwrite — template formulas in item rows are stale data
+          // that must be replaced with the actual sale qty (or null).
+          // The old `if (isFormula(cell)) continue` guard was wrong here.
           const ds = daySalesMap?.get(dates[d]);
           cell.value = (ds && ds.qty > 0) ? r3(ds.qty) : null;
         }
       }
 
       // (b) Beyond-range clearing — ALL named rows (items AND totals).
-      for (let d = dayCount; d < dayCount + 40; d++) {
+      for (let d = effectiveDayCount; d < effectiveDayCount + 40; d++) {
         row.getCell(S_DATE_START + d).value = null;
       }
       row.commit();
@@ -591,7 +627,7 @@ export async function generateSpSalesFormExcel(params: SpSalesFormParams): Promi
   //   visible in the exported workbook.
   //   Fix: always null the cell regardless of formula status for d >= dayCount.
   const eDateRow = entryWs.getRow(E_DATE_ROW);
-  for (let d = 0; d < dayCount; d++) {
+  for (let d = 0; d < effectiveDayCount; d++) {
     const dateVal = addDays(startDate, d);
     const baseCol = E_DATE_START + d * 3;
     for (let c = baseCol; c < baseCol + 3; c++) {
@@ -599,9 +635,11 @@ export async function generateSpSalesFormExcel(params: SpSalesFormParams): Promi
       if (!isFormula(cell)) cell.value = dateVal;
     }
   }
-  // Clear everything beyond the export range — no isFormula guard.
-  // Using +40 to safely cover any template date-column extent.
-  for (let d = dayCount; d < dayCount + 40; d++) {
+  // Clear date cells beyond the export range — stop at E_TEMPLATE_MAX_DAYS.
+  // IMPORTANT: do NOT go past E_TEMPLATE_MAX_DAYS (18 days, ending at col 60).
+  // The fixed Closing Stock columns (BJ=62, BK=63) immediately follow the
+  // date section; the old `dayCount + 40` loop reached col 61-63 and wiped them.
+  for (let d = effectiveDayCount; d < E_TEMPLATE_MAX_DAYS; d++) {
     const baseCol = E_DATE_START + d * 3;
     for (let c = baseCol; c < baseCol + 3; c++) {
       eDateRow.getCell(c).value = null;
@@ -610,42 +648,64 @@ export async function generateSpSalesFormExcel(params: SpSalesFormParams): Promi
   eDateRow.commit();
 
   // 3b. Item data rows
-  // Qty (baseCol) and Sale Price (baseCol+1): plain cells — write normally.
+  //
+  // Key rule: Qty (baseCol) and Sale Price (baseCol+1) are DATA OUTPUT cells,
+  // not template formulas to preserve.  ALWAYS clear all 3 cells unconditionally
+  // before writing, then only write if there is an actual posted SP sale for
+  // that exact item/date.  The old `if (!isFormula(...)) cell.value = null` guard
+  // was wrong — it silently kept stale template formulas alive, producing
+  // phantom Qty/Price values and #DIV/0! on days with no sales.
   //
   // Profit/Bag (baseCol+2):
-  //   Write as a standalone Excel FORMULA string — never as a plain number.
-  //   This preserves the formula-driven nature of the workbook and lets Excel
-  //   recalculate on load.
+  //   Write as a standalone Excel FORMULA string only when a sale exists.
+  //   The pre-sweep above already cleared all sharedFormula slaves.
   //
-  //   • No deduction  → formula mirrors the template: =IF(<qty>=0,0,<price>-$F<row>)
-  //   • With deduction → adds the per-bag deduction as a literal constant:
-  //                      =IF(<qty>=0,0,<price>-$F<row>-<deductionPerBag>)
+  // Opening Stock (col E) and Cost/Bag (col F):
+  //   Written directly here so ExcelJS output is self-contained.
+  //   The ENTRY sheet has SUMIFS formulas pointing at Costing; ExcelJS cannot
+  //   recalculate those, so cached results can show blank/dash.  Writing the
+  //   plain values ensures the profit formula $F<row> always has a real number.
   //
-  //   The pre-sweep above already cleared all sharedFormula slaves, so writing
-  //   a standalone {formula:...} object here is safe — no orphan slave references.
+  // Closing Stock (col BJ=62, BK=63):
+  //   Written directly as closingQty = openingQty − totalSoldInRange.
+  //   Template formulas at those columns are unreliable for the same reason.
+  //   CRITICAL: the "beyond range" clear loop below must stop at E_TEMPLATE_MAX_DAYS
+  //   (col 60) — otherwise it overwrites the Closing Stock columns at 62-63.
   for (const [displayName, rowNum] of itemRows) {
     const systemCode = nameToSystemCode.get(displayName) ?? displayName;
     const daySalesMap = getSalesMap(displayName, systemCode);
+    const stock = getOpening(displayName, systemCode);
     const row = entryWs.getRow(rowNum);
 
-    for (let d = 0; d < dayCount; d++) {
-      const baseCol = E_DATE_START + d * 3;
-      const qtyCell   = row.getCell(baseCol);
-      const priceCell = row.getCell(baseCol + 1);
+    // ── Opening Stock: write directly to ENTRY col E and F ──────────────────
+    row.getCell(E_OPENING_QTY_COL).value = stock.qty > 0 ? r3(stock.qty) : null;
+    // Always write 0 (not null) for avg cost when qty=0 to keep $F<row> numeric
+    // and prevent #DIV/0! in the profit formula =IF(qty=0,0,price-$F<row>).
+    row.getCell(E_COST_BAG_COL).value = stock.qty > 0 ? r2(stock.avgCost) : 0;
+
+    // ── Date blocks ──────────────────────────────────────────────────────────
+    let totalSoldInRange = 0;
+    for (let d = 0; d < effectiveDayCount; d++) {
+      const baseCol    = E_DATE_START + d * 3;
+      const qtyCell    = row.getCell(baseCol);
+      const priceCell  = row.getCell(baseCol + 1);
       const profitCell = row.getCell(baseCol + 2);
 
+      // Unconditional clear — data cells must never retain stale template formulas.
+      qtyCell.value    = null;
+      priceCell.value  = null;
+      profitCell.value = null;
+
       const ds = daySalesMap?.get(dates[d]);
-
       if (ds && ds.qty > 0) {
-        const avgPrice       = ds.totalSales / ds.qty;
-        const deductionPerBag = ds.totalDeduction / ds.qty;
-        const netProfitPB    = (ds.totalSales - ds.totalCost - ds.totalDeduction) / ds.qty;
+        totalSoldInRange          += ds.qty;
+        const avgPrice             = ds.totalSales / ds.qty;
+        const deductionPerBag      = ds.totalDeduction / ds.qty;
+        const netProfitPB          = (ds.totalSales - ds.totalCost - ds.totalDeduction) / ds.qty;
 
-        if (!isFormula(qtyCell))   qtyCell.value   = r3(ds.qty);
-        if (!isFormula(priceCell)) priceCell.value = r2(avgPrice);
+        qtyCell.value   = r3(ds.qty);
+        priceCell.value = r2(avgPrice);
 
-        // Build a formula string that mirrors the template pattern.
-        // qC = Qty column letter, pC = Price column letter, row = item row.
         const qC = colLetter(baseCol);
         const pC = colLetter(baseCol + 1);
         const deductionPart = deductionPerBag !== 0 ? `-${r2(deductionPerBag)}` : "";
@@ -653,19 +713,36 @@ export async function generateSpSalesFormExcel(params: SpSalesFormParams): Promi
           formula: `IF(${qC}${rowNum}=0,0,${pC}${rowNum}-$F${rowNum}${deductionPart})`,
           result: r2(netProfitPB),
         };
-      } else {
-        if (!isFormula(qtyCell))   qtyCell.value   = null;
-        if (!isFormula(priceCell)) priceCell.value = null;
-        profitCell.value = null; // pre-sweep already cleared sharedFormula slaves
       }
+      // No-sale day: all three cells remain null (already cleared above).
     }
 
-    // Clear stale data beyond the export range (+40 for full template coverage)
-    for (let d = dayCount; d < dayCount + 40; d++) {
+    // ── Clear stale data beyond export range (date section only) ─────────────
+    // Stop at E_TEMPLATE_MAX_DAYS — fixed Closing Stock columns (62, 63) follow
+    // immediately and must NOT be overwritten here.
+    for (let d = effectiveDayCount; d < E_TEMPLATE_MAX_DAYS; d++) {
       const baseCol = E_DATE_START + d * 3;
       row.getCell(baseCol).value     = null; // qty
       row.getCell(baseCol + 1).value = null; // price
-      row.getCell(baseCol + 2).value = null; // profit (pre-sweep handled sharedFormula slaves)
+      row.getCell(baseCol + 2).value = null; // profit
+    }
+
+    // ── Closing Stock: compute and write directly ─────────────────────────────
+    // closingQty = openingQty − total qty sold within the selected date range.
+    // Do not rely on the template formula (ExcelJS cannot recalculate it).
+    //
+    // Zero-semantics: write 0 (not null) when opening stock > 0 and all bags
+    // were sold.  This keeps downstream SUM/pivot formulas numeric.
+    // When opening stock = 0 there is nothing to report — write null to leave
+    // those cells blank (consistent with template expectation for new items).
+    const closingQty   = Math.max(0, stock.qty - totalSoldInRange);
+    const closingValue = r2(closingQty * stock.avgCost);
+    if (stock.qty > 0) {
+      row.getCell(E_CLOSING_QTY_COL).value = r3(closingQty);  // 0 when fully sold
+      row.getCell(E_CLOSING_VAL_COL).value = closingValue;     // 0.00 when fully sold
+    } else {
+      row.getCell(E_CLOSING_QTY_COL).value = null;
+      row.getCell(E_CLOSING_VAL_COL).value = null;
     }
 
     row.commit();
