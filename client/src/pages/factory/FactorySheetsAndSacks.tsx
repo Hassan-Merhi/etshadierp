@@ -963,36 +963,30 @@ export default function FactorySheetsAndSacks() {
                         );
                       })}
                     </TableBody>
+                    <tfoot className="border-t-2 bg-muted/40 font-semibold">
+                      <tr>
+                        <td className="w-6 px-2 py-3" />
+                        <td className="py-3 px-4 text-sm text-muted-foreground">
+                          Totals <span className="font-normal">({filtered.length} items)</span>
+                        </td>
+                        <td className="py-3 px-4" />{/* Type */}
+                        <td className="py-3 px-4" />{/* Size */}
+                        <td className="py-3 px-4 text-right font-mono text-sm">
+                          {colTotals.packQty > 0 ? colTotals.packQty.toLocaleString("en-US") : "—"}
+                        </td>
+                        <td className="py-3 px-4" />{/* # / Pack */}
+                        <td className="py-3 px-4 text-right font-mono text-sm">
+                          {colTotals.pcs.toLocaleString("en-US")}
+                        </td>
+                        <td className="py-3 px-4" />{/* Price / Pc */}
+                        <td className="py-3 px-4 text-right font-mono text-sm font-bold">
+                          ${fmt(colTotals.value)}
+                        </td>
+                        <td className="py-3 px-4" />{/* Notes */}
+                        {canEdit && <td className="py-3 px-4" />}
+                      </tr>
+                    </tfoot>
                   </Table>
-
-                  {/* ── Totals bar ── */}
-                  <div className="border-t-2 bg-muted/40 px-0">
-                    <Table>
-                      <TableBody>
-                        <TableRow className="hover:bg-transparent font-semibold">
-                          <TableCell className="w-6 px-2" />
-                          <TableCell className="text-sm text-muted-foreground">
-                            Totals <span className="font-normal">({filtered.length} items)</span>
-                          </TableCell>
-                          <TableCell />{/* Type */}
-                          <TableCell />{/* Size */}
-                          <TableCell className="text-right font-mono text-sm">
-                            {colTotals.packQty > 0 ? colTotals.packQty.toLocaleString("en-US") : "—"}
-                          </TableCell>
-                          <TableCell />{/* # / Pack — no meaningful sum */}
-                          <TableCell className="text-right font-mono text-sm">
-                            {colTotals.pcs.toLocaleString("en-US")}
-                          </TableCell>
-                          <TableCell />{/* Price / Pc — no meaningful sum */}
-                          <TableCell className="text-right font-mono text-sm font-bold">
-                            ${fmt(colTotals.value)}
-                          </TableCell>
-                          <TableCell />
-                          {canEdit && <TableCell />}
-                        </TableRow>
-                      </TableBody>
-                    </Table>
-                  </div>
                 </div>
               )}
             </CardContent>
