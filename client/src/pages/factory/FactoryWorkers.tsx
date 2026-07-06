@@ -22,6 +22,7 @@ import {
   PlusCircle,
   Bus,
   Banknote,
+  Info,
 } from "lucide-react";
 import { ExcelJS, writeFile } from "@/lib/excelHelper";
 import { Button } from "@/components/ui/button";
@@ -210,6 +211,22 @@ export default function FactoryWorkers() {
       return res.json();
     },
     staleTime: 30000,
+  });
+
+  // ── Amount due till today (lightweight snapshot, no attendance needed) ─────
+  const { data: amountDue = {} } = useQuery<Record<number, {
+    periodStart: string; periodEnd: string;
+    base: number; transport: number; advanceDeducted: number; net: number;
+    lastPaidThrough: string | null;
+  }>>({
+    queryKey: ["/api/factory/workers/amount-due"],
+    queryFn: async () => {
+      const res = await fetch("/api/factory/workers/amount-due", { credentials: "include" });
+      if (!res.ok) return {};
+      return res.json();
+    },
+    staleTime: 2 * 60 * 1000,       // 2 min — fresh enough, won't flicker while typing
+    refetchOnWindowFocus: false,
   });
 
   // ── Categories ─────────────────────────────────────────────────────────────
@@ -1205,6 +1222,9 @@ export default function FactoryWorkers() {
                   <TableHead className="w-[9%] text-right text-xs font-semibold uppercase tracking-wide text-muted-foreground py-2">
                     Advance
                   </TableHead>
+                  <TableHead className="w-[11%] text-right text-xs font-semibold uppercase tracking-wide text-muted-foreground py-2">
+                    Due Today
+                  </TableHead>
                   <TableHead className="w-[90px] text-xs font-semibold uppercase tracking-wide text-muted-foreground py-2">
                     Status
                   </TableHead>
@@ -1231,7 +1251,7 @@ export default function FactoryWorkers() {
                   ))
                 ) : filteredWorkers.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={7}>
+                    <TableCell colSpan={8}>
                       <div className="flex flex-col items-center gap-2 py-10 text-center">
                         <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center">
                           <Users className="h-5 w-5 text-muted-foreground" />
@@ -1323,6 +1343,73 @@ export default function FactoryWorkers() {
                           <span className="text-muted-foreground/40">—</span>
                         )}
                       </TableCell>
+
+                      {/* ── Due Today ─────────────────────────────────── */}
+                      <TableCell className="py-3 text-right font-mono text-sm" onClick={(e) => e.stopPropagation()}>
+                        {(() => {
+                          const due = amountDue[worker.id];
+                          if (!due) return <span className="text-muted-foreground/40">—</span>;
+                          const fmt = (n: number) =>
+                            `${n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+                          const fmtDate = (s: string) =>
+                            new Date(s + "T00:00:00").toLocaleDateString(undefined, { month: "short", day: "numeric" });
+                          return (
+                            <Popover>
+                              <PopoverTrigger asChild>
+                                <button
+                                  className={[
+                                    "flex items-center gap-1 ml-auto rounded px-1.5 py-0.5 transition-colors",
+                                    "hover:bg-muted/60 cursor-pointer select-none",
+                                    due.net > 0
+                                      ? "text-emerald-600 dark:text-emerald-400"
+                                      : "text-muted-foreground/50",
+                                  ].join(" ")}
+                                >
+                                  {due.net > 0 ? fmt(due.net) : "Paid up"}
+                                  <Info className="h-3 w-3 opacity-50 shrink-0" />
+                                </button>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-64 p-3 text-sm" align="end" side="left">
+                                <p className="font-semibold text-foreground mb-1">Due Today</p>
+                                <p className="text-[11px] text-muted-foreground mb-3 leading-relaxed">
+                                  Period: {fmtDate(due.periodStart)} → {fmtDate(due.periodEnd)}
+                                  {due.lastPaidThrough && (
+                                    <span className="block">Last paid through {fmtDate(due.lastPaidThrough)}</span>
+                                  )}
+                                </p>
+                                <div className="space-y-1.5">
+                                  <div className="flex justify-between">
+                                    <span className="text-muted-foreground">Base salary</span>
+                                    <span className="font-mono">{fmt(due.base)}</span>
+                                  </div>
+                                  {due.transport > 0 && (
+                                    <div className="flex justify-between">
+                                      <span className="text-muted-foreground">Transport</span>
+                                      <span className="font-mono">+{fmt(due.transport)}</span>
+                                    </div>
+                                  )}
+                                  {due.advanceDeducted > 0 && (
+                                    <div className="flex justify-between text-amber-600 dark:text-amber-400">
+                                      <span>Advance deducted</span>
+                                      <span className="font-mono">−{fmt(due.advanceDeducted)}</span>
+                                    </div>
+                                  )}
+                                  <div className="flex justify-between border-t pt-1.5 font-semibold">
+                                    <span>Net due</span>
+                                    <span className={`font-mono ${due.net > 0 ? "text-emerald-600 dark:text-emerald-400" : "text-muted-foreground"}`}>
+                                      {fmt(due.net)}
+                                    </span>
+                                  </div>
+                                </div>
+                                <p className="text-[10px] text-muted-foreground/50 mt-2 leading-relaxed">
+                                  Calendar-day proration · Salary-deduction advances only
+                                </p>
+                              </PopoverContent>
+                            </Popover>
+                          );
+                        })()}
+                      </TableCell>
+
                       <TableCell className="py-3">
                         <Badge
                           variant="secondary"
