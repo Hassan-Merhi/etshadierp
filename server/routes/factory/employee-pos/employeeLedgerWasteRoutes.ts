@@ -220,7 +220,7 @@ export function registerEmployeeLedgerWasteRoutes(app: Express) {
       }
 
       // Group bales into buckets
-      type BaleDetail = { ref: string; weightKg: number; totalCost: number };
+      type BaleDetail = { id: number; ref: string; weightKg: number; totalCost: number };
       type BucketRow = {
         productId: number | null;
         productName: string;
@@ -255,7 +255,7 @@ export function registerEmployeeLedgerWasteRoutes(app: Express) {
         const w = parseFloat(bale.weightKg) || 0;
         const c = getSellingPrice(bale); // selling price replaces cost
         const ref: string = bale.referenceNumber || "";
-        const detail: BaleDetail = { ref, weightKg: w, totalCost: c };
+        const detail: BaleDetail = { id: bale.id, ref, weightKg: w, totalCost: c };
         if (existing) {
           existing.baleCount++;
           existing.totalWeightKg += w;

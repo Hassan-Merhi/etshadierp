@@ -34,7 +34,10 @@ import {
   RefreshCw,
   Layers,
   Ship,
+  Pencil,
 } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
+import { BaleWeightEditDialog, type WeightEditBale } from "@/components/BaleWeightEditDialog";
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from "recharts";
 
 function todayStr() {
@@ -766,6 +769,7 @@ function MiniPieChart({
 // ─────────────────────────────────────────────
 
 interface BaleDetail {
+  id: number;
   ref: string;
   weightKg: number;
   totalCost: number;
@@ -846,6 +850,8 @@ function LedgerSection({
 }: LedgerSectionProps) {
   const [open, setOpen] = useState(defaultOpen);
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
+  const [weightEditBale, setWeightEditBale] = useState<WeightEditBale | null>(null);
+  const queryClient = useQueryClient();
   function toggleRow(key: string) {
     setExpandedRows((prev) => {
       const next = new Set(prev);
@@ -997,7 +1003,14 @@ function LedgerSection({
                                           <tr key={di} className="border-b border-border/20 last:border-0">
                                             <td className="py-1 pr-4 font-mono">{d.ref || "—"}</td>
                                             <td className="py-1 pr-4 text-right text-muted-foreground">
-                                              {fmtL(d.weightKg)}
+                                              <button
+                                                className="group flex items-center gap-1 ml-auto hover:text-foreground"
+                                                onClick={() => d.id && setWeightEditBale({ id: d.id, referenceNumber: d.ref, weightKg: d.weightKg })}
+                                                title="Correct weight"
+                                              >
+                                                {fmtL(d.weightKg)}
+                                                <Pencil className="h-3 w-3 opacity-0 group-hover:opacity-60 shrink-0" />
+                                              </button>
                                             </td>
                                             <td className="py-1 pr-4 text-right text-muted-foreground">1</td>
                                             <td className="py-1 pr-4 text-right text-muted-foreground">
@@ -1061,6 +1074,14 @@ function LedgerSection({
           </CardContent>
         </CollapsibleContent>
       </Collapsible>
+      <BaleWeightEditDialog
+        bale={weightEditBale}
+        onClose={() => setWeightEditBale(null)}
+        onSuccess={() => {
+          queryClient.invalidateQueries({ queryKey: ["/api/factory/bale-ledger"] });
+          setWeightEditBale(null);
+        }}
+      />
     </Card>
   );
 }

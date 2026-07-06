@@ -1,10 +1,12 @@
-import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocation, useSearch } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { PageHeader } from "@/components/PageHeader";
-import { ArrowLeft, Package, AlertTriangle } from "lucide-react";
+import { ArrowLeft, Package, AlertTriangle, Pencil } from "lucide-react";
+import { BaleWeightEditDialog, type WeightEditBale } from "@/components/BaleWeightEditDialog";
 import { useEscapeBack } from "@/hooks/use-escape-back";
 import { cn } from "@/lib/utils";
 
@@ -45,6 +47,9 @@ export default function FactoryStockBaleList() {
 
   const queryParams = new URLSearchParams({ articleCode });
   if (locationId) queryParams.set("locationId", locationId);
+
+  const queryClient = useQueryClient();
+  const [weightEditBale, setWeightEditBale] = useState<WeightEditBale | null>(null);
 
   const { data: bales = [], isLoading } = useQuery<StockBale[]>({
     queryKey: [`/api/factory/bale-stock-list`, articleCode, locationId],
@@ -120,7 +125,14 @@ export default function FactoryStockBaleList() {
                     <td className="px-3 py-2 font-mono text-xs font-semibold">{bale.referenceNumber}</td>
                     <td className="px-3 py-2 font-mono text-xs text-muted-foreground">{bale.baleCode}</td>
                     <td className="px-3 py-2 font-mono text-xs text-right tabular-nums">
-                      {parseFloat(bale.weightKg).toFixed(2)}
+                      <button
+                        className="group flex items-center gap-1 ml-auto hover:text-foreground"
+                        onClick={(e) => { e.stopPropagation(); setWeightEditBale({ id: bale.id, referenceNumber: bale.referenceNumber, weightKg: bale.weightKg }); }}
+                        title="Correct weight"
+                      >
+                        {parseFloat(bale.weightKg).toFixed(2)}
+                        <Pencil className="h-3 w-3 opacity-0 group-hover:opacity-60 shrink-0" />
+                      </button>
                     </td>
                     <td className="px-3 py-2 text-xs tabular-nums">
                       {fmtDate(bale.productionDate ?? bale.finalizedAt)}
@@ -150,6 +162,15 @@ export default function FactoryStockBaleList() {
           </div>
         </div>
       )}
+
+      <BaleWeightEditDialog
+        bale={weightEditBale}
+        onClose={() => setWeightEditBale(null)}
+        onSuccess={() => {
+          queryClient.invalidateQueries({ queryKey: ["/api/factory/bale-stock-list"] });
+          setWeightEditBale(null);
+        }}
+      />
     </div>
   );
 }

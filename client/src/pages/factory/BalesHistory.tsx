@@ -66,6 +66,7 @@ import {
 } from "@/lib/labelHtml";
 import { useLabelDesignColors } from "@/hooks/useLabelDesignColors";
 import type { FactoryMixBatch, FactoryBaleProduct } from "@shared/schema";
+import { BaleWeightEditDialog, type WeightEditBale } from "@/components/BaleWeightEditDialog";
 
 const STATUS_COLORS: Record<string, string> = {
   PENDING_PRESSING: "outline",
@@ -113,6 +114,7 @@ export default function BalesHistory() {
   const { toast } = useToast();
   const appMode = useAppMode();
   const modeApiRequest = getApiRequest(appMode);
+  const [weightEditBale, setWeightEditBale] = useState<WeightEditBale | null>(null);
 
   // Keyboard +/- date navigation
   useEffect(() => {
@@ -1114,7 +1116,16 @@ export default function BalesHistory() {
                                 {product?.articleCode || bale.category || "-"}
                               </TableCell>
                               <TableCell className="text-right">{bale.quantity}</TableCell>
-                              <TableCell className="text-right font-mono">{formatLabelNum(bale.weightKg)}</TableCell>
+                              <TableCell className="text-right font-mono">
+                                <button
+                                  className="group flex items-center gap-1 ml-auto hover:text-foreground"
+                                  onClick={(e) => { e.stopPropagation(); setWeightEditBale({ id: bale.id, referenceNumber: bale.referenceNumber, weightKg: bale.weightKg }); }}
+                                  title="Correct weight"
+                                >
+                                  {formatLabelNum(bale.weightKg)}
+                                  <Pencil className="h-3 w-3 opacity-0 group-hover:opacity-60 shrink-0" />
+                                </button>
+                              </TableCell>
                               <TableCell>
                                 <Select
                                   value={bale.status}
@@ -1609,6 +1620,15 @@ export default function BalesHistory() {
       </Dialog>
 
       {AdminDialog}
+
+      <BaleWeightEditDialog
+        bale={weightEditBale}
+        onClose={() => setWeightEditBale(null)}
+        onSuccess={() => {
+          queryClient.invalidateQueries({ queryKey: ["/api/factory/bales"] });
+          setWeightEditBale(null);
+        }}
+      />
     </div>
   );
 }

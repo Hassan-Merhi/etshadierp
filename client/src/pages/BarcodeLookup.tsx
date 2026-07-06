@@ -45,6 +45,7 @@ import { useAppMode } from "@/contexts/AppModeContext";
 import { getApiRequest } from "@/lib/factoryApi";
 import { useAdminOverride } from "@/hooks/use-admin-override";
 import type { BaleProduct, BaleLabelPrint } from "@shared/schema";
+import { BaleWeightEditDialog, type WeightEditBale } from "@/components/BaleWeightEditDialog";
 
 function BaleStatusBadge({ status }: { status: string }) {
   const map: Record<
@@ -111,6 +112,8 @@ export default function BarcodeLookup() {
     status: string;
     articleCode: string | null;
   } | null>(null);
+
+  const [weightEditBale, setWeightEditBale] = useState<WeightEditBale | null>(null);
 
   const [referenceResult, setReferenceResult] = useState<{
     labelPrint: BaleLabelPrint | null;
@@ -833,9 +836,16 @@ export default function BarcodeLookup() {
                     {referenceResult.baleInfo && (
                       <div>
                         <p className="text-xs text-muted-foreground uppercase tracking-wide mb-0.5">Actual Weight</p>
-                        <p className="font-bold font-mono text-base">
-                          {smartNum(referenceResult.baleInfo.weightKg)} KG
-                        </p>
+                        <button
+                          className="group flex items-center gap-1.5 hover:text-foreground"
+                          onClick={() => referenceResult.baleInfo && setWeightEditBale({ id: referenceResult.baleInfo.id, referenceNumber: referenceResult.labelPrint?.referenceNumber || "", weightKg: referenceResult.baleInfo.weightKg })}
+                          title="Correct weight"
+                        >
+                          <span className="font-bold font-mono text-base">
+                            {smartNum(referenceResult.baleInfo.weightKg)} KG
+                          </span>
+                          <Pencil className="h-3.5 w-3.5 opacity-0 group-hover:opacity-60 shrink-0" />
+                        </button>
                       </div>
                     )}
                     {referenceResult.baleInfo?.grade && (
@@ -1579,6 +1589,17 @@ export default function BarcodeLookup() {
       </Dialog>
 
       {AdminDialog}
+
+      <BaleWeightEditDialog
+        bale={weightEditBale}
+        onClose={() => setWeightEditBale(null)}
+        onSuccess={() => {
+          setWeightEditBale(null);
+          if (referenceResult?.labelPrint?.referenceNumber) {
+            referenceLookup.mutate(referenceResult.labelPrint.referenceNumber);
+          }
+        }}
+      />
     </div>
   );
 }
