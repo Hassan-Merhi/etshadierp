@@ -1,4 +1,4 @@
-import { trackOneContainerById } from "../../../services/containerTrackingService";
+import { trackOneFactoryContainerById } from "../../../services/factoryContainerTrackingService";
 import { parseId, parseOptionalId } from "../../../lib/parseId";
 import { dispatchNotification } from "../../../lib/notificationService";
 import { getClientDate } from "../../../lib/dateUtils";
@@ -192,26 +192,29 @@ export function registerOrderTrackingRoutes(app: Express) {
         return res.json({ tracked: 0, message: "No container numbers found on active orders." });
       }
 
-      // Find matching ERP containers
+      // Find matching factory containers (sp_containers / factoryContainers table)
       const matched = await db
-        .select({ id: containers.id, containerNumber: containers.containerNumber })
-        .from(containers)
+        .select({ id: factoryContainers.id, containerNumber: factoryContainers.containerNumber })
+        .from(factoryContainers)
         .where(
-          and(inArray(sql`UPPER(TRIM(${containers.containerNumber}))`, containerNumbers), isNull(containers.deletedAt))
+          and(
+            eq(factoryContainers.companyId, companyId),
+            inArray(sql`UPPER(TRIM(${factoryContainers.containerNumber}))`, containerNumbers),
+          )
         );
 
       if (matched.length === 0) {
         return res.json({
           tracked: 0,
           message:
-            "No matching containers found in tracking system. Ensure container numbers are registered as ERP containers.",
+            "No matching factory containers found. Ensure the container numbers on orders match containers in the factory system.",
         });
       }
 
-      // Fire tracking for each matched container in parallel (fire-and-forget)
+      // Fire factory tracking for each matched container (fire-and-forget)
       let queued = 0;
       for (const c of matched) {
-        trackOneContainerById(c.id).catch(() => {});
+        trackOneFactoryContainerById(c.id).catch(() => {});
         queued++;
       }
 
