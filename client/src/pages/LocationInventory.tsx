@@ -394,7 +394,7 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
           (a.stockGroupName || "").localeCompare(b.stockGroupName || "") ||
           a.stockItemName.localeCompare(b.stockItemName)
       );
-  }, [inventory, itemSearchTerm]);
+  }, [inventory, itemSearchTerm, showNegativeStock]);
 
   // Totals across all stock groups
   const totalQty = stockGroups.reduce((s, g) => s + g.totalQuantity, 0);
