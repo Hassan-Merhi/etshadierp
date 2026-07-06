@@ -49,6 +49,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 import { factoryApiRequest } from "@/lib/factoryApi";
@@ -118,6 +119,12 @@ export default function FactorySuppliers() {
   const { toast } = useToast();
 
   const [listIncludeOtw, setListIncludeOtw] = useState(false);
+  const [moveContainerDialog, setMoveContainerDialog] = useState<{
+    open: boolean;
+    containerId: number | null;
+    containerRef: string;
+  }>({ open: false, containerId: null, containerRef: "" });
+  const [moveTargetSupplierId, setMoveTargetSupplierId] = useState<string>("");
   const { data: suppliers, isLoading } = useQuery<SupplierWithBalance[]>({
     queryKey: ["/api/factory/suppliers/with-balances", listIncludeOtw],
     queryFn: async () => {
@@ -392,6 +399,34 @@ export default function FactorySuppliers() {
     },
   });
 
+  const makeBrokerMutation = useMutation({
+    mutationFn: async ({ id, isBroker }: { id: number; isBroker: boolean }) => {
+      const res = await factoryApiRequest("PATCH", `/api/factory/suppliers/${id}/set-broker`, { isBroker });
+      if (!res.ok) { const err = await res.json().catch(() => ({})); throw new Error(err.message || "Failed"); }
+      return res.json();
+    },
+    onSuccess: (_, { isBroker }) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/suppliers"] });
+      toast({ title: isBroker ? "Supplier marked as Broker" : "Broker flag removed" });
+    },
+    onError: (err: Error) => toast({ title: "Failed", description: err.message, variant: "destructive" }),
+  });
+
+  const moveContainerMutation = useMutation({
+    mutationFn: async ({ containerId, targetSupplierId }: { containerId: number; targetSupplierId: number }) => {
+      const res = await factoryApiRequest("POST", `/api/factory/containers/${containerId}/move-supplier`, { targetSupplierId });
+      if (!res.ok) { const err = await res.json().catch(() => ({})); throw new Error(err.message || "Failed to move container"); }
+      return res.json();
+    },
+    onSuccess: (data) => {
+      setMoveContainerDialog({ open: false, containerId: null, containerRef: "" });
+      setMoveTargetSupplierId("");
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/suppliers"] });
+      toast({ title: `Moved to ${data.toSupplierName}`, description: `Was under ${data.fromSupplierName}` });
+    },
+    onError: (err: Error) => toast({ title: "Move failed", description: err.message, variant: "destructive" }),
+  });
+
   const [editObComm, setEditObComm] = useState<null | {
     rawStockId: number;
     amount: string;
@@ -444,7 +479,7 @@ export default function FactorySuppliers() {
   }, 0);
 
   const filteredTopLevel = displayedTopLevel.filter((s) => {
-    if (activeFilter === "brokers") return !!subAccountsByParent[s.id]?.length;
+    if (activeFilter === "brokers") return !!subAccountsByParent[s.id]?.length || !!s.isBroker;
     if (activeFilter === "standalone") return !subAccountsByParent[s.id]?.length;
     if (activeFilter === "with-balance") return parseFloat(s.totalValue || "0") > 0;
     if (activeFilter === "zero-balance") return parseFloat(s.totalValue || "0") === 0;
@@ -473,6 +508,67 @@ export default function FactorySuppliers() {
     </Badge>
   );
 
+  const moveContainerDialogJsx = (
+    <Dialog
+      open={moveContainerDialog.open}
+      onOpenChange={(o) => {
+        if (!o) {
+          setMoveContainerDialog((p) => ({ ...p, open: false }));
+          setMoveTargetSupplierId("");
+        }
+      }}
+    >
+      <DialogContent className="max-w-sm">
+        <DialogHeader>
+          <DialogTitle>Move Container</DialogTitle>
+        </DialogHeader>
+        <p className="text-sm text-muted-foreground mb-2">
+          Moving <span className="font-semibold text-foreground">{moveContainerDialog.containerRef}</span> to a new
+          supplier shifts the outstanding balance immediately. Payments already recorded under the current supplier are
+          not moved automatically.
+        </p>
+        <Select value={moveTargetSupplierId} onValueChange={setMoveTargetSupplierId}>
+          <SelectTrigger>
+            <SelectValue placeholder="Select target supplier…" />
+          </SelectTrigger>
+          <SelectContent>
+            {activeSuppliers
+              .filter((s) => s.id !== statementSupplierId)
+              .map((s) => (
+                <SelectItem key={s.id} value={String(s.id)}>
+                  {s.name}
+                </SelectItem>
+              ))}
+          </SelectContent>
+        </Select>
+        <DialogFooter className="mt-4">
+          <Button
+            variant="outline"
+            onClick={() => {
+              setMoveContainerDialog((p) => ({ ...p, open: false }));
+              setMoveTargetSupplierId("");
+            }}
+          >
+            Cancel
+          </Button>
+          <Button
+            disabled={!moveTargetSupplierId || moveContainerMutation.isPending}
+            onClick={() => {
+              if (moveContainerDialog.containerId && moveTargetSupplierId) {
+                moveContainerMutation.mutate({
+                  containerId: moveContainerDialog.containerId,
+                  targetSupplierId: parseInt(moveTargetSupplierId),
+                });
+              }
+            }}
+          >
+            {moveContainerMutation.isPending ? "Moving…" : "Move Container"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+
   if (statementSupplierId) {
     const rows = statementData?.statement || [];
     const pmts = statementData?.payments || [];
@@ -489,6 +585,7 @@ export default function FactorySuppliers() {
         amountVal: parseFloat(r.value),
         rowCc: "USD",
         status: r.status,
+        onMove: () => setMoveContainerDialog({ open: true, containerId: r.id, containerRef: r.containerNumber }),
       })
     );
     pmts.forEach((p) =>
@@ -572,6 +669,7 @@ export default function FactorySuppliers() {
     filteredRows.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
     return (
+      <>
       <SupplierStatement
         statementSupplierId={statementSupplierId}
         statementData={statementData}
@@ -640,6 +738,8 @@ export default function FactorySuppliers() {
           }, "Delete Supplier")
         }
       />
+      {moveContainerDialogJsx}
+      </>
     );
   }
 
@@ -741,6 +841,7 @@ export default function FactorySuppliers() {
           setEditObComm={setEditObComm}
           updateObCommissionMutation={updateObCommissionMutation as any}
         />
+        {moveContainerDialogJsx}
         {AdminDialog}
       </>
     );
@@ -823,7 +924,7 @@ export default function FactorySuppliers() {
       <div className="rounded-xl border divide-y">
         {filteredTopLevel.map((s) => {
           const balVal = parseFloat(s.totalValue || "0");
-          const isBroker = !!subAccountsByParent[s.id]?.length;
+          const isBroker = !!subAccountsByParent[s.id]?.length || !!s.isBroker;
           const otwCount = s.otwByCurrency
             ? Object.values(s.otwByCurrency).reduce((a, b) => a + b, 0)
             : s.pendingContainers || 0;
@@ -945,6 +1046,30 @@ export default function FactorySuppliers() {
                       <Pencil className="h-4 w-4 mr-2" />
                       Edit
                     </DropdownMenuItem>
+                    {!isBroker && !s.parentId && (
+                      <DropdownMenuItem
+                        onClick={() =>
+                          wrapAdminAction(() => makeBrokerMutation.mutate({ id: s.id, isBroker: true }), "Make Broker")
+                        }
+                        data-testid={`btn-make-broker-${s.id}`}
+                      >
+                        <GitBranch className="h-4 w-4 mr-2" />
+                        Make Broker
+                      </DropdownMenuItem>
+                    )}
+                    {isBroker && (
+                      <DropdownMenuItem
+                        onClick={() => {
+                          setCreateSubAccountParentId(s.id);
+                          resetForm();
+                          setCreateOpen(true);
+                        }}
+                        data-testid={`btn-add-linked-${s.id}`}
+                      >
+                        <Plus className="h-4 w-4 mr-2" />
+                        Add Linked Supplier
+                      </DropdownMenuItem>
+                    )}
                     {nonUsdBalances.filter((cb) => cb.balance > 0.005).map((cb) => (
                       <DropdownMenuItem
                         key={cb.currencyCode}
@@ -1093,6 +1218,7 @@ export default function FactorySuppliers() {
         updateObCommissionMutation={updateObCommissionMutation as any}
       />
 
+      {moveContainerDialogJsx}
       <DeleteConfirmDialog
         open={!!pendingDelete}
         onOpenChange={(o) => {

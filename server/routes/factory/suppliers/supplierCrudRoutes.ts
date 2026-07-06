@@ -755,6 +755,39 @@ export function registerSupplierCrudRoutes(app: Express) {
     }
   });
 
+  // Mark / unmark a supplier as broker (explicit flag, independent of whether children exist)
+  app.patch("/api/factory/suppliers/:id/set-broker", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      const id = parseId(req.params.id);
+      if (id === null) return res.status(400).json({ message: "Invalid id" });
+      const { isBroker } = req.body;
+      if (typeof isBroker !== "boolean") return res.status(400).json({ message: "isBroker must be boolean" });
+      // A broker cannot itself have a parent (it IS the parent)
+      if (isBroker) {
+        const [sup] = await db
+          .select({ parentId: factorySuppliers.parentId })
+          .from(factorySuppliers)
+          .where(and(eq(factorySuppliers.id, id), eq(factorySuppliers.companyId, companyId)))
+          .limit(1);
+        if (sup?.parentId) {
+          return res.status(400).json({ message: "A linked supplier (child) cannot be set as broker directly. Remove the parent link first." });
+        }
+      }
+      const [updated] = await db
+        .update(factorySuppliers)
+        .set({ isBroker, updatedAt: new Date() })
+        .where(and(eq(factorySuppliers.id, id), eq(factorySuppliers.companyId, companyId)))
+        .returning();
+      if (!updated) return res.status(404).json({ message: "Supplier not found" });
+      res.json(updated);
+    } catch (error: any) {
+      console.error("Error setting broker flag:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Hard-delete a factory supplier — cascades through all related records
   app.delete("/api/factory/suppliers/:id/permanent", requireAuth, async (req: any, res: any) => {
     try {

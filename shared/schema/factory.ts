@@ -517,6 +517,7 @@ export const factorySuppliers = pgTable(
     parentId: integer("parent_id"),
     supplierCategoryId: integer("supplier_category_id"),
     isActive: boolean("is_active").notNull().default(true),
+    isBroker: boolean("is_broker").notNull().default(false),
     createdAt: timestamp("created_at").notNull().defaultNow(),
     updatedAt: timestamp("updated_at").notNull().defaultNow(),
   },
@@ -544,6 +545,7 @@ export const insertFactorySupplierSchema = createInsertSchema(factorySuppliers)
     parentId: z.number().optional().nullable(),
     supplierCategoryId: z.number().optional().nullable(),
     isActive: z.boolean().optional(),
+    isBroker: z.boolean().optional(),
   });
 
 export type InsertFactorySupplier = z.infer<typeof insertFactorySupplierSchema>;

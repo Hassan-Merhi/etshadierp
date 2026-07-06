@@ -2,7 +2,7 @@ import { StatementResponse, SupplierWithBalance } from "./factorySupplierTypes";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Pencil, Trash2, Package } from "lucide-react";
+import { ArrowRightLeft, Pencil, Trash2, Package } from "lucide-react";
 
 interface SupplierStatementRowsProps {
   statementData: StatementResponse;
@@ -191,6 +191,11 @@ export function SupplierStatementRows({
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-1">
+                      {row.onMove && (
+                        <Button variant="ghost" size="icon" title="Move to another supplier" onClick={row.onMove}>
+                          <ArrowRightLeft className="h-3.5 w-3.5 text-blue-500" />
+                        </Button>
+                      )}
                       {row.onEdit && (
                         <Button variant="ghost" size="icon" onClick={row.onEdit}>
                           <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
