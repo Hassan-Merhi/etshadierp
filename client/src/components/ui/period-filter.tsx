@@ -8,7 +8,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Popover, PopoverAnchor, PopoverContent } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { useDateFormat } from "@/contexts/DateFormatContext";
 import { cn } from "@/lib/utils";
@@ -134,9 +134,10 @@ export function PeriodFilter({
 
   const handlePresetChange = (preset: PeriodPreset) => {
     if (preset === "custom") {
-      // Defer until after the DropdownMenu close event finishes propagating,
-      // otherwise the Dialog immediately dismisses from the same outside-click.
-      setTimeout(() => setCalendarOpen(true), 0);
+      // Use a Popover (non-modal) to avoid the Dialog focus-trap/outside-click
+      // interaction that caused the calendar to immediately dismiss when opened
+      // from a DropdownMenuItem click.
+      setCalendarOpen(true);
     } else {
       const dates = getPresetDates(preset);
       onChange({ ...dates, preset });
@@ -173,73 +174,82 @@ export function PeriodFilter({
 
   return (
     <div className={cn("flex flex-wrap items-center gap-2", className)}>
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button variant="outline" size="sm" className="gap-1" data-testid={testId || "period-filter-dropdown"}>
-            <CalendarIcon className="h-4 w-4 shrink-0" />
-            <span className="max-w-[200px] truncate">{displayLabel}</span>
-            <ChevronDown className="h-3 w-3 opacity-50 shrink-0" />
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-48">
-          <DropdownMenuItem onClick={() => handlePresetChange("all_time")} data-testid="period-preset-all-time">
-            All Time
-          </DropdownMenuItem>
-          <DropdownMenuSeparator />
-          <DropdownMenuItem onClick={() => handlePresetChange("today")} data-testid="period-preset-today">
-            Today
-          </DropdownMenuItem>
-          <DropdownMenuItem onClick={() => handlePresetChange("yesterday")} data-testid="period-preset-yesterday">
-            Yesterday
-          </DropdownMenuItem>
-          <DropdownMenuItem onClick={() => handlePresetChange("this_week")} data-testid="period-preset-this-week">
-            This Week
-          </DropdownMenuItem>
-          <DropdownMenuItem onClick={() => handlePresetChange("this_month")} data-testid="period-preset-this-month">
-            This Month
-          </DropdownMenuItem>
-          <DropdownMenuItem onClick={() => handlePresetChange("last_1_month")} data-testid="period-preset-last-1-month">
-            Last 1 Month
-          </DropdownMenuItem>
-          <DropdownMenuItem
-            onClick={() => handlePresetChange("last_6_months")}
-            data-testid="period-preset-last-6-months"
-          >
-            Last 6 Months
-          </DropdownMenuItem>
-          <DropdownMenuItem onClick={() => handlePresetChange("this_year")} data-testid="period-preset-this-year">
-            This Year
-          </DropdownMenuItem>
-          <DropdownMenuSeparator />
-          <DropdownMenuItem onClick={() => handlePresetChange("custom")} data-testid="period-preset-custom">
-            Custom Range...
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
+      {/*
+       * Wrap the DropdownMenu trigger in a PopoverAnchor so the calendar
+       * Popover (non-modal) appears anchored to the same button.
+       * A Popover doesn't have Dialog's modal focus-trap, so the DropdownMenu
+       * close event cannot cause it to immediately dismiss.
+       */}
+      <Popover open={!hideCustomInputs && calendarOpen} onOpenChange={setCalendarOpen}>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <PopoverAnchor asChild>
+              <Button variant="outline" size="sm" className="gap-1" data-testid={testId || "period-filter-dropdown"}>
+                <CalendarIcon className="h-4 w-4 shrink-0" />
+                <span className="max-w-[200px] truncate">{displayLabel}</span>
+                <ChevronDown className="h-3 w-3 opacity-50 shrink-0" />
+              </Button>
+            </PopoverAnchor>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-48">
+            <DropdownMenuItem onClick={() => handlePresetChange("all_time")} data-testid="period-preset-all-time">
+              All Time
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={() => handlePresetChange("today")} data-testid="period-preset-today">
+              Today
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => handlePresetChange("yesterday")} data-testid="period-preset-yesterday">
+              Yesterday
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => handlePresetChange("this_week")} data-testid="period-preset-this-week">
+              This Week
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => handlePresetChange("this_month")} data-testid="period-preset-this-month">
+              This Month
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() => handlePresetChange("last_1_month")}
+              data-testid="period-preset-last-1-month"
+            >
+              Last 1 Month
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() => handlePresetChange("last_6_months")}
+              data-testid="period-preset-last-6-months"
+            >
+              Last 6 Months
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => handlePresetChange("this_year")} data-testid="period-preset-this-year">
+              This Year
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={() => handlePresetChange("custom")} data-testid="period-preset-custom">
+              Custom Range...
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
 
-      {/* Calendar dialog for custom range */}
-      {!hideCustomInputs && (
-        <Dialog open={calendarOpen} onOpenChange={setCalendarOpen}>
-          <DialogContent className="w-auto max-w-[95vw] p-0">
-            <DialogHeader className="p-3 border-b">
-              <DialogTitle className="text-sm font-medium">Select date range</DialogTitle>
-              <p className="text-xs text-muted-foreground mt-0.5">Click a start date, then an end date</p>
-            </DialogHeader>
-            <Calendar
-              mode="range"
-              selected={calendarRange}
-              onSelect={handleRangeSelect}
-              numberOfMonths={2}
-              defaultMonth={fromDateObj ?? new Date()}
-            />
-            {calendarRange?.from && !calendarRange?.to && (
-              <div className="p-3 border-t text-xs text-muted-foreground text-center">
-                Now click an end date
-              </div>
-            )}
-          </DialogContent>
-        </Dialog>
-      )}
+        {/* Calendar popover — non-modal, anchored to the trigger button above */}
+        <PopoverContent className="w-auto p-0" align="end" sideOffset={4}>
+          <div className="p-3 border-b">
+            <p className="text-sm font-medium">Select date range</p>
+            <p className="text-xs text-muted-foreground mt-0.5">Click a start date, then an end date</p>
+          </div>
+          <Calendar
+            mode="range"
+            selected={calendarRange}
+            onSelect={handleRangeSelect}
+            numberOfMonths={2}
+            defaultMonth={fromDateObj ?? new Date()}
+          />
+          {calendarRange?.from && !calendarRange?.to && (
+            <div className="p-3 border-t text-xs text-muted-foreground text-center">
+              Now click an end date
+            </div>
+          )}
+        </PopoverContent>
+      </Popover>
     </div>
   );
 }
