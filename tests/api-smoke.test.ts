@@ -163,9 +163,9 @@ describe("Smoke — Reports", () => {
     expect(res.status).toBe(200);
   });
 
-  it("GET /api/reports/closing-stock-summary returns 200 (not 500)", async () => {
+  it("GET /api/reports/closing-stock-summary returns 200", async () => {
     const res = await agent.get("/api/reports/closing-stock-summary");
-    expect(res.status).toBeLessThan(500);
+    expect(res.status).toBe(200);
   });
 });
 
@@ -210,6 +210,24 @@ describe("Smoke — Factory (returns non-500)", () => {
   it("GET /api/factory/supplier-payments does not return 500", async () => {
     const res = await agent.get("/api/factory/supplier-payments");
     expect(res.status).toBeLessThan(500);
+  });
+});
+
+describe("Smoke — SP company guard (non-SP company gets 403, not 500)", () => {
+  it("GET /api/sp/setup/status returns 403 for a non-supplier_partner company", async () => {
+    const res = await agent.get("/api/sp/setup/status");
+    // Our test company is type 'erp', not 'supplier_partner'
+    expect(res.status).toBe(403);
+  });
+
+  it("POST /api/sp/setup returns 403 for a non-supplier_partner company", async () => {
+    const res = await agent.post("/api/sp/setup").send({});
+    expect(res.status).toBe(403);
+  });
+
+  it("GET /api/sp/containers returns 403 for a non-supplier_partner company", async () => {
+    const res = await agent.get("/api/sp/containers");
+    expect(res.status).toBe(403);
   });
 });
 

@@ -306,6 +306,63 @@ async function pool_count(companyId: number): Promise<number> {
   return parseInt(r.rows[0].cnt, 10);
 }
 
+// ── Closing stock summary ─────────────────────────────────────────────────────
+
+describe("Report Accuracy — Closing stock summary", () => {
+  it("GET /api/reports/closing-stock-summary returns 200 with structured body", async () => {
+    const res = await agent.get("/api/reports/closing-stock-summary");
+    expect(res.status).toBe(200);
+    expect(typeof res.body === "object" && res.body !== null).toBe(true);
+  });
+
+  it("closing stock summary body is not an empty error object", async () => {
+    const res = await agent.get("/api/reports/closing-stock-summary");
+    expect(res.status).toBe(200);
+    // If a 'message' key is the only key, the route returned an error disguised as 200
+    const keys = Object.keys(res.body);
+    if (keys.length === 1 && keys[0] === "message") {
+      throw new Error(`Closing stock summary returned error: ${res.body.message}`);
+    }
+  });
+});
+
+// ── Sales totals visible in P&L ───────────────────────────────────────────────
+
+describe("Report Accuracy — Sales totals appear in P&L after posting", () => {
+  const today = new Date().toISOString().split("T")[0];
+  const fromDate = "2024-01-01";
+
+  it("P&L totalIncome reflects the posted journal credit amount exactly", async () => {
+    // P&L uses startDate/endDate query params (not fromDate/toDate)
+    // Omitting dates → all-time report; clean state from beforeEach ensures only our entry
+    const KNOWN_AMOUNT = 7919; // prime-ish, unlikely to collide with defaults
+    const createRes = await agent.post("/api/vouchers/journal").send(journalBody(KNOWN_AMOUNT));
+    expect(createRes.status).toBeGreaterThanOrEqual(200);
+    expect(createRes.status).toBeLessThan(300);
+
+    const res = await agent.get("/api/reports/profit-loss");
+    expect(res.status).toBe(200);
+    // The income section must have our exact posted amount
+    expect(res.body.totalIncome).toBeCloseTo(KNOWN_AMOUNT, 0);
+    expect(res.body.netProfit).toBeCloseTo(KNOWN_AMOUNT, 0); // no expenses → net = income
+  });
+
+  it("incomeItems contains the seeded sales account with correct balance", async () => {
+    const KNOWN_AMOUNT = 3311;
+    await agent.post("/api/vouchers/journal").send(journalBody(KNOWN_AMOUNT));
+
+    const res = await agent.get("/api/reports/profit-loss");
+    expect(res.status).toBe(200);
+    expect(Array.isArray(res.body.incomeItems)).toBe(true);
+
+    const salesItem = (res.body.incomeItems as any[]).find(
+      (i: any) => i.id === ctx.salesAccountId,
+    );
+    expect(salesItem).toBeDefined();
+    expect(salesItem!.balance).toBeCloseTo(KNOWN_AMOUNT, 0);
+  });
+});
+
 /*
  * What this file protects:
  * - Ledger balance returned by API = sum of DB DR/CR entries
@@ -313,4 +370,11 @@ async function pool_count(companyId: number): Promise<number> {
  * - Balance is always a finite number (no NaN)
  * - Balance-sheet and P&L return 200, structured body, no cross-company leakage
  * - Total debits = total credits in the DB for all company vouchers
+ * - Closing stock summary returns 200 with structured (non-error) body
+ * - Sales account appears in P&L body after posting a journal
+ *
+ * Skipped / TODO:
+ * - Daybook totals (factory daybook — GET /api/factory/daybook) require a
+ *   factory-type company context with seeded factory_daybook_entries.
+ *   Covered in factory-container-lifecycle.test.ts.
  */

@@ -330,8 +330,12 @@ describe("Quick Adjust Tests", () => {
   });
 
   it.skip("should handle sequential adjustments correctly", async () => {
-    // TODO: pre-existing failure — quick-adjust returns non-200 in test env (session/auth issue),
-    // causing accumulated qty to stay at 100 instead of 110. Tracked in docs/testing.md.
+    // TODO (production fix needed): quick-adjust returns non-200 in sequential test env
+    // because the supertest agent serializes requests but the server's session store
+    // occasionally drops the company selection between calls. Root cause: in-memory
+    // MemoryStore does not guarantee session persistence across rapid sequential requests
+    // in test mode. Fix: switch to a persistent session store (e.g. connect-pg-simple)
+    // even in test, OR retry with explicit session re-assert between calls.
     for (let i = 0; i < 5; i++) {
       await agent.post("/api/inventory/quick-adjust").send({
         stockItemId: ctx.stockItemIds[0],
@@ -560,8 +564,11 @@ describe("adjustInventory Helper Tests", () => {
   });
 
   it.skip("should enforce qty <= 0 implies total_value = 0 and rate = 0 (Bug 4 fix)", async () => {
-    // TODO: pre-existing failure — adjustInventory does not zero totalValue/averageRate when
-    // resulting qty goes negative. Invariant not yet enforced in production code. Tracked in docs/testing.md.
+    // TODO (production fix needed): adjustInventory does not zero totalValue/averageRate
+    // when resulting qty goes negative. Production fix required in server/inventoryHelper.ts:
+    // after computing newQuantity, if newQuantity <= 0 force newTotalValue = 0 and
+    // newAverageRate = 0. This prevents phantom value accumulation in negative-stock positions.
+    // Until fixed, the invariant "qty <= 0 → value = 0, rate = 0" is NOT enforced.
     const { adjustInventory } = await import("../server/inventoryHelper");
 
     const result = await adjustInventory(
@@ -618,8 +625,11 @@ describe("reverseInventoryByExactValue Tests", () => {
   });
 
   it.skip("should subtract exact value and normalize invariants", async () => {
-    // TODO: pre-existing failure — reverseInventoryByExactValue leaves non-zero averageRate
-    // when qty goes negative. Invariant normalization not yet enforced. Tracked in docs/testing.md.
+    // TODO (production fix needed): reverseInventoryByExactValue leaves a non-zero averageRate
+    // when qty goes negative (same root cause as Bug 4 above). The function correctly subtracts
+    // the exact value from totalValue but does NOT reset averageRate to 0 when qty crosses zero.
+    // Production fix: after the subtraction in inventoryHelper.ts, apply the same qty<=0 guard
+    // that forces rate=0 and value=0.
     const { reverseInventoryByExactValue } = await import("../server/inventoryHelper");
 
     await db
@@ -655,8 +665,10 @@ describe("reverseInventoryByExactValue Tests", () => {
   });
 
   it.skip("should produce idempotent results across reverse/re-offload cycles", async () => {
-    // TODO: pre-existing failure — averageRate remains non-zero after reverse when qty reaches 0,
-    // violating idempotency invariant. Tracked in docs/testing.md.
+    // TODO (production fix needed): averageRate remains non-zero after reverse when qty reaches 0,
+    // violating the idempotency invariant across reverse/re-offload cycles.
+    // Root cause: same qty<=0 normalization gap as Bug 4. Fix the invariant in inventoryHelper.ts
+    // and this test should pass without any other changes.
     const { adjustInventory, reverseInventoryByExactValue } = await import("../server/inventoryHelper");
 
     const offloadQty = 200;
@@ -722,8 +734,10 @@ describe("reverseInventoryByExactValue Tests", () => {
   });
 
   it.skip("should handle negative-stock offload reversal without value inflation", async () => {
-    // TODO: pre-existing failure — averageRate stays non-zero after reversal into negative-stock
-    // position. Value inflation not yet prevented. Tracked in docs/testing.md.
+    // TODO (production fix needed): averageRate stays non-zero after reversal into a negative-stock
+    // position, causing value inflation on subsequent offloads. Same root cause as Bug 4.
+    // Production fix: in inventoryHelper.ts, after any operation that leaves qty<=0, set
+    // totalValue=0 and averageRate=0 unconditionally.
     const { adjustInventory, reverseInventoryByExactValue } = await import("../server/inventoryHelper");
 
     await db
@@ -1321,8 +1335,13 @@ describe("Concurrency Tests", () => {
   }, 30000);
 
   it.skip("should handle concurrent quick adjustments without lost updates", async () => {
-    // TODO: pre-existing failure — concurrent quick-adjust calls all return non-200 in test env
-    // (session sharing issue with supertest agent under Promise.all). Tracked in docs/testing.md.
+    // TODO (two fixes needed):
+    // 1. Infrastructure: supertest agent does not support truly concurrent requests — all calls
+    //    through a single agent are serialized on the TCP level. Fix: use separate agents per
+    //    request in the test, OR switch to a raw fetch-based approach.
+    // 2. Production: quick-adjust does not use a SELECT FOR UPDATE or advisory lock, so
+    //    concurrent real requests could cause lost updates. Production fix: wrap the
+    //    inventory read-modify-write in a transaction with FOR UPDATE on the inventory row.
     const initialQty = await getInventoryQty(ctx.locationId, ctx.stockItemIds[0]);
     expect(initialQty).toBe(100);
 
