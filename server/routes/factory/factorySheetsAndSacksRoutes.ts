@@ -26,8 +26,84 @@ const SELECT_COLS = `
   notes, created_at AS "createdAt"
 `;
 
+const LOG_COLS = `
+  id, company_id AS "companyId", item_id AS "itemId",
+  item_name AS "itemName", item_type AS "itemType",
+  action, pieces, packs,
+  unit_price AS "unitPrice", total_value AS "totalValue",
+  notes, created_at AS "createdAt"
+`;
+
+async function insertLog(
+  client: any,
+  companyId: number,
+  itemId: number,
+  itemName: string,
+  itemType: string,
+  action: "IN" | "OUT" | "ADJUST",
+  pieces: number,
+  packs: number | null,
+  unitPrice: number,
+  notes: string | null
+) {
+  const totalValue = pieces * unitPrice;
+  await client.query(
+    `INSERT INTO factory_sheets_sacks_log
+       (company_id, item_id, item_name, item_type, action, pieces, packs, unit_price, total_value, notes)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
+    [companyId, itemId, itemName, itemType, action, pieces, packs, unitPrice, totalValue, notes]
+  );
+}
+
 export function registerFactorySheetsAndSacksRoutes(app: Express) {
-  // GET /api/factory/sheets-sacks — list all items
+  // ── GET /api/factory/sheets-sacks/log ─────────────────────────────────────
+  // Must be before /:id routes
+  app.get("/api/factory/sheets-sacks/log", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = getFactoryCompanyId(req);
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const { from, to, action, itemId, limit } = req.query;
+      const params: any[] = [companyId];
+      const conditions: string[] = ["company_id = $1"];
+
+      if (from) {
+        params.push(from);
+        conditions.push(`created_at >= $${params.length}::date`);
+      }
+      if (to) {
+        params.push(to);
+        conditions.push(`created_at < ($${params.length}::date + interval '1 day')`);
+      }
+      if (action && action !== "all") {
+        params.push(action);
+        conditions.push(`action = $${params.length}`);
+      }
+      const parsedItemId = itemId ? parseInt(itemId as string) : NaN;
+      if (!isNaN(parsedItemId)) {
+        params.push(parsedItemId);
+        conditions.push(`item_id = $${params.length}`);
+      }
+
+      const maxRows = Math.min(parseInt((limit as string) || "500") || 500, 2000);
+      params.push(maxRows);
+
+      const { rows } = await pool.query(
+        `SELECT ${LOG_COLS}
+         FROM factory_sheets_sacks_log
+         WHERE ${conditions.join(" AND ")}
+         ORDER BY created_at DESC
+         LIMIT $${params.length}`,
+        params
+      );
+      res.json(rows);
+    } catch (err: any) {
+      console.error("GET /api/factory/sheets-sacks/log error:", err);
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  // ── GET /api/factory/sheets-sacks ─────────────────────────────────────────
   app.get("/api/factory/sheets-sacks", requireAuth, async (req: any, res: any) => {
     try {
       const companyId = getFactoryCompanyId(req);
@@ -47,7 +123,7 @@ export function registerFactorySheetsAndSacksRoutes(app: Express) {
     }
   });
 
-  // POST /api/factory/sheets-sacks — create item
+  // ── POST /api/factory/sheets-sacks ────────────────────────────────────────
   app.post("/api/factory/sheets-sacks", requireAuth, async (req: any, res: any) => {
     try {
       const companyId = getFactoryCompanyId(req);
@@ -57,30 +133,46 @@ export function registerFactorySheetsAndSacksRoutes(app: Express) {
       const { type, name, size, quantity, unitPrice, packQty, pcsPerPack, rowColor, notes } = req.body;
       if (!name || !type) return res.status(400).json({ message: "name and type are required" });
 
-      const { rows } = await pool.query(
-        `INSERT INTO factory_sheets_sacks
-           (company_id, type, name, size, quantity, unit_price, pack_qty, pcs_per_pack, row_color, notes)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-         RETURNING ${SELECT_COLS}`,
-        [
-          companyId, type, name,
-          size || null,
-          quantity || 0,
-          unitPrice || 0,
-          packQty != null ? parseInt(packQty) : null,
-          pcsPerPack != null ? parseInt(pcsPerPack) : null,
-          rowColor || null,
-          notes || null,
-        ]
-      );
-      res.status(201).json(rows[0]);
+      const client = await pool.connect();
+      try {
+        await client.query("BEGIN");
+        const { rows } = await client.query(
+          `INSERT INTO factory_sheets_sacks
+             (company_id, type, name, size, quantity, unit_price, pack_qty, pcs_per_pack, row_color, notes)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+           RETURNING ${SELECT_COLS}`,
+          [
+            companyId, type, name, size || null,
+            quantity || 0, unitPrice || 0,
+            packQty != null ? parseInt(packQty) : null,
+            pcsPerPack != null ? parseInt(pcsPerPack) : null,
+            rowColor || null, notes || null,
+          ]
+        );
+        const item = rows[0];
+        const pcs = parseInt(quantity) || 0;
+        if (pcs > 0) {
+          await insertLog(
+            client, companyId, item.id, name, type, "IN",
+            pcs, packQty != null ? parseInt(packQty) : null,
+            parseFloat(unitPrice) || 0, "Initial stock"
+          );
+        }
+        await client.query("COMMIT");
+        res.status(201).json(item);
+      } catch (e) {
+        await client.query("ROLLBACK");
+        throw e;
+      } finally {
+        client.release();
+      }
     } catch (err: any) {
       console.error("POST /api/factory/sheets-sacks error:", err);
       res.status(500).json({ message: err.message || "Failed to create item" });
     }
   });
 
-  // PATCH /api/factory/sheets-sacks/:id — update item
+  // ── PATCH /api/factory/sheets-sacks/:id ──────────────────────────────────
   app.patch("/api/factory/sheets-sacks/:id", requireAuth, async (req: any, res: any) => {
     try {
       const companyId = getFactoryCompanyId(req);
@@ -92,15 +184,15 @@ export function registerFactorySheetsAndSacksRoutes(app: Express) {
 
       const { rows } = await pool.query(
         `UPDATE factory_sheets_sacks
-         SET type       = COALESCE($1, type),
-             name       = COALESCE($2, name),
-             size       = $3,
-             quantity   = COALESCE($4, quantity),
-             unit_price = COALESCE($5, unit_price),
-             pack_qty   = $6,
+         SET type         = COALESCE($1, type),
+             name         = COALESCE($2, name),
+             size         = $3,
+             quantity     = COALESCE($4, quantity),
+             unit_price   = COALESCE($5, unit_price),
+             pack_qty     = $6,
              pcs_per_pack = $7,
-             row_color  = $8,
-             notes      = $9
+             row_color    = $8,
+             notes        = $9
          WHERE id = $10 AND company_id = $11
          RETURNING ${SELECT_COLS}`,
         [
@@ -108,8 +200,7 @@ export function registerFactorySheetsAndSacksRoutes(app: Express) {
           quantity ?? null, unitPrice ?? null,
           packQty != null ? parseInt(packQty) : null,
           pcsPerPack != null ? parseInt(pcsPerPack) : null,
-          rowColor || null,
-          notes || null,
+          rowColor || null, notes || null,
           id, companyId,
         ]
       );
@@ -121,7 +212,65 @@ export function registerFactorySheetsAndSacksRoutes(app: Express) {
     }
   });
 
-  // PATCH /api/factory/sheets-sacks/:id/deduct — reduce stock
+  // ── PATCH /api/factory/sheets-sacks/:id/restock — add stock (IN) ─────────
+  app.patch("/api/factory/sheets-sacks/:id/restock", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = getFactoryCompanyId(req);
+      const id = parseInt(req.params.id);
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      if (!(await hasWriteAccess(req, companyId))) return res.status(403).json({ message: "Access denied" });
+
+      const pieces = parseInt(req.body.pieces) || 0;
+      const packs = req.body.packs != null ? parseInt(req.body.packs) : null;
+      if (pieces <= 0) return res.status(400).json({ message: "Pieces to add must be > 0" });
+
+      const client = await pool.connect();
+      try {
+        await client.query("BEGIN");
+        // Lock row to prevent lost-update race conditions
+        const { rows: existing } = await client.query(
+          `SELECT quantity, pack_qty, name, type, unit_price
+           FROM factory_sheets_sacks WHERE id = $1 AND company_id = $2 FOR UPDATE`,
+          [id, companyId]
+        );
+        if (existing.length === 0) {
+          await client.query("ROLLBACK");
+          return res.status(404).json({ message: "Item not found" });
+        }
+
+        const currentQty = parseFloat(existing[0].quantity || "0");
+        const currentPackQty = existing[0].pack_qty != null ? parseInt(existing[0].pack_qty) : null;
+        const unitPrice = parseFloat(existing[0].unit_price || "0");
+        const newQty = currentQty + pieces;
+        const newPackQty = packs != null && currentPackQty != null ? currentPackQty + packs : currentPackQty;
+
+        const { rows } = await client.query(
+          `UPDATE factory_sheets_sacks
+           SET quantity = $1, pack_qty = $2
+           WHERE id = $3 AND company_id = $4
+           RETURNING ${SELECT_COLS}`,
+          [newQty, newPackQty, id, companyId]
+        );
+        await insertLog(
+          client, companyId, id,
+          existing[0].name, existing[0].type, "IN",
+          pieces, packs, unitPrice, req.body.notes || null
+        );
+        await client.query("COMMIT");
+        res.json(rows[0]);
+      } catch (e) {
+        await client.query("ROLLBACK");
+        throw e;
+      } finally {
+        client.release();
+      }
+    } catch (err: any) {
+      console.error("PATCH /api/factory/sheets-sacks/:id/restock error:", err);
+      res.status(500).json({ message: err.message || "Failed to restock" });
+    }
+  });
+
+  // ── PATCH /api/factory/sheets-sacks/:id/deduct — reduce stock (OUT) ──────
   app.patch("/api/factory/sheets-sacks/:id/deduct", requireAuth, async (req: any, res: any) => {
     try {
       const companyId = getFactoryCompanyId(req);
@@ -131,39 +280,58 @@ export function registerFactorySheetsAndSacksRoutes(app: Express) {
 
       const pieces = parseInt(req.body.pieces) || 0;
       const packs = req.body.packs != null ? parseInt(req.body.packs) : null;
-      if (pieces <= 0) return res.status(400).json({ message: "Pieces to deduct must be greater than 0" });
+      if (pieces <= 0) return res.status(400).json({ message: "Pieces to deduct must be > 0" });
 
-      // Fetch current values
-      const { rows: existing } = await pool.query(
-        `SELECT quantity, pack_qty FROM factory_sheets_sacks WHERE id = $1 AND company_id = $2`,
-        [id, companyId]
-      );
-      if (existing.length === 0) return res.status(404).json({ message: "Item not found" });
+      const client = await pool.connect();
+      try {
+        await client.query("BEGIN");
+        // Lock row to prevent lost-update race conditions
+        const { rows: existing } = await client.query(
+          `SELECT quantity, pack_qty, name, type, unit_price
+           FROM factory_sheets_sacks WHERE id = $1 AND company_id = $2 FOR UPDATE`,
+          [id, companyId]
+        );
+        if (existing.length === 0) {
+          await client.query("ROLLBACK");
+          return res.status(404).json({ message: "Item not found" });
+        }
 
-      const currentQty = parseFloat(existing[0].quantity || "0");
-      const currentPackQty = existing[0].pack_qty != null ? parseInt(existing[0].pack_qty) : null;
+        const currentQty = parseFloat(existing[0].quantity || "0");
+        const currentPackQty = existing[0].pack_qty != null ? parseInt(existing[0].pack_qty) : null;
+        const unitPrice = parseFloat(existing[0].unit_price || "0");
+        const newQty = Math.max(0, currentQty - pieces);
+        const newPackQty =
+          packs != null && currentPackQty != null
+            ? Math.max(0, currentPackQty - packs)
+            : currentPackQty;
 
-      const newQty = Math.max(0, currentQty - pieces);
-      const newPackQty =
-        packs != null && currentPackQty != null
-          ? Math.max(0, currentPackQty - packs)
-          : currentPackQty;
-
-      const { rows } = await pool.query(
-        `UPDATE factory_sheets_sacks
-         SET quantity = $1, pack_qty = $2
-         WHERE id = $3 AND company_id = $4
-         RETURNING ${SELECT_COLS}`,
-        [newQty, newPackQty, id, companyId]
-      );
-      res.json(rows[0]);
+        const { rows } = await client.query(
+          `UPDATE factory_sheets_sacks
+           SET quantity = $1, pack_qty = $2
+           WHERE id = $3 AND company_id = $4
+           RETURNING ${SELECT_COLS}`,
+          [newQty, newPackQty, id, companyId]
+        );
+        await insertLog(
+          client, companyId, id,
+          existing[0].name, existing[0].type, "OUT",
+          pieces, packs, unitPrice, req.body.notes || null
+        );
+        await client.query("COMMIT");
+        res.json(rows[0]);
+      } catch (e) {
+        await client.query("ROLLBACK");
+        throw e;
+      } finally {
+        client.release();
+      }
     } catch (err: any) {
       console.error("PATCH /api/factory/sheets-sacks/:id/deduct error:", err);
       res.status(500).json({ message: err.message || "Failed to deduct" });
     }
   });
 
-  // DELETE /api/factory/sheets-sacks/:id
+  // ── DELETE /api/factory/sheets-sacks/:id ─────────────────────────────────
   app.delete("/api/factory/sheets-sacks/:id", requireAuth, async (req: any, res: any) => {
     try {
       const companyId = getFactoryCompanyId(req);
@@ -179,7 +347,7 @@ export function registerFactorySheetsAndSacksRoutes(app: Express) {
       res.json({ success: true });
     } catch (err: any) {
       console.error("DELETE /api/factory/sheets-sacks/:id error:", err);
-      res.status(500).json({ message: err.message || "Failed to delete item" });
+      res.status(500).json({ message: err.message || "Failed to delete" });
     }
   });
 }
