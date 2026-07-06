@@ -49,7 +49,7 @@ export default function FactoryPayrollHub() {
             <Users className="h-4 w-4 text-primary" />
           </div>
           <div>
-            <h1 className="text-base font-semibold leading-tight">People & Benefits</h1>
+            <h1 className="text-base font-semibold leading-tight">Payroll & Benefits</h1>
             <p className="text-xs text-muted-foreground">
               Workers, employees and insurance management
             </p>
