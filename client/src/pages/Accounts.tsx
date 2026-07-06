@@ -166,7 +166,7 @@ export default function Accounts() {
       toast({ title: "Delete failed", description: err?.message ?? "Unknown error", variant: "destructive" });
     },
   });
-  const { data: voucherSearchResults = [], isFetching: voucherSearchLoading } = useQuery<any[]>({
+  const { data: voucherSearchResults = [], isLoading: voucherSearchLoading } = useQuery<any[]>({
     queryKey: ["/api/vouchers/search", debouncedFindQuery],
     queryFn: async () => {
       if (!debouncedFindQuery.trim()) return [];
@@ -1031,7 +1031,6 @@ export default function Accounts() {
                     <FileText className="w-4 h-4 shrink-0 text-muted-foreground" />
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <span className="font-medium text-sm">{v.voucherNumber}</span>
                         <Badge variant="outline" className="text-[10px]">
                           {v.voucherType}
                         </Badge>
