@@ -103,7 +103,7 @@ export function SystemToolsTab({ appMode, currentUser, selectedCompany, companie
       title: "Deleted Items",
       description: "Restore deleted records or permanently remove archived data.",
       actionLabel: "Open",
-      onAction: () => navigate("/deleted-items"),
+      onAction: () => navigate(isFactory ? "/factory/deleted-items" : "/deleted-items"),
       testId: "card-deleted-items",
     },
     {
