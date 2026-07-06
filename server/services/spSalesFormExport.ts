@@ -395,17 +395,32 @@ export async function generateSpSalesFormExcel(params: SpSalesFormParams): Promi
   // Scope: we restrict to columns >= E_DATE_START to avoid touching static
   // formula columns (A–F: item name, cost/bag, opening stock totals, etc.)
   // that are not part of the per-day data block and should remain intact.
+  //
+  // IMPORTANT: do NOT use row.eachCell({ includeEmpty: false }) here.
+  // That only iterates cells that ExcelJS has already materialised in its
+  // in-memory row model.  Slave shared-formula cells that Excel omitted from
+  // the XML (because their computed value was empty/zero) are absent from the
+  // row's _cells array, so eachCell silently skips them.  ExcelJS's internal
+  // shared-formula tracker still knows about those slaves via the master's
+  // declared ref range, and writeBuffer() tries to write them — finding the
+  // master gone and throwing "Shared Formula master must exist above and or
+  // left of clone" (observed: cell AN134, col 40 = day-11 qty, row 134).
+  //
+  // Fix: iterate column-by-column with row.getCell(c), which FORCES
+  // materialisation of every column in the date region regardless of whether
+  // the underlying XML had a <c> element for it.
+  const entryLastCol = entryWs.columnCount;
   for (let r = E_DATA_START; r <= E_DATA_END; r++) {
     const row = entryWs.getRow(r);
     let rowChanged = false;
-    row.eachCell({ includeEmpty: false }, (cell) => {
-      if (cell.col < E_DATE_START) return; // preserve static columns A–F
+    for (let c = E_DATE_START; c <= entryLastCol; c++) {
+      const cell = row.getCell(c);
       const v = cell.value as any;
       if (v && typeof v === "object" && "sharedFormula" in v) {
         cell.value = null;
         rowChanged = true;
       }
-    });
+    }
     if (rowChanged) row.commit();
   }
 
