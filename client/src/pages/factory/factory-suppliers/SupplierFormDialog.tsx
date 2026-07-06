@@ -45,10 +45,19 @@ export function SupplierFormDialog({
   const brokers = allSuppliers.filter((s) => !s.parentId && s.isActive !== false);
 
   const handleSubmit = () => {
+    // Derive isBroker + parentId from the current formRole so the type change
+    // is always persisted, regardless of whether we're creating or editing.
+    const rolePayload =
+      formRole === "broker"
+        ? { isBroker: true,  parentId: null }
+        : formRole === "linked"
+        ? { isBroker: false, parentId: formData.parentId ?? null }
+        : { isBroker: false, parentId: null };
+
     if (editingSupplier) {
-      updateMutation.mutate({ id: editingSupplier.id, ...formData });
+      updateMutation.mutate({ id: editingSupplier.id, ...formData, ...rolePayload });
     } else {
-      createMutation.mutate(formData);
+      createMutation.mutate({ ...formData, ...rolePayload });
     }
   };
 
@@ -76,7 +85,7 @@ export function SupplierFormDialog({
                 setFormRole(v);
                 if (v !== "linked") setFormData({ ...formData, parentId: null });
               }}
-              disabled={!!editingSupplier || !!createSubAccountParentId}
+              disabled={!!createSubAccountParentId}
             >
               <SelectTrigger>
                 <SelectValue />
@@ -95,7 +104,7 @@ export function SupplierFormDialog({
               <Select
                 value={String(formData.parentId || "")}
                 onValueChange={(v) => setFormData({ ...formData, parentId: parseInt(v) })}
-                disabled={!!editingSupplier || !!createSubAccountParentId}
+                disabled={!!createSubAccountParentId}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Select broker" />
