@@ -101,7 +101,6 @@ export const FACTORY_NAV_SECTIONS: FactoryNavSection[] = [
     items: [
       { title: "Factory POS", url: "/factory/pos", icon: ShoppingCart },
       { title: "Invoicing", url: "/factory/invoicing", icon: FileText },
-      { title: "Stock Allocation", url: "/factory/stock-allocation-v5", icon: LayoutGrid },
     ],
   },
   {
@@ -110,6 +109,7 @@ export const FACTORY_NAV_SECTIONS: FactoryNavSection[] = [
     items: [
       { title: "Location Inventory", url: "/factory/location-inventory", icon: MapPin },
       { title: "Containers", url: "/factory/containers-hub", icon: Container },
+      { title: "Stock Allocation", url: "/factory/stock-allocation-v5", icon: LayoutGrid },
       { title: "Sheets & Sacks", url: "/factory/sheets-sacks", icon: Layers, viewableByAll: true },
     ],
   },
