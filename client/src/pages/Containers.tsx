@@ -1,5 +1,4 @@
 import { useState, useRef, useCallback } from "react";
-import { useDebounce } from "@/hooks/use-debounce";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useDateFormat } from "@/contexts/DateFormatContext";
 import { Link, useLocation } from "wouter";
@@ -13,7 +12,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/PageHeader";
 import { Badge } from "@/components/ui/badge";
@@ -23,17 +21,13 @@ import {
   Package,
   Eye,
   Search,
-  Filter,
   X,
   Download,
-  HandCoins,
   Truck,
-  Save,
   Check,
   MapPin,
   Upload,
   FileSpreadsheet,
-  Pencil,
   ChevronDown,
   Wrench,
   Loader2,
@@ -47,61 +41,25 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Checkbox } from "@/components/ui/checkbox";
 import { useCompany } from "@/contexts/CompanyContext";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
 import { AddContainerDialog } from "../components/AddContainerDialog";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { utils, writeFile, readFile, read, ExcelJS } from "@/lib/excelHelper";
 import type { Container, Supplier } from "@shared/schema";
-
-interface SoldContainer {
-  containerId: number;
-  containerNumber: string;
-  supplierId: number;
-  status: string;
-  importDate: string;
-  itemsTotal: string;
-  chargesTotal: string;
-  grandTotal: string;
-  saleId: number;
-  customerId: number;
-  customerName: string;
-  saleDate: string;
-  containerCost: string;
-  commission: string;
-  commissionAccountId: number | null;
-  totalAmount: string;
-  notes: string | null;
-}
-
-interface TrackingEdit {
-  [key: number]: Partial<Container>;
-}
+// Split-out modules
+import type { SoldContainer, TrackingEdit } from "./containers/types";
+import { cellVal, cellStr, cellNum, excelDateToString } from "./containers/containerExcel";
+import { useContainerFilters } from "./containers/useContainerFilters";
+import { ContainerFilters } from "./containers/ContainerFilters";
+import { ActiveContainersTable } from "./containers/ActiveContainersTable";
+import { OtwContainersTable } from "./containers/OtwContainersTable";
+import { SoldContainersTable } from "./containers/SoldContainersTable";
 
 export default function Containers() {
   const { formatDisplayDate } = useDateFormat();
   const [activeTab, setActiveTab] = useState("active");
 
-  const [searchTerm, setSearchTerm] = useState("");
-  const [soldSearchTerm, setSoldSearchTerm] = useState("");
-  const [otwSearchTerm, setOtwSearchTerm] = useState("");
-  const debouncedSearch = useDebounce(searchTerm, 300);
-  const debouncedSoldSearch = useDebounce(soldSearchTerm, 300);
-  const debouncedOtwSearch = useDebounce(otwSearchTerm, 300);
-  const [statusFilter, setStatusFilter] = useState("OTW");
-  const [supplierFilter, setSupplierFilter] = useState<string[]>([]);
-  // OTW Tracking filters
-  const [otwLocationFilter, setOtwLocationFilter] = useState("ALL");
-  const [otwSupplierFilter, setOtwSupplierFilter] = useState<string[]>([]);
-  const [otwAgentFilter, setOtwAgentFilter] = useState("ALL");
-  const [otwTransporterFilter, setOtwTransporterFilter] = useState("ALL");
-  const [otwTruckFilter, setOtwTruckFilter] = useState("ALL");
-  const [otwDocReceivedFilter, setOtwDocReceivedFilter] = useState("ALL");
-  const [otwFreightStatusFilter, setOtwFreightStatusFilter] = useState("ALL");
-  const [otwNotesFilter, setOtwNotesFilter] = useState("ALL");
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [editingNumberId, setEditingNumberId] = useState<number | null>(null);
   const [editingNumberValue, setEditingNumberValue] = useState("");
@@ -293,107 +251,49 @@ export default function Containers() {
     },
   });
 
-  const otwContainers = allContainers.filter((c) => c.status === "OTW");
-
-  // Extract unique values for OTW filters
-  const uniqueOtwLocations = Array.from(
-    new Set(otwContainers.map((c) => c.trackingLocation).filter(Boolean) as string[])
-  ).sort();
-  const uniqueOtwAgents = Array.from(new Set(otwContainers.map((c) => c.agent).filter(Boolean) as string[])).sort();
-  const uniqueOtwTransporters = Array.from(
-    new Set(otwContainers.map((c) => c.transporter).filter(Boolean) as string[])
-  ).sort();
-  const uniqueOtwSuppliers = Array.from(new Set(otwContainers.map((c) => c.supplierId))).sort((a, b) => a - b);
-  const uniqueOtwTrucks = Array.from(
-    new Set(otwContainers.map((c) => c.numberPlate).filter(Boolean) as string[])
-  ).sort();
-
-  const filteredOtwContainers = otwContainers.filter((c) => {
-    // Search filter
-    if (debouncedOtwSearch) {
-      const search = (debouncedOtwSearch || "").toLowerCase();
-      if (
-        !(
-          (c.containerNumber || "").toLowerCase().includes(search) ||
-          (c.shopName?.toLowerCase() || "").includes(search) ||
-          (c.agent?.toLowerCase() || "").includes(search)
-        )
-      ) {
-        return false;
-      }
-    }
-    // Location filter
-    if (otwLocationFilter !== "ALL" && (c.trackingLocation || "") !== otwLocationFilter) {
-      return false;
-    }
-    // Supplier filter
-    if (otwSupplierFilter.length > 0 && !otwSupplierFilter.includes(c.supplierId.toString())) {
-      return false;
-    }
-    // Agent filter
-    if (otwAgentFilter !== "ALL" && (c.agent || "") !== otwAgentFilter) {
-      return false;
-    }
-    // Transporter filter
-    if (otwTransporterFilter !== "ALL" && (c.transporter || "") !== otwTransporterFilter) {
-      return false;
-    }
-    // Truck # filter
-    if (otwTruckFilter !== "ALL" && (c.numberPlate || "") !== otwTruckFilter) {
-      return false;
-    }
-    // Doc Received filter
-    if (otwDocReceivedFilter !== "ALL") {
-      const docValue = c.docReceived === true;
-      if (otwDocReceivedFilter === "YES" && !docValue) return false;
-      if (otwDocReceivedFilter === "NO" && docValue) return false;
-    }
-    // Freight status filter
-    if (otwFreightStatusFilter !== "ALL") {
-      const fs = (c.freightStatus || "").trim();
-      if (otwFreightStatusFilter === "NONE" && fs !== "") return false;
-      if (otwFreightStatusFilter !== "NONE" && fs !== otwFreightStatusFilter) return false;
-    }
-    // Notes filter
-    if (otwNotesFilter !== "ALL") {
-      const hasNotes = !!(c.trackingDescription || "").trim();
-      if (otwNotesFilter === "WITH" && !hasNotes) return false;
-      if (otwNotesFilter === "WITHOUT" && hasNotes) return false;
-    }
-    return true;
-  });
-
-  const filteredSoldContainers = soldContainers.filter((sale) => {
-    if (!debouncedSoldSearch) return true;
-    const searchLower = (debouncedSoldSearch || "").toLowerCase();
-    return (
-      (sale.containerNumber || "").toLowerCase().includes(searchLower) ||
-      (sale.customerName || "").toLowerCase().includes(searchLower)
-    );
-  });
-
-  const containers = allContainers.filter((c) => {
-    if (debouncedSearch && !(c.containerNumber || "").toLowerCase().includes((debouncedSearch || "").toLowerCase())) {
-      return false;
-    }
-    if (statusFilter !== "ALL" && c.status !== statusFilter) {
-      return false;
-    }
-    if (supplierFilter.length > 0 && !supplierFilter.includes(c.supplierId.toString())) {
-      return false;
-    }
-    return true;
-  });
+  // Filter state and computed filtered arrays
+  const {
+    searchTerm,
+    setSearchTerm,
+    soldSearchTerm,
+    setSoldSearchTerm,
+    otwSearchTerm,
+    setOtwSearchTerm,
+    statusFilter,
+    setStatusFilter,
+    supplierFilter,
+    setSupplierFilter,
+    otwLocationFilter,
+    setOtwLocationFilter,
+    otwSupplierFilter,
+    setOtwSupplierFilter,
+    otwAgentFilter,
+    setOtwAgentFilter,
+    otwTransporterFilter,
+    setOtwTransporterFilter,
+    otwTruckFilter,
+    setOtwTruckFilter,
+    otwDocReceivedFilter,
+    setOtwDocReceivedFilter,
+    otwFreightStatusFilter,
+    setOtwFreightStatusFilter,
+    otwNotesFilter,
+    setOtwNotesFilter,
+    uniqueOtwLocations,
+    uniqueOtwAgents,
+    uniqueOtwTransporters,
+    uniqueOtwSuppliers,
+    uniqueOtwTrucks,
+    otwContainers,
+    filteredOtwContainers,
+    filteredSoldContainers,
+    containers,
+    clearFilters,
+  } = useContainerFilters(allContainers, soldContainers);
 
   const getSupplierName = (supplierId: number) => {
     const supplier = suppliers.find((s) => s.id === supplierId);
     return supplier ? supplier.legalName : "Unknown";
-  };
-
-  const clearFilters = async () => {
-    setStatusFilter("ALL");
-    setSupplierFilter("ALL");
-    setSearchTerm("");
   };
 
   const exportToExcel = async () => {
@@ -466,88 +366,6 @@ export default function Containers() {
     const workbook = utils.book_new();
     utils.book_append_sheet(workbook, worksheet, "OTW Containers");
     await writeFile(workbook, "otw_containers.xlsx");
-  };
-
-  // Safely extract a primitive value from an ExcelJS cell (which can return rich objects)
-  const cellVal = (value: any): any => {
-    if (value === null || value === undefined) return "";
-    if (typeof value !== "object") return value;
-    if (value instanceof Date) return value;
-    // Formula cell: { result, formula }
-    if ("result" in value) return value.result ?? "";
-    // Rich-text cell: { richText: [...] }
-    if ("richText" in value && Array.isArray(value.richText))
-      return value.richText.map((r: any) => r.text ?? "").join("");
-    // Shared-string / cell-model: { text }
-    if ("text" in value) return value.text ?? "";
-    // Hyperlink cell: { text, hyperlink }
-    if ("hyperlink" in value) return value.text ?? "";
-    return "";
-  };
-
-  const cellStr = (value: any): string => {
-    const v = cellVal(value);
-    if (v === null || v === undefined) return "";
-    return String(v);
-  };
-
-  const cellNum = (value: any): string => {
-    const v = cellVal(value);
-    if (v === null || v === undefined || v === "") return "";
-    const n = parseFloat(String(v).replace(/,/g, ""));
-    return isNaN(n) ? "" : String(n);
-  };
-
-  const excelDateToString = (value: any): string => {
-    if (!value) return "";
-
-    const toYMD = (d: Date): string => {
-      const y = d.getFullYear();
-      const m = (d.getMonth() + 1).toString().padStart(2, "0");
-      const day = d.getDate().toString().padStart(2, "0");
-      return `${y}-${m}-${day}`;
-    };
-
-    // JavaScript Date object (ExcelJS returns these for date cells)
-    if (value instanceof Date) {
-      return isNaN(value.getTime()) ? "" : toYMD(value);
-    }
-
-    // ExcelJS cell-model object that has a 'result' property
-    if (typeof value === "object" && value !== null) {
-      if ("result" in value && value.result instanceof Date) return toYMD(value.result);
-      if ("text" in value) return excelDateToString(value.text);
-      return "";
-    }
-
-    // Excel serial number (integer days since Dec 30 1899)
-    const num = Number(value);
-    if (!isNaN(num) && num > 40000 && num < 60000) {
-      const excelEpoch = new Date(1899, 11, 30);
-      return toYMD(new Date(excelEpoch.getTime() + num * 24 * 60 * 60 * 1000));
-    }
-
-    // String: try to normalise common formats to YYYY-MM-DD
-    if (typeof value === "string") {
-      const s = value.trim();
-      if (!s) return "";
-      // Already YYYY-MM-DD
-      if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
-      // MM/DD/YY  or  MM/DD/YYYY
-      const slashMatch = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
-      if (slashMatch) {
-        const [, m, d, yRaw] = slashMatch;
-        const y = yRaw.length === 2 ? (parseInt(yRaw) >= 50 ? `19${yRaw}` : `20${yRaw}`) : yRaw;
-        return `${y}-${m.padStart(2, "0")}-${d.padStart(2, "0")}`;
-      }
-      // DD-MM-YYYY or DD/MM/YYYY (European style — less common but possible)
-      // Try native Date parse as last resort
-      const parsed = new Date(s);
-      if (!isNaN(parsed.getTime())) return toYMD(parsed);
-      return s;
-    }
-
-    return "";
   };
 
   const downloadImportTemplate = async () => {
@@ -1071,777 +889,93 @@ export default function Containers() {
         </div>
       )}
 
-      {/* Inline filter row */}
-      <div className="flex flex-wrap gap-2 items-center">
-        <div className="relative flex-1 min-w-[200px]">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Search by container number..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10"
-            data-testid="input-search-container"
-          />
-        </div>
-        <div className="flex gap-1 flex-wrap">
-          {(["ALL", "OTW", "ARRIVED", "OFFLOADED"] as const).map((s) => (
-            <Button
-              key={s}
-              size="sm"
-              variant={statusFilter === s ? "default" : "outline"}
-              onClick={() => setStatusFilter(s)}
-              data-testid={`button-status-${s.toLowerCase()}`}
-            >
-              {s === "ALL" ? "All" : s === "OTW" ? "OTW" : s === "ARRIVED" ? "Arrived" : "Offloaded"}
-            </Button>
-          ))}
-        </div>
-        {suppliers.length > 0 && (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm" className="gap-1" data-testid="select-supplier-filter">
-                <Filter className="h-3.5 w-3.5" />
-                {supplierFilter.length === 0
-                  ? "All Suppliers"
-                  : supplierFilter.length === 1
-                    ? getSupplierName(Number(supplierFilter[0]))
-                    : `${supplierFilter.length} Suppliers`}
-                <ChevronDown className="h-3.5 w-3.5" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" className="w-[200px]">
-              {suppliers.map((supplier) => {
-                const val = supplier.id.toString();
-                const checked = supplierFilter.includes(val);
-                return (
-                  <DropdownMenuItem
-                    key={supplier.id}
-                    className="flex items-center gap-2 cursor-pointer"
-                    onSelect={(e) => {
-                      e.preventDefault();
-                      setSupplierFilter((prev) => (checked ? prev.filter((v) => v !== val) : [...prev, val]));
-                    }}
-                  >
-                    <Checkbox checked={checked} className="pointer-events-none" />
-                    <span className="truncate">{supplier.legalName}</span>
-                  </DropdownMenuItem>
-                );
-              })}
-              {supplierFilter.length > 0 && (
-                <>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem
-                    className="text-muted-foreground text-xs cursor-pointer justify-center"
-                    onSelect={(e) => {
-                      e.preventDefault();
-                      setSupplierFilter([]);
-                    }}
-                  >
-                    Clear selection
-                  </DropdownMenuItem>
-                </>
-              )}
-            </DropdownMenuContent>
-          </DropdownMenu>
-        )}
-        {(statusFilter !== "ALL" || supplierFilter.length > 0 || searchTerm) && (
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => {
-              clearFilters();
-              setSearchTerm("");
-              setSupplierFilter([]);
-            }}
-            data-testid="button-clear-filters"
-          >
-            <X className="h-4 w-4 mr-1" />
-            Clear
-          </Button>
-        )}
-      </div>
+      <ContainerFilters
+        searchTerm={searchTerm}
+        onSearchChange={setSearchTerm}
+        statusFilter={statusFilter}
+        onStatusChange={setStatusFilter}
+        supplierFilter={supplierFilter}
+        onSupplierFilterChange={setSupplierFilter}
+        suppliers={suppliers}
+        getSupplierName={getSupplierName}
+        onClearFilters={clearFilters}
+      />
 
-      {/* Container list */}
-      {isLoading ? (
-        <div className="space-y-2">
-          {[1, 2, 3, 4, 5].map((i) => (
-            <Skeleton key={i} className="h-20 w-full rounded-xl" />
-          ))}
-        </div>
-      ) : containers.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-16 text-center">
-          <div className="w-14 h-14 rounded-xl bg-muted/60 flex items-center justify-center mb-4">
-            <Package className="w-7 h-7 text-muted-foreground" />
-          </div>
-          <h2 className="text-lg font-semibold mb-1">No containers found</h2>
-          <p className="text-sm text-muted-foreground mb-4">
-            {allContainers.length === 0
-              ? "Import your first purchase order to get started"
-              : "Try adjusting your search or filters"}
-          </p>
-          {allContainers.length === 0 && (
-            <Link href="/po-import">
-              <Button>
-                <Plus className="w-4 h-4 mr-2" />
-                Import PO
-              </Button>
-            </Link>
-          )}
-        </div>
-      ) : (
-        <div className="space-y-2">
-          {containers.map((container) => {
-            const statusColors: Record<string, string> = {
-              OTW: "bg-blue-500/10 text-blue-700 dark:text-blue-300 border-transparent",
-              ARRIVED: "bg-amber-500/10 text-amber-700 dark:text-amber-300 border-transparent",
-              OFFLOADED: "bg-green-500/10 text-green-700 dark:text-green-300 border-transparent",
-            };
-            return (
-              <div
-                key={container.id}
-                className="bg-card border rounded-xl p-4 flex items-center gap-4 hover-elevate"
-                data-testid={`row-container-${container.id}`}
-              >
-                <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                  <Package className="h-5 w-5 text-primary" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    {editingNumberId === container.id ? (
-                      <div className="flex items-center gap-1">
-                        <Input
-                          className="h-7 w-36 font-mono text-xs px-2"
-                          value={editingNumberValue}
-                          onChange={(e) => setEditingNumberValue(e.target.value.toUpperCase())}
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter")
-                              editContainerNumberMutation.mutate({
-                                id: container.id,
-                                containerNumber: editingNumberValue,
-                              });
-                            if (e.key === "Escape") {
-                              setEditingNumberId(null);
-                              setEditingNumberValue("");
-                            }
-                          }}
-                          autoFocus
-                          data-testid={`input-container-number-${container.id}`}
-                        />
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          onClick={() =>
-                            editContainerNumberMutation.mutate({
-                              id: container.id,
-                              containerNumber: editingNumberValue,
-                            })
-                          }
-                          disabled={editContainerNumberMutation.isPending}
-                          data-testid={`button-save-number-${container.id}`}
-                        >
-                          <Check className="h-3 w-3" />
-                        </Button>
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          onClick={() => {
-                            setEditingNumberId(null);
-                            setEditingNumberValue("");
-                          }}
-                          data-testid={`button-cancel-number-${container.id}`}
-                        >
-                          <X className="h-3 w-3" />
-                        </Button>
-                      </div>
-                    ) : (
-                      <div className="flex items-center gap-1 group">
-                        <span className="font-mono font-semibold text-sm">{container.containerNumber}</span>
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          className="opacity-0 group-hover:opacity-100 transition-opacity"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setEditingNumberId(container.id);
-                            setEditingNumberValue(container.containerNumber);
-                          }}
-                          data-testid={`button-edit-number-${container.id}`}
-                        >
-                          <Pencil className="h-3 w-3" />
-                        </Button>
-                      </div>
-                    )}
-                    <Badge
-                      className={statusColors[container.status] || "border-transparent"}
-                      data-testid={`badge-status-${container.id}`}
-                    >
-                      {container.status}
-                    </Badge>
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-0.5">{getSupplierName(container.supplierId)}</p>
-                </div>
-                <div className="flex items-center gap-4 flex-shrink-0">
-                  <div className="text-right hidden sm:block">
-                    <p className="text-xs text-muted-foreground">Import date</p>
-                    <p className="text-sm font-mono">{formatDisplayDate(container.importDate)}</p>
-                  </div>
-                  {!hideContainerCosts && (
-                    <div className="text-right">
-                      <p className="text-xs text-muted-foreground hidden sm:block">Total</p>
-                      <p className="text-sm font-mono font-semibold">
-                        {formatAmount(parseFloat(container.grandTotal || "0"))}
-                      </p>
-                    </div>
-                  )}
-                  <Link href={`/containers/${container.id}`}>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={(e) => e.stopPropagation()}
-                      data-testid={`button-view-${container.id}`}
-                    >
-                      <Eye className="h-4 w-4 mr-1" />
-                      View
-                    </Button>
-                  </Link>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
+      <ActiveContainersTable
+        containers={containers}
+        allContainers={allContainers}
+        isLoading={isLoading}
+        hideContainerCosts={hideContainerCosts}
+        formatDisplayDate={formatDisplayDate}
+        formatAmount={formatAmount}
+        editingNumberId={editingNumberId}
+        editingNumberValue={editingNumberValue}
+        onEditNumberStart={(id, number) => {
+          setEditingNumberId(id);
+          setEditingNumberValue(number);
+        }}
+        onEditNumberChange={setEditingNumberValue}
+        onEditNumberSave={(id, containerNumber) =>
+          editContainerNumberMutation.mutate({ id, containerNumber })
+        }
+        onEditNumberCancel={() => {
+          setEditingNumberId(null);
+          setEditingNumberValue("");
+        }}
+        isEditNumberPending={editContainerNumberMutation.isPending}
+        getSupplierName={getSupplierName}
+      />
 
       {activeTab === "otw" && (
-        <div className="space-y-4">
-          <div className="flex flex-wrap gap-2">
-            <div className="relative flex-1 min-w-[200px]">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search by container, shop, or agent..."
-                value={otwSearchTerm}
-                onChange={(e) => setOtwSearchTerm(e.target.value)}
-                className="pl-10"
-                data-testid="input-search-otw"
-              />
-            </div>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="sm" className="gap-1" data-testid="select-otw-supplier">
-                  <Filter className="h-3.5 w-3.5" />
-                  {otwSupplierFilter.length === 0
-                    ? "All Suppliers"
-                    : otwSupplierFilter.length === 1
-                      ? getSupplierName(Number(otwSupplierFilter[0]))
-                      : `${otwSupplierFilter.length} Suppliers`}
-                  <ChevronDown className="h-3.5 w-3.5" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" className="w-[200px]">
-                {uniqueOtwSuppliers.map((id) => {
-                  const val = id.toString();
-                  const checked = otwSupplierFilter.includes(val);
-                  return (
-                    <DropdownMenuItem
-                      key={id}
-                      className="flex items-center gap-2 cursor-pointer"
-                      onSelect={(e) => {
-                        e.preventDefault();
-                        setOtwSupplierFilter((prev) => (checked ? prev.filter((v) => v !== val) : [...prev, val]));
-                      }}
-                    >
-                      <Checkbox checked={checked} className="pointer-events-none" />
-                      <span className="truncate">{getSupplierName(id)}</span>
-                    </DropdownMenuItem>
-                  );
-                })}
-                {otwSupplierFilter.length > 0 && (
-                  <>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem
-                      className="text-muted-foreground text-xs cursor-pointer justify-center"
-                      onSelect={(e) => {
-                        e.preventDefault();
-                        setOtwSupplierFilter([]);
-                      }}
-                    >
-                      Clear selection
-                    </DropdownMenuItem>
-                  </>
-                )}
-              </DropdownMenuContent>
-            </DropdownMenu>
-            <Select value={otwLocationFilter} onValueChange={setOtwLocationFilter}>
-              <SelectTrigger className="w-full sm:w-[130px]" data-testid="select-otw-location">
-                <SelectValue placeholder="Location" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="ALL">All Locations</SelectItem>
-                {uniqueOtwLocations.map((loc) => (
-                  <SelectItem key={loc} value={loc}>
-                    {loc}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Select value={otwTruckFilter} onValueChange={setOtwTruckFilter}>
-              <SelectTrigger className="w-full sm:w-[120px]" data-testid="select-otw-truck">
-                <SelectValue placeholder="Truck #" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="ALL">All Trucks</SelectItem>
-                {uniqueOtwTrucks.map((truck) => (
-                  <SelectItem key={truck} value={truck}>
-                    {truck}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Select value={otwAgentFilter} onValueChange={setOtwAgentFilter}>
-              <SelectTrigger className="w-full sm:w-[100px]" data-testid="select-otw-agent">
-                <SelectValue placeholder="Agent" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="ALL">All Agents</SelectItem>
-                {uniqueOtwAgents.map((agent) => (
-                  <SelectItem key={agent} value={agent}>
-                    {agent}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Select value={otwTransporterFilter} onValueChange={setOtwTransporterFilter}>
-              <SelectTrigger className="w-full sm:w-[120px]" data-testid="select-otw-transporter">
-                <SelectValue placeholder="Transporter" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="ALL">All Transporters</SelectItem>
-                {uniqueOtwTransporters.map((t) => (
-                  <SelectItem key={t} value={t}>
-                    {t}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Select value={otwDocReceivedFilter} onValueChange={setOtwDocReceivedFilter}>
-              <SelectTrigger className="w-full sm:w-[100px]" data-testid="select-otw-doc">
-                <SelectValue placeholder="Doc" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="ALL">All Docs</SelectItem>
-                <SelectItem value="YES">Doc Received</SelectItem>
-                <SelectItem value="NO">No Doc</SelectItem>
-              </SelectContent>
-            </Select>
-            <Select value={otwFreightStatusFilter} onValueChange={setOtwFreightStatusFilter}>
-              <SelectTrigger className="w-full sm:w-[120px]" data-testid="select-otw-freight">
-                <SelectValue placeholder="Freight" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="ALL">All Freight</SelectItem>
-                <SelectItem value="Yes">Freight Yes</SelectItem>
-                <SelectItem value="No">Freight No</SelectItem>
-                <SelectItem value="Pending">Pending</SelectItem>
-                <SelectItem value="NONE">Not Set</SelectItem>
-              </SelectContent>
-            </Select>
-            <Select value={otwNotesFilter} onValueChange={setOtwNotesFilter}>
-              <SelectTrigger className="w-full sm:w-[110px]" data-testid="select-otw-notes">
-                <SelectValue placeholder="Notes" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="ALL">All Notes</SelectItem>
-                <SelectItem value="WITH">Has Notes</SelectItem>
-                <SelectItem value="WITHOUT">No Notes</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          {filteredOtwContainers.length === 0 ? (
-            <Card>
-              <CardContent className="flex flex-col items-center justify-center py-12">
-                <Truck className="w-16 h-16 text-muted-foreground mb-4" />
-                <h2 className="text-xl font-semibold mb-2">No OTW containers</h2>
-                <p className="text-muted-foreground">
-                  {otwContainers.length === 0
-                    ? "All containers have arrived or been offloaded"
-                    : "No containers match your search"}
-                </p>
-              </CardContent>
-            </Card>
-          ) : (
-            <Card>
-              <CardContent className="p-0 overflow-x-auto">
-                <Table>
-                  <TableHeader className="sticky top-0 z-30 bg-background">
-                    <TableRow>
-                      <TableHead className="whitespace-nowrap">Container #</TableHead>
-                      <TableHead className="whitespace-nowrap">Supplier</TableHead>
-                      <TableHead className="whitespace-nowrap">Amount</TableHead>
-                      <TableHead className="whitespace-nowrap min-w-[100px]">Shop</TableHead>
-                      <TableHead className="whitespace-nowrap min-w-[130px]">ETA</TableHead>
-                      <TableHead className="whitespace-nowrap min-w-[120px]">Transporter</TableHead>
-                      <TableHead className="whitespace-nowrap min-w-[80px]">Fee</TableHead>
-                      <TableHead className="whitespace-nowrap min-w-[100px]">Plate</TableHead>
-                      <TableHead className="whitespace-nowrap min-w-[120px]">Location</TableHead>
-                      <TableHead className="whitespace-nowrap min-w-[130px]">Border</TableHead>
-                      <TableHead className="whitespace-nowrap min-w-[130px]">Offload</TableHead>
-                      <TableHead className="whitespace-nowrap min-w-[80px]">Agent</TableHead>
-                      <TableHead className="whitespace-nowrap min-w-[80px]">Duty</TableHead>
-                      <TableHead className="whitespace-nowrap">Doc</TableHead>
-                      <TableHead className="whitespace-nowrap">Freight</TableHead>
-                      <TableHead className="whitespace-nowrap min-w-[150px]">Description</TableHead>
-                      <TableHead className="whitespace-nowrap min-w-[130px]">Docs Sent</TableHead>
-                      <TableHead className="whitespace-nowrap min-w-[110px]">Freight (GIT)</TableHead>
-                      <TableHead className="whitespace-nowrap min-w-[160px]">Link</TableHead>
-                      <TableHead></TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredOtwContainers.map((container) => (
-                      <TableRow key={container.id} data-testid={`row-otw-${container.id}`}>
-                        <TableCell className="font-mono font-medium">
-                          <Link href={`/containers/${container.id}`} className="text-primary hover:underline">
-                            {container.containerNumber}
-                          </Link>
-                        </TableCell>
-                        <TableCell className="text-sm">{getSupplierName(container.supplierId)}</TableCell>
-                        <TableCell className="font-mono text-sm">
-                          {formatAmount(parseFloat(container.grandTotal || "0"))}
-                        </TableCell>
-                        <TableCell>
-                          <Input
-                            id={`tracking-${container.id}-shopName`}
-                            value={(getEditValue(container, "shopName") as string) || ""}
-                            onChange={(e) => setEditValue(container.id, "shopName", e.target.value)}
-                            onKeyDown={(e) => handleKeyDown(e, container.id, 0)}
-                            style={autoSizeStyle(getEditValue(container, "shopName"), "Shop", 6, 16)}
-                            className="h-8 text-sm w-auto"
-                            placeholder="Shop"
-                            data-testid={`input-shop-${container.id}`}
-                          />
-                        </TableCell>
-                        <TableCell>
-                          <Input
-                            id={`tracking-${container.id}-eta`}
-                            type="date"
-                            value={(getEditValue(container, "eta") as string) || ""}
-                            onChange={(e) => setEditValue(container.id, "eta", e.target.value)}
-                            onKeyDown={(e) => handleKeyDown(e, container.id, 1)}
-                            style={autoSizeStyle(getEditValue(container, "eta"), "yyyy-mm-dd", 12, 12)}
-                            className="h-8 text-sm w-auto"
-                            data-testid={`input-eta-${container.id}`}
-                          />
-                        </TableCell>
-                        <TableCell>
-                          <Input
-                            id={`tracking-${container.id}-transporter`}
-                            value={(getEditValue(container, "transporter") as string) || ""}
-                            onChange={(e) => setEditValue(container.id, "transporter", e.target.value)}
-                            onKeyDown={(e) => handleKeyDown(e, container.id, 2)}
-                            style={autoSizeStyle(getEditValue(container, "transporter"), "Transporter", 12, 40)}
-                            className="h-8 text-sm w-auto"
-                            placeholder="Transporter"
-                            data-testid={`input-transporter-${container.id}`}
-                          />
-                        </TableCell>
-                        <TableCell>
-                          <Input
-                            id={`tracking-${container.id}-transportFee`}
-                            type="number"
-                            value={(getEditValue(container, "transportFee") as string) || ""}
-                            onChange={(e) => setEditValue(container.id, "transportFee", e.target.value)}
-                            onKeyDown={(e) => handleKeyDown(e, container.id, 3)}
-                            style={autoSizeStyle(getEditValue(container, "transportFee"), "0.00")}
-                            className="h-8 text-sm w-auto"
-                            placeholder="0.00"
-                            data-testid={`input-transport-${container.id}`}
-                          />
-                        </TableCell>
-                        <TableCell>
-                          <Input
-                            id={`tracking-${container.id}-numberPlate`}
-                            value={(getEditValue(container, "numberPlate") as string) || ""}
-                            onChange={(e) => setEditValue(container.id, "numberPlate", e.target.value)}
-                            onKeyDown={(e) => handleKeyDown(e, container.id, 4)}
-                            style={autoSizeStyle(getEditValue(container, "numberPlate"), "Plate", 10, 20)}
-                            className="h-8 text-sm w-auto"
-                            placeholder="Plate"
-                            data-testid={`input-plate-${container.id}`}
-                          />
-                        </TableCell>
-                        <TableCell>
-                          <Input
-                            id={`tracking-${container.id}-trackingLocation`}
-                            value={(getEditValue(container, "trackingLocation") as string) || ""}
-                            onChange={(e) => setEditValue(container.id, "trackingLocation", e.target.value)}
-                            onKeyDown={(e) => handleKeyDown(e, container.id, 5)}
-                            style={autoSizeStyle(getEditValue(container, "trackingLocation"), "Location", 12, 40)}
-                            className="h-8 text-sm w-auto"
-                            placeholder="Location"
-                            data-testid={`input-location-${container.id}`}
-                          />
-                        </TableCell>
-                        <TableCell>
-                          <Input
-                            id={`tracking-${container.id}-borderDate`}
-                            type="date"
-                            value={(getEditValue(container, "borderDate") as string) || ""}
-                            onChange={(e) => setEditValue(container.id, "borderDate", e.target.value)}
-                            onKeyDown={(e) => handleKeyDown(e, container.id, 6)}
-                            style={autoSizeStyle(getEditValue(container, "borderDate"), "yyyy-mm-dd", 12, 12)}
-                            className="h-8 text-sm w-auto"
-                            data-testid={`input-border-${container.id}`}
-                          />
-                        </TableCell>
-                        <TableCell>
-                          <Input
-                            id={`tracking-${container.id}-offloadDate`}
-                            type="date"
-                            value={(getEditValue(container, "offloadDate") as string) || ""}
-                            onChange={(e) => setEditValue(container.id, "offloadDate", e.target.value)}
-                            onKeyDown={(e) => handleKeyDown(e, container.id, 7)}
-                            style={autoSizeStyle(getEditValue(container, "offloadDate"), "yyyy-mm-dd", 12, 12)}
-                            className="h-8 text-sm w-auto"
-                            data-testid={`input-offload-${container.id}`}
-                          />
-                        </TableCell>
-                        <TableCell>
-                          <Input
-                            id={`tracking-${container.id}-agent`}
-                            value={(getEditValue(container, "agent") as string) || ""}
-                            onChange={(e) => setEditValue(container.id, "agent", e.target.value)}
-                            onKeyDown={(e) => handleKeyDown(e, container.id, 8)}
-                            style={autoSizeStyle(getEditValue(container, "agent"), "Agent")}
-                            className="h-8 text-sm w-auto"
-                            placeholder="Agent"
-                            data-testid={`input-agent-${container.id}`}
-                          />
-                        </TableCell>
-                        <TableCell>
-                          <Input
-                            id={`tracking-${container.id}-dutyFee`}
-                            type="number"
-                            value={(getEditValue(container, "dutyFee") as string) || ""}
-                            onChange={(e) => setEditValue(container.id, "dutyFee", e.target.value)}
-                            onKeyDown={(e) => handleKeyDown(e, container.id, 9)}
-                            style={autoSizeStyle(getEditValue(container, "dutyFee"), "0.00")}
-                            className="h-8 text-sm w-auto"
-                            placeholder="0.00"
-                            data-testid={`input-duty-${container.id}`}
-                          />
-                        </TableCell>
-                        <TableCell className="text-center">
-                          <Checkbox
-                            id={`tracking-${container.id}-docReceived`}
-                            checked={!!getEditValue(container, "docReceived")}
-                            onCheckedChange={(checked) => setEditValue(container.id, "docReceived", !!checked)}
-                            data-testid={`checkbox-doc-${container.id}`}
-                          />
-                        </TableCell>
-                        <TableCell>
-                          {(() => {
-                            const fs = freightStatusMap[container.id];
-                            if (!fs || fs.status === "NONE")
-                              return <span className="text-xs text-muted-foreground">--</span>;
-                            return (
-                              <Badge
-                                variant={
-                                  fs.status === "PAID"
-                                    ? "default"
-                                    : fs.status === "PARTIAL"
-                                      ? "secondary"
-                                      : "destructive"
-                                }
-                                data-testid={`badge-freight-${container.id}`}
-                              >
-                                {fs.status}
-                              </Badge>
-                            );
-                          })()}
-                        </TableCell>
-                        <TableCell>
-                          <Input
-                            id={`tracking-${container.id}-trackingDescription`}
-                            value={(getEditValue(container, "trackingDescription") as string) || ""}
-                            onChange={(e) => setEditValue(container.id, "trackingDescription", e.target.value)}
-                            onKeyDown={(e) => handleKeyDown(e, container.id, 11)}
-                            style={autoSizeStyle(getEditValue(container, "trackingDescription"), "Notes...", 10, 32)}
-                            className="h-8 text-sm w-auto"
-                            placeholder="Notes..."
-                            data-testid={`input-desc-${container.id}`}
-                          />
-                        </TableCell>
-                        <TableCell>
-                          <Input
-                            id={`tracking-${container.id}-docsSentDate`}
-                            type="date"
-                            value={(getEditValue(container, "docsSentDate") as string) || ""}
-                            onChange={(e) => setEditValue(container.id, "docsSentDate", e.target.value)}
-                            onKeyDown={(e) => handleKeyDown(e, container.id, 12)}
-                            style={autoSizeStyle(getEditValue(container, "docsSentDate"), "yyyy-mm-dd", 12, 12)}
-                            className="h-8 text-sm w-auto"
-                            data-testid={`input-docs-sent-${container.id}`}
-                          />
-                        </TableCell>
-                        <TableCell>
-                          <select
-                            id={`tracking-${container.id}-freightStatus`}
-                            value={(getEditValue(container, "freightStatus") as string) || ""}
-                            onChange={(e) => setEditValue(container.id, "freightStatus", e.target.value || null)}
-                            className="h-8 text-sm rounded-md border border-input bg-background px-2 py-1"
-                            data-testid={`select-freight-git-${container.id}`}
-                          >
-                            <option value="">—</option>
-                            <option value="Yes">Yes</option>
-                            <option value="No">No</option>
-                            <option value="Pending">Pending</option>
-                          </select>
-                        </TableCell>
-                        <TableCell>
-                          <Input
-                            id={`tracking-${container.id}-trackingLink`}
-                            value={(getEditValue(container, "trackingLink") as string) || ""}
-                            onChange={(e) => setEditValue(container.id, "trackingLink", e.target.value)}
-                            onKeyDown={(e) => handleKeyDown(e, container.id, 13)}
-                            style={autoSizeStyle(getEditValue(container, "trackingLink"), "https://...", 12, 32)}
-                            className="h-8 text-sm w-auto"
-                            placeholder="https://..."
-                            data-testid={`input-link-${container.id}`}
-                          />
-                        </TableCell>
-                        <TableCell>
-                          {hasChanges(container.id) && (
-                            <Button
-                              size="icon"
-                              variant="ghost"
-                              onClick={() => saveTracking(container.id)}
-                              disabled={savingIds.has(container.id)}
-                              data-testid={`button-save-${container.id}`}
-                            >
-                              {savingIds.has(container.id) ? (
-                                <span className="animate-spin">...</span>
-                              ) : (
-                                <Check className="h-4 w-4 text-green-600" />
-                              )}
-                            </Button>
-                          )}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </CardContent>
-            </Card>
-          )}
-        </div>
+        <OtwContainersTable
+          filteredOtwContainers={filteredOtwContainers}
+          otwContainers={otwContainers}
+          otwSearchTerm={otwSearchTerm}
+          setOtwSearchTerm={setOtwSearchTerm}
+          otwSupplierFilter={otwSupplierFilter}
+          setOtwSupplierFilter={setOtwSupplierFilter}
+          otwLocationFilter={otwLocationFilter}
+          setOtwLocationFilter={setOtwLocationFilter}
+          otwTruckFilter={otwTruckFilter}
+          setOtwTruckFilter={setOtwTruckFilter}
+          otwAgentFilter={otwAgentFilter}
+          setOtwAgentFilter={setOtwAgentFilter}
+          otwTransporterFilter={otwTransporterFilter}
+          setOtwTransporterFilter={setOtwTransporterFilter}
+          otwDocReceivedFilter={otwDocReceivedFilter}
+          setOtwDocReceivedFilter={setOtwDocReceivedFilter}
+          otwFreightStatusFilter={otwFreightStatusFilter}
+          setOtwFreightStatusFilter={setOtwFreightStatusFilter}
+          otwNotesFilter={otwNotesFilter}
+          setOtwNotesFilter={setOtwNotesFilter}
+          uniqueOtwLocations={uniqueOtwLocations}
+          uniqueOtwSuppliers={uniqueOtwSuppliers}
+          uniqueOtwAgents={uniqueOtwAgents}
+          uniqueOtwTransporters={uniqueOtwTransporters}
+          uniqueOtwTrucks={uniqueOtwTrucks}
+          getSupplierName={getSupplierName}
+          formatAmount={formatAmount}
+          freightStatusMap={freightStatusMap}
+          getEditValue={getEditValue}
+          setEditValue={setEditValue}
+          hasChanges={hasChanges}
+          saveTracking={saveTracking}
+          savingIds={savingIds}
+          handleKeyDown={handleKeyDown}
+          autoSizeStyle={autoSizeStyle}
+        />
       )}
 
       {activeTab === "sold" && (
-        <div className="space-y-4">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Search by container number or customer..."
-              value={soldSearchTerm}
-              onChange={(e) => setSoldSearchTerm(e.target.value)}
-              className="pl-10"
-              data-testid="input-search-sold-containers"
-            />
-          </div>
-
-          {isSoldLoading ? (
-            <div className="space-y-4">
-              <Skeleton className="h-12 w-full" />
-              <Skeleton className="h-96 w-full" />
-            </div>
-          ) : filteredSoldContainers.length === 0 ? (
-            <Card>
-              <CardContent className="flex flex-col items-center justify-center py-12">
-                <HandCoins className="w-16 h-16 text-muted-foreground mb-4" />
-                <h2 className="text-xl font-semibold mb-2">No sold containers found</h2>
-                <p className="text-muted-foreground">
-                  {soldContainers.length === 0 ? "No containers have been sold yet" : "Try adjusting your search"}
-                </p>
-              </CardContent>
-            </Card>
-          ) : (
-            <Card>
-              <CardContent className="p-0 hidden md:block">
-                <Table>
-                  <TableHeader className="sticky top-0 z-30 bg-background">
-                    <TableRow>
-                      <TableHead>Container Number</TableHead>
-                      <TableHead>Customer</TableHead>
-                      <TableHead>Sale Date</TableHead>
-                      <TableHead className="text-right">Container Cost</TableHead>
-                      <TableHead className="text-right">Commission</TableHead>
-                      <TableHead className="text-right">Total Amount</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredSoldContainers.map((sale) => (
-                      <TableRow key={sale.saleId} data-testid={`row-sale-${sale.saleId}`}>
-                        <TableCell className="font-mono font-medium">{sale.containerNumber}</TableCell>
-                        <TableCell data-testid={`text-customer-${sale.saleId}`}>{sale.customerName}</TableCell>
-                        <TableCell className="font-mono" data-testid={`text-sale-date-${sale.saleId}`}>
-                          {formatDisplayDate(sale.saleDate)}
-                        </TableCell>
-                        <TableCell className="text-right font-mono" data-testid={`text-sale-price-${sale.saleId}`}>
-                          {formatAmount(parseFloat(sale.containerCost))}
-                        </TableCell>
-                        <TableCell className="text-right font-mono">
-                          {formatAmount(parseFloat(sale.commission || "0"))}
-                        </TableCell>
-                        <TableCell className="text-right font-mono font-semibold">
-                          {formatAmount(parseFloat(sale.totalAmount))}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <Link href={`/containers/${sale.containerId}`}>
-                            <Button size="sm" variant="outline" data-testid={`button-view-sale-${sale.saleId}`}>
-                              <Eye className="h-4 w-4 mr-2" />
-                              View
-                            </Button>
-                          </Link>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </CardContent>
-              <div className="md:hidden p-3 space-y-2">
-                {filteredSoldContainers.map((sale) => (
-                  <Link key={sale.saleId} href={`/containers/${sale.containerId}`}>
-                    <div
-                      className="p-3 rounded-md border cursor-pointer hover-elevate"
-                      data-testid={`row-sale-${sale.saleId}`}
-                    >
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="font-mono font-medium text-sm">{sale.containerNumber}</span>
-                        <span className="text-xs text-muted-foreground" data-testid={`text-sale-date-${sale.saleId}`}>
-                          {formatDisplayDate(sale.saleDate)}
-                        </span>
-                      </div>
-                      <div className="text-xs text-muted-foreground mb-1" data-testid={`text-customer-${sale.saleId}`}>
-                        {sale.customerName}
-                      </div>
-                      <div className="flex justify-between text-sm">
-                        <span className="font-mono font-semibold" data-testid={`text-sale-price-${sale.saleId}`}>
-                          {formatAmount(parseFloat(sale.totalAmount))}
-                        </span>
-                        {parseFloat(sale.commission || "0") > 0 && (
-                          <span className="text-xs text-muted-foreground">
-                            Commission: {formatAmount(parseFloat(sale.commission || "0"))}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  </Link>
-                ))}
-              </div>
-            </Card>
-          )}
-        </div>
+        <SoldContainersTable
+          isSoldLoading={isSoldLoading}
+          soldContainers={soldContainers}
+          filteredSoldContainers={filteredSoldContainers}
+          soldSearchTerm={soldSearchTerm}
+          setSoldSearchTerm={setSoldSearchTerm}
+          formatDisplayDate={formatDisplayDate}
+          formatAmount={formatAmount}
+        />
       )}
 
       <AddContainerDialog open={addDialogOpen} onOpenChange={setAddDialogOpen} />
