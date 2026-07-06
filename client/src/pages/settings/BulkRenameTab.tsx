@@ -137,7 +137,7 @@ export function BulkRenameTab() {
   const [isSearching, setIsSearching] = useState(false);
   const [isApplying, setIsApplying] = useState(false);
 
-  const buildRegex = async () => {
+  const buildRegex = () => {
     if (!findText.trim()) return null;
     const escaped = findText.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     const pattern = wholeWordOnly ? `\\b${escaped}\\b` : escaped;
