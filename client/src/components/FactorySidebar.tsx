@@ -102,7 +102,6 @@ export const FACTORY_NAV_SECTIONS: FactoryNavSection[] = [
       { title: "Factory POS", url: "/factory/pos", icon: ShoppingCart },
       { title: "Invoicing", url: "/factory/invoicing", icon: FileText },
       { title: "Stock Allocation", url: "/factory/stock-allocation-v5", icon: LayoutGrid },
-      { title: "Loadings", url: "/factory/sales/loadings", icon: Container },
     ],
   },
   {
