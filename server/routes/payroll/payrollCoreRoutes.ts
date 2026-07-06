@@ -228,6 +228,7 @@ export function registerPayrollCoreRoutes(app: Express) {
       // period boundary is correct across timezone offsets. Falls back to
       // UTC today when the header is absent.
       const todayStr = getClientDate(req);
+      const today = new Date(todayStr + "T00:00:00");
       const pad = (n: number) => String(n).padStart(2, "0");
 
       // Helper: days in the month containing dateStr
