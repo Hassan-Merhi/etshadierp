@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import {
@@ -15,6 +15,8 @@ import {
   Loader2,
   FileText,
   ExternalLink,
+  Receipt,
+  Search,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -372,6 +374,60 @@ export default function FactoryInsurance() {
   const [genMonth, setGenMonth] = useState(new Date().getMonth() + 1);
   const [genYear, setGenYear] = useState(new Date().getFullYear());
 
+  // ── Extra Charges ───────────────────────────────────────────────────────────
+  const [showExtraCharges, setShowExtraCharges] = useState(false);
+  const [ecDate, setEcDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [ecAmount, setEcAmount] = useState("");
+  const [ecDrId, setEcDrId] = useState<number | null>(null);
+  const [ecCrId, setEcCrId] = useState<number | null>(null);
+  const [ecDrSearch, setEcDrSearch] = useState("");
+  const [ecCrSearch, setEcCrSearch] = useState("");
+  const [ecDrOpen, setEcDrOpen] = useState(false);
+  const [ecCrOpen, setEcCrOpen] = useState(false);
+  const [ecNotes, setEcNotes] = useState("");
+  const ecDrRef = useRef<HTMLDivElement>(null);
+  const ecCrRef = useRef<HTMLDivElement>(null);
+
+  const { data: ledgerAccounts = [] } = useQuery<any[]>({ queryKey: ["/api/ledger-accounts"] });
+
+  const extraChargesMutation = useMutation({
+    mutationFn: async () => {
+      const amt = parseFloat(ecAmount);
+      if (!ecDrId || !ecCrId || isNaN(amt) || amt <= 0) throw new Error("Fill in all fields with a valid amount.");
+      return apiRequest("POST", "/api/vouchers/with-entries", {
+        voucher: {
+          voucherType: "Journal",
+          voucherDate: ecDate,
+          voucherNumber: `INS-CHARGE-${Date.now()}`,
+          description: ecNotes || "Insurance extra charge",
+          optional: false,
+        },
+        entries: [
+          { ledgerAccountId: ecDrId, debitAmount: amt.toFixed(2), creditAmount: "0", narration: ecNotes || null },
+          { ledgerAccountId: ecCrId, debitAmount: "0", creditAmount: amt.toFixed(2), narration: ecNotes || null },
+        ],
+      });
+    },
+    onSuccess: () => {
+      setShowExtraCharges(false);
+      setEcAmount(""); setEcDrId(null); setEcCrId(null);
+      setEcDrSearch(""); setEcCrSearch(""); setEcNotes("");
+      setEcDate(new Date().toISOString().slice(0, 10));
+      toast({ title: "Extra charge posted", description: "Voucher created and visible in Daybook & Accounts." });
+    },
+    onError: (e: any) => toast({ title: "Failed", description: e.message, variant: "destructive" }),
+  });
+
+  // Close account dropdowns on outside click
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (ecDrRef.current && !ecDrRef.current.contains(e.target as Node)) setEcDrOpen(false);
+      if (ecCrRef.current && !ecCrRef.current.contains(e.target as Node)) setEcCrOpen(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
   const { data: members = [], isLoading } = useQuery<InsuranceMember[]>({
     queryKey: ["/api/insurance/members", includeInactive],
     queryFn: async () => {
@@ -464,6 +520,14 @@ export default function FactoryInsurance() {
           subtitle="Manage insurance members and generate monthly entries"
         />
         <div className="flex items-center gap-2 flex-wrap">
+          <Button
+            variant="outline"
+            onClick={() => setShowExtraCharges(true)}
+            data-testid="button-extra-charges"
+          >
+            <Receipt className="h-4 w-4 mr-1" />
+            Add Extra Charges
+          </Button>
           <Button
             onClick={() => setShowGenDialog(true)}
             data-testid="button-generate-entries"
@@ -698,6 +762,108 @@ export default function FactoryInsurance() {
               data-testid="button-confirm-delete"
             >
               {deleteMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Delete"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Extra Charges Dialog */}
+      <Dialog open={showExtraCharges} onOpenChange={(v) => { if (!v) setShowExtraCharges(false); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Add Extra Charges</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-1">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label>Date</Label>
+                <Input type="date" value={ecDate} onChange={(e) => setEcDate(e.target.value)} />
+              </div>
+              <div className="space-y-1">
+                <Label>Amount</Label>
+                <Input type="number" min="0" step="0.01" placeholder="0.00" value={ecAmount} onChange={(e) => setEcAmount(e.target.value)} />
+              </div>
+            </div>
+            {/* DR Account */}
+            <div className="space-y-1" ref={ecDrRef}>
+              <Label>Debit Account (Dr)</Label>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
+                <Input
+                  className="pl-8"
+                  placeholder="Search account name…"
+                  value={ecDrSearch}
+                  onFocus={() => setEcDrOpen(true)}
+                  onChange={(e) => { setEcDrSearch(e.target.value); setEcDrId(null); setEcDrOpen(true); }}
+                />
+                {ecDrOpen && (
+                  <div className="absolute z-50 mt-1 w-full max-h-48 overflow-y-auto rounded-md border bg-popover shadow-md text-sm">
+                    {ledgerAccounts
+                      .filter((a: any) => a.name.toLowerCase().includes(ecDrSearch.toLowerCase()))
+                      .slice(0, 60)
+                      .map((a: any) => (
+                        <div key={a.id} className="px-3 py-2 cursor-pointer hover:bg-muted"
+                          onMouseDown={() => { setEcDrId(a.id); setEcDrSearch(a.name); setEcDrOpen(false); }}>
+                          {a.name}
+                        </div>
+                      ))}
+                    {ledgerAccounts.filter((a: any) => a.name.toLowerCase().includes(ecDrSearch.toLowerCase())).length === 0 && (
+                      <div className="px-3 py-2 text-muted-foreground italic">No accounts found</div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+            {/* CR Account */}
+            <div className="space-y-1" ref={ecCrRef}>
+              <Label>Credit Account (Cr)</Label>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
+                <Input
+                  className="pl-8"
+                  placeholder="Search account name…"
+                  value={ecCrSearch}
+                  onFocus={() => setEcCrOpen(true)}
+                  onChange={(e) => { setEcCrSearch(e.target.value); setEcCrId(null); setEcCrOpen(true); }}
+                />
+                {ecCrOpen && (
+                  <div className="absolute z-50 mt-1 w-full max-h-48 overflow-y-auto rounded-md border bg-popover shadow-md text-sm">
+                    {ledgerAccounts
+                      .filter((a: any) => a.name.toLowerCase().includes(ecCrSearch.toLowerCase()))
+                      .slice(0, 60)
+                      .map((a: any) => (
+                        <div key={a.id} className="px-3 py-2 cursor-pointer hover:bg-muted"
+                          onMouseDown={() => { setEcCrId(a.id); setEcCrSearch(a.name); setEcCrOpen(false); }}>
+                          {a.name}
+                        </div>
+                      ))}
+                    {ledgerAccounts.filter((a: any) => a.name.toLowerCase().includes(ecCrSearch.toLowerCase())).length === 0 && (
+                      <div className="px-3 py-2 text-muted-foreground italic">No accounts found</div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+            {/* Notes */}
+            <div className="space-y-1">
+              <Label>Notes <span className="text-xs text-muted-foreground">(saved as voucher description)</span></Label>
+              <Textarea
+                placeholder="e.g. Extra insurance charge — July 2026"
+                value={ecNotes}
+                onChange={(e) => setEcNotes(e.target.value)}
+                rows={2}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowExtraCharges(false)}>Cancel</Button>
+            <Button
+              onClick={() => extraChargesMutation.mutate()}
+              disabled={extraChargesMutation.isPending || !ecDrId || !ecCrId || !ecAmount}
+              data-testid="button-extra-charges-submit"
+            >
+              {extraChargesMutation.isPending && <Loader2 className="h-4 w-4 animate-spin mr-1" />}
+              Post Voucher
             </Button>
           </DialogFooter>
         </DialogContent>
