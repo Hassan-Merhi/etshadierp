@@ -34,6 +34,13 @@ const HEADER_BAR_H = 52; // coloured top bar covering top margin area
 const LINE_H_PT = 9;
 const MAX_DESC_LINES = 2;
 
+// ── PDFKit safety buffer ──────────────────────────────────────────────────────
+// PDFKit auto-inserts a new page whenever (this.y + lineHeight > page.maxY()).
+// Its internal lineHeight for 7.5 pt text is ~11 pt, so we must keep at least
+// that much clearance above PAGE_H − MARGIN_Y in our manual page-break check.
+// Using 14 pt gives a small visual gap and avoids partial-row auto-paging.
+const PDFKIT_LINE_SAFETY = 14;
+
 // ── Date formatting ───────────────────────────────────────────────────────────
 function formatDbDate(d: unknown): string {
   if (!d) return "";
@@ -359,7 +366,7 @@ async function buildPdf(d: InvoiceData): Promise<Buffer> {
     const descLines = wrapText(doc, item.stockItemName, descW, MAX_DESC_LINES);
     const dynH = Math.max(ROW_H, descLines.length * LINE_H_PT + 6);
 
-    if (y + dynH > PAGE_H - MARGIN_Y) {
+    if (y + dynH + PDFKIT_LINE_SAFETY > PAGE_H - MARGIN_Y) {
       doc.addPage({ size: "A4" });
       y = MARGIN_Y;
       rowIndex = 0;
@@ -422,6 +429,14 @@ async function buildPdf(d: InvoiceData): Promise<Buffer> {
 
     y += dynH;
     rowIndex++;
+
+    // Sync PDFKit's internal cursor to our manual tracker after every row.
+    // Each doc.text() call advances doc.y by ~lineHeight even when explicit
+    // coordinates are provided, causing doc.y to drift ahead of our y.  If
+    // PDFKit's cursor crosses (page.maxY − lineHeight) between our intended
+    // rows it auto-inserts a blank page before we can do so ourselves.
+    (doc as any).y = y;
+    (doc as any).x = MARGIN_X;
   }
 
   // ── TOTAL + TOTAL PAID + footer — keep together on the same page ─────────────
@@ -430,7 +445,7 @@ async function buildPdf(d: InvoiceData): Promise<Buffer> {
   // so the summary is never split across pages leaving a near-blank last page.
   const totH = 18;
   const SUMMARY_MIN_H = totH + 8 + 32 + 8 + 26; // 92
-  if (y + SUMMARY_MIN_H > PAGE_H - MARGIN_Y) {
+  if (y + SUMMARY_MIN_H + PDFKIT_LINE_SAFETY > PAGE_H - MARGIN_Y) {
     doc.addPage({ size: "A4" });
     y = MARGIN_Y;
   }
