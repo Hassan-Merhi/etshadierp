@@ -134,7 +134,9 @@ export function PeriodFilter({
 
   const handlePresetChange = (preset: PeriodPreset) => {
     if (preset === "custom") {
-      setCalendarOpen(true);
+      // Defer until after the DropdownMenu close event finishes propagating,
+      // otherwise the Dialog immediately dismisses from the same outside-click.
+      setTimeout(() => setCalendarOpen(true), 0);
     } else {
       const dates = getPresetDates(preset);
       onChange({ ...dates, preset });

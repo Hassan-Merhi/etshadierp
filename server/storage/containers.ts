@@ -211,7 +211,11 @@ export async function createPurchaseOrder(
 
     const voucherDate = voucherDateOverride || new Date().toISOString().split("T")[0];
 
-    if (parentCompany && po.companyId !== parentCompany.id) {
+    // supplier_partner companies own their supplier relationships directly —
+    // they must NOT go through the intercompany branch; the supplier credit
+    // must live inside the SP company so its ledger/stats show the balance.
+    const isSupplierPartner = currentCompany?.companyType === "supplier_partner";
+    if (parentCompany && po.companyId !== parentCompany.id && !isSupplierPartner) {
       const isParentFreight = (po as any).freightPaidBy === "parent" && poFreight > 0;
       const poIntercoTotal = isParentFreight ? poTotal - poFreight : poTotal;
       const freightParentAcctId: number | null = isParentFreight ? ((po as any).freightParentAccountId ?? null) : null;

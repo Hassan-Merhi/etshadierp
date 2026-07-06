@@ -1,4 +1,4 @@
-import { useEffect, useCallback, useState, useRef, lazy, Suspense } from "react";
+import { useEffect, useCallback, useState, useRef, Suspense } from "react";
 import { useButtonClickFeedback } from "@/hooks/use-button-click-feedback";
 import { useServerRestart } from "@/hooks/use-server-restart";
 import { useDialogScrollFix } from "@/hooks/use-dialog-scroll-fix";
@@ -66,217 +66,37 @@ import { useWsInvalidation } from "@/hooks/use-ws-invalidation";
 import { apiRequest } from "@/lib/queryClient";
 import NotFound from "@/pages/not-found";
 import Login from "@/pages/Login";
-const Dashboard = lazy(() => import("@/pages/Dashboard"));
-const ContainersOTW = lazy(() => import("@/pages/GITContainers"));
-const GITMockup = lazy(() => import("@/pages/GITMockup"));
-const TrackingHub = lazy(() => import("@/pages/TrackingHub"));
-const POS = lazy(() => import("@/pages/pos/POS"));
-const POSPage = lazy(() => import("@/pages/pos/POSPage"));
-const StockItems = lazy(() => import("@/pages/StockItems"));
-const Containers = lazy(() => import("@/pages/Containers"));
-const ContainersPage = lazy(() => import("@/pages/ContainersPage"));
-const InventoryHub = lazy(() => import("@/pages/InventoryHub"));
-const StockHub = lazy(() => import("@/pages/StockHub"));
-const Accounts = lazy(() => import("@/pages/Accounts"));
-const Agents = lazy(() => import("@/pages/Agents"));
-const FactoryAccounts = lazy(() => import("@/pages/factory/FactoryAccounts"));
-const FactoryVouchers = lazy(() => import("@/pages/factory/FactoryVouchers"));
-const Suppliers = lazy(() => import("@/pages/Suppliers"));
-const Vouchers = lazy(() => import("@/pages/Vouchers"));
-const Daybook = lazy(() => import("@/pages/Daybook"));
-const TransactionJournal = lazy(() => import("@/pages/TransactionJournal"));
-const FactoryDaybook = lazy(() => import("@/pages/factory/FactoryDaybook"));
-const Analytics = lazy(() => import("@/pages/Analytics"));
-const AccountingCreate = lazy(() => import("@/pages/AccountingCreate"));
-const POImport = lazy(() => import("@/pages/POImport"));
-const AiValidationPage = lazy(() => import("@/pages/AiValidationPage"));
-const AICommandCenter = lazy(() => import("@/pages/AICommandCenter"));
-const POSImport = lazy(() => import("@/pages/pos/POSImport"));
-const ContainerDetail = lazy(() => import("@/pages/ContainerDetail"));
-const ContainerDetailPage = lazy(() => import("@/pages/ContainerDetailPage"));
-const LocationInventory = lazy(() => import("@/pages/LocationInventory"));
-const FactoryLocationInventory = lazy(() => import("@/pages/factory/FactoryLocationInventory"));
-const FactoryLocationInventoryMockup = lazy(() => import("@/pages/factory/FactoryLocationInventoryMockup"));
-const Settings = lazy(() => import("@/pages/Settings"));
-const VoucherEdit = lazy(() => import("@/pages/VoucherEdit"));
-const Payroll = lazy(() => import("@/pages/Payroll"));
-const ImportStockItems = lazy(() => import("@/pages/ImportStockItems"));
-const StockQuery = lazy(() => import("@/pages/StockQuery"));
-const OffloadItemSearch = lazy(() => import("@/pages/OffloadItemSearch"));
-const StockItemDetail = lazy(() => import("@/pages/StockItemDetail"));
-const FactoryStockItemDetail = lazy(() => import("@/pages/factory/FactoryStockItemDetail"));
-const FactoryStockBaleList = lazy(() => import("@/pages/factory/FactoryStockBaleList"));
-const SalesReport = lazy(() => import("@/pages/SalesReport"));
-const CompanyTransfer = lazy(() => import("@/pages/CompanyTransfer"));
-const POSDaybook = lazy(() => import("@/pages/pos/POSDaybook"));
-const SalesToolsHub = lazy(() => import("@/pages/SalesToolsHub"));
-const PartiesHub = lazy(() => import("@/pages/PartiesHub"));
-const POSDashboard = lazy(() => import("@/pages/pos/POSDashboard"));
-const POSCustomers = lazy(() => import("@/pages/pos/POSCustomers"));
-const POSSettings = lazy(() => import("@/pages/pos/POSSettings"));
-const POSPriceList = lazy(() => import("@/pages/pos/POSPriceList"));
-const PosTransferOrders = lazy(() => import("@/pages/pos/PosTransferOrders"));
-const EditSupplier = lazy(() => import("@/pages/EditSupplier"));
-const SupplierProformas = lazy(() => import("@/pages/SupplierProformas"));
-const SupplierProfitCheck = lazy(() => import("@/pages/SupplierProfitCheck"));
-const ContainerVerification = lazy(() => import("@/pages/ContainerVerification"));
-const StockOTW = lazy(() => import("@/pages/StockOTW"));
-const Customers = lazy(() => import("@/pages/Customers"));
-const SoldContainers = lazy(() => import("@/pages/SoldContainers"));
-const Bales = lazy(() => import("@/pages/Bales"));
-const ProductionBales = lazy(() => import("@/pages/ProductionBales"));
-const BaleProducts = lazy(() => import("@/pages/BaleProducts"));
-const OrphanedRecords = lazy(() => import("@/pages/OrphanedRecords"));
-const DeletedItems = lazy(() => import("@/pages/DeletedItems"));
-const ChatbotSettings = lazy(() => import("@/pages/ChatbotSettings"));
-const NotificationSettings = lazy(() => import("@/pages/NotificationSettings"));
-const AccountGroups = lazy(() => import("@/pages/AccountGroups"));
-const PurchaseOrderEdit = lazy(() => import("@/pages/PurchaseOrderEdit"));
-const OffloadDetail = lazy(() => import("@/pages/OffloadDetail"));
-const StockItemHistory = lazy(() => import("@/pages/StockItemHistory"));
-const StockItemVouchers = lazy(() => import("@/pages/StockItemVouchers"));
-const LocationMonthlySummary = lazy(() => import("@/pages/LocationMonthlySummary"));
-const LocationVouchers = lazy(() => import("@/pages/LocationVouchers"));
-const OpeningStockSummary = lazy(() => import("@/pages/OpeningStockSummary"));
-const OpeningStockDetail = lazy(() => import("@/pages/OpeningStockDetail"));
-const ClosingStockSummary = lazy(() => import("@/pages/ClosingStockSummary"));
-const ClosingStockDetail = lazy(() => import("@/pages/ClosingStockDetail"));
-const LedgerMonthlySummary = lazy(() => import("@/pages/LedgerMonthlySummary"));
-const LedgerVouchers = lazy(() => import("@/pages/LedgerVouchers"));
-const VoucherDetail = lazy(() => import("@/pages/VoucherDetail"));
-const FactoryProduction = lazy(() => import("@/pages/factory/FactoryProduction"));
-const ProductionRawStock = lazy(() => import("@/pages/factory/ProductionRawStock"));
-const FactoryOpeningBalanceEdit = lazy(() => import("@/pages/factory/FactoryOpeningBalanceEdit"));
-const PressingBales = lazy(() => import("@/pages/PressingBales"));
-const BaleStockEntry = lazy(() => import("@/pages/factory/BaleStockEntry"));
-const BalesHistory = lazy(() => import("@/pages/factory/BalesHistory"));
-const FactoryBaleProductHistory = lazy(() => import("@/pages/factory/FactoryBaleProductHistory"));
-const FactoryBaleProductMonthDetail = lazy(() =>
-  import("@/pages/factory/FactoryBaleProductHistory").then((m) => ({ default: m.FactoryBaleProductMonthDetail }))
-);
-const FactoryBaleProductAllMonths = lazy(() =>
-  import("@/pages/factory/FactoryBaleProductHistory").then((m) => ({ default: m.FactoryBaleProductAllMonths }))
-);
-const BarcodeLookup = lazy(() => import("@/pages/BarcodeLookup"));
-const FactoryBalesHub = lazy(() => import("@/pages/factory/FactoryBalesHub"));
-const FactoryReprintLabels = lazy(() => import("@/pages/factory/FactoryReprintLabels"));
-const FactoryRawMaterialsHub = lazy(() => import("@/pages/factory/FactoryRawMaterialsHub"));
-const FactoryLoadingsHub = lazy(() => import("@/pages/factory/FactoryLoadingsHub"));
-const ProductionSummary = lazy(() => import("@/pages/factory/ProductionSummary"));
-const FactorySuppliers = lazy(() => import("@/pages/factory/FactorySuppliers"));
-const FactoryPartiesHub = lazy(() => import("@/pages/factory/FactoryPartiesHub"));
-const FactoryContainers = lazy(() => import("@/pages/factory/FactoryContainers"));
-const FactoryContainerCreate = lazy(() => import("@/pages/factory/FactoryContainerCreate"));
-const FactoryContainersHub = lazy(() => import("@/pages/factory/FactoryContainersHub"));
-const BarcodeManager = lazy(() => import("@/pages/BarcodeManager"));
-const TestDataImport = lazy(() => import("@/pages/TestDataImport"));
-const ImportCycleDiagnostics = lazy(() => import("@/pages/ImportCycleDiagnostics"));
-const InventoryRepair = lazy(() => import("@/pages/InventoryRepair"));
-const BalanceRepair = lazy(() => import("@/pages/BalanceRepair"));
-const NetProfitDetails = lazy(() => import("@/pages/NetProfitDetails"));
-const NetProfitReport = lazy(() => import("@/pages/NetProfitReport"));
-const FactoryNetProfitAnalytics = lazy(() => import("@/pages/factory/FactoryNetProfitAnalytics"));
-const FactoryNetPosition = lazy(() => import("@/pages/factory/FactoryNetPosition"));
-const FactoryNetPositionDetails = lazy(() => import("@/pages/factory/FactoryNetPositionDetails"));
-const FactoryFinancialSnapshot = lazy(() => import("@/pages/factory/FactoryFinancialSnapshot"));
-const DailyProductionReport = lazy(() => import("@/pages/factory/DailyProductionReport"));
-const CompanyDataReset = lazy(() => import("@/pages/CompanyDataReset"));
-const AccountMigration = lazy(() => import("@/pages/AccountMigration"));
-const AccountTransfer = lazy(() => import("@/pages/AccountTransfer"));
-const StockTransferOrder = lazy(() => import("@/pages/StockTransferOrder"));
-const StockTransfers = lazy(() => import("@/pages/StockTransfers"));
-const OptionalVouchers = lazy(() => import("@/pages/OptionalVouchers"));
-const BaleLedger = lazy(() => import("@/pages/BaleLedger"));
-const SalesReportDetail = lazy(() => import("@/pages/SalesReportDetail"));
-const SalesReportComparison = lazy(() => import("@/pages/SalesReportComparison"));
-const FactoryImport = lazy(() => import("@/pages/factory/FactoryImport"));
-const FactoryBaleRelabeling = lazy(() => import("@/pages/factory/FactoryBaleRelabeling"));
-const MergeBaleProducts = lazy(() => import("@/pages/factory/MergeBaleProducts"));
-const BaleProductImages = lazy(() => import("@/pages/factory/BaleProductImages"));
-const CustomerLogosSettings = lazy(() => import("@/pages/factory/CustomerLogosSettings"));
-const LabelBannersSettings = lazy(() => import("@/pages/factory/LabelBannersSettings"));
-const WipersReEntry = lazy(() => import("@/pages/factory/WipersReEntry"));
-const FactoryUsers = lazy(() => import("@/pages/factory/FactoryUsers"));
-const FactoryWorkersHub = lazy(() => import("@/pages/factory/FactoryWorkersHub"));
-const FactoryWorkerDetail = lazy(() => import("@/pages/factory/FactoryWorkerDetail"));
-const FactoryEmployeesHub = lazy(() => import("@/pages/factory/FactoryEmployeesHub"));
-const FactoryEmployeeDetail = lazy(() => import("@/pages/factory/FactoryEmployeeDetail"));
-const FactoryPayrollHub = lazy(() => import("@/pages/factory/FactoryPayrollHub"));
-const FactoryInsurance = lazy(() => import("@/pages/factory/FactoryInsurance"));
-const FactorySheetsAndSacks = lazy(() => import("@/pages/factory/FactorySheetsAndSacks"));
-const FactorySupplierReport = lazy(() => import("@/pages/factory/FactorySupplierReport"));
-const FactorySupplierStatement = lazy(() => import("@/pages/factory/FactorySupplierStatement"));
-const FactoryBrokerVisualStatement = lazy(() => import("@/pages/factory/FactoryBrokerVisualStatement"));
-const FactoryCustomers = lazy(() => import("@/pages/factory/FactoryCustomers"));
-const FactoryCustomerStatement = lazy(() => import("@/pages/factory/FactoryCustomerStatement"));
-const FactoryInvoicing = lazy(() => import("@/pages/factory/FactoryInvoicing"));
-const FactoryInvoices = lazy(() => import("@/pages/factory/FactoryInvoices"));
-const FactoryInvoiceCreate = lazy(() => import("@/pages/factory/FactoryInvoiceCreate"));
-const FactoryInvoiceDetail = lazy(() => import("@/pages/factory/FactoryInvoiceDetail"));
-const FactoryProformas = lazy(() => import("@/pages/factory/FactoryProformas"));
-const FactoryDispatchBatches = lazy(() => import("@/pages/factory/FactoryDispatchBatches"));
-const FactoryDispatchBatchDetail = lazy(() => import("@/pages/factory/FactoryDispatchBatchDetail"));
-const FactoryDispatchBatchScan = lazy(() => import("@/pages/factory/FactoryDispatchBatchScan"));
-const FactoryBaleTracking = lazy(() => import("@/pages/factory/FactoryBaleTracking"));
-const FactoryStockAllocation = lazy(() => import("@/pages/factory/FactoryStockAllocationV2"));
-const FactoryStockAllocationV3 = lazy(() => import("@/pages/factory/FactoryStockAllocationV3"));
-const FactoryStockAllocationV5 = lazy(() => import("@/pages/factory/FactoryStockAllocationV5"));
-const ProformaAddLine = lazy(() => import("@/pages/factory/ProformaAddLine"));
-const FactoryPriceList = lazy(() => import("@/pages/factory/FactoryPriceList"));
-const FactoryPendingInvoiceVerify = lazy(() => import("@/pages/factory/FactoryPendingInvoiceVerify"));
-const FactoryPendingLoadings = lazy(() => import("@/pages/factory/FactoryPendingLoadings"));
-const FactoryContainerLoadingScan = lazy(() => import("@/pages/factory/FactoryContainerLoadingScan"));
-const FactoryInvoiceLoadingScan = lazy(() => import("@/pages/factory/FactoryInvoiceLoadingScan"));
-const FactoryTransporters = lazy(() => import("@/pages/factory/FactoryTransporters"));
-const FactoryDashboardIntel = lazy(() => import("@/pages/factory/FactoryDashboard"));
-const FactoryKpis = lazy(() => import("@/pages/factory/FactoryKpis"));
-const FactoryProfitability = lazy(() => import("@/pages/factory/FactoryProfitability"));
-const FactoryAlerts = lazy(() => import("@/pages/factory/FactoryAlerts"));
-const FactorySupplierScoreboard = lazy(() => import("@/pages/factory/FactorySupplierScoreboard"));
-const FactoryMixOptimizer = lazy(() => import("@/pages/factory/FactoryMixOptimizer"));
-const FactoryCashflow = lazy(() => import("@/pages/factory/FactoryCashflow"));
-const FactoryWaste = lazy(() => import("@/pages/factory/FactoryWaste"));
-const FactorySupplierHub = lazy(() => import("@/pages/factory/FactorySupplierHub"));
-const FactoryFinancialHub = lazy(() => import("@/pages/factory/FactoryFinancialHub"));
-const FactoryProductionIntelHub = lazy(() => import("@/pages/factory/FactoryProductionIntelHub"));
-const WasteDispatchPage = lazy(() => import("@/pages/factory/WasteDispatch"));
-const FactoryPOS = lazy(() => import("@/pages/factory/FactoryPOS"));
-const FactoryIntelSettings = lazy(() => import("@/pages/factory/FactorySettings"));
-const ConflictCenter = lazy(() => import("@/pages/ConflictCenter"));
-const Chat = lazy(() => import("@/pages/Chat"));
-const SpreadsheetEditor = lazy(() => import("@/pages/SpreadsheetEditor"));
-const LiveSheets = lazy(() => import("@/pages/LiveSheets"));
-const PropertiesDashboard = lazy(() => import("@/pages/properties/PropertiesDashboard"));
-const PropertiesAccounts = lazy(() => import("@/pages/properties/PropertiesAccounts"));
-const PropertiesVouchers = lazy(() => import("@/pages/properties/PropertiesVouchers"));
-const PropertiesVoucherEdit = lazy(() => import("@/pages/properties/PropertiesVoucherEdit"));
-const PropertiesVoucherDetail = lazy(() => import("@/pages/properties/PropertiesVoucherDetail"));
-const PropertiesCreate = lazy(() => import("@/pages/properties/PropertiesCreate"));
-const PropertiesAnalytics = lazy(() => import("@/pages/properties/PropertiesAnalytics"));
-const PropertiesDaybook = lazy(() => import("@/pages/properties/PropertiesDaybook"));
-const PropertiesLedgerMonthly = lazy(() => import("@/pages/properties/PropertiesLedgerMonthly"));
-const PropertiesLedgerVouchers = lazy(() => import("@/pages/properties/PropertiesLedgerVouchers"));
-const PropertiesSettings = lazy(() => import("@/pages/properties/PropertiesSettings"));
-const PropertiesRentalWarehouses = lazy(() => import("@/pages/properties/PropertiesRentalWarehouses"));
-const PropertiesRentalShops = lazy(() => import("@/pages/properties/PropertiesRentalShops"));
-const ErpRentalWarehouses = lazy(() => import("@/pages/erp/ErpRentalWarehouses"));
-const ErpRentalShops = lazy(() => import("@/pages/erp/ErpRentalShops"));
-const ErpRentalPayments = lazy(() => import("@/pages/erp/ErpRentalPayments"));
-const FactoryRentalWarehouses = lazy(() => import("@/pages/factory/FactoryRentalWarehouses"));
-const FactoryRentalShops = lazy(() => import("@/pages/factory/FactoryRentalShops"));
-const FactoryRentalPayments = lazy(() => import("@/pages/factory/FactoryRentalPayments"));
-const PropertiesRentalPayments = lazy(() => import("@/pages/properties/PropertiesRentalPayments"));
-const MySettings = lazy(() => import("@/pages/MySettings"));
-
-// ── Supplier Partner pages ────────────────────────────────────────────────────
-const SpSetup = lazy(() => import("@/pages/sp/SpSetup"));
-const SpReports = lazy(() => import("@/pages/sp/SpReports"));
-const SpOpeningStock = lazy(() => import("@/pages/sp/SpOpeningStock"));
-const SpAliases = lazy(() => import("@/pages/sp/SpAliases"));
-const SpMigrationRehearsal = lazy(() => import("@/pages/sp/SpMigrationRehearsal"));
-const GcLshiMigration = lazy(() => import("@/pages/sp/GcLshiMigration"));
-const IntercompanyLinks = lazy(() => import("@/pages/IntercompanyLinks"));
-const IntercompanyRequests = lazy(() => import("@/pages/IntercompanyRequests"));
+// Page components — lazy-loaded for code splitting. See lazyPages.ts for all declarations.
+import {
+  AICommandCenter, AccountGroups, AccountMigration, AccountTransfer,
+  AccountingCreate, Accounts, Agents, AiValidationPage,
+  Analytics, BalanceRepair, BaleLedger, BarcodeManager,
+  Chat, ChatbotSettings, ClosingStockDetail, ClosingStockSummary,
+  CompanyDataReset, CompanyTransfer, ConflictCenter, ContainerDetailPage,
+  ContainerVerification, Containers, ContainersOTW, ContainersPage,
+  Customers, Dashboard, Daybook, DeletedItems,
+  EditSupplier, ErpRentalPayments, ErpRentalShops, ErpRentalWarehouses,
+  GITMockup, GcLshiMigration, ImportCycleDiagnostics, ImportStockItems,
+  IntercompanyLinks, IntercompanyRequests, InventoryHub, InventoryRepair,
+  LedgerMonthlySummary, LedgerVouchers, LiveSheets, LocationInventory,
+  LocationMonthlySummary, LocationVouchers, MySettings, NetProfitDetails,
+  NetProfitReport, NotificationSettings, OffloadDetail, OpeningStockDetail,
+  OpeningStockSummary, OptionalVouchers, OrphanedRecords, POImport,
+  POS, POSCustomers, POSDashboard, POSDaybook,
+  POSImport, POSPage, POSPriceList, POSSettings,
+  PartiesHub, Payroll, PosTransferOrders, PropertiesAccounts,
+  PropertiesAnalytics, PropertiesCreate, PropertiesDashboard, PropertiesDaybook,
+  PropertiesLedgerMonthly, PropertiesLedgerVouchers, PropertiesRentalPayments, PropertiesRentalShops,
+  PropertiesRentalWarehouses, PropertiesSettings, PropertiesVoucherDetail, PropertiesVoucherEdit,
+  PropertiesVouchers, PurchaseOrderEdit, SalesReport, SalesReportComparison,
+  SalesReportDetail, SalesToolsHub, Settings, SpAliases,
+  SpMigrationRehearsal, SpOpeningStock, SpReports, SpSetup,
+  SpreadsheetEditor, StockHub, StockItemDetail, StockItemHistory,
+  StockItemVouchers, StockTransferOrder, SupplierProfitCheck, SupplierProformas,
+  Suppliers, TestDataImport, TrackingHub, TransactionJournal,
+  VoucherDetail, VoucherEdit, Vouchers,
+} from "@/lazyPages";
+import { FactoryRoutes } from "@/components/FactoryRoutes";
 
 import { CommandPalette } from "@/components/CommandPalette";
 import { AppTopBar } from "@/components/AppTopBar";
@@ -1659,211 +1479,11 @@ function AuthenticatedApp() {
                         </div>
                       }
                     >
-                      <Switch>
-                        <Route path="/factory/daybook" component={FactoryDaybook} />
-                        <Route path="/factory/transporters" component={FactoryTransporters} />
-                        <Route path="/factory/finance">
-                          <Redirect to="/factory/workers" />
-                        </Route>
-                        <Route path="/factory/suppliers">
-                          <Redirect to="/factory/parties?section=suppliers" />
-                        </Route>
-                        <Route path="/factory/containers/new" component={FactoryContainerCreate} />
-                        <Route path="/factory/containers">
-                          <Redirect to="/factory/containers-hub?section=containers" />
-                        </Route>
-                        <Route path="/factory/bale-products" component={BaleProducts} />
-                        <Route
-                          path="/factory/raw-stock/opening-balance/:id/edit"
-                          component={FactoryOpeningBalanceEdit}
-                        />
-                        <Route path="/factory/raw-stock" component={ProductionRawStock} />
-                        <Route path="/factory/raw-materials" component={FactoryRawMaterialsHub} />
-                        <Route path="/factory/pressing">
-                          <Redirect to="/factory/stock-entry" />
-                        </Route>
-                        <Route path="/factory/finalize">
-                          <Redirect to="/factory/stock-entry" />
-                        </Route>
-                        <Route path="/factory/stock-entry" component={BaleStockEntry} />
-                        <Route path="/factory/bales-history" component={BalesHistory} />
-                        <Route path="/factory/bales-hub" component={FactoryBalesHub} />
-                        <Route path="/factory/reprint-labels" component={FactoryReprintLabels} />
-                        <Route path="/factory/location-inventory" component={FactoryLocationInventory} />
-                        <Route path="/factory/location-inventory-mockup" component={FactoryLocationInventoryMockup} />
-                        <Route
-                          path="/factory/bale-product-history/:productId/:locationId/:year/all"
-                          component={FactoryBaleProductAllMonths}
-                        />
-                        <Route
-                          path="/factory/bale-product-history/:productId/:locationId/:year/:month"
-                          component={FactoryBaleProductMonthDetail}
-                        />
-                        <Route
-                          path="/factory/bale-product-history/:productId/:locationId"
-                          component={FactoryBaleProductHistory}
-                        />
-                        <Route path="/factory/containers-hub" component={FactoryContainersHub} />
-                        <Route path="/factory/stock-otw">
-                          <Redirect to="/factory/containers-hub" />
-                        </Route>
-                        <Route path="/factory/stock-bale-list" component={FactoryStockBaleList} />
-                        <Route path="/factory/stock-query/:id" component={FactoryStockItemDetail} />
-                        <Route path="/factory/stock-query" component={StockQuery} />
-                        <Route path="/factory/accounts" component={FactoryAccounts} />
-                        <Route path="/factory/agents" component={Agents} />
-                        <Route path="/factory/vouchers">{() => <FactoryVouchers />}</Route>
-                        <Route path="/factory/vouchers/:id/edit" component={VoucherEdit} />
-                        <Route path="/factory/voucher-detail/:voucherId" component={VoucherDetail} />
-                        <Route path="/factory/create" component={AccountingCreate} />
-                        <Route path="/factory/payroll" component={Payroll} />
-                        <Route path="/factory/analytics" component={Analytics} />
-                        <Route path="/factory/production-summary">
-                          <Redirect to="/factory/intelligence/production-hub?section=production-summary" />
-                        </Route>
-                        <Route path="/factory/sales/new" component={FactoryInvoiceCreate} />
-                        <Route path="/factory/sales/loading/pending" component={FactoryPendingLoadings} />
-                        <Route path="/factory/sales/loading/new" component={FactoryContainerLoadingScan} />
-                        <Route path="/factory/sales/loadings" component={FactoryLoadingsHub} />
-                        <Route
-                          path="/factory/sales/pending-invoices/:id/verify"
-                          component={FactoryPendingInvoiceVerify}
-                        />
-                        <Route path="/factory/invoices/:id/loading-scan" component={FactoryInvoiceLoadingScan} />
-                        <Route path="/factory/sales/invoices/:id" component={FactoryInvoiceDetail} />
-                        <Route path="/factory/price-list" component={FactoryPriceList} />
-                        <Route path="/factory/sales/proformas/:proformaId/add-line" component={ProformaAddLine} />
-                        <Route path="/factory/bale-tracking" component={FactoryBaleTracking} />
-                        <Route
-                          path="/factory/dispatch-batches/:batchId/rides/:rideId/scan"
-                          component={FactoryDispatchBatchScan}
-                        />
-                        <Route path="/factory/dispatch-batches/:id" component={FactoryDispatchBatchDetail} />
-                        <Route path="/factory/dispatch-batches" component={FactoryDispatchBatches} />
-                        <Route path="/factory/invoicing" component={FactoryInvoicing} />
-                        <Route path="/factory/stock-allocation" component={FactoryStockAllocation} />
-                        <Route path="/factory/stock-allocation-v3" component={FactoryStockAllocationV3} />
-                        <Route path="/factory/stock-allocation-v5" component={FactoryStockAllocationV5} />
-                        <Route path="/factory/parties" component={FactoryPartiesHub} />
-                        <Route path="/factory/customers/:id" component={FactoryCustomerStatement} />
-                        <Route path="/factory/customers">
-                          <Redirect to="/factory/parties?section=customers" />
-                        </Route>
-                        <Route path="/factory/payroll-hub" component={FactoryPayrollHub} />
-                        <Route path="/factory/insurance" component={FactoryInsurance} />
-                        <Route path="/factory/sheets-sacks" component={FactorySheetsAndSacks} />
-                        <Route path="/factory/employees/:id" component={FactoryEmployeeDetail} />
-                        <Route path="/factory/employees">
-                          <Redirect to="/factory/payroll-hub?section=employees" />
-                        </Route>
-                        <Route path="/factory/workers/:id" component={FactoryWorkerDetail} />
-                        <Route path="/factory/workers">
-                          <Redirect to="/factory/payroll-hub?section=workers" />
-                        </Route>
-                        <Route path="/factory/worker-payroll">
-                          <Redirect to="/factory/workers?tab=payroll" />
-                        </Route>
-                        <Route path="/factory/supplier-report">
-                          <Redirect to="/factory/intelligence/supplier-hub?section=report" />
-                        </Route>
-                        <Route path="/factory/supplier-statement">
-                          <Redirect to="/factory/intelligence/supplier-hub?section=statement" />
-                        </Route>
-                        <Route path="/factory/broker-visual-statement" component={FactoryBrokerVisualStatement} />
-                        <Route path="/factory/barcode-lookup" component={BarcodeLookup} />
-                        <Route path="/factory/import" component={FactoryImport} />
-                        <Route path="/factory/bale-relabeling" component={FactoryBaleRelabeling} />
-                        <Route path="/factory/merge-bale-products" component={MergeBaleProducts} />
-                        <Route path="/factory/bale-product-images" component={BaleProductImages} />
-                        <Route path="/factory/customer-logos" component={CustomerLogosSettings} />
-                        <Route path="/factory/label-banners" component={LabelBannersSettings} />
-                        <Route path="/factory/bale-relabeling/wipers-re-entry" component={WipersReEntry} />
-                        <Route path="/factory/users">
-                          <Redirect to="/factory/settings" />
-                        </Route>
-                        <Route path="/factory/ledger-monthly/:accountId" component={LedgerMonthlySummary} />
-                        <Route path="/factory/ledger-vouchers/:accountId/:year/:month" component={LedgerVouchers} />
-                        <Route path="/factory/intelligence/dashboard" component={FactoryDashboardIntel} />
-                        <Route path="/factory/intelligence/kpis" component={FactoryKpis} />
-                        <Route path="/factory/intelligence/profitability">
-                          <Redirect to="/factory/intelligence/financial-hub?section=profitability" />
-                        </Route>
-                        <Route path="/factory/intelligence/alerts" component={FactoryAlerts} />
-                        <Route path="/factory/intelligence/supplier-hub" component={FactorySupplierHub} />
-                        <Route path="/factory/intelligence/financial-hub" component={FactoryFinancialHub} />
-                        <Route path="/factory/intelligence/production-hub" component={FactoryProductionIntelHub} />
-                        <Route path="/factory/intelligence/supplier-scores">
-                          <Redirect to="/factory/intelligence/supplier-hub?section=scores" />
-                        </Route>
-                        <Route path="/factory/intelligence/mix-optimizer">
-                          <Redirect to="/factory/intelligence/production-hub?section=mix-optimizer" />
-                        </Route>
-                        <Route path="/factory/intelligence/cashflow">
-                          <Redirect to="/factory/intelligence/financial-hub?section=cashflow" />
-                        </Route>
-                        <Route path="/factory/intelligence/waste">
-                          <Redirect to="/factory/intelligence/production-hub?section=waste" />
-                        </Route>
-                        <Route path="/factory/waste-dispatch" component={WasteDispatchPage} />
-                        <Route path="/factory/pos" component={FactoryPOS} />
-                        <Route path="/factory/bale-ledger">{() => <Redirect to="/factory/production-report" />}</Route>
-                        <Route path="/factory/intelligence/settings" component={FactoryIntelSettings} />
-                        {(user?.role === "Admin" || user?.role === "Developer" || myAccess?.fullAccess) && (
-                          <Route path="/factory/spreadsheet" component={SpreadsheetEditor} />
-                        )}
-                        <Route path="/factory/chat" component={Chat} />
-                        <Route path="/factory/conflicts" component={ConflictCenter} />
-                        {(user?.role === "Admin" || user?.role === "Developer") && (
-                          <Route path="/factory/settings" component={Settings} />
-                        )}
-                        <Route path="/my-settings" component={MySettings} />
-                        <Route path="/intercompany-requests" component={IntercompanyRequests} />
-                        <Route path="/intercompany-links" component={IntercompanyLinks} />
-                        {(user?.role === "Admin" || user?.role === "Developer") && (
-                          <Route path="/factory/deleted-items" component={DeletedItems} />
-                        )}
-                        {(user?.role === "Admin" || user?.role === "Developer") && (
-                          <Route path="/factory/orphaned-records" component={OrphanedRecords} />
-                        )}
-                        {(user?.role === "Admin" || user?.role === "Developer") && (
-                          <Route path="/factory/chatbot-settings" component={ChatbotSettings} />
-                        )}
-                        {(user?.role === "Admin" || user?.role === "Developer") && (
-                          <Route path="/factory/import-cycle-diagnostics" component={ImportCycleDiagnostics} />
-                        )}
-                        {(user?.role === "Admin" || user?.role === "Developer") && (
-                          <Route path="/factory/inventory-repair" component={InventoryRepair} />
-                        )}
-                        {(user?.role === "Admin" || user?.role === "Developer") && (
-                          <Route path="/factory/company-data-reset" component={CompanyDataReset} />
-                        )}
-                        <Route path="/factory/net-position-details" component={FactoryNetPositionDetails} />
-                        <Route path="/factory/net-profit-analytics">
-                          <Redirect to="/factory/intelligence/financial-hub?section=net-profit" />
-                        </Route>
-                        <Route path="/factory/net-position">
-                          <Redirect to="/factory/intelligence/financial-hub?section=net-position" />
-                        </Route>
-                        <Route path="/factory/financial-snapshot" component={FactoryFinancialSnapshot} />
-                        <Route path="/factory/production-report">
-                          {() =>
-                            myAccess?.hiddenCostFields?.includes("hide_tab_production_analytics") ? (
-                              <Redirect to={factoryDefaultPage} />
-                            ) : (
-                              <DailyProductionReport />
-                            )
-                          }
-                        </Route>
-                        <Route path="/factory/rental/warehouses" component={FactoryRentalWarehouses} />
-                        <Route path="/factory/rental/shops" component={FactoryRentalShops} />
-                        <Route path="/factory/rental/payments" component={FactoryRentalPayments} />
-                        {(user?.role === "Admin" || user?.role === "Developer") && (
-                          <Route path="/balance-repair" component={BalanceRepair} />
-                        )}
-                        <Route>
-                          <Redirect to={factoryDefaultPage} />
-                        </Route>
-                      </Switch>
+                      <FactoryRoutes
+                        user={user}
+                        myAccess={myAccess}
+                        factoryDefaultPage={factoryDefaultPage}
+                      />
                     </Suspense>
                   </ErrorBoundary>
                 </div>
