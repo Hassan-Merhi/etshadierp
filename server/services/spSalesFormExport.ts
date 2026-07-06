@@ -380,25 +380,32 @@ export async function generateSpSalesFormExcel(params: SpSalesFormParams): Promi
 
   // ── 3. ENTRY sheet ────────────────────────────────────────────────────────
 
-  // Pre-sweep: nullify every sharedFormula SLAVE cell in the profit column
-  // (baseCol+2 for each day) across all item rows.
+  // Pre-sweep: nullify sharedFormula SLAVE cells in every item row of the
+  // ENTRY sheet, limited to the date-block columns (col E_DATE_START onward).
   //
   // Why: ExcelJS throws "Shared Formula master must exist above and or left of
-  // clone" if a slave's master cell is later replaced with a non-shared-formula
-  // value (even another formula written as a plain {formula:...} object).
-  // We fix this by clearing slaves upfront; the main loop then writes each profit
-  // cell as its own standalone formula string — no shared-formula chain.
+  // clone" if any slave's master cell is later replaced or cleared (even
+  // replacing with another formula written as a plain {formula:...} object
+  // counts as "changing" the master for ExcelJS's validator).
+  //
+  // Earlier versions only swept the profit column (baseCol+2) for the first
+  // dayCount days; but templates with shared-formula chains spanning qty/price
+  // columns (baseCol+0/+1) and days beyond the export range were still failing.
+  //
+  // Scope: we restrict to columns >= E_DATE_START to avoid touching static
+  // formula columns (A–F: item name, cost/bag, opening stock totals, etc.)
+  // that are not part of the per-day data block and should remain intact.
   for (let r = E_DATA_START; r <= E_DATA_END; r++) {
     const row = entryWs.getRow(r);
     let rowChanged = false;
-    for (let d = 0; d < dayCount + 20; d++) {
-      const profitCell = row.getCell(E_DATE_START + d * 3 + 2);
-      const v = profitCell.value as any;
+    row.eachCell({ includeEmpty: false }, (cell) => {
+      if (cell.col < E_DATE_START) return; // preserve static columns A–F
+      const v = cell.value as any;
       if (v && typeof v === "object" && "sharedFormula" in v) {
-        profitCell.value = null;
+        cell.value = null;
         rowChanged = true;
       }
-    }
+    });
     if (rowChanged) row.commit();
   }
 

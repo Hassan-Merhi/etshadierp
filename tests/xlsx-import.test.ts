@@ -21,6 +21,7 @@ import {
   closeTestServer,
   type TestContext,
 } from "./setup";
+import { pool } from "../server/db";
 
 const TEST_PREFIX = "xlsimp";
 
@@ -393,6 +394,262 @@ describe("XLSX Import — Company isolation", () => {
   });
 });
 
+// ── POS Import — validate endpoint ───────────────────────────────────────────
+
+describe("XLSX Import — POS validate endpoint", () => {
+  it("returns errors for an unrecognised barcode", async () => {
+    const res = await agent.post("/api/pos-import/validate").send({
+      locationId: ctx.locationId,
+      items: [{ barcode: "DOES-NOT-EXIST-XYZ", quantity: 1, rate: 10, rowNum: 2 }],
+    });
+    expect(res.status).toBe(200);
+    expect(res.body.errors.length).toBeGreaterThan(0);
+    expect(res.body.errors[0]).toMatch(/DOES-NOT-EXIST-XYZ/);
+  });
+
+  it("resolves a known barcode and returns stockItemId", async () => {
+    const barcode = `${TEST_PREFIX}-ITEM1`;
+    const res = await agent.post("/api/pos-import/validate").send({
+      locationId: ctx.locationId,
+      items: [{ barcode, quantity: 1, rate: 10, rowNum: 2 }],
+    });
+    expect(res.status).toBe(200);
+    expect(res.body.errors).toHaveLength(0);
+    expect(res.body.validatedItems[0].stockItemId).toBe(ctx.stockItemIds[0]);
+    expect(res.body.validatedItems[0].stockItemName).toBeDefined();
+  });
+
+  it("returns 400 when locationId is missing", async () => {
+    const res = await agent.post("/api/pos-import/validate").send({
+      items: [{ barcode: `${TEST_PREFIX}-ITEM1`, quantity: 1, rate: 10, rowNum: 2 }],
+    });
+    expect(res.status).toBe(400);
+  });
+
+  it("requires authentication (unauthenticated → 401)", async () => {
+    const res = await request(ctx.app).post("/api/pos-import/validate").send({
+      locationId: ctx.locationId,
+      items: [],
+    });
+    expect(res.status).toBe(401);
+  });
+});
+
+// ── POS Import — full commit flow with DB assertions ──────────────────────────
+
+describe("XLSX Import — POS import (commit) endpoint", () => {
+  it("creates a sales voucher and returns itemsCount + totalSales", async () => {
+    const barcode = `${TEST_PREFIX}-ITEM1`;
+    const res = await agent.post("/api/pos-import/import").send({
+      locationId: ctx.locationId,
+      saleDate: "2024-06-01",
+      cashAccountId: ctx.cashAccountId,
+      items: [{ barcode, quantity: 5, rate: 20 }],
+    });
+
+    expect(res.status).toBe(200);
+    expect(res.body.itemsCount).toBe(1);
+    expect(parseFloat(res.body.totalSales)).toBeCloseTo(100, 1);
+  });
+
+  it("inventory decreases after a successful POS import", async () => {
+    const barcode = `${TEST_PREFIX}-ITEM2`;
+    // setup.ts seeds 100 units of each item; earlier tests may have run but
+    // we look at the delta, not the absolute value.
+    const before = await pool.query<{ quantity: string }>(
+      `SELECT quantity FROM inventory
+        WHERE location_id = $1 AND stock_item_id = $2
+        LIMIT 1`,
+      [ctx.locationId, ctx.stockItemIds[1]],
+    );
+    const qtyBefore = parseFloat(before.rows[0]?.quantity ?? "0");
+
+    const res = await agent.post("/api/pos-import/import").send({
+      locationId: ctx.locationId,
+      saleDate: "2024-06-02",
+      cashAccountId: ctx.cashAccountId,
+      items: [{ barcode, quantity: 3, rate: 15 }],
+    });
+    expect(res.status).toBe(200);
+
+    const after = await pool.query<{ quantity: string }>(
+      `SELECT quantity FROM inventory
+        WHERE location_id = $1 AND stock_item_id = $2
+        LIMIT 1`,
+      [ctx.locationId, ctx.stockItemIds[1]],
+    );
+    const qtyAfter = parseFloat(after.rows[0]?.quantity ?? "0");
+    expect(qtyAfter).toBeCloseTo(qtyBefore - 3, 2);
+  });
+
+  it("missing cashAccountId returns 400", async () => {
+    const res = await agent.post("/api/pos-import/import").send({
+      locationId: ctx.locationId,
+      saleDate: "2024-06-01",
+      items: [{ barcode: `${TEST_PREFIX}-ITEM1`, quantity: 1, rate: 10 }],
+      // cashAccountId omitted
+    });
+    expect(res.status).toBe(400);
+  });
+
+  it("missing locationId returns 400", async () => {
+    const res = await agent.post("/api/pos-import/import").send({
+      saleDate: "2024-06-01",
+      cashAccountId: ctx.cashAccountId,
+      items: [{ barcode: `${TEST_PREFIX}-ITEM1`, quantity: 1, rate: 10 }],
+    });
+    expect(res.status).toBe(400);
+  });
+
+  it("unknown barcode in items returns 500 and rolls back (no voucher created)", async () => {
+    // Count existing sales vouchers before the failed commit
+    const before = await pool.query<{ count: string }>(
+      `SELECT COUNT(*) FROM vouchers WHERE company_id = $1 AND voucher_type = 'Sales'`,
+      [ctx.companyId],
+    );
+    const countBefore = parseInt(before.rows[0].count);
+
+    const res = await agent.post("/api/pos-import/import").send({
+      locationId: ctx.locationId,
+      saleDate: "2024-06-01",
+      cashAccountId: ctx.cashAccountId,
+      items: [{ barcode: "NONEXISTENT-BARCODE-12345", quantity: 1, rate: 10 }],
+    });
+    // The commit throws inside a transaction → 500
+    expect(res.status).toBe(500);
+
+    // Transaction must have rolled back — voucher count unchanged
+    const after = await pool.query<{ count: string }>(
+      `SELECT COUNT(*) FROM vouchers WHERE company_id = $1 AND voucher_type = 'Sales'`,
+      [ctx.companyId],
+    );
+    const countAfter = parseInt(after.rows[0].count);
+    expect(countAfter).toBe(countBefore);
+  });
+
+  it("requires authentication (unauthenticated → 401)", async () => {
+    const res = await request(ctx.app).post("/api/pos-import/import").send({
+      locationId: ctx.locationId,
+      saleDate: "2024-06-01",
+      cashAccountId: ctx.cashAccountId,
+      items: [{ barcode: `${TEST_PREFIX}-ITEM1`, quantity: 1, rate: 10 }],
+    });
+    expect(res.status).toBe(401);
+  });
+});
+
+// ── Stock Transfer Import — validate endpoint ─────────────────────────────────
+
+describe("XLSX Import — Stock Transfer validate endpoint", () => {
+  it("returns errors for an unrecognised barcode", async () => {
+    const res = await agent.post("/api/stock-transfer-import/validate").send({
+      sourceLocationId: ctx.locationId,
+      destinationLocationId: ctx.location2Id,
+      items: [{ barcode: "NO-SUCH-ITEM-XYZ", quantity: 5, rowNum: 2 }],
+    });
+    expect(res.status).toBe(200);
+    expect(res.body.errors.length).toBeGreaterThan(0);
+  });
+
+  it("validates a known barcode and returns stockItemId", async () => {
+    const barcode = `${TEST_PREFIX}-ITEM3`;
+    const res = await agent.post("/api/stock-transfer-import/validate").send({
+      sourceLocationId: ctx.locationId,
+      destinationLocationId: ctx.location2Id,
+      items: [{ barcode, quantity: 5, rowNum: 2 }],
+    });
+    expect(res.status).toBe(200);
+    expect(res.body.errors).toHaveLength(0);
+    expect(res.body.validatedItems[0].stockItemId).toBe(ctx.stockItemIds[2]);
+  });
+
+  it("returns 400 when source === destination location", async () => {
+    const res = await agent.post("/api/stock-transfer-import/validate").send({
+      sourceLocationId: ctx.locationId,
+      destinationLocationId: ctx.locationId, // same!
+      items: [{ barcode: `${TEST_PREFIX}-ITEM1`, quantity: 1 }],
+    });
+    expect(res.status).toBe(400);
+  });
+});
+
+// ── Stock Transfer Import — full commit flow with DB assertions ───────────────
+
+describe("XLSX Import — Stock Transfer import (commit) endpoint", () => {
+  it("creates a transfer record and returns success with itemsCount", async () => {
+    const barcode = `${TEST_PREFIX}-ITEM3`;
+    const res = await agent.post("/api/stock-transfer-import/import").send({
+      sourceLocationId: ctx.locationId,
+      destinationLocationId: ctx.location2Id,
+      transferDate: "2024-06-03",
+      items: [{ barcode, quantity: 5 }],
+    });
+
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(res.body.itemsCount).toBe(1);
+  });
+
+  it("inventory moves from source to destination after transfer", async () => {
+    const barcode = `${TEST_PREFIX}-ITEM1`;
+
+    const beforeSrc = await pool.query<{ quantity: string }>(
+      `SELECT quantity FROM inventory WHERE location_id = $1 AND stock_item_id = $2 LIMIT 1`,
+      [ctx.locationId, ctx.stockItemIds[0]],
+    );
+    const srcQtyBefore = parseFloat(beforeSrc.rows[0]?.quantity ?? "0");
+
+    const beforeDst = await pool.query<{ quantity: string }>(
+      `SELECT quantity FROM inventory WHERE location_id = $1 AND stock_item_id = $2 LIMIT 1`,
+      [ctx.location2Id, ctx.stockItemIds[0]],
+    );
+    const dstQtyBefore = parseFloat(beforeDst.rows[0]?.quantity ?? "0");
+
+    const res = await agent.post("/api/stock-transfer-import/import").send({
+      sourceLocationId: ctx.locationId,
+      destinationLocationId: ctx.location2Id,
+      transferDate: "2024-06-04",
+      items: [{ barcode, quantity: 8 }],
+    });
+    expect(res.status).toBe(200);
+
+    const afterSrc = await pool.query<{ quantity: string }>(
+      `SELECT quantity FROM inventory WHERE location_id = $1 AND stock_item_id = $2 LIMIT 1`,
+      [ctx.locationId, ctx.stockItemIds[0]],
+    );
+    const srcQtyAfter = parseFloat(afterSrc.rows[0]?.quantity ?? "0");
+
+    const afterDst = await pool.query<{ quantity: string }>(
+      `SELECT quantity FROM inventory WHERE location_id = $1 AND stock_item_id = $2 LIMIT 1`,
+      [ctx.location2Id, ctx.stockItemIds[0]],
+    );
+    const dstQtyAfter = parseFloat(afterDst.rows[0]?.quantity ?? "0");
+
+    expect(srcQtyAfter).toBeCloseTo(srcQtyBefore - 8, 2);
+    expect(dstQtyAfter).toBeCloseTo(dstQtyBefore + 8, 2);
+  });
+
+  it("missing required fields returns 400", async () => {
+    const res = await agent.post("/api/stock-transfer-import/import").send({
+      sourceLocationId: ctx.locationId,
+      // destinationLocationId omitted
+      transferDate: "2024-06-03",
+      items: [{ barcode: `${TEST_PREFIX}-ITEM1`, quantity: 1 }],
+    });
+    expect(res.status).toBe(400);
+  });
+
+  it("requires authentication (unauthenticated → 401)", async () => {
+    const res = await request(ctx.app).post("/api/stock-transfer-import/import").send({
+      sourceLocationId: ctx.locationId,
+      destinationLocationId: ctx.location2Id,
+      transferDate: "2024-06-03",
+      items: [{ barcode: `${TEST_PREFIX}-ITEM1`, quantity: 1 }],
+    });
+    expect(res.status).toBe(401);
+  });
+});
+
 /*
  * What this file protects:
  * - POS parse: valid XLSX → structured items + totalValue
@@ -403,10 +660,21 @@ describe("XLSX Import — Company isolation", () => {
  * - POS parse: lowercase column aliases accepted
  * - POS parse: no file → 400; bad binary → 400 (not 500); empty XLSX → 400
  * - POS parse: requires auth and company session
+ * - POS validate: known barcode → stockItemId resolved; unknown barcode → error
+ * - POS validate: missing locationId → 400; requires auth
+ * - POS import/commit: creates voucher, returns itemsCount + totalSales
+ * - POS import/commit: inventory decreases at source location (DB assertion)
+ * - POS import/commit: missing cashAccountId/locationId → 400; bad barcode → 500
+ * - POS import/commit: requires auth
  * - Stock transfer parse: valid XLSX → items + totalItems
  * - Stock transfer parse: zero qty rows skipped; lowercase aliases accepted
  * - Stock transfer parse: duplicate rows all returned
  * - Stock transfer parse: no file → 400; bad binary → 400; empty XLSX → 400
  * - Stock transfer parse: requires auth
+ * - Stock transfer validate: known barcode → stockItemId; unknown barcode → error
+ * - Stock transfer validate: same source/destination → 400
+ * - Stock transfer import/commit: returns success + itemsCount (DB record created)
+ * - Stock transfer import/commit: source inventory decreases, destination increases (DB assertion)
+ * - Stock transfer import/commit: missing fields → 400; requires auth
  * - Company isolation: parse with no company set returns 400
  */
