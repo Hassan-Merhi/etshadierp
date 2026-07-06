@@ -24,6 +24,7 @@ import {
   Banknote,
   Info,
   SlidersHorizontal,
+  Clock,
 } from "lucide-react";
 import { ExcelJS, writeFile } from "@/lib/excelHelper";
 import { Button } from "@/components/ui/button";
@@ -1140,6 +1141,7 @@ export default function FactoryWorkers() {
   const totalSalary = (workers ?? []).filter((w) => w.active).reduce((s, w) => s + parseFloat(w.baseSalary || "0"), 0);
   const totalTransport = (workers ?? []).filter((w) => w.active).reduce((s, w) => s + parseFloat((w as any).transportAllowance || "0"), 0);
   const totalAdvances = (workers ?? []).reduce((s, w) => s + parseFloat((w as any).pendingAdvanceBalance || "0"), 0);
+  const totalDueToday = Object.values(amountDue).reduce((s, d) => s + (d.net > 0 ? d.net : 0), 0);
 
   return (
     <div className="space-y-5">
@@ -1204,6 +1206,13 @@ export default function FactoryWorkers() {
                   <Banknote className="h-4 w-4 text-amber-500" />
                   <span className="text-muted-foreground">Advances</span>
                   <span className="font-semibold font-mono">${totalAdvances.toLocaleString()}</span>
+                </div>
+                <div className="flex items-center gap-2 rounded-lg border bg-muted/40 px-4 py-2 text-sm">
+                  <Clock className="h-4 w-4 text-emerald-500" />
+                  <span className="text-muted-foreground">Due Today</span>
+                  <span className="font-semibold font-mono text-emerald-600 dark:text-emerald-400">
+                    ${totalDueToday.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </span>
                 </div>
               </>
             )}
