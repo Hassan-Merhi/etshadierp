@@ -66,6 +66,7 @@ import {
 import { BrokerOverviewPanel } from "./factory-suppliers/BrokerOverviewPanel";
 import { SupplierStatement } from "./factory-suppliers/SupplierStatement";
 import { SupplierDialogs } from "./factory-suppliers/SupplierDialogs";
+import { AssignContainersDialog, DirectContainer } from "./factory-suppliers/AssignContainersDialog";
 
 export default function FactorySuppliers() {
   const { wrapAdminAction, AdminDialog } = useAdminOverride();
@@ -180,6 +181,21 @@ export default function FactorySuppliers() {
     },
     enabled: !!parentViewSupplierId && !statementSupplierId,
   });
+
+  // Direct containers — held by the broker itself, not yet assigned to a linked child
+  const { data: directContainersData, isLoading: directContainersLoading } = useQuery<DirectContainer[]>({
+    queryKey: ["/api/factory/suppliers", parentViewSupplierId, "direct-containers"],
+    queryFn: async () => {
+      const res = await factoryApiRequest("GET", `/api/factory/suppliers/${parentViewSupplierId}/direct-containers`);
+      if (!res.ok) throw new Error("Failed to load direct containers");
+      return res.json();
+    },
+    enabled: !!parentViewSupplierId && !statementSupplierId,
+  });
+  const directContainers: DirectContainer[] = directContainersData || [];
+
+  // Assign containers dialog state
+  const [assignTarget, setAssignTarget] = useState<{ id: number; name: string } | null>(null);
 
   const isBrokerStatement = !!statementData?.linkedSupplierGroups?.length;
   const today = new Date().toLocaleDateString("en-CA");
@@ -425,6 +441,29 @@ export default function FactorySuppliers() {
       toast({ title: `Moved to ${data.toSupplierName}`, description: `Was under ${data.fromSupplierName}` });
     },
     onError: (err: Error) => toast({ title: "Move failed", description: err.message, variant: "destructive" }),
+  });
+
+  // Bulk-assign: move multiple containers to a linked supplier in sequence
+  const assignContainersMutation = useMutation({
+    mutationFn: async ({ containerIds, targetSupplierId }: { containerIds: number[]; targetSupplierId: number }) => {
+      const results: any[] = [];
+      for (const containerId of containerIds) {
+        const res = await factoryApiRequest("POST", `/api/factory/containers/${containerId}/move-supplier`, { targetSupplierId });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(`Container ${containerId}: ${err.message || "Failed"}`);
+        }
+        results.push(await res.json());
+      }
+      return results;
+    },
+    onSuccess: (results) => {
+      setAssignTarget(null);
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/suppliers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/suppliers", parentViewSupplierId, "direct-containers"] });
+      toast({ title: `${results.length} container${results.length !== 1 ? "s" : ""} assigned to ${results[0]?.toSupplierName}` });
+    },
+    onError: (err: Error) => toast({ title: "Assignment failed", description: err.message, variant: "destructive" }),
   });
 
   const [editObComm, setEditObComm] = useState<null | {
@@ -784,6 +823,26 @@ export default function FactorySuppliers() {
           }}
           formatNum={formatNum}
           formatDate={formatDate}
+          directContainers={directContainers}
+          directContainersLoading={directContainersLoading}
+          onAddLinkedSupplier={() => {
+            setCreateSubAccountParentId(parentViewSupplierId);
+            resetForm();
+            setCreateOpen(true);
+          }}
+          onAssignContainersTo={(supplierId, supplierName) =>
+            setAssignTarget({ id: supplierId, name: supplierName })
+          }
+        />
+        <AssignContainersDialog
+          open={!!assignTarget}
+          onClose={() => setAssignTarget(null)}
+          linkedSupplier={assignTarget}
+          containers={directContainers}
+          onAssign={(containerIds) =>
+            assignTarget && assignContainersMutation.mutate({ containerIds, targetSupplierId: assignTarget.id })
+          }
+          isPending={assignContainersMutation.isPending}
         />
         <SupplierDialogs
           createOpen={createOpen}
