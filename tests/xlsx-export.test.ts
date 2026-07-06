@@ -488,6 +488,7 @@ describe("XLSX Export — Bale Full Export (success path — requires isolated D
   });
 
   it("ExcelJS can open the returned buffer without error", async (t) => {
+    // Skip on shared DB: seeded bale landed in a different company's session.
     if (!baleAppearsInSessionCompany) { t.skip(); return; }
     const res = await getBinary(
       agent,
@@ -498,6 +499,7 @@ describe("XLSX Export — Bale Full Export (success path — requires isolated D
   });
 
   it('contains "Bales" sheet', async (t) => {
+    // Skip on shared DB: seeded bale landed in a different company's session.
     if (!baleAppearsInSessionCompany) { t.skip(); return; }
     const res = await getBinary(
       agent,
@@ -508,6 +510,7 @@ describe("XLSX Export — Bale Full Export (success path — requires isolated D
   });
 
   it('"Bales" sheet contains the seeded bale reference number', async (t) => {
+    // Skip on shared DB: seeded bale landed in a different company's session.
     if (!baleAppearsInSessionCompany) { t.skip(); return; }
     const res = await getBinary(
       agent,
@@ -525,6 +528,7 @@ describe("XLSX Export — Bale Full Export (success path — requires isolated D
   });
 
   it('"Bales" sheet has expected column headers (Reference Number, Weight, Status)', async (t) => {
+    // Skip on shared DB: seeded bale landed in a different company's session.
     if (!baleAppearsInSessionCompany) { t.skip(); return; }
     const res = await getBinary(
       agent,

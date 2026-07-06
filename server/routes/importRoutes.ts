@@ -1181,7 +1181,12 @@ export function registerImportRoutes(app: Express) {
           // Get stock item
           const stockItem = await storage.getStockItemByCodeOrAlias(item.barcode, req.session.currentCompanyId!);
           if (!stockItem) {
-            throw new Error(`Stock item not found for barcode: ${item.barcode}`);
+            // Bad user input (unknown barcode) → should be 400, not 500.
+            // Throw inside the transaction so the tx rolls back cleanly; the
+            // tagged httpStatus lets the outer catch return the right status code.
+            const inputErr: any = new Error(`Stock item not found for barcode: ${item.barcode}`);
+            inputErr.httpStatus = 400;
+            throw inputErr;
           }
 
           // Get current inventory (allow negative stock for historical sales import)
@@ -1353,6 +1358,11 @@ export function registerImportRoutes(app: Express) {
         });
       }
     } catch (error: any) {
+      // httpStatus=400 means bad user input (e.g. unknown barcode); transaction
+      // already rolled back at this point.
+      if (error.httpStatus === 400) {
+        return res.status(400).json({ message: error.message });
+      }
       console.error("POS Import error:", error);
       res.status(500).json({ message: error.message });
     }

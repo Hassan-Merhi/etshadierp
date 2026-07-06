@@ -501,7 +501,7 @@ describe("XLSX Import — POS import (commit) endpoint", () => {
     expect(res.status).toBe(400);
   });
 
-  it("unknown barcode in items returns 500 and rolls back (no voucher created)", async () => {
+  it("unknown barcode in items returns 400 and rolls back (no voucher created)", async () => {
     // Count existing sales vouchers before the failed commit
     const before = await pool.query<{ count: string }>(
       `SELECT COUNT(*) FROM vouchers WHERE company_id = $1 AND voucher_type = 'Sales'`,
@@ -515,8 +515,9 @@ describe("XLSX Import — POS import (commit) endpoint", () => {
       cashAccountId: ctx.cashAccountId,
       items: [{ barcode: "NONEXISTENT-BARCODE-12345", quantity: 1, rate: 10 }],
     });
-    // The commit throws inside a transaction → 500
-    expect(res.status).toBe(500);
+    // Unknown barcode is bad user input → 400 (not a server error)
+    expect(res.status).toBe(400);
+    expect(res.body.message).toMatch(/NONEXISTENT-BARCODE-12345/);
 
     // Transaction must have rolled back — voucher count unchanged
     const after = await pool.query<{ count: string }>(
@@ -648,6 +649,143 @@ describe("XLSX Import — Stock Transfer import (commit) endpoint", () => {
     });
     expect(res.status).toBe(401);
   });
+
+  it("unknown barcode returns 400 (not 500), no voucher created", async () => {
+    // The route validates every barcode before starting the DB transaction, so
+    // an unknown barcode is user input error → 400 with no partial state.
+    const before = await pool.query<{ count: string }>(
+      `SELECT COUNT(*) FROM vouchers WHERE company_id = $1 AND voucher_type = 'Stock Transfer'`,
+      [ctx.companyId],
+    );
+    const countBefore = parseInt(before.rows[0].count);
+
+    const res = await agent.post("/api/stock-transfer-import/import").send({
+      sourceLocationId: ctx.locationId,
+      destinationLocationId: ctx.location2Id,
+      transferDate: "2024-06-05",
+      items: [{ barcode: "NO-SUCH-BARCODE-XYZ", quantity: 2 }],
+    });
+    expect(res.status).toBe(400);
+    expect(res.body.message).toMatch(/NO-SUCH-BARCODE-XYZ/);
+
+    const after = await pool.query<{ count: string }>(
+      `SELECT COUNT(*) FROM vouchers WHERE company_id = $1 AND voucher_type = 'Stock Transfer'`,
+      [ctx.companyId],
+    );
+    expect(parseInt(after.rows[0].count)).toBe(countBefore);
+  });
+
+  it("no partial state when second item has unknown barcode (rollback guard)", async () => {
+    // First item is valid, second is not. The route detects the bad barcode
+    // BEFORE opening any transaction, so no voucher or inventory row is written.
+    const before = await pool.query<{ count: string }>(
+      `SELECT COUNT(*) FROM vouchers WHERE company_id = $1 AND voucher_type = 'Stock Transfer'`,
+      [ctx.companyId],
+    );
+    const countBefore = parseInt(before.rows[0].count);
+
+    const res = await agent.post("/api/stock-transfer-import/import").send({
+      sourceLocationId: ctx.locationId,
+      destinationLocationId: ctx.location2Id,
+      transferDate: "2024-06-06",
+      items: [
+        { barcode: `${TEST_PREFIX}-ITEM1`, quantity: 1 },
+        { barcode: "TOTALLY-UNKNOWN-BARCODE", quantity: 1 },
+      ],
+    });
+    expect(res.status).toBe(400);
+
+    const after = await pool.query<{ count: string }>(
+      `SELECT COUNT(*) FROM vouchers WHERE company_id = $1 AND voucher_type = 'Stock Transfer'`,
+      [ctx.companyId],
+    );
+    expect(parseInt(after.rows[0].count)).toBe(countBefore);
+  });
+});
+
+// ── PO/Container Import — validate endpoint ───────────────────────────────────
+// The PO import flow is a two-step JSON API: (1) client parses the XLSX in the
+// browser and sends structured preview JSON; (2) server validates + commits.
+// There is no server-side multipart parse endpoint for PO import, so full XLSX
+// commit tests are not applicable here.  We cover the validate layer directly.
+
+describe("PO Import — validate endpoint", () => {
+  it("returns 400 when required fields are missing", async () => {
+    const res = await agent.post("/api/po-import/validate").send({
+      // containerNumber missing
+      supplierId: 9999,
+      preview: [],
+    });
+    expect(res.status).toBe(400);
+  });
+
+  it("reports validation error for unknown supplierId", async () => {
+    const res = await agent.post("/api/po-import/validate").send({
+      containerNumber: `${TEST_PREFIX}-CONT-001`,
+      supplierId: 9999999, // does not exist
+      preview: [
+        {
+          containerNumber: `${TEST_PREFIX}-CONT-001`,
+          items: [],
+          charges: {},
+          itemsTotal: 0,
+          chargesTotal: 0,
+          grandTotal: 0,
+        },
+      ],
+    });
+    expect(res.status).toBe(200); // validate returns 200 with errors array
+    expect(res.body.valid).toBe(false);
+    expect(res.body.errors.length).toBeGreaterThan(0);
+    expect(res.body.errors.some((e: string) => /supplier/i.test(e))).toBe(true);
+  });
+
+  it("reports validation error when item barcode is unknown", async () => {
+    // Create a real supplier so the supplierId check passes and the route reaches
+    // per-item barcode validation — otherwise only "supplier not found" surfaces.
+    // suppliers table has no companyId, so this is a global insert.
+    const supRes = await pool.query<{ id: number }>(
+      `INSERT INTO suppliers (code, legal_name, email) VALUES ($1, $2, $3) RETURNING id`,
+      [`${TEST_PREFIX}-SUP-001`, `${TEST_PREFIX} Test Supplier`, `${TEST_PREFIX}@test.example`],
+    );
+    const supplierId = supRes.rows[0].id;
+
+    try {
+      const res = await agent.post("/api/po-import/validate").send({
+        containerNumber: `${TEST_PREFIX}-CONT-002`,
+        supplierId,
+        preview: [
+          {
+            containerNumber: `${TEST_PREFIX}-CONT-002`,
+            items: [
+              { barcode: "DOES-NOT-EXIST-BC", itemName: "Unknown Item", poNumber: "PO-1" },
+            ],
+            charges: {},
+            itemsTotal: 0,
+            chargesTotal: 0,
+            grandTotal: 0,
+          },
+        ],
+      });
+      expect(res.status).toBe(200);
+      expect(res.body.valid).toBe(false);
+      // Must report the unknown barcode/item specifically — not just supplier error
+      expect(
+        res.body.errors.some((e: string) => /DOES-NOT-EXIST-BC|Item not found/i.test(e)),
+      ).toBe(true);
+    } finally {
+      await pool.query(`DELETE FROM suppliers WHERE id = $1`, [supplierId]);
+    }
+  });
+
+  it("requires authentication (unauthenticated → 401)", async () => {
+    const res = await request(ctx.app).post("/api/po-import/validate").send({
+      containerNumber: "X",
+      supplierId: 1,
+      preview: [],
+    });
+    expect(res.status).toBe(401);
+  });
 });
 
 /*
@@ -664,8 +802,8 @@ describe("XLSX Import — Stock Transfer import (commit) endpoint", () => {
  * - POS validate: missing locationId → 400; requires auth
  * - POS import/commit: creates voucher, returns itemsCount + totalSales
  * - POS import/commit: inventory decreases at source location (DB assertion)
- * - POS import/commit: missing cashAccountId/locationId → 400; bad barcode → 500
- * - POS import/commit: requires auth
+ * - POS import/commit: unknown barcode → 400 (not 500); transaction rolls back
+ * - POS import/commit: missing cashAccountId/locationId → 400; requires auth
  * - Stock transfer parse: valid XLSX → items + totalItems
  * - Stock transfer parse: zero qty rows skipped; lowercase aliases accepted
  * - Stock transfer parse: duplicate rows all returned
@@ -676,5 +814,15 @@ describe("XLSX Import — Stock Transfer import (commit) endpoint", () => {
  * - Stock transfer import/commit: returns success + itemsCount (DB record created)
  * - Stock transfer import/commit: source inventory decreases, destination increases (DB assertion)
  * - Stock transfer import/commit: missing fields → 400; requires auth
+ * - Stock transfer import/commit: unknown barcode → 400, no voucher created
+ * - Stock transfer import/commit: mixed valid+invalid items → 400, no partial state
+ * - PO validate: missing required fields → 400; unknown supplier → validation error
+ * - PO validate: unknown item barcode → validation error reported; requires auth
  * - Company isolation: parse with no company set returns 400
+ *
+ * Not covered (by design):
+ * - PO import commit: requires a real supplier + all items seeded + container
+ *   uniqueness; covered by manual/E2E testing rather than integration tests.
+ * - PO import multipart parse: no server-side XLSX parse endpoint exists for PO
+ *   import (browser parses client-side); therefore multipart tests are N/A.
  */
