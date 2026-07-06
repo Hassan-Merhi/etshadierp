@@ -118,7 +118,11 @@ export const ProductionRawStock = lazy(() => import("@/pages/factory/ProductionR
 export const FactoryOpeningBalanceEdit = lazy(() => import("@/pages/factory/FactoryOpeningBalanceEdit"));
 export const BaleStockEntry = lazy(() => import("@/pages/factory/BaleStockEntry"));
 export const BalesHistory = lazy(() => import("@/pages/factory/BalesHistory"));
-export const FactoryBaleProductHistory = lazy(() => import("@/pages/factory/FactoryBaleProductHistory"));
+export const FactoryBaleProductHistory = lazy(() =>
+  import("@/pages/factory/FactoryBaleProductHistory").then((m) => ({
+    default: m.FactoryBaleProductHistory,
+  }))
+);
 export const FactoryBaleProductMonthDetail = lazy(() =>
   import("@/pages/factory/FactoryBaleProductHistory").then((m) => ({
     default: m.FactoryBaleProductMonthDetail,
