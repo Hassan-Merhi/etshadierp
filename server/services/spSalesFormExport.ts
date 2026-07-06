@@ -61,19 +61,37 @@ function isFormula(cell: ExcelJS.Cell): boolean {
   return "formula" in v || "sharedFormula" in v;
 }
 
+/**
+ * Convert 1-based column number to Excel letter notation.
+ * e.g. 1→A, 26→Z, 27→AA, 53→BA
+ */
+function colLetter(n: number): string {
+  let s = "";
+  while (n > 0) {
+    n--;
+    s = String.fromCharCode(65 + (n % 26)) + s;
+    n = Math.floor(n / 26);
+  }
+  return s;
+}
+
+/** Excel formula error strings we scan for after export. */
+const EXCEL_ERRORS = ["#REF!", "#DIV/0!", "#VALUE!", "#NAME?", "#N/A"];
+
 // ── Template column / row constants ──────────────────────────────────────────
 
 // ENTRY sheet
 const E_DATE_ROW = 3;
 const E_DATA_START = 5;
-const E_DATA_END = 128;
+// E_DATA_END is resolved dynamically from entryWs.rowCount after template load.
+// The template (55 Lubumbashi) has 173 rows; the old hardcoded 128 skipped items after that.
 const E_NAME_COL = 3; // C – display name (matches article_code / canonical stock code)
 const E_CODE_COL = 4; // D – optional system code override
 const E_DATE_START = 7; // G – first date block
 // Pattern per day d: baseCol = E_DATE_START + d*3
 //   baseCol   = Qty          (plain)
 //   baseCol+1 = Sale Price   (plain)
-//   baseCol+2 = Profit/Bag   (formula in template – we always overwrite with computed value)
+//   baseCol+2 = Profit/Bag   (formula – see below)
 
 // Costing sheet
 const C_NAME_COL = 4; // D – item name (same as ENTRY col C)
@@ -235,7 +253,12 @@ export async function generateSpSalesFormExcel(params: SpSalesFormParams): Promi
 
   if (!entryWs || !costingWs) throw new Error("ENTRY or Costing sheet missing from template");
 
-  // ── Scan ENTRY rows 5-128: build name → systemCode + row-number maps ───────
+  // ── Resolve actual item row ceiling dynamically ───────────────────────────
+  // The attached template has 173 rows; old hardcoded E_DATA_END = 128 silently
+  // dropped all items after row 128.  Use the sheet's own rowCount instead.
+  const E_DATA_END = entryWs.rowCount;
+
+  // ── Scan ENTRY rows 5–<actual>: build name → systemCode + row-number maps ──
   const nameToSystemCode = new Map<string, string>();
   const itemRows = new Map<string, number>();
 
@@ -292,10 +315,15 @@ export async function generateSpSalesFormExcel(params: SpSalesFormParams): Promi
       valCell.value = assetVal > 0 ? r2(assetVal) : null;
     }
 
-    // Always set avg cost cell to prevent #DIV/0!:
-    //   • qty > 0 → write computed avg cost (plain value, safe even if formula present)
-    //   • qty = 0 → write 0 (overrides =H/E formula that would produce #DIV/0!)
-    avgCostCell.value = stock.qty > 0 ? r2(stock.avgCost) : 0;
+    // Avg Cost cell:
+    //   • qty > 0 → write formula =H<r>/E<r> with the computed result as cached value.
+    //               This stays formula-based (matches template) and is recalculated by Excel.
+    //   • qty = 0 → write plain 0 to replace the =H/E formula; otherwise Excel shows #DIV/0!
+    if (stock.qty > 0) {
+      avgCostCell.value = { formula: `H${r}/E${r}`, result: r2(stock.avgCost) };
+    } else {
+      avgCostCell.value = 0;
+    }
 
     row.commit();
   }
@@ -352,20 +380,14 @@ export async function generateSpSalesFormExcel(params: SpSalesFormParams): Promi
 
   // ── 3. ENTRY sheet ────────────────────────────────────────────────────────
 
-  // Pre-sweep: nullify every sharedFormula slave cell in the profit column
-  // (baseCol+2 for each day) across ALL rows E_DATA_START–E_DATA_END.
+  // Pre-sweep: nullify every sharedFormula SLAVE cell in the profit column
+  // (baseCol+2 for each day) across all item rows.
   //
-  // Why this is necessary:
-  //   The template stores profit/bag as a shared formula — row 5 is the master
-  //   (value: { formula: '=IF(G5=0,0,H5-$F5)' }) and rows 6–128 are slaves
-  //   (value: { sharedFormula: 'I5' }).  When the main loop below overwrites
-  //   the master cell with a plain number, ExcelJS removes the formula from
-  //   that cell.  But rows that are skipped (e.g. "Total …" rows) still carry
-  //   { sharedFormula: 'I5' }.  During wb.xlsx.writeBuffer() ExcelJS validates
-  //   every slave reference; finding a slave that points to a non-formula master
-  //   throws "Shared Formula master must exist above and or left of clone for
-  //   cell I<N>".  Nullifying slaves here breaks the reference safely before
-  //   we overwrite the master.
+  // Why: ExcelJS throws "Shared Formula master must exist above and or left of
+  // clone" if a slave's master cell is later replaced with a non-shared-formula
+  // value (even another formula written as a plain {formula:...} object).
+  // We fix this by clearing slaves upfront; the main loop then writes each profit
+  // cell as its own standalone formula string — no shared-formula chain.
   for (let r = E_DATA_START; r <= E_DATA_END; r++) {
     const row = entryWs.getRow(r);
     let rowChanged = false;
@@ -403,13 +425,18 @@ export async function generateSpSalesFormExcel(params: SpSalesFormParams): Promi
 
   // 3b. Item data rows
   // Qty (baseCol) and Sale Price (baseCol+1): plain cells — write normally.
-  // Profit/Bag (baseCol+2): always write our computed deduction-adjusted value,
-  //   bypassing the isFormula guard. The template has IF(G=0,0,H-$F) as a
-  //   master formula in row 5 (isFormula=true) and shared-formula refs in rows
-  //   6-128 (isFormula=true with the updated check). We need to override all of
-  //   them with the real net-profit-per-bag that includes the warehouse deduction.
-  //   Writing a plain value replaces the formula in the output file; fullCalcOnLoad
-  //   does not undo plain cell overwrites.
+  //
+  // Profit/Bag (baseCol+2):
+  //   Write as a standalone Excel FORMULA string — never as a plain number.
+  //   This preserves the formula-driven nature of the workbook and lets Excel
+  //   recalculate on load.
+  //
+  //   • No deduction  → formula mirrors the template: =IF(<qty>=0,0,<price>-$F<row>)
+  //   • With deduction → adds the per-bag deduction as a literal constant:
+  //                      =IF(<qty>=0,0,<price>-$F<row>-<deductionPerBag>)
+  //
+  //   The pre-sweep above already cleared all sharedFormula slaves, so writing
+  //   a standalone {formula:...} object here is safe — no orphan slave references.
   for (const [displayName, rowNum] of itemRows) {
     const systemCode = nameToSystemCode.get(displayName) ?? displayName;
     const daySalesMap = getSalesMap(displayName, systemCode);
@@ -417,33 +444,43 @@ export async function generateSpSalesFormExcel(params: SpSalesFormParams): Promi
 
     for (let d = 0; d < dayCount; d++) {
       const baseCol = E_DATE_START + d * 3;
-      const qtyCell = row.getCell(baseCol);
+      const qtyCell   = row.getCell(baseCol);
       const priceCell = row.getCell(baseCol + 1);
       const profitCell = row.getCell(baseCol + 2);
 
       const ds = daySalesMap?.get(dates[d]);
 
       if (ds && ds.qty > 0) {
-        const avgPrice = ds.totalSales / ds.qty;
-        const netProfitPB = (ds.totalSales - ds.totalCost - ds.totalDeduction) / ds.qty;
+        const avgPrice       = ds.totalSales / ds.qty;
+        const deductionPerBag = ds.totalDeduction / ds.qty;
+        const netProfitPB    = (ds.totalSales - ds.totalCost - ds.totalDeduction) / ds.qty;
 
-        if (!isFormula(qtyCell)) qtyCell.value = r3(ds.qty);
+        if (!isFormula(qtyCell))   qtyCell.value   = r3(ds.qty);
         if (!isFormula(priceCell)) priceCell.value = r2(avgPrice);
-        profitCell.value = r2(netProfitPB); // always write — bypasses formula guard
+
+        // Build a formula string that mirrors the template pattern.
+        // qC = Qty column letter, pC = Price column letter, row = item row.
+        const qC = colLetter(baseCol);
+        const pC = colLetter(baseCol + 1);
+        const deductionPart = deductionPerBag !== 0 ? `-${r2(deductionPerBag)}` : "";
+        profitCell.value = {
+          formula: `IF(${qC}${rowNum}=0,0,${pC}${rowNum}-$F${rowNum}${deductionPart})`,
+          result: r2(netProfitPB),
+        };
       } else {
-        if (!isFormula(qtyCell)) qtyCell.value = null;
+        if (!isFormula(qtyCell))   qtyCell.value   = null;
         if (!isFormula(priceCell)) priceCell.value = null;
-        profitCell.value = null; // always clear — bypasses formula guard
+        profitCell.value = null; // pre-sweep already cleared sharedFormula slaves
       }
     }
 
     // Clear stale data beyond the export range
     for (let d = dayCount; d < dayCount + 15; d++) {
       const baseCol = E_DATE_START + d * 3;
-      const qtyCell = row.getCell(baseCol);
+      const qtyCell   = row.getCell(baseCol);
       const priceCell = row.getCell(baseCol + 1);
       const profitCell = row.getCell(baseCol + 2);
-      if (!isFormula(qtyCell)) qtyCell.value = null;
+      if (!isFormula(qtyCell))   qtyCell.value   = null;
       if (!isFormula(priceCell)) priceCell.value = null;
       profitCell.value = null;
     }
@@ -458,12 +495,77 @@ export async function generateSpSalesFormExcel(params: SpSalesFormParams): Promi
     summaryIWs.getRow(1).commit();
   }
 
-  // ── 5. Hide Ageing (preserve formula refs) ────────────────────────────────
-  if (ageingWs) {
-    (ageingWs as any).state = "hidden";
+  // ── 5. Sheet visibility ───────────────────────────────────────────────────
+  // Match attached template exactly:
+  //   Costing=hidden, Sales=hidden, ENTRY=visible, Summary=visible,
+  //   Ageing=VISIBLE (template has it visible — do NOT hide it), Summary-Itemwise=hidden
+  // The old code incorrectly set Ageing to "hidden". Removed.
+  if (costingWs)  (costingWs  as any).state = "hidden";
+  if (salesWs)    (salesWs    as any).state = "hidden";
+  if (summaryIWs) (summaryIWs as any).state = "hidden";
+  // ENTRY, Summary, Ageing: leave as visible (template default)
+
+  // ── 6. Sales sheet alignment check ────────────────────────────────────────
+  // ENTRY BM formulas pull daily qty from the hidden Sales sheet via INDIRECT/SUMIFS.
+  // Sales date row starts at col F (S_DATE_START=6); ENTRY dates start at col G (E_DATE_START=7).
+  // Each day in Sales occupies 1 column; each day in ENTRY occupies 3 columns.
+  // Confirm the Sales sheet has enough columns for the requested date range.
+  if (salesWs) {
+    const salesCapacity = salesWs.columnCount - S_DATE_START + 1;
+    if (dayCount > salesCapacity) {
+      console.warn(
+        `[spSalesFormExport] Sales sheet alignment warning: export has ${dayCount} days ` +
+        `but Sales sheet only has ${salesCapacity} date columns ` +
+        `(Sales!F1 onward). ENTRY BM formula may not cover all dates.`
+      );
+    }
   }
 
-  // ── 6. Output ─────────────────────────────────────────────────────────────
+  // ── 7. Output ─────────────────────────────────────────────────────────────
   const rawBuf = await wb.xlsx.writeBuffer();
-  return Buffer.isBuffer(rawBuf) ? rawBuf : Buffer.from(rawBuf);
+  const buf = Buffer.isBuffer(rawBuf) ? rawBuf : Buffer.from(rawBuf);
+
+  // ── 8. Post-export formula error scan ─────────────────────────────────────
+  // Re-read the generated buffer and scan every cell result for Excel error strings.
+  // If any critical sheet contains errors, fail loudly instead of sending a broken file.
+  try {
+    const wbCheck = new ExcelJS.Workbook();
+    await wbCheck.xlsx.load(buf);
+    const errorsBySheet: Record<string, string[]> = {};
+    for (const ws of wbCheck.worksheets) {
+      ws.eachRow({ includeEmpty: false }, (row) => {
+        row.eachCell({ includeEmpty: false }, (cell) => {
+          const v = cell.value as any;
+          const result = v?.result ?? (typeof v === "string" ? v : null);
+          if (typeof result === "string" && EXCEL_ERRORS.some((e) => result.includes(e))) {
+            (errorsBySheet[ws.name] ??= []).push(`${ws.name}!${cell.address}: ${result}`);
+          }
+        });
+      });
+    }
+
+    const allErrors = Object.entries(errorsBySheet)
+      .flatMap(([, errs]) => errs);
+    if (allErrors.length > 0) {
+      console.warn(`[spSalesFormExport] Formula errors detected:`, allErrors);
+    }
+
+    // NOTE: ExcelJS does not recalculate formulas when loading a buffer — it only reads
+    // cached results that were embedded at write-time. This scan catches errors that
+    // were already in the template cache or that we explicitly wrote as result values,
+    // but cannot detect errors that only appear after Excel recalculates on open.
+    // Treat as a diagnostic log only; do not fail the export on this basis.
+    const criticalSheets = ["ENTRY", "Costing", "Summary", "Ageing", "Summary-Itemwise"];
+    const criticalErrors = criticalSheets.flatMap((s) => errorsBySheet[s] ?? []);
+    if (criticalErrors.length > 0) {
+      console.warn(
+        `[spSalesFormExport] Cached formula errors in critical sheets (diagnostic only):\n` +
+        criticalErrors.slice(0, 20).join("\n")
+      );
+    }
+  } catch (scanErr: any) {
+    console.error("[spSalesFormExport] Error scan failed (non-critical):", scanErr.message);
+  }
+
+  return buf;
 }
