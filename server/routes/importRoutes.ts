@@ -1007,7 +1007,8 @@ export function registerImportRoutes(app: Express) {
       });
     } catch (error: any) {
       console.error("POS Import parse error:", error);
-      res.status(500).json({ message: error.message });
+      // File-parse errors are client errors (bad/corrupt file) — return 400, not 500
+      res.status(400).json({ message: error.message || "Failed to parse Excel file" });
     }
   });
 
@@ -1913,7 +1914,8 @@ export function registerImportRoutes(app: Express) {
       });
     } catch (error: any) {
       console.error("Stock Transfer Import parse error:", error);
-      res.status(500).json({ message: error.message });
+      // File-parse errors are client errors (bad/corrupt file) — return 400, not 500
+      res.status(400).json({ message: error.message || "Failed to parse Excel file" });
     }
   });
 
