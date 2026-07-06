@@ -163,6 +163,7 @@ export default function FactoryWorkers() {
   const [nationalityFilter, setNationalityFilter] = useState("all");
   const [salaryTypeFilter, setSalaryTypeFilter] = useState("all");
   const [salaryRangeFilter, setSalaryRangeFilter] = useState("all"); // all | 0-500 | 500-1000 | 1000-2000 | 2000-5000 | 5000+
+  const [transportFilter, setTransportFilter]   = useState("all"); // all | has | none
   const [advanceFilter, setAdvanceFilter]       = useState("all"); // all | has | none
 
   const [createOpen, setCreateOpen] = useState(false);
@@ -223,10 +224,11 @@ export default function FactoryWorkers() {
     staleTime: 30000,
   });
 
-  // ── Amount due till today (lightweight snapshot, no attendance needed) ─────
+  // ── Amount due till today (calendar proration minus recorded absences) ─────
   const { data: amountDue = {} } = useQuery<Record<number, {
     periodStart: string; periodEnd: string;
-    base: number; transport: number; advanceDeducted: number; net: number;
+    base: number; transport: number;
+    absenceDeducted: number; advanceDeducted: number; net: number;
     lastPaidThrough: string | null;
   }>>({
     queryKey: ["/api/factory/workers/amount-due"],
@@ -567,6 +569,7 @@ export default function FactoryWorkers() {
     nationalityFilter !== "all",
     salaryTypeFilter !== "all",
     salaryRangeFilter !== "all",
+    transportFilter !== "all",
     advanceFilter !== "all",
   ].filter(Boolean).length;
 
@@ -576,6 +579,7 @@ export default function FactoryWorkers() {
     setNationalityFilter("all");
     setSalaryTypeFilter("all");
     setSalaryRangeFilter("all");
+    setTransportFilter("all");
     setAdvanceFilter("all");
   };
 
@@ -623,13 +627,16 @@ export default function FactoryWorkers() {
           }
         }
 
+        if (transportFilter === "has" && !(parseFloat((w as any).transportAllowance || "0") > 0)) return false;
+        if (transportFilter === "none" && parseFloat((w as any).transportAllowance || "0") > 0) return false;
+
         if (advanceFilter === "has" && !((w as any).pendingAdvanceBalance > 0 || parseFloat((w as any).pendingAdvanceBalance || "0") > 0)) return false;
         if (advanceFilter === "none" && parseFloat((w as any).pendingAdvanceBalance || "0") > 0) return false;
 
         return true;
       })
       .sort((a, b) => parseCodeNumber(a.employeeCode) - parseCodeNumber(b.employeeCode));
-  }, [workers, statusFilter, searchQuery, positionFilter, locationFilter, nationalityFilter, salaryTypeFilter, salaryRangeFilter, advanceFilter]);
+  }, [workers, statusFilter, searchQuery, positionFilter, locationFilter, nationalityFilter, salaryTypeFilter, salaryRangeFilter, transportFilter, advanceFilter]);
 
   const activeCount = workers?.filter((w) => w.active).length ?? 0;
   const inactiveCount = workers?.filter((w) => !w.active).length ?? 0;
@@ -1379,6 +1386,21 @@ export default function FactoryWorkers() {
                 </Select>
               </div>
 
+              {/* Transport */}
+              <div className="flex flex-col gap-1 min-w-[150px]">
+                <label className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Transport</label>
+                <Select value={transportFilter} onValueChange={setTransportFilter}>
+                  <SelectTrigger className="h-8 text-sm bg-background">
+                    <SelectValue placeholder="All" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All</SelectItem>
+                    <SelectItem value="has">Has transport allowance</SelectItem>
+                    <SelectItem value="none">No transport allowance</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
               {/* Advance status */}
               <div className="flex flex-col gap-1 min-w-[150px]">
                 <label className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Advance</label>
@@ -1427,6 +1449,12 @@ export default function FactoryWorkers() {
                 <span className="inline-flex items-center gap-1 text-xs bg-primary/10 text-primary rounded-full px-2.5 py-1 font-medium">
                   {({ "0-500": "Salary: Under $500", "500-1000": "Salary: $500 – under $1,000", "1000-2000": "Salary: $1,000 – under $2,000", "2000-5000": "Salary: $2,000 – under $5,000", "5000+": "Salary: $5,000 and above" } as Record<string,string>)[salaryRangeFilter] ?? `Salary: ${salaryRangeFilter}`}
                   <button onClick={() => setSalaryRangeFilter("all")} className="hover:opacity-70"><X className="h-3 w-3" /></button>
+                </span>
+              )}
+              {transportFilter !== "all" && (
+                <span className="inline-flex items-center gap-1 text-xs bg-primary/10 text-primary rounded-full px-2.5 py-1 font-medium">
+                  {transportFilter === "has" ? "Has transport" : "No transport"}
+                  <button onClick={() => setTransportFilter("all")} className="hover:opacity-70"><X className="h-3 w-3" /></button>
                 </span>
               )}
               {advanceFilter !== "all" && (
@@ -1645,6 +1673,12 @@ export default function FactoryWorkers() {
                                       <span className="font-mono">+{fmt(due.transport)}</span>
                                     </div>
                                   )}
+                                  {(due.absenceDeducted ?? 0) > 0 && (
+                                    <div className="flex justify-between text-rose-600 dark:text-rose-400">
+                                      <span>Absences deducted</span>
+                                      <span className="font-mono">−{fmt(due.absenceDeducted)}</span>
+                                    </div>
+                                  )}
                                   {due.advanceDeducted > 0 && (
                                     <div className="flex justify-between text-amber-600 dark:text-amber-400">
                                       <span>Advance deducted</span>
@@ -1659,7 +1693,7 @@ export default function FactoryWorkers() {
                                   </div>
                                 </div>
                                 <p className="text-[10px] text-muted-foreground/50 mt-2 leading-relaxed">
-                                  Calendar-day proration · Salary-deduction advances only
+                                  Calendar-day proration · Absences &amp; advances deducted
                                 </p>
                               </PopoverContent>
                             </Popover>

@@ -212,9 +212,9 @@ export function registerPayrollCoreRoutes(app: Express) {
   });
 
   // GET /api/factory/workers/amount-due
-  // Returns a lightweight "owed till today" snapshot for every active worker.
-  // Uses calendar-day proration (same formula as the full payroll preview) so the
-  // number is consistent — just faster because no attendance records are needed.
+  // Returns a "owed till today" snapshot for every active worker.
+  // Uses calendar-day proration then deducts explicitly recorded Absent / Half Day
+  // entries from the attendance table — consistent with the full payroll calculation.
   // Period start = day after last PAID payroll's periodEnd, or 1st of current month.
   // Only salary_deduction advances are auto-deducted (same rule as payroll preview).
   app.get("/api/factory/workers/amount-due", requireAuth, async (req: any, res: any) => {
@@ -227,6 +227,12 @@ export function registerPayrollCoreRoutes(app: Express) {
       const today = new Date();
       const pad = (n: number) => String(n).padStart(2, "0");
       const todayStr = `${today.getFullYear()}-${pad(today.getMonth() + 1)}-${pad(today.getDate())}`;
+
+      // Helper: days in the month containing dateStr
+      const getDIM = (dateStr: string) => {
+        const d = new Date(dateStr + "T00:00:00");
+        return new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+      };
 
       // All active workers for this company
       const workers = await db
@@ -261,6 +267,24 @@ export function registerPayrollCoreRoutes(app: Express) {
         if (!lastPaidEnd[p.workerId]) lastPaidEnd[p.workerId] = p.periodEnd;
       }
 
+      // Pre-compute period start for every worker so we can do a bulk attendance query
+      const periodStarts: Record<number, string> = {};
+      for (const w of workers) {
+        if (lastPaidEnd[w.id]) {
+          const d = new Date(lastPaidEnd[w.id] + "T00:00:00");
+          d.setDate(d.getDate() + 1);
+          periodStarts[w.id] = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+        } else {
+          periodStarts[w.id] = `${today.getFullYear()}-${pad(today.getMonth() + 1)}-01`;
+        }
+      }
+
+      // Earliest period start across all workers (lower bound for attendance query)
+      const allStarts = Object.values(periodStarts);
+      const minPeriodStart = allStarts.length > 0
+        ? allStarts.reduce((a, b) => (a < b ? a : b))
+        : todayStr;
+
       // Pending salary_deduction advances per worker
       const advanceRows = await db
         .select({
@@ -282,6 +306,33 @@ export function registerPayrollCoreRoutes(app: Express) {
         advanceMap[a.workerId] = (advanceMap[a.workerId] || 0) + parseFloat(a.remaining || "0");
       }
 
+      // Bulk-fetch attendance records for all workers covering their unpaid periods
+      const attendanceRows = await db
+        .select({
+          workerId: factoryAttendance.workerId,
+          attendanceDate: factoryAttendance.attendanceDate,
+          status: factoryAttendance.status,
+        })
+        .from(factoryAttendance)
+        .where(
+          and(
+            eq(factoryAttendance.companyId, companyId),
+            inArray(factoryAttendance.workerId, workerIds),
+            gte(factoryAttendance.attendanceDate, minPeriodStart),
+            lte(factoryAttendance.attendanceDate, todayStr),
+          ),
+        );
+
+      // Group attendance by workerId for O(1) lookup
+      const attendanceByWorker: Record<number, Array<{ date: string; status: string }>> = {};
+      for (const att of attendanceRows) {
+        if (!attendanceByWorker[att.workerId]) attendanceByWorker[att.workerId] = [];
+        attendanceByWorker[att.workerId].push({
+          date: att.attendanceDate,
+          status: att.status ?? "Present",
+        });
+      }
+
       const round2 = (n: number) => Math.round(n * 100) / 100;
 
       const result: Record<number, {
@@ -289,6 +340,7 @@ export function registerPayrollCoreRoutes(app: Express) {
         periodEnd: string;
         base: number;
         transport: number;
+        absenceDeducted: number;
         advanceDeducted: number;
         net: number;
         lastPaidThrough: string | null;
@@ -297,17 +349,7 @@ export function registerPayrollCoreRoutes(app: Express) {
       for (const w of workers) {
         const baseSal = parseFloat(w.baseSalary || "0");
         const transport = parseFloat(w.transportAllowance || "0");
-
-        // Determine period start
-        let periodStart: string;
-        if (lastPaidEnd[w.id]) {
-          const d = new Date(lastPaidEnd[w.id] + "T00:00:00");
-          d.setDate(d.getDate() + 1);
-          periodStart = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-        } else {
-          // No paid payroll yet — start from 1st of current month
-          periodStart = `${today.getFullYear()}-${pad(today.getMonth() + 1)}-01`;
-        }
+        const periodStart = periodStarts[w.id];
 
         // Nothing owed if already paid through today or beyond
         if (periodStart > todayStr) {
@@ -316,6 +358,7 @@ export function registerPayrollCoreRoutes(app: Express) {
             periodEnd: todayStr,
             base: 0,
             transport: 0,
+            absenceDeducted: 0,
             advanceDeducted: 0,
             net: 0,
             lastPaidThrough: lastPaidEnd[w.id] || null,
@@ -323,8 +366,30 @@ export function registerPayrollCoreRoutes(app: Express) {
           continue;
         }
 
-        const base = computeMonthlyPay(baseSal, periodStart, todayStr);
-        const transportDue = computeMonthlyPay(transport, periodStart, todayStr);
+        // Calendar-day gross
+        const grossBase = computeMonthlyPay(baseSal, periodStart, todayStr);
+        const grossTransport = computeMonthlyPay(transport, periodStart, todayStr);
+
+        // Deduct for each explicitly recorded Absent or Half Day in this period.
+        // Days with no attendance record are NOT deducted (calendar proration stands).
+        let absDeductBase = 0;
+        let absDeductTransport = 0;
+        for (const att of (attendanceByWorker[w.id] ?? [])) {
+          if (att.date < periodStart || att.date > todayStr) continue;
+          const dim = getDIM(att.date);
+          if (att.status === "Absent") {
+            absDeductBase += baseSal / dim;
+            absDeductTransport += transport / dim;
+          } else if (att.status === "Half Day") {
+            absDeductBase += (baseSal / dim) * 0.5;
+            absDeductTransport += (transport / dim) * 0.5;
+          }
+        }
+
+        const base = Math.max(0, grossBase - absDeductBase);
+        const transportDue = Math.max(0, grossTransport - absDeductTransport);
+        const absenceDeducted = absDeductBase + absDeductTransport;
+
         const advanceBalance = advanceMap[w.id] || 0;
         const advanceDeducted = Math.min(advanceBalance, base + transportDue);
         const net = Math.max(0, base + transportDue - advanceDeducted);
@@ -334,6 +399,7 @@ export function registerPayrollCoreRoutes(app: Express) {
           periodEnd: todayStr,
           base: round2(base),
           transport: round2(transportDue),
+          absenceDeducted: round2(absenceDeducted),
           advanceDeducted: round2(advanceDeducted),
           net: round2(net),
           lastPaidThrough: lastPaidEnd[w.id] || null,
