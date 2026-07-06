@@ -506,17 +506,83 @@ export async function generateSpSalesFormExcel(params: SpSalesFormParams): Promi
   // ENTRY, Summary, Ageing: leave as visible (template default)
 
   // ── 6. Sales sheet alignment check ────────────────────────────────────────
-  // ENTRY BM formulas pull daily qty from the hidden Sales sheet via INDIRECT/SUMIFS.
-  // Sales date row starts at col F (S_DATE_START=6); ENTRY dates start at col G (E_DATE_START=7).
-  // Each day in Sales occupies 1 column; each day in ENTRY occupies 3 columns.
-  // Confirm the Sales sheet has enough columns for the requested date range.
+  // ENTRY BM formulas read the hidden Sales sheet via INDIRECT/SUMIFS on Sales!$1:$1.
+  // Alignment requires:
+  //   (a) Sales date-row starts at the same column offset as written (S_DATE_START = F = col 6).
+  //   (b) Sales has enough date columns for the full dayCount.
+  //   (c) First date written into Sales!F1 matches the export fromDate.
+  //   (d) Item name column in Sales (col C = S_NAME_COL) matches ENTRY col C (E_NAME_COL).
+  //   (e) ENTRY BM formula sample references "Sales!" — confirm the sheet is not renamed.
   if (salesWs) {
+    const mismatches: string[] = [];
+
+    // (a) Column offset
+    if (S_DATE_START !== 6) {
+      mismatches.push(`S_DATE_START=${S_DATE_START} expected 6 (col F); ENTRY BM uses Sales!$1:$1 starting F`);
+    }
+
+    // (b) Capacity
     const salesCapacity = salesWs.columnCount - S_DATE_START + 1;
     if (dayCount > salesCapacity) {
+      mismatches.push(
+        `capacity: export=${dayCount} days, Sales only has ${salesCapacity} date columns (F1 onward)`
+      );
+    }
+
+    // (c) First date cell in Sales row 1 vs fromDate
+    const firstDateCell = salesWs.getRow(S_DATE_ROW).getCell(S_DATE_START);
+    const firstDateVal = firstDateCell.value;
+    const firstDateWritten =
+      firstDateVal instanceof Date
+        ? firstDateVal.toISOString().slice(0, 10)
+        : typeof firstDateVal === "string"
+          ? firstDateVal.slice(0, 10)
+          : null;
+    if (firstDateWritten && firstDateWritten !== fromDate) {
+      mismatches.push(
+        `Sales!F1 date="${firstDateWritten}" does not match fromDate="${fromDate}"; ` +
+        `SUMIFS date range will be offset`
+      );
+    }
+
+    // (d) Name column alignment
+    if (S_NAME_COL !== E_NAME_COL) {
+      mismatches.push(
+        `name column mismatch: Sales uses col ${S_NAME_COL}, ENTRY uses col ${E_NAME_COL}; ` +
+        `item lookup by row reference may fail`
+      );
+    }
+
+    // (e) Verify a sample ENTRY BM formula actually references "Sales!"
+    const bmColIdx = 65; // BM = column 65
+    let bmFormulaChecked = false;
+    for (let r = E_DATA_START; r <= Math.min(E_DATA_START + 5, E_DATA_END); r++) {
+      const bmCell = entryWs.getRow(r).getCell(bmColIdx);
+      const v = bmCell.value as any;
+      const fmla: string = v?.formula ?? v?.sharedFormula ?? "";
+      if (fmla) {
+        if (!fmla.includes("Sales!") && !fmla.includes("Sales!")) {
+          mismatches.push(
+            `ENTRY!BM${r} formula "${fmla}" does not reference "Sales!" — ` +
+            `sheet may have been renamed or formula structure changed`
+          );
+        }
+        bmFormulaChecked = true;
+        break;
+      }
+    }
+    if (!bmFormulaChecked) {
+      mismatches.push(`No BM formula found in ENTRY rows ${E_DATA_START}–${E_DATA_START + 5}; template may be missing Avg Monthly Sales column`);
+    }
+
+    if (mismatches.length > 0) {
       console.warn(
-        `[spSalesFormExport] Sales sheet alignment warning: export has ${dayCount} days ` +
-        `but Sales sheet only has ${salesCapacity} date columns ` +
-        `(Sales!F1 onward). ENTRY BM formula may not cover all dates.`
+        `[spSalesFormExport] Sales alignment issues (${mismatches.length}):\n` +
+        mismatches.map((m, i) => `  ${i + 1}. ${m}`).join("\n")
+      );
+    } else {
+      console.info(
+        `[spSalesFormExport] Sales alignment OK — ${dayCount} day(s), F1=${firstDateWritten ?? fromDate}, BM formula references Sales!`
       );
     }
   }
@@ -547,23 +613,25 @@ export async function generateSpSalesFormExcel(params: SpSalesFormParams): Promi
     const allErrors = Object.entries(errorsBySheet)
       .flatMap(([, errs]) => errs);
     if (allErrors.length > 0) {
-      console.warn(`[spSalesFormExport] Formula errors detected:`, allErrors);
+      console.warn(`[spSalesFormExport] Formula errors detected (all sheets):`, allErrors);
     }
 
-    // NOTE: ExcelJS does not recalculate formulas when loading a buffer — it only reads
-    // cached results that were embedded at write-time. This scan catches errors that
-    // were already in the template cache or that we explicitly wrote as result values,
-    // but cannot detect errors that only appear after Excel recalculates on open.
-    // Treat as a diagnostic log only; do not fail the export on this basis.
+    // NOTE: ExcelJS reads cached formula results embedded at write-time; it does not
+    // recalculate.  This catches errors baked into the template cache or explicitly
+    // written as result values.  Errors that only appear after Excel recalculates on
+    // open cannot be detected here — but cached errors always indicate a real problem
+    // (broken template cell, bad opening-stock write, missing data, etc.) so we fail.
     const criticalSheets = ["ENTRY", "Costing", "Summary", "Ageing", "Summary-Itemwise"];
     const criticalErrors = criticalSheets.flatMap((s) => errorsBySheet[s] ?? []);
     if (criticalErrors.length > 0) {
-      console.warn(
-        `[spSalesFormExport] Cached formula errors in critical sheets (diagnostic only):\n` +
+      throw new Error(
+        `SP Sales Form export aborted — formula errors in critical sheets:\n` +
         criticalErrors.slice(0, 20).join("\n")
       );
     }
   } catch (scanErr: any) {
+    // Re-throw export-abort errors; swallow scan infrastructure failures only.
+    if (scanErr.message?.startsWith("SP Sales Form export aborted")) throw scanErr;
     console.error("[spSalesFormExport] Error scan failed (non-critical):", scanErr.message);
   }
 
