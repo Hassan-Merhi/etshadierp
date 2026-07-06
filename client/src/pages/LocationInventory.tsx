@@ -1,55 +1,40 @@
 import { useState, useRef, useMemo, useEffect } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "@/contexts/LocationContext";
 import { useCompany } from "@/contexts/CompanyContext";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
 import { useLocation as useRoute } from "wouter";
 import {
   ArrowUpDown,
-  Package,
-  Warehouse,
   Search,
   X,
-  ChevronDown,
-  Download,
-  List,
-  Eye,
-  Printer,
-  Trash2,
   ArrowLeft,
   ArrowRight,
-  Layers,
-  FileSpreadsheet,
-  MessageCircle,
-  Pencil,
-  AlertCircle,
   Globe,
   MapPin,
   ChevronRight,
   Plus,
+  AlertCircle,
+  Layers,
+  Trash2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest, queryClient } from "@/lib/queryClient";
-import { format } from "date-fns";
+import { queryClient } from "@/lib/queryClient";
+import { apiRequest } from "@/lib/queryClient";
 import { getDefaultPeriodValue } from "@/components/ui/period-filter";
 
 import { LocationGrid } from "./location-inventory/LocationGrid";
 import { InventoryTable } from "./location-inventory/InventoryTable";
 import { CombinedStockView } from "./location-inventory/CombinedStockView";
 import { LocationDialogs } from "./location-inventory/LocationDialogs";
+import { useLocationInventoryQueries } from "./location-inventory/useLocationInventoryQueries";
+import { useLocationInventoryMutations } from "./location-inventory/useLocationInventoryMutations";
+import { useLocationInventoryExports } from "./location-inventory/useLocationInventoryExports";
+import { LocationInventoryDialogs } from "./location-inventory/LocationInventoryDialogs";
+import { StockGroupsView } from "./location-inventory/StockGroupsView";
 
 interface Location {
   id: number;
@@ -155,97 +140,16 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
     queryClient.invalidateQueries({ queryKey: ["/api/stock-categories"] });
   }, [companyId]);
 
-  const handlePrintWithOption = async (withCost: boolean) => {
-    if (!selectedLocationLocal) return;
-    try {
-      const includeCost = withCost ? "1" : "0";
-      const response = await fetch(
-        `/api/locations/${selectedLocationLocal.id}/inventory/pdf?includeCost=${includeCost}`,
-        { credentials: "include" }
-      );
-      if (!response.ok) {
-        const err = await response.json().catch(() => ({ message: "PDF generation failed" }));
-        toast({ title: "Export Failed", description: err.message, variant: "destructive" });
-        return;
-      }
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      const safeName = selectedLocationLocal.name.replace(/\s+/g, "_");
-      const date = new Date().toLocaleDateString("en-CA");
-      a.download = `${safeName}_Godown_${date}${withCost ? "_with_cost" : "_no_cost"}.pdf`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      window.URL.revokeObjectURL(url);
-      toast({ title: "PDF Downloaded" });
-    } catch (error: any) {
-      toast({ title: "Export Failed", description: error.message, variant: "destructive" });
-    }
-  };
-
   // ─── Mutations ──────────────────────────────────────────────────────────────
 
-  const renameLocationMutation = useMutation({
-    mutationFn: async ({
-      id,
-      name,
-      supplierPartnerPayableDeductionPerQty,
-    }: {
-      id: number;
-      name: string;
-      supplierPartnerPayableDeductionPerQty?: number;
-    }) => {
-      const payload: Record<string, any> = { name };
-      if (supplierPartnerPayableDeductionPerQty !== undefined)
-        payload.supplierPartnerPayableDeductionPerQty = supplierPartnerPayableDeductionPerQty;
-      const res = await apiRequest("PATCH", `/api/locations/${id}`, payload);
-      return res.json();
-    },
-    onSuccess: (updated) => {
-      toast({ title: "Location renamed", description: `Renamed to "${updated.name}".` });
-      queryClient.invalidateQueries({ queryKey: ["/api/locations"] });
-      if (selectedLocationLocal?.id === updated.id) setSelectedLocationLocal(updated);
-      setRenameDialogOpen(false);
-    },
-    onError: (error: Error) => toast({ title: "Error", description: error.message, variant: "destructive" }),
-  });
-
-  const createLocationMutation = useMutation({
-    mutationFn: async (name: string) => {
-      const res = await apiRequest("POST", "/api/locations", { name });
-      return res.json();
-    },
-    onSuccess: () => {
-      toast({ title: "Location created" });
-      queryClient.invalidateQueries({ queryKey: ["/api/locations"] });
-      setCreateLocationOpen(false);
-      setCreateLocationName("");
-    },
-    onError: (error: Error) => toast({ title: "Error", description: error.message, variant: "destructive" }),
-  });
-
-  const waGroupMutation = useMutation({
-    mutationFn: async ({
-      id,
-      name,
-      whatsappGroupChatId,
-    }: {
-      id: number;
-      name: string;
-      whatsappGroupChatId: string | null;
-    }) => {
-      const res = await apiRequest("PATCH", `/api/locations/${id}`, { name, whatsappGroupChatId });
-      return res.json();
-    },
-    onSuccess: (updated) => {
-      toast({ title: updated.whatsappGroupChatId ? "WhatsApp group assigned" : "WhatsApp group removed" });
-      queryClient.invalidateQueries({ queryKey: ["/api/locations"] });
-      if (selectedLocationLocal?.id === updated.id) setSelectedLocationLocal(updated);
-      setWaGroupDialogOpen(false);
-    },
-    onError: (error: Error) => toast({ title: "Error", description: error.message, variant: "destructive" }),
+  const { renameLocationMutation, createLocationMutation, waGroupMutation } = useLocationInventoryMutations({
+    toast,
+    selectedLocationLocal,
+    setSelectedLocationLocal,
+    setRenameDialogOpen,
+    setCreateLocationOpen,
+    setCreateLocationName,
+    setWaGroupDialogOpen,
   });
 
   const openRenameDialog = (loc: Location, e?: { stopPropagation: () => void }) => {
@@ -266,100 +170,40 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
 
   // ─── Queries ────────────────────────────────────────────────────────────────
 
-  const { data: waChats = [], isLoading: waChatsLoading } = useQuery<{ id: string; name: string; type: string }[]>({
-    queryKey: ["/api/whatsapp/chats/pos"],
-    enabled: waGroupDialogOpen,
-    staleTime: 60_000,
+  const {
+    waChats,
+    waChatsLoading,
+    locations,
+    locationsLoading,
+    inventoryData,
+    inventoryLoading,
+    openingInventoryData,
+    openingInventoryLoading,
+    closingInventoryData,
+    closingInventoryLoading,
+    allInventoryData,
+    allInventoryLoading,
+    allNegativeStock,
+    negativeStockLoading,
+    categoriesList,
+  } = useLocationInventoryQueries({
+    waGroupDialogOpen,
+    posUser,
+    companyId,
+    selectedLocationLocal,
+    showZeroStock,
+    fromDate,
+    asOfDate,
+    showAllStock,
+    showNegativeStock,
   });
 
-  const { data: allLocations = [], isLoading: allLocationsLoading } = useQuery<Location[]>({
-    queryKey: companyId ? [`/api/locations?companyId=${companyId}`] : [],
-    enabled: !posUser && !!companyId,
-    staleTime: 5 * 60 * 1000,
-  });
+  // ─── Export helpers ──────────────────────────────────────────────────────────
 
-  const { data: posAssignedLocations = [], isLoading: posLocationsLoading } = useQuery<Location[]>({
-    queryKey: posUser ? ["/api/my-locations"] : [],
-    enabled: !!posUser,
-  });
-
-  const locations = posUser ? posAssignedLocations : allLocations;
-  const locationsLoading = posUser ? posLocationsLoading : allLocationsLoading;
-
-  const { data: inventoryData = [], isLoading: inventoryLoading } = useQuery<InventoryItem[]>({
-    queryKey:
-      selectedLocationLocal && companyId
-        ? [`/api/locations/${selectedLocationLocal.id}/inventory${showZeroStock ? "?includeZero=true" : ""}`, companyId]
-        : [],
-    queryFn: async () => {
-      const url = `/api/locations/${selectedLocationLocal!.id}/inventory${showZeroStock ? "?includeZero=true" : ""}`;
-      const res = await fetch(url, { credentials: "include" });
-      if (!res.ok) throw new Error(await res.text());
-      return res.json();
-    },
-    enabled: !!selectedLocationLocal && !!companyId,
-  });
-
-  const { data: openingInventoryData = [], isLoading: openingInventoryLoading } = useQuery<InventoryItem[]>({
-    queryKey:
-      selectedLocationLocal && fromDate && companyId
-        ? [`/api/locations/${selectedLocationLocal.id}/inventory?asOfDate=${fromDate}`, companyId]
-        : [],
-    queryFn: async () => {
-      const url = `/api/locations/${selectedLocationLocal!.id}/inventory?asOfDate=${fromDate}`;
-      const res = await fetch(url, { credentials: "include" });
-      if (!res.ok) throw new Error(await res.text());
-      return res.json();
-    },
-    enabled: !!selectedLocationLocal && !!fromDate && !!companyId,
-  });
-
-  const { data: closingInventoryData = [], isLoading: closingInventoryLoading } = useQuery<InventoryItem[]>({
-    queryKey:
-      selectedLocationLocal && asOfDate && companyId
-        ? [`/api/locations/${selectedLocationLocal.id}/inventory?asOfDate=${asOfDate}`, companyId]
-        : [],
-    queryFn: async () => {
-      const url = `/api/locations/${selectedLocationLocal!.id}/inventory?asOfDate=${asOfDate}`;
-      const res = await fetch(url, { credentials: "include" });
-      if (!res.ok) throw new Error(await res.text());
-      return res.json();
-    },
-    enabled: !!selectedLocationLocal && !!asOfDate && !!companyId,
-  });
-
-  const { data: allInventoryData = [], isLoading: allInventoryLoading } = useQuery<any[]>({
-    queryKey: companyId ? ["/api/inventory", companyId] : [],
-    queryFn: async () => {
-      const res = await fetch("/api/inventory", { credentials: "include" });
-      if (!res.ok) throw new Error(await res.text());
-      return res.json();
-    },
-    enabled: showAllStock && !!companyId,
-    staleTime: 30000,
-  });
-
-  const { data: allNegativeStock = [], isLoading: negativeStockLoading } = useQuery<any[]>({
-    queryKey: companyId ? ["/api/inventory/negative", companyId] : [],
-    queryFn: async () => {
-      const res = await fetch("/api/inventory/negative", { credentials: "include" });
-      if (!res.ok) throw new Error(await res.text());
-      return res.json();
-    },
-    enabled: !posUser && !!companyId && showNegativeStock && !selectedLocationLocal,
-    staleTime: 30000,
-  });
-
-  const { data: categoriesList = [] } = useQuery<{ id: number; name: string; active: boolean }[]>({
-    queryKey: companyId ? ["/api/stock-categories", companyId] : [],
-    queryFn: async () => {
-      const res = await fetch("/api/stock-categories", { credentials: "include" });
-      if (!res.ok) throw new Error(await res.text());
-      return res.json();
-    },
-    enabled: !!companyId,
-    staleTime: 5 * 60 * 1000,
-  });
+  const { handlePrintWithOption, handleExportInventory } = useLocationInventoryExports(
+    selectedLocationLocal,
+    toast
+  );
 
   // ─── Derived data ────────────────────────────────────────────────────────────
 
@@ -594,26 +438,6 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
     }
   };
 
-  const handleExportInventory = async () => {
-    if (!selectedLocationLocal) return;
-    try {
-      const response = await fetch(`/api/locations/${selectedLocationLocal.id}/inventory/export`, {
-        credentials: "include",
-      });
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `${selectedLocationLocal.name}_inventory_${new Date().toLocaleDateString("en-CA")}.xlsx`;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      toast({ title: "Export Successful" });
-    } catch (error: any) {
-      toast({ title: "Export Failed", description: error.message, variant: "destructive" });
-    }
-  };
-
   const goBackToLocations = () => {
     setSelectedLocationLocal(null);
     setSelectedGroup(null);
@@ -826,278 +650,33 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
 
             {/* ── LOCATION SELECTED, no group, no view-all: stock groups ───── */}
             {selectedLocationLocal && !selectedGroup && !viewAllItems && (
-              <>
-                {/* Location title + action buttons */}
-                <div className="flex flex-col sm:flex-row sm:items-start gap-4">
-                  <div className="flex items-center gap-3 flex-1 min-w-0">
-                    <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-                      <Warehouse className="h-5 w-5 text-primary" />
-                    </div>
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        <h2 className="text-2xl font-bold truncate">{selectedLocationLocal.name}</h2>
-                        {!posUser && (
-                          <>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => openRenameDialog(selectedLocationLocal)}
-                              data-testid="button-rename-location"
-                            >
-                              <Pencil className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => openWaGroupDialog(selectedLocationLocal)}
-                              data-testid="button-wa-location"
-                              title={
-                                (selectedLocationLocal as any)?.whatsappGroupChatId
-                                  ? "WhatsApp group assigned"
-                                  : "Assign WhatsApp group"
-                              }
-                            >
-                              <MessageCircle
-                                className={`h-4 w-4 ${(selectedLocationLocal as any)?.whatsappGroupChatId ? "text-green-500" : ""}`}
-                              />
-                            </Button>
-                          </>
-                        )}
-                      </div>
-                      <p className="text-xs text-muted-foreground uppercase tracking-wide font-medium">Stock Groups</p>
-                    </div>
-                  </div>
-
-                  {/* Stats pills */}
-                  {!activeInventoryLoading && (
-                    <div className="flex items-center gap-2 flex-wrap text-sm shrink-0">
-                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-muted text-muted-foreground font-medium text-xs">
-                        <Layers className="h-3 w-3" />
-                        {stockGroups.length} {stockGroups.length === 1 ? "Group" : "Groups"}
-                      </span>
-                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-muted text-muted-foreground font-medium text-xs">
-                        <Package className="h-3 w-3" />
-                        {totalItems} Items
-                      </span>
-                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-muted text-muted-foreground font-medium text-xs">
-                        {Math.floor(totalQty).toLocaleString()} BL total
-                      </span>
-                      {!posUser && (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-muted text-muted-foreground font-medium text-xs">
-                          {formatAmount(totalValue)} total value
-                        </span>
-                      )}
-                    </div>
-                  )}
-                </div>
-
-                {/* Action buttons */}
-                <div className="flex items-center gap-2 flex-wrap">
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="outline" size="sm" className="gap-1.5" data-testid="button-export-dropdown">
-                        <Download className="h-4 w-4" /> Export <ChevronDown className="h-3 w-3" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="start">
-                      <DropdownMenuItem onClick={handleExportInventory} data-testid="menu-export-excel">
-                        <FileSpreadsheet className="h-4 w-4 mr-2" /> Export to Excel
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => handlePrintWithOption(true)} data-testid="menu-export-pdf-cost">
-                        <Printer className="h-4 w-4 mr-2" /> Export to PDF (with cost)
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        onClick={() => handlePrintWithOption(false)}
-                        data-testid="menu-export-pdf-nocost"
-                      >
-                        <Printer className="h-4 w-4 mr-2" /> Export to PDF (without cost)
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="gap-1.5"
-                    onClick={() => {
-                      setViewAllItems(true);
-                      setItemSearchTerm("");
-                    }}
-                    data-testid="button-view-all-items"
-                  >
-                    <List className="h-4 w-4" /> View All Stock Items
-                  </Button>
-
-                  <Button
-                    variant={showZeroStock ? "default" : "outline"}
-                    size="sm"
-                    className="gap-1.5"
-                    onClick={() => setShowZeroStock(!showZeroStock)}
-                    data-testid="button-show-zero"
-                  >
-                    <Eye className="h-4 w-4" /> Show zero stock
-                  </Button>
-
-                  {!posUser && (
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="gap-1.5 ml-auto"
-                          data-testid="button-location-menu"
-                        >
-                          Location <ChevronDown className="h-3 w-3" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => openRenameDialog(selectedLocationLocal)}>
-                          <Pencil className="h-4 w-4 mr-2" /> Edit / Rename
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => openWaGroupDialog(selectedLocationLocal)}>
-                          <MessageCircle className="h-4 w-4 mr-2" /> WhatsApp Group
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem
-                          className="text-destructive focus:text-destructive"
-                          onClick={() => setDeleteDialogOpen(true)}
-                          data-testid="menu-delete-location"
-                        >
-                          <Trash2 className="h-4 w-4 mr-2" /> Delete Location
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  )}
-                </div>
-
-                {/* Search + categories */}
-                <div className="flex items-center gap-2 flex-wrap">
-                  <div className="relative flex-1 min-w-[200px] max-w-sm">
-                    <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      placeholder="Search stock groups by name..."
-                      value={groupSearchTerm}
-                      onChange={(e) => setGroupSearchTerm(e.target.value)}
-                      className="pl-9"
-                      data-testid="input-group-search"
-                    />
-                  </div>
-                  <Select
-                    value={groupCategoryFilter || "all"}
-                    onValueChange={(v) => setGroupCategoryFilter(v === "all" ? "" : v)}
-                  >
-                    <SelectTrigger className="w-48" data-testid="select-category-filter">
-                      <SelectValue placeholder="All Categories" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Categories</SelectItem>
-                      <SelectItem value="none">Uncategorized</SelectItem>
-                      {categoriesList.map((cat) => (
-                        <SelectItem key={cat.id} value={String(cat.id)}>
-                          {cat.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {/* Stock groups table */}
-                {activeInventoryLoading ? (
-                  <div className="space-y-2">
-                    {Array.from({ length: 4 }).map((_, i) => (
-                      <div key={i} className="h-12 rounded-lg border bg-muted animate-pulse" />
-                    ))}
-                  </div>
-                ) : filteredStockGroups.length === 0 ? (
-                  <div className="py-16 text-center border-2 border-dashed rounded-lg text-muted-foreground">
-                    {groupSearchTerm
-                      ? "No groups match your search."
-                      : showZeroStock
-                        ? "No stock items found for this location."
-                        : 'No items with stock. Toggle "Show zero stock" to see all items.'}
-                  </div>
-                ) : (
-                  <div className="rounded-lg border overflow-hidden">
-                    <table className="w-full text-sm border-collapse">
-                      <thead>
-                        <tr className="bg-muted/50 border-b">
-                          <th className="text-left px-4 py-3 font-medium">Name</th>
-                          <th className="text-center px-4 py-3 font-medium">Items</th>
-                          <th className="text-right px-4 py-3 font-medium">Total Qty (BL)</th>
-                          {!posUser && (
-                            <>
-                              <th className="text-right px-4 py-3 font-medium">Avg Rate</th>
-                              <th className="text-right px-4 py-3 font-medium">Total Value</th>
-                            </>
-                          )}
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {filteredStockGroups.map((g) => (
-                          <tr
-                            key={g.groupId}
-                            className="border-b hover-elevate cursor-pointer"
-                            onClick={() => {
-                              setSelectedGroup(g);
-                              setItemSearchTerm("");
-                              setItemCategoryFilter([]);
-                            }}
-                            data-testid={`row-group-${g.groupId}`}
-                          >
-                            <td className="px-4 py-3 font-medium">{g.groupName}</td>
-                            <td className="px-4 py-3 text-center">
-                              <Badge variant="secondary">{g.itemCount}</Badge>
-                            </td>
-                            <td className="px-4 py-3 text-right font-mono">
-                              {Math.floor(g.totalQuantity).toLocaleString()}
-                              <span className="ml-1 text-xs text-muted-foreground font-normal">BL</span>
-                            </td>
-                            {!posUser && (
-                              <>
-                                <td className="px-4 py-3 text-right font-mono text-muted-foreground">
-                                  {formatAmount(g.averageRate)}
-                                </td>
-                                <td className="px-4 py-3 text-right font-mono font-semibold">
-                                  {formatAmount(g.totalValue)}
-                                </td>
-                              </>
-                            )}
-                          </tr>
-                        ))}
-                      </tbody>
-                      <tfoot>
-                        <tr className="bg-muted/50 border-t-2 font-semibold">
-                          <td className="px-4 py-3 font-bold">Total</td>
-                          <td className="px-4 py-3 text-center">
-                            <Badge variant="secondary">
-                              {filteredStockGroups.reduce((s, g) => s + g.itemCount, 0)}
-                            </Badge>
-                          </td>
-                          <td className="px-4 py-3 text-right font-mono font-bold">
-                            {Math.floor(filteredStockGroups.reduce((s, g) => s + g.totalQuantity, 0)).toLocaleString()}
-                            <span className="ml-1 text-xs font-normal text-muted-foreground">BL</span>
-                          </td>
-                          {!posUser && (
-                            <>
-                              <td className="px-4 py-3" />
-                              <td className="px-4 py-3 text-right font-mono font-bold">
-                                {formatAmount(filteredStockGroups.reduce((s, g) => s + g.totalValue, 0))}
-                              </td>
-                            </>
-                          )}
-                        </tr>
-                      </tfoot>
-                    </table>
-                  </div>
-                )}
-
-                {filteredStockGroups.length > 0 && (
-                  <p className="text-xs text-muted-foreground">
-                    Showing {filteredStockGroups.length} of {stockGroups.length} stock{" "}
-                    {stockGroups.length === 1 ? "group" : "groups"}
-                  </p>
-                )}
-              </>
+              <StockGroupsView
+                selectedLocationLocal={selectedLocationLocal}
+                posUser={posUser}
+                openRenameDialog={openRenameDialog}
+                openWaGroupDialog={openWaGroupDialog}
+                activeInventoryLoading={activeInventoryLoading}
+                stockGroups={stockGroups}
+                totalItems={totalItems}
+                totalQty={totalQty}
+                totalValue={totalValue}
+                formatAmount={formatAmount}
+                handleExportInventory={handleExportInventory}
+                handlePrintWithOption={handlePrintWithOption}
+                setViewAllItems={setViewAllItems}
+                setItemSearchTerm={setItemSearchTerm}
+                showZeroStock={showZeroStock}
+                setShowZeroStock={setShowZeroStock}
+                setDeleteDialogOpen={setDeleteDialogOpen}
+                groupSearchTerm={groupSearchTerm}
+                setGroupSearchTerm={setGroupSearchTerm}
+                groupCategoryFilter={groupCategoryFilter}
+                setGroupCategoryFilter={setGroupCategoryFilter}
+                categoriesList={categoriesList}
+                filteredStockGroups={filteredStockGroups}
+                setSelectedGroup={setSelectedGroup}
+                setItemCategoryFilter={setItemCategoryFilter}
+              />
             )}
 
             {/* ── STOCK GROUP SELECTED: items table ────────────────────────── */}
@@ -1240,103 +819,21 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
         )}
       </div>
 
-      {/* Create Location dialog */}
-      <Dialog open={createLocationOpen} onOpenChange={setCreateLocationOpen}>
-        <DialogContent className="sm:max-w-sm">
-          <DialogHeader>
-            <DialogTitle>Create Location</DialogTitle>
-          </DialogHeader>
-          <div className="grid gap-3 py-2">
-            <Label htmlFor="create-loc-name">Location Name</Label>
-            <Input
-              id="create-loc-name"
-              value={createLocationName}
-              onChange={(e) => setCreateLocationName(e.target.value)}
-              placeholder="e.g. Warehouse A"
-              data-testid="input-create-location-name"
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && createLocationName.trim()) {
-                  createLocationMutation.mutate(createLocationName.trim());
-                }
-              }}
-            />
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setCreateLocationOpen(false)}>
-              Cancel
-            </Button>
-            <Button
-              onClick={() => createLocationMutation.mutate(createLocationName.trim())}
-              disabled={createLocationMutation.isPending || !createLocationName.trim()}
-              data-testid="button-confirm-create-location"
-            >
-              Create
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* ── Negative stock across all locations dialog ───────────────────── */}
-      <Dialog open={showNegativeStock && !selectedLocationLocal} onOpenChange={(open) => { if (!open) setShowNegativeStock(false); }}>
-        <DialogContent className="max-w-2xl max-h-[80vh] flex flex-col">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-destructive">
-              <AlertCircle className="h-5 w-5" /> Negative Stock — All Locations
-            </DialogTitle>
-          </DialogHeader>
-          <div className="relative shrink-0">
-            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground pointer-events-none" />
-            <Input
-              placeholder="Search by item or location..."
-              className="pl-8"
-              value={negativeSearchTerm}
-              onChange={(e) => setNegativeSearchTerm(e.target.value)}
-              data-testid="input-negative-stock-search"
-            />
-          </div>
-          <div className="flex-1 overflow-auto min-h-0">
-            {negativeStockLoading ? (
-              <p className="text-sm text-muted-foreground p-4">Loading…</p>
-            ) : allNegativeStock.length === 0 ? (
-              <p className="text-sm text-muted-foreground p-4">No negative stock found.</p>
-            ) : (
-              <table className="w-full text-sm">
-                <thead className="sticky top-0 bg-background border-b">
-                  <tr>
-                    <th className="text-left py-2 px-3 font-semibold">Item</th>
-                    <th className="text-right py-2 px-3 font-semibold">Qty</th>
-                    <th className="text-left py-2 px-3 font-semibold">Location</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {allNegativeStock
-                    .filter((item) => {
-                      if (!negativeSearchTerm) return true;
-                      const s = negativeSearchTerm.toLowerCase();
-                      return (
-                        item.name.toLowerCase().includes(s) ||
-                        item.code.toLowerCase().includes(s) ||
-                        item.locationName.toLowerCase().includes(s)
-                      );
-                    })
-                    .map((item) => (
-                      <tr key={`${item.stockItemId}-${item.locationId}`} className="border-b border-muted/30 hover:bg-muted/20">
-                        <td className="py-2 px-3 font-medium">
-                          <div>{item.name}</div>
-                          <div className="text-[11px] text-muted-foreground font-mono">{item.code}</div>
-                        </td>
-                        <td className="py-2 px-3 text-right font-bold text-destructive">
-                          {parseFloat(item.quantity).toFixed(2)}
-                        </td>
-                        <td className="py-2 px-3 text-muted-foreground">{item.locationName}</td>
-                      </tr>
-                    ))}
-                </tbody>
-              </table>
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
+      {/* ── Dialogs ──────────────────────────────────────────────────────────── */}
+      <LocationInventoryDialogs
+        createLocationOpen={createLocationOpen}
+        setCreateLocationOpen={setCreateLocationOpen}
+        createLocationName={createLocationName}
+        setCreateLocationName={setCreateLocationName}
+        createLocationMutation={createLocationMutation}
+        showNegativeStock={showNegativeStock}
+        setShowNegativeStock={setShowNegativeStock}
+        selectedLocationLocal={selectedLocationLocal}
+        negativeStockLoading={negativeStockLoading}
+        allNegativeStock={allNegativeStock}
+        negativeSearchTerm={negativeSearchTerm}
+        setNegativeSearchTerm={setNegativeSearchTerm}
+      />
 
       {/* All other dialogs */}
       <LocationDialogs
