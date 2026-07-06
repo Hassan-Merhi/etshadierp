@@ -158,12 +158,12 @@ export default function FactoryWorkers() {
 
   // ── Column filters ──────────────────────────────────────────────────────
   const [filtersOpen, setFiltersOpen] = useState(false);
-  const [positionFilter, setPositionFilter]   = useState("all");
-  const [locationFilter, setLocationFilter]   = useState("all");
+  const [positionFilter, setPositionFilter]     = useState("all");
+  const [locationFilter, setLocationFilter]     = useState("all");
+  const [nationalityFilter, setNationalityFilter] = useState("all");
   const [salaryTypeFilter, setSalaryTypeFilter] = useState("all");
-  const [salaryMin, setSalaryMin] = useState("");
-  const [salaryMax, setSalaryMax] = useState("");
-  const [advanceFilter, setAdvanceFilter]     = useState("all"); // all | has | none
+  const [salaryRangeFilter, setSalaryRangeFilter] = useState("all"); // all | 0-500 | 500-1000 | 1000-2000 | 2000-5000 | 5000+
+  const [advanceFilter, setAdvanceFilter]       = useState("all"); // all | has | none
 
   const [createOpen, setCreateOpen] = useState(false);
   const [editingWorker, setEditingWorker] = useState<FactoryWorker | null>(null);
@@ -554,6 +554,9 @@ export default function FactoryWorkers() {
   const uniqueLocations = useMemo(() =>
     [...new Set((workers ?? []).map((w) => (w as any).city || (w as any).country).filter(Boolean))].sort() as string[],
     [workers]);
+  const uniqueNationalities = useMemo(() =>
+    [...new Set((workers ?? []).map((w) => w.nationality).filter(Boolean))].sort() as string[],
+    [workers]);
   const uniqueSalaryTypes = useMemo(() =>
     [...new Set((workers ?? []).map((w) => w.salaryType).filter(Boolean))].sort() as string[],
     [workers]);
@@ -561,18 +564,18 @@ export default function FactoryWorkers() {
   const activeFilterCount = [
     positionFilter !== "all",
     locationFilter !== "all",
+    nationalityFilter !== "all",
     salaryTypeFilter !== "all",
-    salaryMin !== "",
-    salaryMax !== "",
+    salaryRangeFilter !== "all",
     advanceFilter !== "all",
   ].filter(Boolean).length;
 
   const clearAllFilters = () => {
     setPositionFilter("all");
     setLocationFilter("all");
+    setNationalityFilter("all");
     setSalaryTypeFilter("all");
-    setSalaryMin("");
-    setSalaryMax("");
+    setSalaryRangeFilter("all");
     setAdvanceFilter("all");
   };
 
@@ -605,11 +608,20 @@ export default function FactoryWorkers() {
           const loc = (w as any).city || (w as any).country || "";
           if (loc !== locationFilter) return false;
         }
+        if (nationalityFilter !== "all" && w.nationality !== nationalityFilter) return false;
         if (salaryTypeFilter !== "all" && w.salaryType !== salaryTypeFilter) return false;
 
-        const salary = parseFloat(w.baseSalary || "0");
-        if (salaryMin !== "" && salary < parseFloat(salaryMin)) return false;
-        if (salaryMax !== "" && salary > parseFloat(salaryMax)) return false;
+        if (salaryRangeFilter !== "all") {
+          const salary = parseFloat(w.baseSalary || "0");
+          if (salaryRangeFilter === "5000+") {
+            // "$5,000 and above" — inclusive lower bound
+            if (salary < 5000) return false;
+          } else {
+            // Half-open interval [lo, hi): "Under $500" means salary < 500
+            const [lo, hi] = salaryRangeFilter.split("-").map(Number);
+            if (salary < lo || salary >= hi) return false;
+          }
+        }
 
         if (advanceFilter === "has" && !((w as any).pendingAdvanceBalance > 0 || parseFloat((w as any).pendingAdvanceBalance || "0") > 0)) return false;
         if (advanceFilter === "none" && parseFloat((w as any).pendingAdvanceBalance || "0") > 0) return false;
@@ -617,7 +629,7 @@ export default function FactoryWorkers() {
         return true;
       })
       .sort((a, b) => parseCodeNumber(a.employeeCode) - parseCodeNumber(b.employeeCode));
-  }, [workers, statusFilter, searchQuery, positionFilter, locationFilter, salaryTypeFilter, salaryMin, salaryMax, advanceFilter]);
+  }, [workers, statusFilter, searchQuery, positionFilter, locationFilter, nationalityFilter, salaryTypeFilter, salaryRangeFilter, advanceFilter]);
 
   const activeCount = workers?.filter((w) => w.active).length ?? 0;
   const inactiveCount = workers?.filter((w) => !w.active).length ?? 0;
@@ -1333,26 +1345,38 @@ export default function FactoryWorkers() {
                 </Select>
               </div>
 
+              {/* Nationality */}
+              <div className="flex flex-col gap-1 min-w-[150px]">
+                <label className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Nationality</label>
+                <Select value={nationalityFilter} onValueChange={setNationalityFilter}>
+                  <SelectTrigger className="h-8 text-sm bg-background">
+                    <SelectValue placeholder="All" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All nationalities</SelectItem>
+                    {uniqueNationalities.map((n) => (
+                      <SelectItem key={n} value={n}>{n}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
               {/* Salary range */}
-              <div className="flex flex-col gap-1 min-w-[190px]">
-                <label className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Salary Range ($)</label>
-                <div className="flex items-center gap-2">
-                  <Input
-                    type="number"
-                    placeholder="Min"
-                    value={salaryMin}
-                    onChange={(e) => setSalaryMin(e.target.value)}
-                    className="h-8 text-sm bg-background w-[82px]"
-                  />
-                  <span className="text-muted-foreground text-xs">–</span>
-                  <Input
-                    type="number"
-                    placeholder="Max"
-                    value={salaryMax}
-                    onChange={(e) => setSalaryMax(e.target.value)}
-                    className="h-8 text-sm bg-background w-[82px]"
-                  />
-                </div>
+              <div className="flex flex-col gap-1 min-w-[160px]">
+                <label className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Salary Range</label>
+                <Select value={salaryRangeFilter} onValueChange={setSalaryRangeFilter}>
+                  <SelectTrigger className="h-8 text-sm bg-background">
+                    <SelectValue placeholder="All" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All ranges</SelectItem>
+                    <SelectItem value="0-500">Under $500</SelectItem>
+                    <SelectItem value="500-1000">$500 – under $1,000</SelectItem>
+                    <SelectItem value="1000-2000">$1,000 – under $2,000</SelectItem>
+                    <SelectItem value="2000-5000">$2,000 – under $5,000</SelectItem>
+                    <SelectItem value="5000+">$5,000 and above</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
 
               {/* Advance status */}
@@ -1387,16 +1411,22 @@ export default function FactoryWorkers() {
                   <button onClick={() => setLocationFilter("all")} className="hover:opacity-70"><X className="h-3 w-3" /></button>
                 </span>
               )}
+              {nationalityFilter !== "all" && (
+                <span className="inline-flex items-center gap-1 text-xs bg-primary/10 text-primary rounded-full px-2.5 py-1 font-medium">
+                  Nationality: {nationalityFilter}
+                  <button onClick={() => setNationalityFilter("all")} className="hover:opacity-70"><X className="h-3 w-3" /></button>
+                </span>
+              )}
               {salaryTypeFilter !== "all" && (
                 <span className="inline-flex items-center gap-1 text-xs bg-primary/10 text-primary rounded-full px-2.5 py-1 font-medium">
                   Type: {salaryTypeFilter}
                   <button onClick={() => setSalaryTypeFilter("all")} className="hover:opacity-70"><X className="h-3 w-3" /></button>
                 </span>
               )}
-              {(salaryMin !== "" || salaryMax !== "") && (
+              {salaryRangeFilter !== "all" && (
                 <span className="inline-flex items-center gap-1 text-xs bg-primary/10 text-primary rounded-full px-2.5 py-1 font-medium">
-                  Salary: {salaryMin || "0"}–{salaryMax || "∞"}
-                  <button onClick={() => { setSalaryMin(""); setSalaryMax(""); }} className="hover:opacity-70"><X className="h-3 w-3" /></button>
+                  {({ "0-500": "Salary: Under $500", "500-1000": "Salary: $500 – under $1,000", "1000-2000": "Salary: $1,000 – under $2,000", "2000-5000": "Salary: $2,000 – under $5,000", "5000+": "Salary: $5,000 and above" } as Record<string,string>)[salaryRangeFilter] ?? `Salary: ${salaryRangeFilter}`}
+                  <button onClick={() => setSalaryRangeFilter("all")} className="hover:opacity-70"><X className="h-3 w-3" /></button>
                 </span>
               )}
               {advanceFilter !== "all" && (
@@ -1419,31 +1449,34 @@ export default function FactoryWorkers() {
                   <TableHead className="w-10 text-center text-xs font-semibold uppercase tracking-wide text-muted-foreground py-2 pl-3 pr-1">
                     #
                   </TableHead>
-                  <TableHead className="w-[22%] text-xs font-semibold uppercase tracking-wide text-muted-foreground py-2">
+                  <TableHead className="w-[18%] text-xs font-semibold uppercase tracking-wide text-muted-foreground py-2">
                     Worker
                   </TableHead>
-                  <TableHead className="w-[22%] text-xs font-semibold uppercase tracking-wide text-muted-foreground py-2">
+                  <TableHead className="w-[16%] text-xs font-semibold uppercase tracking-wide text-muted-foreground py-2">
                     Position
                   </TableHead>
-                  <TableHead className="w-[16%] text-xs font-semibold uppercase tracking-wide text-muted-foreground py-2">
+                  <TableHead className="w-[11%] text-xs font-semibold uppercase tracking-wide text-muted-foreground py-2">
+                    Nationality
+                  </TableHead>
+                  <TableHead className="w-[12%] text-xs font-semibold uppercase tracking-wide text-muted-foreground py-2">
                     Location
                   </TableHead>
-                  <TableHead className="w-[11%] text-right text-xs font-semibold uppercase tracking-wide text-muted-foreground py-2">
+                  <TableHead className="w-[10%] text-right text-xs font-semibold uppercase tracking-wide text-muted-foreground py-2">
                     Salary
                   </TableHead>
-                  <TableHead className="w-[9%] text-right text-xs font-semibold uppercase tracking-wide text-muted-foreground py-2">
+                  <TableHead className="w-[8%] text-right text-xs font-semibold uppercase tracking-wide text-muted-foreground py-2">
                     Transport
                   </TableHead>
-                  <TableHead className="w-[9%] text-right text-xs font-semibold uppercase tracking-wide text-muted-foreground py-2">
+                  <TableHead className="w-[8%] text-right text-xs font-semibold uppercase tracking-wide text-muted-foreground py-2">
                     Advance
                   </TableHead>
-                  <TableHead className="w-[11%] text-right text-xs font-semibold uppercase tracking-wide text-muted-foreground py-2">
+                  <TableHead className="w-[10%] text-right text-xs font-semibold uppercase tracking-wide text-muted-foreground py-2">
                     Due Today
                   </TableHead>
-                  <TableHead className="w-[90px] text-xs font-semibold uppercase tracking-wide text-muted-foreground py-2">
+                  <TableHead className="w-[80px] text-xs font-semibold uppercase tracking-wide text-muted-foreground py-2">
                     Status
                   </TableHead>
-                  <TableHead className="w-[72px] py-2"></TableHead>
+                  <TableHead className="w-[64px] py-2"></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -1454,19 +1487,23 @@ export default function FactoryWorkers() {
                       <TableCell>
                         <div className="flex items-center gap-3">
                           <Skeleton className="h-8 w-8 rounded-full shrink-0" />
-                          <Skeleton className="h-4 w-36" />
+                          <Skeleton className="h-4 w-32" />
                         </div>
                       </TableCell>
-                      <TableCell><Skeleton className="h-4 w-24" /></TableCell>
                       <TableCell><Skeleton className="h-4 w-20" /></TableCell>
-                      <TableCell><Skeleton className="h-4 w-16 ml-auto" /></TableCell>
-                      <TableCell><Skeleton className="h-5 w-14 rounded-full" /></TableCell>
+                      <TableCell><Skeleton className="h-4 w-16" /></TableCell>
+                      <TableCell><Skeleton className="h-4 w-16" /></TableCell>
+                      <TableCell><Skeleton className="h-4 w-14 ml-auto" /></TableCell>
+                      <TableCell></TableCell>
+                      <TableCell></TableCell>
+                      <TableCell></TableCell>
+                      <TableCell><Skeleton className="h-5 w-12 rounded-full" /></TableCell>
                       <TableCell></TableCell>
                     </TableRow>
                   ))
                 ) : filteredWorkers.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={10}>
+                    <TableCell colSpan={11}>
                       <div className="flex flex-col items-center gap-2 py-10 text-center">
                         <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center">
                           <Users className="h-5 w-5 text-muted-foreground" />
@@ -1529,6 +1566,11 @@ export default function FactoryWorkers() {
                       </TableCell>
                       <TableCell className="py-3 text-sm text-muted-foreground truncate">
                         {worker.position || <span className="text-muted-foreground/40">—</span>}
+                      </TableCell>
+                      <TableCell className="py-3 text-sm text-muted-foreground truncate">
+                        {worker.nationality
+                          ? <span>{worker.nationality}</span>
+                          : <span className="text-muted-foreground/40">—</span>}
                       </TableCell>
                       <TableCell className="py-3 text-sm text-muted-foreground truncate">
                         {(worker as any).city || (worker as any).country
