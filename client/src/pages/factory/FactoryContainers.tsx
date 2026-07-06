@@ -278,6 +278,14 @@ export default function FactoryContainers() {
           )}
           <div className="flex rounded-md border overflow-hidden">
             <Button
+              variant={viewMode === "tracking" ? "default" : "ghost"}
+              className="rounded-none"
+              onClick={() => setViewMode("tracking")}
+              data-testid="button-view-tracking"
+            >
+              <Radio className="h-4 w-4 mr-2" /> OTW Tracking
+            </Button>
+            <Button
               variant={viewMode === "summary" ? "default" : "ghost"}
               className="rounded-none"
               onClick={() => setViewMode("summary")}
@@ -286,12 +294,12 @@ export default function FactoryContainers() {
               <Ship className="h-4 w-4 mr-2" /> OTW Summary
             </Button>
             <Button
-              variant={viewMode === "tracking" ? "default" : "ghost"}
+              variant={viewMode === "list" ? "default" : "ghost"}
               className="rounded-none"
-              onClick={() => setViewMode("tracking")}
-              data-testid="button-view-tracking"
+              onClick={() => setViewMode("list")}
+              data-testid="button-view-list"
             >
-              <Radio className="h-4 w-4 mr-2" /> OTW Tracking
+              <AlertCircle className="h-4 w-4 mr-2" /> All Containers
             </Button>
           </div>
           <Button onClick={() => navigate("/factory/containers/new")} data-testid="button-add-factory-container">
@@ -300,7 +308,7 @@ export default function FactoryContainers() {
         </div>
       </div>
 
-      {viewMode === "summary" ? (
+      {viewMode === "summary" && (
         <OtwSummaryView
           otwContainers={otwContainers}
           otwSupplierGroups={otwSupplierGroups}
@@ -310,7 +318,11 @@ export default function FactoryContainers() {
           fmtOtwKg={fmtOtwKg}
           onViewContainer={setViewContainer}
         />
-      ) : (
+      )}
+
+      {viewMode === "tracking" && <FactoryOtwTrackingTab onEdit={openEdit} />}
+
+      {viewMode === "list" && (
         <ContainerListView
           containers={containers}
           filteredContainers={filteredContainers}
@@ -331,8 +343,6 @@ export default function FactoryContainers() {
           onNavigateOffload={() => navigate("/factory/raw-stock")}
         />
       )}
-
-      {viewMode === "tracking" && <FactoryOtwTrackingTab onEdit={openEdit} />}
 
       {/* ── Dialogs ───────────────────────────────────────────────────────── */}
       <ContainerFormDialog

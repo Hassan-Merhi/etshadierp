@@ -3665,6 +3665,7 @@ let migrationsDone = false;
     `ALTER TABLE factory_containers ADD COLUMN IF NOT EXISTS tracking_detected_carrier TEXT`,
     `ALTER TABLE factory_containers ADD COLUMN IF NOT EXISTS tracking_next_check_at TIMESTAMPTZ`,
     `ALTER TABLE factory_containers ADD COLUMN IF NOT EXISTS tracking_last_skip_reason TEXT`,
+    `ALTER TABLE factory_containers ADD COLUMN IF NOT EXISTS tracking_carrier_hint TEXT`,
     `CREATE TABLE IF NOT EXISTS factory_container_tracking_events (
       id SERIAL PRIMARY KEY,
       container_id INTEGER NOT NULL,

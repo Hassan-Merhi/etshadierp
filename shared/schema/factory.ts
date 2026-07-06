@@ -702,6 +702,7 @@ export const factoryContainers = pgTable(
     updatedAt: timestamp("updated_at").notNull().defaultNow(),
     trackingEnabled: boolean("tracking_enabled").notNull().default(true),
     trackingAutoUpdate: boolean("tracking_auto_update").notNull().default(true),
+    trackingCarrierHint: text("tracking_carrier_hint"),
     trackingProvider: text("tracking_provider"),
     trackingLastStatus: text("tracking_last_status"),
     trackingLastLocation: text("tracking_last_location"),
