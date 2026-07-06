@@ -177,6 +177,12 @@ export default function Accounts() {
       return res.json();
     },
     enabled: debouncedFindQuery.trim().length > 0,
+    // Only re-fetch when the search term itself changes — never on window
+    // focus or background intervals, so typing is never interrupted.
+    staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
+    refetchOnMount: false,
+    refetchInterval: false,
   });
 
   const updateLedgerMutation = useMutation({
