@@ -568,7 +568,8 @@ describe("XLSX Export — SP Sales Form (July 1–6 verification)", () => {
   const ARTICLE   = `${TEST_PREFIX}_SPITM`;
   const DAY_COUNT = 6;   // 6 days: July 1–6
   const E_DATE_START = 7;
-  const S_DATE_START = 6;
+  const S_DATE_START = 6;  // F = first date column in Sales sheet
+  const S_NAME_COL = 3;    // C = item name column in Sales sheet
 
   let spMovId      = 0;
   let spSaleId     = 0;
@@ -634,6 +635,13 @@ describe("XLSX Export — SP Sales Form (July 1–6 verification)", () => {
       [ctx.companyId, ARTICLE],
     );
     spOnDateMovId = mvOnDateRes.rows[0]?.id ?? 0;
+
+    // Assign a real location to spMovId so locationId-filter tests can verify
+    // that the filter includes/excludes it based on location.
+    await pool.query(
+      "UPDATE sp_stock_movements SET location_id = $1 WHERE id = $2",
+      [ctx.locationId, spMovId],
+    );
   }, 30000);
 
   afterAll(async () => {
@@ -834,6 +842,119 @@ describe("XLSX Export — SP Sales Form (July 1–6 verification)", () => {
     );
     expect(res.rows.length).toBe(1); // row found — movement IS within the <= cutoff
     expect(parseFloat(res.rows[0].opening_qty)).toBe(50);
+  });
+
+  // ── 7. Sales sheet item-row formula clearing ─────────────────────────────
+  it("Sales sheet item rows: all cells beyond toDate are null (formula cells cleared too)", async () => {
+    // Fix: the old code had `if (!isFormula(cell)) cell.value = null` which left
+    // formula-chain cells (e.g. =F2+1) alive after the export range.  The fix
+    // removes the isFormula guard for d >= dayCount so every cell is nulled.
+    const wb = await loadWorkbook(await getExportBuf());
+    const ws = wb.getWorksheet("Sales");
+    if (!ws) return; // skip if Sales sheet absent from this template
+    const surviving: string[] = [];
+    for (let r = 2; r <= ws.rowCount; r++) {
+      const row = ws.getRow(r);
+      if (!row.getCell(S_NAME_COL).value) continue; // skip rows with no item name
+      // Every cell at d >= DAY_COUNT must be null — formulas and plain values alike.
+      for (let d = DAY_COUNT; d < DAY_COUNT + 15; d++) {
+        const c = S_DATE_START + d;
+        const val = row.getCell(c).value;
+        if (val !== null && val !== undefined) {
+          surviving.push(`r${r}c${c}=${JSON.stringify(val)}`);
+        }
+      }
+    }
+    expect(
+      surviving,
+      `Non-null cells survived beyond toDate in Sales item rows: ${surviving.join(", ")}`,
+    ).toHaveLength(0);
+  });
+
+  // ── 8. locationId filtering ───────────────────────────────────────────────
+  it("sales query: locationId filter includes only sales from the matching location", async () => {
+    // spMovId now has location_id = ctx.locationId (set in beforeAll UPDATE).
+    // Query matching that locationId → expect the July 3 sale line.
+    const matchRes = await pool.query(
+      `SELECT COUNT(*) AS cnt
+       FROM  sp_sale_lines sl
+       JOIN  sp_sales       s  ON sl.sale_id   = s.id
+       LEFT  JOIN sp_stock_movements mv ON mv.id = sl.movement_id
+       WHERE sl.company_id = $1
+         AND s.status      = 'posted'
+         AND s.sale_date BETWEEN '2026-07-01'::date AND '2026-07-06'::date
+         AND mv.location_id = $2`,
+      [ctx.companyId, ctx.locationId],
+    );
+    expect(parseInt(matchRes.rows[0].cnt)).toBeGreaterThanOrEqual(1);
+
+    // Query with a different locationId → no rows (our movement is at ctx.locationId only).
+    const noMatchRes = await pool.query(
+      `SELECT COUNT(*) AS cnt
+       FROM  sp_sale_lines sl
+       JOIN  sp_sales       s  ON sl.sale_id   = s.id
+       LEFT  JOIN sp_stock_movements mv ON mv.id = sl.movement_id
+       WHERE sl.company_id = $1
+         AND s.status      = 'posted'
+         AND s.sale_date BETWEEN '2026-07-01'::date AND '2026-07-06'::date
+         AND mv.location_id = $2`,
+      [ctx.companyId, ctx.location2Id], // location2 has no SP movements
+    );
+    expect(parseInt(noMatchRes.rows[0].cnt)).toBe(0);
+  });
+
+  it("opening stock query: locationId filter includes only movements at matching location", async () => {
+    // spMovId was updated to location_id = ctx.locationId.
+    // Opening stock query with that locationId must find our movement.
+    const matchRes = await pool.query(
+      `WITH sold_before AS (
+         SELECT sl.movement_id, SUM(sl.qty_sold) AS qty
+         FROM   sp_sale_lines sl
+         JOIN   sp_sales s ON sl.sale_id = s.id
+         WHERE  sl.company_id = $1
+           AND  s.status      = 'posted'
+           AND  s.sale_date   < '2026-07-01'::date
+         GROUP BY sl.movement_id
+       )
+       SELECT SUM(GREATEST(sm.qty_in::numeric - COALESCE(sb.qty, 0), 0)) AS opening_qty
+       FROM   sp_stock_movements sm
+       LEFT   JOIN sold_before sb ON sb.movement_id = sm.id
+       WHERE  sm.company_id     = $1
+         AND  sm.created_at::date <= '2026-07-01'::date
+         AND  sm.location_id     = $2`,
+      [ctx.companyId, ctx.locationId],
+    );
+    expect(parseFloat(matchRes.rows[0]?.opening_qty ?? "0")).toBeGreaterThan(0);
+
+    // Different location → no opening stock from our movements.
+    const noMatchRes = await pool.query(
+      `WITH sold_before AS (
+         SELECT sl.movement_id, SUM(sl.qty_sold) AS qty
+         FROM   sp_sale_lines sl
+         JOIN   sp_sales s ON sl.sale_id = s.id
+         WHERE  sl.company_id = $1
+           AND  s.status      = 'posted'
+           AND  s.sale_date   < '2026-07-01'::date
+         GROUP BY sl.movement_id
+       )
+       SELECT COALESCE(SUM(GREATEST(sm.qty_in::numeric - COALESCE(sb.qty, 0), 0)), 0) AS opening_qty
+       FROM   sp_stock_movements sm
+       LEFT   JOIN sold_before sb ON sb.movement_id = sm.id
+       WHERE  sm.company_id     = $1
+         AND  sm.created_at::date <= '2026-07-01'::date
+         AND  sm.location_id     = $2`,
+      [ctx.companyId, ctx.location2Id],
+    );
+    expect(parseFloat(noMatchRes.rows[0]?.opening_qty ?? "0")).toBe(0);
+  });
+
+  it("export with locationId param returns valid XLSX (locationId filter does not crash)", async () => {
+    const res = await getBinary(
+      agent,
+      `/api/sp/sales-form/export?fromDate=${FROM}&toDate=${TO}&locationId=${ctx.locationId}`,
+    );
+    expect(res.status, `Export with locationId failed: ${JSON.stringify(res.body)}`).toBe(200);
+    expect(isValidXlsxMagic(res.body as Buffer)).toBe(true);
   });
 });
 

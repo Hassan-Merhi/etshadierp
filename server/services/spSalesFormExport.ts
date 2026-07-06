@@ -11,8 +11,8 @@ export interface SpSalesFormParams {
   fromDate: string; // YYYY-MM-DD
   toDate: string; // YYYY-MM-DD
   supplierName?: string;
-  locationName?: string; // kept for API compat / filename use
-  locationId?: number; // kept for API compat but ignored
+  locationName?: string; // used in filename
+  locationId?: number; // optional; when provided, filters sales and opening stock to that location
 }
 
 // ── Internal types ────────────────────────────────────────────────────────────
@@ -120,7 +120,13 @@ const S_DATE_START = 6; // F – first date column
 // ── Main export function ──────────────────────────────────────────────────────
 
 export async function generateSpSalesFormExcel(params: SpSalesFormParams): Promise<Buffer> {
-  const { companyId, fromDate, toDate } = params;
+  const { companyId, fromDate, toDate, locationId } = params;
+
+  // Build conditional location SQL fragments — injected into both queries below.
+  // When locationId is a positive integer, restrict to that location.
+  // When absent / falsy, keep existing all-location behaviour.
+  const salesLocFilter = locationId ? sql` AND mv.location_id = ${locationId}` : sql``;
+  const openingLocFilter = locationId ? sql` AND sm.location_id = ${locationId}` : sql``;
 
   const templatePath = path.join(process.cwd(), "server", "templates", "supplier_partner_sales_form_template.xlsx");
   if (!fs.existsSync(templatePath)) {
@@ -162,6 +168,7 @@ export async function generateSpSalesFormExcel(params: SpSalesFormParams): Promi
       WHERE sl.company_id = ${companyId}
         AND s.status      = 'posted'
         AND s.sale_date BETWEEN ${fromDate}::date AND ${toDate}::date
+        ${salesLocFilter}
       GROUP BY COALESCE(si.code, sl.article_code), s.sale_date
       ORDER BY s.sale_date
     `),
@@ -197,6 +204,7 @@ export async function generateSpSalesFormExcel(params: SpSalesFormParams): Promi
         LEFT  JOIN sold_before sb ON sb.movement_id = sm.id
         WHERE sm.company_id     = ${companyId}
           AND sm.created_at::date <= ${fromDate}::date
+          ${openingLocFilter}
       )
       SELECT
         COALESCE(si.code, lo.article_code)  AS item_code,
@@ -428,6 +436,33 @@ export async function generateSpSalesFormExcel(params: SpSalesFormParams): Promi
   //   when ENTRY SUMIFS formulas read the hidden Sales sheet — a 0-qty day
   //   is indistinguishable from a truly missing day.
   if (salesWs) {
+    // Pre-sweep: nullify ALL sharedFormula slave cells in the Sales sheet before
+    // making any other modifications.
+    //
+    // Why: the Sales sheet (like ENTRY) contains shared-formula chains.  When we
+    // later write null to cells in "Total" rows (beyond the export range) we may
+    // be clearing slave cells whose masters still reference them in ExcelJS's
+    // internal shared-formula registry.  ExcelJS then throws "Shared Formula
+    // master must exist above and or left of clone" during writeBuffer().
+    //
+    // Scope: ALL rows (date row + item rows + total rows), columns >= S_DATE_START.
+    // Use row.getCell(c) column-by-column to force materialisation of every cell,
+    // for the same reason as the ENTRY pre-sweep above.
+    const salesLastCol = salesWs.columnCount;
+    for (let r = S_DATE_ROW; r <= salesWs.rowCount; r++) {
+      const row = salesWs.getRow(r);
+      let rowChanged = false;
+      for (let c = S_DATE_START; c <= salesLastCol; c++) {
+        const cell = row.getCell(c);
+        const v = cell.value as any;
+        if (v && typeof v === "object" && "sharedFormula" in v) {
+          cell.value = null;
+          rowChanged = true;
+        }
+      }
+      if (rowChanged) row.commit();
+    }
+
     const sDateRow = salesWs.getRow(S_DATE_ROW);
     // Write fromDate to the plain anchor cell (F1 = col S_DATE_START).
     // Formula cells for d=1… auto-chain from F1 — do not overwrite them.
@@ -442,7 +477,20 @@ export async function generateSpSalesFormExcel(params: SpSalesFormParams): Promi
     }
     sDateRow.commit();
 
-    // Item rows: write qty per day
+    // Named rows (items + totals): write qty and clear beyond range.
+    //
+    // Loop design — two concerns kept separate:
+    //   a) Data writing (within range): item rows only; "Total …" rows are
+    //      aggregation rows whose in-range cells are formula-driven and must not
+    //      be overwritten with raw qty values.
+    //   b) Beyond-range clearing: ALL named rows, including "Total …" rows.
+    //      "Total" rows contain formula cells (e.g. SUM chains) that, if left
+    //      intact beyond toDate, survive in the hidden Sales sheet and can be
+    //      picked up by ENTRY SUMIFS, producing phantom quantities.
+    //      The clearing MUST NOT use the isFormula guard — formula cells must be
+    //      nulled just like plain-value cells.
+    //
+    // Blank/unnamed rows are skipped entirely; they carry no formula data.
     const salesWsLast = salesWs.rowCount;
     for (let r = S_DATA_START; r <= salesWsLast; r++) {
       const row = salesWs.getRow(r);
@@ -453,23 +501,27 @@ export async function generateSpSalesFormExcel(params: SpSalesFormParams): Promi
           : typeof (nameRaw as any)?.result === "string"
             ? (nameRaw as any).result.trim()
             : "";
-      if (!displayName || displayName.startsWith("Total ")) continue;
 
-      const systemCode =
-        nameToSystemCode.get(displayName) ?? nameToSystemCode.get(nk(displayName)) ?? displayName;
-      const daySalesMap = getSalesMap(displayName, systemCode);
+      // Completely skip blank/unnamed rows.
+      if (!displayName) continue;
 
-      // Within export range: write qty or null (never 0)
-      for (let d = 0; d < dayCount; d++) {
-        const cell = row.getCell(S_DATE_START + d);
-        if (isFormula(cell)) continue;
-        const ds = daySalesMap?.get(dates[d]);
-        cell.value = (ds && ds.qty > 0) ? r3(ds.qty) : null;
+      // (a) Data writing — item rows only (not "Total …").
+      if (!displayName.startsWith("Total ")) {
+        const systemCode =
+          nameToSystemCode.get(displayName) ?? nameToSystemCode.get(nk(displayName)) ?? displayName;
+        const daySalesMap = getSalesMap(displayName, systemCode);
+
+        for (let d = 0; d < dayCount; d++) {
+          const cell = row.getCell(S_DATE_START + d);
+          if (isFormula(cell)) continue; // leave template formula intact within range
+          const ds = daySalesMap?.get(dates[d]);
+          cell.value = (ds && ds.qty > 0) ? r3(ds.qty) : null;
+        }
       }
-      // Beyond export range: clear everything (null, not 0)
+
+      // (b) Beyond-range clearing — ALL named rows (items AND totals).
       for (let d = dayCount; d < dayCount + 40; d++) {
-        const cell = row.getCell(S_DATE_START + d);
-        if (!isFormula(cell)) cell.value = null;
+        row.getCell(S_DATE_START + d).value = null;
       }
       row.commit();
     }
