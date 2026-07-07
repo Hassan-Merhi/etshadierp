@@ -158,7 +158,11 @@ export function FilterBar({
             <FilterLabel>Transporter</FilterLabel>
             <MultiFilterSelect
               allLabel="All Transporters"
-              options={transporters.map((t) => ({ label: t, value: t }))}
+              options={[
+                { label: "No Transporter", value: "NO_TRANSPORTER" },
+                { label: "────────────────", value: "SEP", dividerBefore: true },
+                ...transporters.map((t) => ({ label: t, value: t })),
+              ]}
               selected={transporterFilters}
               onChange={setTransporterFilters}
               testId="multi-filter-transporter"

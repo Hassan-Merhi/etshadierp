@@ -42,7 +42,14 @@ export function useContainerFilters({
         if (companyFilter !== "ALL" && c.companyName !== companyFilter) return false;
         if (containerFilters.length > 0 && !containerFilters.includes(c.containerNumber)) return false;
         if (supplierFilters.length > 0 && !supplierFilters.includes(c.supplierCode ?? "")) return false;
-        if (transporterFilters.length > 0 && !transporterFilters.includes(c.transporter ?? "")) return false;
+        if (transporterFilters.length > 0) {
+          const tr = (c.transporter ?? "").trim();
+          const match = transporterFilters.some((f) => {
+            if (f === "NO_TRANSPORTER") return !tr;
+            return tr === f;
+          });
+          if (!match) return false;
+        }
         if (agentFilters.length > 0 && !agentFilters.includes(c.agent ?? "")) return false;
         if (truckFilters.length > 0) {
           const plate = (c.numberPlate ?? "").trim();
