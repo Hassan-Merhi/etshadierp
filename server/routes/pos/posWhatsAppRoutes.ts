@@ -191,7 +191,6 @@ export function registerPosWhatsAppRoutes(app: Express): void {
         console.error("[/api/pos/send-stock-pdf]", {
           locationId,
           chatId: location.whatsappGroupChatId,
-          pdfUrl,
           error: result.error,
         });
         return res.status(502).json({ message: result.error ?? "Failed to send WhatsApp PDF" });
