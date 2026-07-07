@@ -5239,6 +5239,28 @@ END $mig$`;
         console.error("[BaleOrphanFix] Error:", e.message);
       }
 
+      // ── Soft-delete orphaned Insurance ledger accounts ───────────────────────
+      // Insurance member deletion previously left the linked "Insurance - Name"
+      // ledger account alive. Clean up any that no longer have a member row.
+      try {
+        const insuranceFix = await migrationClient.query(`
+          UPDATE ledger_accounts la
+          SET deleted_at = NOW()
+          WHERE la.deleted_at IS NULL
+            AND la.name LIKE 'Insurance - %'
+            AND NOT EXISTS (
+              SELECT 1 FROM insurance_members im
+              WHERE im.ledger_account_id = la.id
+            )
+          RETURNING id
+        `);
+        if (insuranceFix.rowCount && insuranceFix.rowCount > 0) {
+          console.log(`[InsuranceFix] Soft-deleted ${insuranceFix.rowCount} orphaned Insurance ledger account(s)`);
+        }
+      } catch (e: any) {
+        console.error("[InsuranceFix] Error:", e.message);
+      }
+
       // Auto-fix sequence desyncs (can happen after data restores / bulk imports with explicit IDs)
       const seqFixes: Array<[string, string]> = [
         ["ledger_accounts", "ledger_accounts_id_seq"],

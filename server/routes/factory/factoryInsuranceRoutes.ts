@@ -260,6 +260,14 @@ export function registerFactoryInsuranceRoutes(app: Express) {
         .delete(insuranceMembers)
         .where(and(eq(insuranceMembers.id, id), eq(insuranceMembers.companyId, companyId)));
 
+      // Also soft-delete the associated ledger account so it no longer shows in Accounts
+      if (existing.ledgerAccountId) {
+        await pool.query(
+          `UPDATE ledger_accounts SET deleted_at = NOW() WHERE id = $1 AND company_id = $2`,
+          [existing.ledgerAccountId, companyId]
+        );
+      }
+
       res.json({ success: true });
     } catch (err: any) {
       console.error("DELETE /api/insurance/members/:id error:", err);
