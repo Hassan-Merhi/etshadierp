@@ -266,7 +266,7 @@ function buildItemRegistry(
 
 // ── Sheet builders ────────────────────────────────────────────────────────────
 
-const FIXED_LEFT   = 6;  // A=RowNum, B=Group, C=Name, D=Code, E=OpenQty, F=Cost/Bag
+const FIXED_LEFT   = 5;  // A=RowNum, B=Name, C=Code, D=OpenQty, E=Cost/Bag
 const COLS_PER_DAY = 3;  // Qty, SalePrice, Profit/Bag
 const AFTER_DATES  = 3;  // CloseQty, CloseVal, AvgMonthlySales
 
@@ -349,8 +349,10 @@ async function buildEntrySheet(
   params: SpSalesFormV2Params
 ): Promise<void> {
   const ws = wb.addWorksheet("ENTRY");
+  // FIXED_LEFT = 5: A=RowNum, B=ItemName, C=Code, D=OpenQty, E=Cost/Bag
+  const dayBase    = FIXED_LEFT + 1;   // = 6 — first Qty column for day 0
   const totalCols  = FIXED_LEFT + dayCount * COLS_PER_DAY + AFTER_DATES;
-  const closeQtyCol = FIXED_LEFT + 1 + dayCount * COLS_PER_DAY;
+  const closeQtyCol = dayBase + dayCount * COLS_PER_DAY;
 
   // ── Print / freeze / filter ──────────────────────────────────────────────────
   ws.pageSetup.orientation    = "landscape";
@@ -359,18 +361,17 @@ async function buildEntrySheet(
   ws.pageSetup.fitToHeight    = 0;
   ws.pageSetup.printTitlesRow = "1:3";
   ws.pageSetup.margins = { left: 0.25, right: 0.25, top: 0.5, bottom: 0.5, header: 0.3, footer: 0.3 };
-  ws.views     = [{ state: "frozen", xSplit: 4, ySplit: 3, activeCell: "E4" }];
+  ws.views     = [{ state: "frozen", xSplit: 3, ySplit: 3, activeCell: "F4" }];
   ws.autoFilter = { from: { row: 3, column: 1 }, to: { row: 3, column: totalCols } };
 
   // ── Column widths ────────────────────────────────────────────────────────────
   ws.getColumn(1).width = 6;   // A: Row#
-  ws.getColumn(2).width = 18;  // B: Group
-  ws.getColumn(3).width = 28;  // C: Item Name
-  ws.getColumn(4).width = 14;  // D: Code
-  ws.getColumn(5).width = 10;  // E: Open Qty
-  ws.getColumn(6).width = 10;  // F: Cost/Bag
+  ws.getColumn(2).width = 28;  // B: Item Name
+  ws.getColumn(3).width = 14;  // C: Item Code
+  ws.getColumn(4).width = 10;  // D: Open Qty
+  ws.getColumn(5).width = 10;  // E: Cost/Bag
   for (let d = 0; d < dayCount; d++) {
-    const b = FIXED_LEFT + 1 + d * COLS_PER_DAY;
+    const b = dayBase + d * COLS_PER_DAY;
     ws.getColumn(b).width   = 8;   // Qty
     ws.getColumn(b+1).width = 9;   // Sale Price
     ws.getColumn(b+2).width = 9;   // Profit/Bag
@@ -410,7 +411,7 @@ async function buildEntrySheet(
   const totalRowNum = nextRow++;
 
   // Cash / payments layout (2 blank gap after TOTAL)
-  const cashHdrRow   = totalRowNum + 2;
+  const cashHdrRow    = totalRowNum + 2;
   const cashSubHdrRow = cashHdrRow + 1;
   const openCashRow   = cashSubHdrRow + 1;
   const depositRow    = openCashRow + 1;
@@ -430,12 +431,12 @@ async function buildEntrySheet(
 
   // ════════ Row 2 — Group headers ════════════════════════════════════════════
   ws.getRow(2).height = 15;
-  ws.mergeCells(2, 1, 2, 4);
+  ws.mergeCells(2, 1, 2, 3);  // A-C: Item (Group column removed)
   applyCell(ws, 2, 1, "Item", fill(DARK_BLUE), wFont(), ctr);
-  ws.mergeCells(2, 5, 2, 6);
-  applyCell(ws, 2, 5, "Opening Stock", fill(OPEN_BLUE), boldSm, ctr);
+  ws.mergeCells(2, 4, 2, 5);  // D-E: Opening Stock
+  applyCell(ws, 2, 4, "Opening Stock", fill(OPEN_BLUE), boldSm, ctr);
   for (let d = 0; d < dayCount; d++) {
-    const b = FIXED_LEFT + 1 + d * COLS_PER_DAY;
+    const b = dayBase + d * COLS_PER_DAY;
     ws.mergeCells(2, b, 2, b + 2);
     applyCell(ws, 2, b, fmtDate(dates[d]), d % 2 === 0 ? fill(GREEN_HDR) : fill(ORANGE_HDR), wFont(9), ctr);
   }
@@ -447,14 +448,13 @@ async function buildEntrySheet(
   ws.getRow(3).height = 14;
   const hdr3: Array<{ col: number; label: string; f?: ExcelJS.Fill }> = [
     { col: 1, label: "#",           f: fill(DARK_BLUE) },
-    { col: 2, label: "Group",       f: fill(YELLOW_GRP) },
-    { col: 3, label: "Item Name",   f: fill(DARK_BLUE) },
-    { col: 4, label: "Item Code",   f: fill(DARK_BLUE) },
-    { col: 5, label: "Open Qty",    f: fill(OPEN_BLUE) },
-    { col: 6, label: "Cost / Bag",  f: fill(OPEN_BLUE) },
+    { col: 2, label: "Item Name",   f: fill(DARK_BLUE) },  // Group column removed
+    { col: 3, label: "Item Code",   f: fill(DARK_BLUE) },
+    { col: 4, label: "Open Qty",    f: fill(OPEN_BLUE) },
+    { col: 5, label: "Cost / Bag",  f: fill(OPEN_BLUE) },
   ];
   for (let d = 0; d < dayCount; d++) {
-    const b  = FIXED_LEFT + 1 + d * COLS_PER_DAY;
+    const b  = dayBase + d * COLS_PER_DAY;
     const df = d % 2 === 0 ? fill(GREEN_HDR) : fill(ORANGE_HDR);
     hdr3.push({ col: b,   label: "Qty",       f: fill(PURPLE_QTY) });
     hdr3.push({ col: b+1, label: "Sale Price", f: fill(BRIGHT_YLW) });
@@ -466,7 +466,7 @@ async function buildEntrySheet(
   for (const h of hdr3) {
     const c = ws.getCell(3, h.col);
     c.value     = h.label;
-    c.font      = [1,3,4].includes(h.col) ? wFont(9) : boldSm;
+    c.font      = [1, 2, 3].includes(h.col) ? wFont(9) : boldSm;
     c.alignment = ctr; c.border = thin;
     if (h.f) c.fill = h.f;
   }
@@ -482,39 +482,36 @@ async function buildEntrySheet(
       itemCounter++;
       ws.getRow(r).height = 14;
 
-      // A: Row number
+      // A: Row number (locked)
       setCellVal(ws, r, 1, itemCounter, boldSm, altFl ?? fill(WHITE), right);
       ws.getCell(r, 1).protection = { locked: true };
 
-      // B: Group (always yellow, locked)
-      setCellVal(ws, r, 2, item.groupName || "", boldSm, fill(YELLOW_GRP), leftAl);
+      // B: Item Name (locked) — Group column removed
+      setCellVal(ws, r, 2, item.itemName, normSm, altFl, leftAl);
       ws.getCell(r, 2).protection = { locked: true };
 
-      // C: Item Name (locked)
-      setCellVal(ws, r, 3, item.itemName, normSm, altFl, leftAl);
+      // C: Item Code (locked)
+      setCellVal(ws, r, 3, item.itemCode, normSm, altFl, leftAl);
       ws.getCell(r, 3).protection = { locked: true };
 
-      // D: Item Code (locked)
-      setCellVal(ws, r, 4, item.itemCode, normSm, altFl, leftAl);
+      // D: Opening Qty (locked, no dollar sign)
+      setCellNum(ws, r, 4, r2(item.openQty) || null, altFl ?? fill(OPEN_BLUE), QTY_FMT);
       ws.getCell(r, 4).protection = { locked: true };
 
-      // E: Opening Qty (locked, no dollar sign)
-      setCellNum(ws, r, 5, r2(item.openQty)  || null, altFl ?? fill(OPEN_BLUE), QTY_FMT);
+      // E: Cost/Bag (locked, dollar sign)
+      setCellNum(ws, r, 5, r4(item.openRate) || null, altFl ?? fill(OPEN_BLUE), MONEY4_FMT);
       ws.getCell(r, 5).protection = { locked: true };
 
-      // F: Cost/Bag (locked, dollar sign)
-      setCellNum(ws, r, 6, r4(item.openRate) || null, altFl ?? fill(OPEN_BLUE), MONEY4_FMT);
-      ws.getCell(r, 6).protection = { locked: true };
-
-      // Build list of qty cell addresses for closing-qty formula
-      const qtyCellRefs = Array.from({ length: dayCount }, (_, d) => `${colLetter(7 + d * 3)}${r}`);
+      // Build list of qty cell addresses for closing-qty and avg formulas
+      // Day base = 6, so day-0 Qty = F, day-1 Qty = I, day-2 Qty = L, …
+      const qtyCellRefs = Array.from({ length: dayCount }, (_, d) => `${colLetter(dayBase + d * COLS_PER_DAY)}${r}`);
 
       // Daily blocks
       for (let d = 0; d < dayCount; d++) {
-        const b  = 7 + d * 3;
+        const b  = dayBase + d * COLS_PER_DAY;
         const ds = item.salesByDate.get(dates[d]);
-        const qtyVal    = ds && ds.qty > 0 ? r2(ds.qty)                             : null;
-        const priceVal  = ds && ds.qty > 0 ? r4(ds.totalSales / ds.qty)             : null;
+        const qtyVal    = ds && ds.qty > 0 ? r2(ds.qty)                                  : null;
+        const priceVal  = ds && ds.qty > 0 ? r4(ds.totalSales / ds.qty)                  : null;
         const profitVal = ds && ds.qty > 0 ? r4((ds.totalSales - ds.totalCost) / ds.qty) : null;
         const qL = colLetter(b), pL = colLetter(b + 1);
 
@@ -531,72 +528,95 @@ async function buildEntrySheet(
         pC.protection = { locked: false };
 
         // Profit/Bag — formula, locked, $ sign
-        // =IF(OR(QtyCell="",PriceCell=""),"",PriceCell-$F{r})
+        // =IF(OR(QtyCell="",PriceCell=""),"",PriceCell-$E{r})  ← $E = Cost/Bag (col 5)
         const prC = ws.getCell(r, b + 2);
-        prC.value     = { formula: `IF(OR(${qL}${r}="",${pL}${r}=""),"",${pL}${r}-$F${r})`, result: profitVal ?? "" } as any;
+        prC.value     = { formula: `IF(OR(${qL}${r}="",${pL}${r}=""),"",${pL}${r}-$E${r})`, result: profitVal ?? "" } as any;
         prC.numFmt    = MONEY4_FMT; prC.font = normSm;
         prC.alignment = right; prC.border = thin;
         prC.protection = { locked: true };
       }
 
-      // Closing Qty — formula =MAX(0, E{r} - SUM(G{r},J{r},...))
+      // Closing Qty — formula =MAX(0, D{r} - SUM(qty refs))  ← D = Opening Qty (col 4)
       const cqC = ws.getCell(r, closeQtyCol);
-      cqC.value = { formula: `MAX(0,E${r}-SUM(${qtyCellRefs.join(",")}))`, result: r2(item.closeQty) || 0 } as any;
+      cqC.value = { formula: `MAX(0,D${r}-SUM(${qtyCellRefs.join(",")}))`, result: r2(item.closeQty) || 0 } as any;
       cqC.numFmt = QTY_FMT; cqC.font = normSm; cqC.alignment = right; cqC.border = thin;
       cqC.fill = fill(CLOSE_GRN); cqC.protection = { locked: true };
 
-      // Closing Value — formula =CloseQtyCell * $F{r}
+      // Closing Value — formula =CloseQtyCell * $E{r}  ← $E = Cost/Bag (col 5)
       const cvC = ws.getCell(r, closeQtyCol + 1);
-      cvC.value = { formula: `${colLetter(closeQtyCol)}${r}*$F${r}`, result: r2(item.closeValue) || 0 } as any;
+      cvC.value = { formula: `${colLetter(closeQtyCol)}${r}*$E${r}`, result: r2(item.closeValue) || 0 } as any;
       cvC.numFmt = MONEY_FMT; cvC.font = normSm; cvC.alignment = right; cvC.border = thin;
       cvC.fill = fill(CLOSE_GRN); cvC.protection = { locked: true };
 
-      // Avg Monthly (locked, no dollar sign — it's a qty)
-      setCellNum(ws, r, closeQtyCol + 2, r2(item.avgMonthlyQty) || null, fill(TOTALS_ORG), QTY_FMT);
-      ws.getCell(r, closeQtyCol + 2).protection = { locked: true };
+      // Avg Monthly — live formula so it recalculates when user types daily Qty
+      // =IF(dayCount=0, 0, SUM(all daily Qty cells) * 30 / dayCount)
+      const avgC = ws.getCell(r, closeQtyCol + 2);
+      avgC.value = {
+        formula: `IF(${dayCount}=0,0,SUM(${qtyCellRefs.join(",")})*30/${dayCount})`,
+        result: r2(item.avgMonthlyQty) || 0,
+      } as any;
+      avgC.numFmt = QTY_FMT; avgC.font = normSm; avgC.alignment = right; avgC.border = thin;
+      avgC.fill = fill(TOTALS_ORG); avgC.protection = { locked: true };
     });
 
     // ── Group subtotal row ─────────────────────────────────────────────────────
     const stRow = gb.subtotalRow;
     ws.getRow(stRow).height = 14;
 
-    // Style every cell in the subtotal row first, then merge A-D
+    // Style every cell in the subtotal row first, then merge A-C
     for (let col = 1; col <= totalCols; col++) {
       const c = ws.getCell(stRow, col);
       c.fill = fill(YELLOW_GRP); c.font = boldSm; c.border = thin;
       c.alignment = right; c.protection = { locked: true };
     }
-    ws.mergeCells(stRow, 1, stRow, 4);
+    ws.mergeCells(stRow, 1, stRow, 3);  // A-C (Group column removed)
     const stLabel = ws.getCell(stRow, 1);
     stLabel.value = gb.groupName; stLabel.fill = fill(YELLOW_GRP);
     stLabel.font  = { ...boldSm, color: { argb: "FF333333" } };
     stLabel.alignment = leftAl;
 
-    // Opening Qty sum
-    const eL5 = colLetter(5);
-    ws.getCell(stRow, 5).value = {
-      formula: `SUM(${eL5}${gb.firstRow}:${eL5}${gb.lastRow})`,
+    // Opening Qty sum (col D = 4)
+    const dL = colLetter(4);
+    ws.getCell(stRow, 4).value = {
+      formula: `SUM(${dL}${gb.firstRow}:${dL}${gb.lastRow})`,
       result: r2(gb.items.reduce((s, i) => s + i.openQty, 0)),
     } as any;
-    ws.getCell(stRow, 5).numFmt = QTY_FMT; ws.getCell(stRow, 5).alignment = right;
+    ws.getCell(stRow, 4).numFmt = QTY_FMT; ws.getCell(stRow, 4).alignment = right;
 
-    // Per-day group totals — Qty (formula), Sales (cached), Profit (cached)
+    // Per-day group totals:
+    //   Qty   = SUM formula (live)
+    //   Sales = SUMPRODUCT(qty * price) — live formula so manual edits recalculate
+    //   Profit = SUMPRODUCT(qty * price) - SUMPRODUCT(qty * costBag)
+    //            where costBag is col E (col 5) for each item row in the group
     for (let d = 0; d < dayCount; d++) {
-      const b  = 7 + d * 3;
-      const qL = colLetter(b);
+      const b  = dayBase + d * COLS_PER_DAY;
+      const qL = colLetter(b), pL = colLetter(b + 1);
       const qtyTot  = r2(gb.items.reduce((s, i) => s + (i.salesByDate.get(dates[d])?.qty        ?? 0), 0));
       const salTot  = r2(gb.items.reduce((s, i) => s + (i.salesByDate.get(dates[d])?.totalSales ?? 0), 0));
       const cstTot  = r2(gb.items.reduce((s, i) => s + (i.salesByDate.get(dates[d])?.totalCost  ?? 0), 0));
       const profTot = r2(salTot - cstTot);
 
+      // Qty — SUM formula
       ws.getCell(stRow, b).value = { formula: `SUM(${qL}${gb.firstRow}:${qL}${gb.lastRow})`, result: qtyTot } as any;
       ws.getCell(stRow, b).numFmt = QTY_FMT; ws.getCell(stRow, b).alignment = right;
 
-      ws.getCell(stRow, b + 1).value = salTot  || null; ws.getCell(stRow, b + 1).numFmt = MONEY_FMT; ws.getCell(stRow, b + 1).alignment = right;
-      ws.getCell(stRow, b + 2).value = profTot || null; ws.getCell(stRow, b + 2).numFmt = MONEY_FMT; ws.getCell(stRow, b + 2).alignment = right;
+      // Sales — SUMPRODUCT(qty, price) handling blanks via IF(ISNUMBER)
+      ws.getCell(stRow, b + 1).value = {
+        formula: `SUMPRODUCT(IF(ISNUMBER(${qL}${gb.firstRow}:${qL}${gb.lastRow}),${qL}${gb.firstRow}:${qL}${gb.lastRow},0),IF(ISNUMBER(${pL}${gb.firstRow}:${pL}${gb.lastRow}),${pL}${gb.firstRow}:${pL}${gb.lastRow},0))`,
+        result: salTot || 0,
+      } as any;
+      ws.getCell(stRow, b + 1).numFmt = MONEY_FMT; ws.getCell(stRow, b + 1).alignment = right;
+
+      // Profit — SUMPRODUCT(qty, price) - SUMPRODUCT(qty, costBag)
+      // E${firstRow}:E${lastRow} = Cost/Bag column (col 5) for items in this group
+      ws.getCell(stRow, b + 2).value = {
+        formula: `SUMPRODUCT(IF(ISNUMBER(${qL}${gb.firstRow}:${qL}${gb.lastRow}),${qL}${gb.firstRow}:${qL}${gb.lastRow},0),IF(ISNUMBER(${pL}${gb.firstRow}:${pL}${gb.lastRow}),${pL}${gb.firstRow}:${pL}${gb.lastRow},0))-SUMPRODUCT(IF(ISNUMBER(${qL}${gb.firstRow}:${qL}${gb.lastRow}),${qL}${gb.firstRow}:${qL}${gb.lastRow},0),E${gb.firstRow}:E${gb.lastRow})`,
+        result: profTot || 0,
+      } as any;
+      ws.getCell(stRow, b + 2).numFmt = MONEY_FMT; ws.getCell(stRow, b + 2).alignment = right;
     }
 
-    // Closing Qty/Value sums (SUM over item rows which have formula results cached)
+    // Closing Qty/Value sums
     const cqL = colLetter(closeQtyCol), cvL = colLetter(closeQtyCol + 1);
     ws.getCell(stRow, closeQtyCol).value = {
       formula: `SUM(${cqL}${gb.firstRow}:${cqL}${gb.lastRow})`,
@@ -618,7 +638,7 @@ async function buildEntrySheet(
     c.fill = fill(GREEN_HDR); c.font = { ...boldSm, color: { argb: WHITE } };
     c.border = thin; c.alignment = right; c.protection = { locked: true };
   }
-  ws.mergeCells(totalRowNum, 1, totalRowNum, 4);
+  ws.mergeCells(totalRowNum, 1, totalRowNum, 3);  // A-C (Group column removed)
   const totLbl = ws.getCell(totalRowNum, 1);
   totLbl.value = "TOTAL"; totLbl.fill = fill(GREEN_HDR);
   totLbl.font  = wFont(); totLbl.alignment = ctr;
@@ -626,16 +646,16 @@ async function buildEntrySheet(
   if (items.length > 0) {
     const stNumRefs = (col: number) => subtotalRowNums.map(sr => `${colLetter(col)}${sr}`).join(",");
 
-    // Opening Qty
-    ws.getCell(totalRowNum, 5).value = {
-      formula: `SUM(${stNumRefs(5)})`,
+    // Opening Qty (col D = 4)
+    ws.getCell(totalRowNum, 4).value = {
+      formula: `SUM(${stNumRefs(4)})`,
       result: r2(items.reduce((s, i) => s + i.openQty, 0)),
     } as any;
-    ws.getCell(totalRowNum, 5).numFmt = QTY_FMT; ws.getCell(totalRowNum, 5).font = { ...boldSm, color: { argb: WHITE } };
+    ws.getCell(totalRowNum, 4).numFmt = QTY_FMT; ws.getCell(totalRowNum, 4).font = { ...boldSm, color: { argb: WHITE } };
 
-    // Per-day grand totals
+    // Per-day grand totals (SUM of category subtotal rows so they cascade from live formulas)
     for (let d = 0; d < dayCount; d++) {
-      const b = 7 + d * 3;
+      const b = dayBase + d * COLS_PER_DAY;
       const qtyTot  = r2(items.reduce((s, i) => s + (i.salesByDate.get(dates[d])?.qty        ?? 0), 0));
       const salTot  = r2(items.reduce((s, i) => s + (i.salesByDate.get(dates[d])?.totalSales ?? 0), 0));
       const profTot = r2(items.reduce((s, i) => {
@@ -646,10 +666,10 @@ async function buildEntrySheet(
       ws.getCell(totalRowNum, b).value = { formula: `SUM(${stNumRefs(b)})`, result: qtyTot } as any;
       ws.getCell(totalRowNum, b).numFmt = QTY_FMT; ws.getCell(totalRowNum, b).font = { ...boldSm, color: { argb: WHITE } };
 
-      ws.getCell(totalRowNum, b + 1).value = salTot  || null;
+      ws.getCell(totalRowNum, b + 1).value = { formula: `SUM(${stNumRefs(b + 1)})`, result: salTot || 0 } as any;
       ws.getCell(totalRowNum, b + 1).numFmt = MONEY_FMT; ws.getCell(totalRowNum, b + 1).font = { ...boldSm, color: { argb: WHITE } };
 
-      ws.getCell(totalRowNum, b + 2).value = profTot || null;
+      ws.getCell(totalRowNum, b + 2).value = { formula: `SUM(${stNumRefs(b + 2)})`, result: profTot || 0 } as any;
       ws.getCell(totalRowNum, b + 2).numFmt = MONEY_FMT; ws.getCell(totalRowNum, b + 2).font = { ...boldSm, color: { argb: WHITE } };
     }
 
@@ -670,10 +690,10 @@ async function buildEntrySheet(
 
   // CASH / BANK sub-headers per day
   ws.getRow(cashSubHdrRow).height = 13;
-  ws.mergeCells(cashSubHdrRow, 1, cashSubHdrRow, 4);
+  ws.mergeCells(cashSubHdrRow, 1, cashSubHdrRow, 3);  // A-C (Group column removed)
   ws.getCell(cashSubHdrRow, 1).border = thin;
   for (let d = 0; d < dayCount; d++) {
-    const b = 7 + d * 3;
+    const b = dayBase + d * COLS_PER_DAY;
     const cashC = ws.getCell(cashSubHdrRow, b);
     cashC.value = "CASH"; cashC.fill = fill(CASH_PINK); cashC.font = boldSm;
     cashC.alignment = ctr; cashC.border = thin; cashC.protection = { locked: true };
@@ -693,7 +713,7 @@ async function buildEntrySheet(
 
   for (const cr of cashRowDefs) {
     ws.getRow(cr.row).height = 13;
-    ws.mergeCells(cr.row, 1, cr.row, 4);
+    ws.mergeCells(cr.row, 1, cr.row, 3);  // A-C (Group column removed)
     const lbl = ws.getCell(cr.row, 1);
     lbl.value = cr.label;
     lbl.font  = cr.textColor ? { ...boldSm, color: { argb: cr.textColor } } : boldSm;
@@ -702,7 +722,7 @@ async function buildEntrySheet(
     lbl.protection = { locked: true };
 
     for (let d = 0; d < dayCount; d++) {
-      const b = 7 + d * 3;
+      const b = dayBase + d * COLS_PER_DAY;
       // CASH col — leave blank (no reliable data source)
       const cashC = ws.getCell(cr.row, b);
       cashC.value = null; cashC.numFmt = MONEY_FMT; cashC.fill = fill(CASH_PINK);
@@ -724,14 +744,14 @@ async function buildEntrySheet(
 
   const payNoteRow = paymentsHdrRow + 1;
   ws.getRow(payNoteRow).height = 13;
-  ws.mergeCells(payNoteRow, 1, payNoteRow, 4);
+  ws.mergeCells(payNoteRow, 1, payNoteRow, 3);  // A-C (Group column removed)
   ws.getCell(payNoteRow, 1).value = "(No payment data — enter manually if needed)";
   ws.getCell(payNoteRow, 1).font  = { ...normSm, color: { argb: "FFAAAAAA" } };
   ws.getCell(payNoteRow, 1).border = thin;
 
   // Per-day payment input cells (editable, blank)
   for (let d = 0; d < dayCount; d++) {
-    const b = 7 + d * 3;
+    const b = dayBase + d * COLS_PER_DAY;
     [b, b + 1].forEach(col => {
       const c = ws.getCell(payNoteRow, col);
       c.value = null; c.numFmt = MONEY_FMT; c.border = thin;

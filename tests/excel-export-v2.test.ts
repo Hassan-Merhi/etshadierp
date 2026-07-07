@@ -44,14 +44,15 @@ const TO    = "2026-07-07";
 const DAY_COUNT = 7; // Jul 1–7
 
 // ENTRY sheet constants (mirrors spSalesFormExportV2.ts)
-const FIXED_LEFT   = 6;  // cols 1-6: RowNum, Group, Name, Code, OpenQty, Cost/Bag
+// Group column removed: A=RowNum, B=ItemName, C=Code, D=OpenQty, E=Cost/Bag
+const FIXED_LEFT   = 5;  // cols 1-5: RowNum, Name, Code, OpenQty, Cost/Bag
 const COLS_PER_DAY = 3;
-const E_ITEM_NAME_COL = 3;  // C
-const E_OPEN_QTY_COL  = 5;  // E
-const E_COST_BAG_COL  = 6;  // F
-const E_DATE_START    = FIXED_LEFT + 1;  // 7 — first Qty column for day 0
-const CLOSE_QTY_COL   = FIXED_LEFT + 1 + DAY_COUNT * COLS_PER_DAY; // 28
-const CLOSE_VAL_COL   = CLOSE_QTY_COL + 1; // 29
+const E_ITEM_NAME_COL = 2;  // B
+const E_OPEN_QTY_COL  = 4;  // D
+const E_COST_BAG_COL  = 5;  // E
+const E_DATE_START    = FIXED_LEFT + 1;  // 6 — first Qty column for day 0
+const CLOSE_QTY_COL   = FIXED_LEFT + 1 + DAY_COUNT * COLS_PER_DAY; // 27
+const CLOSE_VAL_COL   = CLOSE_QTY_COL + 1; // 28
 
 // With 3 items + 1 group, the row layout is:
 // Row 4: item1, Row 5: item2, Row 6: item3
@@ -336,7 +337,7 @@ describe("V2 Export — Closing stock (Jul 7)", () => {
     expect(row, "Test Item 1 row not found").not.toBeNull();
     const formula = cellFormula(ws, row!, CLOSE_QTY_COL);
     expect(formula, "Close Qty should be a formula").not.toBeNull();
-    expect(formula!.toUpperCase()).toContain("MAX(0,E");
+    expect(formula!.toUpperCase()).toContain("MAX(0,D");
     expect(formula!.toUpperCase()).toContain("SUM(");
   });
 
@@ -355,8 +356,8 @@ describe("V2 Export — Closing stock (Jul 7)", () => {
     expect(row, "Test Item 1 row not found").not.toBeNull();
     const formula = cellFormula(ws, row!, CLOSE_VAL_COL);
     expect(formula, "Close Value should be a formula").not.toBeNull();
-    // Formula should reference Close Qty column (AB) and $F (Cost/Bag)
-    expect(formula!.toUpperCase()).toMatch(/\*\$F/);
+    // Formula should reference Close Qty column and $E (Cost/Bag — col E after Group removal)
+    expect(formula!.toUpperCase()).toMatch(/\*\$E/);
   });
 });
 
@@ -443,6 +444,22 @@ describe("V2 Export — Group subtotal rows", () => {
     expect(formula, "Subtotal Qty should be a SUM formula").not.toBeNull();
     expect(formula!.toUpperCase()).toContain("SUM(");
   });
+
+  it("Subtotal Sales column is a live SUMPRODUCT formula (not a cached value)", () => {
+    const ws       = wb.getWorksheet("ENTRY")!;
+    const salesCol = E_DATE_START + 2 * COLS_PER_DAY + 1;
+    const formula  = cellFormula(ws, E_SUBTOTAL_ROW, salesCol);
+    expect(formula, "Subtotal Sales should be a SUMPRODUCT formula").not.toBeNull();
+    expect(formula!.toUpperCase()).toContain("SUMPRODUCT(");
+  });
+
+  it("Subtotal Profit column is a live SUMPRODUCT formula (not a cached value)", () => {
+    const ws        = wb.getWorksheet("ENTRY")!;
+    const profitCol = E_DATE_START + 2 * COLS_PER_DAY + 2;
+    const formula   = cellFormula(ws, E_SUBTOTAL_ROW, profitCol);
+    expect(formula, "Subtotal Profit should be a SUMPRODUCT formula").not.toBeNull();
+    expect(formula!.toUpperCase()).toContain("SUMPRODUCT(");
+  });
 });
 
 // ── 9. Grand TOTAL row ────────────────────────────────────────────────────────
@@ -476,6 +493,22 @@ describe("V2 Export — Grand TOTAL row", () => {
     const totalProfit = cellNum(ws, E_TOTAL_ROW, profitCol);
     expect(totalProfit).not.toBeNull();
     expect(totalProfit).toBeCloseTo(20, 1);
+  });
+
+  it("TOTAL row Sales column is a SUM formula over subtotal rows", () => {
+    const ws       = wb.getWorksheet("ENTRY")!;
+    const salesCol = E_DATE_START + 2 * COLS_PER_DAY + 1;
+    const formula  = cellFormula(ws, E_TOTAL_ROW, salesCol);
+    expect(formula, "TOTAL Sales should be a SUM formula").not.toBeNull();
+    expect(formula!.toUpperCase()).toContain("SUM(");
+  });
+
+  it("TOTAL row Profit column is a SUM formula over subtotal rows", () => {
+    const ws        = wb.getWorksheet("ENTRY")!;
+    const profitCol = E_DATE_START + 2 * COLS_PER_DAY + 2;
+    const formula   = cellFormula(ws, E_TOTAL_ROW, profitCol);
+    expect(formula, "TOTAL Profit should be a SUM formula").not.toBeNull();
+    expect(formula!.toUpperCase()).toContain("SUM(");
   });
 });
 
@@ -760,7 +793,7 @@ describe("V2 Export — ENTRY structural sanity", () => {
     expect(count).toBeGreaterThanOrEqual(3);
   });
 
-  it("ENTRY row 3 (sub-header): has 'Qty' label at day-0 qty column (col 7)", () => {
+  it("ENTRY row 3 (sub-header): has 'Qty' label at day-0 qty column (col 6)", () => {
     const ws = wb.getWorksheet("ENTRY")!;
     const v  = ws.getRow(3).getCell(E_DATE_START).value;
     expect(String(v ?? "").toLowerCase()).toContain("qty");
@@ -773,6 +806,63 @@ describe("V2 Export — ENTRY structural sanity", () => {
   });
 });
 
+// ── 19. No Group column in item rows ──────────────────────────────────────────
+describe("V2 Export — No Group column in item rows", () => {
+  it("ENTRY col B (col 2) for item row contains item name, not group name", () => {
+    const ws  = wb.getWorksheet("ENTRY")!;
+    const row = findItemRow(ws, "Test Item 1");
+    expect(row, "Test Item 1 not found").not.toBeNull();
+    const colBVal = ws.getRow(row!).getCell(2).value;
+    expect(typeof colBVal).toBe("string");
+    // Should be the item name, not a group/category name
+    expect((colBVal as string).toLowerCase()).toContain("test item 1");
+  });
+
+  it("ENTRY row 3 (sub-header): col 2 label is 'Item Name' (not 'Group')", () => {
+    const ws = wb.getWorksheet("ENTRY")!;
+    const v  = ws.getRow(3).getCell(2).value;
+    expect(String(v ?? "").toLowerCase()).toContain("item");
+    expect(String(v ?? "").toLowerCase()).not.toBe("group");
+  });
+
+  it("ENTRY row 3 (sub-header): col 2 label is NOT 'Group'", () => {
+    const ws = wb.getWorksheet("ENTRY")!;
+    const v  = String(ws.getRow(3).getCell(2).value ?? "").toLowerCase().trim();
+    expect(v).not.toBe("group");
+  });
+});
+
+// ── 20. Avg/Mo Sales is a live formula ────────────────────────────────────────
+describe("V2 Export — Avg/Mo Sales formula", () => {
+  const AVG_MO_COL = CLOSE_QTY_COL + 2;
+
+  it("ENTRY Avg/Mo Sales cell for Test Item 1 is a formula (not a static value)", () => {
+    const ws  = wb.getWorksheet("ENTRY")!;
+    const row = findItemRow(ws, "Test Item 1");
+    expect(row, "Test Item 1 not found").not.toBeNull();
+    const formula = cellFormula(ws, row!, AVG_MO_COL);
+    expect(formula, "Avg/Mo Sales should be a formula, not a static value").not.toBeNull();
+  });
+
+  it("ENTRY Avg/Mo Sales formula contains SUM of daily qty cells", () => {
+    const ws  = wb.getWorksheet("ENTRY")!;
+    const row = findItemRow(ws, "Test Item 1");
+    expect(row, "Test Item 1 not found").not.toBeNull();
+    const formula = cellFormula(ws, row!, AVG_MO_COL);
+    expect(formula!.toUpperCase()).toContain("SUM(");
+  });
+
+  it("ENTRY Avg/Mo Sales formula result matches expected monthly average", () => {
+    const ws  = wb.getWorksheet("ENTRY")!;
+    const row = findItemRow(ws, "Test Item 1");
+    expect(row, "Test Item 1 not found").not.toBeNull();
+    // item1 has 10 qty sold over 7 days → avg monthly = 10/7*30 ≈ 42.86
+    const result = cellNum(ws, row!, AVG_MO_COL);
+    expect(result).not.toBeNull();
+    expect(result!).toBeCloseTo((10 / 7) * 30, 0);
+  });
+});
+
 /*
  * Coverage summary
  * ─────────────────
@@ -782,7 +872,7 @@ describe("V2 Export — ENTRY structural sanity", () => {
  * ✓ Opening stock matches calculateHistoricalLocationInventory(Jun 30)
  * ✓ Closing stock is formula MAX(0, E-SUM(qty refs)); result matches helper(Jul 7)
  * ✓ Closing Value is formula CloseQty * CostBag
- * ✓ Profit/Bag is formula IF(OR(Qty="",Price=""),"",Price-$F)
+ * ✓ Profit/Bag is formula IF(OR(Qty="",Price=""),"",Price-$E)  ← $E = Cost/Bag after Group column removal
  * ✓ Group subtotal rows present with Total Qty/Sales/Profit per day
  * ✓ Grand TOTAL row exists and is labelled "TOTAL"
  * ✓ Cash & Bank section: header, CASH/BANK sub-headers, Opening Cash, Deposit, Receipt rows
