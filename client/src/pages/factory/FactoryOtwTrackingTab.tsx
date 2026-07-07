@@ -68,7 +68,7 @@ export interface OtwTrackingTabProps {
   onEdit?: (container: ContainerWithSupplier) => void;
 }
 
-const STATUS_ACTIVE = new Set(["PENDING", "IN_TRANSIT", "ARRIVED", "PARTIALLY_RECEIVED"]);
+const STATUS_ACTIVE = new Set(["PENDING", "IN_TRANSIT", "ARRIVED"]);
 
 // ── Currency helpers ────────────────────────────────────────────────────────
 const CCY_SYMBOLS: Record<string, string> = {

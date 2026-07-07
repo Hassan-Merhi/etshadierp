@@ -52,7 +52,7 @@ interface FactoryContainer {
 }
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
-const STATUS_ACTIVE = new Set(["PENDING", "IN_TRANSIT", "ARRIVED", "RECEIVED", "PARTIALLY_RECEIVED"]);
+const STATUS_ACTIVE = new Set(["PENDING", "IN_TRANSIT", "ARRIVED", "RECEIVED"]);
 
 const CCY_SYMBOLS: Record<string, string> = {
   USD: "$",

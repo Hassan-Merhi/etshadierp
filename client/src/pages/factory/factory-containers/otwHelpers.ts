@@ -6,7 +6,7 @@ export interface ContainerWithSupplier extends FactoryContainer {
 
 export const OTW_NOTES_KEY = "factory-otw-notes";
 
-export const STATUS_ACTIVE = new Set(["PENDING", "IN_TRANSIT", "ARRIVED", "PARTIALLY_RECEIVED"]);
+export const STATUS_ACTIVE = new Set(["PENDING", "IN_TRANSIT", "ARRIVED"]);
 
 export const CCY_SYMBOLS: Record<string, string> = {
   USD: "$",

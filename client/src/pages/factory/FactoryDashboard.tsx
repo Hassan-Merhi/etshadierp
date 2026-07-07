@@ -68,7 +68,7 @@ const STATUS_LABEL: Record<string, string> = {
   PARTIALLY_RECEIVED: "Pending",
   RECEIVED: "Pending",
 };
-const STATUS_ACTIVE = new Set(["PENDING", "IN_TRANSIT", "ARRIVED", "RECEIVED", "PARTIALLY_RECEIVED"]);
+const STATUS_ACTIVE = new Set(["PENDING", "IN_TRANSIT", "ARRIVED", "RECEIVED"]);
 
 const WASTE_TYPE_LABEL: Record<string, string> = {
   GARBAGE: "Garbage",
