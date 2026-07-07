@@ -23,6 +23,7 @@ import {
 import { adjustInventory } from "../inventoryHelper";
 import { getClientDate } from "../lib/dateUtils";
 import { generateSpSalesFormExcel } from "../services/spSalesFormExport";
+import { generateSpSalesFormExcelV2 } from "../services/spSalesFormExportV2";
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
