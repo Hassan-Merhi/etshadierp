@@ -1,111 +1,93 @@
-import { useState, useRef, useEffect, useMemo } from "react";
+import { useEffect, useMemo } from "react";
 import { useLocation as useLocationContext } from "@/contexts/LocationContext";
 import { useCompany } from "@/contexts/CompanyContext";
 import { useLocation } from "wouter";
-import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Textarea } from "@/components/ui/textarea";
-import { MapPin, AlertCircle, Search, Check, Plus, Trash2, Pencil, X, ChevronDown, User, ShoppingCart } from "lucide-react";
-import { cn } from "@/lib/utils";
-import { Badge } from "@/components/ui/badge";
-import { apiRequest, queryClient, getAppDate, invalidateCustomerBalances } from "@/lib/queryClient";
 import { useCurrencyContext, type Currency } from "@/contexts/CurrencyContext";
 import { useToast } from "@/hooks/use-toast";
-import { useReactToPrint } from "react-to-print";
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import * as XLSX from "xlsx";
 
 import { SaleGrid } from "./pos-components/SaleGrid";
 import { InventoryPicker } from "./pos-components/InventoryPicker";
 import { InvoiceTemplate } from "./pos-components/InvoiceTemplate";
 import { POSDialogs } from "./pos-components/POSDialogs";
 import { POSHeader } from "./pos-components/POSHeader";
-import type { SaleRow, InventoryItem, APIInventoryItem, Location } from "./pos-components/posTypes";
+import { PosCheckoutStrip } from "./pos-components/PosCheckoutStrip";
+import { PosMobileLayout } from "./pos-components/PosMobileLayout";
 
+import { usePosState } from "./hooks/usePosState";
 import { usePosQueries } from "./hooks/usePosQueries";
 import { usePosWhatsApp } from "./hooks/usePosWhatsApp";
 import { usePosMutations } from "./hooks/usePosMutations";
 import { usePosAutosave } from "./hooks/usePosAutosave";
+import { usePosHandlers } from "./hooks/usePosHandlers";
+
+import { POS_COLUMNS, formatDisplayAmount } from "./utils/posCalculations";
 
 export default function POS({ posUser, editVoucherId }: { posUser?: any; editVoucherId?: string } = {}) {
   const { selectedLocation, setSelectedLocation } = useLocationContext();
   const { selectedCompany } = useCompany();
   const [_location, navigate] = useLocation();
   const { toast } = useToast();
-  const { selectedCurrency, exchangeRate: dailyExchangeRate, displayCurrency, formatAmountRaw } = useCurrencyContext();
+  const { selectedCurrency, exchangeRate: dailyExchangeRate, displayCurrency } = useCurrencyContext();
 
-  const [posSelectedLocation, setPosSelectedLocation] = useState<Location | null>(null);
-  const [rows, setRows] = useState<SaleRow[]>([{ id: "1", itemName: "", quantity: 0, rate: 0, rateUSD: 0, amount: 0 }]);
-  const [selectedCell, setSelectedCell] = useState<{ row: number; col: number }>({ row: 0, col: 0 });
-  const [paymentAccountType, setPaymentAccountType] = useState<"bank" | "cash" | "credit">("cash");
-  const [paymentAccountId, setPaymentAccountId] = useState<string | null>(null);
-  const [isCreditSale, setIsCreditSale] = useState(false);
-  const [selectedCustomerId, setSelectedCustomerId] = useState("");
-  const [notes, setNotes] = useState("");
-  const [saleDate, setSaleDate] = useState(getAppDate());
-  const [searchTerm, setSearchTerm] = useState("");
-  const [activeRow, setActiveRow] = useState<number | null>(null);
-  const [highlightedIndex, setHighlightedIndex] = useState(0);
-  const [zeroStockAlert, setZeroStockAlert] = useState(false);
-  const [zeroStockItem, setZeroStockItem] = useState("");
-  const [savedSale, setSavedSale] = useState<any>(null);
-  const [showPrintDialog, setShowPrintDialog] = useState(false);
-  const [showDraftDialog, setShowDraftDialog] = useState(false);
-  const [currentDraftId, setCurrentDraftId] = useState<number | null>(null);
-  const [customerComboOpen, setCustomerComboOpen] = useState(false);
-  const [mobileCustomerComboOpen, setMobileCustomerComboOpen] = useState(false);
-  const [saleJustCompleted, setSaleJustCompleted] = useState(false);
-  const [showStockPrompt, setShowStockPrompt] = useState(false);
-  const [invoiceWaStatus, setInvoiceWaStatus] = useState<"idle" | "sending" | "sent" | "failed">("idle");
-  const [stockWaStatus, setStockWaStatus] = useState<"idle" | "sending" | "sent" | "failed" | "not_configured">("idle");
-  const [sendingInvoiceWhatsApp, setSendingInvoiceWhatsApp] = useState(false);
-  const [sendingWhatsApp, setSendingWhatsApp] = useState(false);
-  const [lastAutosaved, setLastAutosaved] = useState<Date | null>(null);
-  const [pendingAutoSend, setPendingAutoSend] = useState<{
-    voucherId: number;
-    locationId: number;
-  } | null>(null);
-  const [pendingStockSend, setPendingStockSend] = useState(false);
-
-  const inputRefs = useRef<{ [key: string]: HTMLInputElement }>({});
-  const itemListRef = useRef<HTMLDivElement>(null);
-  const printRef = useRef<HTMLDivElement | null>(null);
-  const stockPrintRef = useRef<HTMLDivElement>(null);
-  const clearActiveRowTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const clientSaleIdRef = useRef<string>(crypto.randomUUID());
-  const lastSavedFingerprintRef = useRef<string>("");
-  const autoSaveInProgressRef = useRef(false);
-  const autoSaveStateRef = useRef({
-    activeLocation: null as any,
-    rows: [] as any[],
-    notes: "",
-    isCreditSale: false,
-    paymentAccountType: "",
-    paymentAccountId: null as string | null,
-    selectedCustomerId: null as string | null,
-    currentDraftId: null as number | null,
-    saveDraftIsPending: false,
-  });
-
-  const [mobileTab, setMobileTab] = useState<"items" | "cart">("items");
-  const mobileSearchInputRef = useRef<HTMLInputElement>(null);
+  // ── All state & refs ───────────────────────────────────────────────────────
+  const {
+    posSelectedLocation, setPosSelectedLocation,
+    rows, setRows,
+    selectedCell, setSelectedCell,
+    paymentAccountType, setPaymentAccountType,
+    paymentAccountId, setPaymentAccountId,
+    isCreditSale, setIsCreditSale,
+    selectedCustomerId, setSelectedCustomerId,
+    notes, setNotes,
+    saleDate, setSaleDate,
+    searchTerm, setSearchTerm,
+    activeRow, setActiveRow,
+    highlightedIndex, setHighlightedIndex,
+    zeroStockAlert, setZeroStockAlert,
+    zeroStockItem, setZeroStockItem,
+    savedSale, setSavedSale,
+    showPrintDialog, setShowPrintDialog,
+    showDraftDialog, setShowDraftDialog,
+    currentDraftId, setCurrentDraftId,
+    customerComboOpen, setCustomerComboOpen,
+    mobileCustomerComboOpen, setMobileCustomerComboOpen,
+    setSaleJustCompleted,
+    showStockPrompt, setShowStockPrompt,
+    invoiceWaStatus, setInvoiceWaStatus,
+    stockWaStatus, setStockWaStatus,
+    setSendingInvoiceWhatsApp,
+    sendingInvoiceWhatsApp,
+    setSendingWhatsApp,
+    sendingWhatsApp,
+    lastAutosaved, setLastAutosaved,
+    pendingAutoSend, setPendingAutoSend,
+    pendingStockSend, setPendingStockSend,
+    setMobileTab,
+    inputRefs,
+    itemListRef,
+    printRef,
+    stockPrintRef,
+    clearActiveRowTimerRef,
+    clientSaleIdRef,
+    lastSavedFingerprintRef,
+    autoSaveInProgressRef,
+    mobileSearchInputRef,
+    autoSaveStateRef,
+  } = usePosState();
 
   const activeLocation = posUser ? posSelectedLocation : selectedLocation;
+  const activeCurrency: Currency = displayCurrency ? selectedCurrency : "USD";
+  const exchangeRate = dailyExchangeRate;
 
+  // ── Queries ────────────────────────────────────────────────────────────────
   const {
     posAssignedLocations,
     posLocationsLoading,
     allLocations,
     companySettings,
     apiInventory,
-    inventoryLoading,
-    inventoryError,
     inventory,
     bankAccounts,
     allLedgerAccounts,
@@ -130,11 +112,6 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
     showStockPrompt,
   });
 
-  const activeCurrency: Currency = displayCurrency ? selectedCurrency : "USD";
-  const exchangeRate = dailyExchangeRate;
-  const selectedCustomer =
-    isCreditSale && selectedCustomerId ? posCustomers.find((c: any) => String(c.id) === selectedCustomerId) : null;
-
   // Keep autoSaveStateRef in sync
   autoSaveStateRef.current.activeLocation = activeLocation;
   autoSaveStateRef.current.rows = rows;
@@ -144,6 +121,8 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
   autoSaveStateRef.current.paymentAccountId = paymentAccountId;
   autoSaveStateRef.current.selectedCustomerId = selectedCustomerId;
   autoSaveStateRef.current.currentDraftId = currentDraftId;
+
+  // ── Effects ────────────────────────────────────────────────────────────────
 
   // Auto-select first POS location
   useEffect(() => {
@@ -189,7 +168,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
   useEffect(() => {
     if (!editVoucher || !Array.isArray(editVoucher.salesItems) || editVoucher.salesItems.length === 0) return;
 
-    const newRows: SaleRow[] = editVoucher.salesItems.map((item: any, index: number) => ({
+    const newRows = editVoucher.salesItems.map((item: any, index: number) => ({
       id: String(index + 1),
       itemName: item.stockItemName || "",
       stockItemCode: item.stockItemCode || "",
@@ -244,6 +223,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
     }
   }, [editVoucher, allLedgerAccounts]);
 
+  // ── WhatsApp / mutations / autosave ───────────────────────────────────────
   const { handleSendInvoiceWhatsApp, handleSendWhatsAppReport } = usePosWhatsApp({
     pendingAutoSend,
     setPendingAutoSend,
@@ -258,8 +238,6 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
     toast,
   });
 
-  const total = useMemo(() => rows.reduce((sum, row) => sum + (row.amount || 0), 0), [rows]);
-  const totalQty = useMemo(() => rows.reduce((sum, row) => sum + (row.quantity || 0), 0), [rows]);
   const hasValidItems = useMemo(() => rows.some((row) => row.stockItemId && row.quantity > 0), [rows]);
 
   const { saveMutation, deleteDraftMutation, saveDraftMutation } = usePosMutations({
@@ -299,431 +277,43 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
     refetchDrafts,
   });
 
-  // ISSUE 3: Full payload with shiftId, clientSaleId, currency, exchangeRate, correct rate conversion
-  const handleSaveSale = () => {
-    if (!activeLocation && !editVoucherId) {
-      toast({ title: "Error", description: "Please select a location", variant: "destructive" });
-      return;
-    }
-    if (!isCreditSale && !paymentAccountId) {
-      toast({ title: "Error", description: "Please select a payment account", variant: "destructive" });
-      return;
-    }
-    if (isCreditSale && !selectedCustomerId) {
-      toast({ title: "Error", description: "Please select a customer for credit sale", variant: "destructive" });
-      return;
-    }
-    if (activeCurrency === "CFA" && !exchangeRate) {
-      toast({
-        title: "Error",
-        description: "Please enter an exchange rate for this transaction.",
-        variant: "destructive",
-      });
-      return;
-    }
-    const invalidRow = rows.find((r) => r.itemName?.trim() && !r.stockItemId);
-    if (invalidRow) {
-      const invalidIdx = rows.indexOf(invalidRow);
-      toast({
-        title: "Invalid item",
-        description: `"${invalidRow.itemName}" is not valid. Please select an item from the list.`,
-        variant: "destructive",
-      });
-      setSelectedCell({ row: invalidIdx, col: 0 });
-      focusCell(invalidIdx, 0);
-      return;
-    }
-    const validItems = rows.filter((r) => r.stockItemId && r.quantity > 0 && r.rate > 0);
-    if (validItems.length === 0) {
-      toast({ title: "Error", description: "Please add at least one item to the sale", variant: "destructive" });
-      return;
-    }
-
-    const saleData = {
-      locationId: activeLocation?.id || (editVoucher as any)?.locationId,
-      shiftId: posUser && currentShift ? currentShift.id : undefined,
-      clientSaleId: !editVoucherId ? clientSaleIdRef.current : undefined,
-      paymentAccountType: isCreditSale ? "credit" : paymentAccountType,
-      paymentAccountId: isCreditSale ? parseInt(selectedCustomerId) : parseInt(paymentAccountId!),
-      isCreditSale,
-      notes,
-      voucherDate: saleDate,
-      currency: activeCurrency === "CFA" ? "CFA" : "USD",
-      exchangeRate: exchangeRate ? exchangeRate.toString() : undefined,
-      items: validItems.map((row) => {
-        const rateInUSD =
-          activeCurrency === "CFA" && dailyExchangeRate
-            ? parseFloat(row.rate.toString()) / dailyExchangeRate
-            : row.rateUSD;
-        return {
-          stockItemId: row.stockItemId,
-          salesItemId: row.salesItemId,
-          quantity: row.quantity.toString(),
-          rate: rateInUSD.toFixed(6),
-        };
-      }),
-    };
-
-    saveMutation.mutate(saleData);
-  };
-
-  const handleNewSale = () => {
-    setRows([{ id: "1", itemName: "", quantity: 0, rate: 0, rateUSD: 0, amount: 0 }]);
-    setNotes("");
-    setSavedSale(null);
-    setShowPrintDialog(false);
-    setSaleJustCompleted(false);
-    setCurrentDraftId(null);
-    setStockWaStatus("idle");
-    setInvoiceWaStatus("idle");
-    setPendingStockSend(false);
-    lastSavedFingerprintRef.current = "";
-    setLastAutosaved(null);
-    setMobileTab("items");
-  };
-
-  const selectItem = (item: any, targetRowOverride?: number) => {
-    const canSellZeroStock = posUser?.canSellNegativeStock || authUser?.canSellNegativeStock;
-    if (item.stock === 0 && !canSellZeroStock) {
-      setZeroStockItem(item.name);
-      setZeroStockAlert(true);
-      return;
-    }
-    let targetRow = targetRowOverride ?? activeRow ?? rows.findIndex((r) => !r.itemName);
-    const newRows = [...rows];
-    // If no empty row found, append one
-    if (targetRow === -1 || targetRow == null) {
-      targetRow = newRows.length;
-      newRows.push({ id: Date.now().toString(), itemName: "", quantity: 0, rate: 0, rateUSD: 0, amount: 0 });
-    }
-    const rateUSD = lastSoldPrices[item.stockItemId] ? parseFloat(lastSoldPrices[item.stockItemId]) : item.price;
-    const displayRate = activeCurrency === "CFA" ? Math.round(rateUSD * exchangeRate) : rateUSD;
-
-    newRows[targetRow] = {
-      ...newRows[targetRow],
-      itemName: item.name,
-      stockItemCode: item.code,
-      stockItemId: item.stockItemId,
-      rate: displayRate,
-      rateUSD,
-      quantity: 1,
-      amount: displayRate,
-      configuredPrice: item.configuredPrice,
-    };
-
-    if (targetRow === rows.length - 1) {
-      newRows.push({ id: Date.now().toString(), itemName: "", quantity: 0, rate: 0, rateUSD: 0, amount: 0 });
-    }
-    setRows(newRows);
-    setSearchTerm("");
-    setTimeout(() => focusCell(targetRow, 1), 0);
-  };
-
-  const updateRow = (index: number, field: keyof SaleRow, value: any) => {
-    const newRows = [...rows];
-    newRows[index] = { ...newRows[index], [field]: value };
-    if (field === "quantity" || field === "rate") {
-      const numValue = value === "" ? 0 : parseFloat(String(value)) || 0;
-      newRows[index][field] = numValue as any;
-      if (field === "rate") {
-        newRows[index].rateUSD = activeCurrency === "CFA" && exchangeRate ? numValue / exchangeRate : numValue;
-      }
-      newRows[index].amount = (newRows[index].quantity || 0) * (newRows[index].rate || 0);
-    }
-    setRows(newRows);
-  };
-
-  const focusCell = (row: number, col: number) => {
-    inputRefs.current[`${row}-${col}`]?.focus();
-    inputRefs.current[`${row}-${col}`]?.select();
-  };
-
-  const handlePrint = useReactToPrint({ contentRef: printRef });
-
-  // ISSUE 6: Real stock print handler
-  const handleStockPrint = useReactToPrint({
-    contentRef: stockPrintRef,
-    documentTitle: `STK_${(activeLocation?.name || "Location").replace(/\s+/g, "_")}_${new Date().toLocaleDateString("en-CA")}`,
+  // ── Handlers ──────────────────────────────────────────────────────────────
+  const {
+    focusCell,
+    handlePrint,
+    handleStockPrint,
+    handleSaveSale,
+    handleNewSale,
+    selectItem,
+    updateRow,
+    handleLoadDraft,
+    handleExportInventory,
+    handleSummaryExport,
+    handleDetailedExport,
+    makeHandleKeyDown,
+  } = usePosHandlers({
+    rows, isCreditSale, paymentAccountType, paymentAccountId,
+    selectedCustomerId, currentDraftId, notes, saleDate,
+    activeRow, highlightedIndex,
+    setRows, setSelectedCell, setNotes,
+    setPaymentAccountType, setPaymentAccountId,
+    setIsCreditSale, setSelectedCustomerId,
+    setCurrentDraftId, setShowDraftDialog, setShowPrintDialog,
+    setSavedSale, setSaleJustCompleted, setLastAutosaved, setMobileTab,
+    setPendingStockSend, setStockWaStatus, setInvoiceWaStatus,
+    setZeroStockItem, setZeroStockAlert, setSearchTerm, setHighlightedIndex,
+    lastSavedFingerprintRef, inputRefs, printRef, stockPrintRef, clientSaleIdRef,
+    activeCurrency, exchangeRate, dailyExchangeRate,
+    activeLocation, editVoucherId, editVoucher,
+    inventory, apiInventory, lastSoldPrices,
+    currentShift, authUser, posUser,
+    saveMutation, toast,
   });
 
-  // ISSUE 7: Real draft loading
-  const handleLoadDraft = async (draftId: number) => {
-    try {
-      const res = await fetch(`/api/pos/drafts/${draftId}`, { credentials: "include" });
-      if (!res.ok) throw new Error("Failed to load draft");
-      const draft = await res.json();
+  const handleKeyDown = makeHandleKeyDown(searchTerm);
+  const fmtAmount = (v: number) => formatDisplayAmount(activeCurrency, v);
 
-      if (draft.paymentAccountType) setPaymentAccountType(draft.paymentAccountType);
-      if (draft.paymentAccountId) setPaymentAccountId(String(draft.paymentAccountId));
-      setIsCreditSale(draft.isCreditSale || false);
-      if (draft.isCreditSale && draft.paymentAccountId) {
-        setSelectedCustomerId(String(draft.paymentAccountId));
-      }
-      setNotes(draft.notes || "");
-
-      const draftRows = (Array.isArray(draft.items) ? draft.items : []).map((item: any, index: number) => {
-        const rate = parseFloat(item.rate);
-        const inventoryItem = inventory.find((i) => i.stockItemId === item.stockItemId);
-        return {
-          id: String(index + 1),
-          itemName: item.stockItemName,
-          stockItemCode: item.stockItemCode || "",
-          stockItemId: item.stockItemId,
-          quantity: parseFloat(item.quantity),
-          rate,
-          rateUSD: rate,
-          amount: parseFloat(item.amount),
-          configuredPrice: inventoryItem?.configuredPrice,
-        };
-      });
-      draftRows.push({ id: String(draftRows.length + 1), itemName: "", quantity: 0, rate: 0, rateUSD: 0, amount: 0 });
-      setRows(draftRows);
-      setCurrentDraftId(draftId);
-      setShowDraftDialog(false);
-      toast({ title: "Draft Loaded", description: "Transaction has been loaded from draft" });
-    } catch (error: any) {
-      toast({ title: "Error", description: error.message || "Failed to load draft", variant: "destructive" });
-    }
-  };
-
-  // ISSUE 8: Export inventory as Excel
-  const handleExportInventory = () => {
-    if (!activeLocation) {
-      toast({ title: "No location", description: "Select a location first.", variant: "destructive" });
-      return;
-    }
-    const exportData = (Array.isArray(apiInventory) ? apiInventory : []).map((item: any) => ({
-      Code: item.stockItemCode || "",
-      "Item Name": item.stockItemName || "",
-      UOM: item.stockItemUom || "",
-      "Stock Qty": parseFloat(item.quantity),
-      "Avg Rate (USD)": parseFloat(item.averageRate),
-      "Total Value (USD)": parseFloat(item.totalValue),
-      Group: item.stockGroupName || "",
-    }));
-    const worksheet = XLSX.utils.json_to_sheet(exportData);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Inventory");
-    const fileName = `Inventory_${activeLocation.name.replace(/\s+/g, "_")}_${new Date().toLocaleDateString("en-CA")}.xlsx`;
-    XLSX.writeFile(workbook, fileName);
-    toast({ title: "Export successful", description: `Downloaded ${fileName}` });
-  };
-
-  const handleSummaryExport = () => {
-    const validRows = rows.filter((r) => r.stockItemId && r.quantity > 0);
-    if (validRows.length === 0) {
-      toast({ title: "Nothing to export", description: "Add items first.", variant: "destructive" });
-      return;
-    }
-    const data = validRows.map((r, i) => ({
-      "#": i + 1,
-      Item: r.itemName,
-      Qty: r.quantity,
-      Rate: r.rate,
-      Amount: r.amount,
-    }));
-    const ws = XLSX.utils.json_to_sheet(data);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Summary");
-    XLSX.writeFile(wb, `POS_Summary_${new Date().toLocaleDateString("en-CA")}.xlsx`);
-    toast({ title: "Summary exported" });
-  };
-
-  const handleDetailedExport = () => {
-    const validRows = rows.filter((r) => r.stockItemId && r.quantity > 0);
-    if (validRows.length === 0) {
-      toast({ title: "Nothing to export", description: "Add items first.", variant: "destructive" });
-      return;
-    }
-    const data = validRows.map((r, i) => {
-      const cfgUSD = r.configuredPrice ?? 0;
-      const plBale = r.rateUSD - cfgUSD;
-      return {
-        "#": i + 1,
-        Code: r.stockItemCode || "",
-        Item: r.itemName,
-        Qty: r.quantity,
-        "Rate (USD)": r.rateUSD,
-        Amount: r.amount,
-        "P/L per unit": cfgUSD > 0 ? plBale : "",
-        "Total P/L": cfgUSD > 0 ? plBale * r.quantity : "",
-      };
-    });
-    const ws = XLSX.utils.json_to_sheet(data);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Detailed");
-    XLSX.writeFile(wb, `POS_Detailed_${new Date().toLocaleDateString("en-CA")}.xlsx`);
-    toast({ title: "Detailed export downloaded" });
-  };
-
-  const columns = [
-    { key: "itemName", label: "Item", width: "flex-1" },
-    { key: "quantity", label: "Qty", width: "w-20" },
-    { key: "rate", label: "Rate", width: "w-24" },
-    { key: "amount", label: "Amt", width: "w-28" },
-    { key: "plBale", label: "P/L", width: "w-20" },
-    { key: "totalPL", label: "T.P/L", width: "w-20" },
-    { key: "delete", label: "", width: "w-12" },
-  ];
-
-  const normalize = (s: string) => (s || "").toLowerCase().replace(/[.\-\s]/g, "");
-
-  const getFilteredInventory = () => {
-    if (!searchTerm) return inventory;
-    const searchNorm = normalize(searchTerm);
-    return inventory.filter(
-      (item) => normalize(item.name).includes(searchNorm) || normalize(item.code).includes(searchNorm)
-    );
-  };
-
-  // ISSUE 9: Real keyboard navigation
-  const handleKeyDown = (e: React.KeyboardEvent, rowIndex: number, colIndex: number) => {
-    const maxCol = columns.length - 4; // Exclude plBale, totalPL, delete
-    const isItemNameField = columns[colIndex]?.key === "itemName";
-    const filteredItems = getFilteredInventory();
-
-    if (isItemNameField && filteredItems.length > 0) {
-      if (e.key === "ArrowDown") {
-        e.preventDefault();
-        setHighlightedIndex((prev) => Math.min(prev + 1, filteredItems.length - 1));
-        return;
-      }
-      if (e.key === "ArrowUp" && highlightedIndex > 0) {
-        e.preventDefault();
-        setHighlightedIndex((prev) => Math.max(prev - 1, 0));
-        return;
-      }
-      if (e.key === "Enter") {
-        e.preventDefault();
-        if (filteredItems[highlightedIndex]) selectItem(filteredItems[highlightedIndex], rowIndex);
-        return;
-      }
-    }
-
-    const currentRow = rows[rowIndex];
-    const hasUnselectedItem = isItemNameField && currentRow?.itemName?.trim() && !currentRow?.stockItemId;
-
-    switch (e.key) {
-      case "ArrowUp":
-        if (!isItemNameField || filteredItems.length === 0) {
-          if (hasUnselectedItem) {
-            e.preventDefault();
-            toast({
-              title: "Invalid item",
-              description: "Please select an item from the list.",
-              variant: "destructive",
-            });
-            return;
-          }
-          e.preventDefault();
-          if (rowIndex > 0) {
-            setSelectedCell({ row: rowIndex - 1, col: colIndex });
-            focusCell(rowIndex - 1, colIndex);
-          }
-        }
-        break;
-      case "ArrowDown":
-        if (!isItemNameField || filteredItems.length === 0) {
-          if (hasUnselectedItem) {
-            e.preventDefault();
-            toast({
-              title: "Invalid item",
-              description: "Please select an item from the list.",
-              variant: "destructive",
-            });
-            return;
-          }
-          e.preventDefault();
-          if (rowIndex < rows.length - 1) {
-            setSelectedCell({ row: rowIndex + 1, col: colIndex });
-            focusCell(rowIndex + 1, colIndex);
-          }
-        }
-        break;
-      case "Enter":
-        if (!isItemNameField || filteredItems.length === 0) {
-          if (hasUnselectedItem) {
-            e.preventDefault();
-            toast({
-              title: "Invalid item",
-              description: "Please select an item from the list.",
-              variant: "destructive",
-            });
-            return;
-          }
-          e.preventDefault();
-          if (columns[colIndex]?.key === "quantity") {
-            setSelectedCell({ row: rowIndex, col: colIndex + 1 });
-            focusCell(rowIndex, colIndex + 1);
-          } else if (columns[colIndex]?.key === "rate") {
-            if (!rows[rowIndex + 1]) {
-              setRows((prev) => [
-                ...prev,
-                { id: String(Date.now()), itemName: "", quantity: 0, rate: 0, rateUSD: 0, amount: 0 },
-              ]);
-              setTimeout(() => focusCell(rows.length, 0), 50);
-            } else {
-              setSelectedCell({ row: rowIndex + 1, col: 0 });
-              focusCell(rowIndex + 1, 0);
-            }
-          } else if (rowIndex < rows.length - 1) {
-            setSelectedCell({ row: rowIndex + 1, col: colIndex });
-            focusCell(rowIndex + 1, colIndex);
-          }
-        }
-        break;
-      case "ArrowLeft":
-        e.preventDefault();
-        if (colIndex > 0) {
-          setSelectedCell({ row: rowIndex, col: colIndex - 1 });
-          focusCell(rowIndex, colIndex - 1);
-        }
-        break;
-      case "ArrowRight":
-        if (hasUnselectedItem) {
-          e.preventDefault();
-          toast({ title: "Invalid item", description: "Please select an item from the list.", variant: "destructive" });
-          return;
-        }
-        e.preventDefault();
-        if (colIndex < maxCol) {
-          setSelectedCell({ row: rowIndex, col: colIndex + 1 });
-          focusCell(rowIndex, colIndex + 1);
-        }
-        break;
-      case "Tab":
-        if (isItemNameField && activeRow === rowIndex && filteredItems.length > 0 && !e.shiftKey) {
-          e.preventDefault();
-          if (filteredItems[highlightedIndex]) selectItem(filteredItems[highlightedIndex]);
-          return;
-        }
-        if (hasUnselectedItem) {
-          e.preventDefault();
-          toast({ title: "Invalid item", description: "Please select an item from the list.", variant: "destructive" });
-          return;
-        }
-        if (!e.shiftKey && colIndex < maxCol) {
-          e.preventDefault();
-          setSelectedCell({ row: rowIndex, col: colIndex + 1 });
-          focusCell(rowIndex, colIndex + 1);
-        }
-        break;
-      case "Backspace": {
-        const inputVal = (e.target as HTMLInputElement).value;
-        if (inputVal === "" && (columns[colIndex]?.key === "quantity" || columns[colIndex]?.key === "rate")) {
-          e.preventDefault();
-          setSelectedCell({ row: rowIndex, col: colIndex - 1 });
-          focusCell(rowIndex, colIndex - 1);
-        }
-        break;
-      }
-    }
-  };
-
-  const formatDisplayAmount = (v: number) =>
-    activeCurrency === "CFA" ? `CFA ${Math.round(v).toLocaleString()}` : `$ ${v.toLocaleString()}`;
-  const validItemCount = rows.filter((r) => r.amount > 0).length;
-
+  // ── Early returns ─────────────────────────────────────────────────────────
   if (posUser && posLocationsLoading) {
     return (
       <div className="flex flex-col items-center justify-center h-full p-8 gap-4">
@@ -757,6 +347,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
     );
   }
 
+  // ── Render ────────────────────────────────────────────────────────────────
   return (
     <div className="flex flex-col h-full bg-background overflow-hidden relative">
       <POSHeader
@@ -779,161 +370,30 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
         onDetailedExport={handleDetailedExport}
       />
 
-      {/* Inline checkout strip — desktop only */}
-      {activeLocation && (
-        <div className="hidden lg:flex flex-wrap items-center gap-2 px-4 py-2 border-b bg-muted/10">
-          {/* Location — admin: full select; POS user: name badge or select if multiple */}
-          {!posUser ? (
-            <Select
-              value={activeLocation?.id?.toString()}
-              onValueChange={(val) => {
-                const loc = allLocations.find((l) => l.id.toString() === val);
-                if (loc) setSelectedLocation(loc);
-              }}
-            >
-              <SelectTrigger className="w-[180px]" data-testid="select-admin-location">
-                <MapPin className="h-3.5 w-3.5 mr-1 text-muted-foreground shrink-0" />
-                <SelectValue placeholder="Location" />
-              </SelectTrigger>
-              <SelectContent>
-                {allLocations.map((loc) => (
-                  <SelectItem key={loc.id} value={loc.id.toString()}>
-                    {loc.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          ) : posAssignedLocations.length > 1 ? (
-            <Select
-              value={posSelectedLocation?.id?.toString()}
-              onValueChange={(val) => {
-                const loc = posAssignedLocations.find((l) => l.id.toString() === val);
-                if (loc) setPosSelectedLocation(loc);
-              }}
-            >
-              <SelectTrigger className="w-[180px]" data-testid="select-pos-location-strip">
-                <MapPin className="h-3.5 w-3.5 mr-1 text-muted-foreground shrink-0" />
-                <SelectValue placeholder="Location" />
-              </SelectTrigger>
-              <SelectContent>
-                {posAssignedLocations.map((loc) => (
-                  <SelectItem key={loc.id} value={loc.id.toString()}>
-                    {loc.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          ) : (
-            <div className="flex items-center gap-1.5 h-9 px-3 rounded-md border border-input bg-muted/30 text-sm">
-              <MapPin className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-              <span className="font-medium">{activeLocation.name}</span>
-            </div>
-          )}
-
-          <input
-            type="date"
-            value={saleDate}
-            onChange={posUser ? undefined : (e) => setSaleDate(e.target.value)}
-            readOnly={!!posUser}
-            className={`h-9 px-3 rounded-md border border-input bg-background text-sm font-mono focus:outline-none focus:ring-2 focus:ring-ring ${posUser ? "opacity-60 cursor-not-allowed" : ""}`}
-            data-testid="input-sale-date"
-          />
-
-          {!isCreditSale && (
-            <>
-              <Select
-                value={paymentAccountType}
-                onValueChange={posUser ? undefined : (v: "bank" | "cash") => setPaymentAccountType(v)}
-                disabled={!!posUser}
-              >
-                <SelectTrigger className="w-24" data-testid="select-account-type">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="cash">Cash</SelectItem>
-                  <SelectItem value="bank">Bank</SelectItem>
-                </SelectContent>
-              </Select>
-
-              <Select
-                value={paymentAccountId || ""}
-                onValueChange={posUser ? undefined : setPaymentAccountId}
-                disabled={!!posUser}
-              >
-                <SelectTrigger className="w-[180px]" data-testid="select-payment-account">
-                  <SelectValue placeholder={paymentAccountType === "bank" ? "Select Bank" : "Select Cash"} />
-                </SelectTrigger>
-                <SelectContent>
-                  {paymentAccountType === "bank"
-                    ? (Array.isArray(bankAccounts) ? bankAccounts : []).map((acc: any) => (
-                        <SelectItem key={acc.id} value={String(acc.id)}>
-                          {acc.name} ({acc.code})
-                        </SelectItem>
-                      ))
-                    : cashLedgerAccounts.map((acc: any) => (
-                        <SelectItem key={acc.id} value={String(acc.id)}>
-                          {acc.name}
-                        </SelectItem>
-                      ))}
-                </SelectContent>
-              </Select>
-            </>
-          )}
-
-          <div className="flex items-center gap-2">
-            <Switch
-              id="credit-sale-strip"
-              checked={isCreditSale}
-              onCheckedChange={setIsCreditSale}
-              data-testid="toggle-credit-sale"
-            />
-            <Label htmlFor="credit-sale-strip" className="text-sm cursor-pointer">
-              Credit
-            </Label>
-          </div>
-
-          {isCreditSale && (
-            <Popover open={customerComboOpen} onOpenChange={setCustomerComboOpen}>
-              <PopoverTrigger asChild>
-                <Button variant="outline" className="gap-2 font-normal" data-testid="select-customer">
-                  <User className="h-4 w-4 text-muted-foreground" />
-                  <span className="truncate max-w-[140px]">
-                    {selectedCustomerId
-                      ? customerAccounts.find((a: any) => String(a.id) === selectedCustomerId)?.name || "Customer"
-                      : "Select customer…"}
-                  </span>
-                  <ChevronDown className="h-4 w-4 opacity-50" />
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-64 p-0" align="start">
-                <Command>
-                  <CommandInput placeholder="Search customer…" data-testid="input-customer-search" />
-                  <CommandList>
-                    <CommandEmpty>No customer found.</CommandEmpty>
-                    <CommandGroup>
-                      {customerAccounts.map((acc: any) => (
-                        <CommandItem
-                          key={acc.id}
-                          value={acc.name}
-                          onSelect={() => {
-                            setSelectedCustomerId(String(acc.id));
-                            setCustomerComboOpen(false);
-                          }}
-                        >
-                          <Check
-                            className={`mr-2 h-4 w-4 shrink-0 ${selectedCustomerId === String(acc.id) ? "opacity-100" : "opacity-0"}`}
-                          />
-                          {acc.name}
-                        </CommandItem>
-                      ))}
-                    </CommandGroup>
-                  </CommandList>
-                </Command>
-              </PopoverContent>
-            </Popover>
-          )}
-        </div>
-      )}
+      <PosCheckoutStrip
+        posUser={posUser}
+        activeLocation={activeLocation}
+        allLocations={allLocations}
+        posAssignedLocations={posAssignedLocations}
+        posSelectedLocation={posSelectedLocation}
+        setPosSelectedLocation={setPosSelectedLocation}
+        setSelectedLocation={setSelectedLocation}
+        saleDate={saleDate}
+        setSaleDate={setSaleDate}
+        paymentAccountType={paymentAccountType}
+        setPaymentAccountType={setPaymentAccountType}
+        paymentAccountId={paymentAccountId}
+        setPaymentAccountId={setPaymentAccountId}
+        isCreditSale={isCreditSale}
+        setIsCreditSale={setIsCreditSale}
+        customerComboOpen={customerComboOpen}
+        setCustomerComboOpen={setCustomerComboOpen}
+        selectedCustomerId={selectedCustomerId}
+        setSelectedCustomerId={setSelectedCustomerId}
+        customerAccounts={customerAccounts}
+        bankAccounts={bankAccounts}
+        cashLedgerAccounts={cashLedgerAccounts}
+      />
 
       {/* ── Desktop layout ── */}
       <div className="hidden lg:flex flex-1 overflow-hidden p-4">
@@ -942,7 +402,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
             <div>
               <SaleGrid
                 rows={rows}
-                columns={columns}
+                columns={POS_COLUMNS}
                 selectedCell={selectedCell}
                 setSelectedCell={setSelectedCell}
                 updateRow={updateRow}
@@ -952,7 +412,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
                 setSearchTerm={setSearchTerm}
                 setHighlightedIndex={setHighlightedIndex}
                 getStockWarning={() => null}
-                formatDisplayAmount={formatDisplayAmount}
+                formatDisplayAmount={fmtAmount}
                 activeCurrency={activeCurrency}
                 exchangeRate={exchangeRate}
                 inputRefs={inputRefs}
@@ -981,312 +441,45 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
         </div>
       </div>
 
-      {/* ── Mobile layout — single unified scroll view ── */}
-      <div className="flex lg:hidden flex-1 flex-col overflow-y-auto">
-
-        {/* Sticky search bar with live dropdown */}
-        <div className="sticky top-0 z-20 bg-background px-4 pt-3 pb-2 border-b shadow-sm">
-          <div className="relative">
-            <div className="flex items-center gap-2 rounded-md border border-input bg-muted/30 px-3 h-11 focus-within:ring-2 focus-within:ring-ring focus-within:border-transparent transition-all">
-              <Search className="h-5 w-5 text-muted-foreground shrink-0" />
-              <input
-                className="flex-1 bg-transparent outline-none placeholder:text-muted-foreground text-base"
-                placeholder="Search or scan item…"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                ref={mobileSearchInputRef}
-                data-testid="input-mobile-product-search"
-              />
-              {searchTerm && (
-                <button
-                  className="text-muted-foreground text-xl leading-none px-1"
-                  onClick={() => setSearchTerm("")}
-                  aria-label="Clear search"
-                >
-                  ×
-                </button>
-              )}
-            </div>
-
-            {/* Dropdown results */}
-            {searchTerm && getFilteredInventory().length > 0 && (
-              <div className="absolute top-full left-0 right-0 z-30 bg-background border border-input rounded-md shadow-lg mt-1 max-h-72 overflow-y-auto">
-                {getFilteredInventory().map((item) => {
-                  const isOut = item.stock === 0;
-                  const isLow = !isOut && item.stock < 10;
-                  return (
-                    <button
-                      key={item.code}
-                      className="w-full text-left flex items-center justify-between gap-3 px-4 py-3 border-b border-muted/40 last:border-b-0 active:bg-primary/10"
-                      onClick={() => {
-                        selectItem(item);
-                        setSearchTerm("");
-                      }}
-                      data-testid={`button-mobile-select-item-${item.code}`}
-                    >
-                      <div className="min-w-0 flex-1">
-                        <p className="font-semibold text-base leading-tight truncate">{item.name}</p>
-                        <p className="text-xs text-muted-foreground font-mono mt-0.5">{item.code}</p>
-                      </div>
-                      <span className={`shrink-0 font-bold rounded text-xs px-2 py-1 ${
-                        isOut
-                          ? "bg-red-500/15 text-red-500"
-                          : isLow
-                            ? "bg-amber-500/15 text-amber-500"
-                            : "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400"
-                      }`}>
-                        {isOut ? "Out" : isLow ? `${Math.round(item.stock)} Low` : Math.round(item.stock).toLocaleString()}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Sale settings */}
-        <div className="px-4 pt-3 pb-2 border-b space-y-3 bg-muted/10">
-          {/* Location + date row */}
-          <div className="flex items-center gap-2 flex-wrap">
-            {!posUser ? (
-              <Select
-                value={activeLocation?.id?.toString()}
-                onValueChange={(val) => {
-                  const loc = allLocations.find((l) => l.id.toString() === val);
-                  if (loc) setSelectedLocation(loc);
-                }}
-              >
-                <SelectTrigger className="flex-1 min-w-0" data-testid="select-mobile-location">
-                  <MapPin className="h-3.5 w-3.5 mr-1 text-muted-foreground shrink-0" />
-                  <SelectValue placeholder="Location" />
-                </SelectTrigger>
-                <SelectContent>
-                  {allLocations.map((loc) => (
-                    <SelectItem key={loc.id} value={loc.id.toString()}>{loc.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            ) : posAssignedLocations.length > 1 ? (
-              <Select
-                value={posSelectedLocation?.id?.toString()}
-                onValueChange={(val) => {
-                  const loc = posAssignedLocations.find((l) => l.id.toString() === val);
-                  if (loc) setPosSelectedLocation(loc);
-                }}
-              >
-                <SelectTrigger className="flex-1 min-w-0" data-testid="select-mobile-pos-location">
-                  <MapPin className="h-3.5 w-3.5 mr-1 text-muted-foreground shrink-0" />
-                  <SelectValue placeholder="Location" />
-                </SelectTrigger>
-                <SelectContent>
-                  {posAssignedLocations.map((loc) => (
-                    <SelectItem key={loc.id} value={loc.id.toString()}>{loc.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            ) : (
-              <div className="flex items-center gap-1.5 h-9 px-3 rounded-md border border-input bg-muted/30 text-sm flex-1">
-                <MapPin className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-                <span className="font-medium">{activeLocation?.name}</span>
-              </div>
-            )}
-            <input
-              type="date"
-              value={saleDate}
-              onChange={posUser ? undefined : (e) => setSaleDate(e.target.value)}
-              readOnly={!!posUser}
-              className={`h-9 px-3 rounded-md border border-input bg-background text-sm font-mono focus:outline-none focus:ring-2 focus:ring-ring ${posUser ? "opacity-60 cursor-not-allowed" : ""}`}
-              data-testid="input-mobile-sale-date"
-            />
-          </div>
-
-          {/* Credit toggle + customer/payment */}
-          <div className="flex items-center gap-3 flex-wrap">
-            <div className="flex items-center gap-2">
-              <Switch
-                id="mobile-credit-sale"
-                checked={isCreditSale}
-                onCheckedChange={setIsCreditSale}
-                data-testid="toggle-mobile-credit-sale"
-              />
-              <Label htmlFor="mobile-credit-sale" className="text-sm cursor-pointer">Credit Sale</Label>
-            </div>
-
-            {isCreditSale ? (
-              <Popover open={mobileCustomerComboOpen} onOpenChange={setMobileCustomerComboOpen}>
-                <PopoverTrigger asChild>
-                  <Button variant="outline" className="flex-1 gap-2 font-normal justify-start" data-testid="select-mobile-customer">
-                    <User className="h-4 w-4 text-muted-foreground shrink-0" />
-                    <span className="truncate">
-                      {selectedCustomerId
-                        ? customerAccounts.find((a: any) => String(a.id) === selectedCustomerId)?.name || "Customer"
-                        : "Select customer…"}
-                    </span>
-                    <ChevronDown className="h-4 w-4 opacity-50 ml-auto shrink-0" />
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-72 p-0">
-                  <Command>
-                    <CommandInput placeholder="Search customer…" />
-                    <CommandList>
-                      <CommandEmpty>No customer found.</CommandEmpty>
-                      <CommandGroup>
-                        {customerAccounts.map((acc: any) => (
-                          <CommandItem
-                            key={acc.id}
-                            value={acc.name}
-                            onSelect={() => {
-                              setSelectedCustomerId(String(acc.id));
-                              setMobileCustomerComboOpen(false);
-                            }}
-                          >
-                            <Check className={`mr-2 h-4 w-4 shrink-0 ${selectedCustomerId === String(acc.id) ? "opacity-100" : "opacity-0"}`} />
-                            {acc.name}
-                          </CommandItem>
-                        ))}
-                      </CommandGroup>
-                    </CommandList>
-                  </Command>
-                </PopoverContent>
-              </Popover>
-            ) : (
-              <div className="flex items-center gap-2 flex-1">
-                <Select
-                  value={paymentAccountType}
-                  onValueChange={posUser ? undefined : (v: "bank" | "cash") => setPaymentAccountType(v)}
-                  disabled={!!posUser}
-                >
-                  <SelectTrigger className="w-24" data-testid="select-mobile-account-type">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="cash">Cash</SelectItem>
-                    <SelectItem value="bank">Bank</SelectItem>
-                  </SelectContent>
-                </Select>
-                <Select
-                  value={paymentAccountId || ""}
-                  onValueChange={posUser ? undefined : setPaymentAccountId}
-                  disabled={!!posUser}
-                >
-                  <SelectTrigger className="flex-1 min-w-0" data-testid="select-mobile-payment-account">
-                    <SelectValue placeholder={paymentAccountType === "bank" ? "Select Bank" : "Select Cash"} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {paymentAccountType === "bank"
-                      ? (Array.isArray(bankAccounts) ? bankAccounts : []).map((acc: any) => (
-                          <SelectItem key={acc.id} value={String(acc.id)}>{acc.name} ({acc.code})</SelectItem>
-                        ))
-                      : cashLedgerAccounts.map((acc: any) => (
-                          <SelectItem key={acc.id} value={String(acc.id)}>{acc.name}</SelectItem>
-                        ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Cart items */}
-        <div className="px-4 pt-3 pb-2 space-y-2">
-          {rows.filter((r) => r.stockItemId && r.quantity > 0).length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-16 gap-3 text-muted-foreground">
-              <ShoppingCart className="h-12 w-12 opacity-30" />
-              <p className="text-sm">Search above to add items</p>
-            </div>
-          ) : (
-            rows.filter((r) => r.stockItemId).map((row) => {
-              const actualIdx = rows.indexOf(row);
-              if (!row.stockItemId) return null;
-              return (
-                <Card key={row.id} className="p-3">
-                  <div className="flex items-start gap-3">
-                    <div className="flex-1 min-w-0">
-                      <p className="font-semibold text-sm leading-tight truncate">{row.itemName}</p>
-                      <p className="text-xs text-muted-foreground font-mono">{row.stockItemCode}</p>
-                    </div>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => setRows(rows.filter((_, i) => i !== actualIdx))}
-                      className="shrink-0 text-destructive"
-                      data-testid={`button-mobile-delete-${actualIdx}`}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                  <div className="flex items-center gap-3 mt-3">
-                    <div className="flex-1 flex flex-col gap-1">
-                      <span className="text-[11px] text-muted-foreground uppercase tracking-wide">Qty</span>
-                      <input
-                        type="number"
-                        inputMode="decimal"
-                        value={row.quantity || ""}
-                        onChange={(e) => updateRow(actualIdx, "quantity", e.target.value)}
-                        className="w-full h-10 text-center border border-input rounded-md bg-background text-sm font-mono focus:outline-none focus:ring-2 focus:ring-ring"
-                        data-testid={`input-mobile-qty-${actualIdx}`}
-                      />
-                    </div>
-                    <div className="flex-1 flex flex-col gap-1">
-                      <span className="text-[11px] text-muted-foreground uppercase tracking-wide">Rate</span>
-                      <input
-                        type="number"
-                        inputMode="decimal"
-                        value={row.rate || ""}
-                        onChange={(e) => updateRow(actualIdx, "rate", e.target.value)}
-                        className="w-full h-10 text-center border border-input rounded-md bg-background text-sm font-mono focus:outline-none focus:ring-2 focus:ring-ring"
-                        data-testid={`input-mobile-rate-${actualIdx}`}
-                      />
-                    </div>
-                    <div className="flex flex-col gap-1 items-end">
-                      <span className="text-[11px] text-muted-foreground uppercase tracking-wide">Total</span>
-                      <span className="h-10 flex items-center font-mono font-bold text-base">{formatDisplayAmount(row.amount)}</span>
-                    </div>
-                  </div>
-                </Card>
-              );
-            })
-          )}
-        </div>
-
-        {/* Notes */}
-        <div className="px-4 pb-2">
-          <Textarea
-            placeholder="Notes (optional)"
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-            className="resize-none h-12 min-h-[48px] text-sm"
-            data-testid="input-mobile-notes"
-          />
-        </div>
-
-        {/* Total + checkout — pinned to bottom of scroll */}
-        {(() => {
-          const validRows = rows.filter((r) => r.amount > 0);
-          const total = validRows.reduce((s, r) => s + r.amount, 0);
-          const qty = validRows.reduce((s, r) => s + r.quantity, 0);
-          return (
-            <div className="px-4 pb-6 pt-2 mt-auto border-t bg-background space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">
-                  {validRows.length} items · Qty {qty.toFixed(0)}
-                </span>
-                <span className="font-mono font-bold text-2xl">{formatDisplayAmount(total)}</span>
-              </div>
-              <Button
-                className="w-full"
-                size="lg"
-                onClick={handleSaveSale}
-                disabled={saveMutation?.isPending || !hasValidItems}
-                data-testid="button-mobile-checkout"
-              >
-                {saveMutation?.isPending ? "Saving…" : "Checkout"}
-              </Button>
-            </div>
-          );
-        })()}
-      </div>
+      {/* ── Mobile layout ── */}
+      <PosMobileLayout
+        posUser={posUser}
+        activeLocation={activeLocation}
+        allLocations={allLocations}
+        posAssignedLocations={posAssignedLocations}
+        posSelectedLocation={posSelectedLocation}
+        setPosSelectedLocation={setPosSelectedLocation}
+        setSelectedLocation={setSelectedLocation}
+        saleDate={saleDate}
+        setSaleDate={setSaleDate}
+        paymentAccountType={paymentAccountType}
+        setPaymentAccountType={setPaymentAccountType}
+        paymentAccountId={paymentAccountId}
+        setPaymentAccountId={setPaymentAccountId}
+        bankAccounts={bankAccounts}
+        cashLedgerAccounts={cashLedgerAccounts}
+        isCreditSale={isCreditSale}
+        setIsCreditSale={setIsCreditSale}
+        mobileCustomerComboOpen={mobileCustomerComboOpen}
+        setMobileCustomerComboOpen={setMobileCustomerComboOpen}
+        selectedCustomerId={selectedCustomerId}
+        setSelectedCustomerId={setSelectedCustomerId}
+        customerAccounts={customerAccounts}
+        searchTerm={searchTerm}
+        setSearchTerm={setSearchTerm}
+        mobileSearchInputRef={mobileSearchInputRef}
+        inventory={inventory}
+        selectItem={selectItem}
+        rows={rows}
+        setRows={setRows}
+        updateRow={updateRow}
+        notes={notes}
+        setNotes={setNotes}
+        saveMutation={saveMutation}
+        hasValidItems={hasValidItems}
+        handleSaveSale={handleSaveSale}
+        formatDisplayAmount={fmtAmount}
+      />
 
       <POSDialogs
         zeroStockAlert={zeroStockAlert}
