@@ -287,25 +287,6 @@ function ImportedContainerTags({ containers }: { containers: ImportedContainerEn
   );
 }
 
-// ── Location tags shown inline under an offload cell ─────────────────────────
-function LocationTags({ locations }: { locations: LocationCount[] }) {
-  if (!locations || locations.length === 0) return null;
-  return (
-    <div className="flex flex-wrap gap-1 mt-1 justify-center">
-      {locations.map((loc) => (
-        <span
-          key={loc.locationId}
-          className="inline-flex items-center gap-0.5 text-[10px] bg-muted text-muted-foreground rounded px-1.5 py-0.5 whitespace-nowrap"
-        >
-          <MapPin className="h-2.5 w-2.5 shrink-0" />
-          {loc.locationName}
-          {loc.count > 1 && <span className="font-mono ml-0.5">×{loc.count}</span>}
-        </span>
-      ))}
-    </div>
-  );
-}
-
 // ── Day grid for one company ──────────────────────────────────────────────────
 function CompanyDayGrid({ days }: { days: DayEntry[] }) {
   const active = days.filter((d) => d.offloads > 0 || d.purchases > 0);
@@ -352,7 +333,6 @@ function CompanyDayGrid({ days }: { days: DayEntry[] }) {
                   <div>
                     <span className="font-semibold text-foreground">{d.offloads}</span>
                     <ContainerTags containers={d.containers ?? []} />
-                    <LocationTags locations={d.locations} />
                   </div>
                 ) : (
                   <span className="text-muted-foreground/50">—</span>
