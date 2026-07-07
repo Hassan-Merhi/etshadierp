@@ -428,7 +428,11 @@ export function registerPosRoutes(app: Express) {
       res.json({ success: true });
     } catch (error: any) {
       console.error("[/api/pos/send-invoice-pdf-backend]", error);
-      res.status(500).json({ message: error.message });
+      const msg: string = error?.message ?? "Internal server error";
+      if (msg.toLowerCase().includes("voucher not found")) {
+        return res.status(404).json({ message: "Voucher not found" });
+      }
+      res.status(500).json({ message: msg });
     }
   });
 

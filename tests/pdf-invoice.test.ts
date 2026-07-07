@@ -375,8 +375,7 @@ describe("F. Validation guard", () => {
     const res = await agent
       .post("/api/pos/send-invoice-pdf-backend")
       .send({ voucherId: 999999999, locationId: ctx.locationId, dryRun: true });
-    // generateInvoicePdfMeta throws "Voucher not found" → route catches and returns 500
-    expect(res.status).toBe(500);
+    expect(res.status).toBe(404);
     expect(res.body.message).toMatch(/voucher not found/i);
   }, 15000);
 });
