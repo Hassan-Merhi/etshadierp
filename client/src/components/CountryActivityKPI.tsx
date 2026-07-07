@@ -21,6 +21,7 @@ interface ContainerEntry {
   id: number;
   containerNumber: string;
   supplierCode: string | null;
+  locationName: string | null;
 }
 
 interface ImportedContainerEntry {
@@ -112,20 +113,27 @@ function ContainerTags({ containers }: { containers: ContainerEntry[] }) {
   return (
     <div className="flex flex-col gap-0.5 mt-1 items-center">
       {containers.map((c) => (
-        <span
-          key={c.id}
-          className="inline-flex items-center gap-1 text-[10px] bg-primary/10 text-primary rounded px-1.5 py-0.5 whitespace-nowrap"
-          data-testid={`tag-container-${c.id}`}
-        >
-          <Container className="h-2.5 w-2.5 shrink-0" />
-          <span className="font-mono font-medium">{c.containerNumber || "—"}</span>
-          {c.supplierCode && (
-            <>
-              <span className="text-primary/50">·</span>
-              <span className="truncate max-w-[100px]">{c.supplierCode}</span>
-            </>
+        <div key={c.id} className="flex flex-col items-center gap-0">
+          <span
+            className="inline-flex items-center gap-1 text-[10px] bg-primary/10 text-primary rounded px-1.5 py-0.5 whitespace-nowrap"
+            data-testid={`tag-container-${c.id}`}
+          >
+            <Container className="h-2.5 w-2.5 shrink-0" />
+            <span className="font-mono font-medium">{c.containerNumber || "—"}</span>
+            {c.supplierCode && (
+              <>
+                <span className="text-primary/50">·</span>
+                <span className="truncate max-w-[100px]">{c.supplierCode}</span>
+              </>
+            )}
+          </span>
+          {c.locationName && (
+            <span className="inline-flex items-center gap-0.5 text-[10px] bg-muted text-muted-foreground rounded px-1.5 py-0.5 whitespace-nowrap mt-0.5">
+              <MapPin className="h-2.5 w-2.5 shrink-0" />
+              {c.locationName}
+            </span>
           )}
-        </span>
+        </div>
       ))}
     </div>
   );

@@ -52,7 +52,7 @@ export function registerStatsCountryActivityRoutes(app: Express) {
         return String(raw).substring(0, 10);
       };
 
-      type ContainerEntry         = { id: number; containerNumber: string; supplierCode: string | null };
+      type ContainerEntry         = { id: number; containerNumber: string; supplierCode: string | null; locationName: string | null };
       type ImportedContainerEntry = { id: number; containerNumber: string; supplierCode: string | null; shopName: string | null };
       type LocationEntry          = { locationId: number; locationName: string; count: number };
       type DayEntry               = { offloads: number; purchases: number; locations: LocationEntry[]; containers: ContainerEntry[]; importedContainers: ImportedContainerEntry[] };
@@ -88,13 +88,15 @@ export function registerStatsCountryActivityRoutes(app: Express) {
               json_build_object(
                 'id',              c.id,
                 'containerNumber', COALESCE(c.container_number, ''),
-                'supplierCode',    s.code
+                'supplierCode',    s.code,
+                'locationName',    l.name
               )
               ORDER BY c.container_number
             ) AS containers
           FROM container_offloads co
           JOIN containers c ON c.id = co.container_id
           LEFT JOIN suppliers s ON s.id = c.supplier_id
+          LEFT JOIN locations l ON l.id = co.location_id
           WHERE c.company_id IN (${companyIdList})
             AND co.offloaded_at::date BETWEEN $1::date AND $2::date
           GROUP BY c.company_id, co.offloaded_at::date
@@ -112,6 +114,7 @@ export function registerStatsCountryActivityRoutes(app: Express) {
                 id:              Number(c.id),
                 containerNumber: c.containerNumber || "",
                 supplierCode:    c.supplierCode ?? null,
+                locationName:    c.locationName ?? null,
               }));
             }
           }
