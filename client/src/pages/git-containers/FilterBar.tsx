@@ -173,7 +173,11 @@ export function FilterBar({
             <FilterLabel>Agent</FilterLabel>
             <MultiFilterSelect
               allLabel="All Agents"
-              options={agents.map((a) => ({ label: a, value: a }))}
+              options={[
+                { label: "No Agent", value: "NO_AGENT" },
+                { label: "────────────────", value: "SEP", dividerBefore: true },
+                ...agents.map((a) => ({ label: a, value: a })),
+              ]}
               selected={agentFilters}
               onChange={setAgentFilters}
               testId="multi-filter-agent"

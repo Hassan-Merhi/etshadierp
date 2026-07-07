@@ -50,7 +50,14 @@ export function useContainerFilters({
           });
           if (!match) return false;
         }
-        if (agentFilters.length > 0 && !agentFilters.includes(c.agent ?? "")) return false;
+        if (agentFilters.length > 0) {
+          const ag = (c.agent ?? "").trim();
+          const match = agentFilters.some((f) => {
+            if (f === "NO_AGENT") return !ag;
+            return ag === f;
+          });
+          if (!match) return false;
+        }
         if (truckFilters.length > 0) {
           const plate = (c.numberPlate ?? "").trim();
           const match = truckFilters.some((f) => {
