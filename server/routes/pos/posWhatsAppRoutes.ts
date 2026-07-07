@@ -253,7 +253,8 @@ export function registerPosWhatsAppRoutes(app: Express): void {
 
       const senderName = req.user?.username || "POS";
       const waVis = await getErpExportVisibility(req);
-      const hideProfitCols = waVis.hideSelling || waVis.hideCost || waVis.hideSalesProfitCost;
+      // P/L cols auto-hide in the PDF generator when no configured price exists — don't gate on hideSalesProfitCost
+      const hideProfitCols = waVis.hideSelling || waVis.hideCost;
       const pdfBuffer = await generateInvoicePdf(parseInt(voucherId), companyId, senderName, { hideProfitCols });
       const safeDate = (voucher.voucherDate ?? getClientDate(req)).replace(/[^0-9-]/g, "");
       const safeLoc = (location.name ?? "").replace(/[^\w\s.()\-]/g, "_").trim();

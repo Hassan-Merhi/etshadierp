@@ -343,7 +343,10 @@ export function registerPosPrintRoutes(app: Express): void {
       if (!voucherRow) return res.status(404).json({ message: "Voucher not found" });
 
       const erpVis = await getErpExportVisibility(req);
-      const hideProfitCols = erpVis.hideSelling || erpVis.hideCost || erpVis.hideSalesProfitCost;
+      // P/L columns (CONFIG / P/L BALE / TOTAL P/L) auto-hide inside the PDF generator
+      // when no item has a configured price.  Do NOT gate on hideSalesProfitCost here —
+      // the only valid reason to suppress the columns is "no configured price set".
+      const hideProfitCols = erpVis.hideSelling || erpVis.hideCost;
       const pdfBuffer = await generateInvoicePdf(voucherId, companyId, (req as any).user?.username, { hideProfitCols });
 
       // Build a friendly filename

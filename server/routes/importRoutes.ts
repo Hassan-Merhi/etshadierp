@@ -1301,7 +1301,8 @@ export function registerImportRoutes(app: Express) {
           // 1. Invoice PDF
           try {
             const waVis = await getErpExportVisibility(req);
-            const hideProfitCols = waVis.hideSelling || waVis.hideCost || waVis.hideSalesProfitCost;
+            // P/L cols auto-hide in the PDF generator when no configured price exists — don't gate on hideSalesProfitCost
+            const hideProfitCols = waVis.hideSelling || waVis.hideCost;
             const pdfBuffer = await generateInvoicePdf(_voucherId, _companyId, _senderName, { hideProfitCols });
             const safeDate = (_voucherDate ?? _saleDate).replace(/[^0-9-]/g, "");
             const fileName =
@@ -1771,7 +1772,8 @@ export function registerImportRoutes(app: Express) {
           // 1. Invoice PDF
           try {
             const waVis = await getErpExportVisibility(req);
-            const hideProfitCols = waVis.hideSelling || waVis.hideCost || waVis.hideSalesProfitCost;
+            // P/L cols auto-hide in the PDF generator when no configured price exists — don't gate on hideSalesProfitCost
+            const hideProfitCols = waVis.hideSelling || waVis.hideCost;
             const pdfBuffer = await generateInvoicePdf(_voucherId, _companyId, _senderName, { hideProfitCols });
             const safeDate = (_voucherDate ?? _saleDate).replace(/[^0-9-]/g, "");
             const fileName =
