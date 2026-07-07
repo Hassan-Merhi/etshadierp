@@ -25,7 +25,7 @@ import { ContainerSpView } from "./containers/ContainerSpView";
 
 export default function Containers() {
   const { formatDisplayDate } = useDateFormat();
-  const [activeTab] = useState("active");
+  const [activeTab, setActiveTab] = useState("active");
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const { selectedCompany } = useCompany();
   const { formatAmount } = useCurrencyContext();
@@ -173,42 +173,65 @@ export default function Containers() {
         </div>
       )}
 
-      <ContainerFilters
-        searchTerm={searchTerm}
-        onSearchChange={setSearchTerm}
-        statusFilter={statusFilter}
-        onStatusChange={setStatusFilter}
-        supplierFilter={supplierFilter}
-        onSupplierFilterChange={setSupplierFilter}
-        suppliers={suppliers}
-        getSupplierName={getSupplierName}
-        onClearFilters={clearFilters}
-      />
+      {/* Tab bar */}
+      <div className="flex gap-1 border-b pb-0">
+        {(["active", "otw", "sold"] as const).map((tab) => (
+          <button
+            key={tab}
+            onClick={() => setActiveTab(tab)}
+            className={[
+              "px-4 py-2 text-sm font-medium rounded-t-md border border-b-0 -mb-px transition-colors",
+              activeTab === tab
+                ? "bg-background border-border text-foreground"
+                : "bg-muted/40 border-transparent text-muted-foreground hover:text-foreground",
+            ].join(" ")}
+            data-testid={`tab-${tab}`}
+          >
+            {tab === "active" ? "Active" : tab === "otw" ? "OTW" : "Sold"}
+          </button>
+        ))}
+      </div>
 
-      <ActiveContainersTable
-        containers={containers}
-        allContainers={allContainers}
-        isLoading={isLoading}
-        hideContainerCosts={hideContainerCosts}
-        formatDisplayDate={formatDisplayDate}
-        formatAmount={formatAmount}
-        editingNumberId={numberEdit.editingNumberId}
-        editingNumberValue={numberEdit.editingNumberValue}
-        onEditNumberStart={(id, number) => {
-          numberEdit.setEditingNumberId(id);
-          numberEdit.setEditingNumberValue(number);
-        }}
-        onEditNumberChange={numberEdit.setEditingNumberValue}
-        onEditNumberSave={(id, containerNumber) =>
-          numberEdit.editContainerNumberMutation.mutate({ id, containerNumber })
-        }
-        onEditNumberCancel={() => {
-          numberEdit.setEditingNumberId(null);
-          numberEdit.setEditingNumberValue("");
-        }}
-        isEditNumberPending={numberEdit.editContainerNumberMutation.isPending}
-        getSupplierName={getSupplierName}
-      />
+      {activeTab === "active" && (
+        <>
+          <ContainerFilters
+            searchTerm={searchTerm}
+            onSearchChange={setSearchTerm}
+            statusFilter={statusFilter}
+            onStatusChange={setStatusFilter}
+            supplierFilter={supplierFilter}
+            onSupplierFilterChange={setSupplierFilter}
+            suppliers={suppliers}
+            getSupplierName={getSupplierName}
+            onClearFilters={clearFilters}
+          />
+
+          <ActiveContainersTable
+            containers={containers}
+            allContainers={allContainers}
+            isLoading={isLoading}
+            hideContainerCosts={hideContainerCosts}
+            formatDisplayDate={formatDisplayDate}
+            formatAmount={formatAmount}
+            editingNumberId={numberEdit.editingNumberId}
+            editingNumberValue={numberEdit.editingNumberValue}
+            onEditNumberStart={(id, number) => {
+              numberEdit.setEditingNumberId(id);
+              numberEdit.setEditingNumberValue(number);
+            }}
+            onEditNumberChange={numberEdit.setEditingNumberValue}
+            onEditNumberSave={(id, containerNumber) =>
+              numberEdit.editContainerNumberMutation.mutate({ id, containerNumber })
+            }
+            onEditNumberCancel={() => {
+              numberEdit.setEditingNumberId(null);
+              numberEdit.setEditingNumberValue("");
+            }}
+            isEditNumberPending={numberEdit.editContainerNumberMutation.isPending}
+            getSupplierName={getSupplierName}
+          />
+        </>
+      )}
 
       {activeTab === "otw" && (
         <OtwContainersTable
