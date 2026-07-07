@@ -36,7 +36,7 @@ export function SupplierMixBatchHistoryDialog({
   onClose,
 }: SupplierMixBatchHistoryDialogProps) {
   const { data: history = [], isLoading } = useQuery<MixBatchHistoryRow[]>({
-    queryKey: ["/api/factory/suppliers", supplierId, "mix-batch-history"],
+    queryKey: [`/api/factory/suppliers/${supplierId}/mix-batch-history`],
     enabled: open && supplierId !== null,
   });
 
