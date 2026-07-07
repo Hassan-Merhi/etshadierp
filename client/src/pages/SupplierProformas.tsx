@@ -253,13 +253,22 @@ export default function SupplierProformas() {
         const wb = await XLSX.read(data, { type: "array" });
         const ws = wb.Sheets[wb.SheetNames[0]];
         const rows: any[] = XLSX.utils.sheet_to_json(ws);
+        /** Parse a human-entered decimal from Excel into a plain number, 0 on failure. */
+        const parseExcelNum = (v: any): number => {
+          const raw = String(v ?? "").trim();
+          const stripped = raw.replace(/^[^0-9\-(]+/, "").replace(/[^0-9.]+$/, "");
+          const noCommas = stripped.replace(/,(?=\d{3}(?:[,.]|$))/g, "");
+          if (!/^-?\d+(\.\d+)?$/.test(noCommas)) return 0;
+          const n = parseFloat(noCommas);
+          return isFinite(n) ? n : 0;
+        };
         const lines = rows
           .map((r) => ({
             barcode: String(r.Barcode || r.barcode || "").trim(),
             itemName: String(r["Item Name"] || r.itemName || r.Name || "").trim(),
-            qty: parseInt(r.Qty || r.qty || r.Quantity || 0) || 0,
-            weightPerBale: String(r["Weight per Bale"] || r.weightPerBale || r.Weight || "0"),
-            pricePerBale: String(r["Price per Bale"] || r.pricePerBale || r.Price || "0"),
+            qty: Math.max(0, Math.trunc(parseExcelNum(r.Qty ?? r.qty ?? r.Quantity))),
+            weightPerBale: String(parseExcelNum(r["Weight per Bale"] ?? r.weightPerBale ?? r.Weight)),
+            pricePerBale: String(parseExcelNum(r["Price per Bale"] ?? r.pricePerBale ?? r.Price)),
           }))
           .filter((l) => l.barcode);
         if (lines.length === 0) {

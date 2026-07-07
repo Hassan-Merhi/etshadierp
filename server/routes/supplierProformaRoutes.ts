@@ -16,6 +16,40 @@ import {
   stockItemCodeAliases,
 } from "@shared/schema";
 
+/**
+ * Parse a human-entered decimal value from Excel into a PostgreSQL-safe decimal string.
+ * Accepts: optional leading sign, digit groups separated by commas (thousands), optional
+ * decimal point with fractional digits, optional currency prefix/suffix, and surrounding
+ * whitespace.  Everything else (text, "N/A", scientific notation, etc.) returns "0".
+ */
+function sanitizeDecimal(v: any): string {
+  const raw = String(v ?? "").trim();
+  // Strip leading/trailing currency symbols and whitespace
+  const stripped = raw.replace(/^[^0-9\-\(]+/, "").replace(/[^0-9\.]+$/, "");
+  // Remove thousands commas: only valid when pattern is NNN,NNN,...
+  const noCommas = stripped.replace(/,(?=\d{3}(?:[,.]|$))/g, "");
+  // Must match: optional minus, digits, optional .digits — nothing else
+  if (!/^-?\d+(\.\d+)?$/.test(noCommas)) return "0";
+  const n = parseFloat(noCommas);
+  if (!isFinite(n)) return "0";
+  return n.toFixed(6).replace(/\.?0+$/, "") || "0";
+}
+
+/**
+ * Insert proforma lines in chunks inside a single transaction so partial imports
+ * never leave orphan rows when a later chunk fails.
+ */
+async function batchInsertProformaLines(rows: any[]) {
+  // Each row has 6 columns → 6 params; PostgreSQL limit is 65535.
+  // 200 rows × 6 = 1200 params — well within limits.
+  const CHUNK = 200;
+  await db.transaction(async (tx) => {
+    for (let i = 0; i < rows.length; i += CHUNK) {
+      await tx.insert(supplierProformaLines).values(rows.slice(i, i + CHUNK));
+    }
+  });
+}
+
 async function buildAliasMap(companyId: number): Promise<Map<string, string>> {
   const aliases = await db
     .select({ aliasCode: stockItemCodeAliases.aliasCode, primaryCode: stockItems.code })
@@ -91,13 +125,13 @@ export function registerSupplierProformaRoutes(app: Express, requireAuth: any) {
       if (lines && Array.isArray(lines) && lines.length > 0) {
         const lineValues = lines.map((l: any) => ({
           proformaId: proforma.id,
-          barcode: l.barcode || "",
-          itemName: l.itemName || "",
+          barcode: String(l.barcode || "").trim(),
+          itemName: String(l.itemName || "").trim(),
           qty: parseInt(l.qty) || 0,
-          weightPerBale: l.weightPerBale || "0",
-          pricePerBale: l.pricePerBale || "0",
+          weightPerBale: sanitizeDecimal(l.weightPerBale),
+          pricePerBale: sanitizeDecimal(l.pricePerBale),
         }));
-        await db.insert(supplierProformaLines).values(lineValues);
+        await batchInsertProformaLines(lineValues);
       }
       const allLines = await db
         .select()
@@ -268,11 +302,11 @@ export function registerSupplierProformaRoutes(app: Express, requireAuth: any) {
         proformaId,
         barcode: String(l.barcode || l.Barcode || "").trim(),
         itemName: String(l.itemName || l["Item Name"] || "").trim(),
-        qty: parseInt(l.qty || l.Qty || 0) || 0,
-        weightPerBale: String(l.weightPerBale || l["Weight per Bale"] || "0"),
-        pricePerBale: String(l.pricePerBale || l["Price per Bale"] || "0"),
+        qty: parseInt(l.qty ?? l.Qty ?? 0) || 0,
+        weightPerBale: sanitizeDecimal(l.weightPerBale ?? l["Weight per Bale"]),
+        pricePerBale: sanitizeDecimal(l.pricePerBale ?? l["Price per Bale"]),
       }));
-      await db.insert(supplierProformaLines).values(lineValues);
+      await batchInsertProformaLines(lineValues);
       await db.update(supplierProformas).set({ updatedAt: new Date() }).where(eq(supplierProformas.id, proformaId));
       const allLines = await db
         .select()
