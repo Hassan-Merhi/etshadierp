@@ -128,7 +128,7 @@ export function registerEmployeeLedgerWasteRoutes(app: Express) {
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       // Load all relevant data
-      const [allBalesRaw, allProducts, allCategories, pendingOrderBaleIdsRaw] = await Promise.all([
+      const [allBalesRaw, allProducts, allCategories, pendingOrderBaleIdsRaw, staleOrderBaleIdsRaw] = await Promise.all([
         db.execute(sql`
           SELECT
             fb.id,
@@ -166,6 +166,15 @@ export function registerEmployeeLedgerWasteRoutes(app: Express) {
           WHERE co.company_id = ${companyId}
           AND co.status IN ('LOADING', 'PENDING_VERIFICATION', 'VERIFIED')
         `),
+        // Stale bale IDs: bale DB status was never updated after the order completed.
+        // These are physically gone — exclude from in-stock, matching Location Inventory logic.
+        db.execute(sql`
+          SELECT DISTINCT cob.bale_id AS "baleId"
+          FROM customer_order_bales cob
+          INNER JOIN customer_orders co ON co.id = cob.order_id
+          WHERE co.company_id = ${companyId}
+          AND co.status IN ('FINALIZED', 'DISPATCHED', 'SOLD')
+        `),
       ]);
 
       const allBales: any[] = Array.isArray(allBalesRaw) ? allBalesRaw : (allBalesRaw as any).rows || [];
@@ -173,6 +182,13 @@ export function registerEmployeeLedgerWasteRoutes(app: Express) {
         (Array.isArray(pendingOrderBaleIdsRaw)
           ? pendingOrderBaleIdsRaw
           : (pendingOrderBaleIdsRaw as any).rows || []
+        ).map((r: any) => Number(r.baleId))
+      );
+      // Bales physically gone but DB status not yet updated to SOLD/DISPATCHED
+      const staleOrderBaleIds = new Set<number>(
+        (Array.isArray(staleOrderBaleIdsRaw)
+          ? staleOrderBaleIdsRaw
+          : (staleOrderBaleIdsRaw as any).rows || []
         ).map((r: any) => Number(r.baleId))
       );
 
@@ -278,15 +294,23 @@ export function registerEmployeeLedgerWasteRoutes(app: Express) {
           } else {
             addToBucket(buckets.sold, key, label, bale);
           }
+        } else if (bale.status === "FINALIZED") {
+          // FINALIZED means the customer order was completed — bale is sold/shipped.
+          // Never count as in-stock; always goes to the sold bucket.
+          addToBucket(buckets.sold, key, label, bale);
         } else if (bale.status === "DISPATCHED" && bale.wasteDispatchId) {
           addToBucket(buckets.wasteDispatched, key, label, bale);
         } else if (bale.status === "RESERVED_FOR_ORDER") {
           // Bale is physically reserved/scanned into a loading order
           addToBucket(buckets.pendingLoading, key, label, bale);
-        } else if (bale.status === "IN_STOCK" || bale.status === "FINALIZED") {
+        } else if (bale.status === "IN_STOCK") {
           if (pendingOrderBaleIds.has(Number(bale.id))) {
             // Bale is linked to a LOADING/PENDING_VERIFICATION/VERIFIED order but not yet reserved
             addToBucket(buckets.pendingLoading, key, label, bale);
+          } else if (staleOrderBaleIds.has(Number(bale.id))) {
+            // Stale: still IN_STOCK in DB but the order was FINALIZED/DISPATCHED/SOLD.
+            // The bale is physically gone — count it as sold, matching Location Inventory.
+            addToBucket(buckets.sold, key, label, bale);
           } else if (waste) {
             addToBucket(buckets.wasteStock, key, label, bale);
           } else {
