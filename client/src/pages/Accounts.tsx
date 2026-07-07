@@ -13,6 +13,7 @@ import {
   ArrowRight,
   TrendingUp,
   TrendingDown,
+  Trash2,
 } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from "@/components/ui/command";
@@ -148,6 +149,7 @@ export default function Accounts() {
   const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false);
   const [showDeletedVouchers, setShowDeletedVouchers] = useState(false);
   const [parentGroupOpen, setParentGroupOpen] = useState(false);
+  const [showDeleteAccountConfirm, setShowDeleteAccountConfirm] = useState(false);
 
   const bulkDeleteMutation = useMutation({
     mutationFn: async (ids: number[]) => apiRequest("POST", "/api/vouchers/bulk-delete", { voucherIds: ids }),
@@ -183,6 +185,27 @@ export default function Accounts() {
     refetchOnWindowFocus: false,
     refetchOnMount: false,
     refetchInterval: false,
+  });
+
+  const deleteLedgerMutation = useMutation({
+    mutationFn: async (id: number) => {
+      const res = await apiRequest("DELETE", `/api/ledger-accounts/${id}`);
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.message ?? "Delete failed");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Account deleted" });
+      setAlterSelectedAccount(null);
+      editForm.reset();
+      queryClient.invalidateQueries({ queryKey: ["/api/accounts/all"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/ledger-accounts"] });
+    },
+    onError: (err: any) => {
+      toast({ title: "Cannot delete", description: err?.message ?? "Unknown error", variant: "destructive" });
+    },
   });
 
   const updateLedgerMutation = useMutation({
@@ -962,25 +985,37 @@ export default function Accounts() {
                           )}
                         />
 
-                        <div className="flex justify-end gap-2 pt-2">
+                        <div className="flex justify-between gap-2 pt-2">
                           <Button
                             type="button"
-                            variant="outline"
-                            onClick={() => {
-                              setAlterSelectedAccount(null);
-                              editForm.reset();
-                            }}
-                            data-testid="button-alter-cancel"
+                            variant="destructive"
+                            onClick={() => setShowDeleteAccountConfirm(true)}
+                            disabled={deleteLedgerMutation.isPending}
+                            data-testid="button-alter-delete"
                           >
-                            Cancel
+                            <Trash2 className="w-4 h-4 mr-2" />
+                            Delete
                           </Button>
-                          <Button
-                            type="submit"
-                            disabled={updateLedgerMutation.isPending}
-                            data-testid="button-alter-save"
-                          >
-                            {updateLedgerMutation.isPending ? "Saving…" : "Save Changes"}
-                          </Button>
+                          <div className="flex gap-2">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              onClick={() => {
+                                setAlterSelectedAccount(null);
+                                editForm.reset();
+                              }}
+                              data-testid="button-alter-cancel"
+                            >
+                              Cancel
+                            </Button>
+                            <Button
+                              type="submit"
+                              disabled={updateLedgerMutation.isPending}
+                              data-testid="button-alter-save"
+                            >
+                              {updateLedgerMutation.isPending ? "Saving…" : "Save Changes"}
+                            </Button>
+                          </div>
                         </div>
                       </form>
                     </Form>
@@ -1058,6 +1093,32 @@ export default function Accounts() {
           </div>
         </TabsContent>
       </Tabs>
+
+      <AlertDialog open={showDeleteAccountConfirm} onOpenChange={setShowDeleteAccountConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete "{alterSelectedAccount?.name}"?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete this ledger account. This cannot be undone.
+              Accounts with existing transactions or child accounts cannot be deleted.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => {
+                if (alterSelectedAccount?.accountId) {
+                  deleteLedgerMutation.mutate(alterSelectedAccount.accountId);
+                }
+                setShowDeleteAccountConfirm(false);
+              }}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <AlertDialog open={showBulkDeleteConfirm} onOpenChange={setShowBulkDeleteConfirm}>
         <AlertDialogContent>
