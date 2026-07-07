@@ -33,6 +33,7 @@ export default function SpReports() {
   const [exportTo, setExportTo] = useState(new Date().toISOString().slice(0, 10));
   const [exportLocationId, setExportLocationId] = useState<string>("all");
   const [exporting, setExporting] = useState(false);
+  const [exportingV2, setExportingV2] = useState(false);
 
   const payableUrl = "/api/sp/report/payable";
   const profitUrl = `/api/sp/report/profit${startDate || endDate ? `?${new URLSearchParams({ ...(startDate && { startDate }), ...(endDate && { endDate }) })}` : ""}`;
@@ -92,6 +93,36 @@ export default function SpReports() {
       toast({ title: "Export failed", description: e.message, variant: "destructive" });
     } finally {
       setExporting(false);
+    }
+  };
+
+  const handleExportSalesFormV2 = async () => {
+    if (!exportFrom || !exportTo) {
+      toast({ title: "Please select both From and To dates", variant: "destructive" });
+      return;
+    }
+    setExportingV2(true);
+    try {
+      const params = new URLSearchParams({ fromDate: exportFrom, toDate: exportTo });
+      if (exportLocationId && exportLocationId !== "all") params.set("locationId", exportLocationId);
+      const res = await fetch(`/api/sp/sales-form/export-v2?${params}`, { credentials: "include" });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ message: "Export failed" }));
+        throw new Error(err.message);
+      }
+      const blob = await res.blob();
+      const disposition = res.headers.get("Content-Disposition") ?? "";
+      const match = disposition.match(/filename="?([^"]+)"?/);
+      const filename = match ? match[1] : `system_sales_form_${exportFrom}_${exportTo}.xlsx`;
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url; a.download = filename; a.click();
+      URL.revokeObjectURL(url);
+      toast({ title: "System sales form exported", description: filename });
+    } catch (e: any) {
+      toast({ title: "Export failed", description: e.message, variant: "destructive" });
+    } finally {
+      setExportingV2(false);
     }
   };
 
@@ -369,29 +400,45 @@ export default function SpReports() {
                 </div>
               </div>
 
-              <div className="pt-1">
+              <div className="flex flex-wrap gap-3 pt-1">
                 <Button
                   onClick={handleExportSalesForm}
-                  disabled={exporting || !exportFrom || !exportTo}
+                  disabled={exporting || exportingV2 || !exportFrom || !exportTo}
+                  variant="outline"
                   data-testid="button-sp-export-sales-form"
                 >
                   {exporting ? (
-                    <>
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" /> Generating…
-                    </>
+                    <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Generating…</>
                   ) : (
-                    <>
-                      <FileSpreadsheet className="h-4 w-4 mr-2" /> Export Sales Form Excel
-                    </>
+                    <><FileSpreadsheet className="h-4 w-4 mr-2" /> Export Template Form</>
+                  )}
+                </Button>
+
+                <Button
+                  onClick={handleExportSalesFormV2}
+                  disabled={exporting || exportingV2 || !exportFrom || !exportTo}
+                  data-testid="button-sp-export-sales-form-v2"
+                >
+                  {exportingV2 ? (
+                    <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Generating…</>
+                  ) : (
+                    <><FileSpreadsheet className="h-4 w-4 mr-2" /> Export System Sales Form</>
                   )}
                 </Button>
               </div>
 
-              <p className="text-xs text-muted-foreground">
-                The exported file uses the same template as the supplier sales form — all 6 sheets (Costing, Sales,
-                ENTRY, Summary, Ageing, Summary-Itemwise) with formulas intact. Daily quantities and sale prices are
-                filled from your sales data for the selected date range.
-              </p>
+              <div className="space-y-1">
+                <p className="text-xs text-muted-foreground">
+                  <span className="font-medium text-foreground">Export Template Form</span> — fills the original
+                  supplier template with your data (18-day max, formula-based).
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  <span className="font-medium text-foreground">Export System Sales Form</span> — clean from-scratch
+                  workbook built from your live system data. Opening &amp; closing stock match the Location Inventory
+                  page. Supports any date range. 6 sheets: ENTRY, Summary, Ageing (visible) + Costing, Sales,
+                  Summary-Itemwise (hidden).
+                </p>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>

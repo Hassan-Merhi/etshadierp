@@ -2084,4 +2084,55 @@ export function registerSpRoutes(app: Express) {
       res.status(500).json({ message: error.message });
     }
   });
+
+  // ── V2: from-scratch ExcelJS export (matches system inventory) ────────────
+  app.get("/api/sp/sales-form/export-v2", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = await requireSpCompany(req, res);
+      if (!companyId) return;
+
+      const { fromDate, toDate, locationId } = req.query;
+
+      if (!fromDate || !toDate) {
+        return res.status(400).json({ message: "fromDate and toDate are required (YYYY-MM-DD)" });
+      }
+
+      const locId = locationId ? parseInt(locationId as string) : undefined;
+
+      let locationName = "";
+      let companyName  = "";
+      try {
+        if (locId) {
+          const r = await db.execute(sql`SELECT name FROM locations WHERE id = ${locId} LIMIT 1`);
+          locationName = (((r as any).rows ?? (r as any[]))[0]?.name) ?? "";
+        }
+      } catch {}
+      try {
+        const r = await db.execute(sql`SELECT name FROM companies WHERE id = ${companyId} LIMIT 1`);
+        companyName = (((r as any).rows ?? (r as any[]))[0]?.name) ?? "";
+      } catch {}
+
+      const buffer = await generateSpSalesFormExcelV2({
+        companyId,
+        locationId: locId,
+        fromDate:   fromDate as string,
+        toDate:     toDate   as string,
+        locationName,
+        supplierName: companyName,
+      });
+
+      const from     = (fromDate as string).slice(5).replace("-", "");
+      const to       = (toDate   as string).slice(5).replace("-", "");
+      const safeLoc  = locationName.replace(/[^a-zA-Z0-9 ]/g, "").trim();
+      const safeCo   = companyName.replace(/[^a-zA-Z0-9 ]/g, "").trim();
+      const filename = `${safeLoc} ${safeCo} system sales form ${from}-${to}.xlsx`.replace(/\s+/g, " ").trim();
+
+      res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+      res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+      res.send(buffer);
+    } catch (error: any) {
+      console.error("[/api/sp/sales-form/export-v2]", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
 }
