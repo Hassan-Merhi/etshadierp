@@ -260,7 +260,7 @@ export default function ContainerVerification() {
       try {
         const res = await fetch(
           `/api/suppliers/${sid}/containers/${containerId}/verification-summary?proformaId=${pid}`,
-          { credentials: "include" }
+          { credentials: "include", cache: "no-store" }
         );
         if (!res.ok) {
           const e = await res.json();
