@@ -176,6 +176,8 @@ async function fetchSalesData(
     JOIN  stock_items  sk ON sk.id = si.stock_item_id
     LEFT  JOIN stock_groups sg ON sg.id = sk.stock_group_id
     WHERE v.company_id   = ${companyId}
+      AND v.deleted_at   IS NULL
+      AND v.voucher_type = 'Sales'
       AND v.optional     = false
       AND v.voucher_date BETWEEN ${fromDate}::date AND ${toDate}::date
       ${locFilter}
