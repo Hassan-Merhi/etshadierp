@@ -9,10 +9,17 @@ import {
   Globe,
   Loader2,
   MapPin,
+  Receipt,
 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 
 const WINDOW_DAYS = 1;
@@ -107,35 +114,144 @@ function isToday(dateStr: string) {
   return dateStr === new Date().toISOString().substring(0, 10);
 }
 
+// ── Offload charges dialog ─────────────────────────────────────────────────────
+interface OffloadCharge { label: string; amount: number; accountName: string | null }
+interface OffloadChargesData {
+  containerNumber: string;
+  offloadedAt: string;
+  locationName: string | null;
+  charges: OffloadCharge[];
+  totalCharges: number;
+}
+
+function ContainerChargesDialog({
+  containerId,
+  open,
+  onClose,
+}: {
+  containerId: number | null;
+  open: boolean;
+  onClose: () => void;
+}) {
+  const { data, isLoading, isError } = useQuery<OffloadChargesData>({
+    queryKey: ["/api/containers", containerId, "offload-charges"],
+    queryFn: async () => {
+      const res = await fetch(`/api/containers/${containerId}/offload-charges`, {
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error(`${res.status}`);
+      return res.json();
+    },
+    enabled: open && containerId !== null,
+    staleTime: 60_000,
+  });
+
+  const fmt = (n: number) =>
+    n.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+
+  return (
+    <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
+      <DialogContent className="max-w-sm">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2 text-base">
+            <Receipt className="h-4 w-4 text-primary shrink-0" />
+            {data ? (
+              <span>
+                {data.containerNumber}
+                {data.locationName && (
+                  <span className="ml-2 text-xs font-normal text-muted-foreground">
+                    → {data.locationName}
+                  </span>
+                )}
+              </span>
+            ) : (
+              "Offload Charges"
+            )}
+          </DialogTitle>
+        </DialogHeader>
+
+        {isLoading ? (
+          <div className="flex items-center justify-center py-8">
+            <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+          </div>
+        ) : isError ? (
+          <p className="text-sm text-destructive text-center py-4">
+            Could not load offload charges.
+          </p>
+        ) : !data || data.charges.length === 0 ? (
+          <p className="text-sm text-muted-foreground text-center py-4">
+            No charges recorded for this offload.
+          </p>
+        ) : (
+          <div className="space-y-1">
+            {data.charges.map((c) => (
+              <div
+                key={c.label}
+                className="flex items-center justify-between py-2 px-3 rounded-md bg-muted/40"
+              >
+                <div>
+                  <p className="text-sm font-medium">{c.label}</p>
+                  {c.accountName && (
+                    <p className="text-xs text-muted-foreground mt-0.5">{c.accountName}</p>
+                  )}
+                </div>
+                <span className="text-sm font-semibold tabular-nums">${fmt(c.amount)}</span>
+              </div>
+            ))}
+            <div className="flex items-center justify-between pt-2 px-3 border-t mt-1">
+              <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                Total
+              </span>
+              <span className="text-sm font-bold tabular-nums">${fmt(data.totalCharges)}</span>
+            </div>
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 // ── Container tags shown inline under an offload cell ─────────────────────────
 function ContainerTags({ containers }: { containers: ContainerEntry[] }) {
+  const [selectedId, setSelectedId] = useState<number | null>(null);
+
   if (!containers || containers.length === 0) return null;
   return (
-    <div className="flex flex-col gap-0.5 mt-1 items-center">
-      {containers.map((c) => (
-        <div key={c.id} className="flex flex-col items-center gap-0">
-          <span
-            className="inline-flex items-center gap-1 text-[10px] bg-primary/10 text-primary rounded px-1.5 py-0.5 whitespace-nowrap"
-            data-testid={`tag-container-${c.id}`}
-          >
-            <Container className="h-2.5 w-2.5 shrink-0" />
-            <span className="font-mono font-medium">{c.containerNumber || "—"}</span>
-            {c.supplierCode && (
-              <>
-                <span className="text-primary/50">·</span>
-                <span className="truncate max-w-[100px]">{c.supplierCode}</span>
-              </>
+    <>
+      <div className="flex flex-col gap-0.5 mt-1 items-center">
+        {containers.map((c) => (
+          <div key={c.id} className="flex flex-col items-center gap-0">
+            <button
+              className="inline-flex items-center gap-1 text-[10px] bg-primary/10 text-primary rounded px-1.5 py-0.5 whitespace-nowrap hover:bg-primary/20 transition-colors cursor-pointer"
+              data-testid={`tag-container-${c.id}`}
+              onClick={() => setSelectedId(c.id)}
+              title="Click to view offload charges"
+            >
+              <Container className="h-2.5 w-2.5 shrink-0" />
+              <span className="font-mono font-medium">{c.containerNumber || "—"}</span>
+              {c.supplierCode && (
+                <>
+                  <span className="text-primary/50">·</span>
+                  <span className="truncate max-w-[100px]">{c.supplierCode}</span>
+                </>
+              )}
+            </button>
+            {c.locationName && (
+              <span className="inline-flex items-center gap-0.5 text-[10px] bg-muted text-muted-foreground rounded px-1.5 py-0.5 whitespace-nowrap mt-0.5">
+                <MapPin className="h-2.5 w-2.5 shrink-0" />
+                {c.locationName}
+              </span>
             )}
-          </span>
-          {c.locationName && (
-            <span className="inline-flex items-center gap-0.5 text-[10px] bg-muted text-muted-foreground rounded px-1.5 py-0.5 whitespace-nowrap mt-0.5">
-              <MapPin className="h-2.5 w-2.5 shrink-0" />
-              {c.locationName}
-            </span>
-          )}
-        </div>
-      ))}
-    </div>
+          </div>
+        ))}
+      </div>
+
+      <ContainerChargesDialog
+        containerId={selectedId}
+        open={selectedId !== null}
+        onClose={() => setSelectedId(null)}
+      />
+    </>
   );
 }
 
