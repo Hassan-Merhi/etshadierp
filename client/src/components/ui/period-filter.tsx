@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { CalendarIcon, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -123,6 +123,10 @@ export function PeriodFilter({
 }: PeriodFilterProps) {
   const { formatDisplayDate } = useDateFormat();
   const [calendarOpen, setCalendarOpen] = useState(false);
+  // Timestamp of the last time the calendar was opened programmatically.
+  // Used to suppress the stale "outside-click" event that Radix's DismissableLayer
+  // fires when the DropdownMenu finishes closing — even after our setTimeout.
+  const calendarOpenedAt = useRef<number>(0);
 
   const fromDateObj = value.fromDate ? new Date(value.fromDate + "T12:00:00") : undefined;
   const toDateObj = value.toDate ? new Date(value.toDate + "T12:00:00") : undefined;
@@ -132,10 +136,15 @@ export function PeriodFilter({
 
   const handlePresetChange = (preset: PeriodPreset) => {
     if (preset === "custom") {
-      // Delay opening until after the DropdownMenu has fully closed.
-      // Without the delay the dropdown's close event fires an outside-click on
-      // the Popover, which immediately calls onOpenChange(false) and kills it.
-      setTimeout(() => setCalendarOpen(true), 50);
+      // Wait for the DropdownMenu's DismissableLayer to finish its cleanup
+      // before opening the Popover. 50 ms was too short on production — the
+      // stale "outside-click" event from the dropdown close still arrived and
+      // immediately killed the calendar. 200 ms is sufficient; the ref guard
+      // below catches any stragglers that still slip through.
+      setTimeout(() => {
+        calendarOpenedAt.current = Date.now();
+        setCalendarOpen(true);
+      }, 200);
     } else {
       const dates = getPresetDates(preset);
       onChange({ ...dates, preset });
@@ -229,7 +238,19 @@ export function PeriodFilter({
         </DropdownMenu>
 
         {/* Calendar popover — non-modal, anchored to the trigger button above */}
-        <PopoverContent className="w-auto p-0" align="end" sideOffset={4}>
+        <PopoverContent
+          className="w-auto p-0"
+          align="end"
+          sideOffset={4}
+          onInteractOutside={(e) => {
+            // Eat stale outside-click events that arrive within 300 ms of the
+            // calendar opening (caused by the DropdownMenu's DismissableLayer
+            // finishing its cleanup and broadcasting a pointer-outside signal).
+            if (Date.now() - calendarOpenedAt.current < 300) {
+              e.preventDefault();
+            }
+          }}
+        >
           <div className="p-3 border-b">
             <p className="text-sm font-medium">Select date range</p>
             <p className="text-xs text-muted-foreground mt-0.5">Click a start date, then an end date</p>
