@@ -111,7 +111,7 @@ const right: Partial<ExcelJS.Alignment> = { horizontal: "right", vertical: "midd
 const leftAl: Partial<ExcelJS.Alignment> = { horizontal: "left", vertical: "middle" };
 const NUM = "#,##0.00";            // kept for Costing / Summary sheets
 const NUM4 = "#,##0.0000";         // kept for Costing / Summary sheets
-const QTY_FMT   = "#,##0.##";     // ENTRY — quantities, no forced .00
+const QTY_FMT   = "#,##0";        // ENTRY — quantities, whole units only
 const MONEY_FMT  = '"$"#,##0.00'; // ENTRY — monetary values with $ sign
 const MONEY4_FMT = '"$"#,##0.0000'; // ENTRY — high-precision monetary
 
@@ -495,7 +495,7 @@ async function buildEntrySheet(
       ws.getCell(r, 3).protection = { locked: true };
 
       // D: Opening Qty (locked, no dollar sign)
-      setCellNum(ws, r, 4, r2(item.openQty) || null, altFl ?? fill(OPEN_BLUE), QTY_FMT);
+      setCellNum(ws, r, 4, item.openQty ? Math.round(item.openQty) : null, altFl ?? fill(OPEN_BLUE), QTY_FMT);
       ws.getCell(r, 4).protection = { locked: true };
 
       // E: Cost/Bag (locked, dollar sign)
@@ -510,7 +510,7 @@ async function buildEntrySheet(
       for (let d = 0; d < dayCount; d++) {
         const b  = dayBase + d * COLS_PER_DAY;
         const ds = item.salesByDate.get(dates[d]);
-        const qtyVal    = ds && ds.qty > 0 ? r2(ds.qty)                                  : null;
+        const qtyVal    = ds && ds.qty > 0 ? Math.round(ds.qty)                            : null;
         const priceVal  = ds && ds.qty > 0 ? r4(ds.totalSales / ds.qty)                  : null;
         const profitVal = ds && ds.qty > 0 ? r4((ds.totalSales - ds.totalCost) / ds.qty) : null;
         const qL = colLetter(b), pL = colLetter(b + 1);
@@ -528,17 +528,17 @@ async function buildEntrySheet(
         pC.protection = { locked: false };
 
         // Profit/Bag — formula, locked, $ sign
-        // =IF(OR(QtyCell="",PriceCell=""),"",PriceCell-$E{r})  ← $E = Cost/Bag (col 5)
+        // =IF(OR(QtyCell="",PriceCell=""),0,PriceCell-$E{r})  ← returns 0 (not "") so SUMPRODUCT works
         const prC = ws.getCell(r, b + 2);
-        prC.value     = { formula: `IF(OR(${qL}${r}="",${pL}${r}=""),"",${pL}${r}-$E${r})`, result: profitVal ?? "" } as any;
+        prC.value     = { formula: `IF(OR(${qL}${r}="",${pL}${r}=""),0,${pL}${r}-$E${r})`, result: profitVal ?? 0 } as any;
         prC.numFmt    = MONEY4_FMT; prC.font = normSm;
         prC.alignment = right; prC.border = thin;
         prC.protection = { locked: true };
       }
 
-      // Closing Qty — formula =MAX(0, D{r} - SUM(qty refs))  ← D = Opening Qty (col 4)
+      // Closing Qty — formula =D{r}-SUM(qty refs)  ← D = Opening Qty (col 4); can go negative
       const cqC = ws.getCell(r, closeQtyCol);
-      cqC.value = { formula: `MAX(0,D${r}-SUM(${qtyCellRefs.join(",")}))`, result: r2(item.closeQty) || 0 } as any;
+      cqC.value = { formula: `D${r}-SUM(${qtyCellRefs.join(",")})`, result: Math.round(item.closeQty) } as any;
       cqC.numFmt = QTY_FMT; cqC.font = normSm; cqC.alignment = right; cqC.border = thin;
       cqC.fill = fill(CLOSE_GRN); cqC.protection = { locked: true };
 
@@ -549,11 +549,11 @@ async function buildEntrySheet(
       cvC.fill = fill(CLOSE_GRN); cvC.protection = { locked: true };
 
       // Avg Monthly — live formula so it recalculates when user types daily Qty
-      // =IF(dayCount=0, 0, SUM(all daily Qty cells) * 30 / dayCount)
+      // =ROUND(SUM(all daily Qty cells)*30/dayCount,0) → whole units, auto-recalcs
       const avgC = ws.getCell(r, closeQtyCol + 2);
       avgC.value = {
-        formula: `IF(${dayCount}=0,0,SUM(${qtyCellRefs.join(",")})*30/${dayCount})`,
-        result: r2(item.avgMonthlyQty) || 0,
+        formula: `ROUND(SUM(${qtyCellRefs.join(",")})*30/${dayCount},0)`,
+        result: Math.round(item.avgMonthlyQty),
       } as any;
       avgC.numFmt = QTY_FMT; avgC.font = normSm; avgC.alignment = right; avgC.border = thin;
       avgC.fill = fill(TOTALS_ORG); avgC.protection = { locked: true };
@@ -579,48 +579,46 @@ async function buildEntrySheet(
     const dL = colLetter(4);
     ws.getCell(stRow, 4).value = {
       formula: `SUM(${dL}${gb.firstRow}:${dL}${gb.lastRow})`,
-      result: r2(gb.items.reduce((s, i) => s + i.openQty, 0)),
+      result: Math.round(gb.items.reduce((s, i) => s + i.openQty, 0)),
     } as any;
     ws.getCell(stRow, 4).numFmt = QTY_FMT; ws.getCell(stRow, 4).alignment = right;
 
     // Per-day group totals:
     //   Qty   = SUM formula (live)
-    //   Sales = SUMPRODUCT(qty * price) — live formula so manual edits recalculate
-    //   Profit = SUMPRODUCT(qty * price) - SUMPRODUCT(qty * costBag)
-    //            where costBag is col E (col 5) for each item row in the group
+    //   Sales = SUMPRODUCT(qty, salePrice) — no IF(ISNUMBER); blank qty cells treated as 0 by Excel
+    //   Profit = SUMPRODUCT(qty, profitBag) — profitBag col returns 0 (not "") for no-sale days
     for (let d = 0; d < dayCount; d++) {
-      const b  = dayBase + d * COLS_PER_DAY;
-      const qL = colLetter(b), pL = colLetter(b + 1);
-      const qtyTot  = r2(gb.items.reduce((s, i) => s + (i.salesByDate.get(dates[d])?.qty        ?? 0), 0));
+      const b   = dayBase + d * COLS_PER_DAY;
+      const qL  = colLetter(b), pL = colLetter(b + 1), prL = colLetter(b + 2);
+      const qtyTot  = Math.round(gb.items.reduce((s, i) => s + (i.salesByDate.get(dates[d])?.qty        ?? 0), 0));
       const salTot  = r2(gb.items.reduce((s, i) => s + (i.salesByDate.get(dates[d])?.totalSales ?? 0), 0));
       const cstTot  = r2(gb.items.reduce((s, i) => s + (i.salesByDate.get(dates[d])?.totalCost  ?? 0), 0));
       const profTot = r2(salTot - cstTot);
 
-      // Qty — SUM formula
+      // Qty — SUM formula (whole units)
       ws.getCell(stRow, b).value = { formula: `SUM(${qL}${gb.firstRow}:${qL}${gb.lastRow})`, result: qtyTot } as any;
       ws.getCell(stRow, b).numFmt = QTY_FMT; ws.getCell(stRow, b).alignment = right;
 
-      // Sales — SUMPRODUCT(qty, price) handling blanks via IF(ISNUMBER)
+      // Total Sales — SUMPRODUCT(qtyRange, salePriceRange); blank cells = 0 in Excel
       ws.getCell(stRow, b + 1).value = {
-        formula: `SUMPRODUCT(IF(ISNUMBER(${qL}${gb.firstRow}:${qL}${gb.lastRow}),${qL}${gb.firstRow}:${qL}${gb.lastRow},0),IF(ISNUMBER(${pL}${gb.firstRow}:${pL}${gb.lastRow}),${pL}${gb.firstRow}:${pL}${gb.lastRow},0))`,
+        formula: `SUMPRODUCT(${qL}${gb.firstRow}:${qL}${gb.lastRow},${pL}${gb.firstRow}:${pL}${gb.lastRow})`,
         result: salTot || 0,
       } as any;
       ws.getCell(stRow, b + 1).numFmt = MONEY_FMT; ws.getCell(stRow, b + 1).alignment = right;
 
-      // Profit — SUMPRODUCT(qty, price) - SUMPRODUCT(qty, costBag)
-      // E${firstRow}:E${lastRow} = Cost/Bag column (col 5) for items in this group
+      // Total Profit — SUMPRODUCT(qtyRange, profitBagRange); profitBag returns 0 for no-sale days
       ws.getCell(stRow, b + 2).value = {
-        formula: `SUMPRODUCT(IF(ISNUMBER(${qL}${gb.firstRow}:${qL}${gb.lastRow}),${qL}${gb.firstRow}:${qL}${gb.lastRow},0),IF(ISNUMBER(${pL}${gb.firstRow}:${pL}${gb.lastRow}),${pL}${gb.firstRow}:${pL}${gb.lastRow},0))-SUMPRODUCT(IF(ISNUMBER(${qL}${gb.firstRow}:${qL}${gb.lastRow}),${qL}${gb.firstRow}:${qL}${gb.lastRow},0),E${gb.firstRow}:E${gb.lastRow})`,
+        formula: `SUMPRODUCT(${qL}${gb.firstRow}:${qL}${gb.lastRow},${prL}${gb.firstRow}:${prL}${gb.lastRow})`,
         result: profTot || 0,
       } as any;
       ws.getCell(stRow, b + 2).numFmt = MONEY_FMT; ws.getCell(stRow, b + 2).alignment = right;
     }
 
-    // Closing Qty/Value sums
+    // Closing Qty/Value sums (close qty can be negative — no clamping)
     const cqL = colLetter(closeQtyCol), cvL = colLetter(closeQtyCol + 1);
     ws.getCell(stRow, closeQtyCol).value = {
       formula: `SUM(${cqL}${gb.firstRow}:${cqL}${gb.lastRow})`,
-      result: r2(gb.items.reduce((s, i) => s + i.closeQty, 0)),
+      result: Math.round(gb.items.reduce((s, i) => s + i.closeQty, 0)),
     } as any;
     ws.getCell(stRow, closeQtyCol).numFmt = QTY_FMT; ws.getCell(stRow, closeQtyCol).alignment = right;
 
@@ -649,14 +647,14 @@ async function buildEntrySheet(
     // Opening Qty (col D = 4)
     ws.getCell(totalRowNum, 4).value = {
       formula: `SUM(${stNumRefs(4)})`,
-      result: r2(items.reduce((s, i) => s + i.openQty, 0)),
+      result: Math.round(items.reduce((s, i) => s + i.openQty, 0)),
     } as any;
     ws.getCell(totalRowNum, 4).numFmt = QTY_FMT; ws.getCell(totalRowNum, 4).font = { ...boldSm, color: { argb: WHITE } };
 
     // Per-day grand totals (SUM of category subtotal rows so they cascade from live formulas)
     for (let d = 0; d < dayCount; d++) {
       const b = dayBase + d * COLS_PER_DAY;
-      const qtyTot  = r2(items.reduce((s, i) => s + (i.salesByDate.get(dates[d])?.qty        ?? 0), 0));
+      const qtyTot  = Math.round(items.reduce((s, i) => s + (i.salesByDate.get(dates[d])?.qty        ?? 0), 0));
       const salTot  = r2(items.reduce((s, i) => s + (i.salesByDate.get(dates[d])?.totalSales ?? 0), 0));
       const profTot = r2(items.reduce((s, i) => {
         const ds = i.salesByDate.get(dates[d]);
@@ -673,8 +671,8 @@ async function buildEntrySheet(
       ws.getCell(totalRowNum, b + 2).numFmt = MONEY_FMT; ws.getCell(totalRowNum, b + 2).font = { ...boldSm, color: { argb: WHITE } };
     }
 
-    // Closing totals
-    ws.getCell(totalRowNum, closeQtyCol).value = { formula: `SUM(${stNumRefs(closeQtyCol)})`, result: r2(items.reduce((s, i) => s + i.closeQty, 0)) } as any;
+    // Closing totals (can be negative — no clamping)
+    ws.getCell(totalRowNum, closeQtyCol).value = { formula: `SUM(${stNumRefs(closeQtyCol)})`, result: Math.round(items.reduce((s, i) => s + i.closeQty, 0)) } as any;
     ws.getCell(totalRowNum, closeQtyCol).numFmt = QTY_FMT; ws.getCell(totalRowNum, closeQtyCol).font = { ...boldSm, color: { argb: WHITE } };
 
     ws.getCell(totalRowNum, closeQtyCol + 1).value = { formula: `SUM(${stNumRefs(closeQtyCol + 1)})`, result: r2(items.reduce((s, i) => s + i.closeValue, 0)) } as any;
@@ -1051,6 +1049,8 @@ export async function generateSpSalesFormExcelV2(params: SpSalesFormV2Params): P
   wb.creator  = "System SP Export V2";
   wb.created  = new Date();
   wb.modified = new Date();
+  // Force full recalculation when Excel opens the file
+  (wb as any).calcProperties = { fullCalcOnLoad: true };
 
   buildCostingSheet(wb, items);                                    // 1. Costing — hidden
   buildSalesSheet(wb, items, dates);                               // 2. Sales — hidden

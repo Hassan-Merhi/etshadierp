@@ -331,14 +331,16 @@ describe("V2 Export — Closing stock (Jul 7)", () => {
     expect(expectedCloseQtyItem1).toBeGreaterThan(0);
   });
 
-  it("ENTRY closing qty cell is a formula MAX(0, E-SUM(...))", () => {
+  it("ENTRY closing qty cell is a formula D-SUM(...) WITHOUT MAX (can go negative)", () => {
     const ws  = wb.getWorksheet("ENTRY")!;
     const row = findItemRow(ws, "Test Item 1");
     expect(row, "Test Item 1 row not found").not.toBeNull();
     const formula = cellFormula(ws, row!, CLOSE_QTY_COL);
     expect(formula, "Close Qty should be a formula").not.toBeNull();
-    expect(formula!.toUpperCase()).toContain("MAX(0,D");
+    expect(formula!.toUpperCase()).not.toContain("MAX");
     expect(formula!.toUpperCase()).toContain("SUM(");
+    // Formula must start with the opening qty cell reference (D column)
+    expect(formula!.toUpperCase()).toMatch(/^D\d+-SUM\(/);
   });
 
   it("ENTRY closing qty formula result matches calculateHistoricalLocationInventory(Jul 7)", () => {
@@ -453,12 +455,40 @@ describe("V2 Export — Group subtotal rows", () => {
     expect(formula!.toUpperCase()).toContain("SUMPRODUCT(");
   });
 
+  it("Subtotal Sales formula does NOT use IF(ISNUMBER) — uses plain SUMPRODUCT", () => {
+    const ws       = wb.getWorksheet("ENTRY")!;
+    const salesCol = E_DATE_START + 2 * COLS_PER_DAY + 1;
+    const formula  = cellFormula(ws, E_SUBTOTAL_ROW, salesCol);
+    expect(formula!.toUpperCase()).not.toContain("ISNUMBER");
+  });
+
   it("Subtotal Profit column is a live SUMPRODUCT formula (not a cached value)", () => {
     const ws        = wb.getWorksheet("ENTRY")!;
     const profitCol = E_DATE_START + 2 * COLS_PER_DAY + 2;
     const formula   = cellFormula(ws, E_SUBTOTAL_ROW, profitCol);
     expect(formula, "Subtotal Profit should be a SUMPRODUCT formula").not.toBeNull();
     expect(formula!.toUpperCase()).toContain("SUMPRODUCT(");
+  });
+
+  it("Subtotal Profit formula does NOT use IF(ISNUMBER) — uses plain SUMPRODUCT", () => {
+    const ws        = wb.getWorksheet("ENTRY")!;
+    const profitCol = E_DATE_START + 2 * COLS_PER_DAY + 2;
+    const formula   = cellFormula(ws, E_SUBTOTAL_ROW, profitCol);
+    expect(formula!.toUpperCase()).not.toContain("ISNUMBER");
+  });
+
+  it("Subtotal Sale Price column (Total Sales) is money formatted", () => {
+    const ws       = wb.getWorksheet("ENTRY")!;
+    const salesCol = E_DATE_START + 2 * COLS_PER_DAY + 1;
+    const fmt      = ws.getRow(E_SUBTOTAL_ROW).getCell(salesCol).numFmt ?? "";
+    expect(fmt).toMatch(/\$/);
+  });
+
+  it("Subtotal Profit/Bag column (Total Profit) is money formatted", () => {
+    const ws        = wb.getWorksheet("ENTRY")!;
+    const profitCol = E_DATE_START + 2 * COLS_PER_DAY + 2;
+    const fmt       = ws.getRow(E_SUBTOTAL_ROW).getCell(profitCol).numFmt ?? "";
+    expect(fmt).toMatch(/\$/);
   });
 });
 
@@ -748,13 +778,15 @@ describe("V2 Export — Cell protection", () => {
 
 // ── 17. Number formats ────────────────────────────────────────────────────────
 describe("V2 Export — Number formats", () => {
-  it("ENTRY Qty cell format does not force .00 (uses #,##0.## or similar)", () => {
+  it("ENTRY Qty cell format is #,##0 (whole units — no decimals)", () => {
     const ws     = wb.getWorksheet("ENTRY")!;
     const row    = findItemRow(ws, "Test Item 1")!;
     const qtyCol = E_DATE_START + 2 * COLS_PER_DAY; // Jul 3 — has a value
     const fmt    = ws.getRow(row).getCell(qtyCol).numFmt ?? "";
-    // Should not be the ".00" forced-decimal format
+    // Must be the whole-unit format with no decimal places
+    expect(fmt).toBe("#,##0");
     expect(fmt).not.toBe("#,##0.00");
+    expect(fmt).not.toBe("#,##0.##");
     expect(fmt).not.toBe("0.00");
   });
 
@@ -850,6 +882,14 @@ describe("V2 Export — Avg/Mo Sales formula", () => {
     expect(row, "Test Item 1 not found").not.toBeNull();
     const formula = cellFormula(ws, row!, AVG_MO_COL);
     expect(formula!.toUpperCase()).toContain("SUM(");
+  });
+
+  it("ENTRY Avg/Mo Sales formula uses ROUND(...,0) for whole-unit result", () => {
+    const ws  = wb.getWorksheet("ENTRY")!;
+    const row = findItemRow(ws, "Test Item 1");
+    expect(row, "Test Item 1 not found").not.toBeNull();
+    const formula = cellFormula(ws, row!, AVG_MO_COL);
+    expect(formula!.toUpperCase()).toMatch(/^ROUND\(/);
   });
 
   it("ENTRY Avg/Mo Sales formula result matches expected monthly average", () => {
