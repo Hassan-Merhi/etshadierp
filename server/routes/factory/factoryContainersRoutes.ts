@@ -229,7 +229,16 @@ export function registerFactoryContainersRoutes(app: Express) {
         })
         .from(factoryContainers)
         .leftJoin(factorySuppliers, eq(factoryContainers.supplierId, factorySuppliers.id))
-        .where(and(eq(factoryContainers.companyId, companyId), isNull(factoryContainers.deletedAt)))
+        .where(
+          and(
+            eq(factoryContainers.companyId, companyId),
+            isNull(factoryContainers.deletedAt),
+            // activeOnly=true: restrict to OTW statuses (excludes PARTIALLY_RECEIVED, OFFLOADED, RECEIVED)
+            req.query.activeOnly === "true"
+              ? sql`${factoryContainers.status} IN ('PENDING', 'IN_TRANSIT', 'ARRIVED')`
+              : undefined
+          )
+        )
         .orderBy(desc(factoryContainers.createdAt));
 
       res.json(results);

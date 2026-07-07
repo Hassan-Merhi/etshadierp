@@ -594,8 +594,15 @@ export default function FactoryOtwTrackingTab({ onEdit }: OtwTrackingTabProps = 
   const [notes, setNotes] = useState<Record<string, string>>(() => loadMap<string>(NOTES_KEY));
   const [docs, setDocs] = useState<Record<string, boolean>>(() => loadMap<boolean>(DOCS_KEY));
 
+  // Use activeOnly=true so the backend pre-filters to PENDING/IN_TRANSIT/ARRIVED.
+  // The queryKey uses the base path so existing invalidations (prefix-match) still work.
   const { data: containers, isLoading } = useQuery<ContainerWithSupplier[]>({
-    queryKey: ["/api/factory/containers"],
+    queryKey: ["/api/factory/containers", "otw"],
+    queryFn: async () => {
+      const res = await fetch("/api/factory/containers?activeOnly=true", { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch containers");
+      return res.json();
+    },
   });
 
   const otwContainers = (containers || []).filter((c) => STATUS_ACTIVE.has(c.status));
