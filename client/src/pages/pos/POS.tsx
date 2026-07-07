@@ -1,5 +1,4 @@
 import { useState, useRef, useEffect, useMemo } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation as useLocationContext } from "@/contexts/LocationContext";
 import { useCompany } from "@/contexts/CompanyContext";
 import { useLocation } from "wouter";
@@ -29,58 +28,10 @@ import { POSDialogs } from "./pos-components/POSDialogs";
 import { POSHeader } from "./pos-components/POSHeader";
 import type { SaleRow, InventoryItem, APIInventoryItem, Location } from "./pos-components/posTypes";
 
-// Server-side invoice PDF send with retry
-async function sendInvoicePdfWithRetry(
-  voucherId: number,
-  locationId: number,
-  opts: { maxAttempts?: number; delayMs?: number; onAttempt?: (n: number) => void } = {}
-): Promise<{ ok: true } | { ok: false; message: string }> {
-  const maxAttempts = opts.maxAttempts ?? 3;
-  const delayMs = opts.delayMs ?? 2000;
-  let lastMessage = "WhatsApp send failed";
-  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-    opts.onAttempt?.(attempt);
-    try {
-      const res = await apiRequest("POST", "/api/pos/send-invoice-pdf-backend", { voucherId, locationId });
-      const body = await res.json().catch(() => ({}));
-      if (res.ok) return { ok: true };
-      lastMessage = body.message || `WhatsApp send failed (HTTP ${res.status})`;
-      if (res.status >= 400 && res.status < 500 && res.status !== 408 && res.status !== 429) {
-        return { ok: false, message: lastMessage };
-      }
-    } catch (e: any) {
-      lastMessage = e?.message || "Network error";
-    }
-    if (attempt < maxAttempts) await new Promise((r) => setTimeout(r, delayMs * attempt));
-  }
-  return { ok: false, message: lastMessage };
-}
-
-// Server-side stock PDF send with retry
-async function sendStockPdfWithRetry(
-  locationId: number,
-  opts: { maxAttempts?: number; delayMs?: number; onAttempt?: (n: number) => void } = {}
-): Promise<{ ok: true } | { ok: false; message: string }> {
-  const maxAttempts = opts.maxAttempts ?? 3;
-  const delayMs = opts.delayMs ?? 2000;
-  let lastMessage = "WhatsApp send failed";
-  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-    opts.onAttempt?.(attempt);
-    try {
-      const res = await apiRequest("POST", "/api/pos/send-stock-pdf-backend", { locationId });
-      const body = await res.json().catch(() => ({}));
-      if (res.ok) return { ok: true };
-      lastMessage = body.message || `WhatsApp send failed (HTTP ${res.status})`;
-      if (res.status >= 400 && res.status < 500 && res.status !== 408 && res.status !== 429) {
-        return { ok: false, message: lastMessage };
-      }
-    } catch (e: any) {
-      lastMessage = e?.message || "Network error";
-    }
-    if (attempt < maxAttempts) await new Promise((r) => setTimeout(r, delayMs * attempt));
-  }
-  return { ok: false, message: lastMessage };
-}
+import { usePosQueries } from "./hooks/usePosQueries";
+import { usePosWhatsApp } from "./hooks/usePosWhatsApp";
+import { usePosMutations } from "./hooks/usePosMutations";
+import { usePosAutosave } from "./hooks/usePosAutosave";
 
 export default function POS({ posUser, editVoucherId }: { posUser?: any; editVoucherId?: string } = {}) {
   const { selectedLocation, setSelectedLocation } = useLocationContext();
@@ -145,104 +96,38 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
   const [mobileTab, setMobileTab] = useState<"items" | "cart">("items");
   const mobileSearchInputRef = useRef<HTMLInputElement>(null);
 
-  const { data: posAssignedLocations = [], isLoading: posLocationsLoading } = useQuery<Location[]>({
-    queryKey: posUser ? ["/api/my-locations"] : [],
-    enabled: !!posUser,
-  });
-
-  const { data: allLocations = [] } = useQuery<Location[]>({
-    queryKey: ["/api/locations"],
-    enabled: !posUser,
-  });
-
-  const { data: companySettings } = useQuery<any>({
-    queryKey: ["/api/company-settings"],
-    enabled: !!posUser,
-  });
-
   const activeLocation = posUser ? posSelectedLocation : selectedLocation;
 
   const {
-    data: apiInventory = [],
-    isLoading: inventoryLoading,
-    error: inventoryError,
-  } = useQuery<APIInventoryItem[]>({
-    queryKey: activeLocation ? [`/api/locations/${activeLocation.id}/inventory`] : [],
-    enabled: !!activeLocation,
-  });
-
-  const inventory = useMemo(
-    () =>
-      (Array.isArray(apiInventory) ? apiInventory : []).map((item) => ({
-        code: (item.stockItemCode || "").trim(),
-        name: (item.stockItemName || "Unknown Item").trim(),
-        stock: parseFloat(item.quantity),
-        price: parseFloat(item.lastSellingPrice || item.averageRate),
-        configuredPrice: parseFloat(item.lastSellingPrice || "0"),
-        stockItemId: item.stockItemId,
-      })),
-    [apiInventory]
-  );
-
-  const { data: bankAccounts = [] } = useQuery<any[]>({
-    queryKey: ["/api/bank-accounts"],
-    enabled: !!activeLocation,
-  });
-
-  const { data: allLedgerAccounts = [] } = useQuery<any[]>({
-    queryKey: ["/api/ledger-accounts"],
-    enabled: !!activeLocation,
-  });
-
-  const cashLedgerAccounts = useMemo(
-    () => (Array.isArray(allLedgerAccounts) ? allLedgerAccounts : []).filter((acc: any) => acc.accountType === "Cash"),
-    [allLedgerAccounts]
-  );
-  const customerAccounts = useMemo(
-    () => (Array.isArray(allLedgerAccounts) ? allLedgerAccounts : []).filter((acc: any) => acc.accountType === "Asset"),
-    [allLedgerAccounts]
-  );
-
-  const { data: drafts = [], refetch: refetchDrafts } = useQuery<any[]>({
-    queryKey: activeLocation ? [`/api/pos/drafts?locationId=${activeLocation.id}`] : [],
-    enabled: !!activeLocation,
-  });
-
-  const { data: currentShift } = useQuery<any>({
-    queryKey: posUser && activeLocation ? ["/api/pos/shifts/current", { locationId: activeLocation.id }] : [],
-    enabled: !!posUser && !!activeLocation,
-    refetchInterval: 60_000,
-  });
-
-  const { data: authUser } = useQuery<any>({ queryKey: ["/api/auth/me"] });
-
-  const { data: lastSoldPrices = {} } = useQuery<Record<number, string>>({
-    queryKey: activeLocation ? [`/api/pos/last-sold-prices`, { locationId: activeLocation.id }] : [],
-    queryFn: async () => {
-      if (!activeLocation) return {};
-      const res = await fetch(`/api/pos/last-sold-prices?locationId=${activeLocation.id}`, { credentials: "include" });
-      if (!res.ok) return {};
-      return res.json();
-    },
-    enabled: !!activeLocation,
-    staleTime: 60_000,
-  });
-
-  const { data: posCustomers = [] } = useQuery<any[]>({
-    queryKey: ["/api/pos/customers"],
-    enabled: isCreditSale,
-  });
-
-  const { data: editVoucher, isLoading: editVoucherLoading } = useQuery<any>({
-    queryKey: editVoucherId ? [`/api/vouchers/${editVoucherId}`] : [],
-    enabled: !!editVoucherId,
-  });
-
-  // Stock inventory — prefetch when invoice or stock dialog is open
-  const printLocationId = activeLocation?.id ?? (editVoucher as any)?.locationId ?? null;
-  const { data: stockInventory = [], isLoading: stockInventoryLoading } = useQuery<any[]>({
-    queryKey: printLocationId ? [`/api/locations/${printLocationId}/inventory`] : [],
-    enabled: (showPrintDialog || showStockPrompt) && !!printLocationId,
+    posAssignedLocations,
+    posLocationsLoading,
+    allLocations,
+    companySettings,
+    apiInventory,
+    inventoryLoading,
+    inventoryError,
+    inventory,
+    bankAccounts,
+    allLedgerAccounts,
+    cashLedgerAccounts,
+    customerAccounts,
+    drafts,
+    refetchDrafts,
+    currentShift,
+    authUser,
+    lastSoldPrices,
+    posCustomers,
+    editVoucher,
+    editVoucherLoading,
+    stockInventory,
+    stockInventoryLoading,
+  } = usePosQueries({
+    posUser,
+    activeLocation,
+    isCreditSale,
+    editVoucherId,
+    showPrintDialog,
+    showStockPrompt,
   });
 
   const activeCurrency: Currency = displayCurrency ? selectedCurrency : "USD";
@@ -359,253 +244,60 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
     }
   }, [editVoucher, allLedgerAccounts]);
 
-  // Deferred WhatsApp invoice auto-send after sale saved
-  useEffect(() => {
-    if (!pendingAutoSend) return;
-    const data = pendingAutoSend;
-    setPendingAutoSend(null);
-    const doSend = async () => {
-      setSendingInvoiceWhatsApp(true);
-      setInvoiceWaStatus("sending");
-      try {
-        const result = await sendInvoicePdfWithRetry(data.voucherId, data.locationId, {
-          onAttempt: (n) => {
-            if (n > 1) toast({ title: "Retrying…", description: `WhatsApp invoice send attempt ${n}/3.` });
-          },
-        });
-        if (!result.ok) {
-          setInvoiceWaStatus("failed");
-          toast({ title: "WhatsApp", description: result.message, variant: "destructive" });
-        } else {
-          setInvoiceWaStatus("sent");
-        }
-      } catch (e: any) {
-        setInvoiceWaStatus("failed");
-        toast({ title: "WhatsApp", description: e.message || "Could not send invoice.", variant: "destructive" });
-      } finally {
-        setSendingInvoiceWhatsApp(false);
-      }
-    };
-    doSend();
-  }, [pendingAutoSend]);
-
-  // Deferred WhatsApp stock auto-send after sale saved
-  useEffect(() => {
-    if (!pendingStockSend || !activeLocation?.id) return;
-    setPendingStockSend(false);
-    setStockWaStatus("sending");
-    const doSend = async () => {
-      try {
-        const result = await sendStockPdfWithRetry(activeLocation.id, {
-          onAttempt: (n) => {
-            if (n > 1) toast({ title: "Retrying…", description: `WhatsApp stock send attempt ${n}/3.` });
-          },
-        });
-        if (!result.ok) throw new Error(result.message);
-        setStockWaStatus("sent");
-        toast({ title: "Stock sent", description: "Stock report sent to WhatsApp group." });
-      } catch (e: any) {
-        setStockWaStatus("failed");
-        toast({
-          title: "Stock send failed",
-          description: e.message || "Could not send stock report.",
-          variant: "destructive",
-        });
-      }
-    };
-    doSend();
-  }, [pendingStockSend]);
+  const { handleSendInvoiceWhatsApp, handleSendWhatsAppReport } = usePosWhatsApp({
+    pendingAutoSend,
+    setPendingAutoSend,
+    pendingStockSend,
+    setPendingStockSend,
+    activeLocation,
+    savedSale,
+    setInvoiceWaStatus,
+    setStockWaStatus,
+    setSendingInvoiceWhatsApp,
+    setSendingWhatsApp,
+    toast,
+  });
 
   const total = useMemo(() => rows.reduce((sum, row) => sum + (row.amount || 0), 0), [rows]);
   const totalQty = useMemo(() => rows.reduce((sum, row) => sum + (row.quantity || 0), 0), [rows]);
   const hasValidItems = useMemo(() => rows.some((row) => row.stockItemId && row.quantity > 0), [rows]);
 
-  // ISSUE 1 + 2: Fixed endpoints and payload
-  const saveMutation = useMutation({
-    mutationFn: async (saleData: any) => {
-      if (editVoucherId) {
-        const updateData = {
-          description: saleData.notes,
-          locationId: saleData.locationId,
-          paymentAccountType: saleData.paymentAccountType,
-          paymentAccountId: saleData.paymentAccountId,
-          isCreditSale: saleData.isCreditSale,
-          voucherDate: saleData.voucherDate,
-          currency: saleData.currency,
-          items: saleData.items.map((item: any) => ({
-            id: item.salesItemId,
-            stockItemId: item.stockItemId,
-            quantity: String(item.quantity),
-            sellingPrice: String(item.rate),
-          })),
-        };
-        const res = await apiRequest("PUT", `/api/vouchers/${editVoucherId}/sales`, updateData);
-        return res.json();
-      } else {
-        const res = await apiRequest("POST", "/api/pos/sales", saleData);
-        return res.json();
-      }
-    },
-    onSuccess: async (data: any) => {
-      clientSaleIdRef.current = crypto.randomUUID();
-      setSavedSale(data);
-      if (!editVoucherId) setSaleJustCompleted(true);
-
-      const locationId = activeLocation?.id || data.location?.id || (editVoucher as any)?.locationId;
-      if (locationId) queryClient.invalidateQueries({ queryKey: [`/api/locations/${locationId}/inventory`] });
-      queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] });
-      if (editVoucherId) queryClient.invalidateQueries({ queryKey: [`/api/vouchers/${editVoucherId}`] });
-      invalidateCustomerBalances(data?.voucher?.customerId ?? undefined);
-
-      toast({
-        title: editVoucherId ? "Sale Updated" : "Sale Saved",
-        description: `Sale ${data.voucher?.voucherNumber} has been ${editVoucherId ? "updated" : "saved"} successfully.`,
-      });
-      setShowPrintDialog(true);
-
-      if (!editVoucherId) {
-        const waGroupId = (activeLocation as any)?.whatsappGroupChatId || (data.location as any)?.whatsappGroupChatId;
-        if (waGroupId && data.voucher?.id) {
-          setPendingAutoSend({ voucherId: data.voucher.id, locationId: activeLocation?.id || data.location?.id });
-          setStockWaStatus("sending");
-          setTimeout(() => setPendingStockSend(true), 3000);
-        } else {
-          setStockWaStatus("not_configured");
-        }
-      }
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Error",
-        description: error.message || `Failed to ${editVoucherId ? "update" : "save"} sale`,
-        variant: "destructive",
-      });
-    },
-  });
-
-  const deleteDraftMutation = useMutation({
-    mutationFn: async (id: number) => apiRequest("DELETE", `/api/pos/drafts/${id}`),
-    onSuccess: () => {
-      toast({ title: "Draft Deleted", description: "Draft has been deleted successfully" });
-      refetchDrafts();
-    },
-  });
-
-  // Save draft mutation
-  const saveDraftMutation = useMutation({
-    mutationFn: async () => {
-      if (!activeLocation) throw new Error("No location selected");
-      const validItems = rows.filter((r) => r.stockItemId && r.quantity > 0 && r.rate > 0);
-      if (validItems.length === 0) throw new Error("No items to save");
-      const draftData = {
-        locationId: activeLocation.id,
-        paymentAccountType: isCreditSale ? "credit" : paymentAccountType,
-        paymentAccountId: isCreditSale
-          ? selectedCustomerId
-            ? parseInt(selectedCustomerId)
-            : null
-          : paymentAccountId
-            ? parseInt(paymentAccountId)
-            : null,
-        isCreditSale,
-        notes,
-        items: validItems.map((row) => ({
-          stockItemId: row.stockItemId,
-          quantity: row.quantity.toString(),
-          rate: row.rate.toString(),
-          amount: row.amount.toString(),
-        })),
-      };
-      if (currentDraftId) {
-        const res = await apiRequest("PATCH", `/api/pos/drafts/${currentDraftId}`, draftData);
-        return res.json();
-      } else {
-        const res = await apiRequest("POST", "/api/pos/drafts", draftData);
-        return res.json();
-      }
-    },
-    onSuccess: (data: any) => {
-      setCurrentDraftId(data.id);
-      setLastAutosaved(new Date());
-      const validItems = rows.filter((r) => r.stockItemId && r.quantity > 0 && r.rate > 0);
-      lastSavedFingerprintRef.current = JSON.stringify({
-        items: validItems.map((r) => ({ id: r.stockItemId, qty: r.quantity, rate: r.rate })),
-        notes,
-        isCreditSale,
-        paymentAccountType,
-        paymentAccountId,
-        selectedCustomerId,
-      });
-      toast({ title: "Draft Saved", description: "Your transaction has been saved as a draft" });
-      refetchDrafts();
-    },
-    onError: (error: any) => {
-      if (error?._handledGlobally) return;
-      toast({ title: "Error", description: error.message || "Failed to save draft", variant: "destructive" });
-    },
+  const { saveMutation, deleteDraftMutation, saveDraftMutation } = usePosMutations({
+    activeLocation,
+    editVoucherId,
+    editVoucher,
+    clientSaleIdRef,
+    rows,
+    isCreditSale,
+    paymentAccountType,
+    paymentAccountId,
+    selectedCustomerId,
+    currentDraftId,
+    notes,
+    lastSavedFingerprintRef,
+    setSavedSale,
+    setSaleJustCompleted,
+    setShowPrintDialog,
+    setCurrentDraftId,
+    setLastAutosaved,
+    setPendingAutoSend,
+    setPendingStockSend,
+    setStockWaStatus,
+    toast,
+    refetchDrafts,
   });
 
   // Keep saveDraftIsPending in sync
   autoSaveStateRef.current.saveDraftIsPending = saveDraftMutation.isPending;
 
-  // Autosave every 7 seconds
-  useEffect(() => {
-    const interval = setInterval(async () => {
-      const s = autoSaveStateRef.current;
-      if (!s.activeLocation) return;
-      if (autoSaveInProgressRef.current || s.saveDraftIsPending) return;
-      const validItems = s.rows.filter((r: any) => r.stockItemId && r.quantity > 0 && r.rate > 0);
-      if (validItems.length === 0) return;
-      const fingerprint = JSON.stringify({
-        items: validItems.map((r: any) => ({ id: r.stockItemId, qty: r.quantity, rate: r.rate })),
-        notes: s.notes,
-        isCreditSale: s.isCreditSale,
-        paymentAccountType: s.paymentAccountType,
-        paymentAccountId: s.paymentAccountId,
-        selectedCustomerId: s.selectedCustomerId,
-      });
-      if (fingerprint === lastSavedFingerprintRef.current) return;
-      autoSaveInProgressRef.current = true;
-      try {
-        const draftData = {
-          locationId: s.activeLocation.id,
-          paymentAccountType: s.isCreditSale ? "credit" : s.paymentAccountType,
-          paymentAccountId: s.isCreditSale
-            ? s.selectedCustomerId
-              ? parseInt(s.selectedCustomerId)
-              : null
-            : s.paymentAccountId
-              ? parseInt(s.paymentAccountId)
-              : null,
-          isCreditSale: s.isCreditSale,
-          notes: s.notes,
-          items: validItems.map((row: any) => ({
-            stockItemId: row.stockItemId,
-            quantity: row.quantity.toString(),
-            rate: row.rate.toString(),
-            amount: row.amount.toString(),
-          })),
-        };
-        let data;
-        if (s.currentDraftId) {
-          const res = await apiRequest("PATCH", `/api/pos/drafts/${s.currentDraftId}`, draftData);
-          data = await res.json();
-        } else {
-          const res = await apiRequest("POST", "/api/pos/drafts", draftData);
-          data = await res.json();
-        }
-        if (data?.id) setCurrentDraftId(data.id);
-        lastSavedFingerprintRef.current = fingerprint;
-        setLastAutosaved(new Date());
-        refetchDrafts();
-      } catch {
-        // Silent autosave failures
-      } finally {
-        autoSaveInProgressRef.current = false;
-      }
-    }, 3000);
-    return () => clearInterval(interval);
-  }, []); // Empty deps — reads from autoSaveStateRef
+  usePosAutosave({
+    autoSaveStateRef,
+    autoSaveInProgressRef,
+    lastSavedFingerprintRef,
+    setCurrentDraftId,
+    setLastAutosaved,
+    refetchDrafts,
+  });
 
   // ISSUE 3: Full payload with shiftId, clientSaleId, currency, exchangeRate, correct rate conversion
   const handleSaveSale = () => {
@@ -753,62 +445,6 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
     contentRef: stockPrintRef,
     documentTitle: `STK_${(activeLocation?.name || "Location").replace(/\s+/g, "_")}_${new Date().toLocaleDateString("en-CA")}`,
   });
-
-  // ISSUE 5: Real stock WhatsApp send
-  const handleSendWhatsAppReport = async () => {
-    if (!activeLocation?.id) {
-      toast({ title: "No location", description: "No active location selected.", variant: "destructive" });
-      return;
-    }
-    setSendingWhatsApp(true);
-    setStockWaStatus("sending");
-    try {
-      const result = await sendStockPdfWithRetry(activeLocation.id, {
-        onAttempt: (n) => {
-          if (n > 1) toast({ title: "Retrying…", description: `WhatsApp stock send attempt ${n}/3.` });
-        },
-      });
-      if (!result.ok) throw new Error(result.message);
-      setStockWaStatus("sent");
-      toast({ title: "Sent", description: "Stock report sent to WhatsApp group." });
-    } catch (e: any) {
-      setStockWaStatus("failed");
-      toast({ title: "Failed to send", description: e.message || "WhatsApp send failed.", variant: "destructive" });
-    } finally {
-      setSendingWhatsApp(false);
-    }
-  };
-
-  // ISSUE 4: Real invoice WhatsApp send
-  const handleSendInvoiceWhatsApp = async () => {
-    const vId = savedSale?.voucher?.id;
-    const locId = activeLocation?.id;
-    if (!vId || !locId) {
-      toast({ title: "Not ready", description: "No saved invoice to send.", variant: "destructive" });
-      return;
-    }
-    setSendingInvoiceWhatsApp(true);
-    setInvoiceWaStatus("sending");
-    try {
-      const result = await sendInvoicePdfWithRetry(vId, locId, {
-        onAttempt: (n) => {
-          if (n > 1) toast({ title: "Retrying…", description: `WhatsApp invoice send attempt ${n}/3.` });
-        },
-      });
-      if (!result.ok) {
-        setInvoiceWaStatus("failed");
-        toast({ title: "Failed to send", description: result.message, variant: "destructive" });
-      } else {
-        setInvoiceWaStatus("sent");
-        toast({ title: "Sent", description: "Invoice sent to WhatsApp group." });
-      }
-    } catch (e: any) {
-      setInvoiceWaStatus("failed");
-      toast({ title: "Error", description: e.message || "Could not reach the server.", variant: "destructive" });
-    } finally {
-      setSendingInvoiceWhatsApp(false);
-    }
-  };
 
   // ISSUE 7: Real draft loading
   const handleLoadDraft = async (draftId: number) => {
