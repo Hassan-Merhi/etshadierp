@@ -136,12 +136,12 @@ describe("Keyboard navigation infrastructure is intact", () => {
     );
   });
 
-  it("App.tsx — isEditableTarget guard function is present (prevents scroll hijack)", () => {
-    expect(src("client/src/App.tsx")).toContain("isEditableTarget");
+  it("useGlobalScrollKeys.ts — isEditableTarget guard function is present (prevents scroll hijack)", () => {
+    expect(src("client/src/app/useGlobalScrollKeys.ts")).toContain("isEditableTarget");
   });
 
-  it("App.tsx — getBestScrollTarget helper present", () => {
-    expect(src("client/src/App.tsx")).toContain("getBestScrollTarget");
+  it("useGlobalScrollKeys.ts — getBestScrollTarget helper present", () => {
+    expect(src("client/src/app/useGlobalScrollKeys.ts")).toContain("getBestScrollTarget");
   });
 
   it("CursorNavContext.tsx — CursorNavProvider exported", () => {
@@ -166,8 +166,8 @@ describe("Keyboard navigation infrastructure is intact", () => {
 // ── App routing infrastructure ───────────────────────────────────────────────
 
 describe("App routing infrastructure is intact", () => {
-  it("App.tsx — Suspense fallback is present (lazy load errors show UI, not blank)", () => {
-    expect(src("client/src/App.tsx")).toContain("Suspense");
+  it("AuthenticatedApp.tsx — Suspense fallback is present (lazy load errors show UI, not blank)", () => {
+    expect(src("client/src/app/AuthenticatedApp.tsx")).toContain("Suspense");
   });
 
   it("App.tsx — wouter Switch/Route routing is used", () => {
@@ -176,9 +176,9 @@ describe("App routing infrastructure is intact", () => {
     expect(s).toContain("Route");
   });
 
-  it("App.tsx — lazyPages imports are used (not dead imports)", () => {
-    const s = src("client/src/App.tsx");
-    // App.tsx must import from lazyPages (the central lazy-page registry)
+  it("PropertiesRoutes.tsx — lazyPages imports are used (not dead imports)", () => {
+    const s = src("client/src/app/PropertiesRoutes.tsx");
+    // PropertiesRoutes imports all properties pages from the central lazy-page registry
     expect(s).toContain("lazyPages");
   });
 
