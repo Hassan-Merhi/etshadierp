@@ -1143,13 +1143,11 @@ export default function FactoryWorkers() {
   const totalTransport = (workers ?? []).filter((w) => w.active).reduce((s, w) => s + parseFloat((w as any).transportAllowance || "0"), 0);
   const totalAdvances = (workers ?? []).reduce((s, w) => s + parseFloat((w as any).pendingAdvanceBalance || "0"), 0);
   const totalDueToday = Object.values(amountDue).reduce((s, d) => s + (d.net > 0 ? d.net : 0), 0);
-  // Full-period payroll obligation: monthly salary + transport − pending advances − absences already recorded
+  // Total Remaining = sum of the "DUE − ADV" column: Due Today minus pending advance for each active worker
   const totalRemainingToBePaid = (workers ?? []).filter((w) => w.active).reduce((s, w) => {
-    const salary   = parseFloat(w.baseSalary || "0");
-    const transport = parseFloat((w as any).transportAllowance || "0");
-    const advance  = parseFloat((w as any).pendingAdvanceBalance || "0");
-    const absences = amountDue[w.id]?.absenceDeducted ?? 0;
-    return s + Math.max(0, salary + transport - advance - absences);
+    const dueNet  = amountDue[w.id]?.net ?? 0;
+    const advance = parseFloat((w as any).pendingAdvanceBalance || "0");
+    return s + (dueNet - advance);
   }, 0);
 
   return (
