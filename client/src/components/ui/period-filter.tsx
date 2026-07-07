@@ -134,10 +134,10 @@ export function PeriodFilter({
 
   const handlePresetChange = (preset: PeriodPreset) => {
     if (preset === "custom") {
-      // Use a Popover (non-modal) to avoid the Dialog focus-trap/outside-click
-      // interaction that caused the calendar to immediately dismiss when opened
-      // from a DropdownMenuItem click.
-      setCalendarOpen(true);
+      // Delay opening until after the DropdownMenu has fully closed.
+      // Without the delay the dropdown's close event fires an outside-click on
+      // the Popover, which immediately calls onOpenChange(false) and kills it.
+      setTimeout(() => setCalendarOpen(true), 50);
     } else {
       const dates = getPresetDates(preset);
       onChange({ ...dates, preset });
