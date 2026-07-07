@@ -1,0 +1,62 @@
+import { MapPin, ChevronRight } from "lucide-react";
+import type { Location, StockGroupSummary } from "./locationInventoryTypes";
+
+interface LocationInventoryBreadcrumbProps {
+  selectedLocationLocal: Location | null;
+  selectedGroup: StockGroupSummary | null;
+  viewAllItems: boolean;
+  goBackToLocations: () => void;
+  onBackToLocation: () => void;
+}
+
+export function LocationInventoryBreadcrumb({
+  selectedLocationLocal,
+  selectedGroup,
+  viewAllItems,
+  goBackToLocations,
+  onBackToLocation,
+}: LocationInventoryBreadcrumbProps) {
+  return (
+    <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+      <MapPin className="h-3.5 w-3.5 shrink-0" />
+      {!selectedLocationLocal ? (
+        <span>Select Location</span>
+      ) : (
+        <>
+          <button
+            className="hover:underline hover:text-foreground transition-colors"
+            onClick={goBackToLocations}
+          >
+            Locations
+          </button>
+          <ChevronRight className="h-3.5 w-3.5" />
+          {selectedGroup ? (
+            <>
+              <button
+                className="hover:underline hover:text-foreground transition-colors"
+                onClick={onBackToLocation}
+              >
+                {selectedLocationLocal.name}
+              </button>
+              <ChevronRight className="h-3.5 w-3.5" />
+              <span className="text-foreground font-medium">{selectedGroup.groupName}</span>
+            </>
+          ) : viewAllItems ? (
+            <>
+              <button
+                className="hover:underline hover:text-foreground transition-colors"
+                onClick={onBackToLocation}
+              >
+                {selectedLocationLocal.name}
+              </button>
+              <ChevronRight className="h-3.5 w-3.5" />
+              <span className="text-foreground font-medium">All Items</span>
+            </>
+          ) : (
+            <span className="text-foreground font-medium">{selectedLocationLocal.name}</span>
+          )}
+        </>
+      )}
+    </div>
+  );
+}

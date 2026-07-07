@@ -1,33 +1,12 @@
-import { useState, useRef, useMemo, useEffect } from "react";
 import { useLocation } from "@/contexts/LocationContext";
 import { useCompany } from "@/contexts/CompanyContext";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
 import { useLocation as useRoute } from "wouter";
-import {
-  ArrowUpDown,
-  Search,
-  X,
-  ArrowLeft,
-  ArrowRight,
-  Globe,
-  MapPin,
-  ChevronRight,
-  Plus,
-  AlertCircle,
-  Layers,
-  Trash2,
-} from "lucide-react";
+import { ArrowLeft, Globe, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { queryClient } from "@/lib/queryClient";
-import { apiRequest } from "@/lib/queryClient";
-import { getDefaultPeriodValue } from "@/components/ui/period-filter";
 
 import { LocationGrid } from "./location-inventory/LocationGrid";
-import { InventoryTable } from "./location-inventory/InventoryTable";
 import { CombinedStockView } from "./location-inventory/CombinedStockView";
 import { LocationDialogs } from "./location-inventory/LocationDialogs";
 import { useLocationInventoryQueries } from "./location-inventory/useLocationInventoryQueries";
@@ -35,91 +14,16 @@ import { useLocationInventoryMutations } from "./location-inventory/useLocationI
 import { useLocationInventoryExports } from "./location-inventory/useLocationInventoryExports";
 import { LocationInventoryDialogs } from "./location-inventory/LocationInventoryDialogs";
 import { StockGroupsView } from "./location-inventory/StockGroupsView";
-
-interface Location {
-  id: number;
-  code: string;
-  name: string;
-  city: string | null;
-  state: string | null;
-  country: string | null;
-  createdAt?: string;
-  supplierPartnerPayableDeductionPerQty?: string | null;
-}
-
-interface InventoryItem {
-  inventoryId: number | null;
-  locationId: number;
-  stockItemId: number;
-  quantity: string;
-  averageRate: string;
-  totalValue: string;
-  stockItemCode: string;
-  stockItemName: string;
-  stockItemUom: string;
-  stockGroupId: number | null;
-  stockGroupName: string | null;
-  stockGroupCode: string | null;
-  stockItemActive: boolean | null;
-  categoryId?: number | null;
-  categoryName?: string | null;
-}
-
-interface StockGroupSummary {
-  groupId: number | null;
-  groupCode: string | null;
-  groupName: string;
-  totalQuantity: number;
-  totalValue: number;
-  averageRate: number;
-  itemCount: number;
-  items: InventoryItem[];
-}
+import { useLocationInventoryState } from "./location-inventory/useLocationInventoryState";
+import { useCombinedStockRows } from "./location-inventory/useCombinedStockRows";
+import { useStockGroupSummaries } from "./location-inventory/useStockGroupSummaries";
+import { LocationInventoryHeader } from "./location-inventory/LocationInventoryHeader";
+import { LocationInventoryMovementFilter } from "./location-inventory/LocationInventoryMovementFilter";
+import { StockGroupItemsView } from "./location-inventory/StockGroupItemsView";
+import { AllItemsView } from "./location-inventory/AllItemsView";
+import { LocationInventoryBreadcrumb } from "./location-inventory/LocationInventoryBreadcrumb";
 
 export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
-  const [selectedLocationLocal, setSelectedLocationLocal] = useState<Location | null>(null);
-  const [selectedGroup, setSelectedGroup] = useState<StockGroupSummary | null>(null);
-  const [selectedRowIndex, setSelectedRowIndex] = useState<number>(0);
-  const [viewAllItems, setViewAllItems] = useState<boolean>(false);
-  const [locationSearchTerm, setLocationSearchTerm] = useState("");
-  const [groupSearchTerm, setGroupSearchTerm] = useState("");
-  const [itemSearchTerm, setItemSearchTerm] = useState("");
-  const [asOfDate, setAsOfDate] = useState<string>("");
-  const [fromDate, setFromDate] = useState<string>("");
-  const [showNegativeStock, setShowNegativeStock] = useState(false);
-  const [showZeroStock, setShowZeroStock] = useState(false);
-  const [negativeSearchTerm, setNegativeSearchTerm] = useState("");
-  const [showAllStock, setShowAllStock] = useState(false);
-  const [allStockGroupFilter, setAllStockGroupFilter] = useState<string>("");
-  const [allStockSearchTerm, setAllStockSearchTerm] = useState("");
-  const [allStockLocationFilter, setAllStockLocationFilter] = useState<string>("");
-  const [allStockCategoryFilter, setAllStockCategoryFilter] = useState<string[]>([]);
-  const [itemCategoryFilter, setItemCategoryFilter] = useState<string[]>([]);
-  const [groupCategoryFilter, setGroupCategoryFilter] = useState<string>("");
-  const tableRef = useRef<HTMLDivElement>(null);
-  const [allStockSelectedRowIndex, setAllStockSelectedRowIndex] = useState<number>(-1);
-  const [stockMovementOpen, setStockMovementOpen] = useState(false);
-  const [stockMovementItem, setStockMovementItem] = useState<any>(null);
-  const [stockMovementPeriod, setStockMovementPeriod] = useState<any>(() => getDefaultPeriodValue("this_month"));
-  const [drillMonth, setDrillMonth] = useState<any>(null);
-  const allStockTableRef = useRef<HTMLDivElement>(null);
-
-  // Dialogs
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [isDeleting, setIsDeleting] = useState(false);
-  const [archiveDialogOpen, setArchiveDialogOpen] = useState(false);
-  const [isArchiving, setIsArchiving] = useState(false);
-  const [renameDialogOpen, setRenameDialogOpen] = useState(false);
-  const [renamingLocation, setRenamingLocation] = useState<Location | null>(null);
-  const [renameInput, setRenameInput] = useState("");
-  const [renameDeductionInput, setRenameDeductionInput] = useState("");
-  const [waGroupDialogOpen, setWaGroupDialogOpen] = useState(false);
-  const [waGroupLocation, setWaGroupLocation] = useState<Location | null>(null);
-  const [waGroupSearch, setWaGroupSearch] = useState("");
-  const [waGroupSelectedId, setWaGroupSelectedId] = useState<string>("");
-  const [createLocationOpen, setCreateLocationOpen] = useState(false);
-  const [createLocationName, setCreateLocationName] = useState("");
-
   const { setSelectedLocation } = useLocation();
   const [_route, navigate] = useRoute();
   const { toast } = useToast();
@@ -127,21 +31,55 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
   const { selectedCompany } = useCompany();
   const companyId = selectedCompany?.id;
 
-  // Reset location/group selection and invalidate caches whenever the active company changes.
-  useEffect(() => {
-    setSelectedLocationLocal(null);
-    setSelectedGroup(null);
-    setViewAllItems(false);
-    setLocationSearchTerm("");
-    setGroupSearchTerm("");
-    setItemSearchTerm("");
-    queryClient.invalidateQueries({ queryKey: ["/api/locations"] });
-    queryClient.invalidateQueries({ queryKey: ["/api/inventory"] });
-    queryClient.invalidateQueries({ queryKey: ["/api/stock-categories"] });
-  }, [companyId]);
+  // ─── State ────────────────────────────────────────────────────────────────
+  const {
+    selectedLocationLocal, setSelectedLocationLocal,
+    selectedGroup, setSelectedGroup,
+    selectedRowIndex, setSelectedRowIndex,
+    viewAllItems, setViewAllItems,
+    locationSearchTerm, setLocationSearchTerm,
+    groupSearchTerm, setGroupSearchTerm,
+    itemSearchTerm, setItemSearchTerm,
+    asOfDate, setAsOfDate,
+    fromDate, setFromDate,
+    showNegativeStock, setShowNegativeStock,
+    showZeroStock, setShowZeroStock,
+    negativeSearchTerm, setNegativeSearchTerm,
+    showAllStock, setShowAllStock,
+    allStockGroupFilter, setAllStockGroupFilter,
+    allStockSearchTerm, setAllStockSearchTerm,
+    allStockLocationFilter, setAllStockLocationFilter,
+    allStockCategoryFilter, setAllStockCategoryFilter,
+    itemCategoryFilter, setItemCategoryFilter,
+    groupCategoryFilter, setGroupCategoryFilter,
+    allStockSelectedRowIndex,
+    stockMovementOpen, setStockMovementOpen,
+    stockMovementItem, setStockMovementItem,
+    stockMovementPeriod, setStockMovementPeriod,
+    drillMonth, setDrillMonth,
+    allStockTableRef,
+    deleteDialogOpen, setDeleteDialogOpen,
+    isDeleting,
+    archiveDialogOpen, setArchiveDialogOpen,
+    isArchiving,
+    renameDialogOpen, setRenameDialogOpen,
+    renamingLocation,
+    renameInput, setRenameInput,
+    renameDeductionInput, setRenameDeductionInput,
+    waGroupDialogOpen, setWaGroupDialogOpen,
+    waGroupLocation,
+    waGroupSearch, setWaGroupSearch,
+    waGroupSelectedId, setWaGroupSelectedId,
+    createLocationOpen, setCreateLocationOpen,
+    createLocationName, setCreateLocationName,
+    openRenameDialog,
+    openWaGroupDialog,
+    handleDeleteLocation,
+    handleArchiveStockGroup,
+    goBackToLocations,
+  } = useLocationInventoryState({ companyId, toast });
 
-  // ─── Mutations ──────────────────────────────────────────────────────────────
-
+  // ─── Mutations ────────────────────────────────────────────────────────────
   const { renameLocationMutation, createLocationMutation, waGroupMutation } = useLocationInventoryMutations({
     toast,
     selectedLocationLocal,
@@ -152,24 +90,7 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
     setWaGroupDialogOpen,
   });
 
-  const openRenameDialog = (loc: Location, e?: { stopPropagation: () => void }) => {
-    e?.stopPropagation();
-    setRenamingLocation(loc);
-    setRenameInput(loc.name);
-    setRenameDeductionInput(parseFloat(String(loc.supplierPartnerPayableDeductionPerQty ?? "0")).toString());
-    setRenameDialogOpen(true);
-  };
-
-  const openWaGroupDialog = (loc: Location, e?: { stopPropagation: () => void }) => {
-    e?.stopPropagation();
-    setWaGroupLocation(loc);
-    setWaGroupSelectedId((loc as any).whatsappGroupChatId ?? "");
-    setWaGroupSearch("");
-    setWaGroupDialogOpen(true);
-  };
-
-  // ─── Queries ────────────────────────────────────────────────────────────────
-
+  // ─── Queries ──────────────────────────────────────────────────────────────
   const {
     waChats,
     waChatsLoading,
@@ -198,323 +119,70 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
     showNegativeStock,
   });
 
-  // ─── Export helpers ──────────────────────────────────────────────────────────
-
+  // ─── Export helpers ───────────────────────────────────────────────────────
   const { handlePrintWithOption, handleExportInventory } = useLocationInventoryExports(
     selectedLocationLocal,
     toast
   );
 
-  // ─── Derived data ────────────────────────────────────────────────────────────
-
-  const allInventoryLocations = useMemo(() => {
-    const locs = new Map<number, { id: number; name: string }>();
-    allInventoryData.forEach((item: any) => {
-      if (item.locationId && !locs.has(item.locationId))
-        locs.set(item.locationId, { id: item.locationId, name: item.locationName || "" });
-    });
-    return [...locs.values()].sort((a, b) => a.name.localeCompare(b.name));
-  }, [allInventoryData]);
-
-  const allInventoryGroups = useMemo(() => {
-    const groups = new Map<string, { id: number | null; name: string }>();
-    allInventoryData.forEach((item: any) => {
-      const key = String(item.stockGroupId ?? "null");
-      if (!groups.has(key))
-        groups.set(key, { id: item.stockGroupId ?? null, name: item.stockGroupName || "Unassigned" });
-    });
-    return [...groups.values()].sort((a, b) => a.name.localeCompare(b.name));
-  }, [allInventoryData]);
-
-  const combinedStockRows = useMemo(() => {
-    const itemMap = new Map<number, any>();
-    allInventoryData.forEach((item: any) => {
-      const qty = parseFloat(item.quantity || "0");
-      if (qty === 0) return;
-      if (!itemMap.has(item.stockItemId)) {
-        itemMap.set(item.stockItemId, {
-          stockItemId: item.stockItemId,
-          stockItemName: item.stockItemName || "",
-          stockItemCode: item.stockItemCode || "",
-          stockGroupId: item.stockGroupId ?? null,
-          stockGroupName: item.stockGroupName || "Unassigned",
-          categoryId: item.categoryId ?? null,
-          categoryName: item.categoryName ?? null,
-          qtyByLocationName: {} as Record<string, number>,
-          totalQty: 0,
-          weightedCostSum: 0,
-          totalValue: 0,
-        });
-      }
-      const row = itemMap.get(item.stockItemId)!;
-      const locName = item.locationName || "";
-      row.qtyByLocationName[locName] = (row.qtyByLocationName[locName] || 0) + qty;
-      row.totalQty += qty;
-      const avgRate = parseFloat(item.averageRate || "0");
-      row.weightedCostSum += qty * avgRate;
-      row.totalValue += parseFloat(item.totalValue || "0");
-    });
-    return [...itemMap.values()].map((row) => ({
-      ...row,
-      avgCost: row.totalQty > 0 ? row.weightedCostSum / row.totalQty : 0,
-    }));
-  }, [allInventoryData]);
-
-  const filteredCombinedRows = useMemo(() => {
-    return combinedStockRows
-      .filter((row) => {
-        if (allStockGroupFilter) {
-          if (allStockGroupFilter === "null") {
-            if (row.stockGroupId !== null) return false;
-          } else {
-            if (String(row.stockGroupId) !== allStockGroupFilter) return false;
-          }
-        }
-        if (allStockCategoryFilter.length > 0) {
-          const rowCatId = row.categoryId == null ? "none" : String(row.categoryId);
-          if (!allStockCategoryFilter.includes(rowCatId)) return false;
-        }
-        if (allStockLocationFilter) {
-          if (!((row.qtyByLocationName[allStockLocationFilter] || 0) > 0)) return false;
-        }
-        if (allStockSearchTerm) {
-          const s = allStockSearchTerm.toLowerCase();
-          return row.stockItemName.toLowerCase().includes(s) || row.stockItemCode.toLowerCase().includes(s);
-        }
-        return true;
-      })
-      .sort(
-        (a, b) => a.stockGroupName.localeCompare(b.stockGroupName) || a.stockItemName.localeCompare(b.stockItemName)
-      );
-  }, [
-    combinedStockRows,
+  // ─── Combined stock rows (all-stock view) ─────────────────────────────────
+  const { allInventoryLocations, allInventoryGroups, filteredCombinedRows } = useCombinedStockRows({
+    allInventoryData,
     allStockGroupFilter,
     allStockCategoryFilter,
     allStockLocationFilter,
     allStockSearchTerm,
-    allInventoryLocations,
-  ]);
+  });
 
-  const openingInventoryMap = useMemo(() => {
-    const map = new Map<number, number>();
-    openingInventoryData.forEach((item: InventoryItem) => map.set(item.stockItemId, parseFloat(item.quantity || "0")));
-    return map;
-  }, [openingInventoryData]);
+  // ─── Stock group summaries (location view) ────────────────────────────────
+  const {
+    openingInventoryMap,
+    showMovement,
+    activeInventoryLoading,
+    inventory,
+    stockGroups,
+    filteredStockGroups,
+    filteredStockItems,
+    allItemsFiltered,
+    totalQty,
+    totalValue,
+    totalItems,
+  } = useStockGroupSummaries({
+    openingInventoryData,
+    inventoryData,
+    closingInventoryData,
+    openingInventoryLoading,
+    closingInventoryLoading,
+    inventoryLoading,
+    fromDate,
+    asOfDate,
+    showZeroStock,
+    showNegativeStock,
+    groupSearchTerm,
+    groupCategoryFilter,
+    itemSearchTerm,
+    itemCategoryFilter,
+    selectedGroup,
+  });
 
-  const showMovement = !!(fromDate && asOfDate);
-  const activeInventoryData = showMovement ? closingInventoryData : inventoryData;
-  const activeInventoryLoading = showMovement ? closingInventoryLoading || openingInventoryLoading : inventoryLoading;
-
-  // All items (respecting zero filter)
-  const inventory: InventoryItem[] = showZeroStock
-    ? activeInventoryData
-    : activeInventoryData.filter((item) => parseFloat(item.quantity || "0") !== 0);
-
-  // Stock groups built from inventory
-  const stockGroups: StockGroupSummary[] = useMemo(() => {
-    const groups: StockGroupSummary[] = [];
-    inventory.forEach((item) => {
-      const groupId = item.stockGroupId ?? null;
-      let group = groups.find((g) => g.groupId === groupId);
-      if (!group) {
-        group = {
-          groupId,
-          groupCode: item.stockGroupCode,
-          groupName: item.stockGroupName || "Ungrouped",
-          totalQuantity: 0,
-          totalValue: 0,
-          averageRate: 0,
-          itemCount: 0,
-          items: [],
-        };
-        groups.push(group);
-      }
-      const qty = parseFloat(item.quantity || "0");
-      group.totalQuantity += qty;
-      group.totalValue += parseFloat(item.totalValue || "0");
-      group.itemCount += 1;
-      group.items.push(item);
-    });
-    groups.forEach((g) => {
-      if (g.totalQuantity > 0) g.averageRate = g.totalValue / g.totalQuantity;
-    });
-    return groups.sort((a, b) => a.groupName.localeCompare(b.groupName));
-  }, [inventory]);
-
-  // Filter stock groups by search + category + negative stock toggle
-  const filteredStockGroups = useMemo(() => {
-    return stockGroups.filter((g) => {
-      if (showNegativeStock && !g.items.some((item) => parseFloat(item.quantity || "0") < 0)) return false;
-      if (groupSearchTerm && !g.groupName.toLowerCase().includes(groupSearchTerm.toLowerCase())) return false;
-      if (groupCategoryFilter) {
-        if (
-          !g.items.some((item) => {
-            if (groupCategoryFilter === "none") return item.categoryId == null;
-            return String(item.categoryId) === groupCategoryFilter;
-          })
-        )
-          return false;
-      }
-      return true;
-    });
-  }, [stockGroups, groupSearchTerm, groupCategoryFilter, showNegativeStock]);
-
-  // Items within the selected group, with search + category + negative stock toggle
-  const filteredStockItems = useMemo(() => {
-    if (!selectedGroup) return [];
-    return selectedGroup.items
-      .filter((item) => {
-        if (showNegativeStock && parseFloat(item.quantity || "0") >= 0) return false;
-        if (itemCategoryFilter.length > 0) {
-          const itemCatId = item.categoryId == null ? "none" : String(item.categoryId);
-          if (!itemCategoryFilter.includes(itemCatId)) return false;
-        }
-        if (!itemSearchTerm) return true;
-        const s = itemSearchTerm.toLowerCase();
-        return (
-          (item.stockItemName || "").toLowerCase().includes(s) || (item.stockItemCode || "").toLowerCase().includes(s)
-        );
-      })
-      .sort((a, b) => a.stockItemName.localeCompare(b.stockItemName));
-  }, [selectedGroup, itemSearchTerm, itemCategoryFilter, showNegativeStock]);
-
-  // All items flat list (for view-all mode)
-  const allItemsFiltered = useMemo(() => {
-    return inventory
-      .filter((item) => {
-        if (showNegativeStock && parseFloat(item.quantity || "0") >= 0) return false;
-        if (!itemSearchTerm) return true;
-        const s = itemSearchTerm.toLowerCase();
-        return (
-          (item.stockItemName || "").toLowerCase().includes(s) || (item.stockItemCode || "").toLowerCase().includes(s)
-        );
-      })
-      .sort(
-        (a, b) =>
-          (a.stockGroupName || "").localeCompare(b.stockGroupName || "") ||
-          a.stockItemName.localeCompare(b.stockItemName)
-      );
-  }, [inventory, itemSearchTerm, showNegativeStock]);
-
-  // Totals across all stock groups
-  const totalQty = stockGroups.reduce((s, g) => s + g.totalQuantity, 0);
-  const totalValue = stockGroups.reduce((s, g) => s + g.totalValue, 0);
-  const totalItems = stockGroups.reduce((s, g) => s + g.itemCount, 0);
-
-  // ─── Handlers ────────────────────────────────────────────────────────────────
-
-  const handleDeleteLocation = async () => {
-    if (!selectedLocationLocal) return;
-    setIsDeleting(true);
-    try {
-      await apiRequest("DELETE", `/api/locations/${selectedLocationLocal.id}`);
-      queryClient.invalidateQueries({ queryKey: ["/api/locations"] });
-      toast({ title: "Location Deleted", description: `${selectedLocationLocal.name} deleted` });
-      setSelectedLocationLocal(null);
-      setDeleteDialogOpen(false);
-    } catch (error: any) {
-      toast({ title: "Delete Failed", description: error.message, variant: "destructive" });
-    } finally {
-      setIsDeleting(false);
-    }
-  };
-
-  const handleArchiveStockGroup = async () => {
-    if (!selectedLocationLocal || !selectedGroup) return;
-    setIsArchiving(true);
-    try {
-      await apiRequest("POST", "/api/stock-group-archives", {
-        locationId: selectedLocationLocal.id,
-        stockGroupId: selectedGroup.groupId,
-      });
-      queryClient.invalidateQueries({ queryKey: ["/api/inventory"] });
-      toast({ title: "Stock Group Archived" });
-      setSelectedGroup(null);
-      setArchiveDialogOpen(false);
-    } catch (error: any) {
-      toast({ title: "Archive Failed", description: error.message, variant: "destructive" });
-    } finally {
-      setIsArchiving(false);
-    }
-  };
-
-  const goBackToLocations = () => {
-    setSelectedLocationLocal(null);
-    setSelectedGroup(null);
-    setViewAllItems(false);
-    setGroupSearchTerm("");
-    setItemSearchTerm("");
-    setGroupCategoryFilter("");
-  };
-
-  // ─── Render ──────────────────────────────────────────────────────────────────
-
+  // ─── Render ───────────────────────────────────────────────────────────────
   return (
     <div className="flex flex-col min-h-0 h-full">
-      {/* ── Page header ─────────────────────────────────────────────────────── */}
-      <div className="flex items-center justify-between px-6 py-4 border-b shrink-0">
-        <div>
-          <h1 className="text-2xl font-bold">Location Inventory</h1>
-          <p className="text-sm text-muted-foreground">Manage inventory across all locations</p>
-        </div>
-        {!posUser && (
-          <Button
-            variant={showNegativeStock ? "destructive" : "outline"}
-            size="sm"
-            className="gap-2"
-            onClick={() => setShowNegativeStock(!showNegativeStock)}
-            data-testid="button-negative-stock"
-          >
-            <AlertCircle className="h-4 w-4" /> Negative Stock
-          </Button>
-        )}
-      </div>
+      <LocationInventoryHeader
+        posUser={posUser}
+        showNegativeStock={showNegativeStock}
+        setShowNegativeStock={setShowNegativeStock}
+      />
 
-      {/* ── Movement filter (only when a location is selected) ─────────────── */}
-      {selectedLocationLocal && !viewAllItems && (
-        <div className="flex flex-wrap items-center gap-3 px-6 py-2.5 border-b bg-muted/10 shrink-0">
-          <div className="flex items-center gap-1.5 shrink-0">
-            <ArrowUpDown className="h-3.5 w-3.5 text-muted-foreground" />
-            <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">MOVEMENT</span>
-          </div>
-          <span className="text-xs text-muted-foreground">From</span>
-          <div className="relative">
-            <Input
-              type="date"
-              value={fromDate}
-              onChange={(e) => setFromDate(e.target.value)}
-              className="h-8 w-36 text-sm"
-              data-testid="input-from-date"
-            />
-          </div>
-          <ArrowRight className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-          <span className="text-xs text-muted-foreground">To</span>
-          <div className="relative">
-            <Input
-              type="date"
-              value={asOfDate}
-              onChange={(e) => setAsOfDate(e.target.value)}
-              className="h-8 w-36 text-sm"
-              data-testid="input-to-date"
-            />
-          </div>
-          {(fromDate || asOfDate) && (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-8 px-2 text-xs gap-1"
-              onClick={() => {
-                setFromDate("");
-                setAsOfDate("");
-              }}
-            >
-              <X className="h-3 w-3" /> Clear
-            </Button>
-          )}
-        </div>
-      )}
+      <LocationInventoryMovementFilter
+        selectedLocationLocal={selectedLocationLocal}
+        viewAllItems={viewAllItems}
+        fromDate={fromDate}
+        setFromDate={setFromDate}
+        asOfDate={asOfDate}
+        setAsOfDate={setAsOfDate}
+      />
 
-      {/* ── Main content area ────────────────────────────────────────────────── */}
       <div className="flex-1 overflow-auto">
         {showAllStock ? (
           <div className="p-6">
@@ -550,57 +218,20 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
           </div>
         ) : (
           <div className="px-6 py-4 space-y-4">
-            {/* ── Breadcrumb ───────────────────────────────────────────────── */}
-            <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-              <MapPin className="h-3.5 w-3.5 shrink-0" />
-              {!selectedLocationLocal ? (
-                <span>Select Location</span>
-              ) : (
-                <>
-                  <button
-                    className="hover:underline hover:text-foreground transition-colors"
-                    onClick={goBackToLocations}
-                  >
-                    Locations
-                  </button>
-                  <ChevronRight className="h-3.5 w-3.5" />
-                  {selectedGroup ? (
-                    <>
-                      <button
-                        className="hover:underline hover:text-foreground transition-colors"
-                        onClick={() => {
-                          setSelectedGroup(null);
-                          setViewAllItems(false);
-                          setItemSearchTerm("");
-                        }}
-                      >
-                        {selectedLocationLocal.name}
-                      </button>
-                      <ChevronRight className="h-3.5 w-3.5" />
-                      <span className="text-foreground font-medium">{selectedGroup.groupName}</span>
-                    </>
-                  ) : viewAllItems ? (
-                    <>
-                      <button
-                        className="hover:underline hover:text-foreground transition-colors"
-                        onClick={() => {
-                          setViewAllItems(false);
-                          setItemSearchTerm("");
-                        }}
-                      >
-                        {selectedLocationLocal.name}
-                      </button>
-                      <ChevronRight className="h-3.5 w-3.5" />
-                      <span className="text-foreground font-medium">All Items</span>
-                    </>
-                  ) : (
-                    <span className="text-foreground font-medium">{selectedLocationLocal.name}</span>
-                  )}
-                </>
-              )}
-            </div>
+            {/* ── Breadcrumb ──────────────────────────────────────────────── */}
+            <LocationInventoryBreadcrumb
+              selectedLocationLocal={selectedLocationLocal}
+              selectedGroup={selectedGroup}
+              viewAllItems={viewAllItems}
+              goBackToLocations={goBackToLocations}
+              onBackToLocation={() => {
+                setSelectedGroup(null);
+                setViewAllItems(false);
+                setItemSearchTerm("");
+              }}
+            />
 
-            {/* ── NO LOCATION SELECTED: grid header + cards ────────────────── */}
+            {/* ── NO LOCATION SELECTED: grid header + cards ───────────────── */}
             {!selectedLocationLocal && (
               <>
                 <div className="flex items-center justify-between gap-3">
@@ -648,7 +279,7 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
               </>
             )}
 
-            {/* ── LOCATION SELECTED, no group, no view-all: stock groups ───── */}
+            {/* ── LOCATION SELECTED, no group, no view-all: stock groups ──── */}
             {selectedLocationLocal && !selectedGroup && !viewAllItems && (
               <StockGroupsView
                 selectedLocationLocal={selectedLocationLocal}
@@ -679,147 +310,52 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
               />
             )}
 
-            {/* ── STOCK GROUP SELECTED: items table ────────────────────────── */}
+            {/* ── STOCK GROUP SELECTED: items table ───────────────────────── */}
             {selectedLocationLocal && selectedGroup && !viewAllItems && (
-              <>
-                {/* Stats bar */}
-                <div className="flex items-center gap-2 flex-wrap">
-                  <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-                    <Layers className="h-5 w-5 text-primary" />
-                  </div>
-                  <div>
-                    <h2 className="text-xl font-bold">{selectedGroup.groupName}</h2>
-                    <div className="flex items-center gap-3 text-xs text-muted-foreground flex-wrap">
-                      <span>
-                        <span className="font-semibold text-foreground">{selectedGroup.itemCount}</span> Items
-                      </span>
-                      <span>
-                        <span className="font-semibold text-foreground font-mono">
-                          {Math.floor(selectedGroup.totalQuantity).toLocaleString()}
-                        </span>{" "}
-                        BL total
-                      </span>
-                      {!posUser && (
-                        <span>
-                          <span className="font-semibold text-foreground">
-                            {formatAmount(selectedGroup.totalValue)}
-                          </span>{" "}
-                          total value
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                  {!posUser && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="ml-auto gap-1.5 text-destructive border-destructive/30 hover:bg-destructive/10"
-                      onClick={() => setArchiveDialogOpen(true)}
-                      data-testid="button-archive-group"
-                    >
-                      <Trash2 className="h-4 w-4" /> Archive Group
-                    </Button>
-                  )}
-                </div>
-
-                {/* Search + category */}
-                <div className="flex items-center gap-2 flex-wrap">
-                  <div className="relative flex-1 min-w-[200px] max-w-sm">
-                    <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      placeholder="Search items by name..."
-                      value={itemSearchTerm}
-                      onChange={(e) => setItemSearchTerm(e.target.value)}
-                      className="pl-9"
-                      data-testid="input-item-search"
-                    />
-                  </div>
-                  <Select
-                    value={itemCategoryFilter[0] || "all"}
-                    onValueChange={(v) => setItemCategoryFilter(v === "all" ? [] : [v])}
-                  >
-                    <SelectTrigger className="w-48">
-                      <SelectValue placeholder="All Categories" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Categories</SelectItem>
-                      <SelectItem value="none">Uncategorized</SelectItem>
-                      {categoriesList.map((cat) => (
-                        <SelectItem key={cat.id} value={String(cat.id)}>
-                          {cat.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <InventoryTable
-                  filteredStockItems={filteredStockItems}
-                  showMovement={showMovement}
-                  openingInventoryMap={openingInventoryMap}
-                  selectedRowIndex={selectedRowIndex}
-                  setSelectedRowIndex={setSelectedRowIndex}
-                  navigate={navigate}
-                  formatAmount={formatAmount}
-                  posUser={posUser}
-                  itemSearchTerm={itemSearchTerm}
-                  inventory={inventory}
-                  selectedGroup={selectedGroup}
-                />
-              </>
+              <StockGroupItemsView
+                selectedGroup={selectedGroup}
+                posUser={posUser}
+                formatAmount={formatAmount}
+                setArchiveDialogOpen={setArchiveDialogOpen}
+                itemSearchTerm={itemSearchTerm}
+                setItemSearchTerm={setItemSearchTerm}
+                itemCategoryFilter={itemCategoryFilter}
+                setItemCategoryFilter={setItemCategoryFilter}
+                categoriesList={categoriesList}
+                filteredStockItems={filteredStockItems}
+                showMovement={showMovement}
+                openingInventoryMap={openingInventoryMap}
+                selectedRowIndex={selectedRowIndex}
+                setSelectedRowIndex={setSelectedRowIndex}
+                navigate={navigate}
+                inventory={inventory}
+              />
             )}
 
-            {/* ── VIEW ALL ITEMS ────────────────────────────────────────────── */}
+            {/* ── VIEW ALL ITEMS ───────────────────────────────────────────── */}
             {selectedLocationLocal && viewAllItems && !selectedGroup && (
-              <>
-                {/* Stats */}
-                <div className="flex items-center gap-3 text-sm text-muted-foreground flex-wrap">
-                  <span className="font-semibold text-foreground">{totalItems}</span> Items
-                  <span className="text-muted-foreground">·</span>
-                  <span className="font-semibold text-foreground font-mono">
-                    {Math.floor(totalQty).toLocaleString()}
-                  </span>{" "}
-                  BL total
-                  {!posUser && (
-                    <>
-                      <span className="text-muted-foreground">·</span>
-                      <span className="font-semibold text-foreground">{formatAmount(totalValue)}</span> total value
-                    </>
-                  )}
-                </div>
-
-                {/* Search */}
-                <div className="relative max-w-sm">
-                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    placeholder="Search items by name..."
-                    value={itemSearchTerm}
-                    onChange={(e) => setItemSearchTerm(e.target.value)}
-                    className="pl-9"
-                    data-testid="input-all-item-search"
-                  />
-                </div>
-
-                <InventoryTable
-                  filteredStockItems={allItemsFiltered}
-                  showMovement={showMovement}
-                  openingInventoryMap={openingInventoryMap}
-                  selectedRowIndex={selectedRowIndex}
-                  setSelectedRowIndex={setSelectedRowIndex}
-                  navigate={navigate}
-                  formatAmount={formatAmount}
-                  posUser={posUser}
-                  itemSearchTerm={itemSearchTerm}
-                  inventory={inventory}
-                  selectedGroup={null}
-                />
-              </>
+              <AllItemsView
+                totalItems={totalItems}
+                totalQty={totalQty}
+                totalValue={totalValue}
+                posUser={posUser}
+                formatAmount={formatAmount}
+                itemSearchTerm={itemSearchTerm}
+                setItemSearchTerm={setItemSearchTerm}
+                allItemsFiltered={allItemsFiltered}
+                showMovement={showMovement}
+                openingInventoryMap={openingInventoryMap}
+                selectedRowIndex={selectedRowIndex}
+                setSelectedRowIndex={setSelectedRowIndex}
+                navigate={navigate}
+                inventory={inventory}
+              />
             )}
           </div>
         )}
       </div>
 
-      {/* ── Dialogs ──────────────────────────────────────────────────────────── */}
+      {/* ── Dialogs ────────────────────────────────────────────────────────── */}
       <LocationInventoryDialogs
         createLocationOpen={createLocationOpen}
         setCreateLocationOpen={setCreateLocationOpen}
@@ -835,7 +371,6 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
         setNegativeSearchTerm={setNegativeSearchTerm}
       />
 
-      {/* All other dialogs */}
       <LocationDialogs
         renameDialogOpen={renameDialogOpen}
         setRenameDialogOpen={setRenameDialogOpen}
