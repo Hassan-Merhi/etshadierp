@@ -253,8 +253,11 @@ export function registerPosWhatsAppRoutes(app: Express): void {
 
       const senderName = req.user?.username || "POS";
       const waVis = await getErpExportVisibility(req);
-      // P/L cols auto-hide in the PDF generator when no configured price exists — don't gate on hideSalesProfitCost
-      const hideProfitCols = waVis.hideSelling || waVis.hideCost;
+      // Only hide P&L cols when the user has sales_profit_cost explicitly hidden.
+      // hideSelling/hideCost restrict individual price columns (handled elsewhere) but must
+      // NOT suppress the Config Price / P&L columns — those auto-hide inside buildPdf when
+      // no item has a configured price anyway.
+      const hideProfitCols = waVis.hideSalesProfitCost;
       const pdfBuffer = await generateInvoicePdf(parseInt(voucherId), companyId, senderName, { hideProfitCols });
       const safeDate = (voucher.voucherDate ?? getClientDate(req)).replace(/[^0-9-]/g, "");
       const safeLoc = (location.name ?? "").replace(/[^\w\s.()\-]/g, "_").trim();
