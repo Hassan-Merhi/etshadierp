@@ -123,9 +123,13 @@ export function registerSupplierProformaRoutes(app: Express, requireAuth: any) {
         })
         .returning();
       if (lines && Array.isArray(lines) && lines.length > 0) {
+        // Resolve alias codes to primary stock-item codes so that proforma lines
+        // are always stored with the canonical code regardless of what code the
+        // supplier's packing-list used.
+        const aliasMap = await buildAliasMap(companyId);
         const lineValues = lines.map((l: any) => ({
           proformaId: proforma.id,
-          barcode: String(l.barcode || "").trim(),
+          barcode: resolveBarcode(String(l.barcode || "").trim(), aliasMap),
           itemName: String(l.itemName || "").trim(),
           qty: parseInt(l.qty) || 0,
           weightPerBale: sanitizeDecimal(l.weightPerBale),
@@ -298,9 +302,12 @@ export function registerSupplierProformaRoutes(app: Express, requireAuth: any) {
       if (!lines || !Array.isArray(lines) || lines.length === 0) {
         return res.status(400).json({ message: "No lines to import" });
       }
+      // Resolve alias codes to primary stock-item codes at import time so that
+      // items imported with different (supplier) codes are stored canonically.
+      const aliasMap = await buildAliasMap(companyId);
       const lineValues = lines.map((l: any) => ({
         proformaId,
-        barcode: String(l.barcode || l.Barcode || "").trim(),
+        barcode: resolveBarcode(String(l.barcode || l.Barcode || "").trim(), aliasMap),
         itemName: String(l.itemName || l["Item Name"] || "").trim(),
         qty: parseInt(l.qty ?? l.Qty ?? 0) || 0,
         weightPerBale: sanitizeDecimal(l.weightPerBale ?? l["Weight per Bale"]),
@@ -353,11 +360,15 @@ export function registerSupplierProformaRoutes(app: Express, requireAuth: any) {
       if (!(await verifyContainerOwnership(containerId, companyId)))
         return res.status(403).json({ message: "Access denied" });
       const { barcode, itemName, qty, weightPerBale, pricePerBale } = req.body;
+      // Resolve alias code → primary stock-item code before saving so that
+      // items entered with supplier/alias codes match the proforma correctly.
+      const aliasMap = await buildAliasMap(companyId);
+      const resolvedBarcode = resolveBarcode(String(barcode ?? "").trim(), aliasMap);
       const [item] = await db
         .insert(supplierContainerLoadedItems)
         .values({
           containerId,
-          barcode: barcode || "",
+          barcode: resolvedBarcode,
           itemName: itemName || null,
           qty: parseInt(qty) || 0,
           weightPerBale: weightPerBale || null,
@@ -432,9 +443,12 @@ export function registerSupplierProformaRoutes(app: Express, requireAuth: any) {
       if (!items || !Array.isArray(items) || items.length === 0) {
         return res.status(400).json({ message: "No items to import" });
       }
+      // Resolve alias codes → primary stock-item codes before saving so that
+      // items imported with different (supplier) codes match the proforma.
+      const aliasMap = await buildAliasMap(companyId);
       const values = items.map((l: any) => ({
         containerId,
-        barcode: String(l.barcode || l.Barcode || "").trim(),
+        barcode: resolveBarcode(String(l.barcode || l.Barcode || "").trim(), aliasMap),
         itemName: String(l.itemName || l["Item Name"] || "").trim() || null,
         qty: parseInt(l.qty || l.Qty || 0) || 0,
         weightPerBale: l.weightPerBale || l["Weight per Bale"] || null,
