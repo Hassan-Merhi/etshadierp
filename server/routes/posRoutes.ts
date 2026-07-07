@@ -108,7 +108,7 @@ import { z } from "zod";
 import { readExcel, sheetToJson, createWorkbook, jsonToSheet, aoaToSheet, writeWorkbook } from "../excelHelper";
 import { adjustInventory, reverseInventoryByExactValue } from "../inventoryHelper";
 import { generateStockPdf } from "../helpers/generateStockPdf";
-import { generateInvoicePdf } from "../helpers/generateInvoicePdf";
+import { generateInvoicePdf, generateInvoicePdfMeta } from "../helpers/generateInvoicePdf";
 import { getErpExportVisibility } from "../helpers/exportVisibility";
 import { classifyNetPositionAccounts, getAccountNetBalance } from "../netPositionHelper";
 import {
@@ -289,9 +289,11 @@ export function registerPosRoutes(app: Express) {
       const companyId = req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const { voucherId, locationId } = req.body;
+      const { voucherId, locationId, dryRun } = req.body;
       if (!voucherId) return res.status(400).json({ message: "voucherId is required" });
       if (!locationId) return res.status(400).json({ message: "locationId is required" });
+      const parsedVoucherId = parseInt(voucherId);
+      if (isNaN(parsedVoucherId)) return res.status(400).json({ message: "Invalid voucherId" });
 
       const locId = parseInt(locationId);
       if (isNaN(locId)) return res.status(400).json({ message: "Invalid locationId" });
@@ -303,7 +305,9 @@ export function registerPosRoutes(app: Express) {
         .limit(1);
 
       if (!location) return res.status(404).json({ message: "Location not found" });
-      if (!location.whatsappGroupChatId)
+
+      // For non-dry-run, a WhatsApp group must be configured
+      if (!dryRun && !location.whatsappGroupChatId)
         return res.status(400).json({ message: "No WhatsApp group configured for this location" });
 
       // POS users can only send invoices for vouchers from their own shifts
@@ -311,12 +315,11 @@ export function registerPosRoutes(app: Express) {
         const [voucherToCheck] = await db
           .select({ id: vouchers.id, shiftId: vouchers.shiftId })
           .from(vouchers)
-          .where(and(eq(vouchers.id, parseInt(voucherId)), eq(vouchers.companyId, companyId)))
+          .where(and(eq(vouchers.id, parsedVoucherId), eq(vouchers.companyId, companyId)))
           .limit(1);
         if (!voucherToCheck) {
           return res.status(404).json({ message: "Voucher not found" });
         }
-        // Verify ownership via shift when a shiftId is present
         if (voucherToCheck.shiftId) {
           const [shift] = await db
             .select({ userId: posShifts.userId })
@@ -329,13 +332,63 @@ export function registerPosRoutes(app: Express) {
         }
       }
 
-      const erpVis = await getErpExportVisibility(req);
-      const hideProfitCols = erpVis.hideSelling || erpVis.hideCost || erpVis.hideSalesProfitCost;
-      const pdfBuffer = await generateInvoicePdf(parseInt(voucherId), companyId, (req as any).user?.username, {
-        hideProfitCols,
-      });
+      // Always generate in compact / WhatsApp mode for this endpoint
+      const compactMode   = true;
+      const whatsappMode  = true;
+      const { buffer: pdfBuffer, pageCount, itemCount } = await generateInvoicePdfMeta(
+        parsedVoucherId,
+        companyId,
+        (req as any).user?.username,
+        { hideProfitCols: true, compactMode, whatsappMode },
+      );
 
-      // Build filename — for credit sales include customer name
+      // ── PDF validation ─────────────────────────────────────────────────────
+      const pdfSize = pdfBuffer?.length ?? 0;
+      const validHeader = pdfBuffer && pdfBuffer.slice(0, 4).toString("ascii") === "%PDF";
+
+      // Compact mode fits ~60 rows/page. Allow 1 page per 20 items plus a 4-page
+      // fixed buffer to account for header/footer/totals.
+      // e.g. 5 items → max 5 pages, 100 items → max 9 pages, 150 items → max 12 pages.
+      // Any value above this means the compact layout broke — abort the WA send.
+      const maxReasonablePages = Math.ceil(itemCount / 20) + 4;
+      const pageCountOk = pageCount <= maxReasonablePages;
+
+      console.log(
+        `[WA invoice backend] voucherId=${voucherId} locationId=${locId} itemCount=${itemCount} ` +
+        `pageCount=${pageCount} pdfSize=${pdfSize} compactMode=${compactMode} dryRun=${!!dryRun}`,
+      );
+
+      if (!pdfBuffer || pdfSize < 1000 || !validHeader) {
+        console.error(`[WA invoice backend] PDF validation failed voucherId=${voucherId} size=${pdfSize} validHeader=${validHeader}`);
+        return res.status(500).json({ message: "PDF generation failed: invalid or empty PDF" });
+      }
+      if (!pageCountOk) {
+        console.error(`[WA invoice backend] PDF page count excessive voucherId=${voucherId} pages=${pageCount} items=${itemCount}`);
+        return res.status(500).json({
+          message: `PDF page count (${pageCount}) is excessive for ${itemCount} items — aborting WhatsApp send`,
+        });
+      }
+
+      // ── Dry-run: return metadata, do NOT send to WhatsApp ─────────────────
+      if (dryRun) {
+        // Build filename for the dry-run response (same logic as real send)
+        const locName  = location.name;
+        const dateStr  = getClientDate(req);
+        const rawName  = `${locName} Invoice ${dateStr}`;
+        const safeName = rawName.replace(/[^\w\s.()\-]/g, "_").trim();
+        return res.json({
+          success:     true,
+          dryRun:      true,
+          pdfSize,
+          pageCount,
+          itemCount,
+          filename:    `${safeName}.pdf`,
+          compactMode,
+          whatsappMode,
+        });
+      }
+
+      // ── Build filename (real send) ─────────────────────────────────────────
       const locName = location.name;
       const dateStr = getClientDate(req);
 
@@ -343,7 +396,7 @@ export function registerPosRoutes(app: Express) {
       const [voucherMeta] = await db
         .select({ isCreditSale: vouchers.isCreditSale })
         .from(vouchers)
-        .where(eq(vouchers.id, parseInt(voucherId)))
+        .where(eq(vouchers.id, parsedVoucherId))
         .limit(1);
       if (voucherMeta?.isCreditSale) {
         const [custEntry] = await db
@@ -351,27 +404,23 @@ export function registerPosRoutes(app: Express) {
           .from(voucherEntries)
           .innerJoin(ledgerAccounts, eq(ledgerAccounts.id, voucherEntries.ledgerAccountId))
           .where(
-            and(eq(voucherEntries.voucherId, parseInt(voucherId)), sql`${voucherEntries.debitAmount}::numeric > 0`)
+            and(eq(voucherEntries.voucherId, parsedVoucherId), sql`${voucherEntries.debitAmount}::numeric > 0`),
           )
           .limit(1);
         customerNameForFile = custEntry?.name || null;
       }
 
-      const rawName = customerNameForFile
+      const rawName  = customerNameForFile
         ? `${customerNameForFile} Invoice ${locName} ${dateStr}`
         : `${locName} Invoice ${dateStr}`;
       const safeName = rawName.replace(/[^\w\s.()\-]/g, "_").trim();
-      const caption = "";
-
-      console.log(
-        `[WA invoice backend] chatId=${location.whatsappGroupChatId} file=${safeName}.pdf size=${pdfBuffer.length}`
-      );
+      const caption  = "";
 
       const result = await sendWhatsAppFileToChatIdPos(
-        location.whatsappGroupChatId,
+        location.whatsappGroupChatId!,
         pdfBuffer,
         `${safeName}.pdf`,
-        caption
+        caption,
       );
 
       if (!result.success) return res.status(502).json({ message: result.error ?? "WhatsApp send failed" });

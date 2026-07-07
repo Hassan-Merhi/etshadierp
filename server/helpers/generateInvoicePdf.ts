@@ -3,43 +3,54 @@
  *
  * Full columns  : Description (34%) | Qty (7%) | Rate (10%) | Amt (11%) | Config (11%) | P/L Bale (13%) | Total P/L (14%)
  * Profit hidden : Description (42%) | Qty (8%)  | Rate (18%) | Amt (32%)
+ * Compact/WA    : Description (50%) | Qty (8%)  | Rate (18%) | Amt (24%)  — no profit cols, tight layout
  *
- * Numbers : fmtPrint logic — strips trailing ".00", prefixes "$\u00A0" for currency
+ * Numbers : fmtPrint logic — strips trailing ".00", prefixes "$ " for currency
  * Colours : green (#059669) for profit, red (#c2272d) for loss
  */
 
 import { pool } from "../db";
 
 // ── Brand colours (matches generateStockPdf) ──────────────────────────────────
-const CLR_BRAND = "#0f172a"; // dark navy  — header bar, col header, paid box
+const CLR_BRAND  = "#0f172a"; // dark navy  — header bar, col header, paid box
 const CLR_ACCENT = "#059669"; // emerald    — total row, paid amount
-const CLR_WHITE = "#ffffff";
-const CLR_MUTED = "#94a3b8"; // slate-400  — subtitle / meta text
-const CLR_BODY = "#1e293b"; // slate-800  — item text
-const CLR_ROW_ALT = "#f8fafc"; // slate-50   — alternating stripe
-const CLR_SEP = "#b0bec8"; // slate-300+ — row divider (visible)
-const CLR_GREEN = "#059669";
-const CLR_RED = "#c2272d";
+const CLR_WHITE  = "#ffffff";
+const CLR_MUTED  = "#94a3b8"; // slate-400  — subtitle / meta text
+const CLR_BODY   = "#1e293b"; // slate-800  — item text
+const CLR_ROW_ALT = "#f8fafc"; // slate-50  — alternating stripe
+const CLR_SEP    = "#b0bec8"; // slate-300+ — row divider (visible)
+const CLR_GREEN  = "#059669";
+const CLR_RED    = "#c2272d";
 
-// ── Page geometry ─────────────────────────────────────────────────────────────
+// ── Normal (full) page geometry ───────────────────────────────────────────────
 const PAGE_W = 595;
 const PAGE_H = 842;
-const MARGIN_X = 36;
-const MARGIN_Y = 36;
-const USABLE_W = PAGE_W - MARGIN_X * 2; // 523 pt
 
-const HEADER_BAR_H = 52; // coloured top bar covering top margin area
+// Standard layout
+const STD_MARGIN_X     = 36;
+const STD_MARGIN_Y     = 36;
+const STD_USABLE_W     = PAGE_W - STD_MARGIN_X * 2; // 523 pt
+const STD_HEADER_BAR_H = 52;
+const STD_LINE_H_PT    = 9;
+const STD_MAX_LINES    = 2;
+const STD_SAFETY       = 14;
+const STD_THR_H        = 18;
+const STD_ROW_H        = 15;
+const STD_FONT_ROW     = 7.5;
+const STD_FONT_HDR     = 7;
 
-// ── Text line height at fontSize 7.5 ─────────────────────────────────────────
-const LINE_H_PT = 9;
-const MAX_DESC_LINES = 2;
-
-// ── PDFKit safety buffer ──────────────────────────────────────────────────────
-// PDFKit auto-inserts a new page whenever (this.y + lineHeight > page.maxY()).
-// Its internal lineHeight for 7.5 pt text is ~11 pt, so we must keep at least
-// that much clearance above PAGE_H − MARGIN_Y in our manual page-break check.
-// Using 14 pt gives a small visual gap and avoids partial-row auto-paging.
-const PDFKIT_LINE_SAFETY = 14;
+// Compact / WhatsApp layout (tighter, customer-safe)
+const CMP_MARGIN_X     = 18;
+const CMP_MARGIN_Y     = 18;
+const CMP_USABLE_W     = PAGE_W - CMP_MARGIN_X * 2; // 559 pt
+const CMP_HEADER_BAR_H = 40;
+const CMP_LINE_H_PT    = 7.5;
+const CMP_MAX_LINES    = 1;   // single line + ellipsis
+const CMP_SAFETY       = 12;
+const CMP_THR_H        = 13;
+const CMP_ROW_H        = 11;
+const CMP_FONT_ROW     = 6.5;
+const CMP_FONT_HDR     = 6.5;
 
 // ── Date formatting ───────────────────────────────────────────────────────────
 function formatDbDate(d: unknown): string {
@@ -47,11 +58,7 @@ function formatDbDate(d: unknown): string {
   if (d instanceof Date) return d.toISOString().slice(0, 10);
   const s = String(d);
   if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
-  try {
-    return new Date(s).toISOString().slice(0, 10);
-  } catch {
-    return s;
-  }
+  try { return new Date(s).toISOString().slice(0, 10); } catch { return s; }
 }
 
 // ── Manual text wrapper (prevents PDFKit mid-row page breaks) ─────────────────
@@ -86,17 +93,13 @@ function wrapText(doc: any, text: string, maxWidth: number, maxLines: number): s
 // ── Number formatting ─────────────────────────────────────────────────────────
 function fmtNum(n: number, prefix = ""): string {
   const fixed = Math.abs(n).toFixed(2).replace(/\.00$/, "");
-  const parts = fixed.split(".");
+  const parts  = fixed.split(".");
   parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ",");
   const num = parts.join(".");
   return prefix ? prefix + "\u00A0" + num : num;
 }
-function fmtQty(n: number): string {
-  return fmtNum(Math.floor(Math.abs(n)));
-}
-function fmtUSD(n: number): string {
-  return fmtNum(n, "$");
-}
+function fmtQty(n: number): string  { return fmtNum(Math.floor(Math.abs(n))); }
+function fmtUSD(n: number): string  { return fmtNum(n, "$"); }
 function plColor(n: number): string {
   if (n > 0) return CLR_GREEN;
   if (n < 0) return CLR_RED;
@@ -120,15 +123,47 @@ interface InvoiceData {
   customerName: string | null;
   items: InvoiceItem[];
   hideProfitCols: boolean;
+  compactMode: boolean;
+}
+
+export interface InvoicePdfOpts {
+  hideProfitCols?: boolean;
+  compactMode?:    boolean;
+  whatsappMode?:   boolean;
+}
+
+export interface InvoicePdfMeta {
+  buffer:    Buffer;
+  pageCount: number;
+  itemCount: number;
 }
 
 // ── DB query ──────────────────────────────────────────────────────────────────
+
+/**
+ * Generate invoice PDF and return the raw Buffer.
+ * Backward-compatible — existing callers are unaffected.
+ */
 export async function generateInvoicePdf(
   voucherId: number,
   companyId: number,
   callerUserName?: string,
-  opts?: { hideProfitCols?: boolean }
+  opts?: InvoicePdfOpts,
 ): Promise<Buffer> {
+  const { buffer } = await generateInvoicePdfMeta(voucherId, companyId, callerUserName, opts);
+  return buffer;
+}
+
+/**
+ * Generate invoice PDF and also return page count and item count.
+ * Used by the WhatsApp backend route for validation and dry-run.
+ */
+export async function generateInvoicePdfMeta(
+  voucherId: number,
+  companyId: number,
+  callerUserName?: string,
+  opts?: InvoicePdfOpts,
+): Promise<InvoicePdfMeta> {
   const vRes = await pool.query<{
     voucher_date: string;
     description: string | null;
@@ -142,7 +177,7 @@ export async function generateInvoicePdf(
      FROM vouchers v
      JOIN companies c ON c.id = v.company_id
      WHERE v.id = $1 AND v.company_id = $2 LIMIT 1`,
-    [voucherId, companyId]
+    [voucherId, companyId],
   );
   if (!vRes.rows.length) throw new Error("Voucher not found");
   const v = vRes.rows[0];
@@ -157,7 +192,7 @@ export async function generateInvoicePdf(
      FROM sales_items si
      JOIN stock_items s ON s.id = si.stock_item_id
      WHERE si.voucher_id = $1 ORDER BY si.id`,
-    [voucherId]
+    [voucherId],
   );
   const items: InvoiceItem[] = itemsRes.rows.map((r) => ({
     stockItemName: r.stock_item_name,
@@ -173,7 +208,7 @@ export async function generateInvoicePdf(
        FROM voucher_entries ve
        JOIN ledger_accounts la ON la.id = ve.ledger_account_id
        WHERE ve.voucher_id = $1 AND ve.debit_amount::numeric > 0 LIMIT 1`,
-      [voucherId]
+      [voucherId],
     );
     customerName = cRes.rows[0]?.customer_name || null;
   }
@@ -184,12 +219,20 @@ export async function generateInvoicePdf(
       `SELECT u.username FROM pos_shifts ps
        JOIN users u ON u.id = ps.user_id
        WHERE ps.id = $1 LIMIT 1`,
-      [v.shift_id]
+      [v.shift_id],
     );
     userName = uRes.rows[0]?.username || "—";
   }
 
-  return buildPdf({
+  // whatsappMode / compactMode both trigger the compact layout
+  const compactMode = !!(opts?.compactMode || opts?.whatsappMode);
+
+  // In compact/WhatsApp mode always force profit columns hidden
+  const hideProfitCols = compactMode
+    ? true
+    : (opts?.hideProfitCols ?? false);
+
+  const { buffer, pageCount } = await buildPdf({
     voucherDate: formatDbDate(v.voucher_date),
     description: v.description,
     exchangeRate: v.exchange_rate ? parseFloat(v.exchange_rate) : null,
@@ -198,13 +241,30 @@ export async function generateInvoicePdf(
     userName,
     customerName,
     items,
-    hideProfitCols: opts?.hideProfitCols ?? false,
+    hideProfitCols,
+    compactMode,
   });
+
+  return { buffer, pageCount, itemCount: items.length };
 }
 
 // ── PDF renderer ──────────────────────────────────────────────────────────────
-async function buildPdf(d: InvoiceData): Promise<Buffer> {
+async function buildPdf(d: InvoiceData): Promise<{ buffer: Buffer; pageCount: number }> {
   const PDFDocument = (await import("pdfkit")).default;
+
+  // ── Resolve geometry constants based on mode ────────────────────────────────
+  const MARGIN_X     = d.compactMode ? CMP_MARGIN_X     : STD_MARGIN_X;
+  const MARGIN_Y     = d.compactMode ? CMP_MARGIN_Y     : STD_MARGIN_Y;
+  const USABLE_W     = d.compactMode ? CMP_USABLE_W     : STD_USABLE_W;
+  const HEADER_BAR_H = d.compactMode ? CMP_HEADER_BAR_H : STD_HEADER_BAR_H;
+  const LINE_H_PT    = d.compactMode ? CMP_LINE_H_PT    : STD_LINE_H_PT;
+  const MAX_DESC_LINES = d.compactMode ? CMP_MAX_LINES  : STD_MAX_LINES;
+  const PDFKIT_LINE_SAFETY = d.compactMode ? CMP_SAFETY : STD_SAFETY;
+  const THR_H        = d.compactMode ? CMP_THR_H        : STD_THR_H;
+  const ROW_H        = d.compactMode ? CMP_ROW_H        : STD_ROW_H;
+  const FONT_ROW     = d.compactMode ? CMP_FONT_ROW     : STD_FONT_ROW;
+  const FONT_HDR     = d.compactMode ? CMP_FONT_HDR     : STD_FONT_HDR;
+
   const doc = new PDFDocument({ margin: 0, size: "A4", autoFirstPage: true });
 
   const chunks: Buffer[] = [];
@@ -213,6 +273,8 @@ async function buildPdf(d: InvoiceData): Promise<Buffer> {
     doc.on("end", () => resolve(Buffer.concat(chunks)));
     doc.on("error", reject);
   });
+
+  let pageCount = 1; // autoFirstPage adds page 1
 
   const isMali = d.companyName.toLowerCase().includes("mali");
 
@@ -227,37 +289,38 @@ async function buildPdf(d: InvoiceData): Promise<Buffer> {
   let X_CFG: number, X_PLB: number, X_TPL: number;
   let innerDividers: number[];
 
-  if (hideProfitCols) {
-    COL_DESC_W = Math.round(USABLE_W * 0.42);
-    COL_QTY_W = Math.round(USABLE_W * 0.08);
-    COL_RATE_W = Math.round(USABLE_W * 0.18);
-    COL_AMT_W = USABLE_W - COL_DESC_W - COL_QTY_W - COL_RATE_W;
-    COL_CFG_W = 0;
-    COL_PLB_W = 0;
-    COL_TPL_W = 0;
+  if (d.compactMode || hideProfitCols) {
+    // 4-column compact layout — description gets the most room
+    const descPct  = d.compactMode ? 0.50 : 0.42;
+    const qtyPct   = d.compactMode ? 0.08 : 0.08;
+    const ratePct  = d.compactMode ? 0.18 : 0.18;
+    COL_DESC_W = Math.round(USABLE_W * descPct);
+    COL_QTY_W  = Math.round(USABLE_W * qtyPct);
+    COL_RATE_W = Math.round(USABLE_W * ratePct);
+    COL_AMT_W  = USABLE_W - COL_DESC_W - COL_QTY_W - COL_RATE_W;
+    COL_CFG_W = COL_PLB_W = COL_TPL_W = 0;
     X_DESC = MARGIN_X;
-    X_QTY = X_DESC + COL_DESC_W;
-    X_RATE = X_QTY + COL_QTY_W;
-    X_AMT = X_RATE + COL_RATE_W;
-    X_CFG = X_AMT;
-    X_PLB = X_AMT;
-    X_TPL = X_AMT;
+    X_QTY  = X_DESC + COL_DESC_W;
+    X_RATE = X_QTY  + COL_QTY_W;
+    X_AMT  = X_RATE + COL_RATE_W;
+    X_CFG  = X_PLB = X_TPL = X_AMT;
     innerDividers = [X_QTY, X_RATE, X_AMT];
   } else {
+    // 7-column full layout
     COL_DESC_W = Math.round(USABLE_W * 0.34);
-    COL_QTY_W = Math.round(USABLE_W * 0.07);
-    COL_RATE_W = Math.round(USABLE_W * 0.1);
-    COL_AMT_W = Math.round(USABLE_W * 0.11);
-    COL_CFG_W = Math.round(USABLE_W * 0.11);
-    COL_PLB_W = Math.round(USABLE_W * 0.13);
-    COL_TPL_W = USABLE_W - COL_DESC_W - COL_QTY_W - COL_RATE_W - COL_AMT_W - COL_CFG_W - COL_PLB_W;
+    COL_QTY_W  = Math.round(USABLE_W * 0.07);
+    COL_RATE_W = Math.round(USABLE_W * 0.10);
+    COL_AMT_W  = Math.round(USABLE_W * 0.11);
+    COL_CFG_W  = Math.round(USABLE_W * 0.11);
+    COL_PLB_W  = Math.round(USABLE_W * 0.13);
+    COL_TPL_W  = USABLE_W - COL_DESC_W - COL_QTY_W - COL_RATE_W - COL_AMT_W - COL_CFG_W - COL_PLB_W;
     X_DESC = MARGIN_X;
-    X_QTY = X_DESC + COL_DESC_W;
-    X_RATE = X_QTY + COL_QTY_W;
-    X_AMT = X_RATE + COL_RATE_W;
-    X_CFG = X_AMT + COL_AMT_W;
-    X_PLB = X_CFG + COL_CFG_W;
-    X_TPL = X_PLB + COL_PLB_W;
+    X_QTY  = X_DESC + COL_DESC_W;
+    X_RATE = X_QTY  + COL_QTY_W;
+    X_AMT  = X_RATE + COL_RATE_W;
+    X_CFG  = X_AMT  + COL_AMT_W;
+    X_PLB  = X_CFG  + COL_CFG_W;
+    X_TPL  = X_PLB  + COL_PLB_W;
     innerDividers = [X_QTY, X_RATE, X_AMT, X_CFG, X_PLB, X_TPL];
   }
 
@@ -266,80 +329,77 @@ async function buildPdf(d: InvoiceData): Promise<Buffer> {
   doc.rect(0, 0, PAGE_W, HEADER_BAR_H).fill(CLR_BRAND);
   doc.restore();
 
-  // "POS INVOICE" — white bold centred
-  doc.font("Helvetica-Bold").fontSize(15).fillColor(CLR_WHITE);
-  doc.text("POS INVOICE", MARGIN_X, 10, { width: USABLE_W, align: "center", lineBreak: false });
+  const titleFontSize = d.compactMode ? 12 : 15;
+  const metaFontSize  = d.compactMode ? 7  : 8;
+  const subFontSize   = d.compactMode ? 7  : 8.5;
+  const titleY        = d.compactMode ? 7  : 10;
+  const companyY      = d.compactMode ? 21 : 29;
+  const dateY         = d.compactMode ? 9  : 23;
+  const userY         = d.compactMode ? 18 : 35;
 
-  // Company name — muted subtitle
-  doc.font("Helvetica").fontSize(8.5).fillColor(CLR_MUTED);
-  doc.text(d.companyName, MARGIN_X, 29, { width: USABLE_W * 0.55, align: "center", lineBreak: false });
+  doc.font("Helvetica-Bold").fontSize(titleFontSize).fillColor(CLR_WHITE);
+  doc.text("POS INVOICE", MARGIN_X, titleY, { width: USABLE_W, align: "center", lineBreak: false });
 
-  // Date — right side of bar
-  doc.font("Helvetica").fontSize(8).fillColor(CLR_MUTED);
-  doc.text(`Date: ${d.voucherDate}`, MARGIN_X, 23, { width: USABLE_W - 2, align: "right", lineBreak: false });
+  doc.font("Helvetica").fontSize(subFontSize).fillColor(CLR_MUTED);
+  doc.text(d.companyName, MARGIN_X, companyY, { width: USABLE_W * 0.55, align: "center", lineBreak: false });
 
-  // User — right side of bar, below date
-  doc.font("Helvetica").fontSize(8).fillColor(CLR_MUTED);
-  doc.text(`User: ${d.userName}`, MARGIN_X, 35, { width: USABLE_W - 2, align: "right", lineBreak: false });
+  doc.font("Helvetica").fontSize(metaFontSize).fillColor(CLR_MUTED);
+  doc.text(`Date: ${d.voucherDate}`, MARGIN_X, dateY, { width: USABLE_W - 2, align: "right", lineBreak: false });
 
-  let y = HEADER_BAR_H + 6;
+  doc.font("Helvetica").fontSize(metaFontSize).fillColor(CLR_MUTED);
+  doc.text(`User: ${d.userName}`, MARGIN_X, userY, { width: USABLE_W - 2, align: "right", lineBreak: false });
+
+  let y = HEADER_BAR_H + (d.compactMode ? 4 : 6);
 
   // ── Daily exchange rate (Mali only) ──────────────────────────────────────────
   if (isMali && d.exchangeRate) {
-    const rateH = 18;
+    const rateH = d.compactMode ? 14 : 18;
     doc.save();
     doc.rect(MARGIN_X, y, USABLE_W, rateH).fill("#fffbeb");
     doc.rect(MARGIN_X, y, USABLE_W, rateH).strokeColor("#fde68a").lineWidth(0.75).stroke();
     doc.restore();
-    doc.font("Helvetica-Bold").fontSize(8).fillColor("#92400e");
+    doc.font("Helvetica-Bold").fontSize(d.compactMode ? 7 : 8).fillColor("#92400e");
     const rateStr = `Daily Rate: $1 = ${Math.round(d.exchangeRate).toLocaleString("en-US")} CFA`;
-    doc.text(rateStr, MARGIN_X, y + 5, { width: USABLE_W, align: "center", lineBreak: false });
-    y += rateH + 5;
+    doc.text(rateStr, MARGIN_X, y + (d.compactMode ? 3 : 5), { width: USABLE_W, align: "center", lineBreak: false });
+    y += rateH + (d.compactMode ? 3 : 5);
   }
 
   // ── Credit sale customer box ──────────────────────────────────────────────────
   if (d.isCreditSale && d.customerName) {
-    const boxH = 28;
+    const boxH = d.compactMode ? 20 : 28;
     doc.save();
     doc.rect(MARGIN_X, y, USABLE_W, boxH).fill("#eff6ff");
     doc.rect(MARGIN_X, y, USABLE_W, boxH).strokeColor("#bfdbfe").lineWidth(0.75).stroke();
     doc.restore();
-    doc.font("Helvetica-Bold").fontSize(7.5).fillColor("#1e40af");
-    doc.text("CREDIT SALE", MARGIN_X + 6, y + 5, { lineBreak: false });
-    doc.font("Helvetica").fontSize(7.5).fillColor(CLR_BODY);
-    doc.text(`Customer: ${d.customerName}`, MARGIN_X + 6, y + 16, { lineBreak: false });
-    y += boxH + 5;
+    doc.font("Helvetica-Bold").fontSize(d.compactMode ? 6.5 : 7.5).fillColor("#1e40af");
+    doc.text("CREDIT SALE", MARGIN_X + 6, y + (d.compactMode ? 3 : 5), { lineBreak: false });
+    doc.font("Helvetica").fontSize(d.compactMode ? 6.5 : 7.5).fillColor(CLR_BODY);
+    doc.text(`Customer: ${d.customerName}`, MARGIN_X + 6, y + (d.compactMode ? 11 : 16), { lineBreak: false });
+    y += boxH + (d.compactMode ? 3 : 5);
   }
 
   // ── Table column header ───────────────────────────────────────────────────────
-  const THR_H = 18;
-  const ROW_H = 15;
-
   function drawTableHeader(atY: number): number {
     doc.save();
     doc.rect(MARGIN_X, atY, USABLE_W, THR_H).fill(CLR_BRAND);
     doc.restore();
 
-    // inner column dividers — subtle lighter line
     doc.save();
     doc.strokeColor("rgba(255,255,255,0.15)").lineWidth(0.5);
     for (const x of innerDividers) {
-      doc
-        .moveTo(x, atY)
-        .lineTo(x, atY + THR_H)
-        .stroke();
+      doc.moveTo(x, atY).lineTo(x, atY + THR_H).stroke();
     }
     doc.restore();
 
-    doc.font("Helvetica-Bold").fontSize(7).fillColor(CLR_WHITE);
+    doc.font("Helvetica-Bold").fontSize(FONT_HDR).fillColor(CLR_WHITE);
     cellText(doc, "DESCRIPTION", X_DESC, COL_DESC_W, atY, THR_H, "left");
-    cellText(doc, "QTY", X_QTY, COL_QTY_W, atY, THR_H, "center");
-    cellText(doc, "RATE", X_RATE, COL_RATE_W, atY, THR_H, "center");
-    cellText(doc, "AMT", X_AMT, COL_AMT_W, atY, THR_H, "center");
+    cellText(doc, "QTY",         X_QTY,  COL_QTY_W,  atY, THR_H, "center");
+    cellText(doc, "RATE",        X_RATE, COL_RATE_W, atY, THR_H, "center");
+    cellText(doc, "AMT",         X_AMT,  COL_AMT_W,  atY, THR_H, "center");
     if (!hideProfitCols) {
-      cellText(doc, "CONFIG", X_CFG, COL_CFG_W, atY, THR_H, "center");
-      cellText(doc, "P/L BALE", X_PLB, COL_PLB_W, atY, THR_H, "center");
-      cellText(doc, "TOTAL P/L", X_TPL, COL_TPL_W, atY, THR_H, "center");
+      cellText(doc, "CONFIG",    X_CFG,  COL_CFG_W,  atY, THR_H, "center");
+      cellText(doc, "P/L BALE",  X_PLB,  COL_PLB_W,  atY, THR_H, "center");
+      cellText(doc, "TOTAL P/L", X_TPL,  COL_TPL_W,  atY, THR_H, "center");
     }
     return atY + THR_H;
   }
@@ -349,7 +409,7 @@ async function buildPdf(d: InvoiceData): Promise<Buffer> {
   // ── Item rows ─────────────────────────────────────────────────────────────────
   let totalQty = 0;
   let totalAmt = 0;
-  let totalPL = 0;
+  let totalPL  = 0;
   let rowIndex = 0;
 
   for (const item of d.items) {
@@ -359,16 +419,17 @@ async function buildPdf(d: InvoiceData): Promise<Buffer> {
 
     totalQty += item.quantity;
     totalAmt += amtUSD;
-    totalPL += itemPL;
+    totalPL  += itemPL;
 
-    doc.font("Helvetica-Bold").fontSize(7.5);
-    const descW = COL_DESC_W - 8;
+    doc.font("Helvetica-Bold").fontSize(FONT_ROW);
+    const descW     = COL_DESC_W - 8;
     const descLines = wrapText(doc, item.stockItemName, descW, MAX_DESC_LINES);
-    const dynH = Math.max(ROW_H, descLines.length * LINE_H_PT + 6);
+    const dynH      = Math.max(ROW_H, descLines.length * LINE_H_PT + (d.compactMode ? 4 : 6));
 
     if (y + dynH + PDFKIT_LINE_SAFETY > PAGE_H - MARGIN_Y) {
       doc.addPage({ size: "A4" });
-      y = MARGIN_Y;
+      pageCount++;
+      y        = MARGIN_Y;
       rowIndex = 0;
       y = drawTableHeader(y);
     }
@@ -377,50 +438,35 @@ async function buildPdf(d: InvoiceData): Promise<Buffer> {
     const rowBg = rowIndex % 2 === 1 ? CLR_ROW_ALT : CLR_WHITE;
     doc.save();
     doc.rect(MARGIN_X, y, USABLE_W, dynH).fill(rowBg);
-    // bottom separator
-    doc
-      .moveTo(MARGIN_X, y + dynH)
-      .lineTo(MARGIN_X + USABLE_W, y + dynH)
-      .strokeColor(CLR_SEP)
-      .lineWidth(0.75)
-      .stroke();
-    // inner dividers
+    doc.moveTo(MARGIN_X, y + dynH)
+       .lineTo(MARGIN_X + USABLE_W, y + dynH)
+       .strokeColor(CLR_SEP).lineWidth(0.75).stroke();
     doc.strokeColor(CLR_SEP).lineWidth(0.75);
     for (const x of innerDividers) {
-      doc
-        .moveTo(x, y)
-        .lineTo(x, y + dynH)
-        .stroke();
+      doc.moveTo(x, y).lineTo(x, y + dynH).stroke();
     }
     doc.restore();
 
-    // Description (wrapped lines)
-    doc.font("Helvetica-Bold").fontSize(7.5).fillColor(CLR_BRAND);
+    // Description (wrapped lines — max 1 in compact mode)
+    doc.font("Helvetica-Bold").fontSize(FONT_ROW).fillColor(CLR_BRAND);
     for (let li = 0; li < descLines.length; li++) {
       doc.text(descLines[li], X_DESC + 4, y + 3 + li * LINE_H_PT, {
-        width: descW,
-        align: "left",
-        lineBreak: false,
+        width: descW, align: "left", lineBreak: false,
       });
     }
 
-    const cy = y + Math.round((dynH - 7.5) / 2);
+    const cy = y + Math.round((dynH - FONT_ROW) / 2);
 
-    // Qty, Rate, Amt
-    doc.font("Helvetica").fontSize(7.5).fillColor(CLR_BODY);
-    doc.text(fmtQty(item.quantity), X_QTY + 1, cy, { width: COL_QTY_W - 2, align: "center", lineBreak: false });
-    doc.text(fmtUSD(item.rateUSD), X_RATE + 1, cy, { width: COL_RATE_W - 2, align: "center", lineBreak: false });
-    doc.font("Helvetica-Bold").fontSize(7.5).fillColor(CLR_BODY);
-    doc.text(fmtUSD(amtUSD), X_AMT + 1, cy, { width: COL_AMT_W - 2, align: "center", lineBreak: false });
+    doc.font("Helvetica").fontSize(FONT_ROW).fillColor(CLR_BODY);
+    doc.text(fmtQty(item.quantity), X_QTY  + 1, cy, { width: COL_QTY_W  - 2, align: "center", lineBreak: false });
+    doc.text(fmtUSD(item.rateUSD),  X_RATE + 1, cy, { width: COL_RATE_W - 2, align: "center", lineBreak: false });
+    doc.font("Helvetica-Bold").fontSize(FONT_ROW).fillColor(CLR_BODY);
+    doc.text(fmtUSD(amtUSD),        X_AMT  + 1, cy, { width: COL_AMT_W  - 2, align: "center", lineBreak: false });
 
     if (!hideProfitCols) {
-      doc.font("Helvetica").fontSize(7.5).fillColor(CLR_BODY);
-      doc.text(fmtUSD(item.configuredPrice), X_CFG + 1, cy, {
-        width: COL_CFG_W - 2,
-        align: "center",
-        lineBreak: false,
-      });
-      doc.font("Helvetica-Bold").fontSize(7.5);
+      doc.font("Helvetica").fontSize(FONT_ROW).fillColor(CLR_BODY);
+      doc.text(fmtUSD(item.configuredPrice), X_CFG + 1, cy, { width: COL_CFG_W - 2, align: "center", lineBreak: false });
+      doc.font("Helvetica-Bold").fontSize(FONT_ROW);
       doc.fillColor(plColor(plBale));
       doc.text(fmtUSD(plBale), X_PLB + 1, cy, { width: COL_PLB_W - 2, align: "center", lineBreak: false });
       doc.fillColor(plColor(itemPL));
@@ -431,77 +477,68 @@ async function buildPdf(d: InvoiceData): Promise<Buffer> {
     rowIndex++;
 
     // Sync PDFKit's internal cursor to our manual tracker after every row.
-    // Each doc.text() call advances doc.y by ~lineHeight even when explicit
-    // coordinates are provided, causing doc.y to drift ahead of our y.  If
-    // PDFKit's cursor crosses (page.maxY − lineHeight) between our intended
-    // rows it auto-inserts a blank page before we can do so ourselves.
     (doc as any).y = y;
     (doc as any).x = MARGIN_X;
   }
 
   // ── TOTAL + TOTAL PAID + footer — keep together on the same page ─────────────
-  // Minimum combined height: TOTAL (18) + gap (8) + TOTAL PAID (32) + gap (8) +
-  // footer rule + text (~26) = 92 pt.  If that doesn't fit, start a fresh page
-  // so the summary is never split across pages leaving a near-blank last page.
-  const totH = 18;
-  const SUMMARY_MIN_H = totH + 8 + 32 + 8 + 26; // 92
+  const totH = d.compactMode ? 14 : 18;
+  const paidH = d.compactMode ? 24 : 32;
+  const SUMMARY_MIN_H = totH + 6 + paidH + 6 + 22;
   if (y + SUMMARY_MIN_H + PDFKIT_LINE_SAFETY > PAGE_H - MARGIN_Y) {
     doc.addPage({ size: "A4" });
+    pageCount++;
     y = MARGIN_Y;
   }
+
   doc.save();
   doc.rect(MARGIN_X, y, USABLE_W, totH).fill(CLR_ACCENT);
   doc.restore();
 
-  doc.font("Helvetica-Bold").fontSize(8).fillColor(CLR_WHITE);
-  cellText(doc, "TOTAL", X_DESC, COL_DESC_W, y, totH, "left");
-  cellText(doc, fmtQty(totalQty), X_QTY, COL_QTY_W, y, totH, "center");
-  cellText(doc, fmtUSD(totalAmt), X_AMT, COL_AMT_W, y, totH, "center");
+  doc.font("Helvetica-Bold").fontSize(d.compactMode ? 7 : 8).fillColor(CLR_WHITE);
+  cellText(doc, "TOTAL",           X_DESC, COL_DESC_W, y, totH, "left");
+  cellText(doc, fmtQty(totalQty),  X_QTY,  COL_QTY_W,  y, totH, "center");
+  cellText(doc, fmtUSD(totalAmt),  X_AMT,  COL_AMT_W,  y, totH, "center");
   if (!hideProfitCols) {
-    // White for profit, bright red for loss — clearly readable on green background.
-    // Always show sign (+/−) so direction is unambiguous.
     const plSign = totalPL > 0 ? "+" : totalPL < 0 ? "−" : "";
     doc.fillColor(totalPL >= 0 ? CLR_WHITE : "#ffaaaa");
     cellText(doc, plSign + fmtUSD(Math.abs(totalPL)), X_TPL, COL_TPL_W, y, totH, "center");
   }
-  y += totH + 8;
+  y += totH + (d.compactMode ? 5 : 8);
 
   // ── TOTAL PAID block ──────────────────────────────────────────────────────────
-  // (overflow already handled by the combined check above — no extra addPage here)
-
-  const paidH = 32;
   const paidStr = fmtUSD(totalAmt);
-
   doc.save();
   doc.rect(MARGIN_X, y, USABLE_W, paidH).fill(CLR_BRAND);
   doc.restore();
 
-  doc.font("Helvetica").fontSize(8).fillColor(CLR_MUTED);
-  doc.text("TOTAL PAID", MARGIN_X + 10, y + 8, { lineBreak: false });
+  doc.font("Helvetica").fontSize(d.compactMode ? 7 : 8).fillColor(CLR_MUTED);
+  doc.text("TOTAL PAID", MARGIN_X + 10, y + (d.compactMode ? 6 : 8), { lineBreak: false });
 
-  doc.font("Helvetica-Bold").fontSize(14).fillColor(CLR_WHITE);
+  doc.font("Helvetica-Bold").fontSize(d.compactMode ? 11 : 14).fillColor(CLR_WHITE);
   const paidW = doc.widthOfString(paidStr);
-  doc.text(paidStr, MARGIN_X + USABLE_W - paidW - 10, y + 9, { lineBreak: false });
+  doc.text(paidStr, MARGIN_X + USABLE_W - paidW - 10, y + (d.compactMode ? 7 : 9), { lineBreak: false });
 
-  y += paidH + 8;
+  y += paidH + (d.compactMode ? 5 : 8);
 
   // ── Note box ──────────────────────────────────────────────────────────────────
   if (d.description) {
-    doc.font("Helvetica-Bold").fontSize(7.5);
+    doc.font("Helvetica-Bold").fontSize(d.compactMode ? 6.5 : 7.5);
     const noteBodyH = doc.heightOfString(d.description, { width: USABLE_W - 16 });
     const noteH = Math.ceil(noteBodyH) + 14;
     if (y + noteH > PAGE_H - MARGIN_Y) {
       doc.addPage({ size: "A4" });
+      pageCount++;
       y = MARGIN_Y;
     }
     doc.save();
     doc.rect(MARGIN_X, y, USABLE_W, noteH).fill("#fffbeb");
     doc.rect(MARGIN_X, y, USABLE_W, noteH).strokeColor("#fde68a").lineWidth(0.75).stroke();
     doc.restore();
-    doc.font("Helvetica-Bold").fontSize(7.5).fillColor("#92400e");
+    doc.font("Helvetica-Bold").fontSize(d.compactMode ? 6.5 : 7.5).fillColor("#92400e");
     doc.text("Note: ", MARGIN_X + 6, y + 5, { lineBreak: false });
     const noteX = MARGIN_X + 6 + doc.widthOfString("Note: ");
-    doc.font("Helvetica").fontSize(7.5).fillColor(CLR_BODY);
+    doc.font("Helvetica").fontSize(d.compactMode ? 6.5 : 7.5).fillColor(CLR_BODY);
     doc.text(d.description, noteX, y + 5, {
       width: USABLE_W - 6 - doc.widthOfString("Note: "),
       lineBreak: false,
@@ -512,19 +549,15 @@ async function buildPdf(d: InvoiceData): Promise<Buffer> {
   // ── Footer ────────────────────────────────────────────────────────────────────
   y += 4;
   doc.save();
-  doc
-    .moveTo(MARGIN_X, y)
-    .lineTo(MARGIN_X + USABLE_W, y)
-    .strokeColor(CLR_ACCENT)
-    .lineWidth(1.5)
-    .stroke();
+  doc.moveTo(MARGIN_X, y).lineTo(MARGIN_X + USABLE_W, y).strokeColor(CLR_ACCENT).lineWidth(1.5).stroke();
   doc.restore();
   y += 6;
-  doc.font("Helvetica-Bold").fontSize(8).fillColor(CLR_ACCENT);
+  doc.font("Helvetica-Bold").fontSize(d.compactMode ? 7 : 8).fillColor(CLR_ACCENT);
   doc.text("Thank you for your business!", MARGIN_X, y, { width: USABLE_W, align: "center", lineBreak: false });
 
   doc.end();
-  return pdfReady;
+  const buffer = await pdfReady;
+  return { buffer, pageCount };
 }
 
 // ── Vertically centred single-line text inside a cell ─────────────────────────
@@ -535,9 +568,9 @@ function cellText(
   w: number,
   rowY: number,
   rowH: number,
-  align: "left" | "center" | "right"
+  align: "left" | "center" | "right",
 ): void {
   const textY = rowY + Math.round((rowH - 8) / 2);
-  const pad = align === "left" ? 4 : 1;
+  const pad   = align === "left" ? 4 : 1;
   doc.text(text, x + pad, textY, { width: w - pad * 2, align, lineBreak: false });
 }
