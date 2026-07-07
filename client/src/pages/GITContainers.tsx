@@ -44,6 +44,7 @@ import {
   DEFAULT_OTW_COL_VIS,
   fmt,
   BulkProgress,
+  type EtaFilterValue,
 } from "./git-containers/gitContainerTypes";
 import { SummaryCard } from "./git-containers/InlineCells";
 import { ContainerDrawer } from "./git-containers/ContainerDrawer";
@@ -71,7 +72,7 @@ export default function GITContainers({ embedded = false }: { embedded?: boolean
   const [docsFilter, setDocsFilter] = useState("ALL");
   const [delayedFilter, setDelayedFilter] = useState("ALL");
   const [freightFilter, setFreightFilter] = useState("ALL");
-  const [etaFilter, setEtaFilter] = useState("ALL");
+  const [etaFilter, setEtaFilter] = useState<EtaFilterValue>("ALL");
   const [notesFilter, setNotesFilter] = useState("ALL");
   const [sortOrder, setSortOrder] = useState("DEFAULT");
   const [search, setSearch] = useState("");
@@ -171,6 +172,11 @@ export default function GITContainers({ embedded = false }: { embedded?: boolean
   const agents = [...new Set(allContainers.map((c) => c.agent).filter(Boolean))].sort() as string[];
   const trucks = [...new Set(allContainers.map((c) => c.numberPlate).filter(Boolean))].sort() as string[];
   const locations = [...new Set(allContainers.map((c) => c.trackingLocation).filter(Boolean))].sort() as string[];
+  const allEtaDates = useMemo(
+    () => [...new Set(allContainers.map((c) => c.eta).filter(Boolean))].sort() as string[],
+    [allContainers]
+  );
+  const hasContainersWithNoEta = useMemo(() => allContainers.some((c) => !c.eta), [allContainers]);
 
   function openDrawer(c: EnrichedContainerRow) {
     setDrawerContainer(c);
@@ -502,6 +508,8 @@ export default function GITContainers({ embedded = false }: { embedded?: boolean
           setFreightFilter={setFreightFilter}
           etaFilter={etaFilter}
           setEtaFilter={setEtaFilter}
+          allEtaDates={allEtaDates}
+          hasContainersWithNoEta={hasContainersWithNoEta}
           notesFilter={notesFilter}
           setNotesFilter={setNotesFilter}
           sortOrder={sortOrder}

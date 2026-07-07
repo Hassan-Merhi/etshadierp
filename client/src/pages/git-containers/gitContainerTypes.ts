@@ -89,6 +89,15 @@ export const OTW_COLS = [
 
 export type OtwColId = (typeof OTW_COLS)[number]["id"];
 
+/**
+ * ETA filter value for the hierarchical date picker.
+ * "ALL" = no filter applied; object = custom selection of specific YYYY-MM-DD dates
+ * plus an optional "include containers with no ETA" flag.
+ */
+export type EtaFilterValue =
+  | "ALL"
+  | { selectedDates: string[]; includeNoEta: boolean };
+
 export const DEFAULT_OTW_COL_VIS: Record<OtwColId, boolean> = Object.fromEntries(
   OTW_COLS.map((c) => [c.id, true])
 ) as Record<OtwColId, boolean>;

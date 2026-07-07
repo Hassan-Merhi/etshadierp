@@ -4,6 +4,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Button } from "@/components/ui/button";
 import { RefreshCw } from "lucide-react";
 import { MultiFilterSelect } from "./MultiFilterSelect";
+import { EtaDateFilter } from "./EtaDateFilter";
+import type { EtaFilterValue } from "./gitContainerTypes";
 
 interface FilterBarProps {
   showFilters: boolean;
@@ -34,8 +36,10 @@ interface FilterBarProps {
   setDelayedFilter: (v: string) => void;
   freightFilter: string;
   setFreightFilter: (v: string) => void;
-  etaFilter: string;
-  setEtaFilter: (v: string) => void;
+  etaFilter: EtaFilterValue;
+  setEtaFilter: (v: EtaFilterValue) => void;
+  allEtaDates: string[];
+  hasContainersWithNoEta: boolean;
   notesFilter: string;
   setNotesFilter: (v: string) => void;
   sortOrder: string;
@@ -82,6 +86,8 @@ export function FilterBar({
   setFreightFilter,
   etaFilter,
   setEtaFilter,
+  allEtaDates,
+  hasContainersWithNoEta,
   notesFilter,
   setNotesFilter,
   sortOrder,
@@ -101,7 +107,7 @@ export function FilterBar({
     docsFilter !== "ALL" ? 1 : 0,
     delayedFilter !== "ALL" ? 1 : 0,
     freightFilter !== "ALL" ? 1 : 0,
-    etaFilter !== "ALL" ? 1 : 0,
+    etaFilter !== "ALL" ? 1 : 0, // EtaFilterValue "ALL" means unfiltered
     notesFilter !== "ALL" ? 1 : 0,
   ].reduce((a, b) => a + b, 0);
 
@@ -250,18 +256,15 @@ export function FilterBar({
             </Select>
           </div>
 
-          <div className="w-28">
+          <div className="w-44">
             <FilterLabel>ETA</FilterLabel>
-            <Select value={etaFilter} onValueChange={setEtaFilter}>
-              <SelectTrigger className="h-8 text-xs" data-testid="select-filter-eta">
-                <SelectValue placeholder="All" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="ALL">All</SelectItem>
-                <SelectItem value="HAS_ETA">With ETA</SelectItem>
-                <SelectItem value="NO_ETA">No ETA</SelectItem>
-              </SelectContent>
-            </Select>
+            <EtaDateFilter
+              value={etaFilter}
+              onChange={setEtaFilter}
+              allEtaDates={allEtaDates}
+              hasContainersWithNoEta={hasContainersWithNoEta}
+              testId="select-filter-eta"
+            />
           </div>
 
           <div className="w-32">

@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { EnrichedContainerRow } from "./gitContainerTypes";
+import { EnrichedContainerRow, EtaFilterValue } from "./gitContainerTypes";
 
 interface UseContainerFiltersProps {
   allContainers: EnrichedContainerRow[];
@@ -13,7 +13,7 @@ interface UseContainerFiltersProps {
   docsFilter: string;
   delayedFilter: string;
   freightFilter: string;
-  etaFilter: string;
+  etaFilter: EtaFilterValue;
   notesFilter: string;
   search: string;
   sortOrder: string;
@@ -68,8 +68,16 @@ export function useContainerFilters({
         if (delayedFilter === "OVERDUE" && !c.isOverdue) return false;
         if (freightFilter === "HAS_FREIGHT" && !(parseFloat(c.poFreight ?? "0") > 0)) return false;
         if (freightFilter === "NO_FREIGHT" && parseFloat(c.poFreight ?? "0") > 0) return false;
-        if (etaFilter === "HAS_ETA" && !c.eta) return false;
-        if (etaFilter === "NO_ETA" && !!c.eta) return false;
+        if (etaFilter !== "ALL") {
+          const eta = c.eta || null;
+          if (!eta) {
+            // Container has no ETA date
+            if (!etaFilter.includeNoEta) return false;
+          } else {
+            // Container has an ETA date — check if it's in the selected set
+            if (!etaFilter.selectedDates.includes(eta)) return false;
+          }
+        }
         if (notesFilter === "WITH" && !(c.trackingDescription ?? "").trim()) return false;
         if (notesFilter === "WITHOUT" && !!(c.trackingDescription ?? "").trim()) return false;
         if (search) {
@@ -112,7 +120,7 @@ export function useContainerFilters({
     docsFilter,
     delayedFilter,
     freightFilter,
-    etaFilter,
+    JSON.stringify(etaFilter),
     notesFilter,
     sortOrder,
     search,
