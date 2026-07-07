@@ -1,121 +1,55 @@
-import { useState, useEffect } from "react";
+import { useEffect } from "react";
 import { useParams, useLocation } from "wouter";
 import { useBackToParent } from "@/hooks/use-back-to-parent";
 import { useEscapeBack } from "@/hooks/use-escape-back";
-import { useQuery, useMutation } from "@tanstack/react-query";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { parseISO } from "date-fns";
 import { useDateFormat } from "@/contexts/DateFormatContext";
 import { useCompany } from "@/contexts/CompanyContext";
-import { PageHeader } from "@/components/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useToast } from "@/hooks/use-toast";
-import { queryClient, keyStartsWith } from "@/lib/queryClient";
+import { PageHeader } from "@/components/PageHeader";
 import { useAppMode, useModePrefix } from "@/contexts/AppModeContext";
 import { getApiRequest } from "@/lib/factoryApi";
 import { ArrowLeft } from "lucide-react";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
 
 // Sub-components
-import {
-  VoucherData,
-  BankAccount,
-  LedgerAccount,
-  Supplier,
-  StockItem,
-  Location,
-  focusByTestId,
-} from "./voucher-edit/VoucherEditHelpers";
+import { focusByTestId } from "./voucher-edit/VoucherEditHelpers";
 import { PaymentReceiptEditForm } from "./voucher-edit/PaymentReceiptEditForm";
 import { JournalEditForm } from "./voucher-edit/JournalEditForm";
 import { PurchaseEditForm } from "./voucher-edit/PurchaseEditForm";
 import { AdjustmentEditForm } from "./voucher-edit/AdjustmentEditForm";
 import { TransferEditForm } from "./voucher-edit/TransferEditForm";
 import { SalesEditForm } from "./voucher-edit/SalesEditForm";
-import {
-  voucherFormSchema,
-  journalFormSchema,
-  salesFormSchema,
-  purchaseFormSchema,
-  adjustmentFormSchema,
-  transferFormSchema,
-  VoucherFormData,
-  JournalFormData,
-  SalesFormData,
-  PurchaseFormData,
-  AdjustmentFormData,
-  TransferFormData,
-} from "./voucher-edit/VoucherEditSchemas";
 
-import {
-  preparePaymentReceiptData,
-  prepareJournalData,
-  prepareSalesData,
-  preparePurchaseData,
-  prepareAdjustmentData,
-  prepareTransferData,
-} from "./voucher-edit/VoucherSubmitHelpers";
-
-import { useAccountsWithBalances, AccountWithBalance } from "./voucher-edit/VoucherAccountHelpers";
-import { useBalanceAdjustments } from "./voucher-edit/useBalanceAdjustments";
-import { useFormInitialization } from "./voucher-edit/useFormInitialization";
+// Hooks
+import { useVoucherEditQueries } from "./voucher-edit/useVoucherEditQueries";
+import { useVoucherEditMutations } from "./voucher-edit/useVoucherEditMutations";
+import { useVoucherEditState } from "./voucher-edit/useVoucherEditState";
 
 export default function VoucherEdit() {
   const { formatDisplayDate } = useDateFormat();
   const { id } = useParams<{ id: string }>();
   const [_location, navigate] = useLocation();
   const handleBack = useBackToParent();
-  const { toast } = useToast();
   const { selectedCompany } = useCompany();
   const { selectedCurrency, formatAmount, exchangeRate } = useCurrencyContext();
   const appMode = useAppMode();
   const modePrefix = useModePrefix();
   const modeApiRequest = getApiRequest(appMode);
-  const [formInitialized, setFormInitialized] = useState(false);
 
   useEscapeBack(() => navigate(`${modePrefix}/vouchers`));
 
-  useEffect(() => {
-    setFormInitialized(false);
-  }, [id]);
-
   const {
-    data: voucher,
-    isLoading: voucherLoading,
-    error: voucherError,
-  } = useQuery<VoucherData>({
-    queryKey: [`/api/vouchers/${id}`],
-    enabled: !!id,
-  });
-
-  const { data: bankAccounts = [] } = useQuery<BankAccount[]>({
-    queryKey: ["/api/bank-accounts"],
-  });
-
-  const { data: ledgerAccounts = [] } = useQuery<LedgerAccount[]>({
-    queryKey: ["/api/ledger-accounts"],
-  });
-
-  const { data: suppliers = [] } = useQuery<Supplier[]>({
-    queryKey: ["/api/suppliers"],
-  });
-
-  const { data: stockItems = [] } = useQuery<StockItem[]>({
-    queryKey: ["/api/stock-items"],
-    staleTime: 5 * 60 * 1000,
-    refetchOnWindowFocus: false,
-  });
-
-  const { data: locations = [] } = useQuery<Location[]>({
-    queryKey: ["/api/locations"],
-  });
-
-  const { data: allAccountsData = [] } = useQuery<AccountWithBalance[]>({
-    queryKey: ["/api/accounts/all", selectedCompany?.id],
-    enabled: !!selectedCompany?.id,
-  });
+    voucher,
+    voucherLoading,
+    voucherError,
+    bankAccounts,
+    ledgerAccounts,
+    suppliers,
+    stockItems,
+    locations,
+    allAccountsData,
+  } = useVoucherEditQueries({ id, selectedCompanyId: selectedCompany?.id });
 
   const voucherType = voucher?.voucherType;
   const isPaymentOrReceipt = voucherType === "Payment" || voucherType === "Receipt";
@@ -131,261 +65,37 @@ export default function VoucherEdit() {
     }
   }, [isSales, id, navigate]);
 
-  const paymentForm = useForm<VoucherFormData>({
-    resolver: zodResolver(voucherFormSchema),
-    defaultValues: {
-      paymentAccountType: "bank",
-      paymentAccountId: 0,
-      paymentAccountName: "",
-      voucherDate: new Date(),
-      currency: selectedCurrency as "USD" | "CFA",
-      entries: [],
-      notes: "",
-    },
-  });
+  const { paymentForm, journalForm, salesForm, purchaseForm, adjustmentForm, transferForm, allAccountsWithBalances } =
+    useVoucherEditState({
+      voucher,
+      voucherType,
+      isPaymentOrReceipt,
+      selectedCurrency,
+      ledgerAccounts,
+      bankAccounts,
+      suppliers,
+      allAccountsData,
+      exchangeRate,
+      id,
+    });
 
-  const [balanceAdjustments, setBalanceAdjustments] = useState<Record<string, number>>({});
-
-  const allAccountsWithBalances = useAccountsWithBalances(
-    ledgerAccounts,
-    bankAccounts,
-    suppliers,
-    allAccountsData,
-    balanceAdjustments
-  );
-
-  useBalanceAdjustments(isPaymentOrReceipt, paymentForm, voucherType, exchangeRate, setBalanceAdjustments);
-
-  const journalForm = useForm<JournalFormData>({
-    resolver: zodResolver(journalFormSchema),
-    defaultValues: {
-      voucherDate: new Date(),
-      currency: selectedCurrency as "USD" | "CFA",
-      entries: [],
-      notes: "",
-    },
-  });
-
-  const salesForm = useForm<SalesFormData>({
-    resolver: zodResolver(salesFormSchema),
-    defaultValues: {
-      voucherDate: new Date(),
-      currency: selectedCurrency as "USD" | "CFA",
-      locationId: 0,
-      items: [],
-      notes: "",
-    },
-  });
-
-  const purchaseForm = useForm<PurchaseFormData>({
-    resolver: zodResolver(purchaseFormSchema),
-    defaultValues: {
-      voucherDate: new Date(),
-      currency: selectedCurrency as "USD" | "CFA",
-      items: [],
-      notes: "",
-    },
-  });
-
-  const adjustmentForm = useForm<AdjustmentFormData>({
-    resolver: zodResolver(adjustmentFormSchema),
-    defaultValues: {
-      voucherDate: new Date(),
-      currency: selectedCurrency as "USD" | "CFA",
-      locationId: 0,
-      items: [],
-      notes: "",
-    },
-  });
-
-  const transferForm = useForm<TransferFormData>({
-    resolver: zodResolver(transferFormSchema),
-    defaultValues: {
-      voucherDate: new Date(),
-      currency: selectedCurrency as "USD" | "CFA",
-      sourceLocationId: 0,
-      destinationLocationId: 0,
-      items: [],
-      notes: "",
-    },
-  });
-
-  useFormInitialization(
-    voucher,
-    formInitialized,
-    setFormInitialized,
+  const {
+    updateMutation,
+    toggleOptionalMutation,
+    updateSalesMutation,
+    updatePurchaseMutation,
+    updateAdjustmentMutation,
+    updateTransferMutation,
+    onSubmitPaymentReceipt,
+    onSubmitJournal,
+  } = useVoucherEditMutations({
+    id,
+    modeApiRequest,
     voucherType,
-    ledgerAccounts,
-    bankAccounts,
-    suppliers,
-    allAccountsData,
-    selectedCurrency as "USD" | "CFA",
-    paymentForm,
-    journalForm,
-    salesForm,
-    purchaseForm,
-    adjustmentForm,
-    transferForm
-  );
-
-  const updateMutation = useMutation({
-    mutationFn: async (data: { voucherUpdates: any; entries: any[] }) => {
-      return await modeApiRequest("PUT", `/api/vouchers/${id}/with-entries`, {
-        voucher: data.voucherUpdates,
-        entries: data.entries,
-      });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] });
-      queryClient.invalidateQueries({ queryKey: [`/api/vouchers/${id}`] });
-      queryClient.invalidateQueries({ queryKey: ["/api/accounts/all"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/factory/daybook"] });
-      queryClient.invalidateQueries({ predicate: keyStartsWith("/api/accounts/") });
-      queryClient.invalidateQueries({ predicate: keyStartsWith("/api/factory/customers/") });
-      queryClient.invalidateQueries({ queryKey: ["/api/factory/customers"] });
-      queryClient.invalidateQueries({ predicate: keyStartsWith("/api/factory/customer-orders") });
-      toast({ title: "Success", description: "Voucher updated successfully" });
-      handleBack();
-    },
-    onError: (error: any) => {
-      if ((error as any)?._handledGlobally) return;
-      toast({ title: "Error", description: error.message || "Failed to update voucher", variant: "destructive" });
-    },
+    exchangeRate,
+    handleBack,
+    modePrefix,
   });
-
-  const toggleOptionalMutation = useMutation({
-    mutationFn: async (optional: boolean) => {
-      return await modeApiRequest("PATCH", `/api/vouchers/${id}/optional`, { optional });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] });
-      queryClient.invalidateQueries({ queryKey: [`/api/vouchers/${id}`] });
-      queryClient.invalidateQueries({ queryKey: ["/api/accounts/all"] });
-      toast({ title: "Success", description: "Optional status updated successfully" });
-    },
-    onError: (error: any) => {
-      if ((error as any)?._handledGlobally) return;
-      toast({
-        title: "Error",
-        description: error.message || "Failed to update optional status",
-        variant: "destructive",
-      });
-    },
-  });
-
-  const updateSalesMutation = useMutation({
-    mutationFn: async (data: SalesFormData) => {
-      const salesData = prepareSalesData(data);
-      return await modeApiRequest("PATCH", `/api/vouchers/${id}/sales`, salesData);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] });
-      queryClient.invalidateQueries({ queryKey: [`/api/vouchers/${id}`] });
-      queryClient.invalidateQueries({ queryKey: ["/api/accounts/all"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/inventory"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/inventory-by-location"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/stock-transfers"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/daybook"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/factory/daybook"] });
-      toast({ title: "Success", description: "Sales voucher updated successfully" });
-      navigate(`${modePrefix}/daybook`);
-    },
-    onError: (error: any) => {
-      if ((error as any)?._handledGlobally) return;
-      toast({ title: "Error", description: error.message || "Failed to update sales voucher", variant: "destructive" });
-    },
-  });
-
-  const updatePurchaseMutation = useMutation({
-    mutationFn: async (data: PurchaseFormData) => {
-      const purchaseData = preparePurchaseData(data);
-      return await modeApiRequest("PATCH", `/api/vouchers/${id}/purchase`, purchaseData);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] });
-      queryClient.invalidateQueries({ queryKey: [`/api/vouchers/${id}`] });
-      queryClient.invalidateQueries({ queryKey: ["/api/accounts/all"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/inventory"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/inventory-by-location"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/stock-transfers"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/daybook"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/factory/daybook"] });
-      toast({ title: "Success", description: "Purchase voucher updated successfully" });
-      navigate(`${modePrefix}/daybook`);
-    },
-    onError: (error: any) => {
-      if ((error as any)?._handledGlobally) return;
-      toast({
-        title: "Error",
-        description: error.message || "Failed to update purchase voucher",
-        variant: "destructive",
-      });
-    },
-  });
-
-  const updateAdjustmentMutation = useMutation({
-    mutationFn: async (data: AdjustmentFormData) => {
-      const adjustmentData = prepareAdjustmentData(data);
-      return await modeApiRequest("PATCH", `/api/vouchers/${id}/adjustment`, adjustmentData);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] });
-      queryClient.invalidateQueries({ queryKey: [`/api/vouchers/${id}`] });
-      queryClient.invalidateQueries({ queryKey: ["/api/accounts/all"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/inventory"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/inventory-by-location"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/stock-transfers"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/daybook"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/factory/daybook"] });
-      toast({ title: "Success", description: "Adjustment voucher updated successfully" });
-      navigate(`${modePrefix}/daybook`);
-    },
-    onError: (error: any) => {
-      if ((error as any)?._handledGlobally) return;
-      toast({
-        title: "Error",
-        description: error.message || "Failed to update adjustment voucher",
-        variant: "destructive",
-      });
-    },
-  });
-
-  const updateTransferMutation = useMutation({
-    mutationFn: async (data: TransferFormData) => {
-      const transferData = prepareTransferData(data);
-      return await modeApiRequest("PATCH", `/api/vouchers/${id}/transfer`, transferData);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] });
-      queryClient.invalidateQueries({ queryKey: [`/api/vouchers/${id}`] });
-      queryClient.invalidateQueries({ queryKey: ["/api/accounts/all"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/inventory"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/inventory-by-location"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/stock-transfers"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/daybook"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/factory/daybook"] });
-      toast({ title: "Success", description: "Stock transfer voucher updated successfully" });
-      navigate(`${modePrefix}/daybook`);
-    },
-    onError: (error: any) => {
-      if ((error as any)?._handledGlobally) return;
-      toast({
-        title: "Error",
-        description: error.message || "Failed to update stock transfer voucher",
-        variant: "destructive",
-      });
-    },
-  });
-
-  const onSubmitPaymentReceipt = async (data: VoucherFormData) => {
-    const { voucherUpdates, entries } = preparePaymentReceiptData(data, voucherType!, exchangeRate);
-    updateMutation.mutate({ voucherUpdates, entries });
-  };
-
-  const onSubmitJournal = async (data: JournalFormData) => {
-    const { voucherUpdates, entries } = prepareJournalData(data, exchangeRate);
-    updateMutation.mutate({ voucherUpdates, entries });
-  };
 
   if (voucherLoading)
     return (
