@@ -1,5 +1,5 @@
-import { useState, useRef } from "react";
-import { CalendarIcon, ChevronDown } from "lucide-react";
+import { useState } from "react";
+import { CalendarIcon, ChevronDown, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -8,7 +8,12 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Popover, PopoverAnchor, PopoverContent } from "@/components/ui/popover";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Calendar } from "@/components/ui/calendar";
 import { useDateFormat } from "@/contexts/DateFormatContext";
 import { cn } from "@/lib/utils";
@@ -123,10 +128,6 @@ export function PeriodFilter({
 }: PeriodFilterProps) {
   const { formatDisplayDate } = useDateFormat();
   const [calendarOpen, setCalendarOpen] = useState(false);
-  // Timestamp of the last time the calendar was opened programmatically.
-  // Used to suppress the stale "outside-click" event that Radix's DismissableLayer
-  // fires when the DropdownMenu finishes closing — even after our setTimeout.
-  const calendarOpenedAt = useRef<number>(0);
 
   const fromDateObj = value.fromDate ? new Date(value.fromDate + "T12:00:00") : undefined;
   const toDateObj = value.toDate ? new Date(value.toDate + "T12:00:00") : undefined;
@@ -136,15 +137,11 @@ export function PeriodFilter({
 
   const handlePresetChange = (preset: PeriodPreset) => {
     if (preset === "custom") {
-      // Wait for the DropdownMenu's DismissableLayer to finish its cleanup
-      // before opening the Popover. 50 ms was too short on production — the
-      // stale "outside-click" event from the dropdown close still arrived and
-      // immediately killed the calendar. 200 ms is sufficient; the ref guard
-      // below catches any stragglers that still slip through.
-      setTimeout(() => {
-        calendarOpenedAt.current = Date.now();
-        setCalendarOpen(true);
-      }, 200);
+      // Open the modal Dialog after the DropdownMenu has closed.
+      // Using a Dialog (modal) instead of a Popover eliminates the race condition
+      // where Radix's DismissableLayer cleanup events would immediately dismiss
+      // the calendar — a modal is fully immune to those pointer events.
+      setTimeout(() => setCalendarOpen(true), 0);
     } else {
       const dates = getPresetDates(preset);
       onChange({ ...dates, preset });
@@ -181,94 +178,85 @@ export function PeriodFilter({
 
   return (
     <div className={cn("flex flex-wrap items-center gap-2", className)}>
-      {/*
-       * Wrap the DropdownMenu trigger in a PopoverAnchor so the calendar
-       * Popover (non-modal) appears anchored to the same button.
-       * A Popover doesn't have Dialog's modal focus-trap, so the DropdownMenu
-       * close event cannot cause it to immediately dismiss.
-       */}
-      <Popover open={!hideCustomInputs && calendarOpen} onOpenChange={setCalendarOpen}>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <PopoverAnchor asChild>
-              <Button variant="outline" size="sm" className="gap-1" data-testid={testId || "period-filter-dropdown"}>
-                <CalendarIcon className="h-4 w-4 shrink-0" />
-                <span className="max-w-[200px] truncate">{displayLabel}</span>
-                <ChevronDown className="h-3 w-3 opacity-50 shrink-0" />
-              </Button>
-            </PopoverAnchor>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-48">
-            <DropdownMenuItem onClick={() => handlePresetChange("all_time")} data-testid="period-preset-all-time">
-              All Time
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={() => handlePresetChange("today")} data-testid="period-preset-today">
-              Today
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => handlePresetChange("yesterday")} data-testid="period-preset-yesterday">
-              Yesterday
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => handlePresetChange("this_week")} data-testid="period-preset-this-week">
-              This Week
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => handlePresetChange("this_month")} data-testid="period-preset-this-month">
-              This Month
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              onClick={() => handlePresetChange("last_1_month")}
-              data-testid="period-preset-last-1-month"
-            >
-              Last 1 Month
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              onClick={() => handlePresetChange("last_6_months")}
-              data-testid="period-preset-last-6-months"
-            >
-              Last 6 Months
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => handlePresetChange("this_year")} data-testid="period-preset-this-year">
-              This Year
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={() => handlePresetChange("custom")} data-testid="period-preset-custom">
-              Custom Range...
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant="outline" size="sm" className="gap-1" data-testid={testId || "period-filter-dropdown"}>
+            <CalendarIcon className="h-4 w-4 shrink-0" />
+            <span className="max-w-[200px] truncate">{displayLabel}</span>
+            <ChevronDown className="h-3 w-3 opacity-50 shrink-0" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="w-48">
+          <DropdownMenuItem onClick={() => handlePresetChange("all_time")} data-testid="period-preset-all-time">
+            All Time
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem onClick={() => handlePresetChange("today")} data-testid="period-preset-today">
+            Today
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={() => handlePresetChange("yesterday")} data-testid="period-preset-yesterday">
+            Yesterday
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={() => handlePresetChange("this_week")} data-testid="period-preset-this-week">
+            This Week
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={() => handlePresetChange("this_month")} data-testid="period-preset-this-month">
+            This Month
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            onClick={() => handlePresetChange("last_1_month")}
+            data-testid="period-preset-last-1-month"
+          >
+            Last 1 Month
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            onClick={() => handlePresetChange("last_6_months")}
+            data-testid="period-preset-last-6-months"
+          >
+            Last 6 Months
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={() => handlePresetChange("this_year")} data-testid="period-preset-this-year">
+            This Year
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem onClick={() => handlePresetChange("custom")} data-testid="period-preset-custom">
+            Custom Range...
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
 
-        {/* Calendar popover — non-modal, anchored to the trigger button above */}
-        <PopoverContent
-          className="w-auto p-0"
-          align="end"
-          sideOffset={4}
-          onInteractOutside={(e) => {
-            // Eat stale outside-click events that arrive within 300 ms of the
-            // calendar opening (caused by the DropdownMenu's DismissableLayer
-            // finishing its cleanup and broadcasting a pointer-outside signal).
-            if (Date.now() - calendarOpenedAt.current < 300) {
-              e.preventDefault();
-            }
-          }}
-        >
-          <div className="p-3 border-b">
-            <p className="text-sm font-medium">Select date range</p>
-            <p className="text-xs text-muted-foreground mt-0.5">Click a start date, then an end date</p>
-          </div>
-          <Calendar
-            mode="range"
-            selected={calendarRange}
-            onSelect={handleRangeSelect}
-            numberOfMonths={2}
-            defaultMonth={fromDateObj ?? new Date()}
-          />
-          {calendarRange?.from && !calendarRange?.to && (
-            <div className="p-3 border-t text-xs text-muted-foreground text-center">
-              Now click an end date
+      {/* Calendar in a modal Dialog — immune to DismissableLayer race conditions */}
+      {!hideCustomInputs && (
+        <Dialog open={calendarOpen} onOpenChange={setCalendarOpen}>
+          <DialogContent className="w-auto max-w-fit p-0" data-testid="period-custom-range-dialog">
+            <DialogHeader className="px-4 pt-4 pb-0">
+              <DialogTitle className="text-sm font-medium flex items-center justify-between">
+                Select date range
+              </DialogTitle>
+              <p className="text-xs text-muted-foreground mt-0.5">Click a start date, then an end date</p>
+            </DialogHeader>
+            <div className="p-3">
+              <Calendar
+                mode="range"
+                selected={calendarRange}
+                onSelect={handleRangeSelect}
+                numberOfMonths={2}
+                defaultMonth={fromDateObj ?? new Date()}
+              />
             </div>
-          )}
-        </PopoverContent>
-      </Popover>
+            {calendarRange?.from && !calendarRange?.to && (
+              <div className="px-4 pb-3 text-xs text-muted-foreground text-center">
+                Now click an end date
+              </div>
+            )}
+            <div className="px-4 pb-4 flex justify-end">
+              <Button variant="outline" size="sm" onClick={() => setCalendarOpen(false)}>
+                <X className="h-3.5 w-3.5 mr-1" /> Close
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 }
