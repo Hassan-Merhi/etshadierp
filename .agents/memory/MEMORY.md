@@ -24,3 +24,4 @@
 - [excelHelper defval only fills undefined not null](excelhelper-defval.md) — eachCell({includeEmpty:true}) stores null as explicit null so defval does NOT override it; defval only applies to keys absent from rowData (short rows that don't reach the column).
 - [xlsx→excelHelper migration context](xlsx-exceljs-migration.md) — client/src/lib/excelHelper.ts is a pre-existing ExcelJS compatibility shim for the SheetJS xlsx API; migration predates Phase 4; server routes (factoryWorkerRoutes etc.) still use raw xlsx; only client files use the shim.
 - [Proforma/container verification alias matching](proforma-verification-alias-conflict.md) — item matching is barcode/alias-only, never by name; buildAliasMap() flags aliases that collide with another item's own code as conflicts.
+- [POS handlers hook composition pattern](pos-handlers-split.md) — usePosHandlers.ts is a thin orchestrator over focused sub-hooks; keep this shape for future POS frontend splits.
