@@ -827,6 +827,97 @@ describe("V2 Export — Cash/Bank roll-forward formulas", () => {
     expect(formula).toContain(String(E_DEPOSIT_ROW));
     expect(formula).toContain(String(E_TOTAL_PAY_ROW));
   });
+
+  it("With no cashAccountId, Day 1 Opening Cash cell is blank and unlocked for manual entry", () => {
+    // The default `buf` workbook (built in beforeAll) is generated WITHOUT
+    // cashAccountId — Day 1 Opening Cash must be an editable manual cell,
+    // never a stale/frozen value.
+    const ws = wb.getWorksheet("ENTRY")!;
+    const cashCell = ws.getRow(E_OPEN_CASH_ROW).getCell(E_DATE_START);
+    expect(cashCell.value).toBeNull();
+    expect(cashCell.protection?.locked).toBe(false);
+  });
+});
+
+// ── 15c. Historical opening cash from a real ledger account ───────────────────
+describe("V2 Export — Historical opening cash (cashAccountId)", () => {
+  const CASH_PREFIX = "xlsxv2cashtest";
+  let cashCtx: TestContext;
+  const BEFORE_BALANCE = 500;  // posted before fromDate (2026-07-01) → must be picked up
+  const AFTER_DELTA    = 9999; // posted after fromDate → must NOT affect opening cash
+
+  beforeAll(async () => {
+    cashCtx = await seedTestData(CASH_PREFIX);
+    const { companyId, locationId, cashAccountId, salesAccountId } = cashCtx;
+
+    // Journal dated 2026-06-25 (well before fromDate=2026-07-01): DR cash 500.
+    // This must be the balance picked up "as of dayBefore(fromDate)" = Jun 30.
+    const { rows: [vBefore] } = await pool.query<{ id: number }>(
+      `INSERT INTO vouchers (company_id, location_id, voucher_type, voucher_date, description, optional, voucher_number, total_amount)
+       VALUES ($1, $2, 'Journal', '2026-06-25', 'Cash test: pre-period balance', false, 'CASH-PRE-001', $3)
+       RETURNING id`,
+      [companyId, locationId, BEFORE_BALANCE],
+    );
+    await pool.query(
+      `INSERT INTO voucher_entries (voucher_id, ledger_account_id, debit_amount, credit_amount, narration)
+       VALUES ($1, $2, $3, 0, 'pre-period'),
+              ($1, $4, 0, $3, 'pre-period')`,
+      [vBefore.id, cashAccountId, BEFORE_BALANCE, salesAccountId],
+    );
+
+    // Journal dated 2026-07-04 (INSIDE the export range, after fromDate):
+    // must be excluded from the opening-cash balance — it should only ever
+    // show up rolled into a later day's Balance Cash, never Day-1 Opening Cash.
+    const { rows: [vAfter] } = await pool.query<{ id: number }>(
+      `INSERT INTO vouchers (company_id, location_id, voucher_type, voucher_date, description, optional, voucher_number, total_amount)
+       VALUES ($1, $2, 'Journal', '2026-07-04', 'Cash test: in-period, must be excluded from opening', false, 'CASH-POST-001', $3)
+       RETURNING id`,
+      [companyId, locationId, AFTER_DELTA],
+    );
+    await pool.query(
+      `INSERT INTO voucher_entries (voucher_id, ledger_account_id, debit_amount, credit_amount, narration)
+       VALUES ($1, $2, $3, 0, 'in-period'),
+              ($1, $4, 0, $3, 'in-period')`,
+      [vAfter.id, cashAccountId, AFTER_DELTA, salesAccountId],
+    );
+  }, 60000);
+
+  afterAll(async () => {
+    try {
+      await pool.query(
+        `DELETE FROM voucher_entries WHERE voucher_id IN (SELECT id FROM vouchers WHERE company_id = $1)`,
+        [cashCtx.companyId],
+      );
+      await pool.query(`DELETE FROM vouchers WHERE company_id = $1`, [cashCtx.companyId]);
+    } catch { /* ignore */ }
+    await cleanupTestData(CASH_PREFIX);
+  }, 30000);
+
+  it("Day 1 Opening Cash equals the ledger balance as of dayBefore(fromDate) — not today's/current balance — and is locked", async () => {
+    const { companyId, locationId, cashAccountId } = cashCtx;
+    const cashBuf = await generateSpSalesFormExcelV2({
+      companyId,
+      locationId,
+      fromDate: FROM, // 2026-07-01 → dayBefore = 2026-06-30
+      toDate: TO,
+      locationName: "Cash Test Warehouse",
+      supplierName: "Cash Account Test",
+      cashAccountId,
+    });
+    const cashWb = new ExcelJS.Workbook();
+    await cashWb.xlsx.load(cashBuf);
+    const ws = cashWb.getWorksheet("ENTRY")!;
+    const cashCell = ws.getRow(E_OPEN_CASH_ROW).getCell(E_DATE_START);
+
+    // Must equal the pre-period balance (500), never include the in-period
+    // journal (9999) — proving the query is scoped to dayBefore(fromDate),
+    // not "today" or the full ledger through export generation time.
+    expect(cellNum(ws, E_OPEN_CASH_ROW, E_DATE_START)).toBe(BEFORE_BALANCE);
+    // ExcelJS omits the `protection` element for locked cells (locked=true is
+    // the workbook default), so "locked" reads back as undefined — matching
+    // the pattern used by the other roll-forward lock assertions in this file.
+    expect(cashCell.protection?.locked).not.toBe(false);
+  });
 });
 
 // ── 16. Cell protection ────────────────────────────────────────────────────────

@@ -222,10 +222,10 @@ async function fetchCashAccountBalance(
     SELECT COALESCE(SUM(ve.debit_amount - ve.credit_amount), 0) AS balance
     FROM   voucher_entries ve
     JOIN   vouchers        v  ON v.id = ve.voucher_id
-    WHERE  ve.account_id = ${accountId}
-      AND  v.company_id  = ${companyId}
-      AND  v.voucher_date <= ${asOfDate}::date
-      AND  v.deleted_at  IS NULL
+    WHERE  ve.ledger_account_id = ${accountId}
+      AND  v.company_id         = ${companyId}
+      AND  v.voucher_date       <= ${asOfDate}::date
+      AND  v.deleted_at        IS NULL
   `);
   const rows = (res as any).rows ?? (res as any[]);
   return pn(rows[0]?.balance ?? 0);
