@@ -58,6 +58,7 @@ A comprehensive ERP and POS system for multi-company warehouse management, optim
 
 ## User preferences
 Preferred communication style: Simple, everyday language.
+Testing: do not add new test files unless absolutely necessary; only update existing tests if they break because of a change. For verification, run typecheck/build and manually explain what was checked instead of expanding the test suite.
 
 ## Gotchas
 - **`tsc --noEmit` duration**: Typechecking can take longer than 2 minutes, making in-loop verification difficult.
