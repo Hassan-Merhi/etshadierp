@@ -116,21 +116,14 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
     isSpCompany,
   });
 
-  // Supplier Partner sales always settle to a bank account (no cash-ledger,
-  // no credit): /api/sp/sales requires a real bankAccountId and has no
-  // credit-sale support. Enforce this in state (not just hidden UI) so a
-  // stale cash-ledger id or a lingering credit toggle from a prior company
-  // can never be sent as bankAccountId.
+  // Supplier Partner sales support cash or bank settlement, same as normal
+  // ERP POS — but never credit: /api/sp/sales has no credit-sale support.
+  // Enforce only the credit restriction in state (not just hidden UI) so a
+  // lingering credit toggle from a prior company can never leak through.
   useEffect(() => {
     if (!isSpCompany) return;
-    setPaymentAccountType("bank");
     setIsCreditSale(false);
-    setPaymentAccountId((prev) => {
-      if (!prev) return prev;
-      const isValidBankAccount = (bankAccounts || []).some((acc: any) => String(acc.id) === String(prev));
-      return isValidBankAccount ? prev : null;
-    });
-  }, [isSpCompany, bankAccounts]);
+  }, [isSpCompany]);
 
   // Keep autoSaveStateRef in sync
   autoSaveStateRef.current.activeLocation = activeLocation;
@@ -151,17 +144,16 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
     }
   }, [posUser, posAssignedLocations, posSelectedLocation]);
 
-  // Set default cash account for POS users from location mapping
-  // (Supplier Partner sales never use a cash-ledger account — /api/sp/sales
-  // requires a real bankAccountId — so skip this default entirely for SP.)
+  // Set default cash account for POS users from location mapping — applies to
+  // Supplier Partner companies too, same as normal ERP POS.
   useEffect(() => {
-    if (editVoucherId || isSpCompany) return;
+    if (editVoucherId) return;
     const locCashId = (posSelectedLocation as any)?.cashAccountId;
     if (posUser && locCashId) {
       setPaymentAccountType("cash");
       setPaymentAccountId(String(locCashId));
     }
-  }, [posUser, posSelectedLocation, editVoucherId, isSpCompany]);
+  }, [posUser, posSelectedLocation, editVoucherId]);
 
   // Auto-attach to today's draft
   useEffect(() => {

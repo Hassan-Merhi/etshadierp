@@ -81,10 +81,13 @@ export function usePosMutations({
         // Supplier Partner sale — posts through the SP-specific endpoint so the
         // voucher stays exactly Dr Bank/Cash / Cr Supplier Cash Payable (no
         // Sales/COGS/Stock/Cost-Clearing lines); see server/routes/spRoutes.ts.
+        // paymentAccountType/paymentAccountId are resolved server-side against
+        // bank accounts or Cash-type ledger accounts, same as normal ERP POS.
         const spBody = {
           saleDate: saleData.voucherDate,
           customerName: (saleData.notes || "").trim() || "Walk-in Customer",
-          bankAccountId: saleData.paymentAccountId,
+          paymentAccountType: saleData.paymentAccountType,
+          paymentAccountId: saleData.paymentAccountId,
           notes: saleData.notes || undefined,
           saleLines: saleData.items.map((item: any) => ({
             stockItemId: item.stockItemId,

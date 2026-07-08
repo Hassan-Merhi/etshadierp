@@ -55,7 +55,7 @@ interface PosMobileLayoutProps {
   hasValidItems: boolean;
   handleSaveSale: () => void;
   formatDisplayAmount: (v: number) => string;
-  /** Supplier Partner sales always settle to a bank account — no cash-ledger or credit option. */
+  /** Supplier Partner sales support cash/bank settlement like normal ERP POS — no credit option. */
   isSpCompany?: boolean;
 }
 
@@ -281,31 +281,29 @@ export function PosMobileLayout({
             </Popover>
           ) : (
             <div className="flex items-center gap-2 flex-1">
-              {!isSpCompany && (
-                <Select
-                  value={paymentAccountType}
-                  onValueChange={posUser ? undefined : (v: "bank" | "cash") => setPaymentAccountType(v)}
-                  disabled={!!posUser}
-                >
-                  <SelectTrigger className="w-24" data-testid="select-mobile-account-type">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="cash">Cash</SelectItem>
-                    <SelectItem value="bank">Bank</SelectItem>
-                  </SelectContent>
-                </Select>
-              )}
+              <Select
+                value={paymentAccountType}
+                onValueChange={posUser ? undefined : (v: "bank" | "cash") => setPaymentAccountType(v)}
+                disabled={!!posUser}
+              >
+                <SelectTrigger className="w-24" data-testid="select-mobile-account-type">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="cash">Cash</SelectItem>
+                  <SelectItem value="bank">Bank</SelectItem>
+                </SelectContent>
+              </Select>
               <Select
                 value={paymentAccountId || ""}
                 onValueChange={posUser ? undefined : setPaymentAccountId}
                 disabled={!!posUser}
               >
                 <SelectTrigger className="flex-1 min-w-0" data-testid="select-mobile-payment-account">
-                  <SelectValue placeholder={isSpCompany || paymentAccountType === "bank" ? "Select Bank" : "Select Cash"} />
+                  <SelectValue placeholder={paymentAccountType === "bank" ? "Select Bank" : "Select Cash"} />
                 </SelectTrigger>
                 <SelectContent>
-                  {isSpCompany || paymentAccountType === "bank"
+                  {paymentAccountType === "bank"
                     ? (Array.isArray(bankAccounts) ? bankAccounts : []).map((acc: any) => (
                         <SelectItem key={acc.id} value={String(acc.id)}>{acc.name} ({acc.code})</SelectItem>
                       ))

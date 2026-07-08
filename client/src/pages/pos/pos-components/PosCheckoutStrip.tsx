@@ -30,7 +30,7 @@ interface PosCheckoutStripProps {
   customerAccounts: any[];
   bankAccounts: any[];
   cashLedgerAccounts: any[];
-  /** Supplier Partner sales always settle to a bank account — no cash-ledger or credit option. */
+  /** Supplier Partner sales support cash/bank settlement like normal ERP POS — no credit option. */
   isSpCompany?: boolean;
 }
 
@@ -122,21 +122,19 @@ export function PosCheckoutStrip({
 
       {!isCreditSale && (
         <>
-          {!isSpCompany && (
-            <Select
-              value={paymentAccountType}
-              onValueChange={posUser ? undefined : (v: "bank" | "cash") => setPaymentAccountType(v)}
-              disabled={!!posUser}
-            >
-              <SelectTrigger className="w-24" data-testid="select-account-type">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="cash">Cash</SelectItem>
-                <SelectItem value="bank">Bank</SelectItem>
-              </SelectContent>
-            </Select>
-          )}
+          <Select
+            value={paymentAccountType}
+            onValueChange={posUser ? undefined : (v: "bank" | "cash") => setPaymentAccountType(v)}
+            disabled={!!posUser}
+          >
+            <SelectTrigger className="w-24" data-testid="select-account-type">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="cash">Cash</SelectItem>
+              <SelectItem value="bank">Bank</SelectItem>
+            </SelectContent>
+          </Select>
 
           <Select
             value={paymentAccountId || ""}
@@ -144,10 +142,10 @@ export function PosCheckoutStrip({
             disabled={!!posUser}
           >
             <SelectTrigger className="w-[180px]" data-testid="select-payment-account">
-              <SelectValue placeholder={isSpCompany || paymentAccountType === "bank" ? "Select Bank" : "Select Cash"} />
+              <SelectValue placeholder={paymentAccountType === "bank" ? "Select Bank" : "Select Cash"} />
             </SelectTrigger>
             <SelectContent>
-              {isSpCompany || paymentAccountType === "bank"
+              {paymentAccountType === "bank"
                 ? (Array.isArray(bankAccounts) ? bankAccounts : []).map((acc: any) => (
                     <SelectItem key={acc.id} value={String(acc.id)}>
                       {acc.name} ({acc.code})

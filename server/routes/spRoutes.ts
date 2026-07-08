@@ -1237,27 +1237,54 @@ export function registerSpRoutes(app: Express) {
       const companyId = await requireSpCompany(req, res);
       if (!companyId) return;
 
-      const { saleDate, customerName, saleLines, bankAccountId, notes } = req.body;
+      const { saleDate, customerName, saleLines, bankAccountId, paymentAccountType, paymentAccountId, notes } = req.body;
 
       if (!saleDate || !customerName || !Array.isArray(saleLines) || saleLines.length === 0) {
         return res.status(400).json({ message: "saleDate, customerName, saleLines required" });
       }
 
-      // The sale voucher now posts exactly two lines — Dr selected Bank/Cash and
+      // The sale voucher now posts exactly two lines — Dr selected Cash/Bank and
       // Cr Supplier Cash Payable, both = totalSalePrice — so a settlement account
       // is mandatory; without it the voucher would post an unbalanced single credit line.
-      if (!bankAccountId) {
-        return res.status(400).json({ message: "bankAccountId is required to record where the sale cash was collected" });
+      // paymentAccountType/paymentAccountId is the current (cash-or-bank) contract,
+      // same as normal ERP POS; bankAccountId is kept as a legacy fallback for
+      // any older callers that only ever posted to a bank account.
+      const resolvedAccountId = paymentAccountId ?? bankAccountId;
+      const resolvedAccountType: "cash" | "bank" = paymentAccountType === "cash" ? "cash" : "bank";
+      if (!resolvedAccountId) {
+        return res.status(400).json({ message: "A cash or bank account is required to record where the sale cash was collected" });
       }
 
-      // Validate bank account belongs to this company
-      const [ba] = await db
-        .select({ id: bankAccounts.id, companyId: bankAccounts.companyId })
-        .from(bankAccounts)
-        .where(and(eq(bankAccounts.id, parseInt(bankAccountId)), eq(bankAccounts.companyId, companyId)))
-        .limit(1);
-      if (!ba) {
-        return res.status(400).json({ message: "Invalid bank account — account not found for this company" });
+      // Validate the settlement account belongs to this company, and is the
+      // right kind of account for the selected type.
+      let settlementBankAccountId: number | null = null;
+      let settlementLedgerAccountId: number | null = null;
+      if (resolvedAccountType === "cash") {
+        const [cashLedger] = await db
+          .select({ id: ledgerAccounts.id, accountType: ledgerAccounts.accountType })
+          .from(ledgerAccounts)
+          .where(
+            and(
+              eq(ledgerAccounts.id, parseInt(resolvedAccountId)),
+              eq(ledgerAccounts.companyId, companyId),
+              isNull(ledgerAccounts.deletedAt)
+            )
+          )
+          .limit(1);
+        if (!cashLedger || cashLedger.accountType !== "Cash") {
+          return res.status(400).json({ message: "Invalid cash account — account not found for this company" });
+        }
+        settlementLedgerAccountId = cashLedger.id;
+      } else {
+        const [ba] = await db
+          .select({ id: bankAccounts.id, companyId: bankAccounts.companyId })
+          .from(bankAccounts)
+          .where(and(eq(bankAccounts.id, parseInt(resolvedAccountId)), eq(bankAccounts.companyId, companyId)))
+          .limit(1);
+        if (!ba) {
+          return res.status(400).json({ message: "Invalid bank account — account not found for this company" });
+        }
+        settlementBankAccountId = ba.id;
       }
 
       // Supplier Partner sale voucher only ever posts against the payable account
@@ -1408,11 +1435,14 @@ export function registerSpRoutes(app: Express) {
           })
           .returning();
 
-        // bankAccountId is mandatory (validated above) so the voucher always has
-        // exactly this Dr entry balancing the Cr Supplier Cash Payable entry below.
+        // A settlement account is mandatory (validated above) so the voucher
+        // always has exactly this Dr entry balancing the Cr Supplier Cash
+        // Payable entry below — either a bank account or a Cash-type ledger
+        // account, same choice normal ERP POS offers.
         await tx.insert(voucherEntries).values({
           voucherId: voucher.id,
-          bankAccountId: parseInt(bankAccountId),
+          bankAccountId: settlementBankAccountId,
+          ledgerAccountId: settlementLedgerAccountId,
           debitAmount: String(totalSalePrice),
           creditAmount: "0",
           narration: `Sale receipts — ${customerName}`,

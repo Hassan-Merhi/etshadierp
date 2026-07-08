@@ -33,6 +33,7 @@ let cogsAcctId: number;
 let stockAcctId: number;
 let costClrAcctId: number;
 let bankAccountId: number;
+let cashLedgerAcctId: number;
 
 async function loginAsTestUser() {
   const loginRes = await agent.post("/api/auth/login").send({
@@ -138,6 +139,19 @@ beforeAll(async () => {
     })
     .returning();
   bankAccountId = bankAccount.id;
+
+  const [cashLedgerAcct] = await db
+    .insert(schema.ledgerAccounts)
+    .values({
+      companyId: ctx.companyId,
+      code: `${TEST_PREFIX}_CASH`,
+      name: "Test Cash",
+      accountType: "Cash",
+      openingBalance: "0",
+      openingBalanceSide: "Dr",
+    })
+    .returning();
+  cashLedgerAcctId = cashLedgerAcct.id;
 
   agent = request.agent(ctx.app);
   await loginAsTestUser();
@@ -255,7 +269,7 @@ describe("Supplier Partner sale accounting — POST /api/sp/sales", () => {
     });
 
     expect(res.status).toBe(400);
-    expect(res.body.message).toMatch(/bankAccountId/i);
+    expect(res.body.message).toMatch(/cash or bank account/i);
 
     const salesAfter = await pool.query(`SELECT COUNT(*)::int AS c FROM sp_sales WHERE company_id = $1`, [
       ctx.companyId,
@@ -269,6 +283,71 @@ describe("Supplier Partner sale accounting — POST /api/sp/sales", () => {
       [ctx.companyId, "Sale — Test Customer No Bank"],
     );
     expect(voucherCountForNoBankSale.rows[0].c).toBe(0);
+  });
+
+  it("posts ONLY Dr Cash / Cr Supplier Cash Payable = totalSalePrice when paymentAccountType is cash", async () => {
+    await seedStockLot(1, 500, 700);
+    const [stockItemId] = ctx.stockItemIds;
+
+    const res = await agent.post("/api/sp/sales").send({
+      saleDate: new Date().toISOString().split("T")[0],
+      customerName: "Test Customer Cash",
+      paymentAccountType: "cash",
+      paymentAccountId: cashLedgerAcctId,
+      saleLines: [{ stockItemId, qtySold: 1, salePricePerUnit: 1000 }],
+    });
+
+    expect(res.status).toBe(200);
+    const sale = res.body;
+    expect(sale.voucherId).toBeTruthy();
+
+    const entries = await db
+      .select()
+      .from(schema.voucherEntries)
+      .where(eq(schema.voucherEntries.voucherId, sale.voucherId));
+
+    expect(entries.length).toBe(2);
+
+    const totalDebit = entries.reduce((s, e) => s + parseFloat(e.debitAmount as any), 0);
+    const totalCredit = entries.reduce((s, e) => s + parseFloat(e.creditAmount as any), 0);
+    expect(totalDebit).toBeCloseTo(1000, 2);
+    expect(totalCredit).toBeCloseTo(1000, 2);
+
+    const cashEntry = entries.find((e) => e.ledgerAccountId === cashLedgerAcctId);
+    expect(cashEntry).toBeDefined();
+    expect(cashEntry!.bankAccountId).toBeNull();
+    expect(parseFloat(cashEntry!.debitAmount as any)).toBeCloseTo(1000, 2);
+    expect(parseFloat(cashEntry!.creditAmount as any)).toBeCloseTo(0, 2);
+
+    const payableEntry = entries.find((e) => e.ledgerAccountId === payableAcctId);
+    expect(payableEntry).toBeDefined();
+    expect(parseFloat(payableEntry!.creditAmount as any)).toBeCloseTo(1000, 2);
+  });
+
+  it("falls back to bankAccountId when paymentAccountType/paymentAccountId are not sent (legacy callers)", async () => {
+    await seedStockLot(1, 500, 700);
+    const [stockItemId] = ctx.stockItemIds;
+
+    const res = await agent.post("/api/sp/sales").send({
+      saleDate: new Date().toISOString().split("T")[0],
+      customerName: "Test Customer Legacy",
+      bankAccountId,
+      saleLines: [{ stockItemId, qtySold: 1, salePricePerUnit: 1000 }],
+    });
+
+    expect(res.status).toBe(200);
+    const sale = res.body;
+    expect(sale.voucherId).toBeTruthy();
+
+    const entries = await db
+      .select()
+      .from(schema.voucherEntries)
+      .where(eq(schema.voucherEntries.voucherId, sale.voucherId));
+
+    const bankEntry = entries.find((e) => e.bankAccountId === bankAccountId);
+    expect(bankEntry).toBeDefined();
+    expect(bankEntry!.ledgerAccountId).toBeFalsy();
+    expect(parseFloat(bankEntry!.debitAmount as any)).toBeCloseTo(1000, 2);
   });
 
   it("still requires the Supplier Cash Payable account to be configured", async () => {
