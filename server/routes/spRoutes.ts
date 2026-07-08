@@ -1243,25 +1243,31 @@ export function registerSpRoutes(app: Express) {
         return res.status(400).json({ message: "saleDate, customerName, saleLines required" });
       }
 
-      // Validate bank account belongs to this company (if provided)
-      if (bankAccountId) {
-        const [ba] = await db
-          .select({ id: bankAccounts.id, companyId: bankAccounts.companyId })
-          .from(bankAccounts)
-          .where(and(eq(bankAccounts.id, parseInt(bankAccountId)), eq(bankAccounts.companyId, companyId)))
-          .limit(1);
-        if (!ba) {
-          return res.status(400).json({ message: "Invalid bank account — account not found for this company" });
-        }
+      // The sale voucher now posts exactly two lines — Dr selected Bank/Cash and
+      // Cr Supplier Cash Payable, both = totalSalePrice — so a settlement account
+      // is mandatory; without it the voucher would post an unbalanced single credit line.
+      if (!bankAccountId) {
+        return res.status(400).json({ message: "bankAccountId is required to record where the sale cash was collected" });
       }
 
-      const salesAcct = await getSpAccount(companyId, "sp_sales");
-      const cogsAcct = await getSpAccount(companyId, "sp_cogs");
-      const stockAcct = await getSpAccount(companyId, "sp_stock");
-      const costClrAcct = await getSpAccount(companyId, "sp_cost_clearing");
+      // Validate bank account belongs to this company
+      const [ba] = await db
+        .select({ id: bankAccounts.id, companyId: bankAccounts.companyId })
+        .from(bankAccounts)
+        .where(and(eq(bankAccounts.id, parseInt(bankAccountId)), eq(bankAccounts.companyId, companyId)))
+        .limit(1);
+      if (!ba) {
+        return res.status(400).json({ message: "Invalid bank account — account not found for this company" });
+      }
+
+      // Supplier Partner sale voucher only ever posts against the payable account
+      // (Dr Bank/Cash = totalSalePrice, Cr Supplier Cash Payable = totalSalePrice).
+      // Sales/COGS/Stock/Cost-Clearing accounts are NOT touched by this voucher —
+      // COGS/profit/remaining-stock-value are derived from sp_stock_movements and
+      // spSaleLines.finalUnitCostUsd instead (see totalFinalCost/grossProfit below).
       const payableAcct = await getSpAccount(companyId, "sp_payable");
 
-      if (!salesAcct || !cogsAcct || !stockAcct || !costClrAcct || !payableAcct) {
+      if (!payableAcct) {
         return res.status(400).json({ message: "SP accounts not configured. Run Setup first." });
       }
 
@@ -1402,49 +1408,27 @@ export function registerSpRoutes(app: Express) {
           })
           .returning();
 
-        if (bankAccountId) {
-          await tx.insert(voucherEntries).values({
-            voucherId: voucher.id,
-            bankAccountId: parseInt(bankAccountId),
-            debitAmount: String(totalSalePrice),
-            creditAmount: "0",
-            narration: `Sale receipts — ${customerName}`,
-          });
-        }
+        // bankAccountId is mandatory (validated above) so the voucher always has
+        // exactly this Dr entry balancing the Cr Supplier Cash Payable entry below.
+        await tx.insert(voucherEntries).values({
+          voucherId: voucher.id,
+          bankAccountId: parseInt(bankAccountId),
+          debitAmount: String(totalSalePrice),
+          creditAmount: "0",
+          narration: `Sale receipts — ${customerName}`,
+        });
 
-        await tx.insert(voucherEntries).values({
-          voucherId: voucher.id,
-          ledgerAccountId: salesAcct.id,
-          debitAmount: "0",
-          creditAmount: String(totalSalePrice),
-          narration: `Sales — ${customerName}`,
-        });
-        await tx.insert(voucherEntries).values({
-          voucherId: voucher.id,
-          ledgerAccountId: cogsAcct.id,
-          debitAmount: String(totalFinalCost),
-          creditAmount: "0",
-          narration: `COGS — ${customerName}`,
-        });
-        await tx.insert(voucherEntries).values({
-          voucherId: voucher.id,
-          ledgerAccountId: stockAcct.id,
-          debitAmount: "0",
-          creditAmount: String(totalFinalCost),
-          narration: `Stock reduction — ${customerName}`,
-        });
-        await tx.insert(voucherEntries).values({
-          voucherId: voucher.id,
-          ledgerAccountId: costClrAcct.id,
-          debitAmount: String(totalBaseCost),
-          creditAmount: "0",
-          narration: `Cost clearing — base cost to payable — ${customerName}`,
-        });
+        // Supplier Partner sale voucher posts ONLY the customer cash collected —
+        // it must never look like Bank+COGS (e.g. 1700 for a 1000 sale/700 cost).
+        // Supplier Cash Payable = full selling price collected from the customer;
+        // COGS/profit/stock value are derived separately from sp_stock_movements
+        // and spSaleLines.finalUnitCostUsd (see totalFinalCost/grossProfit above),
+        // never posted as extra Dr/Cr lines on this voucher.
         await tx.insert(voucherEntries).values({
           voucherId: voucher.id,
           ledgerAccountId: payableAcct.id,
           debitAmount: "0",
-          creditAmount: String(totalBaseCost),
+          creditAmount: String(totalSalePrice),
           narration: `Supplier Cash Payable — ${customerName}`,
         });
 
