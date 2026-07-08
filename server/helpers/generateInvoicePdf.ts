@@ -3,7 +3,12 @@
  *
  * Full columns  : Description (34%) | Qty (7%) | Rate (10%) | Amt (11%) | Config (11%) | P/L Bale (13%) | Total P/L (14%)
  * Profit hidden : Description (42%) | Qty (8%)  | Rate (18%) | Amt (32%)
- * Compact/WA    : Description (50%) | Qty (8%)  | Rate (18%) | Amt (24%)  — no profit cols, tight layout
+ *
+ * compactMode/whatsappMode only control sizing (tighter margins/rows, single-
+ * line description). Whether P/L columns show is controlled solely by
+ * hideProfitCols (visibility settings) and by the auto-hide-when-no-
+ * configured-price rule in buildPdf — a WhatsApp invoice for a location with
+ * a selling price fix still gets the full 7-column layout above.
  *
  * Numbers : fmtPrint logic — strips trailing ".00", prefixes "$ " for currency
  * Colours : green (#059669) for profit, red (#c2272d) for loss
@@ -224,13 +229,14 @@ export async function generateInvoicePdfMeta(
     userName = uRes.rows[0]?.username || "—";
   }
 
-  // whatsappMode / compactMode both trigger the compact layout
+  // whatsappMode / compactMode both trigger the compact layout (tighter
+  // margins/rows). This is purely a sizing choice — it must NOT force the
+  // Config/P&L columns to hide. Whether those columns show is controlled
+  // solely by opts.hideProfitCols (visibility settings) and by buildPdf's
+  // own auto-hide-when-no-configured-price rule below, so a location with a
+  // selling price fix still gets P/L per bale + Total P/L on the WhatsApp PDF.
   const compactMode = !!(opts?.compactMode || opts?.whatsappMode);
-
-  // In compact/WhatsApp mode always force profit columns hidden
-  const hideProfitCols = compactMode
-    ? true
-    : (opts?.hideProfitCols ?? false);
+  const hideProfitCols = opts?.hideProfitCols ?? false;
 
   const { buffer, pageCount } = await buildPdf({
     voucherDate: formatDbDate(v.voucher_date),
@@ -289,7 +295,7 @@ async function buildPdf(d: InvoiceData): Promise<{ buffer: Buffer; pageCount: nu
   let X_CFG: number, X_PLB: number, X_TPL: number;
   let innerDividers: number[];
 
-  if (d.compactMode || hideProfitCols) {
+  if (hideProfitCols) {
     // 4-column compact layout — description gets the most room
     const descPct  = d.compactMode ? 0.50 : 0.42;
     const qtyPct   = d.compactMode ? 0.08 : 0.08;

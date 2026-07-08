@@ -274,7 +274,43 @@ describe("C. Long item names — no page explosion", () => {
   }, 60000);
 });
 
-describe("D. Profit/cost columns hidden in compact mode", () => {
+describe("D. Profit/cost columns in compact mode follow configured price, not compactMode", () => {
+  it("compactMode does NOT force-hide P/L columns when a configured price exists (regression)", async () => {
+    const voucherId = await seedSale(5, { configuredPrice: 8.0 });
+    const withProfitMeta = await generateInvoicePdfMeta(voucherId, ctx.companyId, "testuser", {
+      compactMode: true,
+      whatsappMode: true,
+    });
+    const hiddenMeta = await generateInvoicePdfMeta(voucherId, ctx.companyId, "testuser", {
+      compactMode: true,
+      whatsappMode: true,
+      hideProfitCols: true,
+    });
+    // Same data, same compact sizing — the only difference is hideProfitCols,
+    // so the 7-col P/L layout must render more content than the 4-col one.
+    expect(withProfitMeta.buffer.length).toBeGreaterThan(hiddenMeta.buffer.length);
+    expect(withProfitMeta.buffer.slice(0, 4).toString("ascii")).toBe("%PDF");
+    expect(hiddenMeta.buffer.slice(0, 4).toString("ascii")).toBe("%PDF");
+  }, 30000);
+
+  it("compactMode with no configured price still auto-hides P/L columns", async () => {
+    const voucherId = await seedSale(5);
+    const meta = await generateInvoicePdfMeta(voucherId, ctx.companyId, "testuser", {
+      compactMode: true,
+      whatsappMode: true,
+    });
+    const hiddenMeta = await generateInvoicePdfMeta(voucherId, ctx.companyId, "testuser", {
+      compactMode: true,
+      whatsappMode: true,
+      hideProfitCols: true,
+    });
+    // No configured price on any item → auto-hide kicks in regardless of hideProfitCols,
+    // so both buffers render the same 4-col layout (byte-identical modulo nothing dynamic).
+    expect(meta.buffer.length).toBe(hiddenMeta.buffer.length);
+  }, 30000);
+});
+
+describe("D2. Profit/cost columns hidden in compact mode", () => {
   it("compact PDF is a valid PDF and stays on 1 page for 5 items", async () => {
     const voucherId = await seedSale(5, { configuredPrice: 8.0 });
     const meta = await generateInvoicePdfMeta(voucherId, ctx.companyId, "testuser", {
@@ -282,7 +318,8 @@ describe("D. Profit/cost columns hidden in compact mode", () => {
       whatsappMode: true,
     });
     expect(meta.buffer.slice(0, 4).toString("ascii")).toBe("%PDF");
-    // Compact forces 4-col layout (profit cols hidden) → should easily fit 5 items on 1 page
+    // Configured price present and no hideProfitCols → 7-col layout shows P/L,
+    // but 5 items still easily fit on 1 page.
     expect(meta.pageCount).toBe(1);
     expect(meta.itemCount).toBe(5);
   }, 30000);

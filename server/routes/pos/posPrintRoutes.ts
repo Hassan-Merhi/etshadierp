@@ -221,14 +221,20 @@ export function registerPosPrintRoutes(app: Express): void {
         }
       }
 
-      // Always generate in compact / WhatsApp mode for this endpoint
+      // Always generate in compact / WhatsApp mode for this endpoint (tighter
+      // sizing only). P/L columns (CONFIG / P/L BALE / TOTAL P/L) auto-hide
+      // inside the PDF generator when no item has a configured price — do NOT
+      // force them hidden here, or a location with a selling price fix would
+      // lose its P/L per bale + Total P/L on the WhatsApp invoice.
       const compactMode   = true;
       const whatsappMode  = true;
+      const erpVis = await getErpExportVisibility(req);
+      const hideProfitCols = erpVis.hideSelling || erpVis.hideCost;
       const { buffer: pdfBuffer, pageCount, itemCount } = await generateInvoicePdfMeta(
         parsedVoucherId,
         companyId,
         (req as any).user?.username,
-        { hideProfitCols: true, compactMode, whatsappMode },
+        { hideProfitCols, compactMode, whatsappMode },
       );
 
       // ── PDF validation ─────────────────────────────────────────────────────
