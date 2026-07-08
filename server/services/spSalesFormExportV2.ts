@@ -132,6 +132,15 @@ async function fetchInventory(
     locationIds = ((res as any).rows ?? (res as any[])).map((r: any) => Number(r.id));
   }
 
+  // TEMP DEBUG (historical opening-stock audit): confirm which locations feed
+  // this as-of-date snapshot, and how many are aggregated for "All Locations".
+  // Gated behind DEBUG_HISTORICAL_INVENTORY=1 to keep routine exports quiet.
+  if (process.env.DEBUG_HISTORICAL_INVENTORY === "1") {
+    console.log(
+      `[spSalesFormExportV2:fetchInventory] asOfDate=${asOfDate} locationId=${locationId ?? "all"} locationsIncluded=${locationIds.length} [${locationIds.join(",")}]`
+    );
+  }
+
   await Promise.all(locationIds.map(async (locId) => {
     const rows = await calculateHistoricalLocationInventory(locId, companyId, asOfDate);
     for (const row of rows) {

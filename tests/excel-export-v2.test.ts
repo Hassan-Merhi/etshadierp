@@ -1051,6 +1051,154 @@ describe("V2 Export — Avg/Mo Sales formula", () => {
   });
 });
 
+// ── Regression: after-cutoff stock adjustments must not leak into opening stock ─
+describe("V2 Export — Historical opening stock excludes after-cutoff stock adjustments", () => {
+  const ADJ_PREFIX = "xlsxv2adjtest";
+  let adjCtx: TestContext;
+
+  beforeAll(async () => {
+    adjCtx = await seedTestData(ADJ_PREFIX);
+  }, 60000);
+
+  afterAll(async () => {
+    try {
+      await pool.query(
+        `DELETE FROM vouchers WHERE company_id = $1`,
+        [adjCtx.companyId],
+      );
+    } catch { /* ignore */ }
+    await cleanupTestData(ADJ_PREFIX);
+  }, 30000);
+
+  it("Consumption adjustment (signed negative qty) dated after cutoff is added back, not double-subtracted", async () => {
+    const { companyId, locationId, stockItemIds } = adjCtx;
+    const itemId = stockItemIds[0]; // seeded qty=100, rate=10
+
+    const before = await calculateHistoricalLocationInventory(locationId, companyId, "2026-06-30");
+    const beforeQty = parseFloat(String(before.find((r) => r.stockItemId === itemId)?.quantity ?? "0"));
+    expect(beforeQty).toBe(100);
+
+    // A "Consumption" adjustment dated 2026-07-07 (after the Jun-30 cutoff)
+    // removes 30 units. Consumption items are persisted with a NEGATIVE
+    // signed quantity (see client/src/pages/vouchers/StockAdjustmentForm.tsx
+    // and server/storage/stockOps.ts) — the on-hand qty afterwards is 70.
+    const { rows: [v] } = await pool.query<{ id: number }>(
+      `INSERT INTO vouchers (company_id, location_id, voucher_type, voucher_date, description, optional, voucher_number, total_amount)
+       VALUES ($1, $2, 'Stock Adjustment', '2026-07-07', 'Adj regression: consumption', false, 'ADJ-CONS-001', 300.00)
+       RETURNING id`,
+      [companyId, locationId],
+    );
+    const { rows: [av] } = await pool.query<{ id: number }>(
+      `INSERT INTO stock_adjustment_vouchers (voucher_id, location_id, adjustment_type)
+       VALUES ($1, $2, 'Consumption') RETURNING id`,
+      [v.id, locationId],
+    );
+    await pool.query(
+      `INSERT INTO stock_adjustment_items (adjustment_id, stock_item_id, quantity, rate, total_amount)
+       VALUES ($1, $2, -30, 10.00, 300.00)`,
+      [av.id, itemId],
+    );
+    await pool.query(
+      `UPDATE inventory SET quantity = quantity - 30, total_value = total_value - 300
+       WHERE company_id = $1 AND location_id = $2 AND stock_item_id = $3`,
+      [companyId, locationId, itemId],
+    );
+
+    const after = await calculateHistoricalLocationInventory(locationId, companyId, "2026-06-30");
+    const afterQty = parseFloat(String(after.find((r) => r.stockItemId === itemId)?.quantity ?? "0"));
+
+    // Historical (Jun 30) opening stock must still read 100: NOT 70 (current,
+    // un-reversed) and NOT 40 (the old bug: current 70 minus 30 again).
+    expect(afterQty).toBe(100);
+  });
+
+  it("Mixed adjustment's production item (positive signed qty) dated after cutoff is subtracted, not added again", async () => {
+    const { companyId, locationId, stockItemIds } = adjCtx;
+    const itemId = stockItemIds[1]; // seeded qty=100, rate=10, untouched by the previous test
+
+    const before = await calculateHistoricalLocationInventory(locationId, companyId, "2026-06-30");
+    const beforeQty = parseFloat(String(before.find((r) => r.stockItemId === itemId)?.quantity ?? "0"));
+    expect(beforeQty).toBe(100);
+
+    // A "Mixed" adjustment dated 2026-07-07 adds 20 units via a production
+    // line item (POSITIVE signed quantity). Current on-hand becomes 120.
+    const { rows: [v] } = await pool.query<{ id: number }>(
+      `INSERT INTO vouchers (company_id, location_id, voucher_type, voucher_date, description, optional, voucher_number, total_amount)
+       VALUES ($1, $2, 'Stock Adjustment', '2026-07-07', 'Adj regression: mixed production', false, 'ADJ-MIX-001', 200.00)
+       RETURNING id`,
+      [companyId, locationId],
+    );
+    const { rows: [av] } = await pool.query<{ id: number }>(
+      `INSERT INTO stock_adjustment_vouchers (voucher_id, location_id, adjustment_type)
+       VALUES ($1, $2, 'Mixed') RETURNING id`,
+      [v.id, locationId],
+    );
+    await pool.query(
+      `INSERT INTO stock_adjustment_items (adjustment_id, stock_item_id, quantity, rate, total_amount)
+       VALUES ($1, $2, 20, 10.00, 200.00)`,
+      [av.id, itemId],
+    );
+    await pool.query(
+      `UPDATE inventory SET quantity = quantity + 20, total_value = total_value + 200
+       WHERE company_id = $1 AND location_id = $2 AND stock_item_id = $3`,
+      [companyId, locationId, itemId],
+    );
+
+    const after = await calculateHistoricalLocationInventory(locationId, companyId, "2026-06-30");
+    const afterQty = parseFloat(String(after.find((r) => r.stockItemId === itemId)?.quantity ?? "0"));
+
+    // Historical (Jun 30) opening stock must still read 100: NOT 120 (current,
+    // un-reversed) and NOT 140 (the old bug: current 120 plus 20 again,
+    // because "Mixed" never matched the old "production" branch check).
+    expect(afterQty).toBe(100);
+  });
+
+  it("Export for Jul 1–7 shows Opening Stock unaffected by a same-run after-cutoff adjustment (All Locations aggregation)", async () => {
+    const { companyId, locationId, stockItemIds } = adjCtx;
+    const itemId = stockItemIds[2]; // seeded qty=100, rate=10, untouched by previous tests
+
+    // Consumption of 15 units dated inside the export range (Jul 7), after cutoff.
+    const { rows: [v] } = await pool.query<{ id: number }>(
+      `INSERT INTO vouchers (company_id, location_id, voucher_type, voucher_date, description, optional, voucher_number, total_amount)
+       VALUES ($1, $2, 'Stock Adjustment', '2026-07-07', 'Adj regression: all-locations', false, 'ADJ-ALL-001', 150.00)
+       RETURNING id`,
+      [companyId, locationId],
+    );
+    const { rows: [av] } = await pool.query<{ id: number }>(
+      `INSERT INTO stock_adjustment_vouchers (voucher_id, location_id, adjustment_type)
+       VALUES ($1, $2, 'Consumption') RETURNING id`,
+      [v.id, locationId],
+    );
+    await pool.query(
+      `INSERT INTO stock_adjustment_items (adjustment_id, stock_item_id, quantity, rate, total_amount)
+       VALUES ($1, $2, -15, 10.00, 150.00)`,
+      [av.id, itemId],
+    );
+    await pool.query(
+      `UPDATE inventory SET quantity = quantity - 15, total_value = total_value - 150
+       WHERE company_id = $1 AND location_id = $2 AND stock_item_id = $3`,
+      [companyId, locationId, itemId],
+    );
+
+    // Export with locationId omitted → "All Locations" aggregation path.
+    const adjBuf = await generateSpSalesFormExcelV2({
+      companyId,
+      fromDate: FROM,
+      toDate: TO,
+      locationName: "All Locations",
+      supplierName: "V2 Adjustment Regression Test",
+    });
+    const adjWb = new ExcelJS.Workbook();
+    await adjWb.xlsx.load(adjBuf);
+    const ws = adjWb.getWorksheet("ENTRY")!;
+    const row = findItemRow(ws, "Test Item 3");
+    expect(row, "Test Item 3 not found in All-Locations export").not.toBeNull();
+    const openQty = cellNum(ws, row!, E_OPEN_QTY_COL);
+    // Must equal the pre-adjustment historical qty (100), not current (85).
+    expect(openQty).toBe(100);
+  });
+});
+
 /*
  * Coverage summary
  * ─────────────────

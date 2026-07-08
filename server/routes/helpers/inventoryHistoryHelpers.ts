@@ -16,6 +16,11 @@ import {
 } from "@shared/schema";
 import { eq, and, sql, gt, inArray } from "drizzle-orm";
 
+// TEMP DEBUG (historical opening-stock audit): gate behind an explicit env
+// flag so routine exports/inventory reads stay quiet by default. Enable with
+// DEBUG_HISTORICAL_INVENTORY=1 when auditing an opening-stock discrepancy.
+const DEBUG_HISTORICAL_INVENTORY = process.env.DEBUG_HISTORICAL_INVENTORY === "1";
+
 // ─── Historical inventory ─────────────────────────────────────────────────────
 export async function calculateHistoricalLocationInventory(
   locationId: number,
@@ -153,6 +158,18 @@ export async function calculateHistoricalLocationInventory(
     .execute();
 
   for (const adj of adjustmentsAfterDate) {
+    // stock_adjustment_items.quantity is stored SIGNED at creation time
+    // (see client StockAdjustmentForm.tsx + server storage/stockOps.ts):
+    //   PRODUCE items -> positive quantity (increases inventory)
+    //   CONSUME items -> negative quantity (decreases inventory)
+    // This holds true for "Production", "Consumption", AND "Mixed" adjustment
+    // vouchers alike — the sign lives on the item, not just the voucher type.
+    // To reverse an after-cutoff adjustment we simply undo its signed effect:
+    //   historicalQty = currentQty - signedQty
+    // (Do NOT branch on adjustmentType here — a prior version treated
+    // non-"Production" rows as "always subtract further", which is correct
+    // for the qty>0 case but doubles the error for negative (Consumption/
+    // Mixed-consumption) quantities instead of adding them back.)
     const qty = parseFloat(adj.quantity) || 0;
     const rate = parseFloat(adj.rate) || 0;
     const existing = inventoryMap.get(adj.stockItemId) || {
@@ -160,16 +177,27 @@ export async function calculateHistoricalLocationInventory(
       totalValue: 0,
       rate: 0,
     };
-    const adjType = (adj.adjustmentType || "").toLowerCase().trim();
-    if (adjType === "production" || adjType === "produce") {
-      existing.quantity -= qty;
-      existing.totalValue -= qty * rate;
-    } else {
-      existing.quantity += qty;
-      existing.totalValue += qty * rate;
-    }
+    existing.quantity -= qty;
+    existing.totalValue -= qty * rate;
     if (existing.quantity > 0) existing.rate = existing.totalValue / existing.quantity;
     inventoryMap.set(adj.stockItemId, existing);
+  }
+
+  // TEMP DEBUG (historical opening-stock audit): show the reversal effect for
+  // one sample stock item so a "stock added today, exported for a past range"
+  // scenario can be verified end-to-end (current vs. after-cutoff adjustments
+  // reversed vs. resulting historical qty).
+  if (DEBUG_HISTORICAL_INVENTORY && adjustmentsAfterDate.length > 0) {
+    const sample = adjustmentsAfterDate[0];
+    const currentSample = currentInventory.find((i) => i.stockItemId === sample.stockItemId);
+    const currentQty = currentSample ? parseFloat(currentSample.quantity) || 0 : 0;
+    const adjustmentsForSample = adjustmentsAfterDate.filter((a) => a.stockItemId === sample.stockItemId);
+    const reversedQty = adjustmentsForSample.reduce((s, a) => s + (parseFloat(a.quantity) || 0), 0);
+    const historicalQty = inventoryMap.get(sample.stockItemId)?.quantity ?? 0;
+    console.log(
+      `[calculateHistoricalLocationInventory] DEBUG sample stockItemId=${sample.stockItemId} locationId=${locationId} cutoff=${cutoffDateStr} ` +
+        `currentQty=${currentQty} afterCutoffAdjustmentsQty(signed,reversed)=${reversedQty} historicalOpeningQty=${historicalQty}`
+    );
   }
 
   const transfersInAfterDate = await db
