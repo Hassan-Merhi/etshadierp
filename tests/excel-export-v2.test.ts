@@ -788,6 +788,25 @@ describe("V2 Export — Cash/Bank roll-forward formulas", () => {
     expect(nextBankCell.protection?.locked).not.toBe(false);
   });
 
+  it("Day 2 Opening Cash/Bank cells reference Day 1's Balance Cash/Bank row (chain continues beyond the first roll-forward)", () => {
+    // Export range is Jul 1–7 (7 days, index 0..6), so index 2 ("Day 3") exists
+    // and must reference index 1's ("Day 2") Balance row — proving the
+    // roll-forward is a repeating chain, not a one-off Day1→Day2 special case.
+    const ws = wb.getWorksheet("ENTRY")!;
+    const day3CashCell = ws.getRow(E_OPEN_CASH_ROW).getCell(E_DATE_START + COLS_PER_DAY * 2);
+    const day3BankCell = ws.getRow(E_OPEN_CASH_ROW).getCell(E_DATE_START + COLS_PER_DAY * 2 + 1);
+    const cashFormula  = (day3CashCell.value as any)?.formula ?? "";
+    const bankFormula  = (day3BankCell.value as any)?.formula ?? "";
+    expect(cashFormula).toContain(String(E_BALANCE_ROW));
+    expect(bankFormula).toContain(String(E_BALANCE_ROW));
+    // And it must reference Day 2's column (one day-block to the left of Day 3's own column)
+    const day2CashCol = E_DATE_START + COLS_PER_DAY; // Day 2's CASH column index
+    const day2ColLetter = ws.getColumn(day2CashCol).letter;
+    expect(cashFormula).toContain(day2ColLetter);
+    expect(day3CashCell.protection?.locked).not.toBe(false);
+    expect(day3BankCell.protection?.locked).not.toBe(false);
+  });
+
   it("BANK deposit cell mirrors the CASH deposit cell via formula, locked", () => {
     const ws = wb.getWorksheet("ENTRY")!;
     const bankDepositCell = ws.getRow(E_DEPOSIT_ROW).getCell(E_DATE_START + 1);
