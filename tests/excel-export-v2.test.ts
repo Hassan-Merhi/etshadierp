@@ -44,15 +44,17 @@ const TO    = "2026-07-07";
 const DAY_COUNT = 7; // Jul 1–7
 
 // ENTRY sheet constants (mirrors spSalesFormExportV2.ts)
-// Group column removed: A=RowNum, B=ItemName, C=Code, D=OpenQty, E=Cost/Bag
-const FIXED_LEFT   = 5;  // cols 1-5: RowNum, Name, Code, OpenQty, Cost/Bag
+// A=RowNum, B=Group, C=ItemName, D=Code, E=OpenQty, F=Cost/Bag
+const FIXED_LEFT   = 6;  // cols 1-6: RowNum, Group, Name, Code, OpenQty, Cost/Bag
 const COLS_PER_DAY = 3;
-const E_ITEM_NAME_COL = 2;  // B
-const E_OPEN_QTY_COL  = 4;  // D
-const E_COST_BAG_COL  = 5;  // E
-const E_DATE_START    = FIXED_LEFT + 1;  // 6 — first Qty column for day 0
-const CLOSE_QTY_COL   = FIXED_LEFT + 1 + DAY_COUNT * COLS_PER_DAY; // 27
-const CLOSE_VAL_COL   = CLOSE_QTY_COL + 1; // 28
+const E_GROUP_COL     = 2;  // B
+const E_ITEM_NAME_COL = 3;  // C
+const E_ITEM_CODE_COL = 4;  // D
+const E_OPEN_QTY_COL  = 5;  // E
+const E_COST_BAG_COL  = 6;  // F
+const E_DATE_START    = FIXED_LEFT + 1;  // 7 — first Qty column for day 0
+const CLOSE_QTY_COL   = FIXED_LEFT + 1 + DAY_COUNT * COLS_PER_DAY; // 28
+const CLOSE_VAL_COL   = CLOSE_QTY_COL + 1; // 29
 
 // With 3 items + 1 group, the row layout is:
 // Row 4: item1, Row 5: item2, Row 6: item3
@@ -262,12 +264,12 @@ describe("V2 Export — Buffer integrity", () => {
   });
 });
 
-// ── 2. Sheet count and order (5 sheets — no Ageing) ───────────────────────────
+// ── 2. Sheet count and order (6 sheets, incl. Ageing — Phase 15) ──────────────
 describe("V2 Export — Sheet order", () => {
-  const EXPECTED_ORDER = ["Costing", "Sales", "ENTRY", "Summary", "Summary-Itemwise"];
+  const EXPECTED_ORDER = ["Costing", "Sales", "ENTRY", "Summary", "Ageing", "Summary-Itemwise"];
 
-  it("workbook has exactly 5 sheets", () => {
-    expect(wb.worksheets.length).toBe(5);
+  it("workbook has exactly 6 sheets", () => {
+    expect(wb.worksheets.length).toBe(6);
   });
 
   EXPECTED_ORDER.forEach((name, idx) => {
@@ -276,8 +278,10 @@ describe("V2 Export — Sheet order", () => {
     });
   });
 
-  it("Ageing sheet does not exist", () => {
-    expect(wb.getWorksheet("Ageing")).toBeUndefined();
+  it("Ageing sheet is visible", () => {
+    const ws = wb.getWorksheet("Ageing");
+    expect(ws).toBeDefined();
+    expect((ws as any)?.state ?? "visible").toBe("visible");
   });
 });
 
@@ -304,7 +308,7 @@ describe("V2 Export — Sheet visibility", () => {
 
 // ── 4. No Excel error cells in visible sheets ──────────────────────────────────
 describe("V2 Export — No error cells in visible sheets", () => {
-  ["ENTRY", "Summary"].forEach((name) => {
+  ["ENTRY", "Summary", "Ageing"].forEach((name) => {
     it(`"${name}" contains no #REF!, #DIV/0!, #VALUE!, #NAME?, #N/A`, () => {
       const ws = wb.getWorksheet(name);
       if (!ws) return;
@@ -336,7 +340,7 @@ describe("V2 Export — Closing stock (Jul 7)", () => {
     expect(expectedCloseQtyItem1).toBeGreaterThan(0);
   });
 
-  it("ENTRY closing qty cell is a formula D-SUM(...) WITHOUT MAX (can go negative)", () => {
+  it("ENTRY closing qty cell is a formula referencing Opening Qty (E) WITHOUT MAX (can go negative)", () => {
     const ws  = wb.getWorksheet("ENTRY")!;
     const row = findItemRow(ws, "Test Item 1");
     expect(row, "Test Item 1 row not found").not.toBeNull();
@@ -344,8 +348,8 @@ describe("V2 Export — Closing stock (Jul 7)", () => {
     expect(formula, "Close Qty should be a formula").not.toBeNull();
     expect(formula!.toUpperCase()).not.toContain("MAX");
     expect(formula!.toUpperCase()).toContain("SUM(");
-    // Formula must start with the opening qty cell reference (D column)
-    expect(formula!.toUpperCase()).toMatch(/^D\d+-SUM\(/);
+    // Formula must reference the Opening Qty cell (E column, IF-guarded against blank)
+    expect(formula!.toUpperCase()).toMatch(/^IF\(E\d+="",0,E\d+\)-SUM\(/);
   });
 
   it("ENTRY closing qty formula result matches calculateHistoricalLocationInventory(Jul 7)", () => {
@@ -363,8 +367,9 @@ describe("V2 Export — Closing stock (Jul 7)", () => {
     expect(row, "Test Item 1 row not found").not.toBeNull();
     const formula = cellFormula(ws, row!, CLOSE_VAL_COL);
     expect(formula, "Close Value should be a formula").not.toBeNull();
-    // Formula should reference Close Qty column and $E (Cost/Bag — col E after Group removal)
-    expect(formula!.toUpperCase()).toMatch(/\*\$E/);
+    // Formula should reference Close Qty column and Cost/Bag (col F, after Group column).
+    // Note: ExcelJS normalizes absolute ($) references away on buffer round-trip parse.
+    expect(formula!.toUpperCase()).toMatch(/\*\$?F/);
   });
 });
 
@@ -1096,29 +1101,106 @@ describe("V2 Export — ENTRY structural sanity", () => {
   });
 });
 
-// ── 19. No Group column in item rows ──────────────────────────────────────────
-describe("V2 Export — No Group column in item rows", () => {
-  it("ENTRY col B (col 2) for item row contains item name, not group name", () => {
+// ── 19. Group column present in item rows (Phase 15) ───────────────────────────
+describe("V2 Export — Group column present in item rows", () => {
+  it("ENTRY col B (col 2) for item row contains the group name", () => {
     const ws  = wb.getWorksheet("ENTRY")!;
     const row = findItemRow(ws, "Test Item 1");
     expect(row, "Test Item 1 not found").not.toBeNull();
-    const colBVal = ws.getRow(row!).getCell(2).value;
+    const colBVal = ws.getRow(row!).getCell(E_GROUP_COL).value;
     expect(typeof colBVal).toBe("string");
-    // Should be the item name, not a group/category name
-    expect((colBVal as string).toLowerCase()).toContain("test item 1");
+    expect((colBVal as string).toLowerCase()).toContain("testgroup");
   });
 
-  it("ENTRY row 3 (sub-header): col 2 label is 'Item Name' (not 'Group')", () => {
-    const ws = wb.getWorksheet("ENTRY")!;
-    const v  = ws.getRow(3).getCell(2).value;
-    expect(String(v ?? "").toLowerCase()).toContain("item");
-    expect(String(v ?? "").toLowerCase()).not.toBe("group");
+  it("ENTRY col C (col 3) for item row contains the item name", () => {
+    const ws  = wb.getWorksheet("ENTRY")!;
+    const row = findItemRow(ws, "Test Item 1");
+    expect(row, "Test Item 1 not found").not.toBeNull();
+    const colCVal = ws.getRow(row!).getCell(E_ITEM_NAME_COL).value;
+    expect(typeof colCVal).toBe("string");
+    expect((colCVal as string).toLowerCase()).toContain("test item 1");
   });
 
-  it("ENTRY row 3 (sub-header): col 2 label is NOT 'Group'", () => {
+  it("ENTRY row 3 (sub-header): col 2 label is 'Group'", () => {
     const ws = wb.getWorksheet("ENTRY")!;
-    const v  = String(ws.getRow(3).getCell(2).value ?? "").toLowerCase().trim();
-    expect(v).not.toBe("group");
+    const v  = String(ws.getRow(3).getCell(E_GROUP_COL).value ?? "").toLowerCase().trim();
+    expect(v).toBe("group");
+  });
+
+  it("ENTRY row 3 (sub-header): col 3 label is 'Item Name'", () => {
+    const ws = wb.getWorksheet("ENTRY")!;
+    const v  = String(ws.getRow(3).getCell(E_ITEM_NAME_COL).value ?? "").toLowerCase().trim();
+    expect(v).toContain("item name");
+  });
+});
+
+// ── 20. Ageing sheet (Phase 15) ─────────────────────────────────────────────────
+describe("V2 Export — Ageing sheet", () => {
+  const AGE_GROUP_COL = 1, AGE_CODE_COL = 2, AGE_NAME_COL = 3,
+        AGE_CQTY_COL = 4, AGE_CVAL_COL = 5,
+        AGE_B1_COL = 6, AGE_B2_COL = 7, AGE_B3_COL = 8, AGE_B4_COL = 9, AGE_B5_COL = 10,
+        AGE_BASIS_COL = 11;
+
+  function findAgeingRow(ws: ExcelJS.Worksheet, itemName: string): number | null {
+    for (let r = 2; r <= ws.rowCount; r++) {
+      const v = ws.getRow(r).getCell(AGE_NAME_COL).value;
+      if (typeof v === "string" && v.trim() === itemName) return r;
+    }
+    return null;
+  }
+
+  it("has the expected header row", () => {
+    const ws = wb.getWorksheet("Ageing")!;
+    expect(String(ws.getRow(1).getCell(AGE_GROUP_COL).value)).toMatch(/group/i);
+    expect(String(ws.getRow(1).getCell(AGE_CQTY_COL).value)).toMatch(/closing qty/i);
+    expect(String(ws.getRow(1).getCell(AGE_B5_COL).value)).toMatch(/121\+/);
+    expect(String(ws.getRow(1).getCell(AGE_BASIS_COL).value)).toMatch(/ageing basis/i);
+  });
+
+  it("Test Item 1 (no seeded offload/transfer movement) falls into the 121+ bucket with a documented fallback basis", () => {
+    const ws  = wb.getWorksheet("Ageing")!;
+    const row = findAgeingRow(ws, "Test Item 1");
+    expect(row, "Test Item 1 not found in Ageing sheet").not.toBeNull();
+    const b5 = ws.getRow(row!).getCell(AGE_B5_COL).value;
+    expect(typeof b5).toBe("number");
+    expect(b5 as number).toBeGreaterThan(0);
+    // No other bucket should be populated for this item
+    [AGE_B1_COL, AGE_B2_COL, AGE_B3_COL, AGE_B4_COL].forEach((c) => {
+      expect(ws.getRow(row!).getCell(c).value).toBeNull();
+    });
+    const basis = String(ws.getRow(row!).getCell(AGE_BASIS_COL).value ?? "");
+    expect(basis.toLowerCase()).toContain("no movement record");
+  });
+
+  it("bucketed qty for Test Item 1 matches its ENTRY Closing Qty", () => {
+    const entryWs = wb.getWorksheet("ENTRY")!;
+    const entryRow = findItemRow(entryWs, "Test Item 1");
+    expect(entryRow, "Test Item 1 not found in ENTRY").not.toBeNull();
+    const closeQty = cellNum(entryWs, entryRow!, CLOSE_QTY_COL);
+
+    const ageWs = wb.getWorksheet("Ageing")!;
+    const ageRow = findAgeingRow(ageWs, "Test Item 1");
+    expect(ageRow, "Test Item 1 not found in Ageing").not.toBeNull();
+    const ageCloseQty = ageWs.getRow(ageRow!).getCell(AGE_CQTY_COL).value as number;
+    expect(ageCloseQty).toBeCloseTo(closeQty!, 1);
+  });
+
+  it("Ageing sheet has a TOTAL row whose 121+ bucket sum reconciles with item rows (no seeded movement data)", () => {
+    const ws = wb.getWorksheet("Ageing")!;
+    let totalRow: number | null = null;
+    for (let r = 2; r <= ws.rowCount; r++) {
+      const v = ws.getRow(r).getCell(AGE_GROUP_COL).value;
+      if (typeof v === "string" && v.trim().toUpperCase() === "TOTAL") { totalRow = r; break; }
+    }
+    expect(totalRow, "TOTAL row not found in Ageing sheet").not.toBeNull();
+    const totalB5 = ws.getRow(totalRow!).getCell(AGE_B5_COL).value as number;
+
+    let sumB5 = 0;
+    for (let r = 2; r < totalRow!; r++) {
+      const v = ws.getRow(r).getCell(AGE_B5_COL).value;
+      if (typeof v === "number") sumB5 += v;
+    }
+    expect(totalB5).toBeCloseTo(sumB5, 1);
   });
 });
 

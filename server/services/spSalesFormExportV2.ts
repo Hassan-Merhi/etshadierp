@@ -3,17 +3,31 @@
  *
  * Data sources:
  *   Opening stock : calculateHistoricalLocationInventory(locationId, companyId, dayBefore(fromDate))
+ *                   — same helper that powers the Location Inventory page, so opening stock here
+ *                   always agrees with what Location Inventory shows as-of that date.
  *   Closing stock : calculateHistoricalLocationInventory(locationId, companyId, toDate)
- *   Daily sales   : sales_items + vouchers (ERP POS) — same tables the inventory helper reverses,
- *                   guaranteeing opening − sales + offloads ≈ closing
+ *                   — same helper, as-of toDate, for the same reason.
+ *   Daily sales   : sales_items + vouchers (ERP POS) — this is the real posted Supplier Partner
+ *                   sales source. sp_sales/sp_sale_lines were checked and are NOT used for
+ *                   posted POS sales; sales_items/vouchers is the source the live system posts to
+ *                   (WHERE voucher_type='Sales' AND optional=false AND deleted_at IS NULL), which
+ *                   is the same source calculateHistoricalLocationInventory reverses out of its
+ *                   as-of-date snapshot, guaranteeing opening − sales + offloads ≈ closing.
+ *   Ageing        : container_offloads.offload_date (best available inbound-movement date per
+ *                   stock item at this location) is used as the "last stock-in" date fallback for
+ *                   bucketing closing stock into 0-30/31-60/61-90/91-120/121+ day buckets. Exact
+ *                   per-lot/FIFO ageing is not tracked anywhere in the schema, so this is a
+ *                   documented best-available-movement-date fallback, not fabricated ageing — see
+ *                   buildAgeingSheet() below for the exact rule and its code comment.
  *   Opening cash  : voucher_entries SUM(debit-credit) as of dayBefore(fromDate) for cashAccountId
  *
- * Sheet order (5 sheets — Ageing removed in V2):
- *   1. Costing         — hidden
- *   2. Sales           — hidden
- *   3. ENTRY           — visible  ← main page
- *   4. Summary         — visible
- *   5. Summary-Itemwise— hidden
+ * Sheet order (6 sheets):
+ *   1. Costing          — hidden
+ *   2. Sales            — hidden
+ *   3. ENTRY            — visible  ← main page (includes Group/category column)
+ *   4. Summary          — visible
+ *   5. Ageing           — visible
+ *   6. Summary-Itemwise — hidden
  */
 
 import ExcelJS from "exceljs";
@@ -212,6 +226,68 @@ async function fetchSalesData(
   }));
 }
 
+// ── Ageing: best-available last-inbound-movement date per stock item ─────────
+// There is no per-lot/FIFO ageing tracked anywhere in the schema. The best
+// available real signal for "when did this stock last arrive at this
+// location" is the later of:
+//   1. container_offload_items.offload_id → container_offloads.offloaded_at
+//      (stock offloaded from a container into this location)
+//   2. stock_transfer_items → stock_transfer_vouchers.created_at, filtered to
+//      transfers whose destination is this location (stock moved in from
+//      another location)
+// This is a documented fallback, not fabricated data — if neither source has
+// a record for an item (e.g. stock predates both tables or was adjusted in
+// directly), we do not guess a date; the item's full closing qty is placed in
+// the 121+ bucket, which is called out explicitly via the "Ageing Basis"
+// column so a reviewer knows it is undetermined rather than confirmed-old.
+async function fetchAgeingData(
+  companyId: number,
+  locationId: number | undefined,
+  toDate: string
+): Promise<Map<number, string>> {
+  const offloadLocFilter  = locationId ? sql` AND co.location_id = ${locationId}` : sql``;
+  const transferLocFilter = locationId ? sql` AND stv.destination_location_id = ${locationId}` : sql``;
+  const res = await db.execute(sql`
+    WITH offload_dates AS (
+      -- Only non-optional (posted/real) offloads count as a genuine stock-in movement.
+      SELECT coi.stock_item_id AS stock_item_id, co.offloaded_at::date AS movement_date
+      FROM   container_offload_items coi
+      JOIN   container_offloads      co ON co.id = coi.offload_id
+      JOIN   containers               c ON c.id = co.container_id
+      WHERE  c.company_id  = ${companyId}
+        AND  co.optional   = false
+        ${offloadLocFilter}
+    ),
+    transfer_dates AS (
+      -- Only transfers actually applied to inventory, on a non-deleted voucher, count.
+      SELECT sti.stock_item_id AS stock_item_id, stv.created_at::date AS movement_date
+      FROM   stock_transfer_items    sti
+      JOIN   stock_transfer_vouchers stv ON stv.id = sti.transfer_id
+      JOIN   vouchers                 v  ON v.id = stv.voucher_id
+      JOIN   locations                l  ON l.id = stv.destination_location_id
+      WHERE  l.company_id        = ${companyId}
+        AND  stv.inventory_applied = true
+        AND  v.deleted_at         IS NULL
+        ${transferLocFilter}
+    ),
+    combined AS (
+      SELECT * FROM offload_dates
+      UNION ALL
+      SELECT * FROM transfer_dates
+    )
+    SELECT stock_item_id, MAX(movement_date)::text AS last_movement_date
+    FROM   combined
+    WHERE  movement_date <= ${toDate}::date
+    GROUP BY stock_item_id
+  `);
+  const rows = (res as any).rows ?? (res as any[]);
+  const map = new Map<number, string>();
+  for (const r of rows) {
+    map.set(Number(r.stock_item_id), String(r.last_movement_date));
+  }
+  return map;
+}
+
 // ── Cash account opening balance ─────────────────────────────────────────────
 async function fetchCashAccountBalance(
   accountId: number,
@@ -294,7 +370,14 @@ function buildItemRegistry(
 
 // ── Sheet builders ────────────────────────────────────────────────────────────
 
-const FIXED_LEFT   = 5;  // A=RowNum, B=Name, C=Code, D=OpenQty, E=Cost/Bag
+// A=RowNum, B=Group/category, C=Item Name, D=Item Code, E=OpenQty, F=Cost/Bag
+const COL_ROWNUM    = 1;
+const COL_GROUP     = 2;
+const COL_ITEMNAME  = 3;
+const COL_ITEMCODE  = 4;
+const COL_OPENQTY   = 5;
+const COL_COSTBAG   = 6;
+const FIXED_LEFT   = COL_COSTBAG;  // = 6
 const COLS_PER_DAY = 3;  // Qty, SalePrice, Profit/Bag
 const AFTER_DATES  = 3;  // CloseQty, CloseVal, AvgMonthlySales
 
@@ -378,8 +461,8 @@ async function buildEntrySheet(
   openingCashBalance: number | null   // null = no account selected (manual input on day 0)
 ): Promise<void> {
   const ws = wb.addWorksheet("ENTRY");
-  // FIXED_LEFT = 5: A=RowNum, B=ItemName, C=Code, D=OpenQty, E=Cost/Bag
-  const dayBase    = FIXED_LEFT + 1;   // = 6 — first Qty column for day 0
+  // FIXED_LEFT = 6: A=RowNum, B=Group, C=ItemName, D=Code, E=OpenQty, F=Cost/Bag
+  const dayBase    = FIXED_LEFT + 1;   // = 7 — first Qty column for day 0
   const totalCols  = FIXED_LEFT + dayCount * COLS_PER_DAY + AFTER_DATES;
   const closeQtyCol = dayBase + dayCount * COLS_PER_DAY;
 
@@ -390,15 +473,16 @@ async function buildEntrySheet(
   ws.pageSetup.fitToHeight    = 0;
   ws.pageSetup.printTitlesRow = "1:3";
   ws.pageSetup.margins = { left: 0.25, right: 0.25, top: 0.5, bottom: 0.5, header: 0.3, footer: 0.3 };
-  ws.views     = [{ state: "frozen", xSplit: 3, ySplit: 3, activeCell: "F4" }];
+  ws.views     = [{ state: "frozen", xSplit: COL_ITEMCODE, ySplit: 3, activeCell: colLetter(dayBase) + "4" }];
   ws.autoFilter = { from: { row: 3, column: 1 }, to: { row: 3, column: totalCols } };
 
   // ── Column widths ────────────────────────────────────────────────────────────
-  ws.getColumn(1).width = 6;   // A: Row#
-  ws.getColumn(2).width = 28;  // B: Item Name
-  ws.getColumn(3).width = 14;  // C: Item Code
-  ws.getColumn(4).width = 10;  // D: Open Qty
-  ws.getColumn(5).width = 10;  // E: Cost/Bag
+  ws.getColumn(COL_ROWNUM).width   = 6;   // A: Row#
+  ws.getColumn(COL_GROUP).width    = 16;  // B: Group / category
+  ws.getColumn(COL_ITEMNAME).width = 28;  // C: Item Name
+  ws.getColumn(COL_ITEMCODE).width = 14;  // D: Item Code
+  ws.getColumn(COL_OPENQTY).width  = 10;  // E: Opening Stock Qty
+  ws.getColumn(COL_COSTBAG).width  = 10;  // F: Cost/Bag
   for (let d = 0; d < dayCount; d++) {
     const b = dayBase + d * COLS_PER_DAY;
     ws.getColumn(b).width   = 8;   // Qty
@@ -460,10 +544,10 @@ async function buildEntrySheet(
 
   // ════════ Row 2 — Group headers ════════════════════════════════════════════
   ws.getRow(2).height = 15;
-  ws.mergeCells(2, 1, 2, 3);  // A-C: Item (Group column removed)
-  applyCell(ws, 2, 1, "Item", fill(DARK_BLUE), wFont(), ctr);
-  ws.mergeCells(2, 4, 2, 5);  // D-E: Opening Stock
-  applyCell(ws, 2, 4, "Opening Stock", fill(OPEN_BLUE), boldSm, ctr);
+  ws.mergeCells(2, COL_ROWNUM, 2, COL_ITEMCODE);  // A-D: Item (incl. Group column)
+  applyCell(ws, 2, COL_ROWNUM, "Item", fill(DARK_BLUE), wFont(), ctr);
+  ws.mergeCells(2, COL_OPENQTY, 2, COL_COSTBAG);  // E-F: Opening Stock
+  applyCell(ws, 2, COL_OPENQTY, "Opening Stock", fill(OPEN_BLUE), boldSm, ctr);
   for (let d = 0; d < dayCount; d++) {
     const b = dayBase + d * COLS_PER_DAY;
     ws.mergeCells(2, b, 2, b + 2);
@@ -476,11 +560,12 @@ async function buildEntrySheet(
   // ════════ Row 3 — Sub-headers ═══════════════════════════════════════════════
   ws.getRow(3).height = 14;
   const hdr3: Array<{ col: number; label: string; f?: ExcelJS.Fill }> = [
-    { col: 1, label: "#",           f: fill(DARK_BLUE) },
-    { col: 2, label: "Item Name",   f: fill(DARK_BLUE) },  // Group column removed
-    { col: 3, label: "Item Code",   f: fill(DARK_BLUE) },
-    { col: 4, label: "Open Qty",    f: fill(OPEN_BLUE) },
-    { col: 5, label: "Cost / Bag",  f: fill(OPEN_BLUE) },
+    { col: COL_ROWNUM,   label: "#",           f: fill(DARK_BLUE) },
+    { col: COL_GROUP,    label: "Group",       f: fill(YELLOW_GRP) },  // Group/category column — yellow
+    { col: COL_ITEMNAME, label: "Item Name",   f: fill(DARK_BLUE) },
+    { col: COL_ITEMCODE, label: "Item Code",   f: fill(DARK_BLUE) },
+    { col: COL_OPENQTY,  label: "Open Qty",    f: fill(OPEN_BLUE) },
+    { col: COL_COSTBAG,  label: "Cost / Bag",  f: fill(OPEN_BLUE) },
   ];
   for (let d = 0; d < dayCount; d++) {
     const b  = dayBase + d * COLS_PER_DAY;
@@ -512,27 +597,31 @@ async function buildEntrySheet(
       ws.getRow(r).height = 14;
 
       // A: Row number (locked)
-      setCellVal(ws, r, 1, itemCounter, boldSm, altFl ?? fill(WHITE), right);
-      ws.getCell(r, 1).protection = { locked: true };
+      setCellVal(ws, r, COL_ROWNUM, itemCounter, boldSm, altFl ?? fill(WHITE), right);
+      ws.getCell(r, COL_ROWNUM).protection = { locked: true };
 
-      // B: Item Name (locked) — Group column removed
-      setCellVal(ws, r, 2, item.itemName, normSm, altFl, leftAl);
-      ws.getCell(r, 2).protection = { locked: true };
+      // B: Group / category (locked) — yellow fill
+      setCellVal(ws, r, COL_GROUP, item.groupName || "(Ungrouped)", boldSm, fill(YELLOW_GRP), leftAl);
+      ws.getCell(r, COL_GROUP).protection = { locked: true };
 
-      // C: Item Code (locked)
-      setCellVal(ws, r, 3, item.itemCode, normSm, altFl, leftAl);
-      ws.getCell(r, 3).protection = { locked: true };
+      // C: Item Name (locked)
+      setCellVal(ws, r, COL_ITEMNAME, item.itemName, normSm, altFl, leftAl);
+      ws.getCell(r, COL_ITEMNAME).protection = { locked: true };
 
-      // D: Opening Qty (locked, no dollar sign)
-      setCellNum(ws, r, 4, item.openQty ? Math.round(item.openQty) : null, altFl ?? fill(OPEN_BLUE), QTY_FMT);
-      ws.getCell(r, 4).protection = { locked: true };
+      // D: Item Code (locked)
+      setCellVal(ws, r, COL_ITEMCODE, item.itemCode, normSm, altFl, leftAl);
+      ws.getCell(r, COL_ITEMCODE).protection = { locked: true };
 
-      // E: Cost/Bag (locked, dollar sign, whole dollars)
-      setCellNum(ws, r, 5, r4(item.openRate) || null, altFl ?? fill(OPEN_BLUE), MONEY_FMT);
-      ws.getCell(r, 5).protection = { locked: true };
+      // E: Opening Stock Qty (locked, no dollar sign)
+      setCellNum(ws, r, COL_OPENQTY, item.openQty ? Math.round(item.openQty) : null, altFl ?? fill(OPEN_BLUE), QTY_FMT);
+      ws.getCell(r, COL_OPENQTY).protection = { locked: true };
+
+      // F: Cost/Bag (locked, dollar sign, whole dollars)
+      setCellNum(ws, r, COL_COSTBAG, r4(item.openRate) || null, altFl ?? fill(OPEN_BLUE), MONEY_FMT);
+      ws.getCell(r, COL_COSTBAG).protection = { locked: true };
 
       // Build list of qty cell addresses for closing-qty and avg formulas
-      // Day base = 6, so day-0 Qty = F, day-1 Qty = I, day-2 Qty = L, …
+      // Day base = 7, so day-0 Qty = G, day-1 Qty = J, day-2 Qty = M, …
       const qtyCellRefs = Array.from({ length: dayCount }, (_, d) => `${colLetter(dayBase + d * COLS_PER_DAY)}${r}`);
 
       // Daily blocks
@@ -557,23 +646,24 @@ async function buildEntrySheet(
         pC.protection = { locked: false };
 
         // Profit/Bag — formula, locked, $ sign, whole dollars
-        // =IF(OR(QtyCell="",PriceCell=""),0,PriceCell-$E{r})  ← returns 0 (not "") so SUMPRODUCT works
+        // =IF(OR(QtyCell="",PriceCell=""),0,PriceCell-$F{r})  ← returns 0 (not "") so SUMPRODUCT works
         const prC = ws.getCell(r, b + 2);
-        prC.value     = { formula: `IF(OR(${qL}${r}="",${pL}${r}=""),0,${pL}${r}-$E${r})`, result: profitVal ?? 0 } as any;
+        prC.value     = { formula: `IF(OR(${qL}${r}="",${pL}${r}=""),0,${pL}${r}-${colLetter(COL_COSTBAG)}${r})`, result: profitVal ?? 0 } as any;
         prC.numFmt    = MONEY_FMT; prC.font = normSm;
         prC.alignment = right; prC.border = thin;
         prC.protection = { locked: true };
       }
 
-      // Closing Qty — formula =D{r}-SUM(qty refs)  ← D = Opening Qty (col 4); can go negative
+      // Closing Qty — formula =IF(E{r}="",0,E{r})-SUM(qty refs) ← E = Opening Qty (IF-guarded); can go negative
+      const openQtyL = colLetter(COL_OPENQTY);
       const cqC = ws.getCell(r, closeQtyCol);
-      cqC.value = { formula: `D${r}-SUM(${qtyCellRefs.join(",")})`, result: Math.round(item.closeQty) } as any;
+      cqC.value = { formula: `IF(${openQtyL}${r}="",0,${openQtyL}${r})-SUM(${qtyCellRefs.join(",")})`, result: Math.round(item.closeQty) } as any;
       cqC.numFmt = QTY_FMT; cqC.font = normSm; cqC.alignment = right; cqC.border = thin;
       cqC.fill = fill(CLOSE_GRN); cqC.protection = { locked: true };
 
-      // Closing Value — formula =CloseQtyCell * $E{r}  ← $E = Cost/Bag (col 5)
+      // Closing Value — formula =CloseQtyCell * $F{r}  ← $F = Cost/Bag (col 6)
       const cvC = ws.getCell(r, closeQtyCol + 1);
-      cvC.value = { formula: `${colLetter(closeQtyCol)}${r}*$E${r}`, result: r2(item.closeValue) || 0 } as any;
+      cvC.value = { formula: `${colLetter(closeQtyCol)}${r}*${colLetter(COL_COSTBAG)}${r}`, result: r2(item.closeValue) || 0 } as any;
       cvC.numFmt = MONEY_FMT; cvC.font = normSm; cvC.alignment = right; cvC.border = thin;
       cvC.fill = fill(CLOSE_GRN); cvC.protection = { locked: true };
 
@@ -592,25 +682,25 @@ async function buildEntrySheet(
     const stRow = gb.subtotalRow;
     ws.getRow(stRow).height = 14;
 
-    // Style every cell in the subtotal row first, then merge A-C
+    // Style every cell in the subtotal row first, then merge A-D
     for (let col = 1; col <= totalCols; col++) {
       const c = ws.getCell(stRow, col);
       c.fill = fill(YELLOW_GRP); c.font = boldSm; c.border = thin;
       c.alignment = right; c.protection = { locked: true };
     }
-    ws.mergeCells(stRow, 1, stRow, 3);  // A-C (Group column removed)
-    const stLabel = ws.getCell(stRow, 1);
+    ws.mergeCells(stRow, COL_ROWNUM, stRow, COL_ITEMCODE);  // A-D (incl. Group column)
+    const stLabel = ws.getCell(stRow, COL_ROWNUM);
     stLabel.value = gb.groupName; stLabel.fill = fill(YELLOW_GRP);
     stLabel.font  = { ...boldSm, color: { argb: "FF333333" } };
     stLabel.alignment = leftAl;
 
-    // Opening Qty sum (col D = 4)
-    const dL = colLetter(4);
-    ws.getCell(stRow, 4).value = {
+    // Opening Qty sum (col E)
+    const dL = colLetter(COL_OPENQTY);
+    ws.getCell(stRow, COL_OPENQTY).value = {
       formula: `SUM(${dL}${gb.firstRow}:${dL}${gb.lastRow})`,
       result: Math.round(gb.items.reduce((s, i) => s + i.openQty, 0)),
     } as any;
-    ws.getCell(stRow, 4).numFmt = QTY_FMT; ws.getCell(stRow, 4).alignment = right;
+    ws.getCell(stRow, COL_OPENQTY).numFmt = QTY_FMT; ws.getCell(stRow, COL_OPENQTY).alignment = right;
 
     // Per-day group totals:
     //   Qty   = SUM formula (live)
@@ -665,20 +755,20 @@ async function buildEntrySheet(
     c.fill = fill(GREEN_HDR); c.font = { ...boldSm, color: { argb: WHITE } };
     c.border = thin; c.alignment = right; c.protection = { locked: true };
   }
-  ws.mergeCells(totalRowNum, 1, totalRowNum, 3);  // A-C (Group column removed)
-  const totLbl = ws.getCell(totalRowNum, 1);
+  ws.mergeCells(totalRowNum, COL_ROWNUM, totalRowNum, COL_ITEMCODE);  // A-D (incl. Group column)
+  const totLbl = ws.getCell(totalRowNum, COL_ROWNUM);
   totLbl.value = "TOTAL"; totLbl.fill = fill(GREEN_HDR);
   totLbl.font  = wFont(); totLbl.alignment = ctr;
 
   if (items.length > 0) {
     const stNumRefs = (col: number) => subtotalRowNums.map(sr => `${colLetter(col)}${sr}`).join(",");
 
-    // Opening Qty (col D = 4)
-    ws.getCell(totalRowNum, 4).value = {
-      formula: `SUM(${stNumRefs(4)})`,
+    // Opening Qty (col E)
+    ws.getCell(totalRowNum, COL_OPENQTY).value = {
+      formula: `SUM(${stNumRefs(COL_OPENQTY)})`,
       result: Math.round(items.reduce((s, i) => s + i.openQty, 0)),
     } as any;
-    ws.getCell(totalRowNum, 4).numFmt = QTY_FMT; ws.getCell(totalRowNum, 4).font = { ...boldSm, color: { argb: WHITE } };
+    ws.getCell(totalRowNum, COL_OPENQTY).numFmt = QTY_FMT; ws.getCell(totalRowNum, COL_OPENQTY).font = { ...boldSm, color: { argb: WHITE } };
 
     // Per-day grand totals (SUM of category subtotal rows so they cascade from live formulas)
     for (let d = 0; d < dayCount; d++) {
@@ -716,10 +806,10 @@ async function buildEntrySheet(
   const totalPayRow = payLast + 1;
   const balanceRow  = totalPayRow + 1;
 
-  // Helper: write label cell (A-C merged) for a cash-section row
+  // Helper: write label cell (A-D merged, incl. Group column) for a cash-section row
   const setCashLabel = (row: number, label: string, bgColor: string, textColor?: string) => {
     ws.getRow(row).height = 13;
-    ws.mergeCells(row, 1, row, 3);
+    ws.mergeCells(row, COL_ROWNUM, row, COL_ITEMCODE);
     const lbl = ws.getCell(row, 1);
     lbl.value      = label;
     lbl.font       = textColor ? { ...boldSm, color: { argb: textColor } } : boldSm;
@@ -736,8 +826,8 @@ async function buildEntrySheet(
 
   // CASH / BANK sub-headers per day
   ws.getRow(cashSubHdrRow).height = 13;
-  ws.mergeCells(cashSubHdrRow, 1, cashSubHdrRow, 3);
-  ws.getCell(cashSubHdrRow, 1).border = thin;
+  ws.mergeCells(cashSubHdrRow, COL_ROWNUM, cashSubHdrRow, COL_ITEMCODE);
+  ws.getCell(cashSubHdrRow, COL_ROWNUM).border = thin;
   for (let d = 0; d < dayCount; d++) {
     const b = dayBase + d * COLS_PER_DAY;
     const cashC = ws.getCell(cashSubHdrRow, b);
@@ -818,7 +908,7 @@ async function buildEntrySheet(
   for (let p = 1; p <= NUM_PAYMENT_ROWS; p++) {
     const pr = paymentsHdrRow + p;
     ws.getRow(pr).height = 13;
-    ws.mergeCells(pr, 1, pr, 3);
+    ws.mergeCells(pr, COL_ROWNUM, pr, COL_ITEMCODE);
     const lbl = ws.getCell(pr, 1);
     lbl.value = `Payment ${p}`; lbl.font = normSm; lbl.fill = fill(WHITE);
     lbl.border = thin; lbl.alignment = leftAl; lbl.protection = { locked: true };
@@ -837,8 +927,8 @@ async function buildEntrySheet(
 
   // ── Total Payments row (locked SUM formulas) ──────────────────────────────────
   ws.getRow(totalPayRow).height = 14;
-  ws.mergeCells(totalPayRow, 1, totalPayRow, 3);
-  const tpLbl = ws.getCell(totalPayRow, 1);
+  ws.mergeCells(totalPayRow, COL_ROWNUM, totalPayRow, COL_ITEMCODE);
+  const tpLbl = ws.getCell(totalPayRow, COL_ROWNUM);
   tpLbl.value = "Total Payments"; tpLbl.font = { ...boldSm, color: { argb: WHITE } };
   tpLbl.fill = fill(DARK_BLUE); tpLbl.border = thin; tpLbl.alignment = leftAl;
   tpLbl.protection = { locked: true };
@@ -863,8 +953,8 @@ async function buildEntrySheet(
   //   Note  : DailyTotalSales is the TOTAL row's Sales column (same letter as BANK col,
   //           but referenced at totalRowNum — not the cash-section bank col).
   ws.getRow(balanceRow).height = 14;
-  ws.mergeCells(balanceRow, 1, balanceRow, 3);
-  const balLbl = ws.getCell(balanceRow, 1);
+  ws.mergeCells(balanceRow, COL_ROWNUM, balanceRow, COL_ITEMCODE);
+  const balLbl = ws.getCell(balanceRow, COL_ROWNUM);
   balLbl.value = "Balance Cash"; balLbl.font = { ...boldSm, color: { argb: WHITE } };
   balLbl.fill = fill(GREEN_HDR); balLbl.border = thin; balLbl.alignment = leftAl;
   balLbl.protection = { locked: true };
@@ -1031,7 +1121,105 @@ function buildSummarySheet(
   });
 }
 
-// Ageing sheet removed (V2 workbook: Costing, Sales, ENTRY, Summary, Summary-Itemwise)
+// ── Ageing sheet ──────────────────────────────────────────────────────────────
+// Buckets each item's Closing Qty into 0-30/31-60/61-90/91-120/121+ days based
+// on the best-available last-inbound-movement date (see fetchAgeingData()
+// above). Items with no movement record fall into 121+ with an explicit
+// "No movement record" note in the Ageing Basis column — this is a documented
+// fallback, never a fabricated age.
+function buildAgeingSheet(
+  wb: ExcelJS.Workbook,
+  items: ItemRow[],
+  ageingMap: Map<number, string>,
+  toDate: string
+): void {
+  const ws = wb.addWorksheet("Ageing");
+  ws.views = [{ state: "frozen", xSplit: 0, ySplit: 1 }];
+  ws.pageSetup.orientation    = "landscape";
+  ws.pageSetup.fitToPage      = true;
+  ws.pageSetup.fitToWidth     = 1;
+  ws.pageSetup.fitToHeight    = 0;
+  ws.pageSetup.printTitlesRow = "1:1";
+
+  ws.columns = [
+    { header: "Group",           key: "grp",   width: 18 },
+    { header: "Item Code",       key: "code",  width: 14 },
+    { header: "Item Name",       key: "name",  width: 28 },
+    { header: "Closing Qty",     key: "cqty",  width: 12 },
+    { header: "Closing Value",   key: "cval",  width: 13 },
+    { header: "0-30 Days Qty",   key: "b1",    width: 12 },
+    { header: "31-60 Days Qty",  key: "b2",    width: 12 },
+    { header: "61-90 Days Qty",  key: "b3",    width: 12 },
+    { header: "91-120 Days Qty", key: "b4",    width: 12 },
+    { header: "121+ Days Qty",   key: "b5",    width: 12 },
+    { header: "Ageing Basis",    key: "basis", width: 28 },
+  ];
+  ws.getRow(1).eachCell(c => { c.fill = fill(DARK_BLUE); c.font = wFont(9); c.alignment = ctr; c.border = thin; });
+  ws.getRow(1).height = 16;
+  ws.autoFilter = { from: { row: 1, column: 1 }, to: { row: 1, column: 11 } };
+
+  const toDateMs = toUtcDate(toDate).getTime();
+
+  const bucketTotals = [0, 0, 0, 0, 0];
+  let rowIdx = 2;
+  for (const item of items) {
+    const closeQty = r2(item.closeQty);
+    if (closeQty === 0 && item.closeValue === 0) continue; // skip zero-stock items entirely
+
+    const lastMoveStr = ageingMap.get(item.stockItemId);
+    let bucket = 4; // default → 121+ (undetermined)
+    let basis: string;
+    if (lastMoveStr) {
+      const days = Math.floor((toDateMs - toUtcDate(lastMoveStr).getTime()) / 86_400_000);
+      if (days <= 30) bucket = 0;
+      else if (days <= 60) bucket = 1;
+      else if (days <= 90) bucket = 2;
+      else if (days <= 120) bucket = 3;
+      else bucket = 4;
+      basis = `Last stock-in ${lastMoveStr} (${Math.max(days, 0)}d)`;
+    } else {
+      basis = "No movement record — defaulted to 121+";
+    }
+
+    const buckets = [null, null, null, null, null] as Array<number | null>;
+    buckets[bucket] = closeQty || null;
+    bucketTotals[bucket] += closeQty;
+
+    const r = rowIdx++;
+    const row = ws.getRow(r);
+    row.values = [
+      item.groupName, item.itemCode, item.itemName,
+      closeQty || null, r2(item.closeValue) || null,
+      ...buckets, basis,
+    ];
+    ws.getCell(r, 1).fill = fill(YELLOW_GRP); // Group column — yellow
+    ws.getCell(r, 4).fill = fill(PURPLE_QTY); // Closing Qty — light purple
+    [6,7,8,9,10].forEach(c => { ws.getCell(r, c).fill = fill(PURPLE_QTY); }); // bucket qty cols — light purple
+    if ((rowIdx - 2) % 2 === 1) row.eachCell(c => { if (!c.fill || (c.fill as any).fgColor?.argb === undefined) c.fill = fill(ALT_ROW); });
+    [4,5,6,7,8,9,10].forEach(c => { ws.getCell(r, c).numFmt = NUM; ws.getCell(r, c).alignment = right; ws.getCell(r, c).border = thin; });
+    ws.getCell(r, 11).font = normSm; ws.getCell(r, 11).border = thin;
+    ws.getCell(r, 2).border = thin; ws.getCell(r, 3).border = thin; ws.getCell(r, 1).border = thin;
+    row.height = 13;
+  }
+
+  // Totals row
+  const totRow = rowIdx;
+  ws.mergeCells(totRow, 1, totRow, 3);
+  applyCell(ws, totRow, 1, "TOTAL", fill(GREEN_HDR), { ...boldSm, color: { argb: WHITE } }, ctr);
+  const grandCloseQty = items.reduce((s, i) => s + r2(i.closeQty), 0);
+  const grandCloseVal = items.reduce((s, i) => s + r2(i.closeValue), 0);
+  applyCell(ws, totRow, 4, r2(grandCloseQty) || null, fill(GREEN_HDR), { ...boldSm, color: { argb: WHITE } }, right);
+  ws.getCell(totRow, 4).numFmt = NUM;
+  applyCell(ws, totRow, 5, r2(grandCloseVal) || null, fill(GREEN_HDR), { ...boldSm, color: { argb: WHITE } }, right);
+  ws.getCell(totRow, 5).numFmt = NUM;
+  [0,1,2,3,4].forEach((b, i) => {
+    const c = ws.getCell(totRow, 6 + i);
+    c.value = r2(bucketTotals[b]) || null; c.numFmt = NUM;
+    c.fill = fill(GREEN_HDR); c.font = { ...boldSm, color: { argb: WHITE } }; c.alignment = right; c.border = thin;
+  });
+  ws.getCell(totRow, 11).fill = fill(GREEN_HDR); ws.getCell(totRow, 11).border = thin;
+  ws.getRow(totRow).height = 16;
+}
 
 function buildSummaryItemwiseSheet(
   wb: ExcelJS.Workbook,
@@ -1163,12 +1351,13 @@ export async function generateSpSalesFormExcelV2(params: SpSalesFormV2Params): P
   const dates     = Array.from({ length: dayCount }, (_, i) => dateStr(addDays(startDate, i)));
   const dayBefore = dateStr(addDays(startDate, -1));
 
-  // Fetch all data in parallel (no ageing fetch — Ageing sheet removed in V2)
-  const [openMap, closeMap, salesRows, openingCashBalance] = await Promise.all([
+  // Fetch all data in parallel
+  const [openMap, closeMap, salesRows, openingCashBalance, ageingMap] = await Promise.all([
     fetchInventory(companyId, locationId, dayBefore),
     fetchInventory(companyId, locationId, toDate),
     fetchSalesData(companyId, locationId, fromDate, toDate),
     cashAccountId ? fetchCashAccountBalance(cashAccountId, companyId, dayBefore) : Promise.resolve(null),
+    fetchAgeingData(companyId, locationId, toDate),
   ]);
   console.log(`[spSalesFormExportV2] cashAccountId=${cashAccountId ?? "none"} openingCashBalance=${openingCashBalance ?? "n/a (manual)"}`);
   console.log(`[spSalesFormExportV2] openItems=${openMap.size} closeItems=${closeMap.size} saleRows=${salesRows.length} dayCount=${dayCount}`);
@@ -1190,7 +1379,8 @@ export async function generateSpSalesFormExcelV2(params: SpSalesFormV2Params): P
   buildSalesSheet(wb, items, dates);                               // 2. Sales — hidden
   await buildEntrySheet(wb, items, dates, dayCount, params, openingCashBalance); // 3. ENTRY — visible (async for ws.protect)
   buildSummarySheet(wb, items, dates, params);                     // 4. Summary — visible
-  buildSummaryItemwiseSheet(wb, items, dayCount);                  // 5. Summary-Itemwise — hidden
+  buildAgeingSheet(wb, items, ageingMap, toDate);                  // 5. Ageing — visible
+  buildSummaryItemwiseSheet(wb, items, dayCount);                  // 6. Summary-Itemwise — hidden
 
   // Error scan — fail fast on visible-sheet errors
   const errors = scanErrors(wb);
