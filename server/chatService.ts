@@ -1562,7 +1562,11 @@ function classifyChatIntent(
   if (RE_STOCK_ADJ.test(userMessage)) return "create_stock_adjustment";
   if (RE_STOCK_ITEM_CREATE.test(userMessage)) return "create_stock_item";
   // Transfer before voucher — "transfer stock" should not match voucher keywords
-  if (RE_STOCK_TRANSFER.test(userMessage) && !RE_VOUCHER.test(userMessage)) return "create_stock_transfer";
+  if (
+    (RE_STOCK_TRANSFER.test(userMessage) || RE_STOCK_TRANSFER_ANALYSIS.test(userMessage)) &&
+    !RE_VOUCHER.test(userMessage)
+  )
+    return "create_stock_transfer";
   if (RE_VOUCHER_SEARCH.test(userMessage)) return "search_voucher";
   if (RE_ACCOUNT_QUERY.test(userMessage)) return "account_query";
   if (RE_PRICE_UPDATE.test(userMessage)) return "price_update";
@@ -2852,7 +2856,11 @@ If intent is not about an account query, respond with exactly: null`;
     // ── Stock transfer detection ───────────────────────────────────────
     let stockTransferDraft: any = undefined;
 
-    if (RE_STOCK_TRANSFER.test(userMessage) && !voucherDraft && !stockAdjustmentDraft) {
+    if (
+      (RE_STOCK_TRANSFER.test(userMessage) || RE_STOCK_TRANSFER_ANALYSIS.test(userMessage)) &&
+      !voucherDraft &&
+      !stockAdjustmentDraft
+    ) {
       try {
         if (RE_STOCK_TRANSFER_ANALYSIS.test(userMessage)) {
           // ── AI-suggested OPTIONAL stock transfer (data-driven analysis) ──
@@ -2961,6 +2969,8 @@ If this is not a two-location stock-transfer analysis request, respond with exac
                   sourceSalesRate: i.sourceSalesRate,
                   destinationSalesRate: i.destinationSalesRate,
                   otwQty: i.otwQty,
+                  otwDetails: i.otwDetails,
+                  otwSummary: i.otwSummary,
                   suggestedQty: i.suggestedQty,
                   reason: i.reason,
                   confidence: i.confidence,

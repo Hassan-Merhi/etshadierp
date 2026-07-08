@@ -4,6 +4,29 @@ import { Button } from "@/components/ui/button";
 import { StockTransferDraft, VerifyContainerDraft, DataQueryResult } from "./chatWidgetTypes";
 import { cn } from "@/lib/utils";
 
+type OtwDetail = NonNullable<StockTransferDraft["items"][number]["otwDetails"]>[number];
+
+// ── Compact OTW (on-the-way) line for the AI stock transfer confirmation card ──
+// Examples: "OTW: 12 for Kolwezi in MSKU1234567, ETA 2026-07-20" / "OTW: 30 across 3 containers" / "OTW: none"
+function formatOtwLine(otwQty: number | null | undefined, details: OtwDetail[] | undefined, summary?: string): string {
+  if (!details || details.length === 0) {
+    return `OTW: ${otwQty === null || otwQty === undefined || otwQty === 0 ? "none" : otwQty}`;
+  }
+  const counted = details.filter((d) => d.matchType !== "other");
+  if (counted.length === 1) {
+    const d = counted[0];
+    const shopText = d.matchType === "direct" && d.shopName ? ` for ${d.shopName}` : d.matchType === "unknown" ? ", shop unknown" : "";
+    const etaText = d.eta ? `, ETA ${d.eta}` : d.trackingStatus ? `, ${d.trackingStatus}` : ", ETA unavailable";
+    return `OTW: ${d.quantity}${shopText} in ${d.containerNumber}${etaText}`;
+  }
+  if (counted.length > 1) {
+    const total = counted.reduce((s, d) => s + d.quantity, 0);
+    return `OTW: ${total} across ${counted.length} containers`;
+  }
+  // Only "other-shop" containers exist — none counted for this destination.
+  return summary || "OTW exists but assigned to another shop, not counted for this destination";
+}
+
 // ── Stock Transfer Confirmation Card ───────────────────────────────
 export function StockTransferConfirmCard({
   draft,
@@ -195,7 +218,7 @@ export function StockTransferConfirmCard({
                         Dest sales: <span className="text-foreground">{item.destinationSalesQty ?? 0}</span> (
                         {item.destinationSalesRate ?? 0}/day)
                       </span>
-                      <span>OTW: {item.otwQty === null || item.otwQty === undefined ? "not available" : item.otwQty}</span>
+                      <span className="col-span-2">{formatOtwLine(item.otwQty, item.otwDetails, item.otwSummary)}</span>
                       <span>
                         Confidence:{" "}
                         <span className="text-foreground">

@@ -79,6 +79,17 @@ export async function cleanupTestData(prefix: string): Promise<void> {
       .delete(schema.vouchers)
       .where(eq(schema.vouchers.companyId, company.id));
     await db
+      .delete(schema.poLineItems)
+      .where(
+        sql`${schema.poLineItems.poId} IN (SELECT id FROM purchase_orders WHERE company_id = ${company.id})`,
+      );
+    await db
+      .delete(schema.purchaseOrders)
+      .where(eq(schema.purchaseOrders.companyId, company.id));
+    await db
+      .delete(schema.containers)
+      .where(eq(schema.containers.companyId, company.id));
+    await db
       .delete(schema.stockItems)
       .where(eq(schema.stockItems.companyId, company.id));
     await db

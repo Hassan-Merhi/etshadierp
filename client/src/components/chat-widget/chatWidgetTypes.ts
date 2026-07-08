@@ -247,6 +247,18 @@ export interface StockTransferDraft {
     sourceSalesRate?: number;
     destinationSalesRate?: number;
     otwQty?: number | null;
+    otwDetails?: {
+      containerNumber: string;
+      quantity: number;
+      eta?: string | null;
+      trackingStatus?: string | null;
+      currentLocation?: string | null;
+      shopName?: string | null;
+      supplierName?: string | null;
+      importDate?: string | null;
+      matchType?: "direct" | "unknown" | "other";
+    }[];
+    otwSummary?: string;
     suggestedQty?: number;
     reason?: string;
     confidence?: number;
