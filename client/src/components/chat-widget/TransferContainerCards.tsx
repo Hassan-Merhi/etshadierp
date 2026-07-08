@@ -32,17 +32,24 @@ export function StockTransferConfirmCard({
     return i.currentStock !== undefined && qty > i.currentStock;
   });
 
+  const isAnalysis = draft.optional === true;
+  const hasNoSuggestions = isAnalysis && editItems.length === 0 && !draft.locationCandidates?.length;
+
+  const removeItem = (idx: number) => setEditItems((prev) => prev.filter((_, i) => i !== idx));
+
   const handleConfirmClick = () => {
     const resolved: StockTransferDraft = {
       ...draft,
       date: editDate,
       notes: editNotes,
-      items: editItems.map((i) => ({
-        ...i,
-        stockItemId: i.selectedId,
-        stockItemName: i.selectedName,
-        quantity: parseFloat(i.qtyStr) || i.quantity,
-      })),
+      items: editItems
+        .filter((i) => (parseFloat(i.qtyStr) || 0) > 0)
+        .map((i) => ({
+          ...i,
+          stockItemId: i.selectedId,
+          stockItemName: i.selectedName,
+          quantity: parseFloat(i.qtyStr) || i.quantity,
+        })),
     };
     onConfirm(resolved);
   };
@@ -54,8 +61,15 @@ export function StockTransferConfirmCard({
     >
       <div className="px-3 py-2 bg-blue-500/10 flex items-center gap-2">
         <ArrowLeftRight className="h-4 w-4 text-blue-600 dark:text-blue-400 shrink-0" />
-        <span className="text-sm font-semibold text-blue-700 dark:text-blue-400">Stock Transfer?</span>
+        <span className="text-sm font-semibold text-blue-700 dark:text-blue-400">
+          {isAnalysis ? "AI Suggested Stock Transfer" : "Stock Transfer?"}
+        </span>
       </div>
+      {isAnalysis && draft.analysisSummary && (
+        <div className="px-3 py-2 bg-blue-500/5 border-b border-blue-500/10">
+          <p className="text-[11px] text-muted-foreground leading-snug">{draft.analysisSummary}</p>
+        </div>
+      )}
       <div className="px-3 py-2 space-y-1.5 text-xs">
         <div className="flex justify-between gap-2 text-muted-foreground items-center">
           <span className="shrink-0">Date</span>
@@ -75,6 +89,14 @@ export function StockTransferConfirmCard({
           <span className="shrink-0">To</span>
           <span className="font-medium text-foreground truncate max-w-[170px]">{draft.destinationLocationName}</span>
         </div>
+        {draft.analysisDateRange && (
+          <div className="flex justify-between gap-2 text-muted-foreground items-center">
+            <span className="shrink-0">Analyzed</span>
+            <span className="font-medium text-foreground truncate max-w-[170px]">
+              {draft.analysisDateRange.from} → {draft.analysisDateRange.to}
+            </span>
+          </div>
+        )}
         <div className="flex justify-between gap-2 text-muted-foreground items-center">
           <span className="shrink-0">Notes</span>
           <input
@@ -86,66 +108,122 @@ export function StockTransferConfirmCard({
             data-testid="input-transfer-notes"
           />
         </div>
-        <div className="border-t pt-1.5 mt-1.5 space-y-1.5">
-          <div className="grid grid-cols-[1fr_50px_60px] gap-1 text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">
-            <span>Item</span>
-            <span className="text-right">Qty</span>
-            <span className="text-right">In Stock</span>
-          </div>
-          {editItems.map((item, i) => {
-            const qty = parseFloat(item.qtyStr) || 0;
-            const insufficient = item.currentStock !== undefined && qty > item.currentStock;
-            const candidates = item.candidates ?? [];
-            const hasChoice = candidates.length > 1;
-            return (
-              <div key={i} className="grid grid-cols-[1fr_50px_60px] gap-1 items-center">
-                {hasChoice ? (
-                  <select
-                    className="text-xs font-medium text-foreground bg-background border rounded px-1.5 py-0.5 w-full"
-                    value={item.selectedId}
-                    onChange={(e) => {
-                      const id = Number(e.target.value);
-                      const c = candidates.find((c) => c.id === id);
-                      if (c)
+        {hasNoSuggestions ? (
+          <p className="text-[11px] text-muted-foreground border-t pt-1.5">
+            No items currently qualify for transfer based on stock and sales data.
+          </p>
+        ) : (
+          <div className="border-t pt-1.5 mt-1.5 space-y-2">
+            {editItems.map((item, i) => {
+              const qty = parseFloat(item.qtyStr) || 0;
+              const insufficient = item.currentStock !== undefined && qty > item.currentStock;
+              const candidates = item.candidates ?? [];
+              const hasChoice = candidates.length > 1;
+              return (
+                <div key={i} className={cn("rounded border border-border/50 p-1.5", isAnalysis && "bg-background/40")}>
+                  <div className="grid grid-cols-[1fr_50px_60px_auto] gap-1 items-center">
+                    {hasChoice ? (
+                      <select
+                        className="text-xs font-medium text-foreground bg-background border rounded px-1.5 py-0.5 w-full"
+                        value={item.selectedId}
+                        onChange={(e) => {
+                          const id = Number(e.target.value);
+                          const c = candidates.find((c) => c.id === id);
+                          if (c)
+                            setEditItems((prev) =>
+                              prev.map((it, idx) => (idx === i ? { ...it, selectedId: c.id, selectedName: c.name } : it))
+                            );
+                        }}
+                      >
+                        {candidates.map((c) => (
+                          <option key={c.id} value={c.id}>
+                            {c.name}
+                            {c.code ? ` (${c.code})` : ""}
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      <span className="truncate text-foreground font-medium">
+                        {item.selectedName}
+                        {item.stockItemCode ? ` (${item.stockItemCode})` : ""}
+                      </span>
+                    )}
+                    <input
+                      type="number"
+                      min="0"
+                      value={item.qtyStr}
+                      onChange={(e) =>
                         setEditItems((prev) =>
-                          prev.map((it, idx) => (idx === i ? { ...it, selectedId: c.id, selectedName: c.name } : it))
-                        );
-                    }}
-                  >
-                    {candidates.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.name}
-                        {c.code ? ` (${c.code})` : ""}
-                      </option>
-                    ))}
-                  </select>
-                ) : (
-                  <span className="truncate text-foreground">{item.selectedName}</span>
-                )}
-                <input
-                  type="number"
-                  min="0"
-                  value={item.qtyStr}
-                  onChange={(e) =>
-                    setEditItems((prev) => prev.map((it, idx) => (idx === i ? { ...it, qtyStr: e.target.value } : it)))
-                  }
-                  className={`text-right text-foreground bg-background border rounded px-1 py-0.5 text-[11px] w-full ${insufficient ? "border-destructive" : ""}`}
-                  data-testid={`input-transfer-qty-${i}`}
-                />
-                <span
-                  className={`text-right text-[10px] ${insufficient ? "text-destructive font-semibold" : "text-muted-foreground"}`}
-                >
-                  {item.currentStock !== undefined
-                    ? item.currentStock.toLocaleString(undefined, { maximumFractionDigits: 2 })
-                    : "—"}
-                </span>
-              </div>
-            );
-          })}
-        </div>
+                          prev.map((it, idx) => (idx === i ? { ...it, qtyStr: e.target.value } : it))
+                        )
+                      }
+                      className={`text-right text-foreground bg-background border rounded px-1 py-0.5 text-[11px] w-full ${insufficient ? "border-destructive" : ""}`}
+                      data-testid={`input-transfer-qty-${i}`}
+                    />
+                    <span
+                      className={`text-right text-[10px] ${insufficient ? "text-destructive font-semibold" : "text-muted-foreground"}`}
+                    >
+                      {item.currentStock !== undefined
+                        ? item.currentStock.toLocaleString(undefined, { maximumFractionDigits: 2 })
+                        : "—"}
+                    </span>
+                    {isAnalysis && (
+                      <button
+                        type="button"
+                        onClick={() => removeItem(i)}
+                        className="text-muted-foreground hover:text-destructive"
+                        data-testid={`button-remove-transfer-item-${i}`}
+                        title="Remove suggestion"
+                      >
+                        <Minus className="h-3.5 w-3.5" />
+                      </button>
+                    )}
+                  </div>
+                  {isAnalysis && (
+                    <div className="mt-1 grid grid-cols-2 gap-x-2 gap-y-0.5 text-[10px] text-muted-foreground">
+                      <span>
+                        Source qty: <span className="text-foreground">{item.sourceQty ?? "—"}</span>
+                      </span>
+                      <span>
+                        Dest qty: <span className="text-foreground">{item.destinationQty ?? "—"}</span>
+                      </span>
+                      <span>
+                        Source sales: <span className="text-foreground">{item.sourceSalesQty ?? 0}</span> (
+                        {item.sourceSalesRate ?? 0}/day)
+                      </span>
+                      <span>
+                        Dest sales: <span className="text-foreground">{item.destinationSalesQty ?? 0}</span> (
+                        {item.destinationSalesRate ?? 0}/day)
+                      </span>
+                      <span>OTW: {item.otwQty === null || item.otwQty === undefined ? "not available" : item.otwQty}</span>
+                      <span>
+                        Confidence:{" "}
+                        <span className="text-foreground">
+                          {item.confidence !== undefined ? `${Math.round(item.confidence * 100)}%` : "—"}
+                        </span>
+                      </span>
+                      {(item.previousTransferCount ?? 0) > 0 && (
+                        <span className="col-span-2">
+                          Previous transfers: {item.previousTransferCount} ({item.previousTransferQty} units, last{" "}
+                          {item.lastTransferDate})
+                        </span>
+                      )}
+                      {item.reason && <span className="col-span-2 italic">{item.reason}</span>}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
         {hasInsufficientStock && (
           <p className="text-[10px] text-destructive border-t pt-1">
             Warning: transfer quantity exceeds available stock for one or more items.
+          </p>
+        )}
+        {isAnalysis && (
+          <p className="text-[10px] text-amber-600 dark:text-amber-400 border-t pt-1">
+            This is optional. Inventory will not move until approved/posted.
           </p>
         )}
       </div>
@@ -162,7 +240,7 @@ export function StockTransferConfirmCard({
         <Button
           size="sm"
           onClick={handleConfirmClick}
-          disabled={isSubmitting}
+          disabled={isSubmitting || hasNoSuggestions}
           data-testid="button-confirm-stock-transfer"
         >
           {isSubmitting ? (
@@ -170,7 +248,7 @@ export function StockTransferConfirmCard({
           ) : (
             <ArrowLeftRight className="h-3.5 w-3.5 mr-1" />
           )}
-          Confirm Transfer
+          {isAnalysis ? "Create Optional Transfer" : "Confirm Transfer"}
         </Button>
       </div>
     </div>

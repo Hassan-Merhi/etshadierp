@@ -25,6 +25,7 @@ import {
   getBusinessSummary,
 } from "./aiTools";
 import { getOrBuildAISnapshot } from "./lib/aiSnapshots";
+import { buildStockTransferSuggestionContext, matchLocationByName } from "./services/stockTransferAnalysis";
 
 // AI Provider types
 type AIProvider = "gemini" | "chatgpt" | "grok";
@@ -283,6 +284,10 @@ const RE_STOCK_ADJ =
   /\b(produce|producing|production|consume|consuming|consumption|stock\s+adjust|adjust\s+stock|record\s+production|record\s+consumption|produced|consumed)\b/i;
 const RE_STOCK_TRANSFER =
   /\b(transfer|move|shift)\b.{0,80}\b(stock|item|inventory)\b|\b(stock|item|inventory)\b.{0,60}\b(transfer|move|shift)\b|\btransfer\b.{0,40}\bfrom\b.{0,40}\bto\b/i;
+// Analysis-style stock transfer requests (no explicit item/quantity given —
+// the AI must run a server-side data analysis instead of extracting numbers).
+const RE_STOCK_TRANSFER_ANALYSIS =
+  /\b(analy[sz]e|suggest|recommend|compare)\b.{0,100}\b(transfer|move|stock|sales|sell)\b|\bwhat\s+(should|to)\s+(i|we)\s+(move|transfer)\b|\bsells?\s+better\b|\boptional\s+(stock\s+)?transfer\b|\bbased\s+on\s+(sales|stock|old\s+transfers?)\b.{0,60}\btransfer\b|\btransfer\b.{0,60}\bbased\s+on\b/i;
 const RE_STOCK_ITEM_CREATE =
   /\b(create\s+(a\s+)?stock\s+item|add\s+(a\s+)?stock\s+item|new\s+stock\s+item|create\s+(a\s+)?new\s+item|add\s+(a\s+)?new\s+item|new\s+item)\b/i;
 const RE_PRICE_UPDATE =
@@ -2849,7 +2854,126 @@ If intent is not about an account query, respond with exactly: null`;
 
     if (RE_STOCK_TRANSFER.test(userMessage) && !voucherDraft && !stockAdjustmentDraft) {
       try {
-        const [items, locs] = await Promise.all([
+        if (RE_STOCK_TRANSFER_ANALYSIS.test(userMessage)) {
+          // ── AI-suggested OPTIONAL stock transfer (data-driven analysis) ──
+          // The LLM only classifies intent + picks locations/date range/aggressiveness.
+          // All quantities/numbers come from buildStockTransferSuggestionContext (real SQL).
+          const locRows = await db
+            .select({ id: schema.locations.id, name: schema.locations.name, code: schema.locations.code })
+            .from(schema.locations)
+            .where(and(eq(schema.locations.companyId, companyId), isNull(schema.locations.deletedAt)))
+            .limit(50);
+
+          const today = new Date().toISOString().slice(0, 10);
+          const analysisPrompt = `You are a stock-transfer analysis request parser.
+User message: "${userMessage}"
+Today: ${today}
+Locations (id:name:code): ${locRows.map((l) => `${l.id}:${l.name}:${l.code}`).join(" | ")}
+
+RULES:
+1. Extract the source location name and destination location name exactly as the user referred to them (fuzzy match to the list above by NAME, do not invent an id yourself).
+2. Extract a lookback window in days if mentioned ("last 7 days" -> 7, "last 30 days" -> 30, "this month" -> use days from the 1st of this month to today). Default to 30 if not mentioned.
+3. Extract aggressiveness if mentioned: "aggressive"/"fast"/"more" -> "aggressive", "conservative"/"safe"/"careful" -> "conservative", otherwise "normal".
+4. If the user did not name two distinct locations, respond with exactly: null
+
+Respond with ONLY valid JSON (no markdown):
+{"sourceLocationName":"...","destinationLocationName":"...","days":NUMBER,"aggressiveness":"conservative"|"normal"|"aggressive"}
+
+If this is not a two-location stock-transfer analysis request, respond with exactly: null`;
+
+          const analysisResult = await callAIWithFallback(
+            selectedProvider,
+            analysisPrompt,
+            [],
+            "Extract stock transfer analysis parameters or return null"
+          );
+          const rawAnalysis = analysisResult.response
+            .trim()
+            .replace(/```json\n?|```/g, "")
+            .trim();
+
+          if (rawAnalysis !== "null" && rawAnalysis.startsWith("{")) {
+            const parsedAnalysis = JSON.parse(rawAnalysis);
+            const sourceMatch = await matchLocationByName(companyId, parsedAnalysis.sourceLocationName || "");
+            const destMatch = await matchLocationByName(companyId, parsedAnalysis.destinationLocationName || "");
+
+            if (sourceMatch.candidates.length > 1 || destMatch.candidates.length > 1) {
+              // Ambiguous location name(s) — never guess silently.
+              const ambiguous = sourceMatch.candidates.length > 1 ? sourceMatch.candidates : destMatch.candidates;
+              stockTransferDraft = {
+                date: today,
+                sourceLocationId: sourceMatch.matched?.id || 0,
+                sourceLocationName: sourceMatch.matched?.name || parsedAnalysis.sourceLocationName || "",
+                destinationLocationId: destMatch.matched?.id || 0,
+                destinationLocationName: destMatch.matched?.name || parsedAnalysis.destinationLocationName || "",
+                items: [],
+                locationCandidates: ambiguous.map((c) => ({ id: c.id, name: `${c.name} (${c.code})` })),
+                optional: true,
+                analysisSummary:
+                  "Multiple locations matched that name. Please pick the correct one before I can analyze.",
+              };
+            } else if (sourceMatch.matched && destMatch.matched) {
+              const days = Math.min(365, Math.max(1, Number(parsedAnalysis.days) || 30));
+              const dateTo = today;
+              const dateFromObj = new Date();
+              dateFromObj.setDate(dateFromObj.getDate() - (days - 1));
+              const dateFrom = dateFromObj.toISOString().slice(0, 10);
+              const aggressiveness: "conservative" | "normal" | "aggressive" = [
+                "conservative",
+                "normal",
+                "aggressive",
+              ].includes(parsedAnalysis.aggressiveness)
+                ? parsedAnalysis.aggressiveness
+                : "normal";
+
+              const ctx = await buildStockTransferSuggestionContext(
+                companyId,
+                sourceMatch.matched.id,
+                destMatch.matched.id,
+                dateFrom,
+                dateTo,
+                { aggressiveness }
+              );
+
+              stockTransferDraft = {
+                date: today,
+                sourceLocationId: ctx.sourceLocationId,
+                sourceLocationName: ctx.sourceLocationName,
+                destinationLocationId: ctx.destinationLocationId,
+                destinationLocationName: ctx.destinationLocationName,
+                notes: `AI-suggested optional transfer based on sales/stock analysis (${ctx.dateFrom} to ${ctx.dateTo}).`,
+                optional: true,
+                analysisSummary: ctx.analysisSummary,
+                analysisDateRange: { from: ctx.dateFrom, to: ctx.dateTo },
+                aggressiveness: ctx.aggressiveness,
+                comparedLocations: `${ctx.sourceLocationName} → ${ctx.destinationLocationName}`,
+                oldTransferSummary: ctx.oldTransferSummary,
+                items: ctx.items.map((i) => ({
+                  stockItemId: i.stockItemId,
+                  stockItemName: i.stockItemName,
+                  stockItemCode: i.stockItemCode,
+                  quantity: i.suggestedQty,
+                  currentStock: i.sourceQty,
+                  sourceQty: i.sourceQty,
+                  destinationQty: i.destinationQty,
+                  sourceSalesQty: i.sourceSalesQty,
+                  destinationSalesQty: i.destinationSalesQty,
+                  sourceSalesRate: i.sourceSalesRate,
+                  destinationSalesRate: i.destinationSalesRate,
+                  otwQty: i.otwQty,
+                  suggestedQty: i.suggestedQty,
+                  reason: i.reason,
+                  confidence: i.confidence,
+                  oldTransferSummary: i.oldTransferSummary,
+                  previousTransferQty: i.previousTransferQty,
+                  previousTransferCount: i.previousTransferCount,
+                  lastTransferDate: i.lastTransferDate || undefined,
+                })),
+              };
+            }
+          }
+        } else {
+          const [items, locs] = await Promise.all([
           db
             .select({ id: schema.stockItems.id, name: schema.stockItems.name, code: schema.stockItems.code })
             .from(schema.stockItems)
@@ -2909,6 +3033,7 @@ If intent is unclear or this is not a stock transfer request, respond with exact
             }
             stockTransferDraft = parsedTf;
           }
+        }
         }
       } catch (_) {
         // Extraction failed silently

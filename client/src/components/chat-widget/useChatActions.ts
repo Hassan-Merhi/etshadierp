@@ -168,6 +168,10 @@ export function useChatActions(state: ChatActionsState) {
 
   const handleConfirmStockTransfer = async (resolved: StockTransferDraft) => {
     try {
+      // AI-suggested analysis drafts default to optional=true (no inventory movement
+      // until approved through the normal stock transfer workflow). Manual/direct
+      // drafts (optional undefined) keep prior behavior of creating a real transfer.
+      const optional = resolved.optional === true;
       const resp = await fetch("/api/chatbot/confirm-stock-transfer", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -177,6 +181,9 @@ export function useChatActions(state: ChatActionsState) {
           destinationLocationId: resolved.destinationLocationId,
           notes: resolved.notes || "",
           items: resolved.items.map((i) => ({ stockItemId: i.stockItemId, quantity: i.quantity })),
+          optional,
+          analysisSummary: resolved.analysisSummary || undefined,
+          analysisDateRange: resolved.analysisDateRange || undefined,
           sessionId,
           prompt: `Transfer stock from ${resolved.sourceLocationName} to ${resolved.destinationLocationName}`,
         }),
@@ -186,8 +193,11 @@ export function useChatActions(state: ChatActionsState) {
       if (!resp.ok) throw new Error(data.message || "Transfer failed");
       setPendingStockTransfer(null);
       queryClient.invalidateQueries({ queryKey: ["/api/inventory"] });
+      const voucherRef = data.voucher?.voucherNumber ? ` (voucher ${data.voucher.voucherNumber})` : "";
       sendMutation.mutate(
-        `Stock transfer created from "${resolved.sourceLocationName}" to "${resolved.destinationLocationName}" on ${resolved.date}. ${resolved.items.length} item(s) transferred.`
+        optional
+          ? `Optional stock transfer draft created from "${resolved.sourceLocationName}" to "${resolved.destinationLocationName}"${voucherRef}. ${resolved.items.length} item(s). Inventory has NOT moved — open Stock Transfers to review and approve/post it.`
+          : `Stock transfer created from "${resolved.sourceLocationName}" to "${resolved.destinationLocationName}" on ${resolved.date}. ${resolved.items.length} item(s) transferred.`
       );
     } catch (err: any) {
       sendMutation.mutate(`Stock transfer failed: ${err.message}`);

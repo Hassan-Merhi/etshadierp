@@ -226,12 +226,34 @@ export interface StockTransferDraft {
   destinationLocationId: number;
   destinationLocationName: string;
   notes?: string;
+  /** True for AI-suggested drafts: created as an optional transfer (no inventory movement) until approved. */
+  optional?: boolean;
+  analysisSummary?: string;
+  analysisDateRange?: { from: string; to: string };
+  aggressiveness?: "conservative" | "normal" | "aggressive";
+  comparedLocations?: string;
+  oldTransferSummary?: string;
   items: {
     stockItemId: number;
     stockItemName: string;
     quantity: number;
     currentStock?: number;
     candidates?: { id: number; name: string; code?: string }[];
+    stockItemCode?: string;
+    sourceQty?: number;
+    destinationQty?: number;
+    sourceSalesQty?: number;
+    destinationSalesQty?: number;
+    sourceSalesRate?: number;
+    destinationSalesRate?: number;
+    otwQty?: number | null;
+    suggestedQty?: number;
+    reason?: string;
+    confidence?: number;
+    oldTransferSummary?: string;
+    previousTransferQty?: number;
+    previousTransferCount?: number;
+    lastTransferDate?: string;
   }[];
   locationCandidates?: { id: number; name: string }[];
 }
