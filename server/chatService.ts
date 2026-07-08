@@ -25,7 +25,11 @@ import {
   getBusinessSummary,
 } from "./aiTools";
 import { getOrBuildAISnapshot } from "./lib/aiSnapshots";
-import { buildStockTransferSuggestionContext, matchLocationByName } from "./services/stockTransferAnalysis";
+import {
+  buildStockTransferSuggestionContext,
+  buildStockTransferByTargetQuantityContext,
+  matchLocationByName,
+} from "./services/stockTransferAnalysis";
 
 // AI Provider types
 type AIProvider = "gemini" | "chatgpt" | "grok";
@@ -288,6 +292,20 @@ const RE_STOCK_TRANSFER =
 // the AI must run a server-side data analysis instead of extracting numbers).
 const RE_STOCK_TRANSFER_ANALYSIS =
   /\b(analy[sz]e|suggest|recommend|compare)\b.{0,100}\b(transfer|move|stock|sales|sell)\b|\bwhat\s+(should|to)\s+(i|we)\s+(move|transfer)\b|\bsells?\s+better\b|\boptional\s+(stock\s+)?transfer\b|\bbased\s+on\s+(sales|stock|old\s+transfers?)\b.{0,60}\btransfer\b|\btransfer\b.{0,60}\bbased\s+on\b/i;
+// Multi-source, target-quantity transfer requests — e.g. "410 bales to Kolwezi
+// from Hadi 1,2,3,4, only stock groups Kolwezi already has". No explicit item
+// list is given, so this must go through the deterministic quantity-target
+// builder instead of the naive single-item extraction prompt.
+const RE_MULTI_SOURCE_LOCATIONS =
+  /\b[a-z][a-z\s]*\d+\s*(?:,\s*\d+)+\b|\b[a-z][a-z\s]*\d+\s*-\s*\d+\b/i;
+const RE_TARGET_QTY_HINT = /\b\d+\s*(bales?|items?|units?|pcs?|pieces?|cartons?|bags?)\b/i;
+// Only treat a bare quantity hint (without an explicit multi-source location
+// pattern) as this new flow when the message also signals the "auto-select by
+// stock group" filtering behavior — otherwise a normal single-item transfer
+// like "transfer 50 bales of EG45044 from Hadi 1 to Kolwezi" must keep going
+// through the legacy single-item extraction path unchanged.
+const RE_STOCK_GROUP_FILTER_HINT =
+  /\bstock\s+group|\bsame\s+group|\balready\s+has|\balready\s+carr(?:y|ies)|\bdon'?t\s+mix|\bdo\s+not\s+mix\b/i;
 const RE_STOCK_ITEM_CREATE =
   /\b(create\s+(a\s+)?stock\s+item|add\s+(a\s+)?stock\s+item|new\s+stock\s+item|create\s+(a\s+)?new\s+item|add\s+(a\s+)?new\s+item|new\s+item)\b/i;
 const RE_PRICE_UPDATE =
@@ -1972,6 +1990,7 @@ export async function chat(
   voucherDraft?: any;
   stockAdjustmentDraft?: any;
   stockTransferDraft?: any;
+  stockTransferDrafts?: any[];
   voucherSearchResults?: any[];
   stockItemDraft?: any;
   priceUpdateDraft?: any;
@@ -2855,6 +2874,16 @@ If intent is not about an account query, respond with exactly: null`;
 
     // ── Stock transfer detection ───────────────────────────────────────
     let stockTransferDraft: any = undefined;
+    let stockTransferDrafts: any[] | undefined = undefined;
+    // When set, this is used verbatim as the assistant's text response for the
+    // stock-transfer flow, bypassing the generic "prepared a draft" acknowledgement
+    // prompt — guarantees we never claim a draft exists when it doesn't.
+    let stockTransferResponseOverride: string | undefined = undefined;
+    const isMultiSourceTargetQtyRequest =
+      RE_STOCK_TRANSFER.test(userMessage) &&
+      !RE_STOCK_TRANSFER_ANALYSIS.test(userMessage) &&
+      (RE_MULTI_SOURCE_LOCATIONS.test(userMessage) ||
+        (RE_TARGET_QTY_HINT.test(userMessage) && RE_STOCK_GROUP_FILTER_HINT.test(userMessage)));
 
     if (
       (RE_STOCK_TRANSFER.test(userMessage) || RE_STOCK_TRANSFER_ANALYSIS.test(userMessage)) &&
@@ -2982,6 +3011,165 @@ If this is not a two-location stock-transfer analysis request, respond with exac
               };
             }
           }
+        } else if (isMultiSourceTargetQtyRequest) {
+          // ── Multi-source, target-quantity transfer (e.g. "410 bales to Kolwezi
+          // from Hadi 1,2,3,4, only stock groups Kolwezi already has") ──
+          // The LLM only extracts location names/quantity/flags as TEXT; every
+          // item/quantity in the resulting draft(s) comes from
+          // buildStockTransferByTargetQuantityContext (real SQL) — never invented.
+          const locRows = await db
+            .select({ id: schema.locations.id, name: schema.locations.name, code: schema.locations.code })
+            .from(schema.locations)
+            .where(and(eq(schema.locations.companyId, companyId), isNull(schema.locations.deletedAt)))
+            .limit(80);
+
+          const today = new Date().toISOString().slice(0, 10);
+          const multiPrompt = `You are a stock-transfer request parser for a request that targets a TOTAL QUANTITY across possibly MULTIPLE source locations (not a fixed item list).
+User message: "${userMessage}"
+Today: ${today}
+Locations (id:name:code): ${locRows.map((l) => `${l.id}:${l.name}:${l.code}`).join(" | ")}
+
+RULES:
+1. Extract destinationLocationName exactly as the user referred to it (e.g. "Kolwezi"). Do not guess between similarly-named locations (e.g. "Kolwezi" vs "Kolwezi 2") — just report the name the user typed.
+2. Extract ALL source location names, expanding any shorthand into a full array. "Hadi 1,2,3,4" -> ["Hadi 1","Hadi 2","Hadi 3","Hadi 4"]. "Hadi 1-4" -> ["Hadi 1","Hadi 2","Hadi 3","Hadi 4"]. Match against the locations list by NAME text only, do not invent ids.
+3. Extract targetQty: a whole number of bales/items/units the user wants transferred in TOTAL. If no number is mentioned, use null.
+4. Extract optional: true if the user says "optional", otherwise false.
+5. Extract date: default to today (${today}) if not specified.
+6. Extract onlyDestinationStockGroups: true if the user says things like "only use the same stock groups it already has" / "don't mix X with Y" / similar filtering language. Default true if unclear.
+
+Respond with ONLY valid JSON (no markdown):
+{"destinationLocationName":"...","sourceLocationNames":["..."],"targetQty":NUMBER_OR_NULL,"optional":BOOLEAN,"date":"YYYY-MM-DD","onlyDestinationStockGroups":BOOLEAN}
+
+If this is not this kind of quantity-target multi-source transfer request, respond with exactly: null`;
+
+          const multiResult = await callAIWithFallback(
+            selectedProvider,
+            multiPrompt,
+            [],
+            "Extract multi-source target-quantity stock transfer parameters or return null"
+          );
+          const rawMulti = multiResult.response
+            .trim()
+            .replace(/```json\n?|```/g, "")
+            .trim();
+
+          if (rawMulti !== "null" && rawMulti.startsWith("{")) {
+            const parsedMulti = JSON.parse(rawMulti);
+            const destinationName: string = parsedMulti.destinationLocationName || "";
+            const sourceNames: string[] = Array.isArray(parsedMulti.sourceLocationNames)
+              ? parsedMulti.sourceLocationNames.filter((n: any) => typeof n === "string" && n.trim())
+              : [];
+            const targetQty =
+              Number.isFinite(Number(parsedMulti.targetQty)) && Number(parsedMulti.targetQty) > 0
+                ? Math.floor(Number(parsedMulti.targetQty))
+                : undefined;
+            const optional = parsedMulti.optional === true;
+            const onlyDestinationStockGroups = parsedMulti.onlyDestinationStockGroups !== false;
+            const dateStr = parsedMulti.date || today;
+
+            // Destination must match STRICTLY — never silently pick "Kolwezi 2" for "Kolwezi".
+            const destMatch = await matchLocationByName(companyId, destinationName, { strict: true });
+
+            if (!destinationName) {
+              stockTransferResponseOverride =
+                "I need a destination location to build this transfer — which location should receive the stock?";
+            } else if (!destMatch.matched && destMatch.candidates.length > 0) {
+              stockTransferDraft = {
+                date: dateStr,
+                sourceLocationId: 0,
+                sourceLocationName: sourceNames.join(", "),
+                destinationLocationId: 0,
+                destinationLocationName: destinationName,
+                items: [],
+                locationCandidates: destMatch.candidates.map((c) => ({ id: c.id, name: `${c.name} (${c.code})` })),
+                optional,
+              };
+              stockTransferResponseOverride = `"${destinationName}" matches more than one location. Please tell me exactly which one you mean before I build the transfer.`;
+            } else if (!destMatch.matched) {
+              stockTransferResponseOverride = `I couldn't find a location matching "${destinationName}". Please give the exact destination location name.`;
+            } else if (sourceNames.length === 0) {
+              stockTransferResponseOverride = `Which source location(s) should I pull stock from for the transfer to ${destMatch.matched.name}?`;
+            } else if (!targetQty) {
+              stockTransferResponseOverride = `How many bales/items in total would you like transferred to ${destMatch.matched.name}?`;
+            } else {
+              const sourceMatches = await Promise.all(sourceNames.map((n) => matchLocationByName(companyId, n)));
+              const matchedSources: { id: number; name: string }[] = [];
+              const unresolvedSources: string[] = [];
+              sourceMatches.forEach((m, idx) => {
+                if (m.matched) matchedSources.push(m.matched);
+                else unresolvedSources.push(sourceNames[idx]);
+              });
+
+              const usableSources = matchedSources.filter((s) => s.id !== destMatch.matched!.id);
+              const sameAsDestination = matchedSources.filter((s) => s.id === destMatch.matched!.id);
+
+              if (matchedSources.length === 0) {
+                stockTransferResponseOverride = `I couldn't find any of the source locations you mentioned (${sourceNames.join(", ")}). Please give the exact source location name(s).`;
+              } else if (usableSources.length === 0) {
+                stockTransferResponseOverride = `The source location(s) you gave (${sameAsDestination.map((s) => s.name).join(", ")}) are the same as the destination (${destMatch.matched.name}) — please give different source location(s) to transfer from.`;
+              } else {
+                const ctx = await buildStockTransferByTargetQuantityContext(
+                  companyId,
+                  usableSources.map((s) => s.id),
+                  destMatch.matched.id,
+                  targetQty,
+                  { onlyDestinationStockGroups }
+                );
+
+                const missingNote =
+                  unresolvedSources.length > 0
+                    ? ` (couldn't find: ${unresolvedSources.join(", ")})`
+                    : "";
+
+                if (ctx.noEligibleStock) {
+                  stockTransferResponseOverride = onlyDestinationStockGroups
+                    ? `I didn't find any eligible stock at ${usableSources.map((s) => s.name).join(", ")}${missingNote} in stock groups already carried at ${destMatch.matched.name}, so I did not create a transfer draft.`
+                    : `I didn't find any stock available at ${usableSources.map((s) => s.name).join(", ")}${missingNote}, so I did not create a transfer draft.`;
+                } else {
+                  const draftsPayload = ctx.drafts.map((d) => ({
+                    date: dateStr,
+                    sourceLocationId: d.sourceLocationId,
+                    sourceLocationName: d.sourceLocationName,
+                    destinationLocationId: d.destinationLocationId,
+                    destinationLocationName: d.destinationLocationName,
+                    notes: onlyDestinationStockGroups
+                      ? `Auto-selected using stock groups already carried at ${destMatch.matched!.name}.`
+                      : undefined,
+                    optional,
+                    analysisSummary: ctx.shortfall
+                      ? `Only ${ctx.achievedQty} eligible bale(s)/item(s) found out of requested ${targetQty}${missingNote}.`
+                      : missingNote
+                        ? `Note:${missingNote}.`
+                        : undefined,
+                    items: d.items.map((i) => ({
+                      stockItemId: i.stockItemId,
+                      stockItemName: i.stockItemName,
+                      stockItemCode: i.stockItemCode,
+                      quantity: i.quantity,
+                      currentStock: i.currentStock,
+                      destinationQty: i.destinationQty,
+                      reason: i.reason,
+                    })),
+                  }));
+
+                  if (draftsPayload.length === 1) {
+                    stockTransferDraft = draftsPayload[0];
+                  } else {
+                    stockTransferDrafts = draftsPayload;
+                  }
+
+                  const sourcesLabel = usableSources.map((s) => s.name).join("/");
+                  const draftWord = draftsPayload.length > 1 ? "drafts" : "draft";
+                  stockTransferResponseOverride = ctx.shortfall
+                    ? `Only ${ctx.achievedQty} eligible bale(s)/item(s) found out of requested ${targetQty}${missingNote}. I prepared ${optional ? "optional " : ""}stock transfer ${draftWord} for ${destMatch.matched.name} using the available eligible stock from ${sourcesLabel}. Review below.`
+                    : `I prepared ${optional ? "an optional " : ""}stock transfer ${draftWord} for ${ctx.achievedQty} bale(s)/item(s) from ${sourcesLabel} to ${destMatch.matched.name}${missingNote}. Review below.`;
+                }
+              }
+            }
+          } else {
+            stockTransferResponseOverride =
+              "I couldn't tell which destination, source location(s), and total quantity you want for this transfer. Could you restate it, e.g. \"transfer 410 bales to Kolwezi from Hadi 1,2,3,4\"?";
+          }
         } else {
           const [items, locs] = await Promise.all([
           db
@@ -3045,9 +3233,38 @@ If intent is unclear or this is not a stock transfer request, respond with exact
           }
         }
         }
+
+        // ── Anti-hallucination guard: never let the assistant claim a draft
+        // was prepared unless one was actually built above. ────────────────
+        if (!stockTransferResponseOverride) {
+          if (
+            stockTransferDraft &&
+            Array.isArray(stockTransferDraft.locationCandidates) &&
+            stockTransferDraft.locationCandidates.length > 0 &&
+            (!stockTransferDraft.items || stockTransferDraft.items.length === 0)
+          ) {
+            stockTransferResponseOverride =
+              stockTransferDraft.analysisSummary ||
+              "That location name matches more than one location. Please tell me exactly which one you mean.";
+          } else if (
+            !stockTransferDraft &&
+            (!stockTransferDrafts || stockTransferDrafts.length === 0)
+          ) {
+            stockTransferResponseOverride =
+              "I wasn't able to build a stock transfer draft from that — please tell me the exact source location, destination location, and which item(s)/quantities (or a total target quantity) to move.";
+          }
+        }
       } catch (_) {
         // Extraction failed silently
+        if (!stockTransferResponseOverride && !stockTransferDraft && (!stockTransferDrafts || stockTransferDrafts.length === 0)) {
+          stockTransferResponseOverride =
+            "I wasn't able to build a stock transfer draft from that — please tell me the exact source location, destination location, and which item(s)/quantities (or a total target quantity) to move.";
+        }
       }
+    }
+
+    if (intent === "create_stock_transfer" && stockTransferResponseOverride) {
+      finalResponse = stockTransferResponseOverride;
     }
 
     // ── Verify Container Excel detection ──────────────────────────────
@@ -6907,6 +7124,7 @@ If the intent does not match any type, output: null`;
       voucherDraft,
       stockAdjustmentDraft,
       stockTransferDraft,
+      stockTransferDrafts: stockTransferDrafts && stockTransferDrafts.length > 0 ? stockTransferDrafts : undefined,
       voucherSearchResults,
       stockItemDraft,
       priceUpdateDraft,

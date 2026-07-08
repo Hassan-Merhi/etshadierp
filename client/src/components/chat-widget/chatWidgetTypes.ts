@@ -195,6 +195,10 @@ export interface ChatResponse {
   voucherDraft?: VoucherDraft | null;
   stockAdjustmentDraft?: StockAdjustmentDraft | null;
   stockTransferDraft?: StockTransferDraft | null;
+  /** Multiple per-source drafts for a single "target quantity across several source
+   * locations" request (e.g. "410 bales to Kolwezi from Hadi 1,2,3,4"). Only set
+   * when more than one source location ended up with eligible items. */
+  stockTransferDrafts?: StockTransferDraft[] | null;
   voucherSearchResults?: VoucherSearchResult[] | null;
   stockItemDraft?: StockItemDraft | null;
   priceUpdateDraft?: PriceUpdateDraft | null;

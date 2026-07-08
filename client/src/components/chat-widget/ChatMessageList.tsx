@@ -51,6 +51,9 @@ interface ChatMessageListProps {
   handleConfirmStockTransfer: (resolved: StockTransferDraft) => void;
   setPendingStockTransfer: (v: StockTransferDraft | null) => void;
   stockTransferSubmitting: boolean;
+  pendingStockTransferBatch: StockTransferDraft[] | null;
+  handleConfirmStockTransferBatchItem: (index: number, resolved: StockTransferDraft) => void;
+  handleDismissStockTransferBatchItem: (index: number) => void;
   pendingStockAdj: StockAdjustmentDraft | null;
   handleConfirmStockAdj: (resolved: StockAdjustmentDraft) => void;
   setPendingStockAdj: (v: StockAdjustmentDraft | null) => void;
@@ -110,6 +113,9 @@ export function ChatMessageList({
   handleConfirmStockTransfer,
   setPendingStockTransfer,
   stockTransferSubmitting,
+  pendingStockTransferBatch,
+  handleConfirmStockTransferBatchItem,
+  handleDismissStockTransferBatchItem,
   pendingStockAdj,
   handleConfirmStockAdj,
   setPendingStockAdj,
@@ -319,6 +325,23 @@ export function ChatMessageList({
             onDismiss={() => setPendingStockTransfer(null)}
             isSubmitting={stockTransferSubmitting}
           />
+        )}
+
+        {pendingStockTransferBatch && pendingStockTransferBatch.length > 0 && !isPending && (
+          <div className="space-y-2">
+            <p className="text-xs text-muted-foreground px-1">
+              {pendingStockTransferBatch.length} pending transfer draft{pendingStockTransferBatch.length > 1 ? "s" : ""} — review each below.
+            </p>
+            {pendingStockTransferBatch.map((draft, idx) => (
+              <StockTransferConfirmCard
+                key={`${draft.sourceLocationId}-${draft.destinationLocationId}-${idx}`}
+                draft={draft}
+                onConfirm={(resolved) => handleConfirmStockTransferBatchItem(idx, resolved)}
+                onDismiss={() => handleDismissStockTransferBatchItem(idx)}
+                isSubmitting={stockTransferSubmitting}
+              />
+            ))}
+          </div>
         )}
 
         {pendingStockAdj && !isPending && (

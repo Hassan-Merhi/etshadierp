@@ -74,6 +74,7 @@ export function ChatWidget() {
   const [verifyContainerDraft, setVerifyContainerDraft] = useState<any>(null);
   const [dataQueryResult, setDataQueryResult] = useState<any>(null);
   const [pendingStockTransfer, setPendingStockTransfer] = useState<StockTransferDraft | null>(null);
+  const [pendingStockTransferBatch, setPendingStockTransferBatch] = useState<StockTransferDraft[] | null>(null);
   const [stockTransferSubmitting, setStockTransferSubmitting] = useState(false);
   const [lastUsedProvider, setLastUsedProvider] = useState<string | null>(null);
   const [pendingFilePatches, setPendingFilePatches] = useState<FilePatchDraft[]>([]);
@@ -119,6 +120,7 @@ export function ChatWidget() {
     setPendingVoucher,
     setPendingStockAdj,
     setPendingStockTransfer,
+    setPendingStockTransferBatch,
     setVoucherSearchResults,
     setPendingStockItem,
     setPendingPriceUpdate,
@@ -149,6 +151,28 @@ export function ChatWidget() {
     } finally {
       setStockTransferSubmitting(false);
     }
+  };
+  // Multiple source drafts (e.g. "410 bales to Kolwezi from Hadi 1,2,3,4") render
+  // as separate cards; confirming/dismissing one only removes that one entry.
+  const handleConfirmStockTransferBatchItem = async (index: number, resolved: StockTransferDraft) => {
+    setStockTransferSubmitting(true);
+    try {
+      await _handleConfirmStockTransfer(resolved);
+      setPendingStockTransferBatch((prev) => {
+        if (!prev) return prev;
+        const next = prev.filter((_, i) => i !== index);
+        return next.length > 0 ? next : null;
+      });
+    } finally {
+      setStockTransferSubmitting(false);
+    }
+  };
+  const handleDismissStockTransferBatchItem = (index: number) => {
+    setPendingStockTransferBatch((prev) => {
+      if (!prev) return prev;
+      const next = prev.filter((_, i) => i !== index);
+      return next.length > 0 ? next : null;
+    });
   };
   const handleConfirmStockAdj = async (resolved: StockAdjustmentDraft) => {
     setStockAdjSubmitting(true);
@@ -297,6 +321,7 @@ export function ChatWidget() {
     pendingVoucher ||
       pendingStockAdj ||
       pendingStockTransfer ||
+      (pendingStockTransferBatch && pendingStockTransferBatch.length > 0) ||
       pendingStockItem ||
       pendingPriceUpdate ||
       poDraft ||
@@ -325,6 +350,7 @@ export function ChatWidget() {
     setPendingVoucher(null);
     setPendingStockAdj(null);
     setPendingStockTransfer(null);
+    setPendingStockTransferBatch(null);
     setVoucherSearchResults(null);
     setPendingStockItem(null);
     setPendingPriceUpdate(null);
@@ -542,6 +568,9 @@ export function ChatWidget() {
                 handleConfirmStockTransfer={handleConfirmStockTransfer}
                 setPendingStockTransfer={setPendingStockTransfer}
                 stockTransferSubmitting={stockTransferSubmitting}
+                pendingStockTransferBatch={pendingStockTransferBatch}
+                handleConfirmStockTransferBatchItem={handleConfirmStockTransferBatchItem}
+                handleDismissStockTransferBatchItem={handleDismissStockTransferBatchItem}
                 pendingStockAdj={pendingStockAdj}
                 handleConfirmStockAdj={handleConfirmStockAdj}
                 setPendingStockAdj={setPendingStockAdj}

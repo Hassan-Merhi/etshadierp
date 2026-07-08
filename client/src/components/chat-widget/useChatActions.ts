@@ -24,6 +24,7 @@ interface ChatActionsState {
   setPendingVoucher: (v: VoucherDraft | null) => void;
   setPendingStockAdj: (v: any) => void;
   setPendingStockTransfer: (v: any) => void;
+  setPendingStockTransferBatch: (v: StockTransferDraft[] | null) => void;
   setVoucherSearchResults: (v: any) => void;
   setPendingStockItem: (v: any) => void;
   setPendingPriceUpdate: (v: any) => void;
@@ -51,6 +52,7 @@ export function useChatActions(state: ChatActionsState) {
     setPendingVoucher,
     setPendingStockAdj,
     setPendingStockTransfer,
+    setPendingStockTransferBatch,
     setVoucherSearchResults,
     setPendingStockItem,
     setPendingPriceUpdate,
@@ -91,16 +93,25 @@ export function useChatActions(state: ChatActionsState) {
         setPendingVoucher(data.voucherDraft);
         setPendingStockAdj(null);
         setPendingStockTransfer(null);
+        setPendingStockTransferBatch(null);
       } else if (data.stockAdjustmentDraft) {
         setPendingStockAdj(data.stockAdjustmentDraft);
         setPendingVoucher(null);
         setPendingStockTransfer(null);
+        setPendingStockTransferBatch(null);
       } else if (data.stockTransferDraft) {
         setPendingStockTransfer(data.stockTransferDraft);
+        setPendingStockTransferBatch(null);
+        setPendingVoucher(null);
+        setPendingStockAdj(null);
+      } else if (data.stockTransferDrafts && data.stockTransferDrafts.length > 0) {
+        setPendingStockTransferBatch(data.stockTransferDrafts);
+        setPendingStockTransfer(null);
         setPendingVoucher(null);
         setPendingStockAdj(null);
       } else {
         setPendingStockTransfer(null);
+        setPendingStockTransferBatch(null);
       }
       setVoucherSearchResults(
         data.voucherSearchResults && data.voucherSearchResults.length > 0 ? data.voucherSearchResults : null
