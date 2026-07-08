@@ -80,6 +80,9 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
   const activeLocation = posUser ? posSelectedLocation : selectedLocation;
   const activeCurrency: Currency = displayCurrency ? selectedCurrency : "USD";
   const exchangeRate = dailyExchangeRate;
+  // Supplier Partner companies share this exact POS UI but sell from SP stock
+  // (sp_stock_movements) and post through the SP-specific accounting endpoint.
+  const isSpCompany = selectedCompany?.companyType === "supplier_partner";
 
   // ── Queries ────────────────────────────────────────────────────────────────
   const {
@@ -110,7 +113,24 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
     editVoucherId,
     showPrintDialog,
     showStockPrompt,
+    isSpCompany,
   });
+
+  // Supplier Partner sales always settle to a bank account (no cash-ledger,
+  // no credit): /api/sp/sales requires a real bankAccountId and has no
+  // credit-sale support. Enforce this in state (not just hidden UI) so a
+  // stale cash-ledger id or a lingering credit toggle from a prior company
+  // can never be sent as bankAccountId.
+  useEffect(() => {
+    if (!isSpCompany) return;
+    setPaymentAccountType("bank");
+    setIsCreditSale(false);
+    setPaymentAccountId((prev) => {
+      if (!prev) return prev;
+      const isValidBankAccount = (bankAccounts || []).some((acc: any) => String(acc.id) === String(prev));
+      return isValidBankAccount ? prev : null;
+    });
+  }, [isSpCompany, bankAccounts]);
 
   // Keep autoSaveStateRef in sync
   autoSaveStateRef.current.activeLocation = activeLocation;
@@ -132,14 +152,16 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
   }, [posUser, posAssignedLocations, posSelectedLocation]);
 
   // Set default cash account for POS users from location mapping
+  // (Supplier Partner sales never use a cash-ledger account — /api/sp/sales
+  // requires a real bankAccountId — so skip this default entirely for SP.)
   useEffect(() => {
-    if (editVoucherId) return;
+    if (editVoucherId || isSpCompany) return;
     const locCashId = (posSelectedLocation as any)?.cashAccountId;
     if (posUser && locCashId) {
       setPaymentAccountType("cash");
       setPaymentAccountId(String(locCashId));
     }
-  }, [posUser, posSelectedLocation, editVoucherId]);
+  }, [posUser, posSelectedLocation, editVoucherId, isSpCompany]);
 
   // Auto-attach to today's draft
   useEffect(() => {
@@ -244,6 +266,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
     activeLocation,
     editVoucherId,
     editVoucher,
+    isSpCompany,
     clientSaleIdRef,
     rows,
     isCreditSale,
@@ -393,6 +416,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
         customerAccounts={customerAccounts}
         bankAccounts={bankAccounts}
         cashLedgerAccounts={cashLedgerAccounts}
+        isSpCompany={isSpCompany}
       />
 
       {/* ── Desktop layout ── */}
@@ -479,6 +503,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
         hasValidItems={hasValidItems}
         handleSaveSale={handleSaveSale}
         formatDisplayAmount={fmtAmount}
+        isSpCompany={isSpCompany}
       />
 
       <POSDialogs

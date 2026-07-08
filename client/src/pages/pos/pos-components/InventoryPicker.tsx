@@ -84,7 +84,7 @@ export function InventoryPicker({
           const isLow = !isOut && item.stock < 10;
           return (
             <button
-              key={item.code}
+              key={item.stockItemId ?? item.code}
               className={`w-full text-left flex items-center justify-between gap-2 border-b border-muted/40 transition-colors duration-100 ${
                 mobile ? "px-4 py-3 active:bg-primary/10" : "px-3 py-3"
               } ${index === highlightedIndex ? "bg-primary/25" : "hover:bg-muted/40"} ${isOut ? "opacity-50" : ""}`}
@@ -92,7 +92,7 @@ export function InventoryPicker({
                 selectItem(item);
                 setLocalSearch("");
               }}
-              data-testid={`button-select-item-${item.code}`}
+              data-testid={`button-select-item-${item.stockItemId ?? item.code}`}
             >
               <div className="min-w-0">
                 <p className={`font-semibold leading-tight truncate ${mobile ? "text-base" : "text-sm"}`}>{item.name}</p>

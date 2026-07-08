@@ -2,6 +2,16 @@ import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import type { APIInventoryItem, Location } from "../pos-components/posTypes";
 
+interface SpMovement {
+  id: number;
+  articleCode: string;
+  description: string | null;
+  stockItemId: number | null;
+  locationId: number | null;
+  qtyRemaining: string;
+  finalUnitCostUsd: string;
+}
+
 interface PosQueriesParams {
   posUser: any;
   activeLocation: Location | null;
@@ -9,6 +19,8 @@ interface PosQueriesParams {
   editVoucherId?: string;
   showPrintDialog: boolean;
   showStockPrompt: boolean;
+  /** Supplier Partner companies source their sellable stock from sp_stock_movements, not the normal inventory table. */
+  isSpCompany?: boolean;
 }
 
 export function usePosQueries({
@@ -18,6 +30,7 @@ export function usePosQueries({
   editVoucherId,
   showPrintDialog,
   showStockPrompt,
+  isSpCompany,
 }: PosQueriesParams) {
   const { data: posAssignedLocations = [], isLoading: posLocationsLoading } = useQuery<Location[]>({
     queryKey: posUser ? ["/api/my-locations"] : [],
@@ -40,21 +53,57 @@ export function usePosQueries({
     error: inventoryError,
   } = useQuery<APIInventoryItem[]>({
     queryKey: activeLocation ? [`/api/locations/${activeLocation.id}/inventory`] : [],
-    enabled: !!activeLocation,
+    enabled: !!activeLocation && !isSpCompany,
   });
 
-  const inventory = useMemo(
-    () =>
-      (Array.isArray(apiInventory) ? apiInventory : []).map((item) => ({
-        code: (item.stockItemCode || "").trim(),
-        name: (item.stockItemName || "Unknown Item").trim(),
-        stock: parseFloat(item.quantity),
-        price: parseFloat(item.lastSellingPrice || item.averageRate),
-        configuredPrice: parseFloat(item.lastSellingPrice || "0"),
-        stockItemId: item.stockItemId,
-      })),
-    [apiInventory]
-  );
+  // Supplier Partner companies sell from sp_stock_movements (FIFO lots), not the
+  // normal inventory table. Group remaining qty by articleCode, same as the
+  // former standalone SpPOS component, so the shared grid/picker gets the same
+  // { code, name, stock, price, configuredPrice, stockItemId } shape.
+  const { data: spStock = [], isLoading: spStockLoading } = useQuery<SpMovement[]>({
+    queryKey: ["/api/sp/stock"],
+    enabled: !!isSpCompany && !!activeLocation,
+  });
+
+  const inventory = useMemo(() => {
+    if (isSpCompany) {
+      const atLocation = (Array.isArray(spStock) ? spStock : []).filter(
+        (m) => !activeLocation || m.locationId === activeLocation.id
+      );
+      // Key by stockItemId (the real item identity), not articleCode — two
+      // distinct stock items could share a display code, and merging them
+      // under one row would submit only one stockItemId at checkout.
+      const map = new Map<number, { code: string; name: string; stock: number; price: number; configuredPrice: number; stockItemId: number }>();
+      for (const m of atLocation) {
+        const qty = parseFloat(m.qtyRemaining) || 0;
+        if (qty <= 0 || m.stockItemId == null) continue;
+        const key = m.stockItemId;
+        const existing = map.get(key);
+        if (existing) {
+          existing.stock += qty;
+        } else {
+          const price = parseFloat(m.finalUnitCostUsd) || 0;
+          map.set(key, {
+            code: m.articleCode,
+            name: m.description || m.articleCode,
+            stock: qty,
+            price,
+            configuredPrice: price,
+            stockItemId: m.stockItemId,
+          });
+        }
+      }
+      return Array.from(map.values());
+    }
+    return (Array.isArray(apiInventory) ? apiInventory : []).map((item) => ({
+      code: (item.stockItemCode || "").trim(),
+      name: (item.stockItemName || "Unknown Item").trim(),
+      stock: parseFloat(item.quantity),
+      price: parseFloat(item.lastSellingPrice || item.averageRate),
+      configuredPrice: parseFloat(item.lastSellingPrice || "0"),
+      stockItemId: item.stockItemId,
+    }));
+  }, [apiInventory, spStock, isSpCompany, activeLocation]);
 
   const { data: bankAccounts = [] } = useQuery<any[]>({
     queryKey: ["/api/bank-accounts"],

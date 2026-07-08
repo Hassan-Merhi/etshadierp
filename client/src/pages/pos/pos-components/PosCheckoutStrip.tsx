@@ -30,6 +30,8 @@ interface PosCheckoutStripProps {
   customerAccounts: any[];
   bankAccounts: any[];
   cashLedgerAccounts: any[];
+  /** Supplier Partner sales always settle to a bank account — no cash-ledger or credit option. */
+  isSpCompany?: boolean;
 }
 
 export function PosCheckoutStrip({
@@ -55,6 +57,7 @@ export function PosCheckoutStrip({
   customerAccounts,
   bankAccounts,
   cashLedgerAccounts,
+  isSpCompany,
 }: PosCheckoutStripProps) {
   if (!activeLocation) return null;
 
@@ -119,19 +122,21 @@ export function PosCheckoutStrip({
 
       {!isCreditSale && (
         <>
-          <Select
-            value={paymentAccountType}
-            onValueChange={posUser ? undefined : (v: "bank" | "cash") => setPaymentAccountType(v)}
-            disabled={!!posUser}
-          >
-            <SelectTrigger className="w-24" data-testid="select-account-type">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="cash">Cash</SelectItem>
-              <SelectItem value="bank">Bank</SelectItem>
-            </SelectContent>
-          </Select>
+          {!isSpCompany && (
+            <Select
+              value={paymentAccountType}
+              onValueChange={posUser ? undefined : (v: "bank" | "cash") => setPaymentAccountType(v)}
+              disabled={!!posUser}
+            >
+              <SelectTrigger className="w-24" data-testid="select-account-type">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="cash">Cash</SelectItem>
+                <SelectItem value="bank">Bank</SelectItem>
+              </SelectContent>
+            </Select>
+          )}
 
           <Select
             value={paymentAccountId || ""}
@@ -139,10 +144,10 @@ export function PosCheckoutStrip({
             disabled={!!posUser}
           >
             <SelectTrigger className="w-[180px]" data-testid="select-payment-account">
-              <SelectValue placeholder={paymentAccountType === "bank" ? "Select Bank" : "Select Cash"} />
+              <SelectValue placeholder={isSpCompany || paymentAccountType === "bank" ? "Select Bank" : "Select Cash"} />
             </SelectTrigger>
             <SelectContent>
-              {paymentAccountType === "bank"
+              {isSpCompany || paymentAccountType === "bank"
                 ? (Array.isArray(bankAccounts) ? bankAccounts : []).map((acc: any) => (
                     <SelectItem key={acc.id} value={String(acc.id)}>
                       {acc.name} ({acc.code})
@@ -158,19 +163,21 @@ export function PosCheckoutStrip({
         </>
       )}
 
-      <div className="flex items-center gap-2">
-        <Switch
-          id="credit-sale-strip"
-          checked={isCreditSale}
-          onCheckedChange={setIsCreditSale}
-          data-testid="toggle-credit-sale"
-        />
-        <Label htmlFor="credit-sale-strip" className="text-sm cursor-pointer">
-          Credit
-        </Label>
-      </div>
+      {!isSpCompany && (
+        <div className="flex items-center gap-2">
+          <Switch
+            id="credit-sale-strip"
+            checked={isCreditSale}
+            onCheckedChange={setIsCreditSale}
+            data-testid="toggle-credit-sale"
+          />
+          <Label htmlFor="credit-sale-strip" className="text-sm cursor-pointer">
+            Credit
+          </Label>
+        </div>
+      )}
 
-      {isCreditSale && (
+      {!isSpCompany && isCreditSale && (
         <Popover open={customerComboOpen} onOpenChange={setCustomerComboOpen}>
           <PopoverTrigger asChild>
             <Button variant="outline" className="gap-2 font-normal" data-testid="select-customer">

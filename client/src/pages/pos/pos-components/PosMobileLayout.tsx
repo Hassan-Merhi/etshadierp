@@ -55,6 +55,8 @@ interface PosMobileLayoutProps {
   hasValidItems: boolean;
   handleSaveSale: () => void;
   formatDisplayAmount: (v: number) => string;
+  /** Supplier Partner sales always settle to a bank account — no cash-ledger or credit option. */
+  isSpCompany?: boolean;
 }
 
 export function PosMobileLayout({
@@ -94,6 +96,7 @@ export function PosMobileLayout({
   hasValidItems,
   handleSaveSale,
   formatDisplayAmount,
+  isSpCompany,
 }: PosMobileLayoutProps) {
   const filteredInventory = getFilteredInventory(inventory, searchTerm);
 
@@ -132,13 +135,13 @@ export function PosMobileLayout({
                 const isLow = !isOut && item.stock < 10;
                 return (
                   <button
-                    key={item.code}
+                    key={item.stockItemId ?? item.code}
                     className="w-full text-left flex items-center justify-between gap-3 px-4 py-3 border-b border-muted/40 last:border-b-0 active:bg-primary/10"
                     onClick={() => {
                       selectItem(item);
                       setSearchTerm("");
                     }}
-                    data-testid={`button-mobile-select-item-${item.code}`}
+                    data-testid={`button-mobile-select-item-${item.stockItemId ?? item.code}`}
                   >
                     <div className="min-w-0 flex-1">
                       <p className="font-semibold text-base leading-tight truncate">{item.name}</p>
@@ -221,17 +224,19 @@ export function PosMobileLayout({
 
         {/* Credit toggle + customer/payment */}
         <div className="flex items-center gap-3 flex-wrap">
-          <div className="flex items-center gap-2">
-            <Switch
-              id="mobile-credit-sale"
-              checked={isCreditSale}
-              onCheckedChange={setIsCreditSale}
-              data-testid="toggle-mobile-credit-sale"
-            />
-            <Label htmlFor="mobile-credit-sale" className="text-sm cursor-pointer">Credit Sale</Label>
-          </div>
+          {!isSpCompany && (
+            <div className="flex items-center gap-2">
+              <Switch
+                id="mobile-credit-sale"
+                checked={isCreditSale}
+                onCheckedChange={setIsCreditSale}
+                data-testid="toggle-mobile-credit-sale"
+              />
+              <Label htmlFor="mobile-credit-sale" className="text-sm cursor-pointer">Credit Sale</Label>
+            </div>
+          )}
 
-          {isCreditSale ? (
+          {!isSpCompany && isCreditSale ? (
             <Popover open={mobileCustomerComboOpen} onOpenChange={setMobileCustomerComboOpen}>
               <PopoverTrigger asChild>
                 <Button
@@ -276,29 +281,31 @@ export function PosMobileLayout({
             </Popover>
           ) : (
             <div className="flex items-center gap-2 flex-1">
-              <Select
-                value={paymentAccountType}
-                onValueChange={posUser ? undefined : (v: "bank" | "cash") => setPaymentAccountType(v)}
-                disabled={!!posUser}
-              >
-                <SelectTrigger className="w-24" data-testid="select-mobile-account-type">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="cash">Cash</SelectItem>
-                  <SelectItem value="bank">Bank</SelectItem>
-                </SelectContent>
-              </Select>
+              {!isSpCompany && (
+                <Select
+                  value={paymentAccountType}
+                  onValueChange={posUser ? undefined : (v: "bank" | "cash") => setPaymentAccountType(v)}
+                  disabled={!!posUser}
+                >
+                  <SelectTrigger className="w-24" data-testid="select-mobile-account-type">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="cash">Cash</SelectItem>
+                    <SelectItem value="bank">Bank</SelectItem>
+                  </SelectContent>
+                </Select>
+              )}
               <Select
                 value={paymentAccountId || ""}
                 onValueChange={posUser ? undefined : setPaymentAccountId}
                 disabled={!!posUser}
               >
                 <SelectTrigger className="flex-1 min-w-0" data-testid="select-mobile-payment-account">
-                  <SelectValue placeholder={paymentAccountType === "bank" ? "Select Bank" : "Select Cash"} />
+                  <SelectValue placeholder={isSpCompany || paymentAccountType === "bank" ? "Select Bank" : "Select Cash"} />
                 </SelectTrigger>
                 <SelectContent>
-                  {paymentAccountType === "bank"
+                  {isSpCompany || paymentAccountType === "bank"
                     ? (Array.isArray(bankAccounts) ? bankAccounts : []).map((acc: any) => (
                         <SelectItem key={acc.id} value={String(acc.id)}>{acc.name} ({acc.code})</SelectItem>
                       ))

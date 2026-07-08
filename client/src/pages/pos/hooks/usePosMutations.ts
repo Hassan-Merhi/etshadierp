@@ -6,6 +6,8 @@ interface UsePosMutationsParams {
   activeLocation: Location | null;
   editVoucherId?: string;
   editVoucher: any;
+  /** Supplier Partner companies post through /api/sp/sales with SP-specific accounting. */
+  isSpCompany?: boolean;
   clientSaleIdRef: React.MutableRefObject<string>;
   rows: SaleRow[];
   isCreditSale: boolean;
@@ -31,6 +33,7 @@ export function usePosMutations({
   activeLocation,
   editVoucherId,
   editVoucher,
+  isSpCompany,
   clientSaleIdRef,
   rows,
   isCreditSale,
@@ -72,10 +75,57 @@ export function usePosMutations({
         };
         const res = await apiRequest("PUT", `/api/vouchers/${editVoucherId}/sales`, updateData);
         return res.json();
-      } else {
-        const res = await apiRequest("POST", "/api/pos/sales", saleData);
-        return res.json();
       }
+
+      if (isSpCompany) {
+        // Supplier Partner sale — posts through the SP-specific endpoint so the
+        // voucher stays exactly Dr Bank/Cash / Cr Supplier Cash Payable (no
+        // Sales/COGS/Stock/Cost-Clearing lines); see server/routes/spRoutes.ts.
+        const spBody = {
+          saleDate: saleData.voucherDate,
+          customerName: (saleData.notes || "").trim() || "Walk-in Customer",
+          bankAccountId: saleData.paymentAccountId,
+          notes: saleData.notes || undefined,
+          saleLines: saleData.items.map((item: any) => ({
+            stockItemId: item.stockItemId,
+            qtySold: String(item.quantity),
+            salePricePerUnit: String(item.rate),
+          })),
+        };
+        const res = await apiRequest("POST", "/api/sp/sales", spBody);
+        const raw = await res.json();
+
+        // Normalize into the same shape the normal-POS response has so the
+        // shared print/toast/onSuccess logic below needs no SP-specific branching.
+        const grandTotal = parseFloat(raw.totalSalePriceUsd || "0");
+        const voucherNumber = `SP-SALE-${raw.id}`;
+        return {
+          voucher: { id: raw.voucherId, voucherNumber, customerId: undefined },
+          location: activeLocation,
+          items: (raw.lines || []).map((l: any) => ({
+            stockItemId: l.stockItemId,
+            stockItemName: l.description || l.articleCode,
+            stockItemCode: l.articleCode,
+            quantity: l.qtySold,
+            // InvoiceTemplate reads rate/rateUSD (not sellingPrice) for per-unit
+            // price and profit math — keep all three in sync so print/invoice
+            // totals don't resolve to NaN for SP sales.
+            rate: l.salePricePerUnit,
+            rateUSD: l.salePricePerUnit,
+            sellingPrice: l.salePricePerUnit,
+            configuredPrice: l.salePricePerUnit,
+            amount: l.saleTotal,
+          })),
+          grandTotal: grandTotal.toFixed(2),
+          voucherNumber,
+          saleDate: raw.saleDate,
+          isCreditSale: false,
+          customer: { id: null, code: null, name: raw.customerName },
+        };
+      }
+
+      const res = await apiRequest("POST", "/api/pos/sales", saleData);
+      return res.json();
     },
     onSuccess: async (data: any) => {
       clientSaleIdRef.current = crypto.randomUUID();
@@ -83,7 +133,11 @@ export function usePosMutations({
       if (!editVoucherId) setSaleJustCompleted(true);
 
       const locationId = activeLocation?.id || data.location?.id || (editVoucher as any)?.locationId;
-      if (locationId) queryClient.invalidateQueries({ queryKey: [`/api/locations/${locationId}/inventory`] });
+      if (isSpCompany) {
+        queryClient.invalidateQueries({ queryKey: ["/api/sp/stock"] });
+      } else if (locationId) {
+        queryClient.invalidateQueries({ queryKey: [`/api/locations/${locationId}/inventory`] });
+      }
       queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] });
       if (editVoucherId) queryClient.invalidateQueries({ queryKey: [`/api/vouchers/${editVoucherId}`] });
       invalidateCustomerBalances(data?.voucher?.customerId ?? undefined);

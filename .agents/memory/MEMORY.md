@@ -29,3 +29,4 @@
 - [OTW stock-transfer shop matching](otw-shop-matching.md) — supersedes otw-data-gap.md: containers.shopName now links OTW to a destination via strict exact-match only, feeding AI stock-transfer analysis.
 - [Chat widget minimize/fullscreen pattern](chat-widget-minimize-pattern.md) — minimized bar must use sibling buttons not nested interactive elements; fullscreen toggle must stay visible on mobile too.
 - [AI chat draft anti-hallucination pattern](ai-draft-hallucination-guard.md) — never let an intent's LLM acknowledgment claim "prepared a draft" without a final code-level guard checking a real draft object exists.
+- [SP POS unification](sp-pos-unification.md) — Supplier Partner POS shares the normal ERP POS UI now; /api/sp/sales is the correct SP voucher endpoint, group SP stock by stockItemId not articleCode.
