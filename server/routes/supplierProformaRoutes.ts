@@ -50,20 +50,71 @@ async function batchInsertProformaLines(rows: any[]) {
   });
 }
 
-async function buildAliasMap(companyId: number): Promise<Map<string, string>> {
-  const aliases = await db
-    .select({ aliasCode: stockItemCodeAliases.aliasCode, primaryCode: stockItems.code })
-    .from(stockItemCodeAliases)
-    .innerJoin(stockItems, eq(stockItemCodeAliases.stockItemId, stockItems.id))
-    .where(eq(stockItemCodeAliases.companyId, companyId));
-  const map = new Map<string, string>();
-  for (const a of aliases) {
-    map.set(a.aliasCode.toLowerCase(), a.primaryCode);
-  }
-  return map;
+export interface AliasConflict {
+  aliasCode: string;       // the alias code that is misconfigured
+  aliasedToCode: string;   // stock item the alias table points it at
+  aliasedToName: string;
+  ownerCode: string;       // the stock item whose OWN primary code this alias code collides with
+  ownerName: string;
 }
 
-function resolveBarcode(bc: string, aliasMap: Map<string, string>): string {
+/**
+ * Builds the alias-code → primary-barcode lookup used to match proforma lines
+ * and loaded container items to the same underlying stock item.
+ *
+ * Guardrail: matching here is strictly by barcode/alias-code identity — never
+ * by item name similarity. An alias row is only trusted when its aliasCode is
+ * not itself the OWN primary `code` of a *different* stock item. If it is,
+ * that's a data-entry conflict (one item's real barcode was mistakenly
+ * registered as another item's alias), which is exactly the failure mode
+ * that silently swapped two items' loaded prices in the verification report.
+ * Conflicting aliases are excluded from the map (the raw code is used
+ * unresolved instead) and reported back in `conflicts` so the caller can
+ * surface a warning instead of producing a silently wrong comparison.
+ */
+export async function buildAliasMap(
+  companyId: number
+): Promise<{ map: Map<string, string>; conflicts: AliasConflict[] }> {
+  const [aliases, allItems] = await Promise.all([
+    db
+      .select({
+        aliasCode: stockItemCodeAliases.aliasCode,
+        primaryCode: stockItems.code,
+        primaryName: stockItems.name,
+        primaryId: stockItems.id,
+      })
+      .from(stockItemCodeAliases)
+      .innerJoin(stockItems, eq(stockItemCodeAliases.stockItemId, stockItems.id))
+      .where(eq(stockItemCodeAliases.companyId, companyId)),
+    db
+      .select({ id: stockItems.id, code: stockItems.code, name: stockItems.name })
+      .from(stockItems)
+      .where(eq(stockItems.companyId, companyId)),
+  ]);
+
+  const ownerByCodeLower = new Map(allItems.map((i) => [i.code.trim().toLowerCase(), i]));
+
+  const map = new Map<string, string>();
+  const conflicts: AliasConflict[] = [];
+  for (const a of aliases) {
+    const aliasLower = a.aliasCode.trim().toLowerCase();
+    const owner = ownerByCodeLower.get(aliasLower);
+    if (owner && owner.id !== a.primaryId) {
+      conflicts.push({
+        aliasCode: a.aliasCode,
+        aliasedToCode: a.primaryCode,
+        aliasedToName: a.primaryName,
+        ownerCode: owner.code,
+        ownerName: owner.name,
+      });
+      continue; // do not apply — leave this barcode unresolved (matches itself)
+    }
+    map.set(aliasLower, a.primaryCode);
+  }
+  return { map, conflicts };
+}
+
+export function resolveBarcode(bc: string, aliasMap: Map<string, string>): string {
   const lower = bc.toLowerCase();
   return aliasMap.get(lower) ?? bc;
 }
@@ -126,7 +177,7 @@ export function registerSupplierProformaRoutes(app: Express, requireAuth: any) {
         // Resolve alias codes to primary stock-item codes so that proforma lines
         // are always stored with the canonical code regardless of what code the
         // supplier's packing-list used.
-        const aliasMap = await buildAliasMap(companyId);
+        const { map: aliasMap } = await buildAliasMap(companyId);
         const lineValues = lines.map((l: any) => ({
           proformaId: proforma.id,
           barcode: resolveBarcode(String(l.barcode || "").trim(), aliasMap),
@@ -304,7 +355,7 @@ export function registerSupplierProformaRoutes(app: Express, requireAuth: any) {
       }
       // Resolve alias codes to primary stock-item codes at import time so that
       // items imported with different (supplier) codes are stored canonically.
-      const aliasMap = await buildAliasMap(companyId);
+      const { map: aliasMap } = await buildAliasMap(companyId);
       const lineValues = lines.map((l: any) => ({
         proformaId,
         barcode: resolveBarcode(String(l.barcode || l.Barcode || "").trim(), aliasMap),
@@ -362,7 +413,7 @@ export function registerSupplierProformaRoutes(app: Express, requireAuth: any) {
       const { barcode, itemName, qty, weightPerBale, pricePerBale } = req.body;
       // Resolve alias code → primary stock-item code before saving so that
       // items entered with supplier/alias codes match the proforma correctly.
-      const aliasMap = await buildAliasMap(companyId);
+      const { map: aliasMap } = await buildAliasMap(companyId);
       const resolvedBarcode = resolveBarcode(String(barcode ?? "").trim(), aliasMap);
       const [item] = await db
         .insert(supplierContainerLoadedItems)
@@ -445,7 +496,7 @@ export function registerSupplierProformaRoutes(app: Express, requireAuth: any) {
       }
       // Resolve alias codes → primary stock-item codes before saving so that
       // items imported with different (supplier) codes match the proforma.
-      const aliasMap = await buildAliasMap(companyId);
+      const { map: aliasMap } = await buildAliasMap(companyId);
       const values = items.map((l: any) => ({
         containerId,
         barcode: resolveBarcode(String(l.barcode || l.Barcode || "").trim(), aliasMap),
@@ -550,6 +601,9 @@ export function registerSupplierProformaRoutes(app: Express, requireAuth: any) {
         const proformaId = parseOptionalId(req.query.proformaId);
         if (!proformaId) return res.status(400).json({ message: "proformaId query param required" });
 
+        if (!(await verifyContainerOwnership(containerId, companyId)))
+          return res.status(403).json({ message: "Access denied" });
+
         const [proforma] = await db
           .select()
           .from(supplierProformas)
@@ -566,7 +620,18 @@ export function registerSupplierProformaRoutes(app: Express, requireAuth: any) {
           .from(supplierContainerLoadedItems)
           .where(eq(supplierContainerLoadedItems.containerId, containerId));
 
-        const aliasMap = await buildAliasMap(companyId);
+        const { map: aliasMap, conflicts: allAliasConflicts } = await buildAliasMap(companyId);
+
+        // Only surface conflicts relevant to barcodes actually present in this
+        // proforma/container pair, so unrelated stale conflicts elsewhere in
+        // the company don't spam every verification screen.
+        const relevantRawCodes = new Set([
+          ...proformaLines.map((l) => (l.barcode || "").trim().toLowerCase()),
+          ...loadedItems.map((i) => (i.barcode || "").trim().toLowerCase()),
+        ]);
+        const aliasConflicts = allAliasConflicts.filter((c) =>
+          relevantRawCodes.has(c.aliasCode.trim().toLowerCase())
+        );
 
         const proformaByBarcode = new Map<string, any>();
         for (const line of proformaLines) {
@@ -664,6 +729,7 @@ export function registerSupplierProformaRoutes(app: Express, requireAuth: any) {
           comparison,
           proformaLines,
           loadedItems,
+          aliasConflicts,
         });
       } catch (error: any) {
         res.status(500).json({ message: error.message });
@@ -706,7 +772,7 @@ export function registerSupplierProformaRoutes(app: Express, requireAuth: any) {
           .from(supplierContainerLoadedItems)
           .where(eq(supplierContainerLoadedItems.containerId, containerId));
 
-        const aliasMap = await buildAliasMap(companyId);
+        const { map: aliasMap } = await buildAliasMap(companyId);
 
         const proformaByBarcode = new Map<string, any>();
         for (const line of proformaLinesList) {
@@ -1143,7 +1209,7 @@ export function registerSupplierProformaRoutes(app: Express, requireAuth: any) {
           .from(supplierContainerLoadedItems)
           .where(eq(supplierContainerLoadedItems.containerId, containerId));
 
-        const aliasMap = await buildAliasMap(companyId);
+        const { map: aliasMap } = await buildAliasMap(companyId);
 
         const proformaByBarcode = new Map<string, any>();
         for (const line of proformaLinesList) {

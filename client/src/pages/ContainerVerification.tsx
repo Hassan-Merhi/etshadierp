@@ -64,11 +64,20 @@ interface ComparisonItem {
   totalPriceDiff: number;
 }
 
+interface AliasConflict {
+  aliasCode: string;
+  aliasedToCode: string;
+  aliasedToName: string;
+  ownerCode: string;
+  ownerName: string;
+}
+
 interface VerificationResult {
   proforma: { id: number; reference: string };
   containerId: number;
   supplierId: number;
   comparison: ComparisonItem[];
+  aliasConflicts?: AliasConflict[];
 }
 
 export default function ContainerVerification() {
@@ -675,6 +684,34 @@ export default function ContainerVerification() {
 
       {verificationResult && (
         <>
+          {verificationResult.aliasConflicts && verificationResult.aliasConflicts.length > 0 && (
+            <div
+              className="mb-4 rounded-md border border-orange-500/50 bg-orange-500/10 p-3"
+              data-testid="alert-alias-conflicts"
+            >
+              <div className="flex items-center gap-2 mb-2">
+                <AlertTriangle className="h-4 w-4 text-orange-500 shrink-0" />
+                <span className="text-sm font-medium text-orange-700 dark:text-orange-400">
+                  {verificationResult.aliasConflicts.length} barcode alias conflict
+                  {verificationResult.aliasConflicts.length > 1 ? "s" : ""} detected — comparison below skipped these
+                  and may be incomplete
+                </span>
+              </div>
+              <p className="text-xs text-muted-foreground mb-2">
+                A barcode is registered as an alias for one item, but that exact barcode is also the item's own
+                primary code for a different stock item. This can cause proforma and loaded quantities to be matched
+                to the wrong item. Fix the alias in Stock Item Aliases before trusting this report.
+              </p>
+              <ul className="text-xs font-mono space-y-1">
+                {verificationResult.aliasConflicts.map((c, i) => (
+                  <li key={i}>
+                    "{c.aliasCode}" is aliased to {c.aliasedToName} ({c.aliasedToCode}), but is also the primary code
+                    of {c.ownerName} ({c.ownerCode})
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
           <div className="flex items-center gap-2 mb-4">
             <Button
               variant={viewMode === "summary" ? "default" : "outline"}
