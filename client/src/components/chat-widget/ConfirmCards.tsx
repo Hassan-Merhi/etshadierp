@@ -115,6 +115,7 @@ export function StockAdjustmentConfirmCard({
                   <span className="text-right">Rate</span>
                   {hasStockPreview && <span className="text-right">Stock</span>}
                 </div>
+                <div className="max-h-64 overflow-y-auto space-y-1.5 pr-1">
                 {draft.items.map((item, i) => {
                   const candidates = item.candidates ?? [];
                   const hasChoice = candidates.length > 1;
@@ -173,6 +174,7 @@ export function StockAdjustmentConfirmCard({
                     </div>
                   );
                 })}
+                </div>
               </>
             );
           })()}

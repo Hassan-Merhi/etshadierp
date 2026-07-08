@@ -3,8 +3,9 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   MessageCircle,
   X,
-  RefreshCw,
+  Eraser,
   Maximize2,
+  Minimize2,
   MinimizeIcon,
   Circle,
   Sparkles,
@@ -41,6 +42,9 @@ import { useChatActions } from "./chat-widget/useChatActions";
 export function ChatWidget() {
   const [isOpen, setIsOpen] = useState(false);
   const [isMinimized, setIsMinimized] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [hasNewSinceMinimized, setHasNewSinceMinimized] = useState(false);
+  const prevHistoryLenRef = useRef(0);
   const [message, setMessage] = useState("");
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [feedbackGiven, setFeedbackGiven] = useState<Record<number, "positive" | "negative">>({});
@@ -199,6 +203,19 @@ export function ChatWidget() {
   }, [isOpen, isMinimized]);
 
   useEffect(() => {
+    if (isMinimized && history.length > prevHistoryLenRef.current) {
+      const last = history[history.length - 1];
+      if (last?.role === "assistant") setHasNewSinceMinimized(true);
+    }
+    prevHistoryLenRef.current = history.length;
+  }, [history, isMinimized]);
+
+  const handleRestoreFromMinimized = () => {
+    setIsMinimized(false);
+    setHasNewSinceMinimized(false);
+  };
+
+  useEffect(() => {
     const handler = (e: Event) => {
       const detail = (e as CustomEvent).detail;
       setIsOpen(true);
@@ -276,6 +293,26 @@ export function ChatWidget() {
     }
   };
 
+  const hasPendingDrafts = Boolean(
+    pendingVoucher ||
+      pendingStockAdj ||
+      pendingStockTransfer ||
+      pendingStockItem ||
+      pendingPriceUpdate ||
+      poDraft ||
+      pendingFilePatches.length > 0
+  );
+
+  const handleClearChat = () => {
+    if (
+      hasPendingDrafts &&
+      !window.confirm("You have a pending action that hasn't been confirmed yet. Clear chat and discard it?")
+    ) {
+      return;
+    }
+    handleNewChat();
+  };
+
   const handleNewChat = () => {
     const newSessionId = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     localStorage.setItem("erp_chat_session", newSessionId);
@@ -335,8 +372,13 @@ export function ChatWidget() {
     return "Dashboard";
   })();
 
+  const showFullscreen = isOpen && isFullscreen && !isMinimized;
+
   return (
-    <div className="fixed bottom-4 right-4 z-50" data-testid="chat-widget-container">
+    <div
+      className={cn("fixed z-50", showFullscreen ? "inset-0 flex items-center justify-center" : "bottom-4 right-4")}
+      data-testid="chat-widget-container"
+    >
       {!isOpen ? (
         <button
           onClick={() => setIsOpen(true)}
@@ -351,14 +393,61 @@ export function ChatWidget() {
             AI Assistant
           </span>
         </button>
+      ) : isMinimized ? (
+        <div
+          className="relative flex items-center gap-1 rounded-full bg-card border shadow-lg hover:shadow-xl transition-shadow pl-1 pr-1 py-1"
+          data-testid="chat-minimized-bar"
+        >
+          <button
+            type="button"
+            onClick={handleRestoreFromMinimized}
+            data-testid="button-restore-chat"
+            title="Reopen chat"
+            className="flex items-center gap-3 rounded-full pl-2 pr-1 py-1"
+          >
+            <div className="h-8 w-8 rounded-full bg-blue-50 dark:bg-blue-900/40 flex items-center justify-center shrink-0">
+              <Sparkles className="h-4 w-4 text-blue-500 dark:text-blue-400" />
+            </div>
+            <div className="text-left pr-1">
+              <p className="text-sm font-medium leading-tight">ERP Assistant</p>
+              <div className="flex items-center gap-1.5">
+                <Circle className="h-1.5 w-1.5 fill-green-500 text-green-500" />
+                <span className="text-xs text-muted-foreground">
+                  {hasNewSinceMinimized ? "New response" : "Online"}
+                </span>
+              </div>
+            </div>
+          </button>
+          {hasNewSinceMinimized && (
+            <span
+              className="absolute -top-1 -right-1 h-3 w-3 rounded-full bg-red-500 border-2 border-background"
+              data-testid="indicator-unread-chat"
+            />
+          )}
+          <button
+            type="button"
+            onClick={() => {
+              setIsOpen(false);
+              setIsMinimized(false);
+              setHasNewSinceMinimized(false);
+            }}
+            className="h-6 w-6 rounded-full flex items-center justify-center text-muted-foreground hover:bg-muted hover:text-foreground transition-colors shrink-0"
+            data-testid="button-close-minimized-chat"
+            title="Close chat"
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
+        </div>
       ) : (
         <Card
           className={cn(
-            "w-[360px] sm:w-[420px] shadow-[0_8px_30px_rgba(0,0,0,0.12)] dark:shadow-[0_8px_30px_rgba(0,0,0,0.4)] rounded-3xl transition-all duration-200 flex flex-col overflow-hidden",
-            isMinimized ? "h-auto" : "h-[600px]"
+            "shadow-[0_8px_30px_rgba(0,0,0,0.12)] dark:shadow-[0_8px_30px_rgba(0,0,0,0.4)] transition-all duration-200 flex flex-col overflow-hidden",
+            isFullscreen
+              ? "w-screen h-screen sm:w-[90vw] sm:h-[90vh] sm:max-w-6xl rounded-none sm:rounded-3xl"
+              : "w-[calc(100vw-24px)] h-[calc(100vh-24px)] sm:w-[580px] sm:h-[80vh] sm:max-h-[760px] rounded-3xl"
           )}
         >
-          <CardHeader className="flex flex-row items-center justify-between gap-2 py-4 px-5 border-b">
+          <CardHeader className="flex flex-row items-center justify-between gap-2 py-4 px-5 border-b shrink-0">
             <div className="flex items-center gap-3">
               <div className="h-8 w-8 rounded-full bg-blue-50 dark:bg-blue-900/40 flex items-center justify-center">
                 <Sparkles className="h-4 w-4 text-blue-500 dark:text-blue-400" />
@@ -376,26 +465,38 @@ export function ChatWidget() {
                 variant="ghost"
                 size="icon"
                 className="h-8 w-8 rounded-full"
-                onClick={handleNewChat}
-                title="New conversation"
-                data-testid="button-new-chat"
+                onClick={handleClearChat}
+                title="Clear chat"
+                data-testid="button-clear-chat"
               >
-                <RefreshCw className="h-4 w-4" />
+                <Eraser className="h-4 w-4" />
               </Button>
               <Button
                 variant="ghost"
                 size="icon"
                 className="h-8 w-8 rounded-full"
-                onClick={() => setIsMinimized(!isMinimized)}
+                onClick={() => setIsFullscreen(!isFullscreen)}
+                title={isFullscreen ? "Exit fullscreen" : "Fullscreen"}
+                data-testid="button-fullscreen-chat"
+              >
+                {isFullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 rounded-full"
+                onClick={() => setIsMinimized(true)}
+                title="Minimize"
                 data-testid="button-minimize-chat"
               >
-                {isMinimized ? <Maximize2 className="h-4 w-4" /> : <MinimizeIcon className="h-4 w-4" />}
+                <MinimizeIcon className="h-4 w-4" />
               </Button>
               <Button
                 variant="ghost"
                 size="icon"
                 className="h-8 w-8 rounded-full"
                 onClick={() => setIsOpen(false)}
+                title="Close"
                 data-testid="button-close-chat"
               >
                 <X className="h-4 w-4" />
@@ -403,21 +504,18 @@ export function ChatWidget() {
             </div>
           </CardHeader>
 
-          {!isMinimized && (
-            <div className="px-5 pt-2.5 pb-1 bg-background">
-              <Badge
-                variant="secondary"
-                className="bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 border border-blue-100 dark:border-blue-800 font-medium px-2 py-0.5 flex items-center gap-1.5 w-fit text-[11px]"
-              >
-                <Package className="h-3 w-3" />
-                Context: {pageContext}
-              </Badge>
-            </div>
-          )}
+          <div className="px-5 pt-2.5 pb-1 bg-background shrink-0">
+            <Badge
+              variant="secondary"
+              className="bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 border border-blue-100 dark:border-blue-800 font-medium px-2 py-0.5 flex items-center gap-1.5 w-fit text-[11px]"
+            >
+              <Package className="h-3 w-3" />
+              Context: {pageContext}
+            </Badge>
+          </div>
 
-          {!isMinimized && (
-            <CardContent className="p-0 flex flex-col flex-1 overflow-hidden">
-              {showAlerts && (
+          <CardContent className="p-0 flex flex-col flex-1 overflow-hidden">
+            {showAlerts && (
                 <AlertsDigest
                   onClose={() => setShowAlerts(false)}
                   onPrefill={(text) => {
@@ -533,8 +631,7 @@ export function ChatWidget() {
                 handleSend={handleSend}
                 isError={sendMutation.isError}
               />
-            </CardContent>
-          )}
+          </CardContent>
         </Card>
       )}
     </div>

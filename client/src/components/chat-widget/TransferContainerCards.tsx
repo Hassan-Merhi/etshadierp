@@ -136,7 +136,7 @@ export function StockTransferConfirmCard({
             No items currently qualify for transfer based on stock and sales data.
           </p>
         ) : (
-          <div className="border-t pt-1.5 mt-1.5 space-y-2">
+          <div className="border-t pt-1.5 mt-1.5 space-y-2 max-h-72 overflow-y-auto pr-1">
             {editItems.map((item, i) => {
               const qty = parseFloat(item.qtyStr) || 0;
               const insufficient = item.currentStock !== undefined && qty > item.currentStock;

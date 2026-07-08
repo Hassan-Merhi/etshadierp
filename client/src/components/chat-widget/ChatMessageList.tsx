@@ -210,7 +210,7 @@ export function ChatMessageList({
                 )}
               >
                 {msg.role === "assistant" ? (
-                  <div className="prose prose-sm dark:prose-invert max-w-none [&>*:first-child]:mt-0 [&>*:last-child]:mb-0">
+                  <div className="prose prose-sm dark:prose-invert max-w-none break-words [&>*:first-child]:mt-0 [&>*:last-child]:mb-0">
                     <ReactMarkdown
                       remarkPlugins={[remarkGfm]}
                       components={{
@@ -434,25 +434,6 @@ export function ChatMessageList({
           </div>
         )}
       </div>
-
-      {history.length > 0 && displaySuggestions.length > 0 && !isPending && (
-        <div className="mt-4 pt-3 border-t">
-          <p className="text-xs font-medium text-muted-foreground mb-2">Suggested questions:</p>
-          <div className="flex flex-wrap gap-2">
-            {displaySuggestions.slice(0, 3).map((suggestion, index) => (
-              <Badge
-                key={index}
-                variant="outline"
-                className="cursor-pointer hover-elevate text-xs py-1 px-2"
-                onClick={() => handleSuggestionClick(suggestion)}
-                data-testid={`follow-up-suggestion-${index}`}
-              >
-                {suggestion}
-              </Badge>
-            ))}
-          </div>
-        </div>
-      )}
     </ScrollArea>
   );
 }
