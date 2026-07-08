@@ -2091,13 +2091,29 @@ export function registerSpRoutes(app: Express) {
       const companyId = await requireSpCompany(req, res);
       if (!companyId) return;
 
-      const { fromDate, toDate, locationId } = req.query;
+      const { fromDate, toDate, locationId, cashAccountId } = req.query;
 
       if (!fromDate || !toDate) {
         return res.status(400).json({ message: "fromDate and toDate are required (YYYY-MM-DD)" });
       }
 
-      const locId = locationId ? parseInt(locationId as string) : undefined;
+      const locId  = locationId    ? parseInt(locationId as string)    : undefined;
+      let   cashId = cashAccountId ? parseInt(cashAccountId as string) : undefined;
+
+      // Validate the cash account belongs to this company; ignore silently if not.
+      if (cashId) {
+        try {
+          const r = await db.execute(sql`SELECT id FROM accounts WHERE id = ${cashId} AND company_id = ${companyId} LIMIT 1`);
+          const found = ((r as any).rows ?? (r as any[]))[0];
+          if (!found) {
+            console.warn(`[/api/sp/sales-form/export-v2] cashAccountId=${cashId} not found for companyId=${companyId}; ignoring`);
+            cashId = undefined;
+          }
+        } catch (e) {
+          console.warn(`[/api/sp/sales-form/export-v2] cashAccountId validation failed:`, e);
+          cashId = undefined;
+        }
+      }
 
       let locationName = "";
       let companyName  = "";
@@ -2119,6 +2135,7 @@ export function registerSpRoutes(app: Express) {
         toDate:     toDate   as string,
         locationName,
         supplierName: companyName,
+        cashAccountId: cashId,
       });
 
       const from     = (fromDate as string).slice(5).replace("-", "");

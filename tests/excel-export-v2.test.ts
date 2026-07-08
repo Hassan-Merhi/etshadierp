@@ -68,6 +68,11 @@ const E_OPEN_CASH_ROW  = E_CASH_SUBHDR + 1;                   // 12
 const E_DEPOSIT_ROW    = E_OPEN_CASH_ROW + 1;                 // 13
 const E_RECEIPT_ROW    = E_DEPOSIT_ROW + 1;                    // 14
 const E_PAYMENTS_ROW   = E_RECEIPT_ROW + 2;                   // 16
+const NUM_PAYMENT_ROWS = 10;
+const E_PAY_FIRST_ROW  = E_PAYMENTS_ROW + 1;                  // 17
+const E_PAY_LAST_ROW   = E_PAYMENTS_ROW + NUM_PAYMENT_ROWS;   // 26
+const E_TOTAL_PAY_ROW  = E_PAY_LAST_ROW + 1;                  // 27
+const E_BALANCE_ROW    = E_TOTAL_PAY_ROW + 1;                 // 28
 
 // Sales sheet constants
 const S_ITEM_NAME_COL = 3;
@@ -725,6 +730,103 @@ describe("V2 Export — Payments section", () => {
     const v  = ws.getRow(E_PAYMENTS_ROW).getCell(1).value;
     expect(String(v ?? "").toLowerCase()).toContain("payment");
   });
+
+  it("ENTRY has 10 editable payment rows labeled Payment 1..Payment 10", () => {
+    const ws = wb.getWorksheet("ENTRY")!;
+    for (let p = 1; p <= NUM_PAYMENT_ROWS; p++) {
+      const row = E_PAYMENTS_ROW + p;
+      const label = String(ws.getRow(row).getCell(1).value ?? "");
+      expect(label).toBe(`Payment ${p}`);
+    }
+  });
+
+  it("Payment row CASH and BANK cells are unlocked for manual entry", () => {
+    const ws = wb.getWorksheet("ENTRY")!;
+    const cashProt = ws.getRow(E_PAY_FIRST_ROW).getCell(E_DATE_START).protection;
+    const bankProt = ws.getRow(E_PAY_FIRST_ROW).getCell(E_DATE_START + 1).protection;
+    expect(cashProt?.locked).toBe(false);
+    expect(bankProt?.locked).toBe(false);
+  });
+
+  it("ENTRY has a 'Total Payments' row using SUM formulas, locked", () => {
+    const ws = wb.getWorksheet("ENTRY")!;
+    const label = String(ws.getRow(E_TOTAL_PAY_ROW).getCell(1).value ?? "");
+    expect(label.toLowerCase()).toContain("total payments");
+
+    const cashCell = ws.getRow(E_TOTAL_PAY_ROW).getCell(E_DATE_START);
+    const formula  = (cashCell.value as any)?.formula ?? "";
+    expect(formula).toContain("SUM(");
+    expect(cashCell.protection?.locked).not.toBe(false);
+
+    const bankCell = ws.getRow(E_TOTAL_PAY_ROW).getCell(E_DATE_START + 1);
+    expect(bankCell.protection?.locked).not.toBe(false);
+  });
+
+  it("ENTRY has a 'Balance Cash' row with locked formula cells", () => {
+    const ws = wb.getWorksheet("ENTRY")!;
+    const label = String(ws.getRow(E_BALANCE_ROW).getCell(1).value ?? "");
+    expect(label.toLowerCase()).toContain("balance");
+
+    const cashCell = ws.getRow(E_BALANCE_ROW).getCell(E_DATE_START);
+    expect(cashCell.protection?.locked).not.toBe(false);
+    const bankCell = ws.getRow(E_BALANCE_ROW).getCell(E_DATE_START + 1);
+    expect(bankCell.protection?.locked).not.toBe(false);
+  });
+});
+
+// ── 15b. Cash/Bank formulas ────────────────────────────────────────────────────
+describe("V2 Export — Cash/Bank roll-forward formulas", () => {
+  it("Day 1 Opening Cash/Bank cells reference the previous day's Balance Cash/Bank row", () => {
+    const ws = wb.getWorksheet("ENTRY")!;
+    const nextCashCell = ws.getRow(E_OPEN_CASH_ROW).getCell(E_DATE_START + COLS_PER_DAY);
+    const nextBankCell = ws.getRow(E_OPEN_CASH_ROW).getCell(E_DATE_START + COLS_PER_DAY + 1);
+    const cashFormula  = (nextCashCell.value as any)?.formula ?? "";
+    const bankFormula  = (nextBankCell.value as any)?.formula ?? "";
+    expect(cashFormula).toContain(String(E_BALANCE_ROW));
+    expect(bankFormula).toContain(String(E_BALANCE_ROW));
+    expect(nextCashCell.protection?.locked).not.toBe(false);
+    expect(nextBankCell.protection?.locked).not.toBe(false);
+  });
+
+  it("BANK deposit cell mirrors the CASH deposit cell via formula, locked", () => {
+    const ws = wb.getWorksheet("ENTRY")!;
+    const bankDepositCell = ws.getRow(E_DEPOSIT_ROW).getCell(E_DATE_START + 1);
+    const formula = (bankDepositCell.value as any)?.formula ?? "";
+    expect(formula).toContain(`${E_DEPOSIT_ROW}`);
+    expect(bankDepositCell.protection?.locked).not.toBe(false);
+  });
+
+  it("CASH deposit input cell is unlocked for manual entry", () => {
+    const ws = wb.getWorksheet("ENTRY")!;
+    const cashDepositCell = ws.getRow(E_DEPOSIT_ROW).getCell(E_DATE_START);
+    expect(cashDepositCell.protection?.locked).toBe(false);
+  });
+
+  it("Receipt from Credit Sales CASH cell is unlocked for manual entry", () => {
+    const ws = wb.getWorksheet("ENTRY")!;
+    const receiptCell = ws.getRow(E_RECEIPT_ROW).getCell(E_DATE_START);
+    expect(receiptCell.protection?.locked).toBe(false);
+  });
+
+  it("Balance Cash formula includes Opening Cash + Total Sales - Deposit + Receipt - Total Payments references", () => {
+    const ws = wb.getWorksheet("ENTRY")!;
+    const cashCell = ws.getRow(E_BALANCE_ROW).getCell(E_DATE_START);
+    const formula  = (cashCell.value as any)?.formula ?? "";
+    expect(formula).toContain(String(E_OPEN_CASH_ROW));
+    expect(formula).toContain(String(E_TOTAL_ROW));
+    expect(formula).toContain(String(E_DEPOSIT_ROW));
+    expect(formula).toContain(String(E_RECEIPT_ROW));
+    expect(formula).toContain(String(E_TOTAL_PAY_ROW));
+  });
+
+  it("Balance Bank formula includes Opening Bank + Deposit - Total Bank Payments references", () => {
+    const ws = wb.getWorksheet("ENTRY")!;
+    const bankCell = ws.getRow(E_BALANCE_ROW).getCell(E_DATE_START + 1);
+    const formula  = (bankCell.value as any)?.formula ?? "";
+    expect(formula).toContain(String(E_OPEN_CASH_ROW));
+    expect(formula).toContain(String(E_DEPOSIT_ROW));
+    expect(formula).toContain(String(E_TOTAL_PAY_ROW));
+  });
 });
 
 // ── 16. Cell protection ────────────────────────────────────────────────────────
@@ -790,26 +892,72 @@ describe("V2 Export — Number formats", () => {
     expect(fmt).not.toBe("0.00");
   });
 
-  it("ENTRY Cost/Bag cell format includes a dollar sign", () => {
+  it("ENTRY Cost/Bag cell format includes a dollar sign and no decimals", () => {
     const ws  = wb.getWorksheet("ENTRY")!;
     const row = findItemRow(ws, "Test Item 1")!;
     const fmt = ws.getRow(row).getCell(E_COST_BAG_COL).numFmt ?? "";
     expect(fmt).toMatch(/\$/);
+    expect(fmt).toBe('"$"#,##0');
+    expect(fmt).not.toContain(".00");
+    expect(fmt).not.toContain(".0000");
   });
 
-  it("ENTRY Sale Price cell format includes a dollar sign", () => {
+  it("ENTRY Sale Price cell format includes a dollar sign and no decimals", () => {
     const ws       = wb.getWorksheet("ENTRY")!;
     const row      = findItemRow(ws, "Test Item 1")!;
     const priceCol = E_DATE_START + 2 * COLS_PER_DAY + 1;
     const fmt      = ws.getRow(row).getCell(priceCol).numFmt ?? "";
     expect(fmt).toMatch(/\$/);
+    expect(fmt).toBe('"$"#,##0');
+    expect(fmt).not.toContain(".00");
+    expect(fmt).not.toContain(".0000");
   });
 
-  it("ENTRY Close Value cell format includes a dollar sign", () => {
+  it("ENTRY Profit/Bag cell format includes a dollar sign and no decimals", () => {
+    const ws        = wb.getWorksheet("ENTRY")!;
+    const row       = findItemRow(ws, "Test Item 1")!;
+    const profitCol = E_DATE_START + 2 * COLS_PER_DAY + 2;
+    const fmt       = ws.getRow(row).getCell(profitCol).numFmt ?? "";
+    expect(fmt).toMatch(/\$/);
+    expect(fmt).toBe('"$"#,##0');
+    expect(fmt).not.toContain(".00");
+    expect(fmt).not.toContain(".0000");
+  });
+
+  it("ENTRY Close Value cell format includes a dollar sign and no decimals", () => {
     const ws  = wb.getWorksheet("ENTRY")!;
     const row = findItemRow(ws, "Test Item 1")!;
     const fmt = ws.getRow(row).getCell(CLOSE_VAL_COL).numFmt ?? "";
     expect(fmt).toMatch(/\$/);
+    expect(fmt).not.toContain(".00");
+    expect(fmt).not.toContain(".0000");
+  });
+
+  it("ENTRY Total Sales / Total Profit (TOTAL row) formats have $ and no decimals", () => {
+    const ws       = wb.getWorksheet("ENTRY")!;
+    const salesCol = E_DATE_START + 1;
+    const fmt      = ws.getRow(E_TOTAL_ROW).getCell(salesCol).numFmt ?? "";
+    expect(fmt).toMatch(/\$/);
+    expect(fmt).not.toContain(".00");
+    expect(fmt).not.toContain(".0000");
+  });
+
+  it("Cash/Bank/Payments money cells have $ format and no decimals", () => {
+    const ws = wb.getWorksheet("ENTRY")!;
+    const cells = [
+      ws.getRow(E_OPEN_CASH_ROW).getCell(E_DATE_START),
+      ws.getRow(E_DEPOSIT_ROW).getCell(E_DATE_START),
+      ws.getRow(E_RECEIPT_ROW).getCell(E_DATE_START),
+      ws.getRow(E_PAY_FIRST_ROW).getCell(E_DATE_START),
+      ws.getRow(E_TOTAL_PAY_ROW).getCell(E_DATE_START),
+      ws.getRow(E_BALANCE_ROW).getCell(E_DATE_START),
+    ];
+    for (const c of cells) {
+      const fmt = c.numFmt ?? "";
+      expect(fmt).toMatch(/\$/);
+      expect(fmt).not.toContain(".00");
+      expect(fmt).not.toContain(".0000");
+    }
   });
 });
 

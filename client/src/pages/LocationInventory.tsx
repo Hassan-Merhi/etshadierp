@@ -22,6 +22,7 @@ import { LocationInventoryMovementFilter } from "./location-inventory/LocationIn
 import { StockGroupItemsView } from "./location-inventory/StockGroupItemsView";
 import { AllItemsView } from "./location-inventory/AllItemsView";
 import { LocationInventoryBreadcrumb } from "./location-inventory/LocationInventoryBreadcrumb";
+import type { Location } from "./location-inventory/locationInventoryTypes";
 
 export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
   const { setSelectedLocation } = useLocation();

@@ -32,6 +32,7 @@ export default function SpReports() {
   });
   const [exportTo, setExportTo] = useState(new Date().toISOString().slice(0, 10));
   const [exportLocationId, setExportLocationId] = useState<string>("all");
+  const [exportCashAccountId, setExportCashAccountId] = useState<string>("none");
   const [exporting, setExporting] = useState(false);
   const [exportingV2, setExportingV2] = useState(false);
 
@@ -43,6 +44,7 @@ export default function SpReports() {
   const { data: profit, isLoading: profitLoading } = useQuery<any>({ queryKey: [profitUrl] });
   const { data: splits = [], isLoading: splitsLoading } = useQuery<any[]>({ queryKey: [splitsUrl] });
   const { data: locations = [] } = useQuery<any[]>({ queryKey: ["/api/locations"] });
+  const { data: accounts = [] } = useQuery<any[]>({ queryKey: ["/api/accounts/all"] });
 
   const finalizeMutation = useMutation({
     mutationFn: (body: any) => apiRequest("POST", "/api/sp/profit-splits", body),
@@ -105,6 +107,7 @@ export default function SpReports() {
     try {
       const params = new URLSearchParams({ fromDate: exportFrom, toDate: exportTo });
       if (exportLocationId && exportLocationId !== "all") params.set("locationId", exportLocationId);
+      if (exportCashAccountId && exportCashAccountId !== "none") params.set("cashAccountId", exportCashAccountId);
       const res = await fetch(`/api/sp/sales-form/export-v2?${params}`, { credentials: "include" });
       if (!res.ok) {
         const err = await res.json().catch(() => ({ message: "Export failed" }));
@@ -352,7 +355,7 @@ export default function SpReports() {
             <CardHeader>
               <CardTitle className="text-sm">Export Sales Form Excel</CardTitle>
               <CardDescription className="text-xs">
-                Downloads the same workbook format as the supplier sales form — Costing, Sales, ENTRY, Summary, Ageing,
+                Downloads the same workbook format as the supplier sales form — Costing, Sales, ENTRY, Summary,
                 and Summary-Itemwise sheets filled with current data.
               </CardDescription>
             </CardHeader>
@@ -398,6 +401,26 @@ export default function SpReports() {
                     </SelectContent>
                   </Select>
                 </div>
+                <div className="min-w-48">
+                  <label className="text-xs text-muted-foreground">Opening Cash Account (optional)</label>
+                  <Select
+                    value={exportCashAccountId}
+                    onValueChange={setExportCashAccountId}
+                    data-testid="select-sp-export-cash-account"
+                  >
+                    <SelectTrigger className="mt-1" data-testid="select-sp-export-cash-account-trigger">
+                      <SelectValue placeholder="No account (manual entry)" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">No account (manual entry)</SelectItem>
+                      {accounts.map((a: any) => (
+                        <SelectItem key={a.id} value={String(a.id)} data-testid={`option-cash-account-${a.id}`}>
+                          {a.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
 
               <div className="flex flex-wrap gap-3 pt-1">
@@ -435,8 +458,9 @@ export default function SpReports() {
                 <p className="text-xs text-muted-foreground">
                   <span className="font-medium text-foreground">Export System Sales Form</span> — clean from-scratch
                   workbook built from your live system data. Opening &amp; closing stock match the Location Inventory
-                  page. Supports any date range. 6 sheets: ENTRY, Summary, Ageing (visible) + Costing, Sales,
-                  Summary-Itemwise (hidden).
+                  page. Supports any date range. 5 sheets, no Ageing: ENTRY, Summary (visible) + Costing, Sales,
+                  Summary-Itemwise (hidden). Optionally select an Opening Cash Account to auto-fill day-1 cash from
+                  the ledger balance.
                 </p>
               </div>
             </CardContent>

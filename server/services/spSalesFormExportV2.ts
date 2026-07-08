@@ -6,15 +6,14 @@
  *   Closing stock : calculateHistoricalLocationInventory(locationId, companyId, toDate)
  *   Daily sales   : sales_items + vouchers (ERP POS) — same tables the inventory helper reverses,
  *                   guaranteeing opening − sales + offloads ≈ closing
- *   Ageing dates  : earliest container_offload_items.offloaded_at per stock item
+ *   Opening cash  : voucher_entries SUM(debit-credit) as of dayBefore(fromDate) for cashAccountId
  *
- * Sheet order (mirrors supplier workbook):
+ * Sheet order (5 sheets — Ageing removed in V2):
  *   1. Costing         — hidden
  *   2. Sales           — hidden
  *   3. ENTRY           — visible  ← main page
  *   4. Summary         — visible
- *   5. Ageing          — visible
- *   6. Summary-Itemwise— hidden
+ *   5. Summary-Itemwise— hidden
  */
 
 import ExcelJS from "exceljs";
@@ -26,10 +25,11 @@ import { calculateHistoricalLocationInventory } from "../routes/helpers/inventor
 export interface SpSalesFormV2Params {
   companyId: number;
   locationId?: number;
-  fromDate: string;   // YYYY-MM-DD
-  toDate: string;     // YYYY-MM-DD
+  fromDate: string;      // YYYY-MM-DD
+  toDate: string;        // YYYY-MM-DD
   locationName?: string;
   supplierName?: string;
+  cashAccountId?: number; // optional: opening cash from ledger as-of dayBefore(fromDate)
 }
 
 // ── Internal types ────────────────────────────────────────────────────────────
@@ -112,8 +112,8 @@ const leftAl: Partial<ExcelJS.Alignment> = { horizontal: "left", vertical: "midd
 const NUM = "#,##0.00";            // kept for Costing / Summary sheets
 const NUM4 = "#,##0.0000";         // kept for Costing / Summary sheets
 const QTY_FMT   = "#,##0";        // ENTRY — quantities, whole units only
-const MONEY_FMT  = '"$"#,##0.00'; // ENTRY — monetary values with $ sign
-const MONEY4_FMT = '"$"#,##0.0000'; // ENTRY — high-precision monetary
+const MONEY_FMT  = '"$"#,##0';    // ENTRY — monetary values, whole dollars (no .00)
+const MONEY4_FMT = '"$"#,##0.0000'; // NOT used in ENTRY; reserved for hidden sheets
 
 // ── Data fetch functions ──────────────────────────────────────────────────────
 
@@ -201,6 +201,25 @@ async function fetchSalesData(
     totalSales:  pn(r.total_sales),
     totalCost:   pn(r.total_cost),
   }));
+}
+
+// ── Cash account opening balance ─────────────────────────────────────────────
+async function fetchCashAccountBalance(
+  accountId: number,
+  companyId: number,
+  asOfDate: string
+): Promise<number> {
+  const res = await db.execute(sql`
+    SELECT COALESCE(SUM(ve.debit_amount - ve.credit_amount), 0) AS balance
+    FROM   voucher_entries ve
+    JOIN   vouchers        v  ON v.id = ve.voucher_id
+    WHERE  ve.account_id = ${accountId}
+      AND  v.company_id  = ${companyId}
+      AND  v.voucher_date <= ${asOfDate}::date
+      AND  v.deleted_at  IS NULL
+  `);
+  const rows = (res as any).rows ?? (res as any[]);
+  return pn(rows[0]?.balance ?? 0);
 }
 
 // ── Build item registry ───────────────────────────────────────────────────────
@@ -346,7 +365,8 @@ async function buildEntrySheet(
   items: ItemRow[],
   dates: string[],
   dayCount: number,
-  params: SpSalesFormV2Params
+  params: SpSalesFormV2Params,
+  openingCashBalance: number | null   // null = no account selected (manual input on day 0)
 ): Promise<void> {
   const ws = wb.addWorksheet("ENTRY");
   // FIXED_LEFT = 5: A=RowNum, B=ItemName, C=Code, D=OpenQty, E=Cost/Bag
@@ -498,8 +518,8 @@ async function buildEntrySheet(
       setCellNum(ws, r, 4, item.openQty ? Math.round(item.openQty) : null, altFl ?? fill(OPEN_BLUE), QTY_FMT);
       ws.getCell(r, 4).protection = { locked: true };
 
-      // E: Cost/Bag (locked, dollar sign)
-      setCellNum(ws, r, 5, r4(item.openRate) || null, altFl ?? fill(OPEN_BLUE), MONEY4_FMT);
+      // E: Cost/Bag (locked, dollar sign, whole dollars)
+      setCellNum(ws, r, 5, r4(item.openRate) || null, altFl ?? fill(OPEN_BLUE), MONEY_FMT);
       ws.getCell(r, 5).protection = { locked: true };
 
       // Build list of qty cell addresses for closing-qty and avg formulas
@@ -521,17 +541,17 @@ async function buildEntrySheet(
         qC.alignment = right; qC.border = thin; qC.fill = fill(PURPLE_QTY);
         qC.protection = { locked: false };
 
-        // Sale Price — UNLOCKED, $ sign
+        // Sale Price — UNLOCKED, $ sign, whole dollars
         const pC = ws.getCell(r, b + 1);
-        pC.value = priceVal; pC.numFmt = MONEY4_FMT; pC.font = normSm;
+        pC.value = priceVal; pC.numFmt = MONEY_FMT; pC.font = normSm;
         pC.alignment = right; pC.border = thin; pC.fill = fill(BRIGHT_YLW);
         pC.protection = { locked: false };
 
-        // Profit/Bag — formula, locked, $ sign
+        // Profit/Bag — formula, locked, $ sign, whole dollars
         // =IF(OR(QtyCell="",PriceCell=""),0,PriceCell-$E{r})  ← returns 0 (not "") so SUMPRODUCT works
         const prC = ws.getCell(r, b + 2);
         prC.value     = { formula: `IF(OR(${qL}${r}="",${pL}${r}=""),0,${pL}${r}-$E${r})`, result: profitVal ?? 0 } as any;
-        prC.numFmt    = MONEY4_FMT; prC.font = normSm;
+        prC.numFmt    = MONEY_FMT; prC.font = normSm;
         prC.alignment = right; prC.border = thin;
         prC.protection = { locked: true };
       }
@@ -681,6 +701,25 @@ async function buildEntrySheet(
 
   // ════════ Cash & Bank section ════════════════════════════════════════════════
 
+  const NUM_PAYMENT_ROWS = 10;
+  const payFirst    = paymentsHdrRow + 1;
+  const payLast     = paymentsHdrRow + NUM_PAYMENT_ROWS;
+  const totalPayRow = payLast + 1;
+  const balanceRow  = totalPayRow + 1;
+
+  // Helper: write label cell (A-C merged) for a cash-section row
+  const setCashLabel = (row: number, label: string, bgColor: string, textColor?: string) => {
+    ws.getRow(row).height = 13;
+    ws.mergeCells(row, 1, row, 3);
+    const lbl = ws.getCell(row, 1);
+    lbl.value      = label;
+    lbl.font       = textColor ? { ...boldSm, color: { argb: textColor } } : boldSm;
+    lbl.fill       = fill(bgColor);
+    lbl.border     = thin;
+    lbl.alignment  = leftAl;
+    lbl.protection = { locked: true };
+  };
+
   // Section header
   ws.getRow(cashHdrRow).height = 16;
   ws.mergeCells(cashHdrRow, 1, cashHdrRow, totalCols);
@@ -688,51 +727,77 @@ async function buildEntrySheet(
 
   // CASH / BANK sub-headers per day
   ws.getRow(cashSubHdrRow).height = 13;
-  ws.mergeCells(cashSubHdrRow, 1, cashSubHdrRow, 3);  // A-C (Group column removed)
+  ws.mergeCells(cashSubHdrRow, 1, cashSubHdrRow, 3);
   ws.getCell(cashSubHdrRow, 1).border = thin;
   for (let d = 0; d < dayCount; d++) {
     const b = dayBase + d * COLS_PER_DAY;
     const cashC = ws.getCell(cashSubHdrRow, b);
     cashC.value = "CASH"; cashC.fill = fill(CASH_PINK); cashC.font = boldSm;
     cashC.alignment = ctr; cashC.border = thin; cashC.protection = { locked: true };
-
     const bankC = ws.getCell(cashSubHdrRow, b + 1);
     bankC.value = "BANK"; bankC.fill = fill(BANK_GRN); bankC.font = boldSm;
     bankC.alignment = ctr; bankC.border = thin; bankC.protection = { locked: true };
   }
 
-  // Cash data rows (Opening Cash, Deposit, Receipt)
-  type CashRowDef = { label: string; row: number; labelFill?: string; textColor?: string };
-  const cashRowDefs: CashRowDef[] = [
-    { label: "Opening Cash",                                     row: openCashRow },
-    { label: "Cash deposit in Bank (Enter Only in Cash Column)", row: depositRow,  textColor: "FFCC0000" },
-    { label: "Receipt from Credit Sales",                        row: receiptRow,  labelFill: BRIGHT_YLW },
-  ];
-
-  for (const cr of cashRowDefs) {
-    ws.getRow(cr.row).height = 13;
-    ws.mergeCells(cr.row, 1, cr.row, 3);  // A-C (Group column removed)
-    const lbl = ws.getCell(cr.row, 1);
-    lbl.value = cr.label;
-    lbl.font  = cr.textColor ? { ...boldSm, color: { argb: cr.textColor } } : boldSm;
-    lbl.fill  = cr.labelFill ? fill(cr.labelFill) : fill(WHITE);
-    lbl.border = thin; lbl.alignment = leftAl;
-    lbl.protection = { locked: true };
-
-    for (let d = 0; d < dayCount; d++) {
-      const b = dayBase + d * COLS_PER_DAY;
-      // CASH col — leave blank (no reliable data source)
-      const cashC = ws.getCell(cr.row, b);
-      cashC.value = null; cashC.numFmt = MONEY_FMT; cashC.fill = fill(CASH_PINK);
-      cashC.border = thin; cashC.alignment = right;
-      cashC.protection = { locked: false }; // editable for manual entry
-
-      // BANK col — leave blank
-      const bankC = ws.getCell(cr.row, b + 1);
-      bankC.value = null; bankC.numFmt = MONEY_FMT; bankC.fill = fill(BANK_GRN);
-      bankC.border = thin; bankC.alignment = right;
-      bankC.protection = { locked: false }; // editable for manual entry
+  // ── Opening Cash row ──────────────────────────────────────────────────────────
+  setCashLabel(openCashRow, "Opening Cash", WHITE);
+  for (let d = 0; d < dayCount; d++) {
+    const b = dayBase + d * COLS_PER_DAY;
+    const cashC = ws.getCell(openCashRow, b);
+    cashC.numFmt = MONEY_FMT; cashC.fill = fill(CASH_PINK); cashC.border = thin;
+    cashC.alignment = right; cashC.font = boldSm;
+    const bankC = ws.getCell(openCashRow, b + 1);
+    bankC.numFmt = MONEY_FMT; bankC.fill = fill(BANK_GRN); bankC.border = thin;
+    bankC.alignment = right; bankC.font = boldSm;
+    if (d === 0) {
+      // First day: account balance or blank manual input
+      cashC.value = openingCashBalance !== null ? openingCashBalance : null;
+      cashC.protection = { locked: openingCashBalance !== null };
+      bankC.value = null;
+      bankC.protection = { locked: false };
+    } else {
+      // Subsequent days: link to previous day Balance Cash
+      const prevCL = colLetter(dayBase + (d - 1) * COLS_PER_DAY);
+      const prevBL = colLetter(dayBase + (d - 1) * COLS_PER_DAY + 1);
+      cashC.value = { formula: `${prevCL}${balanceRow}`, result: null } as any;
+      cashC.protection = { locked: true };
+      bankC.value = { formula: `${prevBL}${balanceRow}`, result: null } as any;
+      bankC.protection = { locked: true };
     }
+  }
+
+  // ── Deposit row ───────────────────────────────────────────────────────────────
+  //   CASH col: user enters deposit (unlocked)
+  //   BANK col: formula mirrors CASH deposit (locked)
+  setCashLabel(depositRow, "Cash deposit in Bank (Enter Only in Cash Column)", WHITE, "FFCC0000");
+  for (let d = 0; d < dayCount; d++) {
+    const b  = dayBase + d * COLS_PER_DAY;
+    const cL = colLetter(b);
+    const cashC = ws.getCell(depositRow, b);
+    cashC.value = null; cashC.numFmt = MONEY_FMT; cashC.fill = fill(CASH_PINK);
+    cashC.border = thin; cashC.alignment = right;
+    cashC.protection = { locked: false };
+    const bankC = ws.getCell(depositRow, b + 1);
+    bankC.value = { formula: `${cL}${depositRow}`, result: null } as any;
+    bankC.numFmt = MONEY_FMT; bankC.fill = fill(BANK_GRN);
+    bankC.border = thin; bankC.alignment = right;
+    bankC.protection = { locked: true };
+  }
+
+  // ── Receipt from Credit Sales row ────────────────────────────────────────────
+  //   CASH col: user enters receipt (unlocked)
+  //   BANK col: blank / locked
+  setCashLabel(receiptRow, "Receipt from Credit Sales", BRIGHT_YLW);
+  for (let d = 0; d < dayCount; d++) {
+    const b = dayBase + d * COLS_PER_DAY;
+    const cashC = ws.getCell(receiptRow, b);
+    cashC.value = null; cashC.numFmt = MONEY_FMT; cashC.fill = fill(BRIGHT_YLW);
+    cashC.border = thin; cashC.alignment = right;
+    cashC.protection = { locked: false };
+    const bankC = ws.getCell(receiptRow, b + 1);
+    bankC.value = null; bankC.numFmt = MONEY_FMT; bankC.fill = fill(BANK_GRN);
+    bankC.border = thin; bankC.alignment = right;
+    bankC.protection = { locked: true };
   }
 
   // ════════ Payments section ════════════════════════════════════════════════════
@@ -740,22 +805,80 @@ async function buildEntrySheet(
   ws.mergeCells(paymentsHdrRow, 1, paymentsHdrRow, totalCols);
   applyCell(ws, paymentsHdrRow, 1, "PAYMENTS", fill(DARK_BLUE), wFont(), ctr);
 
-  const payNoteRow = paymentsHdrRow + 1;
-  ws.getRow(payNoteRow).height = 13;
-  ws.mergeCells(payNoteRow, 1, payNoteRow, 3);  // A-C (Group column removed)
-  ws.getCell(payNoteRow, 1).value = "(No payment data — enter manually if needed)";
-  ws.getCell(payNoteRow, 1).font  = { ...normSm, color: { argb: "FFAAAAAA" } };
-  ws.getCell(payNoteRow, 1).border = thin;
+  // Payment rows 1 – NUM_PAYMENT_ROWS (unlocked input)
+  for (let p = 1; p <= NUM_PAYMENT_ROWS; p++) {
+    const pr = paymentsHdrRow + p;
+    ws.getRow(pr).height = 13;
+    ws.mergeCells(pr, 1, pr, 3);
+    const lbl = ws.getCell(pr, 1);
+    lbl.value = `Payment ${p}`; lbl.font = normSm; lbl.fill = fill(WHITE);
+    lbl.border = thin; lbl.alignment = leftAl; lbl.protection = { locked: true };
+    for (let d = 0; d < dayCount; d++) {
+      const b = dayBase + d * COLS_PER_DAY;
+      const cashC = ws.getCell(pr, b);
+      cashC.value = null; cashC.numFmt = MONEY_FMT;
+      cashC.fill = fill(BRIGHT_YLW); cashC.border = thin; cashC.alignment = right;
+      cashC.protection = { locked: false };
+      const bankC = ws.getCell(pr, b + 1);
+      bankC.value = null; bankC.numFmt = MONEY_FMT;
+      bankC.fill = fill(BANK_GRN); bankC.border = thin; bankC.alignment = right;
+      bankC.protection = { locked: false };
+    }
+  }
 
-  // Per-day payment input cells (editable, blank)
+  // ── Total Payments row (locked SUM formulas) ──────────────────────────────────
+  ws.getRow(totalPayRow).height = 14;
+  ws.mergeCells(totalPayRow, 1, totalPayRow, 3);
+  const tpLbl = ws.getCell(totalPayRow, 1);
+  tpLbl.value = "Total Payments"; tpLbl.font = { ...boldSm, color: { argb: WHITE } };
+  tpLbl.fill = fill(DARK_BLUE); tpLbl.border = thin; tpLbl.alignment = leftAl;
+  tpLbl.protection = { locked: true };
   for (let d = 0; d < dayCount; d++) {
-    const b = dayBase + d * COLS_PER_DAY;
-    [b, b + 1].forEach(col => {
-      const c = ws.getCell(payNoteRow, col);
-      c.value = null; c.numFmt = MONEY_FMT; c.border = thin;
-      c.fill = fill(BRIGHT_YLW); c.alignment = right;
-      c.protection = { locked: false };
-    });
+    const b  = dayBase + d * COLS_PER_DAY;
+    const cL = colLetter(b), bL = colLetter(b + 1);
+    const cashC = ws.getCell(totalPayRow, b);
+    cashC.value = { formula: `SUM(${cL}${payFirst}:${cL}${payLast})`, result: 0 } as any;
+    cashC.numFmt = MONEY_FMT; cashC.fill = fill(DARK_BLUE); cashC.border = thin;
+    cashC.alignment = right; cashC.font = { ...boldSm, color: { argb: WHITE } };
+    cashC.protection = { locked: true };
+    const bankC = ws.getCell(totalPayRow, b + 1);
+    bankC.value = { formula: `SUM(${bL}${payFirst}:${bL}${payLast})`, result: 0 } as any;
+    bankC.numFmt = MONEY_FMT; bankC.fill = fill(DARK_BLUE); bankC.border = thin;
+    bankC.alignment = right; bankC.font = { ...boldSm, color: { argb: WHITE } };
+    bankC.protection = { locked: true };
+  }
+
+  // ── Balance Cash row (locked formulas) ────────────────────────────────────────
+  //   Cash  = OpeningCash + DailyTotalSales − CashDeposit + ReceiptFromCredit − TotalCashPayments
+  //   Bank  = OpeningBank + BankDeposit     − TotalBankPayments
+  //   Note  : DailyTotalSales is the TOTAL row's Sales column (same letter as BANK col,
+  //           but referenced at totalRowNum — not the cash-section bank col).
+  ws.getRow(balanceRow).height = 14;
+  ws.mergeCells(balanceRow, 1, balanceRow, 3);
+  const balLbl = ws.getCell(balanceRow, 1);
+  balLbl.value = "Balance Cash"; balLbl.font = { ...boldSm, color: { argb: WHITE } };
+  balLbl.fill = fill(GREEN_HDR); balLbl.border = thin; balLbl.alignment = leftAl;
+  balLbl.protection = { locked: true };
+  for (let d = 0; d < dayCount; d++) {
+    const b  = dayBase + d * COLS_PER_DAY;
+    const cL = colLetter(b), bL = colLetter(b + 1);
+    // cL = CASH column; bL = BANK column (= same column as Total Sales in item/TOTAL rows)
+    const cashC = ws.getCell(balanceRow, b);
+    cashC.value = {
+      formula: `${cL}${openCashRow}+${bL}${totalRowNum}-${cL}${depositRow}+${cL}${receiptRow}-${cL}${totalPayRow}`,
+      result:  0,
+    } as any;
+    cashC.numFmt = MONEY_FMT; cashC.fill = fill(GREEN_HDR); cashC.border = thin;
+    cashC.alignment = right; cashC.font = { ...boldSm, color: { argb: WHITE } };
+    cashC.protection = { locked: true };
+    const bankC = ws.getCell(balanceRow, b + 1);
+    bankC.value = {
+      formula: `${bL}${openCashRow}+${bL}${depositRow}-${bL}${totalPayRow}`,
+      result:  0,
+    } as any;
+    bankC.numFmt = MONEY_FMT; bankC.fill = fill(GREEN_HDR); bankC.border = thin;
+    bankC.alignment = right; bankC.font = { ...boldSm, color: { argb: WHITE } };
+    bankC.protection = { locked: true };
   }
 
   // ── Protect sheet (allow filter, lock all except unlocked cells above) ───────
@@ -1020,7 +1143,7 @@ function scanErrors(wb: ExcelJS.Workbook): Array<{ sheet: string; cell: string; 
 
 // ── Main export function ──────────────────────────────────────────────────────
 export async function generateSpSalesFormExcelV2(params: SpSalesFormV2Params): Promise<Buffer> {
-  const { companyId, locationId, fromDate, toDate } = params;
+  const { companyId, locationId, fromDate, toDate, cashAccountId } = params;
 
   console.log(`[spSalesFormExportV2] start companyId=${companyId} locationId=${locationId ?? "all"} ${fromDate}→${toDate}`);
 
@@ -1032,11 +1155,13 @@ export async function generateSpSalesFormExcelV2(params: SpSalesFormV2Params): P
   const dayBefore = dateStr(addDays(startDate, -1));
 
   // Fetch all data in parallel (no ageing fetch — Ageing sheet removed in V2)
-  const [openMap, closeMap, salesRows] = await Promise.all([
+  const [openMap, closeMap, salesRows, openingCashBalance] = await Promise.all([
     fetchInventory(companyId, locationId, dayBefore),
     fetchInventory(companyId, locationId, toDate),
     fetchSalesData(companyId, locationId, fromDate, toDate),
+    cashAccountId ? fetchCashAccountBalance(cashAccountId, companyId, dayBefore) : Promise.resolve(null),
   ]);
+  console.log(`[spSalesFormExportV2] cashAccountId=${cashAccountId ?? "none"} openingCashBalance=${openingCashBalance ?? "n/a (manual)"}`);
   console.log(`[spSalesFormExportV2] openItems=${openMap.size} closeItems=${closeMap.size} saleRows=${salesRows.length} dayCount=${dayCount}`);
 
   // Build item registry
@@ -1054,7 +1179,7 @@ export async function generateSpSalesFormExcelV2(params: SpSalesFormV2Params): P
 
   buildCostingSheet(wb, items);                                    // 1. Costing — hidden
   buildSalesSheet(wb, items, dates);                               // 2. Sales — hidden
-  await buildEntrySheet(wb, items, dates, dayCount, params);       // 3. ENTRY — visible (async for ws.protect)
+  await buildEntrySheet(wb, items, dates, dayCount, params, openingCashBalance); // 3. ENTRY — visible (async for ws.protect)
   buildSummarySheet(wb, items, dates, params);                     // 4. Summary — visible
   buildSummaryItemwiseSheet(wb, items, dayCount);                  // 5. Summary-Itemwise — hidden
 
