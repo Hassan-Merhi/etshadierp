@@ -4402,6 +4402,35 @@ END $$`,
     `ALTER TABLE factory_sheets_sacks ADD COLUMN IF NOT EXISTS pack_qty INTEGER`,
     `ALTER TABLE factory_sheets_sacks ADD COLUMN IF NOT EXISTS pcs_per_pack INTEGER`,
     `ALTER TABLE factory_sheets_sacks ADD COLUMN IF NOT EXISTS row_color TEXT`,
+    // Sheets & Sacks IN/OUT log (July 2026). This table was previously created
+    // ad hoc directly on some databases with a leftover NOT NULL "color" column
+    // that the app never populates -- the DO block below drops that constraint
+    // wherever it's still present so deductions/restocks don't fail with
+    // "null value in column color violates not-null constraint".
+    `CREATE TABLE IF NOT EXISTS factory_sheets_sacks_log (
+      id          SERIAL PRIMARY KEY,
+      company_id  INTEGER NOT NULL,
+      item_id     INTEGER NOT NULL,
+      item_name   TEXT NOT NULL,
+      item_type   TEXT NOT NULL,
+      action      TEXT NOT NULL CHECK (action IN ('IN','OUT','ADJUST')),
+      pieces      INTEGER NOT NULL DEFAULT 0,
+      packs       INTEGER,
+      unit_price  DECIMAL(20,6),
+      total_value DECIMAL(20,4),
+      notes       TEXT,
+      created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )`,
+    `CREATE INDEX IF NOT EXISTS idx_fss_log_company_created ON factory_sheets_sacks_log (company_id, created_at DESC)`,
+    `CREATE INDEX IF NOT EXISTS idx_fss_log_item ON factory_sheets_sacks_log (item_id)`,
+    `DO $fss_log_color$ BEGIN
+      IF EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'factory_sheets_sacks_log' AND column_name = 'color'
+      ) THEN
+        ALTER TABLE factory_sheets_sacks_log ALTER COLUMN color DROP NOT NULL;
+      END IF;
+    END $fss_log_color$`,
   ];
 
   // /api/health/db — reports migration status but does NOT block deployment.
