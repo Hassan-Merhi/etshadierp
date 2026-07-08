@@ -31,3 +31,4 @@
 - [AI chat draft anti-hallucination pattern](ai-draft-hallucination-guard.md) — never let an intent's LLM acknowledgment claim "prepared a draft" without a final code-level guard checking a real draft object exists.
 - [SP POS unification](sp-pos-unification.md) — Supplier Partner POS shares the normal ERP POS UI now; /api/sp/sales is the correct SP voucher endpoint, group SP stock by stockItemId not articleCode.
 - [req.body mutation after destructure is a no-op](req-body-mutation-after-destructure.md) — legacy handlers that destructure then later mutate req.body fields don't affect already-bound consts; preserve as-is during refactors, flag as latent bug.
+- [AI chat intent classification priority](ai-chat-intent-priority.md) — domain-specific signals must outrank generic financial-transfer heuristics in classifyChatIntent; anti-hallucination overrides should apply regardless of (possibly wrong) classified intent.

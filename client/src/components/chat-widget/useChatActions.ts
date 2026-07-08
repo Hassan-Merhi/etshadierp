@@ -178,6 +178,24 @@ export function useChatActions(state: ChatActionsState) {
   };
 
   const handleConfirmStockTransfer = async (resolved: StockTransferDraft) => {
+    // Defense in depth: even though the confirm button is gated in the UI,
+    // never let an incomplete draft (unresolved location candidates, missing/
+    // equal source & destination, or no items) reach the confirm API — this
+    // is exactly the shape that previously produced a raw "Source and
+    // destination locations are required" 400 the assistant couldn't explain.
+    const items = resolved.items.filter((i) => (Number(i.quantity) || 0) > 0);
+    if (
+      resolved.locationCandidates?.length ||
+      !(Number(resolved.sourceLocationId) > 0) ||
+      !(Number(resolved.destinationLocationId) > 0) ||
+      resolved.sourceLocationId === resolved.destinationLocationId ||
+      items.length === 0
+    ) {
+      sendMutation.mutate(
+        "This draft is incomplete (missing a resolved source/destination location or item quantities), so I didn't submit it. Please provide the exact source location, destination location, and item(s)/quantities."
+      );
+      return;
+    }
     try {
       // AI-suggested analysis drafts default to optional=true (no inventory movement
       // until approved through the normal stock transfer workflow). Manual/direct

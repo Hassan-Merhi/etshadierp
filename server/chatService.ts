@@ -288,6 +288,22 @@ const RE_STOCK_ADJ =
   /\b(produce|producing|production|consume|consuming|consumption|stock\s+adjust|adjust\s+stock|record\s+production|record\s+consumption|produced|consumed)\b/i;
 const RE_STOCK_TRANSFER =
   /\b(transfer|move|shift)\b.{0,80}\b(stock|item|inventory)\b|\b(stock|item|inventory)\b.{0,60}\b(transfer|move|shift)\b|\btransfer\b.{0,40}\bfrom\b.{0,40}\bto\b/i;
+// Explicit stock-transfer signal — the message names stock/item/inventory
+// directly next to transfer/move/shift, so it can NEVER be a financial
+// ledger transfer even if it also happens to match RE_VOUCHER's generic
+// "transfer ... <digit>" heuristic (e.g. "stock transfer draft for 410
+// bales..." incidentally matches "transfer[red]?\b.{0,60}\$?\d"). Used to
+// give stock-transfer classification priority over that voucher heuristic.
+// Excludes "stock/inventory/item ACCOUNT" phrasing (e.g. "transfer $500 from
+// the inventory account to cash") — that is unambiguously a ledger/journal
+// transfer between accounts, not a physical stock movement, even though it
+// mentions "inventory" near "transfer".
+const RE_STOCK_ACCOUNT_CONTEXT = /\b(stock|inventory|item)\s+account\b|\baccount\b.{0,20}\b(stock|inventory|item)\b/i;
+const RE_STOCK_TRANSFER_EXPLICIT_RAW =
+  /\b(transfer|move|shift)\b.{0,80}\b(stock|item|inventory)\b|\b(stock|item|inventory)\b.{0,60}\b(transfer|move|shift)\b/i;
+const RE_STOCK_TRANSFER_EXPLICIT = {
+  test: (msg: string) => RE_STOCK_TRANSFER_EXPLICIT_RAW.test(msg) && !RE_STOCK_ACCOUNT_CONTEXT.test(msg),
+};
 // Analysis-style stock transfer requests (no explicit item/quantity given —
 // the AI must run a server-side data analysis instead of extracting numbers).
 const RE_STOCK_TRANSFER_ANALYSIS =
@@ -324,6 +340,140 @@ const RE_VOUCHER_SEARCH =
   /\b(when did (i|we) pay|find (the )?(payment|receipt|voucher|transaction)|search (for )?(voucher|payment|receipt)|show (me )?(the )?(voucher|payment|receipt)|paid for|receipt for|voucher for|payment (for|of)|what voucher|which voucher|show.*payment.*for|show.*receipt.*for)\b/i;
 const RE_ACCOUNT_QUERY =
   /\b(balance of|account.*balance|how much.*account|account.*how much|what.*balance|balance.*account|when did.*account|account.*transactions|transactions.*account|paid.*from account|received.*account|when.*balance.*was|balance.*was.*when|ledger.*balance|account.*paid|account.*received)\b/i;
+
+// ── Deterministic multi-source/target-quantity transfer pre-parser ─────────
+// The LLM-based `multiPrompt` extraction below is the primary parser, but it
+// can misparse or hallucinate (wrong destination, dropped sources, etc). This
+// deterministic regex/name-matching parser runs first and, when it can
+// confidently resolve destination + source(s) + target quantity against the
+// company's REAL location list, its result is used directly — never invented,
+// always grounded in the actual `locations` rows. It only returns a non-null
+// result when it is fully confident; otherwise the LLM parser is used as
+// before. This guarantees requests like "410 bales to Kolwezi today from
+// Hadi 1, Hadi 2, Hadi 3, and Hadi 4" resolve correctly even if the LLM
+// mis-extracts the repeated-full-name source list.
+function escapeRegexLiteral(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function findKnownLocationMentions(
+  msg: string,
+  locations: { id: number; name: string; code: string | null }[]
+): { name: string; id: number; index: number; length: number }[] {
+  const raw: { name: string; id: number; index: number; length: number }[] = [];
+  for (const loc of locations) {
+    const name = (loc.name || "").trim();
+    if (!name || name.length < 2) continue;
+    const re = new RegExp(`\\b${escapeRegexLiteral(name)}\\b`, "i");
+    const m = msg.match(re);
+    if (m && m.index !== undefined) raw.push({ name, id: loc.id, index: m.index, length: name.length });
+  }
+  // When multiple location names match at/around the same position (e.g. plain
+  // "Kolwezi" is itself a valid \b-bounded match inside "Kolwezi 2"), keep only
+  // the longest/most specific match so "Kolwezi 2" is never silently collapsed
+  // into "Kolwezi".
+  raw.sort((a, b) => a.index - b.index || b.length - a.length);
+  const kept: typeof raw = [];
+  for (const m of raw) {
+    const overlapsKept = kept.some((k) => m.index >= k.index && m.index < k.index + k.length);
+    if (!overlapsKept) kept.push(m);
+  }
+  return kept.sort((a, b) => a.index - b.index);
+}
+
+function extractExcludedLocationIds(
+  msg: string,
+  locations: { id: number; name: string; code: string | null }[]
+): Set<number> {
+  const excluded = new Set<number>();
+  const re = /\b(?:do not use|don'?t use|exclude|excluding|never use)\s+([a-z0-9][\w\s]*?)(?=\s*(?:\.|,|$|\bfrom\b|\bto\b))/gi;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(msg))) {
+    const phrase = m[1].trim().toLowerCase();
+    for (const loc of locations) {
+      if ((loc.name || "").trim().toLowerCase() === phrase) excluded.add(loc.id);
+    }
+  }
+  return excluded;
+}
+
+function matchDeterministicSourceSegment(msg: string): RegExpMatchArray | null {
+  return msg.match(
+    /\bfrom\s+(.+?)(?:\.\s|\.$|,?\s*only\b|,?\s*do not\b|,?\s*don't\b|,?\s*if\b|,?\s*today\b|,?\s*tomorrow\b|$)/i
+  );
+}
+
+// Expands numeric shorthand ("Hadi 1,2,3,4" / "Hadi 1-4") into full names.
+// Only used as a fallback when named-location-mention matching finds 0-1
+// sources, since shorthand numbers don't literally appear as full location
+// names in the text.
+function extractSourceNamesShorthand(msg: string): string[] {
+  const fromMatch = matchDeterministicSourceSegment(msg);
+  if (!fromMatch) return [];
+  const segment = fromMatch[1].replace(/\s+(today|tomorrow)\s*$/i, "").trim();
+  if (!segment) return [];
+  const shorthand = segment.match(/^([a-z][a-z\s]*?)\s+(\d+(?:\s*,\s*(?:and\s+)?\d+)+)$/i);
+  if (shorthand) {
+    const base = shorthand[1].trim();
+    const nums = shorthand[2].match(/\d+/g) || [];
+    return nums.map((n) => `${base} ${n}`);
+  }
+  const rangeMatch = segment.match(/^([a-z][a-z\s]*?)\s+(\d+)\s*-\s*(\d+)$/i);
+  if (rangeMatch) {
+    const base = rangeMatch[1].trim();
+    const start = parseInt(rangeMatch[2], 10);
+    const end = parseInt(rangeMatch[3], 10);
+    if (Number.isFinite(start) && Number.isFinite(end) && end >= start && end - start < 50) {
+      const out: string[] = [];
+      for (let n = start; n <= end; n++) out.push(`${base} ${n}`);
+      return out;
+    }
+  }
+  return [];
+}
+
+interface DeterministicMultiSourceResult {
+  destinationName: string;
+  sourceNames: string[];
+  targetQty: number;
+  optional: boolean;
+}
+
+function deterministicParseMultiSourceTransfer(
+  msg: string,
+  locations: { id: number; name: string; code: string | null }[]
+): DeterministicMultiSourceResult | null {
+  const targetQtyMatch = msg.match(/\b(\d+)\s*(?:bales?|items?|units?|pcs?|pieces?|cartons?|bags?)\b/i);
+  const targetQty = targetQtyMatch ? parseInt(targetQtyMatch[1], 10) : undefined;
+  const optional = /\boptional\b/i.test(msg);
+  const excludedIds = extractExcludedLocationIds(msg, locations);
+  const mentions = findKnownLocationMentions(msg, locations).filter((m) => !excludedIds.has(m.id));
+  const fromMatchObj = msg.match(/\bfrom\b/i);
+  const fromIdx = fromMatchObj ? fromMatchObj.index! : -1;
+
+  let destinationName: string | undefined;
+  let sourceNames: string[] = [];
+
+  if (fromIdx >= 0) {
+    const before = mentions.filter((m) => m.index < fromIdx);
+    const after = mentions.filter((m) => m.index >= fromIdx);
+    if (before.length === 1) destinationName = before[0].name;
+    if (after.length > 0) sourceNames = after.map((m) => m.name);
+  }
+
+  if (sourceNames.length <= 1) {
+    const shorthandSources = extractSourceNamesShorthand(msg);
+    const resolved = shorthandSources.filter((n) =>
+      locations.some((l) => (l.name || "").trim().toLowerCase() === n.trim().toLowerCase())
+    );
+    if (resolved.length > sourceNames.length) sourceNames = resolved;
+  }
+
+  if (!destinationName || sourceNames.length === 0 || !targetQty || !Number.isFinite(targetQty) || targetQty <= 0) {
+    return null;
+  }
+  return { destinationName, sourceNames, targetQty, optional };
+}
 
 // ── ERP context in-memory cache (TTL = 60 s per companyId) ───────────────────
 const ERP_CACHE_TTL_MS = 60_000;
@@ -1589,7 +1739,12 @@ function classifyChatIntent(
   // ── ERP action intents — checked after code intents ──────────────────────
   if (RE_STOCK_ADJ.test(userMessage)) return "create_stock_adjustment";
   if (RE_STOCK_ITEM_CREATE.test(userMessage)) return "create_stock_item";
-  // Transfer before voucher — "transfer stock" should not match voucher keywords
+  // Transfer before voucher — "transfer stock" should not match voucher keywords.
+  // An explicit stock-transfer signal (stock/item/inventory named right next to
+  // transfer/move/shift) always wins, even if RE_VOUCHER's generic "transfer ...
+  // <digit>" heuristic also happens to match (e.g. "stock transfer draft for 410
+  // bales..." — the digit there is a quantity, not a ledger amount).
+  if (RE_STOCK_TRANSFER_EXPLICIT.test(userMessage)) return "create_stock_transfer";
   if (
     (RE_STOCK_TRANSFER.test(userMessage) || RE_STOCK_TRANSFER_ANALYSIS.test(userMessage)) &&
     !RE_VOUCHER.test(userMessage)
@@ -3049,7 +3204,27 @@ If this is not a two-location stock-transfer analysis request, respond with exac
             .limit(80);
 
           const today = new Date().toISOString().slice(0, 10);
-          const multiPrompt = `You are a stock-transfer request parser for a request that targets a TOTAL QUANTITY across possibly MULTIPLE source locations (not a fixed item list).
+
+          // ── Deterministic pass first — grounded in the real location list. ──
+          const deterministic = deterministicParseMultiSourceTransfer(userMessage, locRows);
+
+          let destinationName: string | undefined;
+          let sourceNames: string[] = [];
+          let targetQty: number | undefined;
+          let optional = false;
+          let onlyDestinationStockGroups = true;
+          let dateStr = today;
+          let haveParsedParams = false;
+
+          if (deterministic) {
+            destinationName = deterministic.destinationName;
+            sourceNames = deterministic.sourceNames;
+            targetQty = deterministic.targetQty;
+            optional = deterministic.optional;
+            onlyDestinationStockGroups = RE_STOCK_GROUP_FILTER_HINT.test(userMessage) || onlyDestinationStockGroups;
+            haveParsedParams = true;
+          } else {
+            const multiPrompt = `You are a stock-transfer request parser for a request that targets a TOTAL QUANTITY across possibly MULTIPLE source locations (not a fixed item list).
 User message: "${userMessage}"
 Today: ${today}
 Locations (id:name:code): ${locRows.map((l) => `${l.id}:${l.name}:${l.code}`).join(" | ")}
@@ -3067,30 +3242,36 @@ Respond with ONLY valid JSON (no markdown):
 
 If this is not this kind of quantity-target multi-source transfer request, respond with exactly: null`;
 
-          const multiResult = await callAIWithFallback(
-            selectedProvider,
-            multiPrompt,
-            [],
-            "Extract multi-source target-quantity stock transfer parameters or return null"
-          );
-          const rawMulti = multiResult.response
-            .trim()
-            .replace(/```json\n?|```/g, "")
-            .trim();
+            const multiResult = await callAIWithFallback(
+              selectedProvider,
+              multiPrompt,
+              [],
+              "Extract multi-source target-quantity stock transfer parameters or return null"
+            );
+            const rawMulti = multiResult.response
+              .trim()
+              .replace(/```json\n?|```/g, "")
+              .trim();
 
-          if (rawMulti !== "null" && rawMulti.startsWith("{")) {
-            const parsedMulti = JSON.parse(rawMulti);
-            const destinationName: string = parsedMulti.destinationLocationName || "";
-            const sourceNames: string[] = Array.isArray(parsedMulti.sourceLocationNames)
-              ? parsedMulti.sourceLocationNames.filter((n: any) => typeof n === "string" && n.trim())
-              : [];
-            const targetQty =
-              Number.isFinite(Number(parsedMulti.targetQty)) && Number(parsedMulti.targetQty) > 0
-                ? Math.floor(Number(parsedMulti.targetQty))
-                : undefined;
-            const optional = parsedMulti.optional === true;
-            const onlyDestinationStockGroups = parsedMulti.onlyDestinationStockGroups !== false;
-            const dateStr = parsedMulti.date || today;
+            if (rawMulti !== "null" && rawMulti.startsWith("{")) {
+              const parsedMulti = JSON.parse(rawMulti);
+              destinationName = parsedMulti.destinationLocationName || "";
+              sourceNames = Array.isArray(parsedMulti.sourceLocationNames)
+                ? parsedMulti.sourceLocationNames.filter((n: any) => typeof n === "string" && n.trim())
+                : [];
+              targetQty =
+                Number.isFinite(Number(parsedMulti.targetQty)) && Number(parsedMulti.targetQty) > 0
+                  ? Math.floor(Number(parsedMulti.targetQty))
+                  : undefined;
+              optional = parsedMulti.optional === true;
+              onlyDestinationStockGroups = parsedMulti.onlyDestinationStockGroups !== false;
+              dateStr = parsedMulti.date || today;
+              haveParsedParams = true;
+            }
+          }
+
+          if (haveParsedParams) {
+            destinationName = destinationName || "";
 
             // Destination must match STRICTLY — never silently pick "Kolwezi 2" for "Kolwezi".
             const destMatch = await matchLocationByName(companyId, destinationName, { strict: true });
@@ -3288,7 +3469,14 @@ If intent is unclear or this is not a stock transfer request, respond with exact
       }
     }
 
-    if (intent === "create_stock_transfer" && stockTransferResponseOverride) {
+    // `stockTransferResponseOverride` is only ever assigned inside the
+    // stock-transfer extraction block above, so applying it here is safe
+    // regardless of `classifyChatIntent`'s result — this guards against the
+    // LLM's free-text response claiming a draft was prepared when the
+    // deterministic/backend logic actually found none (or a different
+    // outcome), which previously only applied when intent happened to equal
+    // "create_stock_transfer".
+    if (stockTransferResponseOverride) {
       finalResponse = stockTransferResponseOverride;
     }
 

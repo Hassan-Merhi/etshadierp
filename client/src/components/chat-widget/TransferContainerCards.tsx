@@ -58,6 +58,20 @@ export function StockTransferConfirmCard({
   const isAnalysis = draft.optional === true;
   const hasNoSuggestions = isAnalysis && editItems.length === 0 && !draft.locationCandidates?.length;
 
+  // A draft can legitimately be an ambiguous-candidate placeholder (source/
+  // destination id 0, no items yet) while the user picks one of several
+  // matching locations — that state must never reach the confirm API. Guard
+  // here so a stale/incomplete draft can't slip a "Source and destination
+  // locations are required" 400 through to the user.
+  const hasAmbiguousLocation = !!draft.locationCandidates?.length;
+  const hasValidLocations =
+    !hasAmbiguousLocation &&
+    Number(draft.sourceLocationId) > 0 &&
+    Number(draft.destinationLocationId) > 0 &&
+    draft.sourceLocationId !== draft.destinationLocationId;
+  const hasSubmittableItems = editItems.some((i) => (parseFloat(i.qtyStr) || 0) > 0);
+  const isDraftIncomplete = hasAmbiguousLocation || !hasValidLocations || !hasSubmittableItems;
+
   const removeItem = (idx: number) => setEditItems((prev) => prev.filter((_, i) => i !== idx));
 
   const handleConfirmClick = () => {
@@ -244,6 +258,15 @@ export function StockTransferConfirmCard({
             Warning: transfer quantity exceeds available stock for one or more items.
           </p>
         )}
+        {!hasNoSuggestions && isDraftIncomplete && (
+          <p className="text-[10px] text-destructive border-t pt-1">
+            {hasAmbiguousLocation
+              ? "Please resolve the location choice above before confirming."
+              : !hasValidLocations
+                ? "This draft is missing a valid source and/or destination location and can't be confirmed."
+                : "Add at least one item with a quantity greater than 0 before confirming."}
+          </p>
+        )}
         {isAnalysis && (
           <p className="text-[10px] text-amber-600 dark:text-amber-400 border-t pt-1">
             This is optional. Inventory will not move until approved/posted.
@@ -263,7 +286,7 @@ export function StockTransferConfirmCard({
         <Button
           size="sm"
           onClick={handleConfirmClick}
-          disabled={isSubmitting || hasNoSuggestions}
+          disabled={isSubmitting || hasNoSuggestions || isDraftIncomplete}
           data-testid="button-confirm-stock-transfer"
         >
           {isSubmitting ? (
