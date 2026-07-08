@@ -373,6 +373,7 @@ export function registerSpMigrationRoutes(app: Express) {
         .select()
         .from(locations)
         .where(and(eq(locations.companyId, targetId), isNull(locations.deletedAt)));
+      let mainWarehouseLocationId: number;
       if (!locs.length) {
         const [locRow] = (
           await db.execute(sql`
@@ -381,9 +382,13 @@ export function registerSpMigrationRoutes(app: Express) {
           RETURNING id
         `)
         ).rows as any[];
-        await trackRow(runId, "locations", locRow.id);
+        mainWarehouseLocationId = pn(locRow.id);
+        await trackRow(runId, "locations", mainWarehouseLocationId);
         rowsCreated++;
         summary.push("Created default warehouse location");
+      } else {
+        mainWarehouseLocationId = pn(locs[0].id);
+        summary.push("Using existing warehouse location");
       }
 
       // 3. Fetch source stock items with positive inventory
@@ -442,14 +447,14 @@ export function registerSpMigrationRoutes(app: Express) {
         const [movRow] = (
           await db.execute(sql`
           INSERT INTO sp_stock_movements
-            (company_id, article_code, description, stock_item_id,
+            (company_id, article_code, description, stock_item_id, location_id,
              qty_in, qty_remaining,
              base_unit_cost_usd, landed_unit_cost_usd, final_unit_cost_usd,
              source_type, container_id, offload_id, container_line_id)
           VALUES
             (${targetId}, ${item.code},
              ${"Rehearsal opening stock from " + sourceComp.name},
-             ${stockItemId},
+             ${stockItemId}, ${mainWarehouseLocationId},
              ${qty}, ${qty},
              ${avgRate.toFixed(6)}, ${avgRate.toFixed(6)}, ${avgRate.toFixed(6)},
              'opening_stock', NULL, NULL, NULL)
@@ -983,14 +988,14 @@ export function registerSpMigrationRoutes(app: Express) {
         const [movRow] = (
           await db.execute(sql`
           INSERT INTO sp_stock_movements
-            (company_id, article_code, description, stock_item_id,
+            (company_id, article_code, description, stock_item_id, location_id,
              qty_in, qty_remaining,
              base_unit_cost_usd, landed_unit_cost_usd, final_unit_cost_usd,
              source_type, container_id, offload_id, container_line_id)
           VALUES
             (${targetId}, ${item.code},
              ${"GC Migration opening stock from " + sourceComp.name},
-             ${stockItemId},
+             ${stockItemId}, ${mainWarehouseLocationId},
              ${qty}, ${qty},
              ${avgRate.toFixed(6)}, ${avgRate.toFixed(6)}, ${avgRate.toFixed(6)},
              'opening_stock', NULL, NULL, NULL)
