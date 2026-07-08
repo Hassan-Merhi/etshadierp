@@ -169,6 +169,7 @@ export function ChatMessageList({
             Ask me anything — ERP data, code, general questions, or have me build you a mini app.
           </p>
 
+          {displaySuggestions.length > 0 && (
           <div className="w-full space-y-2">
             <p className="text-xs font-medium text-muted-foreground">Try asking:</p>
             <div className="flex flex-wrap gap-2 justify-center">
@@ -185,6 +186,7 @@ export function ChatMessageList({
               ))}
             </div>
           </div>
+          )}
         </div>
       )}
 

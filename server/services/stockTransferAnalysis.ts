@@ -257,7 +257,11 @@ export async function loadOtwStockByItem(
     .select({ id: stockItems.id, code: stockItems.code, name: stockItems.name })
     .from(stockItems)
     .where(and(eq(stockItems.companyId, companyId), isNull(stockItems.deletedAt)));
-  const byCode = new Map(companyStockItems.map((s) => [s.code.trim().toLowerCase(), s.id]));
+  const byCode = new Map(
+    companyStockItems
+      .map((s) => [(s.code || "").trim().toLowerCase(), s.id] as const)
+      .filter(([code]) => code.length > 0)
+  );
   const byName = new Map(companyStockItems.map((s) => [normalizeShopName(s.name), s.id]));
 
   const lineItemsByPo = new Map<number, typeof lineItems>();

@@ -292,6 +292,16 @@ const RE_STOCK_TRANSFER =
 // the AI must run a server-side data analysis instead of extracting numbers).
 const RE_STOCK_TRANSFER_ANALYSIS =
   /\b(analy[sz]e|suggest|recommend|compare)\b.{0,100}\b(transfer|move|stock|sales|sell)\b|\bwhat\s+(should|to)\s+(i|we)\s+(move|transfer)\b|\bsells?\s+better\b|\boptional\s+(stock\s+)?transfer\b|\bbased\s+on\s+(sales|stock|old\s+transfers?)\b.{0,60}\btransfer\b|\btransfer\b.{0,60}\bbased\s+on\b/i;
+// Same as RE_STOCK_TRANSFER_ANALYSIS but WITHOUT the generic "\boptional\s+(stock\s+)?transfer\b"
+// clause. That clause alone is too broad — a fully deterministic request like
+// "Create an optional stock transfer draft for 410 bales to Kolwezi from Hadi
+// 1, Hadi 2, Hadi 3, and Hadi 4..." also says "optional stock transfer" but has
+// explicit sources/quantity and must NOT be misrouted into the data-driven
+// analysis/suggestion branch. Only genuine analysis language (analyze/suggest/
+// recommend/compare, "what should I move", "sells better", "based on sales")
+// should count as an analysis-style request for routing-priority purposes.
+const RE_STOCK_TRANSFER_ANALYSIS_STRICT =
+  /\b(analy[sz]e|suggest|recommend|compare)\b.{0,100}\b(transfer|move|stock|sales|sell)\b|\bwhat\s+(should|to)\s+(i|we)\s+(move|transfer)\b|\bsells?\s+better\b|\bbased\s+on\s+(sales|stock|old\s+transfers?)\b.{0,60}\btransfer\b|\btransfer\b.{0,60}\bbased\s+on\b/i;
 // Multi-source, target-quantity transfer requests — e.g. "410 bales to Kolwezi
 // from Hadi 1,2,3,4, only stock groups Kolwezi already has". No explicit item
 // list is given, so this must go through the deterministic quantity-target
@@ -2879,19 +2889,34 @@ If intent is not about an account query, respond with exactly: null`;
     // stock-transfer flow, bypassing the generic "prepared a draft" acknowledgement
     // prompt — guarantees we never claim a draft exists when it doesn't.
     let stockTransferResponseOverride: string | undefined = undefined;
+    // Deterministic multi-source/target-quantity signal: an explicit
+    // "Hadi 1, Hadi 2, ..." source list, or an explicit quantity ("410 bales")
+    // combined with "same stock group" filtering language. This is specific
+    // enough on its own to imply transfer intent even when the message never
+    // uses the literal words "stock"/"item"/"inventory" (e.g. "optional
+    // transfer draft for 410 bales to Kolwezi from Hadi 1, Hadi 2, ...").
+    const hasMultiSourceQtySignal =
+      RE_MULTI_SOURCE_LOCATIONS.test(userMessage) ||
+      (RE_TARGET_QTY_HINT.test(userMessage) && RE_STOCK_GROUP_FILTER_HINT.test(userMessage));
     const isMultiSourceTargetQtyRequest =
-      RE_STOCK_TRANSFER.test(userMessage) &&
-      !RE_STOCK_TRANSFER_ANALYSIS.test(userMessage) &&
-      (RE_MULTI_SOURCE_LOCATIONS.test(userMessage) ||
-        (RE_TARGET_QTY_HINT.test(userMessage) && RE_STOCK_GROUP_FILTER_HINT.test(userMessage)));
+      (RE_STOCK_TRANSFER.test(userMessage) || hasMultiSourceQtySignal) &&
+      !RE_STOCK_TRANSFER_ANALYSIS_STRICT.test(userMessage) &&
+      hasMultiSourceQtySignal;
 
     if (
-      (RE_STOCK_TRANSFER.test(userMessage) || RE_STOCK_TRANSFER_ANALYSIS.test(userMessage)) &&
+      (RE_STOCK_TRANSFER.test(userMessage) ||
+        RE_STOCK_TRANSFER_ANALYSIS.test(userMessage) ||
+        isMultiSourceTargetQtyRequest) &&
       !voucherDraft &&
       !stockAdjustmentDraft
     ) {
       try {
-        if (RE_STOCK_TRANSFER_ANALYSIS.test(userMessage)) {
+        // The deterministic multi-source/target-quantity builder takes priority
+        // over the looser analysis match — a request can say "optional stock
+        // transfer" (matching RE_STOCK_TRANSFER_ANALYSIS) while also giving an
+        // explicit quantity and named sources, which must go through the
+        // deterministic path, not the AI-suggestion analysis path.
+        if (RE_STOCK_TRANSFER_ANALYSIS.test(userMessage) && !isMultiSourceTargetQtyRequest) {
           // ── AI-suggested OPTIONAL stock transfer (data-driven analysis) ──
           // The LLM only classifies intent + picks locations/date range/aggressiveness.
           // All quantities/numbers come from buildStockTransferSuggestionContext (real SQL).

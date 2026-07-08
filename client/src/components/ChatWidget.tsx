@@ -374,7 +374,23 @@ export function ChatWidget() {
     "Show my top selling products",
     "What are my outstanding payments?",
   ];
-  const displaySuggestions = suggestions.length > 0 ? suggestions : defaultSuggestions;
+  // Suggestion chips are only useful on a brand-new, empty chat — once the
+  // user has sent a message, gotten a response, or has any pending
+  // draft/card on screen, showing them again just wastes space.
+  const isChatEmpty =
+    history.length === 0 &&
+    !pendingVoucher &&
+    !pendingStockAdj &&
+    !pendingStockTransfer &&
+    !(pendingStockTransferBatch && pendingStockTransferBatch.length > 0) &&
+    !pendingStockItem &&
+    !pendingPriceUpdate &&
+    !accountQueryResult &&
+    !poDraft &&
+    !verifyContainerDraft &&
+    !dataQueryResult &&
+    pendingFilePatches.length === 0;
+  const displaySuggestions = isChatEmpty ? (suggestions.length > 0 ? suggestions : defaultSuggestions) : [];
 
   const formatMsgTime = (iso: string) => {
     try {
