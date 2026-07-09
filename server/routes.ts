@@ -77,7 +77,7 @@ import { registerLabelBannersRoutes } from "./routes/factory/labelBannersRoutes"
 import { registerFactoryTransporterRoutes } from "./routes/factory/factoryTransporterRoutes";
 import { registerFactoryInsuranceRoutes } from "./routes/factory/factoryInsuranceRoutes";
 import { registerFactorySheetsAndSacksRoutes } from "./routes/factory/factorySheetsAndSacksRoutes";
-import { registerSpRoutes } from "./routes/spRoutes";
+import { registerSpRoutes } from "./routes/sp";
 import { registerSpMigrationRoutes } from "./routes/spMigrationRoutes";
 import { registerAiImportRoutes } from "./routes/aiImportRoutes";
 import { registerAiValidationRoutes } from "./routes/aiValidationRoutes";
