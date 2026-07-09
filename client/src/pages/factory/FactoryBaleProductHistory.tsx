@@ -145,7 +145,17 @@ export function FactoryBaleProductHistory() {
         <PageHeader
           title={product?.name || "Bale Product History"}
           subtitle={`${product?.articleCode || ""} · ${year}`}
-        />
+        >
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-1.5"
+            onClick={() => navigate(`/factory/bale-product-history/${productId}/${locationId}/${year}/all`)}
+            data-testid="button-show-all-months"
+          >
+            Show All Months
+          </Button>
+        </PageHeader>
       </div>
 
       {grandTotal && (
