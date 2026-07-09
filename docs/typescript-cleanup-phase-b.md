@@ -16,7 +16,33 @@ accounting logic touched; no database schema or Drizzle table definitions touche
 Both counts were produced by `node --max-old-space-size=4096 node_modules/typescript/bin/tsc --noEmit`
 (the default heap OOMs on this project in this environment).
 
-## Files changed (10)
+The full "after" error listing was captured locally to `ts-errors-after-phase-b.txt` during
+this work for review/diffing purposes, but that file was **not committed** to the repo (it was
+deleted after the counts above were extracted). If a persistent, reviewable error log is wanted
+going forward, regenerate it with the command above and commit it explicitly.
+
+## Files changed (17)
+
+Per `git show --stat` on the commit that introduced Phase B (17 source files, plus this
+doc — 18 files total in that commit):
+
+- `client/src/components/FactorySidebar.tsx`
+- `client/src/components/sidebar/sidebarPrimitives.tsx`
+- `client/src/components/ui/dialog.tsx`
+- `client/src/components/vouchers/PrintTemplate.tsx`
+- `client/src/components/vouchers/StockItemCombobox.tsx`
+- `client/src/pages/LocationInventory.tsx`
+- `client/src/pages/location-inventory/LocationDialogs.tsx`
+- `client/src/pages/location-inventory/LocationGrid.tsx`
+- `client/src/pages/location-inventory/LocationInventoryBreadcrumb.tsx`
+- `client/src/pages/location-inventory/LocationInventoryDialogs.tsx`
+- `client/src/pages/location-inventory/LocationInventoryMovementFilter.tsx`
+- `client/src/pages/location-inventory/StockGroupsView.tsx`
+- `client/src/pages/location-inventory/locationInventoryTypes.ts`
+- `client/src/pages/location-inventory/useLocationInventoryExports.ts`
+- `client/src/pages/location-inventory/useLocationInventoryMutations.ts`
+- `client/src/pages/location-inventory/useLocationInventoryQueries.ts`
+- `client/src/pages/location-inventory/useLocationInventoryState.ts`
 
 ### 1. Client/UI prop-shape errors
 
