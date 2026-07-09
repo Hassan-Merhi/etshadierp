@@ -1,6 +1,6 @@
 import { parseId, parseOptionalId } from "../../lib/parseId";
 import type { Express } from "express";
-import { db } from "../../db";
+import { db, pool } from "../../db";
 import { requireAuth } from "../../auth";
 import { statusBuilderSheets } from "@shared/schema";
 import { eq, and, asc } from "drizzle-orm";
@@ -22,6 +22,78 @@ function getCellRawValue(cell: any): CellVal {
   if (typeof cell === "number" || typeof cell === "string") return cell;
   if (typeof cell === "object" && "value" in cell) return cell.value ?? null;
   return null;
+}
+
+// Human-readable representation of a cell for the history log: manual values
+// are shown as-is, linked cells are shown as "→ linked" since the resolved
+// number lives on another sheet and isn't meaningful to diff here.
+function describeCellForLog(cell: any): string {
+  if (cell && typeof cell === "object" && "value" in cell) {
+    if (cell.link) return "→ linked";
+    return cell.value === null || cell.value === undefined ? "" : String(cell.value);
+  }
+  return cell === null || cell === undefined ? "" : String(cell);
+}
+
+async function logStatusBuilderChanges(
+  companyId: number,
+  sheetId: number,
+  sheetName: string,
+  oldRows: SRow[],
+  oldColumns: any[],
+  newRows: SRow[],
+  newColumns: any[],
+  changedBy: string | undefined
+) {
+  const colLabels = newColumns.map(getColLabel);
+  const oldById = new Map((oldRows || []).map((r) => [r.id, r]));
+  const entries: { rowLabel: string; columnLabel: string; oldValue: string; newValue: string }[] = [];
+
+  for (const newRow of newRows || []) {
+    const oldRow = newRow.id ? oldById.get(newRow.id) : undefined;
+    if (!oldRow) {
+      // Brand new row — log it once as a whole, not per cell.
+      entries.push({ rowLabel: newRow.label || "(row)", columnLabel: "(new row)", oldValue: "", newValue: "added" });
+      continue;
+    }
+    if ((oldRow.label || "") !== (newRow.label || "")) {
+      entries.push({
+        rowLabel: newRow.label || "(row)",
+        columnLabel: "(label)",
+        oldValue: oldRow.label || "",
+        newValue: newRow.label || "",
+      });
+    }
+    const cellCount = Math.max(newRow.cells?.length ?? 0, oldRow.cells?.length ?? 0);
+    for (let ci = 0; ci < cellCount; ci++) {
+      const oldDesc = describeCellForLog(oldRow.cells?.[ci]);
+      const newDesc = describeCellForLog(newRow.cells?.[ci]);
+      if (oldDesc !== newDesc) {
+        entries.push({
+          rowLabel: newRow.label || "(row)",
+          columnLabel: colLabels[ci] || `Column ${ci + 1}`,
+          oldValue: oldDesc,
+          newValue: newDesc,
+        });
+      }
+    }
+  }
+  for (const oldRow of oldRows || []) {
+    if (!newRows?.some((r) => r.id === oldRow.id)) {
+      entries.push({ rowLabel: oldRow.label || "(row)", columnLabel: "(row)", oldValue: "present", newValue: "deleted" });
+    }
+  }
+
+  if (entries.length === 0) return;
+
+  for (const e of entries) {
+    await pool.query(
+      `INSERT INTO factory_status_builder_log
+         (company_id, sheet_id, sheet_name, row_label, column_label, old_value, new_value, changed_by)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
+      [companyId, sheetId, sheetName, e.rowLabel, e.columnLabel, e.oldValue, e.newValue, changedBy ?? null]
+    );
+  }
 }
 
 export function registerFactoryStatusBuilderSheetsRoutes(app: Express) {
@@ -73,7 +145,7 @@ export function registerFactoryStatusBuilderSheetsRoutes(app: Express) {
   });
 
   // ── Update a sheet ─────────────────────────────────────────────────────────
-  app.put("/api/factory/status-builder/sheets/:id", requireAuth, async (req, res) => {
+  app.put("/api/factory/status-builder/sheets/:id", requireAuth, async (req: any, res) => {
     try {
       const companyId = req.session.currentCompanyId!;
       const id = parseId(req.params.id);
@@ -81,6 +153,12 @@ export function registerFactoryStatusBuilderSheetsRoutes(app: Express) {
       if (isNaN(id)) return res.status(400).json({ message: "Invalid id" });
 
       const { name, columns, rows } = req.body;
+
+      const [existing] = await db
+        .select()
+        .from(statusBuilderSheets)
+        .where(and(eq(statusBuilderSheets.id, id), eq(statusBuilderSheets.companyId, companyId)));
+      if (!existing) return res.status(404).json({ message: "Sheet not found" });
 
       const updateData: Partial<typeof statusBuilderSheets.$inferInsert> = {
         updatedAt: new Date(),
@@ -96,7 +174,52 @@ export function registerFactoryStatusBuilderSheetsRoutes(app: Express) {
         .returning();
 
       if (!updated) return res.status(404).json({ message: "Sheet not found" });
+
+      if (rows !== undefined) {
+        logStatusBuilderChanges(
+          companyId,
+          id,
+          updated.name,
+          (existing.rows as SRow[]) ?? [],
+          (existing.columns as any[]) ?? [],
+          rows as SRow[],
+          (columns ?? existing.columns) as any[],
+          req.user?.username || req.user?.name
+        ).catch((e) => console.error("[StatusBuilder] history log failed:", e.message));
+      }
+
       res.json(updated);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  // ── Change history log ─────────────────────────────────────────────────────
+  app.get("/api/factory/status-builder/log", requireAuth, async (req: any, res) => {
+    try {
+      const companyId = req.session.currentCompanyId!;
+      const sheetId = parseOptionalId(req.query.sheetId as string | undefined);
+      const limit = Math.min(parseInt((req.query.limit as string) || "200") || 200, 1000);
+
+      const params: any[] = [companyId];
+      const conditions = ["company_id = $1"];
+      if (sheetId != null) {
+        params.push(sheetId);
+        conditions.push(`sheet_id = $${params.length}`);
+      }
+      params.push(limit);
+
+      const { rows } = await pool.query(
+        `SELECT id, sheet_id AS "sheetId", sheet_name AS "sheetName", row_label AS "rowLabel",
+                column_label AS "columnLabel", old_value AS "oldValue", new_value AS "newValue",
+                changed_by AS "changedBy", created_at AS "createdAt"
+         FROM factory_status_builder_log
+         WHERE ${conditions.join(" AND ")}
+         ORDER BY created_at DESC
+         LIMIT $${params.length}`,
+        params
+      );
+      res.json(rows);
     } catch (err: any) {
       res.status(500).json({ message: err.message });
     }

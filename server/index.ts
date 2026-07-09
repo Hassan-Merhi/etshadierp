@@ -4431,6 +4431,23 @@ END $$`,
         ALTER TABLE factory_sheets_sacks_log ALTER COLUMN color DROP NOT NULL;
       END IF;
     END $fss_log_color$`,
+    // Status Builder change history (July 2026). Powers the "History" tab in
+    // the redesigned Factory Sheets card UI -- one row per changed cell/label
+    // on each save, so users can see who changed what and when.
+    `CREATE TABLE IF NOT EXISTS factory_status_builder_log (
+      id           SERIAL PRIMARY KEY,
+      company_id   INTEGER NOT NULL,
+      sheet_id     INTEGER NOT NULL,
+      sheet_name   TEXT NOT NULL,
+      row_label    TEXT NOT NULL DEFAULT '',
+      column_label TEXT NOT NULL DEFAULT '',
+      old_value    TEXT,
+      new_value    TEXT,
+      changed_by   TEXT,
+      created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )`,
+    `CREATE INDEX IF NOT EXISTS idx_sb_log_company_created ON factory_status_builder_log (company_id, created_at DESC)`,
+    `CREATE INDEX IF NOT EXISTS idx_sb_log_sheet ON factory_status_builder_log (sheet_id)`,
   ];
 
   // /api/health/db — reports migration status but does NOT block deployment.
