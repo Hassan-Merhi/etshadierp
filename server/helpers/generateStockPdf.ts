@@ -59,14 +59,24 @@ export async function generateStockPdf(
   companyName: string,
   locationId?: number,
   locationName?: string,
-  includeCost: boolean = false
+  includeCost: boolean = false,
+  stockGroupId?: number | null
 ): Promise<StockPdfResult> {
   // ── Fetch inventory ──────────────────────────────────────────────────────────
   const params: number[] = [companyId];
   let locationFilter = "";
   if (locationId) {
     params.push(locationId);
-    locationFilter = `AND l.id = $${params.length}`;
+    locationFilter = "AND l.id = $" + params.length;
+  }
+
+  let groupFilter = "";
+  if (stockGroupId === null) {
+    // Explicitly requested the "Unassigned" pseudo-group (items with no stock group).
+    groupFilter = "AND sg.id IS NULL";
+  } else if (stockGroupId !== undefined) {
+    params.push(stockGroupId);
+    groupFilter = "AND sg.id = $" + params.length;
   }
 
   const result = await pool.query<{
@@ -89,6 +99,7 @@ export async function generateStockPdf(
      JOIN locations l ON l.id = i.location_id
      WHERE l.company_id = $1
        ${locationFilter}
+       ${groupFilter}
      ORDER BY LOWER(COALESCE(sg.name, 'zzzzz')), LOWER(si.name)`,
     params
   );
@@ -121,7 +132,9 @@ export async function generateStockPdf(
 
   // Title lines
   const mainTitle = locationName ?? companyName;
-  const subTitle = locationName ? "Godown Summary" : "Godown Summary";
+  const groupNameForTitle = stockGroupId === null ? "Unassigned" : rows[0]?.groupName;
+  const subTitle =
+    stockGroupId !== undefined && groupNameForTitle ? `Godown Summary — ${groupNameForTitle}` : "Godown Summary";
 
   // ── Column geometry ──────────────────────────────────────────────────────────
   // Qty column split: number + UOM label

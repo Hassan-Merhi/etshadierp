@@ -121,7 +121,7 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
   });
 
   // ─── Export helpers ───────────────────────────────────────────────────────
-  const { handlePrintWithOption, handleExportInventory } = useLocationInventoryExports(
+  const { handlePrintWithOption, handleExportInventory, handlePrintGroup } = useLocationInventoryExports(
     selectedLocationLocal,
     toast
   );
@@ -295,6 +295,7 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                 formatAmount={formatAmount}
                 handleExportInventory={handleExportInventory}
                 handlePrintWithOption={handlePrintWithOption}
+                handlePrintGroup={handlePrintGroup}
                 setViewAllItems={setViewAllItems}
                 setItemSearchTerm={setItemSearchTerm}
                 showZeroStock={showZeroStock}

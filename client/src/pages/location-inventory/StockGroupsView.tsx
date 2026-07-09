@@ -55,6 +55,7 @@ interface StockGroupsViewProps {
   formatAmount: (n: number) => string;
   handleExportInventory: () => void;
   handlePrintWithOption: (withCost: boolean) => void;
+  handlePrintGroup: (group: { groupId: number | null; groupName: string }, withCost: boolean) => void;
   setViewAllItems: (v: boolean) => void;
   setItemSearchTerm: (s: string) => void;
   showZeroStock: boolean;
@@ -83,6 +84,7 @@ export function StockGroupsView({
   formatAmount,
   handleExportInventory,
   handlePrintWithOption,
+  handlePrintGroup,
   setViewAllItems,
   setItemSearchTerm,
   showZeroStock,
@@ -302,6 +304,7 @@ export function StockGroupsView({
                     <th className="text-right px-4 py-3 font-medium">Total Value</th>
                   </>
                 )}
+                <th className="text-right px-4 py-3 font-medium">Export</th>
               </tr>
             </thead>
             <tbody>
@@ -334,6 +337,34 @@ export function StockGroupsView({
                       </td>
                     </>
                   )}
+                  <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7"
+                          data-testid={`button-export-group-${g.groupId}`}
+                        >
+                          <Printer className="h-3.5 w-3.5" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem
+                          onClick={() => handlePrintGroup({ groupId: g.groupId, groupName: g.groupName }, true)}
+                          data-testid={`menu-export-group-pdf-cost-${g.groupId}`}
+                        >
+                          <Printer className="h-4 w-4 mr-2" /> Export PDF (with cost)
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() => handlePrintGroup({ groupId: g.groupId, groupName: g.groupName }, false)}
+                          data-testid={`menu-export-group-pdf-nocost-${g.groupId}`}
+                        >
+                          <Printer className="h-4 w-4 mr-2" /> Export PDF (without cost)
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -357,6 +388,7 @@ export function StockGroupsView({
                     </td>
                   </>
                 )}
+                <td className="px-4 py-3" />
               </tr>
             </tfoot>
           </table>
