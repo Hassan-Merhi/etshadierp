@@ -132,7 +132,11 @@ export function CombinedImportDialog({ open, onOpenChange }: CombinedImportDialo
       const arrayBuffer = await pricesFile.arrayBuffer();
       const workbook = await read(arrayBuffer);
       const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-      const data = utils.sheet_to_json(worksheet) as Array<{ Barcode?: string; "Selling Price"?: string | number }>;
+      const data = utils.sheet_to_json(worksheet) as Array<{
+        Barcode?: string;
+        "Barcode (Item Code)"?: string;
+        "Selling Price"?: string | number;
+      }>;
 
       if (data.length === 0) {
         toast({

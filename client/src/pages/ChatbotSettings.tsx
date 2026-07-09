@@ -111,6 +111,16 @@ export default function ChatbotSettings() {
     queryKey: ["/api/users/chatbot-status"],
   });
 
+  const { data: chatStatus } = useQuery<{
+    enabled: boolean;
+    hasApiKey: boolean;
+    providerName: string;
+    selectedProvider: string;
+    isAdminOrOwner: boolean;
+  }>({
+    queryKey: ["/api/chatbot/status"],
+  });
+
   const { data: chatHistory = [], isLoading: allHistoryLoading } = useQuery<ChatMessage[]>({
     queryKey: ["/api/chatbot/all-history"],
     enabled: activeTab === "history" && !!chatStatus?.isAdminOrOwner && viewAllChats,
@@ -123,16 +133,6 @@ export default function ChatbotSettings() {
   } = useQuery<MySession[]>({
     queryKey: ["/api/chatbot/my-sessions"],
     enabled: activeTab === "history",
-  });
-
-  const { data: chatStatus } = useQuery<{
-    enabled: boolean;
-    hasApiKey: boolean;
-    providerName: string;
-    selectedProvider: string;
-    isAdminOrOwner: boolean;
-  }>({
-    queryKey: ["/api/chatbot/status"],
   });
 
   const {

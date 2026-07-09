@@ -98,13 +98,13 @@ export function RemoveFromStockTable({
             condensedRows.map((row) => (
               <TableRow
                 key={row.groupKey}
-                className={row.baleIds.every((id) => selectedBaleIds.has(id)) ? "bg-primary/5" : ""}
+                className={row.baleIds.every((id: number) => selectedBaleIds.has(id)) ? "bg-primary/5" : ""}
               >
                 <TableCell>
                   <input
                     type="checkbox"
                     className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
-                    checked={row.baleIds.every((id) => selectedBaleIds.has(id))}
+                    checked={row.baleIds.every((id: number) => selectedBaleIds.has(id))}
                     onChange={() => onToggleCondensedRow(row.baleIds)}
                   />
                 </TableCell>

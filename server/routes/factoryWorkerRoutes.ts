@@ -201,10 +201,18 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
         .where(and(eq(factoryPayrolls.companyId, companyId), sql`${factoryPayrolls.status} = 'PAID'`))
         .groupBy(factoryPayrolls.workerId);
 
-      const advanceMap = new Map(advanceTotals.map((r) => [r.workerId, parseFloat(r.total)]));
-      const payrollMap = new Map(payrollTotals.map((r) => [r.workerId, parseFloat(r.total)]));
+      const advanceMap = new Map<number, number>(
+        advanceTotals.map(
+          (r: { workerId: number; total: string }): [number, number] => [r.workerId, parseFloat(r.total)]
+        )
+      );
+      const payrollMap = new Map<number, number>(
+        payrollTotals.map(
+          (r: { workerId: number; total: string }): [number, number] => [r.workerId, parseFloat(r.total)]
+        )
+      );
 
-      const result = workers.map((w) => ({
+      const result = workers.map((w: typeof factoryWorkers.$inferSelect) => ({
         ...w,
         currentBalance: (advanceMap.get(w.id) ?? 0) - (payrollMap.get(w.id) ?? 0),
       }));
@@ -259,7 +267,7 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
       const advMap: Record<number, number> = {};
       for (const r of advRows.rows) advMap[r.worker_id] = parseFloat(r.pending_balance);
 
-      const enriched = results.map((w) => ({
+      const enriched = results.map((w: typeof factoryWorkers.$inferSelect) => ({
         ...w,
         pendingAdvanceBalance: (advMap[w.id] ?? 0).toFixed(2),
       }));
@@ -537,7 +545,7 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
 
         // Determine next HMD code number for auto-assignment during import
         const importPrefix = "HMD";
-        let nextHmdNum = existingWorkers.reduce((max, w: any) => {
+        let nextHmdNum = existingWorkers.reduce((max: number, w: any) => {
           if (!w.employeeCode) return max;
           const m = w.employeeCode.match(new RegExp(`^${importPrefix}(\\d+)$`));
           return m ? Math.max(max, parseInt(m[1], 10)) : max;
@@ -773,7 +781,7 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
           .select({ employeeCode: factoryWorkers.employeeCode })
           .from(factoryWorkers)
           .where(eq(factoryWorkers.companyId, companyId));
-        const maxNum = existing.reduce((max, w) => {
+        const maxNum = existing.reduce((max: number, w: { employeeCode: string | null }) => {
           if (!w.employeeCode) return max;
           const m = w.employeeCode.match(new RegExp(`^${prefix}(\\d+)$`));
           if (!m) return max;

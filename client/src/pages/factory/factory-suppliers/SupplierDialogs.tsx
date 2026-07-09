@@ -228,7 +228,14 @@ export function SupplierDialogs({
               <div className="space-y-1">
                 <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Account deductions</p>
                 <div className="rounded-md border divide-y text-sm max-h-64 overflow-y-auto">
-                  {bulkFxPreview.transfers.map((t) => {
+                  {bulkFxPreview.transfers.map(
+                    (t: {
+                      supplierId: number;
+                      supplierName: string;
+                      overpayment: string;
+                      allocated: string;
+                      toAmountUsd: string;
+                    }) => {
                     const overpaid = parseFloat(t.overpayment || "0") > 0.01;
                     return (
                       <div key={t.supplierId} className="flex justify-between items-center px-3 py-2">
@@ -264,7 +271,8 @@ export function SupplierDialogs({
                         </div>
                       </div>
                     );
-                  })}
+                    }
+                  )}
                 </div>
               </div>
               <DialogFooter className="gap-2 flex-wrap">

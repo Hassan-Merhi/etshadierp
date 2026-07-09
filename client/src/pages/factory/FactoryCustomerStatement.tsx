@@ -90,7 +90,7 @@ export default function FactoryCustomerStatement() {
   const customerId = params.id;
 
   const [draftNote, setDraftNote] = useState<string | null>(null);
-  const [rowNotes, setRowNotes] = useState<Record<number, string>>({});
+  const [rowNotes, setRowNotes] = useState<Record<number | string, string>>({});
   const [savingRowNote, setSavingRowNote] = useState<number | null>(null);
 
   const [filterDestination, setFilterDestination] = useState("");
@@ -129,7 +129,7 @@ export default function FactoryCustomerStatement() {
     }
     if (statement?.balanceHistory) {
       setRowNotes((prev) => {
-        const next = { ...prev };
+        const next: Record<number | string, string> = { ...prev };
         for (const entry of statement.balanceHistory) {
           if (!(entry.id in next)) {
             next[entry.id] = entry.rowNote ?? "";

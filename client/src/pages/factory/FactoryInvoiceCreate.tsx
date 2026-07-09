@@ -112,6 +112,11 @@ export default function FactoryInvoiceCreate() {
 
   const customerId = selectedCustomerId ? parseInt(selectedCustomerId) : null;
 
+  const { data: orderDetail } = useQuery<OrderDetail>({
+    queryKey: ["/api/factory/customer-orders", orderId],
+    enabled: !!orderId,
+  });
+
   // ── Sync state from loaded existing order (URL ?orderId=) ──────────────────
   useEffect(() => {
     if (!orderDetail) return;
@@ -143,11 +148,6 @@ export default function FactoryInvoiceCreate() {
   });
 
   const activeProforma = proformas.find((p) => p.isActive) || null;
-
-  const { data: orderDetail } = useQuery<OrderDetail>({
-    queryKey: ["/api/factory/customer-orders", orderId],
-    enabled: !!orderId,
-  });
 
   const createOrderMutation = useMutation({
     mutationFn: async (data: { companyId: number; customerId: number; orderDate: string; proformaIdUsed: number }) => {
