@@ -482,8 +482,9 @@ function MovementLog({ items }: { items: SheetsAndSacksItem[] }) {
   const totals = useMemo(() => {
     let inPcs = 0, outPcs = 0, inVal = 0, outVal = 0;
     for (const e of logEntries) {
-      if (e.action === "IN")  { inPcs  += e.pieces; inVal  += parseFloat(e.totalValue || "0"); }
-      if (e.action === "OUT") { outPcs += e.pieces; outVal += parseFloat(e.totalValue || "0"); }
+      const pieces = Number(e.pieces) || 0;
+      if (e.action === "IN")  { inPcs  += pieces; inVal  += parseFloat(e.totalValue || "0"); }
+      if (e.action === "OUT") { outPcs += pieces; outVal += parseFloat(e.totalValue || "0"); }
     }
     return { inPcs, outPcs, inVal, outVal, net: inPcs - outPcs };
   }, [logEntries]);
@@ -491,8 +492,9 @@ function MovementLog({ items }: { items: SheetsAndSacksItem[] }) {
   const dayTotal = (entries: LogEntry[]) => {
     let inPcs = 0, outPcs = 0;
     for (const e of entries) {
-      if (e.action === "IN")  inPcs  += e.pieces;
-      if (e.action === "OUT") outPcs += e.pieces;
+      const pieces = Number(e.pieces) || 0;
+      if (e.action === "IN")  inPcs  += pieces;
+      if (e.action === "OUT") outPcs += pieces;
     }
     return { inPcs, outPcs, net: inPcs - outPcs };
   };
