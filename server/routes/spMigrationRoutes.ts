@@ -31,12 +31,34 @@ const SP_ACCOUNTS = [
   { code: "SP-PREPAID", name: "Prepaid Charges", accountType: "Asset", subType: "sp_prepaid" },
   { code: "SP-STOCK", name: "Stock on Floor", accountType: "Asset", subType: "sp_stock" },
   { code: "SP-COSTCLR", name: "Stock Cost Payable Clearing", accountType: "Liability", subType: "sp_cost_clearing" },
+  { code: "SP-PAYDED", name: "Pay Deduction Clearing", accountType: "Liability", subType: "sp_pay_deduction_clearing" },
   { code: "SP-PAY", name: "Supplier Cash Payable", accountType: "Liability", subType: "sp_payable" },
   { code: "SP-SALES", name: "Sales", accountType: "Income", subType: "sp_sales" },
   { code: "SP-COGS", name: "Cost of Goods Sold", accountType: "Direct Expense", subType: "sp_cogs" },
   { code: "SP-SHARED", name: "Shared Charges", accountType: "Direct Expense", subType: "sp_shared_charges" },
   { code: "SP-OPNBAL", name: "Opening Balance Clearing", accountType: "Equity", subType: "sp_opnbal" },
+  { code: "SP-PREPEXP", name: "Prepaid Expenses", accountType: "Asset", subType: "sp_prepaid_expenses" },
+  { code: "SP-HADIIC", name: "HADI Intercompany", accountType: "Intercompany", subType: "sp_hadi_intercompany" },
 ];
+
+// GC-specific profit-share accounts (created during the GC migration, not the base SP set)
+const GC_PROFIT_ACCOUNTS = [
+  { code: "GC-OURPFT", name: "GC Our Profit Share", accountType: "Equity", subType: "gc_our_profit_share" },
+  { code: "GC-SUPPFT", name: "GC Supplier Profit Share", accountType: "Equity", subType: "gc_supplier_profit_share" },
+  {
+    code: "GC-PROFCLR",
+    name: "GC Accumulated Profit Clearing",
+    accountType: "Equity",
+    subType: "gc_accumulated_profit_clearing",
+  },
+];
+
+// Legacy subTypes created by earlier versions of this tool — kept for account-mapping
+// backward compatibility only; no longer created by default.
+const LEGACY_GC_PROFIT_SUBTYPES = ["gc_owner_profit", "gc_supplier_profit"];
+
+// Whitelist of subTypes the rename/create-accounts endpoint is allowed to create.
+const ALL_ACCOUNT_DEFS = [...SP_ACCOUNTS, ...GC_PROFIT_ACCOUNTS];
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -75,7 +97,10 @@ async function trackRow(runId: string, tableName: string, rowId: number) {
   `);
 }
 
-async function ensureSpAccounts(targetId: number): Promise<{ names: string[]; newIds: number[] }> {
+async function ensureSpAccounts(
+  targetId: number,
+  overrides?: Record<string, { code?: string; name?: string }>
+): Promise<{ names: string[]; newIds: number[] }> {
   const names: string[] = [];
   const newIds: number[] = [];
   for (const acct of SP_ACCOUNTS) {
@@ -90,19 +115,173 @@ async function ensureSpAccounts(targetId: number): Promise<{ names: string[]; ne
         )
       );
     if (!existing.length) {
+      const code = overrides?.[acct.subType]?.code?.trim() || acct.code;
+      const name = overrides?.[acct.subType]?.name?.trim() || acct.name;
       const [row] = (
         await db.execute(sql`
         INSERT INTO ledger_accounts (company_id, code, name, account_type, sub_type, is_hidden, active)
-        VALUES (${targetId}, ${acct.code}, ${acct.name}, ${acct.accountType}, ${acct.subType},
+        VALUES (${targetId}, ${code}, ${name}, ${acct.accountType}, ${acct.subType},
                 ${acct.subType.includes("clearing") || acct.subType === "sp_opnbal"}, true)
         RETURNING id
       `)
       ).rows as any[];
-      names.push(acct.name);
+      names.push(name);
       newIds.push(pn(row.id));
     }
   }
   return { names, newIds };
+}
+
+// Create the GC profit-share accounts (or reuse existing ones), honoring user renames.
+async function ensureGcProfitAccounts(
+  targetId: number,
+  overrides?: Record<string, { code?: string; name?: string }>
+): Promise<{ names: string[]; newIds: number[] }> {
+  const names: string[] = [];
+  const newIds: number[] = [];
+  for (const acct of GC_PROFIT_ACCOUNTS) {
+    const existing = (
+      await db.execute(sql`
+      SELECT id FROM ledger_accounts
+      WHERE company_id = ${targetId} AND sub_type = ${acct.subType} AND deleted_at IS NULL LIMIT 1
+    `)
+    ).rows[0] as any;
+    if (!existing) {
+      const code = overrides?.[acct.subType]?.code?.trim() || acct.code;
+      const name = overrides?.[acct.subType]?.name?.trim() || acct.name;
+      const [row] = (
+        await db.execute(sql`
+        INSERT INTO ledger_accounts (company_id, code, name, account_type, sub_type, active)
+        VALUES (${targetId}, ${code}, ${name}, ${acct.accountType}, ${acct.subType}, true)
+        RETURNING id
+      `)
+      ).rows as any[];
+      names.push(name);
+      newIds.push(pn(row.id));
+    }
+  }
+  return { names, newIds };
+}
+
+// ── Stock master migration (creates REAL target-company stock_items, never reuses source IDs) ──
+async function ensureTargetStockItems(
+  sourceId: number,
+  targetId: number,
+  runId: string
+): Promise<{
+  map: Map<number, number>;
+  groupsCreated: number;
+  itemsCreated: number;
+  itemsReused: number;
+}> {
+  const map = new Map<number, number>();
+  let groupsCreated = 0;
+  let itemsCreated = 0;
+  let itemsReused = 0;
+
+  // 1. Stock groups — mirror by code
+  const groupMap = new Map<number, number>();
+  const sourceGroups = (
+    await db.execute(sql`
+    SELECT id, code, name FROM stock_groups WHERE company_id = ${sourceId} AND deleted_at IS NULL
+  `)
+  ).rows as any[];
+  for (const g of sourceGroups) {
+    const existingGroup = (
+      await db.execute(sql`
+      SELECT id FROM stock_groups WHERE company_id = ${targetId} AND code = ${g.code} AND deleted_at IS NULL LIMIT 1
+    `)
+    ).rows[0] as any;
+    if (existingGroup) {
+      groupMap.set(pn(g.id), pn(existingGroup.id));
+    } else {
+      const [row] = (
+        await db.execute(sql`
+        INSERT INTO stock_groups (company_id, code, name, active)
+        VALUES (${targetId}, ${g.code}, ${g.name}, true)
+        RETURNING id
+      `)
+      ).rows as any[];
+      const newGroupId = pn(row.id);
+      groupMap.set(pn(g.id), newGroupId);
+      await trackRow(runId, "stock_groups", newGroupId);
+      await db.execute(sql`
+        INSERT INTO sp_migration_source_links (run_id, source_table, source_id, target_table, target_id)
+        VALUES (${runId}, 'stock_groups', ${pn(g.id)}, 'stock_groups', ${newGroupId})
+      `);
+      groupsCreated++;
+    }
+  }
+
+  // 2. Stock items with positive inventory in source
+  const sourceItems = (
+    await db.execute(sql`
+    SELECT si.id, si.code, si.name, si.uom, si.stock_group_id
+    FROM stock_items si
+    JOIN inventory inv ON inv.stock_item_id = si.id AND inv.company_id = ${sourceId}
+    WHERE si.company_id = ${sourceId} AND si.deleted_at IS NULL AND inv.quantity > 0
+    ORDER BY si.code
+  `)
+  ).rows as any[];
+
+  for (const item of sourceItems) {
+    const srcId = pn(item.id);
+
+    // Already linked by a prior run?
+    const priorLink = (
+      await db.execute(sql`
+      SELECT target_id FROM sp_migration_source_links
+      WHERE source_table = 'stock_items' AND source_id = ${srcId} AND target_table = 'stock_items'
+      LIMIT 1
+    `)
+    ).rows[0] as any;
+    if (priorLink) {
+      // Verify it still exists in target (defensive — should always be true)
+      const stillExists = (
+        await db.execute(sql`
+        SELECT id FROM stock_items WHERE id = ${pn(priorLink.target_id)} AND company_id = ${targetId} AND deleted_at IS NULL LIMIT 1
+      `)
+      ).rows[0] as any;
+      if (stillExists) {
+        map.set(srcId, pn(priorLink.target_id));
+        itemsReused++;
+        continue;
+      }
+    }
+
+    // Fall back to matching by code (handles manual pre-existing target items)
+    const existingByCode = (
+      await db.execute(sql`
+      SELECT id FROM stock_items WHERE company_id = ${targetId} AND code = ${item.code} AND deleted_at IS NULL LIMIT 1
+    `)
+    ).rows[0] as any;
+
+    let targetItemId: number;
+    if (existingByCode) {
+      targetItemId = pn(existingByCode.id);
+      itemsReused++;
+    } else {
+      const targetGroupId = item.stock_group_id ? (groupMap.get(pn(item.stock_group_id)) ?? null) : null;
+      const [row] = (
+        await db.execute(sql`
+        INSERT INTO stock_items (company_id, code, name, uom, stock_group_id, active)
+        VALUES (${targetId}, ${item.code}, ${item.name}, ${item.uom}, ${targetGroupId}, true)
+        RETURNING id
+      `)
+      ).rows as any[];
+      targetItemId = pn(row.id);
+      await trackRow(runId, "stock_items", targetItemId);
+      itemsCreated++;
+    }
+
+    await db.execute(sql`
+      INSERT INTO sp_migration_source_links (run_id, source_table, source_id, target_table, target_id)
+      VALUES (${runId}, 'stock_items', ${srcId}, 'stock_items', ${targetItemId})
+    `);
+    map.set(srcId, targetItemId);
+  }
+
+  return { map, groupsCreated, itemsCreated, itemsReused };
 }
 
 // ── Route Registration ─────────────────────────────────────────────────────────
@@ -571,6 +750,8 @@ export function registerSpMigrationRoutes(app: Express) {
         "inventory",
         "sp_stock_movements",
         "stock_item_code_aliases",
+        "stock_items",
+        "stock_groups",
         "locations",
       ];
       for (const tbl of tableOrder) {
@@ -614,6 +795,14 @@ export function registerSpMigrationRoutes(app: Express) {
             const [chk] = (await db.execute(sql`SELECT company_id FROM inventory WHERE id = ${id} LIMIT 1`))
               .rows as any[];
             verified = !!chk && pn(chk.company_id) === targetId;
+          } else if (tbl === "stock_items") {
+            const [chk] = (await db.execute(sql`SELECT company_id FROM stock_items WHERE id = ${id} LIMIT 1`))
+              .rows as any[];
+            verified = !!chk && pn(chk.company_id) === targetId;
+          } else if (tbl === "stock_groups") {
+            const [chk] = (await db.execute(sql`SELECT company_id FROM stock_groups WHERE id = ${id} LIMIT 1`))
+              .rows as any[];
+            verified = !!chk && pn(chk.company_id) === targetId;
           }
 
           if (!verified) {
@@ -635,10 +824,17 @@ export function registerSpMigrationRoutes(app: Express) {
             await db.execute(sql`DELETE FROM vouchers WHERE id = ${id}`);
           } else if (tbl === "ledger_accounts") {
             await db.execute(sql`DELETE FROM ledger_accounts WHERE id = ${id}`);
+          } else if (tbl === "stock_items") {
+            await db.execute(sql`DELETE FROM stock_items WHERE id = ${id}`);
+          } else if (tbl === "stock_groups") {
+            await db.execute(sql`DELETE FROM stock_groups WHERE id = ${id}`);
           }
           deleted++;
         }
       }
+
+      // Clean up provenance links written by this run (source-side rows are never touched)
+      await db.execute(sql`DELETE FROM sp_migration_source_links WHERE run_id = ${runId}`);
 
       // Mark run as rolled_back
       await db.execute(sql`
@@ -766,14 +962,15 @@ export function registerSpMigrationRoutes(app: Express) {
         exists: existingSpSubTypes.has(a.subType),
       }));
 
-      // GC profit accounts status
+      // GC profit accounts status (current subtypes + legacy ones from earlier tool versions)
+      const gcAllSubTypes = [...GC_PROFIT_ACCOUNTS.map((a) => a.subType), ...LEGACY_GC_PROFIT_SUBTYPES];
       const gcAcctRows = (
         await db.execute(sql`
-        SELECT sub_type FROM ledger_accounts
-        WHERE company_id = ${targetId} AND deleted_at IS NULL AND sub_type IN ('gc_owner_profit', 'gc_supplier_profit')
+        SELECT sub_type, name FROM ledger_accounts
+        WHERE company_id = ${targetId} AND deleted_at IS NULL AND sub_type = ANY(${gcAllSubTypes})
       `)
       ).rows as any[];
-      const existingGcSubTypes = new Set(gcAcctRows.map((r: any) => r.sub_type));
+      const existingGcSubTypes = new Map(gcAcctRows.map((r: any) => [r.sub_type, r.name]));
 
       const totalQty = stockItems.reduce((s: number, i: any) => s + i.quantity, 0);
       const totalValue = stockItems.reduce((s: number, i: any) => s + i.totalValueUsd, 0);
@@ -794,14 +991,11 @@ export function registerSpMigrationRoutes(app: Express) {
           alreadyMigrated: pn(migratedRow.cnt),
         },
         spAccountsStatus,
-        gcProfitAccountsStatus: [
-          { subType: "gc_owner_profit", name: "GC Owner Profit", exists: existingGcSubTypes.has("gc_owner_profit") },
-          {
-            subType: "gc_supplier_profit",
-            name: "GC Supplier Profit",
-            exists: existingGcSubTypes.has("gc_supplier_profit"),
-          },
-        ],
+        gcProfitAccountsStatus: GC_PROFIT_ACCOUNTS.map((a) => ({
+          subType: a.subType,
+          name: existingGcSubTypes.get(a.subType) ?? a.name,
+          exists: existingGcSubTypes.has(a.subType),
+        })),
         warnings: [
           pn(migratedRow.cnt) > 0
             ? `${pn(migratedRow.cnt)} voucher(s) already migrated in target — re-running will create duplicates. Rollback first.`
@@ -884,39 +1078,27 @@ export function registerSpMigrationRoutes(app: Express) {
     try {
       // 1. Standard SP accounts — track every newly-created row so rollback can remove them
       progress(5, "Creating SP accounts…");
-      const { names: createdAccountNames, newIds: createdAccountIds } = await ensureSpAccounts(targetId);
+      const { names: createdAccountNames, newIds: createdAccountIds } = await ensureSpAccounts(
+        targetId,
+        req.body?.accountOverrides
+      );
       for (const id of createdAccountIds) {
         await trackRow(runId, "ledger_accounts", id);
         rowsCreated++;
       }
       if (createdAccountNames.length) summary.push(`Created SP accounts: ${createdAccountNames.join(", ")}`);
 
-      // 2. GC profit accounts
+      // 2. GC profit accounts (honors user renames submitted from the account-plan step)
       progress(15, "Creating GC profit accounts…");
-      const GC_PROFIT_ACCOUNTS = [
-        { code: "GC-OWNPFT", name: "GC Owner Profit", accountType: "Equity", subType: "gc_owner_profit" },
-        { code: "GC-SUPPFT", name: "GC Supplier Profit", accountType: "Equity", subType: "gc_supplier_profit" },
-      ];
-      for (const acct of GC_PROFIT_ACCOUNTS) {
-        const existing = (
-          await db.execute(sql`
-          SELECT id FROM ledger_accounts
-          WHERE company_id = ${targetId} AND sub_type = ${acct.subType} AND deleted_at IS NULL LIMIT 1
-        `)
-        ).rows[0] as any;
-        if (!existing) {
-          const [row] = (
-            await db.execute(sql`
-            INSERT INTO ledger_accounts (company_id, code, name, account_type, sub_type, active)
-            VALUES (${targetId}, ${acct.code}, ${acct.name}, ${acct.accountType}, ${acct.subType}, true)
-            RETURNING id
-          `)
-          ).rows as any[];
-          await trackRow(runId, "ledger_accounts", pn(row.id));
-          rowsCreated++;
-          summary.push(`Created account: ${acct.name}`);
-        }
+      const { names: createdGcNames, newIds: createdGcIds } = await ensureGcProfitAccounts(
+        targetId,
+        req.body?.accountOverrides
+      );
+      for (const id of createdGcIds) {
+        await trackRow(runId, "ledger_accounts", id);
+        rowsCreated++;
       }
+      if (createdGcNames.length) summary.push(`Created GC profit accounts: ${createdGcNames.join(", ")}`);
 
       // 3. Default location — capture id for inventory rows
       progress(22, "Setting up warehouse location…");
@@ -942,8 +1124,18 @@ export function registerSpMigrationRoutes(app: Express) {
         summary.push("Using existing warehouse location");
       }
 
-      // 4. Stock items
-      progress(28, "Loading stock items…");
+      // 4. Stock master — create REAL target-company stock_items (never reuse source IDs)
+      progress(28, "Creating target stock master…");
+      const { map: stockItemMap, groupsCreated, itemsCreated, itemsReused } = await ensureTargetStockItems(
+        sourceId,
+        targetId,
+        runId
+      );
+      summary.push(
+        `Stock master: ${groupsCreated} stock group(s) created, ${itemsCreated} target stock item(s) created, ${itemsReused} reused`
+      );
+
+      // Re-fetch source rows (qty/rate) for the opening-stock postings below
       const stockRows = (
         await db.execute(sql`
         SELECT si.id AS stock_item_id, si.code, si.name, inv.quantity, inv.average_rate
@@ -954,15 +1146,22 @@ export function registerSpMigrationRoutes(app: Express) {
       `)
       ).rows as any[];
 
-      progress(30, `Copying ${stockRows.length} stock items…`);
+      progress(30, `Posting opening stock for ${stockRows.length} item(s)…`);
       let aliasesCreated = 0,
         aliasesSkipped = 0,
         movementsCreated = 0;
       for (const item of stockRows as any[]) {
-        const stockItemId = pn(item.stock_item_id);
+        const sourceStockItemId = pn(item.stock_item_id);
+        const targetStockItemId = stockItemMap.get(sourceStockItemId);
+        if (!targetStockItemId) {
+          // Should never happen — ensureTargetStockItems covers the same source set
+          console.warn(`[SP Migration] No target stock item mapped for source item ${item.code}, skipping`);
+          continue;
+        }
         const qty = pn(item.quantity);
         const avgRate = pn(item.average_rate);
 
+        // Alias points at the TARGET stock item — lets POS/barcode scanning resolve it in the SP company
         const existingAlias = (
           await db.execute(sql`
           SELECT id FROM stock_item_code_aliases
@@ -974,7 +1173,7 @@ export function registerSpMigrationRoutes(app: Express) {
           const [aliasRow] = (
             await db.execute(sql`
             INSERT INTO stock_item_code_aliases (company_id, stock_item_id, alias_code, description)
-            VALUES (${targetId}, ${stockItemId}, ${item.code}, ${item.name})
+            VALUES (${targetId}, ${targetStockItemId}, ${item.code}, ${item.name})
             RETURNING id
           `)
           ).rows as any[];
@@ -995,7 +1194,7 @@ export function registerSpMigrationRoutes(app: Express) {
           VALUES
             (${targetId}, ${item.code},
              ${"GC Migration opening stock from " + sourceComp.name},
-             ${stockItemId}, ${mainWarehouseLocationId},
+             ${targetStockItemId}, ${mainWarehouseLocationId},
              ${qty}, ${qty},
              ${avgRate.toFixed(6)}, ${avgRate.toFixed(6)}, ${avgRate.toFixed(6)},
              'opening_stock', NULL, NULL, NULL)
@@ -1012,7 +1211,7 @@ export function registerSpMigrationRoutes(app: Express) {
         const [invRow] = (
           await db.execute(sql`
           INSERT INTO inventory (company_id, location_id, stock_item_id, quantity, average_rate, total_value)
-          VALUES (${targetId}, ${mainWarehouseLocationId}, ${stockItemId},
+          VALUES (${targetId}, ${mainWarehouseLocationId}, ${targetStockItemId},
                   ${qty.toFixed(3)}, ${avgRate.toFixed(2)}, ${totalVal})
           ON CONFLICT (location_id, stock_item_id) DO NOTHING
           RETURNING id
@@ -1241,6 +1440,109 @@ export function registerSpMigrationRoutes(app: Express) {
       res.end();
     }
   });
+
+  // ── GET /api/sp/migration/gc-account-plan ────────────────────────────────
+  // Returns the full proposed chart-of-accounts list (SP + GC profit accounts)
+  // with default code/name so the UI can let the user rename before creation.
+  app.get("/api/sp/migration/gc-account-plan", requireAuth, requireRole("Admin", "Owner"), async (req: any, res: any) => {
+    try {
+      const targetId = parseInt(String(req.query.targetCompanyId ?? ""), 10);
+      if (!targetId) return res.status(400).json({ message: "targetCompanyId is required" });
+
+      const existingRows = (
+        await db.execute(sql`
+        SELECT sub_type, code, name FROM ledger_accounts
+        WHERE company_id = ${targetId} AND deleted_at IS NULL
+          AND sub_type = ANY(${ALL_ACCOUNT_DEFS.map((a) => a.subType)})
+      `)
+      ).rows as any[];
+      const existingBySubType = new Map(existingRows.map((r: any) => [r.sub_type, r]));
+
+      const accounts = ALL_ACCOUNT_DEFS.map((a) => {
+        const existing = existingBySubType.get(a.subType);
+        return {
+          subType: a.subType,
+          accountType: a.accountType,
+          defaultCode: a.code,
+          defaultName: a.name,
+          exists: !!existing,
+          currentCode: existing?.code ?? a.code,
+          currentName: existing?.name ?? a.name,
+          group: SP_ACCOUNTS.some((s) => s.subType === a.subType) ? "sp" : "gc",
+        };
+      });
+
+      return res.json({ accounts });
+    } catch (err: any) {
+      console.error("[SP Migration] gc-account-plan error:", err);
+      return res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // ── POST /api/sp/migration/gc-create-accounts ────────────────────────────
+  // Creates only the missing accounts from the whitelist, using user-supplied
+  // code/name overrides. Idempotent — existing subTypes are left untouched.
+  app.post(
+    "/api/sp/migration/gc-create-accounts",
+    requireAuth,
+    requireRole("Admin", "Owner"),
+    async (req: any, res: any) => {
+      try {
+        const { targetCompanyId, accounts } = req.body ?? {};
+        const targetId = parseInt(String(targetCompanyId ?? ""), 10);
+        if (!targetId) return res.status(400).json({ message: "targetCompanyId is required" });
+        if (!Array.isArray(accounts) || !accounts.length) {
+          return res.status(400).json({ message: "accounts array is required" });
+        }
+
+        const targetComp = await getCompanyRow(targetId);
+        if (!targetComp) return res.status(404).json({ message: "Target company not found" });
+        if (targetComp.company_type !== "supplier_partner") {
+          return res.status(400).json({ message: "Target must be a supplier_partner company" });
+        }
+
+        const allowedSubTypes = new Set(ALL_ACCOUNT_DEFS.map((a) => a.subType));
+        const overrides: Record<string, { code?: string; name?: string }> = {};
+        for (const a of accounts) {
+          if (!allowedSubTypes.has(a?.subType)) {
+            return res.status(400).json({ message: `Unknown account subType: ${a?.subType}` });
+          }
+          overrides[a.subType] = { code: a.code, name: a.name };
+        }
+
+        const runId = await logRun(
+          targetId,
+          targetId,
+          "gc_create_accounts",
+          "running",
+          0,
+          null,
+          `User: ${req.session?.userId ?? "unknown"} | Target: ${targetComp.name}`
+        );
+
+        const spResult = await ensureSpAccounts(targetId, overrides);
+        const gcResult = await ensureGcProfitAccounts(targetId, overrides);
+        const allNewIds = [...spResult.newIds, ...gcResult.newIds];
+        for (const id of allNewIds) await trackRow(runId, "ledger_accounts", id);
+
+        await db.execute(sql`
+          UPDATE sp_migration_rehearsal_runs
+          SET status = 'completed', rows_created = ${allNewIds.length}, completed_at = now()
+          WHERE id = ${runId}
+        `);
+
+        return res.json({
+          success: true,
+          runId,
+          created: [...spResult.names, ...gcResult.names],
+          createdCount: allNewIds.length,
+        });
+      } catch (err: any) {
+        console.error("[SP Migration] gc-create-accounts error:", err);
+        return res.status(500).json({ message: "Internal server error" });
+      }
+    }
+  );
 
   // ── GET /api/sp/migration/session-role ──────────────────────────────────
   // Returns the current session's role — used by the frontend to gate the page.

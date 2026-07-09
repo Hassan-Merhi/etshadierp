@@ -118,6 +118,10 @@ export default function GcLshiMigration() {
   const [showMigrateDialog, setShowMigrateDialog] = useState(false);
   const [migrateConfirmName, setMigrateConfirmName] = useState("");
 
+  // Account plan / rename state (Step 2.5 — before Run Migration)
+  const [accountEdits, setAccountEdits] = useState<Record<string, { code: string; name: string }>>({});
+  const [accountsCreated, setAccountsCreated] = useState(false);
+
   // Live migration progress
   const [migrating, setMigrating] = useState(false);
   const [migProgress, setMigProgress] = useState<MigProgress | null>(null);
@@ -177,6 +181,34 @@ export default function GcLshiMigration() {
     queryKey: ["/api/sp/migration/runs"],
   });
 
+  interface AccountPlanRow {
+    subType: string;
+    accountType: string;
+    defaultCode: string;
+    defaultName: string;
+    exists: boolean;
+    currentCode: string;
+    currentName: string;
+    group: "sp" | "gc";
+  }
+
+  const {
+    data: accountPlan,
+    isLoading: accountPlanLoading,
+    refetch: refetchAccountPlan,
+  } = useQuery<{ accounts: AccountPlanRow[] }>({
+    queryKey: ["/api/sp/migration/gc-account-plan", targetCompanyId],
+    queryFn: async () => {
+      const r = await fetch(`/api/sp/migration/gc-account-plan?targetCompanyId=${targetCompanyId}`);
+      if (!r.ok) {
+        const e = await r.json();
+        throw new Error(e.message);
+      }
+      return r.json();
+    },
+    enabled: !!targetCompanyId,
+  });
+
   const { data: cashAccountsData } = useQuery<{
     accounts: Array<{ id: number; code: string; name: string; account_type: string }>;
   }>({
@@ -220,6 +252,20 @@ export default function GcLshiMigration() {
     onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
+  const createAccountsMutation = useMutation({
+    mutationFn: (body: object) => apiRequest("POST", "/api/sp/migration/gc-create-accounts", body),
+    onSuccess: async (data: any) => {
+      const result = await data.json();
+      toast({
+        title: "Accounts created",
+        description: result.createdCount > 0 ? `Created: ${result.created.join(", ")}` : "All accounts already exist.",
+      });
+      setAccountsCreated(true);
+      refetchAccountPlan();
+    },
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
   const rollbackMutation = useMutation({
     mutationFn: (runId: string) => apiRequest("POST", "/api/sp/migration/rollback", { runId }),
     onSuccess: async () => {
@@ -252,6 +298,7 @@ export default function GcLshiMigration() {
           targetCompanyId,
           companyNameConfirm: migrateConfirmName,
           confirmation: "MIGRATE",
+          accountOverrides: accountEdits,
         }),
         signal: abort.signal,
         credentials: "include",
@@ -596,6 +643,119 @@ export default function GcLshiMigration() {
                   </CollapsibleContent>
                 </Collapsible>
               </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Step 2.5 — Account Plan / Rename */}
+      {targetCompanyId && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <DollarSign className="h-4 w-4" />
+              Step 2.5 — Chart of Accounts
+            </CardTitle>
+            <CardDescription>
+              Review the accounts that will be created in {targetComp?.name ?? "the target company"}. Rename any
+              code/name before creating — names cannot be changed here after creation.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {accountPlanLoading && (
+              <div className="flex items-center gap-2 text-muted-foreground text-sm">
+                <RefreshCw className="h-4 w-4 animate-spin" /> Loading account plan…
+              </div>
+            )}
+            {accountPlan && (
+              <>
+                <div className="border rounded-md overflow-auto max-h-80">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Code</TableHead>
+                        <TableHead>Name</TableHead>
+                        <TableHead>Type</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {accountPlan.accounts.map((a) => {
+                        const edit = accountEdits[a.subType] ?? { code: a.currentCode, name: a.currentName };
+                        return (
+                          <TableRow key={a.subType}>
+                            <TableCell>
+                              {a.exists ? (
+                                <Badge variant="secondary" className="gap-1">
+                                  <CheckCircle2 className="h-3 w-3 text-green-600 dark:text-green-400" /> Exists
+                                </Badge>
+                              ) : (
+                                <Badge variant="outline" className="gap-1">
+                                  <Plus className="h-3 w-3" /> New
+                                </Badge>
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              <Input
+                                className="h-8 w-28 font-mono text-xs"
+                                value={edit.code}
+                                disabled={a.exists}
+                                onChange={(e) =>
+                                  setAccountEdits((prev) => ({
+                                    ...prev,
+                                    [a.subType]: { ...edit, code: e.target.value },
+                                  }))
+                                }
+                                data-testid={`input-account-code-${a.subType}`}
+                              />
+                            </TableCell>
+                            <TableCell>
+                              <Input
+                                className="h-8 w-56 text-sm"
+                                value={edit.name}
+                                disabled={a.exists}
+                                onChange={(e) =>
+                                  setAccountEdits((prev) => ({
+                                    ...prev,
+                                    [a.subType]: { ...edit, name: e.target.value },
+                                  }))
+                                }
+                                data-testid={`input-account-name-${a.subType}`}
+                              />
+                            </TableCell>
+                            <TableCell className="text-xs text-muted-foreground">{a.accountType}</TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </div>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    const accounts = accountPlan.accounts
+                      .filter((a) => !a.exists)
+                      .map((a) => {
+                        const edit = accountEdits[a.subType];
+                        return { subType: a.subType, code: edit?.code ?? a.currentCode, name: edit?.name ?? a.currentName };
+                      });
+                    if (!accounts.length) {
+                      toast({ title: "Nothing to create", description: "All accounts already exist." });
+                      return;
+                    }
+                    createAccountsMutation.mutate({ targetCompanyId, accounts });
+                  }}
+                  disabled={createAccountsMutation.isPending}
+                  data-testid="button-create-accounts"
+                >
+                  {createAccountsMutation.isPending ? (
+                    <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <Plus className="h-4 w-4 mr-2" />
+                  )}
+                  Create Missing Accounts
+                </Button>
+              </>
             )}
           </CardContent>
         </Card>

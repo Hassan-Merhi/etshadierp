@@ -3541,6 +3541,17 @@ let migrationsDone = false;
       row_id integer NOT NULL
     )`,
     `CREATE INDEX IF NOT EXISTS sp_migration_run_rows_run_idx ON sp_migration_run_rows (run_id)`,
+    // Source→target provenance links for GC migration (stock items, groups, etc.)
+    `CREATE TABLE IF NOT EXISTS sp_migration_source_links (
+      id serial PRIMARY KEY,
+      run_id uuid,
+      source_table varchar(100) NOT NULL,
+      source_id integer NOT NULL,
+      target_table varchar(100) NOT NULL,
+      target_id integer NOT NULL,
+      created_at timestamp NOT NULL DEFAULT now()
+    )`,
+    `CREATE INDEX IF NOT EXISTS sp_migration_source_links_lookup_idx ON sp_migration_source_links (source_table, source_id, target_table)`,
 
     // ── Property Contracts/Payments: currency + exchange rate columns (May 2026) ──
     `ALTER TABLE property_contracts ADD COLUMN IF NOT EXISTS currency TEXT NOT NULL DEFAULT 'USD'`,
