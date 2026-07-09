@@ -424,6 +424,10 @@ export default function FactoryStockAllocationV5() {
       return res.json();
     },
     retry: 1,
+    staleTime: 60000,
+    gcTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
   });
 
   function isGarbageOrWipers(row: V5Row) {

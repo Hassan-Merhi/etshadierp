@@ -33,7 +33,6 @@ interface BucketRow {
   baleCount: number;
   totalWeightKg: number;
   totalCost: number;
-  baleDetails: BaleDetail[];
 }
 
 interface SectionTotal {
@@ -77,7 +76,10 @@ function fmtN(n: number) {
   return new Intl.NumberFormat("en-US").format(n);
 }
 
+type SectionKey = "currentStock" | "wasteStock" | "sold" | "wasteDispatched" | "pendingLoading";
+
 interface SectionProps {
+  section: SectionKey;
   title: string;
   subtitle: string;
   icon: React.ReactNode;
@@ -86,6 +88,103 @@ interface SectionProps {
   total: SectionTotal;
   defaultOpen?: boolean;
   showSoldPrice?: boolean;
+}
+
+function BaleDetailRows({
+  section,
+  productId,
+  rowAvgRate,
+  totalWeightKg,
+  totalCost,
+  baleCount,
+  colSpan,
+}: {
+  section: SectionKey;
+  productId: number | null;
+  rowAvgRate: number;
+  totalWeightKg: number;
+  totalCost: number;
+  baleCount: number;
+  colSpan: number;
+}) {
+  const { data, isLoading } = useQuery<{ baleDetails: BaleDetail[] }>({
+    queryKey: ["/api/factory/bale-ledger/details", section, productId ?? "null"],
+    queryFn: async () => {
+      const res = await fetch(
+        `/api/factory/bale-ledger/details?section=${section}&productId=${productId ?? "null"}`,
+        { credentials: "include" }
+      );
+      if (!res.ok) throw new Error("Failed to fetch bale details");
+      return res.json();
+    },
+    staleTime: 60_000,
+    refetchOnWindowFocus: false,
+  });
+
+  if (isLoading) {
+    return (
+      <TableRow className="bg-muted/20">
+        <TableCell colSpan={colSpan} className="py-2 px-5 text-xs text-muted-foreground italic">
+          Loading bale details…
+        </TableCell>
+      </TableRow>
+    );
+  }
+
+  const baleDetails = data?.baleDetails || [];
+  const hasBaleDetails = baleDetails.some((d) => d.ref || d.totalCost > 0);
+
+  if (!hasBaleDetails) {
+    return (
+      <TableRow className="bg-muted/20">
+        <TableCell colSpan={colSpan} className="py-2 px-5 text-xs text-muted-foreground italic">
+          No individual bale records found.
+        </TableCell>
+      </TableRow>
+    );
+  }
+
+  return (
+    <TableRow className="bg-muted/20">
+      <TableCell colSpan={colSpan} className="py-0 px-0">
+        <div className="pl-8 pr-3 py-2">
+          <table className="w-full text-xs">
+            <thead className="sticky top-0 z-30 bg-muted/50">
+              <tr className="border-b border-border/50">
+                <th className="text-left py-1 pr-4 font-medium text-muted-foreground">Ref #</th>
+                <th className="text-right py-1 pr-4 font-medium text-muted-foreground">Weight (kg)</th>
+                <th className="text-right py-1 pr-4 font-medium text-muted-foreground">Qty</th>
+                <th className="text-right py-1 pr-4 font-medium text-muted-foreground">Avg Cost/Bale</th>
+                <th className="text-right py-1 font-medium text-muted-foreground">Total Cost</th>
+              </tr>
+            </thead>
+            <tbody>
+              {baleDetails.map((d, di) => (
+                <tr key={di} className="border-b border-border/20 last:border-0">
+                  <td className="py-1 pr-4 font-mono">{d.ref || "—"}</td>
+                  <td className="py-1 pr-4 text-right text-muted-foreground">{fmtKg(d.weightKg)}</td>
+                  <td className="py-1 pr-4 text-right text-muted-foreground">1</td>
+                  <td className="py-1 pr-4 text-right text-muted-foreground">
+                    {d.totalCost > 0 ? fmtMoney(d.totalCost) : "—"}
+                  </td>
+                  <td className="py-1 text-right font-medium">{d.totalCost > 0 ? fmtMoney(d.totalCost) : "—"}</td>
+                </tr>
+              ))}
+              {baleDetails.length > 1 && (
+                <tr className="font-semibold border-t border-border/50">
+                  <td className="py-1 pr-4 text-muted-foreground">Total</td>
+                  <td className="py-1 pr-4 text-right">{fmtKg(totalWeightKg)}</td>
+                  <td className="py-1 pr-4 text-right">{baleCount}</td>
+                  <td className="py-1 pr-4 text-right">{rowAvgRate > 0 ? fmtMoney(rowAvgRate) : "—"}</td>
+                  <td className="py-1 text-right">{totalCost > 0 ? fmtMoney(totalCost) : "—"}</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </TableCell>
+    </TableRow>
+  );
 }
 
 function groupByCategory(rows: BucketRow[]): { category: string; items: BucketRow[] }[] {
@@ -99,6 +198,7 @@ function groupByCategory(rows: BucketRow[]): { category: string; items: BucketRo
 }
 
 function SectionTable({
+  section,
   title,
   subtitle,
   icon,
@@ -207,7 +307,6 @@ function SectionTable({
                         const rowKey = `${category}-${r.productId ?? "null"}-${i}`;
                         const isOpen = expandedRows.has(rowKey);
                         const rowAvgRate = r.baleCount > 0 && r.totalCost > 0 ? r.totalCost / r.baleCount : 0;
-                        const hasBaleDetails = r.baleDetails.some((d) => d.ref || d.totalCost > 0);
 
                         return [
                           <TableRow
@@ -245,66 +344,17 @@ function SectionTable({
                               </>
                             )}
                           </TableRow>,
-                          isOpen && hasBaleDetails ? (
-                            <TableRow key={`${rowKey}-detail`} className="bg-muted/20">
-                              <TableCell colSpan={colSpan} className="py-0 px-0">
-                                <div className="pl-8 pr-3 py-2">
-                                  <table className="w-full text-xs">
-                                    <thead className="sticky top-0 z-30 bg-muted/50">
-                                      <tr className="border-b border-border/50">
-                                        <th className="text-left py-1 pr-4 font-medium text-muted-foreground">Ref #</th>
-                                        <th className="text-right py-1 pr-4 font-medium text-muted-foreground">
-                                          Weight (kg)
-                                        </th>
-                                        <th className="text-right py-1 pr-4 font-medium text-muted-foreground">Qty</th>
-                                        <th className="text-right py-1 pr-4 font-medium text-muted-foreground">
-                                          Avg Cost/Bale
-                                        </th>
-                                        <th className="text-right py-1 font-medium text-muted-foreground">
-                                          Total Cost
-                                        </th>
-                                      </tr>
-                                    </thead>
-                                    <tbody>
-                                      {r.baleDetails.map((d, di) => (
-                                        <tr key={di} className="border-b border-border/20 last:border-0">
-                                          <td className="py-1 pr-4 font-mono">{d.ref || "—"}</td>
-                                          <td className="py-1 pr-4 text-right text-muted-foreground">
-                                            {fmtKg(d.weightKg)}
-                                          </td>
-                                          <td className="py-1 pr-4 text-right text-muted-foreground">1</td>
-                                          <td className="py-1 pr-4 text-right text-muted-foreground">
-                                            {d.totalCost > 0 ? fmtMoney(d.totalCost) : "—"}
-                                          </td>
-                                          <td className="py-1 text-right font-medium">
-                                            {d.totalCost > 0 ? fmtMoney(d.totalCost) : "—"}
-                                          </td>
-                                        </tr>
-                                      ))}
-                                      {r.baleDetails.length > 1 && (
-                                        <tr className="font-semibold border-t border-border/50">
-                                          <td className="py-1 pr-4 text-muted-foreground">Total</td>
-                                          <td className="py-1 pr-4 text-right">{fmtKg(r.totalWeightKg)}</td>
-                                          <td className="py-1 pr-4 text-right">{r.baleCount}</td>
-                                          <td className="py-1 pr-4 text-right">
-                                            {rowAvgRate > 0 ? fmtMoney(rowAvgRate) : "—"}
-                                          </td>
-                                          <td className="py-1 text-right">
-                                            {r.totalCost > 0 ? fmtMoney(r.totalCost) : "—"}
-                                          </td>
-                                        </tr>
-                                      )}
-                                    </tbody>
-                                  </table>
-                                </div>
-                              </TableCell>
-                            </TableRow>
-                          ) : isOpen ? (
-                            <TableRow key={`${rowKey}-empty`} className="bg-muted/20">
-                              <TableCell colSpan={colSpan} className="py-2 px-5 text-xs text-muted-foreground italic">
-                                No individual bale records found.
-                              </TableCell>
-                            </TableRow>
+                          isOpen ? (
+                            <BaleDetailRows
+                              key={`${rowKey}-detail`}
+                              section={section}
+                              productId={r.productId}
+                              rowAvgRate={rowAvgRate}
+                              totalWeightKg={r.totalWeightKg}
+                              totalCost={r.totalCost}
+                              baleCount={r.baleCount}
+                              colSpan={colSpan}
+                            />
                           ) : null,
                         ].filter(Boolean);
                       }),
@@ -382,6 +432,7 @@ export default function BaleLedger() {
         ) : (
           <>
             <SectionTable
+              section="currentStock"
               title="Current Stock — In Hand"
               subtitle="Bales in stock (IN_STOCK / FINALIZED), excluding wipers and garbages"
               icon={<Package className="w-4 h-4 text-green-600" />}
@@ -392,6 +443,7 @@ export default function BaleLedger() {
             />
 
             <SectionTable
+              section="wasteStock"
               title="Wipers & Garbages — In Hand"
               subtitle="Waste-category bales currently in stock (IN_STOCK / FINALIZED)"
               icon={<AlertTriangle className="w-4 h-4 text-amber-500" />}
@@ -402,6 +454,7 @@ export default function BaleLedger() {
             />
 
             <SectionTable
+              section="sold"
               title="Stock Sold"
               subtitle="Bales that have been dispatched and sold to customers"
               icon={<ShoppingCart className="w-4 h-4 text-blue-600" />}
@@ -413,6 +466,7 @@ export default function BaleLedger() {
             />
 
             <SectionTable
+              section="pendingLoading"
               title="Pending Loading / Verified"
               subtitle="Bales reserved for orders currently in Loading, Pending Verification, or Verified status"
               icon={<Truck className="w-4 h-4 text-purple-500" />}
@@ -423,6 +477,7 @@ export default function BaleLedger() {
             />
 
             <SectionTable
+              section="wasteDispatched"
               title="Waste Dispatched"
               subtitle="Bales removed from stock via waste disposal (Waste Dispatch records)"
               icon={<Trash2 className="w-4 h-4 text-destructive" />}

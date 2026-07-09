@@ -320,11 +320,18 @@ export function registerEmployeeLedgerWasteRoutes(app: Express) {
       }
 
       function bucketToArray(m: Map<string, BucketRow>) {
-        return Array.from(m.values()).sort((a, b) => {
-          const catCmp = a.categoryName.localeCompare(b.categoryName);
-          if (catCmp !== 0) return catCmp;
-          return a.productName.localeCompare(b.productName);
-        });
+        return Array.from(m.values())
+          .sort((a, b) => {
+            const catCmp = a.categoryName.localeCompare(b.categoryName);
+            if (catCmp !== 0) return catCmp;
+            return a.productName.localeCompare(b.productName);
+          })
+          .map((r) => {
+            // Strip baleDetails from the summary response — this is the main bandwidth cost.
+            // Full detail is available on demand via /api/factory/bale-ledger/details.
+            const { baleDetails, ...rest } = r;
+            return rest;
+          });
       }
 
       function sumBucket(rows: BucketRow[]) {
@@ -361,6 +368,131 @@ export function registerEmployeeLedgerWasteRoutes(app: Express) {
       });
     } catch (error: any) {
       console.error("Error fetching bale ledger:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Lazy-loaded bale-level detail for a single section + product row of the Bale Ledger.
+  // Keeps the main /api/factory/bale-ledger response small by not returning baleDetails there.
+  app.get("/api/factory/bale-ledger/details", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const section = String(req.query.section || "");
+      const productIdParam = req.query.productId;
+      const validSections = ["currentStock", "wasteStock", "sold", "wasteDispatched", "pendingLoading"];
+      if (!validSections.includes(section)) {
+        return res.status(400).json({ message: "Invalid section" });
+      }
+
+      const productId = productIdParam === "null" || productIdParam === undefined ? null : parseInt(productIdParam, 10);
+
+      const [allBalesRaw, allProducts, allCategories, pendingOrderBaleIdsRaw, staleOrderBaleIdsRaw] = await Promise.all([
+        db.execute(sql`
+          SELECT
+            fb.id,
+            fb.product_id AS "productId",
+            fb.article_code AS "articleCode",
+            fb.status,
+            fb.reference_number AS "referenceNumber",
+            COALESCE(fb.weight_kg, 0)::float AS "weightKg",
+            fb.waste_dispatch_id AS "wasteDispatchId"
+          FROM factory_bales fb
+          WHERE fb.company_id = ${companyId}
+          AND fb.status IN ('IN_STOCK', 'FINALIZED', 'SOLD', 'DISPATCHED', 'RESERVED_FOR_ORDER')
+          AND (${productId === null} AND fb.product_id IS NULL OR fb.product_id = ${productId})
+        `),
+        db
+          .select({
+            id: factoryBaleProducts.id,
+            categoryId: factoryBaleProducts.categoryId,
+            productionPrice: factoryBaleProducts.productionPrice,
+          })
+          .from(factoryBaleProducts)
+          .where(eq(factoryBaleProducts.companyId, companyId)),
+        db
+          .select({ id: factoryCategories.id, name: factoryCategories.name })
+          .from(factoryCategories)
+          .where(eq(factoryCategories.companyId, companyId)),
+        db.execute(sql`
+          SELECT DISTINCT cob.bale_id AS "baleId"
+          FROM customer_order_bales cob
+          INNER JOIN customer_orders co ON co.id = cob.order_id
+          WHERE co.company_id = ${companyId}
+          AND co.status IN ('LOADING', 'PENDING_VERIFICATION', 'VERIFIED')
+        `),
+        db.execute(sql`
+          SELECT DISTINCT cob.bale_id AS "baleId"
+          FROM customer_order_bales cob
+          INNER JOIN customer_orders co ON co.id = cob.order_id
+          WHERE co.company_id = ${companyId}
+          AND co.status IN ('FINALIZED', 'DISPATCHED', 'SOLD')
+        `),
+      ]);
+
+      const allBales: any[] = Array.isArray(allBalesRaw) ? allBalesRaw : (allBalesRaw as any).rows || [];
+      const pendingOrderBaleIds = new Set<number>(
+        (Array.isArray(pendingOrderBaleIdsRaw) ? pendingOrderBaleIdsRaw : (pendingOrderBaleIdsRaw as any).rows || []).map(
+          (r: any) => Number(r.baleId)
+        )
+      );
+      const staleOrderBaleIds = new Set<number>(
+        (Array.isArray(staleOrderBaleIdsRaw) ? staleOrderBaleIdsRaw : (staleOrderBaleIdsRaw as any).rows || []).map(
+          (r: any) => Number(r.baleId)
+        )
+      );
+
+      const productMap = new Map(allProducts.map((p: any) => [p.id, p]));
+      const wasteCategories = new Set<number>(
+        allCategories
+          .filter((c: any) => {
+            const n = (c.name || "").toLowerCase();
+            return n.includes("garbage") || n.includes("wiper");
+          })
+          .map((c: any) => c.id)
+      );
+      function isWasteProduct(pid: number | null, articleCode?: string | null): boolean {
+        if (articleCode?.startsWith("HMD16")) return true;
+        if (!pid) return false;
+        const p = productMap.get(pid);
+        if (!p) return false;
+        return p.categoryId ? wasteCategories.has(p.categoryId) : false;
+      }
+      function getSellingPrice(bale: any): number {
+        const p = bale.productId ? productMap.get(bale.productId) : null;
+        return parseFloat(p?.productionPrice || "0") || 0;
+      }
+
+      function classify(bale: any): string {
+        if (bale.status === "SOLD") {
+          return pendingOrderBaleIds.has(Number(bale.id)) ? "pendingLoading" : "sold";
+        } else if (bale.status === "FINALIZED") {
+          return "sold";
+        } else if (bale.status === "DISPATCHED" && bale.wasteDispatchId) {
+          return "wasteDispatched";
+        } else if (bale.status === "RESERVED_FOR_ORDER") {
+          return "pendingLoading";
+        } else if (bale.status === "IN_STOCK") {
+          if (pendingOrderBaleIds.has(Number(bale.id))) return "pendingLoading";
+          if (staleOrderBaleIds.has(Number(bale.id))) return "sold";
+          return isWasteProduct(bale.productId, bale.articleCode) ? "wasteStock" : "currentStock";
+        }
+        return "unknown";
+      }
+
+      const details = allBales
+        .filter((bale: any) => classify(bale) === section)
+        .map((bale: any) => ({
+          id: bale.id,
+          ref: bale.referenceNumber || "",
+          weightKg: parseFloat(bale.weightKg) || 0,
+          totalCost: getSellingPrice(bale),
+        }));
+
+      res.json({ baleDetails: details });
+    } catch (error: any) {
+      console.error("Error fetching bale ledger details:", error);
       res.status(500).json({ message: error.message });
     }
   });
