@@ -24,12 +24,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-
-interface Location {
-  id: number;
-  name: string;
-  [key: string]: any;
-}
+import type { InventoryLocation as Location } from "./locationInventoryTypes";
 
 interface StockGroupSummary {
   groupId: number | null;

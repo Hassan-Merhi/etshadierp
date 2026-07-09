@@ -189,6 +189,7 @@ export function useFactoryVisibleSections(user?: any): {
   isPinnedVisible: (item: NavItem) => boolean;
   isAdmin: boolean;
   isDeveloper: boolean;
+  isPrivileged: boolean;
 } {
   const isDeveloper = user?.role === "Developer";
   const isAdmin = user?.role === "Admin" || isDeveloper;

@@ -1,5 +1,5 @@
 import { MapPin, ChevronRight } from "lucide-react";
-import type { Location, StockGroupSummary } from "./locationInventoryTypes";
+import type { InventoryLocation as Location, StockGroupSummary } from "./locationInventoryTypes";
 
 interface LocationInventoryBreadcrumbProps {
   selectedLocationLocal: Location | null;

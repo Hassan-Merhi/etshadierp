@@ -19,6 +19,8 @@ export interface NavSection {
   /** CSS color value (e.g. `hsl(var(--nav-inventory))`) used for active accent. */
   color: string;
   items: NavItem[];
+  /** When true, section is only shown to Developer-role users. */
+  devOnly?: boolean;
   [key: string]: any;
 }
 

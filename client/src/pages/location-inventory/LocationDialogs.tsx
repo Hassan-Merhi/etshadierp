@@ -27,12 +27,7 @@ import { Loader2, ArrowLeft, ArrowRight, ChevronRight } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { StockMovementDialog } from "./StockMovementDialog";
-
-interface Location {
-  id: number;
-  name: string;
-  supplierPartnerPayableDeductionPerQty?: string | null;
-}
+import type { InventoryLocation as Location } from "./locationInventoryTypes";
 
 interface LocationDialogsProps {
   // Rename Dialog

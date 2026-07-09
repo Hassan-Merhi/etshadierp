@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { queryClient } from "@/lib/queryClient";
 import { apiRequest } from "@/lib/queryClient";
 import { getDefaultPeriodValue } from "@/components/ui/period-filter";
-import type { Location, StockGroupSummary } from "./locationInventoryTypes";
+import type { InventoryLocation as Location, StockGroupSummary } from "./locationInventoryTypes";
 
 interface UseLocationInventoryStateParams {
   companyId: number | undefined;

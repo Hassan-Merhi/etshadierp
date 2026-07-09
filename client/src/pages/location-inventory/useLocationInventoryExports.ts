@@ -1,8 +1,4 @@
-interface Location {
-  id: number;
-  name: string;
-  [key: string]: any;
-}
+import type { InventoryLocation as Location } from "./locationInventoryTypes";
 
 export function useLocationInventoryExports(
   selectedLocationLocal: Location | null,

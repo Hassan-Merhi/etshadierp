@@ -59,7 +59,7 @@ const DialogContent = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content>
 >(({ className, children, onKeyDown, onCloseAutoFocus, ...props }, ref) => {
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLElement>) => {
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
     if (e.key === "ArrowDown" || e.key === "ArrowUp") {
       if (!shouldSkipArrow(document.activeElement)) {
         const scrollEl = findScrollTarget(e.currentTarget);

@@ -1,11 +1,6 @@
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-
-interface Location {
-  id: number;
-  name: string;
-  [key: string]: any;
-}
+import type { InventoryLocation as Location } from "./locationInventoryTypes";
 
 interface UseLocationInventoryMutationsParams {
   toast: (opts: any) => void;

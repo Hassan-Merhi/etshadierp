@@ -5,6 +5,13 @@ import { Button } from "@/components/ui/button";
 import { Check, ChevronsUpDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 
+// Local shape matching how this component actually uses stock items.
+interface StockItem {
+  id: number;
+  name: string;
+  [key: string]: any;
+}
+
 export function StockItemCombobox({
   value,
   onChange,

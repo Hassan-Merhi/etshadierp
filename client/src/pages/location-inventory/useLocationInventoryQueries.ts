@@ -1,15 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-
-interface Location {
-  id: number;
-  code: string;
-  name: string;
-  city: string | null;
-  state: string | null;
-  country: string | null;
-  createdAt?: string;
-  supplierPartnerPayableDeductionPerQty?: string | null;
-}
+import type { InventoryLocation as Location } from "./locationInventoryTypes";
 
 interface InventoryItem {
   inventoryId: number | null;

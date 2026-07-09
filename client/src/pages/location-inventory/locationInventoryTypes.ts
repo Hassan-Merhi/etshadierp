@@ -1,4 +1,7 @@
-export interface Location {
+// Renamed from `Location` to avoid colliding with the DOM global `Location` type
+// and with the several structurally-similar-but-not-identical local `Location`
+// interfaces previously duplicated across this feature's files (TS Cleanup Phase B).
+export interface InventoryLocation {
   id: number;
   code: string;
   name: string;
@@ -7,7 +10,11 @@ export interface Location {
   country: string | null;
   createdAt?: string;
   supplierPartnerPayableDeductionPerQty?: string | null;
+  whatsappGroupChatId?: string | null;
 }
+
+/** @deprecated use `InventoryLocation` */
+export type Location = InventoryLocation;
 
 export interface InventoryItem {
   inventoryId: number | null;

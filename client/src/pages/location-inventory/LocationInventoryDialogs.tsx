@@ -3,12 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { AlertCircle, Search } from "lucide-react";
-
-interface Location {
-  id: number;
-  name: string;
-  [key: string]: any;
-}
+import type { InventoryLocation as Location } from "./locationInventoryTypes";
 
 interface LocationInventoryDialogsProps {
   // Create Location dialog

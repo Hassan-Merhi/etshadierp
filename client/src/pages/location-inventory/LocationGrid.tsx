@@ -1,17 +1,6 @@
 import { Warehouse, Pencil, MessageCircle, ChevronRight, Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
-
-interface Location {
-  id: number;
-  code: string;
-  name: string;
-  city: string | null;
-  state: string | null;
-  country: string | null;
-  createdAt?: string;
-  supplierPartnerPayableDeductionPerQty?: string | null;
-  whatsappGroupChatId?: string | null;
-}
+import type { InventoryLocation as Location } from "./locationInventoryTypes";
 
 interface LocationGridProps {
   locations: Location[];
