@@ -486,7 +486,7 @@ export function registerSpMigrationRoutes(app: Express) {
           `${alreadyMapped} item(s) already have aliases in target — they will be skipped during rehearsal copy.`
         );
       warnings.push(
-        "Open Goods-OTW containers (ERP purchase orders) cannot be auto-migrated — recreate them manually in the SP Containers screen."
+        "Open/OTW containers can be migrated in the Containers step. Review OTW accounting after migration."
       );
       warnings.push(
         "Cash and bank balances shown below are approximate (debit minus credit sum). Verify in source ERP before migrating."
@@ -561,212 +561,15 @@ export function registerSpMigrationRoutes(app: Express) {
   });
 
   // ── POST /api/sp/migration/rehearsal ────────────────────────────────────
-  // Requires: { sourceCompanyId, targetCompanyId, companyNameConfirm, confirmation: "REHEARSE" }
-  app.post("/api/sp/migration/rehearsal", requireAuth, requireRole("Developer"), async (req: any, res: any) => {
-    const { sourceCompanyId, targetCompanyId, companyNameConfirm, confirmation } = req.body ?? {};
-
-    // Safety gate 1: typed action confirmation
-    if (confirmation !== "REHEARSE") {
-      return res.status(400).json({ message: 'Rehearsal requires confirmation = "REHEARSE"' });
-    }
-
-    const sourceId = parseInt(String(sourceCompanyId ?? ""), 10);
-    const targetId = parseInt(String(targetCompanyId ?? ""), 10);
-
-    if (!sourceId || !targetId)
-      return res.status(400).json({ message: "sourceCompanyId and targetCompanyId required" });
-    if (sourceId === targetId) return res.status(400).json({ message: "Source and target must be different" });
-
-    const sourceComp = await getCompanyRow(sourceId);
-    const targetComp = await getCompanyRow(targetId);
-    if (!sourceComp) return res.status(404).json({ message: "Source company not found" });
-    if (!targetComp) return res.status(404).json({ message: "Target company not found" });
-
-    // Safety gate 2: source must be ERP
-    if (sourceComp.company_type !== "erp") {
-      return res.status(400).json({ message: "Source company must be type 'erp'" });
-    }
-    // Safety gate 3: target must be SP
-    if (targetComp.company_type !== "supplier_partner") {
-      return res.status(400).json({ message: "Target company must be type 'supplier_partner'" });
-    }
-    // Safety gate 4: company name confirmation must match exactly
-    if (!companyNameConfirm || companyNameConfirm.trim() !== sourceComp.name) {
-      return res.status(400).json({
-        message: `Company name confirmation does not match. Expected exactly: "${sourceComp.name}"`,
-      });
-    }
-
-    // Log the attempt immediately (even if it fails later)
-    let runId: string;
-    try {
-      runId = await logRun(
-        sourceId,
-        targetId,
-        "rehearsal",
-        "running",
-        0,
-        null,
-        `User: ${req.session?.userId ?? "unknown"} | Source: ${sourceComp.name} | Target: ${targetComp.name}`
-      );
-    } catch (logErr: any) {
-      return res.status(500).json({ message: "Failed to create run log: " + logErr.message });
-    }
-
-    let rowsCreated = 0;
-    const summary: string[] = [];
-
-    try {
-      // 1. Ensure SP chart of accounts in target
-      const { names: createdAccounts } = await ensureSpAccounts(targetId);
-      if (createdAccounts.length) summary.push(`Created SP accounts: ${createdAccounts.join(", ")}`);
-
-      // 2. Ensure default location in target
-      const locs = await db
-        .select()
-        .from(locations)
-        .where(and(eq(locations.companyId, targetId), isNull(locations.deletedAt)));
-      let mainWarehouseLocationId: number;
-      if (!locs.length) {
-        const [locRow] = (
-          await db.execute(sql`
-          INSERT INTO locations (company_id, code, name, active)
-          VALUES (${targetId}, 'SP-WH-001', 'Main Warehouse', true)
-          RETURNING id
-        `)
-        ).rows as any[];
-        mainWarehouseLocationId = pn(locRow.id);
-        await trackRow(runId, "locations", mainWarehouseLocationId);
-        rowsCreated++;
-        summary.push("Created default warehouse location");
-      } else {
-        mainWarehouseLocationId = pn(locs[0].id);
-        summary.push("Using existing warehouse location");
-      }
-
-      // 3. Fetch source stock items with positive inventory
-      const stockRows = (
-        await db.execute(sql`
-        SELECT
-          si.id AS stock_item_id, si.code, si.name, si.unit,
-          inv.quantity, inv.average_rate
-        FROM stock_items si
-        JOIN inventory inv ON inv.stock_item_id = si.id AND inv.company_id = ${sourceId}
-        WHERE si.company_id = ${sourceId}
-          AND si.deleted_at IS NULL
-          AND inv.quantity > 0
-        ORDER BY si.code
-      `)
-      ).rows as any[];
-
-      summary.push(`Found ${stockRows.length} source stock items with positive inventory`);
-
-      // 4. For each item: create alias + opening stock movement
-      let aliasesCreated = 0;
-      let aliasesSkipped = 0;
-      let movementsCreated = 0;
-
-      for (const item of stockRows as any[]) {
-        const stockItemId = pn(item.stock_item_id);
-        const qty = pn(item.quantity);
-        const avgRate = pn(item.average_rate);
-
-        // Check if alias already exists
-        const existingAlias = (
-          await db.execute(sql`
-          SELECT id FROM stock_item_code_aliases
-          WHERE company_id = ${targetId} AND alias_code = ${item.code}
-          LIMIT 1
-        `)
-        ).rows[0] as any;
-
-        if (!existingAlias) {
-          const [aliasRow] = (
-            await db.execute(sql`
-            INSERT INTO stock_item_code_aliases
-              (company_id, stock_item_id, alias_code, description)
-            VALUES (${targetId}, ${stockItemId}, ${item.code}, ${item.name})
-            RETURNING id
-          `)
-          ).rows as any[];
-          await trackRow(runId, "stock_item_code_aliases", pn(aliasRow.id));
-          aliasesCreated++;
-          rowsCreated++;
-        } else {
-          aliasesSkipped++;
-        }
-
-        // Always create opening stock movement for this run
-        const [movRow] = (
-          await db.execute(sql`
-          INSERT INTO sp_stock_movements
-            (company_id, article_code, description, stock_item_id, location_id,
-             qty_in, qty_remaining,
-             base_unit_cost_usd, landed_unit_cost_usd, final_unit_cost_usd,
-             source_type, container_id, offload_id, container_line_id)
-          VALUES
-            (${targetId}, ${item.code},
-             ${"Rehearsal opening stock from " + sourceComp.name},
-             ${stockItemId}, ${mainWarehouseLocationId},
-             ${qty}, ${qty},
-             ${avgRate.toFixed(6)}, ${avgRate.toFixed(6)}, ${avgRate.toFixed(6)},
-             'opening_stock', NULL, NULL, NULL)
-          RETURNING id
-        `)
-        ).rows as any[];
-        await trackRow(runId, "sp_stock_movements", pn(movRow.id));
-        movementsCreated++;
-        rowsCreated++;
-      }
-
-      summary.push(`Aliases created: ${aliasesCreated}, skipped (already existed): ${aliasesSkipped}`);
-      summary.push(`Opening stock movements created: ${movementsCreated}`);
-
-      // 5. Compute reconciliation totals
-      const totalQty = (stockRows as any[]).reduce((s: number, r: any) => s + pn(r.quantity), 0);
-      const totalValue = (stockRows as any[]).reduce((s: number, r: any) => s + pn(r.quantity) * pn(r.average_rate), 0);
-
-      // Mark run as completed
-      await db.execute(sql`
-        UPDATE sp_migration_rehearsal_runs
-        SET status = 'completed', rows_created = ${rowsCreated}, completed_at = now()
-        WHERE id = ${runId}
-      `);
-
-      return res.json({
-        success: true,
-        runId,
-        rowsCreated,
-        summary,
-        reconciliation: {
-          sourceCompany: sourceComp.name,
-          targetCompany: targetComp.name,
-          itemsCopied: movementsCreated,
-          aliasesCreated,
-          aliasesSkipped,
-          totalQty: Math.round(totalQty * 1000) / 1000,
-          totalValueUsd: Math.round(totalValue * 100) / 100,
-        },
-        warnings: [
-          "Opening stock costs use source inventory average_rate. Verify these match your agreed supplier costs.",
-          "Goods-OTW containers must be recreated manually in the SP Containers screen.",
-          "This was a REHEARSAL COPY — target company only. Source was not modified.",
-        ],
-      });
-    } catch (err: any) {
-      // Mark run as failed
-      await db
-        .execute(
-          sql`
-        UPDATE sp_migration_rehearsal_runs
-        SET status = 'failed', error_message = ${err.message}, completed_at = now()
-        WHERE id = ${runId}
-      `
-        )
-        .catch(() => {});
-      console.error("[SP Migration] rehearsal error:", err);
-      return res.status(500).json({ message: "Migration failed", runId });
-    }
+  // DISABLED: the old all-in-one rehearsal flow (default-warehouse + raw stock_item_id reuse +
+  // source_type='opening_stock' + "recreate containers manually") is permanently retired.
+  // Use the staged endpoints instead: gc-account-plan, gc-stock-master, gc-stock-opening,
+  // gc-sales-readonly, gc-containers, gc-profit-opening, gc-reconciliation.
+  app.post("/api/sp/migration/rehearsal", requireAuth, requireRole("Developer"), async (_req: any, res: any) => {
+    return res.status(410).json({
+      message: "The old all-in-one GC migration flow is disabled. Use the staged migration steps instead.",
+      code: "OLD_GC_REHEARSAL_DISABLED",
+    });
   });
 
   // ── POST /api/sp/migration/rollback ─────────────────────────────────────
@@ -1102,7 +905,10 @@ export function registerSpMigrationRoutes(app: Express) {
           pn(migratedRow.cnt) > 0
             ? `${pn(migratedRow.cnt)} voucher(s) already migrated in target — re-running will create duplicates. Rollback first.`
             : null,
-          "Open Goods-OTW containers must be recreated manually in the SP Containers screen.",
+          "Open/OTW containers can be migrated in the Containers step. Review OTW accounting after migration.",
+          "Duty/surcharge/fumigation/other charges are not auto-posted unless safely mapped; review warnings after the Containers step.",
+          "Cash and bank balances must be posted separately if needed.",
+          "This preview is read-only. No data has been written.",
           "Voucher account mapping uses account type matching. Unmapped entries will be routed to a suspense account.",
         ].filter(Boolean),
       });

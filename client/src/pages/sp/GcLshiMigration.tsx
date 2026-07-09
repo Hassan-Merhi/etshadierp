@@ -108,7 +108,7 @@ export default function GcLshiMigration() {
   const [previewOpen, setPreviewOpen] = useState(false);
   const [stockTableOpen, setStockTableOpen] = useState(false);
 
-  // Account plan / rename state (Step 2.5 — before staged migration)
+  // Account plan / rename state (Step 3 — before staged migration)
   const [accountEdits, setAccountEdits] = useState<Record<string, { code: string; name: string }>>({});
   const [accountsCreated, setAccountsCreated] = useState(false);
 
@@ -548,13 +548,13 @@ export default function GcLshiMigration() {
         </Card>
       )}
 
-      {/* Step 2.5 — Account Plan / Rename */}
+      {/* Step 3 — Account Plan / Rename */}
       {targetCompanyId && (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">
               <DollarSign className="h-4 w-4" />
-              Step 2.5 — Chart of Accounts
+              Step 3 — Chart of Accounts
             </CardTitle>
             <CardDescription>
               Review the accounts that will be created in {targetComp?.name ?? "the target company"}. Rename any
@@ -661,13 +661,13 @@ export default function GcLshiMigration() {
         </Card>
       )}
 
-      {/* Step 3 — Opening Balance */}
+      {/* Opening Cash Balance (optional, run any time before or after the staged steps below) */}
       {targetCompanyId && (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">
               <DollarSign className="h-4 w-4" />
-              Step 3 — Opening Cash Balance
+              Opening Cash Balance (optional)
             </CardTitle>
             <CardDescription>Creates a Journal voucher: Dr Cash → Cr Opening Balance Clearing.</CardDescription>
           </CardHeader>
@@ -759,45 +759,45 @@ export default function GcLshiMigration() {
         </Card>
       )}
 
-      {/* Step 4 — Staged Migration (stock master, stock opening, read-only sales, containers, profit-share) */}
+      {/* Steps 4–7 — Staged Migration (stock master, stock opening, read-only sales, containers) */}
       {sourceCompanyId && targetCompanyId && (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">
               <Layers className="h-4 w-4" />
-              Step 4 — Staged Migration
+              Steps 4–7 — Staged Migration
             </CardTitle>
             <CardDescription>
-              Run each area independently, in order. All steps are idempotent and safe to re-run; only tracked rows
-              are ever touched on rollback, and the source ERP company is never modified.
+              Run each step independently, strictly in the order shown. All steps are idempotent and safe to re-run;
+              only tracked rows are ever touched on rollback, and the source ERP company is never modified.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             {[
               {
                 key: "stockMaster",
-                label: "4a. Stock Master (groups, grades, categories, items)",
+                label: "Step 4 — Stock Master (groups, grades, categories, items)",
                 icon: Layers,
                 endpoint: "/api/sp/migration/gc-stock-master",
                 extraBody: {},
               },
               {
                 key: "stockOpening",
-                label: "4b. Location-aware Stock Opening",
+                label: "Step 5 — Stock Opening by Location",
                 icon: Package,
                 endpoint: "/api/sp/migration/gc-stock-opening",
                 extraBody: {},
               },
               {
                 key: "salesReadonly",
-                label: "4c. Historical Sales (read-only)",
+                label: "Step 6 — Historical Sales (read-only)",
                 icon: FileText,
                 endpoint: "/api/sp/migration/gc-sales-readonly",
                 extraBody: {},
               },
               {
                 key: "containers",
-                label: "4d. Containers → SP (incl. Goods-OTW accounting)",
+                label: "Step 7 — Containers (incl. Goods-OTW accounting)",
                 icon: Building2,
                 endpoint: "/api/sp/migration/gc-containers",
                 extraBody: {},
@@ -817,25 +817,46 @@ export default function GcLshiMigration() {
                 }}
               />
             ))}
-
-            <div className="border-t pt-4">
-              <ProfitOpeningRunner targetCompanyId={targetCompanyId} onDone={() => refetchRuns()} />
-            </div>
-
-            <div className="border-t pt-4">
-              <ReconciliationRunner sourceCompanyId={sourceCompanyId} targetCompanyId={targetCompanyId} />
-            </div>
           </CardContent>
         </Card>
       )}
 
-      {/* Step 5 — Run History */}
+      {/* Step 8 — Profit-share Opening */}
+      {targetCompanyId && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <DollarSign className="h-4 w-4" />
+              Step 8 — Profit-share Opening
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ProfitOpeningRunner targetCompanyId={targetCompanyId} onDone={() => refetchRuns()} />
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Step 9 — Final Reconciliation */}
+      {sourceCompanyId && targetCompanyId && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <CheckCircle2 className="h-4 w-4" />
+              Step 9 — Final Reconciliation
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ReconciliationRunner sourceCompanyId={sourceCompanyId} targetCompanyId={targetCompanyId} />
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Step 10 — Run History */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">
             <RotateCcw className="h-4 w-4" />
-            Step 5 — Run History &amp; Rollback
-
+            Step 10 — Run History &amp; Rollback
           </CardTitle>
           <CardDescription>All migration runs. You can rollback any non-rolled-back run.</CardDescription>
         </CardHeader>
@@ -1199,19 +1220,22 @@ function ReconciliationRunner({
 }) {
   const [report, setReport] = useState<{
     overall: string;
-    areas: Array<{ area: string; status: string; detail: string; mismatches?: string[] }>;
+    areas: Array<{ area: string; status: string; detail?: string; details?: string; mismatches?: string[] }>;
   } | null>(null);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   async function run() {
     setLoading(true);
+    setError(null);
     try {
       const r = await fetch(`/api/sp/migration/gc-reconciliation?sourceCompanyId=${sourceCompanyId}&targetCompanyId=${targetCompanyId}`);
       const data = await r.json();
-      if (!r.ok) throw new Error(data.message);
+      if (!r.ok) throw new Error(data.message ?? `Request failed (${r.status})`);
       setReport(data);
-    } catch {
-      setReport(null);
+    } catch (err: any) {
+      // Keep the previous report visible; surface the real error instead of silently clearing it.
+      setError(err.message ?? "Reconciliation failed");
     } finally {
       setLoading(false);
     }
@@ -1228,6 +1252,11 @@ function ReconciliationRunner({
           {loading ? "Checking…" : "Check"}
         </Button>
       </div>
+      {error && (
+        <p className="text-xs text-destructive" data-testid="text-reconciliation-error">
+          {error}
+        </p>
+      )}
       {report && (
         <div className="border rounded-md overflow-auto">
           <Table>
@@ -1251,7 +1280,7 @@ function ReconciliationRunner({
                     </Badge>
                   </TableCell>
                   <TableCell className="text-xs text-muted-foreground align-top">
-                    <p>{a.detail}</p>
+                    <p>{a.detail ?? a.details}</p>
                     {(a.mismatches ?? []).length > 0 && (
                       <ul className="mt-1 list-disc list-inside space-y-0.5 max-h-40 overflow-auto">
                         {a.mismatches!.map((m, i) => (

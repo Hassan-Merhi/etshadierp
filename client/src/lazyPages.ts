@@ -233,5 +233,4 @@ export const SpSetup = lazy(() => import("@/pages/sp/SpSetup"));
 export const SpReports = lazy(() => import("@/pages/sp/SpReports"));
 export const SpOpeningStock = lazy(() => import("@/pages/sp/SpOpeningStock"));
 export const SpAliases = lazy(() => import("@/pages/sp/SpAliases"));
-export const SpMigrationRehearsal = lazy(() => import("@/pages/sp/SpMigrationRehearsal"));
 export const GcLshiMigration = lazy(() => import("@/pages/sp/GcLshiMigration"));

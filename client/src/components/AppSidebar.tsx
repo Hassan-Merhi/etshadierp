@@ -286,7 +286,6 @@ export function AppSidebar({ user }: { user?: any }) {
                 items: [
                   { title: "SP Reports", url: "/sp/reports", icon: BarChart3 },
                   { title: "Setup", url: "/sp/setup", icon: Wrench },
-                  { title: "Migration", url: "/sp/migration", icon: ArrowLeftRight },
                   { title: "GC Migration", url: "/sp/gc-migration", icon: Building2 },
                 ],
               }}

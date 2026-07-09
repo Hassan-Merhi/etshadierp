@@ -68,7 +68,6 @@ import {
   SalesToolsHub,
   Settings,
   SpAliases,
-  SpMigrationRehearsal,
   SpOpeningStock,
   SpReports,
   SpSetup,
@@ -475,7 +474,8 @@ export function ErpRoutes({ user }: ErpRoutesProps) {
       <Route path="/sp/opening-stock" component={SpOpeningStock} />
       <Route path="/sp/reports" component={SpReports} />
       <Route path="/sp/aliases" component={SpAliases} />
-      <Route path="/sp/migration" component={SpMigrationRehearsal} />
+      {/* Legacy path: redirect to the safe staged migration UI instead of the retired all-in-one page */}
+      <Route path="/sp/migration" component={GcLshiMigration} />
       <Route path="/sp/gc-migration" component={GcLshiMigration} />
       <Route path="/sp/setup" component={SpSetup} />
 
