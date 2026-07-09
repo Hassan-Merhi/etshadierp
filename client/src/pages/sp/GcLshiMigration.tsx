@@ -423,9 +423,9 @@ export default function GcLshiMigration() {
             {preview && !previewLoading && (
               <div className="space-y-4">
                 {/* Warnings */}
-                {preview.warnings.length > 0 && (
+                {(preview.warnings ?? []).length > 0 && (
                   <div className="space-y-1">
-                    {preview.warnings.map((w, i) => (
+                    {(preview.warnings ?? []).map((w, i) => (
                       <div
                         key={i}
                         className="flex items-start gap-2 text-sm text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30 rounded-md px-3 py-2"
@@ -441,24 +441,26 @@ export default function GcLshiMigration() {
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                   <div className="rounded-md border p-3 space-y-0.5">
                     <p className="text-xs text-muted-foreground">Stock Items</p>
-                    <p className="text-lg font-semibold">{preview.stockSummary.itemCount}</p>
-                    <p className="text-xs text-muted-foreground">{preview.stockSummary.alreadyMapped} already mapped</p>
+                    <p className="text-lg font-semibold">{preview.stockSummary?.itemCount ?? 0}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {preview.stockSummary?.alreadyMapped ?? 0} already mapped
+                    </p>
                   </div>
                   <div className="rounded-md border p-3 space-y-0.5">
                     <p className="text-xs text-muted-foreground">Total Stock Value</p>
-                    <p className="text-lg font-semibold">${fmt(preview.stockSummary.totalValueUsd)}</p>
-                    <p className="text-xs text-muted-foreground">{fmt(preview.stockSummary.totalQty)} units</p>
+                    <p className="text-lg font-semibold">${fmt(preview.stockSummary?.totalValueUsd ?? 0)}</p>
+                    <p className="text-xs text-muted-foreground">{fmt(preview.stockSummary?.totalQty ?? 0)} units</p>
                   </div>
                   <div className="rounded-md border p-3 space-y-0.5">
                     <p className="text-xs text-muted-foreground">Sale Vouchers</p>
-                    <p className="text-lg font-semibold">{preview.voucherSummary.sourceCount}</p>
+                    <p className="text-lg font-semibold">{preview.voucherSummary?.sourceCount ?? 0}</p>
                     <p className="text-xs text-muted-foreground">
-                      {preview.voucherSummary.alreadyMigrated} already migrated
+                      {preview.voucherSummary?.alreadyMigrated ?? 0} already migrated
                     </p>
                   </div>
                   <div className="rounded-md border p-3 space-y-0.5">
                     <p className="text-xs text-muted-foreground">Voucher Total</p>
-                    <p className="text-lg font-semibold">${fmt(preview.voucherSummary.totalAmount)}</p>
+                    <p className="text-lg font-semibold">${fmt(preview.voucherSummary?.totalAmount ?? 0)}</p>
                     <p className="text-xs text-muted-foreground">historical sales</p>
                   </div>
                 </div>
@@ -467,7 +469,7 @@ export default function GcLshiMigration() {
                 <div className="space-y-2">
                   <p className="text-sm font-medium">SP Accounts (10 standard)</p>
                   <div className="flex flex-wrap gap-1.5">
-                    {preview.spAccountsStatus.map((a) => (
+                    {(preview.spAccountsStatus ?? []).map((a) => (
                       <Badge key={a.subType} variant={a.exists ? "secondary" : "outline"} className="gap-1">
                         {a.exists ? (
                           <CheckCircle2 className="h-3 w-3 text-green-600 dark:text-green-400" />
@@ -480,7 +482,7 @@ export default function GcLshiMigration() {
                   </div>
                   <p className="text-sm font-medium mt-2">GC Profit Accounts (2 new)</p>
                   <div className="flex flex-wrap gap-1.5">
-                    {preview.gcProfitAccountsStatus.map((a) => (
+                    {(preview.gcProfitAccountsStatus ?? []).map((a) => (
                       <Badge key={a.subType} variant={a.exists ? "secondary" : "outline"} className="gap-1">
                         {a.exists ? (
                           <CheckCircle2 className="h-3 w-3 text-green-600 dark:text-green-400" />
@@ -504,7 +506,7 @@ export default function GcLshiMigration() {
                     >
                       {stockTableOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
                       <Package className="h-4 w-4" />
-                      Show stock items ({preview.stockItems.length})
+                      Show stock items ({(preview.stockItems ?? []).length})
                     </Button>
                   </CollapsibleTrigger>
                   <CollapsibleContent>
@@ -521,7 +523,7 @@ export default function GcLshiMigration() {
                           </TableRow>
                         </TableHeader>
                         <TableBody>
-                          {preview.stockItems.map((item) => (
+                          {(preview.stockItems ?? []).map((item) => (
                             <TableRow key={item.code}>
                               <TableCell className="font-mono text-xs">{item.code}</TableCell>
                               <TableCell className="text-sm">{item.name}</TableCell>

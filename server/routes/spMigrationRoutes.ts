@@ -358,179 +358,185 @@ async function ensureTargetStockItems(
   return { map, groupsCreated, gradesCreated, categoriesCreated, itemsCreated, itemsReused };
 }
 
+// ── Shared read-only preview builder ────────────────────────────────────────
+// Used by both /gc-preview (canonical) and /preview (legacy alias, same shape).
+// NO writes. Returns what WOULD be migrated by the staged flow.
+async function buildGcMigrationPreview(sourceId: number, targetId: number) {
+  const sourceComp = await getCompanyRow(sourceId);
+  const targetComp = await getCompanyRow(targetId);
+  if (!sourceComp) return { status: 404, body: { message: "Source company not found" } };
+  if (!targetComp) return { status: 404, body: { message: "Target company not found" } };
+  if (sourceComp.company_type !== "erp")
+    return { status: 400, body: { message: "Source company must be type 'erp'" } };
+  if (targetComp.company_type !== "supplier_partner")
+    return { status: 400, body: { message: "Target company must be type 'supplier_partner'" } };
+
+  // Stock items with positive inventory in source
+  const stockRows = (
+    await db.execute(sql`
+    SELECT si.id AS stock_item_id, si.code, si.name, inv.quantity, inv.average_rate,
+           ROUND(inv.quantity * COALESCE(inv.average_rate, 0), 4) AS total_value
+    FROM stock_items si
+    JOIN inventory inv ON inv.stock_item_id = si.id AND inv.company_id = ${sourceId}
+    WHERE si.company_id = ${sourceId} AND si.deleted_at IS NULL AND inv.quantity > 0
+    ORDER BY si.code
+  `)
+  ).rows as any[];
+
+  // aliasExists is a per-item display flag only — NOT the mapping check (see below).
+  const existingAliases = (
+    await db.execute(sql`
+    SELECT alias_code FROM stock_item_code_aliases WHERE company_id = ${targetId}
+  `)
+  ).rows as any[];
+  const existingAliasCodes = new Set(existingAliases.map((r: any) => r.alias_code));
+
+  // Real mapping check: has this source stock item already been linked to a target
+  // stock item by a prior staged migration run (sp_migration_source_links)?
+  let mappedSourceIds = new Set<number>();
+  if (stockRows.length > 0) {
+    const linkedRows = (
+      await db.execute(sql`
+      SELECT DISTINCT l.source_id
+      FROM sp_migration_source_links l
+      JOIN stock_items ti ON ti.id = l.target_id AND ti.company_id = ${targetId} AND ti.deleted_at IS NULL
+      WHERE l.source_table = 'stock_items' AND l.target_table = 'stock_items'
+        AND l.source_id IN (${sql.join(
+          stockRows.map((r: any) => sql`${pn(r.stock_item_id)}`),
+          sql`, `
+        )})
+    `)
+    ).rows as any[];
+    mappedSourceIds = new Set(linkedRows.map((r: any) => pn(r.source_id)));
+  }
+
+  const stockItems = stockRows.map((r: any) => ({
+    code: r.code,
+    name: r.name,
+    quantity: pn(r.quantity),
+    averageCostUsd: pn(r.average_rate),
+    totalValueUsd: pn(r.total_value),
+    aliasExists: existingAliasCodes.has(r.code),
+  }));
+
+  // Sale vouchers in source (support 'Sales' and legacy 'Sale')
+  const voucherRow = (
+    await db.execute(sql`
+    SELECT COUNT(*) AS cnt, COALESCE(SUM(total_amount), 0) AS total
+    FROM vouchers
+    WHERE company_id = ${sourceId} AND voucher_type IN ('Sales', 'Sale') AND deleted_at IS NULL
+  `)
+  ).rows[0] as any;
+
+  // Already-migrated vouchers in target: linked from a source sale voucher, OR
+  // carrying the migration-only marker (prefix + source_module).
+  const migratedRow = (
+    await db.execute(sql`
+    SELECT COUNT(*) AS cnt FROM vouchers v
+    WHERE v.company_id = ${targetId} AND v.deleted_at IS NULL
+      AND (
+        v.id IN (
+          SELECT target_id FROM sp_migration_source_links
+          WHERE source_table = 'vouchers' AND target_table = 'vouchers'
+        )
+        OR v.voucher_number LIKE 'MIG-GC-%'
+        OR v.source_module = 'SP_MIGRATION_READONLY'
+      )
+  `)
+  ).rows[0] as any;
+
+  // SP accounts status
+  const spAcctRows = (
+    await db.execute(sql`
+    SELECT sub_type FROM ledger_accounts
+    WHERE company_id = ${targetId} AND deleted_at IS NULL AND sub_type LIKE 'sp_%'
+  `)
+  ).rows as any[];
+  const existingSpSubTypes = new Set(spAcctRows.map((r: any) => r.sub_type));
+  const spAccountsStatus = SP_ACCOUNTS.map((a) => ({
+    subType: a.subType,
+    name: a.name,
+    exists: existingSpSubTypes.has(a.subType),
+  }));
+
+  // GC profit accounts status (current subtypes + legacy ones from earlier tool versions)
+  const gcAllSubTypes = [...GC_PROFIT_ACCOUNTS.map((a) => a.subType), ...LEGACY_GC_PROFIT_SUBTYPES];
+  const gcAcctRows = (
+    await db.execute(sql`
+    SELECT sub_type, name FROM ledger_accounts
+    WHERE company_id = ${targetId} AND deleted_at IS NULL AND sub_type = ANY(${gcAllSubTypes})
+  `)
+  ).rows as any[];
+  const existingGcSubTypes = new Map(gcAcctRows.map((r: any) => [r.sub_type, r.name]));
+
+  const totalQty = stockItems.reduce((s: number, i: any) => s + i.quantity, 0);
+  const totalValue = stockItems.reduce((s: number, i: any) => s + i.totalValueUsd, 0);
+  const alreadyMapped = mappedSourceIds.size;
+
+  const warnings: string[] = [];
+  if (stockItems.length === 0) warnings.push("No stock items with positive inventory found in source company.");
+  if (alreadyMapped > 0)
+    warnings.push(
+      `${alreadyMapped} stock item(s) already have source-to-target migration links and will be reused by staged steps.`
+    );
+  if (pn(migratedRow.cnt) > 0)
+    warnings.push(
+      `${pn(migratedRow.cnt)} voucher(s) already migrated in target — re-running will create duplicates. Rollback first.`
+    );
+  warnings.push("Open/OTW containers can be migrated in the Containers step. Review OTW accounting after migration.");
+  warnings.push(
+    "Duty/surcharge/fumigation/other charges are not auto-posted unless safely mapped; review warnings after the Containers step."
+  );
+  warnings.push("Cash and bank balances must be posted separately if needed.");
+  warnings.push("This preview is read-only. No data has been written.");
+
+  return {
+    status: 200,
+    body: {
+      sourceCompany: { id: sourceComp.id, code: sourceComp.code, name: sourceComp.name },
+      targetCompany: { id: targetComp.id, code: targetComp.code, name: targetComp.name },
+      stockSummary: {
+        itemCount: stockItems.length,
+        totalQty: Math.round(totalQty * 1000) / 1000,
+        totalValueUsd: Math.round(totalValue * 100) / 100,
+        alreadyMapped,
+      },
+      stockItems,
+      voucherSummary: {
+        sourceCount: pn(voucherRow.cnt),
+        totalAmount: pn(voucherRow.total),
+        alreadyMigrated: pn(migratedRow.cnt),
+      },
+      spAccountsStatus,
+      gcProfitAccountsStatus: GC_PROFIT_ACCOUNTS.map((a) => ({
+        subType: a.subType,
+        name: existingGcSubTypes.get(a.subType) ?? a.name,
+        exists: existingGcSubTypes.has(a.subType),
+      })),
+      warnings,
+    },
+  };
+}
+
 // ── Route Registration ─────────────────────────────────────────────────────────
 
 export function registerSpMigrationRoutes(app: Express) {
   // ── GET /api/sp/migration/preview ────────────────────────────────────────
-  // Dry run — NO writes. Returns what WOULD be copied.
+  // Legacy alias — kept only for backward compatibility. Returns the exact same
+  // shape as /gc-preview (see buildGcMigrationPreview) so no two preview
+  // endpoints ever disagree on field names again.
   app.get("/api/sp/migration/preview", requireAuth, requireRole("Developer"), async (req: any, res: any) => {
     try {
       const sourceId = parseInt(String(req.query.sourceCompanyId ?? ""), 10);
       const targetId = parseInt(String(req.query.targetCompanyId ?? ""), 10);
-
       if (!sourceId || !targetId) {
         return res.status(400).json({ message: "sourceCompanyId and targetCompanyId are required" });
       }
       if (sourceId === targetId) {
         return res.status(400).json({ message: "Source and target companies must be different" });
       }
-
-      const sourceComp = await getCompanyRow(sourceId);
-      const targetComp = await getCompanyRow(targetId);
-
-      if (!sourceComp) return res.status(404).json({ message: "Source company not found" });
-      if (!targetComp) return res.status(404).json({ message: "Target company not found" });
-
-      if (sourceComp.company_type !== "erp") {
-        return res.status(400).json({ message: "Source company must be type 'erp'" });
-      }
-      if (targetComp.company_type !== "supplier_partner") {
-        return res.status(400).json({ message: "Target company must be type 'supplier_partner'" });
-      }
-
-      // 1. Stock items with positive inventory
-      const stockRows = (
-        await db.execute(sql`
-        SELECT
-          si.id            AS stock_item_id,
-          si.code,
-          si.name,
-          si.unit,
-          inv.quantity,
-          inv.average_rate,
-          ROUND(inv.quantity * COALESCE(inv.average_rate, 0), 4) AS total_value
-        FROM stock_items si
-        JOIN inventory inv ON inv.stock_item_id = si.id AND inv.company_id = ${sourceId}
-        WHERE si.company_id = ${sourceId}
-          AND si.deleted_at IS NULL
-          AND inv.quantity > 0
-        ORDER BY si.code
-      `)
-      ).rows as any[];
-
-      // 2. Which items already have aliases in target
-      const existingAliases = (
-        await db.execute(sql`
-        SELECT alias_code FROM stock_item_code_aliases WHERE company_id = ${targetId}
-      `)
-      ).rows as any[];
-      const existingAliasCodes = new Set(existingAliases.map((r: any) => r.alias_code));
-
-      const stockItems = stockRows.map((r: any) => ({
-        stockItemId: pn(r.stock_item_id),
-        code: r.code,
-        name: r.name,
-        unit: r.unit,
-        quantity: pn(r.quantity),
-        averageCostUsd: pn(r.average_rate),
-        totalValueUsd: pn(r.total_value),
-        aliasExists: existingAliasCodes.has(r.code),
-        openingStockExists: false, // always fresh in a new run
-      }));
-
-      // 3. SP accounts status in target
-      const spAcctRows = (
-        await db.execute(sql`
-        SELECT sub_type FROM ledger_accounts
-        WHERE company_id = ${targetId} AND deleted_at IS NULL AND sub_type LIKE 'sp_%'
-      `)
-      ).rows as any[];
-      const existingSpSubTypes = new Set(spAcctRows.map((r: any) => r.sub_type));
-      const spAccountsStatus = SP_ACCOUNTS.map((a) => ({
-        subType: a.subType,
-        name: a.name,
-        exists: existingSpSubTypes.has(a.subType),
-      }));
-
-      // 4. Sales totals in source (support 'Sales' and legacy 'Sale')
-      const salesRow = (
-        await db.execute(sql`
-        SELECT COUNT(*) AS cnt, COALESCE(SUM(total_amount), 0) AS total
-        FROM vouchers
-        WHERE company_id = ${sourceId} AND voucher_type IN ('Sales', 'Sale')
-          AND deleted_at IS NULL
-      `)
-      ).rows[0] as any;
-
-      // 5. Top cash/bank/payable accounts in source (approximate, computed from entries)
-      const balanceRows = (
-        await db.execute(sql`
-        SELECT
-          la.code, la.name, la.account_type,
-          COALESCE(
-            (SELECT SUM(ve.debit_amount) - SUM(ve.credit_amount)
-             FROM voucher_entries ve
-             JOIN vouchers v ON v.id = ve.voucher_id
-             WHERE ve.ledger_account_id = la.id AND v.deleted_at IS NULL), 0
-          ) AS balance
-        FROM ledger_accounts la
-        WHERE la.company_id = ${sourceId}
-          AND la.deleted_at IS NULL
-          AND la.account_type IN ('Cash', 'Bank', 'Creditor', 'Liability', 'Current Liability')
-        ORDER BY la.account_type, la.name
-        LIMIT 25
-      `)
-      ).rows as any[];
-
-      // 6. Totals summary
-      const totalQty = stockItems.reduce((s: number, i: any) => s + i.quantity, 0);
-      const totalValue = stockItems.reduce((s: number, i: any) => s + i.totalValueUsd, 0);
-      const alreadyMapped = stockItems.filter((i: any) => i.aliasExists).length;
-      const unmapped = stockItems.filter((i: any) => !i.aliasExists).length;
-
-      // 7. Warnings
-      const warnings: string[] = [];
-      if (stockItems.length === 0) warnings.push("No stock items with positive inventory found in source company.");
-      if (alreadyMapped > 0)
-        warnings.push(
-          `${alreadyMapped} item(s) already have aliases in target — they will be skipped during rehearsal copy.`
-        );
-      warnings.push(
-        "Open/OTW containers can be migrated in the Containers step. Review OTW accounting after migration."
-      );
-      warnings.push(
-        "Cash and bank balances shown below are approximate (debit minus credit sum). Verify in source ERP before migrating."
-      );
-      warnings.push(
-        "Prepaid charges and accrued duties cannot be automatically detected — add them manually after rehearsal copy."
-      );
-      warnings.push("This is a REHEARSAL PREVIEW only. No data has been written.");
-
-      return res.json({
-        dryRun: true,
-        sourceCompany: {
-          id: sourceComp.id,
-          code: sourceComp.code,
-          name: sourceComp.name,
-          type: sourceComp.company_type,
-        },
-        targetCompany: {
-          id: targetComp.id,
-          code: targetComp.code,
-          name: targetComp.name,
-          type: targetComp.company_type,
-        },
-        stockItems,
-        totals: {
-          itemCount: stockItems.length,
-          totalQty: Math.round(totalQty * 1000) / 1000,
-          totalValueUsd: Math.round(totalValue * 100) / 100,
-          alreadyMapped,
-          willBeCopied: unmapped,
-        },
-        spAccountsStatus,
-        salesSummary: {
-          voucherCount: pn(salesRow.cnt),
-          totalAmount: pn(salesRow.total),
-        },
-        balanceAccounts: balanceRows.map((r: any) => ({
-          code: r.code,
-          name: r.name,
-          accountType: r.account_type,
-          balance: pn(r.balance),
-        })),
-        warnings,
-      });
+      const { status, body } = await buildGcMigrationPreview(sourceId, targetId);
+      return res.status(status).json(body);
     } catch (err: any) {
       console.error("[SP Migration] preview error:", err);
       return res.status(500).json({ message: "Internal server error" });
@@ -788,7 +794,8 @@ export function registerSpMigrationRoutes(app: Express) {
   );
 
   // ── GET /api/sp/migration/gc-preview ─────────────────────────────────────
-  // Extended preview that also shows sale voucher counts for the GC migration.
+  // Canonical read-only preview for the staged GC migration flow. Developer-only,
+  // no writes. See buildGcMigrationPreview for the exact response shape.
   app.get("/api/sp/migration/gc-preview", requireAuth, requireRole("Developer"), async (req: any, res: any) => {
     try {
       const sourceId = parseInt(String(req.query.sourceCompanyId ?? ""), 10);
@@ -798,120 +805,8 @@ export function registerSpMigrationRoutes(app: Express) {
         return res.status(400).json({ message: "sourceCompanyId and targetCompanyId are required" });
       if (sourceId === targetId) return res.status(400).json({ message: "Source and target must be different" });
 
-      const sourceComp = await getCompanyRow(sourceId);
-      const targetComp = await getCompanyRow(targetId);
-      if (!sourceComp) return res.status(404).json({ message: "Source company not found" });
-      if (!targetComp) return res.status(404).json({ message: "Target company not found" });
-      if (sourceComp.company_type !== "erp")
-        return res.status(400).json({ message: "Source company must be type 'erp'" });
-      if (targetComp.company_type !== "supplier_partner")
-        return res.status(400).json({ message: "Target company must be type 'supplier_partner'" });
-
-      // Stock items with positive inventory
-      const stockRows = (
-        await db.execute(sql`
-        SELECT si.id AS stock_item_id, si.code, si.name, inv.quantity, inv.average_rate,
-               ROUND(inv.quantity * COALESCE(inv.average_rate, 0), 4) AS total_value
-        FROM stock_items si
-        JOIN inventory inv ON inv.stock_item_id = si.id AND inv.company_id = ${sourceId}
-        WHERE si.company_id = ${sourceId} AND si.deleted_at IS NULL AND inv.quantity > 0
-        ORDER BY si.code
-      `)
-      ).rows as any[];
-
-      const existingAliases = (
-        await db.execute(sql`
-        SELECT alias_code FROM stock_item_code_aliases WHERE company_id = ${targetId}
-      `)
-      ).rows as any[];
-      const existingAliasCodes = new Set(existingAliases.map((r: any) => r.alias_code));
-
-      const stockItems = stockRows.map((r: any) => ({
-        stockItemId: pn(r.stock_item_id),
-        code: r.code,
-        name: r.name,
-        quantity: pn(r.quantity),
-        averageCostUsd: pn(r.average_rate),
-        totalValueUsd: pn(r.total_value),
-        aliasExists: existingAliasCodes.has(r.code),
-      }));
-
-      // Sale vouchers in source (support 'Sales' and legacy 'Sale')
-      const voucherRow = (
-        await db.execute(sql`
-        SELECT COUNT(*) AS cnt, COALESCE(SUM(total_amount), 0) AS total
-        FROM vouchers
-        WHERE company_id = ${sourceId} AND voucher_type IN ('Sales', 'Sale') AND deleted_at IS NULL
-      `)
-      ).rows[0] as any;
-
-      // Already migrated vouchers in target
-      const migratedRow = (
-        await db.execute(sql`
-        SELECT COUNT(*) AS cnt FROM vouchers
-        WHERE company_id = ${targetId} AND voucher_number LIKE 'MIG-%' AND deleted_at IS NULL
-      `)
-      ).rows[0] as any;
-
-      // SP accounts status
-      const spAcctRows = (
-        await db.execute(sql`
-        SELECT sub_type FROM ledger_accounts
-        WHERE company_id = ${targetId} AND deleted_at IS NULL AND sub_type LIKE 'sp_%'
-      `)
-      ).rows as any[];
-      const existingSpSubTypes = new Set(spAcctRows.map((r: any) => r.sub_type));
-      const spAccountsStatus = SP_ACCOUNTS.map((a) => ({
-        subType: a.subType,
-        name: a.name,
-        exists: existingSpSubTypes.has(a.subType),
-      }));
-
-      // GC profit accounts status (current subtypes + legacy ones from earlier tool versions)
-      const gcAllSubTypes = [...GC_PROFIT_ACCOUNTS.map((a) => a.subType), ...LEGACY_GC_PROFIT_SUBTYPES];
-      const gcAcctRows = (
-        await db.execute(sql`
-        SELECT sub_type, name FROM ledger_accounts
-        WHERE company_id = ${targetId} AND deleted_at IS NULL AND sub_type = ANY(${gcAllSubTypes})
-      `)
-      ).rows as any[];
-      const existingGcSubTypes = new Map(gcAcctRows.map((r: any) => [r.sub_type, r.name]));
-
-      const totalQty = stockItems.reduce((s: number, i: any) => s + i.quantity, 0);
-      const totalValue = stockItems.reduce((s: number, i: any) => s + i.totalValueUsd, 0);
-
-      return res.json({
-        sourceCompany: { id: sourceComp.id, code: sourceComp.code, name: sourceComp.name },
-        targetCompany: { id: targetComp.id, code: targetComp.code, name: targetComp.name },
-        stockSummary: {
-          itemCount: stockItems.length,
-          totalQty: Math.round(totalQty * 1000) / 1000,
-          totalValueUsd: Math.round(totalValue * 100) / 100,
-          alreadyMapped: stockItems.filter((i: any) => i.aliasExists).length,
-        },
-        stockItems,
-        voucherSummary: {
-          sourceCount: pn(voucherRow.cnt),
-          totalAmount: pn(voucherRow.total),
-          alreadyMigrated: pn(migratedRow.cnt),
-        },
-        spAccountsStatus,
-        gcProfitAccountsStatus: GC_PROFIT_ACCOUNTS.map((a) => ({
-          subType: a.subType,
-          name: existingGcSubTypes.get(a.subType) ?? a.name,
-          exists: existingGcSubTypes.has(a.subType),
-        })),
-        warnings: [
-          pn(migratedRow.cnt) > 0
-            ? `${pn(migratedRow.cnt)} voucher(s) already migrated in target — re-running will create duplicates. Rollback first.`
-            : null,
-          "Open/OTW containers can be migrated in the Containers step. Review OTW accounting after migration.",
-          "Duty/surcharge/fumigation/other charges are not auto-posted unless safely mapped; review warnings after the Containers step.",
-          "Cash and bank balances must be posted separately if needed.",
-          "This preview is read-only. No data has been written.",
-          "Voucher account mapping uses account type matching. Unmapped entries will be routed to a suspense account.",
-        ].filter(Boolean),
-      });
+      const { status, body } = await buildGcMigrationPreview(sourceId, targetId);
+      return res.status(status).json(body);
     } catch (err: any) {
       console.error("[SP Migration] gc-preview error:", err);
       return res.status(500).json({ message: "Internal server error" });
