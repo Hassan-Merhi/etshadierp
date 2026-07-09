@@ -782,7 +782,9 @@ export default function BarcodeLookup() {
                   )}
                 </div>
                 <div className="px-4 py-4 space-y-4">
-                  {/* Row 1: Key fields */}
+                  {/* Row 1: Key fields — always sourced from the label print itself, so they
+                      show even when no live factory_bales row is linked (e.g. bale record
+                      deleted/never created after the label was printed). */}
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                     <div>
                       <p className="text-xs text-muted-foreground uppercase tracking-wide mb-0.5">Reference Number</p>
@@ -803,23 +805,27 @@ export default function BarcodeLookup() {
                         {formatDateOnly(referenceResult.labelPrint.printedAt as any) ?? "N/A"}
                       </p>
                     </div>
-                    {referenceResult.baleInfo?.productName && (
-                      <div>
-                        <p className="text-xs text-muted-foreground uppercase tracking-wide mb-0.5">Product Name</p>
-                        <p className="font-semibold" data-testid="text-bale-product-name">
-                          {referenceResult.baleInfo.productName}
-                        </p>
-                        <p
-                          className="text-xs text-muted-foreground mt-0.5 flex items-center gap-1"
-                          data-testid="text-ref-printed-by"
-                        >
-                          <User className="h-3 w-3" />
-                          {(referenceResult.labelPrint as any).printedByName ||
-                            referenceResult.labelPrint.printedByUserId ||
-                            "Unknown"}
-                        </p>
-                      </div>
-                    )}
+                    <div>
+                      <p className="text-xs text-muted-foreground uppercase tracking-wide mb-0.5">Product Name</p>
+                      <p className="font-semibold" data-testid="text-bale-product-name">
+                        {(referenceResult.baleInfo as any)?.productName || (referenceResult.product as any)?.name || "—"}
+                      </p>
+                      <p
+                        className="text-xs text-muted-foreground mt-0.5 flex items-center gap-1"
+                        data-testid="text-ref-printed-by"
+                      >
+                        <User className="h-3 w-3" />
+                        {(referenceResult.labelPrint as any).printedByName ||
+                          referenceResult.labelPrint.printedByUserId ||
+                          "Unknown"}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground uppercase tracking-wide mb-0.5">Pieces</p>
+                      <p className="font-mono font-semibold" data-testid="text-ref-pieces">
+                        {(referenceResult.labelPrint as any).pieces ?? 1}
+                      </p>
+                    </div>
                     {referenceResult.baleInfo?.workerName && (
                       <div>
                         <p className="text-xs text-muted-foreground uppercase tracking-wide mb-0.5">Worker</p>
@@ -833,9 +839,11 @@ export default function BarcodeLookup() {
 
                   {/* Row 2: Weight + Grade + Scan button */}
                   <div className="flex items-center gap-6 flex-wrap">
-                    {referenceResult.baleInfo && (
-                      <div>
-                        <p className="text-xs text-muted-foreground uppercase tracking-wide mb-0.5">Actual Weight</p>
+                    <div>
+                      <p className="text-xs text-muted-foreground uppercase tracking-wide mb-0.5">
+                        {referenceResult.baleInfo ? "Actual Weight" : "Approx. Weight"}
+                      </p>
+                      {referenceResult.baleInfo ? (
                         <button
                           className="group flex items-center gap-1.5 hover:text-foreground"
                           onClick={() => referenceResult.baleInfo && setWeightEditBale({ id: referenceResult.baleInfo.id, referenceNumber: referenceResult.labelPrint?.referenceNumber || "", weightKg: referenceResult.baleInfo.weightKg })}
@@ -846,12 +854,22 @@ export default function BarcodeLookup() {
                           </span>
                           <Pencil className="h-3.5 w-3.5 opacity-0 group-hover:opacity-60 shrink-0" />
                         </button>
-                      </div>
-                    )}
+                      ) : (
+                        <span className="font-bold font-mono text-base">
+                          {smartNum((referenceResult.labelPrint as any).approxWeightKg)} KG
+                        </span>
+                      )}
+                    </div>
                     {referenceResult.baleInfo?.grade && (
                       <div>
                         <p className="text-xs text-muted-foreground uppercase tracking-wide mb-0.5">Grade</p>
                         <p className="font-semibold">{referenceResult.baleInfo.grade}</p>
+                      </div>
+                    )}
+                    {!referenceResult.baleInfo && (
+                      <div className="text-xs text-muted-foreground flex items-center gap-1">
+                        <AlertTriangle className="h-3.5 w-3.5 text-amber-500" />
+                        No linked bale record — showing label-print details only.
                       </div>
                     )}
                     {referenceResult.labelPrint.scannedAt ? (
