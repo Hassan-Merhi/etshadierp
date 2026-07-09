@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -7,7 +7,6 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Progress } from "@/components/ui/progress";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -82,12 +81,6 @@ interface MigrationRun {
   target_name: string;
 }
 
-interface MigProgress {
-  pct: number;
-  step: string;
-  detail?: string;
-}
-
 // ── StatusBadge ────────────────────────────────────────────────────────────
 
 function StatusBadge({ status }: { status: string }) {
@@ -115,18 +108,9 @@ export default function GcLshiMigration() {
   const [previewOpen, setPreviewOpen] = useState(false);
   const [stockTableOpen, setStockTableOpen] = useState(false);
 
-  // Migration confirmation dialog
-  const [showMigrateDialog, setShowMigrateDialog] = useState(false);
-  const [migrateConfirmName, setMigrateConfirmName] = useState("");
-
-  // Account plan / rename state (Step 2.5 — before Run Migration)
+  // Account plan / rename state (Step 2.5 — before staged migration)
   const [accountEdits, setAccountEdits] = useState<Record<string, { code: string; name: string }>>({});
   const [accountsCreated, setAccountsCreated] = useState(false);
-
-  // Live migration progress
-  const [migrating, setMigrating] = useState(false);
-  const [migProgress, setMigProgress] = useState<MigProgress | null>(null);
-  const abortRef = useRef<AbortController | null>(null);
 
   // Opening balance
   const [obAmount, setObAmount] = useState("");
@@ -277,91 +261,6 @@ export default function GcLshiMigration() {
     },
     onError: (e: any) => toast({ title: "Rollback failed", description: e.message, variant: "destructive" }),
   });
-
-  // ── SSE migration runner ──────────────────────────────────────────────────
-
-  async function runMigration() {
-    if (!sourceCompanyId || !targetCompanyId || !migrateConfirmName) return;
-
-    setMigrating(true);
-    setMigProgress({ pct: 0, step: "Starting migration…" });
-    setShowMigrateDialog(false);
-
-    const abort = new AbortController();
-    abortRef.current = abort;
-
-    try {
-      const response = await fetch("/api/sp/migration/gc-rehearsal", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          sourceCompanyId,
-          targetCompanyId,
-          companyNameConfirm: migrateConfirmName,
-          confirmation: "MIGRATE",
-          accountOverrides: accountEdits,
-        }),
-        signal: abort.signal,
-        credentials: "include",
-      });
-
-      // Pre-SSE validation errors arrive as JSON (4xx/5xx)
-      if (!response.ok) {
-        const err = await response.json();
-        throw new Error(err.message ?? "Migration failed");
-      }
-
-      // Parse SSE events from the streaming response body
-      const reader = response.body!.getReader();
-      const decoder = new TextDecoder();
-      let buffer = "";
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        buffer += decoder.decode(value, { stream: true });
-
-        // SSE messages are separated by double newline
-        const messages = buffer.split("\n\n");
-        buffer = messages.pop() ?? "";
-
-        for (const msg of messages) {
-          const dataLine = msg.split("\n").find((l) => l.startsWith("data: "));
-          if (!dataLine) continue;
-          let event: any;
-          try {
-            event = JSON.parse(dataLine.slice(6));
-          } catch {
-            continue;
-          }
-
-          if (event.type === "progress") {
-            setMigProgress({ pct: event.pct, step: event.step, detail: event.detail });
-          } else if (event.type === "done") {
-            setMigProgress({ pct: 100, step: "Complete!" });
-            setTimeout(() => {
-              setMigrating(false);
-              setMigProgress(null);
-              setMigrateConfirmName("");
-            }, 1200);
-            toast({
-              title: "Migration complete",
-              description: `${event.rowsCreated} rows created. Run ID: ${String(event.runId).slice(0, 8)}`,
-            });
-            refetchPreview();
-            refetchRuns();
-          } else if (event.type === "error") {
-            throw new Error(event.message ?? "Migration failed");
-          }
-        }
-      }
-    } catch (err: any) {
-      if (err.name === "AbortError") return;
-      setMigrating(false);
-      setMigProgress(null);
-      toast({ title: "Migration failed", description: err.message, variant: "destructive" });
-    }
-  }
 
   // ── Helpers ─────────────────────────────────────────────────────────────
 
@@ -762,56 +661,13 @@ export default function GcLshiMigration() {
         </Card>
       )}
 
-      {/* Step 3 — Run Migration */}
-      {sourceCompanyId && targetCompanyId && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-base">
-              <Play className="h-4 w-4" />
-              Step 3 — Run Migration
-            </CardTitle>
-            <CardDescription>
-              Copies stock, accounts, GC profit accounts, and historical sale vouchers from{" "}
-              {sourceComp?.name ?? "source"} into {targetComp?.name ?? "target"}.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <Button onClick={() => setShowMigrateDialog(true)} disabled={migrating} data-testid="button-run-migration">
-              {migrating ? (
-                <>
-                  <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                  Migrating…
-                </>
-              ) : (
-                <>
-                  <Play className="h-4 w-4 mr-2" />
-                  Run GC Migration
-                </>
-              )}
-            </Button>
-
-            {/* Live progress bar */}
-            {migrating && migProgress && (
-              <div className="space-y-2 pt-1">
-                <div className="flex items-center justify-between text-xs text-muted-foreground">
-                  <span>{migProgress.step}</span>
-                  <span>{migProgress.pct}%</span>
-                </div>
-                <Progress value={migProgress.pct} className="h-2" />
-                {migProgress.detail && <p className="text-xs text-muted-foreground">{migProgress.detail}</p>}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Step 4 — Opening Balance */}
+      {/* Step 3 — Opening Balance */}
       {targetCompanyId && (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">
               <DollarSign className="h-4 w-4" />
-              Step 4 — Opening Cash Balance
+              Step 3 — Opening Cash Balance
             </CardTitle>
             <CardDescription>Creates a Journal voucher: Dr Cash → Cr Opening Balance Clearing.</CardDescription>
           </CardHeader>
@@ -903,38 +759,45 @@ export default function GcLshiMigration() {
         </Card>
       )}
 
-      {/* Step 4.5 — Stage 2 Full Rehearsal (location-aware stock, read-only sales, containers, profit-share) */}
+      {/* Step 4 — Staged Migration (stock master, stock opening, read-only sales, containers, profit-share) */}
       {sourceCompanyId && targetCompanyId && (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">
               <Layers className="h-4 w-4" />
-              Step 4.5 — Full Rehearsal (Stage 2)
+              Step 4 — Staged Migration
             </CardTitle>
             <CardDescription>
-              Run each area independently. All steps are idempotent and safe to re-run; only tracked rows are ever
-              touched on rollback, and the source ERP company is never modified.
+              Run each area independently, in order. All steps are idempotent and safe to re-run; only tracked rows
+              are ever touched on rollback, and the source ERP company is never modified.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             {[
               {
+                key: "stockMaster",
+                label: "4a. Stock Master (groups, grades, categories, items)",
+                icon: Layers,
+                endpoint: "/api/sp/migration/gc-stock-master",
+                extraBody: {},
+              },
+              {
                 key: "stockOpening",
-                label: "Location-aware Stock Opening",
+                label: "4b. Location-aware Stock Opening",
                 icon: Package,
                 endpoint: "/api/sp/migration/gc-stock-opening",
                 extraBody: {},
               },
               {
                 key: "salesReadonly",
-                label: "Historical Sales (read-only)",
+                label: "4c. Historical Sales (read-only)",
                 icon: FileText,
                 endpoint: "/api/sp/migration/gc-sales-readonly",
                 extraBody: {},
               },
               {
                 key: "containers",
-                label: "Containers → SP",
+                label: "4d. Containers → SP (incl. Goods-OTW accounting)",
                 icon: Building2,
                 endpoint: "/api/sp/migration/gc-containers",
                 extraBody: {},
@@ -972,6 +835,7 @@ export default function GcLshiMigration() {
           <CardTitle className="flex items-center gap-2 text-base">
             <RotateCcw className="h-4 w-4" />
             Step 5 — Run History &amp; Rollback
+
           </CardTitle>
           <CardDescription>All migration runs. You can rollback any non-rolled-back run.</CardDescription>
         </CardHeader>
@@ -1074,46 +938,6 @@ export default function GcLshiMigration() {
               data-testid="button-confirm-create-company"
             >
               {createCompanyMutation.isPending ? "Creating…" : "Create Company"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      {/* Migration Confirmation Dialog */}
-      <AlertDialog
-        open={showMigrateDialog}
-        onOpenChange={(open) => {
-          if (!open && !migrating) setShowMigrateDialog(false);
-        }}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Confirm GC Migration</AlertDialogTitle>
-            <AlertDialogDescription>
-              This will copy stock items, opening stock movements, SP accounts, GC profit accounts, and historical sale
-              vouchers from <strong>{sourceComp?.name}</strong> into <strong>{targetComp?.name}</strong>.
-              <br />
-              <br />
-              Type the source company name exactly to confirm:
-              <strong className="block mt-1">{sourceComp?.name}</strong>
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <div className="py-2">
-            <Input
-              placeholder={sourceComp?.name}
-              value={migrateConfirmName}
-              onChange={(e) => setMigrateConfirmName(e.target.value)}
-              data-testid="input-migrate-confirm-name"
-            />
-          </div>
-          <AlertDialogFooter>
-            <AlertDialogCancel data-testid="button-cancel-migrate">Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={runMigration}
-              disabled={migrateConfirmName !== sourceComp?.name}
-              data-testid="button-confirm-migrate"
-            >
-              Run Migration
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -1256,6 +1080,9 @@ function ProfitOpeningRunner({ targetCompanyId, onDone }: { targetCompanyId: num
   const [cutoffDate, setCutoffDate] = useState(() => new Date().toISOString().split("T")[0]);
   const [accumulatedProfit, setAccumulatedProfit] = useState("");
   const [ourSplitPct, setOurSplitPct] = useState("50");
+  const [useManualSplit, setUseManualSplit] = useState(false);
+  const [ourShareAmount, setOurShareAmount] = useState("");
+  const [supplierShareAmount, setSupplierShareAmount] = useState("");
   const [result, setResult] = useState<any>(null);
 
   const mutation = useMutation({
@@ -1264,7 +1091,9 @@ function ProfitOpeningRunner({ targetCompanyId, onDone }: { targetCompanyId: num
         targetCompanyId,
         cutoffDate,
         accumulatedProfit,
-        ourSplitPct,
+        ...(useManualSplit
+          ? { ourShareAmount, supplierShareAmount }
+          : { ourSplitPct }),
       }),
     onSuccess: async (data: any) => {
       const r = await data.json();
@@ -1300,15 +1129,52 @@ function ProfitOpeningRunner({ targetCompanyId, onDone }: { targetCompanyId: num
             placeholder="0.00"
           />
         </div>
-        <div className="space-y-1">
-          <Label>Our Split %</Label>
-          <Input type="number" min="0" max="100" step="1" value={ourSplitPct} onChange={(e) => setOurSplitPct(e.target.value)} />
-        </div>
+        {!useManualSplit && (
+          <div className="space-y-1">
+            <Label>Our Split %</Label>
+            <Input type="number" min="0" max="100" step="1" value={ourSplitPct} onChange={(e) => setOurSplitPct(e.target.value)} />
+          </div>
+        )}
       </div>
+      <label className="flex items-center gap-2 text-xs text-muted-foreground">
+        <input type="checkbox" checked={useManualSplit} onChange={(e) => setUseManualSplit(e.target.checked)} />
+        Use manual split amounts instead of a percentage
+      </label>
+      {useManualSplit && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-end">
+          <div className="space-y-1">
+            <Label>Our Share Amount (USD)</Label>
+            <Input
+              type="number"
+              min="0"
+              step="0.01"
+              value={ourShareAmount}
+              onChange={(e) => setOurShareAmount(e.target.value)}
+              placeholder="0.00"
+            />
+          </div>
+          <div className="space-y-1">
+            <Label>Supplier Share Amount (USD)</Label>
+            <Input
+              type="number"
+              min="0"
+              step="0.01"
+              value={supplierShareAmount}
+              onChange={(e) => setSupplierShareAmount(e.target.value)}
+              placeholder="0.00"
+            />
+          </div>
+        </div>
+      )}
       <Button
         size="sm"
         onClick={() => mutation.mutate()}
-        disabled={!cutoffDate || !accumulatedProfit || mutation.isPending}
+        disabled={
+          !cutoffDate ||
+          !accumulatedProfit ||
+          mutation.isPending ||
+          (useManualSplit && (!ourShareAmount || !supplierShareAmount))
+        }
         data-testid="button-run-profit-opening"
       >
         {mutation.isPending ? "Posting…" : "Post Opening Balance"}
@@ -1331,9 +1197,10 @@ function ReconciliationRunner({
   sourceCompanyId: number;
   targetCompanyId: number;
 }) {
-  const [report, setReport] = useState<{ overall: string; areas: Array<{ area: string; status: string; detail: string }> } | null>(
-    null
-  );
+  const [report, setReport] = useState<{
+    overall: string;
+    areas: Array<{ area: string; status: string; detail: string; mismatches?: string[] }>;
+  } | null>(null);
   const [loading, setLoading] = useState(false);
 
   async function run() {
@@ -1374,8 +1241,8 @@ function ReconciliationRunner({
             <TableBody>
               {report.areas.map((a) => (
                 <TableRow key={a.area}>
-                  <TableCell className="text-sm">{a.area}</TableCell>
-                  <TableCell>
+                  <TableCell className="text-sm align-top">{a.area}</TableCell>
+                  <TableCell className="align-top">
                     <Badge variant={a.status === "PASS" ? "default" : a.status === "FAIL" ? "destructive" : "secondary"}>
                       {a.status === "PASS" && <CheckCircle2 className="h-3 w-3 mr-1" />}
                       {a.status === "FAIL" && <XCircle className="h-3 w-3 mr-1" />}
@@ -1383,7 +1250,16 @@ function ReconciliationRunner({
                       {a.status}
                     </Badge>
                   </TableCell>
-                  <TableCell className="text-xs text-muted-foreground">{a.detail}</TableCell>
+                  <TableCell className="text-xs text-muted-foreground align-top">
+                    <p>{a.detail}</p>
+                    {(a.mismatches ?? []).length > 0 && (
+                      <ul className="mt-1 list-disc list-inside space-y-0.5 max-h-40 overflow-auto">
+                        {a.mismatches!.map((m, i) => (
+                          <li key={i}>{m}</li>
+                        ))}
+                      </ul>
+                    )}
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>
