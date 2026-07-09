@@ -889,11 +889,21 @@ export function registerVoucherSalesUpdateRoutes(app: Express) {
       });
 
       // STEPS 1-4: Reverse old inventory, delete old items, deduct new inventory, insert new items - all atomically
-      const oldSalesItems = await db.select().from(salesItems).where(eq(salesItems.voucherId, id));
-
       const targetLocationId = validatedLocationId !== null ? validatedLocationId : existingVoucher.locationId;
 
       await db.transaction(async (tx) => {
+        // Read + lock the CURRENT old sales items INSIDE the transaction (not before
+        // it starts). If two edits of the same voucher race (e.g. two browser tabs,
+        // a double-submit, or a network retry), this FOR UPDATE lock forces them to
+        // run strictly one after the other: the second edit sees the first edit's
+        // already-committed items as its "old" state, instead of both reversing the
+        // same stale pre-transaction snapshot and double-counting inventory.
+        const oldSalesItems = await tx
+          .select()
+          .from(salesItems)
+          .where(eq(salesItems.voucherId, id))
+          .for("update");
+
         // STEP 1: Reverse inventory for old sales items
         if (existingVoucher.locationId) {
           for (const oldItem of oldSalesItems) {

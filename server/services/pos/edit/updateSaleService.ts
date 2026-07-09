@@ -83,15 +83,6 @@ export async function updatePosSale(params: UpdatePosSaleParams): Promise<{ stat
     if ("error" in newLocationResult) return err(newLocationResult.error);
   }
 
-  // Get old sales items to reverse inventory and preserve historical cost
-  const oldSalesItems = await db.select().from(salesItems).where(eq(salesItems.voucherId, voucherId));
-  // Sort by stockItemId so the reversal loop always acquires locks in a
-  // consistent order — prevents deadlocks with concurrent sale transactions.
-  oldSalesItems.sort((a, b) => a.stockItemId - b.stockItemId);
-
-  // Create map of old items by line ID for cost preservation (not stockItemId to handle duplicates)
-  const oldItemsMap = new Map(oldSalesItems.map((item) => [item.id, item]));
-
   // Get existing voucher entries to recreate them
   const oldEntries = await db.select().from(voucherEntries).where(eq(voucherEntries.voucherId, voucherId));
 
@@ -100,6 +91,24 @@ export async function updatePosSale(params: UpdatePosSaleParams): Promise<{ stat
 
   // Begin transaction
   await db.transaction(async (tx) => {
+    // Read + lock the CURRENT old sales items INSIDE the transaction (not before it
+    // starts). If two edits of the same voucher race (two tabs, a double-submit, or
+    // a network retry), this FOR UPDATE lock forces them to run strictly one after
+    // the other: the second edit sees the first edit's already-committed items as
+    // its "old" state, instead of both reversing the same stale pre-transaction
+    // snapshot and double-counting inventory.
+    const oldSalesItems = await tx
+      .select()
+      .from(salesItems)
+      .where(eq(salesItems.voucherId, voucherId))
+      .for("update");
+    // Sort by stockItemId so the reversal loop always acquires locks in a
+    // consistent order — prevents deadlocks with concurrent sale transactions.
+    oldSalesItems.sort((a, b) => a.stockItemId - b.stockItemId);
+
+    // Create map of old items by line ID for cost preservation (not stockItemId to handle duplicates)
+    const oldItemsMap = new Map(oldSalesItems.map((item) => [item.id, item]));
+
     // Reverse old inventory movements
     await reverseOriginalSaleInventory(tx, existingVoucher, oldSalesItems);
 
