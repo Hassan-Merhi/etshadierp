@@ -218,10 +218,14 @@ export function PeriodFilter({
           <DropdownMenuItem onClick={() => handlePresetChange("this_year")} data-testid="period-preset-this-year">
             This Year
           </DropdownMenuItem>
-          <DropdownMenuSeparator />
-          <DropdownMenuItem onClick={() => handlePresetChange("custom")} data-testid="period-preset-custom">
-            Custom Range...
-          </DropdownMenuItem>
+          {!hideCustomInputs && (
+            <>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => handlePresetChange("custom")} data-testid="period-preset-custom">
+                Custom Range...
+              </DropdownMenuItem>
+            </>
+          )}
         </DropdownMenuContent>
       </DropdownMenu>
 
