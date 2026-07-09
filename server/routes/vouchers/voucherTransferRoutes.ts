@@ -3,6 +3,7 @@ import { db } from "../../db";
 import { storage } from "../../storage";
 import { requireAuth, requireRole, canDelete, requireNonPOS, checkPOSLocation } from "../../auth";
 import { requireActionAccess } from "../../lib/permissionMiddleware";
+import { isReadonlyMigratedVoucher, READONLY_MIGRATED_VOUCHER_MESSAGE } from "../../lib/migratedVoucherGuard";
 import {
   upload,
   logAudit,
@@ -178,6 +179,10 @@ export function registerVoucherTransferRoutes(app: Express) {
         return res.status(403).json({
           message: "Access denied: Voucher belongs to a different company",
         });
+      }
+
+      if (isReadonlyMigratedVoucher(existingVoucher)) {
+        return res.status(403).json({ message: READONLY_MIGRATED_VOUCHER_MESSAGE });
       }
 
       // Check edit permissions
@@ -418,6 +423,10 @@ export function registerVoucherTransferRoutes(app: Express) {
       const existingVoucher = await storage.getVoucherById(id);
       if (!existingVoucher) {
         return res.status(404).json({ message: "Voucher not found" });
+      }
+
+      if (isReadonlyMigratedVoucher(existingVoucher)) {
+        return res.status(403).json({ message: READONLY_MIGRATED_VOUCHER_MESSAGE });
       }
 
       // Verify voucher belongs to current company

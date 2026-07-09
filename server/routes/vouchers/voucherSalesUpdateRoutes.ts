@@ -3,6 +3,7 @@ import { db } from "../../db";
 import { storage } from "../../storage";
 import { requireAuth, requireRole, canDelete, requireNonPOS, checkPOSLocation } from "../../auth";
 import { requireActionAccess } from "../../lib/permissionMiddleware";
+import { isReadonlyMigratedVoucher, READONLY_MIGRATED_VOUCHER_MESSAGE } from "../../lib/migratedVoucherGuard";
 import {
   upload,
   logAudit,
@@ -154,6 +155,10 @@ export function registerVoucherSalesUpdateRoutes(app: Express) {
       const existingVoucher = await storage.getVoucherById(id);
       if (!existingVoucher) {
         return res.status(404).json({ message: "Voucher not found" });
+      }
+
+      if (isReadonlyMigratedVoucher(existingVoucher)) {
+        return res.status(403).json({ message: READONLY_MIGRATED_VOUCHER_MESSAGE });
       }
 
       // Verify voucher belongs to current company (respect factory mode company)
@@ -506,6 +511,10 @@ export function registerVoucherSalesUpdateRoutes(app: Express) {
         });
       }
 
+      if (isReadonlyMigratedVoucher(existingVoucher)) {
+        return res.status(403).json({ message: READONLY_MIGRATED_VOUCHER_MESSAGE });
+      }
+
       // Only Admin and Owner can toggle optional status
       const userRole = req.session.currentRole;
       if (userRole !== "Admin" && userRole !== "Owner" && userRole !== "Developer") {
@@ -773,6 +782,10 @@ export function registerVoucherSalesUpdateRoutes(app: Express) {
       const existingVoucher = await storage.getVoucherById(id);
       if (!existingVoucher) {
         return res.status(404).json({ message: "Voucher not found" });
+      }
+
+      if (isReadonlyMigratedVoucher(existingVoucher)) {
+        return res.status(403).json({ message: READONLY_MIGRATED_VOUCHER_MESSAGE });
       }
 
       // Verify this is a Sales voucher

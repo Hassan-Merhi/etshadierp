@@ -1,6 +1,7 @@
 import type { Express } from "express";
 import { db } from "../../db";
 import { storage } from "../../storage";
+import { isReadonlyMigratedVoucher, READONLY_MIGRATED_VOUCHER_MESSAGE } from "../../lib/migratedVoucherGuard";
 import { requireAuth, requireRole, canDelete, requireNonPOS, checkPOSLocation } from "../../auth";
 import { requireActionAccess } from "../../lib/permissionMiddleware";
 import {
@@ -530,6 +531,10 @@ export function registerVoucherJournalRoutes(app: Express) {
 
         if (existingVoucher.companyId !== req.session.currentCompanyId) {
           throw new Error("Access denied: Voucher belongs to a different company");
+        }
+
+        if (isReadonlyMigratedVoucher(existingVoucher)) {
+          throw new Error(READONLY_MIGRATED_VOUCHER_MESSAGE);
         }
 
         // Get existing entries before deleting (for balance sync)

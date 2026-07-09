@@ -289,7 +289,7 @@ async function ensureTargetStockItems(
 export function registerSpMigrationRoutes(app: Express) {
   // ── GET /api/sp/migration/preview ────────────────────────────────────────
   // Dry run — NO writes. Returns what WOULD be copied.
-  app.get("/api/sp/migration/preview", requireAuth, requireRole("Admin", "Owner"), async (req: any, res: any) => {
+  app.get("/api/sp/migration/preview", requireAuth, requireRole("Developer"), async (req: any, res: any) => {
     try {
       const sourceId = parseInt(String(req.query.sourceCompanyId ?? ""), 10);
       const targetId = parseInt(String(req.query.targetCompanyId ?? ""), 10);
@@ -464,7 +464,7 @@ export function registerSpMigrationRoutes(app: Express) {
   });
 
   // ── GET /api/sp/migration/runs ──────────────────────────────────────────
-  app.get("/api/sp/migration/runs", requireAuth, requireRole("Admin", "Owner"), async (_req: any, res: any) => {
+  app.get("/api/sp/migration/runs", requireAuth, requireRole("Developer"), async (_req: any, res: any) => {
     try {
       const runs = (
         await db.execute(sql`
@@ -488,7 +488,7 @@ export function registerSpMigrationRoutes(app: Express) {
 
   // ── POST /api/sp/migration/rehearsal ────────────────────────────────────
   // Requires: { sourceCompanyId, targetCompanyId, companyNameConfirm, confirmation: "REHEARSE" }
-  app.post("/api/sp/migration/rehearsal", requireAuth, requireRole("Admin", "Owner"), async (req: any, res: any) => {
+  app.post("/api/sp/migration/rehearsal", requireAuth, requireRole("Developer"), async (req: any, res: any) => {
     const { sourceCompanyId, targetCompanyId, companyNameConfirm, confirmation } = req.body ?? {};
 
     // Safety gate 1: typed action confirmation
@@ -698,7 +698,7 @@ export function registerSpMigrationRoutes(app: Express) {
   // ── POST /api/sp/migration/rollback ─────────────────────────────────────
   // Removes ONLY rows created by a specific rehearsal run.
   // Never touches source (ERP) company.
-  app.post("/api/sp/migration/rollback", requireAuth, requireRole("Admin", "Owner"), async (req: any, res: any) => {
+  app.post("/api/sp/migration/rollback", requireAuth, requireRole("Developer"), async (req: any, res: any) => {
     const { runId } = req.body ?? {};
     if (!runId) return res.status(400).json({ message: "runId is required" });
 
@@ -746,6 +746,8 @@ export function registerSpMigrationRoutes(app: Express) {
       const tableOrder = [
         "voucher_entries",
         "vouchers",
+        "sp_container_lines",
+        "sp_containers",
         "ledger_accounts",
         "inventory",
         "sp_stock_movements",
@@ -803,6 +805,14 @@ export function registerSpMigrationRoutes(app: Express) {
             const [chk] = (await db.execute(sql`SELECT company_id FROM stock_groups WHERE id = ${id} LIMIT 1`))
               .rows as any[];
             verified = !!chk && pn(chk.company_id) === targetId;
+          } else if (tbl === "sp_containers") {
+            const [chk] = (await db.execute(sql`SELECT company_id FROM sp_containers WHERE id = ${id} LIMIT 1`))
+              .rows as any[];
+            verified = !!chk && pn(chk.company_id) === targetId;
+          } else if (tbl === "sp_container_lines") {
+            const [chk] = (await db.execute(sql`SELECT company_id FROM sp_container_lines WHERE id = ${id} LIMIT 1`))
+              .rows as any[];
+            verified = !!chk && pn(chk.company_id) === targetId;
           }
 
           if (!verified) {
@@ -828,6 +838,10 @@ export function registerSpMigrationRoutes(app: Express) {
             await db.execute(sql`DELETE FROM stock_items WHERE id = ${id}`);
           } else if (tbl === "stock_groups") {
             await db.execute(sql`DELETE FROM stock_groups WHERE id = ${id}`);
+          } else if (tbl === "sp_container_lines") {
+            await db.execute(sql`DELETE FROM sp_container_lines WHERE id = ${id}`);
+          } else if (tbl === "sp_containers") {
+            await db.execute(sql`DELETE FROM sp_containers WHERE id = ${id}`);
           }
           deleted++;
         }
@@ -856,7 +870,7 @@ export function registerSpMigrationRoutes(app: Express) {
   app.post(
     "/api/sp/migration/create-sp-company",
     requireAuth,
-    requireRole("Admin", "Owner"),
+    requireRole("Developer"),
     async (req: any, res: any) => {
       try {
         const { name, code } = req.body ?? {};
@@ -884,7 +898,7 @@ export function registerSpMigrationRoutes(app: Express) {
 
   // ── GET /api/sp/migration/gc-preview ─────────────────────────────────────
   // Extended preview that also shows sale voucher counts for the GC migration.
-  app.get("/api/sp/migration/gc-preview", requireAuth, requireRole("Admin", "Owner"), async (req: any, res: any) => {
+  app.get("/api/sp/migration/gc-preview", requireAuth, requireRole("Developer"), async (req: any, res: any) => {
     try {
       const sourceId = parseInt(String(req.query.sourceCompanyId ?? ""), 10);
       const targetId = parseInt(String(req.query.targetCompanyId ?? ""), 10);
@@ -1016,7 +1030,7 @@ export function registerSpMigrationRoutes(app: Express) {
   //   2. GC profit accounts (2 accounts)
   //   3. Stock items + aliases (same as rehearsal)
   //   4. Sale vouchers from ERP → SP (with account remapping)
-  app.post("/api/sp/migration/gc-rehearsal", requireAuth, requireRole("Admin", "Owner"), async (req: any, res: any) => {
+  app.post("/api/sp/migration/gc-rehearsal", requireAuth, requireRole("Developer"), async (req: any, res: any) => {
     const { sourceCompanyId, targetCompanyId, companyNameConfirm, confirmation } = req.body ?? {};
 
     if (confirmation !== "MIGRATE") {
@@ -1444,7 +1458,7 @@ export function registerSpMigrationRoutes(app: Express) {
   // ── GET /api/sp/migration/gc-account-plan ────────────────────────────────
   // Returns the full proposed chart-of-accounts list (SP + GC profit accounts)
   // with default code/name so the UI can let the user rename before creation.
-  app.get("/api/sp/migration/gc-account-plan", requireAuth, requireRole("Admin", "Owner"), async (req: any, res: any) => {
+  app.get("/api/sp/migration/gc-account-plan", requireAuth, requireRole("Developer"), async (req: any, res: any) => {
     try {
       const targetId = parseInt(String(req.query.targetCompanyId ?? ""), 10);
       if (!targetId) return res.status(400).json({ message: "targetCompanyId is required" });
@@ -1485,7 +1499,7 @@ export function registerSpMigrationRoutes(app: Express) {
   app.post(
     "/api/sp/migration/gc-create-accounts",
     requireAuth,
-    requireRole("Admin", "Owner"),
+    requireRole("Developer"),
     async (req: any, res: any) => {
       try {
         const { targetCompanyId, accounts } = req.body ?? {};
@@ -1546,13 +1560,13 @@ export function registerSpMigrationRoutes(app: Express) {
 
   // ── GET /api/sp/migration/session-role ──────────────────────────────────
   // Returns the current session's role — used by the frontend to gate the page.
-  app.get("/api/sp/migration/session-role", requireAuth, requireRole("Admin", "Owner"), async (req: any, res: any) => {
+  app.get("/api/sp/migration/session-role", requireAuth, requireRole("Developer"), async (req: any, res: any) => {
     return res.json({ role: req.session?.currentRole ?? null });
   });
 
   // ── GET /api/sp/migration/cash-accounts ─────────────────────────────────
   // Returns Cash/Bank ledger accounts for a given SP target company.
-  app.get("/api/sp/migration/cash-accounts", requireAuth, requireRole("Admin", "Owner"), async (req: any, res: any) => {
+  app.get("/api/sp/migration/cash-accounts", requireAuth, requireRole("Developer"), async (req: any, res: any) => {
     try {
       const targetId = parseInt(String(req.query.targetCompanyId ?? ""), 10);
       if (!targetId) return res.status(400).json({ message: "targetCompanyId is required" });
@@ -1576,7 +1590,7 @@ export function registerSpMigrationRoutes(app: Express) {
   app.post(
     "/api/sp/migration/opening-balance",
     requireAuth,
-    requireRole("Admin", "Owner"),
+    requireRole("Developer"),
     async (req: any, res: any) => {
       try {
         const { targetCompanyId, cashAccountId, amount, date, narration } = req.body ?? {};
@@ -1660,6 +1674,838 @@ export function registerSpMigrationRoutes(app: Express) {
   // ── POST /api/sp/migration/rollback (extended) ───────────────────────────
   // Updated below — existing endpoint handles all tracked tables.
   // Extension: also handles voucher_entries, vouchers, ledger_accounts.
+
+  // ── Location-aware stock opening ────────────────────────────────────────
+  // Copies source per-location inventory into matching target locations
+  // (matched by code, then name, then created), instead of dumping everything
+  // into a single "Main Warehouse". Idempotent per (target stock item, target
+  // location): a prior sp_stock_movements 'opening_stock' row for that pair
+  // blocks a duplicate re-add.
+  async function ensureTargetLocation(
+    sourceLoc: { id: number; code: string; name: string },
+    targetId: number,
+    runId: string,
+    locMap: Map<number, number>
+  ): Promise<number> {
+    const srcId = pn(sourceLoc.id);
+    if (locMap.has(srcId)) return locMap.get(srcId)!;
+
+    let targetLocId: number | undefined;
+    const byCode = (
+      await db.execute(sql`
+      SELECT id FROM locations WHERE company_id = ${targetId} AND code = ${sourceLoc.code} AND deleted_at IS NULL LIMIT 1
+    `)
+    ).rows[0] as any;
+    if (byCode) targetLocId = pn(byCode.id);
+
+    if (!targetLocId) {
+      const byName = (
+        await db.execute(sql`
+        SELECT id FROM locations WHERE company_id = ${targetId} AND name = ${sourceLoc.name} AND deleted_at IS NULL LIMIT 1
+      `)
+      ).rows[0] as any;
+      if (byName) targetLocId = pn(byName.id);
+    }
+
+    if (!targetLocId) {
+      const [row] = (
+        await db.execute(sql`
+        INSERT INTO locations (company_id, code, name, active)
+        VALUES (${targetId}, ${sourceLoc.code}, ${sourceLoc.name}, true)
+        RETURNING id
+      `)
+      ).rows as any[];
+      targetLocId = pn(row.id);
+      await trackRow(runId, "locations", targetLocId);
+    }
+
+    locMap.set(srcId, targetLocId);
+    return targetLocId;
+  }
+
+  // POST /api/sp/migration/gc-stock-opening
+  // Requires: { sourceCompanyId, targetCompanyId, companyNameConfirm, confirmation: "MIGRATE" }
+  app.post(
+    "/api/sp/migration/gc-stock-opening",
+    requireAuth,
+    requireRole("Developer"),
+    async (req: any, res: any) => {
+      const { sourceCompanyId, targetCompanyId, companyNameConfirm, confirmation } = req.body ?? {};
+      if (confirmation !== "MIGRATE") {
+        return res.status(400).json({ message: 'Requires confirmation = "MIGRATE"' });
+      }
+      const sourceId = parseInt(String(sourceCompanyId ?? ""), 10);
+      const targetId = parseInt(String(targetCompanyId ?? ""), 10);
+      if (!sourceId || !targetId)
+        return res.status(400).json({ message: "sourceCompanyId and targetCompanyId required" });
+
+      const sourceComp = await getCompanyRow(sourceId);
+      const targetComp = await getCompanyRow(targetId);
+      if (!sourceComp) return res.status(404).json({ message: "Source company not found" });
+      if (!targetComp) return res.status(404).json({ message: "Target company not found" });
+      if (sourceComp.company_type !== "erp")
+        return res.status(400).json({ message: "Source company must be type 'erp'" });
+      if (targetComp.company_type !== "supplier_partner")
+        return res.status(400).json({ message: "Target company must be type 'supplier_partner'" });
+      if (!companyNameConfirm || companyNameConfirm.trim() !== sourceComp.name) {
+        return res.status(400).json({ message: `Company name confirmation must match exactly: "${sourceComp.name}"` });
+      }
+
+      const runId = await logRun(
+        sourceId,
+        targetId,
+        "gc_stock_opening",
+        "running",
+        0,
+        null,
+        `User: ${req.session?.userId ?? "unknown"} | Source: ${sourceComp.name} | Target: ${targetComp.name}`
+      );
+
+      let rowsCreated = 0;
+      const summary: string[] = [];
+      try {
+        const { map: stockItemMap } = await ensureTargetStockItems(sourceId, targetId, runId);
+
+        const sourceLocs = (
+          await db.execute(sql`
+          SELECT id, code, name FROM locations WHERE company_id = ${sourceId} AND deleted_at IS NULL
+        `)
+        ).rows as any[];
+        const locMap = new Map<number, number>();
+        for (const l of sourceLocs) await ensureTargetLocation(l, targetId, runId, locMap);
+
+        // Per-location inventory in source (location_id may be null for legacy rows — group those into an "Unassigned" bucket)
+        const invRows = (
+          await db.execute(sql`
+          SELECT inv.stock_item_id, inv.location_id, si.code, si.name AS item_name, inv.quantity, inv.average_rate
+          FROM inventory inv
+          JOIN stock_items si ON si.id = inv.stock_item_id
+          WHERE inv.company_id = ${sourceId} AND inv.quantity > 0
+        `)
+        ).rows as any[];
+
+        let movementsCreated = 0,
+          skipped = 0,
+          mismatchedItems = 0;
+        const perLocationRecon: Array<{ location: string; sourceQty: number; targetQty: number }> = [];
+
+        for (const row of invRows) {
+          const srcStockItemId = pn(row.stock_item_id);
+          const targetStockItemId = stockItemMap.get(srcStockItemId);
+          if (!targetStockItemId) {
+            mismatchedItems++;
+            continue;
+          }
+          const qty = pn(row.quantity);
+          const avgRate = pn(row.average_rate);
+
+          let targetLocId: number;
+          if (row.location_id && locMap.has(pn(row.location_id))) {
+            targetLocId = locMap.get(pn(row.location_id))!;
+          } else {
+            // Fall back to (create-once) "Unassigned" location for rows with no source location
+            const unassigned = (
+              await db.execute(sql`
+              SELECT id FROM locations WHERE company_id = ${targetId} AND code = 'UNASSIGNED' AND deleted_at IS NULL LIMIT 1
+            `)
+            ).rows[0] as any;
+            if (unassigned) {
+              targetLocId = pn(unassigned.id);
+            } else {
+              const [locRow] = (
+                await db.execute(sql`
+                INSERT INTO locations (company_id, code, name, active)
+                VALUES (${targetId}, 'UNASSIGNED', 'Unassigned (migrated)', true)
+                RETURNING id
+              `)
+              ).rows as any[];
+              targetLocId = pn(locRow.id);
+              await trackRow(runId, "locations", targetLocId);
+            }
+          }
+
+          // Idempotency: skip if an opening_stock movement for this exact (item, location) already exists in target
+          const already = (
+            await db.execute(sql`
+            SELECT id FROM sp_stock_movements
+            WHERE company_id = ${targetId} AND stock_item_id = ${targetStockItemId} AND location_id = ${targetLocId}
+              AND source_type = 'opening_stock' LIMIT 1
+          `)
+          ).rows[0] as any;
+          if (already) {
+            skipped++;
+            continue;
+          }
+
+          const [movRow] = (
+            await db.execute(sql`
+            INSERT INTO sp_stock_movements
+              (company_id, article_code, description, stock_item_id, location_id,
+               qty_in, qty_remaining, base_unit_cost_usd, landed_unit_cost_usd, final_unit_cost_usd, source_type)
+            VALUES
+              (${targetId}, ${row.code}, ${"GC Migration opening stock (per-location) from " + sourceComp.name},
+               ${targetStockItemId}, ${targetLocId}, ${qty}, ${qty},
+               ${avgRate.toFixed(6)}, ${avgRate.toFixed(6)}, ${avgRate.toFixed(6)}, 'opening_stock')
+            RETURNING id
+          `)
+          ).rows as any[];
+          await trackRow(runId, "sp_stock_movements", pn(movRow.id));
+          movementsCreated++;
+          rowsCreated++;
+
+          const totalVal = (qty * avgRate).toFixed(2);
+          const [invRow] = (
+            await db.execute(sql`
+            INSERT INTO inventory (company_id, location_id, stock_item_id, quantity, average_rate, total_value)
+            VALUES (${targetId}, ${targetLocId}, ${targetStockItemId}, ${qty.toFixed(3)}, ${avgRate.toFixed(2)}, ${totalVal})
+            ON CONFLICT (location_id, stock_item_id) DO NOTHING
+            RETURNING id
+          `)
+          ).rows as any[];
+          if (invRow) {
+            await trackRow(runId, "inventory", pn(invRow.id));
+            rowsCreated++;
+          }
+        }
+
+        // Reconciliation: compare per-location totals source vs target
+        for (const [srcLocId, tgtLocId] of Array.from(locMap.entries())) {
+          const srcTotal = (
+            await db.execute(sql`
+            SELECT COALESCE(SUM(quantity), 0) AS q FROM inventory WHERE company_id = ${sourceId} AND location_id = ${srcLocId}
+          `)
+          ).rows[0] as any;
+          const tgtTotal = (
+            await db.execute(sql`
+            SELECT COALESCE(SUM(quantity), 0) AS q FROM inventory WHERE company_id = ${targetId} AND location_id = ${tgtLocId}
+          `)
+          ).rows[0] as any;
+          const locNameRow = sourceLocs.find((l: any) => pn(l.id) === srcLocId);
+          perLocationRecon.push({
+            location: locNameRow?.name ?? `location #${srcLocId}`,
+            sourceQty: Math.round(pn(srcTotal.q) * 1000) / 1000,
+            targetQty: Math.round(pn(tgtTotal.q) * 1000) / 1000,
+          });
+        }
+
+        summary.push(`Opening stock movements created: ${movementsCreated}, skipped (already existed): ${skipped}`);
+        if (mismatchedItems) summary.push(`${mismatchedItems} row(s) had no target stock item mapping — skipped`);
+
+        await db.execute(sql`
+          UPDATE sp_migration_rehearsal_runs
+          SET status = 'completed', rows_created = ${rowsCreated}, completed_at = now()
+          WHERE id = ${runId}
+        `);
+
+        return res.json({
+          success: true,
+          runId,
+          rowsCreated,
+          summary,
+          perLocationRecon,
+          warnings: mismatchedItems
+            ? ["Some inventory rows referenced stock items not migrated by the stock-master step — run it first."]
+            : [],
+        });
+      } catch (err: any) {
+        await db
+          .execute(
+            sql`UPDATE sp_migration_rehearsal_runs SET status = 'failed', error_message = ${err.message}, completed_at = now() WHERE id = ${runId}`
+          )
+          .catch(() => {});
+        console.error("[SP Migration] gc-stock-opening error:", err);
+        return res.status(500).json({ message: "Stock opening migration failed", runId });
+      }
+    }
+  );
+
+  // ── Historical sales — TRUE read-only copy ──────────────────────────────
+  // POST /api/sp/migration/gc-sales-readonly
+  app.post(
+    "/api/sp/migration/gc-sales-readonly",
+    requireAuth,
+    requireRole("Developer"),
+    async (req: any, res: any) => {
+      const { sourceCompanyId, targetCompanyId, companyNameConfirm, confirmation } = req.body ?? {};
+      if (confirmation !== "MIGRATE") {
+        return res.status(400).json({ message: 'Requires confirmation = "MIGRATE"' });
+      }
+      const sourceId = parseInt(String(sourceCompanyId ?? ""), 10);
+      const targetId = parseInt(String(targetCompanyId ?? ""), 10);
+      if (!sourceId || !targetId)
+        return res.status(400).json({ message: "sourceCompanyId and targetCompanyId required" });
+
+      const sourceComp = await getCompanyRow(sourceId);
+      const targetComp = await getCompanyRow(targetId);
+      if (!sourceComp) return res.status(404).json({ message: "Source company not found" });
+      if (!targetComp) return res.status(404).json({ message: "Target company not found" });
+      if (sourceComp.company_type !== "erp")
+        return res.status(400).json({ message: "Source company must be type 'erp'" });
+      if (targetComp.company_type !== "supplier_partner")
+        return res.status(400).json({ message: "Target company must be type 'supplier_partner'" });
+      if (!companyNameConfirm || companyNameConfirm.trim() !== sourceComp.name) {
+        return res.status(400).json({ message: `Company name confirmation must match exactly: "${sourceComp.name}"` });
+      }
+
+      const runId = await logRun(
+        sourceId,
+        targetId,
+        "gc_sales_readonly",
+        "running",
+        0,
+        null,
+        `User: ${req.session?.userId ?? "unknown"} | Source: ${sourceComp.name} | Target: ${targetComp.name}`
+      );
+
+      let rowsCreated = 0;
+      const summary: string[] = [];
+      try {
+        // Reuse the same account-mapping strategy as gc-rehearsal
+        const ERP_TO_SP_SUBTYPE: Record<string, string> = {
+          "Direct Income": "sp_sales",
+          "Direct Expense": "sp_cogs",
+          "Indirect Expense": "sp_shared_charges",
+          hadi_sp_intercompany: "sp_hadi_intercompany",
+        };
+        const sourceAccts = (
+          await db.execute(sql`SELECT id, account_type, sub_type FROM ledger_accounts WHERE company_id = ${sourceId} AND deleted_at IS NULL`)
+        ).rows as any[];
+        const targetAccts = (
+          await db.execute(sql`SELECT id, account_type, sub_type FROM ledger_accounts WHERE company_id = ${targetId} AND deleted_at IS NULL`)
+        ).rows as any[];
+        const targetBySubType = new Map<string, number>();
+        for (const ta of targetAccts) if (ta.sub_type) targetBySubType.set(ta.sub_type, pn(ta.id));
+
+        let suspenseAccountId: number;
+        const existingSuspense = (
+          await db.execute(sql`SELECT id FROM ledger_accounts WHERE company_id = ${targetId} AND sub_type = 'gc_mig_suspense' AND deleted_at IS NULL LIMIT 1`)
+        ).rows[0] as any;
+        if (existingSuspense) {
+          suspenseAccountId = pn(existingSuspense.id);
+        } else {
+          const [suspRow] = (
+            await db.execute(sql`
+            INSERT INTO ledger_accounts (company_id, code, name, account_type, sub_type, active, is_hidden)
+            VALUES (${targetId}, 'GC-SUSP', 'Migration Suspense', 'Equity', 'gc_mig_suspense', true, true)
+            RETURNING id
+          `)
+          ).rows as any[];
+          suspenseAccountId = pn(suspRow.id);
+          await trackRow(runId, "ledger_accounts", suspenseAccountId);
+          rowsCreated++;
+        }
+
+        const accountMap = new Map<number, number | null>();
+        for (const sa of sourceAccts) {
+          const srcId = pn(sa.id);
+          if (sa.sub_type && targetBySubType.has(sa.sub_type)) accountMap.set(srcId, targetBySubType.get(sa.sub_type)!);
+          else if (sa.account_type && ERP_TO_SP_SUBTYPE[sa.account_type] && targetBySubType.has(ERP_TO_SP_SUBTYPE[sa.account_type]))
+            accountMap.set(srcId, targetBySubType.get(ERP_TO_SP_SUBTYPE[sa.account_type])!);
+          else accountMap.set(srcId, suspenseAccountId);
+        }
+
+        const saleVouchers = (
+          await db.execute(sql`
+          SELECT id, voucher_number, voucher_type, voucher_date, description, total_amount, currency, exchange_rate
+          FROM vouchers
+          WHERE company_id = ${sourceId} AND voucher_type IN ('Sales', 'Sale') AND deleted_at IS NULL
+          ORDER BY voucher_date ASC, id ASC
+        `)
+        ).rows as any[];
+
+        let vouchersCreated = 0,
+          vouchersSkipped = 0,
+          entriesCreated = 0;
+        for (const v of saleVouchers) {
+          const newVoucherNumber = ("MIG-GC-" + v.voucher_number).substring(0, 100);
+          const alreadyMig = (
+            await db.execute(sql`SELECT id FROM vouchers WHERE voucher_number = ${newVoucherNumber} AND company_id = ${targetId} LIMIT 1`)
+          ).rows[0] as any;
+          if (alreadyMig) {
+            vouchersSkipped++;
+            continue;
+          }
+
+          const [vRow] = (
+            await db.execute(sql`
+            INSERT INTO vouchers
+              (company_id, voucher_number, voucher_type, voucher_date, description, total_amount, currency, exchange_rate, source_module)
+            VALUES
+              (${targetId}, ${newVoucherNumber}, ${v.voucher_type}, ${v.voucher_date},
+               ${v.description ?? "Migrated (read-only) from GC-LSHI ERP"},
+               ${v.total_amount}, ${v.currency ?? "USD"}, ${v.exchange_rate ?? null}, 'SP_MIGRATION_READONLY')
+            RETURNING id
+          `)
+          ).rows as any[];
+          const newVoucherId = pn(vRow.id);
+          await trackRow(runId, "vouchers", newVoucherId);
+          rowsCreated++;
+          vouchersCreated++;
+
+          await db.execute(sql`
+            INSERT INTO sp_migration_source_links (run_id, source_table, source_id, target_table, target_id)
+            VALUES (${runId}, 'vouchers', ${pn(v.id)}, 'vouchers', ${newVoucherId})
+          `);
+
+          const entries = (
+            await db.execute(sql`SELECT ledger_account_id, debit_amount, credit_amount, narration FROM voucher_entries WHERE voucher_id = ${v.id}`)
+          ).rows as any[];
+          for (const e of entries) {
+            const srcAcctId = e.ledger_account_id ? pn(e.ledger_account_id) : null;
+            const mappedAcctId = srcAcctId !== null ? accountMap.get(srcAcctId) ?? suspenseAccountId : null;
+            const [eRow] = (
+              await db.execute(sql`
+              INSERT INTO voucher_entries (voucher_id, ledger_account_id, debit_amount, credit_amount, narration)
+              VALUES (${newVoucherId}, ${mappedAcctId}, ${e.debit_amount ?? "0"}, ${e.credit_amount ?? "0"}, ${e.narration ?? null})
+              RETURNING id
+            `)
+            ).rows as any[];
+            await trackRow(runId, "voucher_entries", pn(eRow.id));
+            entriesCreated++;
+            rowsCreated++;
+          }
+        }
+
+        summary.push(`Vouchers: ${vouchersCreated} created (read-only), ${vouchersSkipped} skipped, ${entriesCreated} entries`);
+
+        await db.execute(sql`
+          UPDATE sp_migration_rehearsal_runs SET status = 'completed', rows_created = ${rowsCreated}, completed_at = now() WHERE id = ${runId}
+        `);
+
+        return res.json({
+          success: true,
+          runId,
+          rowsCreated,
+          summary,
+          reconciliation: { vouchersCreated, vouchersSkipped, entriesCreated },
+          warnings: [
+            "These vouchers are marked read-only (sourceModule = SP_MIGRATION_READONLY, prefix MIG-GC-) and never move stock.",
+            "Account mapping used account type matching — verify entries routed to Migration Suspense.",
+          ],
+        });
+      } catch (err: any) {
+        await db
+          .execute(
+            sql`UPDATE sp_migration_rehearsal_runs SET status = 'failed', error_message = ${err.message}, completed_at = now() WHERE id = ${runId}`
+          )
+          .catch(() => {});
+        console.error("[SP Migration] gc-sales-readonly error:", err);
+        return res.status(500).json({ message: "Sales migration failed", runId });
+      }
+    }
+  );
+
+  // ── Container migration into SP ─────────────────────────────────────────
+  // POST /api/sp/migration/gc-containers
+  // Creates sp_containers/sp_container_lines from ERP containers/purchase_orders/po_line_items.
+  // Does NOT re-create stock movements for offloaded containers — that stock is
+  // already covered by the stock-opening step; only OPEN (OTW) containers get an
+  // OTW clearing voucher since their stock isn't yet in source inventory either.
+  app.post("/api/sp/migration/gc-containers", requireAuth, requireRole("Developer"), async (req: any, res: any) => {
+    const { sourceCompanyId, targetCompanyId, companyNameConfirm, confirmation } = req.body ?? {};
+    if (confirmation !== "MIGRATE") {
+      return res.status(400).json({ message: 'Requires confirmation = "MIGRATE"' });
+    }
+    const sourceId = parseInt(String(sourceCompanyId ?? ""), 10);
+    const targetId = parseInt(String(targetCompanyId ?? ""), 10);
+    if (!sourceId || !targetId) return res.status(400).json({ message: "sourceCompanyId and targetCompanyId required" });
+
+    const sourceComp = await getCompanyRow(sourceId);
+    const targetComp = await getCompanyRow(targetId);
+    if (!sourceComp) return res.status(404).json({ message: "Source company not found" });
+    if (!targetComp) return res.status(404).json({ message: "Target company not found" });
+    if (sourceComp.company_type !== "erp") return res.status(400).json({ message: "Source company must be type 'erp'" });
+    if (targetComp.company_type !== "supplier_partner")
+      return res.status(400).json({ message: "Target company must be type 'supplier_partner'" });
+    if (!companyNameConfirm || companyNameConfirm.trim() !== sourceComp.name) {
+      return res.status(400).json({ message: `Company name confirmation must match exactly: "${sourceComp.name}"` });
+    }
+
+    const runId = await logRun(
+      sourceId,
+      targetId,
+      "gc_containers",
+      "running",
+      0,
+      null,
+      `User: ${req.session?.userId ?? "unknown"} | Source: ${sourceComp.name} | Target: ${targetComp.name}`
+    );
+
+    let rowsCreated = 0;
+    const summary: string[] = [];
+    const chargeWarnings: string[] = [];
+    try {
+      const { map: stockItemMap } = await ensureTargetStockItems(sourceId, targetId, runId);
+
+      const containerRows = (
+        await db.execute(sql`
+        SELECT id, container_number, supplier_id, status, import_date, items_total, charges_total, grand_total
+        FROM containers WHERE company_id = ${sourceId}
+        ORDER BY import_date ASC, id ASC
+      `)
+      ).rows as any[];
+
+      let containersCreated = 0,
+        containersSkipped = 0,
+        linesCreated = 0;
+
+      for (const c of containerRows) {
+        const srcContainerId = pn(c.id);
+        const alreadyLinked = (
+          await db.execute(sql`
+          SELECT target_id FROM sp_migration_source_links
+          WHERE source_table = 'containers' AND source_id = ${srcContainerId} AND target_table = 'sp_containers' LIMIT 1
+        `)
+        ).rows[0] as any;
+        if (alreadyLinked) {
+          containersSkipped++;
+          continue;
+        }
+
+        // Supplier name lookup (best-effort — supplier match by name in target is a manual step, so supplierId stays null)
+        const supplierRow = (
+          await db.execute(sql`SELECT legal_name FROM suppliers WHERE id = ${pn(c.supplier_id)} LIMIT 1`)
+        ).rows[0] as any;
+        const supplierName = supplierRow?.legal_name ?? "Unknown Supplier (GC migration)";
+
+        const poRow = (
+          await db.execute(sql`
+          SELECT id, po_number, freight FROM purchase_orders WHERE container_id = ${srcContainerId} LIMIT 1
+        `)
+        ).rows[0] as any;
+
+        const status = c.status === "OTW" || c.status === "Open" ? "open" : "offloaded";
+
+        const [contRow] = (
+          await db.execute(sql`
+          INSERT INTO sp_containers
+            (company_id, supplier_id, supplier_name, container_number, invoice_number, invoice_date,
+             invoice_total_usd, freight_estimate_usd, status, notes)
+          VALUES
+            (${targetId}, NULL, ${supplierName}, ${c.container_number}, ${poRow?.po_number ?? c.container_number},
+             ${c.import_date}, ${c.items_total ?? "0"}, ${poRow?.freight ?? "0"}, ${status},
+             ${"Migrated from GC-LSHI ERP container #" + c.container_number})
+          RETURNING id
+        `)
+        ).rows as any[];
+        const newContainerId = pn(contRow.id);
+        await trackRow(runId, "sp_containers", newContainerId);
+        await db.execute(sql`
+          INSERT INTO sp_migration_source_links (run_id, source_table, source_id, target_table, target_id)
+          VALUES (${runId}, 'containers', ${srcContainerId}, 'sp_containers', ${newContainerId})
+        `);
+        rowsCreated++;
+        containersCreated++;
+
+        if (poRow) {
+          const lineItems = (
+            await db.execute(sql`
+            SELECT stock_item_id, item_name, quantity, rate FROM po_line_items WHERE po_id = ${pn(poRow.id)}
+          `)
+          ).rows as any[];
+          for (const li of lineItems) {
+            const srcStockItemId = li.stock_item_id ? pn(li.stock_item_id) : null;
+            const targetStockItemId = srcStockItemId ? stockItemMap.get(srcStockItemId) ?? null : null;
+            if (srcStockItemId && !targetStockItemId) {
+              chargeWarnings.push(`Container ${c.container_number}: line "${li.item_name}" has no mapped target stock item.`);
+            }
+            const [lineRow] = (
+              await db.execute(sql`
+              INSERT INTO sp_container_lines (container_id, company_id, article_code, description, qty, unit_rate_usd, stock_item_id)
+              VALUES (${newContainerId}, ${targetId}, ${li.item_name}, ${li.item_name}, ${li.quantity}, ${li.rate}, ${targetStockItemId})
+              RETURNING id
+            `)
+            ).rows as any[];
+            await trackRow(runId, "sp_container_lines", pn(lineRow.id));
+            linesCreated++;
+            rowsCreated++;
+          }
+        } else {
+          chargeWarnings.push(`Container ${c.container_number}: no purchase order found — line items were not migrated.`);
+        }
+
+        // Charges beyond freight (duty, surcharge, fumigation, etc.) are best-effort noted, not posted —
+        // they typically require account-specific mapping that must be reviewed manually.
+        if (poRow) {
+          chargeWarnings.push(
+            `Container ${c.container_number}: only freight was carried over — duty/surcharge/fumigation/other charges must be reviewed and entered manually in SP.`
+          );
+        }
+      }
+
+      summary.push(`Containers: ${containersCreated} created, ${containersSkipped} skipped (already migrated), ${linesCreated} line(s) created`);
+
+      await db.execute(sql`
+        UPDATE sp_migration_rehearsal_runs SET status = 'completed', rows_created = ${rowsCreated}, completed_at = now() WHERE id = ${runId}
+      `);
+
+      return res.json({
+        success: true,
+        runId,
+        rowsCreated,
+        summary,
+        warnings: [
+          ...Array.from(new Set(chargeWarnings)),
+          "Supplier linkage was not auto-matched — set supplierId on migrated SP containers manually if needed.",
+          "Offloaded containers' stock quantities are already covered by the stock-opening step; this step only migrates container/line records for history.",
+        ],
+      });
+    } catch (err: any) {
+      await db
+        .execute(
+          sql`UPDATE sp_migration_rehearsal_runs SET status = 'failed', error_message = ${err.message}, completed_at = now() WHERE id = ${runId}`
+        )
+        .catch(() => {});
+      console.error("[SP Migration] gc-containers error:", err);
+      return res.status(500).json({ message: "Container migration failed", runId });
+    }
+  });
+
+  // ── Profit-share opening balance ────────────────────────────────────────
+  // POST /api/sp/migration/gc-profit-opening
+  // Posts: Dr GC-PROFCLR (accumulated profit) / Cr GC-OURPFT (our share) + Cr GC-SUPPFT (supplier share)
+  app.post(
+    "/api/sp/migration/gc-profit-opening",
+    requireAuth,
+    requireRole("Developer"),
+    async (req: any, res: any) => {
+      try {
+        const { targetCompanyId, cutoffDate, accumulatedProfit, ourSplitPct } = req.body ?? {};
+        const targetId = parseInt(String(targetCompanyId ?? ""), 10);
+        const profit = parseFloat(accumulatedProfit);
+        const ourPct = ourSplitPct !== undefined && ourSplitPct !== null && ourSplitPct !== "" ? parseFloat(ourSplitPct) : 50;
+
+        if (!targetId) return res.status(400).json({ message: "targetCompanyId is required" });
+        if (!cutoffDate) return res.status(400).json({ message: "cutoffDate is required" });
+        if (isNaN(profit) || profit < 0) return res.status(400).json({ message: "accumulatedProfit must be a non-negative number" });
+        if (isNaN(ourPct) || ourPct < 0 || ourPct > 100)
+          return res.status(400).json({ message: "ourSplitPct must be between 0 and 100" });
+
+        const targetComp = await getCompanyRow(targetId);
+        if (!targetComp) return res.status(404).json({ message: "Target company not found" });
+        if (targetComp.company_type !== "supplier_partner")
+          return res.status(400).json({ message: "Target must be a supplier_partner company" });
+
+        const acctRows = (
+          await db.execute(sql`
+          SELECT sub_type, id FROM ledger_accounts
+          WHERE company_id = ${targetId} AND deleted_at IS NULL
+            AND sub_type IN ('gc_our_profit_share', 'gc_supplier_profit_share', 'gc_accumulated_profit_clearing')
+        `)
+        ).rows as any[];
+        const bySubType = new Map(acctRows.map((r: any) => [r.sub_type, pn(r.id)]));
+        const ourAcctId = bySubType.get("gc_our_profit_share");
+        const supAcctId = bySubType.get("gc_supplier_profit_share");
+        const clrAcctId = bySubType.get("gc_accumulated_profit_clearing");
+        if (!ourAcctId || !supAcctId || !clrAcctId) {
+          return res.status(400).json({
+            message: "GC profit-share accounts not found in target company. Run the account creation step first.",
+          });
+        }
+
+        const runId = await logRun(
+          targetId,
+          targetId,
+          "gc_profit_opening",
+          "running",
+          0,
+          null,
+          `User: ${req.session?.userId ?? "unknown"} | Target: ${targetComp.name}`
+        );
+
+        const ourShare = Math.round(profit * (ourPct / 100) * 100) / 100;
+        const supplierShare = Math.round((profit - ourShare) * 100) / 100;
+
+        // Deterministic voucher number (no timestamp) so re-running for the same
+        // target + cutoff date is idempotent instead of creating a duplicate journal.
+        const voucherNumber = `GC-PROFIT-OPN-${targetId}-${cutoffDate}`;
+        const existing = (
+          await db.execute(sql`SELECT id FROM vouchers WHERE company_id = ${targetId} AND voucher_number = ${voucherNumber} LIMIT 1`)
+        ).rows[0] as any;
+        if (existing) {
+          await db
+            .execute(
+              sql`UPDATE sp_migration_rehearsal_runs SET status = 'failed', error_message = 'Duplicate — already posted', completed_at = now() WHERE id = ${runId}`
+            )
+            .catch(() => {});
+          return res.status(409).json({
+            message: `A profit-share opening balance for ${cutoffDate} has already been posted (voucher ${voucherNumber}). Roll it back first if you need to re-post with different figures.`,
+            voucherId: pn(existing.id),
+            voucherNumber,
+          });
+        }
+
+        const [vRow] = (
+          await db.execute(sql`
+          INSERT INTO vouchers (company_id, voucher_number, voucher_type, voucher_date, description, total_amount, currency, source_module)
+          VALUES (${targetId}, ${voucherNumber}, 'Journal', ${cutoffDate},
+                  ${`GC accumulated profit-share opening balance as of ${cutoffDate} (${ourPct}% / ${100 - ourPct}% split)`},
+                  ${profit.toFixed(2)}, 'USD', 'ERP')
+          RETURNING id
+        `)
+        ).rows as any[];
+        const voucherId = pn(vRow.id);
+        await trackRow(runId, "vouchers", voucherId);
+
+        const clrEntry = (
+          await db.execute(sql`
+          INSERT INTO voucher_entries (voucher_id, ledger_account_id, debit_amount, credit_amount, narration)
+          VALUES (${voucherId}, ${clrAcctId}, ${profit.toFixed(2)}, '0.00', 'Accumulated profit clearing')
+          RETURNING id
+        `)
+        ).rows[0] as any;
+        await trackRow(runId, "voucher_entries", pn(clrEntry.id));
+
+        const ourEntry = (
+          await db.execute(sql`
+          INSERT INTO voucher_entries (voucher_id, ledger_account_id, debit_amount, credit_amount, narration)
+          VALUES (${voucherId}, ${ourAcctId}, '0.00', ${ourShare.toFixed(2)}, 'Our profit share opening balance')
+          RETURNING id
+        `)
+        ).rows[0] as any;
+        await trackRow(runId, "voucher_entries", pn(ourEntry.id));
+
+        const supEntry = (
+          await db.execute(sql`
+          INSERT INTO voucher_entries (voucher_id, ledger_account_id, debit_amount, credit_amount, narration)
+          VALUES (${voucherId}, ${supAcctId}, '0.00', ${supplierShare.toFixed(2)}, 'Supplier profit share opening balance')
+          RETURNING id
+        `)
+        ).rows[0] as any;
+        await trackRow(runId, "voucher_entries", pn(supEntry.id));
+
+        await db.execute(sql`
+          UPDATE sp_migration_rehearsal_runs SET status = 'completed', rows_created = 4, completed_at = now() WHERE id = ${runId}
+        `);
+
+        return res.json({
+          success: true,
+          runId,
+          voucherId,
+          voucherNumber,
+          accumulatedProfit: profit,
+          ourShare,
+          supplierShare,
+          ourSplitPct: ourPct,
+        });
+      } catch (err: any) {
+        console.error("[SP Migration] gc-profit-opening error:", err);
+        return res.status(500).json({ message: "Internal server error" });
+      }
+    }
+  );
+
+  // ── Final reconciliation report ─────────────────────────────────────────
+  // GET /api/sp/migration/gc-reconciliation
+  app.get(
+    "/api/sp/migration/gc-reconciliation",
+    requireAuth,
+    requireRole("Developer"),
+    async (req: any, res: any) => {
+      try {
+        const sourceId = parseInt(String(req.query.sourceCompanyId ?? ""), 10);
+        const targetId = parseInt(String(req.query.targetCompanyId ?? ""), 10);
+        if (!sourceId || !targetId)
+          return res.status(400).json({ message: "sourceCompanyId and targetCompanyId are required" });
+
+        const areas: Array<{ area: string; status: "PASS" | "FAIL" | "WARN"; detail: string }> = [];
+
+        // 1. Stock master: every source stock item (with positive inventory) must have a target link
+        const unlinkedItems = (
+          await db.execute(sql`
+          SELECT COUNT(*) AS cnt FROM stock_items si
+          JOIN inventory inv ON inv.stock_item_id = si.id AND inv.company_id = ${sourceId}
+          WHERE si.company_id = ${sourceId} AND si.deleted_at IS NULL AND inv.quantity > 0
+            AND NOT EXISTS (
+              SELECT 1 FROM sp_migration_source_links l
+              WHERE l.source_table = 'stock_items' AND l.source_id = si.id AND l.target_table = 'stock_items'
+            )
+        `)
+        ).rows[0] as any;
+        areas.push({
+          area: "Stock master",
+          status: pn(unlinkedItems.cnt) === 0 ? "PASS" : "FAIL",
+          detail: pn(unlinkedItems.cnt) === 0 ? "All source stock items are linked to target." : `${pn(unlinkedItems.cnt)} source item(s) have no target stock item link.`,
+        });
+
+        // 2. Stock in hand: total qty/value comparison (source vs target across all locations)
+        const srcStock = (
+          await db.execute(sql`SELECT COALESCE(SUM(quantity),0) AS q, COALESCE(SUM(quantity*average_rate),0) AS v FROM inventory WHERE company_id = ${sourceId}`)
+        ).rows[0] as any;
+        const tgtStock = (
+          await db.execute(sql`SELECT COALESCE(SUM(quantity),0) AS q, COALESCE(SUM(quantity*average_rate),0) AS v FROM inventory WHERE company_id = ${targetId}`)
+        ).rows[0] as any;
+        const qtyDiff = Math.abs(pn(srcStock.q) - pn(tgtStock.q));
+        areas.push({
+          area: "Stock in hand",
+          status: qtyDiff < 0.01 ? "PASS" : "WARN",
+          detail: `Source qty ${pn(srcStock.q).toFixed(3)} vs target qty ${pn(tgtStock.q).toFixed(3)} (value ${pn(srcStock.v).toFixed(2)} vs ${pn(tgtStock.v).toFixed(2)}).`,
+        });
+
+        // 3. Historical sales
+        const srcSales = (
+          await db.execute(sql`SELECT COUNT(*) AS cnt FROM vouchers WHERE company_id = ${sourceId} AND voucher_type IN ('Sales','Sale') AND deleted_at IS NULL`)
+        ).rows[0] as any;
+        const tgtSales = (
+          await db.execute(sql`SELECT COUNT(*) AS cnt FROM vouchers WHERE company_id = ${targetId} AND source_module = 'SP_MIGRATION_READONLY' AND deleted_at IS NULL`)
+        ).rows[0] as any;
+        areas.push({
+          area: "Historical sales",
+          status: pn(srcSales.cnt) === pn(tgtSales.cnt) ? "PASS" : "WARN",
+          detail: `Source: ${pn(srcSales.cnt)} sale voucher(s). Migrated read-only: ${pn(tgtSales.cnt)}.`,
+        });
+
+        // 4. Containers
+        const srcContainers = (await db.execute(sql`SELECT COUNT(*) AS cnt FROM containers WHERE company_id = ${sourceId}`)).rows[0] as any;
+        const tgtContainers = (
+          await db.execute(sql`
+          SELECT COUNT(*) AS cnt FROM sp_migration_source_links WHERE source_table = 'containers' AND target_table = 'sp_containers'
+            AND run_id IN (SELECT id FROM sp_migration_rehearsal_runs WHERE source_company_id = ${sourceId} AND target_company_id = ${targetId})
+        `)
+        ).rows[0] as any;
+        areas.push({
+          area: "Containers",
+          status: pn(srcContainers.cnt) === pn(tgtContainers.cnt) ? "PASS" : "WARN",
+          detail: `Source: ${pn(srcContainers.cnt)} container(s). Migrated: ${pn(tgtContainers.cnt)}.`,
+        });
+
+        // 5. Accounting balance — verify all migrated vouchers in target are balanced
+        const unbalanced = (
+          await db.execute(sql`
+          SELECT COUNT(*) AS cnt FROM (
+            SELECT ve.voucher_id, SUM(ve.debit_amount::numeric) AS d, SUM(ve.credit_amount::numeric) AS c
+            FROM voucher_entries ve JOIN vouchers v ON v.id = ve.voucher_id
+            WHERE v.company_id = ${targetId} AND (v.source_module IN ('ERP','SP_MIGRATION_READONLY'))
+            GROUP BY ve.voucher_id
+            HAVING ABS(SUM(ve.debit_amount::numeric) - SUM(ve.credit_amount::numeric)) > 0.01
+          ) x
+        `)
+        ).rows[0] as any;
+        areas.push({
+          area: "Accounting",
+          status: pn(unbalanced.cnt) === 0 ? "PASS" : "FAIL",
+          detail: pn(unbalanced.cnt) === 0 ? "All migrated vouchers are balanced." : `${pn(unbalanced.cnt)} migrated voucher(s) are unbalanced.`,
+        });
+
+        // 6. Profit opening
+        const profitOpening = (
+          await db.execute(sql`SELECT COUNT(*) AS cnt FROM vouchers WHERE company_id = ${targetId} AND voucher_number LIKE 'GC-PROFIT-OPN-%'`)
+        ).rows[0] as any;
+        areas.push({
+          area: "Profit opening",
+          status: pn(profitOpening.cnt) > 0 ? "PASS" : "WARN",
+          detail: pn(profitOpening.cnt) > 0 ? `${pn(profitOpening.cnt)} profit-opening voucher(s) posted.` : "No profit-share opening balance has been posted yet.",
+        });
+
+        const overall = areas.some((a) => a.status === "FAIL") ? "FAIL" : areas.some((a) => a.status === "WARN") ? "WARN" : "PASS";
+
+        return res.json({ overall, areas });
+      } catch (err: any) {
+        console.error("[SP Migration] gc-reconciliation error:", err);
+        return res.status(500).json({ message: "Internal server error" });
+      }
+    }
+  );
 
   // ── HARD GUARD: No cutover endpoint ─────────────────────────────────────
   // This explicitly blocks any attempt to POST to /api/sp/migration/cutover.

@@ -23,6 +23,7 @@ import { salesItems, voucherEntries, stockItems, vouchers } from "@shared/schema
 import { eq } from "drizzle-orm";
 import type { HandlerErrorResult, UpdatePosSaleParams } from "./posEditSaleTypes";
 import { fetchSpEditAccountingContext, fetchSpEditDeductionPerQty } from "./posEditSaleHelpers";
+import { isReadonlyMigratedVoucher, READONLY_MIGRATED_VOUCHER_MESSAGE } from "../../../lib/migratedVoucherGuard";
 import {
   validateItemsPositive,
   loadAndValidateExistingVoucher,
@@ -61,6 +62,10 @@ export async function updatePosSale(params: UpdatePosSaleParams): Promise<{ stat
   const voucherResult = await loadAndValidateExistingVoucher(voucherId, currentCompanyId);
   if ("error" in voucherResult) return err(voucherResult.error);
   const { existingVoucher } = voucherResult;
+
+  if (isReadonlyMigratedVoucher(existingVoucher as any)) {
+    return err({ status: 403, body: { message: READONLY_MIGRATED_VOUCHER_MESSAGE } });
+  }
 
   // POS restrictions on existing sales (location-change block only — see
   // applyPosRoleRestrictions for why the original payment-account "strip" was

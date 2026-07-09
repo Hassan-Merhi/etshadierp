@@ -33,3 +33,4 @@
 - [req.body mutation after destructure is a no-op](req-body-mutation-after-destructure.md) — legacy handlers that destructure then later mutate req.body fields don't affect already-bound consts; preserve as-is during refactors, flag as latent bug.
 - [AI chat intent classification priority](ai-chat-intent-priority.md) — domain-specific signals must outrank generic financial-transfer heuristics in classifyChatIntent; anti-hallucination overrides should apply regardless of (possibly wrong) classified intent.
 - [GC migration stock master fix](gc-migration-stock-master-fix.md) — never reuse source-company stock_item ids in target company rows; create real target stock_items via source_links map.
+- [Migrated read-only voucher guard](migrated-readonly-voucher-guard.md) — one shared helper must be enforced on every voucher/entry mutation route, not just the obvious edit/delete ones.

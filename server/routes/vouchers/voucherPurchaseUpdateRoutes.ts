@@ -1,6 +1,7 @@
 import type { Express } from "express";
 import { db } from "../../db";
 import { storage } from "../../storage";
+import { isReadonlyMigratedVoucher, READONLY_MIGRATED_VOUCHER_MESSAGE } from "../../lib/migratedVoucherGuard";
 import { requireAuth, requireRole, canDelete, requireNonPOS, checkPOSLocation } from "../../auth";
 import { requireActionAccess } from "../../lib/permissionMiddleware";
 import {
@@ -172,6 +173,10 @@ export function registerVoucherPurchaseUpdateRoutes(app: Express) {
         return res.status(403).json({
           message: "Access denied: Voucher belongs to a different company",
         });
+      }
+
+      if (isReadonlyMigratedVoucher(existingVoucher)) {
+        return res.status(403).json({ message: READONLY_MIGRATED_VOUCHER_MESSAGE });
       }
 
       // Check edit permissions based on role
@@ -357,6 +362,10 @@ export function registerVoucherPurchaseUpdateRoutes(app: Express) {
         return res.status(403).json({
           message: "Access denied: Voucher belongs to a different company",
         });
+      }
+
+      if (isReadonlyMigratedVoucher(existingVoucher)) {
+        return res.status(403).json({ message: READONLY_MIGRATED_VOUCHER_MESSAGE });
       }
 
       // Check edit permissions

@@ -2,6 +2,7 @@ import type { Express } from "express";
 import { db } from "../db";
 import { storage } from "../storage";
 import { requireAuth, requireRole, canDelete, requireNonPOS, checkPOSLocation } from "../auth";
+import { isReadonlyMigratedVoucher, READONLY_MIGRATED_VOUCHER_MESSAGE } from "../lib/migratedVoucherGuard";
 import {
   upload,
   logAudit,
@@ -514,6 +515,10 @@ export function registerVoucherEntryRoutes(app: Express) {
         });
       }
 
+      if (isReadonlyMigratedVoucher(voucher)) {
+        return res.status(403).json({ message: READONLY_MIGRATED_VOUCHER_MESSAGE });
+      }
+
       // Check permissions based on role (same logic as voucher edit)
       const userRole = req.session.currentRole;
       if (!userRole) {
@@ -585,6 +590,10 @@ export function registerVoucherEntryRoutes(app: Express) {
         });
       }
 
+      if (isReadonlyMigratedVoucher(voucher)) {
+        return res.status(403).json({ message: READONLY_MIGRATED_VOUCHER_MESSAGE });
+      }
+
       // Check edit permissions based on role (same logic as voucher edit)
       const userRole = req.session.currentRole;
       if (!userRole) {
@@ -646,6 +655,10 @@ export function registerVoucherEntryRoutes(app: Express) {
       const voucher = await storage.getVoucherById(id);
       if (!voucher) {
         return res.status(404).json({ message: "Voucher not found" });
+      }
+
+      if (isReadonlyMigratedVoucher(voucher)) {
+        return res.status(403).json({ message: READONLY_MIGRATED_VOUCHER_MESSAGE });
       }
 
       // Wrap balance sync and deletion in a transaction
@@ -995,6 +1008,11 @@ export function registerVoucherEntryRoutes(app: Express) {
 
           if (voucher.companyId !== currentCompanyId) {
             errors.push(`Voucher ${id} does not belong to current company`);
+            continue;
+          }
+
+          if (isReadonlyMigratedVoucher(voucher)) {
+            errors.push(`Voucher ${id}: ${READONLY_MIGRATED_VOUCHER_MESSAGE}`);
             continue;
           }
 

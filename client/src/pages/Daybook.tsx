@@ -30,6 +30,7 @@ import { EyeOff, Plus, ChevronDown, FileDown, LayoutList, Layers } from "lucide-
 import { format, parseISO, addDays } from "date-fns";
 import { useDateFormat } from "@/contexts/DateFormatContext";
 import { cn } from "@/lib/utils";
+import { isReadonlyMigratedVoucher } from "@/lib/migratedVoucherGuard";
 import { utils, writeFile } from "@/lib/excelHelper";
 import { getDefaultPeriodValue } from "@/components/ui/period-filter";
 import { useDateJump } from "@/hooks/use-date-jump";
@@ -469,7 +470,8 @@ export default function Daybook({ user }: { user?: any } = {}) {
   );
   const displayedRows = useMemo(() => visibleRows.slice(0, daybookRowLimit), [visibleRows, daybookRowLimit]);
 
-  const canEdit = (v: Voucher) => !["Sales", "Purchase"].includes(v.voucherType) && user?.role !== "POS";
+  const canEdit = (v: Voucher) =>
+    !["Sales", "Purchase"].includes(v.voucherType) && user?.role !== "POS" && !isReadonlyMigratedVoucher(v);
   const canDelete = () => !!(user?.role === "Developer" || user?.role === "Admin" || user?.canDeleteRecords);
   const handleView = (v: Voucher) => {
     setSelectedVoucher(v);

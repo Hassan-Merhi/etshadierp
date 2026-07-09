@@ -1,4 +1,5 @@
 import { getClientDate } from "../../lib/dateUtils";
+import { isReadonlyMigratedVoucher, READONLY_MIGRATED_VOUCHER_MESSAGE } from "../../lib/migratedVoucherGuard";
 import type { Express } from "express";
 import { db, pool } from "../../db";
 import { storage } from "../../storage";
@@ -959,6 +960,9 @@ export function registerAdminRepairRoutes(app: Express) {
         .where(and(eq(vouchers.id, voucherId), eq(vouchers.companyId, companyId)));
 
       if (!voucher) return res.status(404).json({ message: "Voucher not found" });
+      if (isReadonlyMigratedVoucher(voucher)) {
+        return res.status(403).json({ message: READONLY_MIGRATED_VOUCHER_MESSAGE });
+      }
       if (!voucher.optional) return res.status(400).json({ message: "Voucher is already finalized" });
 
       // For stock transfers: apply inventory changes on finalization

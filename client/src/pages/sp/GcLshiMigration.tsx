@@ -36,6 +36,7 @@ import {
   FileText,
   Layers,
   Lock,
+  type LucideIcon,
 } from "lucide-react";
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -902,6 +903,69 @@ export default function GcLshiMigration() {
         </Card>
       )}
 
+      {/* Step 4.5 — Stage 2 Full Rehearsal (location-aware stock, read-only sales, containers, profit-share) */}
+      {sourceCompanyId && targetCompanyId && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Layers className="h-4 w-4" />
+              Step 4.5 — Full Rehearsal (Stage 2)
+            </CardTitle>
+            <CardDescription>
+              Run each area independently. All steps are idempotent and safe to re-run; only tracked rows are ever
+              touched on rollback, and the source ERP company is never modified.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {[
+              {
+                key: "stockOpening",
+                label: "Location-aware Stock Opening",
+                icon: Package,
+                endpoint: "/api/sp/migration/gc-stock-opening",
+                extraBody: {},
+              },
+              {
+                key: "salesReadonly",
+                label: "Historical Sales (read-only)",
+                icon: FileText,
+                endpoint: "/api/sp/migration/gc-sales-readonly",
+                extraBody: {},
+              },
+              {
+                key: "containers",
+                label: "Containers → SP",
+                icon: Building2,
+                endpoint: "/api/sp/migration/gc-containers",
+                extraBody: {},
+              },
+            ].map((step) => (
+              <Stage2StepRunner
+                key={step.key}
+                label={step.label}
+                Icon={step.icon}
+                endpoint={step.endpoint}
+                sourceCompanyId={sourceCompanyId}
+                targetCompanyId={targetCompanyId}
+                sourceCompanyName={sourceComp?.name}
+                onDone={() => {
+                  refetchRuns();
+                  refetchPreview();
+                }}
+              />
+            ))}
+
+            <div className="border-t pt-4">
+              <ProfitOpeningRunner targetCompanyId={targetCompanyId} onDone={() => refetchRuns()} />
+            </div>
+
+            <div className="border-t pt-4">
+              <ReconciliationRunner sourceCompanyId={sourceCompanyId} targetCompanyId={targetCompanyId} />
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Step 5 — Run History */}
       <Card>
         <CardHeader>
@@ -1085,4 +1149,251 @@ export default function GcLshiMigration() {
       </AlertDialog>
     </div>
   );
+}
+
+// ── Stage 2 step runner (stock-opening / sales-readonly / containers) ──────
+
+function Stage2StepRunner({
+  label,
+  Icon,
+  endpoint,
+  sourceCompanyId,
+  targetCompanyId,
+  sourceCompanyName,
+  onDone,
+}: {
+  label: string;
+  Icon: LucideIcon;
+  endpoint: string;
+  sourceCompanyId: number;
+  targetCompanyId: number;
+  sourceCompanyName?: string;
+  onDone: () => void;
+}) {
+  const { toast } = useToast();
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [confirmName, setConfirmName] = useState("");
+  const [result, setResult] = useState<any>(null);
+
+  const mutation = useMutation({
+    mutationFn: () =>
+      apiRequest("POST", endpoint, {
+        sourceCompanyId,
+        targetCompanyId,
+        companyNameConfirm: confirmName,
+        confirmation: "MIGRATE",
+      }),
+    onSuccess: async (data: any) => {
+      const r = await data.json();
+      setResult(r);
+      setConfirmOpen(false);
+      setConfirmName("");
+      toast({ title: `${label} complete`, description: `${r.rowsCreated} row(s) created.` });
+      onDone();
+    },
+    onError: (e: any) => toast({ title: `${label} failed`, description: e.message, variant: "destructive" }),
+  });
+
+  return (
+    <div className="border rounded-md p-3 space-y-2">
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2 text-sm font-medium">
+          <Icon className="h-4 w-4 text-muted-foreground" />
+          {label}
+        </div>
+        <Button size="sm" variant="outline" onClick={() => setConfirmOpen(true)} data-testid={`button-run-${endpoint.split("/").pop()}`}>
+          <Play className="h-3 w-3 mr-1" /> Run
+        </Button>
+      </div>
+      {result && (
+        <div className="text-xs space-y-1 bg-muted/50 rounded p-2">
+          {(result.summary ?? []).map((s: string, i: number) => (
+            <p key={i}>{s}</p>
+          ))}
+          {(result.warnings ?? []).length > 0 && (
+            <div className="text-amber-600 dark:text-amber-400 space-y-0.5 mt-1">
+              {result.warnings.map((w: string, i: number) => (
+                <p key={i} className="flex gap-1">
+                  <AlertTriangle className="h-3 w-3 shrink-0 mt-0.5" /> {w}
+                </p>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      <AlertDialog open={confirmOpen} onOpenChange={(open) => !mutation.isPending && setConfirmOpen(open)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirm: {label}</AlertDialogTitle>
+            <AlertDialogDescription>
+              Type the source company name exactly to confirm:
+              <strong className="block mt-1">{sourceCompanyName}</strong>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="py-2">
+            <Input value={confirmName} onChange={(e) => setConfirmName(e.target.value)} placeholder={sourceCompanyName} />
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => mutation.mutate()}
+              disabled={confirmName !== sourceCompanyName || mutation.isPending}
+            >
+              {mutation.isPending ? "Running…" : "Run"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
+  );
+}
+
+// ── Profit-share opening balance runner ─────────────────────────────────────
+
+function ProfitOpeningRunner({ targetCompanyId, onDone }: { targetCompanyId: number; onDone: () => void }) {
+  const { toast } = useToast();
+  const [cutoffDate, setCutoffDate] = useState(() => new Date().toISOString().split("T")[0]);
+  const [accumulatedProfit, setAccumulatedProfit] = useState("");
+  const [ourSplitPct, setOurSplitPct] = useState("50");
+  const [result, setResult] = useState<any>(null);
+
+  const mutation = useMutation({
+    mutationFn: () =>
+      apiRequest("POST", "/api/sp/migration/gc-profit-opening", {
+        targetCompanyId,
+        cutoffDate,
+        accumulatedProfit,
+        ourSplitPct,
+      }),
+    onSuccess: async (data: any) => {
+      const r = await data.json();
+      setResult(r);
+      toast({ title: "Profit-share opening balance posted", description: `Voucher ${r.voucherNumber}` });
+      onDone();
+    },
+    onError: (e: any) => toast({ title: "Failed", description: e.message, variant: "destructive" }),
+  });
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center gap-2 text-sm font-medium">
+        <DollarSign className="h-4 w-4 text-muted-foreground" />
+        Profit-Share Opening Balance
+      </div>
+      <p className="text-xs text-muted-foreground">
+        Posts a balanced journal: Dr Accumulated Profit Clearing → Cr Our Share + Cr Supplier Share.
+      </p>
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-end">
+        <div className="space-y-1">
+          <Label>Cutoff Date</Label>
+          <Input type="date" value={cutoffDate} onChange={(e) => setCutoffDate(e.target.value)} />
+        </div>
+        <div className="space-y-1">
+          <Label>Accumulated Profit (USD)</Label>
+          <Input
+            type="number"
+            min="0"
+            step="0.01"
+            value={accumulatedProfit}
+            onChange={(e) => setAccumulatedProfit(e.target.value)}
+            placeholder="0.00"
+          />
+        </div>
+        <div className="space-y-1">
+          <Label>Our Split %</Label>
+          <Input type="number" min="0" max="100" step="1" value={ourSplitPct} onChange={(e) => setOurSplitPct(e.target.value)} />
+        </div>
+      </div>
+      <Button
+        size="sm"
+        onClick={() => mutation.mutate()}
+        disabled={!cutoffDate || !accumulatedProfit || mutation.isPending}
+        data-testid="button-run-profit-opening"
+      >
+        {mutation.isPending ? "Posting…" : "Post Opening Balance"}
+      </Button>
+      {result && (
+        <p className="text-xs text-muted-foreground">
+          Our share: ${fmtNum(result.ourShare)} · Supplier share: ${fmtNum(result.supplierShare)} (voucher {result.voucherNumber})
+        </p>
+      )}
+    </div>
+  );
+}
+
+// ── Final reconciliation report ─────────────────────────────────────────────
+
+function ReconciliationRunner({
+  sourceCompanyId,
+  targetCompanyId,
+}: {
+  sourceCompanyId: number;
+  targetCompanyId: number;
+}) {
+  const [report, setReport] = useState<{ overall: string; areas: Array<{ area: string; status: string; detail: string }> } | null>(
+    null
+  );
+  const [loading, setLoading] = useState(false);
+
+  async function run() {
+    setLoading(true);
+    try {
+      const r = await fetch(`/api/sp/migration/gc-reconciliation?sourceCompanyId=${sourceCompanyId}&targetCompanyId=${targetCompanyId}`);
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.message);
+      setReport(data);
+    } catch {
+      setReport(null);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2 text-sm font-medium">
+          <CheckCircle2 className="h-4 w-4 text-muted-foreground" />
+          Final Reconciliation Report
+        </div>
+        <Button size="sm" variant="outline" onClick={run} disabled={loading} data-testid="button-run-reconciliation">
+          {loading ? "Checking…" : "Check"}
+        </Button>
+      </div>
+      {report && (
+        <div className="border rounded-md overflow-auto">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Area</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Detail</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {report.areas.map((a) => (
+                <TableRow key={a.area}>
+                  <TableCell className="text-sm">{a.area}</TableCell>
+                  <TableCell>
+                    <Badge variant={a.status === "PASS" ? "default" : a.status === "FAIL" ? "destructive" : "secondary"}>
+                      {a.status === "PASS" && <CheckCircle2 className="h-3 w-3 mr-1" />}
+                      {a.status === "FAIL" && <XCircle className="h-3 w-3 mr-1" />}
+                      {a.status === "WARN" && <AlertTriangle className="h-3 w-3 mr-1" />}
+                      {a.status}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="text-xs text-muted-foreground">{a.detail}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function fmtNum(n: number) {
+  return (n ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
