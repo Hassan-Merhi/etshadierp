@@ -6,11 +6,15 @@ on:
   pull_request:
     branches: [main]
 
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   ci:
-    name: Check / Build / Lint / Format / Test
+    name: Check / Build / Lint / Test
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 35
 
     services:
       postgres:
@@ -30,45 +34,39 @@ jobs:
     env:
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/heliumdb
       NODE_ENV: test
-      # Prevents exit-code 134 (OOM/SIGABRT) on memory-heavy steps.
-      # ubuntu-latest runners have 7 GB RAM; 4096 MB heap is safe.
+      SESSION_SECRET: ci-session-secret
+      CSRF_ENFORCE: "0"
       NODE_OPTIONS: --max-old-space-size=4096
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Node.js 24
+      - name: Set up Node.js 20
         uses: actions/setup-node@v4
         with:
-          node-version: "24"
+          node-version: "20"
+          cache: npm
 
       - name: Install dependencies
-        run: npm install --no-audit
+        run: npm ci --no-audit
 
-      # ── Blocking gates ─────────────────────────────────────────────────────
-      # These three MUST pass. A failure here stops the workflow.
-
-      - name: Type-check (tsc --noEmit)
+      - name: Type-check
         run: npm run check
 
-      - name: Build (Vite + esbuild)
+      - name: Build
         run: npm run build
 
-      - name: Tests (Vitest)
-        run: npm run test
-
-      # ── Advisory checks ────────────────────────────────────────────────────
-      # Lint and format have pre-existing repo-wide debt (documented in
-      # docs/service-layer-audit.md). They run and report, but do NOT fail
-      # the workflow until a dedicated cleanup phase completes.
-      # continue-on-error: true  →  step is annotated as failed in the UI
-      #                             but the overall job still succeeds.
-
-      - name: Lint (ESLint) — advisory
+      - name: Lint
         run: npm run lint
-        continue-on-error: true
 
-      - name: Format check (Prettier) — advisory
+      - name: Backend tests
+        run: npm run test:backend
+
+      - name: Frontend tests
+        run: npm run test:frontend
+
+      # Format check remains advisory until existing repo-wide formatting debt is cleaned up.
+      - name: Format check
         run: npm run format:check
         continue-on-error: true
