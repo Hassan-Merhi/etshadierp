@@ -998,6 +998,7 @@ export function registerSupplierStatementRoutes(app: Express) {
         obCommissions,
         offloadCharges: allSupplierCharges,
         payments,
+        voucherPayments: voucherPaymentRows,
         fxTransfers: enrichedFxTransfers,
         linkedSupplierGroups,
         brokerContainers,

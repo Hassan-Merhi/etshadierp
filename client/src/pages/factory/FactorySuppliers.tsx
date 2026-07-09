@@ -622,6 +622,7 @@ export default function FactorySuppliers() {
   if (statementSupplierId) {
     const rows = statementData?.statement || [];
     const pmts = statementData?.payments || [];
+    const voucherPmts = statementData?.voucherPayments || [];
     const fxts = statementData?.fxTransfers || [];
     const obcs = statementData?.obCommissions || [];
     const allRows: any[] = [];
@@ -653,6 +654,25 @@ export default function FactorySuppliers() {
         onDelete: () => wrapAdminAction(() => deletePaymentMutation.mutate(p.id), "Delete Payment"),
       })
     );
+    voucherPmts.forEach((p: any) => {
+      const currency = p.currency || "USD";
+      const debitAmt = parseFloat(p.debitAmount || "0");
+      const fx = parseFloat(p.exchangeRate || "1") || 1;
+      const usdAmt = currency === "USD" ? debitAmt : debitAmt / fx;
+      allRows.push({
+        key: `vp-${p.id}`,
+        date: p.voucherDate,
+        type: "payment",
+        ref: currency !== "USD"
+          ? `${p.voucherNumber} (${currency} ${formatNum(String(debitAmt))} @ ${fx.toFixed(4)})`
+          : p.voucherNumber,
+        detail: p.description || undefined,
+        amount: formatNum(String(debitAmt)),
+        amountVal: p.optional ? 0 : usdAmt,
+        rowCc: "USD",
+        optional: !!p.optional,
+      });
+    });
     fxts.forEach((f) =>
       allRows.push({
         key: `f-${f.id}`,
