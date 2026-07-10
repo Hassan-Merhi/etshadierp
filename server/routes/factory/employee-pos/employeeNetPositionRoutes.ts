@@ -963,6 +963,13 @@ export function registerEmployeeNetPositionRoutes(app: Express) {
       // got updated). Location Inventory and Bale Ledger already exclude these;
       // without the same exclusion here, Stock In Hand is inflated and drifts
       // out of sync with what Location Inventory shows.
+      //
+      // Must ALSO exclude bales tied to an order that's currently LOADING /
+      // PENDING_VERIFICATION / VERIFIED. Location Inventory's Cost Value KPI
+      // subtracts these ("loadingCount") from its total, and they're already
+      // counted separately here as "Loading Orders" / "Verified Orders" /
+      // "Pending Orders" receivables — leaving them in Stock In Hand as well
+      // double-counts them.
       const invResult = await db.execute(sql`
         SELECT COALESCE(SUM(p.production_price::numeric), 0) AS total
         FROM   factory_bales   b
@@ -975,6 +982,13 @@ export function registerEmployeeNetPositionRoutes(app: Express) {
             INNER JOIN customer_orders co ON co.id = cob.order_id
             WHERE cob.bale_id = b.id
               AND co.status IN ('FINALIZED', 'DISPATCHED', 'SOLD')
+              AND co.company_id = ${companyId}
+          )
+          AND  NOT EXISTS (
+            SELECT 1 FROM customer_order_bales cob
+            INNER JOIN customer_orders co ON co.id = cob.order_id
+            WHERE cob.bale_id = b.id
+              AND co.status IN ('LOADING', 'PENDING_VERIFICATION', 'VERIFIED')
               AND co.company_id = ${companyId}
           )
       `);
