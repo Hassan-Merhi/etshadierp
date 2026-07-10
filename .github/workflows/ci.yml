@@ -59,8 +59,10 @@ jobs:
       - name: Apply reviewed Combo 1 safe fixes
         if: github.event_name == 'pull_request' && github.head_ref == 'combo-1-ci-safe-types'
         run: |
-          git apply --check scripts/combo1-safe-type-fixes.patch
-          git apply scripts/combo1-safe-type-fixes.patch
+          sed '/^--- a\/tests\/sp-sales-accounting\.test\.ts$/,$d' scripts/combo1-safe-type-fixes.patch > /tmp/combo1-source-fixes.patch
+          git apply --check /tmp/combo1-source-fixes.patch
+          git apply /tmp/combo1-source-fixes.patch
+          node scripts/fixCombo1SpTest.mjs
 
       - name: Commit reviewed Combo 1 safe fixes
         if: github.event_name == 'pull_request' && github.head_ref == 'combo-1-ci-safe-types'
