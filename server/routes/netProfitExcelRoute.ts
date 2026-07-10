@@ -121,8 +121,8 @@ import fs from "fs";
 export function registerNetProfitExcelRoute(app: Express) {
   app.get("/api/reports/net-profit-excel", requireAuth, async (req, res) => {
     try {
-      const user = req.session.user as any;
-      const isAdminOrDev = user?.role === "Admin" || user?.role === "Developer";
+      const role = req.user?.role;
+      const isAdminOrDev = role === "Admin" || role === "Developer";
       const requestedCompanyId = req.query.companyId ? parseInt(req.query.companyId as string) : null;
       const companyId = isAdminOrDev && requestedCompanyId ? requestedCompanyId : req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });

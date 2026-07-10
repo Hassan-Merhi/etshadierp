@@ -519,24 +519,27 @@ export function registerWhatsAppRoutes(app: Express) {
       const npEnd = today;
 
       // Build ZIP
-      const zipBuf = await new Promise<Buffer>(async (resolve, reject) => {
+      const zipBuf = await new Promise<Buffer>((resolve, reject) => {
         const chunks: Buffer[] = [];
         const arc = archiver("zip", { zlib: { level: 6 } });
         arc.on("data", (chunk: Buffer) => chunks.push(chunk));
         arc.on("end", () => resolve(Buffer.concat(chunks)));
         arc.on("error", reject);
-        for (const company of allCompanies) {
-          try {
-            const buf = await generateNetPositionExcel(company.id, company.name, npStart, npEnd);
-            const safe = company.name.replace(/[^a-z0-9]/gi, "_");
-            arc.append(Buffer.isBuffer(buf) ? buf : Buffer.from(buf), {
-              name: `NetPosition_${safe}_${npEnd}.xlsx`,
-            });
-          } catch (e: any) {
-            console.error(`[NpAllNow] Failed for ${company.name}:`, e.message);
+
+        void (async () => {
+          for (const company of allCompanies) {
+            try {
+              const buf = await generateNetPositionExcel(company.id, company.name, npStart, npEnd);
+              const safe = company.name.replace(/[^a-z0-9]/gi, "_");
+              arc.append(Buffer.isBuffer(buf) ? buf : Buffer.from(buf), {
+                name: `NetPosition_${safe}_${npEnd}.xlsx`,
+              });
+            } catch (e: any) {
+              console.error(`[NpAllNow] Failed for ${company.name}:`, e.message);
+            }
           }
-        }
-        arc.finalize();
+          await arc.finalize();
+        })().catch(reject);
       });
 
       const messages: string[] = [];

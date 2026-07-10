@@ -33,7 +33,6 @@ let cogsAcctId: number;
 let stockAcctId: number;
 let costClrAcctId: number;
 let bankAccountId: number;
-let cashLedgerAcctId: number;
 
 async function loginAsTestUser() {
   const loginRes = await agent.post("/api/auth/login").send({
@@ -139,19 +138,6 @@ beforeAll(async () => {
     })
     .returning();
   bankAccountId = bankAccount.id;
-
-  const [cashLedgerAcct] = await db
-    .insert(schema.ledgerAccounts)
-    .values({
-      companyId: ctx.companyId,
-      code: `${TEST_PREFIX}_CASH`,
-      name: "Test Cash",
-      accountType: "Cash",
-      openingBalance: "0",
-      openingBalanceSide: "Dr",
-    })
-    .returning();
-  cashLedgerAcctId = cashLedgerAcct.id;
 
   agent = request.agent(ctx.app);
   await loginAsTestUser();
@@ -293,7 +279,7 @@ describe("Supplier Partner sale accounting — POST /api/sp/sales", () => {
       saleDate: new Date().toISOString().split("T")[0],
       customerName: "Test Customer Cash",
       paymentAccountType: "cash",
-      paymentAccountId: cashLedgerAcctId,
+      paymentAccountId: ctx.cashAccountId,
       saleLines: [{ stockItemId, qtySold: 1, salePricePerUnit: 1000 }],
     });
 
@@ -313,7 +299,7 @@ describe("Supplier Partner sale accounting — POST /api/sp/sales", () => {
     expect(totalDebit).toBeCloseTo(1000, 2);
     expect(totalCredit).toBeCloseTo(1000, 2);
 
-    const cashEntry = entries.find((e) => e.ledgerAccountId === cashLedgerAcctId);
+    const cashEntry = entries.find((e) => e.ledgerAccountId === ctx.cashAccountId);
     expect(cashEntry).toBeDefined();
     expect(cashEntry!.bankAccountId).toBeNull();
     expect(parseFloat(cashEntry!.debitAmount as any)).toBeCloseTo(1000, 2);

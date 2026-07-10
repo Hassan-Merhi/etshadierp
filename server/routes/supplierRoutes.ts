@@ -327,7 +327,7 @@ export function registerSupplierRoutes(app: Express) {
       const updatedSupplier = await storage.updateSupplier(supplierId, parsed);
 
       try {
-        const _supChanges: Record<string, { old: any; new: any }> = {};
+        const _supChanges: Record<string, { old?: any; new?: any }> = {};
         for (const _f of ["legalName", "phone", "email", "address", "taxId", "paymentTerms"] as const) {
           if (String((existingSupplier as any)[_f] ?? "") !== String((updatedSupplier as any)[_f] ?? "")) {
             _supChanges[_f] = { old: (existingSupplier as any)[_f], new: (updatedSupplier as any)[_f] };

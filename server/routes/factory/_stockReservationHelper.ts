@@ -79,7 +79,7 @@ export async function syncProformaReservations(tx: DbOrTx, companyId: number, pr
     if (!line.articleCode) continue;
     currentCodes.add(line.articleCode);
     const loaded = loadedMap.get(line.articleCode) ?? 0;
-    const reservedQty = Math.max(0, (Number(line.quantity) ?? 0) - loaded);
+    const reservedQty = Math.max(0, Number(line.quantity) - loaded);
 
     await tx.execute(
       sql`INSERT INTO proforma_stock_reservations

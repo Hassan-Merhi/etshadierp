@@ -529,7 +529,7 @@ async function logAudit(params: {
   tableName: string;
   recordId?: number | null;
   recordIdentifier?: string | null;
-  changes?: Record<string, { old: any; new: any }> | null;
+  changes?: Record<string, { old?: any; new?: any }> | null;
 }) {
   try {
     await db.insert(auditLog).values({

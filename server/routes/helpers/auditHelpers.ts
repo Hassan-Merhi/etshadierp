@@ -19,7 +19,7 @@ export async function logAudit(params: {
   tableName: string;
   recordId?: number | null;
   recordIdentifier?: string | null;
-  changes?: Record<string, { old: any; new: any }> | null;
+  changes?: Record<string, { old?: any; new?: any }> | null;
 }) {
   try {
     await db.insert(auditLog).values({
@@ -191,8 +191,8 @@ export function buildVoucherChangesForUpdate(
   newV: VoucherSnap,
   oldEntries: EntrySnap[],
   newEntries: EntrySnap[]
-): Record<string, { old: any; new: any }> {
-  const c: Record<string, { old: any; new: any }> = {};
+): Record<string, { old?: any; new?: any }> {
+  const c: Record<string, { old?: any; new?: any }> = {};
   if (oldV.voucherType !== newV.voucherType) c.voucherType = { old: oldV.voucherType, new: newV.voucherType };
   if (oldV.voucherDate !== newV.voucherDate) c.date = { old: oldV.voucherDate, new: newV.voucherDate };
   if (parseFloat(oldV.totalAmount || "0") !== parseFloat(newV.totalAmount || "0"))

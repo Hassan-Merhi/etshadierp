@@ -80,7 +80,7 @@ export async function buildEntrySheet(
     groupBounds.push({ groupName: gName, items: gItems, firstRow, lastRow, subtotalRow });
     nextRow++;
   }
-  const totalRowNum = nextRow++;
+  const totalRowNum = nextRow;
 
   // Cash / payments layout (2 blank gap after TOTAL)
   const cashHdrRow    = totalRowNum + 2;

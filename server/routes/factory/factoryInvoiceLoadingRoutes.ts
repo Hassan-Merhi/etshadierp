@@ -244,7 +244,7 @@ export function registerFactoryInvoiceLoadingRoutes(app: Express) {
       if (invoiceId === null) return res.status(400).json({ message: "Invalid id" });
       if (isNaN(invoiceId)) return res.status(400).json({ message: "Invalid invoice ID" });
 
-      const activeSessionId = req.query.sessionId ? parseOptionalId(req.query.sessionId) : undefined;
+      const activeSessionId = req.query.sessionId ? (parseOptionalId(req.query.sessionId) ?? undefined) : undefined;
 
       const summary = await buildLoadingSummary(invoiceId, companyId, activeSessionId);
       if (!summary) return res.status(404).json({ message: "Invoice not found" });

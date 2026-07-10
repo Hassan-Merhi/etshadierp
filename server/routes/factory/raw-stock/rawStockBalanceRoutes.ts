@@ -155,7 +155,7 @@ export function registerRawStockBalanceRoutes(app: Express) {
 
       const result = await db.transaction(async (tx: any) => {
         // Use supplierId directly if provided, otherwise find-or-create by name
-        let existingSupplier: any = null;
+        let existingSupplier: any;
         if (reqSupplierId) {
           const [found] = await tx
             .select()

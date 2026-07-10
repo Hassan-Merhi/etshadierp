@@ -798,8 +798,8 @@ export function registerFactoryCustomersRoutes(app: Express) {
         const debit = parseFloat(row.debitAmount || "0");
         const credit = parseFloat(row.creditAmount || "0");
         runningBalance += debit - credit;
-        let container = "",
-          particulars = "";
+        let container = "";
+        let particulars: string;
         if (row.referenceType === "INVOICE" && row.referenceId) {
           container = containerNumMap.get(row.referenceId) || "";
           particulars = destinationMapPdf.get(row.referenceId) || "";

@@ -835,7 +835,7 @@ export function registerStockTransferAdjRoutes(app: Express) {
 
       const updated = await storage.updateStockItem(stockItemId, updates);
       try {
-        const _stockChanges: Record<string, { old: any; new: any }> = {};
+        const _stockChanges: Record<string, { old?: any; new?: any }> = {};
         for (const _f of ["name", "code", "uom", "barcode", "sellingPrice", "active"] as const) {
           if (String((existingItem as any)[_f] ?? "") !== String((updated as any)[_f] ?? "")) {
             _stockChanges[_f] = { old: (existingItem as any)[_f], new: (updated as any)[_f] };
