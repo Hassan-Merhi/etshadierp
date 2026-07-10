@@ -10,6 +10,7 @@ import {
   stockAdjustmentVouchers,
   stockTransferItems,
   stockTransferVouchers,
+  creditNoteItems,
   stockItems as stockItemsTable,
   stockGroups as stockGroupsTable,
   stockCategories as stockCategoriesTable,
@@ -87,6 +88,17 @@ export async function calculateHistoricalLocationInventory(
     .where(and(eq(vouchers.companyId, companyId), eq(stockTransferItems.sourceLocationId, locationId)))
     .execute();
   for (const item of transfersOutStockItems) seedStockItemIds.add(item.stockItemId);
+
+  // Credit/Debit notes — the monthly-summary route's per-month buckets fold these
+  // in (Credit Note = inward, Debit Note = outward), so the historical opening
+  // reconstruction must seed and reverse them too or opening balances drift.
+  const creditDebitNoteStockItems = await db
+    .selectDistinct({ stockItemId: creditNoteItems.stockItemId })
+    .from(creditNoteItems)
+    .innerJoin(vouchers, eq(creditNoteItems.voucherId, vouchers.id))
+    .where(and(eq(vouchers.companyId, companyId), eq(creditNoteItems.locationId, locationId)))
+    .execute();
+  for (const item of creditDebitNoteStockItems) seedStockItemIds.add(item.stockItemId);
 
   if (seedStockItemIds.size === 0) return [];
 
@@ -296,6 +308,43 @@ export async function calculateHistoricalLocationInventory(
     existing.totalValue -= qty * cost;
     if (existing.quantity > 0) existing.rate = existing.totalValue / existing.quantity;
     inventoryMap.set(offload.stockItemId, existing);
+  }
+
+  // Reverse credit/debit notes AFTER the target date. Credit Notes restored
+  // stock (were inward) so reverse by subtracting; Debit Notes reduced stock
+  // (were outward) so reverse by adding back — mirrors the sign convention
+  // used in the monthly-summary month buckets.
+  const creditDebitNotesAfterDate = await db
+    .select({
+      stockItemId: creditNoteItems.stockItemId,
+      quantity: creditNoteItems.quantity,
+      inventoryCost: creditNoteItems.inventoryCost,
+      noteType: vouchers.voucherType,
+    })
+    .from(creditNoteItems)
+    .innerJoin(vouchers, eq(creditNoteItems.voucherId, vouchers.id))
+    .where(
+      and(
+        eq(vouchers.companyId, companyId),
+        eq(creditNoteItems.locationId, locationId),
+        sql`${vouchers.voucherDate} > ${cutoffDateStr}`
+      )
+    )
+    .execute();
+
+  for (const note of creditDebitNotesAfterDate) {
+    const qty = parseFloat(note.quantity) || 0;
+    const cost = parseFloat(note.inventoryCost) || 0;
+    const existing = inventoryMap.get(note.stockItemId) || { quantity: 0, totalValue: 0, rate: 0 };
+    if (note.noteType === "Credit Note") {
+      existing.quantity -= qty;
+      existing.totalValue -= qty * cost;
+    } else {
+      existing.quantity += qty;
+      existing.totalValue += qty * cost;
+    }
+    if (existing.quantity > 0) existing.rate = existing.totalValue / existing.quantity;
+    inventoryMap.set(note.stockItemId, existing);
   }
 
   const stockItemIdList = Array.from(inventoryMap.keys());

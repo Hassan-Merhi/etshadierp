@@ -519,7 +519,7 @@ export function StockMovementDialog({
                     }
                   } else {
                     if (locId) {
-                      navigate(`/locations/${locId}/stock-items/${sid}/monthly-summary`);
+                      navigate(`/locations/${locId}/stock-items/${sid}/history`);
                     } else {
                       navigate(`/stock-items/${sid}/monthly-summary`);
                     }

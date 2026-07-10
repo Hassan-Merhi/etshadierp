@@ -2728,15 +2728,17 @@ export default function StockTransferOrder() {
             <Button variant="outline" onClick={() => setHistoryDialogOpen(false)} data-testid="button-history-close">
               Close
             </Button>
-            <Button variant="default" asChild data-testid="button-history-open-full">
-              <a
-                href={`/locations/${historyLocation?.id}/stock-items/${historyItem?.id}/history`}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                <ExternalLink className="h-4 w-4 mr-1.5" />
-                Open full history
-              </a>
+            <Button
+              variant="default"
+              data-testid="button-history-open-full"
+              onClick={() => {
+                if (!historyLocation || !historyItem) return;
+                navigate(`/locations/${historyLocation.id}/stock-items/${historyItem.id}/history`);
+                setHistoryDialogOpen(false);
+              }}
+            >
+              <ExternalLink className="h-4 w-4 mr-1.5" />
+              Open full history
             </Button>
           </DialogFooter>
         </DialogContent>
