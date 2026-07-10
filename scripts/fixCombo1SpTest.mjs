@@ -8,7 +8,7 @@ const duplicateInsert = `  const [cashLedgerAcct] = await db
     .insert(schema.ledgerAccounts)
     .values({
       companyId: ctx.companyId,
-      code: \`${TEST_PREFIX}_CASH\`,
+      code: \`\${TEST_PREFIX}_CASH\`,
       name: "Test Cash",
       accountType: "Cash",
       openingBalance: "0",
