@@ -52,9 +52,22 @@ jobs:
           fetch-depth: 0
 
       - name: Apply guarded Combo 2 export-test fixes
-        run: node scripts/combo2-apply-safe-test-fixes.mjs
+        id: combo2_apply
+        run: |
+          set -o pipefail
+          node scripts/combo2-apply-safe-test-fixes.mjs 2>&1 | tee combo2-apply-errors.txt
+
+      - name: Upload Combo 2 apply failure
+        if: always() && steps.combo2_apply.outcome == 'failure'
+        uses: actions/upload-artifact@v4
+        with:
+          name: combo2-apply-errors
+          path: combo2-apply-errors.txt
+          if-no-files-found: error
+          retention-days: 1
 
       - name: Commit guarded Combo 2 export-test fixes
+        if: steps.combo2_apply.outcome == 'success'
         run: |
           git diff --check
           if git diff --quiet; then
