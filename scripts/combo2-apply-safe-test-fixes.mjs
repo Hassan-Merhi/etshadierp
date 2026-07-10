@@ -23,8 +23,8 @@ function updateExcelExportTests() {
 
   if (
     source.includes("Required SP export template missing") &&
-    !/it\.skip\s*\(/.test(currentCode) &&
-    !/ctx\.skip\s*\(/.test(currentCode)
+    !/it\.skip\s*[.(]/.test(currentCode) &&
+    !/(?:ctx|tCtx)\.skip\s*\(/.test(currentCode)
   ) {
     return;
   }
@@ -47,25 +47,77 @@ function updateExcelExportTests() {
     source,
     /function requireWb\(ctx: \{ skip: \(\) => void \}\): ExcelJS\.Workbook \| null \{\s*if \(!buf \|\| !wb\) \{ ctx\.skip\(\); return null; \}\s*return wb;\s*\}/,
     `function requireWb(_ctx?: { skip: () => void }): ExcelJS.Workbook {
-  expect(buf).toBeDefined();
-  expect(wb).toBeDefined();
+  expect(buf, "SP export buffer should be generated").toBeDefined();
+  expect(wb, "SP export workbook should be loaded").toBeDefined();
   return wb;
 }`,
     "excel workbook guard",
   );
 
   source = source.replace(/\s*if \(!buf\) \{ ctx\.skip\(\); return; \}\n/g, "\n");
+
+  // The committed template and seeded Shoes row are required fixtures, not optional variants.
+  source = source.replace(
+    /if \(shoesRow === null\) \{\s*(?:ctx|tCtx)\.skip\(\);[^}]*return;\s*\}/g,
+    `expect(shoesRow, 'Required "Shoes" row is missing from the SP export template').not.toBeNull();
+    if (shoesRow === null) return;`,
+  );
+
+  source = source.replace(
+    /\s*if \(!templateExists\) return;\s*/g,
+    "\n    expect(templateExists, `Required SP export template missing: ${TEMPLATE_PATH}`).toBe(true);\n",
+  );
+  source = source.replace(
+    /\s*if \(!mvt\) return;[^\n]*\n/g,
+    `
+    expect(mvt, "Required seeded Shoes stock movement is missing").toBeDefined();
+    if (!mvt) throw new Error("Required seeded Shoes stock movement is missing");
+`,
+  );
+
+  source = replaceOnce(
+    source,
+    /function rWb\(tCtx: \{ skip: \(\) => void \}\): ExcelJS\.Workbook \| null \{\s*if \(!rbuf \|\| !rwb\) \{ tCtx\.skip\(\); return null; \}\s*return rwb;\s*\}/,
+    `function rWb(_tCtx?: { skip: () => void }): ExcelJS.Workbook {
+    expect(rbuf, "Regression export buffer should be generated").toBeDefined();
+    expect(rwb, "Regression export workbook should be loaded").toBeDefined();
+    return rwb;
+  }`,
+    "regression workbook guard",
+  );
+  source = replaceOnce(
+    source,
+    /const rIt = templateExists \? it : it\.skip\.bind\(it, "template missing"\);/,
+    "const rIt = it;",
+    "regression conditional test alias",
+  );
+  source = source.replace(/\s*if \(!rbuf\) \{ tCtx\.skip\(\); return; \}\n/g, "\n");
+
+  source = source.replace(
+    /if \(!salesWs\) \{ tCtx\.skip\(\); return; \}/g,
+    `expect(salesWs, 'Required "Sales" sheet is missing').toBeDefined();
+    if (!salesWs) return;`,
+  );
+  source = source.replace(
+    /if \(!templateExists\) \{ tCtx\.skip\(\); return; \}/g,
+    `expect(templateExists, \`Required SP export template missing: \${TEMPLATE_PATH}\`).toBe(true);`,
+  );
+
   source = source.replace(
     "// All inner tests use conditional `it` so they stay in the normal test runner\n// (skipped = todoish, no silent-pass, shows intent clearly).",
-    "// All workbook checks run as normal tests. Missing required assets fail in beforeAll.",
+    "// All workbook checks run as normal tests. Missing required assets fail explicitly.",
   );
   source = source.replace(
     "// Returns the workbook if available, or calls ctx.skip() and returns null.",
     "// Returns the generated workbook; missing setup fails the test explicitly.",
   );
+  source = source.replace(
+    "// Helper: skip if the regression buffer wasn't generated",
+    "// Helper: require the regression workbook to have been generated",
+  );
 
   const updatedCode = executableLines(source);
-  if (/it\.skip\s*\(/.test(updatedCode) || /ctx\.skip\s*\(/.test(updatedCode)) {
+  if (/it\.skip\s*[.(]/.test(updatedCode) || /(?:ctx|tCtx)\.skip\s*\(/.test(updatedCode)) {
     throw new Error("Excel export test still contains active skip guards");
   }
 
