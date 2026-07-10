@@ -1253,10 +1253,47 @@ export function registerEmployeeNetPositionRoutes(app: Express) {
       }
 
 
+      // ── Employee Salaries Payable / Receivables — directly from employees.currentBalance ──
+      // Employee balances are tracked via employees.currentBalance (not through a
+      // "Payroll Payable" ledger account), so we inject them here explicitly.
+      // A negative currentBalance means the employee owes the company (e.g. an unpaid
+      // advance/FX debit) — that's a receivable and belongs in "What We Have", not a
+      // liability. Previously these were dropped entirely (only bal > 0 was summed).
+      const allEmployeesForNP = await db
+        .select({
+          firstName: employees.firstName,
+          lastName: employees.lastName,
+          currentBalance: employees.currentBalance,
+        })
+        .from(employees)
+        .where(
+          and(
+            eq(employees.companyId, companyId),
+            eq(employees.employeeType, "Employee"),
+            eq(employees.active, true),
+            isNull(employees.deletedAt)
+          )
+        );
+      let employeeSalariesPayable = 0;
+      let employeeReceivablesTotal = 0;
+      const employeeReceivableItems: { name: string; balanceUsd: number }[] = [];
+      for (const emp of allEmployeesForNP) {
+        const bal = parseFloat(emp.currentBalance || "0");
+        if (bal > 0) employeeSalariesPayable += bal;
+        else if (bal < 0) {
+          employeeReceivablesTotal += Math.abs(bal);
+          const empName = [emp.firstName, emp.lastName].filter(Boolean).join(" ").trim();
+          if (empName) employeeReceivableItems.push({ name: empName, balanceUsd: Math.abs(bal) });
+        }
+      }
+      employeeSalariesPayable = round2(employeeSalariesPayable);
+      employeeReceivablesTotal = round2(employeeReceivablesTotal);
+
       // forUsTotal: ledger assets + inventory + raw material + balance on table + stock OTW
       //             + customer receivables (DR) + pending orders + verified orders + loading orders
       //             + overpaid suppliers (they owe us the overpayment back)
       //             + prepaidRent (we overpaid our landlord → asset)
+      //             + employee receivables (negative employee balances — they owe us back)
       //             (bales are reserved/excluded from baleInventoryValue — no double-count)
       const totalSupplierOverpaymentsRounded = round2(totalSupplierOverpayments);
       const forUsTotal = round2(
@@ -1270,28 +1307,9 @@ export function registerEmployeeNetPositionRoutes(app: Express) {
           verifiedTotal +
           loadingTotal +
           totalSupplierOverpaymentsRounded +
-          prepaidRent
+          prepaidRent +
+          employeeReceivablesTotal
       );
-      // ── Employee Salaries Payable — directly from employees.currentBalance ───────
-      // Employee balances are tracked via employees.currentBalance (not through a
-      // "Payroll Payable" ledger account), so we inject them here explicitly.
-      const allEmployeesForNP = await db
-        .select({ currentBalance: employees.currentBalance })
-        .from(employees)
-        .where(
-          and(
-            eq(employees.companyId, companyId),
-            eq(employees.employeeType, "Employee"),
-            eq(employees.active, true),
-            isNull(employees.deletedAt)
-          )
-        );
-      let employeeSalariesPayable = 0;
-      for (const emp of allEmployeesForNP) {
-        const bal = parseFloat(emp.currentBalance || "0");
-        if (bal > 0) employeeSalariesPayable += bal;
-      }
-      employeeSalariesPayable = round2(employeeSalariesPayable);
 
       // onUsTotal: ledger liabilities + supplier balances + customer credit balances (CR) + employee salaries + rent payable
       const onUsTotal = round2(
@@ -1364,6 +1382,15 @@ export function registerEmployeeNetPositionRoutes(app: Express) {
         ...(prepaidRent > 0
           ? [{ name: "Prepaid Rent", code: "PREPAID_RENT", value: prepaidRent, category: "Prepaid Rent" }]
           : []),
+        // Employees who owe the company (negative currentBalance) — a receivable
+        ...employeeReceivableItems
+          .sort((a, b) => b.balanceUsd - a.balanceUsd)
+          .map((e) => ({
+            name: e.name,
+            code: "EMPLOYEE_RECEIVABLE",
+            value: round2(e.balanceUsd),
+            category: "Employee Receivable",
+          })),
       ];
 
       // Group ledger on-us by category
