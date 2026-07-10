@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "NODE_ENV=development tsx server/index.ts",
     "prebuild": "node -e \"require.resolve('vite'); require.resolve('esbuild'); console.log('Build dependencies OK')\"",
-    "build": "node node_modules/vite/bin/vite.js build && node node_modules/esbuild/bin/esbuild server/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist",
+    "build": "node node_modules/vite/bin/vite.js build && node_modules/esbuild/bin/esbuild server/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist",
     "start": "node dist/index.js",
     "check": "node node_modules/typescript/bin/tsc --noEmit",
     "db:push": "drizzle-kit push",
