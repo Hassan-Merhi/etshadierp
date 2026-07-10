@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
-import { Layers, Trash2 } from "lucide-react";
+import { History, PackagePlus, MinusCircle, Layers, Container } from "lucide-react";
 import { formatNumber } from "@/lib/formatNumber";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
@@ -14,19 +14,58 @@ interface SupplierMixBatchHistoryDialogProps {
   onClose: () => void;
 }
 
-interface MixBatchHistoryRow {
-  batchId: number;
-  batchCode: string;
-  batchName: string | null;
-  batchDate: string | null;
-  batchStatus: string;
-  deletedAt: string | null;
-  batchCreatedAt: string;
-  sourceId: number;
-  weightKg: string;
-  costPerKg: string;
-  totalCost: string;
-  sourceCreatedAt: string;
+interface RawStockHistoryRow {
+  kind: "adjustment" | "batch" | "receipt";
+  date: string;
+  createdAt: string;
+  type: string; // ADD | REMOVE | DEDUCT | USED | RECEIPT
+  kg: number;
+  usedKg?: number;
+  costPerKg: number;
+  currencyCode: string;
+  notes?: string | null;
+  reference?: string | null;
+  label: string;
+  ref: string;
+  batchStatus?: string | null;
+  batchId?: number | null;
+  adjId?: number | null;
+  rawStockId?: number | null;
+}
+
+function getKindMeta(row: RawStockHistoryRow) {
+  if (row.kind === "receipt") {
+    return {
+      icon: Container,
+      badgeClass: "bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 border-blue-200 dark:border-blue-800",
+      label: "Offload / Receipt",
+      sign: "+" as const,
+    };
+  }
+  if (row.kind === "batch") {
+    return {
+      icon: Layers,
+      badgeClass:
+        "bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800",
+      label: row.batchStatus || "Mix Batch",
+      sign: "-" as const,
+    };
+  }
+  if (row.type === "ADD") {
+    return {
+      icon: PackagePlus,
+      badgeClass:
+        "bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800",
+      label: "Addition",
+      sign: "+" as const,
+    };
+  }
+  return {
+    icon: MinusCircle,
+    badgeClass: "bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400 border-red-200 dark:border-red-800",
+    label: row.type === "DEDUCT" ? "Deduct from Received" : "Deduction",
+    sign: "-" as const,
+  };
 }
 
 export function SupplierMixBatchHistoryDialog({
@@ -35,44 +74,43 @@ export function SupplierMixBatchHistoryDialog({
   open,
   onClose,
 }: SupplierMixBatchHistoryDialogProps) {
-  const { data: history = [], isLoading } = useQuery<MixBatchHistoryRow[]>({
-    queryKey: [`/api/factory/suppliers/${supplierId}/mix-batch-history`],
+  const { data: history = [], isLoading } = useQuery<RawStockHistoryRow[]>({
+    queryKey: [`/api/factory/raw-stock/history/${supplierId}`],
     enabled: open && supplierId !== null,
   });
 
-  const totalKg = history.reduce((s, r) => s + parseFloat(r.weightKg || "0"), 0);
-  const deletedCount = history.filter((r) => r.deletedAt).length;
-  const activeCount = history.filter((r) => !r.deletedAt).length;
+  const totalIn = history
+    .filter((r) => r.kind === "receipt" || r.type === "ADD")
+    .reduce((s, r) => s + (r.kg || 0), 0);
+  // Note: DEDUCT adjustments reduce receivedKg directly on the container/receipt record
+  // (history-only entry, not a separate movement against the balance) — see
+  // rawStockReceiptRoutes.ts's DEDUCT-skip logic. Counting it here too would double-subtract
+  // against the already-reduced receipt kg, so only REMOVE and batch usage count as "Out".
+  const totalOut = history
+    .filter((r) => r.kind === "batch" || r.type === "REMOVE")
+    .reduce((s, r) => s + (r.kg || 0), 0);
 
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="max-w-2xl max-h-[80vh] flex flex-col">
+      <DialogContent className="max-w-3xl max-h-[80vh] flex flex-col">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Layers className="h-4 w-4 text-primary" />
-            Mix Batch History — {supplierName}
+            <History className="h-4 w-4 text-primary" />
+            Raw Material History — {supplierName}
           </DialogTitle>
         </DialogHeader>
 
-        <div className="flex items-center gap-3 text-sm text-muted-foreground">
+        <div className="flex items-center gap-3 text-sm text-muted-foreground flex-wrap">
           <span>
             <span className="font-medium text-foreground">{history.length}</span> total entries
           </span>
           <span className="text-border">|</span>
-          <span>
-            <span className="font-medium text-foreground">{activeCount}</span> active
+          <span className="text-emerald-600 dark:text-emerald-400">
+            In (received/added): <span className="font-medium">{formatNumber(totalIn)} kg</span>
           </span>
-          {deletedCount > 0 && (
-            <>
-              <span className="text-border">|</span>
-              <span className="text-destructive">
-                <span className="font-medium">{deletedCount}</span> deleted
-              </span>
-            </>
-          )}
           <span className="text-border">|</span>
-          <span>
-            Total: <span className="font-medium text-foreground">{formatNumber(totalKg)} kg</span>
+          <span className="text-red-600 dark:text-red-400">
+            Out (used/deducted): <span className="font-medium">{formatNumber(totalOut)} kg</span>
           </span>
         </div>
 
@@ -85,71 +123,54 @@ export function SupplierMixBatchHistoryDialog({
             </div>
           ) : history.length === 0 ? (
             <div className="h-32 flex items-center justify-center text-muted-foreground text-sm">
-              No mix batch history found for this supplier.
+              No raw material history found for this supplier.
             </div>
           ) : (
             <Table>
               <TableHeader className="bg-muted/50 sticky top-0">
                 <TableRow className="hover:bg-transparent">
-                  <TableHead className="py-3">Batch</TableHead>
+                  <TableHead className="py-3">Entry</TableHead>
                   <TableHead className="py-3">Date</TableHead>
                   <TableHead className="text-right py-3">Weight (kg)</TableHead>
                   <TableHead className="text-right py-3">Cost/kg</TableHead>
-                  <TableHead className="py-3">Status</TableHead>
+                  <TableHead className="py-3">Type</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {history.map((row) => {
-                  const isDeleted = !!row.deletedAt;
+                {history.map((row, idx) => {
+                  const meta = getKindMeta(row);
+                  const Icon = meta.icon;
+                  const rowKey = `${row.kind}-${row.adjId ?? row.batchId ?? row.rawStockId ?? idx}`;
                   return (
-                    <TableRow
-                      key={row.sourceId}
-                      className={isDeleted ? "opacity-50" : ""}
-                      data-testid={`row-mix-batch-history-${row.sourceId}`}
-                    >
+                    <TableRow key={rowKey} data-testid={`row-raw-stock-history-${rowKey}`}>
                       <TableCell className="py-2.5">
                         <div className="flex flex-col">
-                          <span className="font-medium text-sm font-mono">{row.batchCode}</span>
-                          {row.batchName && (
-                            <span className="text-[11px] text-muted-foreground">{row.batchName}</span>
-                          )}
+                          <span className="font-medium text-sm font-mono">{row.ref}</span>
+                          <span className="text-[11px] text-muted-foreground">{row.label}</span>
+                          {row.notes && <span className="text-[10px] text-muted-foreground/70">{row.notes}</span>}
                         </div>
                       </TableCell>
                       <TableCell className="py-2.5 text-sm text-muted-foreground">
-                        <div className="flex flex-col">
-                          {row.batchDate
-                            ? format(new Date(row.batchDate), "dd MMM yyyy")
-                            : format(new Date(row.batchCreatedAt), "dd MMM yyyy")}
-                          <span className="text-[10px] opacity-70">
-                            Added {format(new Date(row.sourceCreatedAt), "dd MMM yyyy, HH:mm")}
-                          </span>
-                          {isDeleted && (
-                            <span className="text-[10px] text-destructive">
-                              Deleted {format(new Date(row.deletedAt!), "dd MMM yyyy, HH:mm")}
-                            </span>
-                          )}
-                        </div>
+                        {row.date ? format(new Date(row.date), "dd MMM yyyy") : "—"}
                       </TableCell>
-                      <TableCell className="text-right font-mono text-sm py-2.5">
-                        {formatNumber(parseFloat(row.weightKg))}
+                      <TableCell
+                        className={`text-right font-mono text-sm py-2.5 ${
+                          meta.sign === "+"
+                            ? "text-emerald-600 dark:text-emerald-400"
+                            : "text-red-600 dark:text-red-400"
+                        }`}
+                      >
+                        {meta.sign}
+                        {formatNumber(row.kg)}
                       </TableCell>
                       <TableCell className="text-right font-mono text-sm py-2.5 text-muted-foreground">
-                        ${parseFloat(row.costPerKg).toFixed(4)}
+                        ${(row.costPerKg || 0).toFixed(4)}
                       </TableCell>
                       <TableCell className="py-2.5">
-                        {isDeleted ? (
-                          <Badge variant="destructive" className="gap-1 text-[10px]">
-                            <Trash2 className="h-2.5 w-2.5" />
-                            Deleted
-                          </Badge>
-                        ) : (
-                          <Badge
-                            variant="outline"
-                            className="text-[10px] bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800"
-                          >
-                            {row.batchStatus}
-                          </Badge>
-                        )}
+                        <Badge variant="outline" className={`text-[10px] gap-1 ${meta.badgeClass}`}>
+                          <Icon className="h-2.5 w-2.5" />
+                          {meta.label}
+                        </Badge>
                       </TableCell>
                     </TableRow>
                   );
