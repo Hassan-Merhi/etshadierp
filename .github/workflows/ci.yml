@@ -49,15 +49,19 @@ jobs:
           cache: npm
 
       - name: Install dependencies
+        id: install
         run: npm ci --no-audit
 
       - name: Type-check
+        id: typecheck
+        if: always() && steps.install.outcome == 'success'
         run: |
+          node -p "'TypeScript ' + require('typescript/package.json').version"
           set -o pipefail
           npm run check 2>&1 | tee ts-errors-ci.txt
 
       - name: Upload type-check failure log
-        if: failure()
+        if: always() && steps.typecheck.outcome == 'failure'
         uses: actions/upload-artifact@v4
         with:
           name: typecheck-errors
@@ -66,18 +70,35 @@ jobs:
           retention-days: 7
 
       - name: Build
+        if: always() && steps.install.outcome == 'success'
         run: npm run build
 
       - name: Lint
-        run: npm run lint
+        id: lint
+        if: always() && steps.install.outcome == 'success'
+        run: |
+          set -o pipefail
+          npm run lint 2>&1 | tee lint-errors-ci.txt
+
+      - name: Upload lint failure log
+        if: always() && steps.lint.outcome == 'failure'
+        uses: actions/upload-artifact@v4
+        with:
+          name: lint-errors
+          path: lint-errors-ci.txt
+          if-no-files-found: error
+          retention-days: 7
 
       - name: Backend tests
+        if: always() && steps.install.outcome == 'success'
         run: npm run test:backend
 
       - name: Frontend tests
+        if: always() && steps.install.outcome == 'success'
         run: npm run test:frontend
 
       # Format check remains advisory until existing repo-wide formatting debt is cleaned up.
       - name: Format check
+        if: always() && steps.install.outcome == 'success'
         run: npm run format:check
         continue-on-error: true
