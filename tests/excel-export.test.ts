@@ -38,7 +38,7 @@ function isFormulaCell(cell: ExcelJS.Cell): boolean {
 beforeAll(async () => {
   ctx = await seedTestData(TEST_PREFIX);
 
-  if (!templateExists) return; // skip generation; inner tests use it.skip
+  expect(templateExists, `Required SP export template missing: ${TEMPLATE_PATH}`).toBe(true);
 
   // ── Seed minimum SP data so generateSpSalesFormExcel has real data ────────
   // The SP export reads from sp_stock_movements, sp_sales, and sp_sale_lines.
@@ -134,17 +134,15 @@ afterAll(async () => {
 }, 30000);
 
 // ── guard ─────────────────────────────────────────────────────────────────────
-// All inner tests use conditional `it` so they stay in the normal test runner
-// (skipped = todoish, no silent-pass, shows intent clearly).
+// All workbook checks run as normal tests. Missing required assets fail explicitly.
 
-const maybeIt = templateExists
-  ? it
-  : it.skip.bind(it, "template missing");
+const maybeIt = it;
 
 // Helper: call at the top of each structure test.
-// Returns the workbook if available, or calls ctx.skip() and returns null.
-function requireWb(ctx: { skip: () => void }): ExcelJS.Workbook | null {
-  if (!buf || !wb) { ctx.skip(); return null; }
+// Returns the generated workbook; missing setup fails the test explicitly.
+function requireWb(_ctx?: { skip: () => void }): ExcelJS.Workbook {
+  expect(buf, "SP export buffer should be generated").toBeDefined();
+  expect(wb, "SP export workbook should be loaded").toBeDefined();
   return wb;
 }
 // Alias for backward-compat with older call sites
@@ -153,12 +151,10 @@ const wbOrSkip = requireWb;
 // ── 1. Corruption-free open ───────────────────────────────────────────────────
 describe("SP Sales Form — Workbook integrity", () => {
   maybeIt("generated buffer is non-empty", (ctx) => {
-    if (!buf) { ctx.skip(); return; }
     expect(buf.length).toBeGreaterThan(1000); // a minimal xlsx is always > 1 KB
   });
 
   maybeIt("returned value is a real Buffer", (ctx) => {
-    if (!buf) { ctx.skip(); return; }
     expect(Buffer.isBuffer(buf)).toBe(true);
   });
 
@@ -322,10 +318,8 @@ describe("SP Sales Form — seeded Shoes row", () => {
         break;
       }
     }
-    if (shoesRow === null) {
-      ctx.skip(); // "Shoes" not in this template variant — ok to skip
-      return;
-    }
+    expect(shoesRow, 'Required "Shoes" row is missing from the SP export template').not.toBeNull();
+    if (shoesRow === null) return;
     // Day 0 qty column = E_DATE_START + 0*3 = col 7 (G)
     // The seeded sp_sale_lines has qty_sold = 10 for 2024-06-01.
     const qtyCell = ws.getRow(shoesRow).getCell(E_DATE_START);
@@ -348,7 +342,8 @@ describe("SP Sales Form — seeded Shoes row", () => {
         break;
       }
     }
-    if (shoesRow === null) { ctx.skip(); return; }
+    expect(shoesRow, 'Required "Shoes" row is missing from the SP export template').not.toBeNull();
+    if (shoesRow === null) return;
 
     // Days 5–9 (beyond the 5-day export range) should have null qty cells
     const stale: string[] = [];
@@ -428,9 +423,8 @@ describe("SP Sales Form — regression 2026-07-01 to 2026-07-06", () => {
   let rwb: ExcelJS.Workbook;
 
   beforeAll(async () => {
-    if (!templateExists) return;
-
-    // The existing Shoes movement (created 2024-05-31, qty_in=100, cost=10) already
+    expect(templateExists, `Required SP export template missing: ${TEMPLATE_PATH}`).toBe(true);
+// The existing Shoes movement (created 2024-05-31, qty_in=100, cost=10) already
     // exists in the DB (seeded by the file-level beforeAll).
     // Opening stock for 2026-07-01 = 100 − 10 (sold 2024-06-01) = 90 bags.
     const { rows: [mvt] } = await pool.query<{ id: number }>(
@@ -440,7 +434,8 @@ describe("SP Sales Form — regression 2026-07-01 to 2026-07-06", () => {
         LIMIT 1`,
       [ctx.companyId],
     );
-    if (!mvt) return; // movement not found — skip the regression
+    expect(mvt, "Required seeded Shoes stock movement is missing").toBeDefined();
+    if (!mvt) throw new Error("Required seeded Shoes stock movement is missing");
 
     // Add a sale on 2026-07-01: 5 bags × $20.  Days 2-6 (July 2-6) have no sale.
     const { rows: [sale2] } = await pool.query<{ id: number }>(
@@ -474,15 +469,15 @@ describe("SP Sales Form — regression 2026-07-01 to 2026-07-06", () => {
     rwb = tmpWb;
   }, 90000);
 
-  // Helper: skip if the regression buffer wasn't generated
-  function rWb(tCtx: { skip: () => void }): ExcelJS.Workbook | null {
-    if (!rbuf || !rwb) { tCtx.skip(); return null; }
+  // Helper: require the regression workbook to have been generated
+  function rWb(_tCtx?: { skip: () => void }): ExcelJS.Workbook {
+    expect(rbuf, "Regression export buffer should be generated").toBeDefined();
+    expect(rwb, "Regression export workbook should be loaded").toBeDefined();
     return rwb;
   }
-  const rIt = templateExists ? it : it.skip.bind(it, "template missing");
+  const rIt = it;
 
   rIt("generated buffer is non-empty for 2026-07-01 to 2026-07-06", (tCtx) => {
-    if (!rbuf) { tCtx.skip(); return; }
     expect(rbuf.length).toBeGreaterThan(1000);
   });
 
@@ -534,7 +529,8 @@ describe("SP Sales Form — regression 2026-07-01 to 2026-07-06", () => {
       const n = ws.getRow(r).getCell(3).value;
       if (typeof n === "string" && n.trim() === "Shoes") { shoesRow = r; break; }
     }
-    if (shoesRow === null) { tCtx.skip(); return; }
+    expect(shoesRow, 'Required "Shoes" row is missing from the SP export template').not.toBeNull();
+    if (shoesRow === null) return;
     const stale: string[] = [];
     for (let d = 1; d < DAY_COUNT_R; d++) { // days 1-5 (July 2-6) have no sale
       const baseCol = E_DATE_START_R + d * 3;
@@ -554,7 +550,8 @@ describe("SP Sales Form — regression 2026-07-01 to 2026-07-06", () => {
       const n = ws.getRow(r).getCell(3).value;
       if (typeof n === "string" && n.trim() === "Shoes") { shoesRow = r; break; }
     }
-    if (shoesRow === null) { tCtx.skip(); return; }
+    expect(shoesRow, 'Required "Shoes" row is missing from the SP export template').not.toBeNull();
+    if (shoesRow === null) return;
     const v = ws.getRow(shoesRow).getCell(E_OPENING_COL).value as any;
     const qty = typeof v === "number" ? v : (v?.result ?? null);
     // 100 seeded − 10 sold on 2024-06-01 = 90 opening for 2026-07-01
@@ -570,7 +567,8 @@ describe("SP Sales Form — regression 2026-07-01 to 2026-07-06", () => {
       const n = ws.getRow(r).getCell(3).value;
       if (typeof n === "string" && n.trim() === "Shoes") { shoesRow = r; break; }
     }
-    if (shoesRow === null) { tCtx.skip(); return; }
+    expect(shoesRow, 'Required "Shoes" row is missing from the SP export template').not.toBeNull();
+    if (shoesRow === null) return;
     const v = ws.getRow(shoesRow).getCell(E_CLOSING_COL).value as any;
     const qty = typeof v === "number" ? v : (v?.result ?? null);
     // 90 opening − 5 sold = 85
@@ -586,7 +584,8 @@ describe("SP Sales Form — regression 2026-07-01 to 2026-07-06", () => {
       const n = ws.getRow(r).getCell(3).value;
       if (typeof n === "string" && n.trim() === "Shoes") { shoesRow = r; break; }
     }
-    if (shoesRow === null) { tCtx.skip(); return; }
+    expect(shoesRow, 'Required "Shoes" row is missing from the SP export template').not.toBeNull();
+    if (shoesRow === null) return;
     const v = ws.getRow(shoesRow).getCell(E_CLOSING_VAL).value as any;
     const val = typeof v === "number" ? v : (v?.result ?? null);
     // 85 × $10 = $850
@@ -597,7 +596,8 @@ describe("SP Sales Form — regression 2026-07-01 to 2026-07-06", () => {
   rIt("Sales sheet: no stale data on item rows for days 6-9 (immediately after toDate)", (tCtx) => {
     const w = rWb(tCtx); if (!w) return;
     const salesWs = w.getWorksheet("Sales");
-    if (!salesWs) { tCtx.skip(); return; }
+    expect(salesWs, 'Required "Sales" sheet is missing').toBeDefined();
+    if (!salesWs) return;
     const stale: string[] = [];
     for (let r = 2; r <= salesWs.rowCount; r++) {
       const nameRaw = salesWs.getRow(r).getCell(3).value;
@@ -658,7 +658,7 @@ describe("SP Sales Form — regression 2026-07-01 to 2026-07-06", () => {
 
   // ── Edge case: capacity overflow — export clamped at 18 days ──────────────
   rIt("capacity guard: 20-day export is clamped — BJ col (Closing Stock label) not wiped", async (tCtx) => {
-    if (!templateExists) { tCtx.skip(); return; }
+    expect(templateExists, `Required SP export template missing: ${TEMPLATE_PATH}`).toBe(true);
     // fromDate=2026-07-01, toDate=2026-07-20 = 20 days (> 18 template capacity)
     const buf4 = await generateSpSalesFormExcel({
       companyId: ctx.companyId,

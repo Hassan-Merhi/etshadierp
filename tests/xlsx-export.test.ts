@@ -41,13 +41,8 @@ const BALE_FINALIZED_DATE = "2000-06-15";
 let ctx: TestContext;
 let agent: request.SuperAgentTest;
 let seededBaleId: number | null = null;
-/**
- * Set to true in the "seeded bale appears" check.
- * export-full.xlsx success-path tests are skipped when false to avoid false
- * failures on shared DBs where the session company may contain production data.
- */
-let baleAppearsInSessionCompany = false;
-
+// CI uses an isolated PostgreSQL database, so the seeded bale must always be
+// visible through the authenticated test company's export endpoints.
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 async function loadWorkbook(body: Buffer): Promise<ExcelJS.Workbook> {
@@ -204,7 +199,7 @@ describe("XLSX Export — Bale Stock Register", () => {
     expect(headers).toContain("Total Weight (KG)");
   });
 
-  it("seeded bale reference number appears in the export (sets baleAppearsInSessionCompany)", async (t) => {
+  it("seeded bale reference number appears in the export", async () => {
     // This test doubles as a session-company diagnostic: if our seeded bale
     // (company_id = ctx.companyId) does not appear, the session is pointing to
     // a different company (shared-DB environment issue). We record the outcome
@@ -219,21 +214,7 @@ describe("XLSX Export — Bale Stock Register", () => {
       const val = row.getCell(1).value;
       if (val) refNumbers.push(String(val));
     });
-
-    baleAppearsInSessionCompany = refNumbers.includes(`${TEST_PREFIX}-REF-001`);
-
-    if (!baleAppearsInSessionCompany) {
-      // Shared DB environment: session company has production data, skip.
-      // The structural tests above (headers, magic bytes, sheet names) still pass.
-      console.info(
-        `[xlsx-export.test] Seeded bale not in export — session company likely ` +
-          `contains production data. Skipping bale-presence assertion.`,
-      );
-      t.skip();
-      return;
-    }
-
-    expect(refNumbers).toContain(`${TEST_PREFIX}-REF-001`);
+expect(refNumbers).toContain(`${TEST_PREFIX}-REF-001`);
   });
 
   it("export does not contain another company's bale reference", async () => {
@@ -447,9 +428,7 @@ describe("XLSX Export — Daily Production Report", () => {
 
 // ── Bale Full Export ──────────────────────────────────────────────────────────
 //
-// Error cases always run.  Success-path cases (200 + valid XLSX) only run when
-// baleAppearsInSessionCompany is true, meaning the seeded bale landed in the
-// session company and we can export it with a known date.
+// Error and success paths both run against the isolated CI database.
 
 describe("XLSX Export — Bale Full Export (error cases)", () => {
   it("GET without date param returns 400 with message mentioning 'date'", async () => {
@@ -470,13 +449,9 @@ describe("XLSX Export — Bale Full Export (error cases)", () => {
   });
 });
 
-describe("XLSX Export — Bale Full Export (success path — requires isolated DB)", () => {
-  it("with seeded bale date returns 200 with valid XLSX", async (t) => {
-    if (!baleAppearsInSessionCompany) {
-      t.skip(); // shared DB: session company differs — see note at top of file
-      return;
-    }
-    const res = await getBinary(
+describe("XLSX Export — Bale Full Export (success path)", () => {
+  it("with seeded bale date returns 200 with valid XLSX", async () => {
+const res = await getBinary(
       agent,
       `/api/factory/bales/export-full.xlsx?date=${BALE_FINALIZED_DATE}`,
     );
@@ -487,10 +462,8 @@ describe("XLSX Export — Bale Full Export (success path — requires isolated D
     expect(isValidXlsxMagic(buf)).toBe(true);
   });
 
-  it("ExcelJS can open the returned buffer without error", async (t) => {
-    // Skip on shared DB: seeded bale landed in a different company's session.
-    if (!baleAppearsInSessionCompany) { t.skip(); return; }
-    const res = await getBinary(
+  it("ExcelJS can open the returned buffer without error", async () => {
+const res = await getBinary(
       agent,
       `/api/factory/bales/export-full.xlsx?date=${BALE_FINALIZED_DATE}`,
     );
@@ -498,10 +471,8 @@ describe("XLSX Export — Bale Full Export (success path — requires isolated D
     expect(wb).toBeDefined();
   });
 
-  it('contains "Bales" sheet', async (t) => {
-    // Skip on shared DB: seeded bale landed in a different company's session.
-    if (!baleAppearsInSessionCompany) { t.skip(); return; }
-    const res = await getBinary(
+  it('contains "Bales" sheet', async () => {
+const res = await getBinary(
       agent,
       `/api/factory/bales/export-full.xlsx?date=${BALE_FINALIZED_DATE}`,
     );
@@ -509,10 +480,8 @@ describe("XLSX Export — Bale Full Export (success path — requires isolated D
     expect(wb.getWorksheet("Bales")).toBeDefined();
   });
 
-  it('"Bales" sheet contains the seeded bale reference number', async (t) => {
-    // Skip on shared DB: seeded bale landed in a different company's session.
-    if (!baleAppearsInSessionCompany) { t.skip(); return; }
-    const res = await getBinary(
+  it('"Bales" sheet contains the seeded bale reference number', async () => {
+const res = await getBinary(
       agent,
       `/api/factory/bales/export-full.xlsx?date=${BALE_FINALIZED_DATE}`,
     );
@@ -527,10 +496,8 @@ describe("XLSX Export — Bale Full Export (success path — requires isolated D
     expect(refNumbers).toContain(`${TEST_PREFIX}-REF-001`);
   });
 
-  it('"Bales" sheet has expected column headers (Reference Number, Weight, Status)', async (t) => {
-    // Skip on shared DB: seeded bale landed in a different company's session.
-    if (!baleAppearsInSessionCompany) { t.skip(); return; }
-    const res = await getBinary(
+  it('"Bales" sheet has expected column headers (Reference Number, Weight, Status)', async () => {
+const res = await getBinary(
       agent,
       `/api/factory/bales/export-full.xlsx?date=${BALE_FINALIZED_DATE}`,
     );
