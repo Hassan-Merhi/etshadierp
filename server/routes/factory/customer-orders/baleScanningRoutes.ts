@@ -1027,7 +1027,7 @@ export function registerBaleScanningRoutes(app: Express) {
           status: customerOrders.status,
           invoiceNumber: customerOrders.invoiceNumber,
           grandTotal: customerOrders.grandTotal,
-          customerName: customers.name,
+          customerName: customers.legalName,
           orderDate: customerOrders.orderDate,
           containerNumber: customerOrders.containerNumber,
           totalQtyBales: customerOrders.totalQtyBales,

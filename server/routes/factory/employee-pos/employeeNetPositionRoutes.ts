@@ -2,7 +2,7 @@ import { getClientDate } from "../../../lib/dateUtils";
 import type { Express } from "express";
 import { db } from "../../../db";
 import { requireAuth } from "../../../auth";
-import { classifyNetPositionAccounts } from "../../../netPositionHelper";
+import { classifyNetPositionAccounts, type AccountLike } from "../../../netPositionHelper";
 import { buildBrokerStatement } from "../suppliers/supplierBrokerRoutes";
 import { adjustInventory } from "../../../inventoryHelper";
 import {

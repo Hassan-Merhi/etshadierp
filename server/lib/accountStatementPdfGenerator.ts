@@ -189,7 +189,7 @@ export async function generateAccountStatementPdf(opts: StatementPdfOptions): Pr
       creditAmount: row.creditAmount,
     }));
     const [acct] = await db.select().from(customers).where(eq(customers.id, accountId));
-    accountName = acct?.name ?? "Customer";
+    accountName = acct?.legalName ?? "Customer";
     rawOB = parseFloat(acct?.openingBalance ?? "0") || 0;
     obSide = "Dr";
   } else {

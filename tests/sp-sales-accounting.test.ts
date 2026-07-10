@@ -33,7 +33,6 @@ let cogsAcctId: number;
 let stockAcctId: number;
 let costClrAcctId: number;
 let bankAccountId: number;
-let cashLedgerAcctId: number;
 
 async function loginAsTestUser() {
   const loginRes = await agent.post("/api/auth/login").send({
@@ -139,19 +138,6 @@ beforeAll(async () => {
     })
     .returning();
   bankAccountId = bankAccount.id;
-
-  const [cashLedgerAcct] = await db
-    .insert(schema.ledgerAccounts)
-    .values({
-      companyId: ctx.companyId,
-      code: `${TEST_PREFIX}_CASH`,
-      name: "Test Cash",
-      accountType: "Cash",
-      openingBalance: "0",
-      openingBalanceSide: "Dr",
-    })
-    .returning();
-  cashLedgerAcctId = cashLedgerAcct.id;
 
   agent = request.agent(ctx.app);
   await loginAsTestUser();

@@ -321,20 +321,29 @@ export function normaliseEvents(shipment: ParcelsAppShipment): ParcelsAppEvent[]
   }));
 }
 
+function getShipmentAttribute(shipment: ParcelsAppShipment, key: string): string | undefined {
+  const attributes = shipment.attributes;
+  if (!attributes) return undefined;
+  if (Array.isArray(attributes)) {
+    return attributes.find((attribute) => attribute.l.toLowerCase() === key.toLowerCase())?.val;
+  }
+  return attributes[key];
+}
+
 /**
  * Derives a simple last-known status string from the shipment attributes or latest state.
  */
 export function deriveLastStatus(shipment: ParcelsAppShipment): string | null {
-  const firstState = shipment.states?.[0] as any;
-  return shipment.attributes?.status ?? firstState?.status ?? null;
+  const firstState = shipment.states?.[0];
+  return getShipmentAttribute(shipment, "status") ?? firstState?.status ?? null;
 }
 
 /**
  * Derives a simple last-known location string from the shipment attributes or latest state.
  */
 export function deriveLastLocation(shipment: ParcelsAppShipment): string | null {
-  const firstState = shipment.states?.[0] as any;
-  return shipment.attributes?.location ?? firstState?.location ?? null;
+  const firstState = shipment.states?.[0];
+  return getShipmentAttribute(shipment, "location") ?? firstState?.location ?? null;
 }
 
 /**

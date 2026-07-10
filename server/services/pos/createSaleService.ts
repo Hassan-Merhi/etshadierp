@@ -16,6 +16,7 @@
  * unmodified, and so the row-lock check performed *inside* the DB transaction
  * still triggers a proper rollback.
  */
+import { randomUUID } from "node:crypto";
 import { db } from "../../db";
 import { storage } from "../../storage";
 import { logAudit, runIntercompanyPosTransfer } from "../../routes/_helpers";
@@ -140,7 +141,7 @@ export async function createPosSale(
   const { location } = locationResult;
 
   // STEP 1: Validate inventory availability
-  const voucherNumber = `SALES-${Date.now()}`;
+  const voucherNumber = `SALES-${Date.now()}-${randomUUID().slice(0, 8)}`;
   const voucherDate = providedVoucherDate || voucherDateFallback;
 
   // Fix 5: Verify each stockItemId exists, belongs to this company, and is not deleted/merged
