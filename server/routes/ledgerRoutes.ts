@@ -376,7 +376,7 @@ export function registerLedgerRoutes(app: Express) {
       });
 
       try {
-        const _ledChanges: Record<string, { old: any; new: any }> = {};
+        const _ledChanges: Record<string, { old?: any; new?: any }> = {};
         for (const _f of [
           "name",
           "code",

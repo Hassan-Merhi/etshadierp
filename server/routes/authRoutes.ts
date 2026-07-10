@@ -942,7 +942,7 @@ export function registerAuthRoutes(app: Express) {
       const role = await storage.updateUserCompanyRole(parseInt(id), parsed);
 
       if (oldRecord) {
-        const changes: Record<string, { old: any; new: any }> = {};
+        const changes: Record<string, { old?: any; new?: any }> = {};
         for (const key of Object.keys(parsed) as Array<keyof typeof parsed>) {
           const oldVal = (oldRecord as any)[key];
           const newVal = (parsed as any)[key];

@@ -1162,7 +1162,7 @@ export function registerSupplierProformaRoutes(app: Express, requireAuth: any) {
         });
 
         res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
-        const safeSupplier = (supplier?.name || "").replace(/[^a-zA-Z0-9 ]/g, "").trim();
+        const safeSupplier = (supplier?.legalName || "").replace(/[^a-zA-Z0-9 ]/g, "").trim();
         const safeContainer = (container?.containerNumber || String(containerId)).replace(/[^a-zA-Z0-9]/g, "");
         const fileName = `Verification ${safeSupplier} ${safeContainer}.xlsx`;
         res.setHeader("Content-Disposition", `attachment; filename="${fileName}"`);
@@ -1493,7 +1493,7 @@ export function registerSupplierProformaRoutes(app: Express, requireAuth: any) {
         addBlock("Price Diff", sc.priceDiffBorder, priceDiffCols, priceDiffs);
 
         res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
-        const safeSupplierS = (supplier?.name || "").replace(/[^a-zA-Z0-9 ]/g, "").trim();
+        const safeSupplierS = (supplier?.legalName || "").replace(/[^a-zA-Z0-9 ]/g, "").trim();
         const safeContainerS = (container?.containerNumber || String(containerId)).replace(/[^a-zA-Z0-9]/g, "");
         const summaryFileName = `Verification Summary ${safeSupplierS} ${safeContainerS}.xlsx`;
         res.setHeader("Content-Disposition", `attachment; filename="${summaryFileName}"`);
@@ -1588,7 +1588,7 @@ export function registerSupplierProformaRoutes(app: Express, requireAuth: any) {
       ws.mergeCells(2, 5, 2, NUM_COLS);
       ws.getRow(2).height = 24;
       const suppCell = ws.getCell(2, 1);
-      suppCell.value = `Supplier: ${supplier?.legalName || supplier?.name || `#${sid}`}`;
+      suppCell.value = `Supplier: ${supplier?.legalName || `#${sid}`}`;
       suppCell.font = { bold: true, size: 11, color: { argb: C.navy } };
       suppCell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: C.subtleBg } };
       suppCell.alignment = { vertical: "middle", indent: 1 };

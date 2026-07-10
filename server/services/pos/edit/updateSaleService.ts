@@ -204,7 +204,7 @@ export async function updatePosSale(params: UpdatePosSaleParams): Promise<{ stat
   }
 
   try {
-    const _posChanges: Record<string, { old: any; new: any }> = {};
+    const _posChanges: Record<string, { old?: any; new?: any }> = {};
     if (existingVoucher.totalAmount !== updatedVoucher.totalAmount)
       _posChanges.totalAmount = { old: existingVoucher.totalAmount, new: updatedVoucher.totalAmount };
     if (existingVoucher.voucherDate !== updatedVoucher.voucherDate)
