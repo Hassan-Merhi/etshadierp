@@ -279,7 +279,7 @@ describe("Supplier Partner sale accounting — POST /api/sp/sales", () => {
       saleDate: new Date().toISOString().split("T")[0],
       customerName: "Test Customer Cash",
       paymentAccountType: "cash",
-      paymentAccountId: cashLedgerAcctId,
+      paymentAccountId: ctx.cashAccountId,
       saleLines: [{ stockItemId, qtySold: 1, salePricePerUnit: 1000 }],
     });
 
@@ -299,7 +299,7 @@ describe("Supplier Partner sale accounting — POST /api/sp/sales", () => {
     expect(totalDebit).toBeCloseTo(1000, 2);
     expect(totalCredit).toBeCloseTo(1000, 2);
 
-    const cashEntry = entries.find((e) => e.ledgerAccountId === cashLedgerAcctId);
+    const cashEntry = entries.find((e) => e.ledgerAccountId === ctx.cashAccountId);
     expect(cashEntry).toBeDefined();
     expect(cashEntry!.bankAccountId).toBeNull();
     expect(parseFloat(cashEntry!.debitAmount as any)).toBeCloseTo(1000, 2);
