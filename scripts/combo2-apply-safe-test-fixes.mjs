@@ -11,6 +11,14 @@ function updateExcelExportTests() {
   const path = "tests/excel-export.test.ts";
   let source = readFileSync(path, "utf8");
 
+  if (
+    source.includes("Required SP export template missing") &&
+    !source.includes("it.skip") &&
+    !source.includes("ctx.skip()")
+  ) {
+    return;
+  }
+
   source = replaceExact(
     source,
     "  if (!templateExists) return; // skip generation; inner tests use it.skip\n",
@@ -58,6 +66,10 @@ function updateExcelExportTests() {
 function updateFactoryXlsxTests() {
   const path = "tests/xlsx-export.test.ts";
   let source = readFileSync(path, "utf8");
+
+  if (!source.includes("baleAppearsInSessionCompany") && !source.includes("t.skip()")) {
+    return;
+  }
 
   source = replaceExact(
     source,
@@ -114,13 +126,9 @@ let baleAppearsInSessionCompany = false;
     }
 `;
   source = source.split(multilineSkip).join("");
-
-  const oneLineSkips = [
-    "    if (!baleAppearsInSessionCompany) { t.skip(); return; }\n",
-  ];
-  for (const guard of oneLineSkips) {
-    source = source.split(guard).join("");
-  }
+  source = source
+    .split("    if (!baleAppearsInSessionCompany) { t.skip(); return; }\n")
+    .join("");
 
   if (source.includes("baleAppearsInSessionCompany") || source.includes("t.skip()")) {
     throw new Error("Factory XLSX test still contains shared-database skip guards");
