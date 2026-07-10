@@ -989,6 +989,8 @@ export function registerDebugRoutes(app: Express) {
         const totalUncategorized = uncategorizedAccounts.reduce((sum, a) => sum + a.balance, 0);
         issues.push({
           id: "uncategorized-accounts",
+          type: "uncategorized-accounts",
+          details: { accounts: uncategorizedAccounts },
           severity: "warning",
           title: "Accounts with Unknown Category",
           description: `Found ${uncategorizedAccounts.length} account(s) with balance of $${Math.abs(totalUncategorized).toFixed(2)} that don't fit any standard category. These may be causing the imbalance.`,
@@ -1005,6 +1007,8 @@ export function registerDebugRoutes(app: Express) {
         for (const v of significantVariances) {
           issues.push({
             id: `variance-${v.bucket}`,
+            type: "variance",
+            details: { bucket: v.bucket, computed: v.computed, fromAccounts: v.fromAccounts },
             severity: "warning",
             title: `Variance in ${v.bucket}`,
             description: `Computed value ($${v.computed.toFixed(2)}) differs from account-level sum ($${v.fromAccounts.toFixed(2)}) by $${Math.abs(v.variance).toFixed(2)}. This may indicate double-counting or a calculation discrepancy.`,
@@ -1199,6 +1203,8 @@ export function registerDebugRoutes(app: Express) {
       for (const comp of componentsWithVariance) {
         issues.push({
           id: "variance-" + comp.key,
+          type: "component-variance",
+          details: { key: comp.key, value: comp.value, ledgerSum: comp.ledgerSum },
           severity: "warning",
           title: "Variance in " + comp.label,
           description:
@@ -1324,6 +1330,8 @@ export function registerDebugRoutes(app: Express) {
       for (const c of containersWithDiscrepancy) {
         issues.push({
           id: `container-discrepancy-${c.containerId}`,
+          type: "container-discrepancy",
+          details: { containerId: c.containerId, containerNumber: c.containerNumber, difference: c.difference },
           severity: "critical",
           title: `Container ${c.containerNumber} has unbalanced entries`,
           description: `Voucher debits ($${c.voucherDebits.toFixed(2)}) do not equal credits ($${c.voucherCredits.toFixed(2)}). Difference: $${Math.abs(c.difference).toFixed(2)}. This container's offload entries are not balanced.`,
@@ -1337,6 +1345,23 @@ export function registerDebugRoutes(app: Express) {
 
       // Sum up issue impacts
       const totalIssueImpact = round2(issues.reduce((sum, issue) => sum + issue.impact, 0));
+
+      const totalAssets = round2(stockOtwValue + cashBalance + bankBalance + stockOnFloorValue + assetBalance);
+      const totalExpenses = round2(
+        salaryAdvancesBalance + indirectExpenseBalance + payrollExpenseBalance + governmentTaxesBalance + cogsBalance
+      );
+      const totalLiabilities = round2(
+        supplierBalance +
+          dutyAgentBalance +
+          transporterAgentBalance +
+          loansBalance +
+          liabilityBalance +
+          profitBalance +
+          equityTransactionBalance +
+          apTransactionBalance +
+          incomeBalance +
+          payrollLiabilitiesBalance
+      );
 
       res.json({
         totals: {

@@ -99,7 +99,7 @@ export function registerBankAssetRoutes(app: Express) {
 
       // Validate opening balance amount and side must both be present or both absent
       const hasBalance = parsed.openingBalance && parseFloat(parsed.openingBalance) !== 0;
-      const hasSide = parsed.openingBalanceSide && parsed.openingBalanceSide !== "";
+      const hasSide = !!parsed.openingBalanceSide;
 
       if (hasBalance && !hasSide) {
         return res.status(400).json({ message: "Opening balance requires Dr/Cr side" });
@@ -136,12 +136,12 @@ export function registerBankAssetRoutes(app: Express) {
           recordId: account.id,
           recordIdentifier: account.name,
           changes: {
-            name: { new: account.name },
-            code: { new: account.code },
-            bankName: { new: (account as any).bankName || null },
-            accountNumber: { new: (account as any).accountNumber || null },
-            openingBalance: { new: account.openingBalance || "0" },
-            openingBalanceSide: { new: account.openingBalanceSide || null },
+            name: { old: undefined, new: account.name },
+            code: { old: undefined, new: account.code },
+            bankName: { old: undefined, new: (account as any).bankName || null },
+            accountNumber: { old: undefined, new: (account as any).accountNumber || null },
+            openingBalance: { old: undefined, new: account.openingBalance || "0" },
+            openingBalanceSide: { old: undefined, new: account.openingBalanceSide || null },
           },
         });
       } catch {
@@ -165,7 +165,7 @@ export function registerBankAssetRoutes(app: Express) {
 
       // Validate opening balance amount and side must both be present or both absent
       const hasBalance = parsed.openingBalance && parseFloat(parsed.openingBalance) !== 0;
-      const hasSide = parsed.openingBalanceSide && parsed.openingBalanceSide !== "";
+      const hasSide = !!parsed.openingBalanceSide;
 
       if (hasBalance && !hasSide) {
         return res.status(400).json({ message: "Opening balance requires Dr/Cr side" });
@@ -224,9 +224,9 @@ export function registerBankAssetRoutes(app: Express) {
             recordId: existingBankAccDel.id,
             recordIdentifier: existingBankAccDel.name,
             changes: {
-              name: { old: existingBankAccDel.name },
-              code: { old: existingBankAccDel.code },
-              openingBalance: { old: existingBankAccDel.openingBalance || "0" },
+              name: { old: existingBankAccDel.name, new: null },
+              code: { old: existingBankAccDel.code, new: null },
+              openingBalance: { old: existingBankAccDel.openingBalance || "0", new: null },
             },
           });
         }

@@ -1740,6 +1740,7 @@ export function registerAuthRoutes(app: Express) {
             posStation: null,
             cashAccountId: null,
             canSellNegativeStock: true,
+            posViewOnly: false,
             daybookEditDays: 9999,
             canAccessCustomers: true,
             canDeleteRecords: true,
@@ -1748,6 +1749,9 @@ export function registerAuthRoutes(app: Express) {
         } else {
           return res.status(403).json({ message: "You don't have access to this company" });
         }
+      }
+      if (!userRole) {
+        return res.status(403).json({ message: "You don't have access to this company" });
       }
 
       req.session.currentCompanyId = companyId;

@@ -383,11 +383,11 @@ export function registerCreditNoteRoutes(app: Express) {
           recordId: voucher.id,
           recordIdentifier: voucher.voucherNumber,
           changes: {
-            voucherType: { new: noteType },
-            date: { new: voucherDate },
-            totalAmount: { new: totalRefundAmount.toFixed(2) },
-            itemCount: { new: items.length },
-            cashAccount: { new: cashAccountId },
+            voucherType: { old: null, new: noteType },
+            date: { old: null, new: voucherDate },
+            totalAmount: { old: null, new: totalRefundAmount.toFixed(2) },
+            itemCount: { old: null, new: items.length },
+            cashAccount: { old: null, new: cashAccountId },
           },
         });
       } catch {

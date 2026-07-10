@@ -357,12 +357,12 @@ export function registerAiAgentRoutes(app: Express) {
           const { step: updatedStep, approvalId: aId } = await executeStep(step, companyId, userId, taskId);
           Object.assign(step, updatedStep);
 
-          if (step.status === "waiting_approval") {
+          if (updatedStep.status === "waiting_approval") {
             waitingForApproval = true;
             approvalId = aId;
             break;
           }
-          if (step.status === "failed") {
+          if (updatedStep.status === "failed") {
             failedStep = true;
             break;
           }

@@ -80,11 +80,11 @@ export function registerLocationCrudRoutes(app: Express) {
           recordId: location.id,
           recordIdentifier: location.name,
           changes: {
-            name: { new: location.name },
-            code: { new: location.code },
-            city: { new: location.city || null },
-            state: { new: location.state || null },
-            country: { new: location.country || null },
+            name: { old: null, new: location.name },
+            code: { old: null, new: location.code },
+            city: { old: null, new: location.city || null },
+            state: { old: null, new: location.state || null },
+            country: { old: null, new: location.country || null },
           },
         });
       } catch {
@@ -209,8 +209,8 @@ export function registerLocationCrudRoutes(app: Express) {
           recordId: location.id,
           recordIdentifier: location.name,
           changes: {
-            name: { old: location.name },
-            code: { old: location.code },
+            name: { old: location.name, new: null },
+            code: { old: location.code, new: null },
           },
         });
       } catch {

@@ -550,11 +550,13 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
           const m = w.employeeCode.match(new RegExp(`^${importPrefix}(\\d+)$`));
           return m ? Math.max(max, parseInt(m[1], 10)) : max;
         }, 0);
-        const byCode = new Map(existingWorkers.filter((w: any) => w.employeeCode).map((w: any) => [w.employeeCode, w]));
-        const byPassport = new Map(
+        const byCode = new Map<string, any>(
+          existingWorkers.filter((w: any) => w.employeeCode).map((w: any) => [w.employeeCode, w])
+        );
+        const byPassport = new Map<string, any>(
           existingWorkers.filter((w: any) => w.passportNumber).map((w: any) => [w.passportNumber, w])
         );
-        const byNationalId = new Map(
+        const byNationalId = new Map<string, any>(
           existingWorkers.filter((w: any) => w.nationalId).map((w: any) => [w.nationalId, w])
         );
 

@@ -131,10 +131,11 @@ export function registerOrderCrudRoutes(app: Express) {
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const conditions: any[] = [eq(customerOrders.companyId, companyId), isNull(customerOrders.deletedAt)];
-      if (req.query.customerId) conditions.push(eq(customerOrders.customerId, parseOptionalId(req.query.customerId)));
+      const queryCustomerId = parseOptionalId(req.query.customerId);
+      if (queryCustomerId !== null) conditions.push(eq(customerOrders.customerId, queryCustomerId));
       if (req.query.status) conditions.push(eq(customerOrders.status, req.query.status));
-      if (req.query.proformaId)
-        conditions.push(eq(customerOrders.proformaIdUsed, parseOptionalId(req.query.proformaId)));
+      const queryProformaId = parseOptionalId(req.query.proformaId);
+      if (queryProformaId !== null) conditions.push(eq(customerOrders.proformaIdUsed, queryProformaId));
       if (req.query.showHidden !== "1") conditions.push(eq(customerOrders.isHidden, false));
 
       const orders = await db

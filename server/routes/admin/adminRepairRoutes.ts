@@ -1016,7 +1016,7 @@ export function registerAdminRepairRoutes(app: Express) {
       return res.status(403).json({ message: "Dev seed only available in development" });
     }
     try {
-      const { runDevSeed } = await import("../seedDev");
+      const { runDevSeed } = await import("../../seedDev");
       const summary = await runDevSeed();
       console.log("\n=== SEED DATA SUMMARY ===");
       console.log(`Products: ${summary.products}`);

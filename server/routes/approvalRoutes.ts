@@ -84,7 +84,7 @@ export function registerApprovalRoutes(app: Express) {
         tableName: "approval_requests",
         recordId: row.id,
         recordIdentifier: actionType,
-        changes: { status: "pending" },
+        changes: { status: { old: null, new: "pending" } },
       });
       res.status(201).json(row);
     } catch (e: any) {
@@ -133,7 +133,7 @@ export function registerApprovalRoutes(app: Express) {
         tableName: "approval_requests",
         recordId: id,
         recordIdentifier: `Approved: ${existing.actionType}`,
-        changes: { status: "approved" },
+        changes: { status: { old: "pending", new: "approved" } },
       });
       res.json(updated);
     } catch (e: any) {
@@ -182,7 +182,7 @@ export function registerApprovalRoutes(app: Express) {
         tableName: "approval_requests",
         recordId: id,
         recordIdentifier: `Rejected: ${existing.actionType}`,
-        changes: { status: "rejected" },
+        changes: { status: { old: "pending", new: "rejected" } },
       });
       res.json(updated);
     } catch (e: any) {
@@ -223,7 +223,7 @@ export function registerApprovalRoutes(app: Express) {
         tableName: "approval_requests",
         recordId: id,
         recordIdentifier: `Executed: ${existing.actionType}`,
-        changes: { status: "executed" },
+        changes: { status: { old: "approved", new: "executed" } },
       });
       res.json(updated);
     } catch (e: any) {

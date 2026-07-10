@@ -498,99 +498,6 @@ export function registerFactoryMixBatchRoutes(app: Express) {
 
       if (!updated) return res.status(404).json({ message: "Mix batch not found" });
       res.json({ id: updated.id, message: "Mix batch moved to Deleted Items" });
-      return;
-
-      await db.transaction(async (tx: any) => {
-        const [batch] = await tx
-          .select()
-          .from(factoryMixBatches)
-          .where(and(eq(factoryMixBatches.id, id), eq(factoryMixBatches.companyId, companyId)));
-
-        if (!batch) throw new Error("Mix batch not found");
-
-        // 1. Unlink bales (set mixBatchId = NULL, preserve bales themselves)
-        await tx
-          .update(factoryBales)
-          .set({ mixBatchId: null })
-          .where(and(eq(factoryBales.mixBatchId, id), eq(factoryBales.companyId, companyId)));
-
-        // 2. Reverse used_kg on each source
-        const sources = await tx.select().from(factoryMixBatchSources).where(eq(factoryMixBatchSources.mixBatchId, id));
-
-        for (const src of sources) {
-          if (src.containerId) {
-            // Reverse used_kg on the raw stock container row
-            const [rsRow] = await tx
-              .select()
-              .from(factoryRawStock)
-              .where(eq(factoryRawStock.containerId, src.containerId));
-            if (rsRow) {
-              const newUsed = Math.max(0, parseFloat(rsRow.usedKg) - parseFloat(src.weightKg));
-              await tx
-                .update(factoryRawStock)
-                .set({ usedKg: newUsed.toFixed(3) })
-                .where(eq(factoryRawStock.id, rsRow.id));
-            }
-          } else if (src.supplierId && !src.sourceBatchId) {
-            // Legacy: source stored only supplierId (no containerId). Reverse FIFO from supplier's raw stock.
-            const supplierRawStocks = await tx
-              .select({
-                id: factoryRawStock.id,
-                usedKg: factoryRawStock.usedKg,
-                offloadedAt: factoryRawStock.offloadedAt,
-              })
-              .from(factoryRawStock)
-              .innerJoin(factoryContainers, eq(factoryRawStock.containerId, factoryContainers.id))
-              .where(and(eq(factoryRawStock.companyId, companyId), eq(factoryContainers.supplierId, src.supplierId)))
-              .orderBy(desc(factoryRawStock.offloadedAt), desc(factoryRawStock.id));
-
-            let toRestore = parseFloat(src.weightKg);
-            for (const rs of supplierRawStocks) {
-              if (toRestore <= 0.001) break;
-              const usedNow = parseFloat(rs.usedKg);
-              if (usedNow <= 0) continue;
-              const restore = Math.min(toRestore, usedNow);
-              await tx
-                .update(factoryRawStock)
-                .set({ usedKg: Math.max(0, usedNow - restore).toFixed(3) })
-                .where(eq(factoryRawStock.id, rs.id));
-              toRestore -= restore;
-            }
-          } else if (src.sourceBatchId) {
-            // Reverse used_kg on source batch and restore to ACTIVE
-            const [srcBatch] = await tx
-              .select()
-              .from(factoryMixBatches)
-              .where(eq(factoryMixBatches.id, src.sourceBatchId));
-            if (srcBatch) {
-              const newUsed = Math.max(0, parseFloat(srcBatch.usedKg) - parseFloat(src.weightKg));
-              await tx
-                .update(factoryMixBatches)
-                .set({ usedKg: newUsed.toFixed(3), status: "ACTIVE" })
-                .where(eq(factoryMixBatches.id, src.sourceBatchId));
-            }
-          }
-        }
-
-        // 3. Delete sources
-        await tx.delete(factoryMixBatchSources).where(eq(factoryMixBatchSources.mixBatchId, id));
-
-        // 4. Delete daybook entries for this mix batch (creation + any top-ups)
-        await tx
-          .delete(factoryDaybookEntries)
-          .where(
-            and(
-              eq(factoryDaybookEntries.companyId, companyId),
-              inArray(factoryDaybookEntries.txType, ["MIX_BATCH_CREATED", "MIX_BATCH_TOPUP"]),
-              eq(factoryDaybookEntries.referenceId, id)
-            )
-          );
-
-        // 5. Delete the batch
-        await tx.delete(factoryMixBatches).where(eq(factoryMixBatches.id, id));
-      });
-
-      res.json({ success: true });
     } catch (error: any) {
       console.error("Error deleting mix batch:", error);
       res.status(500).json({ message: error.message });
@@ -1235,7 +1142,7 @@ export function registerFactoryMixBatchRoutes(app: Express) {
               wWeight = 0;
             for (const r of rows) {
               const kg = parseFloat(r.receivedKg) || 0;
-              const c = parseFloat(r.costPerKgUsd) || parseFloat(r.costPerKg) || 0;
+              const c = parseFloat(r.costPerKgUsd || "0") || parseFloat(r.costPerKg || "0") || 0;
               wSum += kg * c;
               wWeight += kg;
             }
@@ -1254,7 +1161,7 @@ export function registerFactoryMixBatchRoutes(app: Express) {
               wWeight = 0;
             for (const r of rows) {
               const kg = parseFloat(r.receivedKg) || 0;
-              const c = parseFloat(r.costPerKgUsd) || parseFloat(r.costPerKg) || 0;
+              const c = parseFloat(r.costPerKgUsd || "0") || parseFloat(r.costPerKg || "0") || 0;
               wSum += kg * c;
               wWeight += kg;
             }

@@ -115,6 +115,11 @@ import {
   factorySettings as fSettings,
   factoryDaybookEntries as fde,
   factoryBaleSequences,
+  mixBatchSources,
+  insertMixBatchSourceSchema,
+  insertBaleProductCategorySchema,
+  insertBaleProductSchema,
+  insertProductionBaleSchema,
 } from "@shared/schema";
 import {
   eq,

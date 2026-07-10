@@ -281,17 +281,17 @@ export function registerSupplierRoutes(app: Express) {
         await logAudit({
           userId: req.session.userId!,
           username: (req.session as any).username || "unknown",
-          companyId: supplier.companyId!,
+          companyId: req.session.currentCompanyId!,
           action: "create",
           tableName: "suppliers",
           recordId: supplier.id,
           recordIdentifier: supplier.legalName,
           changes: {
-            name: { new: supplier.legalName },
-            code: { new: supplier.code },
-            phone: { new: supplier.phone || null },
-            email: { new: supplier.email || null },
-            address: { new: supplier.address || null },
+            name: { old: null, new: supplier.legalName },
+            code: { old: null, new: supplier.code },
+            phone: { old: null, new: supplier.phone || null },
+            email: { old: null, new: supplier.email || null },
+            address: { old: null, new: supplier.address || null },
           },
         });
       } catch {
@@ -336,7 +336,7 @@ export function registerSupplierRoutes(app: Express) {
         await logAudit({
           userId: req.session.userId!,
           username: (req.session as any).username || "unknown",
-          companyId: updatedSupplier.companyId!,
+          companyId: req.session.currentCompanyId!,
           action: "update",
           tableName: "suppliers",
           recordId: updatedSupplier.id,
@@ -367,16 +367,16 @@ export function registerSupplierRoutes(app: Express) {
         await logAudit({
           userId: req.session.userId!,
           username: (req.session as any).username || "unknown",
-          companyId: existing.companyId!,
+          companyId: req.session.currentCompanyId!,
           action: "delete",
           tableName: "suppliers",
           recordId: existing.id,
           recordIdentifier: existing.legalName,
           changes: {
-            name: { old: existing.legalName },
-            code: { old: existing.code },
-            phone: { old: existing.phone || null },
-            email: { old: existing.email || null },
+            name: { old: existing.legalName, new: null },
+            code: { old: existing.code, new: null },
+            phone: { old: existing.phone || null, new: null },
+            email: { old: existing.email || null, new: null },
           },
         });
       } catch {

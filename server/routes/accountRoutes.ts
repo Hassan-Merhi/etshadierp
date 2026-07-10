@@ -1813,7 +1813,10 @@ export function registerAccountRoutes(app: Express) {
           const [r] = await db.select({ name: suppliers.legalName }).from(suppliers).where(eq(suppliers.id, accountId));
           resolvedName = r?.name ?? resolvedName;
         } else if (accountType === "customer") {
-          const [r] = await db.select({ name: customers.name }).from(customers).where(eq(customers.id, accountId));
+          const [r] = await db
+            .select({ name: customers.legalName })
+            .from(customers)
+            .where(eq(customers.id, accountId));
           resolvedName = r?.name ?? resolvedName;
         } else if (accountType === "employee") {
           const [r] = await db
@@ -1872,10 +1875,7 @@ export function registerAccountRoutes(app: Express) {
         if (!acct) return res.status(404).json({ message: "Bank account not found" });
         accountName = acct.name;
       } else if (accountType === "supplier") {
-        const [acct] = await db
-          .select({ name: suppliers.legalName })
-          .from(suppliers)
-          .where(and(eq(suppliers.id, accountId), eq(suppliers.companyId, companyId)));
+        const [acct] = await db.select({ name: suppliers.legalName }).from(suppliers).where(eq(suppliers.id, accountId));
         if (!acct) return res.status(404).json({ message: "Supplier not found" });
         accountName = acct.name ?? "Supplier";
       } else if (accountType === "employee") {
@@ -1894,9 +1894,9 @@ export function registerAccountRoutes(app: Express) {
       } else if (accountType === "bank") {
         txRows = await storage.getVoucherEntriesByBankAccount(accountId, startDate, endDate);
       } else if (accountType === "supplier") {
-        txRows = await storage.getVoucherEntriesBySupplier(accountId, startDate, endDate);
+        txRows = await storage.getVoucherEntriesBySupplier(accountId, companyId, startDate, endDate);
       } else if (accountType === "employee") {
-        txRows = await storage.getVoucherEntriesByEmployee(accountId, startDate, endDate);
+        txRows = await storage.getVoucherEntriesByEmployee(accountId, companyId, startDate, endDate);
       }
 
       // Compute brought-forward balance (entries before startDate when filtering)

@@ -109,7 +109,7 @@ export async function generateWorkerBalesPdf(groups: GroupRow[], date: string, c
       if (arabic) {
         doc.font("Amiri").fontSize(9);
         fill(doc, NAVY);
-        doc.text(name, x, ry + 1, { width: w, align: "right", features: ["rtla", "arab"] });
+        doc.text(name, x, ry + 1, { width: w, align: "right", features: ["rtla", "arab"] as any });
       } else {
         doc.font("Helvetica-Bold").fontSize(8.5);
         fill(doc, NAVY);
@@ -348,7 +348,7 @@ export async function generateWorkerBalesPdf(groups: GroupRow[], date: string, c
       if (arabic) {
         doc.font("Amiri").fontSize(9.5);
         fill(doc, NAVY);
-        doc.text(r.worker, LM + 4, y + 3, { width: S_COL_W - 8, align: "right", features: ["rtla", "arab"] });
+        doc.text(r.worker, LM + 4, y + 3, { width: S_COL_W - 8, align: "right", features: ["rtla", "arab"] as any });
       } else {
         doc.font("Helvetica-Bold").fontSize(9);
         fill(doc, SLATE);

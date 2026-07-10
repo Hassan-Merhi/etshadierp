@@ -305,13 +305,11 @@ export function registerCustomerRoutes(app: Express) {
           recordId: customer.id,
           recordIdentifier: customer.legalName,
           changes: {
-            name: { new: customer.legalName },
-            code: { new: customer.code },
-            phone: { new: customer.phone || null },
-            email: { new: customer.email || null },
-            address: { new: customer.address || null },
-            openingBalance: { new: customer.openingBalance || "0" },
-            openingBalanceSide: { new: customer.openingBalanceSide || null },
+            name: { old: null, new: customer.legalName },
+            code: { old: null, new: customer.code },
+            phone: { old: null, new: customer.phone || null },
+            openingBalance: { old: null, new: customer.openingBalance || "0" },
+            openingBalanceSide: { old: null, new: customer.openingBalanceSide || null },
           },
         });
       } catch {
@@ -425,7 +423,7 @@ export function registerCustomerRoutes(app: Express) {
           ledgerUpdate.openingBalanceSide = updatedCustomer.openingBalanceSide ?? "Dr";
         }
         if (Object.keys(ledgerUpdate).length > 0) {
-          await storage.updateLedgerAccount({ id: updatedCustomer.ledgerAccountId!, ...ledgerUpdate });
+          await storage.updateLedgerAccount({ id: updatedCustomer.ledgerAccountId!, ...ledgerUpdate } as any);
         }
       }
 
@@ -462,11 +460,9 @@ export function registerCustomerRoutes(app: Express) {
           recordId: existing.id,
           recordIdentifier: existing.legalName,
           changes: {
-            name: { old: existing.legalName },
-            code: { old: existing.code },
-            phone: { old: existing.phone || null },
-            email: { old: existing.email || null },
-            address: { old: existing.address || null },
+            name: { old: existing.legalName, new: null },
+            code: { old: existing.code, new: null },
+            phone: { old: existing.phone || null, new: null },
           },
         });
       } catch {

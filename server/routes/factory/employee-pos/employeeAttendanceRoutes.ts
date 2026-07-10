@@ -250,7 +250,7 @@ export function registerEmployeeAttendanceRoutes(app: Express) {
             ORDER BY attendance_date`
       );
       const attRecords: { workerId: number; date: string; status: string }[] = (
-        (attRows as any).rows ?? (attRows as any[])
+        (attRows as any).rows ?? (attRows as unknown as any[])
       ).map((r: any) => ({
         workerId: Number(r.workerId),
         date: typeof r.date === "string" ? r.date.substring(0, 10) : new Date(r.date).toISOString().substring(0, 10),
@@ -284,7 +284,7 @@ export function registerEmployeeAttendanceRoutes(app: Express) {
               AND worker_id = ANY(${sqlArray(workerIds)})`
       );
       const paidPayrollList: { workerId: number; netSalary: string }[] = (
-        (paidPayrollRows as any).rows ?? (paidPayrollRows as any[])
+        (paidPayrollRows as any).rows ?? (paidPayrollRows as unknown as any[])
       ).map((r: any) => ({
         workerId: Number(r.workerId),
         netSalary: r.netSalary ?? "0",
@@ -405,9 +405,9 @@ export function registerEmployeeAttendanceRoutes(app: Express) {
               AND period_start <= ${monthEnd}::date
               AND period_end   >= ${monthStart}::date`
       );
-      const payrollList: { netSalary: string }[] = ((payrollRows as any).rows ?? (payrollRows as any[])).map(
-        (r: any) => ({ netSalary: r.netSalary ?? "0" })
-      );
+      const payrollList: { netSalary: string }[] = (
+        (payrollRows as any).rows ?? (payrollRows as unknown as any[])
+      ).map((r: any) => ({ netSalary: r.netSalary ?? "0" }));
 
       let totalWorkerPaid = 0;
       for (const p of payrollList) {

@@ -1150,7 +1150,7 @@ export async function getERPContext(companyId: number): Promise<ERPContext> {
 
   const lowStockAlerts: any[] = [];
   for (const item of stockItems) {
-    const qty = inventoryMap.get(item.id) || 0;
+    const qty = parseFloat(inventoryMap.get(item.id)?.quantity || "0");
     const reorderLevel = parseFloat(item.reorderLevel || "0");
     if (reorderLevel > 0 && qty <= reorderLevel) {
       lowStockAlerts.push({
@@ -1332,11 +1332,11 @@ export async function getERPContext(companyId: number): Promise<ERPContext> {
 
   const slowMovingStock = stockItems
     .filter((item) => {
-      const qty = inventoryMap.get(item.id) || 0;
+      const qty = parseFloat(inventoryMap.get(item.id)?.quantity || "0");
       return qty > 0 && !recentlySoldItemIds.has(item.id);
     })
     .map((item) => {
-      const qty = inventoryMap.get(item.id) || 0;
+      const qty = parseFloat(inventoryMap.get(item.id)?.quantity || "0");
       const invRecord = inventory.find((i) => i.stockItemId === item.id);
       const value = invRecord ? parseFloat(invRecord.totalValue || "0") : 0;
       return {
@@ -2475,13 +2475,13 @@ export async function chat(
         const keywords = [
           ...new Set(
             (
-              userMessage.match(
+              (userMessage.match(
                 /\b[A-Z][a-zA-Z]{3,}\b|\b[a-z]{4,}(?:Form|Page|Component|Hook|Route|Schema|Type|Service|Helper|Utils?)\b/g
-              ) ?? []
+              ) ?? []) as string[]
             ).concat(
-              userMessage.match(
+              (userMessage.match(
                 /\b(?:voucher|invoice|payment|receipt|stock|pos|purchase|sale|customer|supplier|company|user|auth|chat)\b/gi
-              ) ?? []
+              ) ?? []) as string[]
             )
           ),
         ].slice(0, 4);
@@ -2644,7 +2644,7 @@ Rules:
                 originalContent: p.originalContent ?? codeEditOriginalMap[p.filePath] ?? "",
                 newContent: p.newContent ?? "",
               }));
-            if (filePatchDrafts.length > 0) {
+            if (filePatchDrafts && filePatchDrafts.length > 0) {
               const fileList = filePatchDrafts.map((p: any) => `- \`${p.filePath}\``).join("\n");
               finalResponse = `I've prepared changes for **${filePatchDrafts.length} file${filePatchDrafts.length > 1 ? "s" : ""}**.\n\n${parsed.description || "Review the diffs below."}\n\n${fileList}\n\nClick **Apply** on each diff, or **Apply All** to write all changes at once.`;
             }
@@ -2761,6 +2761,7 @@ If the intent is unclear or amounts/accounts are too ambiguous to resolve, respo
 
     if (RE_STOCK_ADJ.test(userMessage)) {
       try {
+        const today = new Date().toISOString().slice(0, 10);
         const [items, locs] = await Promise.all([
           db
             .select({ id: schema.stockItems.id, name: schema.stockItems.name, code: schema.stockItems.code })
@@ -7667,7 +7668,7 @@ export async function getConversationHistoryForAI(
     .orderBy(desc(schema.chatMessages.createdAt))
     .limit(limit);
 
-  return messages.reverse();
+  return messages.reverse().map((m) => ({ role: m.role || "", content: m.content || "" }));
 }
 
 export async function getAllChatHistory(companyId: number, limit: number = 100): Promise<any[]> {

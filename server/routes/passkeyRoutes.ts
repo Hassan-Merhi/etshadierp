@@ -40,10 +40,12 @@ export function registerPasskeyRoutes(app: Express) {
         sql`SELECT credential_id FROM passkey_credentials WHERE user_id = ${userId}`
       );
 
-      const excludeCredentials = (existingCreds.rows as any[]).map((row: any) => ({
-        id: isoBase64URL.toBuffer(row.credential_id),
-        type: "public-key" as const,
-      }));
+      const excludeCredentials: { id: string; type: "public-key" }[] = (existingCreds.rows as any[]).map(
+        (row: any) => ({
+          id: row.credential_id as string,
+          type: "public-key" as const,
+        })
+      );
 
       const options = await generateRegistrationOptions({
         rpName: "HMD International Group",
@@ -84,7 +86,7 @@ export function registerPasskeyRoutes(app: Express) {
       }
 
       const { credential } = verification.registrationInfo;
-      const credentialId = isoBase64URL.fromBuffer(credential.id);
+      const credentialId = credential.id;
       const publicKey = isoBase64URL.fromBuffer(credential.publicKey);
       const deviceName = req.body.deviceName || null;
       const transports = JSON.stringify(req.body.response?.transports || []);
@@ -107,14 +109,14 @@ export function registerPasskeyRoutes(app: Express) {
     try {
       const { username } = req.body || {};
 
-      let allowCredentials: { id: Buffer; type: "public-key" }[] = [];
+      let allowCredentials: { id: string; type: "public-key" }[] = [];
       if (username) {
         const userRow = await db.execute(sql`SELECT id FROM users WHERE username = ${username} LIMIT 1`);
         if ((userRow.rows as any[]).length > 0) {
           const uid = (userRow.rows as any[])[0].id;
           const creds = await db.execute(sql`SELECT credential_id FROM passkey_credentials WHERE user_id = ${uid}`);
           allowCredentials = (creds.rows as any[]).map((r: any) => ({
-            id: isoBase64URL.toBuffer(r.credential_id),
+            id: r.credential_id as string,
             type: "public-key" as const,
           }));
         }
@@ -160,7 +162,7 @@ export function registerPasskeyRoutes(app: Express) {
         expectedOrigin: getRpOrigins(req),
         expectedRPID: getRpID(req),
         credential: {
-          id: isoBase64URL.toBuffer(cred.credential_id),
+          id: cred.credential_id as string,
           publicKey: isoBase64URL.toBuffer(cred.public_key),
           counter: cred.counter,
           transports: JSON.parse(cred.transports || "[]"),
@@ -176,7 +178,7 @@ export function registerPasskeyRoutes(app: Express) {
         WHERE credential_id = ${credId}
       `);
 
-      const userId: number = cred.uid;
+      const userId: string = String(cred.uid);
       req.session.userId = userId;
       req.session.username = cred.username;
       (req.session as any).csrfToken = require("crypto").randomBytes(32).toString("hex");

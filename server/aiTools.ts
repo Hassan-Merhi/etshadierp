@@ -127,14 +127,7 @@ export async function searchSuppliers(companyId: number, query: string, limit = 
       openingBalance: schema.suppliers.openingBalance,
     })
     .from(schema.suppliers)
-    .where(
-      and(
-        eq(schema.suppliers.companyId, companyId),
-        eq(schema.suppliers.active, true),
-        isNull(schema.suppliers.deletedAt),
-        or(...conditions)
-      )
-    )
+    .where(and(eq(schema.suppliers.active, true), isNull(schema.suppliers.deletedAt), or(...conditions)))
     .limit(limit);
 
   return rows.map((s) => ({
@@ -155,18 +148,13 @@ export async function searchCustomers(companyId: number, query: string, limit = 
     .filter((w) => w.length > 1);
 
   const conditions = terms.map((t) =>
-    or(
-      ilike(schema.customers.legalName, `%${t}%`),
-      ilike(schema.customers.name, `%${t}%`),
-      ilike(schema.customers.code, `%${t}%`)
-    )
+    or(ilike(schema.customers.legalName, `%${t}%`), ilike(schema.customers.code, `%${t}%`))
   );
 
   const rows = await db
     .select({
       id: schema.customers.id,
       code: schema.customers.code,
-      name: schema.customers.name,
       legalName: schema.customers.legalName,
       phone: schema.customers.phone,
     })
@@ -184,7 +172,7 @@ export async function searchCustomers(companyId: number, query: string, limit = 
   return rows.map((c) => ({
     id: c.id,
     code: c.code || "",
-    name: c.legalName || c.name || "Unknown",
+    name: c.legalName || "Unknown",
     phone: c.phone || "",
   }));
 }

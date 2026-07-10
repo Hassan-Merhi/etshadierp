@@ -303,8 +303,8 @@ export function registerWhatsAppRoutes(app: Express) {
     const _cid = req.session.currentCompanyId;
     try {
       logger.info("whatsapp send-net-position started", { module: "whatsapp", action: "sendNetPosition", userId: _uid, companyId: _cid });
-      const user = req.session.user as any;
-      const isAdmin = user?.role === "Admin" || user?.role === "Developer";
+      const currentRole = (req.session as any)?.currentRole;
+      const isAdmin = currentRole === "Admin" || currentRole === "Developer";
       const requestedCompanyId = req.body.companyId ? parseInt(req.body.companyId) : null;
       const companyId = isAdmin && requestedCompanyId ? requestedCompanyId : req.session.currentCompanyId;
 

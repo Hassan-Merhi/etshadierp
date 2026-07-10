@@ -461,7 +461,7 @@ export function registerFactorySheetsRoutes(app: Express) {
         const ws = xlsxUtils.aoa_to_sheet(aoa);
 
         // Column widths
-        ws["!cols"] = [{ wch: 25 }, ...columns.map(() => ({ wch: 16 }))];
+        ws["!cols"] = [{ wch: 25 }, ...rawColumns.map(() => ({ wch: 16 }))];
 
         xlsxUtils.book_append_sheet(wb, ws, sheet.name.slice(0, 31));
       }

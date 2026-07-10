@@ -325,14 +325,16 @@ export function normaliseEvents(shipment: ParcelsAppShipment): ParcelsAppEvent[]
  * Derives a simple last-known status string from the shipment attributes or latest state.
  */
 export function deriveLastStatus(shipment: ParcelsAppShipment): string | null {
-  return shipment.attributes?.status ?? shipment.states?.[0]?.status ?? null;
+  const firstState = shipment.states?.[0] as any;
+  return shipment.attributes?.status ?? firstState?.status ?? null;
 }
 
 /**
  * Derives a simple last-known location string from the shipment attributes or latest state.
  */
 export function deriveLastLocation(shipment: ParcelsAppShipment): string | null {
-  return shipment.attributes?.location ?? shipment.states?.[0]?.location ?? null;
+  const firstState = shipment.states?.[0] as any;
+  return shipment.attributes?.location ?? firstState?.location ?? null;
 }
 
 /**

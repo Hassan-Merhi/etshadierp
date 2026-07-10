@@ -19,6 +19,7 @@ export function registerFactoryContainerTrackingRoutes(app: Express) {
   app.get("/api/factory/container-tracking/:id/events", requireAuth, async (req: any, res: any) => {
     try {
       const containerId = parseId(req.params.id);
+      if (containerId === null) return res.status(400).json({ message: "Invalid container id" });
 
       // Verify container belongs to the user's factory company
       const [container] = await db
@@ -45,6 +46,7 @@ export function registerFactoryContainerTrackingRoutes(app: Express) {
   app.get("/api/factory/container-tracking/:id/checks", requireAuth, async (req: any, res: any) => {
     try {
       const containerId = parseId(req.params.id);
+      if (containerId === null) return res.status(400).json({ message: "Invalid container id" });
 
       const [container] = await db
         .select({ id: factoryContainers.id })
@@ -77,6 +79,7 @@ export function registerFactoryContainerTrackingRoutes(app: Express) {
   app.get("/api/factory/container-tracking/:id/progress", requireAuth, async (req: any, res: any) => {
     try {
       const containerId = parseId(req.params.id);
+      if (containerId === null) return res.status(400).json({ message: "Invalid container id" });
       const steps = getFactoryTrackingProgress(containerId);
       res.json(steps);
     } catch (err: any) {
@@ -88,6 +91,7 @@ export function registerFactoryContainerTrackingRoutes(app: Express) {
   app.post("/api/factory/container-tracking/:id/track-now", requireAuth, async (req: any, res: any) => {
     try {
       const containerId = parseId(req.params.id);
+      if (containerId === null) return res.status(400).json({ message: "Invalid container id" });
 
       const [container] = await db
         .select({ id: factoryContainers.id, companyId: factoryContainers.companyId })
@@ -119,6 +123,7 @@ export function registerFactoryContainerTrackingRoutes(app: Express) {
   app.patch("/api/factory/container-tracking/:id/settings", requireAuth, async (req: any, res: any) => {
     try {
       const containerId = parseId(req.params.id);
+      if (containerId === null) return res.status(400).json({ message: "Invalid container id" });
       const { trackingEnabled, trackingAutoUpdate, trackingCarrierHint } = req.body as {
         trackingEnabled?: boolean;
         trackingAutoUpdate?: boolean;

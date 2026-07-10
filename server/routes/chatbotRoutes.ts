@@ -378,7 +378,7 @@ export function registerChatbotRoutes(app: Express) {
             and(
               eq(userCompanyRoles.companyId, companyId),
               eq(userCompanyRoles.role, "Developer"),
-              inArray(userCompanyRoles.userId, userIds.map(Number))
+              inArray(userCompanyRoles.userId, userIds.map(String))
             )
           );
         developerUserIds = new Set(roleRows.map((r) => String(r.userId)));
@@ -466,7 +466,7 @@ export function registerChatbotRoutes(app: Express) {
           .where(
             and(
               eq(userCompanyRoles.companyId, companyId),
-              eq(userCompanyRoles.userId, Number(ownerUserId)),
+              eq(userCompanyRoles.userId, String(ownerUserId)),
               eq(userCompanyRoles.role, "Developer")
             )
           )
@@ -896,9 +896,11 @@ export function registerChatbotRoutes(app: Express) {
       }
       if (searchModules.includes("customers")) {
         const crows = await db
-          .select({ id: customers.id, name: customers.name, phone: customers.phone })
+          .select({ id: customers.id, name: customers.legalName, phone: customers.phone })
           .from(customers)
-          .where(and(eq(customers.companyId, companyId), isNull(customers.deletedAt), ilike(customers.name, `%${q}%`)))
+          .where(
+            and(eq(customers.companyId, companyId), isNull(customers.deletedAt), ilike(customers.legalName, `%${q}%`))
+          )
           .limit(5);
         crows.forEach((r) =>
           results.push({
@@ -915,9 +917,7 @@ export function registerChatbotRoutes(app: Express) {
         const srows = await db
           .select({ id: suppliers.id, legalName: suppliers.legalName, code: suppliers.code })
           .from(suppliers)
-          .where(
-            and(eq(suppliers.companyId, companyId), isNull(suppliers.deletedAt), ilike(suppliers.legalName, `%${q}%`))
-          )
+          .where(and(isNull(suppliers.deletedAt), ilike(suppliers.legalName, `%${q}%`)))
           .limit(5);
         srows.forEach((r) =>
           results.push({
@@ -998,7 +998,7 @@ export function registerChatbotRoutes(app: Express) {
       // ── Helper: match stock item ────────────────────────────────────
       async function tryMatchItem(code: string, name: string): Promise<{ id: number; name: string } | null> {
         if (code) {
-          const si = await storage.getStockItemByCodeOrAlias(code, companyId);
+          const si = await storage.getStockItemByCodeOrAlias(code, companyId as number);
           if (si) return { id: si.id, name: si.name };
         }
         if (name) {
@@ -1095,7 +1095,8 @@ export function registerChatbotRoutes(app: Express) {
       if (fileExt === "pdf") {
         let pdfText = "";
         try {
-          const pdfParse = (await import("pdf-parse")).default;
+          const pdfParseModule: any = await import("pdf-parse");
+          const pdfParse = (pdfParseModule.default ?? pdfParseModule) as (buf: Buffer) => Promise<{ text: string }>;
           const parsed = await pdfParse(req.file.buffer);
           pdfText = parsed.text;
         } catch (pdfErr: any) {
@@ -1461,6 +1462,8 @@ export function registerChatbotRoutes(app: Express) {
       if (!filePath || newContent === undefined || newContent === null) {
         return res.status(400).json({ message: "filePath and newContent are required" });
       }
+      const companyId = req.session.currentCompanyId;
+      const userId = req.session.userId;
 
       // Validate path is inside workspace
       let absPath: string;
@@ -1507,7 +1510,7 @@ export function registerChatbotRoutes(app: Express) {
       const { description: patchDescription } = req.body;
       try {
         await db.insert(codePatchHistory).values({
-          companyId,
+          companyId: companyId ?? 0,
           filePath,
           description: patchDescription || null,
           originalContent: originalContent || "",
@@ -1711,9 +1714,10 @@ export function registerChatbotRoutes(app: Express) {
       }
 
       // Link commit hash to patch history records for each pushed file
-      if (result.commitHash && companyId) {
+      const gitPushCompanyId = req.session.currentCompanyId;
+      if (result.commitHash && gitPushCompanyId) {
         for (const fp of files) {
-          await updatePatchCommitHash(companyId, fp, result.commitHash).catch(() => {});
+          await updatePatchCommitHash(gitPushCompanyId, fp, result.commitHash).catch(() => {});
         }
       }
 

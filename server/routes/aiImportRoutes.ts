@@ -229,10 +229,7 @@ async function validateCustomerRows(companyId: number, rows: { id: number; rowNu
 }
 
 async function validateSupplierRows(companyId: number, rows: { id: number; rowNumber: number; rawData: any }[]) {
-  const existingCodes = await db
-    .select({ code: suppliers.code })
-    .from(suppliers)
-    .where(and(eq(suppliers.companyId, companyId), isNull(suppliers.deletedAt)));
+  const existingCodes = await db.select({ code: suppliers.code }).from(suppliers).where(isNull(suppliers.deletedAt));
   const existingCodeSet = new Set(existingCodes.map((r) => (r.code || "").toLowerCase()));
   const batchCodes = new Set<string>();
 
@@ -517,7 +514,7 @@ export function registerAiImportRoutes(app: Express) {
         return res.status(400).json({ message: `importType must be one of: ${SUPPORTED.join(", ")}` });
 
       // Parse the Excel file
-      const workbook = readExcel(req.file.buffer);
+      const workbook = await readExcel(req.file.buffer);
       const sheetName = workbook.SheetNames[0];
       if (!sheetName) return res.status(400).json({ message: "Excel file has no sheets" });
 
