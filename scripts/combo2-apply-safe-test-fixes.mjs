@@ -1,5 +1,6 @@
 import { readFileSync, writeFileSync } from "node:fs";
 
+// Temporary guarded helper for Combo 2; removed before merge.
 function replaceExact(source, oldText, newText, label) {
   if (!source.includes(oldText)) {
     throw new Error(`Combo 2 replacement not found: ${label}`);
