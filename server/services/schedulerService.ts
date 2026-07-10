@@ -32,28 +32,30 @@ function getTodayLabel(): string {
  * Build a ZIP containing per-company net position Excel files.
  */
 async function buildNetPositionZip(companies: any[], startDate: string, endDate: string): Promise<Buffer> {
-  return new Promise(async (resolve, reject) => {
+  return new Promise((resolve, reject) => {
     const chunks: Buffer[] = [];
     const arc = archiver("zip", { zlib: { level: 6 } });
     arc.on("data", (chunk: Buffer) => chunks.push(chunk));
     arc.on("end", () => resolve(Buffer.concat(chunks)));
     arc.on("error", reject);
 
-    for (const company of companies) {
-      const safe = company.name.replace(/[^a-z0-9]/gi, "_");
-      const pass = new PassThrough();
-      arc.append(pass, { name: `NetPosition_${safe}_${endDate}.xlsx` });
-      try {
-        await generateNetPositionExcel(company.id, company.name, startDate, endDate, pass);
-        if (!pass.destroyed) pass.end();
-        console.log(`[NetPositionExport] Added ${company.name}`);
-      } catch (e: any) {
-        console.error(`[NetPositionExport] Failed for ${company.name}:`, e.message);
-        if (!pass.destroyed) pass.destroy(e);
+    void (async () => {
+      for (const company of companies) {
+        const safe = company.name.replace(/[^a-z0-9]/gi, "_");
+        const pass = new PassThrough();
+        arc.append(pass, { name: `NetPosition_${safe}_${endDate}.xlsx` });
+        try {
+          await generateNetPositionExcel(company.id, company.name, startDate, endDate, pass);
+          if (!pass.destroyed) pass.end();
+          console.log(`[NetPositionExport] Added ${company.name}`);
+        } catch (e: any) {
+          console.error(`[NetPositionExport] Failed for ${company.name}:`, e.message);
+          if (!pass.destroyed) pass.destroy(e);
+        }
       }
-    }
 
-    arc.finalize();
+      await arc.finalize();
+    })().catch(reject);
   });
 }
 

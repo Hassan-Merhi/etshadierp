@@ -220,7 +220,8 @@ export async function readFile(file: File): Promise<ExcelJS.Workbook> {
 
 export async function readFromBuffer(data: ArrayBuffer | Uint8Array): Promise<ExcelJS.Workbook> {
   const workbook = new ExcelJS.Workbook();
-  await workbook.xlsx.load(data instanceof ArrayBuffer ? data : data.buffer);
+  const normalizedBuffer = data instanceof ArrayBuffer ? data : Uint8Array.from(data).buffer;
+  await workbook.xlsx.load(normalizedBuffer);
   return workbook;
 }
 

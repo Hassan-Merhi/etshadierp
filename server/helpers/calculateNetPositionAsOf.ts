@@ -226,7 +226,7 @@ export async function calculateNetPositionAsOf(
         } else if (netBalance < 0) {
           forUsTotal += Math.abs(netBalance);
           forUsLines.push({
-            label: `Supplier Credit: ${sup.name}`,
+            label: `Supplier Credit: ${sup.legalName}`,
             value: round2(Math.abs(netBalance)),
             category: "Supplier Credits",
             side: "forUs",

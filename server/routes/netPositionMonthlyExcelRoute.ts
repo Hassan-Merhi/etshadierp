@@ -13,8 +13,8 @@ import { getClientDate } from "../lib/dateUtils";
 export function registerNetPositionMonthlyExcelRoute(app: Express) {
   app.get("/api/reports/net-position-monthly-excel", requireAuth, async (req, res) => {
     try {
-      const user = req.session.user as any;
-      const isAdminOrDev = user?.role === "Admin" || user?.role === "Developer";
+      const role = req.user?.role;
+      const isAdminOrDev = role === "Admin" || role === "Developer";
       const requestedCompanyId = req.query.companyId ? parseOptionalId(req.query.companyId) : null;
       const companyId = isAdminOrDev && requestedCompanyId ? requestedCompanyId : req.session.currentCompanyId;
 

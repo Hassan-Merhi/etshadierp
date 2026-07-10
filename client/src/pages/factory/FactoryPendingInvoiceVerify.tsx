@@ -70,6 +70,8 @@ interface ComparisonItem {
   totalWeight: number;
   totalPrice: number;
   pricePerBale: string;
+  stockQty?: number;
+  stockTotalWeight?: number;
   inProforma: boolean;
   status: "LOADED_NOT_IN_PROFORMA" | "MISSING_FROM_LOADED" | "UNDER_LOADED" | "OVER_LOADED" | "MATCH";
 }

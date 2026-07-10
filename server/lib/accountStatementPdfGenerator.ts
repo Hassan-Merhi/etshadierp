@@ -118,10 +118,10 @@ export async function generateAccountStatementPdf(opts: StatementPdfOptions): Pr
   const isSupplier = accountType === "supplier";
 
   // ── 1. Fetch raw entries ──
-  let rawEntries: any[] = [];
-  let accountName = "";
-  let rawOB = 0;
-  let obSide = "Dr";
+  let rawEntries: any[];
+  let accountName: string;
+  let rawOB: number;
+  let obSide: string;
 
   if (accountType === "ledger") {
     const [acct] = await db.select().from(ledgerAccounts).where(eq(ledgerAccounts.id, accountId));
@@ -189,7 +189,7 @@ export async function generateAccountStatementPdf(opts: StatementPdfOptions): Pr
       creditAmount: row.creditAmount,
     }));
     const [acct] = await db.select().from(customers).where(eq(customers.id, accountId));
-    accountName = acct?.name ?? "Customer";
+    accountName = acct?.legalName ?? "Customer";
     rawOB = parseFloat(acct?.openingBalance ?? "0") || 0;
     obSide = "Dr";
   } else {

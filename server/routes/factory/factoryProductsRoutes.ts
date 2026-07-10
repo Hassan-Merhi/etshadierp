@@ -704,8 +704,8 @@ export function registerFactoryProductsRoutes(app: Express) {
       }
 
       // Build explicit insert values (bypasses drizzle-zod coercion issues)
-      const buildInsertValues = (ac: string, c: string) => {
-        const v: Record<string, any> = {
+      const buildInsertValues = (ac: string, c: string): typeof factoryBaleProducts.$inferInsert => {
+        const v: typeof factoryBaleProducts.$inferInsert = {
           companyId,
           code: c,
           articleCode: ac || null,

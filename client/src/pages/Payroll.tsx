@@ -339,12 +339,13 @@ export default function Payroll() {
   // Pre-populate edit employee form + load bale rates when editingEmployee changes
   useEffect(() => {
     if (!editingEmployee) return;
+    const employeeGroupId = (editingEmployee as Employee & { employeeGroupId?: number | null }).employeeGroupId;
     editEmployeeForm.reset({
       firstName: editingEmployee.firstName || "",
       lastName: editingEmployee.lastName || "",
       code: editingEmployee.code || "",
       monthlySalary: editingEmployee.monthlySalary || "",
-      employeeGroupId: editingEmployee.employeeGroupId ? String(editingEmployee.employeeGroupId) : "",
+      employeeGroupId: employeeGroupId ? String(employeeGroupId) : "",
       salesBonusPct: editingEmployee.salesBonusPct ? String(editingEmployee.salesBonusPct) : "",
       salesBonusPctLocationId: editingEmployee.salesBonusPctLocationId
         ? String(editingEmployee.salesBonusPctLocationId)

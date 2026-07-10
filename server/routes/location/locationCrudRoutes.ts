@@ -157,7 +157,7 @@ export function registerLocationCrudRoutes(app: Express) {
       const [updated] = await db.update(locations).set(updatePayload).where(eq(locations.id, locationId)).returning();
 
       try {
-        const _locChanges: Record<string, { old: any; new: any }> = {};
+        const _locChanges: Record<string, { old?: any; new?: any }> = {};
         if (location.name !== updated.name) _locChanges.name = { old: location.name, new: updated.name };
         await logAudit({
           userId: req.session.userId!,

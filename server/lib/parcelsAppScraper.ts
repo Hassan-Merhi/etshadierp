@@ -118,6 +118,9 @@ export async function ensureChromiumInstalled(): Promise<void> {
   }
 }
 
+// Backward-compatible name used by the server startup pre-warm import.
+export const ensureChromiumAvailable = ensureChromiumInstalled;
+
 // ── Shared browser instance ───────────────────────────────────────────────────
 // One Chrome process is kept alive and reused across all scrape calls.
 // Replaced automatically if it crashes.

@@ -798,6 +798,10 @@ export function registerOrderVerifyRecoverRoutes(app: Express) {
             if (!loc?.whatsappGroupChatId) return;
 
             const { buffer, fileName } = await buildOrderExcelBuffer(orderId, companyId, false);
+            const [verifyBaleCountRow] = await db
+              .select({ count: sql<number>`COUNT(*)::int` })
+              .from(customerOrderBales)
+              .where(eq(customerOrderBales.orderId, orderId));
 
             const captionParts: string[] = [
               `*Container Verified* ✓`,
@@ -805,7 +809,7 @@ export function registerOrderVerifyRecoverRoutes(app: Express) {
               `Order #${orderId}`,
               order.containerNumber ? `Container: ${order.containerNumber}` : null,
               `Customer: ${verifyCustomer?.legalName || "—"}`,
-              `Bales loaded: ${verifyBales.length}`,
+              `Bales loaded: ${verifyBaleCountRow?.count ?? 0}`,
               order.destination ? `Destination: ${order.destination}` : null,
               `Date: ${verifyToday}`,
               notes ? `Notes: ${notes}` : null,

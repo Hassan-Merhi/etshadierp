@@ -536,7 +536,7 @@ export function registerPayrollCoreRoutes(app: Express) {
       const result = targetWorkers.map((worker: any) => {
         const baseSal = parseFloat(worker.baseSalary || "0");
         const freq = worker.payFrequency || worker.salaryType || "Monthly";
-        let base = 0;
+        let base: number;
         if (freq === "Weekly") base = (days / 7) * baseSal;
         else if (freq === "Bi-Weekly") base = (days / 14) * baseSal;
         else if (freq === "Daily" || worker.salaryType === "Daily") base = days * baseSal;
@@ -771,7 +771,7 @@ export function registerPayrollCoreRoutes(app: Express) {
         for (const worker of targetWorkers) {
           const baseSal = parseFloat(worker.baseSalary || "0");
           const freq = (worker as any).payFrequency || worker.salaryType || "Monthly";
-          let base = 0;
+          let base: number;
           if (freq === "Weekly") base = (days / 7) * parseFloat((worker as any).weeklySalary || baseSal.toString());
           else if (freq === "Bi-Weekly")
             base = (days / 14) * parseFloat((worker as any).biWeeklySalary || baseSal.toString());

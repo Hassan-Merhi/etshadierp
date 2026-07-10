@@ -381,7 +381,7 @@ export function registerCustomerRoutes(app: Express) {
       const updatedCustomer = await storage.updateCustomer(customerId, parsed);
 
       try {
-        const _custChanges: Record<string, { old: any; new: any }> = {};
+        const _custChanges: Record<string, { old?: any; new?: any }> = {};
         for (const _f of [
           "legalName",
           "phone",

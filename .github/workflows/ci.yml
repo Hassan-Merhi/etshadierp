@@ -33,10 +33,13 @@ jobs:
 
     env:
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/heliumdb
+      PGSSLMODE: disable
       NODE_ENV: test
       SESSION_SECRET: ci-session-secret
       CSRF_ENFORCE: "0"
+      ENABLE_SCHEDULERS: "false"
       NODE_OPTIONS: --max-old-space-size=4096
+      PORT: "5000"
 
     steps:
       - name: Checkout repository
@@ -48,25 +51,168 @@ jobs:
           node-version: "20"
           cache: npm
 
+      - name: Normalize Replit registry URLs for CI
+        run: sed -i 's#http://package-firewall.replit.local/npm/#https://registry.npmjs.org/#g' package-lock.json
+
       - name: Install dependencies
-        run: npm ci --no-audit
+        id: install
+        run: npm ci --no-audit --bin-links=true
+
+      - name: Dependency diagnostics
+        if: always() && steps.install.outcome == 'success'
+        run: |
+          node --version
+          npm --version
+          npm config get bin-links
+          node -p "'TypeScript ' + require('typescript/package.json').version"
+          node -p "'jsdom ' + require('jsdom/package.json').version"
+          for binary in tsc vite eslint vitest; do
+            if [ -x "node_modules/.bin/$binary" ]; then
+              echo "$binary: available"
+            else
+              echo "::warning::$binary is missing from node_modules/.bin"
+            fi
+          done
 
       - name: Type-check
-        run: npm run check
+        id: typecheck
+        if: always() && steps.install.outcome == 'success'
+        run: |
+          set -o pipefail
+          npm run check 2>&1 | tee ts-errors-ci.txt
+
+      - name: Upload type-check failure log
+        if: always() && steps.typecheck.outcome == 'failure'
+        uses: actions/upload-artifact@v4
+        with:
+          name: typecheck-errors
+          path: ts-errors-ci.txt
+          if-no-files-found: error
+          retention-days: 7
 
       - name: Build
-        run: npm run build
+        id: build
+        if: always() && steps.install.outcome == 'success'
+        run: |
+          set -o pipefail
+          npm run build 2>&1 | tee build-errors-ci.txt
+
+      - name: Upload build failure log
+        if: always() && steps.build.outcome == 'failure'
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-errors
+          path: build-errors-ci.txt
+          if-no-files-found: error
+          retention-days: 7
 
       - name: Lint
-        run: npm run lint
+        id: lint
+        if: always() && steps.install.outcome == 'success'
+        run: |
+          set -o pipefail
+          npm run lint 2>&1 | tee lint-errors-ci.txt
+
+      - name: Upload lint failure log
+        if: always() && steps.lint.outcome == 'failure'
+        uses: actions/upload-artifact@v4
+        with:
+          name: lint-errors
+          path: lint-errors-ci.txt
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Prepare test database schema
+        id: db_schema
+        if: always() && steps.install.outcome == 'success'
+        run: |
+          set -o pipefail
+          node node_modules/drizzle-kit/bin.cjs push --force 2>&1 | tee db-schema-ci.txt
+
+      - name: Upload database schema failure log
+        if: always() && steps.db_schema.outcome == 'failure'
+        uses: actions/upload-artifact@v4
+        with:
+          name: database-schema-errors
+          path: db-schema-ci.txt
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Run application startup migrations
+        id: runtime_migrations
+        if: always() && steps.db_schema.outcome == 'success' && steps.build.outcome == 'success'
+        run: |
+          set -o pipefail
+          node dist/index.js > startup-migrations-ci.txt 2>&1 &
+          app_pid=$!
+          cleanup() {
+            kill "$app_pid" 2>/dev/null || true
+            wait "$app_pid" 2>/dev/null || true
+          }
+          trap cleanup EXIT
+
+          for attempt in $(seq 1 180); do
+            if curl --fail --silent --show-error http://127.0.0.1:${PORT}/api/health/db > health-db-ci.json; then
+              cat health-db-ci.json
+              exit 0
+            fi
+            if ! kill -0 "$app_pid" 2>/dev/null; then
+              echo "Application exited before startup migrations became ready."
+              cat startup-migrations-ci.txt
+              exit 1
+            fi
+            sleep 1
+          done
+
+          echo "Timed out waiting for application startup migrations."
+          cat startup-migrations-ci.txt
+          exit 1
+
+      - name: Upload startup migration failure log
+        if: always() && steps.runtime_migrations.outcome == 'failure'
+        uses: actions/upload-artifact@v4
+        with:
+          name: startup-migration-errors
+          path: |
+            startup-migrations-ci.txt
+            health-db-ci.json
+          if-no-files-found: warn
+          retention-days: 7
 
       - name: Backend tests
-        run: npm run test:backend
+        id: backend_tests
+        if: always() && steps.runtime_migrations.outcome == 'success'
+        run: |
+          set -o pipefail
+          npm run test:backend 2>&1 | tee backend-test-errors-ci.txt
+
+      - name: Upload backend test failure log
+        if: always() && steps.backend_tests.outcome == 'failure'
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-test-errors
+          path: backend-test-errors-ci.txt
+          if-no-files-found: error
+          retention-days: 7
 
       - name: Frontend tests
-        run: npm run test:frontend
+        id: frontend_tests
+        if: always() && steps.install.outcome == 'success'
+        run: |
+          set -o pipefail
+          npm run test:frontend 2>&1 | tee frontend-test-errors-ci.txt
+
+      - name: Upload frontend test failure log
+        if: always() && steps.frontend_tests.outcome == 'failure'
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-test-errors
+          path: frontend-test-errors-ci.txt
+          if-no-files-found: error
+          retention-days: 7
 
       # Format check remains advisory until existing repo-wide formatting debt is cleaned up.
       - name: Format check
+        if: always() && steps.install.outcome == 'success'
         run: npm run format:check
         continue-on-error: true

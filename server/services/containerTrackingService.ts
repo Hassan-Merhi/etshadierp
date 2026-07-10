@@ -45,7 +45,7 @@ import * as seventeenTrack from "../lib/trackingProviders/seventeenTrackProvider
 import * as cmaPublicProvider from "../lib/trackingProviders/cmaPublicProvider";
 import * as cmaCgmApiProvider from "../lib/trackingProviders/cmaCgmApiProvider";
 import { resolveProvider } from "../lib/trackingProviders/providerResolver";
-import type { CarrierTrackResult } from "../lib/trackingProviders/types";
+import type { CarrierTrackResult, TrackingEvent } from "../lib/trackingProviders/types";
 import { getTrackingPriority, calcPerRunBudget } from "../lib/trackingPriority";
 import { calcMaxOffloadDate, calcIsOverdue, calcDocsReadyNotSent } from "../lib/gitHelpers";
 
@@ -62,6 +62,7 @@ const activeStatusFilter = sql`LOWER(${containers.status}) NOT IN ('offloaded','
 // ── Container number validation ───────────────────────────────────────────────
 
 const VALID_CONTAINER_REGEX = /^[A-Z]{4}\d{7}$/;
+const CMA_PREFIXES = /^(CMAU|CMDU|APZU|CGMU|APMU|APHU|CXDU|CAAU|CAJU|CAIU)/i;
 
 function isValidContainerNumber(containerNumber: string | null | undefined): boolean {
   if (!containerNumber) return false;
@@ -884,6 +885,7 @@ async function trackOneContainer(
     lastDirectFallbackReason,
     now,
     currentEta,
+    lastCheckedAt,
     destinationCountry
   );
 }
@@ -897,6 +899,7 @@ async function trackViaParcelsApp(
   fallbackReason: string | null,
   now: Date,
   currentEta: string | null,
+  lastCheckedAt: Date | null,
   destinationCountry?: string
 ): Promise<{
   success: boolean;
@@ -1307,7 +1310,6 @@ async function trackViaParcelsApp(
   //   2. CMA CGM public JSON endpoint (free, no key, often blocked by DataDome)
   //   3. 17track
   //   4. ParcelsApp API
-  const CMA_PREFIXES = /^(CMAU|CMDU|APZU|CGMU|APMU|APHU|CXDU|CAAU|CAJU|CAIU)/i;
   if (CMA_PREFIXES.test(containerNumber)) {
     console.log(`[ContainerTracking] ${containerNumber}: CMA detected — trying CMA CGM official API...`);
 

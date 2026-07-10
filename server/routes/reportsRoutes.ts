@@ -1997,7 +1997,7 @@ export function registerReportsRoutes(app: Express) {
       // Enrich with party names
       const vouchersWithDetails = await Promise.all(
         voucherEntriesData.map(async (entry) => {
-          let particulars = "";
+          let particulars: string;
 
           if (entry.supplierId) {
             const supplierData = await db
