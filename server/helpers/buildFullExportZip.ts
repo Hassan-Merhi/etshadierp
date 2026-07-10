@@ -1,5 +1,6 @@
 import archiver from "archiver";
 import { streamCompanyWorkbookDirect } from "../services/exportExcelService";
+import { logger } from "../lib/logger";
 
 export interface ExportZipResult {
   zip: Buffer;
@@ -13,7 +14,7 @@ export interface ExportZipResult {
  *
  * Memory-safe approach: each company's data is fetched one sheet at a time
  * and streamed directly into the archiver via a PassThrough — no dataset is
- * held in RAM while the next is fetched.  Peak RAM is bounded to roughly one
+ * held in RAM while the next is fetched. Peak RAM is bounded to roughly one
  * sheet's worth of raw rows + the ExcelJS workbook being built (instead of
  * ALL table data + workbook simultaneously, which caused OOM crashes).
  *
@@ -28,18 +29,30 @@ export async function buildFullExportZip(
   toDate?: string,
   onProgress?: (msg: string, level?: "info" | "success" | "warning" | "error") => void
 ): Promise<ExportZipResult> {
-  const log = onProgress ?? ((msg: string) => console.log(`[FullExport] ${msg}`));
+  const log =
+    onProgress ??
+    ((message: string, level: "info" | "success" | "warning" | "error" = "info") => {
+      const context = { module: "full-export", action: "build-zip" };
+      if (level === "error") logger.error(message, context);
+      else if (level === "warning") logger.warn(message, context);
+      else logger.info(message, context);
+    });
 
   const dateLabel = new Date().toISOString().substring(0, 10);
-
   const names: string[] = [];
   const skipped: string[] = [];
 
   // Start the archiver up front so we can stream into it company-by-company.
   const chunks: Buffer[] = [];
   const arc = archiver("zip", { zlib: { level: 6 } });
-  arc.on("data", (c: Buffer) => chunks.push(c));
-  arc.on("warning", (e: any) => console.warn("[FullExport] archiver warning:", e?.message || e));
+  arc.on("data", (chunk: Buffer) => chunks.push(chunk));
+  arc.on("warning", (error: unknown) => {
+    logger.warn("Export ZIP archiver warning", {
+      module: "full-export",
+      action: "archive",
+      error,
+    });
+  });
 
   const zipPromise = new Promise<Buffer>((resolve, reject) => {
     arc.on("end", () => resolve(Buffer.concat(chunks)));
@@ -60,18 +73,25 @@ export async function buildFullExportZip(
 
       names.push(company.name);
       log(`[${company.name}] workbook streamed into ZIP`, "success");
-    } catch (err: any) {
-      log(`[${company.name}] Failed: ${err?.message || err}`, "error");
-      if (err?.stack) console.error(`[FullExport] Stack for ${company.name}:`, err.stack);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      log(`[${company.name}] Failed: ${message}`, "error");
+      logger.error("Company workbook export failed", {
+        module: "full-export",
+        action: "company-workbook",
+        companyId: company.id,
+        companyName: company.name,
+        error,
+      });
       skipped.push(company.name);
     }
   }
 
   if (names.length === 0) {
     arc.abort();
-    const msg = `Export aborted — all ${companies.length} company/companies failed to generate workbooks. ZIP would be empty. Check server logs for per-company errors.`;
-    log(msg, "error");
-    throw new Error(msg);
+    const message = `Export aborted — all ${companies.length} company/companies failed to generate workbooks. ZIP would be empty. Check server logs for per-company errors.`;
+    log(message, "error");
+    throw new Error(message);
   }
 
   arc.finalize();
