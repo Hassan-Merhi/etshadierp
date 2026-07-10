@@ -1189,10 +1189,34 @@ export function registerEmployeeNetPositionRoutes(app: Express) {
       // (that guard only runs for types in assetAccountTypes).  Removing them
       // here guarantees ONE source of truth for both factory values.
       const inventoryCategoryRx = /inventory|stock in hand|stock on hand|raw material/i;
+      // Also strip the "Factory Worker Advances" ledger account — its balance drifts from
+      // reality because advance repayments/deductions aren't always posted back to it.
+      // factory_worker_advances.remaining_balance (used by the Payroll & Benefits "Advances"
+      // KPI) is the authoritative source; we recompute it fresh below instead.
       const cleanLedgerForUs = ledgerForUs.filter(
-        (a) => !inventoryCategoryRx.test(a.category) && !inventoryCategoryRx.test(a.name)
+        (a) =>
+          !inventoryCategoryRx.test(a.category) &&
+          !inventoryCategoryRx.test(a.name) &&
+          (a.name || "")
+            .toLowerCase()
+            .trim()
+            .replace(/\s+/g, " ") !== "factory worker advances"
       );
       const cleanLedgerForUsTotal = round2(cleanLedgerForUs.reduce((s, a) => s + a.value, 0));
+
+      // ── Factory Worker Advances — authoritative sum from factory_worker_advances ──
+      // Mirrors the Payroll & Benefits "Advances" KPI exactly: SUM(remaining_balance)
+      // WHERE remaining_balance > 0 (see GET /api/factory/workers), so the two figures
+      // always match instead of drifting from the stale "Factory Worker Advances" ledger
+      // account balance (advance repayments aren't always posted back to that account).
+      const workerAdvRes = await db.execute(sql`
+        SELECT COALESCE(SUM(remaining_balance::numeric), 0) AS total
+        FROM   factory_worker_advances
+        WHERE  company_id = ${companyId}
+          AND  remaining_balance > 0
+      `);
+      const workerAdvRow = ((workerAdvRes as any).rows ?? (workerAdvRes as any))[0] ?? {};
+      const workerAdvancesValue = round2(parseFloat(String(workerAdvRow.total ?? "0")) || 0);
 
       // ── Split customer items into DR (asset) and CR (liability) ──────────────
       const customerDrItems = customerItems.filter((c) => c.balanceUsd > 0);
@@ -1308,7 +1332,8 @@ export function registerEmployeeNetPositionRoutes(app: Express) {
           loadingTotal +
           totalSupplierOverpaymentsRounded +
           prepaidRent +
-          employeeReceivablesTotal
+          employeeReceivablesTotal +
+          workerAdvancesValue
       );
 
       // onUsTotal: ledger liabilities + supplier balances + customer credit balances (CR) + employee salaries + rent payable
@@ -1391,6 +1416,16 @@ export function registerEmployeeNetPositionRoutes(app: Express) {
             value: round2(e.balanceUsd),
             category: "Employee Receivable",
           })),
+        ...(workerAdvancesValue > 0
+          ? [
+              {
+                name: "Factory Worker Advances",
+                code: "WORKER_ADVANCES",
+                value: workerAdvancesValue,
+                category: "Asset",
+              },
+            ]
+          : []),
       ];
 
       // Group ledger on-us by category
