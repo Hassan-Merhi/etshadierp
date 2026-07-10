@@ -18,6 +18,7 @@ import {
   factoryRawStock,
   factoryRawMaterialAdjustments,
   factoryMixBatches,
+  factoryMixBatchSources,
   factoryBales,
   customerProformas,
   customerProformaLines,
@@ -1067,10 +1068,57 @@ export function registerDeletedItemsRoutes(app: Express) {
             );
           break;
         case "factoryMixBatch":
-          await db
-            .update(factoryMixBatches)
-            .set({ deletedAt: null, updatedAt: new Date() })
-            .where(and(eq(factoryMixBatches.id, itemId), eq(factoryMixBatches.companyId, companyId)));
+          // Restoring must re-apply the usedKg consumption on its sources — the
+          // DELETE route (factoryMixBatchRoutes.ts) reverses that consumption on
+          // delete, so skipping it here would leave the source stock artificially
+          // over-available (double-counted as both free and locked in this batch).
+          await db.transaction(async (tx) => {
+            // Guard: only restore rows that are actually soft-deleted, so calling
+            // restore twice (or on an already-active batch) can't re-apply
+            // consumption a second time.
+            const [restored] = await tx
+              .update(factoryMixBatches)
+              .set({ deletedAt: null, updatedAt: new Date() })
+              .where(
+                and(
+                  eq(factoryMixBatches.id, itemId),
+                  eq(factoryMixBatches.companyId, companyId),
+                  isNotNull(factoryMixBatches.deletedAt)
+                )
+              )
+              .returning({ id: factoryMixBatches.id });
+            if (!restored) return;
+
+            const batchSourceRows = await tx
+              .select({
+                containerId: factoryMixBatchSources.containerId,
+                sourceBatchId: factoryMixBatchSources.sourceBatchId,
+                weightKg: factoryMixBatchSources.weightKg,
+              })
+              .from(factoryMixBatchSources)
+              .where(eq(factoryMixBatchSources.mixBatchId, itemId));
+
+            for (const src of batchSourceRows) {
+              const weight = parseFloat(src.weightKg) || 0;
+              if (weight <= 0) continue;
+              if (src.containerId) {
+                // Scope to companyId too (via a join-equivalent subselect) so a
+                // corrupted/cross-tenant containerId can never mutate another
+                // company's raw stock.
+                await tx
+                  .update(factoryRawStock)
+                  .set({ usedKg: sql`${factoryRawStock.usedKg} + ${weight}` })
+                  .where(and(eq(factoryRawStock.containerId, src.containerId), eq(factoryRawStock.companyId, companyId)));
+              } else if (src.sourceBatchId) {
+                await tx
+                  .update(factoryMixBatches)
+                  .set({ usedKg: sql`${factoryMixBatches.usedKg} + ${weight}`, updatedAt: new Date() })
+                  .where(
+                    and(eq(factoryMixBatches.id, src.sourceBatchId), eq(factoryMixBatches.companyId, companyId))
+                  );
+              }
+            }
+          });
           break;
         case "factoryBale":
           // Restore bale to IN_STOCK so it's usable again

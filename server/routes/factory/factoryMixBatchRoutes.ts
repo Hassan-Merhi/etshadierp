@@ -482,22 +482,65 @@ export function registerFactoryMixBatchRoutes(app: Express) {
 
       if (id === null) return res.status(400).json({ message: "Invalid id" });
 
-      // Soft-delete: preserve sources / used_kg reversals for restore.
-      // Permanent deletion (with cascade) occurs from Settings → Deleted Items.
-      const [updated] = await db
-        .update(factoryMixBatches)
-        .set({ deletedAt: new Date(), updatedAt: new Date() })
-        .where(
-          and(
-            eq(factoryMixBatches.id, id),
-            eq(factoryMixBatches.companyId, companyId),
-            isNull(factoryMixBatches.deletedAt)
+      // Soft-delete: also reverse the usedKg this batch consumed from its sources
+      // (raw stock containers and/or upstream batches) so the material becomes
+      // available again in Raw Materials stock. Previously this reversal never
+      // happened, so deleting a batch permanently "lost" its consumed stock.
+      const result = await db.transaction(async (tx) => {
+        const [updated] = await tx
+          .update(factoryMixBatches)
+          .set({ deletedAt: new Date(), updatedAt: new Date() })
+          .where(
+            and(
+              eq(factoryMixBatches.id, id),
+              eq(factoryMixBatches.companyId, companyId),
+              isNull(factoryMixBatches.deletedAt)
+            )
           )
-        )
-        .returning({ id: factoryMixBatches.id });
+          .returning({ id: factoryMixBatches.id });
 
-      if (!updated) return res.status(404).json({ message: "Mix batch not found" });
-      res.json({ id: updated.id, message: "Mix batch moved to Deleted Items" });
+        if (!updated) return null;
+
+        const batchSourceRows = await tx
+          .select({
+            containerId: factoryMixBatchSources.containerId,
+            sourceBatchId: factoryMixBatchSources.sourceBatchId,
+            weightKg: factoryMixBatchSources.weightKg,
+          })
+          .from(factoryMixBatchSources)
+          .where(eq(factoryMixBatchSources.mixBatchId, id));
+
+        for (const src of batchSourceRows) {
+          const weight = parseFloat(src.weightKg) || 0;
+          if (weight <= 0) continue;
+          if (src.containerId) {
+            // Reverse consumption on the underlying raw-stock container. Scoped to
+            // companyId too so a corrupted/cross-tenant containerId can never
+            // mutate another company's raw stock. GREATEST(...,0) is a defensive
+            // floor only — the restore path in deletedItemsRoutes.ts re-adds the
+            // same `weight` (not a clamped value), so a normal delete→restore
+            // round trip is exact as long as usedKg wasn't already corrupted below
+            // this batch's own contribution.
+            await tx
+              .update(factoryRawStock)
+              .set({ usedKg: sql`GREATEST(${factoryRawStock.usedKg} - ${weight}, 0)` })
+              .where(and(eq(factoryRawStock.containerId, src.containerId), eq(factoryRawStock.companyId, companyId)));
+          } else if (src.sourceBatchId) {
+            // Reverse consumption on the upstream batch this batch topped up from.
+            await tx
+              .update(factoryMixBatches)
+              .set({ usedKg: sql`GREATEST(${factoryMixBatches.usedKg} - ${weight}, 0)`, updatedAt: new Date() })
+              .where(
+                and(eq(factoryMixBatches.id, src.sourceBatchId), eq(factoryMixBatches.companyId, companyId))
+              );
+          }
+        }
+
+        return updated;
+      });
+
+      if (!result) return res.status(404).json({ message: "Mix batch not found" });
+      res.json({ id: result.id, message: "Mix batch moved to Deleted Items" });
     } catch (error: any) {
       console.error("Error deleting mix batch:", error);
       res.status(500).json({ message: error.message });
