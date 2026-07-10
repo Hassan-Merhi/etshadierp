@@ -1058,6 +1058,34 @@ export function registerEmployeeNetPositionRoutes(app: Express) {
           supMap.set(key, { recv: kg, used: 0, cpkUsd: cpk });
         }
       }
+
+      // MANUAL-only suppliers (no factoryRawStock container rows) never get usedKg
+      // incremented anywhere else — consumption only happens via factoryMixBatchSources
+      // when a batch is completed. Without this step their `used` stays 0 forever, so
+      // remaining/value stays overstated relative to /api/factory/raw-stock, which
+      // applies this same correction (see rawStockReceiptRoutes.ts "completedBatchRows").
+      const supplierKeysWithContainerStock = new Set<string>();
+      for (const r of rawRows) {
+        if (r.supplier_id) supplierKeysWithContainerStock.add(`s${r.supplier_id}`);
+      }
+      const completedBatchResult = await db.execute(sql`
+        SELECT fms.supplier_id, SUM(fms.weight_kg::numeric) AS consumed_kg
+        FROM   factory_mix_batch_sources fms
+        JOIN   factory_mix_batches fmb ON fmb.id = fms.mix_batch_id
+        WHERE  fmb.company_id = ${companyId}
+          AND  fms.supplier_id IS NOT NULL
+          AND  fmb.status IN ('CLOSED', 'COMPLETED')
+        GROUP  BY fms.supplier_id
+      `);
+      const completedBatchRows: any[] = (completedBatchResult as any).rows ?? (completedBatchResult as any);
+      for (const r of completedBatchRows) {
+        if (!r.supplier_id) continue;
+        const key = `s${r.supplier_id}`;
+        if (supplierKeysWithContainerStock.has(key)) continue; // container stock already tracks used via total_used
+        const ex = supMap.get(key);
+        if (ex) ex.used += parseFloat(String(r.consumed_kg ?? "0")) || 0;
+      }
+
       // Sum ALL bucket values (including negative remainders from over-usage/adjustments) —
       // /api/factory/raw-stock's client KPI (ProductionRawStock.tsx totalValue) sums
       // valueRemainingUsd across every row unconditionally, so clamping to positive-only
