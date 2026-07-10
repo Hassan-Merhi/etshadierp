@@ -52,7 +52,18 @@ jobs:
         run: npm ci --no-audit
 
       - name: Type-check
-        run: npm run check
+        run: |
+          set -o pipefail
+          npm run check 2>&1 | tee ts-errors-ci.txt
+
+      - name: Upload type-check failure log
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: typecheck-errors
+          path: ts-errors-ci.txt
+          if-no-files-found: error
+          retention-days: 7
 
       - name: Build
         run: npm run build
