@@ -326,7 +326,6 @@ export function registerFactoryMixBatchRoutes(app: Express) {
             const ex = perRsDeductions.find((d) => d.containerId === lastRs.containerId);
             if (ex) ex.deduct += remaining;
             else perRsDeductions.push({ containerId: lastRs.containerId, deduct: remaining });
-            remaining = 0;
           }
 
           totalWeightKg += weight;
@@ -689,7 +688,6 @@ export function registerFactoryMixBatchRoutes(app: Express) {
             const existing = perRsDeductions.find((d) => d.containerId === lastRs.containerId);
             if (existing) existing.deduct += remaining;
             else perRsDeductions.push({ containerId: lastRs.containerId, deduct: remaining });
-            remaining = 0;
           }
 
           totalWeightKg += weight;

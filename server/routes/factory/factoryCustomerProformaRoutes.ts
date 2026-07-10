@@ -739,7 +739,7 @@ export function registerFactoryCustomerProformaRoutes(app: Express) {
       // factory_v2: warn if quantity increase exceeds free-to-promise (non-blocking)
       let stockWarning: string | undefined;
       if (updateData.quantity !== undefined && (await isFactoryV2Company(companyId))) {
-        const delta = updateData.quantity - (Number(existingLine.quantity) ?? 0);
+        const delta = updateData.quantity - Number(existingLine.quantity);
         if (delta > 0) {
           const ftp = await computeFreeToPromise(companyId, existingLine.articleCode);
           if (delta > ftp) {

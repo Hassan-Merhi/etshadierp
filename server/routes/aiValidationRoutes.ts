@@ -197,7 +197,7 @@ async function runItemCodeCheck(
       return;
     }
     const lower = raw.toLowerCase();
-    let status = "";
+    let status: string;
     let detail = "";
 
     // Duplicate within file

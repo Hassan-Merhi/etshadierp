@@ -47,6 +47,7 @@ export default tseslint.config(
       "@typescript-eslint/no-empty-object-type": "off",
       "@typescript-eslint/no-wrapper-object-types": "off",
       "@typescript-eslint/no-unsafe-function-type": "off",
+      "@typescript-eslint/no-namespace": ["error", { allowDeclarations: true }],
 
       "no-console": "off",
       "no-undef": "off",

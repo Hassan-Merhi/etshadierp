@@ -308,7 +308,6 @@ export function registerBaleScanningRoutes(app: Express) {
         let priceUsed = "0";
         if (productForBale?.sellingPrice) priceUsed = productForBale.sellingPrice;
 
-        let proformaLine: any = null;
         if (order.proformaIdUsed) {
           const [pl] = await tx
             .select()
@@ -319,7 +318,7 @@ export function registerBaleScanningRoutes(app: Express) {
                 eq(customerProformaLines.articleCode, effectiveArticleCode)
               )
             );
-          proformaLine = pl || null;
+          const proformaLine: any = pl || null;
           if (proformaLine) {
             const pricingMode = (proformaLine as any).pricingMode ?? "per_bale";
             const perKgVal = (proformaLine as any).pricePerKg;
