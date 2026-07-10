@@ -9,14 +9,22 @@ function replaceOnce(source, pattern, replacement, label) {
   return next;
 }
 
+function executableLines(source) {
+  return source
+    .split("\n")
+    .filter((line) => !line.trimStart().startsWith("//"))
+    .join("\n");
+}
+
 function updateExcelExportTests() {
   const path = "tests/excel-export.test.ts";
   let source = readFileSync(path, "utf8");
+  const currentCode = executableLines(source);
 
   if (
     source.includes("Required SP export template missing") &&
-    !source.includes("it.skip") &&
-    !source.includes("ctx.skip()")
+    !/it\.skip\s*\(/.test(currentCode) &&
+    !/ctx\.skip\s*\(/.test(currentCode)
   ) {
     return;
   }
@@ -47,8 +55,17 @@ function updateExcelExportTests() {
   );
 
   source = source.replace(/\s*if \(!buf\) \{ ctx\.skip\(\); return; \}\n/g, "\n");
+  source = source.replace(
+    "// All inner tests use conditional `it` so they stay in the normal test runner\n// (skipped = todoish, no silent-pass, shows intent clearly).",
+    "// All workbook checks run as normal tests. Missing required assets fail in beforeAll.",
+  );
+  source = source.replace(
+    "// Returns the workbook if available, or calls ctx.skip() and returns null.",
+    "// Returns the generated workbook; missing setup fails the test explicitly.",
+  );
 
-  if (source.includes("it.skip") || source.includes("ctx.skip()")) {
+  const updatedCode = executableLines(source);
+  if (/it\.skip\s*\(/.test(updatedCode) || /ctx\.skip\s*\(/.test(updatedCode)) {
     throw new Error("Excel export test still contains active skip guards");
   }
 
@@ -58,8 +75,13 @@ function updateExcelExportTests() {
 function updateFactoryXlsxTests() {
   const path = "tests/xlsx-export.test.ts";
   let source = readFileSync(path, "utf8");
+  const currentCode = executableLines(source);
 
-  if (!source.includes("baleAppearsInSessionCompany") && !source.includes("t.skip()")) {
+  if (
+    !/let baleAppearsInSessionCompany\s*=/.test(currentCode) &&
+    !/if \(!baleAppearsInSessionCompany\)/.test(currentCode) &&
+    !/t\.skip\s*\(\)/.test(currentCode)
+  ) {
     return;
   }
 
@@ -99,8 +121,19 @@ function updateFactoryXlsxTests() {
     "\n",
   );
 
-  if (source.includes("baleAppearsInSessionCompany") || source.includes("t.skip()")) {
-    throw new Error("Factory XLSX test still contains shared-database skip guards");
+  source = source.replace(
+    /\/\/ Error cases always run\.\s+Success-path cases[\s\S]*?session company and we can export it with a known date\.\n/,
+    "// Error and success paths both run against the isolated CI database.\n",
+  );
+  source = source.replace(/\s*\/\/ Skip on shared DB:[^\n]*\n/g, "\n");
+
+  const updatedCode = executableLines(source);
+  if (
+    /let baleAppearsInSessionCompany\s*=/.test(updatedCode) ||
+    /if \(!baleAppearsInSessionCompany\)/.test(updatedCode) ||
+    /t\.skip\s*\(\)/.test(updatedCode)
+  ) {
+    throw new Error("Factory XLSX test still contains active shared-database skip guards");
   }
 
   writeFileSync(path, source);
