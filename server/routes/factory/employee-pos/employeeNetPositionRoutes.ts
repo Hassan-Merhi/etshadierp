@@ -1008,14 +1008,17 @@ export function registerEmployeeNetPositionRoutes(app: Express) {
         JOIN   factory_containers  fc  ON fc.id  = frs.container_id
         WHERE  frs.company_id = ${companyId}
           AND  fc.status     != 'DELETED'
+          AND  frs.deleted_at IS NULL
+          AND  fc.deleted_at IS NULL
         GROUP  BY fc.supplier_id
       `);
       const rawRows: any[] = (rawResult as any).rows ?? (rawResult as any);
 
       const adjResult = await db.execute(sql`
-        SELECT supplier_id, type, kg::numeric AS kg, cost_per_kg::numeric AS cpk
+        SELECT supplier_id, type, kg::numeric AS kg, cost_per_kg::numeric AS cpk, material_label
         FROM   factory_raw_material_adjustments
         WHERE  company_id = ${companyId}
+          AND  deleted_at IS NULL
       `);
       const adjRows: any[] = (adjResult as any).rows ?? (adjResult as any);
 
@@ -1030,7 +1033,15 @@ export function registerEmployeeNetPositionRoutes(app: Express) {
         supMap.set(key, { recv, used, cpkUsd });
       }
       for (const a of adjRows) {
-        const key = a.supplier_id ? `s${a.supplier_id}` : `MANUAL`;
+        // DEDUCT is history-only — it already reduced received_kg on the underlying
+        // factory_raw_stock row directly, so applying it again here (on top of the
+        // already-reduced total_recv from rawResult above) would double-subtract it.
+        // Mirrors the same skip in /api/factory/raw-stock (rawStockReceiptRoutes.ts).
+        if (a.type === "DEDUCT") continue;
+        // Manual (no-supplier) adjustments are kept separate per material label, matching
+        // /api/factory/raw-stock's `MANUAL__${materialLabel}` bucket keying — collapsing them
+        // into a single MANUAL bucket would incorrectly blend distinct materials' weighted costs.
+        const key = a.supplier_id ? `s${a.supplier_id}` : `MANUAL__${a.material_label || "unknown"}`;
         const kg = parseFloat(String(a.kg ?? "0")) || 0;
         const cpk = parseFloat(String(a.cpk ?? "0")) || 0;
         const isAdd = a.type === "ADD";
@@ -1047,10 +1058,13 @@ export function registerEmployeeNetPositionRoutes(app: Express) {
           supMap.set(key, { recv: kg, used: 0, cpkUsd: cpk });
         }
       }
+      // Sum ALL bucket values (including negative remainders from over-usage/adjustments) —
+      // /api/factory/raw-stock's client KPI (ProductionRawStock.tsx totalValue) sums
+      // valueRemainingUsd across every row unconditionally, so clamping to positive-only
+      // here would overstate the net position total relative to the Raw Materials page.
       let rawTotal = 0;
       for (const s of supMap.values()) {
-        const val = (s.recv - s.used) * s.cpkUsd;
-        if (val > 0) rawTotal += val;
+        rawTotal += (s.recv - s.used) * s.cpkUsd;
       }
       const rawMaterialStockValue = round2(rawTotal);
 
