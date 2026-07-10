@@ -6,9 +6,6 @@ on:
   pull_request:
     branches: [main]
 
-permissions:
-  contents: write
-
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
@@ -47,47 +44,12 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-        with:
-          ref: ${{ github.head_ref || github.ref_name }}
 
       - name: Set up Node.js 20
         uses: actions/setup-node@v4
         with:
           node-version: "20"
           cache: npm
-
-      - name: Apply reviewed Combo 1 safe fixes
-        if: github.event_name == 'pull_request' && github.head_ref == 'combo-1-ci-safe-types'
-        run: |
-          sed '/^--- a\/tests\/sp-sales-accounting\.test\.ts$/,$d' scripts/combo1-safe-type-fixes.patch > /tmp/combo1-source-fixes.patch
-          git apply --check /tmp/combo1-source-fixes.patch
-          git apply /tmp/combo1-source-fixes.patch
-          node scripts/fixCombo1SpTest.mjs
-
-      - name: Commit reviewed Combo 1 safe fixes
-        if: github.event_name == 'pull_request' && github.head_ref == 'combo-1-ci-safe-types'
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add \
-            client/src/pages/Payroll.tsx \
-            client/src/pages/factory/FactoryPendingInvoiceVerify.tsx \
-            server/helpers/calculateNetPositionAsOf.ts \
-            server/lib/accountStatementPdfGenerator.ts \
-            server/lib/parcelsAppClient.ts \
-            server/routes/factory/customer-orders/baleScanningRoutes.ts \
-            server/routes/factory/customer-orders/orderVerifyRecoverRoutes.ts \
-            server/routes/factory/employee-pos/employeeNetPositionRoutes.ts \
-            server/routes/factory/factoryInvoiceLoadingRoutes.ts \
-            server/routes/factory/factoryProductsRoutes.ts \
-            server/routes/netProfitExcelRoute.ts \
-            server/services/containerTrackingService.ts \
-            server/services/pos/createSaleService.ts \
-            tests/sp-sales-accounting.test.ts
-          if ! git diff --cached --quiet; then
-            git commit -m "Fix safe type and concurrency blockers"
-            git push origin HEAD:${{ github.head_ref }}
-          fi
 
       - name: Normalize Replit registry URLs for CI
         run: sed -i 's#http://package-firewall.replit.local/npm/#https://registry.npmjs.org/#g' package-lock.json
