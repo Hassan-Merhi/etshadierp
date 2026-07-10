@@ -679,6 +679,38 @@ export default function FactoryOtwTrackingTab({ onEdit }: OtwTrackingTabProps = 
     return acc;
   }, {});
 
+  // Commission totals grouped by currency — there's no dedicated Commission KPI card;
+  // instead its USD portion is folded into the "Total (USD)" card below so that card
+  // represents the full USD balance (container cost + freight + commission), matching
+  // how "Total (USD)" already implicitly combines cost-in-USD across containers.
+  const commissionByCurrency = filtered.reduce<Record<string, { symbol: string; amount: number }>>((acc, c) => {
+    const commAmt = num((c as any).commissionAmount);
+    if (commAmt <= 0) return acc;
+    const ccy = (c as any).commissionCurrencyCode || "USD";
+    const sym = ccySym(ccy);
+    if (!acc[ccy]) acc[ccy] = { symbol: sym, amount: 0 };
+    acc[ccy].amount += commAmt;
+    return acc;
+  }, {});
+
+  // "Total (USD)" = USD-priced container cost + USD freight + USD commission.
+  // Other currencies' Total cards are left as cost-only (freight/commission for those
+  // currencies already appear on their own Freight (CCY) card, and commission has no
+  // separate card at all, per request — its USD amount rolls into Total (USD) instead).
+  const totalByCurrencyWithUsdBalance: Record<string, { symbol: string; amount: number }> = { ...costByCurrency };
+  {
+    const usdFreight = freightByCurrency.USD?.amount || 0;
+    const usdCommission = commissionByCurrency.USD?.amount || 0;
+    const extraUsd = usdFreight + usdCommission;
+    if (extraUsd > 0) {
+      const existing = totalByCurrencyWithUsdBalance.USD;
+      totalByCurrencyWithUsdBalance.USD = {
+        symbol: existing?.symbol || ccySym("USD"),
+        amount: (existing?.amount || 0) + extraUsd,
+      };
+    }
+  }
+
   const docsReceived = filtered.filter((c) => docs[String(c.id)]).length;
   const totalWeight = filtered.reduce((sum, c) => sum + num(c.totalKg), 0);
   const timelineContainer = otwContainers.find((c) => c.id === timelineId) ?? null;
@@ -876,10 +908,10 @@ export default function FactoryOtwTrackingTab({ onEdit }: OtwTrackingTabProps = 
             accent="bg-violet-100 dark:bg-violet-900/30"
           />
         )}
-        {Object.entries(costByCurrency).map(([ccy, { symbol, amount }]) => (
+        {Object.entries(totalByCurrencyWithUsdBalance).map(([ccy, { symbol, amount }]) => (
           <SummaryCard
             key={ccy}
-            label={`Total (${ccy})`}
+            label={ccy === "USD" ? "Total (USD) — cost + freight + commission" : `Total (${ccy})`}
             value={`${symbol} ${Math.round(amount).toLocaleString()}`}
             icon={<DollarSign className="h-4 w-4 text-emerald-600" />}
             accent="bg-emerald-100 dark:bg-emerald-900/30"
