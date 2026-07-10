@@ -269,7 +269,28 @@ export default function LocationMonthlySummary({ posUser }: { posUser?: any } = 
           <Button
             variant={showAllMonths ? "default" : "outline"}
             size="sm"
-            onClick={() => setShowAllMonths((v) => !v)}
+            onClick={() => {
+              setShowAllMonths((v) => {
+                const next = !v;
+                // "Show all months" should genuinely show the full 12-month year, even if
+                // a narrower custom range (e.g. a single month) is currently selected —
+                // otherwise the toggle flips but the table still only has the months that
+                // were already fetched, which looks like the button does nothing.
+                if (next) {
+                  const parsed = periodFilter.fromDate ? new Date(periodFilter.fromDate) : new Date();
+                  const year = Number.isNaN(parsed.getTime()) ? new Date().getFullYear() : parsed.getFullYear();
+                  const fullYear = {
+                    fromDate: `${year}-01-01`,
+                    toDate: `${year}-12-31`,
+                    preset: "custom" as const,
+                  };
+                  if (periodFilter.fromDate !== fullYear.fromDate || periodFilter.toDate !== fullYear.toDate) {
+                    setPeriodFilter(fullYear);
+                  }
+                }
+                return next;
+              });
+            }}
             data-testid="button-show-all-months"
           >
             <Eye className="h-4 w-4 mr-1.5" />
