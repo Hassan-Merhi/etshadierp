@@ -248,6 +248,32 @@ export function registerAccountRoutes(app: Express) {
         }
       }
 
+      // The "Factory Worker Advances" ledger account's own debit/credit balance drifts
+      // from reality because advance repayments/deductions aren't always posted back to
+      // it (see the same guard in the Factory Net Position route). factory_worker_advances
+      // .remaining_balance is the authoritative source (also used by the Payroll & Benefits
+      // "Advances" KPI and Net Position), so override this account's displayed balance here
+      // too — otherwise the Accounts page shows a stale figure that doesn't match those pages.
+      if (isFactoryCompany) {
+        const workerAdvLedger = ledgers.find(
+          (a) => (a.name || "").toLowerCase().replace(/\s+/g, " ").trim() === "factory worker advances"
+        );
+        if (workerAdvLedger) {
+          const workerAdvRes = await db.execute(sql`
+            SELECT COALESCE(SUM(remaining_balance::numeric), 0) AS total
+            FROM   factory_worker_advances
+            WHERE  company_id = ${companyId}
+              AND  remaining_balance > 0
+          `);
+          const workerAdvRow = ((workerAdvRes as any).rows ?? (workerAdvRes as any))[0] ?? {};
+          const workerAdvancesValue = parseFloat(String(workerAdvRow.total ?? "0")) || 0;
+          customerLedgerOverrides.set(workerAdvLedger.id, {
+            balance: workerAdvancesValue.toFixed(2),
+            balanceSide: "Dr",
+          });
+        }
+      }
+
       // Optional date range filter for account balances
       const balStartDate = req.query.startDate as string | undefined;
       const balEndDate = req.query.endDate as string | undefined;
