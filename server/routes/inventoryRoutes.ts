@@ -5,6 +5,7 @@ import { storage } from "../storage";
 import { requireAuth, requireRole, canDelete, requireNonPOS, checkPOSLocation } from "../auth";
 import { requireActionAccess } from "../lib/permissionMiddleware";
 import { upload, logAudit, getCurrentExchangeRate, syncEmployeeBalancesFromEntries } from "./_helpers";
+import { calculateHistoricalLocationInventory } from "./helpers/inventoryHistoryHelpers";
 import { adjustInventory } from "../inventoryHelper";
 import {
   locations,
@@ -289,6 +290,13 @@ export function registerInventoryRoutes(app: Express) {
     "November",
     "December",
   ];
+
+  // Returns the calendar day immediately before the given YYYY-MM-DD date string.
+  function dayBefore(dateStr: string): string {
+    const d = new Date(dateStr + "T00:00:00.000Z");
+    d.setUTCDate(d.getUTCDate() - 1);
+    return d.toISOString().slice(0, 10);
+  }
 
   interface StockMovementTx {
     date: string;
@@ -623,18 +631,33 @@ export function registerInventoryRoutes(app: Express) {
           grandTotal: { inwardQty: 0, inwardValue: 0, outwardQty: 0, outwardValue: 0, closingQty: 0, closingValue: 0 },
         });
 
-      // Opening balance = stockItem master + all pre-period movements
-      const [item] = await db
-        .select({ openingQty: stockItems.openingQty, openingRate: stockItems.openingRate })
-        .from(stockItems)
-        .where(eq(stockItems.id, stockItemId));
-      const baseQty = parseFloat(item?.openingQty ?? "0");
-      const baseRate = parseFloat(item?.openingRate ?? "0");
+      // Opening balance for the period.
+      // NOTE: stockItems.openingQty/openingRate are COMPANY-WIDE master fields, not
+      // location-specific — adding them to location-filtered prior movements produces
+      // wrong (sometimes negative) results when a locationId is given. When a location
+      // is specified, derive the true opening balance for that item+location by
+      // reconstructing the historical balance backward from current live inventory
+      // (same approach used by Location Inventory "as of" reports), anchored to the
+      // day before the period start.
+      let baseQty = 0;
+      let baseRate = 0;
+      if (locationId !== null) {
+        const historical = await calculateHistoricalLocationInventory(locationId, companyId, dayBefore(sd));
+        const row = historical.find((r) => r.stockItemId === stockItemId);
+        baseQty = row ? parseFloat(row.quantity) || 0 : 0;
+        baseRate = row ? parseFloat(row.averageRate) || 0 : 0;
+      } else {
+        const [item] = await db
+          .select({ openingQty: stockItems.openingQty, openingRate: stockItems.openingRate })
+          .from(stockItems)
+          .where(eq(stockItems.id, stockItemId));
+        baseQty = parseFloat(item?.openingQty ?? "0");
+        baseRate = parseFloat(item?.openingRate ?? "0");
+      }
 
-      const [priorMovements, periodMovements] = await Promise.all([
-        fetchStockMovements(companyId, stockItemId, locationId, null, sd, true),
-        fetchStockMovements(companyId, stockItemId, locationId, sd, ed),
-      ]);
+      const priorMovements =
+        locationId !== null ? [] : await fetchStockMovements(companyId, stockItemId, locationId, null, sd, true);
+      const periodMovements = await fetchStockMovements(companyId, stockItemId, locationId, sd, ed);
 
       let runQty = baseQty + priorMovements.reduce((s, m) => s + m.inwardQty - m.outwardQty, 0);
       let runValue = baseQty * baseRate + priorMovements.reduce((s, m) => s + m.inwardValue - m.outwardValue, 0);
@@ -726,15 +749,28 @@ export function registerInventoryRoutes(app: Express) {
       const lastDay = new Date(year, month, 0).getDate();
       const mEnd = `${year}-${String(month).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
 
-      const [item] = await db
-        .select({ openingQty: stockItems.openingQty, openingRate: stockItems.openingRate })
-        .from(stockItems)
-        .where(eq(stockItems.id, stockItemId));
-      const baseQty = parseFloat(item?.openingQty ?? "0");
-      const baseRate = parseFloat(item?.openingRate ?? "0");
+      // See /api/inventory/movement above for why this can't simply add the
+      // company-wide stockItems.openingQty to location-filtered prior movements.
+      let baseQty = 0;
+      let baseRate = 0;
+      if (locationId !== null) {
+        const historical = await calculateHistoricalLocationInventory(locationId, companyId, dayBefore(mStart));
+        const row = historical.find((r) => r.stockItemId === stockItemId);
+        baseQty = row ? parseFloat(row.quantity) || 0 : 0;
+        baseRate = row ? parseFloat(row.averageRate) || 0 : 0;
+      } else {
+        const [item] = await db
+          .select({ openingQty: stockItems.openingQty, openingRate: stockItems.openingRate })
+          .from(stockItems)
+          .where(eq(stockItems.id, stockItemId));
+        baseQty = parseFloat(item?.openingQty ?? "0");
+        baseRate = parseFloat(item?.openingRate ?? "0");
+      }
 
       const [priorMovements, monthMovements] = await Promise.all([
-        fetchStockMovements(companyId, stockItemId, locationId, null, mStart, true),
+        locationId !== null
+          ? Promise.resolve([])
+          : fetchStockMovements(companyId, stockItemId, locationId, null, mStart, true),
         fetchStockMovements(companyId, stockItemId, locationId, mStart, mEnd),
       ]);
 

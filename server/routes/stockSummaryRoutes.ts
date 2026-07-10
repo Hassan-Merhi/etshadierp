@@ -1164,21 +1164,21 @@ export function registerStockSummaryRoutes(app: Express) {
 
       const currentYear = new Date().getFullYear();
 
-      // For current year: work backwards from actual inventory to derive opening
-      // For past years: we use voucher-based calculation (no inventory history)
-      let derivedOpeningQty: number;
-      let derivedOpeningVal: number;
-
-      if (year === currentYear) {
-        // Current Inventory = Opening + YearNetMovements
-        // Opening = Current Inventory - YearNetMovements
-        derivedOpeningQty = actualQty - totalYearNetQty;
-        derivedOpeningVal = actualValue - totalYearNetVal;
-      } else {
-        // For past years, start from 0 (no inventory history available)
-        derivedOpeningQty = 0;
-        derivedOpeningVal = 0;
-      }
+      // Derive the opening balance for Jan 1 of `year` by reconstructing the historical
+      // balance backward from current live inventory (same source-of-truth approach used
+      // by Location Inventory "as of" reports), rather than either (a) subtracting this
+      // route's own voucher-derived net movements from actualQty — which silently drifts
+      // whenever a transaction type is captured inconsistently between the two — or
+      // (b) hardcoding 0 for past years, which is simply wrong whenever the item had any
+      // stock at that point.
+      const historicalAsOfPriorYearEnd = await calculateHistoricalLocationInventory(
+        locationId,
+        companyId,
+        `${year - 1}-12-31`
+      );
+      const historicalRow = historicalAsOfPriorYearEnd.find((r) => r.stockItemId === stockItemId);
+      const derivedOpeningQty = historicalRow ? parseFloat(historicalRow.quantity) || 0 : 0;
+      const derivedOpeningVal = historicalRow ? parseFloat(historicalRow.averageRate) * derivedOpeningQty || 0 : 0;
 
       // Calculate running closing balance starting from derived opening
       let runningQty = derivedOpeningQty;
