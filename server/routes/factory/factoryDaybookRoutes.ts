@@ -121,7 +121,18 @@ export function registerFactoryDaybookRoutes(app: Express) {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const currentUserId = (req.session as any).userId != null ? String((req.session as any).userId) : undefined;
-      const { startDate, endDate, txType, currencyCode } = req.query;
+      let { startDate, endDate, txType, currencyCode } = req.query;
+
+      // Guard against unbounded "return everything ever" queries: only apply when
+      // the caller omits the params entirely (e.g. a raw/older API call) — not when
+      // the client explicitly sent empty strings for its "All Time" preset. The
+      // client always sends startDate/endDate now (even as "" for All Time), so an
+      // actual `undefined` here means the params were never sent at all.
+      if (startDate === undefined && endDate === undefined) {
+        const todayStr = new Date().toISOString().slice(0, 10);
+        startDate = todayStr;
+        endDate = todayStr;
+      }
 
       // ── Check if this user has "daybook_own_only" restriction ─────────────
       let ownOnly = false;

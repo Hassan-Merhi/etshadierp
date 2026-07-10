@@ -1830,15 +1830,34 @@ export default function FactoryDaybook() {
     currentUser?.role === "Admin" || currentUser?.role === "Owner" || currentUser?.role === "Developer";
 
   // ── Filter state ──────────────────────────────────────────────────────────
-  const [periodFilter, setPeriodFilter] = useState<PeriodFilterValue>(getDefaultPeriodValue("today"));
+  // Restore any saved session state directly in the initializers (not in a
+  // post-mount useEffect) so the very first query fires once, with the right
+  // dates/filters — never "today" followed immediately by a second, wider fetch.
+  const initialDaybookStateRef = useRef<FactoryDaybookUIState | null>(loadFactoryDaybookState());
+  const [periodFilter, setPeriodFilter] = useState<PeriodFilterValue>(
+    () => initialDaybookStateRef.current?.periodFilter || getDefaultPeriodValue("today")
+  );
   useDateJump((date) => setPeriodFilter({ fromDate: date, toDate: date, preset: "custom" }));
-  const [txTypeFilter, setTxTypeFilter] = useState("ALL");
-  const [currencyFilter, setCurrencyFilter] = useState("ALL");
-  const [statusFilter, setStatusFilter] = useState<"all" | "exclude" | "only">("all");
-  const [searchQuery, setSearchQuery] = useState("");
-  const [minAmount, setMinAmount] = useState("");
-  const [maxAmount, setMaxAmount] = useState("");
-  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
+  const [txTypeFilter, setTxTypeFilter] = useState(() => initialDaybookStateRef.current?.txTypeFilter || "ALL");
+  const [currencyFilter, setCurrencyFilter] = useState(
+    () => initialDaybookStateRef.current?.currencyFilter || "ALL"
+  );
+  const [statusFilter, setStatusFilter] = useState<"all" | "exclude" | "only">(
+    () => (initialDaybookStateRef.current?.statusFilter as "all" | "exclude" | "only") || "all"
+  );
+  const [searchQuery, setSearchQuery] = useState(() => initialDaybookStateRef.current?.searchQuery || "");
+  const [minAmount, setMinAmount] = useState(() => initialDaybookStateRef.current?.minAmount || "");
+  const [maxAmount, setMaxAmount] = useState(() => initialDaybookStateRef.current?.maxAmount || "");
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">(
+    () => initialDaybookStateRef.current?.sortOrder || "desc"
+  );
+  // searchQuery filters client-side only (not part of the query key below), but debounce
+  // it anyway so rapid typing doesn't thrash the derived filteredEntries memo on large lists.
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState(searchQuery);
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearchQuery(searchQuery), 250);
+    return () => clearTimeout(t);
+  }, [searchQuery]);
 
   // ── View/UX state ─────────────────────────────────────────────────────────
   const [expandedRowKey, setExpandedRowKey] = useState<string | null>(null);
@@ -1903,8 +1922,12 @@ export default function FactoryDaybook() {
 
   // ── API query ─────────────────────────────────────────────────────────────
   const queryParams = new URLSearchParams();
-  if (startDate) queryParams.set("startDate", startDate);
-  if (endDate) queryParams.set("endDate", endDate);
+  // Always send startDate/endDate explicitly — including as empty strings for the
+  // "All Time" preset — so the server can tell "user explicitly wants all time" apart
+  // from "caller omitted the params entirely" (e.g. a raw API call) and only applies
+  // its own safety-net default in the latter case.
+  queryParams.set("startDate", startDate || "");
+  queryParams.set("endDate", endDate || "");
   if (txTypeFilter !== "ALL") queryParams.set("txType", txTypeFilter);
   if (currencyFilter !== "ALL") queryParams.set("currencyCode", currencyFilter);
 
@@ -1915,6 +1938,13 @@ export default function FactoryDaybook() {
       if (!res.ok) throw new Error("Failed to fetch daybook");
       return res.json();
     },
+    // Avoid the bandwidth spike from constant refetching: the daybook list doesn't
+    // need to be second-by-second live, and refocusing/reconnecting shouldn't
+    // trigger a fresh multi-MB fetch every time.
+    staleTime: 60 * 1000,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+    placeholderData: (prev) => prev,
   });
 
   const { data: myErpPages } = useQuery<{ hiddenErpCostFields?: string[] }>({ queryKey: ["/api/my-erp-pages"] });
@@ -1959,8 +1989,8 @@ export default function FactoryDaybook() {
     }
     if (statusFilter === "exclude") result = result.filter((e) => !e.optional);
     else if (statusFilter === "only") result = result.filter((e) => e.optional);
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase();
+    if (debouncedSearchQuery.trim()) {
+      const q = debouncedSearchQuery.toLowerCase();
       result = result.filter(
         (e) =>
           formatDaybookDescription(e).toLowerCase().includes(q) ||
@@ -1983,7 +2013,7 @@ export default function FactoryDaybook() {
       return sortOrder === "desc" ? -dateCmp : dateCmp;
     });
     return result;
-  }, [entries, statusFilter, searchQuery, minAmount, maxAmount, sortOrder]);
+  }, [entries, statusFilter, debouncedSearchQuery, minAmount, maxAmount, sortOrder]);
 
   // ── Condensed grouped rows ────────────────────────────────────────────────
   const condensedRows = useMemo(() => {
@@ -2058,18 +2088,13 @@ export default function FactoryDaybook() {
     setMaxAmount("");
   };
 
-  // ── Session persistence: restore on mount ─────────────────────────────────
+  // ── Session persistence: restore scroll position on mount ─────────────────
+  // Filter/period state is now restored directly in the useState initializers
+  // above (see initialDaybookStateRef) so the query doesn't fire twice on
+  // mount — once for the "today" default, then again for the restored range.
   useEffect(() => {
-    const saved = loadFactoryDaybookState();
-    if (!saved) return;
-    setPeriodFilter(saved.periodFilter);
-    setTxTypeFilter(saved.txTypeFilter || "ALL");
-    setCurrencyFilter(saved.currencyFilter || "ALL");
-    setStatusFilter((saved.statusFilter as "all" | "exclude" | "only") || "all");
-    setSearchQuery(saved.searchQuery || "");
-    setMinAmount(saved.minAmount || "");
-    setMaxAmount(saved.maxAmount || "");
-    const scrollY = saved.scrollY || 0;
+    const scrollY = initialDaybookStateRef.current?.scrollY || 0;
+    if (!scrollY) return;
     requestAnimationFrame(() => {
       window.scrollTo({ top: scrollY, behavior: "instant" as ScrollBehavior });
     });
