@@ -82,7 +82,10 @@ export function EditMixBatchDialog({ batch, open, onOpenChange }: EditMixBatchDi
     setBatchDate((batch as any).batchDate || new Date().toLocaleDateString("en-CA"));
 
     // Aggregate supplier sources by supplierId
-    const supplierMap = new Map<number, { weightKg: number; costPerKg: number; label: string; availableKg: number }>();
+    const supplierMap = new Map<
+      number,
+      { weightKg: number; costPerKg: number; totalCost: number; label: string; availableKg: number }
+    >();
     const batchSourceList: SourceSelection[] = [];
 
     for (const src of currentSources) {
@@ -115,6 +118,7 @@ export function EditMixBatchDialog({ batch, open, onOpenChange }: EditMixBatchDi
           supplierMap.set(src.supplierId, {
             weightKg: srcWeight,
             costPerKg: parseFloat(src.costPerKg),
+            totalCost: srcWeight * parseFloat(src.costPerKg),
             label: src.supplierName || `Supplier #${src.supplierId}`,
             availableKg: currentRemaining + srcWeight,
           });

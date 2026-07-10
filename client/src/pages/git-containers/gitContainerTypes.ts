@@ -184,6 +184,8 @@ export type BulkProgress = {
   completedAt: number | null;
 };
 
+export type PriorityTier = "high" | "medium" | "low";
+
 export interface UIPriority {
   tier: PriorityTier;
   label: string;

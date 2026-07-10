@@ -378,6 +378,8 @@ export default function FactoryInvoiceLoadingScan() {
     );
   }
 
+  if (!summary) return null;
+
   const inv = summary.invoice;
 
   return (

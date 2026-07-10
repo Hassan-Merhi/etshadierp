@@ -75,7 +75,7 @@ export default function VoucherEdit() {
       bankAccounts,
       suppliers,
       allAccountsData,
-      exchangeRate,
+      exchangeRate: exchangeRate ?? 1,
       id,
     });
 
@@ -92,7 +92,7 @@ export default function VoucherEdit() {
     id,
     modeApiRequest,
     voucherType,
-    exchangeRate,
+    exchangeRate: exchangeRate ?? 1,
     handleBack,
     modePrefix,
   });

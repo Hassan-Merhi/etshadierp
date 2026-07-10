@@ -53,7 +53,7 @@ interface StockTransfersProps {
 export default function StockTransfers({ hideVoucherNotes = false }: StockTransfersProps) {
   const [, setLocation] = useLocation();
   const { formatAmount } = useCurrencyContext();
-  const { formatDate } = useDateFormat();
+  const { formatShortDate: formatDate } = useDateFormat();
   const { toast } = useToast();
 
   const [period, setPeriod] = useState<PeriodFilterValue>(getDefaultPeriodValue());

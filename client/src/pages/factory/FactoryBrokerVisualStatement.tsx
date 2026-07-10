@@ -21,12 +21,12 @@ type DisplayCcy = (typeof DISPLAY_CURRENCIES)[number];
 
 function fmt(n: number, decimals = 2) {
   if (!n || n === 0) return "";
-  return formatNumber(Math.abs(n).toFixed(decimals));
+  return formatNumber(Math.abs(n), decimals);
 }
 
 function fmtSigned(n: number, decimals = 2) {
   if (!n || n === 0) return "";
-  const abs = formatNumber(Math.abs(n).toFixed(decimals));
+  const abs = formatNumber(Math.abs(n), decimals);
   return n < 0 ? `−${abs}` : abs;
 }
 

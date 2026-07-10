@@ -314,7 +314,7 @@ export function StockReportSection() {
           <div className="flex flex-wrap items-center gap-3">
             <Button
               variant="outline"
-              onClick={() => saveSettings.mutate()}
+              onClick={() => saveSettings.mutate(undefined)}
               disabled={!canSend || saveSettings.isPending}
               data-testid="button-stock-save"
             >

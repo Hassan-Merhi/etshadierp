@@ -278,7 +278,7 @@ function CategoryProductBreakdown({
     categoryName: string;
     qty: number;
     totalWeightKg: number;
-    sellingPricePerBale: number;
+    costPricePerBale: number;
     totalValue: number;
   }[];
   totalBales: number;
@@ -1223,7 +1223,8 @@ export default function DailyProductionReport() {
     if (!attendanceData || !attendanceData.dates.length) return null;
     let totalExpected = 0;
     let totalPaid = 0;
-    const perWorker: { code: string; attendanceSalary: number; transport: number; baseSalary: number }[] = [];
+    const perWorker: { code: string; name: string; attendanceSalary: number; transport: number; baseSalary: number }[] =
+      [];
     for (const w of attendanceData.workers) {
       const transport = parseFloat(w.transportAllowance || "0");
       const fullExpected = computeWorkerExpectedSalary(w, attendanceData.dates);
@@ -1456,7 +1457,7 @@ export default function DailyProductionReport() {
                   {/* Row 2 — weight breakdown */}
                   {(() => {
                     const origKg = data?.rawMaterial.totalWeightKg ?? 0;
-                    const onTableKg = data?.rawMaterial.onTableKg ?? 0;
+                    const onTableKg = data?.balanceOnTable.weightKg ?? 0;
                     const productionsKg =
                       (data?.production.totalWeightKg ?? 0) + (data?.wipersGarbage.totalWeightKg ?? 0);
                     // Net waste = Productions − (Original Batches − On Table)
@@ -2000,7 +2001,7 @@ export default function DailyProductionReport() {
               categoryName: string;
               qty: number;
               totalWeightKg: number;
-              sellingPricePerBale: number;
+              costPricePerBale: number;
               totalValue: number;
             }[] = [];
             if (data) {
@@ -2020,7 +2021,7 @@ export default function DailyProductionReport() {
                     categoryName: "Wipers",
                     qty: r.qty,
                     totalWeightKg: r.totalWeightKg,
-                    sellingPricePerBale: 0,
+                    costPricePerBale: 0,
                     totalValue: r.totalValue,
                   }))
                 );
@@ -2039,7 +2040,7 @@ export default function DailyProductionReport() {
                     categoryName: "Garbage",
                     qty: r.qty,
                     totalWeightKg: r.totalWeightKg,
-                    sellingPricePerBale: 0,
+                    costPricePerBale: 0,
                     totalValue: r.totalValue,
                   }))
                 );

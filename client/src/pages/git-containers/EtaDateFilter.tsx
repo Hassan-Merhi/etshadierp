@@ -55,7 +55,7 @@ export function EtaDateFilter({
     () => (value === "ALL" ? new Set(allEtaDates) : new Set(value.selectedDates)),
     [value, allEtaDates]
   );
-  const includeNoEta = value === "ALL" || (value !== "ALL" && value.includeNoEta);
+  const includeNoEta = value === "ALL" ? true : value.includeNoEta;
 
   // Commit a new selection back to the parent
   function commit(next: Set<string>, noEta: boolean) {

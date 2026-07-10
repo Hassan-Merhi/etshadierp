@@ -653,7 +653,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
           {!isPOS && activeTab === "journal" && <JournalForm voucherIdToEdit={voucherIdToEdit} isPOS={isPOS} />}
 
           {(isPOS || activeTab === "transfer") && (
-            <StockTransferForm voucherIdToEdit={voucherIdToEdit} isPOS={isPOS} posUser={posUser} />
+            <StockTransferForm voucherIdToEdit={voucherIdToEdit} isPOS={isPOS} posUser={posUser ?? undefined} />
           )}
 
           {!isPOS && activeTab === "adjustment" && (

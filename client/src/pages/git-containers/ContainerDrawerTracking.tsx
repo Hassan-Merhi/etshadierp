@@ -477,7 +477,7 @@ export function ContainerDrawerTracking({
               )}
 
               {container.trackingLink && (
-                <Button variant="link" size="sm" className="w-full text-[10px] h-auto py-0 text-sky-600" asChild>
+                <Button variant="ghost" size="sm" className="w-full text-[10px] h-auto py-0 text-sky-600 underline" asChild>
                   <a href={container.trackingLink} target="_blank" rel="noopener noreferrer">
                     View on carrier website <ExternalLink className="ml-1 h-2.5 w-2.5" />
                   </a>

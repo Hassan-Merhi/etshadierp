@@ -1021,6 +1021,11 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
     );
   }
 
+  // Defensive guard: by this point isSupplierPartner is false (handled above) and the
+  // earlier `!containerData && !isSupplierPartner` check already returned if missing,
+  // but TS can't infer that across the two branches — this re-confirms it for display only.
+  if (!containerData) return null;
+
   const { container, pos, charges } = containerData;
   const supplier = suppliers.find((s: any) => s.id === container.supplierId);
 

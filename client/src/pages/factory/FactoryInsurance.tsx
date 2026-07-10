@@ -468,10 +468,11 @@ export default function FactoryInsurance() {
 
   const generateMutation = useMutation({
     mutationFn: async () => {
-      return apiRequest("POST", "/api/insurance/generate", {
+      const res = await apiRequest("POST", "/api/insurance/generate", {
         month: genMonth,
         year: genYear,
       });
+      return res.json();
     },
     onSuccess: (data) => {
       setShowGenDialog(false);

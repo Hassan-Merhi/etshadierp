@@ -83,7 +83,7 @@ export function EventTimelineSheet({
     queryFn: async () => {
       if (!containerId) return [];
       const res = await factoryApiRequest("GET", `/api/factory/container-tracking/${containerId}/events`);
-      return res as TrackingEvent[];
+      return (await res.json()) as TrackingEvent[];
     },
     enabled: open && !!containerId,
   });
@@ -289,7 +289,7 @@ export function TrackNowProgressLog({ containerId }: { containerId: number }) {
       while (!cancelled) {
         try {
           const res = await factoryApiRequest("GET", `/api/factory/container-tracking/${containerId}/progress`);
-          const data = res as ProgressStep[];
+          const data = (await res.json()) as ProgressStep[];
           if (!cancelled) setSteps(data ?? []);
         } catch {
           // ignore polling errors

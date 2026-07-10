@@ -83,6 +83,7 @@ export default function FactoryUsers() {
       hasErpAccess: boolean;
       hasFactoryAccess: boolean;
       hiddenCostFields: string[];
+      hideAllCosts?: boolean;
     }) => {
       const res = await factoryApiRequest("POST", "/api/factory/users", data);
       if (!res.ok) {

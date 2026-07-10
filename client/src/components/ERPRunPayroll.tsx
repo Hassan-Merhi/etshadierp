@@ -539,7 +539,7 @@ export default function ERPRunPayroll() {
     const totalDed = items.reduce((s, it) => s + parseFloat(it.deduction || "0"), 0);
     const totalNet = items.reduce((s, it) => s + parseFloat(it.netPay || "0"), 0);
     const hasDed = totalDed > 0;
-    const cur = selectedCompany?.currency || "$";
+    const cur = selectedCompany?.displayCurrency || "$";
     const fmt = (n: number) =>
       `${cur}\u00A0${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
@@ -633,7 +633,7 @@ export default function ERPRunPayroll() {
 
     const items = run.items || [];
     const hasDed = items.some((it) => parseFloat(it.deduction || "0") > 0);
-    const cur = selectedCompany?.currency || "$";
+    const cur = selectedCompany?.displayCurrency || "$";
     const fmtN = (n: number) => `${cur} ${n.toFixed(2)}`;
 
     const thinBlack = { style: "thin", color: { rgb: "000000" } };

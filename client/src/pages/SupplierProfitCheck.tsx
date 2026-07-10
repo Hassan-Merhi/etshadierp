@@ -367,7 +367,7 @@ export default function SupplierProfitCheck() {
   });
 
   // ─── PO price overrides (persisted to DB) ─────────────────────────────────
-  const { data: overridesData } = useQuery<{ stockItemId: number; poPrice: string }[]>({
+  const { data: overridesData } = useQuery<{ stockItemId: number; poPrice: string; avgPrice: string }[]>({
     queryKey: ["/api/supplier-profit-check/po-overrides", supplierId],
     enabled: !!supplierId,
     queryFn: async () => {

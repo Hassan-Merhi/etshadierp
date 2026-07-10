@@ -20,7 +20,7 @@ export { fmtDate, tableShortName, getRecordLabel, getDetailsSentence };
 
 export function AuditLog() {
   const { toast } = useToast();
-  const { appMode } = useAppMode();
+  const appMode = useAppMode();
   const { isOnline } = useConnectivity();
   const [filterAction, setFilterAction] = useState("update,delete");
   const [filterModule, setFilterModule] = useState("");

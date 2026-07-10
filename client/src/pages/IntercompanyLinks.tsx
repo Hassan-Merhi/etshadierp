@@ -263,7 +263,7 @@ export default function IntercompanyLinks() {
     <div className="p-4 sm:p-6 space-y-4 max-w-5xl mx-auto">
       {/* Header */}
       <div className="flex flex-wrap items-center gap-3">
-        <Button variant="ghost" size="icon" onClick={() => navigate(-1)} data-testid="button-back">
+        <Button variant="ghost" size="icon" onClick={() => window.history.back()} data-testid="button-back">
           <ArrowLeft className="h-4 w-4" />
         </Button>
         <div>

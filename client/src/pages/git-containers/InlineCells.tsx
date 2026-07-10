@@ -81,12 +81,14 @@ export function InlineTextCell({
   value,
   mono,
   width,
+  uppercase,
 }: {
   id: number;
   field: string;
   value: string | null | undefined;
   mono?: boolean;
   width?: string;
+  uppercase?: boolean;
 }) {
   const [editing, setEditing] = useState(false);
   const [val, setVal] = useState(value ?? "");
@@ -101,7 +103,7 @@ export function InlineTextCell({
         type="text"
         autoFocus
         value={val}
-        onChange={(e) => setVal(e.target.value)}
+        onChange={(e) => setVal(uppercase ? e.target.value.toUpperCase() : e.target.value)}
         onBlur={save}
         onKeyDown={(e) => {
           if (e.key === "Enter") save();
@@ -128,7 +130,7 @@ export function InlineTextCell({
         mono && "font-mono"
       )}
     >
-      {value || <span className="text-muted-foreground/50 text-xs">—</span>}
+      {value ? (uppercase ? value.toUpperCase() : value) : <span className="text-muted-foreground/50 text-xs">—</span>}
     </span>
   );
 }
@@ -180,11 +182,13 @@ export function InlineNumberCell({
   field,
   value,
   prefix = "$",
+  width,
 }: {
   id: number;
   field: string;
   value: string | null | undefined;
   prefix?: string;
+  width?: string;
 }) {
   const [editing, setEditing] = useState(false);
   const [val, setVal] = useState(value ?? "");
@@ -209,7 +213,8 @@ export function InlineNumberCell({
           }
         }}
         onClick={(e) => e.stopPropagation()}
-        className="w-[80px] h-7 rounded-md border border-input bg-background px-2 text-xs text-right focus:outline-none focus:ring-1 focus:ring-ring"
+        style={{ width: width ?? "80px" }}
+        className="h-7 rounded-md border border-input bg-background px-2 text-xs text-right focus:outline-none focus:ring-1 focus:ring-ring"
       />
     );
   const num = parseNum(value);

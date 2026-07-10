@@ -233,21 +233,24 @@ export default function FactoryInvoices() {
   };
 
   // Per-order remaining: how many bales still needed to meet proforma target
-  const getRemainingBales = (order: CustomerOrder): number => {
+  const getRemainingBales = (order: {
+    proformaExpectedBales?: string;
+    totalQtyBales: number;
+  }): number => {
     const expected = parseFloat(order.proformaExpectedBales || "0");
     if (expected <= 0) return 0;
     return Math.max(0, expected - (order.totalQtyBales || 0));
   };
 
   // Estimate kg and price for remaining bales using the order's average
-  const getEstimatedKg = (order: CustomerOrder, bales: number): number => {
+  const getEstimatedKg = (order: { totalQtyBales: number; totalWeightKg: string }, bales: number): number => {
     const loaded = order.totalQtyBales || 0;
     if (loaded <= 0) return 0;
     const avgWeight = parseFloat(order.totalWeightKg || "0") / loaded;
     return bales * avgWeight;
   };
 
-  const getEstimatedPrice = (order: CustomerOrder, bales: number): number => {
+  const getEstimatedPrice = (order: { totalQtyBales: number; grandTotal: string }, bales: number): number => {
     const loaded = order.totalQtyBales || 0;
     if (loaded <= 0) return 0;
     const avgPrice = parseFloat(order.grandTotal || "0") / loaded;

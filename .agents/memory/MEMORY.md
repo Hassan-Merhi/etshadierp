@@ -34,3 +34,4 @@
 - [AI chat intent classification priority](ai-chat-intent-priority.md) — domain-specific signals must outrank generic financial-transfer heuristics in classifyChatIntent; anti-hallucination overrides should apply regardless of (possibly wrong) classified intent.
 - [GC migration stock master fix](gc-migration-stock-master-fix.md) — never reuse source-company stock_item ids in target company rows; create real target stock_items via source_links map.
 - [Migrated read-only voucher guard](migrated-readonly-voucher-guard.md) — one shared helper must be enforced on every voucher/entry mutation route, not just the obvious edit/delete ones.
+- [GC migration staged dependency scoping](gc-migration-staged-dependency-scoping.md) — dependency/idempotency checks across staged migration steps must be scoped to the exact (source,target) pair, not just target; varchar column widths silently truncate literal source_type values.

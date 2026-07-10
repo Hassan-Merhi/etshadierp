@@ -132,7 +132,7 @@ export function MixBatchList({
           {mixBatchesByDate.map((batch: any) => (
             <div key={batch.id} style={{ marginBottom: "20px" }}>
               <div
-                style={{ display: "flex", alignItems: "center", justifyBetween: "space-between", marginBottom: "12px" }}
+                style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "12px" }}
               >
                 <div>
                   <div style={{ fontSize: "15px", fontWeight: 700, fontFamily: "monospace", color: "#f9fafb" }}>

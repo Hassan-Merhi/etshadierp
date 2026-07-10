@@ -140,7 +140,7 @@ export const spStockMovements = pgTable(
     containerId: integer("container_id"),
     offloadId: integer("offload_id"),
     containerLineId: integer("container_line_id"),
-    sourceType: varchar("source_type", { length: 20 }).default("offload"),
+    sourceType: varchar("source_type", { length: 40 }).default("offload"),
     articleCode: varchar("article_code", { length: 100 }).notNull(),
     description: text("description"),
     stockItemId: integer("stock_item_id"),

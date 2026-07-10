@@ -2,14 +2,15 @@ import { Fragment } from "react";
 import { TableRow, TableCell } from "@/components/ui/table";
 import { ChevronRight, ChevronDown } from "lucide-react";
 import { drCrClass } from "@/lib/formatNumber";
-import { Account, parseBalance, calculateChildrenTotal, formatSmartCurrency, goToStatement } from "./analyticsHelpers";
+import { parseBalance, calculateChildrenTotal, formatSmartCurrency, goToStatement } from "./analyticsHelpers";
+import type { Account } from "./analyticsTypes";
 
 interface HierarchicalAccountsProps {
   accountList: Account[];
   expandedAccounts: Set<number>;
   toggleAccount: (accountId: number) => void;
   appMode: string;
-  accountMap: Map<number | undefined, Account[]>;
+  accountMap: Map<number, Account[]>;
   parentAccounts: Account[];
 }
 

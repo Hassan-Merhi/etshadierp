@@ -109,6 +109,7 @@ interface OrderCharge {
   name: string;
   amount: string;
   chargeType: string;
+  ledgerAccountId?: number | null;
 }
 
 interface OrderDetail {

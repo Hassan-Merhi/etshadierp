@@ -694,7 +694,14 @@ export default function FactorySuppliers() {
         amount: formatNum(o.amount),
         amountVal: parseFloat(o.amountUsd),
         rowCc: "USD",
-        onEdit: () => setEditObComm(o),
+        onEdit: () =>
+          setEditObComm({
+            rawStockId: o.rawStockId,
+            amount: o.amount,
+            currencyCode: o.currencyCode,
+            personName: o.personName,
+            notes: "",
+          }),
         onDelete: () => wrapAdminAction(() => deleteObCommissionMutation.mutate(o.rawStockId), "Delete OB Commission"),
       })
     );

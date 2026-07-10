@@ -97,6 +97,47 @@ async function trackRow(runId: string, tableName: string, rowId: number) {
   `);
 }
 
+// Map of dependent action -> action(s) that must have a 'completed' run for this
+// target company before the dependent action is allowed to run.
+const MIGRATION_ACTION_DEPENDENCIES: Record<string, string[]> = {
+  gc_stock_opening: ["gc_stock_master"],
+  gc_sales_readonly: ["gc_stock_opening"],
+  gc_containers: ["gc_stock_opening"],
+};
+
+// Enforced server-side (not just UI) staged-dependency guard. Returns null if the
+// dependency is satisfied, or an error message string describing what must run first.
+async function requireCompletedMigrationAction(
+  sourceCompanyId: number,
+  targetCompanyId: number,
+  actionName: string
+): Promise<string | null> {
+  const deps = MIGRATION_ACTION_DEPENDENCIES[actionName];
+  if (!deps || !deps.length) return null;
+  const ACTION_LABELS: Record<string, string> = {
+    gc_stock_master: "Step 4 — Stock Master",
+    gc_stock_opening: "Step 5 — Stock Opening by Location",
+    gc_sales_readonly: "Step 6 — Historical Sales",
+    gc_containers: "Step 7 — Containers",
+  };
+  for (const dep of deps) {
+    // Scoped to the exact (source, target) pair — a completed run for a different
+    // source company into the same target must NOT satisfy this dependency.
+    const row = (
+      await db.execute(sql`
+      SELECT id FROM sp_migration_rehearsal_runs
+      WHERE source_company_id = ${sourceCompanyId} AND target_company_id = ${targetCompanyId}
+        AND action = ${dep} AND status = 'completed'
+      ORDER BY id DESC LIMIT 1
+    `)
+    ).rows?.[0] as any;
+    if (!row) {
+      return `Run ${ACTION_LABELS[dep] ?? dep} successfully before running ${ACTION_LABELS[actionName] ?? actionName}.`;
+    }
+  }
+  return null;
+}
+
 async function ensureSpAccounts(
   targetId: number,
   overrides?: Record<string, { code?: string; name?: string }>
@@ -1206,6 +1247,8 @@ export function registerSpMigrationRoutes(app: Express) {
       if (!companyNameConfirm || companyNameConfirm.trim() !== sourceComp.name) {
         return res.status(400).json({ message: `Company name confirmation must match exactly: "${sourceComp.name}"` });
       }
+      const depError = await requireCompletedMigrationAction(sourceId, targetId, "gc_stock_opening");
+      if (depError) return res.status(409).json({ message: depError });
 
       const runId = await logRun(
         sourceId,
@@ -1389,8 +1432,16 @@ export function registerSpMigrationRoutes(app: Express) {
             sql`UPDATE sp_migration_rehearsal_runs SET status = 'failed', error_message = ${err.message}, completed_at = now() WHERE id = ${runId}`
           )
           .catch(() => {});
-        console.error("[SP Migration] gc-stock-opening error:", err);
-        return res.status(500).json({ message: "Stock opening migration failed", runId });
+        console.error("[SP Migration] gc-stock-opening error:", {
+          sourceCompanyId: sourceId,
+          targetCompanyId: targetId,
+          runId,
+          error: err?.message,
+        });
+        return res.status(500).json({
+          message: `Stock opening migration failed: ${err?.message || "Unknown error"}`,
+          runId,
+        });
       }
     }
   );
@@ -1422,6 +1473,8 @@ export function registerSpMigrationRoutes(app: Express) {
       if (!companyNameConfirm || companyNameConfirm.trim() !== sourceComp.name) {
         return res.status(400).json({ message: `Company name confirmation must match exactly: "${sourceComp.name}"` });
       }
+      const depError = await requireCompletedMigrationAction(sourceId, targetId, "gc_sales_readonly");
+      if (depError) return res.status(409).json({ message: depError });
 
       const runId = await logRun(
         sourceId,
@@ -1489,9 +1542,25 @@ export function registerSpMigrationRoutes(app: Express) {
         `)
         ).rows as any[];
 
+        // Stock item mapping produced by Step 4 (Stock Master) — required to translate
+        // source sale-item stock_item_id references into the target company's stock items.
+        const stockItemLinkRows = (
+          await db.execute(sql`
+          SELECT sml.source_id, sml.target_id
+          FROM sp_migration_source_links sml
+          JOIN sp_migration_rehearsal_runs r ON r.id = sml.run_id
+          WHERE r.target_company_id = ${targetId} AND r.source_company_id = ${sourceId}
+            AND sml.source_table = 'stock_items' AND sml.target_table = 'stock_items'
+        `)
+        ).rows as any[];
+        const stockItemMap = new Map<number, number>();
+        for (const l of stockItemLinkRows) stockItemMap.set(pn(l.source_id), pn(l.target_id));
+
         let vouchersCreated = 0,
           vouchersSkipped = 0,
-          entriesCreated = 0;
+          entriesCreated = 0,
+          itemRowsCreated = 0,
+          vouchersMissingItems = 0;
         for (const v of saleVouchers) {
           const newVoucherNumber = ("MIG-GC-" + v.voucher_number).substring(0, 100);
           const alreadyMig = (
@@ -1523,6 +1592,42 @@ export function registerSpMigrationRoutes(app: Express) {
             VALUES (${runId}, 'vouchers', ${pn(v.id)}, 'vouchers', ${newVoucherId})
           `);
 
+          // Copy the original sale-item rows so migrated vouchers show real item details
+          // (not just the accounting entries) — display/history only, never touches stock.
+          const sourceSaleItems = (
+            await db.execute(sql`
+            SELECT stock_item_id, quantity, selling_price, cost_price, total_sales, total_cost, profit, configured_price
+            FROM sales_items WHERE voucher_id = ${v.id}
+          `)
+          ).rows as any[];
+          if (!sourceSaleItems.length) {
+            vouchersMissingItems++;
+            summary.push(`Voucher ${v.voucher_number} has no source sale item rows; accounting-only voucher migrated.`);
+          } else {
+            for (const si of sourceSaleItems) {
+              const targetStockItemId = stockItemMap.get(pn(si.stock_item_id));
+              if (!targetStockItemId) {
+                summary.push(
+                  `Voucher ${v.voucher_number}: sale item for source stock_item_id=${si.stock_item_id} has no target stock item mapping — skipped (run Stock Master first).`
+                );
+                continue;
+              }
+              const [siRow] = (
+                await db.execute(sql`
+                INSERT INTO sales_items
+                  (voucher_id, stock_item_id, quantity, selling_price, cost_price, total_sales, total_cost, profit, configured_price)
+                VALUES
+                  (${newVoucherId}, ${targetStockItemId}, ${si.quantity}, ${si.selling_price}, ${si.cost_price},
+                   ${si.total_sales}, ${si.total_cost}, ${si.profit ?? "0"}, ${si.configured_price ?? null})
+                RETURNING id
+              `)
+              ).rows as any[];
+              await trackRow(runId, "sales_items", pn(siRow.id));
+              itemRowsCreated++;
+              rowsCreated++;
+            }
+          }
+
           const entries = (
             await db.execute(sql`SELECT ledger_account_id, debit_amount, credit_amount, narration FROM voucher_entries WHERE voucher_id = ${v.id}`)
           ).rows as any[];
@@ -1542,7 +1647,10 @@ export function registerSpMigrationRoutes(app: Express) {
           }
         }
 
-        summary.push(`Vouchers: ${vouchersCreated} created (read-only), ${vouchersSkipped} skipped, ${entriesCreated} entries`);
+        summary.push(
+          `Vouchers: ${vouchersCreated} created (read-only), ${vouchersSkipped} skipped, ${entriesCreated} entries, ${itemRowsCreated} sale item rows copied`
+        );
+        if (vouchersMissingItems) summary.push(`${vouchersMissingItems} voucher(s) had no source sale item rows.`);
 
         await db.execute(sql`
           UPDATE sp_migration_rehearsal_runs SET status = 'completed', rows_created = ${rowsCreated}, completed_at = now() WHERE id = ${runId}
@@ -1553,7 +1661,7 @@ export function registerSpMigrationRoutes(app: Express) {
           runId,
           rowsCreated,
           summary,
-          reconciliation: { vouchersCreated, vouchersSkipped, entriesCreated },
+          reconciliation: { vouchersCreated, vouchersSkipped, entriesCreated, itemRowsCreated, vouchersMissingItems },
           warnings: [
             "These vouchers are marked read-only (sourceModule = SP_MIGRATION_READONLY, prefix MIG-GC-) and never move stock.",
             "Account mapping used account type matching — verify entries routed to Migration Suspense.",
@@ -1565,8 +1673,16 @@ export function registerSpMigrationRoutes(app: Express) {
             sql`UPDATE sp_migration_rehearsal_runs SET status = 'failed', error_message = ${err.message}, completed_at = now() WHERE id = ${runId}`
           )
           .catch(() => {});
-        console.error("[SP Migration] gc-sales-readonly error:", err);
-        return res.status(500).json({ message: "Sales migration failed", runId });
+        console.error("[SP Migration] gc-sales-readonly error:", {
+          sourceCompanyId: sourceId,
+          targetCompanyId: targetId,
+          runId,
+          error: err?.message,
+        });
+        return res.status(500).json({
+          message: `Historical sales migration failed: ${err?.message || "Unknown error"}`,
+          runId,
+        });
       }
     }
   );
@@ -1596,6 +1712,8 @@ export function registerSpMigrationRoutes(app: Express) {
     if (!companyNameConfirm || companyNameConfirm.trim() !== sourceComp.name) {
       return res.status(400).json({ message: `Company name confirmation must match exactly: "${sourceComp.name}"` });
     }
+    const depError = await requireCompletedMigrationAction(sourceId, targetId, "gc_containers");
+    if (depError) return res.status(409).json({ message: depError });
 
     const runId = await logRun(
       sourceId,
@@ -1807,8 +1925,16 @@ export function registerSpMigrationRoutes(app: Express) {
           sql`UPDATE sp_migration_rehearsal_runs SET status = 'failed', error_message = ${err.message}, completed_at = now() WHERE id = ${runId}`
         )
         .catch(() => {});
-      console.error("[SP Migration] gc-containers error:", err);
-      return res.status(500).json({ message: "Container migration failed", runId });
+      console.error("[SP Migration] gc-containers error:", {
+        sourceCompanyId: sourceId,
+        targetCompanyId: targetId,
+        runId,
+        error: err?.message,
+      });
+      return res.status(500).json({
+        message: `Container migration failed: ${err?.message || "Unknown error"}`,
+        runId,
+      });
     }
   });
 
@@ -2063,11 +2189,40 @@ export function registerSpMigrationRoutes(app: Express) {
         const tgtSales = (
           await db.execute(sql`SELECT COUNT(*) AS cnt FROM vouchers WHERE company_id = ${targetId} AND source_module = 'SP_MIGRATION_READONLY' AND deleted_at IS NULL`)
         ).rows[0] as any;
+        const srcSaleItems = (
+          await db.execute(sql`
+          SELECT COUNT(*) AS cnt FROM sales_items si JOIN vouchers v ON v.id = si.voucher_id
+          WHERE v.company_id = ${sourceId} AND v.voucher_type IN ('Sales','Sale') AND v.deleted_at IS NULL
+        `)
+        ).rows[0] as any;
+        const migratedSaleItems = (
+          await db.execute(sql`
+          SELECT COUNT(*) AS cnt FROM sales_items si JOIN vouchers v ON v.id = si.voucher_id
+          WHERE v.company_id = ${targetId} AND v.source_module = 'SP_MIGRATION_READONLY' AND v.deleted_at IS NULL
+        `)
+        ).rows[0] as any;
+        const migratedVouchersWithoutItems = (
+          await db.execute(sql`
+          SELECT v.voucher_number FROM vouchers v
+          WHERE v.company_id = ${targetId} AND v.source_module = 'SP_MIGRATION_READONLY' AND v.deleted_at IS NULL
+            AND NOT EXISTS (SELECT 1 FROM sales_items si WHERE si.voucher_id = v.id)
+          ORDER BY v.voucher_number LIMIT 50
+        `)
+        ).rows as any[];
+        const salesStatus =
+          unmigratedSales.length > 0 ? "WARN" : migratedVouchersWithoutItems.length > 0 ? "WARN" : "PASS";
         areas.push({
           area: "Historical sales",
-          status: unmigratedSales.length === 0 ? "PASS" : "WARN",
-          detail: `Source: ${pn(srcSales.cnt)} sale voucher(s). Migrated read-only: ${pn(tgtSales.cnt)}. ${unmigratedSales.length} source sale(s) have no migrated copy (showing up to 50).`,
-          mismatches: unmigratedSales.map((r: any) => r.voucher_number),
+          status: salesStatus,
+          detail:
+            `Source: ${pn(srcSales.cnt)} sale voucher(s), ${pn(srcSaleItems.cnt)} item row(s). ` +
+            `Migrated read-only: ${pn(tgtSales.cnt)} voucher(s), ${pn(migratedSaleItems.cnt)} item row(s). ` +
+            `${unmigratedSales.length} source sale(s) have no migrated copy. ` +
+            `${migratedVouchersWithoutItems.length} migrated voucher(s) have no item rows (accounting-only).`,
+          mismatches: [
+            ...unmigratedSales.map((r: any) => `Not migrated: ${r.voucher_number}`),
+            ...migratedVouchersWithoutItems.map((r: any) => `No item rows: ${r.voucher_number}`),
+          ],
         });
 
         // 4. Containers — list which source containers have no migrated sp_containers row
@@ -2156,7 +2311,23 @@ export function registerSpMigrationRoutes(app: Express) {
 
         const overall = areas.some((a) => a.status === "FAIL") ? "FAIL" : areas.some((a) => a.status === "WARN") ? "WARN" : "PASS";
 
-        return res.json({ overall, areas });
+        // Detect the specific partial-run scenario: stock master done, stock-in-hand empty on
+        // target, but later steps (historical sales / containers) already ran. Surface a clear
+        // recovery instruction instead of silently letting the user proceed further.
+        const stockMasterArea = areas.find((a) => a.area === "Stock master");
+        const stockInHandArea = areas.find((a) => a.area === "Stock in hand");
+        const salesArea = areas.find((a) => a.area === "Historical sales");
+        const containersArea = areas.find((a) => a.area === "Containers");
+        const targetHasNoStock = pn(tgtStock.q) === 0 && pn(srcStock.q) > 0;
+        const laterStepsRan = pn(tgtSales.cnt) > 0 || pn(tgtContainers.cnt) > 0;
+        let partialMigrationWarning: string | null = null;
+        if (stockMasterArea?.status === "PASS" && targetHasNoStock && laterStepsRan) {
+          partialMigrationWarning =
+            "This migration is partially applied. Stock opening failed but later steps were run. " +
+            "Roll back Step 7 Containers, then Step 6 Historical Sales, then rerun Step 5 Stock Opening before continuing.";
+        }
+
+        return res.json({ overall, areas, partialMigrationWarning });
       } catch (err: any) {
         console.error("[SP Migration] gc-reconciliation error:", err);
         return res.status(500).json({ message: "Internal server error" });

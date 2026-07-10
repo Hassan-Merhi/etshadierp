@@ -781,44 +781,61 @@ export default function GcLshiMigration() {
                 label: "Step 4 — Stock Master (groups, grades, categories, items)",
                 icon: Layers,
                 endpoint: "/api/sp/migration/gc-stock-master",
-                extraBody: {},
+                dependsOnAction: null as string | null,
+                dependsOnLabel: null as string | null,
               },
               {
                 key: "stockOpening",
                 label: "Step 5 — Stock Opening by Location",
                 icon: Package,
                 endpoint: "/api/sp/migration/gc-stock-opening",
-                extraBody: {},
+                dependsOnAction: "gc_stock_master",
+                dependsOnLabel: "Step 4 — Stock Master",
               },
               {
                 key: "salesReadonly",
                 label: "Step 6 — Historical Sales (read-only)",
                 icon: FileText,
                 endpoint: "/api/sp/migration/gc-sales-readonly",
-                extraBody: {},
+                dependsOnAction: "gc_stock_opening",
+                dependsOnLabel: "Step 5 — Stock Opening by Location",
               },
               {
                 key: "containers",
                 label: "Step 7 — Containers (incl. Goods-OTW accounting)",
                 icon: Building2,
                 endpoint: "/api/sp/migration/gc-containers",
-                extraBody: {},
+                dependsOnAction: "gc_stock_opening",
+                dependsOnLabel: "Step 5 — Stock Opening by Location",
               },
-            ].map((step) => (
-              <Stage2StepRunner
-                key={step.key}
-                label={step.label}
-                Icon={step.icon}
-                endpoint={step.endpoint}
-                sourceCompanyId={sourceCompanyId}
-                targetCompanyId={targetCompanyId}
-                sourceCompanyName={sourceComp?.name}
-                onDone={() => {
-                  refetchRuns();
-                  refetchPreview();
-                }}
-              />
-            ))}
+            ].map((step) => {
+              const dependencyMet =
+                !step.dependsOnAction ||
+                allRuns.some(
+                  (r) =>
+                    r.action === step.dependsOnAction &&
+                    r.status === "completed" &&
+                    r.source_company_id === sourceCompanyId &&
+                    r.target_company_id === targetCompanyId
+                );
+              return (
+                <Stage2StepRunner
+                  key={step.key}
+                  label={step.label}
+                  Icon={step.icon}
+                  endpoint={step.endpoint}
+                  sourceCompanyId={sourceCompanyId}
+                  targetCompanyId={targetCompanyId}
+                  sourceCompanyName={sourceComp?.name}
+                  disabled={!dependencyMet}
+                  disabledReason={dependencyMet ? undefined : `Run ${step.dependsOnLabel} successfully first.`}
+                  onDone={() => {
+                    refetchRuns();
+                    refetchPreview();
+                  }}
+                />
+              );
+            })}
           </CardContent>
         </Card>
       )}
@@ -1007,6 +1024,8 @@ function Stage2StepRunner({
   sourceCompanyId,
   targetCompanyId,
   sourceCompanyName,
+  disabled,
+  disabledReason,
   onDone,
 }: {
   label: string;
@@ -1015,43 +1034,74 @@ function Stage2StepRunner({
   sourceCompanyId: number;
   targetCompanyId: number;
   sourceCompanyName?: string;
+  disabled?: boolean;
+  disabledReason?: string;
   onDone: () => void;
 }) {
   const { toast } = useToast();
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [confirmName, setConfirmName] = useState("");
   const [result, setResult] = useState<any>(null);
+  const [runError, setRunError] = useState<string | null>(null);
 
   const mutation = useMutation({
-    mutationFn: () =>
-      apiRequest("POST", endpoint, {
+    mutationFn: async () => {
+      const res = await apiRequest("POST", endpoint, {
         sourceCompanyId,
         targetCompanyId,
         companyNameConfirm: confirmName,
         confirmation: "MIGRATE",
-      }),
+      });
+      return res;
+    },
     onSuccess: async (data: any) => {
       const r = await data.json();
       setResult(r);
+      setRunError(null);
       setConfirmOpen(false);
       setConfirmName("");
       toast({ title: `${label} complete`, description: `${r.rowsCreated} row(s) created.` });
       onDone();
     },
-    onError: (e: any) => toast({ title: `${label} failed`, description: e.message, variant: "destructive" }),
+    onError: (e: any) => {
+      setRunError(e.message);
+      toast({ title: `${label} failed`, description: e.message, variant: "destructive" });
+    },
   });
 
   return (
-    <div className="border rounded-md p-3 space-y-2">
+    <div className={`border rounded-md p-3 space-y-2 ${disabled ? "opacity-60" : ""}`}>
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-2 text-sm font-medium">
           <Icon className="h-4 w-4 text-muted-foreground" />
           {label}
         </div>
-        <Button size="sm" variant="outline" onClick={() => setConfirmOpen(true)} data-testid={`button-run-${endpoint.split("/").pop()}`}>
-          <Play className="h-3 w-3 mr-1" /> Run
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={() => {
+            if (disabled) {
+              toast({ title: "Step locked", description: disabledReason, variant: "destructive" });
+              return;
+            }
+            setConfirmOpen(true);
+          }}
+          data-testid={`button-run-${endpoint.split("/").pop()}`}
+        >
+          {disabled ? <Lock className="h-3 w-3 mr-1" /> : <Play className="h-3 w-3 mr-1" />}
+          Run
         </Button>
       </div>
+      {disabled && disabledReason && (
+        <p className="text-xs text-muted-foreground flex items-center gap-1">
+          <Lock className="h-3 w-3" /> {disabledReason}
+        </p>
+      )}
+      {runError && (
+        <p className="text-xs text-destructive" data-testid="text-step-error">
+          {runError}
+        </p>
+      )}
       {result && (
         <div className="text-xs space-y-1 bg-muted/50 rounded p-2">
           {(result.summary ?? []).map((s: string, i: number) => (
@@ -1223,6 +1273,7 @@ function ReconciliationRunner({
   const [report, setReport] = useState<{
     overall: string;
     areas: Array<{ area: string; status: string; detail?: string; details?: string; mismatches?: string[] }>;
+    partialMigrationWarning?: string | null;
   } | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -1258,6 +1309,15 @@ function ReconciliationRunner({
         <p className="text-xs text-destructive" data-testid="text-reconciliation-error">
           {error}
         </p>
+      )}
+      {report?.partialMigrationWarning && (
+        <div
+          className="flex items-start gap-2 text-sm text-amber-800 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-800 rounded-md px-3 py-2"
+          data-testid="text-partial-migration-warning"
+        >
+          <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
+          {report.partialMigrationWarning}
+        </div>
       )}
       {report && (
         <div className="border rounded-md overflow-auto">

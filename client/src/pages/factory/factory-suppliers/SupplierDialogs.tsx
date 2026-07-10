@@ -232,7 +232,7 @@ export function SupplierDialogs({
                     (t: {
                       supplierId: number;
                       supplierName: string;
-                      overpayment: string;
+                      overpayment?: string;
                       allocated: string;
                       toAmountUsd: string;
                     }) => {
@@ -244,7 +244,7 @@ export function SupplierDialogs({
                           {overpaid && (
                             <div className="text-xs text-amber-600 dark:text-amber-400">
                               incl. {bulkFxForm.fromCurrencyCode}{" "}
-                              {parseFloat(t.overpayment).toLocaleString(undefined, {
+                              {parseFloat(t.overpayment || "0").toLocaleString(undefined, {
                                 minimumFractionDigits: 2,
                                 maximumFractionDigits: 2,
                               })}{" "}
@@ -280,7 +280,7 @@ export function SupplierDialogs({
                   Back to Edit
                 </Button>
                 <Button
-                  onClick={() => wrapAdminAction(() => bulkFxMutation.mutate(), "Record Bulk FX Settlement")}
+                  onClick={() => wrapAdminAction(() => bulkFxMutation.mutate(undefined), "Record Bulk FX Settlement")}
                   disabled={bulkFxMutation.isPending}
                   data-testid="button-bulk-fx-confirm"
                 >
@@ -338,7 +338,7 @@ export function SupplierDialogs({
                   Cancel
                 </Button>
                 <Button
-                  onClick={() => bulkFxPreviewMutation.mutate()}
+                  onClick={() => bulkFxPreviewMutation.mutate(undefined)}
                   disabled={
                     bulkFxPreviewMutation.isPending ||
                     !bulkFxForm.fromCurrencyCode ||

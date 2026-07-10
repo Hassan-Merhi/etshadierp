@@ -125,6 +125,7 @@ export default function BarcodeLookup() {
       weightKg: string;
       costPerKg: string;
       totalCost: string;
+      productName: string | null;
       grade: string | null;
       stockEntryDate: string | null;
       pressedAt: string | null;
@@ -179,6 +180,7 @@ export default function BarcodeLookup() {
       customerName: string | null;
       priceUsed: string;
       baleWeight: string;
+      scannedBy: string | null;
     } | null;
     auditHistory: Array<{
       id: number;

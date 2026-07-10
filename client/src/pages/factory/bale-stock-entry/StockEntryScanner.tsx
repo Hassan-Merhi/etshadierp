@@ -117,7 +117,7 @@ export function StockEntryScanner({
                       idx === activeIndex ? "bg-primary text-primary-foreground" : "bg-primary/10 text-primary"
                     }`}
                   >
-                    {p.grade || "STK"}
+                    {p.articleCode || p.code || "STK"}
                   </div>
                   <div>
                     <div className="text-sm font-bold">{p.name}</div>

@@ -29,9 +29,11 @@ export function loadDaybookState(): DaybookUIState | null {
   }
 }
 
-export function saveDaybookState(state: DaybookUIState): void {
+export function saveDaybookState(state: DaybookUIState | Partial<DaybookUIState>): void {
   try {
-    sessionStorage.setItem(DAYBOOK_STATE_KEY, JSON.stringify(state));
+    const existing = loadDaybookState();
+    const merged = existing ? { ...existing, ...state } : state;
+    sessionStorage.setItem(DAYBOOK_STATE_KEY, JSON.stringify(merged));
   } catch {
     // sessionStorage may be unavailable in some contexts
   }

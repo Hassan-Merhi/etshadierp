@@ -176,12 +176,12 @@ export function ErpRoutes({ user }: ErpRoutesProps) {
       )}
 
       {/* Containers OTW — Admin/Dev only */}
-      {isAdminOrDev && <Route path="/mock-containers-otw" component={ContainersOTW} />}
-      {isAdminOrDev && <Route path="/containers-otw" component={ContainersOTW} />}
+      {isAdminOrDev && <Route path="/mock-containers-otw" component={ContainersOTW as ComponentType<any>} />}
+      {isAdminOrDev && <Route path="/containers-otw" component={ContainersOTW as ComponentType<any>} />}
 
       {/* GIT mockup — Admin/Dev only */}
-      <Route path="/mock-git" component={GITMockup} />
-      <Route path="/git" component={GITMockup} />
+      <Route path="/mock-git" component={GITMockup as ComponentType<any>} />
+      <Route path="/git" component={GITMockup as ComponentType<any>} />
 
       {/* Containers */}
       {G("/containers/:containerId/verification", "containers", ContainerVerification)}

@@ -183,8 +183,8 @@ export default function LabelBannersSettings() {
     <div className="p-4 md:p-6 space-y-6 max-w-4xl mx-auto">
       <PageHeader
         title="Label Banner Images"
-        description="Manage the colored header banners printed on A4 bale labels. Add custom colors, upload your own images, or revert to defaults."
-        backHref="/factory/settings"
+        subtitle="Manage the colored header banners printed on A4 bale labels. Add custom colors, upload your own images, or revert to defaults."
+        showBackButton
       />
 
       {isLoading && (

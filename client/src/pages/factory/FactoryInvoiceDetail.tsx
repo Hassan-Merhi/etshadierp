@@ -239,7 +239,7 @@ export default function FactoryInvoiceDetail() {
     onError: (e: Error) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
-  const { data: myAccess } = useQuery<{ hiddenCostFields: string[] }>({
+  const { data: myAccess } = useQuery<{ hiddenCostFields: string[]; fullAccess?: boolean }>({
     queryKey: ["/api/factory/my-access"],
   });
   const { data: me } = useQuery<{ role: string }>({ queryKey: ["/api/auth/me"] });

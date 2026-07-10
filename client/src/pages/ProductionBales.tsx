@@ -116,6 +116,7 @@ function BatchDetailView({ batch, onBack }: { batch: any; onBack: () => void }) 
   const [createBatchOpen, setCreateBatchOpen] = useState(false);
   const scanRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
+  const { formatDisplayDate } = useDateFormat();
 
   const { data: locations } = useQuery<Location[]>({ queryKey: ["/api/locations"] });
   const { data: mixBatches } = useQuery<FactoryMixBatch[]>({ queryKey: ["/api/factory/mix-batches"] });

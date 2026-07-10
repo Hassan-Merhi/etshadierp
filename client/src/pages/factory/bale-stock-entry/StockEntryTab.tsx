@@ -399,10 +399,11 @@ export function StockEntryTab() {
                 </Button>
                 {hasCartDraft && (
                   <DraftRestorePrompt
-                    age={cartDraftAge}
+                    draftAge={cartDraftAge ?? ""}
                     onRestore={() => {
-                      if (cartDraft?.cart) {
-                        const restored = cartDraft.cart
+                      const draftData = cartDraft?.data as { cart?: any[]; selectedLocationId?: string } | undefined;
+                      if (draftData?.cart) {
+                        const restored = draftData.cart
                           .map((i: any) => {
                             const p = baleProducts?.find((bp) => bp.id === i.productId);
                             return { ...i, product: p };
@@ -410,7 +411,7 @@ export function StockEntryTab() {
                           .filter((i: any) => i.product);
                         setCart(restored);
                       }
-                      if (cartDraft?.selectedLocationId) setSelectedLocationId(cartDraft.selectedLocationId);
+                      if (draftData?.selectedLocationId) setSelectedLocationId(draftData.selectedLocationId);
                       discardCartDraft();
                     }}
                     onDiscard={discardCartDraft}

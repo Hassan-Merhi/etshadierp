@@ -92,6 +92,7 @@ interface OrderDetail {
   status: string;
   proformaIdUsed: number | null;
   totalQtyBales: number;
+  containerNotes: string | null;
   bales: OrderBale[];
 }
 

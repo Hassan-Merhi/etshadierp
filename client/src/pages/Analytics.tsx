@@ -169,7 +169,7 @@ interface StockGroup {
 interface Supplier {
   id: number;
   code: string;
-  name: string;
+  legalName: string;
 }
 
 interface OpeningStockGroup {

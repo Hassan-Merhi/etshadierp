@@ -27,7 +27,7 @@ export default function ProductionRawStock() {
   const { wrapAdminAction, AdminDialog } = useAdminOverride();
   const { formatDisplayDate } = useDateFormat();
   const { toast } = useToast();
-  const { appMode } = useAppMode();
+  const appMode = useAppMode();
   const modeApiRequest = getApiRequest(appMode);
 
   // Dialog States

@@ -30,6 +30,7 @@ interface RawStockTableProps {
   onAdjust: (row: RawStockRow) => void;
   onDeduct: (row: RawStockRow) => void;
   onAddToBatch: (row: RawStockRow) => void;
+  onNewMaterial: () => void;
 }
 
 export function RawStockTable({ rawStock, onAdjust, onDeduct, onAddToBatch }: RawStockTableProps) {

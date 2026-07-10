@@ -229,7 +229,7 @@ export default function BalanceRepair() {
           </Button>
           {phase === "scanned" && total > 0 && (
             <Button onClick={applyFixes} disabled={busy} data-testid="button-apply-fixes">
-              {phase === "applying" ? (
+              {busy ? (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               ) : (
                 <Wrench className="mr-2 h-4 w-4" />
@@ -239,7 +239,7 @@ export default function BalanceRepair() {
           )}
           {phase === "applied" && snapshot && (
             <Button variant="outline" onClick={undoFixes} disabled={busy} data-testid="button-undo-repair">
-              {phase === "undoing" ? (
+              {busy ? (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               ) : (
                 <Undo2 className="mr-2 h-4 w-4" />

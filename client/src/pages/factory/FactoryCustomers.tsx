@@ -62,6 +62,7 @@ export default function FactoryCustomers() {
       phone?: string;
       openingBalance?: string;
       openingBalanceSide?: string;
+      paymentTermsDays?: number;
     }) => {
       return await factoryApiRequest("POST", "/api/factory/customers", data);
     },

@@ -1,4 +1,5 @@
 import type { FactorySupplier } from "@shared/schema";
+export type { BulkFxPreviewResult as BulkFxPreview } from "@/lib/bulkFxOffline";
 
 export interface CurrencyBalance {
   currencyCode: string;
@@ -104,6 +105,8 @@ export interface StatementResponse {
   currencyGroups: CurrencyGroup[];
   obCommissions: ObCommission[];
   payments: SupplierPayment[];
+  /** Not currently returned by the backend statement endpoint — kept optional so callers can safely no-op until it exists server-side. */
+  voucherPayments?: unknown[];
   fxTransfers: FxTransfer[];
   linkedSupplierGroups: Array<{
     supplierId: number;

@@ -80,6 +80,7 @@ export default function FactoryStockAllocationV2() {
         articleRows: [] as (StockTruthEntry & { displayName: string })[],
         allProformas: [] as ProformaV2[],
         visibleProformas: [] as ProformaV2[],
+        hiddenZeroCount: 0,
       };
 
     const allProformas = data.proformas.filter((p) => p.isActive || showInactiveProformas);
@@ -102,6 +103,7 @@ export default function FactoryStockAllocationV2() {
           proformaReserved: 0,
           reservedNotYetLoaded: 0,
           freeToPromise: 0,
+          isActive: true,
         };
         // productNames (from factory_bale_products SQL) is the canonical source — always wins.
         // Only fall back to the proforma line's stored productName if the canonical lookup fails

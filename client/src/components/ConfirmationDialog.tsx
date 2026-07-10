@@ -49,15 +49,23 @@ interface DeleteConfirmDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onConfirm: () => void;
+  title?: string;
+  description?: string;
 }
 
-export function DeleteConfirmDialog({ open, onOpenChange, onConfirm }: DeleteConfirmDialogProps) {
+export function DeleteConfirmDialog({
+  open,
+  onOpenChange,
+  onConfirm,
+  title = "ARE YOU SURE YOU WANT TO DELETE THIS?",
+  description = "This action cannot be undone.",
+}: DeleteConfirmDialogProps) {
   return (
     <ConfirmDialog
       open={open}
       onOpenChange={onOpenChange}
-      title="ARE YOU SURE YOU WANT TO DELETE THIS?"
-      description="This action cannot be undone."
+      title={title}
+      description={description}
       confirmText="Delete"
       tone="destructive"
       onConfirm={onConfirm}

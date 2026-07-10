@@ -71,8 +71,8 @@ const VOUCHER_TYPE_ORDER: Record<string, number> = {
 
 export default function Daybook({ user }: { user?: any } = {}) {
   const { toast } = useToast();
-  const { selectedCompany, companyType } = useCompany();
-  const vouchersBase = companyType === "properties" ? "/properties/vouchers" : "/vouchers";
+  const { selectedCompany } = useCompany();
+  const vouchersBase = selectedCompany?.companyType === "properties" ? "/properties/vouchers" : "/vouchers";
   const { formatDisplayDate, formatDisplayTime } = useDateFormat();
   const { formatAmount } = useCurrencyContext();
   const [, navigate] = useLocation();

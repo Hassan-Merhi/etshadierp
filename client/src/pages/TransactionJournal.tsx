@@ -85,6 +85,7 @@ interface JournalResponse {
 interface VoucherEntry {
   id: number;
   ledgerAccountId: number | null;
+  customerId: number | null;
   accountName: string | null;
   debitAmount: string;
   creditAmount: string;

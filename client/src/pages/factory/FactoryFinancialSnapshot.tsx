@@ -563,10 +563,10 @@ export default function FactoryFinancialSnapshot() {
                           <p className="text-xs text-muted-foreground mt-0.5">
                             {computed.supplierCount} supplier{computed.supplierCount !== 1 ? "s" : ""} · Owed to
                             suppliers
-                            {(netPosition.supplierOverpayments ?? 0) > 0 && (
+                            {(netPosition?.supplierOverpayments ?? 0) > 0 && (
                               <span className="text-green-600 dark:text-green-400">
                                 {" "}
-                                · {usd(netPosition.supplierOverpayments ?? 0)} overpaid (recoverable)
+                                · {usd(netPosition?.supplierOverpayments ?? 0)} overpaid (recoverable)
                               </span>
                             )}
                           </p>
