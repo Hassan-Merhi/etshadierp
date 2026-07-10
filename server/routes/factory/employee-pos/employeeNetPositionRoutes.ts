@@ -827,7 +827,13 @@ export function registerEmployeeNetPositionRoutes(app: Express) {
         // up to asOf) is always more accurate than the accrual-scheduler-dependent ledger account.
         const isAccruedRentPayable =
           nameLower.includes("accrued rent") || code === "ACCR-RENT-PAY" || code === "ACCRUED_RENT_PAYABLE";
-        return !isPayrollPayable && !isAccruedRentPayable;
+        // Also exclude the "Factory Worker Advances" ledger account on the liability side —
+        // its balance drifts from reality (advance repayments/deductions aren't always posted
+        // back to it), and the asset side already strips it in favor of the authoritative
+        // factory_worker_advances table sum injected below. Without this, a stray credit
+        // balance on that ledger account leaks through here as a bogus liability line.
+        const isFactoryWorkerAdvances = nameLower.replace(/\s+/g, " ").trim() === "factory worker advances";
+        return !isPayrollPayable && !isAccruedRentPayable && !isFactoryWorkerAdvances;
       });
       const ledgerForUsTotal = round2(ledgerForUs.reduce((s: number, a: any) => s + a.value, 0));
       const ledgerOnUsTotal = round2(ledgerOnUs.reduce((s: number, a: any) => s + a.value, 0));
