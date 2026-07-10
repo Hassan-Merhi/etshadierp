@@ -1069,8 +1069,11 @@ export function registerEmployeeNetPositionRoutes(app: Express) {
       const rawMaterialStockValue = round2(rawTotal);
 
       // ── 3b. Factory Stock OTW — containers in transit (PENDING / IN_TRANSIT / ARRIVED) ──
-      // Mirrors the FactoryStockOTW page formula: per-currency goods+freight+commission+other charges,
-      // then converted to approx USD via: USD + (EUR × 1.17) + (AUD × 0.75) + other currencies at face value
+      // Per-currency goods+freight+commission+other charges, converted to USD using the
+      // user-configured manual FX rates loaded above (getConfigFx / configFxRates — set in
+      // Settings → FX Rates, e.g. EUR=1.18, AUD=0.75). This was previously hardcoded
+      // (EUR×1.17, AUD×0.75), which drifted from the user's actual configured rates and
+      // produced a wrong OTW total on this page.
       const otwStatuses = new Set(["PENDING", "IN_TRANSIT", "ARRIVED"]);
       const otwCurrBuckets: Record<string, number> = {};
       const otwAdd = (cc: string, amt: number) => {
@@ -1090,13 +1093,12 @@ export function registerEmployeeNetPositionRoutes(app: Express) {
         otwAdd(commCcy, parseFloat(c.commissionAmount || "0"));
         otwAdd(containerCcy, parseFloat(c.otherCharges || "0"));
       }
-      const otwUsd = otwCurrBuckets["USD"] || 0;
-      const otwEur = otwCurrBuckets["EUR"] || 0;
-      const otwAud = otwCurrBuckets["AUD"] || 0;
-      const otwOther = Object.entries(otwCurrBuckets)
-        .filter(([cc]) => cc !== "USD" && cc !== "EUR" && cc !== "AUD")
-        .reduce((s, [, v]) => s + v, 0);
-      const stockOtwValue = round2(otwUsd + otwEur * 1.17 + otwAud * 0.75 + otwOther);
+      const stockOtwValue = round2(
+        Object.entries(otwCurrBuckets).reduce((sum, [cc, amt]) => {
+          const fx = cc === "USD" ? 1 : getConfigFx(cc);
+          return sum + amt * fx;
+        }, 0)
+      );
 
       // ── 3c. Balance on Table — material in process (mix batch input minus bale output) ──
       // Mirrors the production-value-report formula: all-time totals, no date filter.
