@@ -50,13 +50,14 @@ jobs:
 
       - name: Install dependencies
         id: install
-        run: npm ci --no-audit
+        run: npm ci --no-audit --bin-links=true
 
       - name: Dependency diagnostics
         if: always() && steps.install.outcome == 'success'
         run: |
           node --version
           npm --version
+          npm config get bin-links
           node -p "'TypeScript ' + require('typescript/package.json').version"
           for binary in tsc vite eslint vitest; do
             if [ -x "node_modules/.bin/$binary" ]; then
