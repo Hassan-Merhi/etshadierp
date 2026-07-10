@@ -74,6 +74,7 @@ import {
   baleProductCategories,
   storedFiles,
   stockItemLocationPrices,
+  type Container,
 } from "@shared/schema";
 import {
   eq,
@@ -126,10 +127,28 @@ export function registerImportRoutes(app: Express) {
         errors.push("Selected supplier not found");
       }
 
-      // Reject if container number already exists
+      // A container number that already exists is only a problem if it already has
+      // real financial data attached (i.e. it was already imported/offloaded/sold before).
+      // A container that was manually added on the tracking page (container number typed
+      // in ahead of the invoice, still status OTW with no PO/charges/sale yet) is treated
+      // as a placeholder — the import will attach its PO/line items to that existing
+      // record instead of creating a duplicate. Must be in the same company to be eligible.
       const existingContainer = await storage.getContainerByNumber(containerNumber);
       if (existingContainer) {
-        errors.push(`Container number "${containerNumber}" already exists — it cannot be imported again`);
+        if (existingContainer.companyId !== req.session.currentCompanyId) {
+          errors.push(`Container number "${containerNumber}" already exists — it cannot be imported again`);
+        } else if (existingContainer.status !== "OTW") {
+          errors.push(`Container number "${containerNumber}" already exists — it cannot be imported again`);
+        } else {
+          const [existingPOs, existingCharges, existingSale] = await Promise.all([
+            storage.getPurchaseOrdersByContainer(existingContainer.id),
+            storage.getChargesByContainer(existingContainer.id),
+            storage.getContainerSaleByContainerId(existingContainer.id, existingContainer.companyId),
+          ]);
+          if (existingPOs.length > 0 || existingCharges.length > 0 || existingSale) {
+            errors.push(`Container number "${containerNumber}" already exists — it cannot be imported again`);
+          }
+        }
       }
 
       // Get all stock items for validation
@@ -280,25 +299,54 @@ export function registerImportRoutes(app: Express) {
         return res.status(400).json({ message: "This file has already been imported" });
       }
 
-      // Hard block: container number must be unique
+      // A container number that already exists is only a hard block if it already has
+      // real financial data attached (PO, charges, or a sale) or belongs to another
+      // company, or has moved past OTW (offloaded/sold). A container manually typed in
+      // on the tracking page ahead of the invoice (still OTW, no PO/charges/sale yet) is
+      // a placeholder — merge the imported PO/line items into that existing record
+      // instead of creating a duplicate or blocking.
       const existingContainerCheck = await storage.getContainerByNumber(containerNumber);
+      let container: Container;
       if (existingContainerCheck) {
-        return res.status(400).json({
+        const blockedMessage = {
           message: `Container "${containerNumber}" already exists in the system. Each container number can only be imported once.`,
+        };
+        if (existingContainerCheck.companyId !== req.session.currentCompanyId) {
+          return res.status(400).json(blockedMessage);
+        }
+        if (existingContainerCheck.status !== "OTW") {
+          return res.status(400).json(blockedMessage);
+        }
+        const [existingPOs, existingCharges, existingSale] = await Promise.all([
+          storage.getPurchaseOrdersByContainer(existingContainerCheck.id),
+          storage.getChargesByContainer(existingContainerCheck.id),
+          storage.getContainerSaleByContainerId(existingContainerCheck.id, existingContainerCheck.companyId),
+        ]);
+        if (existingPOs.length > 0 || existingCharges.length > 0 || existingSale) {
+          return res.status(400).json(blockedMessage);
+        }
+        // Merge into the existing placeholder container, preserving its tracking fields
+        // (shopName, eta, transporter, etc.) that may have been filled in manually.
+        container = await storage.updateContainer(existingContainerCheck.id, {
+          supplierId,
+          status: "OTW",
+          importDate,
+          itemsTotal: containerPreview.itemsTotal.toString(),
+          chargesTotal: containerPreview.chargesTotal.toString(),
+          grandTotal: containerPreview.grandTotal.toString(),
+        });
+      } else {
+        container = await storage.createContainer({
+          companyId: req.session.currentCompanyId!,
+          containerNumber,
+          supplierId,
+          status: "OTW",
+          importDate,
+          itemsTotal: containerPreview.itemsTotal.toString(),
+          chargesTotal: containerPreview.chargesTotal.toString(),
+          grandTotal: containerPreview.grandTotal.toString(),
         });
       }
-
-      // Create new container
-      let container = await storage.createContainer({
-        companyId: req.session.currentCompanyId!,
-        containerNumber,
-        supplierId,
-        status: "OTW",
-        importDate,
-        itemsTotal: containerPreview.itemsTotal.toString(),
-        chargesTotal: containerPreview.chargesTotal.toString(),
-        grandTotal: containerPreview.grandTotal.toString(),
-      });
 
       // Group items by PO
       const poGroups = containerPreview.items.reduce((acc: any, item: any) => {

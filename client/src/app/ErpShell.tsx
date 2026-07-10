@@ -64,7 +64,7 @@ export function ErpShell({ user, hasErpAccess, handleLogout, leaveConfirmDialog 
         onOpenChange={setPaletteOpen}
         hasErpAccess={hasErpAccess}
         hasFactoryAccess={false}
-        isAdminOwner={user?.role === "Admin" || user?.role === "Developer"}
+        isAdminOwner={user?.role === "Admin" || user?.role === "Owner" || user?.role === "Developer"}
         user={user}
       />
       {leaveConfirmDialog}

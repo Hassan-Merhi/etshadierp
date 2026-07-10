@@ -92,7 +92,7 @@ export function FactoryShell({
         onOpenChange={setPaletteOpen}
         hasErpAccess={false}
         hasFactoryAccess={true}
-        isAdminOwner={user?.role === "Admin" || user?.role === "Developer"}
+        isAdminOwner={user?.role === "Admin" || user?.role === "Owner" || user?.role === "Developer"}
         user={user}
       />
       {leaveConfirmDialog}

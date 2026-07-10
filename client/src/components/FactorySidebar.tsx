@@ -192,7 +192,7 @@ export function useFactoryVisibleSections(user?: any): {
   isPrivileged: boolean;
 } {
   const isDeveloper = user?.role === "Developer";
-  const isAdmin = user?.role === "Admin" || isDeveloper;
+  const isAdmin = user?.role === "Admin" || user?.role === "Owner" || isDeveloper;
 
   const { data: settings } = useQuery<any>({
     queryKey: ["/api/factory/settings"],
