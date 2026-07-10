@@ -120,9 +120,25 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
+      - name: Prepare test database schema
+        id: db_schema
+        if: always() && steps.install.outcome == 'success'
+        run: |
+          set -o pipefail
+          node node_modules/drizzle-kit/bin.cjs push --force 2>&1 | tee db-schema-ci.txt
+
+      - name: Upload database schema failure log
+        if: always() && steps.db_schema.outcome == 'failure'
+        uses: actions/upload-artifact@v4
+        with:
+          name: database-schema-errors
+          path: db-schema-ci.txt
+          if-no-files-found: error
+          retention-days: 7
+
       - name: Backend tests
         id: backend_tests
-        if: always() && steps.install.outcome == 'success'
+        if: always() && steps.db_schema.outcome == 'success'
         run: |
           set -o pipefail
           npm run test:backend 2>&1 | tee backend-test-errors-ci.txt
