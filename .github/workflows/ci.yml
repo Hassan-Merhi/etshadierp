@@ -38,6 +38,7 @@ jobs:
       SESSION_SECRET: ci-session-secret
       CSRF_ENFORCE: "0"
       NODE_OPTIONS: --max-old-space-size=4096
+      PORT: "5000"
 
     steps:
       - name: Checkout repository
@@ -136,9 +137,50 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
+      - name: Run application startup migrations
+        id: runtime_migrations
+        if: always() && steps.db_schema.outcome == 'success'
+        run: |
+          set -o pipefail
+          node node_modules/tsx/dist/cli.mjs server/index.ts > startup-migrations-ci.txt 2>&1 &
+          app_pid=$!
+          cleanup() {
+            kill "$app_pid" 2>/dev/null || true
+            wait "$app_pid" 2>/dev/null || true
+          }
+          trap cleanup EXIT
+
+          for attempt in $(seq 1 180); do
+            if curl --fail --silent --show-error http://127.0.0.1:${PORT}/api/health/db > health-db-ci.json; then
+              cat health-db-ci.json
+              exit 0
+            fi
+            if ! kill -0 "$app_pid" 2>/dev/null; then
+              echo "Application exited before startup migrations became ready."
+              cat startup-migrations-ci.txt
+              exit 1
+            fi
+            sleep 1
+          done
+
+          echo "Timed out waiting for application startup migrations."
+          cat startup-migrations-ci.txt
+          exit 1
+
+      - name: Upload startup migration failure log
+        if: always() && steps.runtime_migrations.outcome == 'failure'
+        uses: actions/upload-artifact@v4
+        with:
+          name: startup-migration-errors
+          path: |
+            startup-migrations-ci.txt
+            health-db-ci.json
+          if-no-files-found: warn
+          retention-days: 7
+
       - name: Backend tests
         id: backend_tests
-        if: always() && steps.db_schema.outcome == 'success'
+        if: always() && steps.runtime_migrations.outcome == 'success'
         run: |
           set -o pipefail
           npm run test:backend 2>&1 | tee backend-test-errors-ci.txt
