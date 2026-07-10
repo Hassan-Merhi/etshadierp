@@ -53,7 +53,7 @@ export function PropertiesShell({ user, currentLocation, handleLogout, leaveConf
         hasErpAccess={false}
         hasFactoryAccess={false}
         hasPropertiesAccess={true}
-        isAdminOwner={user?.role === "Admin" || user?.role === "Developer"}
+        isAdminOwner={user?.role === "Admin" || user?.role === "Owner" || user?.role === "Developer"}
         user={user}
       />
       {leaveConfirmDialog}
