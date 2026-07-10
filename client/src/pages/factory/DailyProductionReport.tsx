@@ -943,7 +943,7 @@ function LedgerSection({
                         const rowKey = `${category}-${r.productId ?? "null"}-${i}`;
                         const isOpen = expandedRows.has(rowKey);
                         const rowAvgRate = r.baleCount > 0 && r.totalCost > 0 ? r.totalCost / r.baleCount : 0;
-                        const hasBaleDetails = r.baleDetails.some((d) => d.ref || d.totalCost > 0);
+                        const hasBaleDetails = (r.baleDetails ?? []).some((d) => d.ref || d.totalCost > 0);
                         return [
                           <TableRow key={rowKey} className={isOpen ? "bg-muted/10" : ""}>
                             <TableCell className="py-2 px-3 pl-5">
@@ -1000,7 +1000,7 @@ function LedgerSection({
                                         </tr>
                                       </thead>
                                       <tbody>
-                                        {r.baleDetails.map((d, di) => (
+                                        {(r.baleDetails ?? []).map((d, di) => (
                                           <tr key={di} className="border-b border-border/20 last:border-0">
                                             <td className="py-1 pr-4 font-mono">{d.ref || "—"}</td>
                                             <td className="py-1 pr-4 text-right text-muted-foreground">
@@ -1022,7 +1022,7 @@ function LedgerSection({
                                             </td>
                                           </tr>
                                         ))}
-                                        {r.baleDetails.length > 1 && (
+                                        {(r.baleDetails ?? []).length > 1 && (
                                           <tr className="font-semibold border-t border-border/50">
                                             <td className="py-1 pr-4 text-muted-foreground">Total</td>
                                             <td className="py-1 pr-4 text-right">{fmtL(r.totalWeightKg)}</td>
