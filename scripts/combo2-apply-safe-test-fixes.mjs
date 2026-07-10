@@ -1,11 +1,12 @@
 import { readFileSync, writeFileSync } from "node:fs";
 
 // Temporary guarded helper for Combo 2; removed before merge.
-function replaceExact(source, oldText, newText, label) {
-  if (!source.includes(oldText)) {
+function replaceOnce(source, pattern, replacement, label) {
+  const next = source.replace(pattern, replacement);
+  if (next === source) {
     throw new Error(`Combo 2 replacement not found: ${label}`);
   }
-  return source.replace(oldText, newText);
+  return next;
 }
 
 function updateExcelExportTests() {
@@ -20,28 +21,23 @@ function updateExcelExportTests() {
     return;
   }
 
-  source = replaceExact(
+  source = replaceOnce(
     source,
-    "  if (!templateExists) return; // skip generation; inner tests use it.skip\n",
+    /  if \(!templateExists\) return;[^\n]*\n/,
     "  expect(templateExists, `Required SP export template missing: ${TEMPLATE_PATH}`).toBe(true);\n",
     "excel template guard",
   );
 
-  source = replaceExact(
+  source = replaceOnce(
     source,
-    `const maybeIt = templateExists
-  ? it
-  : it.skip.bind(it, "template missing");`,
+    /const maybeIt = templateExists\s*\? it\s*:\s*it\.skip\.bind\(it, "template missing"\);/,
     "const maybeIt = it;",
     "excel conditional test alias",
   );
 
-  source = replaceExact(
+  source = replaceOnce(
     source,
-    `function requireWb(ctx: { skip: () => void }): ExcelJS.Workbook | null {
-  if (!buf || !wb) { ctx.skip(); return null; }
-  return wb;
-}`,
+    /function requireWb\(ctx: \{ skip: \(\) => void \}\): ExcelJS\.Workbook \| null \{\s*if \(!buf \|\| !wb\) \{ ctx\.skip\(\); return null; \}\s*return wb;\s*\}/,
     `function requireWb(_ctx?: { skip: () => void }): ExcelJS.Workbook {
   expect(buf).toBeDefined();
   expect(wb).toBeDefined();
@@ -50,12 +46,7 @@ function updateExcelExportTests() {
     "excel workbook guard",
   );
 
-  const skipLine = "    if (!buf) { ctx.skip(); return; }\n";
-  const skipCount = source.split(skipLine).length - 1;
-  if (skipCount !== 2) {
-    throw new Error(`Expected 2 Excel buffer skip guards, found ${skipCount}`);
-  }
-  source = source.split(skipLine).join("");
+  source = source.replace(/\s*if \(!buf\) \{ ctx\.skip\(\); return; \}\n/g, "\n");
 
   if (source.includes("it.skip") || source.includes("ctx.skip()")) {
     throw new Error("Excel export test still contains active skip guards");
@@ -72,45 +63,24 @@ function updateFactoryXlsxTests() {
     return;
   }
 
-  source = replaceExact(
-    source,
-    `/**
- * Set to true in the "seeded bale appears" check.
- * export-full.xlsx success-path tests are skipped when false to avoid false
- * failures on shared DBs where the session company may contain production data.
- */
-let baleAppearsInSessionCompany = false;
-`,
+  source = source.replace(
+    /\/\*\*\s*\* Set to true in the "seeded bale appears" check\.[\s\S]*?\*\/\s*let baleAppearsInSessionCompany = false;\s*/,
     `// CI uses an isolated PostgreSQL database, so the seeded bale must always be
 // visible through the authenticated test company's export endpoints.
 `,
-    "XLSX shared-database flag",
   );
 
-  source = replaceExact(
+  source = replaceOnce(
     source,
-    `  it("seeded bale reference number appears in the export (sets baleAppearsInSessionCompany)", async (t) => {`,
-    `  it("seeded bale reference number appears in the export", async () => {`,
+    /it\("seeded bale reference number appears in the export \(sets baleAppearsInSessionCompany\)", async \(t\) => \{/,
+    'it("seeded bale reference number appears in the export", async () => {',
     "XLSX seeded-bale test signature",
   );
 
-  source = replaceExact(
+  source = replaceOnce(
     source,
-    `    baleAppearsInSessionCompany = refNumbers.includes(\`${"${TEST_PREFIX}"}-REF-001\`);
-
-    if (!baleAppearsInSessionCompany) {
-      // Shared DB environment: session company has production data, skip.
-      // The structural tests above (headers, magic bytes, sheet names) still pass.
-      console.info(
-        \`[xlsx-export.test] Seeded bale not in export — session company likely \` +
-          \`contains production data. Skipping bale-presence assertion.\`,
-      );
-      t.skip();
-      return;
-    }
-
-`,
-    "",
+    /\s*baleAppearsInSessionCompany = refNumbers\.includes\(`\$\{TEST_PREFIX\}-REF-001`\);\s*if \(!baleAppearsInSessionCompany\) \{[\s\S]*?t\.skip\(\);\s*return;\s*\}\s*/,
+    "\n",
     "XLSX seeded-bale conditional skip",
   );
 
@@ -120,16 +90,14 @@ let baleAppearsInSessionCompany = false;
   );
 
   source = source.replaceAll("async (t) => {", "async () => {");
-
-  const multilineSkip = `    if (!baleAppearsInSessionCompany) {
-      t.skip(); // shared DB: session company differs — see note at top of file
-      return;
-    }
-`;
-  source = source.split(multilineSkip).join("");
-  source = source
-    .split("    if (!baleAppearsInSessionCompany) { t.skip(); return; }\n")
-    .join("");
+  source = source.replace(
+    /\s*if \(!baleAppearsInSessionCompany\) \{\s*t\.skip\(\);[^\n]*\s*return;\s*\}\s*/g,
+    "\n",
+  );
+  source = source.replace(
+    /\s*if \(!baleAppearsInSessionCompany\) \{ t\.skip\(\); return; \}\s*/g,
+    "\n",
+  );
 
   if (source.includes("baleAppearsInSessionCompany") || source.includes("t.skip()")) {
     throw new Error("Factory XLSX test still contains shared-database skip guards");
