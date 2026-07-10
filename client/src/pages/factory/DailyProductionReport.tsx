@@ -1,4 +1,5 @@
 import { useState, useMemo, useCallback, useEffect } from "react";
+import { useSearch } from "wouter";
 import FactoryFinancialSnapshot from "@/pages/factory/FactoryFinancialSnapshot";
 import FactoryShippingContainers from "@/pages/factory/FactoryShippingContainers";
 import FactoryStatusBuilder from "@/pages/factory/FactoryStatusBuilder";
@@ -1087,7 +1088,17 @@ function LedgerSection({
 }
 
 export default function DailyProductionReport() {
-  const [activeTab, setActiveTab] = useState("production");
+  const search = useSearch();
+  const initialTab = new URLSearchParams(search).get("tab") || "production";
+  const [activeTab, setActiveTab] = useState(initialTab);
+
+  // Keep in sync if the query param changes after mount (e.g. navigating here
+  // again from a redirect like /factory/bale-ledger?tab=ledger while already
+  // on this page).
+  useEffect(() => {
+    const tab = new URLSearchParams(search).get("tab");
+    setActiveTab(tab || "production");
+  }, [search]);
   const [preset, setPreset] = useState<Preset>("today");
   const [customFrom, setCustomFrom] = useState(todayStr());
   const [customTo, setCustomTo] = useState(todayStr());

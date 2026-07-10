@@ -957,6 +957,12 @@ export function registerEmployeeNetPositionRoutes(app: Express) {
       // Single query: sum production_price for every IN_STOCK bale that has a
       // matched product, scoped strictly to companyId.
       // Production price (cost to manufacture) is used here, not selling price.
+      //
+      // Must exclude "stale" IN_STOCK bales — bales still marked IN_STOCK in the
+      // DB but whose order was actually FINALIZED/DISPATCHED/SOLD (status never
+      // got updated). Location Inventory and Bale Ledger already exclude these;
+      // without the same exclusion here, Stock In Hand is inflated and drifts
+      // out of sync with what Location Inventory shows.
       const invResult = await db.execute(sql`
         SELECT COALESCE(SUM(p.production_price::numeric), 0) AS total
         FROM   factory_bales   b
@@ -964,6 +970,13 @@ export function registerEmployeeNetPositionRoutes(app: Express) {
         WHERE  b.company_id = ${companyId}
           AND  b.status     = 'IN_STOCK'
           AND  p.company_id = ${companyId}
+          AND  NOT EXISTS (
+            SELECT 1 FROM customer_order_bales cob
+            INNER JOIN customer_orders co ON co.id = cob.order_id
+            WHERE cob.bale_id = b.id
+              AND co.status IN ('FINALIZED', 'DISPATCHED', 'SOLD')
+              AND co.company_id = ${companyId}
+          )
       `);
       const invRow = ((invResult as any).rows ?? (invResult as any))[0] ?? {};
       const inventorySellValue = round2(parseFloat(String(invRow?.total ?? "0")));

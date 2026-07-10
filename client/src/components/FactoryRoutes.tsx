@@ -199,7 +199,7 @@ export function FactoryRoutes({ user, myAccess, factoryDefaultPage }: FactoryRou
       <Route path="/factory/waste-dispatch" component={WasteDispatchPage} />
       <Route path="/factory/pos" component={FactoryPOS} />
       <Route path="/factory/bale-ledger">
-        {() => <Redirect to="/factory/production-report" />}
+        {() => <Redirect to="/factory/production-report?tab=ledger" />}
       </Route>
       <Route path="/factory/intelligence/settings" component={FactoryIntelSettings} />
       {(user?.role === "Admin" || user?.role === "Developer" || myAccess?.fullAccess) && (
