@@ -1,14 +1,16 @@
 import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
 import * as schema from "@shared/schema";
+import { logger } from "./lib/logger";
 
 // Database connection configuration
 // Supports: DATABASE_URL (Render, external) or individual PG* variables (Replit)
 let connectionString: string;
+let databaseSource: "DATABASE_URL" | "PG_ENV";
 
 if (process.env.DATABASE_URL) {
   connectionString = process.env.DATABASE_URL;
-  console.log("✓ Using DATABASE_URL for PostgreSQL connection");
+  databaseSource = "DATABASE_URL";
 } else if (
   process.env.PGHOST &&
   process.env.PGPORT &&
@@ -18,31 +20,41 @@ if (process.env.DATABASE_URL) {
 ) {
   const { PGHOST, PGPORT, PGUSER, PGPASSWORD, PGDATABASE } = process.env;
   connectionString = `postgresql://${PGUSER}:${PGPASSWORD}@${PGHOST}:${PGPORT}/${PGDATABASE}`;
-  console.log("✓ Using Replit PostgreSQL database");
+  databaseSource = "PG_ENV";
 } else {
   throw new Error("No database configuration found. Please set DATABASE_URL or provision a PostgreSQL database.");
 }
-
-console.log("Database connection endpoint:", connectionString.replace(/:[^:@]*@/, ":***@"));
 
 // SSL: disabled for Replit local DB or when PGSSLMODE=disable, enabled for everything else.
 const isLocalReplitDB = process.env.PGHOST === "helium" || connectionString.includes("@helium:");
 const sslExplicitlyDisabled = process.env.PGSSLMODE === "disable";
 const requiresSSL = !isLocalReplitDB && !sslExplicitlyDisabled;
 
-if (isLocalReplitDB) {
-  console.log("ℹ️  SSL disabled for Replit local database (helium)");
-} else if (sslExplicitlyDisabled) {
-  console.warn("⚠️  SSL disabled via PGSSLMODE=disable");
-} else {
-  console.log("✓ SSL enabled for external database connection");
+logger.info("Database configuration selected", {
+  module: "database",
+  action: "configure",
+  source: databaseSource,
+  sslEnabled: requiresSSL,
+});
+
+if (sslExplicitlyDisabled && !isLocalReplitDB) {
+  logger.warn("Database SSL disabled by environment", {
+    module: "database",
+    action: "configure",
+    setting: "PGSSLMODE=disable",
+  });
 }
 
 // Configurable via PG_POOL_MAX env var (default 10).
 // Zero-downtime deploy runs two instances: 10*2 + session(1*2) = 22 connections,
 // well within the Render 97-connection limit. Raise PG_POOL_MAX if the DB plan allows more.
 const poolMax = Number(process.env.PG_POOL_MAX || 10);
-console.log(`[DB Pool] max=${poolMax} (PG_POOL_MAX=${process.env.PG_POOL_MAX ?? "unset"})`);
+logger.info("Database pool configured", {
+  module: "database",
+  action: "pool-configure",
+  max: poolMax,
+  configuredValue: process.env.PG_POOL_MAX ?? "unset",
+});
 
 export const pool = new Pool({
   connectionString,
@@ -57,8 +69,12 @@ export const pool = new Pool({
 });
 
 // Log unexpected errors on idle clients.
-pool.on("error", (err) => {
-  console.error("[DB Pool] Idle client error:", err.message);
+pool.on("error", (error) => {
+  logger.error("Database pool idle-client error", {
+    module: "database",
+    action: "pool-error",
+    error,
+  });
   logPoolStats("on-error");
 });
 
@@ -74,9 +90,20 @@ pool.on("acquire", () => {
 });
 
 export function logPoolStats(trigger: string) {
-  console.log(
-    `[DB Pool] trigger=${trigger} total=${pool.totalCount} idle=${pool.idleCount} waiting=${pool.waitingCount}`
-  );
+  const context = {
+    module: "database",
+    action: "pool-stats",
+    trigger,
+    total: pool.totalCount,
+    idle: pool.idleCount,
+    waiting: pool.waitingCount,
+  };
+
+  if (trigger === "on-error" || pool.waitingCount > 0) {
+    logger.warn("Database pool pressure", context);
+  } else {
+    logger.debug("Database pool stats", context);
+  }
 }
 
 export const db = drizzle(pool, { schema });
