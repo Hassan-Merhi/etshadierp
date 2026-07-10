@@ -33,6 +33,7 @@ jobs:
 
     env:
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/heliumdb
+      PGSSLMODE: disable
       NODE_ENV: test
       SESSION_SECRET: ci-session-secret
       CSRF_ENFORCE: "0"
@@ -48,6 +49,9 @@ jobs:
           node-version: "20"
           cache: npm
 
+      - name: Normalize Replit registry URLs for CI
+        run: sed -i 's#http://package-firewall.replit.local/npm/#https://registry.npmjs.org/#g' package-lock.json
+
       - name: Install dependencies
         id: install
         run: npm ci --no-audit --bin-links=true
@@ -59,6 +63,7 @@ jobs:
           npm --version
           npm config get bin-links
           node -p "'TypeScript ' + require('typescript/package.json').version"
+          node -p "'jsdom ' + require('jsdom/package.json').version"
           for binary in tsc vite eslint vitest; do
             if [ -x "node_modules/.bin/$binary" ]; then
               echo "$binary: available"
