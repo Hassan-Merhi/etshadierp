@@ -1,0 +1,39 @@
+name: Combo 4D Apply 2
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: combo4d-apply-2-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  apply:
+    if: github.event.pull_request.head.ref == 'agent/combo-4d-stock-pos-vouchers-typescript'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Combo 4D branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+          fetch-depth: 0
+      - name: Apply audited second safe slice
+        run: node scripts/combo-4d-safe-slice-2.mjs
+      - name: Commit production changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add server/routes/factory/_helpers.ts \
+                  server/routes/factory/factoryBalesRoutes.ts \
+                  server/routes/factory/factoryStockRoutes.ts \
+                  server/routes/factory/factoryStockAllocationV3Routes.ts
+          if git diff --cached --quiet; then
+            echo "Combo 4D second safe slice already applied."
+          else
+            git commit -m "Apply Combo 4D factory map and row typing fixes"
+            git push origin HEAD:${{ github.event.pull_request.head.ref }}
+          fi
