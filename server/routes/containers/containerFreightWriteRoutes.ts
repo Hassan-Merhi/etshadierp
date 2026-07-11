@@ -50,6 +50,7 @@ import {
   intercompanyPosConfigs,
   stockItemMergeLogs,
 } from "@shared/schema";
+import type { InsertPurchaseOrder } from "@shared/schema";
 import {
   eq,
   and,
@@ -765,7 +766,6 @@ export function registerContainerFreightWriteRoutes(app: Express) {
                 } else {
                   await tx.insert(voucherEntries).values({
                     voucherId: existingPO.voucherId,
-                    companyId: existingPO.companyId,
                     ledgerAccountId: newFreightParentAccountId,
                     debitAmount: "0",
                     creditAmount: newFreight.toFixed(2),
@@ -817,7 +817,6 @@ export function registerContainerFreightWriteRoutes(app: Express) {
                 } else if (parentCreditAcctId) {
                   await tx.insert(voucherEntries).values({
                     voucherId: existingPO.voucherId,
-                    companyId: existingPO.companyId,
                     ledgerAccountId: parentCreditAcctId,
                     debitAmount: "0",
                     creditAmount: newGrandTotal.toFixed(2),
@@ -829,7 +828,6 @@ export function registerContainerFreightWriteRoutes(app: Express) {
                   await tx.insert(voucherEntries).values([
                     {
                       voucherId: existingPO.voucherId,
-                      companyId: existingPO.companyId,
                       ledgerAccountId: purchasesAcctId,
                       debitAmount: supplierTotal.toFixed(2),
                       creditAmount: "0",
@@ -837,7 +835,6 @@ export function registerContainerFreightWriteRoutes(app: Express) {
                     },
                     {
                       voucherId: existingPO.voucherId,
-                      companyId: existingPO.companyId,
                       ledgerAccountId: purchasesAcctId,
                       debitAmount: newFreight.toFixed(2),
                       creditAmount: "0",
@@ -889,7 +886,6 @@ export function registerContainerFreightWriteRoutes(app: Express) {
                 await tx.insert(voucherEntries).values([
                   {
                     voucherId: existingPO.voucherId,
-                    companyId: existingPO.companyId,
                     ledgerAccountId: purchasesAcctId,
                     debitAmount: newFreight.toFixed(2),
                     creditAmount: "0",
@@ -897,7 +893,6 @@ export function registerContainerFreightWriteRoutes(app: Express) {
                   },
                   {
                     voucherId: existingPO.voucherId,
-                    companyId: existingPO.companyId,
                     ledgerAccountId: newFreightOwnAccountId,
                     debitAmount: "0",
                     creditAmount: newFreight.toFixed(2),
@@ -1045,7 +1040,7 @@ export function registerContainerFreightWriteRoutes(app: Express) {
             const [existingFV] = await tx
               .select()
               .from(vouchers)
-              .where(and(eq(vouchers.companyId, companyId), eq(vouchers.voucherNumber, freightVoucherNum)))
+              .where(and(eq(vouchers.companyId, existingPO.companyId), eq(vouchers.voucherNumber, freightVoucherNum)))
               .limit(1);
             if (existingFV) {
               // Update existing freight voucher
@@ -1076,7 +1071,7 @@ export function registerContainerFreightWriteRoutes(app: Express) {
               const [newFV] = await tx
                 .insert(vouchers)
                 .values({
-                  companyId,
+                  companyId: existingPO.companyId,
                   voucherNumber: freightVoucherNum,
                   voucherType: "Payment",
                   voucherDate: today,
@@ -1109,7 +1104,7 @@ export function registerContainerFreightWriteRoutes(app: Express) {
             const [existingFV] = await tx
               .select()
               .from(vouchers)
-              .where(and(eq(vouchers.companyId, companyId), eq(vouchers.voucherNumber, freightVoucherNum)))
+              .where(and(eq(vouchers.companyId, existingPO.companyId), eq(vouchers.voucherNumber, freightVoucherNum)))
               .limit(1);
             if (existingFV) {
               await tx.delete(voucherEntries).where(eq(voucherEntries.voucherId, existingFV.id));

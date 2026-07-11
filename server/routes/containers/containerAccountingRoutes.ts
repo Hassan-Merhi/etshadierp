@@ -269,7 +269,6 @@ export function registerContainerAccountingRoutes(app: Express) {
             } else if (parentCreditAcctId) {
               await db.insert(voucherEntries).values({
                 voucherId: po.voucherId,
-                companyId: po.companyId,
                 ledgerAccountId: parentCreditAcctId,
                 debitAmount: "0",
                 creditAmount: poTotal.toFixed(2),
@@ -282,7 +281,6 @@ export function registerContainerAccountingRoutes(app: Express) {
               await db.insert(voucherEntries).values([
                 {
                   voucherId: po.voucherId,
-                  companyId: po.companyId,
                   ledgerAccountId: purchasesAcctId,
                   debitAmount: poIntercoTotal.toFixed(2),
                   creditAmount: "0",
@@ -290,11 +288,10 @@ export function registerContainerAccountingRoutes(app: Express) {
                 },
                 {
                   voucherId: po.voucherId,
-                  companyId: po.companyId,
                   ledgerAccountId: purchasesAcctId,
                   debitAmount: poFreight.toFixed(2),
                   creditAmount: "0",
-                  narration: `Freight - ${po.poNumber}${poContainerRow?.containerNumber ? ` (${poContainerRow.containerNumber})` : ""}`,
+                  narration: `Freight - ${po.poNumber}${container.containerNumber ? ` (${container.containerNumber})` : ""}`,
                 },
               ]);
             }
@@ -338,19 +335,17 @@ export function registerContainerAccountingRoutes(app: Express) {
               await db.insert(voucherEntries).values([
                 {
                   voucherId: po.voucherId,
-                  companyId: po.companyId,
                   ledgerAccountId: purchasesAcctId,
                   debitAmount: poFreight.toFixed(2),
                   creditAmount: "0",
-                  narration: `Freight - ${po.poNumber}${poContainerRow?.containerNumber ? ` (${poContainerRow.containerNumber})` : ""}`,
+                  narration: `Freight - ${po.poNumber}${container.containerNumber ? ` (${container.containerNumber})` : ""}`,
                 },
                 {
                   voucherId: po.voucherId,
-                  companyId: po.companyId,
                   ledgerAccountId: freightAccountId,
                   debitAmount: "0",
                   creditAmount: poFreight.toFixed(2),
-                  narration: `Freight - ${po.poNumber}${poContainerRow?.containerNumber ? ` (${poContainerRow.containerNumber})` : ""}`,
+                  narration: `Freight - ${po.poNumber}${container.containerNumber ? ` (${container.containerNumber})` : ""}`,
                 },
               ]);
             }
@@ -517,6 +512,12 @@ export function registerContainerAccountingRoutes(app: Express) {
                 ? poFreightOwnAccountId
                 : null;
 
+            const poContainerId = po.containerId;
+            const cNum = poContainerId
+              ? (containerNumberMap.get(poContainerId) ?? String(poContainerId))
+              : String(po.id);
+            const isSameCompanyPo = !parentCompanyId || po.companyId === parentCompanyId;
+
             // ── Fix the local purchase voucher ────────────────────────────────
             // Expected total:
             //   parent-freight (with or without account) → grossTotal (child owes parent the full amount)
@@ -539,7 +540,6 @@ export function registerContainerAccountingRoutes(app: Express) {
                   .where(eq(voucherEntries.voucherId, po.voucherId));
 
                 // ── Determine if a repair is needed ──────────────────────────
-                const isSameCompanyPo = !parentCompanyId || po.companyId === parentCompanyId;
                 let freightEntryMissing = false;
                 if (hasParentFreight) {
                   if (isSameCompanyPo) {
@@ -643,7 +643,6 @@ export function registerContainerAccountingRoutes(app: Express) {
                       } else {
                         await db.insert(voucherEntries).values({
                           voucherId: po.voucherId,
-                          companyId: po.companyId,
                           ledgerAccountId: poFreightParentAccountId!,
                           debitAmount: "0",
                           creditAmount: poFreight.toFixed(2),
@@ -692,7 +691,6 @@ export function registerContainerAccountingRoutes(app: Express) {
                       } else if (parentCreditAcctId) {
                         await db.insert(voucherEntries).values({
                           voucherId: po.voucherId,
-                          companyId: po.companyId,
                           ledgerAccountId: parentCreditAcctId,
                           debitAmount: "0",
                           creditAmount: grossTotal.toFixed(2),
@@ -704,7 +702,6 @@ export function registerContainerAccountingRoutes(app: Express) {
                         await db.insert(voucherEntries).values([
                           {
                             voucherId: po.voucherId,
-                            companyId: po.companyId,
                             ledgerAccountId: purchasesAcctId,
                             debitAmount: intercoTotal.toFixed(2),
                             creditAmount: "0",
@@ -712,7 +709,6 @@ export function registerContainerAccountingRoutes(app: Express) {
                           },
                           {
                             voucherId: po.voucherId,
-                            companyId: po.companyId,
                             ledgerAccountId: purchasesAcctId,
                             debitAmount: poFreight.toFixed(2),
                             creditAmount: "0",
@@ -758,7 +754,6 @@ export function registerContainerAccountingRoutes(app: Express) {
                       await db.insert(voucherEntries).values([
                         {
                           voucherId: po.voucherId,
-                          companyId: po.companyId,
                           ledgerAccountId: purchasesAcctId,
                           debitAmount: poFreight.toFixed(2),
                           creditAmount: "0",
@@ -766,7 +761,6 @@ export function registerContainerAccountingRoutes(app: Express) {
                         },
                         {
                           voucherId: po.voucherId,
-                          companyId: po.companyId,
                           ledgerAccountId: freightAccountId,
                           debitAmount: "0",
                           creditAmount: poFreight.toFixed(2),
@@ -802,12 +796,6 @@ export function registerContainerAccountingRoutes(app: Express) {
                 }
               }
             }
-
-            // ── Compute container number for this PO (used by parent sync) ──
-            const poContainerId = po.containerId;
-            const cNum = poContainerId
-              ? (containerNumberMap.get(poContainerId) ?? String(poContainerId))
-              : String(po.id);
 
             // ── Fix the parent INTERCO-PARENT voucher ───────────────────────
             if (parentCompanyId && po.companyId !== parentCompanyId) {
