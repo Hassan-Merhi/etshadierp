@@ -171,11 +171,17 @@ export default function BalesHistory() {
     queryFn: async () => {
       const params = new URLSearchParams();
       if (dateFilter) params.set("date", dateFilter);
-      const path = `/api/factory/bales${params.toString() ? `?${params}` : ""}`;
+      // Lite mode: slim product/mixBatch payloads; skips lastPrintedAt lookup.
+      params.set("lite", "1");
+      const path = `/api/factory/bales?${params.toString()}`;
       const res = await modeApiRequest("GET", path);
       if (!res.ok) throw new Error("Failed to fetch bales");
       return res.json();
     },
+    staleTime: 60_000,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+    placeholderData: (prev: any) => prev,
   });
 
   const { data: mixBatches } = useQuery<FactoryMixBatch[]>({
