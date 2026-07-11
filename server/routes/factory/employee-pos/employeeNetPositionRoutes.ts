@@ -1007,6 +1007,10 @@ export function registerEmployeeNetPositionRoutes(app: Express) {
           fc.supplier_id,
           SUM(frs.received_kg::numeric)                                            AS total_recv,
           SUM(frs.used_kg::numeric)                                                AS total_used,
+          -- Local cost per kg (the currency on the container, e.g. AUD, EUR)
+          SUM(frs.received_kg::numeric * frs.cost_per_kg::numeric)
+            / NULLIF(SUM(frs.received_kg::numeric), 0)                             AS avg_cpk_local,
+          -- USD cost per kg (falls back to local when cost_per_kg_usd is zero/null)
           SUM(frs.received_kg::numeric *
               COALESCE(NULLIF(frs.cost_per_kg_usd::numeric, 0), frs.cost_per_kg::numeric, 0))
             / NULLIF(SUM(frs.received_kg::numeric), 0)                             AS avg_cpk_usd
@@ -1028,15 +1032,21 @@ export function registerEmployeeNetPositionRoutes(app: Express) {
       `);
       const adjRows: any[] = (adjResult as any).rows ?? (adjResult as any);
 
-      // Build per-supplier totals (same weighted-average logic as the route)
-      type SupMap = { recv: number; used: number; cpkUsd: number };
+      // Build per-supplier totals (same weighted-average logic as rawStockReceiptRoutes.ts)
+      // cpkLocal = weighted avg of local-currency cost_per_kg (AUD/EUR/USD etc.)
+      // cpkUsd   = weighted avg of cost_per_kg_usd (falls back to local when 0)
+      // After a manual ADD adjustment on an existing supplier, rawStockReceiptRoutes sets
+      // _avgCostPerKgUsd = _avgCostPerKg (the newly blended local rate). We mirror that here
+      // so the net-position value matches the "Stock Value" shown on the Raw Materials page.
+      type SupMap = { recv: number; used: number; cpkUsd: number; cpkLocal: number };
       const supMap = new Map<string, SupMap>();
       for (const r of rawRows) {
         const key = r.supplier_id ? `s${r.supplier_id}` : `u`;
         const recv = parseFloat(String(r.total_recv ?? "0")) || 0;
         const used = parseFloat(String(r.total_used ?? "0")) || 0;
+        const cpkLocal = parseFloat(String(r.avg_cpk_local ?? "0")) || 0;
         const cpkUsd = parseFloat(String(r.avg_cpk_usd ?? "0")) || 0;
-        supMap.set(key, { recv, used, cpkUsd });
+        supMap.set(key, { recv, used, cpkUsd, cpkLocal });
       }
       for (const a of adjRows) {
         // DEDUCT is history-only — it already reduced received_kg on the underlying
@@ -1054,14 +1064,17 @@ export function registerEmployeeNetPositionRoutes(app: Express) {
         const ex = supMap.get(key);
         if (ex) {
           if (isAdd) {
-            const prevVal = ex.recv * ex.cpkUsd;
+            // Mirror rawStockReceiptRoutes: blend local rates, then set cpkUsd = blended local.
+            // This ensures the net-position value == sum(valueRemainingUsd) on the Raw Materials page.
+            const prevLocalVal = ex.recv * ex.cpkLocal;
             ex.recv += kg;
-            ex.cpkUsd = ex.recv > 0 ? (prevVal + kg * cpk) / ex.recv : 0;
+            ex.cpkLocal = ex.recv > 0 ? (prevLocalVal + kg * cpk) / ex.recv : 0;
+            ex.cpkUsd = ex.cpkLocal;
           } else {
             ex.used += kg;
           }
         } else if (isAdd) {
-          supMap.set(key, { recv: kg, used: 0, cpkUsd: cpk });
+          supMap.set(key, { recv: kg, used: 0, cpkUsd: cpk, cpkLocal: cpk });
         }
       }
 
@@ -1111,12 +1124,14 @@ export function registerEmployeeNetPositionRoutes(app: Express) {
         if (r.supplier_id) reservedBySupKey.set(`s${r.supplier_id}`, parseFloat(String(r.reserved_kg ?? "0")) || 0);
       }
 
-      // Sum free-available values only (remaining − reserved) × cpkUsd
+      // Sum remainingKg × cpkUsd per supplier — mirrors the "valueRemainingUsd" field that
+      // rawStockReceiptRoutes computes and that the Raw Materials page sums for "Stock Value".
+      // (Reserved kg still have physical value in the warehouse; they are subtracted from the
+      // displayed kg count but not from the dollar value, matching the raw-materials KPI.)
       let rawTotal = 0;
-      for (const [key, s] of supMap.entries()) {
-        const reserved = reservedBySupKey.get(key) ?? 0;
-        const free = s.recv - s.used - reserved;
-        rawTotal += free * s.cpkUsd;
+      for (const [, s] of supMap.entries()) {
+        const remaining = s.recv - s.used;
+        rawTotal += remaining * s.cpkUsd;
       }
       const rawMaterialStockValue = round2(rawTotal);
 
@@ -1252,7 +1267,10 @@ export function registerEmployeeNetPositionRoutes(app: Express) {
           (a.name || "")
             .toLowerCase()
             .trim()
-            .replace(/\s+/g, " ") !== "factory worker advances"
+            .replace(/\s+/g, " ") !== "factory worker advances" &&
+          // Exclude per-worker insurance liability accounts (e.g. "Insurance - أحمد علي رمضان")
+          // — these are tracked separately via the Insurance section, not Net Position assets
+          !/^Insurance\s*[-–]/i.test(a.name || "")
       );
       const cleanLedgerForUsTotal = round2(cleanLedgerForUs.reduce((s, a) => s + a.value, 0));
 
