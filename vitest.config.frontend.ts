@@ -19,6 +19,12 @@ export default defineConfig({
         "client/src/pages/StockHub.tsx",
         "client/src/pages/InventoryHub.tsx",
       ],
+      thresholds: {
+        lines: 65,
+        statements: 60,
+        functions: 60,
+        branches: 55,
+      },
     },
     // No pool/fork overrides — jsdom runs in the same process
   },
