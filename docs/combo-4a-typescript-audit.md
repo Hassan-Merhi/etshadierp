@@ -1,6 +1,6 @@
 # Combo 4A — Safe TypeScript UI/report cleanup
 
-Status: validation in progress.
+Status: validated; draft PR remains unmerged.
 
 ## Guardrails
 
@@ -57,6 +57,28 @@ Report-looking diagnostics were also deferred when the type error exposes a poss
 - `server/routes/reportsRoutes.ts` and `server/routes/vouchers/voucherQueryRoutes.ts` reference `voucher.userId` for POS access control, but that property is absent from the returned voucher type. This needs an authorization/data-source review, not a cast.
 - `server/routes/stats/statsReportsRoutes.ts` passes a company identifier to a storage method whose current signature accepts one argument. Removing either side blindly could alter company scoping.
 - `server/services/spSalesFormExport.ts` contains formula-cell and workbook-value diagnostics adjacent to export calculations. Those remain visible until the formula/output contract is reviewed directly.
+
+## Validation
+
+Final CI run 316 on head commit `12b92ba7e9b086ce9ae0d00a0bfde317f3ec9645` completed with:
+
+- TypeScript diagnostics: **154 across 32 files**
+- Exact reduction: **9 diagnostics and 2 files**
+- New TypeScript diagnostics: **0**
+- Diagnostics in the two modified production files: **0**
+- Production build: **pass**
+- Lint: **pass**
+- Test database schema preparation: **pass**
+- Production startup migrations: **pass**
+- Backend tests: **pass**
+- Frontend tests: **pass**
+- Frontend coverage thresholds: **pass**
+- Coverage summary upload: **pass**
+- Formatting check: **pass**
+
+The CI job is expected to have an overall failure conclusion only because the repository intentionally retains 154 deferred TypeScript diagnostics. Every other blocking validation step passed.
+
+The branch was rechecked after CI and is **0 commits behind `main`**.
 
 ## Files changed
 
