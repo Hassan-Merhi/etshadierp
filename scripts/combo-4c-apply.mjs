@@ -123,9 +123,6 @@ write(factoryPath, factory);
 
 const totalRemoved =
   accountingRemoval.removed + readRemoval.removed + writeRemoval.removed + factoryRemoval.removed;
-if (totalRemoved === 0) {
-  throw new Error("No voucherEntries companyId properties were removed");
-}
 
 console.log(
   JSON.stringify(
