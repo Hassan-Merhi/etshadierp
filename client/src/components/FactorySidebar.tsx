@@ -119,8 +119,6 @@ export const FACTORY_NAV_SECTIONS: FactoryNavSection[] = [
     items: [
       { title: "Parties", url: "/factory/parties", icon: Users },
       { title: "Payroll & Benefits", url: "/factory/payroll-hub", icon: HardHat },
-      { title: "Vouchers", url: "/factory/vouchers", icon: FileText },
-      { title: "Accounts", url: "/factory/accounts", icon: Landmark },
       { title: "Analytics", url: "/factory/analytics", icon: TrendingUp, adminOnly: true },
     ],
   },
@@ -182,6 +180,8 @@ const FACTORY_PINNED_DEFAULTS: NavItem[] = [
   { title: "Overview", url: "/factory/production-report", icon: BarChart3 },
   { title: "Daybook", url: "/factory/daybook", icon: BookOpen },
   { title: "Agent Ledger", url: "/factory/agents", icon: UserRound },
+  { title: "Accounts", url: "/factory/accounts", icon: Landmark },
+  { title: "Vouchers", url: "/factory/vouchers", icon: FileText },
 ];
 
 export function useFactoryVisibleSections(user?: any): {
@@ -219,6 +219,15 @@ export function useFactoryVisibleSections(user?: any): {
     }
     if (item.url === "/factory/agents") {
       return !myAccess?.hiddenCostFields?.includes("hide_tab_agents");
+    }
+    // Accounts and Vouchers: only show when the user has explicit page access.
+    // Mirrors the Finance section's pageKeys check so restricted users can't see
+    // them in the pinned area either.
+    if (item.url === "/factory/accounts" || item.url === "/factory/vouchers") {
+      if (myAccess && !myAccess.fullAccess && myAccess.pageKeys.length > 0) {
+        return myAccess.pageKeys.includes(item.url.replace(/^\//, ""));
+      }
+      return true; // full access or no per-page restrictions configured
     }
     return true;
   };
