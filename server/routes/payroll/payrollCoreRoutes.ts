@@ -74,7 +74,12 @@ async function writeDaybookEntry(
 
 /** Find or create a ledger account by name for a company. Returns the account row.
  *  Skips soft-deleted accounts and handles race-condition unique-constraint failures. */
-async function findOrCreateLedger(companyId: number, name: string, accountType: string): Promise<{ id: number }> {
+async function findOrCreateLedger(
+  companyId: number,
+  name: string,
+  accountType: string,
+  opts?: { parentId?: number; subType?: string }
+): Promise<{ id: number }> {
   const [existing] = await db
     .select({ id: ledgerAccounts.id })
     .from(ledgerAccounts)
@@ -88,9 +93,12 @@ async function findOrCreateLedger(companyId: number, name: string, accountType: 
       .where(and(eq(ledgerAccounts.companyId, companyId), sql`code ~ '^\\d+$'`));
     const nextCode = String((parseInt((maxCodeRow as any)?.maxCode || "0") || 0) + 1 + attempt);
     try {
+      const insertVals: any = { companyId, code: nextCode, name, accountType, active: true, isHidden: false };
+      if (opts?.parentId) insertVals.parentId = opts.parentId;
+      if (opts?.subType)  insertVals.subType  = opts.subType;
       const [created] = await db
         .insert(ledgerAccounts)
-        .values({ companyId, code: nextCode, name, accountType, active: true, isHidden: false })
+        .values(insertVals)
         .returning({ id: ledgerAccounts.id });
       return created;
     } catch (err: any) {
@@ -744,14 +752,17 @@ export function registerPayrollCoreRoutes(app: Express) {
 
       // Pre-resolve per-worker ledger accounts OUTSIDE the transaction
       // Sequential calls to avoid simultaneous MAX(code) reads returning the same nextCode
-      const payableAccGen = await findOrCreateLedger(companyId, "Payroll Payable", "Liability");
-      const advancesAccGen = await findOrCreateLedger(companyId, "Factory Worker Advances", "Asset");
+      const payableAccGen  = await findOrCreateLedger(companyId, "Payroll Payable",          "Liability");
+      const advancesAccGen = await findOrCreateLedger(companyId, "Factory Worker Advances",   "Asset");
+      // Ensure group header accounts exist — worker accounts nest under them in the chart of accounts
+      const salaryGroupAcc = await findOrCreateLedger(companyId, "Salary Expense - Workers", "Expense", { subType: "Group" });
+      const bonusGroupAcc  = await findOrCreateLedger(companyId, "Bonus Expense - Workers",  "Expense", { subType: "Group" });
       // Map: workerId → { salaryId, bonusId } — each worker gets their own named expense account
       const workerAccCache = new Map<number, { salaryId: number; bonusId: number }>();
       for (const worker of targetWorkers) {
         const workerName = (worker.fullName as string) || `Worker #${worker.id}`;
-        const sa = await findOrCreateLedger(companyId, `Salary Expense - ${workerName}`, "Expense");
-        const ba = await findOrCreateLedger(companyId, `Bonus Expense - ${workerName}`, "Expense");
+        const sa = await findOrCreateLedger(companyId, `Salary Expense - ${workerName}`, "Expense", { parentId: salaryGroupAcc.id });
+        const ba = await findOrCreateLedger(companyId, `Bonus Expense - ${workerName}`,  "Expense", { parentId: bonusGroupAcc.id });
         workerAccCache.set(worker.id, { salaryId: sa.id, bonusId: ba.id });
       }
 
@@ -1725,6 +1736,64 @@ export function registerPayrollCoreRoutes(app: Express) {
       res.json({ message: "Worker-name migration complete", vouchersUpdated });
     } catch (error: any) {
       console.error("migrate-worker-names error:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // POST /api/factory/payroll/migrate-salary-groups
+  // Creates "Salary Expense - Workers" and "Bonus Expense - Workers" group header accounts,
+  // then re-parents every matching individual worker account under them so the chart of accounts
+  // shows an expandable group row instead of a flat list.  Safe to run multiple times.
+  app.post("/api/factory/payroll/migrate-salary-groups", requireAuth, async (req: any, res: any) => {
+    try {
+      const currentRole = (req.session as any).currentRole;
+      if (!["Admin", "Owner", "Developer"].includes(currentRole)) {
+        return res.status(403).json({ message: "Only Admin, Owner, or Developer can run this migration" });
+      }
+      const companyId = req.body.companyId || getFactoryCompanyId(req);
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      // 1. Find or create the two group header accounts
+      const salaryGroup = await findOrCreateLedger(companyId, "Salary Expense - Workers", "Expense", { subType: "Group" });
+      const bonusGroup  = await findOrCreateLedger(companyId, "Bonus Expense - Workers",  "Expense", { subType: "Group" });
+
+      // 2. Ensure sub_type = 'Group' on both (in case they already existed without it)
+      await db.execute(sql`
+        UPDATE ledger_accounts
+        SET sub_type = 'Group'
+        WHERE id IN (${salaryGroup.id}, ${bonusGroup.id})
+          AND (sub_type IS NULL OR sub_type <> 'Group')
+      `);
+
+      // 3. Re-parent all "Salary Expense - *" accounts under salaryGroup
+      const salRes = await db.execute(sql`
+        UPDATE ledger_accounts
+        SET parent_id = ${salaryGroup.id}
+        WHERE company_id = ${companyId}
+          AND name LIKE 'Salary Expense - %'
+          AND id <> ${salaryGroup.id}
+          AND deleted_at IS NULL
+      `);
+
+      // 4. Re-parent all "Bonus Expense - *" accounts under bonusGroup
+      const bonRes = await db.execute(sql`
+        UPDATE ledger_accounts
+        SET parent_id = ${bonusGroup.id}
+        WHERE company_id = ${companyId}
+          AND name LIKE 'Bonus Expense - %'
+          AND id <> ${bonusGroup.id}
+          AND deleted_at IS NULL
+      `);
+
+      res.json({
+        message: "Salary groups migration complete",
+        salaryGroupId: salaryGroup.id,
+        bonusGroupId:  bonusGroup.id,
+        salaryAccountsReparented: (salRes as any).rowCount ?? 0,
+        bonusAccountsReparented:  (bonRes as any).rowCount ?? 0,
+      });
+    } catch (error: any) {
+      console.error("migrate-salary-groups error:", error);
       res.status(500).json({ message: error.message });
     }
   });

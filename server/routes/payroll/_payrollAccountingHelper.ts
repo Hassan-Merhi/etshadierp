@@ -5,17 +5,20 @@
  */
 
 import { db as globalDb } from "../../db";
-import { eq, and, sql, inArray, ne } from "drizzle-orm";
+import { eq, and, sql, inArray, ne, isNull } from "drizzle-orm";
 import { ledgerAccounts, vouchers, voucherEntries, factoryPayrolls, factoryWorkers } from "@shared/schema";
 
 /**
  * Find or create a ledger account by name for a company.
  * Uses the global db (not a transaction) to avoid race-condition issues with unique constraints.
+ * Pass opts.parentId to set the parent group account id on creation.
+ * Pass opts.subType (e.g. "Group") to mark the account as a group header.
  */
 export async function findOrCreateLedger(
   companyId: number,
   name: string,
-  accountType: string
+  accountType: string,
+  opts?: { parentId?: number; subType?: string }
 ): Promise<{ id: number }> {
   const [existing] = await globalDb
     .select({ id: ledgerAccounts.id })
@@ -24,45 +27,53 @@ export async function findOrCreateLedger(
       and(
         eq(ledgerAccounts.companyId, companyId),
         eq(ledgerAccounts.name, name),
-        eq(ledgerAccounts.isDeleted, false)
+        isNull(ledgerAccounts.deletedAt)
       )
     );
   if (existing) return existing;
 
-  // Compute next account code
-  const [maxRow] = await globalDb.execute(sql`
-    SELECT COALESCE(MAX(CAST(REGEXP_REPLACE(code, '[^0-9]', '', 'g') AS INTEGER)), 999) AS max_code
-    FROM ledger_accounts
-    WHERE company_id = ${companyId}
-  `);
-  const nextCode = ((maxRow as any).max_code ?? 999) + 1;
-
-  try {
-    const [created] = await globalDb
-      .insert(ledgerAccounts)
-      .values({
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const [maxCodeRow] = await globalDb
+      .select({ maxCode: sql`MAX(CAST(code AS INTEGER))` })
+      .from(ledgerAccounts)
+      .where(and(eq(ledgerAccounts.companyId, companyId), sql`code ~ '^\\d+$'`));
+    const nextCode = String((parseInt((maxCodeRow as any)?.maxCode || "0") || 0) + 1 + attempt);
+    try {
+      const insertVals: any = {
         companyId,
+        code: nextCode,
         name,
         accountType,
-        code: String(nextCode),
-        isDeleted: false,
-      } as any)
-      .returning({ id: ledgerAccounts.id });
-    return created;
-  } catch {
-    // Unique constraint race — retry read
-    const [retry] = await globalDb
-      .select({ id: ledgerAccounts.id })
-      .from(ledgerAccounts)
-      .where(
-        and(
-          eq(ledgerAccounts.companyId, companyId),
-          eq(ledgerAccounts.name, name),
-          eq(ledgerAccounts.isDeleted, false)
-        )
-      );
-    return retry;
+        active: true,
+        isHidden: false,
+      };
+      if (opts?.parentId) insertVals.parentId = opts.parentId;
+      if (opts?.subType) insertVals.subType = opts.subType;
+
+      const [created] = await globalDb
+        .insert(ledgerAccounts)
+        .values(insertVals)
+        .returning({ id: ledgerAccounts.id });
+      return created;
+    } catch (err: any) {
+      if (err?.code === "23505" || err?.message?.includes("unique")) {
+        const [nowFound] = await globalDb
+          .select({ id: ledgerAccounts.id })
+          .from(ledgerAccounts)
+          .where(
+            and(
+              eq(ledgerAccounts.companyId, companyId),
+              eq(ledgerAccounts.name, name),
+              isNull(ledgerAccounts.deletedAt)
+            )
+          );
+        if (nowFound) return nowFound;
+        continue;
+      }
+      throw err;
+    }
   }
+  throw new Error(`Unable to create ledger account "${name}" after multiple attempts`);
 }
 
 /**
@@ -110,7 +121,7 @@ export async function rebuildPayrollGenVoucher(
   }
 
   // ── Step 2: remaining payrolls for this period ────────────────────────────
-  const remainingQuery = tx
+  const remaining: any[] = await tx
     .select({
       workerId: factoryPayrolls.workerId,
       baseSalary: factoryPayrolls.baseSalary,
@@ -131,8 +142,6 @@ export async function rebuildPayrollGenVoucher(
         ...(excludePayrollId !== undefined ? [ne(factoryPayrolls.id, excludePayrollId)] : [])
       )
     );
-
-  const remaining: any[] = await remainingQuery;
 
   if (remaining.length === 0) return; // nothing left → no voucher needed
 
@@ -160,11 +169,15 @@ export async function rebuildPayrollGenVoucher(
   const payableAcc = await findOrCreateLedger(companyId, "Payroll Payable", "Liability");
   const advancesAcc = await findOrCreateLedger(companyId, "Factory Worker Advances", "Asset");
 
+  // Ensure salary/bonus group parents exist
+  const salaryGroup = await findOrCreateLedger(companyId, "Salary Expense - Workers", "Expense", { subType: "Group" });
+  const bonusGroup = await findOrCreateLedger(companyId, "Bonus Expense - Workers", "Expense", { subType: "Group" });
+
   const workerAccCache = new Map<number, { salaryId: number; bonusId: number }>();
   for (const { workerId, workerName } of workerRows) {
     if (workerAccCache.has(workerId)) continue;
-    const sa = await findOrCreateLedger(companyId, `Salary Expense - ${workerName}`, "Expense");
-    const ba = await findOrCreateLedger(companyId, `Bonus Expense - ${workerName}`, "Expense");
+    const sa = await findOrCreateLedger(companyId, `Salary Expense - ${workerName}`, "Expense", { parentId: salaryGroup.id });
+    const ba = await findOrCreateLedger(companyId, `Bonus Expense - ${workerName}`, "Expense", { parentId: bonusGroup.id });
     workerAccCache.set(workerId, { salaryId: sa.id, bonusId: ba.id });
   }
 
@@ -188,7 +201,6 @@ export async function rebuildPayrollGenVoucher(
 
   const journalEntries: any[] = [];
 
-  // DR entries — one salary line + one bonus line per worker
   for (const { workerId, workerName, salAmt, bonAmt } of workerRows) {
     const accs = workerAccCache.get(workerId)!;
     if (salAmt > 0) {
