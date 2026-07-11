@@ -343,7 +343,6 @@ export function registerStatsNetPositionRoutes(app: Express) {
       const netPosition = round2(forUsTotal - onUsTotal);
       forUsTotal = round2(forUsTotal);
       onUsTotal = round2(onUsTotal);
-      const round2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
 
       // ── 5. Build Excel ────────────────────────────────────────────────────
       const ExcelJS = await import("exceljs");
