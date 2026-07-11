@@ -10,9 +10,6 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
-permissions:
-  contents: write
-
 jobs:
   ci:
     name: Check / Build / Lint / Test
@@ -47,66 +44,12 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-        with:
-          ref: combo-3-frontend-tests-coverage
-          fetch-depth: 0
 
       - name: Set up Node.js 20
         uses: actions/setup-node@v4
         with:
           node-version: "20"
           cache: npm
-
-      - name: Generate coverage lockfile candidate
-        id: coverage_lock_candidate
-        run: |
-          set +e
-          set -o pipefail
-          npm install --package-lock-only --ignore-scripts --legacy-peer-deps --registry=https://registry.npmjs.org 2>&1 | tee coverage-lock-sync.txt
-          npm_exit=${PIPESTATUS[0]}
-          echo "${npm_exit}" > coverage-lock-exit.txt
-          git diff -- package-lock.json > coverage-lock.diff
-          git diff --numstat -- package-lock.json > coverage-lock-numstat.txt
-          exit 0
-
-      - name: Upload coverage lock diagnostics
-        uses: actions/upload-artifact@v4
-        with:
-          name: combo3-coverage-lock-diagnostics
-          path: |
-            coverage-lock-sync.txt
-            coverage-lock-exit.txt
-            coverage-lock.diff
-            coverage-lock-numstat.txt
-          if-no-files-found: error
-          retention-days: 2
-
-      - name: Validate coverage lockfile candidate
-        run: |
-          npm_exit=$(cat coverage-lock-exit.txt)
-          if [ "${npm_exit}" -ne 0 ]; then
-            echo "npm lockfile generation failed with exit code ${npm_exit}."
-            exit 1
-          fi
-          git diff --check -- package-lock.json
-          changed_lines=$(git diff --numstat -- package-lock.json | awk '{ total += $1 + $2 } END { print total + 0 }')
-          echo "package-lock changed lines: ${changed_lines}"
-          if [ "${changed_lines}" -gt 2000 ]; then
-            echo "Unexpectedly large lockfile rewrite; refusing to commit."
-            exit 1
-          fi
-
-      - name: Commit coverage lockfile
-        run: |
-          if git diff --quiet -- package-lock.json; then
-            echo "Coverage lockfile is already synchronized."
-          else
-            git config user.name "github-actions[bot]"
-            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add package-lock.json
-            git commit -m "Combo 3: lock frontend coverage provider"
-            git push origin HEAD:combo-3-frontend-tests-coverage
-          fi
 
       - name: Normalize Replit registry URLs for CI
         run: sed -i 's#http://package-firewall.replit.local/npm/#https://registry.npmjs.org/#g' package-lock.json
@@ -268,16 +211,27 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
-      - name: Measure frontend coverage
+      - name: Frontend coverage thresholds
         id: frontend_coverage
         if: always() && steps.frontend_tests.outcome == 'success'
-        run: npm run test:frontend:coverage
+        run: |
+          set -o pipefail
+          npm run test:frontend:coverage 2>&1 | tee frontend-coverage-errors-ci.txt
 
-      - name: Upload frontend coverage baseline
+      - name: Upload frontend coverage failure log
+        if: always() && steps.frontend_coverage.outcome == 'failure'
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-coverage-errors
+          path: frontend-coverage-errors-ci.txt
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Upload frontend coverage summary
         if: always() && steps.frontend_coverage.outcome == 'success'
         uses: actions/upload-artifact@v4
         with:
-          name: combo3-frontend-coverage
+          name: frontend-coverage-summary
           path: coverage/frontend/coverage-summary.json
           if-no-files-found: error
           retention-days: 7
