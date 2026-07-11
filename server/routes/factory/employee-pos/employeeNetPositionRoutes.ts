@@ -1092,13 +1092,31 @@ export function registerEmployeeNetPositionRoutes(app: Express) {
         if (ex) ex.used += parseFloat(String(r.consumed_kg ?? "0")) || 0;
       }
 
-      // Sum ALL bucket values (including negative remainders from over-usage/adjustments) —
-      // /api/factory/raw-stock's client KPI (ProductionRawStock.tsx totalValue) sums
-      // valueRemainingUsd across every row unconditionally, so clamping to positive-only
-      // here would overstate the net position total relative to the Raw Materials page.
+      // Subtract kg reserved in open (not yet CLOSED/COMPLETED) mix batches —
+      // mirrors the freeKg = remainingKg − reservedKg logic in rawStockReceiptRoutes.ts.
+      // This aligns the net-position "Factory Raw Material Stock" value with the
+      // "FREE AVAILABLE → Stock Value" figure shown on the Raw Materials page.
+      const openReservedResult = await db.execute(sql`
+        SELECT fms.supplier_id, SUM(fms.weight_kg::numeric) AS reserved_kg
+        FROM   factory_mix_batch_sources fms
+        JOIN   factory_mix_batches fmb ON fmb.id = fms.mix_batch_id
+        WHERE  fmb.company_id = ${companyId}
+          AND  fms.supplier_id IS NOT NULL
+          AND  fmb.status NOT IN ('CLOSED', 'COMPLETED')
+        GROUP  BY fms.supplier_id
+      `);
+      const openReservedRows: any[] = (openReservedResult as any).rows ?? (openReservedResult as any);
+      const reservedBySupKey = new Map<string, number>();
+      for (const r of openReservedRows) {
+        if (r.supplier_id) reservedBySupKey.set(`s${r.supplier_id}`, parseFloat(String(r.reserved_kg ?? "0")) || 0);
+      }
+
+      // Sum free-available values only (remaining − reserved) × cpkUsd
       let rawTotal = 0;
-      for (const s of supMap.values()) {
-        rawTotal += (s.recv - s.used) * s.cpkUsd;
+      for (const [key, s] of supMap.entries()) {
+        const reserved = reservedBySupKey.get(key) ?? 0;
+        const free = s.recv - s.used - reserved;
+        rawTotal += free * s.cpkUsd;
       }
       const rawMaterialStockValue = round2(rawTotal);
 
