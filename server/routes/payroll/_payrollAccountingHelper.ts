@@ -171,13 +171,25 @@ export async function rebuildPayrollGenVoucher(
 
   // Ensure salary/bonus group parents exist
   const salaryGroup = await findOrCreateLedger(companyId, "Salary Expense - Workers", "Expense", { subType: "Group" });
-  const bonusGroup = await findOrCreateLedger(companyId, "Bonus Expense - Workers", "Expense", { subType: "Group" });
+  const bonusGroup  = await findOrCreateLedger(companyId, "Bonus Expense - Workers",  "Expense", { subType: "Group" });
+
+  // Ensure both headers carry subType="Group" even if they existed without it
+  await globalDb.execute(
+    sql`UPDATE ledger_accounts SET sub_type='Group' WHERE id IN (${salaryGroup.id}, ${bonusGroup.id}) AND (sub_type IS NULL OR sub_type <> 'Group')`
+  );
 
   const workerAccCache = new Map<number, { salaryId: number; bonusId: number }>();
   for (const { workerId, workerName } of workerRows) {
     if (workerAccCache.has(workerId)) continue;
     const sa = await findOrCreateLedger(companyId, `Salary Expense - ${workerName}`, "Expense", { parentId: salaryGroup.id });
-    const ba = await findOrCreateLedger(companyId, `Bonus Expense - ${workerName}`, "Expense", { parentId: bonusGroup.id });
+    const ba = await findOrCreateLedger(companyId, `Bonus Expense - ${workerName}`,  "Expense", { parentId: bonusGroup.id });
+    // Ensure parentId is set even for pre-existing accounts that were created without it
+    await globalDb.execute(
+      sql`UPDATE ledger_accounts SET parent_id = ${salaryGroup.id} WHERE id = ${sa.id} AND (parent_id IS NULL OR parent_id <> ${salaryGroup.id})`
+    );
+    await globalDb.execute(
+      sql`UPDATE ledger_accounts SET parent_id = ${bonusGroup.id} WHERE id = ${ba.id} AND (parent_id IS NULL OR parent_id <> ${bonusGroup.id})`
+    );
     workerAccCache.set(workerId, { salaryId: sa.id, bonusId: ba.id });
   }
 

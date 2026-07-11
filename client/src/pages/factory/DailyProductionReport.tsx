@@ -1490,20 +1490,6 @@ export default function DailyProductionReport() {
                             {fmtKg(origKg)}
                           </span>
                         </div>
-                        {onTableKg > 0 && (
-                          <>
-                            <span className="text-muted-foreground text-base font-semibold">+</span>
-                            <div className="flex items-center gap-2">
-                              <span className="text-sm font-semibold text-muted-foreground">On Table</span>
-                              <span
-                                className="text-base font-bold text-amber-600 dark:text-amber-400"
-                                data-testid="text-weight-on-table"
-                              >
-                                {fmtKg(onTableKg)}
-                              </span>
-                            </div>
-                          </>
-                        )}
                         <span className="text-muted-foreground text-base font-semibold">=</span>
                         <div className="flex items-center gap-2">
                           <span className="text-sm font-semibold text-muted-foreground">Total</span>
