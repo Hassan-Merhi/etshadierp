@@ -503,7 +503,8 @@ export function registerFiscalTransferRoutes(app: Express) {
             voucherDate: voucher.voucherDate,
             createdAt: voucher.createdAt,
             description: voucher.description,
-            customerName: voucher.customerName ?? null,
+            // The voucher schema has no persisted customer-name field in this query.
+            customerName: null,
             cashAccountName: cashAccountByVoucher.get(voucher.id) ?? null,
             totalAmount: totalAmt,
             totalQuantity: totalQty,
@@ -1089,7 +1090,18 @@ export function registerFiscalTransferRoutes(app: Express) {
 
       const optionalRevs = allRevWithItems.filter((r) => r.optional);
       const nonOptionalRevs = allRevWithItems.filter((r) => !r.optional);
-      let finalRevisions = [...nonOptionalRevs];
+      type RevisionResponseItem = Omit<
+        (typeof allRevWithItems)[number]["items"][number],
+        "id" | "revisionId"
+      > & {
+        id?: number;
+        revisionId?: number;
+      };
+      type RevisionResponse = Omit<(typeof allRevWithItems)[number], "items"> & {
+        items: RevisionResponseItem[];
+        _mergedCount?: number;
+      };
+      let finalRevisions: RevisionResponse[] = [...nonOptionalRevs];
 
       if (optionalRevs.length > 0) {
         const netMap = new Map<
@@ -1135,7 +1147,7 @@ export function registerFiscalTransferRoutes(app: Express) {
         const mergedOptional = {
           ...first,
           note: last.note,
-          createdAt: last.createdAt,
+          revisionDate: last.revisionDate,
           _mergedCount: optionalRevs.length,
           items: Array.from(netMap.values()),
         };
@@ -1175,7 +1187,18 @@ export function registerFiscalTransferRoutes(app: Express) {
       const optionalRevs = allRevWithItems.filter((r) => r.optional);
       const nonOptionalRevs = allRevWithItems.filter((r) => !r.optional);
 
-      let finalRevisions = [...nonOptionalRevs];
+      type RevisionResponseItem = Omit<
+        (typeof allRevWithItems)[number]["items"][number],
+        "id" | "revisionId"
+      > & {
+        id?: number;
+        revisionId?: number;
+      };
+      type RevisionResponse = Omit<(typeof allRevWithItems)[number], "items"> & {
+        items: RevisionResponseItem[];
+        _mergedCount?: number;
+      };
+      let finalRevisions: RevisionResponse[] = [...nonOptionalRevs];
 
       if (optionalRevs.length > 0) {
         // Merge all optional revisions into one, computing net delta per item
@@ -2014,7 +2037,7 @@ export function registerFiscalTransferRoutes(app: Express) {
           rate: wasteDispatchItems.rate,
           totalAmount: wasteDispatchItems.totalAmount,
           stockItemName: stockItems.name,
-          stockItemUnit: stockItems.unit,
+          stockItemUnit: stockItems.uom,
         })
         .from(wasteDispatchItems)
         .leftJoin(stockItems, eq(stockItems.id, wasteDispatchItems.stockItemId))
