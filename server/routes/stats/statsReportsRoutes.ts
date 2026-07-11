@@ -770,7 +770,7 @@ export function registerStatsReportsRoutes(app: Express) {
       };
 
       // Get stock group info
-      const stockGroup = await storage.getStockGroupById(parseInt(stockGroupId), companyId);
+      const stockGroup = await storage.getStockGroupById(parseInt(stockGroupId));
 
       res.json({
         items,

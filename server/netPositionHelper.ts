@@ -25,7 +25,7 @@ export interface AccountBalance {
 }
 
 export interface NetPositionAccount {
-  id: number;
+  id?: number;
   name: string;
   code: string;
   value: number;

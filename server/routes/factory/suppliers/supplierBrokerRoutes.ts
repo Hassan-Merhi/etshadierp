@@ -593,6 +593,7 @@ export async function buildBrokerStatement(brokerId: number, companyId: number, 
       const totalFxIn = rows.filter((r) => r.type === "fx_in").reduce((s, r) => s + r.amount, 0);
       const totalOtherCharges = rows.filter((r) => r.type === "other_charge").reduce((s, r) => s + r.amount, 0);
       const totalFreight = rows.filter((r) => r.type === "freight").reduce((s, r) => s + r.amount, 0);
+      const totalCommission = rows.reduce((s, r) => s + (r.commissionAmount || 0), 0);
       // A "broker pool" section is the USD section that has no containers —
       // it represents USD the broker has received from FX settlements and commission transfers.
       // Its balance is an ASSET (received), not a payable, so CR/DR labels are inverted vs normal sections.
@@ -603,6 +604,7 @@ export async function buildBrokerStatement(brokerId: number, companyId: number, 
         totalContainers,
         totalValue: totalValue.toFixed(2),
         totalFreight: totalFreight.toFixed(2),
+        totalCommission: totalCommission.toFixed(2),
         totalOtherCharges: totalOtherCharges.toFixed(2),
         totalPaid: totalPaid.toFixed(2),
         totalFxOut: totalFxOut.toFixed(2),
