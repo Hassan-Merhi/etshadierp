@@ -1775,9 +1775,11 @@ export function registerPayrollCoreRoutes(app: Express) {
           )
       `);
       let accountsDeleted = 0;
-      if ((orphanedAccounts.rows as any[]).length > 0) {
-        const orphanIds = (orphanedAccounts.rows as any[]).map((r: any) => r.id);
-        await db.execute(sql`DELETE FROM ledger_accounts WHERE id = ANY(${orphanIds}::int[])`);
+      const orphanRows = (orphanedAccounts.rows as any[]);
+      if (orphanRows.length > 0) {
+        // Use inArray (drizzle) instead of raw ANY() to avoid parameterization issues
+        const orphanIds = orphanRows.map((r: any) => r.id as number);
+        await db.delete(ledgerAccounts).where(inArray(ledgerAccounts.id, orphanIds));
         accountsDeleted = orphanIds.length;
       }
 
