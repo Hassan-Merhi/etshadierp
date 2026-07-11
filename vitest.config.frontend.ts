@@ -10,6 +10,16 @@ export default defineConfig({
     setupFiles: ["tests/ui/setup.ts"],
     testTimeout: 15000,
     include: ["tests/ui/**/*.test.{ts,tsx}"],
+    coverage: {
+      provider: "v8",
+      reporter: ["text", "json-summary"],
+      reportsDirectory: "coverage/frontend",
+      include: [
+        "client/src/components/ui/period-filter.tsx",
+        "client/src/pages/StockHub.tsx",
+        "client/src/pages/InventoryHub.tsx",
+      ],
+    },
     // No pool/fork overrides — jsdom runs in the same process
   },
   resolve: {
