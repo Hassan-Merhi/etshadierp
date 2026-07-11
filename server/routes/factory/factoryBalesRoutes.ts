@@ -1266,10 +1266,10 @@ export function registerFactoryBalesRoutes(app: Express) {
             .where(eq(factoryBaleProducts.companyId, companyId));
           type ImportedBaleProduct = (typeof allProducts)[number];
           const productByName = new Map<string, ImportedBaleProduct>(
-            allProducts.map((p) => [p.name.toLowerCase(), p] as const)
+            allProducts.map((p: ImportedBaleProduct) => [p.name.toLowerCase(), p] as const)
           );
           const productByArticle = new Map<string | undefined, ImportedBaleProduct>(
-            allProducts.map((p) => [p.articleCode?.toLowerCase(), p] as const)
+            allProducts.map((p: ImportedBaleProduct) => [p.articleCode?.toLowerCase(), p] as const)
           );
 
           const allCategories = await tx
@@ -1278,7 +1278,7 @@ export function registerFactoryBalesRoutes(app: Express) {
             .where(eq(factoryCategories.companyId, companyId));
           type ImportedBaleCategory = (typeof allCategories)[number];
           const categoryByName = new Map<string | undefined, ImportedBaleCategory>(
-            allCategories.map((c) => [c.name?.toLowerCase(), c] as const)
+            allCategories.map((c: ImportedBaleCategory) => [c.name?.toLowerCase(), c] as const)
           );
 
           const createdBales: any[] = [];

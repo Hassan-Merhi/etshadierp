@@ -1107,7 +1107,12 @@ export function registerStockGroupsItemsRoutes(app: Express) {
         return res.status(400).json({ message: "Invalid stock item ID" });
       }
 
-      const prices = await storage.getStockItemLocationPrices(stockItemId, req.session.currentCompanyId);
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+
+      const prices = await storage.getStockItemLocationPrices(stockItemId, companyId);
       res.json(prices);
     } catch (error: any) {
       res.status(500).json({ message: error.message });

@@ -501,7 +501,7 @@ export function registerFactoryStockRoutes(app: Express) {
           .where(eq(factoryBaleProducts.companyId, companyId));
         type ImportedStockProduct = (typeof allProducts)[number];
         const productByName = new Map<string, ImportedStockProduct>(
-          allProducts.map((p) => [p.name.toLowerCase(), p] as const)
+          allProducts.map((p: ImportedStockProduct) => [p.name.toLowerCase(), p] as const)
         );
 
         const createdBales: any[] = [];

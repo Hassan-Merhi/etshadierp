@@ -415,7 +415,7 @@ export async function recalculateContainerCosts(
     }
 
     // 4. Recalculate weighted-average costPerKg on affected mix batches
-    const affectedBatchIds = Array.from(new Set<number>(mixSources.map((s) => s.mixBatchId)));
+    const affectedBatchIds = Array.from(new Set<number>(mixSources.map((s: (typeof mixSources)[number]) => s.mixBatchId)));
     for (const batchId of affectedBatchIds) {
       const allSrc = await tx
         .select()
