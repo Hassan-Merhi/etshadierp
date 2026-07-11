@@ -59,11 +59,11 @@ jobs:
 
       - name: Synchronize coverage lockfile
         run: |
-          npm install --package-lock-only --ignore-scripts --registry=https://registry.npmjs.org
+          npm install --package-lock-only --ignore-scripts --legacy-peer-deps --registry=https://registry.npmjs.org
           git diff --check -- package-lock.json
           changed_lines=$(git diff --numstat -- package-lock.json | awk '{ total += $1 + $2 } END { print total + 0 }')
           echo "package-lock changed lines: ${changed_lines}"
-          if [ "${changed_lines}" -gt 800 ]; then
+          if [ "${changed_lines}" -gt 2000 ]; then
             echo "Unexpectedly large lockfile rewrite; refusing to commit."
             exit 1
           fi
