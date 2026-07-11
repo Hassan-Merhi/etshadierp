@@ -305,6 +305,16 @@ export function registerFactoryStockAllocationV3Routes(app: any) {
 
       const scanLower = scanCode.toLowerCase().trim();
 
+      type ScannedBaleRow = {
+        id: number;
+        baleCode: string;
+        referenceNumber: string;
+        articleCode: string;
+        productName: string;
+        weightKg: string;
+        status: string;
+      };
+
       // Find the bale by referenceNumber, baleCode, articleCode (pick ONE bale — prefer IN_STOCK)
       const balesFound = await db.execute(sql`
         SELECT id, bale_code AS "baleCode", reference_number AS "referenceNumber",
@@ -321,7 +331,7 @@ export function registerFactoryStockAllocationV3Routes(app: any) {
         LIMIT 1
       `);
 
-      let bale = (balesFound.rows)[0];
+      let bale = balesFound.rows[0] as ScannedBaleRow | undefined;
 
       // If not found by ref/baleCode, try articleCode (adds one IN_STOCK bale of that article)
       if (!bale) {
@@ -336,7 +346,7 @@ export function registerFactoryStockAllocationV3Routes(app: any) {
           ORDER BY id
           LIMIT 1
         `);
-        bale = (byArticle.rows)[0];
+        bale = byArticle.rows[0] as ScannedBaleRow | undefined;
       }
 
       if (!bale) return res.status(404).json({ message: `No bale found for scan code: ${scanCode}` });
