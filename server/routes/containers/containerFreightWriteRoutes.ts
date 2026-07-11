@@ -1083,7 +1083,6 @@ export function registerContainerFreightWriteRoutes(app: Express) {
               await tx.insert(voucherEntries).values([
                 {
                   voucherId: newFV.id,
-                  companyId,
                   ledgerAccountId: purchasesAcctId,
                   debitAmount: newFreight.toFixed(2),
                   creditAmount: "0",
@@ -1091,7 +1090,6 @@ export function registerContainerFreightWriteRoutes(app: Express) {
                 },
                 {
                   voucherId: newFV.id,
-                  companyId,
                   ledgerAccountId: newFreightOwnAccountId,
                   debitAmount: "0",
                   creditAmount: newFreight.toFixed(2),
