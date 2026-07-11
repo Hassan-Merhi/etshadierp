@@ -57,7 +57,7 @@ function dateStr(d: Date): string {
 function isFormula(cell: ExcelJS.Cell): boolean {
   if (cell.value === null || cell.value === undefined) return false;
   if (typeof cell.value !== "object") return false;
-  const v = cell.value as Record<string, unknown>;
+  const v = cell.value as unknown as Record<string, unknown>;
   return "formula" in v || "sharedFormula" in v;
 }
 
@@ -260,8 +260,8 @@ export async function generateSpSalesFormExcel(params: SpSalesFormParams): Promi
     `),
   ]);
 
-  const salesRows = (salesRes as any).rows ?? (salesRes as any[]);
-  const openingRows = (openingRes as any).rows ?? (openingRes as any[]);
+  const salesRows = salesRes.rows;
+  const openingRows = openingRes.rows;
 
   // ── Build in-memory data structures ──────────────────────────────────────
   //
@@ -442,7 +442,7 @@ export async function generateSpSalesFormExcel(params: SpSalesFormParams): Promi
     //               This stays formula-based (matches template) and is recalculated by Excel.
     //   • qty = 0 → write plain 0 to replace the =H/E formula; otherwise Excel shows #DIV/0!
     if (stock.qty > 0) {
-      avgCostCell.value = { formula: `H${r}/E${r}`, result: r2(stock.avgCost) };
+      avgCostCell.value = { formula: `H${r}/E${r}`, result: r2(stock.avgCost) } as ExcelJS.CellFormulaValue;
     } else {
       avgCostCell.value = 0;
     }
@@ -713,7 +713,7 @@ export async function generateSpSalesFormExcel(params: SpSalesFormParams): Promi
         profitCell.value = {
           formula: `IF(${qC}${rowNum}=0,0,${pC}${rowNum}-$F${rowNum}${deductionPart})`,
           result: r2(netProfitPB),
-        };
+        } as ExcelJS.CellFormulaValue;
       }
       // No-sale day: all three cells remain null (already cleared above).
     }
