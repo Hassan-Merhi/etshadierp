@@ -1,41 +1,47 @@
-# Combo 4B — Payroll and non-stock accounting TypeScript cleanup
+# Combo 4B TypeScript Audit
 
-Status: in progress on `agent/combo-4b-payroll-nonstock-typescript-v3`.
+## Scope
 
-## Verified starting point
+Combo 4B is limited to payroll and low-risk non-stock accounting/report typing corrections.
 
-- Working base: latest `main` commit `63bcae9867af2654d9b1c6ae5f2581a3dd4a5969`.
-- Combo 4A is merged through PR #9.
-- A fresh no-production-change CI run on `main` commit `669695d5b8e34f7d600eee83fa6dc95902b87d09` confirms **154 TypeScript diagnostics across 32 files**.
-- The three subsequent commits through `63bcae9867af2654d9b1c6ae5f2581a3dd4a5969` modify only `FactorySidebar.tsx`, `FactoryInsurance.tsx`, and `MixBatchList.tsx`; none touches the four Combo 4B server targets.
-- Final Combo 4B validation must confirm the complete diagnostic set, not assume the intervening UI commits are neutral.
-
-## Included scope
-
-This combo is limited to narrow, behavior-preserving fixes in payroll and non-stock accounting routes:
+Production files changed:
 
 - `server/routes/payroll/payrollCoreRoutes.ts`
-  - Narrow bulk payroll worker IDs to `number[]` before Drizzle `inArray`.
 - `server/routes/payroll/workerStatsAdvancesRoutes.ts`
-  - Parse and validate worker/deduction IDs before Drizzle comparisons.
 - `server/routes/factory/customer-orders/orderChargesRoutes.ts`
-  - Serialize the three diagnosed, already-calculated daybook totals to the decimal-column string shape expected by Drizzle.
 - `server/routes/factory/suppliers/supplierCrudRoutes.ts`
-  - Compose supplier-payment filters before applying the single Drizzle `.where()` call.
 
-Expected mechanical reduction: **13 diagnostics across 4 files**, from **154 / 32** to **141 / 28**, with no new diagnostics.
+## TypeScript result
 
-## Explicitly deferred
+- Before: **154 diagnostics across 32 files**
+- After: **141 diagnostics across 28 files**
+- Removed: **13 diagnostics across 4 files**
+- New diagnostics: **0**
+- Remaining diagnostics in the four changed production files: **0**
 
-- Stock, inventory, factory mix/allocation, bale, fiscal-transfer, POS, voucher, and container errors remain for Combo 4C/4D.
-- `supplierBrokerRoutes.ts` commission-total errors remain deferred because they expose a report/calculation contract mismatch rather than a type-only correction.
-- Net-profit, net-position, stats, SP workbook formulas, and authorization/data-source mismatches remain deferred for later domain review.
-- No schema, migration, accounting formula, posting rule, inventory value/quantity, negative-stock, container-accounting, or POS behavior may change.
+## Changes
 
-## Validation required before merge
+- Narrow payroll worker ID collections before Drizzle `inArray`.
+- Validate nullable worker and deduction IDs before comparisons.
+- Serialize three diagnosed daybook totals to decimal-column string shapes.
+- Compose supplier-payment conditions before the single Drizzle `.where()` call.
 
-- Compare the complete TypeScript diagnostic set before and after.
-- Confirm all touched production files have zero diagnostics.
-- Run production build, lint, test database setup, startup migrations, backend tests, frontend tests, coverage thresholds, and formatting.
-- Synchronize with latest `main` again before final approval.
-- Keep the PR draft and unmerged pending explicit approval.
+## Safety boundary
+
+No stock or inventory allocation, containers, POS, vouchers, schema, migrations, negative-stock handling, accounting formulas, net-profit/net-position calculations, workbook formulas, SQL meaning, or monetary arithmetic was changed. Broker commission totals remain deferred for report-contract review.
+
+## Validation
+
+The patched tree was validated in GitHub Actions CI run 338:
+
+- TypeScript reached the expected **141 diagnostics across 28 files**.
+- Build passed.
+- Lint passed.
+- Test database schema setup passed.
+- Startup migrations passed.
+- Backend tests passed.
+- Frontend tests passed.
+- Frontend coverage thresholds passed.
+- Formatting passed.
+
+The workflow remains red only because the repository still intentionally contains the 141 deferred TypeScript diagnostics outside Combo 4B.

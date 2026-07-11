@@ -1221,7 +1221,7 @@ export function registerPayrollCoreRoutes(app: Express) {
         // Accounting: Dr Payroll Payable / Cr Cash (settling liability created at run time)
         const payableAcc = payableAccBulk;
 
-        const workerIds = [...new Set(payrollsToMark.map((p: any) => p.workerId))];
+        const workerIds = Array.from(new Set<number>(payrollsToMark.map((p: any) => p.workerId)));
         const workerRows = await tx
           .select({ id: factoryWorkers.id, fullName: factoryWorkers.fullName })
           .from(factoryWorkers)

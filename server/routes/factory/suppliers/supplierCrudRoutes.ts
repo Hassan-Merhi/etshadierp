@@ -951,22 +951,16 @@ export function registerSupplierCrudRoutes(app: Express) {
         children.forEach((c: any) => supplierIds.push(c.id));
       }
 
-      let query = db
-        .select()
-        .from(factorySupplierPayments)
-        .where(eq(factorySupplierPayments.companyId, companyId))
-        .orderBy(desc(factorySupplierPayments.date));
-
+      const paymentConditions = [eq(factorySupplierPayments.companyId, companyId)];
       if (supplierIds.length > 0) {
-        query = query.where(
-          and(
-            eq(factorySupplierPayments.companyId, companyId),
-            inArray(factorySupplierPayments.supplierId, supplierIds)
-          )
-        );
+        paymentConditions.push(inArray(factorySupplierPayments.supplierId, supplierIds));
       }
 
-      const payments = await query;
+      const payments = await db
+        .select()
+        .from(factorySupplierPayments)
+        .where(and(...paymentConditions))
+        .orderBy(desc(factorySupplierPayments.date));
       res.json(payments);
     } catch (error: any) {
       console.error("Error fetching supplier payments:", error);
