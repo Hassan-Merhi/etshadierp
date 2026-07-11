@@ -35,8 +35,8 @@ const salesPath = "server/routes/vouchers/voucherSalesUpdateRoutes.ts";
 let sales = read(salesPath);
 sales = replaceOnceOrVerify(
   sales,
-  "          profit: profit.toFixed(2),\n        };",
-  "          profit: profit.toFixed(2),\n          configuredPrice: null as string | null,\n        };",
+  "        return {\n          voucherId: id,\n          stockItemId: item.stockItemId,\n          quantity: item.quantity,\n          sellingPrice: item.sellingPrice,\n          costPrice: costPrice.toFixed(2),\n          totalSales: totalSales.toFixed(2),\n          totalCost: totalCost.toFixed(2),\n          profit: profit.toFixed(2),\n        };",
+  "        return {\n          voucherId: id,\n          stockItemId: item.stockItemId,\n          quantity: item.quantity,\n          sellingPrice: item.sellingPrice,\n          costPrice: costPrice.toFixed(2),\n          totalSales: totalSales.toFixed(2),\n          totalCost: totalCost.toFixed(2),\n          profit: profit.toFixed(2),\n          configuredPrice: null as string | null,\n        };",
   "sales item configured-price type seed"
 );
 write(salesPath, sales);
