@@ -867,6 +867,25 @@ export function registerPayrollCoreRoutes(app: Express) {
         // Accounting: Dr per-worker Salary/Bonus Expense / Cr Payroll Payable (net) / Cr Factory Worker Advances
         const totalGross = totalNet + totalAdvanceDeductions;
         if (totalGross > 0) {
+          // ── Dedup guard: remove any existing PAYROLL-GEN vouchers for this period ──
+          // Prevents duplicate expense vouchers when payroll is regenerated (e.g. after a data pull).
+          const staleGenVouchers = await tx
+            .select({ id: vouchers.id })
+            .from(vouchers)
+            .where(
+              and(
+                eq(vouchers.companyId, companyId),
+                sql`${vouchers.voucherNumber} LIKE 'PAYROLL-GEN-%'`,
+                eq(vouchers.voucherDate, periodStart),
+                sql`${vouchers.description} LIKE ${"%" + periodEnd + "%"}`
+              )
+            );
+          if (staleGenVouchers.length > 0) {
+            const vIds = staleGenVouchers.map((v: any) => v.id);
+            await tx.delete(voucherEntries).where(inArray(voucherEntries.voucherId, vIds));
+            await tx.delete(vouchers).where(inArray(vouchers.id, vIds));
+          }
+
           const desc = `Payroll expense: ${count} worker${count !== 1 ? "s" : ""} (${periodStart} – ${periodEnd})`;
           const [genVoucher] = await tx
             .insert(vouchers)
@@ -1682,12 +1701,20 @@ export function registerPayrollCoreRoutes(app: Express) {
         if ((payrollData.rows as any[]).length === 0) continue;
 
         // Resolve per-worker ledger accounts (sequential to avoid nextCode collisions)
+        // Ensure group headers exist so worker accounts nest under them in the chart of accounts
+        const salGrp = await findOrCreateLedger(companyId, "Salary Expense - Workers", "Expense", { subType: "Group" });
+        const bonGrp = await findOrCreateLedger(companyId, "Bonus Expense - Workers",  "Expense", { subType: "Group" });
+        // Stamp subType=Group on both headers in case they existed before the Group flag was introduced
+        await db.execute(sql`UPDATE ledger_accounts SET sub_type='Group' WHERE id IN (${salGrp.id}, ${bonGrp.id}) AND (sub_type IS NULL OR sub_type <> 'Group')`);
         const workerAccMap = new Map<number, { salaryId: number; bonusId: number }>();
         for (const p of payrollData.rows as any[]) {
           if (workerAccMap.has(p.worker_id)) continue;
           const workerName = (p.full_name as string) || `Worker #${p.worker_id}`;
-          const sa = await findOrCreateLedger(companyId, `Salary Expense - ${workerName}`, "Expense");
-          const ba = await findOrCreateLedger(companyId, `Bonus Expense - ${workerName}`, "Expense");
+          const sa = await findOrCreateLedger(companyId, `Salary Expense - ${workerName}`, "Expense", { parentId: salGrp.id });
+          const ba = await findOrCreateLedger(companyId, `Bonus Expense - ${workerName}`,  "Expense", { parentId: bonGrp.id });
+          // Re-parent in case the account already existed without parentId (pre-fix)
+          await db.execute(sql`UPDATE ledger_accounts SET parent_id = ${salGrp.id} WHERE id = ${sa.id} AND (parent_id IS NULL OR parent_id <> ${salGrp.id})`);
+          await db.execute(sql`UPDATE ledger_accounts SET parent_id = ${bonGrp.id} WHERE id = ${ba.id} AND (parent_id IS NULL OR parent_id <> ${bonGrp.id})`);
           workerAccMap.set(p.worker_id, { salaryId: sa.id, bonusId: ba.id });
         }
 

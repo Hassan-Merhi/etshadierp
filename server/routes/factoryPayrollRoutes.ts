@@ -636,6 +636,9 @@ export function registerFactoryPayrollRoutes(app: Express, requireAuth: any, db:
               approvedAt: null,
             })
             .where(eq(factoryPayrolls.id, id));
+          // Rebuild the PAYROLL-GEN expense voucher so any duplicates are collapsed into
+          // one clean voucher that still reflects this (now-DRAFT) payroll.
+          await rebuildPayrollGenVoucher(tx, companyId, existing.periodStart, existing.periodEnd);
         } else {
           // DRAFT → deleting entirely: remove / rebuild the PAYROLL-GEN expense voucher
           // so the expense account reflects only the payrolls that still exist.
