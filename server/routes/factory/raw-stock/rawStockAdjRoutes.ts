@@ -204,7 +204,7 @@ export function registerRawStockAdjRoutes(app: Express) {
         })
         .from(factoryMixBatchSources)
         .innerJoin(factoryMixBatches, eq(factoryMixBatchSources.mixBatchId, factoryMixBatches.id))
-        .where(and(eq(factoryMixBatches.companyId, companyId), eq(factoryMixBatchSources.supplierId, supplierId)))
+        .where(and(eq(factoryMixBatches.companyId, companyId), eq(factoryMixBatchSources.supplierId, supplierId), isNull(factoryMixBatches.deletedAt)))
         .orderBy(desc(factoryMixBatches.createdAt));
 
       // Aggregate multiple source rows for the same batch into one timeline entry
