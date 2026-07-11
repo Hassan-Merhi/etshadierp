@@ -57,9 +57,37 @@ jobs:
           node-version: "20"
           cache: npm
 
-      - name: Synchronize coverage lockfile
+      - name: Generate coverage lockfile candidate
+        id: coverage_lock_candidate
         run: |
-          npm install --package-lock-only --ignore-scripts --legacy-peer-deps --registry=https://registry.npmjs.org
+          set +e
+          set -o pipefail
+          npm install --package-lock-only --ignore-scripts --legacy-peer-deps --registry=https://registry.npmjs.org 2>&1 | tee coverage-lock-sync.txt
+          npm_exit=${PIPESTATUS[0]}
+          echo "${npm_exit}" > coverage-lock-exit.txt
+          git diff -- package-lock.json > coverage-lock.diff
+          git diff --numstat -- package-lock.json > coverage-lock-numstat.txt
+          exit 0
+
+      - name: Upload coverage lock diagnostics
+        uses: actions/upload-artifact@v4
+        with:
+          name: combo3-coverage-lock-diagnostics
+          path: |
+            coverage-lock-sync.txt
+            coverage-lock-exit.txt
+            coverage-lock.diff
+            coverage-lock-numstat.txt
+          if-no-files-found: error
+          retention-days: 2
+
+      - name: Validate coverage lockfile candidate
+        run: |
+          npm_exit=$(cat coverage-lock-exit.txt)
+          if [ "${npm_exit}" -ne 0 ]; then
+            echo "npm lockfile generation failed with exit code ${npm_exit}."
+            exit 1
+          fi
           git diff --check -- package-lock.json
           changed_lines=$(git diff --numstat -- package-lock.json | awk '{ total += $1 + $2 } END { print total + 0 }')
           echo "package-lock changed lines: ${changed_lines}"
