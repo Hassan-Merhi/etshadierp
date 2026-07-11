@@ -8,37 +8,50 @@ function write(path, source) {
   fs.writeFileSync(path, source);
 }
 
-function replaceOnceOrVerify(source, oldText, newText, label) {
-  const count = source.split(oldText).length - 1;
-  if (count === 1) return source.replace(oldText, newText);
-  if (count === 0 && source.includes(newText)) return source;
-  throw new Error(`${label}: expected one source match or an already-applied replacement, found ${count}`);
-}
-
 const mergePath = "server/routes/stock/stockMergeRoutes.ts";
 let merge = read(mergePath);
-merge = replaceOnceOrVerify(
-  merge,
-  "      const userId: number = req.user?.id ?? req.session.userId;",
-  "      const userId = String(req.user?.id ?? req.session.userId ?? \"\");",
-  "stock unmerge audit user ID"
+merge = merge.replace(
+  /const userId:\s*number\s*=\s*req\.user\?\.id\s*\?\?\s*req\.session\.userId;/,
+  'const userId = String(req.user?.id ?? req.session.userId ?? "");'
 );
-merge = replaceOnceOrVerify(
-  merge,
-  "      await logAudit(userId, companyId, \"unmerge_stock_item\", {\n        logId,\n        keptItemId,\n        mergedItemId,\n        mergedItemName,\n      });",
-  "      await logAudit({\n        userId,\n        username: req.session?.username || req.user?.username || \"unknown\",\n        companyId,\n        action: \"update\",\n        tableName: \"stock_items\",\n        recordId: mergedItemId,\n        recordIdentifier: mergedItemName,\n        changes: {\n          unmerge: {\n            old: null,\n            new: { logId, keptItemId, mergedItemId, mergedItemName },\n          },\n        },\n      });",
-  "stock unmerge audit object"
+merge = merge.replace(
+  /await logAudit\(userId, companyId, "unmerge_stock_item", \{\s*logId,\s*keptItemId,\s*mergedItemId,\s*mergedItemName,\s*\}\);/,
+  `await logAudit({
+        userId,
+        username: req.session?.username || req.user?.username || "unknown",
+        companyId,
+        action: "update",
+        tableName: "stock_items",
+        recordId: mergedItemId,
+        recordIdentifier: mergedItemName,
+        changes: {
+          unmerge: {
+            old: null,
+            new: { logId, keptItemId, mergedItemId, mergedItemName },
+          },
+        },
+      });`
 );
+if (!merge.includes('const userId = String(req.user?.id ?? req.session.userId ?? "");')) {
+  throw new Error("stock unmerge audit user ID replacement missing");
+}
+if (!merge.includes('tableName: "stock_items"')) {
+  throw new Error("stock unmerge audit object replacement missing");
+}
 write(mergePath, merge);
 
 const salesPath = "server/routes/vouchers/voucherSalesUpdateRoutes.ts";
 let sales = read(salesPath);
-sales = replaceOnceOrVerify(
-  sales,
-  "        return {\n          voucherId: id,\n          stockItemId: item.stockItemId,\n          quantity: item.quantity,\n          sellingPrice: item.sellingPrice,\n          costPrice: costPrice.toFixed(2),\n          totalSales: totalSales.toFixed(2),\n          totalCost: totalCost.toFixed(2),\n          profit: profit.toFixed(2),\n        };",
-  "        return {\n          voucherId: id,\n          stockItemId: item.stockItemId,\n          quantity: item.quantity,\n          sellingPrice: item.sellingPrice,\n          costPrice: costPrice.toFixed(2),\n          totalSales: totalSales.toFixed(2),\n          totalCost: totalCost.toFixed(2),\n          profit: profit.toFixed(2),\n          configuredPrice: null as string | null,\n        };",
-  "sales item configured-price type seed"
-);
+if (!sales.includes("configuredPrice: null as string | null,")) {
+  sales = sales.replace(
+    /(const salesItemsData = items\.map\([\s\S]*?totalCost: totalCost\.toFixed\(2\),\s*profit: profit\.toFixed\(2\),)(\s*\};\s*\}\);)/,
+    `$1
+          configuredPrice: null as string | null,$2`
+  );
+}
+if (!sales.includes("configuredPrice: null as string | null,")) {
+  throw new Error("sales item configured-price type seed replacement missing");
+}
 write(salesPath, sales);
 
 console.log("Combo 4D fifth safe slice applied or already present.");
