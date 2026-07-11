@@ -1,6 +1,6 @@
 # Combo 4A — Safe TypeScript UI/report cleanup
 
-Status: validated; draft PR remains unmerged.
+Status: synchronized with latest `main`; draft PR remains unmerged.
 
 ## Guardrails
 
@@ -25,7 +25,7 @@ A fresh CI run from `main` commit `d30cdba504bb2602430db5256927016b9c5a8804` pro
 - **34 files**
 - identical to the previous verified Combo 3 baseline
 
-The payroll work merged after Combo 3 did not change the repository-wide TypeScript diagnostic count.
+`main` later advanced to bandwidth commit `b773f13d167c56f27ed0253d61232ee0c34501c9`. That commit was merged into this branch through synchronization PR #10. The synchronized TypeScript artifact remained **154 diagnostics across 32 files**, so the latest-main baseline remains exactly **163 across 34** and the upstream commit introduced no TypeScript diagnostic changes.
 
 ## Included in Combo 4A
 
@@ -58,32 +58,20 @@ Report-looking diagnostics were also deferred when the type error exposes a poss
 - `server/routes/stats/statsReportsRoutes.ts` passes a company identifier to a storage method whose current signature accepts one argument. Removing either side blindly could alter company scoping.
 - `server/services/spSalesFormExport.ts` contains formula-cell and workbook-value diagnostics adjacent to export calculations. Those remain visible until the formula/output contract is reviewed directly.
 
-## Validation
+## Validation history
 
-Final CI run 316 on head commit `12b92ba7e9b086ce9ae0d00a0bfde317f3ec9645` completed with:
+CI run 316 on head `12b92ba7e9b086ce9ae0d00a0bfde317f3ec9645` completed with the expected TypeScript failure only; build, lint, database preparation, startup migrations, backend tests, frontend tests, coverage thresholds, and formatting passed.
 
-- TypeScript diagnostics: **154 across 32 files**
-- Exact reduction: **9 diagnostics and 2 files**
-- New TypeScript diagnostics: **0**
-- Diagnostics in the two modified production files: **0**
-- Production build: **pass**
-- Lint: **pass**
-- Test database schema preparation: **pass**
-- Production startup migrations: **pass**
-- Backend tests: **pass**
-- Frontend tests: **pass**
-- Frontend coverage thresholds: **pass**
-- Coverage summary upload: **pass**
-- Formatting check: **pass**
+After the documentation-only finalization commit, CI run 317 repeated the same successful validation profile.
 
-The CI job is expected to have an overall failure conclusion only because the repository intentionally retains 154 deferred TypeScript diagnostics. Every other blocking validation step passed.
+After `main` advanced, synchronization PR #10 merged commit `b773f13d167c56f27ed0253d61232ee0c34501c9` into this branch as merge commit `5f1ed11d5058b0ffcfca233866c38297b2714cdc`. Its TypeScript artifact stayed at **154 across 32 files**, with zero diagnostics in both modified production files. Build, lint, database setup, startup migrations, frontend tests, coverage, and formatting passed. The first synchronized backend run executed all **853 tests successfully** but the suite teardown failed because a concurrent `login_history` row still referenced a test company. That failure is outside Combo 4A's files and is treated as a test-isolation flake; the latest subsequent CI result is recorded in the PR description.
 
-The branch was rechecked after CI and is **0 commits behind `main`**.
-
-## Files changed
+## Files changed by Combo 4A
 
 - `server/routes/sp/spExportRoutes.ts`
 - `server/services/sp-sales-form-v2/dataFetchers.ts`
 - `docs/combo-4a-typescript-audit.md`
 
-No production calculation, schema, migration, posting, or stock behavior was changed.
+The synchronization merge also carries the unrelated latest-main bandwidth changes without modifying them.
+
+No production calculation, schema, migration, posting, or stock behavior was changed by Combo 4A.
