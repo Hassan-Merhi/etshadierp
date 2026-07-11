@@ -247,6 +247,10 @@ export function registerVoucherSalesUpdateRoutes(app: Express) {
 
             for (const item of items) {
               const sourceLocId = item.sourceLocationId ?? transfer.sourceLocationId;
+              const destinationLocId = transfer.destinationLocationId;
+              if (sourceLocId == null || destinationLocId == null) {
+                throw new Error("Stock transfer is missing source or destination location");
+              }
               const quantity = parseFloat(item.quantity);
               const rate = parseFloat(item.rate);
 
@@ -259,7 +263,7 @@ export function registerVoucherSalesUpdateRoutes(app: Express) {
                 await adjustInventory(tx, sourceLocId, item.stockItemId, quantity, existingVoucher.companyId, rate);
                 await adjustInventory(
                   tx,
-                  transfer.destinationLocationId,
+                  destinationLocId,
                   item.stockItemId,
                   -quantity,
                   existingVoucher.companyId
@@ -269,7 +273,7 @@ export function registerVoucherSalesUpdateRoutes(app: Express) {
                 await adjustInventory(tx, sourceLocId, item.stockItemId, -quantity, existingVoucher.companyId);
                 await adjustInventory(
                   tx,
-                  transfer.destinationLocationId,
+                  destinationLocId,
                   item.stockItemId,
                   quantity,
                   existingVoucher.companyId,
@@ -427,6 +431,9 @@ export function registerVoucherSalesUpdateRoutes(app: Express) {
 
       // Fetch updated voucher with entries
       const updated = await storage.getVoucherById(id);
+      if (!updated) {
+        return res.status(404).json({ message: "Voucher not found after update" });
+      }
       const newEntries = await storage.getVoucherEntriesByVoucher(id);
 
       // Sync employee balances: reverse old entries if voucher was non-optional
@@ -554,6 +561,10 @@ export function registerVoucherSalesUpdateRoutes(app: Express) {
 
             for (const item of items) {
               const sourceLocId = item.sourceLocationId ?? transfer.sourceLocationId;
+              const destinationLocId = transfer.destinationLocationId;
+              if (sourceLocId == null || destinationLocId == null) {
+                throw new Error("Stock transfer is missing source or destination location");
+              }
               const quantity = parseFloat(item.quantity);
               const rate = parseFloat(item.rate);
 
@@ -565,7 +576,7 @@ export function registerVoucherSalesUpdateRoutes(app: Express) {
                 await adjustInventory(tx, sourceLocId, item.stockItemId, quantity, existingVoucher.companyId, rate);
                 await adjustInventory(
                   tx,
-                  transfer.destinationLocationId,
+                  destinationLocId,
                   item.stockItemId,
                   -quantity,
                   existingVoucher.companyId
@@ -575,7 +586,7 @@ export function registerVoucherSalesUpdateRoutes(app: Express) {
                 await adjustInventory(tx, sourceLocId, item.stockItemId, -quantity, existingVoucher.companyId);
                 await adjustInventory(
                   tx,
-                  transfer.destinationLocationId,
+                  destinationLocId,
                   item.stockItemId,
                   quantity,
                   existingVoucher.companyId,
