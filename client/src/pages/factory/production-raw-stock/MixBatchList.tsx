@@ -339,37 +339,31 @@ export function MixBatchList({
                 return (
                   <tfoot className="border-t-2 border-border bg-muted/40">
                     <TableRow className="hover:bg-transparent">
+                      {/* cols 1-3: label + used/remaining subtitle */}
                       <TableCell colSpan={3} className="px-4 py-3 text-sm font-semibold text-foreground">
                         Combined Total
-                        <div className="text-xs text-muted-foreground font-normal">
+                        <div className="text-xs text-muted-foreground font-normal mt-0.5">
                           {mixBatches.length} batch{mixBatches.length !== 1 ? "es" : ""}
+                          {" · "}Used: {fmtKg(sumUsed)}
+                          {" · "}Remaining: {fmtKg(sumRemaining)}
                         </div>
                       </TableCell>
+                      {/* col 4: Total (kg) */}
                       <TableCell
                         className="px-4 py-3 text-right font-mono font-semibold text-sm"
                         data-testid="text-mix-summary-total"
                       >
                         {fmtKg(sumTotal)}
                       </TableCell>
-                      <TableCell
-                        className="px-4 py-3 text-right font-mono font-semibold text-sm"
-                        data-testid="text-mix-summary-used"
-                      >
-                        {fmtKg(sumUsed)}
-                      </TableCell>
-                      <TableCell
-                        className="px-4 py-3 text-right font-mono font-semibold text-sm"
-                        data-testid="text-mix-summary-remaining"
-                      >
-                        {fmtKg(sumRemaining)}
-                      </TableCell>
+                      {/* col 5: Blended Cost */}
                       <TableCell
                         className="px-4 py-3 text-right font-mono font-semibold text-sm"
                         data-testid="text-mix-summary-cost"
                       >
                         ${blendedCost.toFixed(4)}/kg
                       </TableCell>
-                      <TableCell colSpan={2} />
+                      {/* col 6: actions (empty) */}
+                      <TableCell />
                     </TableRow>
                   </tfoot>
                 );
