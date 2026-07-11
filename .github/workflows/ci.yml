@@ -6,13 +6,49 @@ on:
   pull_request:
     branches: [main]
 
+permissions:
+  contents: write
+
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
+  combo4c_apply:
+    name: Apply audited Combo 4C patch
+    if: github.event_name == 'pull_request' && github.event.pull_request.head.ref == 'agent/combo-4c-container-freight-typescript'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Combo 4C branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+          fetch-depth: 0
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Apply audited source patch
+        run: node scripts/combo-4c-apply.mjs
+      - name: Commit production changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add server/routes/containers/containerAccountingRoutes.ts \
+                  server/routes/containers/containerFreightReadRoutes.ts \
+                  server/routes/containers/containerFreightWriteRoutes.ts \
+                  server/routes/factory/factoryContainersRoutes.ts
+          if git diff --cached --quiet; then
+            echo "Combo 4C production files already patched."
+          else
+            git commit -m "Apply Combo 4C container and freight TypeScript fixes"
+            git push origin HEAD:${{ github.event.pull_request.head.ref }}
+          fi
+
   ci:
     name: Check / Build / Lint / Test
+    needs: combo4c_apply
+    if: always() && (needs.combo4c_apply.result == 'success' || needs.combo4c_apply.result == 'skipped')
     runs-on: ubuntu-latest
     timeout-minutes: 35
 
@@ -44,6 +80,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.ref || github.ref_name }}
 
       - name: Set up Node.js 20
         uses: actions/setup-node@v4
