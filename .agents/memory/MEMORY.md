@@ -36,3 +36,4 @@
 - [Migrated read-only voucher guard](migrated-readonly-voucher-guard.md) — one shared helper must be enforced on every voucher/entry mutation route, not just the obvious edit/delete ones.
 - [GC migration staged dependency scoping](gc-migration-staged-dependency-scoping.md) — dependency/idempotency checks across staged migration steps must be scoped to the exact (source,target) pair, not just target; varchar column widths silently truncate literal source_type values.
 - [Audit log changes shape & supplier schema gap](audit-log-changes-shape.md) — audit-log changes fields need {old,new}; suppliers has no companyId column; customers has legalName not name/email/address; vouchers has no creator/userId column.
+- [Per-worker payroll accounting groups](payroll-worker-account-groups.md) — salary/bonus accounts nest under group headers; findOrCreateLedger accepts opts.parentId/subType.
