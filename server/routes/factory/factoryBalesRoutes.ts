@@ -1264,14 +1264,22 @@ export function registerFactoryBalesRoutes(app: Express) {
             .select()
             .from(factoryBaleProducts)
             .where(eq(factoryBaleProducts.companyId, companyId));
-          const productByName = new Map(allProducts.map((p: any) => [p.name.toLowerCase(), p]));
-          const productByArticle = new Map(allProducts.map((p: any) => [p.articleCode?.toLowerCase(), p]));
+          type ImportedBaleProduct = (typeof allProducts)[number];
+          const productByName = new Map<string, ImportedBaleProduct>(
+            allProducts.map((p: ImportedBaleProduct) => [p.name.toLowerCase(), p] as const)
+          );
+          const productByArticle = new Map<string | undefined, ImportedBaleProduct>(
+            allProducts.map((p: ImportedBaleProduct) => [p.articleCode?.toLowerCase(), p] as const)
+          );
 
           const allCategories = await tx
             .select()
             .from(factoryCategories)
             .where(eq(factoryCategories.companyId, companyId));
-          const categoryByName = new Map(allCategories.map((c: any) => [c.name?.toLowerCase(), c]));
+          type ImportedBaleCategory = (typeof allCategories)[number];
+          const categoryByName = new Map<string | undefined, ImportedBaleCategory>(
+            allCategories.map((c: ImportedBaleCategory) => [c.name?.toLowerCase(), c] as const)
+          );
 
           const createdBales: any[] = [];
           let totalWeight = 0;
@@ -2825,10 +2833,10 @@ export function registerFactoryBalesRoutes(app: Express) {
         .returning();
 
       const maxRef = await db
-        .select({ maxRef: sql`MAX(CAST(SUBSTRING(reference_number FROM 4) AS INTEGER))` })
+        .select({ maxRef: sql<number>`MAX(CAST(SUBSTRING(reference_number FROM 4) AS INTEGER))` })
         .from(factoryBales)
         .where(eq(factoryBales.companyId, companyId));
-      let nextRef = Math.max((maxRef[0]?.maxRef || 0) + 1, 200000);
+      let nextRef = Math.max(Number(maxRef[0]?.maxRef ?? 0) + 1, 200000);
 
       let imported = 0;
       let totalWeightKg = 0;

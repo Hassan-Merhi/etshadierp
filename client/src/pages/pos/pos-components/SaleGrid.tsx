@@ -17,7 +17,7 @@ export interface SaleGridProps {
   getStockWarning: (row: SaleRow) => string | null;
   formatDisplayAmount: (amount: number) => string;
   activeCurrency: string;
-  exchangeRate: number;
+  exchangeRate: number | null;
   inputRefs: React.MutableRefObject<{ [key: string]: HTMLInputElement }>;
   clearActiveRowTimerRef: React.MutableRefObject<ReturnType<typeof setTimeout> | null>;
   focusCell: (rowIndex: number, colIndex: number) => void;

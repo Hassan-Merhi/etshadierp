@@ -19,7 +19,9 @@ export async function getLocationById(id: number): Promise<schema.Location | und
   return location;
 }
 
-export async function createLocation(location: schema.InsertLocation): Promise<schema.Location> {
+export async function createLocation(
+  location: schema.InsertLocation & { code: string }
+): Promise<schema.Location> {
   const [created] = await db.insert(schema.locations).values(location).returning();
   return created;
 }
@@ -121,7 +123,7 @@ export async function getLocationInventory(companyId: number, locationId: number
       COALESCE(sg.name, '') AS "stockGroupName",
       COALESCE(sg.code, '') AS "stockGroupCode",
       CASE WHEN si.deleted_at IS NOT NULL THEN false ELSE si.active END AS "stockItemActive",
-      si.barcode,
+      NULL::text            AS barcode,
       si.category_id        AS "categoryId",
       sc.name               AS "categoryName",
       COALESCE(lp.selling_price, si.selling_price) AS "lastSellingPrice"
@@ -290,8 +292,8 @@ export async function getStockItemsWithInventory(companyId: number, locationId?:
       stockItemId: schema.inventory.stockItemId,
       stockItemName: schema.stockItems.name,
       stockItemCode: schema.stockItems.code,
-      stockItemUnit: schema.stockItems.unit,
-      barcode: schema.stockItems.barcode,
+      stockItemUnit: schema.stockItems.uom,
+      barcode: sql<string | null>`NULL::text`,
       quantity: schema.inventory.quantity,
       averageRate: schema.inventory.averageRate,
       totalValue: schema.inventory.totalValue,

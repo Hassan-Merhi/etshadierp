@@ -499,7 +499,10 @@ export function registerFactoryStockRoutes(app: Express) {
           .select()
           .from(factoryBaleProducts)
           .where(eq(factoryBaleProducts.companyId, companyId));
-        const productByName = new Map(allProducts.map((p: any) => [p.name.toLowerCase(), p]));
+        type ImportedStockProduct = (typeof allProducts)[number];
+        const productByName = new Map<string, ImportedStockProduct>(
+          allProducts.map((p: ImportedStockProduct) => [p.name.toLowerCase(), p] as const)
+        );
 
         const createdBales: any[] = [];
         let totalWeight = 0;

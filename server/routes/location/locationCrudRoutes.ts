@@ -64,6 +64,7 @@ export function registerLocationCrudRoutes(app: Express) {
       // Provide defaults for optional fields
       const locationData = {
         ...parsed,
+        code: parsed.code!,
         city: parsed.city || "",
         state: parsed.state || "",
         country: parsed.country || "",

@@ -149,8 +149,8 @@ async function syncJournalToOrderCharge(
   savedEntries: Array<{
     customerId: number | null;
     ledgerAccountId: number | null;
-    debitAmount: string;
-    creditAmount: string;
+    debitAmount: string | null;
+    creditAmount: string | null;
   }>,
   voucherId?: number
 ) {
@@ -448,6 +448,7 @@ export function registerVoucherJournalRoutes(app: Express) {
       }
 
       try {
+        const auditEntries = await snapshotVoucherEntries(result.entries);
         await logAudit({
           userId: req.session.userId!,
           username: (req.session as any).username || "unknown",
@@ -456,7 +457,7 @@ export function registerVoucherJournalRoutes(app: Express) {
           tableName: "vouchers",
           recordId: result.voucher.id,
           recordIdentifier: result.voucher.voucherNumber,
-          changes: buildVoucherChangesForCreate(result.voucher, result.entries),
+          changes: buildVoucherChangesForCreate(result.voucher, auditEntries),
         });
       } catch {
         /* non-fatal */

@@ -106,7 +106,7 @@ export function registerFactoryStockAllocationV2Routes(app: Express) {
       const activeProformaIds = await db.execute(
         sql`SELECT id FROM customer_proformas WHERE company_id = ${companyId} AND is_active = true`
       );
-      const idsToSync: number[] = ((activeProformaIds as any).rows ?? (activeProformaIds as any[])).map((r: any) =>
+      const idsToSync: number[] = (activeProformaIds.rows).map((r: any) =>
         Number(r.id)
       );
       for (const pid of idsToSync) {
@@ -352,7 +352,7 @@ export function registerFactoryStockAllocationV2Routes(app: Express) {
             WHERE company_id = ${companyId} AND active = false`
       );
       const inactiveCodes2 = new Set<string>(
-        ((inactiveRaw2 as any).rows ?? (inactiveRaw2 as any[])).flatMap((r: any) => {
+        (inactiveRaw2.rows).flatMap((r: any) => {
           const vals: string[] = [];
           if (r.code) vals.push(r.code as string);
           if (r.article_code) vals.push(r.article_code as string);

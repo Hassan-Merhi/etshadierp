@@ -47,12 +47,12 @@ interface PosHandlersParams {
   // Refs
   inputRefs: React.MutableRefObject<{ [key: string]: HTMLInputElement }>;
   printRef: React.MutableRefObject<HTMLDivElement | null>;
-  stockPrintRef: React.MutableRefObject<HTMLDivElement>;
+  stockPrintRef: React.RefObject<HTMLDivElement>;
   clientSaleIdRef: React.MutableRefObject<string>;
   // Query results
   activeCurrency: string;
-  exchangeRate: number;
-  dailyExchangeRate: number;
+  exchangeRate: number | null;
+  dailyExchangeRate: number | null;
   activeLocation: Location | null;
   editVoucherId?: string;
   editVoucher: any;

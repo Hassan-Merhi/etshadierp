@@ -221,7 +221,7 @@ export function registerVoucherTransferRoutes(app: Express) {
         : [];
 
       // Wrap the entire operation in a transaction for atomicity
-      const updated = await db.transaction(async (tx) => {
+      const { updatedVoucher: updated, transferItemsData: updatedTransferItemsData } = await db.transaction(async (tx) => {
         // Find or create the associated transfer voucher
         let transferVoucher = await tx
           .select()
@@ -272,6 +272,9 @@ export function registerVoucherTransferRoutes(app: Express) {
 
         const oldSourceLocationId = transferVoucher.sourceLocationId;
         const oldDestinationLocationId = transferVoucher.destinationLocationId;
+        if (oldSourceLocationId == null || oldDestinationLocationId == null) {
+          throw new Error("Existing stock transfer is missing source or destination location");
+        }
 
         for (const oldItem of oldTransferItems) {
           const quantity = parseFloat(oldItem.quantity);
@@ -351,7 +354,7 @@ export function registerVoucherTransferRoutes(app: Express) {
 
         const [updatedVoucher] = await tx.update(vouchers).set(voucherUpdates).where(eq(vouchers.id, id)).returning();
 
-        return updatedVoucher;
+        return { updatedVoucher, transferItemsData };
       });
 
       try {
@@ -377,7 +380,7 @@ export function registerVoucherTransferRoutes(app: Express) {
             rate: it.rate,
             totalAmount: it.totalAmount,
           })),
-          transferItemsData.map((it) => ({
+          updatedTransferItemsData.map((it) => ({
             stockItemId: it.stockItemId,
             quantity: it.quantity,
             rate: it.rate,

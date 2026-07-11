@@ -1177,7 +1177,7 @@ export function registerStockMergeRoutes(app: Express) {
     try {
       const companyId = req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
-      const userId: number = req.user?.id ?? req.session.userId;
+      const userId = String(req.user?.id ?? req.session.userId ?? "");
 
       const logId = parseInt(req.params.logId);
       if (isNaN(logId)) return res.status(400).json({ message: "Invalid log ID" });
@@ -1298,11 +1298,20 @@ export function registerStockMergeRoutes(app: Express) {
         await tx.delete(stockItemMergeLogs).where(eq(stockItemMergeLogs.id, logId));
       });
 
-      await logAudit(userId, companyId, "unmerge_stock_item", {
-        logId,
-        keptItemId,
-        mergedItemId,
-        mergedItemName,
+      await logAudit({
+        userId,
+        username: req.session?.username || req.user?.username || "unknown",
+        companyId,
+        action: "update",
+        tableName: "stock_items",
+        recordId: mergedItemId,
+        recordIdentifier: mergedItemName,
+        changes: {
+          unmerge: {
+            old: null,
+            new: { logId, keptItemId, mergedItemId, mergedItemName },
+          },
+        },
       });
 
       return res.json({ success: true, message: `"${mergedItemName}" has been restored as a separate item.` });

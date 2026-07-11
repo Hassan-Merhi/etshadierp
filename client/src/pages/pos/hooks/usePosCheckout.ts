@@ -30,8 +30,8 @@ interface PosCheckoutParams {
   lastSavedFingerprintRef: React.MutableRefObject<string>;
   clientSaleIdRef: React.MutableRefObject<string>;
   activeCurrency: string;
-  exchangeRate: number;
-  dailyExchangeRate: number;
+  exchangeRate: number | null;
+  dailyExchangeRate: number | null;
   activeLocation: Location | null;
   editVoucherId?: string;
   editVoucher: any;
