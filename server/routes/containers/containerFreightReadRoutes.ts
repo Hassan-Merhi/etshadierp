@@ -231,7 +231,6 @@ export function registerContainerFreightReadRoutes(app: Express) {
           } else {
             await tx.insert(voucherEntries).values({
               voucherId: po.voucherId!,
-              companyId: po.companyId,
               ledgerAccountId: poFreightParentAcctId!,
               debitAmount: "0",
               creditAmount: poFreightAmt.toFixed(2),
@@ -332,7 +331,6 @@ export function registerContainerFreightReadRoutes(app: Express) {
           } else {
             await tx.insert(voucherEntries).values({
               voucherId: po.voucherId!,
-              companyId: po.companyId,
               ledgerAccountId: poFreightParentAcctId!,
               debitAmount: "0",
               creditAmount: poFreightAmt.toFixed(2),
@@ -406,7 +404,7 @@ export function registerContainerFreightReadRoutes(app: Express) {
       const [allLineItems, allStockItems] =
         poIds.length > 0
           ? await Promise.all([
-              db.select().from(poLineItems).where(inArray(poLineItems.purchaseOrderId, poIds)).execute(),
+              db.select().from(poLineItems).where(inArray(poLineItems.poId, poIds)).execute(),
               db
                 .select({
                   id: stockItems.id,
@@ -422,7 +420,7 @@ export function registerContainerFreightReadRoutes(app: Express) {
                         await db
                           .select({ id: poLineItems.stockItemId })
                           .from(poLineItems)
-                          .where(inArray(poLineItems.purchaseOrderId, poIds))
+                          .where(inArray(poLineItems.poId, poIds))
                           .execute()
                       )
                         .map((r) => r.id)
@@ -463,9 +461,9 @@ export function registerContainerFreightReadRoutes(app: Express) {
       }
       const lineItemsByPO = new Map<number, typeof allLineItems>();
       for (const li of allLineItems) {
-        const arr = lineItemsByPO.get(li.purchaseOrderId!) || [];
+        const arr = lineItemsByPO.get(li.poId!) || [];
         arr.push(li);
-        lineItemsByPO.set(li.purchaseOrderId!, arr);
+        lineItemsByPO.set(li.poId!, arr);
       }
 
       const posWithItems = purchaseOrders.map((po) => {

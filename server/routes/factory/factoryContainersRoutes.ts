@@ -690,7 +690,6 @@ export function registerFactoryContainersRoutes(app: Express) {
             .returning();
           await db.insert(voucherEntries).values({
             voucherId: newFV.id,
-            companyId,
             ledgerAccountId: newFreightAcctId,
             debitAmount: String(newFreightAmt),
             creditAmount: "0",
@@ -699,7 +698,6 @@ export function registerFactoryContainersRoutes(app: Express) {
           if (newFreightPaidBy === "own" && newFreightOwnAcctId) {
             await db.insert(voucherEntries).values({
               voucherId: newFV.id,
-              companyId,
               ledgerAccountId: newFreightOwnAcctId,
               debitAmount: "0",
               creditAmount: String(newFreightAmt),
@@ -708,7 +706,6 @@ export function registerFactoryContainersRoutes(app: Express) {
           } else if (updated.supplierId) {
             await db.insert(voucherEntries).values({
               voucherId: newFV.id,
-              companyId,
               factorySupplierId: updated.supplierId,
               debitAmount: "0",
               creditAmount: String(newFreightAmt),
