@@ -909,6 +909,7 @@ export function registerVoucherSalesUpdateRoutes(app: Express) {
           totalSales: totalSales.toFixed(2),
           totalCost: totalCost.toFixed(2),
           profit: profit.toFixed(2),
+          configuredPrice: null as string | null,
         };
       });
 
