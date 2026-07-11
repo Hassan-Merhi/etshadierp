@@ -234,8 +234,11 @@ export function registerWorkerStatsAdvancesRoutes(app: Express) {
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const conditions: any[] = [eq(factoryAdvanceRepayments.companyId, companyId)];
-      if (req.query.workerId)
-        conditions.push(eq(factoryAdvanceRepayments.workerId, parseOptionalId(req.query.workerId)));
+      const workerId = req.query.workerId ? parseOptionalId(req.query.workerId) : null;
+      if (req.query.workerId && workerId === null) {
+        return res.status(400).json({ message: "Invalid workerId" });
+      }
+      if (workerId !== null) conditions.push(eq(factoryAdvanceRepayments.workerId, workerId));
 
       const repayments = await db
         .select({
@@ -274,7 +277,11 @@ export function registerWorkerStatsAdvancesRoutes(app: Express) {
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const conditions: any[] = [eq(factoryWorkerAdvances.companyId, companyId)];
-      if (req.query.workerId) conditions.push(eq(factoryWorkerAdvances.workerId, parseOptionalId(req.query.workerId)));
+      const workerId = req.query.workerId ? parseOptionalId(req.query.workerId) : null;
+      if (req.query.workerId && workerId === null) {
+        return res.status(400).json({ message: "Invalid workerId" });
+      }
+      if (workerId !== null) conditions.push(eq(factoryWorkerAdvances.workerId, workerId));
       if (req.query.status === "outstanding") conditions.push(eq(factoryWorkerAdvances.fullyPaid, false));
       if (req.query.status === "paid") conditions.push(eq(factoryWorkerAdvances.fullyPaid, true));
 
@@ -494,6 +501,7 @@ export function registerWorkerStatsAdvancesRoutes(app: Express) {
       const companyId = getFactoryCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const workerId = parseId(req.params.id);
+      if (workerId === null) return res.status(400).json({ message: "Invalid id" });
       const deductions = await db
         .select()
         .from(factoryWorkerDeductions)
@@ -511,6 +519,7 @@ export function registerWorkerStatsAdvancesRoutes(app: Express) {
       const companyId = getFactoryCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const workerId = parseId(req.params.id);
+      if (workerId === null) return res.status(400).json({ message: "Invalid id" });
       const { amount, reason, deductionDate } = req.body;
       if (!amount || isNaN(parseFloat(amount)) || parseFloat(amount) <= 0) {
         return res.status(400).json({ message: "Amount must be a positive number" });
@@ -539,6 +548,7 @@ export function registerWorkerStatsAdvancesRoutes(app: Express) {
       const companyId = getFactoryCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const deductionId = parseId(req.params.id);
+      if (deductionId === null) return res.status(400).json({ message: "Invalid id" });
       const [existing] = await db
         .select()
         .from(factoryWorkerDeductions)

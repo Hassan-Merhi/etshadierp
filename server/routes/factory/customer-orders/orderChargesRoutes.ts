@@ -268,7 +268,7 @@ export function registerOrderChargesRoutes(app: Express) {
         if (daybookEntry) {
           await db
             .update(factoryDaybookEntries)
-            .set({ amountCurrency: newGrandTotal, amountUsd: newGrandTotal })
+            .set({ amountCurrency: String(newGrandTotal), amountUsd: String(newGrandTotal) })
             .where(eq(factoryDaybookEntries.id, daybookEntry.id));
         }
       }
@@ -289,7 +289,7 @@ export function registerOrderChargesRoutes(app: Express) {
         if (verifiedDaybookEntry) {
           await db
             .update(factoryDaybookEntries)
-            .set({ amountCurrency: newGrandTotal, amountUsd: newGrandTotal })
+            .set({ amountCurrency: String(newGrandTotal), amountUsd: String(newGrandTotal) })
             .where(eq(factoryDaybookEntries.id, verifiedDaybookEntry.id));
         }
       }
@@ -854,7 +854,7 @@ export function registerOrderChargesRoutes(app: Express) {
         if (verifiedDaybookEntry) {
           await db
             .update(factoryDaybookEntries)
-            .set({ amountCurrency: newGrandTotal, amountUsd: newGrandTotal })
+            .set({ amountCurrency: String(newGrandTotal), amountUsd: String(newGrandTotal) })
             .where(eq(factoryDaybookEntries.id, verifiedDaybookEntry.id));
         }
       }
