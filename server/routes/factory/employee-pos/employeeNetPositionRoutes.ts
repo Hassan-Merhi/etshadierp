@@ -1252,7 +1252,10 @@ export function registerEmployeeNetPositionRoutes(app: Express) {
           (a.name || "")
             .toLowerCase()
             .trim()
-            .replace(/\s+/g, " ") !== "factory worker advances"
+            .replace(/\s+/g, " ") !== "factory worker advances" &&
+          // Exclude per-worker insurance liability accounts (e.g. "Insurance - أحمد علي رمضان")
+          // — these are tracked separately via the Insurance section, not Net Position assets
+          !/^Insurance\s*[-–]/i.test(a.name || "")
       );
       const cleanLedgerForUsTotal = round2(cleanLedgerForUs.reduce((s, a) => s + a.value, 0));
 
