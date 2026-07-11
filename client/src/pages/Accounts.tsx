@@ -14,6 +14,7 @@ import {
   TrendingUp,
   TrendingDown,
   Trash2,
+  Wrench,
 } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from "@/components/ui/command";
@@ -234,6 +235,21 @@ export default function Accounts() {
   const [filterCurrency, setFilterCurrency] = useState<"all" | "CFA">("all");
   const { data: currentUser } = useQuery<{ role?: string }>({ queryKey: ["/api/auth/me"] });
   const [exportLang, setExportLang] = useState<"en" | "fr" | "ar">("en");
+
+  const fixPayrollAccountsMutation = useMutation({
+    mutationFn: () =>
+      apiRequest("POST", "/api/factory/payroll/migrate-worker-names", { companyId: selectedCompany?.id }),
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/accounts"] });
+      toast({
+        title: "Payroll accounts fixed",
+        description: `${data.vouchersUpdated ?? 0} voucher(s) updated · ${data.accountsDeleted ?? 0} old account(s) removed · ${(data.salaryAccountsReparented ?? 0) + (data.bonusAccountsReparented ?? 0)} account(s) grouped`,
+      });
+    },
+    onError: (err: any) => {
+      toast({ title: "Fix failed", description: err?.message ?? "Unknown error", variant: "destructive" });
+    },
+  });
 
   // ─── WhatsApp rule state ─────────────────────────────────────────────────
   const defaultWaRule: WaRule = { enabled: false, whatsappChatId: "", sendOnPayment: true, sendOnReceipt: true, sendOnJournal: true };
@@ -487,13 +503,26 @@ export default function Accounts() {
     <div className="space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-2">
         <PageHeader title="Accounts Overview" subtitle="View all accounts, balances, and transaction history" />
-        <Button
-          data-testid="button-create-account"
-          disabled={!selectedCompany}
-          onClick={() => navigate(`${modePrefix}/create`)}
-        >
-          <Plus className="w-4 h-4 mr-2" /> Create
-        </Button>
+        <div className="flex gap-2">
+          {appMode === "factory" && ["Admin", "Owner", "Developer"].includes(currentUser?.role ?? "") && (
+            <Button
+              variant="outline"
+              disabled={!selectedCompany || fixPayrollAccountsMutation.isPending}
+              onClick={() => fixPayrollAccountsMutation.mutate()}
+              title="Rename payroll accounts from city names to worker names and group them under headers"
+            >
+              <Wrench className="w-4 h-4 mr-2" />
+              {fixPayrollAccountsMutation.isPending ? "Fixing…" : "Fix Payroll Accounts"}
+            </Button>
+          )}
+          <Button
+            data-testid="button-create-account"
+            disabled={!selectedCompany}
+            onClick={() => navigate(`${modePrefix}/create`)}
+          >
+            <Plus className="w-4 h-4 mr-2" /> Create
+          </Button>
+        </div>
       </div>
 
       <AccountDialogs
