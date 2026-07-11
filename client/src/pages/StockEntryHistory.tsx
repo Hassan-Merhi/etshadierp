@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient, useQueries } from "@tanstack/react-query";
 import * as XLSX from "@/lib/excelHelper";
 import {
   ChevronDown,
@@ -190,9 +190,18 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
   const [locationIdFilter, setLocationIdFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search), 400);
+    return () => clearTimeout(t);
+  }, [search]);
   const [includeUnassigned, setIncludeUnassigned] = useState(true);
   const [expandedKeys, setExpandedKeys] = useState<Set<string>>(new Set());
   const [viewMode, setViewMode] = useState<"condensed" | "detailed">("condensed");
+
+  // Condensed mode: use lite mode (no per-bale JSON_AGG) for a small initial payload (~95% smaller).
+  // Detailed mode fetches the full response so the flat bale list is populated.
+  const useLite = viewMode === "condensed";
 
   const params = new URLSearchParams();
   if (useDateFilter) {
@@ -203,12 +212,20 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
   if (productIdFilter !== "all") params.set("productId", productIdFilter);
   if (locationIdFilter !== "all") params.set("locationId", locationIdFilter);
   if (statusFilter !== "all") params.set("status", statusFilter);
-  if (search.trim()) params.set("search", search.trim());
+  if (debouncedSearch.trim()) params.set("search", debouncedSearch.trim());
   if (!includeUnassigned) params.set("includeUnassigned", "false");
+  if (useLite) params.set("lite", "1");
 
   const { data: rawGroups, isLoading } = useQuery<GroupRow[]>({
     queryKey: ["/api/factory/bales/stock-entry-history", params.toString()],
-    queryFn: () => fetch(`/api/factory/bales/stock-entry-history?${params.toString()}`).then((r) => r.json()),
+    queryFn: () =>
+      fetch(`/api/factory/bales/stock-entry-history?${params.toString()}`, { credentials: "include" }).then((r) =>
+        r.json()
+      ),
+    staleTime: 60_000,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+    placeholderData: (prev) => prev,
   });
   const groups: GroupRow[] = Array.isArray(rawGroups) ? rawGroups : [];
 
@@ -229,6 +246,36 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
         r.json()
       ),
     enabled: !!planDate,
+  });
+
+  // Per-group bale queries: lazily loaded only when a sub-group row is expanded in condensed mode.
+  const expandedGroupBaleKeys = useMemo(
+    () => Array.from(expandedKeys).filter((k) => k.endsWith("-bales")),
+    [expandedKeys]
+  );
+  const groupBaleQueries = useQueries({
+    queries: expandedGroupBaleKeys.map((key) => {
+      const baseKey = key.replace(/-bales$/, "");
+      const group = groups.find((g) => groupKey(g) === baseKey);
+      if (!group)
+        return { queryKey: ["noop", key], queryFn: () => [] as BaleDetail[], enabled: false };
+      const gp = new URLSearchParams();
+      gp.set("startDate", group.stockEntryDate);
+      gp.set("endDate", group.stockEntryDate);
+      if (group.workerId) gp.set("workerId", String(group.workerId));
+      if (group.productId) gp.set("productId", String(group.productId));
+      if (group.erpLocationId) gp.set("locationId", String(group.erpLocationId));
+      return {
+        queryKey: ["/api/factory/bales/stock-entry-history/group", gp.toString()],
+        queryFn: (): Promise<BaleDetail[]> =>
+          fetch(`/api/factory/bales/stock-entry-history?${gp.toString()}`, { credentials: "include" })
+            .then((r) => r.json())
+            .then((rows: GroupRow[]) => (Array.isArray(rows) ? rows.flatMap((g) => g.bales ?? []) : [])),
+        staleTime: 5 * 60 * 1000,
+        refetchOnWindowFocus: false,
+        enabled: useLite && !!group,
+      };
+    }),
   });
 
   const selectedCategoryWorkerIds: number[] | null = useMemo(() => {
@@ -349,6 +396,35 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
     });
   }
 
+  /** Returns loaded bales for a group. In condensed (lite) mode, fetched lazily on expand. */
+  function getGroupBales(g: GroupRow): BaleDetail[] {
+    if (!useLite) return g.bales;
+    const key = groupKey(g) + "-bales";
+    const idx = expandedGroupBaleKeys.indexOf(key);
+    if (idx < 0) return [];
+    return groupBaleQueries[idx]?.data ?? [];
+  }
+
+  /** True while the per-group bale query is in-flight for an expanded group. */
+  function isGroupBalesLoading(g: GroupRow): boolean {
+    if (!useLite) return false;
+    const key = groupKey(g) + "-bales";
+    const idx = expandedGroupBaleKeys.indexOf(key);
+    if (idx < 0) return false;
+    return groupBaleQueries[idx]?.isLoading ?? false;
+  }
+
+  /** Fetches full group data (with bales) for exports. Skips re-fetch when already in detailed mode. */
+  async function fetchGroupsWithBales(): Promise<GroupRow[]> {
+    if (!useLite) return filteredGroups;
+    const fullParams = new URLSearchParams(params);
+    fullParams.delete("lite");
+    const raw = await fetch(`/api/factory/bales/stock-entry-history?${fullParams.toString()}`, {
+      credentials: "include",
+    }).then((r) => r.json());
+    return Array.isArray(raw) ? raw : filteredGroups;
+  }
+
   function resetFilters() {
     setUseDateFilter(false);
     setFromDate(today);
@@ -389,7 +465,10 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
     const ws1 = XLSX.utils.json_to_sheet(summaryRows);
     XLSX.utils.book_append_sheet(wb, ws1, "Summary");
 
-    const detailRows = filteredGroups.flatMap((g) =>
+    // In lite mode, we need to fetch full bale data for the detail and matrix sheets.
+    const groupsWithBales = await fetchGroupsWithBales();
+
+    const detailRows = groupsWithBales.flatMap((g) =>
       g.bales.map((b) => ({
         "Stock Entry Date": b.stockEntryDate,
         Location: b.locationName,
@@ -405,7 +484,7 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
     const ws2 = XLSX.utils.json_to_sheet(detailRows);
     XLSX.utils.book_append_sheet(wb, ws2, "Bale Details");
 
-    const matrix = buildWorkerMatrix(filteredGroups);
+    const matrix = buildWorkerMatrix(groupsWithBales);
     const ws3 = XLSX.utils.aoa_to_sheet([]);
 
     XLSX.utils.sheet_add_aoa(ws3, [["Stock Entry History — Worker Matrix"]], { origin: "A1" });
@@ -435,9 +514,10 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
     await XLSX.writeFile(wb, `stock-entry-history-${fromDate}-to-${toDate}.xlsx`);
   }
 
-  function handlePrintMatrix() {
+  async function handlePrintMatrix() {
     if (filteredGroups.length === 0) return;
-    const matrix = buildWorkerMatrix(filteredGroups);
+    const groupsWithBales = await fetchGroupsWithBales();
+    const matrix = buildWorkerMatrix(groupsWithBales);
     const { workers: cols, rows, workerTotals, grandTotal } = matrix;
 
     // Readable font — minimum 8.5 px regardless of column count
@@ -590,11 +670,14 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
     win.document.close();
   }
 
-  function handleExportWorkerPDF() {
+  async function handleExportWorkerPDF() {
     if (filteredGroups.length === 0) return;
 
+    // In lite mode, fetch full bale data for the per-worker PDF.
+    const groupsWithBales = await fetchGroupsWithBales();
+
     // Collect all bales across all groups
-    const allBales: BaleDetail[] = filteredGroups.flatMap((g) => g.bales);
+    const allBales: BaleDetail[] = groupsWithBales.flatMap((g) => g.bales);
 
     // Group bales by worker
     const byWorker = new Map<string, BaleDetail[]>();
@@ -1162,7 +1245,7 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
                                     <Select
                                       value={g.workerId ? String(g.workerId) : ""}
                                       onValueChange={(v) => {
-                                        const baleIds = g.bales.map((b) => b.id);
+                                        const baleIds = getGroupBales(g).map((b) => b.id);
                                         bulkAssignMutation.mutate({ baleIds, workerId: parseInt(v) });
                                       }}
                                     >
@@ -1198,7 +1281,9 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
                                           </tr>
                                         </thead>
                                         <tbody>
-                                          {g.bales.map((b) => (
+                                          {isGroupBalesLoading(g) ? (
+                                             <tr><td colSpan={4} className="py-2 text-xs text-muted-foreground">Loading bale details…</td></tr>
+                                           ) : getGroupBales(g).map((b) => (
                                             <tr
                                               key={b.id}
                                               className="border-t border-border/30"

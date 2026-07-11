@@ -1577,7 +1577,8 @@ export function registerFactoryBalesRoutes(app: Express) {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const { status, mixBatchId, pressingBatchId, locationId, productId, limit: limitQ, offset: offsetQ, date } = req.query;
+      const { status, mixBatchId, pressingBatchId, locationId, productId, limit: limitQ, offset: offsetQ, date, lite: liteQ } = req.query;
+      const lite = liteQ === "1";
 
       // Hard cap: never return more than 2000 rows in one call to prevent OOM.
       // Callers that need everything should page with ?limit=N&offset=M.
@@ -1617,11 +1618,21 @@ export function registerFactoryBalesRoutes(app: Express) {
 
       const products =
         productIds.length > 0
-          ? await db.select().from(factoryBaleProducts).where(inArray(factoryBaleProducts.id, productIds))
+          ? lite
+            ? await db
+                .select({ id: factoryBaleProducts.id, name: factoryBaleProducts.name, articleCode: factoryBaleProducts.articleCode })
+                .from(factoryBaleProducts)
+                .where(inArray(factoryBaleProducts.id, productIds))
+            : await db.select().from(factoryBaleProducts).where(inArray(factoryBaleProducts.id, productIds))
           : [];
       const batches =
         batchIds.length > 0
-          ? await db.select().from(factoryMixBatches).where(inArray(factoryMixBatches.id, batchIds))
+          ? lite
+            ? await db
+                .select({ id: factoryMixBatches.id, batchCode: factoryMixBatches.batchCode, name: factoryMixBatches.name })
+                .from(factoryMixBatches)
+                .where(inArray(factoryMixBatches.id, batchIds))
+            : await db.select().from(factoryMixBatches).where(inArray(factoryMixBatches.id, batchIds))
           : [];
 
       const productMap = new Map(products.map((p: any) => [p.id, p]));
@@ -1629,9 +1640,8 @@ export function registerFactoryBalesRoutes(app: Express) {
 
       const baleIds = bales.map((b: any) => b.id).filter(Boolean);
       const lastPrintMap = new Map<number, string>();
-      // Guard: skip the print-history look-up if there are too many IDs — a huge
-      // IN-clause with thousands of values is expensive and rarely needed for all bales.
-      if (baleIds.length > 0 && baleIds.length <= 500) {
+      // In lite mode skip the print-history lookup; in full mode guard against huge IN-clauses.
+      if (!lite && baleIds.length > 0 && baleIds.length <= 500) {
         const printRows = await db
           .select({
             productionBaleId: baleLabelPrints.productionBaleId,
@@ -2079,7 +2089,7 @@ export function registerFactoryBalesRoutes(app: Express) {
         ((req.session as any).currentRole as string) || ((req.session as any).factoryRole as string) || "";
       const isPrivileged = ["Admin", "Owner", "Manager", "Developer"].includes(userRole);
 
-      const { startDate, endDate, workerId, productId, locationId, status, search, includeUnassigned } =
+      const { startDate, endDate, workerId, productId, locationId, status, search, includeUnassigned, lite } =
         req.query as Record<string, string>;
 
       const today = getClientDate(req);
@@ -2097,6 +2107,45 @@ export function registerFactoryBalesRoutes(app: Express) {
       // Privileged users can see deleted bales when searching by ref code;
       // otherwise exclude deleted/removed bales (consistent with daily-summary)
       const deletedFilter = isPrivileged && search ? sql`` : sql`AND fb.status NOT IN ('DELETED', 'REMOVED')`;
+
+      // Lite mode: omit per-bale JSON_AGG — returns a summary-only payload (~95% smaller).
+      // The condensed view uses this for the initial page load; bale details are fetched on demand.
+      if (lite === "1") {
+        const liteRows = await db.execute(sql`
+          SELECT
+            fb.stock_entry_date::text AS "stockEntryDate",
+            fb.erp_location_id AS "erpLocationId",
+            COALESCE(l.name, 'Unknown') AS "locationName",
+            fb.finalized_by AS "workerId",
+            fw.full_name AS "workerName",
+            fb.product_id AS "productId",
+            fbp.name AS "productName",
+            fbp.article_code AS "articleCode",
+            COUNT(*)::int AS "baleCount",
+            ROUND(SUM(CAST(fb.weight_kg AS numeric)), 3) AS "totalWeight",
+            ROUND(AVG(CAST(fb.weight_kg AS numeric)), 3) AS "avgWeight",
+            MIN(fb.finalized_at) AS "firstFinalizedAt",
+            MAX(fb.finalized_at) AS "lastFinalizedAt"
+          FROM factory_bales fb
+          LEFT JOIN factory_workers fw ON fb.finalized_by = fw.id AND fw.company_id = ${companyId}
+          LEFT JOIN factory_bale_products fbp ON fb.product_id = fbp.id AND fbp.company_id = ${companyId}
+          LEFT JOIN locations l ON fb.erp_location_id = l.id AND l.company_id = ${companyId}
+          WHERE fb.company_id = ${companyId}
+            ${deletedFilter}
+            AND fb.stock_entry_date IS NOT NULL
+            AND fb.stock_entry_date >= ${effectiveStart}
+            AND fb.stock_entry_date <= ${effectiveEnd}
+            ${workerFilter}
+            ${productFilter}
+            ${locationFilter}
+            ${statusFilter}
+            ${searchFilter}
+            ${unassignedFilter}
+          GROUP BY fb.stock_entry_date, fb.erp_location_id, l.name, fb.finalized_by, fw.full_name, fb.product_id, fbp.name, fbp.article_code
+          ORDER BY fb.stock_entry_date DESC, l.name NULLS LAST, fw.full_name NULLS LAST, fbp.name NULLS LAST
+        `);
+        return res.json(liteRows.rows.map((r: any) => ({ ...r, bales: [] })));
+      }
 
       const rows = await db.execute(sql`
         SELECT
