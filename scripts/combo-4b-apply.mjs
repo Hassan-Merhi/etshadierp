@@ -16,6 +16,17 @@ function replaceExact(path, oldText, newText, expected = 1) {
   fs.writeFileSync(path, source.replaceAll(oldText, newText));
 }
 
+function replaceLineExact(path, lineNumber, oldText, newText) {
+  const source = fs.readFileSync(path, "utf8");
+  const lines = source.split("\n");
+  const index = lineNumber - 1;
+  if (lines[index] !== oldText) {
+    throw new Error(`${path}:${lineNumber}: expected ${JSON.stringify(oldText)}, found ${JSON.stringify(lines[index])}`);
+  }
+  lines[index] = newText;
+  fs.writeFileSync(path, lines.join("\n"));
+}
+
 // Pull-request jobs normally check out a synthetic merge ref. Switch back to the
 // actual feature branch so the generated commit has a clean, linear parent.
 git("fetch", "origin", branch, "main");
@@ -79,12 +90,12 @@ replaceExact(
       const [existing] = await db`
 );
 
-replaceExact(
-  "server/routes/factory/customer-orders/orderChargesRoutes.ts",
-  ".set({ amountCurrency: newGrandTotal, amountUsd: newGrandTotal })",
-  ".set({ amountCurrency: String(newGrandTotal), amountUsd: String(newGrandTotal) })",
-  3
-);
+const daybookPath = "server/routes/factory/customer-orders/orderChargesRoutes.ts";
+const daybookOld = "            .set({ amountCurrency: newGrandTotal, amountUsd: newGrandTotal })";
+const daybookNew = "            .set({ amountCurrency: String(newGrandTotal), amountUsd: String(newGrandTotal) })";
+replaceLineExact(daybookPath, 271, daybookOld, daybookNew);
+replaceLineExact(daybookPath, 292, daybookOld, daybookNew);
+replaceLineExact(daybookPath, 857, daybookOld, daybookNew);
 
 replaceExact(
   "server/routes/factory/suppliers/supplierCrudRoutes.ts",
