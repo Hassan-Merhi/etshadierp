@@ -1,0 +1,144 @@
+name: Apply Combo 4B safe fixes
+
+on:
+  push:
+    branches:
+      - agent/combo-4b-payroll-nonstock-typescript
+    paths:
+      - .github/workflows/combo-4b-apply.yml
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/combo-4b-payroll-nonstock-typescript
+          fetch-depth: 0
+
+      - name: Apply narrow source edits
+        shell: bash
+        run: |
+          python3 <<'PY'
+          from pathlib import Path
+
+          def replace_exact(path: str, old: str, new: str, expected: int = 1) -> None:
+              file_path = Path(path)
+              text = file_path.read_text()
+              count = text.count(old)
+              if count != expected:
+                  raise SystemExit(f"{path}: expected {expected} match(es), found {count}")
+              file_path.write_text(text.replace(old, new))
+
+          replace_exact(
+              "server/routes/payroll/payrollCoreRoutes.ts",
+              '        const workerIds = [...new Set(payrollsToMark.map((p: any) => p.workerId))];',
+              '        const workerIds = Array.from(new Set<number>(payrollsToMark.map((p: any) => p.workerId)));',
+          )
+
+          replace_exact(
+              "server/routes/payroll/workerStatsAdvancesRoutes.ts",
+              '''      const conditions: any[] = [eq(factoryAdvanceRepayments.companyId, companyId)];
+      if (req.query.workerId)
+        conditions.push(eq(factoryAdvanceRepayments.workerId, parseOptionalId(req.query.workerId)));''',
+              '''      const conditions: any[] = [eq(factoryAdvanceRepayments.companyId, companyId)];
+      const workerId = req.query.workerId ? parseOptionalId(req.query.workerId) : null;
+      if (req.query.workerId && workerId === null) {
+        return res.status(400).json({ message: "Invalid workerId" });
+      }
+      if (workerId !== null) conditions.push(eq(factoryAdvanceRepayments.workerId, workerId));''',
+          )
+
+          replace_exact(
+              "server/routes/payroll/workerStatsAdvancesRoutes.ts",
+              '''      const conditions: any[] = [eq(factoryWorkerAdvances.companyId, companyId)];
+      if (req.query.workerId) conditions.push(eq(factoryWorkerAdvances.workerId, parseOptionalId(req.query.workerId)));''',
+              '''      const conditions: any[] = [eq(factoryWorkerAdvances.companyId, companyId)];
+      const workerId = req.query.workerId ? parseOptionalId(req.query.workerId) : null;
+      if (req.query.workerId && workerId === null) {
+        return res.status(400).json({ message: "Invalid workerId" });
+      }
+      if (workerId !== null) conditions.push(eq(factoryWorkerAdvances.workerId, workerId));''',
+          )
+
+          replace_exact(
+              "server/routes/payroll/workerStatsAdvancesRoutes.ts",
+              '''      const workerId = parseId(req.params.id);
+      const deductions = await db''',
+              '''      const workerId = parseId(req.params.id);
+      if (workerId === null) return res.status(400).json({ message: "Invalid id" });
+      const deductions = await db''',
+          )
+
+          replace_exact(
+              "server/routes/payroll/workerStatsAdvancesRoutes.ts",
+              '''      const workerId = parseId(req.params.id);
+      const { amount, reason, deductionDate } = req.body;''',
+              '''      const workerId = parseId(req.params.id);
+      if (workerId === null) return res.status(400).json({ message: "Invalid id" });
+      const { amount, reason, deductionDate } = req.body;''',
+          )
+
+          replace_exact(
+              "server/routes/payroll/workerStatsAdvancesRoutes.ts",
+              '''      const deductionId = parseId(req.params.id);
+      const [existing] = await db''',
+              '''      const deductionId = parseId(req.params.id);
+      if (deductionId === null) return res.status(400).json({ message: "Invalid id" });
+      const [existing] = await db''',
+          )
+
+          replace_exact(
+              "server/routes/factory/customer-orders/orderChargesRoutes.ts",
+              '.set({ amountCurrency: newGrandTotal, amountUsd: newGrandTotal })',
+              '.set({ amountCurrency: String(newGrandTotal), amountUsd: String(newGrandTotal) })',
+              expected=3,
+          )
+
+          replace_exact(
+              "server/routes/factory/suppliers/supplierCrudRoutes.ts",
+              '''      let query = db
+        .select()
+        .from(factorySupplierPayments)
+        .where(eq(factorySupplierPayments.companyId, companyId))
+        .orderBy(desc(factorySupplierPayments.date));
+
+      if (supplierIds.length > 0) {
+        query = query.where(
+          and(
+            eq(factorySupplierPayments.companyId, companyId),
+            inArray(factorySupplierPayments.supplierId, supplierIds)
+          )
+        );
+      }
+
+      const payments = await query;''',
+              '''      const paymentConditions = [eq(factorySupplierPayments.companyId, companyId)];
+      if (supplierIds.length > 0) {
+        paymentConditions.push(inArray(factorySupplierPayments.supplierId, supplierIds));
+      }
+
+      const payments = await db
+        .select()
+        .from(factorySupplierPayments)
+        .where(and(...paymentConditions))
+        .orderBy(desc(factorySupplierPayments.date));''',
+          )
+          PY
+
+      - name: Commit source changes and remove temporary workflow
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm .github/workflows/combo-4b-apply.yml
+          git add \
+            server/routes/payroll/payrollCoreRoutes.ts \
+            server/routes/payroll/workerStatsAdvancesRoutes.ts \
+            server/routes/factory/customer-orders/orderChargesRoutes.ts \
+            server/routes/factory/suppliers/supplierCrudRoutes.ts
+          git commit -m "Fix Combo 4B payroll and non-stock TypeScript errors"
+          git push origin HEAD:agent/combo-4b-payroll-nonstock-typescript
