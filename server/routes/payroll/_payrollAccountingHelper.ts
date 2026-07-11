@@ -112,13 +112,14 @@ export async function rebuildPayrollGenVoucher(
   // ── Step 2: remaining payrolls for this period ────────────────────────────
   const remainingQuery = tx
     .select({
+      workerId: factoryPayrolls.workerId,
       baseSalary: factoryPayrolls.baseSalary,
       transport: factoryPayrolls.transport,
       bonuses: factoryPayrolls.bonuses,
       deductions: factoryPayrolls.deductions,
       advances: factoryPayrolls.advances,
       netSalary: factoryPayrolls.netSalary,
-      city: factoryWorkers.city,
+      fullName: factoryWorkers.fullName,
     })
     .from(factoryPayrolls)
     .leftJoin(factoryWorkers, eq(factoryWorkers.id, factoryPayrolls.workerId))
@@ -135,21 +136,19 @@ export async function rebuildPayrollGenVoucher(
 
   if (remaining.length === 0) return; // nothing left → no voucher needed
 
-  // ── Step 3: aggregate amounts by city ────────────────────────────────────
-  const salaryByCity = new Map<string, number>();
-  const bonusByCity = new Map<string, number>();
+  // ── Step 3: aggregate totals and per-worker expense amounts ──────────────
   let totalNet = 0;
   let totalAdvances = 0;
+  const workerRows: { workerId: number; workerName: string; salAmt: number; bonAmt: number }[] = [];
 
   for (const p of remaining) {
-    const ck = (p.city as string | null)?.trim() || "";
-    const sal =
+    const workerName = (p.fullName as string | null) || `Worker #${p.workerId}`;
+    const salAmt =
       parseFloat(p.baseSalary || "0") +
       parseFloat(p.transport || "0") -
       parseFloat(p.deductions || "0");
-    const bon = parseFloat(p.bonuses || "0");
-    salaryByCity.set(ck, (salaryByCity.get(ck) || 0) + sal);
-    bonusByCity.set(ck, (bonusByCity.get(ck) || 0) + bon);
+    const bonAmt = parseFloat(p.bonuses || "0");
+    workerRows.push({ workerId: p.workerId, workerName, salAmt, bonAmt });
     totalNet += parseFloat(p.netSalary || "0");
     totalAdvances += parseFloat(p.advances || "0");
   }
@@ -157,22 +156,16 @@ export async function rebuildPayrollGenVoucher(
   const totalGross = totalNet + totalAdvances;
   if (totalGross <= 0) return;
 
-  // ── Step 4: resolve ledger accounts (outside tx to avoid constraint races) ──
+  // ── Step 4: resolve per-worker ledger accounts (outside tx) ──────────────
   const payableAcc = await findOrCreateLedger(companyId, "Payroll Payable", "Liability");
   const advancesAcc = await findOrCreateLedger(companyId, "Factory Worker Advances", "Asset");
 
-  const uniqueCities = new Set([...salaryByCity.keys(), ...bonusByCity.keys()]);
-  const cityAccCache = new Map<string, { salaryId: number; bonusId: number }>();
-  for (const ck of uniqueCities) {
-    if (ck) {
-      const capCity = ck.charAt(0).toUpperCase() + ck.slice(1).toLowerCase();
-      const sa = await findOrCreateLedger(companyId, `Salary Expense - ${capCity}`, "Expense");
-      const ba = await findOrCreateLedger(companyId, `Bonus Expense - ${capCity}`, "Expense");
-      cityAccCache.set(ck, { salaryId: sa.id, bonusId: ba.id });
-    } else {
-      const fa = await findOrCreateLedger(companyId, "Factory Worker Payroll", "Expense");
-      cityAccCache.set("", { salaryId: fa.id, bonusId: fa.id });
-    }
+  const workerAccCache = new Map<number, { salaryId: number; bonusId: number }>();
+  for (const { workerId, workerName } of workerRows) {
+    if (workerAccCache.has(workerId)) continue;
+    const sa = await findOrCreateLedger(companyId, `Salary Expense - ${workerName}`, "Expense");
+    const ba = await findOrCreateLedger(companyId, `Bonus Expense - ${workerName}`, "Expense");
+    workerAccCache.set(workerId, { salaryId: sa.id, bonusId: ba.id });
   }
 
   // ── Step 5: create replacement voucher ───────────────────────────────────
@@ -195,54 +188,25 @@ export async function rebuildPayrollGenVoucher(
 
   const journalEntries: any[] = [];
 
-  for (const [ck, salAmt] of salaryByCity) {
-    const bonAmt = bonusByCity.get(ck) || 0;
-    const accs = cityAccCache.get(ck) ?? cityAccCache.get("")!;
-    if (ck) {
-      const capCity = ck.charAt(0).toUpperCase() + ck.slice(1).toLowerCase();
-      if (salAmt > 0) {
-        journalEntries.push({
-          voucherId: genVoucher.id,
-          ledgerAccountId: accs.salaryId,
-          debitAmount: salAmt.toFixed(2),
-          creditAmount: "0",
-          narration: `Salary expense - ${capCity} (${periodStart} – ${periodEnd})`,
-        });
-      }
-      if (bonAmt > 0) {
-        journalEntries.push({
-          voucherId: genVoucher.id,
-          ledgerAccountId: accs.bonusId,
-          debitAmount: bonAmt.toFixed(2),
-          creditAmount: "0",
-          narration: `Bonus expense - ${capCity} (${periodStart} – ${periodEnd})`,
-        });
-      }
-    } else {
-      const totalForCity = salAmt + bonAmt;
-      if (totalForCity > 0) {
-        journalEntries.push({
-          voucherId: genVoucher.id,
-          ledgerAccountId: accs.salaryId,
-          debitAmount: totalForCity.toFixed(2),
-          creditAmount: "0",
-          narration: desc,
-        });
-      }
-    }
-  }
-
-  // Edge case: bonus-only cities not in salaryByCity
-  for (const [ck, bonAmt] of bonusByCity) {
-    if (!salaryByCity.has(ck) && bonAmt > 0) {
-      const accs = cityAccCache.get(ck) ?? cityAccCache.get("")!;
-      const capCity = ck ? ck.charAt(0).toUpperCase() + ck.slice(1).toLowerCase() : "";
+  // DR entries — one salary line + one bonus line per worker
+  for (const { workerId, workerName, salAmt, bonAmt } of workerRows) {
+    const accs = workerAccCache.get(workerId)!;
+    if (salAmt > 0) {
       journalEntries.push({
         voucherId: genVoucher.id,
-        ledgerAccountId: ck ? accs.bonusId : accs.salaryId,
+        ledgerAccountId: accs.salaryId,
+        debitAmount: salAmt.toFixed(2),
+        creditAmount: "0",
+        narration: `Salary - ${workerName} (${periodStart} – ${periodEnd})`,
+      });
+    }
+    if (bonAmt > 0) {
+      journalEntries.push({
+        voucherId: genVoucher.id,
+        ledgerAccountId: accs.bonusId,
         debitAmount: bonAmt.toFixed(2),
         creditAmount: "0",
-        narration: ck ? `Bonus expense - ${capCity} (${periodStart} – ${periodEnd})` : desc,
+        narration: `Bonus - ${workerName} (${periodStart} – ${periodEnd})`,
       });
     }
   }
