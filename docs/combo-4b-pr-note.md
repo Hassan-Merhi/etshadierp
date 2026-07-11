@@ -1,0 +1,1 @@
+Temporary branch note: the branch-local workflow applies the audited four-file source patch and removes itself before the final validation commit. This note will be removed before Combo 4B is finalized.
