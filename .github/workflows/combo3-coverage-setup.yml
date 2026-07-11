@@ -1,0 +1,65 @@
+name: Combo 3 coverage setup
+
+on:
+  push:
+    branches: [combo-3-frontend-tests-coverage]
+
+permissions:
+  contents: write
+
+jobs:
+  coverage-baseline:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout Combo 3 branch
+        uses: actions/checkout@v4
+        with:
+          ref: combo-3-frontend-tests-coverage
+          fetch-depth: 0
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+
+      - name: Update lockfile for coverage provider
+        run: |
+          npm install --package-lock-only --ignore-scripts --registry=https://registry.npmjs.org
+          git diff --check -- package-lock.json
+          changed_lines=$(git diff --numstat -- package-lock.json | awk '{ total += $1 + $2 } END { print total + 0 }')
+          echo "package-lock changed lines: ${changed_lines}"
+          if [ "${changed_lines}" -gt 800 ]; then
+            echo "Unexpectedly large lockfile rewrite; refusing to commit."
+            exit 1
+          fi
+
+      - name: Commit lockfile update
+        run: |
+          if git diff --quiet -- package-lock.json; then
+            echo "Lockfile is already synchronized."
+          else
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add package-lock.json
+            git commit -m "Combo 3: lock frontend coverage provider"
+            git push origin HEAD:combo-3-frontend-tests-coverage
+          fi
+
+      - name: Normalize Replit registry URLs for measurement
+        run: sed -i 's#http://package-firewall.replit.local/npm/#https://registry.npmjs.org/#g' package-lock.json
+
+      - name: Install dependencies
+        run: npm ci --no-audit --bin-links=true
+
+      - name: Measure frontend coverage
+        run: npm run test:frontend:coverage
+
+      - name: Upload frontend coverage baseline
+        uses: actions/upload-artifact@v4
+        with:
+          name: combo3-frontend-coverage
+          path: coverage/frontend/coverage-summary.json
+          if-no-files-found: error
+          retention-days: 7
