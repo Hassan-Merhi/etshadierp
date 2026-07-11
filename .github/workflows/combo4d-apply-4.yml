@@ -1,0 +1,37 @@
+name: Combo 4D Apply 4
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: combo4d-apply-4-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  apply:
+    if: github.event.pull_request.head.ref == 'agent/combo-4d-stock-pos-vouchers-typescript'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Combo 4D branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+          fetch-depth: 0
+      - name: Apply audited fourth safe slice
+        run: node scripts/combo-4d-safe-slice-4.mjs
+      - name: Commit production changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add server/routes/vouchers/voucherSalesUpdateRoutes.ts \
+                  server/routes/vouchers/voucherTransferRoutes.ts
+          if git diff --cached --quiet; then
+            echo "Combo 4D fourth safe slice already applied."
+          else
+            git commit -m "Apply Combo 4D voucher guard and audit fixes"
+            git push origin HEAD:${{ github.event.pull_request.head.ref }}
+          fi
