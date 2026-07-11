@@ -4,6 +4,13 @@ import { calculateHistoricalLocationInventory } from "../../routes/helpers/inven
 import { pn } from "./styleHelpers";
 import { InvEntry } from "./types";
 
+type QueryRecord = Record<string, unknown>;
+type QueryResultLike = { rows: QueryRecord[] };
+
+function queryRows(result: QueryResultLike | QueryRecord[]): QueryRecord[] {
+  return Array.isArray(result) ? result : result.rows;
+}
+
 export async function fetchInventory(
   companyId: number,
   locationId: number | undefined,
@@ -15,8 +22,10 @@ export async function fetchInventory(
   if (locationId) {
     locationIds = [locationId];
   } else {
-    const res = await db.execute(sql`SELECT id FROM locations WHERE company_id = ${companyId} AND deleted_at IS NULL`);
-    locationIds = ((res as any).rows ?? (res as any[])).map((r: any) => Number(r.id));
+    const res = await db.execute(
+      sql`SELECT id FROM locations WHERE company_id = ${companyId} AND deleted_at IS NULL`
+    );
+    locationIds = queryRows(res).map((r) => Number(r.id));
   }
 
   // TEMP DEBUG (historical opening-stock audit): confirm which locations feed
@@ -28,28 +37,36 @@ export async function fetchInventory(
     );
   }
 
-  await Promise.all(locationIds.map(async (locId) => {
-    const rows = await calculateHistoricalLocationInventory(locId, companyId, asOfDate);
-    for (const row of rows) {
-      const qty = pn(row.quantity), val = pn(row.totalValue), rate = pn(row.averageRate);
-      const ex = result.get(row.stockItemId);
-      if (!ex) {
-        result.set(row.stockItemId, {
-          stockItemId: row.stockItemId,
-          stockItemCode: row.stockItemCode ?? "",
-          stockItemName: row.stockItemName ?? "",
-          stockGroupName: row.stockGroupName ?? "",
-          stockItemUom: row.stockItemUom ?? "",
-          quantity: qty, averageRate: rate, totalValue: val,
-        });
-      } else {
-        const newQty = ex.quantity + qty, newVal = ex.totalValue + val;
-        ex.quantity = newQty; ex.totalValue = newVal;
-        ex.averageRate = newQty > 0 ? newVal / newQty : 0;
-        if (!ex.stockGroupName && row.stockGroupName) ex.stockGroupName = row.stockGroupName;
+  await Promise.all(
+    locationIds.map(async (locId) => {
+      const rows = await calculateHistoricalLocationInventory(locId, companyId, asOfDate);
+      for (const row of rows) {
+        const qty = pn(row.quantity),
+          val = pn(row.totalValue),
+          rate = pn(row.averageRate);
+        const ex = result.get(row.stockItemId);
+        if (!ex) {
+          result.set(row.stockItemId, {
+            stockItemId: row.stockItemId,
+            stockItemCode: row.stockItemCode ?? "",
+            stockItemName: row.stockItemName ?? "",
+            stockGroupName: row.stockGroupName ?? "",
+            stockItemUom: row.stockItemUom ?? "",
+            quantity: qty,
+            averageRate: rate,
+            totalValue: val,
+          });
+        } else {
+          const newQty = ex.quantity + qty,
+            newVal = ex.totalValue + val;
+          ex.quantity = newQty;
+          ex.totalValue = newVal;
+          ex.averageRate = newQty > 0 ? newVal / newQty : 0;
+          if (!ex.stockGroupName && row.stockGroupName) ex.stockGroupName = row.stockGroupName;
+        }
       }
-    }
-  }));
+    })
+  );
 
   return result;
 }
@@ -59,7 +76,19 @@ export async function fetchSalesData(
   locationId: number | undefined,
   fromDate: string,
   toDate: string
-): Promise<Array<{ stockItemId: number; itemCode: string; itemName: string; groupName: string; uom: string; saleDate: string; qty: number; totalSales: number; totalCost: number }>> {
+): Promise<
+  Array<{
+    stockItemId: number;
+    itemCode: string;
+    itemName: string;
+    groupName: string;
+    uom: string;
+    saleDate: string;
+    qty: number;
+    totalSales: number;
+    totalCost: number;
+  }>
+> {
   const locFilter = locationId ? sql` AND v.location_id = ${locationId}` : sql``;
   const res = await db.execute(sql`
     SELECT
@@ -85,17 +114,16 @@ export async function fetchSalesData(
     GROUP BY si.stock_item_id, sk.code, sk.name, COALESCE(sg.name,''), COALESCE(sk.uom,''), v.voucher_date
     ORDER BY COALESCE(sg.name,''), sk.name, v.voucher_date
   `);
-  const rows = (res as any).rows ?? (res as any[]);
-  return rows.map((r: any) => ({
+  return queryRows(res).map((r) => ({
     stockItemId: Number(r.stock_item_id),
-    itemCode:    String(r.item_code ?? ""),
-    itemName:    String(r.item_name ?? ""),
-    groupName:   String(r.group_name ?? ""),
-    uom:         String(r.uom ?? ""),
-    saleDate:    String(r.sale_date),
-    qty:         pn(r.qty),
-    totalSales:  pn(r.total_sales),
-    totalCost:   pn(r.total_cost),
+    itemCode: String(r.item_code ?? ""),
+    itemName: String(r.item_name ?? ""),
+    groupName: String(r.group_name ?? ""),
+    uom: String(r.uom ?? ""),
+    saleDate: String(r.sale_date),
+    qty: pn(r.qty),
+    totalSales: pn(r.total_sales),
+    totalCost: pn(r.total_cost),
   }));
 }
 
@@ -118,7 +146,7 @@ export async function fetchAgeingData(
   locationId: number | undefined,
   toDate: string
 ): Promise<Map<number, string>> {
-  const offloadLocFilter  = locationId ? sql` AND co.location_id = ${locationId}` : sql``;
+  const offloadLocFilter = locationId ? sql` AND co.location_id = ${locationId}` : sql``;
   const transferLocFilter = locationId ? sql` AND stv.destination_location_id = ${locationId}` : sql``;
   const res = await db.execute(sql`
     WITH offload_dates AS (
@@ -153,9 +181,8 @@ export async function fetchAgeingData(
     WHERE  movement_date <= ${toDate}::date
     GROUP BY stock_item_id
   `);
-  const rows = (res as any).rows ?? (res as any[]);
   const map = new Map<number, string>();
-  for (const r of rows) {
+  for (const r of queryRows(res)) {
     map.set(Number(r.stock_item_id), String(r.last_movement_date));
   }
   return map;
@@ -176,6 +203,5 @@ export async function fetchCashAccountBalance(
       AND  v.voucher_date       <= ${asOfDate}::date
       AND  v.deleted_at        IS NULL
   `);
-  const rows = (res as any).rows ?? (res as any[]);
-  return pn(rows[0]?.balance ?? 0);
+  return pn(queryRows(res)[0]?.balance ?? 0);
 }
