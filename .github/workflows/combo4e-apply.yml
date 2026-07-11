@@ -1,0 +1,32 @@
+name: Combo 4E Apply
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    if: startsWith(github.head_ref, 'agent/combo-4e-accounting-reports-typescript')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Combo 4E branch
+        uses: actions/checkout@v4
+        with:
+          ref: agent/combo-4e-accounting-reports-typescript
+          fetch-depth: 0
+      - name: Apply audited safe slice
+        run: node scripts/combo-4e-apply.mjs
+      - name: Commit production changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add server/netPositionHelper.ts server/routes/stats/statsNetPositionRoutes.ts server/routes/factory/suppliers/supplierBrokerRoutes.ts server/routes/stats/statsReportsRoutes.ts
+          if git diff --cached --quiet; then
+            echo "No production changes to commit"
+          else
+            git commit -m "Fix safe accounting and report TypeScript diagnostics"
+            git push origin HEAD:agent/combo-4e-accounting-reports-typescript
+          fi
