@@ -475,7 +475,7 @@ export function registerStockMergeRoutes(app: Express) {
     try {
       const companyId = req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
-      const userId = String(req.user?.id ?? req.session.userId ?? "");
+      const userId: number = req.user?.id ?? req.session.userId;
 
       const keptId = parseInt(req.params.id);
       const duplicateId = parseInt(req.body.duplicateId);
@@ -1177,7 +1177,7 @@ export function registerStockMergeRoutes(app: Express) {
     try {
       const companyId = req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
-      const userId: number = req.user?.id ?? req.session.userId;
+      const userId = String(req.user?.id ?? req.session.userId ?? "");
 
       const logId = parseInt(req.params.logId);
       if (isNaN(logId)) return res.status(400).json({ message: "Invalid log ID" });
