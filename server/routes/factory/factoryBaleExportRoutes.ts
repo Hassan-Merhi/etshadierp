@@ -1664,7 +1664,9 @@ export function registerFactoryBaleExportRoutes(app: Express) {
           COALESCE(SUM(total_weight_kg::numeric), 0) AS mix_kg,
           COALESCE(SUM(total_cost::numeric),      0) AS mix_cost
         FROM factory_mix_batches
-        WHERE company_id = ${companyId}
+        WHERE company_id        = ${companyId}
+          AND carry_forward_from_id IS NULL
+          AND deleted_at        IS NULL
       `);
       const mixAllTimeRow = ((mixAllTimeResult as any).rows ?? (mixAllTimeResult as any))[0] ?? {};
       const allTimeMixKg = parseFloat(String(mixAllTimeRow.mix_kg ?? "0")) || 0;
@@ -1721,7 +1723,8 @@ export function registerFactoryBaleExportRoutes(app: Express) {
         },
         balanceOnTable: {
           weightKg: balanceWeightKg,
-          costPerKg: blendedCostPerKg,
+          // Use all-time blended cost so the card is never affected by the date filter.
+          costPerKg: allTimeBlendedCpk,
           value: balanceValue,
         },
         summary: {
