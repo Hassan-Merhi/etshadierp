@@ -190,7 +190,12 @@ export function registerStatsNetPositionRoutes(app: Express) {
       const isSupplierPartner = (company as any)?.companyType === "supplier_partner";
       const accountsForClassify = isSupplierPartner
         ? companyAccounts.filter((a: any) => a.accountType === "Cash" || a.subType === "sp_payable")
-        : companyAccounts.filter((a: any) => a.subType !== "sp_stock" && a.subType !== "sp_cost_clearing");
+        : companyAccounts.filter(
+            (a: any) =>
+              a.subType !== "sp_stock" &&
+              a.subType !== "sp_cost_clearing" &&
+              !(a.accountType === "Liability" && (a.name as string)?.startsWith("Insurance"))
+          );
       const classified = classifyNetPositionAccounts(accountsForClassify, accountBalances, {
         includeSupplierTypeAccounts: shouldIncludeSuppliers,
       });
