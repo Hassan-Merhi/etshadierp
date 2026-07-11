@@ -12,6 +12,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
+      # Temporary guarded workflow; removed after the baseline is committed.
       - name: Checkout Combo 3 branch
         uses: actions/checkout@v4
         with:
