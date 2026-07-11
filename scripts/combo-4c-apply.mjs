@@ -13,7 +13,7 @@ function removeVoucherEntryCompanyIds(source) {
   const next = source.replace(
     /(insert\(voucherEntries\)\.values\()([\s\S]*?)(\)\s*;)/g,
     (_whole, prefix, body, suffix) => {
-      const cleaned = body.replace(/^[ \t]*companyId:\s*[^\n]+,\r?\n/gm, () => {
+      const cleaned = body.replace(/^[ \t]*companyId(?::\s*[^\n]+)?,\r?\n/gm, () => {
         removed += 1;
         return "";
       });
