@@ -21,7 +21,8 @@
     "format": "node node_modules/prettier/bin/prettier.cjs --write \"client/src/**/*.{ts,tsx,css}\" \"server/**/*.ts\" \"shared/**/*.ts\"",
     "format:check": "node node_modules/prettier/bin/prettier.cjs --check \"client/src/**/*.{ts,tsx,css}\" \"server/**/*.ts\" \"shared/**/*.ts\"",
     "test:backend": "node node_modules/vitest/vitest.mjs run",
-    "test:frontend": "node node_modules/vitest/vitest.mjs run --config vitest.config.frontend.ts"
+    "test:frontend": "node node_modules/vitest/vitest.mjs run --config vitest.config.frontend.ts",
+    "test:frontend:coverage": "node node_modules/vitest/vitest.mjs run --config vitest.config.frontend.ts --coverage"
   },
   "dependencies": {
     "@aparajita/capacitor-biometric-auth": "^10.0.0",
@@ -173,6 +174,7 @@
     "@types/react": "^18.3.11",
     "@types/react-dom": "^18.3.1",
     "@types/ws": "^8.5.13",
+    "@vitest/coverage-v8": "4.1.9",
     "drizzle-kit": "^0.31.10",
     "jsdom": "^29.1.1",
     "tsx": "^4.20.5",

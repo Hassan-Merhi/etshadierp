@@ -211,6 +211,31 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
+      - name: Frontend coverage thresholds
+        id: frontend_coverage
+        if: always() && steps.frontend_tests.outcome == 'success'
+        run: |
+          set -o pipefail
+          npm run test:frontend:coverage 2>&1 | tee frontend-coverage-errors-ci.txt
+
+      - name: Upload frontend coverage failure log
+        if: always() && steps.frontend_coverage.outcome == 'failure'
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-coverage-errors
+          path: frontend-coverage-errors-ci.txt
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Upload frontend coverage summary
+        if: always() && steps.frontend_coverage.outcome == 'success'
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-coverage-summary
+          path: coverage/frontend/coverage-summary.json
+          if-no-files-found: error
+          retention-days: 7
+
       # Format check remains advisory until existing repo-wide formatting debt is cleaned up.
       - name: Format check
         if: always() && steps.install.outcome == 'success'
