@@ -1760,7 +1760,52 @@ export function registerPayrollCoreRoutes(app: Express) {
         vouchersUpdated++;
       }
 
-      res.json({ message: "Worker-name migration complete", vouchersUpdated });
+      // ── Step 2: delete orphaned Salary/Bonus Expense accounts (no entries left) ──
+      // These are the old city-based accounts created by migrate-city-split.
+      // Now that all voucher entries point to per-worker accounts, city accounts are empty.
+      const orphanedAccounts = await db.execute(sql`
+        SELECT la.id
+        FROM ledger_accounts la
+        WHERE la.company_id = ${companyId}
+          AND (la.name LIKE 'Salary Expense - %' OR la.name LIKE 'Bonus Expense - %')
+          AND la.sub_type IS DISTINCT FROM 'Group'
+          AND la.deleted_at IS NULL
+          AND NOT EXISTS (
+            SELECT 1 FROM voucher_entries ve WHERE ve.ledger_account_id = la.id
+          )
+      `);
+      let accountsDeleted = 0;
+      if ((orphanedAccounts.rows as any[]).length > 0) {
+        const orphanIds = (orphanedAccounts.rows as any[]).map((r: any) => r.id);
+        await db.execute(sql`DELETE FROM ledger_accounts WHERE id = ANY(${orphanIds}::int[])`);
+        accountsDeleted = orphanIds.length;
+      }
+
+      // ── Step 3: ensure group headers exist and re-parent all worker accounts ──
+      const salaryGroup = await findOrCreateLedger(companyId, "Salary Expense - Workers", "Expense", { subType: "Group" });
+      const bonusGroup  = await findOrCreateLedger(companyId, "Bonus Expense - Workers",  "Expense", { subType: "Group" });
+      await db.execute(sql`
+        UPDATE ledger_accounts SET sub_type = 'Group'
+        WHERE id IN (${salaryGroup.id}, ${bonusGroup.id}) AND (sub_type IS NULL OR sub_type <> 'Group')
+      `);
+      const salReparent = await db.execute(sql`
+        UPDATE ledger_accounts SET parent_id = ${salaryGroup.id}
+        WHERE company_id = ${companyId} AND name LIKE 'Salary Expense - %'
+          AND id <> ${salaryGroup.id} AND deleted_at IS NULL
+      `);
+      const bonReparent = await db.execute(sql`
+        UPDATE ledger_accounts SET parent_id = ${bonusGroup.id}
+        WHERE company_id = ${companyId} AND name LIKE 'Bonus Expense - %'
+          AND id <> ${bonusGroup.id} AND deleted_at IS NULL
+      `);
+
+      res.json({
+        message: "Payroll accounts fixed",
+        vouchersUpdated,
+        accountsDeleted,
+        salaryAccountsReparented: (salReparent as any).rowCount ?? 0,
+        bonusAccountsReparented:  (bonReparent as any).rowCount ?? 0,
+      });
     } catch (error: any) {
       console.error("migrate-worker-names error:", error);
       res.status(500).json({ message: error.message });
