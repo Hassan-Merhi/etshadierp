@@ -364,20 +364,20 @@ export function registerFactoryInsuranceRoutes(app: Express) {
         const vId = newVoucher.id;
 
         const journalEntries = [
-          // Debit: Insurance Expense (total)
+          // Credit: Insurance Expense (insurance withheld offsets the expense account)
           {
             voucherId: vId,
             ledgerAccountId: expenseAccount.id,
-            debitAmount: totalAmount.toFixed(2),
-            creditAmount: "0",
+            debitAmount: "0",
+            creditAmount: totalAmount.toFixed(2),
             narration,
           },
-          // Credit: each member's personal account
+          // Debit: each member's personal Insurance liability account
           ...memberLedgers.map((ml) => ({
             voucherId: vId,
             ledgerAccountId: ml.ledgerId,
-            debitAmount: "0",
-            creditAmount: ml.amount.toFixed(2),
+            debitAmount: ml.amount.toFixed(2),
+            creditAmount: "0",
             narration,
           })),
         ];
