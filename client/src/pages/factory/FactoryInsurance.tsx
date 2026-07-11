@@ -593,7 +593,7 @@ export default function FactoryInsurance() {
               <span className="text-sm text-muted-foreground">Monthly Total</span>
             </div>
             <div className="text-2xl font-bold mt-1" data-testid="stat-amount">
-              ${stats.totalAmount.toFixed(2)}
+              ${stats.totalAmount % 1 === 0 ? stats.totalAmount.toFixed(0) : stats.totalAmount.toFixed(2)}
             </div>
           </CardContent>
         </Card>
@@ -611,7 +611,7 @@ export default function FactoryInsurance() {
             </div>
             <div className="text-2xl font-bold mt-1 font-mono" data-testid="stat-expense-balance">
               {insExpenseBalance != null
-                ? `${Math.abs(insExpenseBalance.balance).toFixed(2)}`
+                ? (() => { const v = Math.abs(insExpenseBalance.balance); return `${v % 1 === 0 ? v.toFixed(0) : v.toFixed(2)}`; })()
                 : "—"}
             </div>
             {insExpenseBalance != null && (
