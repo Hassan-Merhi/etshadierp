@@ -200,7 +200,11 @@ export function registerRawStockAdjRoutes(app: Express) {
           batchDate: factoryMixBatches.batchDate,
           createdAt: factoryMixBatches.createdAt,
           weightKg: factoryMixBatchSources.weightKg,
-          costPerKg: factoryMixBatchSources.costPerKg,
+          // Use the batch's blended cost/kg (factoryMixBatches.costPerKg), NOT the
+          // per-source raw-material rate (factoryMixBatchSources.costPerKg).
+          // The source rate is what BASMA UK costs per kg in isolation; the batch rate
+          // is the actual blended output cost that appears on the Recent Mix Batches list.
+          costPerKg: factoryMixBatches.costPerKg,
         })
         .from(factoryMixBatchSources)
         .innerJoin(factoryMixBatches, eq(factoryMixBatchSources.mixBatchId, factoryMixBatches.id))
@@ -237,6 +241,11 @@ export function registerRawStockAdjRoutes(app: Express) {
           id: factoryRawStock.id,
           receivedKg: factoryRawStock.receivedKg,
           usedKg: factoryRawStock.usedKg,
+          // costPerKgUsd is computed at offload time as totalCost / actualReceivedKg,
+          // so it correctly reflects the reduced received quantity. costPerKg is the
+          // declared container rate (based on full expected weight) and would be too low
+          // when fewer kg were received.
+          costPerKgUsd: factoryRawStock.costPerKgUsd,
           costPerKg: factoryRawStock.costPerKg,
           offloadedAt: factoryRawStock.offloadedAt,
           containerNumber: factoryContainers.containerNumber,
@@ -262,8 +271,10 @@ export function registerRawStockAdjRoutes(app: Express) {
         kg: parseFloat(r.receivedKg as string) || 0,
         usedKg: parseFloat(r.usedKg as string) || 0,
         rawStockId: r.id,
-        costPerKg: parseFloat(r.costPerKg as string) || 0,
-        currencyCode: r.currencyCode || "USD",
+        // Prefer the USD rate (computed from actual received kg at offload time);
+        // fall back to the native rate only if costPerKgUsd is absent (legacy rows).
+        costPerKg: parseFloat(r.costPerKgUsd as string) || parseFloat(r.costPerKg as string) || 0,
+        currencyCode: "USD",
         notes: r.origin ? `Origin: ${r.origin}` : null,
         label: `Container Receipt — ${r.containerNumber || `#${r.id}`}`,
         ref: r.containerNumber || `CONTAINER-${r.id}`,
