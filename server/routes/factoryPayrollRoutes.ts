@@ -3,6 +3,7 @@ import { getClientDate } from "../lib/dateUtils";
 import type { Express } from "express";
 import { checkFactoryAdmin } from "./factory/_helpers";
 import { eq, and, sql, asc, gte, lte, desc, inArray } from "drizzle-orm";
+import { rebuildPayrollGenVoucher } from "./payroll/_payrollAccountingHelper";
 import PDFDocument from "pdfkit";
 import path from "path";
 import fs from "fs";
@@ -636,6 +637,9 @@ export function registerFactoryPayrollRoutes(app: Express, requireAuth: any, db:
             })
             .where(eq(factoryPayrolls.id, id));
         } else {
+          // DRAFT → deleting entirely: remove / rebuild the PAYROLL-GEN expense voucher
+          // so the expense account reflects only the payrolls that still exist.
+          await rebuildPayrollGenVoucher(tx, companyId, existing.periodStart, existing.periodEnd, id);
           await tx.delete(factoryPayrolls).where(eq(factoryPayrolls.id, id));
         }
       });
@@ -710,6 +714,10 @@ export function registerFactoryPayrollRoutes(app: Express, requireAuth: any, db:
               eq(factoryDaybookEntries.referenceTable, "factory_payrolls")
             )
           );
+
+        // Remove and rebuild the PAYROLL-GEN expense voucher for this period so the
+        // expense account reflects only the payrolls that still exist.
+        await rebuildPayrollGenVoucher(tx, companyId, existing.periodStart, existing.periodEnd, id);
 
         await tx.delete(factoryPayrolls).where(eq(factoryPayrolls.id, id));
       });

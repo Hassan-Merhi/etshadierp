@@ -913,6 +913,49 @@ export function registerWorkerStatementRoutes(app: Express) {
           await tx.delete(vouchers).where(inArray(vouchers.id, orphanedRepayVoucherIds));
           deletedRepayVouchers = orphanedRepayVoucherIds.length;
         }
+
+        // ── PAYROLL-GEN-{ts} ────────────────────────────────────────────────
+        // A PAYROLL-GEN voucher is orphaned when no factory_payrolls rows exist
+        // for the same company + periodStart (voucherDate). This happens when all
+        // payrolls in a batch are deleted/undone individually and the repair
+        // utility is run afterward as a safety net.
+        const genVouchers = await tx
+          .select({ id: vouchers.id, voucherDate: vouchers.voucherDate, description: vouchers.description })
+          .from(vouchers)
+          .where(and(eq(vouchers.companyId, companyId), sql`${vouchers.voucherNumber} LIKE 'PAYROLL-GEN-%'`));
+
+        const orphanedGenVoucherIds: number[] = [];
+        for (const v of genVouchers) {
+          // Parse periodEnd from description: "Payroll expense: N workers (YYYY-MM-DD – YYYY-MM-DD)"
+          const periodMatch = (v.description as string | null)?.match(
+            /\((\d{4}-\d{2}-\d{2})\s*[–-]\s*(\d{4}-\d{2}-\d{2})\)/
+          );
+          const periodStart = v.voucherDate as string;
+          const periodEnd = periodMatch ? periodMatch[2] : null;
+
+          const whereConditions: any[] = [
+            eq(factoryPayrolls.companyId, companyId),
+            eq(factoryPayrolls.periodStart, periodStart),
+          ];
+          if (periodEnd) whereConditions.push(eq(factoryPayrolls.periodEnd, periodEnd));
+
+          const [payrollExists] = await tx
+            .select({ id: factoryPayrolls.id })
+            .from(factoryPayrolls)
+            .where(and(...whereConditions))
+            .limit(1);
+
+          if (!payrollExists) {
+            orphanedGenVoucherIds.push(v.id);
+          }
+        }
+
+        let deletedGenVouchers = 0;
+        if (orphanedGenVoucherIds.length > 0) {
+          await tx.delete(voucherEntries).where(inArray(voucherEntries.voucherId, orphanedGenVoucherIds));
+          await tx.delete(vouchers).where(inArray(vouchers.id, orphanedGenVoucherIds));
+          deletedGenVouchers = orphanedGenVoucherIds.length;
+        }
       });
 
       res.json({
