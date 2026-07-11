@@ -1468,12 +1468,10 @@ export default function DailyProductionReport() {
                   {/* Row 2 — weight breakdown */}
                   {(() => {
                     const origKg = data?.rawMaterial.totalWeightKg ?? 0;
-                    const onTableKg = data?.balanceOnTable.weightKg ?? 0;
                     const productionsKg =
                       (data?.production.totalWeightKg ?? 0) + (data?.wipersGarbage.totalWeightKg ?? 0);
-                    // Net waste = Productions − (Original Batches − On Table)
-                    // i.e. exclude material still being processed from the "used" side
-                    const totalKg = productionsKg - origKg + onTableKg;
+                    // Total = Productions − Original Batches (material consumed → finished goods + waste)
+                    const totalKg = productionsKg - origKg;
                     const isPositive = totalKg >= 0;
                     return (
                       <div className="flex flex-wrap items-center gap-5 pt-2 border-t border-border">
