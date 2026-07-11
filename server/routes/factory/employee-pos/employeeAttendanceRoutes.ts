@@ -146,12 +146,17 @@ export function registerEmployeeAttendanceRoutes(app: Express) {
         )
         .orderBy(employees.firstName, employees.lastName);
 
-      const result = rows.map((r) => ({
-        id: r.id,
-        name: `${r.firstName} ${r.lastName}`.trim(),
-        code: r.code ?? "",
-        balance: parseFloat(r.currentBalance || "0"),
-      }));
+      const result = rows
+        .map((r) => ({
+          id: r.id,
+          name: `${r.firstName} ${r.lastName}`.trim(),
+          code: r.code ?? "",
+          balance: parseFloat(r.currentBalance || "0"),
+        }))
+        // Only show employees the company owes money to (positive balance = payroll payable).
+        // Negative-balance employees owe the company — they appear on the "What We Have"
+        // side as receivables and must NOT appear here too.
+        .filter((r) => r.balance > 0);
 
       res.json({ employees: result });
     } catch (error: any) {
