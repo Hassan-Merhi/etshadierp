@@ -11,12 +11,12 @@ import {
   DollarSign,
   Users,
   UserCheck,
-  UserX,
   Loader2,
   FileText,
   ExternalLink,
   Receipt,
   Search,
+  BookOpen,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -390,6 +390,22 @@ export default function FactoryInsurance() {
 
   const { data: ledgerAccounts = [] } = useQuery<any[]>({ queryKey: ["/api/ledger-accounts"] });
 
+  // Find the Insurance Expense account dynamically from the fetched accounts list
+  const insuranceExpenseAccount = useMemo(
+    () => (ledgerAccounts as any[]).find((a) => a.name === "Insurance Expense"),
+    [ledgerAccounts]
+  );
+  const { data: insExpenseBalance } = useQuery<{ balance: number }>({
+    queryKey: ["/api/accounts/ledger", insuranceExpenseAccount?.id, "balance"],
+    queryFn: async () => {
+      const res = await fetch(`/api/accounts/ledger/${insuranceExpenseAccount!.id}/balance`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch balance");
+      return res.json();
+    },
+    enabled: !!insuranceExpenseAccount?.id,
+    staleTime: 30_000,
+  });
+
   const extraChargesMutation = useMutation({
     mutationFn: async () => {
       const amt = parseFloat(ecAmount);
@@ -573,23 +589,36 @@ export default function FactoryInsurance() {
         <Card>
           <CardContent className="pt-4 pb-4">
             <div className="flex items-center gap-2">
-              <UserX className="h-4 w-4 text-muted-foreground" />
-              <span className="text-sm text-muted-foreground">Inactive</span>
-            </div>
-            <div className="text-2xl font-bold mt-1 text-muted-foreground" data-testid="stat-inactive">
-              {stats.inactive}
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-4 pb-4">
-            <div className="flex items-center gap-2">
               <DollarSign className="h-4 w-4 text-muted-foreground" />
               <span className="text-sm text-muted-foreground">Monthly Total</span>
             </div>
             <div className="text-2xl font-bold mt-1" data-testid="stat-amount">
               ${stats.totalAmount.toFixed(2)}
             </div>
+          </CardContent>
+        </Card>
+        <Card
+          className={insuranceExpenseAccount ? "cursor-pointer hover:ring-1 hover:ring-primary/40 transition-all" : ""}
+          onClick={() =>
+            insuranceExpenseAccount &&
+            window.open(`/factory/accounts?accountId=${insuranceExpenseAccount.id}&accountType=ledger`, "_blank")
+          }
+        >
+          <CardContent className="pt-4 pb-4">
+            <div className="flex items-center gap-2">
+              <BookOpen className="h-4 w-4 text-muted-foreground" />
+              <span className="text-sm text-muted-foreground">Insurance Expense</span>
+            </div>
+            <div className="text-2xl font-bold mt-1 font-mono" data-testid="stat-expense-balance">
+              {insExpenseBalance != null
+                ? `${Math.abs(insExpenseBalance.balance).toFixed(2)}`
+                : "—"}
+            </div>
+            {insExpenseBalance != null && (
+              <div className="text-xs text-muted-foreground mt-0.5">
+                {insExpenseBalance.balance <= 0 ? "Cr balance" : "Dr balance"}
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
