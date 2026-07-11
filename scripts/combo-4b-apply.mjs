@@ -1,12 +1,6 @@
 import fs from "node:fs";
 import { execFileSync } from "node:child_process";
 
-const branch = "agent/combo-4b-payroll-nonstock-typescript-v3";
-
-function git(...args) {
-  execFileSync("git", args, { stdio: "inherit" });
-}
-
 function replaceExact(path, oldText, newText, expected = 1) {
   const source = fs.readFileSync(path, "utf8");
   const count = source.split(oldText).length - 1;
@@ -26,9 +20,6 @@ function replaceLineExact(path, lineNumber, oldText, newText) {
   lines[index] = newText;
   fs.writeFileSync(path, lines.join("\n"));
 }
-
-git("fetch", "origin", branch, "main");
-git("checkout", "-B", branch, `origin/${branch}`);
 
 replaceExact(
   "server/routes/payroll/payrollCoreRoutes.ts",
@@ -125,13 +116,15 @@ replaceExact(
         .orderBy(desc(factorySupplierPayments.date));`
 );
 
-git("checkout", "origin/main", "--", "package.json");
-fs.rmSync("scripts/combo-4b-apply.mjs");
-
-git("config", "user.name", "github-actions[bot]");
-git("config", "user.email", "41898282+github-actions[bot]@users.noreply.github.com");
-git("add", "-A");
-git("commit", "-m", "Fix Combo 4B payroll and non-stock TypeScript errors");
-git("push", "origin", `HEAD:${branch}`);
-
-console.log("Combo 4B source patch committed and bootstrap removed.");
+const files = [
+  "server/routes/payroll/payrollCoreRoutes.ts",
+  "server/routes/payroll/workerStatsAdvancesRoutes.ts",
+  "server/routes/factory/customer-orders/orderChargesRoutes.ts",
+  "server/routes/factory/suppliers/supplierCrudRoutes.ts",
+];
+const archive = "/tmp/combo-4b-patched-sources.tar.gz";
+execFileSync("tar", ["-czf", archive, ...files]);
+console.log("COMBO4B_ARCHIVE_BEGIN");
+console.log(fs.readFileSync(archive).toString("base64"));
+console.log("COMBO4B_ARCHIVE_END");
+console.log("Combo 4B audited source patch exported; continuing with TypeScript validation.");
