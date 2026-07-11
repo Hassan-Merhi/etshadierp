@@ -48,9 +48,7 @@ describe("PeriodFilter interactions", () => {
     await user.click(await screen.findByTestId("period-preset-custom"));
     expect(await screen.findByTestId("period-custom-range-dialog")).toBeInTheDocument();
 
-    const footerCloseButton = screen.getByText("Close").closest("button");
-    expect(footerCloseButton).not.toBeNull();
-    await user.click(footerCloseButton!);
+    await user.click(screen.getByText("Close", { selector: "button" }));
 
     expect(screen.queryByTestId("period-custom-range-dialog")).not.toBeInTheDocument();
   });
