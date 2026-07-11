@@ -1164,7 +1164,7 @@ export function registerFactoryStockAllocationV5Routes(app: Express) {
             ORDER BY co.created_at DESC`
       );
 
-      const orders = ((raw as any).rows ?? (raw as any[])).map((r: any) => ({
+      const orders = (raw.rows).map((r: any) => ({
         id: Number(r.id),
         containerNumber: r.containerNumber ?? `Order #${r.id}`,
         status: r.status,

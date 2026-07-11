@@ -90,7 +90,7 @@ export function registerFactoryStockAllocationV3Routes(app: any) {
         ORDER BY a.article_code
       `);
 
-      const rows = (result as any).rows ?? (result as any[]);
+      const rows = result.rows;
       res.json(rows);
     } catch (e: any) {
       res.status(500).json({ message: e.message });
@@ -138,7 +138,7 @@ export function registerFactoryStockAllocationV3Routes(app: any) {
         ORDER BY l.created_at DESC
       `);
 
-      res.json((result as any).rows ?? (result as any[]));
+      res.json(result.rows);
     } catch (e: any) {
       res.status(500).json({ message: e.message });
     }
@@ -178,7 +178,7 @@ export function registerFactoryStockAllocationV3Routes(app: any) {
         WHERE l.id = ${id} AND l.company_id = ${companyId}
       `);
 
-      const rows = (loadResult as any).rows ?? (loadResult as any[]);
+      const rows = loadResult.rows;
       if (!rows.length) return res.status(404).json({ message: "Load not found" });
       const load = rows[0];
 
@@ -203,7 +203,7 @@ export function registerFactoryStockAllocationV3Routes(app: any) {
         ORDER BY lb.added_at DESC
       `);
 
-      const bales = (baleRows as any).rows ?? (baleRows as any[]);
+      const bales = baleRows.rows;
 
       // Proforma lines for expected summary
       const lineRows = await db.execute(sql`
@@ -212,7 +212,7 @@ export function registerFactoryStockAllocationV3Routes(app: any) {
         FROM customer_proforma_lines pl
         WHERE pl.proforma_id = ${load.proformaId}
       `);
-      const proformaLines = (lineRows as any).rows ?? (lineRows as any[]);
+      const proformaLines = lineRows.rows;
 
       res.json({ ...load, bales, proformaLines });
     } catch (e: any) {
@@ -321,7 +321,7 @@ export function registerFactoryStockAllocationV3Routes(app: any) {
         LIMIT 1
       `);
 
-      let bale = ((balesFound as any).rows ?? (balesFound as any[]))[0];
+      let bale = (balesFound.rows)[0];
 
       // If not found by ref/baleCode, try articleCode (adds one IN_STOCK bale of that article)
       if (!bale) {
@@ -336,7 +336,7 @@ export function registerFactoryStockAllocationV3Routes(app: any) {
           ORDER BY id
           LIMIT 1
         `);
-        bale = ((byArticle as any).rows ?? (byArticle as any[]))[0];
+        bale = (byArticle.rows)[0];
       }
 
       if (!bale) return res.status(404).json({ message: `No bale found for scan code: ${scanCode}` });
@@ -353,7 +353,7 @@ export function registerFactoryStockAllocationV3Routes(app: any) {
         SELECT id FROM factory_v3_load_bales
         WHERE load_id = ${loadId} AND bale_id = ${bale.id} AND removed_at IS NULL
       `);
-      if (((alreadyInLoad as any).rows ?? (alreadyInLoad as any[])).length > 0) {
+      if ((alreadyInLoad.rows).length > 0) {
         return res.status(400).json({ message: `Bale ${bale.referenceNumber} is already in this load` });
       }
 
@@ -378,7 +378,7 @@ export function registerFactoryStockAllocationV3Routes(app: any) {
           AND l.company_id = ${companyId}
         LIMIT 1
       `);
-      const otherV3 = ((inOtherV3 as any).rows ?? (inOtherV3 as any[]))[0];
+      const otherV3 = (inOtherV3.rows)[0];
       if (otherV3 && !bypass) {
         return res.status(409).json({
           code: "OTHER_V3_LOAD_WARNING",
@@ -465,7 +465,7 @@ export function registerFactoryStockAllocationV3Routes(app: any) {
         SELECT bale_id FROM factory_v3_load_bales
         WHERE load_id = ${id} AND removed_at IS NULL
       `);
-      const baleIds: number[] = ((baleRows as any).rows ?? (baleRows as any[])).map((r: any) => r.bale_id ?? r.baleId);
+      const baleIds: number[] = (baleRows.rows).map((r: any) => r.bale_id ?? r.baleId);
 
       // Mark each bale as SOLD in factory_bales (same end-state as existing finalization)
       if (baleIds.length > 0) {
@@ -562,7 +562,7 @@ export function registerFactoryStockAllocationV3Routes(app: any) {
         ORDER BY p.created_at DESC
       `);
 
-      res.json((result as any).rows ?? (result as any[]));
+      res.json(result.rows);
     } catch (e: any) {
       res.status(500).json({ message: e.message });
     }
@@ -592,7 +592,7 @@ export function registerFactoryStockAllocationV3Routes(app: any) {
         ORDER BY l.created_at DESC
       `);
 
-      res.json((result as any).rows ?? (result as any[]));
+      res.json(result.rows);
     } catch (e: any) {
       res.status(500).json({ message: e.message });
     }

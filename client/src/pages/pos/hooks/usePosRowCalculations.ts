@@ -9,7 +9,7 @@ interface PosRowCalculationsParams {
   setZeroStockAlert: React.Dispatch<React.SetStateAction<boolean>>;
   lastSoldPrices: Record<number, string>;
   activeCurrency: string;
-  exchangeRate: number;
+  exchangeRate: number | null;
   authUser: any;
   posUser: any;
   focusCell: (row: number, col: number) => void;
@@ -48,7 +48,7 @@ export function usePosRowCalculations({
       newRows.push({ id: Date.now().toString(), itemName: "", quantity: 0, rate: 0, rateUSD: 0, amount: 0 });
     }
     const rateUSD = lastSoldPrices[item.stockItemId] ? parseFloat(lastSoldPrices[item.stockItemId]) : item.price;
-    const displayRate = activeCurrency === "CFA" ? Math.round(rateUSD * exchangeRate) : rateUSD;
+    const displayRate = activeCurrency === "CFA" ? Math.round(rateUSD * (exchangeRate ?? 0)) : rateUSD;
 
     newRows[targetRow] = {
       ...newRows[targetRow],

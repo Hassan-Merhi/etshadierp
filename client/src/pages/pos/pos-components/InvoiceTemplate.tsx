@@ -5,7 +5,7 @@ export interface InvoiceTemplateProps {
   savedSale: any;
   printUserName: string;
   selectedCompany: any;
-  exchangeRate: number;
+  exchangeRate: number | null;
   fmtPrint: (val: any, prefix?: string) => string;
   fmtPrintCurrency: (val: any) => string;
 }
