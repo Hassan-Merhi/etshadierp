@@ -1,0 +1,31 @@
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Africa/Lubumbashi
+    open-pull-requests-limit: 5
+    versioning-strategy: increase-if-necessary
+    groups:
+      development-dependencies:
+        dependency-type: development
+      production-minor-patch:
+        dependency-type: production
+        update-types:
+          - minor
+          - patch
+    labels:
+      - dependencies
+      - security
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 3
+    labels:
+      - dependencies
+      - security
