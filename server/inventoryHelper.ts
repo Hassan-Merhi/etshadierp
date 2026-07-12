@@ -41,6 +41,24 @@ async function createNegativeLayer(
 }
 
 /**
+ * Return only the newly-created shortage between two inventory quantities.
+ *
+ * Examples:
+ *  10 -> -5  creates 5
+ *  -5 -> -8  creates 3 (not 8)
+ *  -8 -> -3  creates 0
+ *
+ * Negative layers represent incremental outbound shortage. Recording the full
+ * resulting negative quantity more than once would overstate the FIFO layers
+ * and make later receipts settle stock that was never actually issued.
+ */
+function incrementalShortage(previousQty: number, newQty: number): number {
+  const previousShortage = Math.max(-previousQty, 0);
+  const newShortage = Math.max(-newQty, 0);
+  return Math.max(newShortage - previousShortage, 0);
+}
+
+/**
  * Settle oldest negative layers FIFO using the actual incoming rate.
  * Returns { settled: qty consumed from layers, remaining: qty left for positive inventory }.
  */
@@ -161,23 +179,25 @@ export async function adjustInventory(
         newTotalValue = 0;
         newRate = effectiveRate; // keep for cost memory
       } else {
-        // ── Goes short: consume all positive stock, create negative layer ──
-        const shortageQty = Math.abs(newQty);
+        // ── Goes or remains short: create only the incremental shortage ─────────
+        const shortageQty = incrementalShortage(prevQty, newQty);
         const provisionalRate = effectiveRate > 0 ? effectiveRate : prevRate;
 
         newTotalValue = 0;
         newRate = provisionalRate > 0 ? provisionalRate : 0; // cost memory
 
-        await createNegativeLayer(
-          tx,
-          companyId,
-          locationId,
-          stockItemId,
-          shortageQty,
-          provisionalRate,
-          sourceVoucherType,
-          sourceVoucherId
-        );
+        if (shortageQty > 0.0005) {
+          await createNegativeLayer(
+            tx,
+            companyId,
+            locationId,
+            stockItemId,
+            shortageQty,
+            provisionalRate,
+            sourceVoucherType,
+            sourceVoucherId
+          );
+        }
       }
     } else {
       // deltaQty === 0: no-op
@@ -273,8 +293,8 @@ export async function adjustInventory(
  * Design:
  *  - Subtracts qtyToReverse and valueToReverse exactly.
  *  - averageRate is preserved when qty ≤ 0 (cost memory, never lost).
- *  - If reversal pushes qty below zero, a negative layer is created for the shortage
- *    so that a subsequent re-receipt settles it correctly (idempotent).
+ *  - If reversal pushes qty below zero, a negative layer is created for only
+ *    the incremental shortage so repeated reversals remain symmetric.
  */
 export async function reverseInventoryByExactValue(
   tx: TxOrDb,
@@ -317,8 +337,8 @@ export async function reverseInventoryByExactValue(
     newValue = 0;
     newRate = currentRate; // preserve last positive rate for cost memory
 
-    if (newQty < 0 && companyId) {
-      const shortageQty = Math.abs(newQty);
+    const shortageQty = incrementalShortage(currentQty, newQty);
+    if (shortageQty > 0.0005 && companyId) {
       const provisionalRate =
         currentRate > 0 ? currentRate : Math.abs(qtyToReverse > 0 ? valueToReverse / qtyToReverse : 0);
       await createNegativeLayer(
