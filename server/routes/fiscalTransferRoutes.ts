@@ -2095,6 +2095,8 @@ export function registerFiscalTransferRoutes(app: Express) {
         voucherDate: dispatchDate,
         description: `Waste dispatch from ${location.name}`,
         totalAmount: "0",
+        currency: "USD",
+        sourceModule: "ERP",
         optional: false,
         locationId,
       });
