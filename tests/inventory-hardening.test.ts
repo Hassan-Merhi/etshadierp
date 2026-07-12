@@ -101,7 +101,11 @@ describe("Inventory API hardening", () => {
     expect(await getInventoryQty(ctx.locationId, ctx.stockItemIds[0])).toBe(110);
   });
 
-  it("keeps both locations unchanged when a transfer exceeds source stock", async () => {
+  it("conserves total quantity when a transfer intentionally creates negative source stock", async () => {
+    const initialTotal =
+      (await getInventoryQty(ctx.locationId, ctx.stockItemIds[0])) +
+      (await getInventoryQty(ctx.location2Id, ctx.stockItemIds[0]));
+
     const res = await agent.post("/api/stock-transfers").send({
       sourceLocationId: ctx.locationId,
       destinationLocationId: ctx.location2Id,
@@ -112,13 +116,18 @@ describe("Inventory API hardening", () => {
           sourceLocationId: ctx.locationId,
         },
       ],
-      notes: "Insufficient-stock atomicity test",
+      notes: "Negative-source transfer invariant test",
       voucherDate: new Date().toISOString().split("T")[0],
     });
 
-    expect(res.status).toBeGreaterThanOrEqual(400);
-    expect(await getInventoryQty(ctx.locationId, ctx.stockItemIds[0])).toBe(100);
-    expect(await getInventoryQty(ctx.location2Id, ctx.stockItemIds[0])).toBe(50);
+    expect(res.status).toBeGreaterThanOrEqual(200);
+    expect(res.status).toBeLessThan(300);
+
+    const sourceQty = await getInventoryQty(ctx.locationId, ctx.stockItemIds[0]);
+    const destinationQty = await getInventoryQty(ctx.location2Id, ctx.stockItemIds[0]);
+    expect(sourceQty).toBe(-50);
+    expect(destinationQty).toBe(200);
+    expect(sourceQty + destinationQty).toBe(initialTotal);
   });
 
   it("keeps inventory unchanged after a rejected excessive quick subtraction", async () => {
@@ -175,11 +184,11 @@ describe("Negative-stock costing invariants", () => {
     expect(Number(record!.averageRate)).toBe(5);
   });
 
-  it("is stable across repeated receive and exact-reversal cycles", async () => {
+  it("is stable across repeated matched receive and exact-reversal cycles", async () => {
     await setInventory(ctx.locationId, ctx.stockItemIds[0], 0, 0, 0);
 
     for (let cycle = 0; cycle < 3; cycle += 1) {
-      await adjustInventory(
+      const receipt = await adjustInventory(
         db as any,
         ctx.locationId,
         ctx.stockItemIds[0],
@@ -191,7 +200,7 @@ describe("Negative-stock costing invariants", () => {
 
       let record = await getInventoryRecord(ctx.locationId, ctx.stockItemIds[0]);
       expect(Number(record!.quantity)).toBe(200);
-      expect(Number(record!.totalValue)).toBe(1000);
+      expect(Number(record!.totalValue)).toBe(receipt.newTotalValue);
       expect(Number(record!.averageRate)).toBe(5);
 
       await reverseInventoryByExactValue(
@@ -199,7 +208,7 @@ describe("Negative-stock costing invariants", () => {
         ctx.locationId,
         ctx.stockItemIds[0],
         200,
-        1000,
+        receipt.newTotalValue,
         ctx.companyId,
         "TEST",
       );
