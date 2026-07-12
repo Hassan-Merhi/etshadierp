@@ -29,7 +29,7 @@ describe("requestLogger health metrics", () => {
     poolState.waitingCount = 0;
   });
 
-  it("reports safe process and pool metrics without connection details", () => {
+  it("reports safe process, request baseline, and pool metrics without connection details", () => {
     const snapshot = getRequestMetricsSnapshot();
 
     expect(snapshot.status).toBe("ok");
@@ -40,6 +40,27 @@ describe("requestLogger health metrics", () => {
       active: 4,
       waiting: 0,
       utilizationPercent: 40,
+    });
+    expect(snapshot.requests).toMatchObject({
+      total: 0,
+      active: 0,
+      completed: 0,
+      success: 0,
+      clientError: 0,
+      serverError: 0,
+      slow: 0,
+      averageDurationMs: 0,
+      maxDurationMs: 0,
+      slowPercent: 0,
+      serverErrorPercent: 0,
+      slowRequestThresholdMs: 500,
+    });
+    expect(snapshot.requests.durationBuckets).toEqual({
+      under100: 0,
+      under500: 0,
+      under1000: 0,
+      under5000: 0,
+      over5000: 0,
     });
     expect(snapshot.process.uptimeSeconds).toBeGreaterThanOrEqual(0);
     expect(snapshot.process.memoryMb.rss).toBeGreaterThan(0);
