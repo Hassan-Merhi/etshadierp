@@ -8,6 +8,7 @@ import { randomUUID } from "crypto";
 import type { Request, Response, NextFunction } from "express";
 import { pool } from "../db";
 import { logger } from "../lib/logger";
+import { getOperationalEventSnapshot, recordOperationalEvent } from "../lib/operationalEvents";
 
 const SLOW_REQUEST_MS = Number(process.env.SLOW_REQUEST_MS || 500);
 const SUCCESS_SAMPLE_RATE = Math.min(1, Math.max(0, Number(process.env.REQUEST_LOG_SAMPLE_RATE || 0)));
@@ -93,6 +94,7 @@ export function getRequestMetricsSnapshot() {
       waiting: poolWaiting,
       utilizationPercent: poolMax > 0 ? Math.round(((poolTotal - poolIdle) / poolMax) * 100) : null,
     },
+    operationalEvents: getOperationalEventSnapshot(),
   };
 }
 
@@ -139,16 +141,35 @@ export function requestLogger(req: Request, res: Response, next: NextFunction): 
 
     const isSlow = durationMs >= SLOW_REQUEST_MS;
     if (isSlow) metrics.slow += 1;
-    if (SKIPPED_PATHS.has(path)) return;
 
     const userId: number | undefined = (req as any).user?.id;
     const companyId: number | undefined = (req as any).session?.currentCompanyId;
+
+    if (statusCode >= 500) {
+      recordOperationalEvent({
+        category: "error",
+        code: "http_server_error",
+        severity: "critical",
+        message: "HTTP server error detected",
+        requestId,
+        method,
+        path,
+        status: statusCode,
+        durationMs,
+        ...(userId != null ? { userId } : {}),
+        ...(companyId != null ? { companyId } : {}),
+      });
+      return;
+    }
+
+    if (SKIPPED_PATHS.has(path)) return;
+
     const isFailure = statusCode >= 400;
     const sampledSuccess = !isFailure && SUCCESS_SAMPLE_RATE > 0 && Math.random() < SUCCESS_SAMPLE_RATE;
 
     if (!isFailure && !isSlow && !sampledSuccess) return;
 
-    const level = statusCode >= 500 ? "error" : statusCode >= 400 || isSlow ? "warn" : "info";
+    const level = statusCode >= 400 || isSlow ? "warn" : "info";
     logger[level](`${method} ${path} ${statusCode}`, {
       module: "http",
       action: isSlow ? "slow_request" : "request",
