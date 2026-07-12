@@ -12,7 +12,7 @@ import { logger } from "../lib/logger";
 const SLOW_REQUEST_MS = Number(process.env.SLOW_REQUEST_MS || 500);
 const SUCCESS_SAMPLE_RATE = Math.min(
   1,
-  Math.max(0, Number(process.env.REQUEST_LOG_SAMPLE_RATE || 0))
+  Math.max(0, Number(process.env.REQUEST_LOG_SAMPLE_RATE || 0)),
 );
 const SKIPPED_PATHS = new Set([
   "/api/health",
@@ -72,7 +72,7 @@ function recordDuration(durationMs: number): void {
 
 function isMonitoringRole(req: Request): boolean {
   const role = String(
-    (req as any).session?.currentRole || (req as any).user?.role || ""
+    (req as any).session?.currentRole || (req as any).user?.role || "",
   ).toLowerCase();
   return role === "admin" || role === "developer";
 }
@@ -118,10 +118,11 @@ export function getRequestMetricsSnapshot() {
 export function requestLogger(
   req: Request,
   res: Response,
-  next: NextFunction
+  next: NextFunction,
 ): void {
   const start = Date.now();
-  const requestId = normaliseRequestId(req.headers["x-request-id"]) || randomUUID();
+  const requestId =
+    normaliseRequestId(req.headers["x-request-id"]) || randomUUID();
   res.setHeader("X-Request-Id", requestId);
 
   if (req.method === "GET" && req.path === "/api/health") {
@@ -165,7 +166,8 @@ export function requestLogger(
     if (SKIPPED_PATHS.has(path)) return;
 
     const userId: number | undefined = (req as any).user?.id;
-    const companyId: number | undefined = (req as any).session?.currentCompanyId;
+    const companyId: number | undefined = (req as any).session
+      ?.currentCompanyId;
     const isFailure = statusCode >= 400;
     const sampledSuccess =
       !isFailure &&
