@@ -1,23 +1,9 @@
 /**
  * Structured logger for server-side use.
  *
- * In production (NODE_ENV=production): emits one-line JSON to stdout/stderr —
- * readable by Render's log aggregator and any structured-log tool.
- * In development: emits a compact human-readable line.
- *
- * Security rules baked in:
- *  - Never log passwords, tokens, cookies, or session secrets.
- *  - Stack traces are only included in development.
- *  - The `error` field is sanitised: only message (+ dev stack) is forwarded.
- *
- * Usage:
- *   import { logger } from "../lib/logger";
- *   const t = Date.now();
- *   logger.info("Voucher create started", { module: "vouchers", action: "create", userId, companyId });
- *   logger.info("Voucher create succeeded", { module: "vouchers", action: "create", voucherId, durationMs: Date.now() - t });
- *   logger.error("Voucher create failed",  { module: "vouchers", action: "create", durationMs: Date.now() - t, error });
+ * Production emits one-line JSON. Development emits compact readable lines.
+ * Context is sanitised before output and must never contain request/response bodies.
  */
-
 const isDev = process.env.NODE_ENV !== "production";
 
 export type LogLevel = "debug" | "info" | "warn" | "error";
@@ -25,6 +11,7 @@ export type LogLevel = "debug" | "info" | "warn" | "error";
 export interface LogContext {
   module?: string;
   action?: string;
+  requestId?: string;
   userId?: number | string | null;
   companyId?: number | string | null;
   factoryCompanyId?: number | string | null;
@@ -39,31 +26,75 @@ export interface LogContext {
   [key: string]: unknown;
 }
 
+const SENSITIVE_KEY_PATTERN = /(?:password|passwd|secret|token|authorization|cookie|session|csrf|api[-_]?key|private[-_]?key)/i;
+const MAX_STRING_LENGTH = 2_000;
+const MAX_DEPTH = 4;
+
 function safeError(err: unknown): { message: string; stack?: string } | undefined {
   if (err === undefined || err === null) return undefined;
   if (err instanceof Error) {
     return isDev ? { message: err.message, stack: err.stack } : { message: err.message };
   }
-  return { message: String(err) };
+  return { message: String(err).slice(0, MAX_STRING_LENGTH) };
+}
+
+function sanitiseValue(value: unknown, depth = 0, seen = new WeakSet<object>()): unknown {
+  if (value === null || value === undefined || typeof value === "number" || typeof value === "boolean") {
+    return value;
+  }
+  if (typeof value === "string") {
+    return value.length > MAX_STRING_LENGTH ? `${value.slice(0, MAX_STRING_LENGTH)}…` : value;
+  }
+  if (typeof value === "bigint") return value.toString();
+  if (typeof value === "function" || typeof value === "symbol") return String(value);
+  if (value instanceof Error) return safeError(value);
+  if (value instanceof Date) return value.toISOString();
+  if (Buffer.isBuffer(value)) return `[Buffer ${value.length} bytes]`;
+  if (depth >= MAX_DEPTH) return "[MaxDepth]";
+
+  if (typeof value === "object") {
+    if (seen.has(value)) return "[Circular]";
+    seen.add(value);
+
+    if (Array.isArray(value)) {
+      return value.slice(0, 50).map((entry) => sanitiseValue(entry, depth + 1, seen));
+    }
+
+    const output: Record<string, unknown> = {};
+    for (const [key, entry] of Object.entries(value as Record<string, unknown>)) {
+      output[key] = SENSITIVE_KEY_PATTERN.test(key) ? "[REDACTED]" : sanitiseValue(entry, depth + 1, seen);
+    }
+    return output;
+  }
+
+  return String(value);
+}
+
+function sanitiseContext(ctx: LogContext): Record<string, unknown> {
+  const output: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(ctx)) {
+    if (key === "error") continue;
+    output[key] = SENSITIVE_KEY_PATTERN.test(key) ? "[REDACTED]" : sanitiseValue(value);
+  }
+  return output;
 }
 
 function emit(level: LogLevel, message: string, ctx: LogContext = {}): void {
   if (level === "debug" && !isDev) return;
 
-  const { error, ...rest } = ctx;
+  const safeContext = sanitiseContext(ctx);
+  const error = safeError(ctx.error);
 
   if (isDev) {
     const parts: string[] = [`[${level.toUpperCase()}]`, message];
     if (ctx.module) parts.push(`[${ctx.module}${ctx.action ? `:${ctx.action}` : ""}]`);
+    if (ctx.requestId) parts.push(`request=${ctx.requestId}`);
     if (ctx.userId != null) parts.push(`user=${ctx.userId}`);
     if (ctx.companyId != null) parts.push(`co=${ctx.companyId}`);
     if (ctx.voucherId != null) parts.push(`voucher=${ctx.voucherId}`);
     if (ctx.containerId != null) parts.push(`container=${ctx.containerId}`);
     if (ctx.durationMs != null) parts.push(`(${ctx.durationMs}ms)`);
-    if (error) {
-      const e = safeError(error);
-      if (e) parts.push(`— ${e.message}`);
-    }
+    if (error) parts.push(`— ${error.message}`);
     const line = parts.join(" ");
     if (level === "error") console.error(line);
     else if (level === "warn") console.warn(line);
@@ -74,14 +105,24 @@ function emit(level: LogLevel, message: string, ctx: LogContext = {}): void {
   const entry: Record<string, unknown> = {
     timestamp: new Date().toISOString(),
     level: level.toUpperCase(),
-    message,
-    ...rest,
+    message: message.slice(0, MAX_STRING_LENGTH),
+    ...safeContext,
   };
-  if (error !== undefined) {
-    entry.error = safeError(error);
+  if (error !== undefined) entry.error = error;
+
+  let line: string;
+  try {
+    line = JSON.stringify(entry);
+  } catch {
+    line = JSON.stringify({
+      timestamp: new Date().toISOString(),
+      level: "ERROR",
+      message: "Logger serialization failed",
+      module: "logger",
+      action: "serialize",
+    });
   }
 
-  const line = JSON.stringify(entry);
   if (level === "error") console.error(line);
   else if (level === "warn") console.warn(line);
   else console.log(line);
