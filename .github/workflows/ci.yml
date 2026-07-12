@@ -122,6 +122,22 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
+      - name: Format check
+        id: format_check
+        if: always() && steps.install.outcome == 'success'
+        run: |
+          set -o pipefail
+          npm run format:check 2>&1 | tee format-errors-ci.txt
+
+      - name: Upload format failure log
+        if: always() && steps.format_check.outcome == 'failure'
+        uses: actions/upload-artifact@v4
+        with:
+          name: format-errors
+          path: format-errors-ci.txt
+          if-no-files-found: error
+          retention-days: 7
+
       - name: Prepare test database schema
         id: db_schema
         if: always() && steps.install.outcome == 'success'
@@ -195,6 +211,31 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
+      - name: Backend coverage thresholds
+        id: backend_coverage
+        if: always() && steps.backend_tests.outcome == 'success'
+        run: |
+          set -o pipefail
+          npm run test:backend:coverage 2>&1 | tee backend-coverage-errors-ci.txt
+
+      - name: Upload backend coverage failure log
+        if: always() && steps.backend_coverage.outcome == 'failure'
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-coverage-errors
+          path: backend-coverage-errors-ci.txt
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Upload backend coverage summary
+        if: always() && steps.backend_coverage.outcome == 'success'
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-coverage-summary
+          path: coverage/backend/coverage-summary.json
+          if-no-files-found: error
+          retention-days: 7
+
       - name: Frontend tests
         id: frontend_tests
         if: always() && steps.install.outcome == 'success'
@@ -235,9 +276,3 @@ jobs:
           path: coverage/frontend/coverage-summary.json
           if-no-files-found: error
           retention-days: 7
-
-      # Format check remains advisory until existing repo-wide formatting debt is cleaned up.
-      - name: Format check
-        if: always() && steps.install.outcome == 'success'
-        run: npm run format:check
-        continue-on-error: true
