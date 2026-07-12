@@ -24,6 +24,8 @@ interface RequestMetrics {
   clientError: number;
   serverError: number;
   slow: number;
+  durationTotalMs: number;
+  durationMaxMs: number;
   durationBuckets: Record<DurationBucket, number>;
 }
 
@@ -34,6 +36,8 @@ const metrics: RequestMetrics = {
   clientError: 0,
   serverError: 0,
   slow: 0,
+  durationTotalMs: 0,
+  durationMaxMs: 0,
   durationBuckets: {
     under100: 0,
     under500: 0,
@@ -50,11 +54,19 @@ function normaliseRequestId(value: unknown): string | undefined {
 }
 
 function recordDuration(durationMs: number): void {
+  metrics.durationTotalMs += durationMs;
+  metrics.durationMaxMs = Math.max(metrics.durationMaxMs, durationMs);
+
   if (durationMs < 100) metrics.durationBuckets.under100 += 1;
   else if (durationMs < 500) metrics.durationBuckets.under500 += 1;
   else if (durationMs < 1000) metrics.durationBuckets.under1000 += 1;
   else if (durationMs < 5000) metrics.durationBuckets.under5000 += 1;
   else metrics.durationBuckets.over5000 += 1;
+}
+
+function percentage(part: number, total: number): number {
+  if (total <= 0) return 0;
+  return Math.round((part / total) * 10000) / 100;
 }
 
 function isMonitoringRole(req: Request): boolean {
@@ -68,6 +80,7 @@ export function getRequestMetricsSnapshot() {
   const poolTotal = Number((pool as any).totalCount || 0);
   const poolIdle = Number((pool as any).idleCount || 0);
   const poolWaiting = Number((pool as any).waitingCount || 0);
+  const completed = metrics.success + metrics.clientError + metrics.serverError;
 
   return {
     status: poolWaiting > 0 ? "degraded" : "ok",
@@ -83,7 +96,18 @@ export function getRequestMetricsSnapshot() {
       },
     },
     requests: {
-      ...metrics,
+      total: metrics.total,
+      active: metrics.active,
+      completed,
+      success: metrics.success,
+      clientError: metrics.clientError,
+      serverError: metrics.serverError,
+      slow: metrics.slow,
+      averageDurationMs: completed > 0 ? Math.round(metrics.durationTotalMs / completed) : 0,
+      maxDurationMs: metrics.durationMaxMs,
+      slowPercent: percentage(metrics.slow, completed),
+      serverErrorPercent: percentage(metrics.serverError, completed),
+      slowRequestThresholdMs: SLOW_REQUEST_MS,
       durationBuckets: { ...metrics.durationBuckets },
     },
     databasePool: {
