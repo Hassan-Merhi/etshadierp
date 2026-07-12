@@ -24,11 +24,7 @@ const SKIPPED_PATHS = new Set([
 const startedAt = Date.now();
 
 type DurationBucket =
-  | "under100"
-  | "under500"
-  | "under1000"
-  | "under5000"
-  | "over5000";
+  "under100" | "under500" | "under1000" | "under5000" | "over5000";
 
 interface RequestMetrics {
   total: number;
