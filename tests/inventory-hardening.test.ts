@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import request from "supertest";
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import * as schema from "../shared/schema";
 import { db } from "../server/db";
 import { adjustInventory, reverseInventoryByExactValue } from "../server/inventoryHelper";
@@ -63,6 +63,12 @@ async function setInventory(
 }
 
 async function resetInventory(): Promise<void> {
+  await db.execute(sql`
+    DELETE FROM inventory_negative_layers
+    WHERE company_id = ${ctx.companyId}
+      AND location_id IN (${ctx.locationId}, ${ctx.location2Id})
+  `);
+
   for (const stockItemId of ctx.stockItemIds) {
     await setInventory(ctx.locationId, stockItemId, 100, 10, 1000);
     await setInventory(ctx.location2Id, stockItemId, 50, 10, 500);
