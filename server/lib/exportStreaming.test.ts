@@ -24,20 +24,14 @@ function makeResponse() {
 describe("Phase 7D export streaming", () => {
   it("recognizes PDF and XLSX response types only", () => {
     expect(isStreamedExportContentType("application/pdf")).toBe(true);
-    expect(
-      isStreamedExportContentType(
-        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-      ),
-    ).toBe(true);
+    expect(isStreamedExportContentType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")).toBe(true);
     expect(isStreamedExportContentType("application/json")).toBe(false);
   });
 
   it("adds no-store and proxy no-buffering headers", () => {
     const res = makeResponse();
     applyExportStreamingHeaders(res);
-    expect(res.headers.get("cache-control")).toBe(
-      "private, no-store, max-age=0",
-    );
+    expect(res.headers.get("cache-control")).toBe("private, no-store, max-age=0");
     expect(res.headers.get("pragma")).toBe("no-cache");
     expect(res.headers.get("x-accel-buffering")).toBe("no");
   });
