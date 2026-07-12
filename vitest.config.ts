@@ -11,6 +11,24 @@ export default defineConfig({
     exclude: ["tests/ui/**"],
     pool: "forks",
     singleFork: true,
+    coverage: {
+      provider: "v8",
+      reporter: ["text", "json-summary"],
+      reportsDirectory: "coverage/backend",
+      include: ["server/**/*.ts", "shared/**/*.ts"],
+      exclude: [
+        "server/index.ts",
+        "server/vite.ts",
+        "server/**/*.d.ts",
+        "shared/**/*.d.ts",
+      ],
+      thresholds: {
+        lines: 5,
+        statements: 5,
+        functions: 3,
+        branches: 3,
+      },
+    },
   },
   resolve: {
     alias: {
