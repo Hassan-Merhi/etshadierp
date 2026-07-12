@@ -20,84 +20,42 @@ export function registerCommonInventoryPerformanceRoutes(app: Express): void {
       if (!req.query.page) return next();
 
       try {
-        const companyId =
-          req.session.currentCompanyId || (req.session as any).factoryCompanyId;
-        if (!companyId)
-          return res.status(400).json({ message: "No company selected" });
+        const companyId = req.session.currentCompanyId || (req.session as any).factoryCompanyId;
+        if (!companyId) return res.status(400).json({ message: "No company selected" });
 
         const page = parsePage(req.query.page);
         const pageSize = parsePageSize(req.query.pageSize);
         const offset = (page - 1) * pageSize;
-        const conditions: any[] = [
-          eq(stockItems.companyId, companyId),
-          isNull(stockItems.deletedAt),
-        ];
+        const conditions: any[] = [eq(stockItems.companyId, companyId), isNull(stockItems.deletedAt)];
 
-        const search =
-          typeof req.query.search === "string" ? req.query.search.trim() : "";
+        const search = typeof req.query.search === "string" ? req.query.search.trim() : "";
         if (search) {
           const query = `%${search}%`;
-          conditions.push(
-            or(ilike(stockItems.name, query), ilike(stockItems.code, query)),
-          );
+          conditions.push(or(ilike(stockItems.name, query), ilike(stockItems.code, query)));
         }
 
         if (req.query.stockGroupId && req.query.stockGroupId !== "all") {
-          conditions.push(
-            eq(
-              stockItems.stockGroupId,
-              Number.parseInt(String(req.query.stockGroupId), 10),
-            ),
-          );
+          conditions.push(eq(stockItems.stockGroupId, Number.parseInt(String(req.query.stockGroupId), 10)));
         }
-        if (req.query.gradeId === "none")
-          conditions.push(isNull(stockItems.gradeId));
+        if (req.query.gradeId === "none") conditions.push(isNull(stockItems.gradeId));
         else if (req.query.gradeId && req.query.gradeId !== "all") {
-          conditions.push(
-            eq(
-              stockItems.gradeId,
-              Number.parseInt(String(req.query.gradeId), 10),
-            ),
-          );
+          conditions.push(eq(stockItems.gradeId, Number.parseInt(String(req.query.gradeId), 10)));
         }
-        if (req.query.categoryId === "none")
-          conditions.push(isNull(stockItems.categoryId));
+        if (req.query.categoryId === "none") conditions.push(isNull(stockItems.categoryId));
         else if (req.query.categoryId && req.query.categoryId !== "all") {
-          conditions.push(
-            eq(
-              stockItems.categoryId,
-              Number.parseInt(String(req.query.categoryId), 10),
-            ),
-          );
+          conditions.push(eq(stockItems.categoryId, Number.parseInt(String(req.query.categoryId), 10)));
         }
-        if (req.query.active === "true")
-          conditions.push(eq(stockItems.active, true));
-        else if (req.query.active === "false")
-          conditions.push(eq(stockItems.active, false));
+        if (req.query.active === "true") conditions.push(eq(stockItems.active, true));
+        else if (req.query.active === "false") conditions.push(eq(stockItems.active, false));
 
         const where = and(...conditions);
         const [countRows, data] = await Promise.all([
-          db
-            .select({ total: sql<number>`count(*)::int` })
-            .from(stockItems)
-            .where(where),
-          db
-            .select()
-            .from(stockItems)
-            .where(where)
-            .orderBy(asc(stockItems.name))
-            .limit(pageSize)
-            .offset(offset),
+          db.select({ total: sql<number>`count(*)::int` }).from(stockItems).where(where),
+          db.select().from(stockItems).where(where).orderBy(asc(stockItems.name)).limit(pageSize).offset(offset),
         ]);
         const total = countRows[0]?.total ?? 0;
 
-        return res.json({
-          data,
-          page,
-          pageSize,
-          total,
-          totalPages: Math.ceil(total / pageSize),
-        });
+        return res.json({ data, page, pageSize, total, totalPages: Math.ceil(total / pageSize) });
       } catch (error: any) {
         return res.status(500).json({ message: error.message });
       }
@@ -112,8 +70,7 @@ export function registerCommonInventoryPerformanceRoutes(app: Express): void {
 
       try {
         const companyId = req.session.currentCompanyId;
-        if (!companyId)
-          return res.status(400).json({ message: "No company selected" });
+        if (!companyId) return res.status(400).json({ message: "No company selected" });
 
         const page = parsePage(req.query.page);
         const pageSize = parsePageSize(req.query.pageSize);
@@ -125,28 +82,15 @@ export function registerCommonInventoryPerformanceRoutes(app: Express): void {
         ];
 
         if (req.query.locationId) {
-          conditions.push(
-            eq(
-              inventory.locationId,
-              Number.parseInt(String(req.query.locationId), 10),
-            ),
-          );
+          conditions.push(eq(inventory.locationId, Number.parseInt(String(req.query.locationId), 10)));
         }
         if (req.query.stockGroupId && req.query.stockGroupId !== "all") {
-          conditions.push(
-            eq(
-              stockItems.stockGroupId,
-              Number.parseInt(String(req.query.stockGroupId), 10),
-            ),
-          );
+          conditions.push(eq(stockItems.stockGroupId, Number.parseInt(String(req.query.stockGroupId), 10)));
         }
-        const search =
-          typeof req.query.search === "string" ? req.query.search.trim() : "";
+        const search = typeof req.query.search === "string" ? req.query.search.trim() : "";
         if (search) {
           const query = `%${search}%`;
-          conditions.push(
-            or(ilike(stockItems.name, query), ilike(stockItems.code, query)),
-          );
+          conditions.push(or(ilike(stockItems.name, query), ilike(stockItems.code, query)));
         }
 
         const where = and(...conditions);
@@ -185,13 +129,7 @@ export function registerCommonInventoryPerformanceRoutes(app: Express): void {
 
         const [countRows, data] = await Promise.all([countQuery, dataQuery]);
         const total = countRows[0]?.total ?? 0;
-        return res.json({
-          data,
-          page,
-          pageSize,
-          total,
-          totalPages: Math.ceil(total / pageSize),
-        });
+        return res.json({ data, page, pageSize, total, totalPages: Math.ceil(total / pageSize) });
       } catch (error: any) {
         return res.status(500).json({ message: error.message });
       }
