@@ -156,7 +156,6 @@ export function registerSpContainerRoutes(app: Express) {
               currency: "USD",
               exchangeRate: "1",
               sourceModule: "SP",
-              supplierId: supplierIdNum,
             })
             .returning();
 
@@ -173,6 +172,7 @@ export function registerSpContainerRoutes(app: Express) {
             ledgerAccountId: otwClrAcct.id,
             debitAmount: "0",
             creditAmount: String(totalUsd),
+            supplierId: supplierIdNum,
             narration: `OTW Clearing — ${supplierName} inv ${invoiceNumber}`,
           });
 
@@ -257,7 +257,6 @@ export function registerSpContainerRoutes(app: Express) {
               voucherDate: newInvoiceDate,
               description: `Goods OTW: ${newSupplierName} — Invoice ${newInvoiceNumber}`,
               totalAmount: String(totalUsd),
-              supplierId: supplierIdNum,
             })
             .where(eq(vouchers.id, existing.goodsOtwVoucherId));
 
@@ -277,6 +276,7 @@ export function registerSpContainerRoutes(app: Express) {
             ledgerAccountId: otwClrAcct.id,
             debitAmount: "0",
             creditAmount: String(totalUsd),
+            supplierId: supplierIdNum,
             narration: `OTW Clearing — ${newSupplierName} inv ${newInvoiceNumber}`,
           });
         } else if (!existing.goodsOtwVoucherId && totalUsd > 0) {
@@ -294,7 +294,6 @@ export function registerSpContainerRoutes(app: Express) {
               currency: "USD",
               exchangeRate: "1",
               sourceModule: "SP",
-              supplierId: supplierIdNum,
             })
             .returning();
 
@@ -311,6 +310,7 @@ export function registerSpContainerRoutes(app: Express) {
             ledgerAccountId: otwClrAcct.id,
             debitAmount: "0",
             creditAmount: String(totalUsd),
+            supplierId: supplierIdNum,
             narration: `OTW Clearing — ${newSupplierName} inv ${newInvoiceNumber}`,
           });
 

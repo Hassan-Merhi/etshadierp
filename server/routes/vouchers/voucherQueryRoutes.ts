@@ -47,6 +47,7 @@ import {
   insertContainerSaleSchema,
   vouchers,
   voucherEntries,
+  posShifts,
   salesItems,
   insertVoucherSchema,
   insertVoucherEntrySchema,
@@ -452,9 +453,18 @@ export function registerVoucherQueryRoutes(app: Express) {
         });
       }
 
-      // POS users can only access their own Sales vouchers
-      if (req.user?.role === "POS" && voucher.voucherType === "Sales" && voucher.userId !== req.user.id) {
-        return res.status(403).json({ message: "Access denied" });
+      // POS sales ownership is recorded through the linked shift.
+      if (req.user?.role === "POS" && voucher.voucherType === "Sales") {
+        const [ownedShift] = voucher.shiftId
+          ? await db
+              .select({ id: posShifts.id })
+              .from(posShifts)
+              .where(and(eq(posShifts.id, voucher.shiftId), eq(posShifts.userId, req.user.id)))
+              .limit(1)
+          : [];
+        if (!ownedShift) {
+          return res.status(403).json({ message: "Access denied" });
+        }
       }
 
       const entries = await storage.getVoucherEntriesByVoucher(id);

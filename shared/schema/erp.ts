@@ -225,6 +225,7 @@ export const insertVoucherSchema = createInsertSchema(vouchers)
       "Purchase",
       "Contra",
       "Stock Transfer",
+      "Consumption",
       "Credit Note",
       "Debit Note",
     ]),

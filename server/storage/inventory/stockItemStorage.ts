@@ -71,17 +71,8 @@ export async function getStockItemByCodeOrAlias(
 }
 
 export async function getStockItemByBarcode(barcode: string, companyId: number): Promise<schema.StockItem | undefined> {
-  const [item] = await db
-    .select()
-    .from(schema.stockItems)
-    .where(
-      and(
-        eq(schema.stockItems.barcode, barcode),
-        eq(schema.stockItems.companyId, companyId),
-        isNull(schema.stockItems.deletedAt)
-      )
-    );
-  return item;
+  // Barcodes are persisted in stock_item_code_aliases by the barcode import flow.
+  return getStockItemByCodeOrAlias(barcode, companyId);
 }
 
 export async function createStockItem(item: schema.InsertStockItem): Promise<schema.StockItem> {

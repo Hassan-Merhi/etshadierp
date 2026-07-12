@@ -657,15 +657,8 @@ export function registerOrderCrudRoutes(app: Express) {
         .where(eq(customerOrders.id, orderId))
         .returning();
 
-      if (shippingCompany && order.customerId) {
-        await db
-          .update(customers)
-          .set({
-            defaultShippingCompany: shippingCompany,
-          })
-          .where(eq(customers.id, order.customerId))
-          .catch(() => {});
-      }
+      // Shipping company is order-specific. The customers table has no
+      // defaultShippingCompany field, so do not perform a swallowed invalid update.
 
       res.json(updated);
     } catch (error: any) {
