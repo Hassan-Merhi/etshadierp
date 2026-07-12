@@ -76,7 +76,7 @@ export function recordIntegrityEvent(
   message: string,
   context: Omit<OperationalEventInput, "category" | "code" | "message"> = {
     severity: "warning",
-  },
+  }
 ): void {
   recordOperationalEvent({
     category: "integrity",
