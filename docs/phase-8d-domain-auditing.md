@@ -29,3 +29,5 @@ This is a safety boundary, not a claim that payroll is transactionally hardened.
 ## Regression verification
 
 `server/services/audit/phase8dCoverage.test.ts` guards the account, user, role, migration, cleanup, and repair audit call sites and verifies that the compatibility adapter remains connected to the shared audit framework. It also keeps the reviewed payroll safety exception explicit so it cannot be silently mistaken for transaction-bound payroll audit coverage.
+
+Phase 8D is complete within these documented safety boundaries.
