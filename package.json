@@ -21,6 +21,7 @@
     "format": "node node_modules/prettier/bin/prettier.cjs --write \"client/src/**/*.{ts,tsx,css}\" \"server/**/*.ts\" \"shared/**/*.ts\"",
     "format:check": "node node_modules/prettier/bin/prettier.cjs --check \"client/src/**/*.{ts,tsx,css}\" \"server/**/*.ts\" \"shared/**/*.ts\"",
     "test:backend": "node node_modules/vitest/vitest.mjs run",
+    "test:backend:coverage": "node node_modules/vitest/vitest.mjs run --coverage",
     "test:frontend": "node node_modules/vitest/vitest.mjs run --config vitest.config.frontend.ts",
     "test:frontend:coverage": "node node_modules/vitest/vitest.mjs run --config vitest.config.frontend.ts --coverage"
   },

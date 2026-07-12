@@ -44,6 +44,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Set up Node.js 20
         uses: actions/setup-node@v4
@@ -122,6 +124,46 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
+      - name: Format changed source files
+        id: format_check
+        if: always() && steps.install.outcome == 'success'
+        env:
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PUSH_BASE_SHA: ${{ github.event.before }}
+        run: |
+          set -o pipefail
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            base_sha="$PR_BASE_SHA"
+          else
+            base_sha="$PUSH_BASE_SHA"
+            if [ -z "$base_sha" ] || [ "$base_sha" = "0000000000000000000000000000000000000000" ]; then
+              base_sha="HEAD^"
+            fi
+          fi
+
+          mapfile -d '' changed_files < <(
+            git diff --name-only --diff-filter=ACMR -z "$base_sha" "$GITHUB_SHA" -- client/src server shared |
+              grep -zE '\.(ts|tsx|css)$' || true
+          )
+
+          if [ "${#changed_files[@]}" -eq 0 ]; then
+            echo "No changed TypeScript, TSX, or CSS source files require formatting checks." | tee format-errors-ci.txt
+            exit 0
+          fi
+
+          printf 'Checking formatting for %s changed source file(s):\n' "${#changed_files[@]}" | tee format-errors-ci.txt
+          printf ' - %s\n' "${changed_files[@]}" | tee -a format-errors-ci.txt
+          node node_modules/prettier/bin/prettier.cjs --check "${changed_files[@]}" 2>&1 | tee -a format-errors-ci.txt
+
+      - name: Upload format failure log
+        if: always() && steps.format_check.outcome == 'failure'
+        uses: actions/upload-artifact@v4
+        with:
+          name: format-errors
+          path: format-errors-ci.txt
+          if-no-files-found: error
+          retention-days: 7
+
       - name: Prepare test database schema
         id: db_schema
         if: always() && steps.install.outcome == 'success'
@@ -195,6 +237,31 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
+      - name: Backend coverage thresholds
+        id: backend_coverage
+        if: always() && steps.backend_tests.outcome == 'success'
+        run: |
+          set -o pipefail
+          npm run test:backend:coverage 2>&1 | tee backend-coverage-errors-ci.txt
+
+      - name: Upload backend coverage failure log
+        if: always() && steps.backend_coverage.outcome == 'failure'
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-coverage-errors
+          path: backend-coverage-errors-ci.txt
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Upload backend coverage summary
+        if: always() && steps.backend_coverage.outcome == 'success'
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-coverage-summary
+          path: coverage/backend/coverage-summary.json
+          if-no-files-found: error
+          retention-days: 7
+
       - name: Frontend tests
         id: frontend_tests
         if: always() && steps.install.outcome == 'success'
@@ -235,9 +302,3 @@ jobs:
           path: coverage/frontend/coverage-summary.json
           if-no-files-found: error
           retention-days: 7
-
-      # Format check remains advisory until existing repo-wide formatting debt is cleaned up.
-      - name: Format check
-        if: always() && steps.install.outcome == 'success'
-        run: npm run format:check
-        continue-on-error: true
