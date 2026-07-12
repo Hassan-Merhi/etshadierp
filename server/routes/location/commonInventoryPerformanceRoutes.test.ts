@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 
 const source = readFileSync(
   resolve(process.cwd(), "server/routes/location/commonInventoryPerformanceRoutes.ts"),
-  "utf8",
+  "utf8"
 );
 
 describe("Phase 7B common inventory performance routes", () => {
