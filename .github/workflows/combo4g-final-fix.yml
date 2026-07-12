@@ -1,0 +1,34 @@
+name: Combo 4G Final Fix
+
+on:
+  push:
+    branches:
+      - agent/combo-4g-final-data-model-typescript
+    paths:
+      - .github/workflows/combo4g-final-fix.yml
+      - scripts/combo-4g-final-fix.mjs
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Combo 4G branch
+        uses: actions/checkout@v4
+        with:
+          ref: agent/combo-4g-final-data-model-typescript
+          persist-credentials: true
+
+      - name: Apply final explicit voucher defaults
+        run: node scripts/combo-4g-final-fix.mjs
+
+      - name: Commit production change and cleanup
+        run: |
+          rm -f scripts/combo-4g-final-fix.mjs .github/workflows/combo4g-final-fix.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Complete final TypeScript data-model cleanup"
+          git push origin HEAD:agent/combo-4g-final-data-model-typescript
