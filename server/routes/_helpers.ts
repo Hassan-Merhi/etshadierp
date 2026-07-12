@@ -5,8 +5,8 @@ export { upload } from "./helpers/uploadHelpers";
 
 export { hashPassword, isLegacySHA256Hash, verifyLegacyPassword, verifyPassword } from "./helpers/passwordHelpers";
 
+export { logAudit } from "./helpers/auditWriteAdapter";
 export {
-  logAudit,
   snapshotVoucherEntries,
   buildVoucherChangesForCreate,
   buildVoucherChangesForDelete,
