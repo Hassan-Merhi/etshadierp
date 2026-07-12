@@ -11,9 +11,7 @@ const DEFAULT_THRESHOLD_BYTES = 500 * 1024;
 
 function getThresholdBytes(): number {
   const configuredKb = Number(process.env.BANDWIDTH_DEBUG_THRESHOLD_KB || 500);
-  return Number.isFinite(configuredKb) && configuredKb > 0
-    ? Math.round(configuredKb * 1024)
-    : DEFAULT_THRESHOLD_BYTES;
+  return Number.isFinite(configuredKb) && configuredKb > 0 ? Math.round(configuredKb * 1024) : DEFAULT_THRESHOLD_BYTES;
 }
 
 export function bandwidthDebugMiddleware(req: Request, res: Response, next: NextFunction): void {
