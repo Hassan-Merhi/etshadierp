@@ -5,15 +5,13 @@
  * never response bodies, request bodies, cookies, auth headers or tokens.
  */
 import type { Request, Response, NextFunction } from "express";
-import { logger } from "../lib/logger";
+import { recordOperationalEvent } from "../lib/operationalEvents";
 
 const DEFAULT_THRESHOLD_BYTES = 500 * 1024;
 
 function getThresholdBytes(): number {
   const configuredKb = Number(process.env.BANDWIDTH_DEBUG_THRESHOLD_KB || 500);
-  return Number.isFinite(configuredKb) && configuredKb > 0
-    ? Math.round(configuredKb * 1024)
-    : DEFAULT_THRESHOLD_BYTES;
+  return Number.isFinite(configuredKb) && configuredKb > 0 ? Math.round(configuredKb * 1024) : DEFAULT_THRESHOLD_BYTES;
 }
 
 export function bandwidthDebugMiddleware(req: Request, res: Response, next: NextFunction): void {
@@ -40,16 +38,16 @@ export function bandwidthDebugMiddleware(req: Request, res: Response, next: Next
     originalEnd(chunk, ...args);
 
     if (totalBytes >= thresholdBytes) {
-      const durationMs = Date.now() - start;
-      logger.warn("Large HTTP response", {
-        module: "http",
-        action: "large_response",
+      recordOperationalEvent({
+        category: "bandwidth",
+        code: "large_http_response",
+        severity: "warning",
+        message: "Large HTTP response detected",
         method: req.method,
         path: req.path,
         status: res.statusCode,
         responseBytes: totalBytes,
-        responseKB: Math.round(totalBytes / 1024),
-        durationMs,
+        durationMs: Date.now() - start,
       });
     }
 
