@@ -73,11 +73,15 @@ export function useVoucherQueries({
     staleTime: 5 * 60 * 1000,
   });
 
+  // Voucher transfer/adjustment/POS pickers only use id, code, name and uom.
+  // Share the lightweight endpoint/cache across all of those screens instead of
+  // downloading the ~634 KB full stock-item payload on every mount.
   const { data: stockItems = [] } = useQuery<StockItem[]>({
-    queryKey: ["/api/stock-items", selectedCompany?.id],
-    enabled: needsStockData,
+    queryKey: ["/api/stock-items/light", selectedCompany?.id],
+    enabled: needsStockData && !!selectedCompany?.id,
     staleTime: 5 * 60 * 1000,
     refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
   });
 
   const { data: locations = [] } = useQuery<Location[]>({
