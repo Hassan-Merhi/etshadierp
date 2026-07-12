@@ -31,7 +31,10 @@ const counts: Record<OperationalEventCategory, number> = {
 const recentEvents: OperationalEventRecord[] = [];
 
 function normalizeCode(code: string): string {
-  const normalized = code.trim().toLowerCase().replace(/[^a-z0-9_.-]+/g, "_");
+  const normalized = code
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9_.-]+/g, "_");
   return normalized.slice(0, 80) || "unknown_event";
 }
 
