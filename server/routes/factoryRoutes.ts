@@ -18,6 +18,7 @@ import { registerFactoryGroundScanRoutes } from "./factory/factoryGroundScanRout
 import { registerFactoryContainerTrackingRoutes } from "./factory/factoryContainerTrackingRoutes";
 import { registerEndProductionRoutes } from "./factory/endProductionRoutes";
 import { registerProductionPlannerRoutes } from "./factory/factoryProductionPlannerRoutes";
+import { registerPerformanceReadMicrocache } from "./performance/readMicrocache";
 
 export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
   // ─────────────────────────────────────────────────────────────────────────────
@@ -64,6 +65,8 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       next();
     }
   });
+
+  registerPerformanceReadMicrocache(app);
 
   // ─────────────────────────────────────────────────────────────────────────────
   // FACTORY ADMIN GUARD — blocks PUT / PATCH / DELETE for non-admins unless
