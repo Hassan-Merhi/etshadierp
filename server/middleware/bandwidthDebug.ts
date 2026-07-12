@@ -1,46 +1,56 @@
 /**
  * Bandwidth debug middleware.
  *
- * Only active when BANDWIDTH_DEBUG=true.
- * Logs any response whose uncompressed byte count exceeds THRESHOLD_BYTES.
- *
- * Logs ONLY: method, path, status, approximate size (KB), duration (ms).
- * NEVER logs: response body, request body, cookies, auth headers, tokens,
- *             passwords, or any sensitive business data.
+ * Only active when BANDWIDTH_DEBUG=true. Logs metadata for large responses,
+ * never response bodies, request bodies, cookies, auth headers or tokens.
  */
 import type { Request, Response, NextFunction } from "express";
+import { logger } from "../lib/logger";
 
-const THRESHOLD_BYTES = 500 * 1024; // 500 KB
+const DEFAULT_THRESHOLD_BYTES = 500 * 1024;
+
+function getThresholdBytes(): number {
+  const configuredKb = Number(process.env.BANDWIDTH_DEBUG_THRESHOLD_KB || 500);
+  return Number.isFinite(configuredKb) && configuredKb > 0
+    ? Math.round(configuredKb * 1024)
+    : DEFAULT_THRESHOLD_BYTES;
+}
 
 export function bandwidthDebugMiddleware(req: Request, res: Response, next: NextFunction): void {
-  if (process.env.BANDWIDTH_DEBUG !== "true") {
-    return next();
-  }
+  if (process.env.BANDWIDTH_DEBUG !== "true") return next();
 
   const start = Date.now();
+  const thresholdBytes = getThresholdBytes();
   let totalBytes = 0;
 
-  const _write = res.write.bind(res);
+  const originalWrite = res.write.bind(res);
   (res as any).write = function (chunk: any, ...args: any[]): boolean {
     if (chunk != null) {
       totalBytes += Buffer.isBuffer(chunk) ? chunk.length : Buffer.byteLength(String(chunk));
     }
-    return _write(chunk, ...args);
+    return originalWrite(chunk, ...args);
   };
 
-  const _end = res.end.bind(res);
+  const originalEnd = res.end.bind(res);
   (res as any).end = function (chunk?: any, ...args: any[]): Response {
     if (chunk != null && typeof chunk !== "function") {
       totalBytes += Buffer.isBuffer(chunk) ? chunk.length : Buffer.byteLength(String(chunk));
     }
-    _end(chunk, ...args);
 
-    if (totalBytes >= THRESHOLD_BYTES) {
+    originalEnd(chunk, ...args);
+
+    if (totalBytes >= thresholdBytes) {
       const durationMs = Date.now() - start;
-      const sizeKB = Math.round(totalBytes / 1024);
-      console.log(
-        `[BANDWIDTH] ${req.method} ${req.path} ${res.statusCode} — ${sizeKB}KB in ${durationMs}ms`
-      );
+      logger.warn("Large HTTP response", {
+        module: "http",
+        action: "large_response",
+        method: req.method,
+        path: req.path,
+        status: res.statusCode,
+        responseBytes: totalBytes,
+        responseKB: Math.round(totalBytes / 1024),
+        durationMs,
+      });
     }
 
     return res;
