@@ -1,4 +1,4 @@
-import { Client, type QueryConfig, type QueryResult, type QueryResultRow } from "pg";
+import { Client, type QueryConfig } from "pg";
 import { logger } from "./lib/logger";
 
 const STARTUP_LOCK_KEY = 741_220_260;
@@ -30,6 +30,12 @@ export function getMigrationLockOptions(env: NodeJS.ProcessEnv = process.env): M
   };
 }
 
+const rawClientQuery = Client.prototype.query as unknown as (
+  this: Client,
+  queryText: string,
+  values?: unknown[],
+) => Promise<{ rows: Array<Record<string, unknown>> }>;
+
 export async function acquireStartupMigrationLock(
   client: Client,
   options: MigrationLockOptions = getMigrationLockOptions(),
@@ -39,12 +45,12 @@ export async function acquireStartupMigrationLock(
 
   while (Date.now() <= deadline) {
     attempts += 1;
-    const result = await Client.prototype.query.call(
+    const result = await rawClientQuery.call(
       client,
       "SELECT pg_try_advisory_lock($1) AS acquired",
       [STARTUP_LOCK_KEY],
     );
-    if (result.rows?.[0]?.acquired === true) {
+    if (result.rows[0]?.acquired === true) {
       logger.info("Startup migration advisory lock acquired", {
         module: "startup-migrations",
         action: "lock-acquired",
@@ -69,7 +75,7 @@ export async function acquireStartupMigrationLock(
 
 export async function releaseStartupMigrationLock(client: Client): Promise<void> {
   try {
-    await Client.prototype.query.call(client, "SELECT pg_advisory_unlock($1)", [STARTUP_LOCK_KEY]);
+    await rawClientQuery.call(client, "SELECT pg_advisory_unlock($1)", [STARTUP_LOCK_KEY]);
     logger.info("Startup migration advisory lock released", {
       module: "startup-migrations",
       action: "lock-released",
@@ -92,20 +98,19 @@ export function installStartupMigrationCoordinator(): void {
   if (prototype[PATCH_MARKER]) return;
   prototype[PATCH_MARKER] = true;
 
-  const originalQuery = Client.prototype.query;
-  const originalEnd = Client.prototype.end;
+  const originalQuery = Client.prototype.query as any;
+  const originalEnd = Client.prototype.end as any;
   const coordinatedClients = new WeakSet<Client>();
   const lockedClients = new WeakSet<Client>();
 
-  Client.prototype.query = async function <R extends QueryResultRow = any, I = any[]>(
-    query: string | QueryConfig<I>,
-    values?: I,
-  ): Promise<QueryResult<R>> {
-    const result = await originalQuery.call(this, query as any, values as any);
+  Client.prototype.query = async function (this: Client, query: string | QueryConfig, ...args: any[]): Promise<any> {
+    const result = await originalQuery.call(this, query, ...args);
+
     if (!coordinatedClients.has(this) && MIGRATION_SETUP_SQL.test(sqlText(query))) {
       coordinatedClients.add(this);
       const options = getMigrationLockOptions();
       const acquired = await acquireStartupMigrationLock(this, options);
+
       if (acquired) {
         lockedClients.add(this);
       } else if (!options.failOpen) {
@@ -113,7 +118,7 @@ export function installStartupMigrationCoordinator(): void {
           module: "startup-migrations",
           action: "lock-fail-closed",
         });
-        process.exit(1);
+        throw new Error("Could not acquire startup migration advisory lock");
       } else {
         logger.warn("Continuing startup migrations without advisory lock", {
           module: "startup-migrations",
@@ -121,16 +126,17 @@ export function installStartupMigrationCoordinator(): void {
         });
       }
     }
-    return result as QueryResult<R>;
+
+    return result;
   } as typeof Client.prototype.query;
 
-  Client.prototype.end = async function (): Promise<void> {
+  Client.prototype.end = async function (this: Client, ...args: any[]): Promise<void> {
     if (lockedClients.has(this)) {
       lockedClients.delete(this);
       await releaseStartupMigrationLock(this);
     }
-    await originalEnd.call(this);
-  };
+    await originalEnd.call(this, ...args);
+  } as typeof Client.prototype.end;
 }
 
 installStartupMigrationCoordinator();
