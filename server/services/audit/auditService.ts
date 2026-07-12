@@ -64,7 +64,9 @@ export function sanitizeAuditValue(value: unknown, key?: string, depth = 0): unk
   }
   if (typeof value === "object") {
     const entries = Object.entries(value as Record<string, unknown>).slice(0, MAX_OBJECT_KEYS);
-    return Object.fromEntries(entries.map(([entryKey, entryValue]) => [entryKey, sanitizeAuditValue(entryValue, entryKey, depth + 1)]));
+    return Object.fromEntries(
+      entries.map(([entryKey, entryValue]) => [entryKey, sanitizeAuditValue(entryValue, entryKey, depth + 1)])
+    );
   }
   return sanitizeString(String(value));
 }
@@ -75,12 +77,8 @@ export function sanitizeAuditChanges(changes?: AuditChanges | null): AuditChange
     Object.entries(changes).map(([field, change]) => [
       field,
       {
-        ...(Object.prototype.hasOwnProperty.call(change, "old")
-          ? { old: sanitizeAuditValue(change.old, field) }
-          : {}),
-        ...(Object.prototype.hasOwnProperty.call(change, "new")
-          ? { new: sanitizeAuditValue(change.new, field) }
-          : {}),
+        ...(Object.prototype.hasOwnProperty.call(change, "old") ? { old: sanitizeAuditValue(change.old, field) } : {}),
+        ...(Object.prototype.hasOwnProperty.call(change, "new") ? { new: sanitizeAuditValue(change.new, field) } : {}),
       },
     ])
   );
@@ -97,7 +95,8 @@ export function buildAuditChanges(
   for (const key of keys) {
     const oldValue = before?.[key];
     const newValue = after?.[key];
-    if (JSON.stringify(sanitizeAuditValue(oldValue, key)) === JSON.stringify(sanitizeAuditValue(newValue, key))) continue;
+    if (JSON.stringify(sanitizeAuditValue(oldValue, key)) === JSON.stringify(sanitizeAuditValue(newValue, key)))
+      continue;
     changes[key] = {
       ...(before && Object.prototype.hasOwnProperty.call(before, key) ? { old: oldValue } : {}),
       ...(after && Object.prototype.hasOwnProperty.call(after, key) ? { new: newValue } : {}),
