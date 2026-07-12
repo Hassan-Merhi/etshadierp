@@ -10,25 +10,11 @@ import { pool } from "../db";
 import { logger } from "../lib/logger";
 
 const SLOW_REQUEST_MS = Number(process.env.SLOW_REQUEST_MS || 500);
-const SUCCESS_SAMPLE_RATE = Math.min(
-  1,
-  Math.max(0, Number(process.env.REQUEST_LOG_SAMPLE_RATE || 0)),
-);
-const SKIPPED_PATHS = new Set([
-  "/api/health",
-  "/api/health/db",
-  "/api/health/metrics",
-  "/api/boot",
-  "/api/csrf-token",
-]);
+const SUCCESS_SAMPLE_RATE = Math.min(1, Math.max(0, Number(process.env.REQUEST_LOG_SAMPLE_RATE || 0)));
+const SKIPPED_PATHS = new Set(["/api/health", "/api/health/db", "/api/health/metrics", "/api/boot", "/api/csrf-token"]);
 const startedAt = Date.now();
 
-type DurationBucket =
-  | "under100"
-  | "under500"
-  | "under1000"
-  | "under5000"
-  | "over5000";
+type DurationBucket = "under100" | "under500" | "under1000" | "under5000" | "over5000";
 
 interface RequestMetrics {
   total: number;
@@ -71,9 +57,7 @@ function recordDuration(durationMs: number): void {
 }
 
 function isMonitoringRole(req: Request): boolean {
-  const role = String(
-    (req as any).session?.currentRole || (req as any).user?.role || "",
-  ).toLowerCase();
+  const role = String((req as any).session?.currentRole || (req as any).user?.role || "").toLowerCase();
   return role === "admin" || role === "developer";
 }
 
@@ -107,22 +91,14 @@ export function getRequestMetricsSnapshot() {
       idle: poolIdle,
       active: Math.max(0, poolTotal - poolIdle),
       waiting: poolWaiting,
-      utilizationPercent:
-        poolMax > 0
-          ? Math.round(((poolTotal - poolIdle) / poolMax) * 100)
-          : null,
+      utilizationPercent: poolMax > 0 ? Math.round(((poolTotal - poolIdle) / poolMax) * 100) : null,
     },
   };
 }
 
-export function requestLogger(
-  req: Request,
-  res: Response,
-  next: NextFunction,
-): void {
+export function requestLogger(req: Request, res: Response, next: NextFunction): void {
   const start = Date.now();
-  const requestId =
-    normaliseRequestId(req.headers["x-request-id"]) || randomUUID();
+  const requestId = normaliseRequestId(req.headers["x-request-id"]) || randomUUID();
   res.setHeader("X-Request-Id", requestId);
 
   if (req.method === "GET" && req.path === "/api/health") {
@@ -166,22 +142,13 @@ export function requestLogger(
     if (SKIPPED_PATHS.has(path)) return;
 
     const userId: number | undefined = (req as any).user?.id;
-    const companyId: number | undefined = (req as any).session
-      ?.currentCompanyId;
+    const companyId: number | undefined = (req as any).session?.currentCompanyId;
     const isFailure = statusCode >= 400;
-    const sampledSuccess =
-      !isFailure &&
-      SUCCESS_SAMPLE_RATE > 0 &&
-      Math.random() < SUCCESS_SAMPLE_RATE;
+    const sampledSuccess = !isFailure && SUCCESS_SAMPLE_RATE > 0 && Math.random() < SUCCESS_SAMPLE_RATE;
 
     if (!isFailure && !isSlow && !sampledSuccess) return;
 
-    const level =
-      statusCode >= 500
-        ? "error"
-        : statusCode >= 400 || isSlow
-          ? "warn"
-          : "info";
+    const level = statusCode >= 500 ? "error" : statusCode >= 400 || isSlow ? "warn" : "info";
     logger[level](`${method} ${path} ${statusCode}`, {
       module: "http",
       action: isSlow ? "slow_request" : "request",
