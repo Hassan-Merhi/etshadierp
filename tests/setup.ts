@@ -96,6 +96,12 @@ export async function cleanupTestData(prefix: string): Promise<void> {
     await db
       .delete(schema.userLocations)
       .where(eq(schema.userLocations.companyId, company.id));
+
+    // Authentication and audit middleware can finish asynchronously while a test
+    // is tearing down. Clear any rows written after the initial cleanup before
+    // deleting the company so the test-only fixture teardown remains deterministic.
+    await pool.query("DELETE FROM audit_log WHERE company_id = $1", [company.id]);
+    await pool.query("DELETE FROM login_history WHERE company_id = $1", [company.id]);
     await db.delete(schema.companies).where(eq(schema.companies.id, company.id));
   }
 
