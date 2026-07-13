@@ -182,18 +182,23 @@ export function registerRawStockReceiptRoutes(app: Express) {
         const costPerKg = parseFloat(r.costPerKg as string) || 0;
 
         const costPerKgUsd = parseFloat(r.costPerKgUsd as string) || costPerKg;
+        // Each raw-stock row is one specific container/source with its own cost/kg and its
+        // own usedKg (usage is already attributed to the exact container it was drawn from
+        // via factoryMixBatchSources). The remaining VALUE of this row is therefore
+        // (received - used) * this row's own cost/kg — never a blended average of every
+        // container's received cost re-applied across the supplier's total remaining kg.
+        // Averaging received cost first and multiplying by remaining kg afterwards silently
+        // misattributes the cost of whatever was actually used to every other container in
+        // the blend, inflating (or deflating) the remaining stock value.
+        const rowRemainingKg = received - used;
+        const rowRemainingValueLocal = rowRemainingKg * costPerKg;
+        const rowRemainingValueUsd = rowRemainingKg * costPerKgUsd;
         if (supplierMap.has(key)) {
           const existing = supplierMap.get(key)!;
-          const prevTotalCost = existing._totalReceived * existing._avgCostPerKg;
-          const newTotalCost = received * costPerKg;
-          const prevTotalCostUsd = existing._totalReceived * existing._avgCostPerKgUsd;
-          const newTotalCostUsd = received * costPerKgUsd;
           existing._totalReceived += received;
           existing._totalUsed += used;
-          existing._avgCostPerKg =
-            existing._totalReceived > 0 ? (prevTotalCost + newTotalCost) / existing._totalReceived : 0;
-          existing._avgCostPerKgUsd =
-            existing._totalReceived > 0 ? (prevTotalCostUsd + newTotalCostUsd) / existing._totalReceived : 0;
+          existing._remainingValueLocal += rowRemainingValueLocal;
+          existing._remainingValueUsd += rowRemainingValueUsd;
           if (new Date(r.offloadedAt) > new Date(existing.lastOffloaded)) {
             existing.lastOffloaded = r.offloadedAt;
           }
@@ -212,8 +217,8 @@ export function registerRawStockReceiptRoutes(app: Express) {
             currencyCode: r.currencyCode || "USD",
             _totalReceived: received,
             _totalUsed: used,
-            _avgCostPerKg: costPerKg,
-            _avgCostPerKgUsd: costPerKgUsd,
+            _remainingValueLocal: rowRemainingValueLocal,
+            _remainingValueUsd: rowRemainingValueUsd,
             lastOffloaded: r.offloadedAt,
           });
         }
@@ -259,13 +264,22 @@ export function registerRawStockReceiptRoutes(app: Express) {
         if (supplierMap.has(key)) {
           const existing = supplierMap.get(key)!;
           if (isAdd) {
-            const prevCost = existing._totalReceived * existing._avgCostPerKg;
-            const newCost = kg * costPerKgAdj;
+            // New stock added at its own cost — nothing used from it yet, so its full
+            // value joins the remaining-value pool (manual adjustments have no separate
+            // USD leg, so local and USD value move together).
             existing._totalReceived += kg;
-            existing._avgCostPerKg = existing._totalReceived > 0 ? (prevCost + newCost) / existing._totalReceived : 0;
-            existing._avgCostPerKgUsd = existing._avgCostPerKg;
+            existing._remainingValueLocal += kg * costPerKgAdj;
+            existing._remainingValueUsd += kg * costPerKgAdj;
           } else {
+            // Manual usage isn't tied to a specific container/source, so it draws down
+            // the supplier's remaining stock at that stock's current blended cost/kg —
+            // the best available attribution without a specific source reference.
+            const remainingKgBefore = existing._totalReceived - existing._totalUsed;
+            const avgCostBefore = remainingKgBefore > 0 ? existing._remainingValueUsd / remainingKgBefore : 0;
+            const avgCostLocalBefore = remainingKgBefore > 0 ? existing._remainingValueLocal / remainingKgBefore : 0;
             existing._totalUsed += kg;
+            existing._remainingValueUsd -= kg * avgCostBefore;
+            existing._remainingValueLocal -= kg * avgCostLocalBefore;
           }
         } else {
           const adjCatInfo = supplierId
@@ -280,8 +294,8 @@ export function registerRawStockReceiptRoutes(app: Express) {
             currencyCode: adj.currencyCode || "USD",
             _totalReceived: isAdd ? kg : 0,
             _totalUsed: isAdd ? 0 : kg,
-            _avgCostPerKg: costPerKgAdj,
-            _avgCostPerKgUsd: costPerKgAdj,
+            _remainingValueLocal: isAdd ? kg * costPerKgAdj : 0,
+            _remainingValueUsd: isAdd ? kg * costPerKgAdj : 0,
             lastOffloaded: adj.createdAt,
             _adjustmentIds: [adj.id],
           });
@@ -353,15 +367,27 @@ export function registerRawStockReceiptRoutes(app: Express) {
         const consumed = parseFloat(r.consumedKg as string) || 0;
         const key = `supplier-${r.supplierId}`;
         if (supplierMap.has(key)) {
-          supplierMap.get(key)!._totalUsed += consumed;
+          const existing = supplierMap.get(key)!;
+          const remainingKgBefore = existing._totalReceived - existing._totalUsed;
+          const avgCostBefore = remainingKgBefore > 0 ? existing._remainingValueUsd / remainingKgBefore : 0;
+          const avgCostLocalBefore = remainingKgBefore > 0 ? existing._remainingValueLocal / remainingKgBefore : 0;
+          existing._totalUsed += consumed;
+          existing._remainingValueUsd -= consumed * avgCostBefore;
+          existing._remainingValueLocal -= consumed * avgCostLocalBefore;
         }
       }
 
       // Build aggregated rows (reservedKg / freeKg will be fixed below for multi-row suppliers)
       const aggregated = Array.from(supplierMap.values()).map((s: any) => {
         const remainingKg = s._totalReceived - s._totalUsed;
-        const valueRemaining = remainingKg * s._avgCostPerKg;
-        const valueRemainingUsd = remainingKg * s._avgCostPerKgUsd;
+        // Value is the tracked remaining cost basis itself (sum of each row's own
+        // (received-used)*cost), not a recomputed blended-average * remainingKg — the
+        // latter re-derives a number that can drift from the true remaining basis once
+        // multiple containers/adjustments with different costs are involved.
+        const valueRemaining = s._remainingValueLocal;
+        const valueRemainingUsd = s._remainingValueUsd;
+        const avgCostPerKg = remainingKg > 0 ? valueRemaining / remainingKg : 0;
+        const avgCostPerKgUsd = remainingKg > 0 ? valueRemainingUsd / remainingKg : 0;
         return {
           supplierName: s.supplierName,
           supplierId: s.supplierId,
@@ -374,8 +400,8 @@ export function registerRawStockReceiptRoutes(app: Express) {
           remainingKg: remainingKg.toFixed(3),
           reservedKg: "0.000",
           freeKg: "0.000",
-          costPerKg: s._avgCostPerKg.toFixed(6),
-          costPerKgUsd: s._avgCostPerKgUsd.toFixed(6),
+          costPerKg: avgCostPerKg.toFixed(6),
+          costPerKgUsd: avgCostPerKgUsd.toFixed(6),
           valueRemaining: valueRemaining.toFixed(2),
           valueRemainingUsd: valueRemainingUsd.toFixed(2),
           lastOffloaded: s.lastOffloaded,
