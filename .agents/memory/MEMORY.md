@@ -38,3 +38,5 @@
 - [Audit log changes shape & supplier schema gap](audit-log-changes-shape.md) — audit-log changes fields need {old,new}; suppliers has no companyId column; customers has legalName not name/email/address; vouchers has no creator/userId column.
 - [Per-worker payroll accounting groups](payroll-worker-account-groups.md) — salary/bonus accounts nest under group headers; findOrCreateLedger accepts opts.parentId/subType.
 - [Bandwidth lite mode — bale history endpoints](bandwidth-lite-mode.md) — ?lite=1 on stock-entry-history (omits JSON_AGG) and /api/factory/bales (slim joins); frontend uses staleTime+debounce+per-group lazy queries.
+- [Express literal routes vs :id routes](express-literal-route-vs-param-order.md) — a literal sibling route registered after an existing /resource/:id route gets swallowed by it; order registration modules accordingly and test through the real app.
+- [Layering a single-purpose provider onto a multi-provider pipeline](layered-tracking-provider-pattern.md) — give the new provider its own gating/status columns and a self-contained pre-check call at the top of the existing flow instead of touching its internals.
