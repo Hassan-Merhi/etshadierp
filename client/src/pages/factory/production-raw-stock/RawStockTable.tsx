@@ -170,12 +170,12 @@ export function RawStockTable({ rawStock, onAdjust, onDeduct, onAddToBatch }: Ra
                           <div className="flex flex-col items-end">
                             <span>${formatNumber(parseFloat(row.valueRemainingUsd))}</span>
                             <span className="text-[10px] opacity-60">
-                              $
-                              {(
-                                parseFloat(row.freeKg || "0") > 0
-                                  ? parseFloat(row.valueRemainingUsd || "0") / parseFloat(row.freeKg || "0")
-                                  : parseFloat(row.costPerKgUsd || "0")
-                              ).toFixed(6)}
+                              {/* Rate is the received-weighted purchase cost/kg — it must only
+                                  move when new stock is received (offload/ADD adjustment),
+                                  never when existing stock is drawn down by a mix batch. Do
+                                  NOT derive it from valueRemainingUsd/freeKg — that ratio
+                                  shifts with usage and drifted from the true rate. */}$
+                              {parseFloat(row.costPerKgUsd || "0").toFixed(6)}
                               /kg
                             </span>
                           </div>
