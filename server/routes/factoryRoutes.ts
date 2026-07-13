@@ -113,6 +113,12 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
   registerFactoryStockRoutes(app);
   registerFactorySuppliersRoutes(app);
   registerFactoryProductsRoutes(app);
+  // Tracking routes registered BEFORE registerFactoryContainersRoutes: it defines
+  // literal siblings (/refresh-etas, /eta-tracking-summary) under the same
+  // /api/factory/containers/... prefix as the container module's GET/DELETE
+  // "/api/factory/containers/:id" routes. Express matches by registration order,
+  // not specificity, so :id would otherwise swallow those literal paths first.
+  registerFactoryContainerTrackingRoutes(app);
   registerFactoryContainersRoutes(app);
   registerFactoryBalesRoutes(app);
   registerFactoryCustomersRoutes(app);
@@ -124,7 +130,6 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
   registerFactoryShippingContainerRoutes(app);
   registerFactoryDailyScanRoutes(app);
   registerFactoryGroundScanRoutes(app);
-  registerFactoryContainerTrackingRoutes(app);
   registerEndProductionRoutes(app, requireAuth);
   registerProductionPlannerRoutes(app);
 }

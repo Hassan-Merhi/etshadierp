@@ -40,3 +40,4 @@
 - [Bandwidth lite mode — bale history endpoints](bandwidth-lite-mode.md) — ?lite=1 on stock-entry-history (omits JSON_AGG) and /api/factory/bales (slim joins); frontend uses staleTime+debounce+per-group lazy queries.
 - [Express literal routes vs :id routes](express-literal-route-vs-param-order.md) — a literal sibling route registered after an existing /resource/:id route gets swallowed by it; order registration modules accordingly and test through the real app.
 - [Layering a single-purpose provider onto a multi-provider pipeline](layered-tracking-provider-pattern.md) — give the new provider its own gating/status columns and a self-contained pre-check call at the top of the existing flow instead of touching its internals.
+- [ERP vs factory are parallel mirrored systems](erp-factory-parallel-systems.md) — separate schema/service/route/UI trees per company type; any cross-cutting feature must be checked against both or it silently only half-applies.

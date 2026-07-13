@@ -43,6 +43,7 @@ import {
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { factoryApiRequest } from "@/lib/factoryApi";
+import { useFactoryJsonCargoEta } from "./useFactoryJsonCargoEta";
 import type { FactoryContainer } from "@shared/schema";
 
 // ── localStorage helpers ────────────────────────────────────────────────────
@@ -579,6 +580,8 @@ function TrackNowProgressLog({ containerId }: { containerId: number }) {
 export default function FactoryOtwTrackingTab({ onEdit }: OtwTrackingTabProps = {}) {
   const { toast } = useToast();
   const tqClient = useTQClient();
+  const { data: currentUser } = useQuery<any>({ queryKey: ["/api/auth/me"] });
+  const jsonCargoEta = useFactoryJsonCargoEta();
   const [trackingNowId, setTrackingNowId] = useState<number | null>(null);
   const [timelineId, setTimelineId] = useState<number | null>(null);
   const [settingsContainer, setSettingsContainer] = useState<ContainerWithSupplier | null>(null);
@@ -962,6 +965,22 @@ export default function FactoryOtwTrackingTab({ onEdit }: OtwTrackingTabProps = 
               : "Tracking…"
             : `Track All${trackingEnabledCount > 0 ? ` (${trackingEnabledCount})` : ""}`}
         </Button>
+        {currentUser?.role === "Developer" && (
+          <Button
+            variant="outline"
+            onClick={() => jsonCargoEta.refreshBulk()}
+            disabled={jsonCargoEta.bulkIsPending}
+            title="JSONCargo ETA refresh — Maersk, Hapag-Lloyd, MSC, CMA CGM"
+            data-testid="button-update-etas"
+          >
+            {jsonCargoEta.bulkIsPending ? (
+              <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
+            ) : (
+              <RefreshCw className="h-4 w-4 mr-1.5" />
+            )}
+            Update ETAs
+          </Button>
+        )}
       </div>
 
       {/* ── Expandable Filters Panel ── */}
@@ -1319,6 +1338,24 @@ export default function FactoryOtwTrackingTab({ onEdit }: OtwTrackingTabProps = 
                         <TooltipContent>
                           {!isEnabled ? "Tracking disabled" : !isValidNum ? "Invalid container # format" : "Track Now"}
                         </TooltipContent>
+                      </Tooltip>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            disabled={jsonCargoEta.refreshingIds.has(c.id)}
+                            onClick={() => jsonCargoEta.refreshOne(c.id)}
+                            data-testid={`button-otw-refresh-eta-${c.id}`}
+                          >
+                            {jsonCargoEta.refreshingIds.has(c.id) ? (
+                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            ) : (
+                              <Ship className="h-3.5 w-3.5" />
+                            )}
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>Refresh ETA (JSONCargo)</TooltipContent>
                       </Tooltip>
                     </div>
                   </TableCell>

@@ -28,6 +28,8 @@ import * as cmaPublicProvider from "../lib/trackingProviders/cmaPublicProvider";
 import * as cmaCgmApiProvider from "../lib/trackingProviders/cmaCgmApiProvider";
 import { resolveProvider } from "../lib/trackingProviders/providerResolver";
 import type { CarrierTrackResult } from "../lib/trackingProviders/types";
+import { refreshFactoryContainerEta as refreshJsonCargoEta } from "./factoryJsonCargoTrackingService";
+import { normalizeJsonCargoCarrier } from "../lib/trackingProviders/jsonCargoProvider";
 
 // ── Status helpers ────────────────────────────────────────────────────────────
 
@@ -263,11 +265,27 @@ async function trackOneContainer(
     .select({
       arrivalDate: factoryContainers.arrivalDate,
       trackingLastCheckedAt: factoryContainers.trackingLastCheckedAt,
+      trackingCarrierHint: factoryContainers.trackingCarrierHint,
     })
     .from(factoryContainers)
     .where(eq(factoryContainers.id, containerId))
     .limit(1);
-  const currentEta: string | null = currentRow?.arrivalDate ?? null;
+  let currentEta: string | null = currentRow?.arrivalDate ?? null;
+
+  // ── JSONCargo — tried FIRST for Maersk/Hapag-Lloyd/MSC/CMA CGM ──────────────
+  // ETA-only, on its own weekly cadence (JSONCARGO_REFRESH_HOURS). Never blocks or
+  // replaces the status/location provider chain below.
+  if (normalizeJsonCargoCarrier(currentRow?.trackingCarrierHint)) {
+    try {
+      const jc = await refreshJsonCargoEta(containerId);
+      if (jc.newEta) currentEta = jc.newEta;
+      if (jc.status !== "skipped_recent") {
+        console.log(`[FactoryTracking] ${containerNumber}: jsoncargo → ${jc.status} (${jc.message})`);
+      }
+    } catch (err: any) {
+      console.warn(`[FactoryTracking] ${containerNumber}: jsoncargo pre-check error —`, err?.message ?? err);
+    }
+  }
 
   if (!isValidContainerNumber(containerNumber)) {
     const errMsg = `Invalid container number format: "${containerNumber}" (must be 4 letters + 7 digits)`;

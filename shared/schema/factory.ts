@@ -714,6 +714,9 @@ export const factoryContainers = pgTable(
     trackingDetectedCarrier: text("tracking_detected_carrier"),
     trackingNextCheckAt: timestamp("tracking_next_check_at", { withTimezone: true }),
     trackingLastSkipReason: text("tracking_last_skip_reason"),
+    jsonCargoLastCheckedAt: timestamp("json_cargo_last_checked_at", { withTimezone: true }),
+    jsonCargoTrackingStatus: text("json_cargo_tracking_status"),
+    jsonCargoError: text("json_cargo_error"),
   },
   (t) => ({
     companyIdx: index("factory_containers_company_idx").on(t.companyId),
