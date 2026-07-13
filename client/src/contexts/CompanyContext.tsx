@@ -5,7 +5,6 @@ import { queryClient, apiRequest } from "@/lib/queryClient";
 const PREFETCH_KEYS = [
   "/api/suppliers",
   "/api/customers",
-  "/api/stock-items",
   "/api/ledger-accounts",
   "/api/bank-accounts",
   "/api/locations",
