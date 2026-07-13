@@ -83,23 +83,11 @@ pool.on("error", (error) => {
 pool.on("connect", () => logPoolStats("connect"));
 pool.on("remove", () => logPoolStats("remove"));
 
-// A short request burst can emit one "acquire" event per waiting client even
-// when the queue clears within a few milliseconds. Only warn when pressure is
-// still present after a brief grace period so production logs represent
-// sustained contention instead of duplicating transient pool activity.
-const POOL_PRESSURE_GRACE_MS = 250;
-let poolPressureTimer: NodeJS.Timeout | null = null;
-
+// Log when a client is acquired from the pool under pressure.
 pool.on("acquire", () => {
-  if (pool.waitingCount === 0 || poolPressureTimer) return;
-
-  poolPressureTimer = setTimeout(() => {
-    poolPressureTimer = null;
-    if (pool.waitingCount > 0) {
-      logPoolStats("sustained-acquire-pressure");
-    }
-  }, POOL_PRESSURE_GRACE_MS);
-  poolPressureTimer.unref();
+  if (pool.waitingCount > 0) {
+    logPoolStats("acquire-under-pressure");
+  }
 });
 
 export function logPoolStats(trigger: string) {
