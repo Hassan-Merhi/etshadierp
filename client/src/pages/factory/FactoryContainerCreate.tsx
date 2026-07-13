@@ -40,6 +40,28 @@ export default function FactoryContainerCreate() {
   const [totalKg, setTotalKg] = useState("");
   const [ratePerKg, setRatePerKg] = useState("");
   const [otherChargeLines, setOtherChargeLines] = useState<OtherChargeLine[]>([]);
+  const [fxRate, setFxRate] = useState("1");
+  const [fxRateLoading, setFxRateLoading] = useState(false);
+
+  // Auto-fetch the live USD exchange rate whenever a non-USD currency is selected.
+  // Without this, fxRateToUsd was previously hardcoded to "1" for every currency,
+  // which meant EUR (or any other) amounts were treated as if they were already USD —
+  // e.g. a €11,035 container plus a $1,000 USD commission would be added as
+  // 11,035 + 1,000 = 12,035 instead of converting the EUR portion to USD first.
+  useEffect(() => {
+    if (currency === "USD") {
+      setFxRate("1");
+      return;
+    }
+    setFxRateLoading(true);
+    factoryApiRequest("GET", `/api/factory/fx-rates/latest/${currency}`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data?.rate) setFxRate(String(data.rate));
+      })
+      .catch(() => {})
+      .finally(() => setFxRateLoading(false));
+  }, [currency]);
 
   const updateOtherChargeLine = (idx: number, field: keyof OtherChargeLine, value: string) => {
     setOtherChargeLines((prev) => prev.map((l, i) => (i === idx ? { ...l, [field]: value } : l)));
@@ -91,8 +113,8 @@ export default function FactoryContainerCreate() {
         notes: formData.notes || null,
         status: "PENDING",
         currencyCode: currency,
-        fxRateToUsd: "1",
-        fxRateSource: "manual",
+        fxRateToUsd: currency === "USD" ? "1" : fxRate,
+        fxRateSource: "auto",
         totalKg: totalKg || null,
         ratePerKg: ratePerKg || null,
         commissionAmount: formData.commissionAmount || "0",
@@ -142,7 +164,10 @@ export default function FactoryContainerCreate() {
     },
   });
 
-  const canSubmit = !!formData.containerNumber && !createMutation.isPending;
+  const canSubmit =
+    !!formData.containerNumber &&
+    !createMutation.isPending &&
+    !(currency !== "USD" && (fxRateLoading || !(parseFloat(fxRate) > 0)));
 
   return (
     <div className="max-w-2xl mx-auto p-4 sm:p-6 space-y-6">
@@ -270,6 +295,16 @@ export default function FactoryContainerCreate() {
               </Select>
             </div>
           </div>
+
+          {currency !== "USD" && (
+            <div className="text-xs text-muted-foreground">
+              {fxRateLoading
+                ? "Fetching current exchange rate…"
+                : parseFloat(fxRate) > 0
+                  ? `1 ${currency} = ${formatNumber(parseFloat(fxRate))} USD (auto rate, used to convert this container's costs and commission to a common currency)`
+                  : "Exchange rate unavailable — costs in this currency may not convert correctly."}
+            </div>
+          )}
 
           <Separator />
 
