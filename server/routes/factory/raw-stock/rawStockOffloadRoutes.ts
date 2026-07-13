@@ -203,6 +203,19 @@ export function registerRawStockOffloadRoutes(app: Express) {
       const differenceKg = String(parseFloat(declaredKg) - parseFloat(actualKg));
       const basePayable = parseFloat(actualKg) * parseFloat(baseCostPerKg);
 
+      // Fall back to the container's own supplier for freight payee when the offload
+      // request didn't explicitly resend one. Container creation and the PATCH freight-sync
+      // route both credit container.supplierId whenever freightPaidBy='supplier' (the
+      // default) without requiring a separate freightSupplierId to be selected again — the
+      // offload form should honor the same default, or freight silently falls into the
+      // no-payee ledger branch (Dr Factory Charges Payable / Cr Freight), which nets the
+      // freight expense to zero and leaves an unresolved balance in Charges Payable.
+      const effectiveFreightSupplierId: number | null = reqFreightSupplierId
+        ? parseInt(reqFreightSupplierId)
+        : !reqFreightAccountId && ((container as any).freightPaidBy || "supplier") === "supplier" && container.supplierId
+          ? container.supplierId
+          : null;
+
       const freightVal = parseFloat(reqFreight || "0");
       const otherChargesVal = parseFloat(reqOtherCharges || "0");
       const additionalChargesArr = Array.isArray(reqAdditionalCharges) ? reqAdditionalCharges : [];
@@ -298,7 +311,7 @@ export function registerRawStockOffloadRoutes(app: Express) {
         "Factory Charges Payable"
       );
       const freightExpenseAcctId =
-        freightVal > 0 && reqFreightSupplierId
+        freightVal > 0 && effectiveFreightSupplierId
           ? reqFreightAccountId
             ? parseInt(reqFreightAccountId)
             : await getOrCreateLedgerAccount(companyId, "FACTORY_FREIGHT_EXPENSE", "Freight Expense")
@@ -364,7 +377,7 @@ export function registerRawStockOffloadRoutes(app: Express) {
             finalPayableAmountUsd,
             freight: String(freightVal),
             freightAccountId: reqFreightAccountId ? parseInt(reqFreightAccountId) : null,
-            freightSupplierId: reqFreightSupplierId ? parseInt(reqFreightSupplierId) : null,
+            freightSupplierId: effectiveFreightSupplierId,
             otherCharges: String(otherChargesVal),
             otherChargesCurrencyCode: ocCcy || null,
             otherChargesAccountId: reqOtherChargesAccountId ? parseInt(reqOtherChargesAccountId) : null,
@@ -531,7 +544,7 @@ export function registerRawStockOffloadRoutes(app: Express) {
           );
 
         // 8. Freight voucher (double-entry)
-        if (freightVal > 0 && (reqFreightAccountId || reqFreightSupplierId)) {
+        if (freightVal > 0 && (reqFreightAccountId || effectiveFreightSupplierId)) {
           const freightVoucherNum = `FACTORY-FREIGHT-${containerId}-${Date.now()}`;
           const freightVoucherCcy = reqFreightCurrencyCode || currencyCode;
           const freightFx = parseFloat(reqFreightFxRate || String(fxRate));
@@ -549,7 +562,7 @@ export function registerRawStockOffloadRoutes(app: Express) {
               sourceModule: "FACTORY",
             })
             .returning();
-          if (reqFreightSupplierId) {
+          if (effectiveFreightSupplierId) {
             // Supplier: Dr Freight Expense / Cr Supplier Balance
             await tx.insert(voucherEntries).values({
               voucherId: freightVoucher.id,
@@ -560,7 +573,7 @@ export function registerRawStockOffloadRoutes(app: Express) {
             });
             await tx.insert(voucherEntries).values({
               voucherId: freightVoucher.id,
-              factorySupplierId: parseInt(reqFreightSupplierId),
+              factorySupplierId: effectiveFreightSupplierId,
               debitAmount: "0",
               creditAmount: String(freightVal),
               narration: `Freight payable to supplier - container ${container.containerNumber}`,

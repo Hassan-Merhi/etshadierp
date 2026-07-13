@@ -359,6 +359,17 @@ export function registerFactoryContainersRoutes(app: Express) {
         values.freightAccountId = await getOrCreateLedgerAccount(companyId, "FREIGHT", "Freight");
       }
 
+      // Persist which supplier freight is payable to when freightPaidBy='supplier' (default).
+      // Without this, factoryContainers.freightSupplierId stays null even though the freight
+      // voucher below correctly credits container.supplierId — later steps (offload prefill,
+      // PATCH freight-sync) read freightSupplierId, not supplierId, to know freight has a
+      // supplier payee. Leaving it null makes them fall back to a no-supplier posting branch
+      // and silently re-book freight against the wrong ledger.
+      const freightPaidByOnCreate = values.freightPaidBy || "supplier";
+      if (freightPaidByOnCreate === "supplier" && !values.freightSupplierId && values.supplierId) {
+        values.freightSupplierId = values.supplierId;
+      }
+
       const [container] = await db.insert(factoryContainers).values(values).returning();
 
       let supplierNameForDesc = "";
