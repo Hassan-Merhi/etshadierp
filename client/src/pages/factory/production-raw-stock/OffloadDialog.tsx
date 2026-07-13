@@ -1,5 +1,6 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useMutation } from "@tanstack/react-query";
+import { factoryApiRequest } from "@/lib/factoryApi";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -55,11 +56,13 @@ export function OffloadDialog({
   const [freightCurrencyCode, setFreightCurrencyCode] = useState("USD");
   const [freightFxRate, setFreightFxRate] = useState("1");
   const [freightFromContainer, setFreightFromContainer] = useState(false);
+  const [freightFxRateLoading, setFreightFxRateLoading] = useState(false);
   const [otherCharges, setOtherCharges] = useState("");
   const [otherChargesAccountId, setOtherChargesAccountId] = useState("");
   const [otherChargesCurrencyCode, setOtherChargesCurrencyCode] = useState("USD");
   const [otherChargesFxRate, setOtherChargesFxRate] = useState("1");
   const [otherChargesFromContainer, setOtherChargesFromContainer] = useState(false);
+  const [otherChargesFxRateLoading, setOtherChargesFxRateLoading] = useState(false);
   const [commissionFromContainer, setCommissionFromContainer] = useState(false);
   const [containerCommissionCcy, setContainerCommissionCcy] = useState("USD");
   const [commissionPersonName, setCommissionPersonName] = useState("");
@@ -76,6 +79,44 @@ export function OffloadDialog({
   const selectedContainer = useMemo(() => {
     return availableContainers?.find((c) => c.id.toString() === selectedContainerId);
   }, [availableContainers, selectedContainerId]);
+
+  // Auto-fetch the live USD exchange rate whenever the freight currency is changed
+  // away from USD (and isn't already pinned to the container's own fx rate). Without
+  // this, entering e.g. a EUR freight amount with fxRate left at "1" would post it to
+  // the ledger as if it were already USD, silently overstating (or understating) the
+  // landed cost — mirrors the same auto-fetch on FactoryContainerCreate.tsx.
+  useEffect(() => {
+    if (freightFromContainer) return;
+    if (freightCurrencyCode === "USD") {
+      setFreightFxRate("1");
+      return;
+    }
+    setFreightFxRateLoading(true);
+    factoryApiRequest("GET", `/api/factory/fx-rates/latest/${freightCurrencyCode}`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data?.rate) setFreightFxRate(String(data.rate));
+      })
+      .catch(() => {})
+      .finally(() => setFreightFxRateLoading(false));
+  }, [freightCurrencyCode, freightFromContainer]);
+
+  // Same auto-fetch for Other Charges currency.
+  useEffect(() => {
+    if (otherChargesFromContainer) return;
+    if (otherChargesCurrencyCode === "USD") {
+      setOtherChargesFxRate("1");
+      return;
+    }
+    setOtherChargesFxRateLoading(true);
+    factoryApiRequest("GET", `/api/factory/fx-rates/latest/${otherChargesCurrencyCode}`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data?.rate) setOtherChargesFxRate(String(data.rate));
+      })
+      .catch(() => {})
+      .finally(() => setOtherChargesFxRateLoading(false));
+  }, [otherChargesCurrencyCode, otherChargesFromContainer]);
 
   const handleContainerSelect = (id: string) => {
     setSelectedContainerId(id);
@@ -265,16 +306,43 @@ export function OffloadDialog({
           <div className="grid grid-cols-2 gap-6">
             <div className="space-y-4">
               <h3 className="font-semibold text-sm">Freight & Other Charges</h3>
-              <div className="space-y-2">
-                <Label>Freight Cost ({freightCurrencyCode})</Label>
-                <Input
-                  type="number"
-                  step="0.01"
-                  value={freight}
-                  onChange={(e) => setFreight(e.target.value)}
-                  disabled={freightFromContainer}
-                />
+              <div className="grid grid-cols-[1fr_auto] gap-2">
+                <div className="space-y-2">
+                  <Label>Freight Cost</Label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    value={freight}
+                    onChange={(e) => setFreight(e.target.value)}
+                    disabled={freightFromContainer}
+                    placeholder="0.00"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Currency</Label>
+                  <Select value={freightCurrencyCode} onValueChange={setFreightCurrencyCode} disabled={freightFromContainer}>
+                    <SelectTrigger className="w-24">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="USD">USD</SelectItem>
+                      <SelectItem value="EUR">EUR</SelectItem>
+                      <SelectItem value="AUD">AUD</SelectItem>
+                      <SelectItem value="GBP">GBP</SelectItem>
+                      <SelectItem value="LBP">LBP</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
+              {freightCurrencyCode !== "USD" && (
+                <p className="text-xs text-muted-foreground -mt-2">
+                  {freightFxRateLoading
+                    ? "Fetching current exchange rate…"
+                    : parseFloat(freightFxRate) > 0
+                      ? `1 ${freightCurrencyCode} = ${formatNumber(parseFloat(freightFxRate))} USD — freight will be posted to the ledger in USD.`
+                      : "Exchange rate unavailable — enter it manually to convert this charge to USD."}
+                </p>
+              )}
               <div className="space-y-2">
                 <Label>Freight Account</Label>
                 <AccountCombobox
@@ -283,6 +351,60 @@ export function OffloadDialog({
                   accounts={ledgerAccounts}
                   suppliers={factorySuppliers}
                   disabled={freightFromContainer}
+                />
+              </div>
+
+              <Separator />
+
+              <div className="grid grid-cols-[1fr_auto] gap-2">
+                <div className="space-y-2">
+                  <Label>Other Charges</Label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    value={otherCharges}
+                    onChange={(e) => setOtherCharges(e.target.value)}
+                    disabled={otherChargesFromContainer}
+                    placeholder="0.00"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Currency</Label>
+                  <Select
+                    value={otherChargesCurrencyCode}
+                    onValueChange={setOtherChargesCurrencyCode}
+                    disabled={otherChargesFromContainer}
+                  >
+                    <SelectTrigger className="w-24">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="USD">USD</SelectItem>
+                      <SelectItem value="EUR">EUR</SelectItem>
+                      <SelectItem value="AUD">AUD</SelectItem>
+                      <SelectItem value="GBP">GBP</SelectItem>
+                      <SelectItem value="LBP">LBP</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              {otherChargesCurrencyCode !== "USD" && (
+                <p className="text-xs text-muted-foreground -mt-2">
+                  {otherChargesFxRateLoading
+                    ? "Fetching current exchange rate…"
+                    : parseFloat(otherChargesFxRate) > 0
+                      ? `1 ${otherChargesCurrencyCode} = ${formatNumber(parseFloat(otherChargesFxRate))} USD — other charges will be posted to the ledger in USD.`
+                      : "Exchange rate unavailable — enter it manually to convert this charge to USD."}
+                </p>
+              )}
+              <div className="space-y-2">
+                <Label>Other Charges Account</Label>
+                <AccountCombobox
+                  value={otherChargesAccountId}
+                  onValueChange={setOtherChargesAccountId}
+                  accounts={ledgerAccounts}
+                  suppliers={factorySuppliers}
+                  disabled={otherChargesFromContainer}
                 />
               </div>
             </div>
