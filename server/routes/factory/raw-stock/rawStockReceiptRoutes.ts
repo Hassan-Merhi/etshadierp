@@ -193,10 +193,22 @@ export function registerRawStockReceiptRoutes(app: Express) {
         const rowRemainingKg = received - used;
         const rowRemainingValueLocal = rowRemainingKg * costPerKg;
         const rowRemainingValueUsd = rowRemainingKg * costPerKgUsd;
+        // The displayed "rate" (cost/kg) is a separate concept from remaining value: it's
+        // the going purchase rate for this supplier's material, weighted by everything ever
+        // RECEIVED. It should only move when a new container/receipt is added, never when
+        // existing stock is consumed in a mix batch — so it's tracked independently of usage.
         if (supplierMap.has(key)) {
           const existing = supplierMap.get(key)!;
+          const prevTotalCost = existing._totalReceived * existing._avgCostPerKg;
+          const newTotalCost = received * costPerKg;
+          const prevTotalCostUsd = existing._totalReceived * existing._avgCostPerKgUsd;
+          const newTotalCostUsd = received * costPerKgUsd;
           existing._totalReceived += received;
           existing._totalUsed += used;
+          existing._avgCostPerKg =
+            existing._totalReceived > 0 ? (prevTotalCost + newTotalCost) / existing._totalReceived : 0;
+          existing._avgCostPerKgUsd =
+            existing._totalReceived > 0 ? (prevTotalCostUsd + newTotalCostUsd) / existing._totalReceived : 0;
           existing._remainingValueLocal += rowRemainingValueLocal;
           existing._remainingValueUsd += rowRemainingValueUsd;
           if (new Date(r.offloadedAt) > new Date(existing.lastOffloaded)) {
@@ -217,6 +229,8 @@ export function registerRawStockReceiptRoutes(app: Express) {
             currencyCode: r.currencyCode || "USD",
             _totalReceived: received,
             _totalUsed: used,
+            _avgCostPerKg: costPerKg,
+            _avgCostPerKgUsd: costPerKgUsd,
             _remainingValueLocal: rowRemainingValueLocal,
             _remainingValueUsd: rowRemainingValueUsd,
             lastOffloaded: r.offloadedAt,
@@ -266,8 +280,13 @@ export function registerRawStockReceiptRoutes(app: Express) {
           if (isAdd) {
             // New stock added at its own cost — nothing used from it yet, so its full
             // value joins the remaining-value pool (manual adjustments have no separate
-            // USD leg, so local and USD value move together).
+            // USD leg, so local and USD value move together). This also shifts the
+            // received-weighted rate, same as receiving a new container would.
+            const prevCost = existing._totalReceived * existing._avgCostPerKg;
+            const newCost = kg * costPerKgAdj;
             existing._totalReceived += kg;
+            existing._avgCostPerKg = existing._totalReceived > 0 ? (prevCost + newCost) / existing._totalReceived : 0;
+            existing._avgCostPerKgUsd = existing._avgCostPerKg;
             existing._remainingValueLocal += kg * costPerKgAdj;
             existing._remainingValueUsd += kg * costPerKgAdj;
           } else {
@@ -294,6 +313,8 @@ export function registerRawStockReceiptRoutes(app: Express) {
             currencyCode: adj.currencyCode || "USD",
             _totalReceived: isAdd ? kg : 0,
             _totalUsed: isAdd ? 0 : kg,
+            _avgCostPerKg: costPerKgAdj,
+            _avgCostPerKgUsd: costPerKgAdj,
             _remainingValueLocal: isAdd ? kg * costPerKgAdj : 0,
             _remainingValueUsd: isAdd ? kg * costPerKgAdj : 0,
             lastOffloaded: adj.createdAt,
@@ -386,8 +407,12 @@ export function registerRawStockReceiptRoutes(app: Express) {
         // multiple containers/adjustments with different costs are involved.
         const valueRemaining = s._remainingValueLocal;
         const valueRemainingUsd = s._remainingValueUsd;
-        const avgCostPerKg = remainingKg > 0 ? valueRemaining / remainingKg : 0;
-        const avgCostPerKgUsd = remainingKg > 0 ? valueRemainingUsd / remainingKg : 0;
+        // The displayed rate is the received-weighted purchase cost/kg — it only moves when
+        // new stock is received (a new container offload or an ADD adjustment), never when
+        // existing stock is drawn down in a mix batch. It is intentionally not re-derived
+        // from valueRemaining/remainingKg (that ratio does shift with usage; the rate must not).
+        const avgCostPerKg = s._avgCostPerKg;
+        const avgCostPerKgUsd = s._avgCostPerKgUsd;
         return {
           supplierName: s.supplierName,
           supplierId: s.supplierId,
