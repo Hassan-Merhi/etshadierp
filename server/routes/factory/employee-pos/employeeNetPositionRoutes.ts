@@ -1169,12 +1169,19 @@ export function registerEmployeeNetPositionRoutes(app: Express) {
 
       // ── 3c. Balance on Table — material in process (mix batch input minus bale output) ──
       // Mirrors the production-value-report formula: all-time totals, no date filter.
+      // Must exclude soft-deleted batches and carry-forward rows exactly like
+      // factoryBaleExportRoutes.ts does, or a deleted batch keeps inflating this figure
+      // (its total_weight_kg/total_cost still get summed even though the batch no longer
+      // exists from the user's point of view) and Net Position stops matching the
+      // Production report's Balance on Table card.
       const mixSumResult = await db.execute(sql`
         SELECT
           COALESCE(SUM(total_weight_kg::numeric), 0) AS total_mix_kg,
           COALESCE(SUM(total_cost::numeric),      0) AS total_mix_cost
         FROM factory_mix_batches
         WHERE company_id = ${companyId}
+          AND carry_forward_from_id IS NULL
+          AND deleted_at IS NULL
       `);
       const mixSumRow = ((mixSumResult as any).rows ?? (mixSumResult as any))[0] ?? {};
       const totalMixKg = parseFloat(String(mixSumRow.total_mix_kg ?? "0")) || 0;
