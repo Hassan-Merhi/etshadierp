@@ -175,11 +175,25 @@ export function registerRawStockOffloadRoutes(app: Express) {
       if (reqFxRate && parseFloat(reqFxRate) > 0) {
         // User explicitly set the FX rate — always honour it
         fxRate = parseFloat(reqFxRate);
+      } else if (currencyCode === "USD") {
+        fxRate = 1;
       } else {
         try {
           fxRate = parseFloat(await getOrFetchFxRateToUsd(companyId, currencyCode, offloadDate));
-        } catch {
-          fxRate = parseFloat(container.fxRateToUsd || "1");
+        } catch (err: any) {
+          // Do NOT silently default to 1 for a non-USD offload — that would understate
+          // (or overstate) the USD landed cost by the entire FX differential with no
+          // trace of why. The container's own fxRateToUsd is only a legitimate fallback
+          // if it was itself explicitly set (not left at the schema default of "1" for
+          // a non-USD currency, which means "never actually set").
+          const containerRate = parseFloat(container.fxRateToUsd || "0");
+          const containerRateLooksSet = containerRate > 0 && !(container.currencyCode !== "USD" && containerRate === 1);
+          if (!containerRateLooksSet) {
+            return res.status(400).json({
+              message: `No valid FX rate available for ${currencyCode} on ${offloadDate}, and the container has no explicitly-set fxRateToUsd to fall back on. Provide fxRateToUsd explicitly to offload this container. (${err.message})`,
+            });
+          }
+          fxRate = containerRate;
         }
       }
 

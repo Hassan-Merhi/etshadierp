@@ -191,6 +191,14 @@ export function registerRawStockAdjRoutes(app: Express) {
         .orderBy(desc(factoryRawMaterialAdjustments.createdAt));
 
       // 2. Mix batch usage: batch sources referencing this supplier (aggregate per batch)
+      //
+      // IMPORTANT: costPerKg must come from factoryMixBatchSources (this supplier's own
+      // rate for the material it contributed), NOT from factoryMixBatches.costPerKg.
+      // The batch's costPerKg is a weighted BLEND across every supplier/source that fed
+      // that batch — showing it here would silently attribute other suppliers' material
+      // cost (or dilute this supplier's true cost) whenever a batch draws from more than
+      // one source. Aggregating this supplier's own source rows (weight-averaged if a
+      // batch drew from this supplier more than once) is the only correct per-supplier figure.
       const batchSourceRows = await db
         .select({
           batchId: factoryMixBatches.id,
@@ -200,30 +208,33 @@ export function registerRawStockAdjRoutes(app: Express) {
           batchDate: factoryMixBatches.batchDate,
           createdAt: factoryMixBatches.createdAt,
           weightKg: factoryMixBatchSources.weightKg,
-          // Use the batch's blended cost/kg (factoryMixBatches.costPerKg), NOT the
-          // per-source raw-material rate (factoryMixBatchSources.costPerKg).
-          // The source rate is what BASMA UK costs per kg in isolation; the batch rate
-          // is the actual blended output cost that appears on the Recent Mix Batches list.
-          costPerKg: factoryMixBatches.costPerKg,
+          costPerKg: factoryMixBatchSources.costPerKg,
+          totalCost: factoryMixBatchSources.totalCost,
         })
         .from(factoryMixBatchSources)
         .innerJoin(factoryMixBatches, eq(factoryMixBatchSources.mixBatchId, factoryMixBatches.id))
         .where(and(eq(factoryMixBatches.companyId, companyId), eq(factoryMixBatchSources.supplierId, supplierId), isNull(factoryMixBatches.deletedAt)))
         .orderBy(desc(factoryMixBatches.createdAt));
 
-      // Aggregate multiple source rows for the same batch into one timeline entry
+      // Aggregate multiple source rows for the same batch into one timeline entry.
+      // costPerKg is derived as totalCost / kg across THIS supplier's source rows only,
+      // so a batch fed by this supplier more than once still shows one correct weighted rate.
       const batchAggMap = new Map<number, any>();
       for (const r of batchSourceRows) {
+        const kg = parseFloat(r.weightKg as string) || 0;
+        const cost = parseFloat(r.totalCost as string) || kg * (parseFloat(r.costPerKg as string) || 0);
         if (batchAggMap.has(r.batchId)) {
-          batchAggMap.get(r.batchId).kg += parseFloat(r.weightKg as string) || 0;
+          const agg = batchAggMap.get(r.batchId);
+          agg.kg += kg;
+          agg._cost += cost;
         } else {
           batchAggMap.set(r.batchId, {
             kind: "batch" as const,
             date: r.batchDate || r.createdAt,
             createdAt: r.createdAt,
             type: "USED",
-            kg: parseFloat(r.weightKg as string) || 0,
-            costPerKg: parseFloat(r.costPerKg as string) || 0,
+            kg,
+            _cost: cost,
             currencyCode: "USD",
             notes: null,
             label: `Mix Batch — ${r.batchName || r.batchCode}`,
@@ -233,7 +244,10 @@ export function registerRawStockAdjRoutes(app: Express) {
           });
         }
       }
-      const batches = Array.from(batchAggMap.values());
+      const batches = Array.from(batchAggMap.values()).map((r) => {
+        const { _cost, ...rest } = r;
+        return { ...rest, costPerKg: rest.kg > 0 ? _cost / rest.kg : 0 };
+      });
 
       // 3. Container-based raw stock receipts for this supplier
       const containerRows = await db

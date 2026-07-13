@@ -5,6 +5,7 @@ import { db } from "../../../db";
 import { requireAuth } from "../../../auth";
 import { classifyNetPositionAccounts } from "../../../netPositionHelper";
 import { adjustInventory } from "../../../inventoryHelper";
+import { cascadeContainerCostChange } from "../../../services/factory/rawStockCostCascade";
 import {
   writeDaybookEntry,
   getOrFetchFxRateToUsd,
@@ -442,74 +443,13 @@ export function registerRawStockContainerRoutes(app: Express) {
         }
 
         // 5. Cascade to mix batch sources → recalculate affected batch weighted averages → cascade to bales
-        const mixSources = await tx
-          .select()
-          .from(factoryMixBatchSources)
-          .where(eq(factoryMixBatchSources.containerId, containerId));
-
-        if (mixSources.length > 0) {
-          for (const src of mixSources) {
-            const newSourceTotalCost = parseFloat(src.weightKg) * newInclusiveCostPerKg;
-            await tx
-              .update(factoryMixBatchSources)
-              .set({ costPerKg: String(newInclusiveCostPerKg), totalCost: String(newSourceTotalCost.toFixed(2)) })
-              .where(eq(factoryMixBatchSources.id, src.id));
-          }
-
-          const affectedBatchIds = [...new Set(mixSources.map((s: any) => s.mixBatchId))];
-          for (const batchId of affectedBatchIds) {
-            const [batch] = await tx.select().from(factoryMixBatches).where(eq(factoryMixBatches.id, batchId));
-            const oldCostPerKg = batch ? parseFloat(batch.costPerKg || "0") : 0;
-            const allSources = await tx
-              .select()
-              .from(factoryMixBatchSources)
-              .where(eq(factoryMixBatchSources.mixBatchId, batchId));
-            const batchTotalCost = allSources.reduce((sum: number, s: any) => sum + parseFloat(s.totalCost || "0"), 0);
-            const batchTotalWeight = allSources.reduce((sum: number, s: any) => sum + parseFloat(s.weightKg || "0"), 0);
-            const batchCostPerKg = batchTotalWeight > 0 ? batchTotalCost / batchTotalWeight : 0;
-            await tx
-              .update(factoryMixBatches)
-              .set({
-                costPerKg: String(batchCostPerKg.toFixed(4)),
-                totalCost: String(batchTotalCost.toFixed(2)),
-                updatedAt: new Date(),
-              })
-              .where(eq(factoryMixBatches.id, batchId));
-            const srcWeight = mixSources
-              .filter((s: any) => s.mixBatchId === batchId)
-              .reduce((sum: number, s: any) => sum + parseFloat(s.weightKg || "0"), 0);
-            affectedBatches.push({
-              batchId,
-              batchCode: batch?.batchCode || `#${batchId}`,
-              oldCostPerKg,
-              newCostPerKg: batchCostPerKg,
-              weightKg: srcWeight,
-            });
-
-            // 5b. Cascade blended cost down to all bales already pressed from this batch
-            const balesInBatch = await tx
-              .select({ id: factoryBales.id, weightKg: factoryBales.weightKg })
-              .from(factoryBales)
-              .where(
-                and(
-                  eq(factoryBales.mixBatchId, batchId),
-                  eq(factoryBales.companyId, companyId),
-                  sql`${factoryBales.status} NOT IN ('DELETED','REMOVED')`
-                )
-              );
-            for (const bale of balesInBatch) {
-              const baleWt = parseFloat(bale.weightKg as string) || 0;
-              await tx
-                .update(factoryBales)
-                .set({
-                  costPerKg: String(batchCostPerKg.toFixed(4)),
-                  totalCost: String((baleWt * batchCostPerKg).toFixed(2)),
-                  updatedAt: new Date(),
-                })
-                .where(eq(factoryBales.id, bale.id));
-            }
-          }
-        }
+        const cascadeResult = await cascadeContainerCostChange(tx, {
+          companyId,
+          containerId,
+          newCostPerKg: newInclusiveCostPerKg,
+          newCostPerKgUsd,
+        });
+        affectedBatches.push(...cascadeResult.affectedBatches);
 
         // 6. Daybook entries + vouchers for each new charge
         // chargeCtxs[ci] is pre-computed outside the transaction (index-aligned with validCharges / insertedCharges).
