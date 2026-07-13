@@ -41,3 +41,4 @@
 - [Express literal routes vs :id routes](express-literal-route-vs-param-order.md) — a literal sibling route registered after an existing /resource/:id route gets swallowed by it; order registration modules accordingly and test through the real app.
 - [Layering a single-purpose provider onto a multi-provider pipeline](layered-tracking-provider-pattern.md) — give the new provider its own gating/status columns and a self-contained pre-check call at the top of the existing flow instead of touching its internals.
 - [ERP vs factory are parallel mirrored systems](erp-factory-parallel-systems.md) — separate schema/service/route/UI trees per company type; any cross-cutting feature must be checked against both or it silently only half-applies.
+- [/api/factory test-session company resolution](factory-companyid-test-middleware.md) — seeded test companies need companyType="factory" set before any /api/factory request or the middleware pins the wrong company and lookups 404.
