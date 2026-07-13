@@ -21,10 +21,27 @@ interface SupplierRawStock {
   receivedKg: string;
   usedKg: string;
   remainingKg: string;
+  freeKg?: string;
   costPerKg: string;
   costPerKgUsd?: string;
   valueRemaining: string;
+  valueRemainingUsd?: string;
   lastOffloaded: string;
+}
+
+/**
+ * The true current $/kg for a supplier's remaining stock is valueRemainingUsd ÷ freeKg,
+ * not the received-weighted costPerKgUsd — that rate can drift from reality once charges
+ * are edited or stock is partially used (see the Raw Stock card, which uses the same
+ * formula). Falls back to costPerKgUsd/costPerKg when there's no free stock to derive a
+ * rate from (e.g. fully-used supplier).
+ */
+function getSupplierRate(stock: SupplierRawStock): number {
+  const freeKg = parseFloat(stock.freeKg || "0");
+  if (freeKg > 0) {
+    return parseFloat(stock.valueRemainingUsd || "0") / freeKg;
+  }
+  return parseFloat(stock.costPerKgUsd || "") || parseFloat(stock.costPerKg || "0");
 }
 
 type SourceType = "supplier" | "batch";
@@ -260,11 +277,10 @@ export function CreateMixBatchDialog({ open, onOpenChange, onCreated }: CreateMi
       const available = parseFloat(stock.remainingKg);
       // Over-use allowed: no guard on weight > available
 
-      // Prefer costPerKgUsd — this matches the backend's actual blending logic
-      // (POST /api/factory/mix-batches uses rs.costPerKgUsd || rs.costPerKg), so the
-      // preview shown here no longer diverges from the batch actually created when the
-      // supplier's raw stock is denominated in a non-USD currency.
-      const costPerKg = parseFloat(stock.costPerKgUsd || "") || parseFloat(stock.costPerKg);
+      // Use the same true remaining-value rate as the Raw Stock card (valueRemainingUsd ÷
+      // freeKg), not the received-weighted costPerKgUsd — otherwise this preview (and the
+      // batch actually created from it) can diverge from what the Raw Stock card shows.
+      const costPerKg = getSupplierRate(stock);
       setSelectedSources((prev) => [
         ...prev,
         {
@@ -483,7 +499,7 @@ export function CreateMixBatchDialog({ open, onOpenChange, onCreated }: CreateMi
                     {availableSuppliers?.map((stock) => (
                       <SelectItem key={stock.supplierId!} value={stock.supplierId!.toString()}>
                         {stock.supplierName} ({formatNumber(parseFloat(stock.remainingKg))} kg @ $
-                        {(parseFloat(stock.costPerKgUsd || "") || parseFloat(stock.costPerKg)).toFixed(4)}/kg)
+                        {getSupplierRate(stock).toFixed(4)}/kg)
                       </SelectItem>
                     ))}
                     {(!availableSuppliers || availableSuppliers.length === 0) && (
