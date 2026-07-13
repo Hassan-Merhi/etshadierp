@@ -1,8 +1,9 @@
 import { useState, useMemo, useRef } from "react";
+import { Link } from "wouter";
 import { useAdminOverride } from "@/hooks/use-admin-override";
 import { useDateFormat } from "@/contexts/DateFormatContext";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { FlaskConical, ArrowDown, Plus, Tag, Layers } from "lucide-react";
+import { FlaskConical, ArrowDown, Plus, Tag, Layers, Calculator } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
@@ -258,6 +259,11 @@ export default function ProductionRawStock() {
           <Button variant="outline" onClick={() => setCategoriesDialogOpen(true)} className="gap-2">
             <Tag className="h-4 w-4" /> Categories
           </Button>
+          <Link href="/factory/raw-stock/recalculate">
+            <Button variant="outline" className="gap-2">
+              <Calculator className="h-4 w-4" /> Recalculate Cost
+            </Button>
+          </Link>
         </div>
       </div>
 

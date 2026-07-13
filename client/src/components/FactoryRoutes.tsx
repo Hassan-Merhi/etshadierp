@@ -31,7 +31,7 @@ import {
   ImportCycleDiagnostics, IntercompanyLinks, IntercompanyRequests, InventoryRepair,
   LabelBannersSettings, LedgerMonthlySummary, LedgerVouchers, MergeBaleProducts,
   MySettings, OrphanedRecords, Payroll, ProductionRawStock,
-  ProformaAddLine, Settings, SpreadsheetEditor, StockQuery,
+  ProformaAddLine, RawStockRecalculate, Settings, SpreadsheetEditor, StockQuery,
   VoucherDetail, VoucherEdit, WasteDispatchPage, WipersReEntry,
 } from "@/lazyPages";
 
@@ -69,6 +69,7 @@ export function FactoryRoutes({ user, myAccess, factoryDefaultPage }: FactoryRou
         path="/factory/raw-stock/opening-balance/:id/edit"
         component={FactoryOpeningBalanceEdit}
       />
+      <Route path="/factory/raw-stock/recalculate" component={RawStockRecalculate} />
       <Route path="/factory/raw-stock" component={ProductionRawStock} />
       <Route path="/factory/raw-materials" component={FactoryRawMaterialsHub} />
       <Route path="/factory/pressing">

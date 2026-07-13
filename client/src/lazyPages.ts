@@ -115,6 +115,7 @@ export const FactoryLocationInventoryMockup = lazy(
 );
 export const FactoryProduction = lazy(() => import("@/pages/factory/FactoryProduction"));
 export const ProductionRawStock = lazy(() => import("@/pages/factory/ProductionRawStock"));
+export const RawStockRecalculate = lazy(() => import("@/pages/factory/production-raw-stock/RawStockRecalculate"));
 export const FactoryOpeningBalanceEdit = lazy(() => import("@/pages/factory/FactoryOpeningBalanceEdit"));
 export const BaleStockEntry = lazy(() => import("@/pages/factory/BaleStockEntry"));
 export const BalesHistory = lazy(() => import("@/pages/factory/BalesHistory"));
