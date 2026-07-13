@@ -392,8 +392,11 @@ export function registerEmployeeAdvancesBonusRoutes(app: Express) {
       const workerFilter = workerId ? sql`AND wb.worker_id = ${parseInt(workerId)}` : sql``;
       const statusFilter = status ? sql`AND wb.status = ${status}` : sql``;
       const result = await db.execute(sql`
-        SELECT wb.*, fw.full_name as worker_name, fw.employee_code,
-          la.name as cash_account_name
+        SELECT wb.id, wb.worker_id AS "workerId", wb.bonus_date AS "bonusDate",
+          wb.amount, wb.notes, wb.status,
+          wb.cash_account_id AS "cashAccountId", wb.paid_date AS "paidDate",
+          fw.full_name as "workerName", fw.employee_code as "employeeCode",
+          la.name as "cashAccountName"
         FROM worker_bonuses wb
         LEFT JOIN factory_workers fw ON fw.id = wb.worker_id
         LEFT JOIN ledger_accounts la ON la.id = wb.cash_account_id
@@ -521,10 +524,30 @@ export function registerEmployeeAdvancesBonusRoutes(app: Express) {
     try {
       const companyId = req.session.currentCompanyId || (req.session as any).factoryCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
-      await db.execute(
-        sql`DELETE FROM worker_bonuses WHERE id = ${parseInt(req.params.id)} AND company_id = ${companyId} AND status = 'pending'`
+      const id = parseInt(req.params.id);
+
+      const bonusRows = await db.execute(
+        sql`SELECT * FROM worker_bonuses WHERE id = ${id} AND company_id = ${companyId}`
       );
-      res.json({ message: "Bonus deleted" });
+      const bonus = bonusRows.rows[0] as any;
+      if (!bonus) return res.status(404).json({ message: "Bonus not found" });
+
+      await db.transaction(async (tx: any) => {
+        // Paid bonuses are posted with voucherNumber `WBONUS-{id}-{ts}` (see /pay above) —
+        // there's no voucher_id FK column on worker_bonuses, so look the voucher up by that
+        // naming convention and reverse it along with its entries before deleting the bonus.
+        const voucherRows = await tx.execute(
+          sql`SELECT id FROM vouchers WHERE company_id = ${companyId} AND voucher_number LIKE ${"WBONUS-" + id + "-%"}`
+        );
+        for (const v of voucherRows.rows as any[]) {
+          await tx.execute(sql`DELETE FROM voucher_entries WHERE voucher_id = ${v.id}`);
+          await tx.execute(sql`DELETE FROM vouchers WHERE id = ${v.id}`);
+        }
+
+        await tx.execute(sql`DELETE FROM worker_bonuses WHERE id = ${id} AND company_id = ${companyId}`);
+      });
+
+      res.json({ message: "Bonus deleted and reversed" });
     } catch (err: any) {
       res.status(500).json({ message: err.message });
     }

@@ -261,28 +261,26 @@ export default function FactoryWorkerBonusesTab() {
                     <TableCell>
                       <div className="flex gap-1 justify-end">
                         {b.status === "pending" && (
-                          <>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => {
-                                setPayOpen(b);
-                                setPayForm({ cashAccountId: "", paidDate: today() });
-                              }}
-                              data-testid={`button-pay-bonus-${b.id}`}
-                            >
-                              <Banknote className="h-3 w-3 mr-1" /> Pay
-                            </Button>
-                            <Button
-                              size="icon"
-                              variant="ghost"
-                              onClick={() => setDeleteConfirm(b)}
-                              data-testid={`button-delete-worker-bonus-${b.id}`}
-                            >
-                              <Trash2 className="h-4 w-4 text-destructive" />
-                            </Button>
-                          </>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                              setPayOpen(b);
+                              setPayForm({ cashAccountId: "", paidDate: today() });
+                            }}
+                            data-testid={`button-pay-bonus-${b.id}`}
+                          >
+                            <Banknote className="h-3 w-3 mr-1" /> Pay
+                          </Button>
                         )}
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          onClick={() => setDeleteConfirm(b)}
+                          data-testid={`button-delete-worker-bonus-${b.id}`}
+                        >
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
                       </div>
                     </TableCell>
                   </TableRow>
@@ -308,8 +306,8 @@ export default function FactoryWorkerBonusesTab() {
                     </div>
                   </div>
                   {b.notes && <p className="text-xs text-muted-foreground">{b.notes}</p>}
-                  {b.status === "pending" && (
-                    <div className="flex gap-2 pt-1">
+                  <div className="flex gap-2 pt-1">
+                    {b.status === "pending" && (
                       <Button
                         size="sm"
                         variant="outline"
@@ -321,11 +319,11 @@ export default function FactoryWorkerBonusesTab() {
                       >
                         <Banknote className="h-3 w-3 mr-1" /> Mark Paid
                       </Button>
-                      <Button size="icon" variant="ghost" onClick={() => setDeleteConfirm(b)}>
-                        <Trash2 className="h-4 w-4 text-destructive" />
-                      </Button>
-                    </div>
-                  )}
+                    )}
+                    <Button size="icon" variant="ghost" onClick={() => setDeleteConfirm(b)}>
+                      <Trash2 className="h-4 w-4 text-destructive" />
+                    </Button>
+                  </div>
                 </CardContent>
               </Card>
             ))}
@@ -463,8 +461,10 @@ export default function FactoryWorkerBonusesTab() {
           <DialogHeader>
             <DialogTitle>Delete Bonus</DialogTitle>
             <DialogDescription>
-              Delete pending bonus of {deleteConfirm && fmt(deleteConfirm.amount)} for {deleteConfirm?.workerName}? Only
-              pending bonuses can be deleted.
+              Delete bonus of {deleteConfirm && fmt(deleteConfirm.amount)} for {deleteConfirm?.workerName}?
+              {deleteConfirm?.status === "paid"
+                ? " This bonus was paid — its accounting voucher and entries will be removed as well."
+                : ""}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
