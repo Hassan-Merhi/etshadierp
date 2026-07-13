@@ -498,6 +498,10 @@ export function registerRawStockOffloadRoutes(app: Express) {
 
         // 7. Delete any creation-time FACTORY-FREIGHT vouchers and daybook entries
         //    before posting new offload ones (prevents double-posting).
+        //    Container creation (factoryContainersRoutes.ts) posts a stable, non-suffixed
+        //    `FACTORY-FREIGHT-{id}` voucher number when freight is set at creation time —
+        //    match that exact form too, not just the `-{timestamp}` suffixed offload form,
+        //    or the creation-time voucher survives and freight gets expensed twice.
         const existingFreightVouchers = await tx
           .select({ id: vouchers.id })
           .from(vouchers)
@@ -505,7 +509,10 @@ export function registerRawStockOffloadRoutes(app: Express) {
             and(
               eq(vouchers.companyId, companyId),
               eq(vouchers.sourceModule, "FACTORY"),
-              ilike(vouchers.voucherNumber, `FACTORY-FREIGHT-${containerId}-%`)
+              or(
+                eq(vouchers.voucherNumber, `FACTORY-FREIGHT-${containerId}`),
+                ilike(vouchers.voucherNumber, `FACTORY-FREIGHT-${containerId}-%`)
+              )
             )
           );
         if (existingFreightVouchers.length > 0) {
