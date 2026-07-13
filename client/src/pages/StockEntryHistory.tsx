@@ -405,6 +405,38 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
     return groupBaleQueries[idx]?.data ?? [];
   }
 
+  /**
+   * Resolves the bale ids for a group for actions (like Reassign) that don't require the
+   * row to already be expanded. In condensed (lite) mode, getGroupBales() only has data once
+   * the user has expanded that specific group's bale-detail row — before that it returns []
+   * (which used to send an empty baleIds array to the server and fail with "baleIds array is
+   * required"). This fetches the group's bales on demand, reusing the same cache key/params
+   * as the lazy per-group query so a later expand just reads the cache.
+   */
+  async function resolveGroupBaleIds(g: GroupRow): Promise<number[]> {
+    const cached = getGroupBales(g);
+    if (cached.length > 0) return cached.map((b) => b.id);
+    if (!useLite) return g.bales.map((b) => b.id);
+
+    const gp = new URLSearchParams();
+    gp.set("startDate", g.stockEntryDate);
+    gp.set("endDate", g.stockEntryDate);
+    if (g.workerId) gp.set("workerId", String(g.workerId));
+    if (g.productId) gp.set("productId", String(g.productId));
+    if (g.erpLocationId) gp.set("locationId", String(g.erpLocationId));
+
+    const rows: GroupRow[] = await qc.fetchQuery({
+      queryKey: ["/api/factory/bales/stock-entry-history/group", gp.toString()],
+      queryFn: () =>
+        fetch(`/api/factory/bales/stock-entry-history?${gp.toString()}`, { credentials: "include" }).then((r) =>
+          r.json()
+        ),
+      staleTime: 5 * 60 * 1000,
+    });
+    const bales = Array.isArray(rows) ? rows.flatMap((row) => row.bales ?? []) : [];
+    return bales.map((b) => b.id);
+  }
+
   /** True while the per-group bale query is in-flight for an expanded group. */
   function isGroupBalesLoading(g: GroupRow): boolean {
     if (!useLite) return false;
@@ -1244,9 +1276,18 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
                                   <td className="px-3 py-1.5" onClick={(e) => e.stopPropagation()}>
                                     <Select
                                       value={g.workerId ? String(g.workerId) : ""}
-                                      onValueChange={(v) => {
-                                        const baleIds = getGroupBales(g).map((b) => b.id);
-                                        bulkAssignMutation.mutate({ baleIds, workerId: parseInt(v) });
+                                      onValueChange={async (v) => {
+                                        const workerId = parseInt(v);
+                                        const baleIds = await resolveGroupBaleIds(g);
+                                        if (baleIds.length === 0) {
+                                          toast({
+                                            title: "Reassign failed",
+                                            description: "Could not find any bales for this group.",
+                                            variant: "destructive",
+                                          });
+                                          return;
+                                        }
+                                        bulkAssignMutation.mutate({ baleIds, workerId });
                                       }}
                                     >
                                       <SelectTrigger
