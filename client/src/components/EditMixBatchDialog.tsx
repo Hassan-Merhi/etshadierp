@@ -490,7 +490,7 @@ export function EditMixBatchDialog({ batch, open, onOpenChange }: EditMixBatchDi
                           />
                         </TableCell>
                         <TableCell className="text-right font-mono text-sm">${sel.costPerKg.toFixed(4)}</TableCell>
-                        <TableCell className="text-right font-mono text-sm">${formatNumber(sel.totalCost)}</TableCell>
+                        <TableCell className="text-right font-mono text-sm">${formatNumber(sel.totalCost, 4)}</TableCell>
                         <TableCell>
                           <Button
                             type="button"
@@ -522,7 +522,7 @@ export function EditMixBatchDialog({ batch, open, onOpenChange }: EditMixBatchDi
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Total Cost</p>
-                <p className="text-2xl font-bold font-mono">${formatNumber(totalCost)}</p>
+                <p className="text-2xl font-bold font-mono">${formatNumber(totalCost, 4)}</p>
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Blended Cost/kg</p>
