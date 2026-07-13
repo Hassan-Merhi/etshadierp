@@ -862,8 +862,11 @@ export const factoryRawStock = pgTable(
       .references(() => factoryContainers.id, { onDelete: "restrict" }),
     receivedKg: decimal("received_kg", { precision: 15, scale: 3 }).notNull(),
     usedKg: decimal("used_kg", { precision: 15, scale: 3 }).notNull().default("0"),
-    costPerKg: decimal("cost_per_kg", { precision: 20, scale: 4 }).notNull(),
-    costPerKgUsd: decimal("cost_per_kg_usd", { precision: 20, scale: 4 }),
+    // scale 6 (not 4) — at typical container volumes (20k+ kg) a 4th-decimal rounding on
+    // cost/kg compounds into a multi-dollar swing on the total landed cost, and disagrees
+    // with suppliers' own Excel reconciliations computed at full precision.
+    costPerKg: decimal("cost_per_kg", { precision: 20, scale: 6 }).notNull(),
+    costPerKgUsd: decimal("cost_per_kg_usd", { precision: 20, scale: 6 }),
     commissionPersonName: text("commission_person_name"),
     commissionAmount: decimal("commission_amount", { precision: 20, scale: 4 }),
     commissionCurrencyCode: varchar("commission_currency_code", { length: 10 }),
