@@ -37,6 +37,8 @@ import {
   deriveEstimatedDeliveryDate,
   type ParcelsAppShipment,
 } from "../lib/parcelsAppClient";
+import { refreshContainerEta as refreshJsonCargoEta } from "./jsonCargoTrackingService";
+import { normalizeJsonCargoCarrier } from "../lib/trackingProviders/jsonCargoProvider";
 import { scrapeTracking, isScraperAvailable } from "../lib/parcelsAppScraper";
 import { httpScrapeTracking, isHttpScraperAvailable } from "../lib/httpTrackingScraper";
 import { scrapeMaerskDirect, isMaerskDirectScraperAvailable } from "../lib/maerskDirectScraper";
@@ -782,12 +784,33 @@ async function trackOneContainer(
   // Fetch the current ETA from the DB so we can preserve it if the provider
   // returns nothing — we never want to blank an existing ETA.
   const [currentRow] = await db
-    .select({ eta: containers.eta, trackingLastCheckedAt: containers.trackingLastCheckedAt })
+    .select({
+      eta: containers.eta,
+      trackingLastCheckedAt: containers.trackingLastCheckedAt,
+      trackingCarrierHint: containers.trackingCarrierHint,
+    })
     .from(containers)
     .where(eq(containers.id, containerId))
     .limit(1);
-  const currentEta: string | null = currentRow?.eta ?? null;
+  let currentEta: string | null = currentRow?.eta ?? null;
   const lastCheckedAt: Date | null = currentRow?.trackingLastCheckedAt ?? null;
+
+  // ── JSONCargo — tried FIRST for Maersk/Hapag-Lloyd/MSC/CMA CGM ──────────────
+  // ETA-only, on its own weekly cadence (JSONCARGO_REFRESH_HOURS). Never blocks or
+  // replaces the status/location provider chain below — it only opportunistically
+  // keeps `eta` fresher for these four carriers using the carrier stored on the
+  // container record (not a container-number-prefix guess).
+  if (normalizeJsonCargoCarrier(currentRow?.trackingCarrierHint)) {
+    try {
+      const jc = await refreshJsonCargoEta(containerId);
+      if (jc.newEta) currentEta = jc.newEta;
+      if (jc.status !== "skipped_recent") {
+        console.log(`[ContainerTracking] ${containerNumber}: jsoncargo → ${jc.status} (${jc.message})`);
+      }
+    } catch (err: any) {
+      console.warn(`[ContainerTracking] ${containerNumber}: jsoncargo pre-check error —`, err?.message ?? err);
+    }
+  }
 
   // Guard: reject invalid container numbers before any API call
   if (!isValidContainerNumber(containerNumber)) {

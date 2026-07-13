@@ -69,6 +69,13 @@ export const containers = pgTable(
     trackingFallbackReason: text("tracking_fallback_reason"),
     trackingNextCheckAt: timestamp("tracking_next_check_at", { withTimezone: true }),
     trackingLastSkipReason: text("tracking_last_skip_reason"),
+    // ── JSONCargo — dedicated ETA-only provider (Maersk/Hapag-Lloyd/MSC/CMA CGM) ──
+    // Kept separate from the generic tracking* fields above because JSONCargo runs
+    // on its own weekly cadence (JSONCARGO_REFRESH_HOURS) independent of the
+    // multi-provider status/location scheduler, and only ever touches `eta`.
+    jsonCargoLastCheckedAt: timestamp("json_cargo_last_checked_at", { withTimezone: true }),
+    jsonCargoTrackingStatus: text("json_cargo_tracking_status"),
+    jsonCargoError: text("json_cargo_error"),
     createdAt: timestamp("created_at").notNull().defaultNow(),
   },
   (t) => ({

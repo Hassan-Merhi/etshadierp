@@ -8,8 +8,12 @@ import { registerContainerDocumentsRoutes } from "./containers/containerDocument
 import { registerContainerCostingRoutes } from "./containers/containerCostingRoutes";
 
 export function registerContainerRoutes(app: Express) {
-  registerContainerCrudRoutes(app);
+  // Tracking routes registered first: they include literal-path routes like
+  // /api/containers/eta-tracking-summary and /api/containers/refresh-etas that
+  // must be matched before containerCrudRoutes' /api/containers/:id, since Express
+  // resolves routes strictly in registration order (not by specificity).
   registerContainerTrackingRoutes(app);
+  registerContainerCrudRoutes(app);
   registerContainerAccountingRoutes(app);
   registerContainerFreightRoutes(app);
   registerContainerOffloadRoutes(app);

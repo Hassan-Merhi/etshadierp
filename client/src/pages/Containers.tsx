@@ -12,6 +12,7 @@ import { useContainerSyncAll } from "./containers/useContainerSyncAll";
 import { useContainerTracking } from "./containers/useContainerTracking";
 import { useContainerNumberEdit } from "./containers/useContainerNumberEdit";
 import { useContainerImportExport } from "./containers/useContainerImportExport";
+import { useJsonCargoEta } from "./containers/useJsonCargoEta";
 // Split-out components
 import { useContainerFilters } from "./containers/useContainerFilters";
 import { ContainerFilters } from "./containers/ContainerFilters";
@@ -74,6 +75,7 @@ export default function Containers() {
 
   const syncAll = useContainerSyncAll();
   const tracking = useContainerTracking(filteredOtwContainers);
+  const jsonCargoEta = useJsonCargoEta();
   const numberEdit = useContainerNumberEdit();
   const importExport = useContainerImportExport({
     containers,
@@ -114,6 +116,8 @@ export default function Containers() {
           onExportAllFull={importExport.exportAllContainersFull}
           isSupplierPartner={isSupplierPartner}
           onAddDialogOpen={() => setAddDialogOpen(true)}
+          onRefreshEtasClick={jsonCargoEta.refreshBulk}
+          refreshEtasIsPending={jsonCargoEta.bulkIsPending}
         />
       </PageHeader>
 

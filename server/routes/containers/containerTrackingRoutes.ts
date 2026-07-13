@@ -74,6 +74,13 @@ import { format } from "date-fns";
 import { z } from "zod";
 import { readExcel, sheetToJson, createWorkbook, jsonToSheet, aoaToSheet, writeWorkbook } from "../../excelHelper";
 import { adjustInventory, reverseInventoryByExactValue } from "../../inventoryHelper";
+import {
+  refreshContainerEta,
+  refreshMultipleContainerEtas,
+  getEtaTrackingSummary,
+} from "../../services/jsonCargoTrackingService";
+
+const JSONCARGO_ADMIN_ROLES = ["Admin", "Developer", "Owner"];
 
 export function registerContainerTrackingRoutes(app: Express) {
   app.patch("/api/containers/:id/tracking", requireAuth, requireNonPOS, async (req, res) => {
@@ -311,64 +318,99 @@ export function registerContainerTrackingRoutes(app: Express) {
     }
   });
 
-  // Fetch container ETA from external tracking API (optional - requires CONTAINER_TRACKING_API_KEY)
+  // Fetch container ETA via JSONCargo (Maersk / Hapag-Lloyd / MSC / CMA CGM only).
+  // Any authenticated non-POS user in the container's own company may trigger this,
+  // matching the permission level of the manual tracking-fields PATCH above.
   app.post("/api/containers/:id/fetch-eta", requireAuth, requireNonPOS, async (req, res) => {
+    if (!req.session.currentCompanyId) {
+      return res.status(400).json({ message: "No company selected" });
+    }
+    const id = parseId(req.params.id);
+    if (id === null) {
+      return res.status(400).json({ message: "Invalid container ID" });
+    }
+
     try {
-      if (!req.session.currentCompanyId) {
-        return res.status(400).json({ message: "No company selected" });
-      }
-      const id = parseId(req.params.id);
-      if (id === null) return res.status(400).json({ message: "Invalid id" });
-      if (isNaN(id)) {
-        return res.status(400).json({ message: "Invalid container ID" });
-      }
-
-      // Get the container
-      const [container] = await db
-        .select()
-        .from(containers)
-        .where(and(eq(containers.id, id), eq(containers.companyId, req.session.currentCompanyId)))
-        .limit(1);
-
-      if (!container) {
+      const result = await refreshContainerEta(id, {
+        forceRefresh: req.body?.forceRefresh === true,
+        companyId: req.session.currentCompanyId,
+      });
+      res.json(result);
+    } catch (error: any) {
+      if (error?.message === "Container not found") {
         return res.status(404).json({ message: "Container not found" });
       }
+      res.status(500).json({ message: error?.message ?? "Failed to refresh ETA" });
+    }
+  });
 
-      const apiKey = process.env.CONTAINER_TRACKING_API_KEY;
-      if (!apiKey) {
-        return res.status(400).json({
-          message: "Container tracking API not configured. Add CONTAINER_TRACKING_API_KEY to enable auto ETA updates.",
-          needsSetup: true,
-        });
-      }
+  // Alias with a more descriptive path — same behavior as fetch-eta above.
+  app.post("/api/containers/:id/refresh-eta", requireAuth, requireNonPOS, async (req, res) => {
+    if (!req.session.currentCompanyId) {
+      return res.status(400).json({ message: "No company selected" });
+    }
+    const id = parseId(req.params.id);
+    if (id === null) {
+      return res.status(400).json({ message: "Invalid container ID" });
+    }
 
-      // Try to fetch from Terminal49 or similar API
-      // For now, return a message that the feature requires setup
-      // In production, this would call the actual API
-      try {
-        // Example: Terminal49 API call
-        // const response = await fetch(`https://api.terminal49.com/v2/containers/${container.containerNumber}`, {
-        //   headers: { 'Authorization': `Token ${apiKey}` }
-        // });
-        // const data = await response.json();
-        // const eta = data.pod_eta;
-
-        // For now, simulate the response
-        return res.json({
-          message: "Container tracking API integration requires Terminal49 or similar API key",
-          containerNumber: container.containerNumber,
-          currentEta: container.eta,
-          etaSource: container.etaSource,
-          instructions: "Set CONTAINER_TRACKING_API_KEY secret with your Terminal49 API key to enable auto ETA updates",
-        });
-      } catch (apiError: any) {
-        return res.status(502).json({
-          message: "Failed to fetch from tracking API",
-          error: apiError.message,
-        });
-      }
+    try {
+      const result = await refreshContainerEta(id, {
+        forceRefresh: req.body?.forceRefresh === true,
+        companyId: req.session.currentCompanyId,
+      });
+      res.json(result);
     } catch (error: any) {
-      res.status(500).json({ message: error.message });
+      if (error?.message === "Container not found") {
+        return res.status(404).json({ message: "Container not found" });
+      }
+      res.status(500).json({ message: error?.message ?? "Failed to refresh ETA" });
+    }
+  });
+
+  // POST /api/containers/refresh-etas — bulk JSONCargo ETA refresh, Admin/Developer/Owner only.
+  app.post("/api/containers/refresh-etas", requireAuth, requireNonPOS, async (req, res) => {
+    const role = (req.user as any)?.role;
+    if (!JSONCARGO_ADMIN_ROLES.includes(role)) {
+      return res.status(403).json({ message: "Insufficient permissions" });
+    }
+    if (!req.session.currentCompanyId) {
+      return res.status(400).json({ message: "No company selected" });
+    }
+
+    try {
+      const containerIds = Array.isArray(req.body?.containerIds)
+        ? req.body.containerIds.filter((n: any) => Number.isInteger(n))
+        : undefined;
+
+      const summary = await refreshMultipleContainerEtas(containerIds, {
+        forceRefresh: req.body?.forceRefresh === true,
+        companyId: req.session.currentCompanyId,
+      });
+
+      const message =
+        summary.total === 0
+          ? "No containers were eligible for a JSONCargo ETA refresh (unsupported carrier, inactive, or none tracked)."
+          : `Checked ${summary.total} container(s): ${summary.updated} updated, ${summary.unchanged} unchanged, ` +
+            `${summary.noEta} with no ETA yet, ${summary.notFound} not found, ${summary.skippedRecent} skipped (checked recently), ` +
+            `${summary.errors} failed.`;
+
+      res.json({ ...summary, message });
+    } catch (error: any) {
+      res.status(500).json({ message: error?.message ?? "Bulk ETA refresh failed" });
+    }
+  });
+
+  // GET /api/containers/eta-tracking-summary — dashboard summary, no secrets/raw data.
+  app.get("/api/containers/eta-tracking-summary", requireAuth, requireNonPOS, async (req, res) => {
+    if (!req.session.currentCompanyId) {
+      return res.status(400).json({ message: "No company selected" });
+    }
+    try {
+      const summary = await getEtaTrackingSummary(req.session.currentCompanyId);
+      res.json(summary);
+    } catch (error: any) {
+      res.status(500).json({ message: error?.message ?? "Failed to load ETA tracking summary" });
     }
   });
 

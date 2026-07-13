@@ -1,6 +1,6 @@
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
-import { Download, Plus, Wrench, ChevronDown, Loader2 } from "lucide-react";
+import { Download, Plus, Wrench, ChevronDown, Loader2, RefreshCw } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -17,6 +17,8 @@ interface ContainerToolbarProps {
   onExportAllFull: () => void;
   isSupplierPartner: boolean;
   onAddDialogOpen: () => void;
+  onRefreshEtasClick?: () => void;
+  refreshEtasIsPending?: boolean;
 }
 
 export function ContainerToolbar({
@@ -27,6 +29,8 @@ export function ContainerToolbar({
   onExportAllFull,
   isSupplierPartner,
   onAddDialogOpen,
+  onRefreshEtasClick,
+  refreshEtasIsPending,
 }: ContainerToolbarProps) {
   return (
     <div className="flex gap-2 flex-wrap">
@@ -44,6 +48,24 @@ export function ContainerToolbar({
             <Wrench className="h-4 w-4" />
           )}
           Fix All PO &amp; Parent JV Sync
+        </Button>
+      )}
+
+      {isDeveloper && onRefreshEtasClick && (
+        <Button
+          variant="outline"
+          className="gap-2"
+          onClick={onRefreshEtasClick}
+          disabled={refreshEtasIsPending}
+          title="Refresh ETAs via JSONCargo (Maersk / Hapag-Lloyd / MSC / CMA CGM)"
+          data-testid="button-refresh-etas"
+        >
+          {refreshEtasIsPending ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <RefreshCw className="h-4 w-4" />
+          )}
+          Update ETAs
         </Button>
       )}
 
