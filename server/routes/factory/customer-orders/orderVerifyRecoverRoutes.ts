@@ -1,7 +1,7 @@
 import { trackOneContainerById } from "../../../services/containerTrackingService";
 import { parseId, parseOptionalId } from "../../../lib/parseId";
 import { dispatchNotification } from "../../../lib/notificationService";
-import { getClientDate } from "../../../lib/dateUtils";
+import { getClientDate } from "../../../lib/dateUtils";\nimport { logger } from "../../../lib/logger";
 import { getExportPriceVisibility } from "../../../helpers/exportVisibility";
 import { sendWhatsAppFileToChatIdPos } from "../../../services/whatsappService";
 import type { Express } from "express";
@@ -191,12 +191,16 @@ export function registerOrderVerifyRecoverRoutes(app: Express) {
         bale_reference: String(r.bale_reference ?? ""),
       }));
 
-      // Diagnostic log so production logs can confirm the actual DB state.
-      console.log(
-        `[verify-summary] orderId=${orderId} companyId=${companyId}` +
-          ` status=${order.status} proformaIdUsed=${order.proformaIdUsed ?? "null"}` +
-          ` customer_order_bales.count=${orderBales.length} total_qty_bales=${order.totalQtyBales}`
-      );
+      logger.debug("Factory order verification summary loaded", {
+        module: "factory-orders",
+        action: "verify-summary",
+        orderId,
+        companyId,
+        status: order.status,
+        proformaIdUsed: order.proformaIdUsed,
+        orderBaleCount: orderBales.length,
+        totalQtyBales: order.totalQtyBales,
+      });
 
       // ── Fallback: when customer_order_bales is empty but the order has a recorded
       // total (total_qty_bales > 0), reconstruct loadedByArticle from customer_order_lines.
@@ -213,9 +217,14 @@ export function registerOrderVerifyRecoverRoutes(app: Express) {
 
         if (hasLines) {
           dataSource = "order_lines";
-          console.log(
-            `[verify-summary] orderId=${orderId} falling back to order_lines (${linesRows.length} lines, totalQtyBales=${order.totalQtyBales})`
-          );
+          logger.warn("Factory order verification used order-line fallback", {
+            module: "factory-orders",
+            action: "verify-summary-fallback",
+            orderId,
+            companyId,
+            orderLineCount: linesRows.length,
+            totalQtyBales: order.totalQtyBales,
+          });
           // Synthesise bale-like records from lines so the rest of the pipeline works unchanged
           for (const row of linesRows) {
             const qty = Number(row.qty ?? 0);
