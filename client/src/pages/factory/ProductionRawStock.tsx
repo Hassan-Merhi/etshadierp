@@ -199,21 +199,30 @@ export default function ProductionRawStock() {
 
   const kpiData = useMemo(() => {
     const rs = rawStock || [];
+    const mb = mixBatches || [];
+    // Total Used $ mirrors the "Combined Total" blended cost shown under Recent Mix
+    // Batches — the blended cost/kg across all mix batches (weighted by each batch's own
+    // total weight) times the kg actually used — not the supplier-level received rate,
+    // which doesn't reflect what a mix batch actually cost to produce.
+    const mbSumTotal = mb.reduce((s, b) => s + (parseFloat(b.totalWeightKg) || 0), 0);
+    const mbWeightedCost = mb.reduce(
+      (s, b) => s + (parseFloat(b.totalWeightKg) || 0) * (parseFloat(b.costPerKg) || 0),
+      0
+    );
+    const mbBlendedCost = mbSumTotal > 0 ? mbWeightedCost / mbSumTotal : 0;
+    const totalUsed = rs.reduce((sum, r) => sum + parseFloat(r.usedKg || "0"), 0);
     return {
       totalReceived: rs.reduce((sum, r) => sum + parseFloat(r.receivedKg || "0"), 0),
       totalReceivedValue: rs.reduce(
         (sum, r) => sum + parseFloat(r.receivedKg || "0") * parseFloat(r.costPerKgUsd || r.costPerKg || "0"),
         0
       ),
-      totalUsed: rs.reduce((sum, r) => sum + parseFloat(r.usedKg || "0"), 0),
-      totalUsedValue: rs.reduce(
-        (sum, r) => sum + parseFloat(r.usedKg || "0") * parseFloat(r.costPerKgUsd || r.costPerKg || "0"),
-        0
-      ),
+      totalUsed,
+      totalUsedValue: mbBlendedCost * totalUsed,
       totalFree: rs.reduce((sum, r) => sum + parseFloat(r.freeKg || "0"), 0),
       totalValue: rs.reduce((sum, r) => sum + parseFloat(r.valueRemainingUsd || r.valueRemaining || "0"), 0),
     };
-  }, [rawStock]);
+  }, [rawStock, mixBatches]);
 
   return (
     <div className="space-y-6 p-6">
