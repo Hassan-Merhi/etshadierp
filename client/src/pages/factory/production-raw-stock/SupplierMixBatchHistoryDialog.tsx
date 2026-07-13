@@ -164,7 +164,7 @@ export function SupplierMixBatchHistoryDialog({
                         {formatNumber(row.kg)}
                       </TableCell>
                       <TableCell className="text-right font-mono text-sm py-2.5 text-muted-foreground">
-                        ${(row.costPerKg || 0).toFixed(4)}
+                        ${(row.costPerKg || 0).toFixed(6)}
                       </TableCell>
                       <TableCell className="py-2.5">
                         <Badge variant="outline" className={`text-[10px] gap-1 ${meta.badgeClass}`}>
