@@ -72,7 +72,7 @@ export default function ProductionRawStock() {
   });
 
   const { data: mixBatchesByDate = [], isLoading: mixBatchesByDateLoading } = useQuery<any[]>({
-    queryKey: ["/api/factory/mix-batches-by-date", mixBatchDate],
+    queryKey: [`/api/factory/mix-batches-by-date?date=${encodeURIComponent(mixBatchDate)}`],
     enabled: !!mixBatchDate,
   });
 
