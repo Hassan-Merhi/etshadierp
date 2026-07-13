@@ -3,6 +3,7 @@
 - [ExcelJS write-stream bug](exceljs-write-stream.md) — ExcelJS 3.x wb.xlsx.write(stream) throws "ea.results is not a Promise"; use writeBuffer() instead.
 - [Puppeteer headless API](puppeteer-headless.md) — Puppeteer 22+ dropped headless:"new"; use headless:true.
 - [Same-company parent freight posting](same-company-freight.md) — when freightPaidBy='parent' and the PO is on the parent company, freight must be embedded in the local voucher (DR freightAcct), not skipped.
+- [Raw stock value: per-row basis not avg×remaining](raw-stock-value-per-row-basis.md) — remaining stock value must sum each receipt's own (received-used)*cost; recomputing as remainingKg*avgCostAcrossAllReceived drifts once a supplier has multiple receipts at different cost/kg.
 - [Schema domain split — factory.ts](schema-factory-split.md) — factory.ts is now actual defs; erp.ts owns baleLabelPrints/customerLogos/referenceSequences/locationPriceGroups; _definitions.ts is dead code.
 - [Vouchers.tsx monolith split](vouchers-split.md) — Vouchers.tsx split into JournalForm, StockTransferForm, StockAdjustmentForm under pages/vouchers/; each owns its own queries/state/mutations/JSX.
 - [Storage refactor missing functions](storage-refactor-gaps.md) — after domain split, several storage functions were missing or had wrong schema refs; see file for full list of patterns fixed.

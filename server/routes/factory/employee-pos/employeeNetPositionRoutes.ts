@@ -1002,18 +1002,35 @@ export function registerEmployeeNetPositionRoutes(app: Express) {
       const inventorySellValue = round2(parseFloat(String(invRow?.total ?? "0")));
 
       // ── 3b. Raw material stock value — direct SQL, mirrors /api/factory/raw-stock
+      //
+      // IMPORTANT: value must be the SUM of each row's own (received - used) * cost —
+      // never remaining_kg * a received-weighted average cost across the whole supplier.
+      // The latter misattributes whatever was actually consumed onto every other
+      // container in the blend, which drifts from /api/factory/raw-stock's per-row
+      // "valueRemainingUsd" (rawStockReceiptRoutes.ts) once a supplier has multiple
+      // receipts at different cost/kg — this was the cause of "What We Have" showing a
+      // different total than the Raw Materials page's "Available (Free) → Value (USD)".
       const rawResult = await db.execute(sql`
         SELECT
           fc.supplier_id,
           SUM(frs.received_kg::numeric)                                            AS total_recv,
           SUM(frs.used_kg::numeric)                                                AS total_used,
-          -- Local cost per kg (the currency on the container, e.g. AUD, EUR)
+          -- Local cost per kg (the currency on the container, e.g. AUD, EUR) — a
+          -- received-weighted rate used only for display/adjustment math, never for
+          -- the remaining-value total itself.
           SUM(frs.received_kg::numeric * frs.cost_per_kg::numeric)
             / NULLIF(SUM(frs.received_kg::numeric), 0)                             AS avg_cpk_local,
           -- USD cost per kg (falls back to local when cost_per_kg_usd is zero/null)
           SUM(frs.received_kg::numeric *
               COALESCE(NULLIF(frs.cost_per_kg_usd::numeric, 0), frs.cost_per_kg::numeric, 0))
-            / NULLIF(SUM(frs.received_kg::numeric), 0)                             AS avg_cpk_usd
+            / NULLIF(SUM(frs.received_kg::numeric), 0)                             AS avg_cpk_usd,
+          -- Per-row remaining cost basis, summed — mirrors rawStockReceiptRoutes.ts's
+          -- rowRemainingValueLocal/rowRemainingValueUsd accumulation exactly.
+          SUM((frs.received_kg::numeric - frs.used_kg::numeric) * frs.cost_per_kg::numeric)
+                                                                                     AS remaining_value_local,
+          SUM((frs.received_kg::numeric - frs.used_kg::numeric) *
+              COALESCE(NULLIF(frs.cost_per_kg_usd::numeric, 0), frs.cost_per_kg::numeric, 0))
+                                                                                     AS remaining_value_usd
         FROM   factory_raw_stock   frs
         JOIN   factory_containers  fc  ON fc.id  = frs.container_id
         WHERE  frs.company_id = ${companyId}
@@ -1038,7 +1055,14 @@ export function registerEmployeeNetPositionRoutes(app: Express) {
       // After a manual ADD adjustment on an existing supplier, rawStockReceiptRoutes sets
       // _avgCostPerKgUsd = _avgCostPerKg (the newly blended local rate). We mirror that here
       // so the net-position value matches the "Stock Value" shown on the Raw Materials page.
-      type SupMap = { recv: number; used: number; cpkUsd: number; cpkLocal: number };
+      type SupMap = {
+        recv: number;
+        used: number;
+        cpkUsd: number;
+        cpkLocal: number;
+        remValLocal: number;
+        remValUsd: number;
+      };
       const supMap = new Map<string, SupMap>();
       for (const r of rawRows) {
         const key = r.supplier_id ? `s${r.supplier_id}` : `u`;
@@ -1046,7 +1070,9 @@ export function registerEmployeeNetPositionRoutes(app: Express) {
         const used = parseFloat(String(r.total_used ?? "0")) || 0;
         const cpkLocal = parseFloat(String(r.avg_cpk_local ?? "0")) || 0;
         const cpkUsd = parseFloat(String(r.avg_cpk_usd ?? "0")) || 0;
-        supMap.set(key, { recv, used, cpkUsd, cpkLocal });
+        const remValLocal = parseFloat(String(r.remaining_value_local ?? "0")) || 0;
+        const remValUsd = parseFloat(String(r.remaining_value_usd ?? "0")) || 0;
+        supMap.set(key, { recv, used, cpkUsd, cpkLocal, remValLocal, remValUsd });
       }
       for (const a of adjRows) {
         // DEDUCT is history-only — it already reduced received_kg on the underlying
@@ -1064,17 +1090,35 @@ export function registerEmployeeNetPositionRoutes(app: Express) {
         const ex = supMap.get(key);
         if (ex) {
           if (isAdd) {
-            // Mirror rawStockReceiptRoutes: blend local rates, then set cpkUsd = blended local.
-            // This ensures the net-position value == sum(valueRemainingUsd) on the Raw Materials page.
+            // Mirror rawStockReceiptRoutes: new stock's full value joins the remaining-value
+            // pool directly (manual adjustments have no separate USD leg, so local and USD
+            // move together); the received-weighted rate also shifts, same as a new container.
             const prevLocalVal = ex.recv * ex.cpkLocal;
             ex.recv += kg;
             ex.cpkLocal = ex.recv > 0 ? (prevLocalVal + kg * cpk) / ex.recv : 0;
             ex.cpkUsd = ex.cpkLocal;
+            ex.remValLocal += kg * cpk;
+            ex.remValUsd += kg * cpk;
           } else {
+            // Manual usage isn't tied to a specific container/source, so it draws down the
+            // supplier's remaining stock at that stock's current blended remaining cost/kg —
+            // mirrors rawStockReceiptRoutes.ts's avgCostBefore/avgCostLocalBefore depletion.
+            const remainingKgBefore = ex.recv - ex.used;
+            const avgCostUsdBefore = remainingKgBefore > 0 ? ex.remValUsd / remainingKgBefore : 0;
+            const avgCostLocalBefore = remainingKgBefore > 0 ? ex.remValLocal / remainingKgBefore : 0;
             ex.used += kg;
+            ex.remValUsd -= kg * avgCostUsdBefore;
+            ex.remValLocal -= kg * avgCostLocalBefore;
           }
         } else if (isAdd) {
-          supMap.set(key, { recv: kg, used: 0, cpkUsd: cpk, cpkLocal: cpk });
+          supMap.set(key, {
+            recv: kg,
+            used: 0,
+            cpkUsd: cpk,
+            cpkLocal: cpk,
+            remValLocal: kg * cpk,
+            remValUsd: kg * cpk,
+          });
         }
       }
 
@@ -1102,7 +1146,16 @@ export function registerEmployeeNetPositionRoutes(app: Express) {
         const key = `s${r.supplier_id}`;
         if (supplierKeysWithContainerStock.has(key)) continue; // container stock already tracks used via total_used
         const ex = supMap.get(key);
-        if (ex) ex.used += parseFloat(String(r.consumed_kg ?? "0")) || 0;
+        if (!ex) continue;
+        const consumed = parseFloat(String(r.consumed_kg ?? "0")) || 0;
+        // Mirrors rawStockReceiptRoutes.ts: draw down at the current blended remaining
+        // cost/kg (the best available attribution without a specific source container).
+        const remainingKgBefore = ex.recv - ex.used;
+        const avgCostUsdBefore = remainingKgBefore > 0 ? ex.remValUsd / remainingKgBefore : 0;
+        const avgCostLocalBefore = remainingKgBefore > 0 ? ex.remValLocal / remainingKgBefore : 0;
+        ex.used += consumed;
+        ex.remValUsd -= consumed * avgCostUsdBefore;
+        ex.remValLocal -= consumed * avgCostLocalBefore;
       }
 
       // Subtract kg reserved in open (not yet CLOSED/COMPLETED) mix batches —
@@ -1124,14 +1177,17 @@ export function registerEmployeeNetPositionRoutes(app: Express) {
         if (r.supplier_id) reservedBySupKey.set(`s${r.supplier_id}`, parseFloat(String(r.reserved_kg ?? "0")) || 0);
       }
 
-      // Sum remainingKg × cpkUsd per supplier — mirrors the "valueRemainingUsd" field that
-      // rawStockReceiptRoutes computes and that the Raw Materials page sums for "Stock Value".
+      // Sum each supplier's own tracked remaining cost basis (remValUsd) — mirrors the
+      // "valueRemainingUsd" field that rawStockReceiptRoutes computes and that the Raw
+      // Materials page sums for "Stock Value". This must NOT be re-derived as
+      // remainingKg * avgCostPerKg: once a supplier has multiple receipts at different
+      // cost/kg, that re-derivation misattributes whatever was consumed onto every other
+      // container in the blend and drifts from the per-row-tracked total.
       // (Reserved kg still have physical value in the warehouse; they are subtracted from the
       // displayed kg count but not from the dollar value, matching the raw-materials KPI.)
       let rawTotal = 0;
       for (const [, s] of supMap.entries()) {
-        const remaining = s.recv - s.used;
-        rawTotal += remaining * s.cpkUsd;
+        rawTotal += s.remValUsd;
       }
       const rawMaterialStockValue = round2(rawTotal);
 
