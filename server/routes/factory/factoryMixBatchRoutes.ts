@@ -116,6 +116,7 @@ import CryptoJS from "crypto-js";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
+import { getStableSupplierCost } from "../../services/factory/rawStockStableCost";
 
 export function registerFactoryMixBatchRoutes(app: Express) {
   app.get("/api/factory/mix-batches", requireAuth, async (req: any, res: any) => {
@@ -277,37 +278,22 @@ export function registerFactoryMixBatchRoutes(app: Express) {
           const { supplierId, weightKg } = source;
           const weight = parseFloat(weightKg);
 
-          const supplierRawStocks = await tx
-            .select({
-              id: factoryRawStock.id,
-              receivedKg: factoryRawStock.receivedKg,
-              usedKg: factoryRawStock.usedKg,
-              costPerKg: factoryRawStock.costPerKg,
-              costPerKgUsd: factoryRawStock.costPerKgUsd,
-              containerId: factoryRawStock.containerId,
-              offloadedAt: factoryRawStock.offloadedAt,
-            })
-            .from(factoryRawStock)
-            .innerJoin(factoryContainers, eq(factoryRawStock.containerId, factoryContainers.id))
-            .where(and(eq(factoryRawStock.companyId, companyId), eq(factoryContainers.supplierId, supplierId)))
-            .orderBy(factoryRawStock.offloadedAt, factoryRawStock.id)
-            .for("update");
+          // Stable receipt-weighted rate — never derived from remaining/available kg,
+          // so it doesn't shift depending on which container FIFO happens to draw from.
+          const { costPerKgUsd: costPerKg, rows: supplierRawStocks } = await getStableSupplierCost(
+            tx,
+            companyId,
+            supplierId,
+            { forUpdate: true }
+          );
 
-          let weightedCostSum = 0,
-            weightedCostWeight = 0;
-          for (const rs of supplierRawStocks) {
-            const avail = Math.max(0, parseFloat(rs.receivedKg) - parseFloat(rs.usedKg));
-            const rsCost = parseFloat(rs.costPerKgUsd) || parseFloat(rs.costPerKg) || 0;
-            weightedCostSum += avail * rsCost;
-            weightedCostWeight += avail;
-          }
-          const costPerKg = weightedCostWeight > 0 ? weightedCostSum / weightedCostWeight : 0;
-
+          // FIFO allocation of usedKg only — this determines WHICH container rows get
+          // debited, never the cost rate itself (that's fixed above).
           const perRsDeductions: Array<{ containerId: number; deduct: number }> = [];
           let remaining = weight;
           for (const rs of supplierRawStocks) {
             if (remaining <= 0.001) break;
-            const avail = parseFloat(rs.receivedKg) - parseFloat(rs.usedKg);
+            const avail = rs.receivedKg - rs.usedKg;
             if (avail <= 0) continue;
             const deduct = Math.min(remaining, avail);
             await tx
@@ -631,41 +617,22 @@ export function registerFactoryMixBatchRoutes(app: Express) {
           const { supplierId, weightKg, costPerKg: srcCostPerKg } = source;
           const weight = parseFloat(weightKg);
 
-          const supplierRawStocks = await tx
-            .select({
-              id: factoryRawStock.id,
-              receivedKg: factoryRawStock.receivedKg,
-              usedKg: factoryRawStock.usedKg,
-              costPerKg: factoryRawStock.costPerKg,
-              costPerKgUsd: factoryRawStock.costPerKgUsd,
-              containerId: factoryRawStock.containerId,
-              offloadedAt: factoryRawStock.offloadedAt,
-            })
-            .from(factoryRawStock)
-            .innerJoin(factoryContainers, eq(factoryRawStock.containerId, factoryContainers.id))
-            .where(and(eq(factoryRawStock.companyId, companyId), eq(factoryContainers.supplierId, supplierId)))
-            .orderBy(factoryRawStock.offloadedAt, factoryRawStock.id)
-            .for("update");
+          // Stable receipt-weighted rate — never derived from remaining/available kg,
+          // so it doesn't shift depending on which container FIFO happens to draw from.
+          const { costPerKgUsd: costPerKg, rows: supplierRawStocks } = await getStableSupplierCost(
+            tx,
+            companyId,
+            supplierId,
+            { forUpdate: true }
+          );
 
-          let totalAvailable = 0;
-          let weightedCostSum = 0;
-          let weightedCostWeight = 0;
-          for (const rs of supplierRawStocks) {
-            const avail = Math.max(0, parseFloat(rs.receivedKg) - parseFloat(rs.usedKg));
-            totalAvailable += avail;
-            const rsCost = parseFloat(rs.costPerKgUsd) || parseFloat(rs.costPerKg) || 0;
-            weightedCostSum += avail * rsCost;
-            weightedCostWeight += avail;
-          }
-
-          const costPerKg = weightedCostWeight > 0 ? weightedCostSum / weightedCostWeight : 0;
-
-          // Track per-raw-stock deductions so we can store containerId in each source record
+          // FIFO allocation of usedKg only — this determines WHICH container rows get
+          // debited, never the cost rate itself (that's fixed above).
           const perRsDeductions: Array<{ containerId: number; deduct: number }> = [];
           let remaining = weight;
           for (const rs of supplierRawStocks) {
             if (remaining <= 0.001) break;
-            const avail = parseFloat(rs.receivedKg) - parseFloat(rs.usedKg);
+            const avail = rs.receivedKg - rs.usedKg;
             if (avail <= 0) continue;
 
             const deduct = Math.min(remaining, avail);
@@ -874,30 +841,16 @@ export function registerFactoryMixBatchRoutes(app: Express) {
           const { supplierId, weightKg, costPerKg: srcCostPerKg } = source;
           const weight = parseFloat(weightKg);
 
-          const supplierRawStocks = await tx
-            .select({
-              id: factoryRawStock.id,
-              receivedKg: factoryRawStock.receivedKg,
-              usedKg: factoryRawStock.usedKg,
-              costPerKg: factoryRawStock.costPerKg,
-              costPerKgUsd: factoryRawStock.costPerKgUsd,
-              offloadedAt: factoryRawStock.offloadedAt,
-            })
-            .from(factoryRawStock)
-            .innerJoin(factoryContainers, eq(factoryRawStock.containerId, factoryContainers.id))
-            .where(and(eq(factoryRawStock.companyId, companyId), eq(factoryContainers.supplierId, supplierId)))
-            .orderBy(factoryRawStock.offloadedAt, factoryRawStock.id)
-            .for("update");
+          // Stable receipt-weighted rate — never derived from remaining/available kg,
+          // so it doesn't shift depending on which container FIFO happens to draw from.
+          const { costPerKgUsd: stableCostPerKg, rows: supplierRawStocks } = await getStableSupplierCost(
+            tx,
+            companyId,
+            supplierId,
+            { forUpdate: true }
+          );
 
           const isManualSupplier = supplierRawStocks.length === 0;
-
-          let totalAvailable = 0;
-          let weightedCostSum = 0;
-          for (const rs of supplierRawStocks) {
-            const avail = Math.max(0, parseFloat(rs.receivedKg) - parseFloat(rs.usedKg));
-            totalAvailable += avail;
-            weightedCostSum += avail * (parseFloat(rs.costPerKgUsd) || parseFloat(rs.costPerKg) || 0);
-          }
 
           if (isManualSupplier) {
             // MANUAL supplier — no container raw-stock rows to update.
@@ -913,12 +866,14 @@ export function registerFactoryMixBatchRoutes(app: Express) {
               totalCost: String(weight * cost),
             });
           } else {
-            // FIFO deduction — allow over-use: any leftover after FIFO drains all rows
-            // is pushed onto the last row, driving its usedKg above receivedKg (negative stock).
+            // FIFO deduction of usedKg only — this determines WHICH container rows get
+            // debited, never the cost rate itself (that's fixed above). Allow over-use:
+            // any leftover after FIFO drains all rows is pushed onto the last row,
+            // driving its usedKg above receivedKg (negative stock).
             let toDeduct = weight;
             for (const rs of supplierRawStocks) {
               if (toDeduct <= 0.001) break;
-              const avail = Math.max(0, parseFloat(rs.receivedKg) - parseFloat(rs.usedKg));
+              const avail = Math.max(0, rs.receivedKg - rs.usedKg);
               if (avail <= 0) continue;
               const take = Math.min(toDeduct, avail);
               await tx
@@ -936,11 +891,7 @@ export function registerFactoryMixBatchRoutes(app: Express) {
                 .where(eq(factoryRawStock.id, lastRs.id));
             }
 
-            const costUsed = srcCostPerKg
-              ? parseFloat(srcCostPerKg)
-              : totalAvailable > 0
-                ? weightedCostSum / totalAvailable
-                : 0;
+            const costUsed = srcCostPerKg ? parseFloat(srcCostPerKg) : stableCostPerKg;
 
             addedWeightKg += weight;
             addedCost += weight * costUsed;
@@ -1169,6 +1120,8 @@ export function registerFactoryMixBatchRoutes(app: Express) {
           if (storedCost > 0) return src;
 
           // Try to find a raw stock cost via containerId first, then supplierId.
+          // Uses the same stable receipt-weighted rate as the write paths (getStableSupplierCost)
+          // so the display fallback can never disagree with what was actually costed.
           let fallbackCost = 0;
           if (src.containerId) {
             const rows = await db
@@ -1189,24 +1142,8 @@ export function registerFactoryMixBatchRoutes(app: Express) {
             }
             fallbackCost = wWeight > 0 ? wSum / wWeight : 0;
           } else if (src.supplierId) {
-            const rows = await db
-              .select({
-                costPerKgUsd: factoryRawStock.costPerKgUsd,
-                costPerKg: factoryRawStock.costPerKg,
-                receivedKg: factoryRawStock.receivedKg,
-              })
-              .from(factoryRawStock)
-              .innerJoin(factoryContainers, eq(factoryRawStock.containerId, factoryContainers.id))
-              .where(and(eq(factoryContainers.supplierId, src.supplierId), eq(factoryRawStock.companyId, companyId)));
-            let wSum = 0,
-              wWeight = 0;
-            for (const r of rows) {
-              const kg = parseFloat(r.receivedKg) || 0;
-              const c = parseFloat(r.costPerKgUsd || "0") || parseFloat(r.costPerKg || "0") || 0;
-              wSum += kg * c;
-              wWeight += kg;
-            }
-            fallbackCost = wWeight > 0 ? wSum / wWeight : 0;
+            const stable = await getStableSupplierCost(db, companyId, src.supplierId);
+            fallbackCost = stable.costPerKgUsd;
           }
 
           if (fallbackCost <= 0) return src;
