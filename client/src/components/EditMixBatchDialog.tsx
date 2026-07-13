@@ -307,6 +307,19 @@ export function EditMixBatchDialog({ batch, open, onOpenChange }: EditMixBatchDi
     );
   };
 
+  const handleUpdateSourceCost = (type: string, sourceId: number, newCostPerKg: string) => {
+    const costPerKg = parseFloat(newCostPerKg);
+    if (isNaN(costPerKg) || costPerKg < 0) return;
+    setSelectedSources((prev) =>
+      prev.map((s) => {
+        if (s.type === type && s.sourceId === sourceId) {
+          return { ...s, costPerKg, totalCost: s.weightKg * costPerKg };
+        }
+        return s;
+      })
+    );
+  };
+
   const handleRemoveSource = (type: string, sourceId: number) => {
     setSelectedSources((prev) => prev.filter((s) => !(s.type === type && s.sourceId === sourceId)));
   };
@@ -489,7 +502,22 @@ export function EditMixBatchDialog({ batch, open, onOpenChange }: EditMixBatchDi
                             data-testid={`input-weight-${sel.type}-${sel.sourceId}`}
                           />
                         </TableCell>
-                        <TableCell className="text-right font-mono text-sm">${sel.costPerKg.toFixed(4)}</TableCell>
+                        <TableCell className="text-right">
+                          <div className="relative ml-auto w-28">
+                            <span className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
+                              $
+                            </span>
+                            <Input
+                              type="number"
+                              className="h-7 w-28 pl-4 text-right font-mono text-xs"
+                              value={sel.costPerKg.toFixed(4)}
+                              step="0.0001"
+                              min="0"
+                              onChange={(e) => handleUpdateSourceCost(sel.type, sel.sourceId, e.target.value)}
+                              data-testid={`input-cost-per-kg-${sel.type}-${sel.sourceId}`}
+                            />
+                          </div>
+                        </TableCell>
                         <TableCell className="text-right font-mono text-sm">${formatNumber(sel.totalCost, 4)}</TableCell>
                         <TableCell>
                           <Button
