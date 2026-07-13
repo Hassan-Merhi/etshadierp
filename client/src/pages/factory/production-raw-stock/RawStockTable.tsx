@@ -170,7 +170,13 @@ export function RawStockTable({ rawStock, onAdjust, onDeduct, onAddToBatch }: Ra
                           <div className="flex flex-col items-end">
                             <span>${formatNumber(parseFloat(row.valueRemainingUsd))}</span>
                             <span className="text-[10px] opacity-60">
-                              ${parseFloat(row.costPerKgUsd || "0").toFixed(4)}/kg
+                              $
+                              {(
+                                parseFloat(row.freeKg || "0") > 0
+                                  ? parseFloat(row.valueRemainingUsd || "0") / parseFloat(row.freeKg || "0")
+                                  : parseFloat(row.costPerKgUsd || "0")
+                              ).toFixed(6)}
+                              /kg
                             </span>
                           </div>
                         </TableCell>
