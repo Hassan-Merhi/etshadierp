@@ -102,6 +102,10 @@ export async function cleanupTestData(prefix: string): Promise<void> {
     // deleting the company so the test-only fixture teardown remains deterministic.
     await pool.query("DELETE FROM audit_log WHERE company_id = $1", [company.id]);
     await pool.query("DELETE FROM login_history WHERE company_id = $1", [company.id]);
+    // A crashed/interrupted factory test can leave rows in factory_daybook_entries
+    // (and other factory_* tables) referencing this company; those FKs otherwise
+    // block the company delete below on the NEXT run that reuses this prefix.
+    await pool.query("DELETE FROM factory_daybook_entries WHERE company_id = $1", [company.id]);
     await db.delete(schema.companies).where(eq(schema.companies.id, company.id));
   }
 

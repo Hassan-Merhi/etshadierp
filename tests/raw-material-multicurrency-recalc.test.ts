@@ -37,13 +37,15 @@ beforeAll(async () => {
 }, 30000);
 
 afterAll(async () => {
+  if (!ctx) return; // beforeAll never completed — nothing to tear down
+  await pool.query(`DELETE FROM factory_daybook_entries WHERE company_id = $1`, [ctx.companyId]);
   await pool.query(`DELETE FROM factory_offload_additional_charges WHERE company_id = $1`, [ctx.companyId]);
   await pool.query(`DELETE FROM factory_container_commissions WHERE company_id = $1`, [ctx.companyId]);
   await pool.query(`DELETE FROM factory_raw_stock WHERE company_id = $1`, [ctx.companyId]);
   await pool.query(`DELETE FROM factory_containers WHERE company_id = $1`, [ctx.companyId]);
   await pool.query(`DELETE FROM factory_suppliers WHERE company_id = $1`, [ctx.companyId]);
-  await cleanupTestData(ctx);
-  await closeTestServer(ctx);
+  await cleanupTestData(TEST_PREFIX);
+  closeTestServer();
 }, 30000);
 
 describe("Multi-currency raw-material cost recomputation (decimal.js)", () => {
