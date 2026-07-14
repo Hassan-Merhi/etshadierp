@@ -1,3 +1,5 @@
+- [fxRateConfirmed explicit flag](fx-rate-confirmed-flag.md) — replaces rate===1 heuristic on factory_containers/offload-charges/commissions; lists tables/routes not yet converted.
+- [drizzle-kit push needs a TTY](drizzle-push-no-tty.md) — push/generate fail non-interactively on ANY column-rename ambiguity in the whole schema, even unrelated to your change; apply new columns via direct idempotent ALTER TABLE instead.
 - [SP container supplier linking](sp-container-supplier.md) — sp_containers needs supplierId FK to suppliers; voucher must have supplierId set for supplier balance to appear in ledger.
 - [SP Intercompany Agent Charges](sp-intercompany.md) — SP offload posts Voucher C in HADI L'SHI (Dr Agent / Cr SP-IC); "Intercompany" account type excluded from Net Position.
 - [ExcelJS write-stream bug](exceljs-write-stream.md) — ExcelJS 3.x wb.xlsx.write(stream) throws "ea.results is not a Promise"; use writeBuffer() instead.
