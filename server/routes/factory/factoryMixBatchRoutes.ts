@@ -914,15 +914,15 @@ export function registerFactoryMixBatchRoutes(app: Express) {
                 .where(eq(factoryRawStock.id, lastRs.id));
             }
 
-            const costUsed = srcCostPerKg ? parseFloat(srcCostPerKg) : stableCostPerKg;
-
+            // Cost is always the supplier's locked rate — client-supplied cost is
+            // never trusted, regardless of which raw-stock rows FIFO happened to hit.
             addedWeightKg += weight;
-            addedCost += weight * costUsed;
+            addedCost += weight * stableCostPerKg;
             sourceRecords.push({
               supplierId,
               weightKg: String(weight),
-              costPerKg: String(costUsed),
-              totalCost: String(weight * costUsed),
+              costPerKg: String(stableCostPerKg),
+              totalCost: String(weight * stableCostPerKg),
             });
           }
         }

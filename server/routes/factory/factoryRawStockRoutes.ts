@@ -4,6 +4,7 @@ import { registerRawStockOffloadRoutes } from "./raw-stock/rawStockOffloadRoutes
 import { registerRawStockContainerRoutes } from "./raw-stock/rawStockContainerRoutes";
 import { registerRawStockBalanceRoutes } from "./raw-stock/rawStockBalanceRoutes";
 import { registerRawStockRecalcRoutes } from "./raw-stock/rawStockRecalcRoutes";
+import { registerRawStockDiagnosticRoutes } from "./raw-stock/rawStockDiagnosticRoutes";
 
 export function registerFactoryRawStockRoutes(app: Express) {
   registerRawStockCrudRoutes(app);
@@ -11,4 +12,5 @@ export function registerFactoryRawStockRoutes(app: Express) {
   registerRawStockContainerRoutes(app);
   registerRawStockBalanceRoutes(app);
   registerRawStockRecalcRoutes(app);
+  registerRawStockDiagnosticRoutes(app);
 }

@@ -18,6 +18,7 @@
  */
 import { eq, and, sql } from "drizzle-orm";
 import { factoryRawStock, factoryMixBatchSources, factoryMixBatches, factoryBales, factoryContainers, factorySuppliers } from "@shared/schema";
+import { getLockedSupplierRate, getAuthoritativeSupplierRemainingKg } from "./rawStockLockedRate";
 
 export interface CascadeResult {
   rawStockRowsUpdated: number;
@@ -50,59 +51,59 @@ export async function cascadeContainerCostChange(
   const { companyId, containerId, newCostPerKg, newCostPerKgUsd } = params;
 
   // 1. Raw stock — update ALL rows for this container/company (normally exactly one,
-  //    enforced by the factory_raw_stock_company_container_unique index).
+  //    enforced by the factory_raw_stock_company_container_unique index). Capture
+  //    each row's OLD cost and still-remaining kg BEFORE overwriting, so the locked
+  //    rate correction below can isolate exactly the value impact that still
+  //    belongs to current stock (see step 1a).
   const rawStockRows = await tx
     .select()
     .from(factoryRawStock)
     .where(and(eq(factoryRawStock.companyId, companyId), eq(factoryRawStock.containerId, containerId)));
+
+  let correctedContainerRemainingKg = 0;
+  let oldValueOfRemaining = 0;
   for (const row of rawStockRows) {
+    const rowRemainingKg = Math.max(
+      0,
+      (parseFloat(row.receivedKg as string) || 0) - (parseFloat(row.usedKg as string) || 0)
+    );
+    const rowOldCostUsd = parseFloat(row.costPerKgUsd as string) || parseFloat(row.costPerKg as string) || 0;
+    correctedContainerRemainingKg += rowRemainingKg;
+    oldValueOfRemaining += rowRemainingKg * rowOldCostUsd;
+
     await tx
       .update(factoryRawStock)
       .set({ costPerKg: String(newCostPerKg), costPerKgUsd: String(newCostPerKgUsd) })
       .where(eq(factoryRawStock.id, row.id));
   }
 
-  // This IS one of the two sanctioned ways a supplier's locked rate may change
-  // (an explicit authorized landed-cost correction to a specific container).
-  // Recompute the supplier's locked rate from ALL of its current raw-stock rows
-  // (receipt-weighted) so it reflects this correction, and persist it — this is
-  // the only place outside a real offload that's allowed to touch the field.
+  // 1a. This IS one of the two sanctioned ways a supplier's locked rate may change
+  // (an explicit authorized landed-cost correction to a specific container). It
+  // must apply ONLY the value impact of the correction that still belongs to
+  // current remaining stock — never recompute from all-time received kg, which
+  // would reintroduce already-consumed kilograms into the rate. The correction is
+  // spread across the supplier's TOTAL current remaining kg (via the same
+  // authoritative helper the offload formula and Raw Materials API use), exactly
+  // like a moving-average nudge rather than a full re-derivation:
+  //
+  //   newLockedRate = oldLockedRate
+  //                   + (correctedContainerRemainingKg × (newCostPerKgUsd − oldCostPerKgUsd))
+  //                     ÷ supplierTotalRemainingKg
   const [container] = await tx
     .select({ supplierId: factoryContainers.supplierId })
     .from(factoryContainers)
     .where(and(eq(factoryContainers.id, containerId), eq(factoryContainers.companyId, companyId)));
-  if (container?.supplierId) {
-    const allSupplierRows = await tx
-      .select({
-        receivedKg: factoryRawStock.receivedKg,
-        costPerKg: factoryRawStock.costPerKg,
-        costPerKgUsd: factoryRawStock.costPerKgUsd,
-      })
-      .from(factoryRawStock)
-      .innerJoin(factoryContainers, eq(factoryRawStock.containerId, factoryContainers.id))
-      .where(
-        and(
-          eq(factoryRawStock.companyId, companyId),
-          eq(factoryContainers.supplierId, container.supplierId),
-          sql`${factoryContainers.status} != 'DELETED'`,
-          sql`${factoryRawStock.deletedAt} IS NULL`,
-          sql`${factoryContainers.deletedAt} IS NULL`
-        )
-      );
-    let weightedSum = 0;
-    let totalKg = 0;
-    for (const r of allSupplierRows) {
-      const kg = parseFloat(r.receivedKg as string) || 0;
-      const cost = parseFloat(r.costPerKgUsd as string) || parseFloat(r.costPerKg as string) || 0;
-      weightedSum += kg * cost;
-      totalKg += kg;
-    }
-    if (totalKg > 0) {
-      await tx
-        .update(factorySuppliers)
-        .set({ currentRawMaterialCostPerKgUsd: String(weightedSum / totalKg), updatedAt: new Date() })
-        .where(and(eq(factorySuppliers.id, container.supplierId), eq(factorySuppliers.companyId, companyId)));
-    }
+  if (container?.supplierId && correctedContainerRemainingKg > 0) {
+    const oldLockedRate = await getLockedSupplierRate(tx, companyId, container.supplierId, { forUpdate: true });
+    const supplierTotalRemainingKg = await getAuthoritativeSupplierRemainingKg(tx, companyId, container.supplierId);
+    const oldCostWeightedAvgForContainer = oldValueOfRemaining / correctedContainerRemainingKg;
+    const valueDelta = correctedContainerRemainingKg * (newCostPerKgUsd - oldCostWeightedAvgForContainer);
+    const newLockedRate =
+      supplierTotalRemainingKg > 0 ? oldLockedRate + valueDelta / supplierTotalRemainingKg : newCostPerKgUsd;
+    await tx
+      .update(factorySuppliers)
+      .set({ currentRawMaterialCostPerKgUsd: String(Math.max(0, newLockedRate)), updatedAt: new Date() })
+      .where(and(eq(factorySuppliers.id, container.supplierId), eq(factorySuppliers.companyId, companyId)));
   }
 
   // 2. Mix batch sources sourced from this container.

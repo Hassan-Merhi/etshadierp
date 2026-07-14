@@ -15,8 +15,57 @@
  * value / free kg, or from all-time received kg, at read time.
  */
 import { eq, and, sql } from "drizzle-orm";
-import { factorySuppliers, factoryRawStock, factoryContainers } from "@shared/schema";
+import { factorySuppliers, factoryRawStock, factoryContainers, factoryRawMaterialAdjustments } from "@shared/schema";
 import { getStableSupplierCost } from "./rawStockStableCost";
+
+/**
+ * The single authoritative "how much of this supplier's raw material is
+ * currently on hand" figure — the SAME quantity GET /api/factory/raw-stock
+ * shows as remainingKg (before reservations). It is:
+ *   SUM(raw-stock rows: receivedKg - usedKg)
+ *   + SUM(supplier-linked ADD adjustment kg)
+ *   - SUM(supplier-linked REMOVE adjustment kg)
+ * DEDUCT-type adjustments are excluded: they directly reduce a raw-stock row's
+ * own receivedKg at write time, so counting them again here would double-count.
+ * Both the offload moving-average formula and the Raw Materials API MUST read
+ * this exact helper so they can never disagree about "remaining kg".
+ */
+export async function getAuthoritativeSupplierRemainingKg(
+  tx: any,
+  companyId: number,
+  supplierId: number
+): Promise<number> {
+  const [{ remainingKg }] = await tx
+    .select({
+      remainingKg: sql<string>`COALESCE(SUM(${factoryRawStock.receivedKg} - ${factoryRawStock.usedKg}), 0)`,
+    })
+    .from(factoryRawStock)
+    .innerJoin(factoryContainers, eq(factoryRawStock.containerId, factoryContainers.id))
+    .where(
+      and(
+        eq(factoryRawStock.companyId, companyId),
+        eq(factoryContainers.supplierId, supplierId),
+        sql`${factoryContainers.status} != 'DELETED'`,
+        sql`${factoryRawStock.deletedAt} IS NULL`,
+        sql`${factoryContainers.deletedAt} IS NULL`
+      )
+    );
+
+  const [{ netAdjustedKg }] = await tx
+    .select({
+      netAdjustedKg: sql<string>`COALESCE(SUM(CASE WHEN ${factoryRawMaterialAdjustments.type} = 'ADD' THEN ${factoryRawMaterialAdjustments.kg} WHEN ${factoryRawMaterialAdjustments.type} = 'REMOVE' THEN -${factoryRawMaterialAdjustments.kg} ELSE 0 END), 0)`,
+    })
+    .from(factoryRawMaterialAdjustments)
+    .where(
+      and(
+        eq(factoryRawMaterialAdjustments.companyId, companyId),
+        eq(factoryRawMaterialAdjustments.supplierId, supplierId),
+        sql`${factoryRawMaterialAdjustments.deletedAt} IS NULL`
+      )
+    );
+
+  return (parseFloat(remainingKg as string) || 0) + (parseFloat(netAdjustedKg as string) || 0);
+}
 
 /**
  * Reads the supplier's locked rate. If it has never been established (NULL —
@@ -93,25 +142,11 @@ export async function applyOffloadMovingAverage(
   // Lock the supplier row first — serializes concurrent offloads for this supplier.
   const oldLockedRate = await getLockedSupplierRate(tx, companyId, supplierId, { forUpdate: true });
 
-  // Remaining kg immediately BEFORE this offload, from existing raw-stock rows only
-  // (the new container's row has not been inserted yet when this is called).
-  const [{ remainingKg }] = await tx
-    .select({
-      remainingKg: sql<string>`COALESCE(SUM(${factoryRawStock.receivedKg} - ${factoryRawStock.usedKg}), 0)`,
-    })
-    .from(factoryRawStock)
-    .innerJoin(factoryContainers, eq(factoryRawStock.containerId, factoryContainers.id))
-    .where(
-      and(
-        eq(factoryRawStock.companyId, companyId),
-        eq(factoryContainers.supplierId, supplierId),
-        sql`${factoryContainers.status} != 'DELETED'`,
-        sql`${factoryRawStock.deletedAt} IS NULL`,
-        sql`${factoryContainers.deletedAt} IS NULL`
-      )
-    );
-
-  const oldRemainingKg = Math.max(0, parseFloat(remainingKg as string) || 0);
+  // Remaining kg immediately BEFORE this offload — via the SAME shared helper the
+  // Raw Materials API uses, so it includes supplier-linked ADD/REMOVE adjustment
+  // quantity (not just raw-stock rows). The new container's row has not been
+  // inserted yet when this is called, so it's correctly excluded here.
+  const oldRemainingKg = Math.max(0, await getAuthoritativeSupplierRemainingKg(tx, companyId, supplierId));
   const totalKg = oldRemainingKg + newReceivedKg;
   const newLockedRate =
     totalKg > 0
