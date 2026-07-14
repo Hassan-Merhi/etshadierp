@@ -1,3 +1,5 @@
+import Decimal from "decimal.js";
+
 /**
  * Centralized raw-material currency conversion.
  *
@@ -40,14 +42,25 @@ export function resolveStoredFxRate(
 ): FxRateResolution {
   const ccy = currencyCode || "USD";
   if (ccy === "USD") return { fxRate: 1, looksSet: true };
-  const rate = parseFloat(String(storedFxRateToUsd ?? "0")) || 0;
-  const looksSet = confirmed !== undefined ? confirmed && rate > 0 : rate > 0 && rate !== 1;
-  return { fxRate: looksSet ? rate : 0, looksSet };
+  // decimal.js instead of parseFloat: this rate feeds every downstream cost/kg,
+  // stock-value, and supplier-balance USD conversion, so float rounding error here
+  // would compound across every row that shares the rate. new Decimal(...) throws
+  // on genuinely invalid input rather than silently coercing to NaN/0 like parseFloat.
+  let rate: Decimal;
+  try {
+    rate = new Decimal(storedFxRateToUsd ?? 0);
+  } catch {
+    rate = new Decimal(0);
+  }
+  const rateNum = rate.toNumber();
+  const looksSet = confirmed !== undefined ? confirmed && rate.gt(0) : rate.gt(0) && !rate.eq(1);
+  return { fxRate: looksSet ? rateNum : 0, looksSet };
 }
 
 /** Applies an already-resolved rate. Only call after confirming looksSet (or use convertToUsdOrNull/convertToUsdOrThrow). */
 export function applyFxRate(amount: number, currencyCode: string | null | undefined, fxRate: number): number {
-  return (currencyCode || "USD") === "USD" ? amount : amount * fxRate;
+  if ((currencyCode || "USD") === "USD") return amount;
+  return new Decimal(amount).times(new Decimal(fxRate)).toNumber();
 }
 
 /**
