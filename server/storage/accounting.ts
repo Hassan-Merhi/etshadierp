@@ -1156,6 +1156,50 @@ export async function createExchangeRate(rate: schema.InsertExchangeRate): Promi
   return result;
 }
 
+export async function getExchangeRateForExactDate(
+  companyId: number,
+  fromCurrency: string,
+  toCurrency: string,
+  date: string
+): Promise<schema.ExchangeRate | undefined> {
+  const [result] = await db
+    .select()
+    .from(schema.exchangeRates)
+    .where(
+      and(
+        eq(schema.exchangeRates.companyId, companyId),
+        eq(schema.exchangeRates.fromCurrency, fromCurrency),
+        eq(schema.exchangeRates.toCurrency, toCurrency),
+        eq(schema.exchangeRates.effectiveDate, date)
+      )
+    )
+    .limit(1);
+  return result;
+}
+
+/**
+ * Atomically saves the company-wide rate for a given (company, date, currency pair) —
+ * inserting a new row, or updating the existing one in place if it already exists.
+ * Relies on the exchange_rates_company_date_pair_unique DB constraint so two concurrent
+ * saves for the same day can never create duplicate rows (last write wins).
+ */
+export async function upsertExchangeRate(rate: schema.InsertExchangeRate): Promise<schema.ExchangeRate> {
+  const [result] = await db
+    .insert(schema.exchangeRates)
+    .values(rate)
+    .onConflictDoUpdate({
+      target: [
+        schema.exchangeRates.companyId,
+        schema.exchangeRates.effectiveDate,
+        schema.exchangeRates.fromCurrency,
+        schema.exchangeRates.toCurrency,
+      ],
+      set: { rate: rate.rate },
+    })
+    .returning();
+  return result;
+}
+
 // ---------------------------------------------------------------------------
 // Customers
 // ---------------------------------------------------------------------------

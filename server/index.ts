@@ -4459,6 +4459,35 @@ END $$`,
     )`,
     `CREATE INDEX IF NOT EXISTS idx_sb_log_company_created ON factory_status_builder_log (company_id, created_at DESC)`,
     `CREATE INDEX IF NOT EXISTS idx_sb_log_sheet ON factory_status_builder_log (sheet_id)`,
+
+    // -- Exchange rates: one shared company-wide rate per (company, date, pair) (July 2026) --
+    // Fixes the "Set Today's Exchange Rate" popup reappearing for every user: without this
+    // constraint, concurrent/duplicate saves could create more than one row for the same
+    // day, and the popup's "has a rate today" check had no atomic guarantee. Dedupe existing
+    // rows first (keep the newest per group) so the unique index can be created on data that
+    // predates this migration.
+    `DO $exch_dedup$
+     DECLARE keep_id integer; dup_id integer;
+     BEGIN
+       FOR keep_id IN
+         SELECT DISTINCT ON (company_id, effective_date, from_currency, to_currency) id
+         FROM exchange_rates
+         ORDER BY company_id, effective_date, from_currency, to_currency, created_at DESC, id DESC
+       LOOP
+         FOR dup_id IN
+           SELECT er2.id FROM exchange_rates er2
+           WHERE er2.id != keep_id
+             AND er2.company_id = (SELECT company_id FROM exchange_rates WHERE id = keep_id)
+             AND er2.effective_date = (SELECT effective_date FROM exchange_rates WHERE id = keep_id)
+             AND er2.from_currency = (SELECT from_currency FROM exchange_rates WHERE id = keep_id)
+             AND er2.to_currency = (SELECT to_currency FROM exchange_rates WHERE id = keep_id)
+         LOOP
+           DELETE FROM exchange_rates WHERE id = dup_id;
+         END LOOP;
+       END LOOP;
+     END $exch_dedup$`,
+    `CREATE UNIQUE INDEX IF NOT EXISTS exchange_rates_company_date_pair_unique
+     ON exchange_rates (company_id, effective_date, from_currency, to_currency)`,
   ];
 
   // /api/health/db — reports migration status but does NOT block deployment.

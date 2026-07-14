@@ -44,3 +44,5 @@
 - [ERP vs factory are parallel mirrored systems](erp-factory-parallel-systems.md) — separate schema/service/route/UI trees per company type; any cross-cutting feature must be checked against both or it silently only half-applies.
 - [/api/factory test-session company resolution](factory-companyid-test-middleware.md) — seeded test companies need companyType="factory" set before any /api/factory request or the middleware pins the wrong company and lookups 404.
 - [Mix-batch stable supplier cost rate](mix-batch-stable-supplier-cost.md) — supplier cost/kg for mix-batch costing must be weighted by received kg, not remaining kg, or FIFO consumption drifts it.
+- [Bare block+return in route handler](bare-block-return-in-route.md) — `try { { if(x) return; } } catch{}` inside a route exits the whole handler, skipping res.json and hanging the client.
+- [Company-wide daily state pattern](company-wide-daily-state-pattern.md) — shared "once per day per company" gates need DB uniqueness+upsert, server-computed company business date, and audited skip buttons.

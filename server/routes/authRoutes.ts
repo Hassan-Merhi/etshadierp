@@ -1,4 +1,4 @@
-import { getClientDate } from "../lib/dateUtils";
+import { getClientDate, getCompanyBusinessDate } from "../lib/dateUtils";
 import type { Express } from "express";
 import { db, pool } from "../db";
 import { storage } from "../storage";
@@ -1445,6 +1445,12 @@ export function registerAuthRoutes(app: Express) {
         return res.json({ hasRate: true });
       }
 
+      // "Today" is the company's own business date (its configured timezone), never the
+      // requesting browser's clock — otherwise two users in different timezones/devices
+      // could disagree on whether "today's" rate has been set for this shared company.
+      const companySettings = await storage.getCompanySettings(companyId);
+      const today = getCompanyBusinessDate(companySettings?.timezone);
+
       const latestRate = await storage.getLatestExchangeRate(
         companyId,
         company.baseCurrency || "",
@@ -1452,14 +1458,13 @@ export function registerAuthRoutes(app: Express) {
       );
 
       if (!latestRate) {
-        return res.json({ hasRate: false });
+        return res.json({ hasRate: false, today });
       }
 
-      const today = getClientDate(req);
       const rateDate = new Date(latestRate.effectiveDate).toISOString().split("T")[0];
       const hasRate = rateDate === today;
 
-      res.json({ hasRate, latestRate });
+      res.json({ hasRate, latestRate, today });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
@@ -1519,13 +1524,22 @@ export function registerAuthRoutes(app: Express) {
         });
       }
 
-      const rate = await storage.createExchangeRate(validationResult.data);
+      // Atomic upsert — relies on the exchange_rates_company_date_pair_unique DB
+      // constraint so two users saving the same company/date/pair concurrently can
+      // never create duplicate rows; the second save simply updates the first's row.
+      const rate = await storage.upsertExchangeRate(validationResult.data);
 
       // --- Auto-revalue Cash accounts when exchange rate changes ---
       // Runs before the response so balance queries see the updated data immediately.
       // Wrapped in try/catch so a revaluation failure never fails the main request.
+      // NOTE: the body below MUST stay inside this async IIFE — a bare `return` used to
+      // sit directly in the route handler's try block, which meant every early-exit path
+      // (no previous rate yet, no cash accounts, no meaningful change, etc.) returned from
+      // the whole POST handler and skipped res.json(rate) entirely, hanging the request
+      // forever. That silently broke "Set Today's Rate" on the very first save for any
+      // company (no previous rate to compare against) until the client eventually timed out.
       try {
-        {
+        await (async () => {
           const { fromCurrency, toCurrency } = validationResult.data;
           const newRate = parseFloat(validationResult.data.rate);
 
@@ -1702,9 +1716,9 @@ export function registerAuthRoutes(app: Express) {
 
           await db.insert(voucherEntries).values(entryRows);
           console.log(
-            `[FX Revaluation] Created voucher ${voucherNumber}: ${adjustments.length} cash account(s) adjusted, total Δ $${totalAbsDiff.toFixed(2)}`
+            `[FX Revaluation] Created voucher ${voucherNumber}: ${adjustments.length} cash account(s) adjusted, total Δ ${totalAbsDiff.toFixed(2)}`
           );
-        }
+        })();
       } catch (revalErr) {
         console.error("[FX Revaluation] Error during auto-revaluation:", revalErr);
       }

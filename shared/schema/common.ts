@@ -10,6 +10,7 @@ import {
   timestamp,
   index,
   jsonb,
+  uniqueIndex,
 } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
@@ -55,6 +56,15 @@ export const exchangeRates = pgTable(
   },
   (t) => ({
     companyIdx: index("exchange_rates_company_idx").on(t.companyId),
+    // One shared company-wide rate per (company, date, currency pair) — this is the
+    // backend source of truth the "Set Today's Exchange Rate" popup relies on to know
+    // whether *any* user has already set today's rate for the company.
+    companyDatePairUnique: uniqueIndex("exchange_rates_company_date_pair_unique").on(
+      t.companyId,
+      t.effectiveDate,
+      t.fromCurrency,
+      t.toCurrency
+    ),
   })
 );
 

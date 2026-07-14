@@ -46,7 +46,11 @@ export function DailyRateModal({ companyId }: DailyRateModalProps) {
     enabled: !!companyId,
   });
 
-  const { data: todayRateCheck, isLoading: isCheckingRate } = useQuery<{ hasRate: boolean; latestRate?: any }>({
+  const { data: todayRateCheck, isLoading: isCheckingRate } = useQuery<{
+    hasRate: boolean;
+    latestRate?: any;
+    today: string;
+  }>({
     queryKey: ["/api/exchange-rates/check-today", companyId],
     queryFn: async () => {
       const res = await fetch(`/api/exchange-rates/check-today?companyId=${companyId}`, {
@@ -56,6 +60,12 @@ export function DailyRateModal({ companyId }: DailyRateModalProps) {
       return res.json();
     },
     enabled: !!companyId && !!company?.displayCurrency && company.displayCurrency !== "none",
+    // The backend is the single source of truth for whether today's rate has been set
+    // company-wide. Never let a stale cached "no rate yet" answer linger and reopen the
+    // popup after another user (or this one) has already saved it — always refetch when
+    // the page/tab regains focus or the query is invalidated.
+    staleTime: 0,
+    refetchOnWindowFocus: true,
   });
 
   const previousRate = todayRateCheck?.latestRate;
@@ -83,7 +93,10 @@ export function DailyRateModal({ companyId }: DailyRateModalProps) {
         fromCurrency: company?.baseCurrency,
         toCurrency: company?.displayCurrency,
         rate: data.rate,
-        effectiveDate: format(new Date(), "yyyy-MM-dd"),
+        // Use the company's own business date (from the backend check-today response),
+        // not this browser's local clock — so every user's save lands on the same shared
+        // daily row regardless of their device/timezone.
+        effectiveDate: todayRateCheck?.today || format(new Date(), "yyyy-MM-dd"),
       });
     },
     onSuccess: async () => {
@@ -106,8 +119,15 @@ export function DailyRateModal({ companyId }: DailyRateModalProps) {
     createRateMutation.mutate(data);
   };
 
-  const handleSkip = () => {
-    setIsOpen(false);
+  // "Use Previous Rate" must actually persist today's shared company rate (copied from
+  // the most recent earlier rate) — merely closing the popup left no row for today, which
+  // is why the popup kept reappearing for every user even after someone clicked this.
+  const handleUsePrevious = () => {
+    if (previousRateValue) {
+      createRateMutation.mutate({ rate: String(previousRateValue) });
+    } else {
+      setIsOpen(false);
+    }
   };
 
   if (!company?.displayCurrency || company.displayCurrency === "none") {
@@ -123,7 +143,12 @@ export function DailyRateModal({ companyId }: DailyRateModalProps) {
             Set Today's Exchange Rate
           </DialogTitle>
           <DialogDescription>
-            No exchange rate has been set for today ({format(new Date(), "MMM d, yyyy")}).
+            No exchange rate has been set for today (
+            {format(
+              todayRateCheck?.today ? new Date(`${todayRateCheck.today}T00:00:00`) : new Date(),
+              "MMM d, yyyy"
+            )}
+            ).
           </DialogDescription>
         </DialogHeader>
 
@@ -165,7 +190,13 @@ export function DailyRateModal({ companyId }: DailyRateModalProps) {
               )}
             />
             <div className="flex gap-2 justify-end">
-              <Button type="button" variant="outline" onClick={handleSkip} data-testid="button-skip-rate">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleUsePrevious}
+                disabled={createRateMutation.isPending}
+                data-testid="button-skip-rate"
+              >
                 {previousRateValue ? "Use Previous Rate" : "Skip for Now"}
               </Button>
               <Button type="submit" disabled={createRateMutation.isPending} data-testid="button-save-daily-rate">
