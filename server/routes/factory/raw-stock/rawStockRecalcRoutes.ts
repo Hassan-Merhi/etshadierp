@@ -1,11 +1,17 @@
 import type { Express } from "express";
 import { requireAuth, requireRole } from "../../../auth";
-import { getRawStockRecalcPreview, applyRawStockRecalc } from "../../../services/factory/rawStockRecalc";
+import {
+  getRawStockRecalcPreview,
+  applyRawStockRecalc,
+  loadRecalcFingerprintInputs,
+  computeRecalcFingerprint,
+} from "../../../services/factory/rawStockRecalc";
 import { logAudit } from "../../helpers/auditHelpers";
 import {
   signRepairToken,
   verifyRepairToken,
   ExpiredRepairTokenError,
+  RepairTokenConfigurationError,
   REPAIR_TOKEN_TTL_MS,
 } from "../../../services/factory/repairToken";
 
@@ -14,9 +20,13 @@ const ADMIN_ROLES = ["Admin", "Developer"] as const;
 interface RecalcTokenPayload {
   companyId: number;
   containerIds: number[];
-  /** Each requested container's old costPerKgUsd at preview time, so a stale
-   * token (row changed since preview) can be detected before apply. */
-  oldCostPerKgUsdByContainer: Record<number, number>;
+  /** Deterministic fingerprint of EVERY approved calculation input per
+   * container (see computeRecalcFingerprint) — container status/updatedAt,
+   * received kg, rate, currency, FX rate/confirmed state, freight, duty,
+   * commission, other charges, every additional-charge row, and the current
+   * vs. expected cost. Re-derived from a fresh, row-locked read inside the
+   * apply transaction and rejected as STALE_TOKEN on any mismatch. */
+  fingerprintByContainer: Record<number, string>;
   userId: string;
   expiresAt: number;
 }
@@ -70,20 +80,22 @@ export function registerRawStockRecalcRoutes(app: Express) {
           return res.status(400).json({ message: "containerIds must contain at least one valid id" });
         }
 
-        // Snapshot each requested container's CURRENT stored costPerKgUsd — used both
-        // to build the token (dry-run) and to detect staleness (apply).
         const preview = await getRawStockRecalcPreview(companyId);
         const previewByContainer = new Map(preview.map((r) => [r.containerId, r]));
-        const oldCostPerKgUsdByContainer: Record<number, number> = {};
-        for (const id of parsedIds) {
-          oldCostPerKgUsdByContainer[id] = previewByContainer.get(id)?.old.costPerKgUsd ?? 0;
-        }
 
         if (!confirm) {
+          // Fingerprint EVERY approved calculation input per container (not just its
+          // old cost) so the token is bound to the exact calculation the admin saw,
+          // not merely the numeric outcome.
+          const fingerprintByContainer: Record<number, string> = {};
+          for (const id of parsedIds) {
+            const inputs = await loadRecalcFingerprintInputs(companyId, id);
+            if (inputs) fingerprintByContainer[id] = computeRecalcFingerprint(inputs);
+          }
           const tokenPayload: RecalcTokenPayload = {
             companyId,
             containerIds: parsedIds,
-            oldCostPerKgUsdByContainer,
+            fingerprintByContainer,
             userId: req.session.userId,
             expiresAt: Date.now() + REPAIR_TOKEN_TTL_MS,
           };
@@ -118,19 +130,18 @@ export function registerRawStockRecalcRoutes(app: Express) {
           });
         }
 
-        // Stale-token detection: compare the CURRENT stored cost against what the token
-        // captured at preview time. Exception: if the container is already sitting at
-        // its corrected value (changed === false — e.g. a previous apply of this same
-        // token already succeeded), that's a safe idempotent replay, not staleness; let
-        // it fall through to applyRawStockRecalc, which will correctly report
-        // applied:false without writing anything again.
+        // The authoritative stale check is inside applyRawStockRecalc's row-locked
+        // transaction (fingerprint recomputed from a fresh read there), so a change
+        // that lands after this point but before that lock is still caught. This is
+        // only a cheap early-exit for the common case.
         const EPS = 0.0005;
         for (const id of parsedIds) {
           const freshRow = previewByContainer.get(id);
           if (freshRow && freshRow.changed === false) continue;
-          const currentOld = freshRow?.old.costPerKgUsd ?? 0;
-          const tokenOld = tokenPayload.oldCostPerKgUsdByContainer[id] ?? 0;
-          if (Math.abs(currentOld - tokenOld) > EPS) {
+          const inputs = await loadRecalcFingerprintInputs(companyId, id);
+          const freshFingerprint = inputs ? computeRecalcFingerprint(inputs) : undefined;
+          const tokenFingerprint = tokenPayload.fingerprintByContainer[id];
+          if (tokenFingerprint && freshFingerprint !== tokenFingerprint) {
             return res.status(400).json({
               code: "STALE_TOKEN",
               message: `Container #${id} changed since the dry-run preview was issued — re-run the preview and try again.`,
@@ -139,6 +150,7 @@ export function registerRawStockRecalcRoutes(app: Express) {
         }
 
         const results = await applyRawStockRecalc(companyId, parsedIds, {
+          expectedFingerprints: tokenPayload.fingerprintByContainer,
           onAudit: async (tx, result) => {
             await logAudit(
               {
@@ -156,8 +168,20 @@ export function registerRawStockRecalcRoutes(app: Express) {
           },
         });
 
+        const staleResult = results.find((r) => r.staleToken);
+        if (staleResult) {
+          return res.status(400).json({
+            code: "STALE_TOKEN",
+            message: `Container #${staleResult.containerId} changed since the dry-run preview was issued — re-run the preview and try again.`,
+          });
+        }
+
         res.json({ dryRun: false, results });
       } catch (err: any) {
+        if (err instanceof RepairTokenConfigurationError) {
+          console.error("Repair token configuration error (SESSION_SECRET missing/fallback in production):", err.message);
+          return res.status(500).json({ message: err.message, code: "REPAIR_TOKEN_MISCONFIGURED" });
+        }
         console.error("[raw-stock recalc apply] error:", err);
         res.status(500).json({ message: err.message || "Failed to apply recalculation" });
       }

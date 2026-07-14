@@ -40,6 +40,7 @@ import {
   verifyRepairToken,
   InvalidRepairTokenError,
   ExpiredRepairTokenError,
+  RepairTokenConfigurationError,
   REPAIR_TOKEN_TTL_MS,
 } from "../../../services/factory/repairToken";
 
@@ -409,6 +410,10 @@ export function registerFactoryFxDiagnosticRoutes(app: Express) {
         }
         if (error instanceof AlreadyConfirmedError) {
           return res.status(409).json({ message: error.message, code: "ALREADY_CONFIRMED" });
+        }
+        if (error instanceof RepairTokenConfigurationError) {
+          console.error("Repair token configuration error (SESSION_SECRET missing/fallback in production):", error.message);
+          return res.status(500).json({ message: error.message, code: "REPAIR_TOKEN_MISCONFIGURED" });
         }
         console.error("Error applying FX resolution repair:", error);
         res.status(500).json({ message: error.message });

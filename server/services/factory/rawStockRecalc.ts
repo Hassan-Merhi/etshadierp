@@ -19,6 +19,7 @@
  */
 import { eq, and, isNull, sql } from "drizzle-orm";
 import Decimal from "decimal.js";
+import crypto from "crypto";
 import { db } from "../../db";
 import {
   factoryContainers,
@@ -150,6 +151,127 @@ export function computeCorrectContainerCost(
   };
 }
 
+export interface RecalcFingerprintInputs {
+  container: typeof factoryContainers.$inferSelect;
+  additionalCharges: (typeof factoryOffloadAdditionalCharges.$inferSelect)[];
+  commissionRecord: typeof factoryContainerCommissions.$inferSelect | null;
+  rawStock: typeof factoryRawStock.$inferSelect | null;
+}
+
+function toIso(v: Date | string | null | undefined): string | null {
+  if (!v) return null;
+  return v instanceof Date ? v.toISOString() : String(v);
+}
+
+/**
+ * Deterministic fingerprint of every input that feeds a container's corrected
+ * landed cost, plus the current stored cost and the expected corrected
+ * result. Used to bind a recalc confirmation token to the EXACT approved
+ * calculation — not just its numeric output — so ANY change to a
+ * contributing field (container status/updatedAt, rate, currency, FX rate or
+ * confirmed state, freight, duty, commission, other charges, or any
+ * individual additional-charge row's amount/currency/rate/version) between
+ * dry-run and apply invalidates the token, even if the corrected numbers
+ * happen to net out the same.
+ */
+export function computeRecalcFingerprint(inputs: RecalcFingerprintInputs): string {
+  const c = inputs.container;
+  const next = computeCorrectContainerCost(c, inputs.additionalCharges, inputs.commissionRecord);
+  const canonical = {
+    containerId: c.id,
+    status: c.status,
+    updatedAt: toIso((c as any).updatedAt),
+    actualReceivedKg: c.actualReceivedKg,
+    ratePerKg: c.ratePerKg,
+    currencyCode: c.currencyCode,
+    fxRateToUsd: c.fxRateToUsd,
+    fxRateToUsdOffload: c.fxRateToUsdOffload,
+    fxRateConfirmed: c.fxRateConfirmed,
+    freight: c.freight,
+    freightCurrencyCode: c.freightCurrencyCode,
+    dutyAmount: c.dutyAmount,
+    dutyStatus: c.dutyStatus,
+    commissionAmount: c.commissionAmount,
+    commissionCurrencyCode: c.commissionCurrencyCode,
+    otherCharges: c.otherCharges,
+    otherChargesCurrencyCode: (c as any).otherChargesCurrencyCode,
+    additionalCharges: [...inputs.additionalCharges]
+      .map((a) => ({
+        id: a.id,
+        amount: a.amount,
+        currencyCode: a.currencyCode,
+        fxRateToUsd: a.fxRateToUsd,
+        version: toIso((a as any).updatedAt) ?? toIso(a.createdAt),
+      }))
+      .sort((a, b) => a.id - b.id),
+    commissionRecord: inputs.commissionRecord
+      ? {
+          id: inputs.commissionRecord.id,
+          commissionTotal: inputs.commissionRecord.commissionTotal,
+          currencyCode: inputs.commissionRecord.currencyCode,
+          fxRateToUsd: inputs.commissionRecord.fxRateToUsd,
+          version: toIso((inputs.commissionRecord as any).updatedAt) ?? toIso(inputs.commissionRecord.createdAt),
+        }
+      : null,
+    currentCostPerKg: inputs.rawStock?.costPerKg ?? null,
+    currentCostPerKgUsd: inputs.rawStock?.costPerKgUsd ?? null,
+    expectedCostPerKg: next.costPerKg,
+    expectedCostPerKgUsd: next.costPerKgUsd,
+    expectedFxUnresolved: next.fxUnresolved,
+  };
+  return crypto.createHash("sha256").update(JSON.stringify(canonical)).digest("hex");
+}
+
+/** Loads the current, fresh inputs for one container (outside any transaction —
+ * used for dry-run preview fingerprinting; the apply path re-loads under a row
+ * lock and calls computeRecalcFingerprint again itself). Returns null if the
+ * container doesn't exist in this company. */
+export async function loadRecalcFingerprintInputs(
+  companyId: number,
+  containerId: number,
+  dbOrTx: any = db
+): Promise<RecalcFingerprintInputs | null> {
+  const [container] = await dbOrTx
+    .select()
+    .from(factoryContainers)
+    .where(and(eq(factoryContainers.id, containerId), eq(factoryContainers.companyId, companyId)));
+  if (!container) return null;
+
+  const [additionalCharges, commissionRecords, rawStockRows] = await Promise.all([
+    dbOrTx
+      .select()
+      .from(factoryOffloadAdditionalCharges)
+      .where(
+        and(
+          eq(factoryOffloadAdditionalCharges.containerId, containerId),
+          eq(factoryOffloadAdditionalCharges.companyId, companyId)
+        )
+      ),
+    dbOrTx
+      .select()
+      .from(factoryContainerCommissions)
+      .where(
+        and(
+          eq(factoryContainerCommissions.containerId, containerId),
+          eq(factoryContainerCommissions.companyId, companyId)
+        )
+      ),
+    dbOrTx
+      .select()
+      .from(factoryRawStock)
+      .where(
+        and(
+          eq(factoryRawStock.containerId, containerId),
+          eq(factoryRawStock.companyId, companyId),
+          isNull(factoryRawStock.deletedAt)
+        )
+      ),
+  ]);
+  const commissionRecord = commissionRecords.sort((a: any, b: any) => b.id - a.id)[0] || null;
+
+  return { container, additionalCharges, commissionRecord, rawStock: rawStockRows[0] || null };
+}
+
 /** Read-only: build the full diff list for every offloaded container in this company. */
 export async function getRawStockRecalcPreview(companyId: number): Promise<RecalcRow[]> {
   const rows = await db
@@ -239,6 +361,7 @@ export interface ApplyResult {
   containerNumber: string;
   applied: boolean;
   skippedReason?: string;
+  staleToken?: boolean;
   rawStockRowsUpdated: number;
   affectedBatches: number;
   affectedBales: number;
@@ -260,6 +383,14 @@ export interface ApplyRawStockRecalcOptions {
    * is atomic with that container's update: if it throws, that container's
    * transaction (and only that one) rolls back. */
   onAudit?: (tx: any, result: ApplyResult) => Promise<void>;
+  /** Per-container fingerprint captured at dry-run/token-issue time (see
+   * computeRecalcFingerprint). When provided, the fingerprint is RECOMPUTED
+   * from the fresh, row-locked state inside this container's own transaction
+   * — not just compared before the transaction opens — and the write is
+   * refused (staleToken=true) if anything the token approved has changed.
+   * Skipped for a container already sitting at its corrected value: that is
+   * a safe idempotent replay of an already-applied token, not staleness. */
+  expectedFingerprints?: Record<number, string>;
 }
 
 /**
@@ -323,6 +454,18 @@ export async function applyRawStockRecalc(
       ]);
       const commissionRecord = commissionRecords.sort((a: any, b: any) => b.id - a.id)[0] || null;
 
+      const rawStockRows = await tx
+        .select()
+        .from(factoryRawStock)
+        .where(
+          and(
+            eq(factoryRawStock.containerId, containerId),
+            eq(factoryRawStock.companyId, companyId),
+            isNull(factoryRawStock.deletedAt)
+          )
+        );
+      const rawStockRow = rawStockRows[0] || null;
+
       const next = computeCorrectContainerCost(container, additionalCharges, commissionRecord);
       if (next.fxUnresolved) {
         return {
@@ -360,6 +503,32 @@ export async function applyRawStockRecalc(
           affectedBatches: 0,
           affectedBales: 0,
         } as ApplyResult;
+      }
+
+      // Recalculate the fingerprint from THIS fresh, row-locked read — not the
+      // one taken before the transaction opened — so a concurrent edit that
+      // landed between dry-run/token-issue and this exact apply attempt is
+      // caught even under concurrency, not just via a best-effort pre-check.
+      const expectedFingerprint = opts.expectedFingerprints?.[containerId];
+      if (expectedFingerprint) {
+        const freshFingerprint = computeRecalcFingerprint({
+          container,
+          additionalCharges,
+          commissionRecord,
+          rawStock: rawStockRow,
+        });
+        if (freshFingerprint !== expectedFingerprint) {
+          return {
+            containerId,
+            containerNumber: container.containerNumber,
+            applied: false,
+            staleToken: true,
+            skippedReason: "Container's approved calculation inputs changed since the confirmation token was issued — re-run the dry-run preview and try again.",
+            rawStockRowsUpdated: 0,
+            affectedBatches: 0,
+            affectedBales: 0,
+          } as ApplyResult;
+        }
       }
 
       await tx

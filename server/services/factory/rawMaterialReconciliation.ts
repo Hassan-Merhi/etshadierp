@@ -10,7 +10,7 @@
  * and nothing here performs a lazy-backfill write (uses the ReadOnly locked
  * rate helper via getLockedRateDiagnosticsForCompany).
  */
-import { eq, and, sql, isNull, ne } from "drizzle-orm";
+import { eq, and, sql, isNull, ne, inArray } from "drizzle-orm";
 import { db } from "../../db";
 import {
   factorySuppliers,
@@ -20,9 +20,15 @@ import {
   factoryMixBatches,
   factoryOffloadAdditionalCharges,
   factoryContainerCommissions,
+  factoryContainerOtherCharges,
+  factorySupplierPayments,
+  factorySupplierFxTransfers,
+  voucherEntries,
+  vouchers,
 } from "@shared/schema";
 import { getLockedRateDiagnosticsForCompany, type LockedRateDiagnosticRow } from "./rawStockLockedRate";
 import { resolveStoredFxRate } from "./currencyConversion";
+import { resolveParentCompanyId } from "../../routes/helpers/supplierBalanceHelpers";
 
 export interface KgSummary {
   receivedKg: number;
@@ -37,6 +43,38 @@ export interface SupplierCurrencyExposureRow {
   supplierId: number;
   supplierName: string;
   byCurrency: Record<string, { resolvedNative: number; unresolvedNative: number; unresolvedCount: number }>;
+}
+
+export interface UnresolvedFxRow {
+  supplierId: number;
+  supplierName: string;
+  currencyCode: string;
+  source: "container" | "offload_charge" | "commission" | "container_other_charge" | "voucher_payment";
+  rowId: number;
+  nativeAmount: number;
+}
+
+/**
+ * A supplier's true net balance by currency — NOT the same thing as gross
+ * exposure. grossExposureByCurrency is everything ever owed to the supplier
+ * (opening balance + container liabilities + freight/charges/commissions),
+ * before any payment is netted off; it must never be presented to a user as
+ * "the balance". paymentsByCurrency nets off supplier payments, voucher
+ * payments, and FX transfers/settlements. netBalanceByCurrency is the actual
+ * per-currency amount still owed (gross − payments, computed from native
+ * amounts, so it never depends on FX resolution). netBalanceUsd converts each
+ * currency's net balance using that row's OWN resolved FX rate and excludes
+ * any amount whose FX could not be resolved (see unresolvedFxRows on the
+ * parent report) rather than guessing at a rate.
+ */
+export interface SupplierBalanceByCurrencyRow {
+  supplierId: number;
+  supplierName: string;
+  grossExposureByCurrency: Record<string, number>;
+  paymentsByCurrency: Record<string, number>;
+  netBalanceByCurrency: Record<string, number>;
+  netBalanceUsd: number;
+  hasUnresolvedFx: boolean;
 }
 
 export interface CrossCompanyContaminationRow {
@@ -63,6 +101,8 @@ export interface RawMaterialReconciliation {
   lockedRateDiagnostics: LockedRateDiagnosticRow[];
   lockedRateDriftCount: number;
   supplierCurrencyExposure: SupplierCurrencyExposureRow[];
+  supplierBalanceByCurrency: SupplierBalanceByCurrencyRow[];
+  unresolvedFxRows: UnresolvedFxRow[];
   crossCompanyContamination: CrossCompanyContaminationRow[];
   doubleReservedDeductions: DoubleReservedRow[];
   negativeStockCount: number;
@@ -203,6 +243,305 @@ export async function getRawMaterialReconciliation(companyId: number): Promise<R
     bumpExposure(container?.supplierId ?? null, cm.currencyCode, parseFloat(cm.commissionTotal || "0") || 0, looksSet);
   }
 
+  // ── 3b. Supplier balance-by-currency reconciliation ───────────────────────
+  // Completes #3 above into an actual net balance (not just gross exposure):
+  // opening balance (parent-company context only, USD) + container liabilities
+  // + freight/charges/commissions, netted against supplier payments, voucher
+  // payments, and FX transfers/settlements. Gross and net are kept as
+  // distinctly-named fields — grossExposureByCurrency is never presented as
+  // "the balance".
+  const unresolvedFxRows: UnresolvedFxRow[] = [];
+  const balanceBySupplier = new Map<
+    number,
+    { grossNative: Map<string, number>; paymentsNative: Map<string, number>; usdGrossResolved: number; usdPayments: number; hasUnresolvedFx: boolean }
+  >();
+  function getBalanceAcc(supplierId: number) {
+    if (!balanceBySupplier.has(supplierId)) {
+      balanceBySupplier.set(supplierId, {
+        grossNative: new Map(),
+        paymentsNative: new Map(),
+        usdGrossResolved: 0,
+        usdPayments: 0,
+        hasUnresolvedFx: false,
+      });
+    }
+    return balanceBySupplier.get(supplierId)!;
+  }
+  function addGross(supplierId: number | null, cc: string, nativeAmount: number, usdAmount: number | null) {
+    if (!supplierId || !nativeAmount) return;
+    const acc = getBalanceAcc(supplierId);
+    acc.grossNative.set(cc, (acc.grossNative.get(cc) || 0) + nativeAmount);
+    if (usdAmount !== null) acc.usdGrossResolved += usdAmount;
+    else acc.hasUnresolvedFx = true;
+  }
+  function addPayment(supplierId: number | null, cc: string, nativeAmount: number, usdAmount: number | null) {
+    if (!supplierId || !nativeAmount) return;
+    const acc = getBalanceAcc(supplierId);
+    acc.paymentsNative.set(cc, (acc.paymentsNative.get(cc) || 0) + nativeAmount);
+    if (usdAmount !== null) acc.usdPayments += usdAmount;
+    else acc.hasUnresolvedFx = true;
+  }
+
+  // Opening balance — USD-only, and only counts in the parent company's own books.
+  let parentCompanyId: number | null = null;
+  try {
+    parentCompanyId = await resolveParentCompanyId();
+  } catch {
+    parentCompanyId = null; // ambiguous/unconfigured — skip opening balances rather than guess.
+  }
+  if (parentCompanyId === companyId) {
+    for (const s of suppliers as any[]) {
+      const ob = parseFloat((s as any).openingBalance || "0") || 0;
+      if (ob !== 0) addGross(s.id, "USD", ob, ob);
+    }
+  }
+
+  // Container liabilities (kg × ratePerKg, native currency) + freight (native
+  // freight currency) — only payable-status containers, matching the broker
+  // statement's own definition of what is actually owed to a supplier.
+  const PAYABLE_CONTAINER_STATUSES = new Set(["OFFLOADED", "RECEIVED", "PARTIALLY_RECEIVED"]);
+  for (const c of allContainersById.values()) {
+    if (!c.supplierId) continue;
+    if (c.deletedAt) continue;
+    if (!PAYABLE_CONTAINER_STATUSES.has(String(c.status || "").toUpperCase())) continue;
+    const cc = c.currencyCode || "USD";
+    const kg = parseFloat(c.actualReceivedKg || c.totalKg || "0") || 0;
+    const rate = parseFloat(c.ratePerKg || "0") || 0;
+    const amt = kg * rate;
+    if (amt) {
+      const { fxRate, looksSet } = resolveStoredFxRate(cc, c.fxRateToUsd, c.fxRateConfirmed);
+      addGross(c.supplierId, cc, amt, cc === "USD" ? amt : looksSet ? amt * fxRate : null);
+      if (cc !== "USD" && !looksSet) {
+        unresolvedFxRows.push({
+          supplierId: c.supplierId,
+          supplierName: supplierNameById.get(c.supplierId) || "Unknown Supplier",
+          currencyCode: cc,
+          source: "container",
+          rowId: c.id,
+          nativeAmount: amt,
+        });
+      }
+    }
+
+    const freight = parseFloat(c.freight || "0") || 0;
+    if (freight) {
+      const freightCc = c.freightCurrencyCode || cc;
+      const { fxRate, looksSet } = resolveStoredFxRate(freightCc, c.fxRateToUsd, c.fxRateConfirmed);
+      addGross(c.supplierId, freightCc, freight, freightCc === "USD" ? freight : looksSet ? freight * fxRate : null);
+      if (freightCc !== "USD" && !looksSet) {
+        unresolvedFxRows.push({
+          supplierId: c.supplierId,
+          supplierName: supplierNameById.get(c.supplierId) || "Unknown Supplier",
+          currencyCode: freightCc,
+          source: "container",
+          rowId: c.id,
+          nativeAmount: freight,
+        });
+      }
+    }
+  }
+
+  // Offload additional charges assigned directly to a supplier.
+  const allOffloadCharges = await db
+    .select()
+    .from(factoryOffloadAdditionalCharges)
+    .where(eq(factoryOffloadAdditionalCharges.companyId, companyId));
+  for (const oc of allOffloadCharges as any[]) {
+    const supplierId = oc.supplierId ?? allContainersById.get(oc.containerId)?.supplierId ?? null;
+    if (!supplierId) continue;
+    const cc = oc.currencyCode || "USD";
+    const amt = parseFloat(oc.amount || "0") || 0;
+    if (!amt) continue;
+    const { fxRate, looksSet } = resolveStoredFxRate(cc, oc.fxRateToUsd, oc.fxRateConfirmed);
+    addGross(supplierId, cc, amt, cc === "USD" ? amt : looksSet ? amt * fxRate : null);
+    if (cc !== "USD" && !looksSet) {
+      unresolvedFxRows.push({
+        supplierId,
+        supplierName: supplierNameById.get(supplierId) || "Unknown Supplier",
+        currencyCode: cc,
+        source: "offload_charge",
+        rowId: oc.id,
+        nativeAmount: amt,
+      });
+    }
+  }
+
+  // Container-level other-charges table (multi-row) and the legacy single
+  // other-charges column, both scoped to whichever supplier they're assigned to.
+  const allContainerOtherCharges = await db
+    .select()
+    .from(factoryContainerOtherCharges)
+    .where(eq(factoryContainerOtherCharges.companyId, companyId));
+  for (const oc of allContainerOtherCharges as any[]) {
+    const container = allContainersById.get(oc.containerId);
+    const supplierId = container?.supplierId ?? null;
+    if (!supplierId) continue;
+    const cc = oc.currencyCode || container?.currencyCode || "USD";
+    const amt = parseFloat(oc.amount || "0") || 0;
+    if (!amt) continue;
+    // This table has no FX fields of its own — reuse the container's, since the
+    // charge's currency defaults to the container's currency when unset.
+    const { fxRate, looksSet } = resolveStoredFxRate(cc, container?.fxRateToUsd, container?.fxRateConfirmed);
+    addGross(supplierId, cc, amt, cc === "USD" ? amt : looksSet ? amt * fxRate : null);
+    if (cc !== "USD" && !looksSet) {
+      unresolvedFxRows.push({
+        supplierId,
+        supplierName: supplierNameById.get(supplierId) || "Unknown Supplier",
+        currencyCode: cc,
+        source: "container_other_charge",
+        rowId: oc.id,
+        nativeAmount: amt,
+      });
+    }
+  }
+  for (const c of allContainersById.values()) {
+    const chargeSupplierId = c.otherChargesSupplierId;
+    if (!chargeSupplierId) continue;
+    const amt = parseFloat(c.otherCharges || "0") || 0;
+    if (!amt) continue;
+    const cc = c.otherChargesCurrencyCode || "USD";
+    const { fxRate, looksSet } = resolveStoredFxRate(cc, c.fxRateToUsd, c.fxRateConfirmed);
+    addGross(chargeSupplierId, cc, amt, cc === "USD" ? amt : looksSet ? amt * fxRate : null);
+    if (cc !== "USD" && !looksSet) {
+      unresolvedFxRows.push({
+        supplierId: chargeSupplierId,
+        supplierName: supplierNameById.get(chargeSupplierId) || "Unknown Supplier",
+        currencyCode: cc,
+        source: "container_other_charge",
+        rowId: c.id,
+        nativeAmount: amt,
+      });
+    }
+  }
+
+  // Commissions — same supplier-recipient rule as the container loop above:
+  // owed to whichever supplier is the actual commission recipient.
+  const allCommissions = await db
+    .select()
+    .from(factoryContainerCommissions)
+    .where(eq(factoryContainerCommissions.companyId, companyId));
+  for (const cm of allCommissions as any[]) {
+    const container = allContainersById.get(cm.containerId);
+    const recipientId = cm.commissionSupplierId ?? container?.supplierId ?? null;
+    if (!recipientId) continue;
+    const cc = cm.currencyCode || "USD";
+    const amt = parseFloat(cm.commissionTotal || "0") || 0;
+    if (!amt) continue;
+    const { fxRate, looksSet } = resolveStoredFxRate(cc, cm.fxRateToUsd, cm.fxRateConfirmed);
+    addGross(recipientId, cc, amt, cc === "USD" ? amt : looksSet ? amt * fxRate : null);
+    if (cc !== "USD" && !looksSet) {
+      unresolvedFxRows.push({
+        supplierId: recipientId,
+        supplierName: supplierNameById.get(recipientId) || "Unknown Supplier",
+        currencyCode: cc,
+        source: "commission",
+        rowId: cm.id,
+        nativeAmount: amt,
+      });
+    }
+  }
+
+  // Supplier payments — amountUsd is already stored at write time, so USD is
+  // always resolved here regardless of the payment's native currency.
+  const allSupplierPayments = await db
+    .select()
+    .from(factorySupplierPayments)
+    .where(eq(factorySupplierPayments.companyId, companyId));
+  for (const p of allSupplierPayments as any[]) {
+    const cc = p.currencyCode || "USD";
+    const amt = parseFloat(p.amount || "0") || 0;
+    const amtUsd = parseFloat(p.amountUsd || "0") || 0;
+    addPayment(p.supplierId, cc, amt, amtUsd);
+  }
+
+  // Voucher-linked supplier payments (general accounting), skipping optional
+  // (informational-only) vouchers. Uses the voucher's stored exchangeRate; a
+  // non-USD voucher with no exchangeRate is flagged unresolved rather than
+  // assumed to be 1.
+  const supplierIds = suppliers.map((s) => s.id);
+  const allVoucherPayments =
+    supplierIds.length > 0
+      ? await db
+          .select({
+            id: voucherEntries.id,
+            debitAmount: voucherEntries.debitAmount,
+            supplierId: voucherEntries.factorySupplierId,
+            currency: vouchers.currency,
+            exchangeRate: vouchers.exchangeRate,
+            optional: vouchers.optional,
+            voucherNumber: vouchers.voucherNumber,
+          })
+          .from(voucherEntries)
+          .innerJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
+          .where(
+            and(
+              inArray(voucherEntries.factorySupplierId as any, supplierIds),
+              sql`${voucherEntries.debitAmount}::numeric > 0`,
+              sql`${vouchers.voucherNumber} NOT LIKE 'FACTORY-PAY-%'`
+            )
+          )
+      : [];
+  for (const p of allVoucherPayments as any[]) {
+    if (p.optional || !p.supplierId) continue;
+    const cc = p.currency || "USD";
+    const amt = parseFloat(p.debitAmount || "0") || 0;
+    if (!amt) continue;
+    const rate = p.exchangeRate !== null && p.exchangeRate !== undefined ? parseFloat(p.exchangeRate) : cc === "USD" ? 1 : null;
+    const resolved = cc === "USD" ? true : rate !== null && rate > 0;
+    addPayment(p.supplierId, cc, amt, resolved ? amt * (rate ?? 1) : null);
+    if (!resolved) {
+      unresolvedFxRows.push({
+        supplierId: p.supplierId,
+        supplierName: supplierNameById.get(p.supplierId) || "Unknown Supplier",
+        currencyCode: cc,
+        source: "voucher_payment",
+        rowId: p.id,
+        nativeAmount: amt,
+      });
+    }
+  }
+
+  // FX transfers/settlements between suppliers: the sender's foreign-currency
+  // exposure is settled (treated as a payment out in that currency); the
+  // recipient's USD exposure is settled by the USD they received. Both legs
+  // are already fully resolved at write time (toAmountUsd/fxRateToUsd stored).
+  const allFxTransfers = await db
+    .select()
+    .from(factorySupplierFxTransfers)
+    .where(eq(factorySupplierFxTransfers.companyId, companyId));
+  for (const t of allFxTransfers as any[]) {
+    const fromCc = t.fromCurrencyCode || "USD";
+    const fromAmt = parseFloat(t.fromAmount || "0") || 0;
+    const toAmountUsd = parseFloat(t.toAmountUsd || "0") || 0;
+    if (fromAmt) addPayment(t.fromSupplierId, fromCc, fromAmt, fromCc === "USD" ? fromAmt : toAmountUsd);
+    if (toAmountUsd) addPayment(t.toSupplierId, "USD", toAmountUsd, toAmountUsd);
+  }
+
+  const supplierBalanceByCurrency: SupplierBalanceByCurrencyRow[] = Array.from(balanceBySupplier.entries()).map(
+    ([supplierId, acc]) => {
+      const currencies = new Set<string>([...acc.grossNative.keys(), ...acc.paymentsNative.keys()]);
+      const grossExposureByCurrency: Record<string, number> = {};
+      const paymentsByCurrency: Record<string, number> = {};
+      const netBalanceByCurrency: Record<string, number> = {};
+      for (const cc of currencies) {
+        const gross = acc.grossNative.get(cc) || 0;
+        const paid = acc.paymentsNative.get(cc) || 0;
+        grossExposureByCurrency[cc] = gross;
+        paymentsByCurrency[cc] = paid;
+        netBalanceByCurrency[cc] = gross - paid;
+      }
+      return {
+        supplierId,
+        supplierName: supplierNameById.get(supplierId) || "Unknown Supplier",
+        grossExposureByCurrency,
+        paymentsByCurrency,
+        netBalanceByCurrency,
+        netBalanceUsd: acc.usdGrossResolved - acc.usdPayments,
+        hasUnresolvedFx: acc.hasUnresolvedFx,
+      };
+    }
+  );
+
   // ── 4. Cross-company contamination ────────────────────────────────────────
   const crossCompanyContamination: CrossCompanyContaminationRow[] = [];
   const allSuppliersEverywhere = await db.select({ id: factorySuppliers.id, companyId: factorySuppliers.companyId }).from(factorySuppliers);
@@ -284,26 +623,48 @@ export async function getRawMaterialReconciliation(companyId: number): Promise<R
     )
     .groupBy(factoryMixBatchSources.containerId);
 
+  const receivedByContainer = new Map<number, number>();
+  const usedByContainer = new Map<number, number>();
   const remainingByContainer = new Map<number, number>();
   for (const r of rawStockRows) {
     const rec = parseFloat(r.receivedKg as string) || 0;
     const used = parseFloat(r.usedKg as string) || 0;
+    receivedByContainer.set(r.containerId, (receivedByContainer.get(r.containerId) || 0) + rec);
+    usedByContainer.set(r.containerId, (usedByContainer.get(r.containerId) || 0) + used);
     remainingByContainer.set(r.containerId, (remainingByContainer.get(r.containerId) || 0) + (rec - used));
   }
 
+  // Model A: usedKg already reflects mix-batch consumption, so a container's
+  // real free kg is always receivedKg − usedKg (== remainingByContainer here,
+  // the ground truth this report itself computes from factory_raw_stock).
+  // reservedKg (active, non-closed mix-batch reservations against this
+  // container) is informational exposure only — it must NEVER be subtracted a
+  // second time on top of usedKg. A fully-allocated container legitimately has
+  // reservedKg == its own historical consumption, which can exceed its OWN
+  // remaining kg once fully consumed; that is NOT a bug and must not be
+  // flagged merely because reservedKg > remainingKg (see
+  // detectDoubleReservedDeduction for the real, provable check).
   const doubleReservedDeductions: DoubleReservedRow[] = [];
   for (const r of reservedByContainer) {
     if (!r.containerId) continue;
     const reserved = parseFloat(r.reservedKg as string) || 0;
     const remaining = remainingByContainer.get(r.containerId) || 0;
-    if (reserved - remaining > EPS) {
+    const received = receivedByContainer.get(r.containerId) || 0;
+    const used = usedByContainer.get(r.containerId) || 0;
+    // displayedFreeKg is this report's own ground-truth remaining kg — the
+    // same figure the Raw Materials list / diagnostics surface. Comparing it
+    // against receivedKg − usedKg here is a structural regression guard: it
+    // will only ever flag if some future change makes "remaining" diverge
+    // from Model A (e.g. by reintroducing a reservedKg subtraction).
+    const check = detectDoubleReservedDeduction({ receivedKg: received, usedKg: used, reservedKg: reserved, displayedFreeKg: remaining });
+    if (check.provenDoubleSubtraction) {
       const container = allContainersById.get(r.containerId);
       doubleReservedDeductions.push({
         containerId: r.containerId,
         containerNumber: container?.containerNumber ?? null,
         remainingKg: remaining,
         reservedKg: reserved,
-        overCommittedKg: reserved - remaining,
+        overCommittedKg: -check.discrepancyKg,
       });
     }
   }
@@ -315,8 +676,43 @@ export async function getRawMaterialReconciliation(companyId: number): Promise<R
     lockedRateDiagnostics,
     lockedRateDriftCount,
     supplierCurrencyExposure: Array.from(exposureBySupplier.values()),
+    supplierBalanceByCurrency,
+    unresolvedFxRows,
     crossCompanyContamination: scopedContamination,
     doubleReservedDeductions,
     negativeStockCount: negativeStockRows.length,
   };
+}
+
+export interface DoubleReservedCheckResult {
+  expectedFreeKg: number;
+  discrepancyKg: number;
+  provenDoubleSubtraction: boolean;
+}
+
+/**
+ * Model A structural guard: usedKg already includes mix-batch consumption, so
+ * a container's free kg must always equal receivedKg − usedKg. reservedKg
+ * (the sum of active, non-closed mix-batch source weight against this
+ * container) is informational exposure only and must NEVER be subtracted a
+ * second time on top of usedKg — doing so is the "double reserved deduction"
+ * bug this guards against.
+ *
+ * A genuine double-subtraction shows up as the system's displayed/calculated
+ * free quantity being LOWER than the correct value by (approximately) the
+ * reservedKg amount — i.e. reservedKg was subtracted again on top of usedKg,
+ * which already accounts for it. Pure function so it is directly unit
+ * testable without touching the database; also used, with displayedFreeKg set
+ * to this report's own ground-truth remaining kg, as a live regression guard.
+ */
+export function detectDoubleReservedDeduction(params: {
+  receivedKg: number;
+  usedKg: number;
+  reservedKg: number;
+  displayedFreeKg: number;
+}): DoubleReservedCheckResult {
+  const expectedFreeKg = params.receivedKg - params.usedKg;
+  const discrepancyKg = params.displayedFreeKg - expectedFreeKg;
+  const provenDoubleSubtraction = params.reservedKg > EPS && Math.abs(discrepancyKg + params.reservedKg) <= EPS;
+  return { expectedFreeKg, discrepancyKg, provenDoubleSubtraction };
 }

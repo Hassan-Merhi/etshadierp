@@ -21,11 +21,10 @@
  */
 import crypto from "node:crypto";
 
-const SIGNING_KEY = process.env.SESSION_SECRET || "dev-fallback-repair-token-key-not-for-production";
-
-function hmac(payload: string): string {
-  return crypto.createHmac("sha256", SIGNING_KEY).update(payload).digest("hex");
-}
+// Never a real production secret — only ever used in non-production environments,
+// and only when the caller hasn't supplied a real SESSION_SECRET at all (local dev
+// without a .env, or a test run that hasn't injected its own test secret yet).
+const DEV_FALLBACK_SIGNING_KEY = "dev-fallback-repair-token-key-not-for-production";
 
 export class InvalidRepairTokenError extends Error {
   constructor(reason: string) {
@@ -41,8 +40,47 @@ export class ExpiredRepairTokenError extends Error {
   }
 }
 
+/** Thrown instead of ever signing/verifying a repair token with a fallback key
+ * in production. Routes must catch this and return a configuration error
+ * WITHOUT performing any write — a repair token is meaningless security theater
+ * if it's signed with a key every deployment shares. */
+export class RepairTokenConfigurationError extends Error {
+  constructor() {
+    super(
+      "SESSION_SECRET is not configured (or is still the development fallback) — repair confirmation tokens " +
+        "cannot be safely issued or verified in production. Set a strong, unique SESSION_SECRET first."
+    );
+    this.name = "RepairTokenConfigurationError";
+  }
+}
+
+/**
+ * Resolves the signing key fresh on every call (never cached at module load)
+ * so tests can inject their own SESSION_SECRET at any point and repair-token
+ * behavior picks it up immediately. In production, a missing or dev-fallback
+ * SESSION_SECRET is a hard failure — never silently signs with a shared,
+ * guessable key. Outside production (dev/test with no secret configured at
+ * all), the dev fallback is allowed so local development keeps working.
+ */
+function getSigningKey(): string {
+  const configured = process.env.SESSION_SECRET;
+  const isProduction = process.env.NODE_ENV === "production";
+  if (!configured || configured === DEV_FALLBACK_SIGNING_KEY) {
+    if (isProduction) throw new RepairTokenConfigurationError();
+    return DEV_FALLBACK_SIGNING_KEY;
+  }
+  return configured;
+}
+
+function hmac(payload: string): string {
+  return crypto.createHmac("sha256", getSigningKey()).update(payload).digest("hex");
+}
+
 /** Signs an arbitrary JSON-serializable payload. Caller must include an
- * `expiresAt` (epoch ms) field in `payload` for expiry to be enforced. */
+ * `expiresAt` (epoch ms) field in `payload` for expiry to be enforced.
+ * Throws RepairTokenConfigurationError in production without a real
+ * SESSION_SECRET — callers must catch this and refuse the request, never
+ * fall back to issuing a token anyway. */
 export function signRepairToken(payload: Record<string, any>): string {
   const json = JSON.stringify(payload);
   const encoded = Buffer.from(json, "utf8").toString("base64url");
