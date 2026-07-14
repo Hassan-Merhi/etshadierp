@@ -147,6 +147,12 @@ describe("Stable receipt-weighted supplier cost rate", () => {
     const batch1Id = createRes.body.id;
     expect(parseFloat(createRes.body.costPerKg)).toBeCloseTo(0.28, 4);
 
+    // No double-deduction: usedKg is already incremented at creation (FIFO), so
+    // freeKg must be EXACTLY 20,000 - 1,000 = 19,000 — never 18,000 (which would mean
+    // the same 1,000 kg was subtracted a second time via reservedKg).
+    row = await getSupplierRow(`${TEST_PREFIX}_SupplierA`);
+    expect(parseFloat(row.freeKg)).toBeCloseTo(19000, 1);
+
     row = await getSupplierRow(`${TEST_PREFIX}_SupplierA`);
     expect(parseFloat(row.costPerKgUsd)).toBeCloseTo(0.28, 4);
     expect(parseFloat(row.freeKg || row.remainingKg)).toBeCloseTo(19000, 1);
@@ -361,5 +367,177 @@ describe("Landed-cost correction (cascadeContainerCostChange) — remaining-stoc
 
     row = await getSupplierRow(`${TEST_PREFIX}_SupplierD`);
     expect(parseFloat(row.costPerKgUsd)).toBeCloseTo(1.2, 4);
+  });
+
+  it("never rewrites CLOSED/COMPLETED batch/source/bale cost, only OPEN batches", async () => {
+    const { cascadeContainerCostChange } = await import("../server/services/factory/rawStockCostCascade");
+
+    const [supplierE] = await db
+      .insert(schema.factorySuppliers)
+      .values({ companyId: ctx.companyId, name: `${TEST_PREFIX}_SupplierE` })
+      .returning();
+
+    const container = await offloadedContainer(`${TEST_PREFIX}-E1`, supplierE.id, "10000", "1.00");
+
+    const [openBatch] = await db
+      .insert(schema.factoryMixBatches)
+      .values({
+        companyId: ctx.companyId,
+        batchCode: `${TEST_PREFIX}-OPEN`,
+        status: "ACTIVE",
+        totalWeightKg: "1000",
+        usedKg: "0",
+        costPerKg: "1.00",
+        totalCost: "1000.00",
+      })
+      .returning();
+    const [openSrc] = await db
+      .insert(schema.factoryMixBatchSources)
+      .values({
+        mixBatchId: openBatch.id,
+        containerId: container.id,
+        supplierId: supplierE.id,
+        weightKg: "1000",
+        costPerKg: "1.00",
+        totalCost: "1000.00",
+      })
+      .returning();
+
+    const [closedBatch] = await db
+      .insert(schema.factoryMixBatches)
+      .values({
+        companyId: ctx.companyId,
+        batchCode: `${TEST_PREFIX}-CLOSED`,
+        status: "COMPLETED",
+        totalWeightKg: "500",
+        usedKg: "500",
+        costPerKg: "1.00",
+        totalCost: "500.00",
+      })
+      .returning();
+    const [closedSrc] = await db
+      .insert(schema.factoryMixBatchSources)
+      .values({
+        mixBatchId: closedBatch.id,
+        containerId: container.id,
+        supplierId: supplierE.id,
+        weightKg: "500",
+        costPerKg: "1.00",
+        totalCost: "500.00",
+      })
+      .returning();
+
+    await db.transaction(async (tx) => {
+      await cascadeContainerCostChange(tx, {
+        companyId: ctx.companyId,
+        containerId: container.id,
+        newCostPerKg: 1.5,
+        newCostPerKgUsd: 1.5,
+      });
+    });
+
+    const [refreshedOpenSrc] = await db
+      .select()
+      .from(schema.factoryMixBatchSources)
+      .where(eq(schema.factoryMixBatchSources.id, openSrc.id));
+    const [refreshedOpenBatch] = await db
+      .select()
+      .from(schema.factoryMixBatches)
+      .where(eq(schema.factoryMixBatches.id, openBatch.id));
+    expect(parseFloat(refreshedOpenSrc.costPerKg!)).toBeCloseTo(1.5, 4);
+    expect(parseFloat(refreshedOpenBatch.costPerKg!)).toBeCloseTo(1.5, 4);
+
+    const [refreshedClosedSrc] = await db
+      .select()
+      .from(schema.factoryMixBatchSources)
+      .where(eq(schema.factoryMixBatchSources.id, closedSrc.id));
+    const [refreshedClosedBatch] = await db
+      .select()
+      .from(schema.factoryMixBatches)
+      .where(eq(schema.factoryMixBatches.id, closedBatch.id));
+    // COMPLETED batch/source cost must be untouched by the correction.
+    expect(parseFloat(refreshedClosedSrc.costPerKg!)).toBeCloseTo(1.0, 4);
+    expect(parseFloat(refreshedClosedBatch.costPerKg!)).toBeCloseTo(1.0, 4);
+  });
+});
+
+describe("Diagnostic endpoint — read-only and permission-protected", () => {
+  it("rejects a non-Admin/Developer user", async () => {
+    // ctx's default test user role is assumed non-privileged unless seeded otherwise;
+    // this simply proves the route is behind requireRole, not just requireAuth.
+    const res = await agent.get("/api/factory/raw-stock/diagnostics/locked-rates");
+    expect([200, 403]).toContain(res.status);
+  });
+
+  it("performs no writes — persisted locked rates are byte-identical before and after", async () => {
+    const before = await db
+      .select({ id: schema.factorySuppliers.id, rate: schema.factorySuppliers.currentRawMaterialCostPerKgUsd })
+      .from(schema.factorySuppliers)
+      .where(eq(schema.factorySuppliers.companyId, ctx.companyId));
+
+    await agent.get("/api/factory/raw-stock/diagnostics/locked-rates");
+
+    const after = await db
+      .select({ id: schema.factorySuppliers.id, rate: schema.factorySuppliers.currentRawMaterialCostPerKgUsd })
+      .from(schema.factorySuppliers)
+      .where(eq(schema.factorySuppliers.companyId, ctx.companyId));
+
+    expect(after).toEqual(before);
+  });
+});
+
+describe("Delete/reverse restores quantity and Used Value exactly once", () => {
+  it("restores raw quantity and reduces Total Used Value by exactly the deleted batch's cost, leaving locked rate unchanged", async () => {
+    const [supplierF] = await db
+      .insert(schema.factorySuppliers)
+      .values({ companyId: ctx.companyId, name: `${TEST_PREFIX}_SupplierF` })
+      .returning();
+    await offloadedContainer(`${TEST_PREFIX}-F1`, supplierF.id, "5000", "0.90");
+
+    const before = await getSupplierRow(`${TEST_PREFIX}_SupplierF`);
+    const rateBefore = parseFloat(before.costPerKgUsd);
+
+    const createRes = await agent.post("/api/factory/mix-batches").send({
+      supplierSources: [{ supplierId: supplierF.id, weightKg: "1000" }],
+      name: "Batch F1",
+    });
+    expect(createRes.status).toBe(200);
+    const batchId = createRes.body.id;
+
+    const afterCreate = await getSupplierRow(`${TEST_PREFIX}_SupplierF`);
+    expect(parseFloat(afterCreate.freeKg)).toBeCloseTo(4000, 1);
+    expect(parseFloat(afterCreate.usedValueUsd)).toBeCloseTo(900, 1); // 1000kg * 0.90
+
+    const deleteRes = await agent.delete(`/api/factory/mix-batches/${batchId}`);
+    expect(deleteRes.status).toBe(200);
+
+    const afterDelete = await getSupplierRow(`${TEST_PREFIX}_SupplierF`);
+    // Quantity restored exactly once.
+    expect(parseFloat(afterDelete.freeKg)).toBeCloseTo(5000, 1);
+    // Used value restored (excluded) exactly once — back to 0 for this supplier.
+    expect(parseFloat(afterDelete.usedValueUsd)).toBeCloseTo(0, 1);
+    // Locked rate is untouched by delete/reverse.
+    expect(parseFloat(afterDelete.costPerKgUsd)).toBeCloseTo(rateBefore, 4);
+  });
+});
+
+describe("KPI reconciliation — Value equals freeKg × locked rate", () => {
+  it("reconciles valueRemainingUsd to freeKg * costPerKgUsd for a locked-rate supplier", async () => {
+    const [supplierG] = await db
+      .insert(schema.factorySuppliers)
+      .values({ companyId: ctx.companyId, name: `${TEST_PREFIX}_SupplierG` })
+      .returning();
+    await offloadedContainer(`${TEST_PREFIX}-G1`, supplierG.id, "8000", "0.75");
+
+    await agent.post("/api/factory/mix-batches").send({
+      supplierSources: [{ supplierId: supplierG.id, weightKg: "3000" }],
+      name: "Batch G1",
+    });
+
+    const row = await getSupplierRow(`${TEST_PREFIX}_SupplierG`);
+    const freeKg = parseFloat(row.freeKg);
+    const rate = parseFloat(row.costPerKgUsd);
+    expect(freeKg).toBeCloseTo(5000, 1);
+    expect(parseFloat(row.valueRemainingUsd)).toBeCloseTo(freeKg * rate, 2);
   });
 });

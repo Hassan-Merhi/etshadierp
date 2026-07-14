@@ -116,6 +116,33 @@ export async function getLockedSupplierRate(
 }
 
 /**
+ * Pure read-only variant of getLockedSupplierRate: never writes, even when the
+ * persisted rate has never been established. Diagnostics and any other
+ * read-only surface must use this instead of getLockedSupplierRate, which
+ * performs a one-time lazy backfill write as a side effect of reading.
+ */
+export async function getLockedSupplierRateReadOnly(
+  tx: any,
+  companyId: number,
+  supplierId: number
+): Promise<{ rate: number; wasBackfilled: boolean }> {
+  const [supplier] = await tx
+    .select({ currentRawMaterialCostPerKgUsd: factorySuppliers.currentRawMaterialCostPerKgUsd })
+    .from(factorySuppliers)
+    .where(and(eq(factorySuppliers.id, supplierId), eq(factorySuppliers.companyId, companyId)));
+  if (!supplier) return { rate: 0, wasBackfilled: false };
+
+  const existing = supplier.currentRawMaterialCostPerKgUsd;
+  if (existing !== null && existing !== undefined) {
+    return { rate: parseFloat(existing as string) || 0, wasBackfilled: false };
+  }
+
+  // Never-established — compute what the lazy backfill WOULD persist, without writing.
+  const { costPerKgUsd } = await getStableSupplierCost(tx, companyId, supplierId);
+  return { rate: costPerKgUsd, wasBackfilled: false };
+}
+
+/**
  * Applies the spec's exact moving-average formula when a new container is
  * offloaded for a supplier, and persists the result as the new locked rate.
  * MUST be called BEFORE the new raw-stock row is inserted, inside the same

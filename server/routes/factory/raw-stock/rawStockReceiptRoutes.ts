@@ -364,7 +364,8 @@ export function registerRawStockReceiptRoutes(app: Express) {
           and(
             eq(factoryMixBatches.companyId, companyId),
             sql`${factoryMixBatchSources.supplierId} IS NOT NULL`,
-            sql`${factoryMixBatches.status} NOT IN ('CLOSED', 'COMPLETED')`
+            sql`${factoryMixBatches.status} NOT IN ('CLOSED', 'COMPLETED')`,
+            isNull(factoryMixBatches.deletedAt)
           )
         )
         .groupBy(factoryMixBatchSources.supplierId);
@@ -375,6 +376,9 @@ export function registerRawStockReceiptRoutes(app: Express) {
       // is the only correct "Total Used Value": a single global blended mix-batch rate
       // multiplied by total used kg is unreliable once suppliers/batches have different
       // rates, since it attributes every kg to a rate it may never have actually cost.
+      // Exclude soft-deleted/reversed batches — once a batch is deleted its sources no
+      // longer contribute to "used" stock, so they must not still count toward Total
+      // Used Value (the corresponding usedKg was already restored by the delete route).
       const usedValueRows = await db
         .select({
           supplierId: factoryMixBatchSources.supplierId,
@@ -382,7 +386,13 @@ export function registerRawStockReceiptRoutes(app: Express) {
         })
         .from(factoryMixBatchSources)
         .innerJoin(factoryMixBatches, eq(factoryMixBatchSources.mixBatchId, factoryMixBatches.id))
-        .where(and(eq(factoryMixBatches.companyId, companyId), sql`${factoryMixBatchSources.supplierId} IS NOT NULL`))
+        .where(
+          and(
+            eq(factoryMixBatches.companyId, companyId),
+            sql`${factoryMixBatchSources.supplierId} IS NOT NULL`,
+            isNull(factoryMixBatches.deletedAt)
+          )
+        )
         .groupBy(factoryMixBatchSources.supplierId);
       const usedValueBySupplierId = new Map<number, number>();
       for (const r of usedValueRows) {
@@ -487,20 +497,26 @@ export function registerRawStockReceiptRoutes(app: Express) {
         }
       }
       for (const [suppId, rows] of rowsBySupplierId) {
+        // Model A: creating/editing/topping-up a mix batch already increments
+        // factoryRawStock.usedKg (and factoryMixBatches.usedKg) via FIFO at the moment
+        // the batch is created — see factoryMixBatchRoutes.ts. That consumption is
+        // therefore already reflected in remainingKg (received - used) above.
+        // reservedKg (active, non-CLOSED/COMPLETED batch source weight) is purely
+        // informational here — showing how much of the already-deducted usedKg is
+        // still "in an open batch" versus fully consumed — and must NOT be subtracted
+        // again from freeKg, or the same kilograms are deducted twice.
         const reserved = reservedBySupplierId.get(suppId) || 0;
         const totalRemaining = rows.reduce((sum, r) => sum + parseFloat(r.remainingKg), 0);
-        // Allow negative freeKg so over-used stock is visible in the UI
-        const totalFree = totalRemaining - reserved;
         if (rows.length === 1) {
           rows[0].reservedKg = reserved.toFixed(3);
-          rows[0].freeKg = totalFree.toFixed(3);
+          rows[0].freeKg = totalRemaining.toFixed(3);
         } else {
           // Proportional distribution across multiple rows
           for (const row of rows as any[]) {
             const rem = parseFloat(row.remainingKg);
             const proportion = totalRemaining > 0 ? rem / totalRemaining : 0;
             row.reservedKg = (reserved * proportion).toFixed(3);
-            row.freeKg = (totalFree * proportion).toFixed(3);
+            row.freeKg = rem.toFixed(3);
           }
         }
       }

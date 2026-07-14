@@ -16,7 +16,7 @@
  * Must be called inside an existing `db.transaction(async (tx) => {...})` —
  * pass the `tx` handle so all writes are atomic with the caller's other work.
  */
-import { eq, and, sql } from "drizzle-orm";
+import { eq, and, sql, inArray } from "drizzle-orm";
 import { factoryRawStock, factoryMixBatchSources, factoryMixBatches, factoryBales, factoryContainers, factorySuppliers } from "@shared/schema";
 import { getLockedSupplierRate, getAuthoritativeSupplierRemainingKg } from "./rawStockLockedRate";
 
@@ -106,11 +106,24 @@ export async function cascadeContainerCostChange(
       .where(and(eq(factorySuppliers.id, container.supplierId), eq(factorySuppliers.companyId, companyId)));
   }
 
-  // 2. Mix batch sources sourced from this container.
+  // 2. Mix batch sources sourced from this container — restricted to batches still
+  //    OPEN (ACTIVE/OPEN/CARRY_FORWARD). A landed-cost correction is a forward-looking
+  //    fix to current stock; it must never rewrite the recorded cost of a batch that
+  //    has already been CLOSED/COMPLETED (or soft-deleted) — those costs, and any bales
+  //    pressed from them, are historical record and must stay exactly as they were.
+  const OPEN_BATCH_STATUSES = ["ACTIVE", "OPEN", "CARRY_FORWARD"];
   const mixSources = await tx
-    .select()
+    .select({ src: factoryMixBatchSources })
     .from(factoryMixBatchSources)
-    .where(eq(factoryMixBatchSources.containerId, containerId));
+    .innerJoin(factoryMixBatches, eq(factoryMixBatchSources.mixBatchId, factoryMixBatches.id))
+    .where(
+      and(
+        eq(factoryMixBatchSources.containerId, containerId),
+        inArray(factoryMixBatches.status, OPEN_BATCH_STATUSES),
+        sql`${factoryMixBatches.deletedAt} IS NULL`
+      )
+    )
+    .then((rows: any[]) => rows.map((r) => r.src));
 
   const affectedBatches: CascadeResult["affectedBatches"] = [];
   const affectedBales: CascadeResult["affectedBales"] = [];
