@@ -16,15 +16,16 @@ whether a stored rate is trustworthy:
 schema flag was required.
 
 **How to apply:** `fxRateConfirmed` boolean columns (default false) exist on `factory_containers`,
-`factory_offload_additional_charges`, `factory_container_commissions` — pass `(row as any).fxRateConfirmed`
-whenever resolving one of those tables' rates. Tables WITHOUT the column yet (`factory_daybook_entries`,
-`factory_supplier_payments`, `factory_supplier_fx_transfers`, `factory_raw_stock` commission fields,
-`factory_fx_rates`, generic ERP `vouchers.exchangeRate`) still use the legacy heuristic or are out of
-scope (generic voucher exchange rate is a separate ERP-wide system, not raw-material specific).
+`factory_offload_additional_charges`, `factory_container_commissions`. Every container-create/edit/bulk-import
+write path now sets it `true` when it explicitly resolves a rate (manual entry or a real auto-fetch);
+all read/aggregate paths pass `(row as any).fxRateConfirmed` through to `resolveStoredFxRate` and exclude
+(never guess at 1) any row where `looksSet` is false. Tables WITHOUT the column yet
+(`factory_daybook_entries`, `factory_supplier_payments`, `factory_supplier_fx_transfers`, `factory_raw_stock`
+commission fields, `factory_fx_rates`, generic ERP `vouchers.exchangeRate`) still use the legacy heuristic —
+out of scope by design for `vouchers.exchangeRate` (separate ERP-wide voucher system), and a documented
+stopgap everywhere else until those tables get the same column.
 
-Known remaining gap (not yet converted to the flag-based/rejecting model as of this pass): the
-`/api/factory/suppliers/with-balances` list endpoint in `supplierBalanceRoutes.ts` (~lines 900-1140)
-still uses `configuredFxRates[cc] ?? parseFloat(c.fxRateToUsd || "1")` as a fallback chain — an
-admin-configured company rate takes priority (safer than a bare default), but the final fallback can
-still silently use 1. Also unconverted: `supplierStatementRoutes.ts`, `supplierCrudRoutes.ts`,
-`supplierBrokerRoutes.ts`, `employeeNetPositionRoutes.ts` fx read sites.
+A read-only diagnostic, `GET /api/factory/suppliers/fx-diagnostic`, scans containers/offload-charges/commissions
+for the current company and reports every unresolved row grouped by supplier/currency/status/container, flagging
+CLOSED/COMPLETED/OFFLOADED rows as `manualReviewRequired` (never auto-fixable). No repair/write service exists
+yet — that and decimal.js-based arithmetic are still open work.
