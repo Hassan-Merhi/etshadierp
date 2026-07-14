@@ -359,7 +359,20 @@ export async function recalculateContainerCosts(
     ? parseFloat(commission.commissionTotal || "0")
     : parseFloat(container.commissionAmount || "0");
   const commCcy = commission ? commission.currencyCode || "USD" : containerCcy;
-  const commFx = commission ? parseFloat(commission.fxRateToUsd || "1") : fxRate;
+  let commFx = fxRate;
+  if (commission && commCcy !== "USD") {
+    if (commCcy === containerCcy) {
+      commFx = fxRate; // same currency as container — reuse the already-validated container rate
+    } else {
+      const { fxRate: resolvedCommFx, looksSet: commFxLooksSet } = resolveStoredFxRate(
+        commCcy,
+        commission.fxRateToUsd,
+        (commission as any).fxRateConfirmed
+      );
+      if (!commFxLooksSet) throw new UnresolvedExchangeRateError(commCcy);
+      commFx = resolvedCommFx;
+    }
+  }
   const commUsdAmt = commCcy === "USD" ? commVal : commVal * commFx;
   const commInCcy = commCcy === containerCcy ? commVal : fxRate > 0 ? commUsdAmt / fxRate : commVal;
 

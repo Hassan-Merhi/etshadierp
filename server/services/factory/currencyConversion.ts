@@ -17,19 +17,31 @@
 export interface FxRateResolution {
   /** The rate to use for conversion. Only meaningful when looksSet is true. */
   fxRate: number;
-  /** False when the currency is non-USD and the stored rate is missing, <= 0, or exactly 1 (the unset schema default). */
+  /** False when the currency is non-USD and the rate cannot be trusted as explicitly resolved. */
   looksSet: boolean;
 }
 
-/** USD always resolves to 1 with looksSet=true — no rate is ever needed for USD amounts. */
+/**
+ * USD always resolves to 1 with looksSet=true — no rate is ever needed for USD amounts.
+ *
+ * For non-USD currencies, prefer the explicit `fxRateConfirmed` column when the caller
+ * has it available (added to factory_containers, factory_offload_additional_charges,
+ * and factory_container_commissions) — this is the source of truth and a confirmed
+ * rate of exactly 1 IS valid. `confirmed` is `undefined` for tables that don't carry
+ * the column yet (e.g. factory_supplier_payments, factory_raw_stock commission fields,
+ * factory_daybook_entries) — for those we fall back to the legacy "rate>0 && rate!==1"
+ * heuristic as a stopgap, which is a known imprecision (a genuine confirmed 1.0 rate on
+ * those tables would still be flagged unresolved) until they get the same column.
+ */
 export function resolveStoredFxRate(
   currencyCode: string | null | undefined,
-  storedFxRateToUsd: string | number | null | undefined
+  storedFxRateToUsd: string | number | null | undefined,
+  confirmed?: boolean
 ): FxRateResolution {
   const ccy = currencyCode || "USD";
   if (ccy === "USD") return { fxRate: 1, looksSet: true };
   const rate = parseFloat(String(storedFxRateToUsd ?? "0")) || 0;
-  const looksSet = rate > 0 && rate !== 1;
+  const looksSet = confirmed !== undefined ? confirmed && rate > 0 : rate > 0 && rate !== 1;
   return { fxRate: looksSet ? rate : 0, looksSet };
 }
 
@@ -47,9 +59,10 @@ export function applyFxRate(amount: number, currencyCode: string | null | undefi
 export function convertToUsdOrNull(
   amount: number,
   currencyCode: string | null | undefined,
-  storedFxRateToUsd: string | number | null | undefined
+  storedFxRateToUsd: string | number | null | undefined,
+  confirmed?: boolean
 ): number | null {
-  const { fxRate, looksSet } = resolveStoredFxRate(currencyCode, storedFxRateToUsd);
+  const { fxRate, looksSet } = resolveStoredFxRate(currencyCode, storedFxRateToUsd, confirmed);
   if (!looksSet) return null;
   return applyFxRate(amount, currencyCode, fxRate);
 }
@@ -73,9 +86,10 @@ export class UnresolvedExchangeRateError extends Error {
 export function convertToUsdOrThrow(
   amount: number,
   currencyCode: string | null | undefined,
-  storedFxRateToUsd: string | number | null | undefined
+  storedFxRateToUsd: string | number | null | undefined,
+  confirmed?: boolean
 ): number {
-  const result = convertToUsdOrNull(amount, currencyCode, storedFxRateToUsd);
+  const result = convertToUsdOrNull(amount, currencyCode, storedFxRateToUsd, confirmed);
   if (result === null) throw new UnresolvedExchangeRateError(currencyCode || "USD");
   return result;
 }

@@ -6,6 +6,7 @@ import { requireAuth } from "../../../auth";
 import { classifyNetPositionAccounts } from "../../../netPositionHelper";
 import { adjustInventory } from "../../../inventoryHelper";
 import { applyOffloadMovingAverage } from "../../../services/factory/rawStockLockedRate";
+import { resolveStoredFxRate } from "../../../services/factory/currencyConversion";
 import {
   writeDaybookEntry,
   getOrFetchFxRateToUsd,
@@ -187,8 +188,11 @@ export function registerRawStockOffloadRoutes(app: Express) {
           // trace of why. The container's own fxRateToUsd is only a legitimate fallback
           // if it was itself explicitly set (not left at the schema default of "1" for
           // a non-USD currency, which means "never actually set").
-          const containerRate = parseFloat(container.fxRateToUsd || "0");
-          const containerRateLooksSet = containerRate > 0 && !(container.currencyCode !== "USD" && containerRate === 1);
+          const { fxRate: containerRate, looksSet: containerRateLooksSet } = resolveStoredFxRate(
+            container.currencyCode,
+            container.fxRateToUsd,
+            (container as any).fxRateConfirmed
+          );
           if (!containerRateLooksSet) {
             return res.status(400).json({
               message: `No valid FX rate available for ${currencyCode} on ${offloadDate}, and the container has no explicitly-set fxRateToUsd to fall back on. Provide fxRateToUsd explicitly to offload this container. (${err.message})`,

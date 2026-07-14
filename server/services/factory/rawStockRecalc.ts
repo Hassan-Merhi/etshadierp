@@ -27,6 +27,7 @@ import {
   factorySuppliers,
 } from "@shared/schema";
 import { cascadeContainerCostChange } from "./rawStockCostCascade";
+import { resolveStoredFxRate } from "./currencyConversion";
 
 export interface RecalcRow {
   containerId: number;
@@ -40,6 +41,10 @@ export interface RecalcRow {
   next: { costPerKg: number; costPerKgUsd: number };
   diffPct: number; // % change in costPerKgUsd, signed
   changed: boolean;
+  /** True when the container's currency is non-USD and no explicitly-resolved exchange
+   * rate is available — `next` is NOT trustworthy in this case and must never be applied
+   * automatically; surfaced for MANUAL_REVIEW_REQUIRED instead of an auto-fixable diff. */
+  fxUnresolved: boolean;
 }
 
 /**
@@ -52,14 +57,22 @@ export function computeCorrectContainerCost(
   container: typeof factoryContainers.$inferSelect,
   additionalCharges: (typeof factoryOffloadAdditionalCharges.$inferSelect)[],
   commissionRecord: typeof factoryContainerCommissions.$inferSelect | null
-): { costPerKg: number; costPerKgUsd: number; totalCost: number; totalUsd: number } {
+): { costPerKg: number; costPerKgUsd: number; totalCost: number; totalUsd: number; fxUnresolved: boolean } {
   const containerCcy = container.currencyCode || "USD";
   // The offload/edit fx rate actually applied to this container's charges — prefer the
-  // rate captured at offload time, falling back to the general one if not set.
-  const fxRate = parseFloat(container.fxRateToUsdOffload || container.fxRateToUsd || "1") || 1;
+  // rate captured at offload time, falling back to the general one if not set. Never
+  // silently default an unresolved non-USD rate to 1 — surface it as fxUnresolved instead.
+  const { fxRate, looksSet: fxLooksSet } = resolveStoredFxRate(
+    containerCcy,
+    container.fxRateToUsdOffload || container.fxRateToUsd,
+    (container as any).fxRateConfirmed
+  );
+  if (!fxLooksSet) {
+    return { costPerKg: 0, costPerKgUsd: 0, totalCost: 0, totalUsd: 0, fxUnresolved: true };
+  }
   const actualKg = parseFloat(container.actualReceivedKg || "0");
   if (actualKg <= 0) {
-    return { costPerKg: 0, costPerKgUsd: 0, totalCost: 0, totalUsd: 0 };
+    return { costPerKg: 0, costPerKgUsd: 0, totalCost: 0, totalUsd: 0, fxUnresolved: false };
   }
 
   const baseRate = parseFloat(container.ratePerKg || "0");
@@ -124,6 +137,7 @@ export function computeCorrectContainerCost(
     costPerKgUsd: totalUsd / actualKg,
     totalCost,
     totalUsd,
+    fxUnresolved: false,
   };
 }
 
@@ -181,7 +195,8 @@ export async function getRawStockRecalcPreview(companyId: number): Promise<Recal
     // Tiny float-noise tolerance — anything above this is a real, actionable diff.
     const EPS = 0.0005;
     const changed =
-      Math.abs(next.costPerKg - oldCostPerKg) > EPS || Math.abs(next.costPerKgUsd - oldCostPerKgUsd) > EPS;
+      !next.fxUnresolved &&
+      (Math.abs(next.costPerKg - oldCostPerKg) > EPS || Math.abs(next.costPerKgUsd - oldCostPerKgUsd) > EPS);
     const diffPct = oldCostPerKgUsd > 0 ? ((next.costPerKgUsd - oldCostPerKgUsd) / oldCostPerKgUsd) * 100 : 0;
 
     results.push({
@@ -194,13 +209,15 @@ export async function getRawStockRecalcPreview(companyId: number): Promise<Recal
       receivedKg: parseFloat(row.receivedKg || "0"),
       old: { costPerKg: oldCostPerKg, costPerKgUsd: oldCostPerKgUsd },
       next: { costPerKg: next.costPerKg, costPerKgUsd: next.costPerKgUsd },
-      diffPct,
+      diffPct: next.fxUnresolved ? 0 : diffPct,
       changed,
+      fxUnresolved: next.fxUnresolved,
     });
   }
 
-  // Changed rows first, biggest impact first.
+  // Unresolved-FX rows need human attention first, then changed rows, biggest impact first.
   results.sort((a, b) => {
+    if (a.fxUnresolved !== b.fxUnresolved) return a.fxUnresolved ? -1 : 1;
     if (a.changed !== b.changed) return a.changed ? -1 : 1;
     return Math.abs(b.diffPct) - Math.abs(a.diffPct);
   });
@@ -250,6 +267,7 @@ export async function applyRawStockRecalc(companyId: number, containerIds: numbe
     const commissionRecord = commissionRecords.sort((a, b) => b.id - a.id)[0] || null;
 
     const next = computeCorrectContainerCost(container, additionalCharges, commissionRecord);
+    if (next.fxUnresolved) continue; // never auto-apply a recompute derived from an unresolved FX rate
     if (next.costPerKgUsd === 0 && next.costPerKg === 0) continue; // no received kg, nothing to fix
 
     const result = await db.transaction(async (tx) => {

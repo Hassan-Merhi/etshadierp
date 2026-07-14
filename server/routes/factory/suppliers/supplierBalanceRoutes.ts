@@ -6,6 +6,7 @@ import { requireAuth } from "../../../auth";
 import { classifyNetPositionAccounts } from "../../../netPositionHelper";
 import { adjustInventory } from "../../../inventoryHelper";
 import { sqlArray } from "../../../lib/sqlArray";
+import { resolveStoredFxRate } from "../../../services/factory/currencyConversion";
 import {
   writeDaybookEntry,
   getOrFetchFxRateToUsd,
@@ -698,6 +699,7 @@ export function registerSupplierBalanceRoutes(app: Express) {
           amount: factoryOffloadAdditionalCharges.amount,
           currencyCode: factoryOffloadAdditionalCharges.currencyCode,
           fxRateToUsd: factoryOffloadAdditionalCharges.fxRateToUsd,
+          fxRateConfirmed: (factoryOffloadAdditionalCharges as any).fxRateConfirmed,
         })
         .from(factoryOffloadAdditionalCharges)
         .where(
@@ -710,6 +712,11 @@ export function registerSupplierBalanceRoutes(app: Express) {
       // computeBalance: TRUE BROKER BALANCE MODEL.
       // Commission from a supplier's own containers is included in the supplier's balance.
       // For brokers, their balance = only direct entries + FX-in (no child rollup).
+      // Tracks suppliers whose balance includes a component derived from an unresolved
+      // non-USD exchange rate — the returned USD figure for these is NOT trustworthy and
+      // callers must surface this rather than silently trusting the number (unresolved
+      // components are treated as 0 contribution, never silently priced at rate=1).
+      const balanceFxUnresolved = new Set<number>();
       const computeBalance = (sid: number, openingBal: number) => {
         const supplierContainers = allContainers.filter((c: any) => c.supplierId === sid);
         const containerValue = supplierContainers.reduce((sum: number, c: any) => {
@@ -718,12 +725,18 @@ export function registerSupplierBalanceRoutes(app: Express) {
           const kg = parseFloat(c.totalKg || "0");
           const rate = parseFloat(c.ratePerKg || "0");
           const freight = parseFloat(c.freight || "0");
-          const fx = parseFloat(c.fxRateToUsd || "1");
           const containerCc = c.currencyCode || "USD";
+          const { fxRate: fx, looksSet: fxLooksSet } = resolveStoredFxRate(
+            containerCc,
+            c.fxRateToUsd,
+            (c as any).fxRateConfirmed
+          );
+          if (!fxLooksSet) balanceFxUnresolved.add(sid);
           const freightCc = c.freightCurrencyCode || containerCc;
           // Freight in the same currency as the container → multiply by fx; otherwise treat separately
           const freightInContainerCurr = freightCc === containerCc ? freight : 0;
           const freightDirectUsd = freightCc === "USD" && freightCc !== containerCc ? freight : 0;
+          if (!fxLooksSet) return sum + freightDirectUsd; // skip the unresolved-rate portion, don't guess
           return sum + (kg * rate + freightInContainerCurr) * fx + freightDirectUsd;
         }, 0);
         // Commission from supplier's OWN containers (not broker-earned from other suppliers' containers)
@@ -731,8 +744,17 @@ export function registerSupplierBalanceRoutes(app: Express) {
           const commAmt = parseFloat(c.commissionAmount || "0");
           if (commAmt <= 0) return sum;
           const commCurr = c.commissionCurrencyCode || c.currencyCode || "USD";
-          const commFx = parseFloat(c.fxRateToUsd || "1");
-          return sum + (commCurr === "USD" ? commAmt : commAmt * commFx);
+          if (commCurr === "USD") return sum + commAmt;
+          const { fxRate: commFx, looksSet: commFxLooksSet } = resolveStoredFxRate(
+            commCurr,
+            c.fxRateToUsd,
+            (c as any).fxRateConfirmed
+          );
+          if (!commFxLooksSet) {
+            balanceFxUnresolved.add(sid);
+            return sum;
+          }
+          return sum + commAmt * commFx;
         }, 0);
         // Other charges from other suppliers' containers where this supplier is the charge recipient
         const otherChargesValue = allContainers.reduce((sum: number, c: any) => {
@@ -740,7 +762,12 @@ export function registerSupplierBalanceRoutes(app: Express) {
           const oc = parseFloat(c.otherCharges || "0");
           if (oc <= 0) return sum;
           const ocCcy = (c as any).otherChargesCurrencyCode || "USD";
-          const fx = ocCcy === "USD" ? 1 : parseFloat(c.fxRateToUsd || "1");
+          if (ocCcy === "USD") return sum + oc;
+          const { fxRate: fx, looksSet } = resolveStoredFxRate(ocCcy, c.fxRateToUsd, (c as any).fxRateConfirmed);
+          if (!looksSet) {
+            balanceFxUnresolved.add(sid);
+            return sum;
+          }
           return sum + oc * fx;
         }, 0);
         // Post-offload additional charges explicitly assigned to this supplier (or children)
@@ -749,7 +776,12 @@ export function registerSupplierBalanceRoutes(app: Express) {
           const amt = parseFloat(oc.amount || "0");
           if (amt <= 0) return sum;
           const cc = oc.currencyCode || "USD";
-          const fx = cc === "USD" ? 1 : parseFloat(oc.fxRateToUsd || "1");
+          if (cc === "USD") return sum + amt;
+          const { fxRate: fx, looksSet } = resolveStoredFxRate(cc, oc.fxRateToUsd, oc.fxRateConfirmed);
+          if (!looksSet) {
+            balanceFxUnresolved.add(sid);
+            return sum;
+          }
           return sum + amt * fx;
         }, 0);
         // FX net: FX-in transfers received minus FX-out transfers sent (in USD)
@@ -781,7 +813,11 @@ export function registerSupplierBalanceRoutes(app: Express) {
       // True broker balance: only the broker's own balance (NOT children aggregated in)
       const outstandingUsd = computeBalance(supplierId, parseFloat(supplier.openingBalance || "0"));
 
-      res.json({ balance: outstandingUsd, outstandingUsd });
+      res.json({
+        balance: outstandingUsd,
+        outstandingUsd,
+        fxUnresolved: balanceFxUnresolved.has(supplierId),
+      });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
