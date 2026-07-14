@@ -39,6 +39,28 @@ async function loginAsTestUser() {
   }
 }
 
+// Creates a dedicated test user with an explicit role on ctx.companyId, logs in as
+// them on a fresh agent, and switches to that company so req.session.currentRole is
+// populated for requireRole checks. Used by the diagnostics permission tests, which
+// must prove exact 403/200 behavior per role rather than accept either outcome.
+async function createAndLoginAs(username: string, role: string): Promise<request.SuperAgentTest> {
+  const bcrypt = await import("bcryptjs");
+  const hashedPassword = await bcrypt.hash("testpassword123", 10);
+  const [user] = await db.insert(schema.users).values({ username, password: hashedPassword }).returning();
+  await db.insert(schema.userCompanyRoles).values({ userId: user.id, companyId: ctx.companyId, role });
+
+  const roleAgent = request.agent(ctx.app);
+  const loginRes = await roleAgent.post("/api/auth/login").send({ username, password: "testpassword123" });
+  if (loginRes.status !== 200) {
+    throw new Error(`Login failed for ${username}: ${loginRes.status} ${JSON.stringify(loginRes.body)}`);
+  }
+  const switchRes = await roleAgent.post("/api/auth/set-company").send({ companyId: ctx.companyId });
+  if (switchRes.status !== 200) {
+    throw new Error(`Set-company failed for ${username}: ${switchRes.status} ${JSON.stringify(switchRes.body)}`);
+  }
+  return roleAgent;
+}
+
 async function cleanupFactoryTables(companyId: number) {
   await pool.query(`DELETE FROM factory_daybook_entries WHERE company_id = $1`, [companyId]);
   await pool.query(
@@ -305,17 +327,85 @@ describe("Locked rate — ADD/REMOVE adjustments, client-cost tampering, and cor
     expect(parseFloat(row.remainingKg)).toBeCloseTo(39500, 1); // 40000 - 500
   });
 
-  it("ignores client-supplied costPerKg tampering when creating a mix batch from a real supplier", async () => {
+  it("ignores client-supplied costPerKg tampering on POST create — stored source and batch use the locked rate", async () => {
     const row = await getSupplierRow(`${TEST_PREFIX}_SupplierC`);
     const lockedRate = parseFloat(row.costPerKgUsd);
 
     const createRes = await agent.post("/api/factory/mix-batches").send({
       supplierSources: [{ supplierId: supplierCId, weightKg: "100", costPerKg: "9.99" }],
-      name: "Batch Tamper Test",
+      name: "Batch Tamper Test Create",
     });
     expect(createRes.status).toBe(200);
     expect(parseFloat(createRes.body.costPerKg)).toBeCloseTo(lockedRate, 4);
     expect(parseFloat(createRes.body.costPerKg)).not.toBeCloseTo(9.99, 2);
+
+    const sources = await db
+      .select()
+      .from(schema.factoryMixBatchSources)
+      .where(eq(schema.factoryMixBatchSources.mixBatchId, createRes.body.id));
+    expect(sources.length).toBeGreaterThan(0);
+    for (const src of sources) {
+      expect(parseFloat(src.costPerKg)).toBeCloseTo(lockedRate, 4);
+      expect(parseFloat(src.costPerKg)).not.toBeCloseTo(9.99, 2);
+    }
+  });
+
+  it("ignores client-supplied costPerKg tampering on PATCH edit — stored source and batch use the locked rate", async () => {
+    const row = await getSupplierRow(`${TEST_PREFIX}_SupplierC`);
+    const lockedRate = parseFloat(row.costPerKgUsd);
+
+    const createRes = await agent.post("/api/factory/mix-batches").send({
+      supplierSources: [{ supplierId: supplierCId, weightKg: "50" }],
+      name: "Batch Tamper Test Edit",
+    });
+    expect(createRes.status).toBe(200);
+    const batchId = createRes.body.id;
+
+    const editRes = await agent.patch(`/api/factory/mix-batches/${batchId}`).send({
+      supplierSources: [{ supplierId: supplierCId, weightKg: "80", costPerKg: "9.99" }],
+    });
+    expect(editRes.status).toBe(200);
+    expect(parseFloat(editRes.body.costPerKg)).toBeCloseTo(lockedRate, 4);
+    expect(parseFloat(editRes.body.costPerKg)).not.toBeCloseTo(9.99, 2);
+
+    const sources = await db
+      .select()
+      .from(schema.factoryMixBatchSources)
+      .where(eq(schema.factoryMixBatchSources.mixBatchId, batchId));
+    expect(sources.length).toBeGreaterThan(0);
+    for (const src of sources) {
+      expect(parseFloat(src.costPerKg)).toBeCloseTo(lockedRate, 4);
+      expect(parseFloat(src.costPerKg)).not.toBeCloseTo(9.99, 2);
+    }
+  });
+
+  it("ignores client-supplied costPerKg tampering on POST top-up — stored source and batch use the locked rate", async () => {
+    const row = await getSupplierRow(`${TEST_PREFIX}_SupplierC`);
+    const lockedRate = parseFloat(row.costPerKgUsd);
+
+    const createRes = await agent.post("/api/factory/mix-batches").send({
+      supplierSources: [{ supplierId: supplierCId, weightKg: "40" }],
+      name: "Batch Tamper Test TopUp",
+    });
+    expect(createRes.status).toBe(200);
+    const batchId = createRes.body.id;
+
+    const topUpRes = await agent.post(`/api/factory/mix-batches/${batchId}/top-up`).send({
+      supplierSources: [{ supplierId: supplierCId, weightKg: "30", costPerKg: "9.99" }],
+    });
+    expect(topUpRes.status).toBe(200);
+    expect(parseFloat(topUpRes.body.costPerKg)).toBeCloseTo(lockedRate, 4);
+    expect(parseFloat(topUpRes.body.costPerKg)).not.toBeCloseTo(9.99, 2);
+
+    const sources = await db
+      .select()
+      .from(schema.factoryMixBatchSources)
+      .where(eq(schema.factoryMixBatchSources.mixBatchId, batchId));
+    expect(sources.length).toBeGreaterThan(0);
+    for (const src of sources) {
+      expect(parseFloat(src.costPerKg)).toBeCloseTo(lockedRate, 4);
+      expect(parseFloat(src.costPerKg)).not.toBeCloseTo(9.99, 2);
+    }
   });
 
   it("update-cost sets the locked rate directly to the new uniform cost (an explicit, deliberate correction)", async () => {
@@ -462,27 +552,54 @@ describe("Landed-cost correction (cascadeContainerCostChange) — remaining-stoc
 });
 
 describe("Diagnostic endpoint — read-only and permission-protected", () => {
-  it("rejects a non-Admin/Developer user", async () => {
-    // ctx's default test user role is assumed non-privileged unless seeded otherwise;
-    // this simply proves the route is behind requireRole, not just requireAuth.
-    const res = await agent.get("/api/factory/raw-stock/diagnostics/locked-rates");
-    expect([200, 403]).toContain(res.status);
+  let normalAgent: request.SuperAgentTest;
+  let adminAgent: request.SuperAgentTest;
+  let developerAgent: request.SuperAgentTest;
+
+  beforeAll(async () => {
+    normalAgent = await createAndLoginAs(`${TEST_PREFIX}_diag_normal`, "Normal User");
+    adminAgent = await createAndLoginAs(`${TEST_PREFIX}_diag_admin`, "Admin");
+    developerAgent = await createAndLoginAs(`${TEST_PREFIX}_diag_dev`, "Developer");
+  }, 30000);
+
+  it("rejects a normal/nonprivileged user with exactly 403", async () => {
+    const res = await normalAgent.get("/api/factory/raw-stock/diagnostics/locked-rates");
+    expect(res.status).toBe(403);
   });
 
-  it("performs no writes — persisted locked rates are byte-identical before and after", async () => {
+  it("allows an Admin user with exactly 200", async () => {
+    const res = await adminAgent.get("/api/factory/raw-stock/diagnostics/locked-rates");
+    expect(res.status).toBe(200);
+  });
+
+  it("allows a Developer user with exactly 200", async () => {
+    const res = await developerAgent.get("/api/factory/raw-stock/diagnostics/locked-rates");
+    expect(res.status).toBe(200);
+  });
+
+  it("performs no writes — persisted locked rates are byte-identical before and after (Admin/Developer, 200 only)", async () => {
     const before = await db
       .select({ id: schema.factorySuppliers.id, rate: schema.factorySuppliers.currentRawMaterialCostPerKgUsd })
       .from(schema.factorySuppliers)
       .where(eq(schema.factorySuppliers.companyId, ctx.companyId));
 
-    await agent.get("/api/factory/raw-stock/diagnostics/locked-rates");
+    const adminRes = await adminAgent.get("/api/factory/raw-stock/diagnostics/locked-rates");
+    expect(adminRes.status).toBe(200);
 
-    const after = await db
+    const afterAdmin = await db
       .select({ id: schema.factorySuppliers.id, rate: schema.factorySuppliers.currentRawMaterialCostPerKgUsd })
       .from(schema.factorySuppliers)
       .where(eq(schema.factorySuppliers.companyId, ctx.companyId));
+    expect(afterAdmin).toEqual(before);
 
-    expect(after).toEqual(before);
+    const devRes = await developerAgent.get("/api/factory/raw-stock/diagnostics/locked-rates");
+    expect(devRes.status).toBe(200);
+
+    const afterDev = await db
+      .select({ id: schema.factorySuppliers.id, rate: schema.factorySuppliers.currentRawMaterialCostPerKgUsd })
+      .from(schema.factorySuppliers)
+      .where(eq(schema.factorySuppliers.companyId, ctx.companyId));
+    expect(afterDev).toEqual(before);
   });
 });
 

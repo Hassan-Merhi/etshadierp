@@ -204,3 +204,52 @@ export async function requireExistingLockedRate(
   const rate = await getLockedSupplierRate(tx, companyId, supplierId, { forUpdate: true });
   return rate > 0 ? rate : null;
 }
+
+/**
+ * Single source of truth for the startup DB migration that adds and backfills
+ * factorySuppliers.currentRawMaterialCostPerKgUsd. Consumed by both the real
+ * startup migration runner (server/index.ts) and the migration test suite
+ * (tests/factory-locked-rate-migration.test.ts), so the tested SQL is
+ * byte-identical to what production actually runs — never a re-implemented
+ * copy that could silently drift from the real migration.
+ *
+ * Column add: nullable NUMERIC(20,8), safe to re-run (IF NOT EXISTS).
+ *
+ * Backfill formula (per supplier):
+ *   SUM(received_kg * COALESCE(cost_per_kg_usd, cost_per_kg)) / SUM(received_kg)
+ * over that supplier's own non-deleted raw-stock rows, on non-deleted /
+ * non-DELETED-status containers, with positive received kg. Only updates rows
+ * where the locked rate is still NULL — never overwrites an established rate,
+ * so it is safe to run against a fresh database or a live production database,
+ * and safe to run repeatedly.
+ */
+export const FACTORY_SUPPLIER_LOCKED_RATE_ADD_COLUMN_SQL =
+  `ALTER TABLE factory_suppliers ADD COLUMN IF NOT EXISTS current_raw_material_cost_per_kg_usd NUMERIC(20,8)`;
+
+export const FACTORY_SUPPLIER_LOCKED_RATE_BACKFILL_MIGRATION_KEY =
+  "factory-supplier-locked-raw-material-rate-backfill-v1";
+
+/** The bare backfill UPDATE — no migrations_log gate. Used directly by tests to
+ * verify the formula and per-row "never overwrite non-NULL" safety in isolation.
+ * The real startup migration wraps this in a migrations_log-gated DO block
+ * (see server/index.ts) so it only ever executes once per database. */
+export const FACTORY_SUPPLIER_LOCKED_RATE_BACKFILL_SQL = `
+  UPDATE factory_suppliers fs
+  SET current_raw_material_cost_per_kg_usd = sub.rate
+  FROM (
+    SELECT
+      c.supplier_id AS supplier_id,
+      SUM(rs.received_kg * COALESCE(rs.cost_per_kg_usd, rs.cost_per_kg)) / SUM(rs.received_kg) AS rate
+    FROM factory_raw_stock rs
+    INNER JOIN factory_containers c ON c.id = rs.container_id
+    WHERE rs.deleted_at IS NULL
+      AND c.deleted_at IS NULL
+      AND c.status != 'DELETED'
+      AND c.supplier_id IS NOT NULL
+      AND rs.received_kg > 0
+    GROUP BY c.supplier_id
+    HAVING SUM(rs.received_kg) > 0
+  ) sub
+  WHERE fs.id = sub.supplier_id
+    AND fs.current_raw_material_cost_per_kg_usd IS NULL
+`;

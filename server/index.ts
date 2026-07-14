@@ -17,6 +17,11 @@ import { Client } from "pg";
 import { requestLogger } from "./middleware/requestLogger";
 import { bandwidthDebugMiddleware } from "./middleware/bandwidthDebug";
 import { logger } from "./lib/logger";
+import {
+  FACTORY_SUPPLIER_LOCKED_RATE_ADD_COLUMN_SQL,
+  FACTORY_SUPPLIER_LOCKED_RATE_BACKFILL_MIGRATION_KEY,
+  FACTORY_SUPPLIER_LOCKED_RATE_BACKFILL_SQL,
+} from "./services/factory/rawStockLockedRate";
 
 // Global error handlers
 // In production: log and exit so the process manager (Render/Replit) restarts cleanly.
@@ -4488,6 +4493,29 @@ END $$`,
      END $exch_dedup$`,
     `CREATE UNIQUE INDEX IF NOT EXISTS exchange_rates_company_date_pair_unique
      ON exchange_rates (company_id, effective_date, from_currency, to_currency)`,
+
+    // -- Factory: locked raw-material rate column + backfill (July 2026) --
+    // Persists the authoritative locked cost/kg (USD) per factory supplier
+    // (shared/schema/factory.ts: factorySuppliers.currentRawMaterialCostPerKgUsd) so it
+    // survives restarts/deploys without depending on a lazy runtime derive. See
+    // server/services/factory/rawStockLockedRate.ts for the read/write helpers that own
+    // all future updates to this column (real offload moving-average, landed-cost
+    // correction, explicit update-cost), the exported SQL constants this migration
+    // reuses (single source of truth, shared with the migration test suite), and the
+    // exact backfill formula/inclusion rules.
+    FACTORY_SUPPLIER_LOCKED_RATE_ADD_COLUMN_SQL,
+    // Guarded twice for safety: by migrations_log (one-time, so a supplier that
+    // legitimately still has no historical receipts stays NULL forever, to be set
+    // later by a real offload) AND by "current value IS NULL" inside the backfill
+    // SQL's own UPDATE WHERE clause (so even a hypothetical re-run can never clobber
+    // an already-established rate).
+    `DO $lockrate_backfill$ BEGIN
+      IF NOT EXISTS (SELECT 1 FROM migrations_log WHERE key = '${FACTORY_SUPPLIER_LOCKED_RATE_BACKFILL_MIGRATION_KEY}') THEN
+        ${FACTORY_SUPPLIER_LOCKED_RATE_BACKFILL_SQL};
+        INSERT INTO migrations_log(key) VALUES ('${FACTORY_SUPPLIER_LOCKED_RATE_BACKFILL_MIGRATION_KEY}');
+      END IF;
+    END $lockrate_backfill$;
+  `,
   ];
 
   // /api/health/db — reports migration status but does NOT block deployment.
