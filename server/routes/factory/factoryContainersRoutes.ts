@@ -6,7 +6,7 @@ import { db } from "../../db";
 import { requireAuth } from "../../auth";
 import { classifyNetPositionAccounts } from "../../netPositionHelper";
 import { adjustInventory } from "../../inventoryHelper";
-import { resolveStoredFxRate, applyFxRate, UnresolvedExchangeRateError } from "../../services/factory/currencyConversion";
+import { resolveStoredFxRate, resolveStoredFxRateOrThrow, applyFxRate, UnresolvedExchangeRateError } from "../../services/factory/currencyConversion";
 import {
   writeDaybookEntry,
   getOrFetchFxRateToUsd,
@@ -401,7 +401,7 @@ export function registerFactoryContainersRoutes(app: Express) {
         description: descParts.join(" · "),
         currencyCode: ccyForDesc,
         amountCurrency: parseFloat(container.ratePerKg || "0") * parseFloat(container.totalKg || "0"),
-        fxRateToUsd: parseFloat(container.fxRateToUsd || "1"),
+        fxRateToUsd: resolveStoredFxRateOrThrow(ccyForDesc, container.fxRateToUsd, (container as any).fxRateConfirmed),
       });
 
       // Double-entry: Goods value — Dr Factory Import Cost / Cr Supplier Payable
@@ -419,7 +419,9 @@ export function registerFactoryContainersRoutes(app: Express) {
             description: `Goods import - container ${container.containerNumber}`,
             totalAmount: String(goodsValue),
             currency: container.currencyCode || "USD",
-            exchangeRate: String(parseFloat(container.fxRateToUsd || "1")),
+            exchangeRate: String(
+              resolveStoredFxRateOrThrow(container.currencyCode, container.fxRateToUsd, (container as any).fxRateConfirmed)
+            ),
             sourceModule: "FACTORY",
           })
           .returning();
@@ -463,7 +465,9 @@ export function registerFactoryContainersRoutes(app: Express) {
             totalAmount: String(freightAmt),
             currency: freightCcy,
             exchangeRate:
-              freightCcy === (container.currencyCode || "USD") ? String(parseFloat(container.fxRateToUsd || "1")) : "1",
+              freightCcy === (container.currencyCode || "USD")
+                ? String(resolveStoredFxRateOrThrow(container.currencyCode, container.fxRateToUsd, (container as any).fxRateConfirmed))
+                : "1",
             sourceModule: "FACTORY",
           })
           .returning();
@@ -1072,6 +1076,7 @@ export function registerFactoryContainersRoutes(app: Express) {
 
       let created = 0;
       let skipped = 0;
+      const fxUnresolvedSkipped: string[] = [];
 
       for (const container of allContainers) {
         if (!container.supplierId) {
@@ -1101,6 +1106,21 @@ export function registerFactoryContainersRoutes(app: Express) {
           continue;
         }
 
+        // Unresolved non-USD rate: skip this one container (report it) rather than
+        // aborting the whole bulk backfill or silently posting a mispriced voucher.
+        let backfillFxRate: number;
+        try {
+          backfillFxRate = resolveStoredFxRateOrThrow(
+            container.currencyCode,
+            container.fxRateToUsd,
+            (container as any).fxRateConfirmed
+          );
+        } catch {
+          skipped++;
+          fxUnresolvedSkipped.push(container.containerNumber);
+          continue;
+        }
+
         const today = getClientDate(req);
         const importCostAccId = await getOrCreateLedgerAccount(companyId, "FACTORY_IMPORT_COST", "Factory Import Cost");
         const importVoucherNum = `FACTORY-IMPORT-${container.id}-${Date.now()}`;
@@ -1114,7 +1134,7 @@ export function registerFactoryContainersRoutes(app: Express) {
             description: `Goods import - container ${container.containerNumber}`,
             totalAmount: String(goodsValue),
             currency: container.currencyCode || "USD",
-            exchangeRate: String(parseFloat(container.fxRateToUsd || "1")),
+            exchangeRate: String(backfillFxRate),
             sourceModule: "FACTORY",
           })
           .returning();
@@ -1135,7 +1155,7 @@ export function registerFactoryContainersRoutes(app: Express) {
         created++;
       }
 
-      res.json({ created, skipped, total: allContainers.length });
+      res.json({ created, skipped, total: allContainers.length, fxUnresolvedSkipped });
     } catch (error: any) {
       console.error("Error backfilling import credits:", error);
       res.status(500).json({ message: error.message });

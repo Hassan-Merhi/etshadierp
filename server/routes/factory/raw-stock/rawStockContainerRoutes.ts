@@ -6,7 +6,7 @@ import { requireAuth } from "../../../auth";
 import { classifyNetPositionAccounts } from "../../../netPositionHelper";
 import { adjustInventory } from "../../../inventoryHelper";
 import { cascadeContainerCostChange } from "../../../services/factory/rawStockCostCascade";
-import { resolveStoredFxRate, applyFxRate, UnresolvedExchangeRateError } from "../../../services/factory/currencyConversion";
+import { resolveStoredFxRate, resolveStoredFxRateOrThrow, applyFxRate, UnresolvedExchangeRateError } from "../../../services/factory/currencyConversion";
 import {
   writeDaybookEntry,
   getOrFetchFxRateToUsd,
@@ -426,7 +426,7 @@ export function registerRawStockContainerRoutes(app: Express) {
           const chargeAmt = parseFloat(charge.amount || "0");
           if (chargeAmt <= 0) continue;
           const chargeCcy = charge.currencyCode || "USD";
-          const chargeFx = parseFloat(charge.fxRateToUsd || "1");
+          const chargeFx = resolveStoredFxRateOrThrow(chargeCcy, charge.fxRateToUsd, (charge as any).fxRateConfirmed);
           await writeDaybookEntry(tx, {
             companyId,
             txDate,
@@ -435,7 +435,7 @@ export function registerRawStockContainerRoutes(app: Express) {
             description: `${charge.description} (post-offload) — container ${container.containerNumber}`,
             currencyCode: chargeCcy,
             amountCurrency: chargeAmt,
-            fxRateToUsd: chargeCcy === "USD" ? 1 : chargeFx,
+            fxRateToUsd: chargeFx,
             metaJson: JSON.stringify({ containerId, sourceType: "POST_OFFLOAD_ADDITIONAL", chargeId: charge.id }),
           });
           if (charge.ledgerAccountId || charge.supplierId) {

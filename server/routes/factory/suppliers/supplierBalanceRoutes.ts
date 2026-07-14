@@ -1227,7 +1227,11 @@ export function registerSupplierBalanceRoutes(app: Express) {
           const val =
             parseFloat(c.actualReceivedKg || c.totalKg || "0") * parseFloat(c.ratePerKg || "0") +
             parseFloat(c.freight || "0");
-          return s + val * parseFloat(c.fxRateToUsd || "1");
+          // fxContainers was already filtered to looksSet===true rows above, so this rate
+          // is guaranteed resolved — resolve it through the same helper rather than a bare
+          // "|| 1" fallback (which would silently mask a bug if that filter is ever loosened).
+          const { fxRate } = resolveStoredFxRate(c.currencyCode, c.fxRateToUsd, (c as any).fxRateConfirmed);
+          return s + val * fxRate;
         }, 0);
         const fxWeightBase = fxContainers.reduce((s: number, c: any) => {
           return (

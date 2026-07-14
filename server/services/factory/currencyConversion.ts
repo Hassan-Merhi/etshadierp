@@ -92,6 +92,24 @@ export class UnresolvedExchangeRateError extends Error {
 }
 
 /**
+ * Returns just the resolved rate (not an amount) for write paths that need
+ * to persist a raw `exchangeRate`/`fxRateToUsd` value (e.g. a voucher's
+ * `exchangeRate` column derived from an already-stored container/charge/
+ * commission row) rather than convert a specific amount. Throws
+ * `UnresolvedExchangeRateError` instead of silently falling back to 1 when
+ * the currency is non-USD and no explicitly-set rate is available.
+ */
+export function resolveStoredFxRateOrThrow(
+  currencyCode: string | null | undefined,
+  storedFxRateToUsd: string | number | null | undefined,
+  confirmed?: boolean
+): number {
+  const { fxRate, looksSet } = resolveStoredFxRate(currencyCode, storedFxRateToUsd, confirmed);
+  if (!looksSet) throw new UnresolvedExchangeRateError(currencyCode || "USD");
+  return fxRate;
+}
+
+/**
  * Throwing version for write paths that must reject the write outright
  * rather than silently persist a mispriced USD value. Callers should catch
  * `UnresolvedExchangeRateError` and return HTTP 400 with its message.

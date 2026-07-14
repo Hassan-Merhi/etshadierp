@@ -6,7 +6,7 @@ import { requireAuth } from "../../../auth";
 import { classifyNetPositionAccounts } from "../../../netPositionHelper";
 import { adjustInventory } from "../../../inventoryHelper";
 import { applyOffloadMovingAverage } from "../../../services/factory/rawStockLockedRate";
-import { resolveStoredFxRate } from "../../../services/factory/currencyConversion";
+import { resolveStoredFxRate, resolveStoredFxRateOrThrow } from "../../../services/factory/currencyConversion";
 import {
   writeDaybookEntry,
   getOrFetchFxRateToUsd,
@@ -469,7 +469,11 @@ export function registerRawStockOffloadRoutes(app: Express) {
             description: `Commission for ${commissionRecord.personName} on container ${container.containerNumber}`,
             currencyCode: commissionRecord.currencyCode || "USD",
             amountCurrency: parseFloat(commissionRecord.commissionTotal),
-            fxRateToUsd: parseFloat(commissionRecord.fxRateToUsd || "1"),
+            fxRateToUsd: resolveStoredFxRateOrThrow(
+              commissionRecord.currencyCode,
+              commissionRecord.fxRateToUsd,
+              (commissionRecord as any).fxRateConfirmed
+            ),
             metaJson: JSON.stringify({ containerId, sourceType: "COMMISSION", commissionId: commissionRecord.id }),
           });
         }
@@ -919,7 +923,9 @@ export function registerRawStockOffloadRoutes(app: Express) {
               description: `Freight on container ${container.containerNumber}`,
               totalAmount: String(restoredFreightAmt),
               currency: restoredFreightCurrencyCode,
-              exchangeRate: String(parseFloat(container.fxRateToUsd || "1")),
+              exchangeRate: String(
+                resolveStoredFxRateOrThrow(container.currencyCode, container.fxRateToUsd, (container as any).fxRateConfirmed)
+              ),
               sourceModule: "FACTORY",
             })
             .returning();

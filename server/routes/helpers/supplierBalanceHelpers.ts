@@ -12,6 +12,7 @@
 // brought-forward/date-filtered queries, PDF/Excel statement exports) MUST
 // route through these helpers instead of re-implementing the parent check.
 
+import Decimal from "decimal.js";
 import { storage } from "../../storage";
 
 export class ParentCompanyNotConfiguredError extends Error {
@@ -74,16 +75,18 @@ export async function getSupplierBalanceForContext(
   companyId?: number | null
 ): Promise<SupplierBalanceContextResult> {
   const isParent = await isParentCompanyContext(companyId);
-  const openingBalance = isParent ? parseFloat(supplier.openingBalance || "0") : 0;
+  const openingBalanceD = isParent ? new Decimal(supplier.openingBalance || "0") : new Decimal(0);
+  const openingBalance = openingBalanceD.toNumber();
   const entries = await storage.getVoucherEntriesBySupplier(supplier.id, companyId || undefined);
 
-  const balance = entries.reduce((sum: number, entry: any) => {
-    const credit = parseFloat(entry.creditAmount || "0");
-    const debit = parseFloat(entry.debitAmount || "0");
-    if (credit > 0 && debit === 0) return sum + credit;
-    if (debit > 0 && credit === 0) return sum - debit;
+  const balanceD = entries.reduce((sum: Decimal, entry: any) => {
+    const credit = new Decimal(entry.creditAmount || "0");
+    const debit = new Decimal(entry.debitAmount || "0");
+    if (credit.gt(0) && debit.eq(0)) return sum.plus(credit);
+    if (debit.gt(0) && credit.eq(0)) return sum.minus(debit);
     return sum;
-  }, openingBalance);
+  }, openingBalanceD);
+  const balance = balanceD.toNumber();
 
   // A nonzero opening balance (only ever present in the parent's own context)
   // counts as activity too — otherwise the parent company itself would

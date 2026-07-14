@@ -293,7 +293,10 @@ export function registerSupplierStatementRoutes(app: Express) {
           origin: c.origin,
           status: effectiveStatus,
           currencyCode: containerCc,
-          fxRateToUsd: c.fxRateToUsd || "1",
+          fxRateToUsd: (() => {
+            const { fxRate, looksSet } = resolveStoredFxRate(containerCc, c.fxRateToUsd, (c as any).fxRateConfirmed);
+            return looksSet ? String(fxRate) : "unresolved";
+          })(),
           declaredKg: c.declaredKg,
           actualReceivedKg: c.actualReceivedKg,
           totalKg: c.totalKg,
@@ -693,8 +696,10 @@ export function registerSupplierStatementRoutes(app: Express) {
         const totalRawVal = resolvedCtrs.reduce((s: number, c: any) => s + parseFloat(c.value || "0"), 0);
         if (totalRawVal <= 0) return sum; // no resolved-rate containers → exclude rather than guess
         const weightedRate =
-          resolvedCtrs.reduce((s: number, c: any) => s + parseFloat(c.value || "0") * parseFloat(c.fxRateToUsd || "1"), 0) /
-          totalRawVal;
+          resolvedCtrs.reduce((s: number, c: any) => {
+            const { fxRate } = resolveStoredFxRate(cg.currencyCode, c.fxRateToUsd, (c as any).fxRateConfirmed);
+            return s + parseFloat(c.value || "0") * fxRate;
+          }, 0) / totalRawVal;
         return sum + netPay * weightedRate;
       }, 0);
 
@@ -749,7 +754,11 @@ export function registerSupplierStatementRoutes(app: Express) {
           commissionSupplierId: r.commissionSupplierId || null,
           amount: r.commissionAmount,
           currencyCode: r.commissionCurrencyCode || "USD",
-          fxRateToUsd: r.commissionFxRateToUsd || "1",
+          fxRateToUsd: (() => {
+            const ccy = r.commissionCurrencyCode || "USD";
+            const { fxRate, looksSet } = resolveStoredFxRate(ccy, r.commissionFxRateToUsd);
+            return looksSet ? String(fxRate) : "unresolved";
+          })(),
           amountUsd: r.commissionAmountUsd || r.commissionAmount,
         }));
       const totalObCommissions = obCommissions.reduce((sum: number, c: any) => sum + parseFloat(c.amountUsd || "0"), 0);
@@ -808,7 +817,10 @@ export function registerSupplierStatementRoutes(app: Express) {
             freightCurrencyCode: freightCc,
             value: value.toFixed(2),
             currencyCode: cc,
-            fxRateToUsd: c.fxRateToUsd || "1",
+            fxRateToUsd: (() => {
+              const { fxRate, looksSet } = resolveStoredFxRate(cc, c.fxRateToUsd, (c as any).fxRateConfirmed);
+              return looksSet ? String(fxRate) : "unresolved";
+            })(),
             status: c.status,
             commissionAmount: c.commissionAmount || "0",
             commissionCurrencyCode: commCc,

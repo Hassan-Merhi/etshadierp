@@ -6,7 +6,7 @@ import { requireAuth } from "../../../auth";
 import { classifyNetPositionAccounts } from "../../../netPositionHelper";
 import { adjustInventory } from "../../../inventoryHelper";
 import { applyOffloadMovingAverage } from "../../../services/factory/rawStockLockedRate";
-import { convertToUsdOrThrow, UnresolvedExchangeRateError } from "../../../services/factory/currencyConversion";
+import { convertToUsdOrThrow, resolveStoredFxRateOrThrow, UnresolvedExchangeRateError } from "../../../services/factory/currencyConversion";
 import {
   writeDaybookEntry,
   getOrFetchFxRateToUsd,
@@ -163,6 +163,21 @@ export function registerRawStockBalanceRoutes(app: Express) {
       const totalPayableUsd = kgVal * costPerKgUsd;
       const trimmedSupplierName = String(supplierName).trim();
 
+      // Commission is a separate new record on this same write — its non-USD rate must be
+      // explicitly supplied too, never silently defaulted to 1 like the main container rate.
+      const hasCommissionReq = reqCommAmount && parseFloat(reqCommAmount) > 0;
+      const commCurrencyCode = reqCommCurrency || "USD";
+      let commFxRateResolved = 1;
+      if (hasCommissionReq && commCurrencyCode !== "USD") {
+        try {
+          commFxRateResolved = resolveStoredFxRateOrThrow(commCurrencyCode, reqCommFxRate);
+        } catch (err: any) {
+          if (err instanceof UnresolvedExchangeRateError)
+            return res.status(400).json({ message: `Commission: ${err.message}` });
+          throw err;
+        }
+      }
+
       const result = await db.transaction(async (tx: any) => {
         // Use supplierId directly if provided, otherwise find-or-create by name
         let existingSupplier: any;
@@ -238,9 +253,9 @@ export function registerRawStockBalanceRoutes(app: Express) {
           .returning();
 
         // Commission processing — auto-create/reuse "[SupplierName] Commission" sub-account
-        const hasCommission = reqCommAmount && parseFloat(reqCommAmount) > 0;
-        const commCurrency = reqCommCurrency || "USD";
-        const commFxRate = parseFloat(reqCommFxRate || "1");
+        const hasCommission = hasCommissionReq;
+        const commCurrency = commCurrencyCode;
+        const commFxRate = commFxRateResolved;
         const commAmountNum = hasCommission ? parseFloat(reqCommAmount) : 0;
         const commAmountUsd = hasCommission ? (commCurrency === "USD" ? commAmountNum : commAmountNum * commFxRate) : 0;
 
@@ -372,6 +387,8 @@ export function registerRawStockBalanceRoutes(app: Express) {
   });
 
   // PATCH a single opening-balance raw stock record
+  // (This route's catch block already returns 400 for any thrown error, including
+  // UnresolvedExchangeRateError from the FX helpers used below.)
   app.patch("/api/factory/raw-stock/opening-balance/:id", requireAuth, async (req: any, res: any) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
@@ -450,6 +467,7 @@ export function registerRawStockBalanceRoutes(app: Express) {
               costPerKg: factoryRawStock.costPerKg,
               currencyCode: factoryContainers.currencyCode,
               fxRateToUsd: factoryContainers.fxRateToUsd,
+              fxRateConfirmed: (factoryContainers as any).fxRateConfirmed,
             })
             .from(factoryRawStock)
             .innerJoin(factoryContainers, eq(factoryRawStock.containerId, factoryContainers.id))
@@ -457,8 +475,18 @@ export function registerRawStockBalanceRoutes(app: Express) {
             .limit(1);
 
           const resolvedCost = effectiveCost ?? parseFloat(current?.costPerKg || "0");
-          const resolvedFx = effectiveFx ?? parseFloat(current?.fxRateToUsd || "1");
           const resolvedCurrency = effectiveCurrency ?? current?.currencyCode ?? "USD";
+          // effectiveFx is the caller's explicit new rate (already validated positive above);
+          // otherwise fall back to the stored rate — but only if it's actually resolved, never
+          // guessed as 1, since this edit may also be changing the currency to non-USD.
+          let resolvedFx: number;
+          if (effectiveFx !== undefined) {
+            resolvedFx = effectiveFx;
+          } else if (resolvedCurrency === "USD") {
+            resolvedFx = 1;
+          } else {
+            resolvedFx = resolveStoredFxRateOrThrow(resolvedCurrency, current?.fxRateToUsd, current?.fxRateConfirmed);
+          }
           const costUsd = resolvedCurrency === "USD" ? resolvedCost : resolvedCost * resolvedFx;
           rawUpdates.costPerKgUsd = String(costUsd);
           containerUpdates.ratePerKgUsd = String(costUsd);
@@ -487,7 +515,10 @@ export function registerRawStockBalanceRoutes(app: Express) {
             .where(eq(factoryRawStock.id, id))
             .limit(1);
           const resolvedCommCurr = commissionCurrencyCode ?? cur?.commissionCurrencyCode ?? "USD";
-          const resolvedCommFx = parseFloat(commissionFxRateToUsd ?? cur?.commissionFxRateToUsd ?? "1");
+          const resolvedCommFx =
+            resolvedCommCurr === "USD"
+              ? 1
+              : resolveStoredFxRateOrThrow(resolvedCommCurr, commissionFxRateToUsd ?? cur?.commissionFxRateToUsd);
           const resolvedCommAmt = parseFloat(commissionAmount ?? "0");
           rawUpdates.commissionAmountUsd =
             resolvedCommCurr === "USD" ? String(resolvedCommAmt) : String(resolvedCommAmt * resolvedCommFx);

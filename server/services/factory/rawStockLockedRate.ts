@@ -15,6 +15,7 @@
  * value / free kg, or from all-time received kg, at read time.
  */
 import { eq, and, sql } from "drizzle-orm";
+import Decimal from "decimal.js";
 import { factorySuppliers, factoryRawStock, factoryContainers, factoryRawMaterialAdjustments } from "@shared/schema";
 import { getStableSupplierCost } from "./rawStockStableCost";
 
@@ -64,7 +65,9 @@ export async function getAuthoritativeSupplierRemainingKg(
       )
     );
 
-  return (parseFloat(remainingKg as string) || 0) + (parseFloat(netAdjustedKg as string) || 0);
+  const rk = new Decimal(remainingKg || 0);
+  const nk = new Decimal(netAdjustedKg || 0);
+  return rk.plus(nk).toNumber();
 }
 
 /**
@@ -100,7 +103,7 @@ export async function getLockedSupplierRate(
 
   const existing = supplier.currentRawMaterialCostPerKgUsd;
   if (existing !== null && existing !== undefined) {
-    return parseFloat(existing as string) || 0;
+    return new Decimal(existing || 0).toNumber();
   }
 
   // Never-established rate — lazy one-time backfill from legacy stable cost so
@@ -134,7 +137,7 @@ export async function getLockedSupplierRateReadOnly(
 
   const existing = supplier.currentRawMaterialCostPerKgUsd;
   if (existing !== null && existing !== undefined) {
-    return { rate: parseFloat(existing as string) || 0, wasBackfilled: false };
+    return { rate: new Decimal(existing || 0).toNumber(), wasBackfilled: false };
   }
 
   // Never-established — compute what the lazy backfill WOULD persist, without writing.
@@ -174,11 +177,16 @@ export async function applyOffloadMovingAverage(
   // quantity (not just raw-stock rows). The new container's row has not been
   // inserted yet when this is called, so it's correctly excluded here.
   const oldRemainingKg = Math.max(0, await getAuthoritativeSupplierRemainingKg(tx, companyId, supplierId));
-  const totalKg = oldRemainingKg + newReceivedKg;
-  const newLockedRate =
-    totalKg > 0
-      ? (oldRemainingKg * oldLockedRate + newReceivedKg * newContainerLandedCostPerKgUsd) / totalKg
-      : newContainerLandedCostPerKgUsd;
+  const oldRemainingKgD = new Decimal(oldRemainingKg);
+  const newReceivedKgD = new Decimal(newReceivedKg);
+  const totalKgD = oldRemainingKgD.plus(newReceivedKgD);
+  const newLockedRateD = totalKgD.gt(0)
+    ? oldRemainingKgD
+        .times(oldLockedRate)
+        .plus(newReceivedKgD.times(newContainerLandedCostPerKgUsd))
+        .dividedBy(totalKgD)
+    : new Decimal(newContainerLandedCostPerKgUsd);
+  const newLockedRate = newLockedRateD.toNumber();
 
   await tx
     .update(factorySuppliers)
