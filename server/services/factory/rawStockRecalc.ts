@@ -18,6 +18,7 @@
  * Read-only preview never writes anything. Apply runs inside a transaction per container.
  */
 import { eq, and, isNull } from "drizzle-orm";
+import Decimal from "decimal.js";
 import { db } from "../../db";
 import {
   factoryContainers,
@@ -70,73 +71,81 @@ export function computeCorrectContainerCost(
   if (!fxLooksSet) {
     return { costPerKg: 0, costPerKgUsd: 0, totalCost: 0, totalUsd: 0, fxUnresolved: true };
   }
-  const actualKg = parseFloat(container.actualReceivedKg || "0");
-  if (actualKg <= 0) {
+  const actualKg = new Decimal(container.actualReceivedKg || "0");
+  if (actualKg.lte(0)) {
     return { costPerKg: 0, costPerKgUsd: 0, totalCost: 0, totalUsd: 0, fxUnresolved: false };
   }
 
-  const baseRate = parseFloat(container.ratePerKg || "0");
-  const basePayable = actualKg * baseRate;
-  const baseMaterialUsd = containerCcy === "USD" ? basePayable : basePayable * fxRate;
+  const dFxRate = new Decimal(fxRate);
+  const baseRate = new Decimal(container.ratePerKg || "0");
+  const basePayable = actualKg.times(baseRate);
+  const baseMaterialUsd = containerCcy === "USD" ? basePayable : basePayable.times(dFxRate);
 
   // Freight — has its own currency field, no separate stored fx rate, so it uses the
   // container's fx rate for conversion (same as at offload time).
-  const freightVal = parseFloat(container.freight || "0");
+  const freightVal = new Decimal(container.freight || "0");
   const freightCcy = container.freightCurrencyCode || containerCcy;
-  const freightUsd = freightCcy === "USD" ? freightVal : freightVal * fxRate;
+  const freightUsd = freightCcy === "USD" ? freightVal : freightVal.times(dFxRate);
   const freightInContainerCcy =
-    freightCcy === containerCcy ? freightVal : fxRate > 0 ? freightUsd / fxRate : freightVal;
+    freightCcy === containerCcy ? freightVal : dFxRate.gt(0) ? freightUsd.div(dFxRate) : freightVal;
 
   // Other charges — has its own currency field (otherChargesCurrencyCode) that the
   // buggy post-offload-charge route ignored. Convert it properly here.
-  const ocVal = parseFloat(container.otherCharges || "0");
+  const ocVal = new Decimal(container.otherCharges || "0");
   const ocCcy = (container as any).otherChargesCurrencyCode || containerCcy;
-  const ocUsd = ocCcy === "USD" ? ocVal : ocVal * fxRate;
-  const ocInContainerCcy = ocCcy === containerCcy ? ocVal : fxRate > 0 ? ocUsd / fxRate : ocVal;
+  const ocUsd = ocCcy === "USD" ? ocVal : ocVal.times(dFxRate);
+  const ocInContainerCcy = ocCcy === containerCcy ? ocVal : dFxRate.gt(0) ? ocUsd.div(dFxRate) : ocVal;
 
   // Commission — prefer the dedicated commission record (it stores its own currency +
   // fx rate explicitly), falling back to the container's mirrored fields.
-  let commUsd: number;
-  let commInContainerCcy: number;
+  let commUsd: Decimal;
+  let commInContainerCcy: Decimal;
   if (commissionRecord) {
-    const commVal = parseFloat(commissionRecord.commissionTotal || "0");
+    const commVal = new Decimal(commissionRecord.commissionTotal || "0");
     const commCcy = commissionRecord.currencyCode || containerCcy;
-    const commFx = parseFloat(commissionRecord.fxRateToUsd || String(fxRate)) || fxRate;
-    commUsd = commCcy === "USD" ? commVal : commVal * commFx;
-    commInContainerCcy = commCcy === containerCcy ? commVal : fxRate > 0 ? commUsd / fxRate : commVal;
+    const rawCommFx = parseFloat(commissionRecord.fxRateToUsd || "");
+    const commFx = Number.isFinite(rawCommFx) && rawCommFx > 0 ? new Decimal(rawCommFx) : dFxRate;
+    commUsd = commCcy === "USD" ? commVal : commVal.times(commFx);
+    commInContainerCcy = commCcy === containerCcy ? commVal : dFxRate.gt(0) ? commUsd.div(dFxRate) : commVal;
   } else {
-    const commVal = parseFloat(container.commissionAmount || "0");
+    const commVal = new Decimal(container.commissionAmount || "0");
     const commCcy = (container as any).commissionCurrencyCode || containerCcy;
-    commUsd = commCcy === "USD" ? commVal : commVal * fxRate;
-    commInContainerCcy = commCcy === containerCcy ? commVal : fxRate > 0 ? commUsd / fxRate : commVal;
+    commUsd = commCcy === "USD" ? commVal : commVal.times(dFxRate);
+    commInContainerCcy = commCcy === containerCcy ? commVal : dFxRate.gt(0) ? commUsd.div(dFxRate) : commVal;
   }
 
   // Duty — no separate currency field on the container; always container currency.
-  const dutyVal = container.dutyStatus === "CONFIRMED" ? parseFloat(container.dutyAmount || "0") : 0;
-  const dutyUsd = containerCcy === "USD" ? dutyVal : dutyVal * fxRate;
+  const dutyVal = container.dutyStatus === "CONFIRMED" ? new Decimal(container.dutyAmount || "0") : new Decimal(0);
+  const dutyUsd = containerCcy === "USD" ? dutyVal : dutyVal.times(dFxRate);
 
   // Additional charges — each row already stores its own currency + fx rate explicitly;
   // this part was already correct in the live code, kept identical here.
-  let addlInContainerCcy = 0;
-  let addlUsd = 0;
+  let addlInContainerCcy = new Decimal(0);
+  let addlUsd = new Decimal(0);
   for (const c of additionalCharges) {
-    const amt = parseFloat(c.amount || "0");
+    const amt = new Decimal(c.amount || "0");
     const ccy = c.currencyCode || containerCcy;
-    const cfx = parseFloat(c.fxRateToUsd || String(fxRate)) || fxRate;
-    const amtUsd = ccy === "USD" ? amt : amt * cfx;
-    const amtInContainerCcy = ccy === containerCcy ? amt : fxRate > 0 ? amtUsd / fxRate : amt;
-    addlInContainerCcy += amtInContainerCcy;
-    addlUsd += amtUsd;
+    const rawCfx = parseFloat(c.fxRateToUsd || "");
+    const cfx = Number.isFinite(rawCfx) && rawCfx > 0 ? new Decimal(rawCfx) : dFxRate;
+    const amtUsd = ccy === "USD" ? amt : amt.times(cfx);
+    const amtInContainerCcy = ccy === containerCcy ? amt : dFxRate.gt(0) ? amtUsd.div(dFxRate) : amt;
+    addlInContainerCcy = addlInContainerCcy.plus(amtInContainerCcy);
+    addlUsd = addlUsd.plus(amtUsd);
   }
 
-  const totalCost = basePayable + freightInContainerCcy + ocInContainerCcy + commInContainerCcy + dutyVal + addlInContainerCcy;
-  const totalUsd = baseMaterialUsd + freightUsd + ocUsd + commUsd + dutyUsd + addlUsd;
+  const totalCost = basePayable
+    .plus(freightInContainerCcy)
+    .plus(ocInContainerCcy)
+    .plus(commInContainerCcy)
+    .plus(dutyVal)
+    .plus(addlInContainerCcy);
+  const totalUsd = baseMaterialUsd.plus(freightUsd).plus(ocUsd).plus(commUsd).plus(dutyUsd).plus(addlUsd);
 
   return {
-    costPerKg: totalCost / actualKg,
-    costPerKgUsd: totalUsd / actualKg,
-    totalCost,
-    totalUsd,
+    costPerKg: totalCost.div(actualKg).toNumber(),
+    costPerKgUsd: totalUsd.div(actualKg).toNumber(),
+    totalCost: totalCost.toNumber(),
+    totalUsd: totalUsd.toNumber(),
     fxUnresolved: false,
   };
 }
