@@ -771,7 +771,14 @@ export function registerRawStockOffloadRoutes(app: Express) {
             and(
               eq(factoryMixBatches.companyId, companyId),
               inArray(factoryMixBatches.id, linkedBatchIds),
-              sql`${factoryMixBatches.usedKg}::numeric > 0`
+              sql`${factoryMixBatches.usedKg}::numeric > 0`,
+              // A soft-deleted batch no longer holds live production usage — its
+              // consumption of this container's stock was already reversed by the
+              // delete route (factoryMixBatchRoutes.ts). Without this filter, a
+              // deleted batch's stale, never-reset usedKg field permanently blocks
+              // reversing the offload even though nothing is actually consuming
+              // the stock anymore.
+              isNull(factoryMixBatches.deletedAt)
             )
           );
 
