@@ -1,6 +1,8 @@
 import type { Express } from "express";
 import { requireAuth } from "../../../auth";
 import { getRawStockRecalcPreview, applyRawStockRecalc } from "../../../services/factory/rawStockRecalc";
+import { checkFactoryAdmin } from "../_helpers";
+import { logAudit } from "../../helpers/auditHelpers";
 
 export function registerRawStockRecalcRoutes(app: Express) {
   // Read-only diff preview — never writes anything.
@@ -17,9 +19,11 @@ export function registerRawStockRecalcRoutes(app: Express) {
   });
 
   // Apply the corrected cost for the containers the admin approved, cascading to
-  // mix batches/bales. Only touches the ids explicitly passed in.
+  // mix batches/bales. Only touches the ids explicitly passed in. Admin-only, and
+  // every apply is audit-logged (the preview endpoint above remains fully read-only).
   app.post("/api/factory/raw-stock/recalc/apply", requireAuth, async (req: any, res: any) => {
     try {
+      if (!checkFactoryAdmin(req, res)) return;
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const { containerIds } = req.body;
@@ -28,6 +32,17 @@ export function registerRawStockRecalcRoutes(app: Express) {
       }
       const parsedIds = containerIds.map((id: any) => parseInt(id)).filter((id: number) => !isNaN(id));
       const results = await applyRawStockRecalc(companyId, parsedIds);
+
+      await logAudit({
+        userId: req.session.userId,
+        username: req.session.username || req.session.userId,
+        companyId,
+        action: "update",
+        tableName: "factory_raw_stock",
+        recordIdentifier: `recalc/apply — ${parsedIds.length} container(s) requested`,
+        changes: { requestedContainerIds: { new: parsedIds }, results: { new: results } },
+      });
+
       res.json({ results });
     } catch (err: any) {
       console.error("[raw-stock recalc apply] error:", err);
