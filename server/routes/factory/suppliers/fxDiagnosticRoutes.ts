@@ -21,6 +21,27 @@ import {
   factorySuppliers,
 } from "@shared/schema";
 import { resolveStoredFxRate } from "../../../services/factory/currencyConversion";
+import { checkFactoryAdmin } from "../_helpers";
+import { logAudit } from "../../helpers/auditHelpers";
+import {
+  planFxResolutionRepair,
+  applyFxResolutionRepair,
+  type FxResolutionSource,
+} from "../../../services/factory/fxResolutionRepair";
+import crypto from "node:crypto";
+
+const VALID_SOURCES: FxResolutionSource[] = ["container", "offload_additional_charge", "commission"];
+
+/** Simple confirmation-token scheme: ties a dry-run preview to the exact repair it
+ * previewed, so an apply request can't be replayed against a different rate/row
+ * than the one an admin actually reviewed. Not a security boundary — just anti-fat-finger. */
+function makeConfirmationToken(companyId: number, source: string, id: number, newFxRateToUsd: number): string {
+  return crypto
+    .createHash("sha256")
+    .update(`${companyId}:${source}:${id}:${newFxRateToUsd}`)
+    .digest("hex")
+    .slice(0, 16);
+}
 
 interface UnresolvedRow {
   source: "container" | "offload_additional_charge" | "commission";
@@ -208,6 +229,76 @@ export function registerFactoryFxDiagnosticRoutes(app: Express) {
       });
     } catch (error: any) {
       console.error("Error running factory FX diagnostic:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Safe repair: resolve ONE unresolved row's exchange rate by supplying the real,
+  // explicitly-known rate. Admin-only. Defaults to a dry-run preview (which returns a
+  // confirmationToken); the actual write only happens when the caller re-submits with
+  // { confirm: true, confirmationToken } matching that exact (source, id, rate) triple.
+  // Never touches CLOSED/COMPLETED/OFFLOADED containers — those come back as
+  // MANUAL_REVIEW_REQUIRED instead. Never recalculates cost/kg or cascades — see
+  // rawStockRecalc.ts's separate preview/apply flow for that, which already refuses
+  // to run on fx-unresolved containers.
+  app.post("/api/factory/suppliers/fx-diagnostic/repair", requireAuth, async (req: any, res: any) => {
+    try {
+      if (!checkFactoryAdmin(req, res)) return;
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const { source, id, fxRateToUsd, confirm, confirmationToken } = req.body || {};
+      const parsedId = parseInt(id);
+      const parsedRate = parseFloat(fxRateToUsd);
+
+      if (!VALID_SOURCES.includes(source)) {
+        return res.status(400).json({ message: `source must be one of: ${VALID_SOURCES.join(", ")}` });
+      }
+      if (isNaN(parsedId)) return res.status(400).json({ message: "id must be a number" });
+      if (!(parsedRate > 0)) return res.status(400).json({ message: "fxRateToUsd must be a positive number" });
+
+      const plan = await planFxResolutionRepair(source, parsedId, companyId, parsedRate);
+      if (!plan) return res.status(404).json({ message: `${source} #${parsedId} not found` });
+
+      const expectedToken = makeConfirmationToken(companyId, source, parsedId, parsedRate);
+
+      if (!confirm) {
+        return res.json({ dryRun: true, plan, confirmationToken: expectedToken });
+      }
+
+      if (confirmationToken !== expectedToken) {
+        return res.status(400).json({
+          message: "confirmationToken does not match this exact repair — re-run the dry-run preview first.",
+        });
+      }
+
+      const result = await applyFxResolutionRepair(source, parsedId, companyId, parsedRate);
+
+      await logAudit({
+        userId: req.session.userId,
+        username: req.session.username || req.session.userId,
+        companyId,
+        action: "update",
+        tableName:
+          source === "container"
+            ? "factory_containers"
+            : source === "offload_additional_charge"
+              ? "factory_offload_additional_charges"
+              : "factory_container_commissions",
+        recordId: parsedId,
+        recordIdentifier: `FX resolution repair — ${source} #${parsedId}`,
+        changes: {
+          fxRateToUsd: { old: result.oldFxRateToUsd, new: result.newFxRateToUsd },
+          fxRateConfirmed: { old: result.oldFxRateConfirmed, new: true },
+        },
+      });
+
+      res.json({ dryRun: false, result });
+    } catch (error: any) {
+      if (String(error.message || "").startsWith("MANUAL_REVIEW_REQUIRED")) {
+        return res.status(409).json({ message: error.message, code: "MANUAL_REVIEW_REQUIRED" });
+      }
+      console.error("Error applying FX resolution repair:", error);
       res.status(500).json({ message: error.message });
     }
   });
