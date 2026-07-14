@@ -5,6 +5,7 @@ import { db } from "../../../db";
 import { requireAuth } from "../../../auth";
 import { classifyNetPositionAccounts } from "../../../netPositionHelper";
 import { adjustInventory } from "../../../inventoryHelper";
+import { applyOffloadMovingAverage } from "../../../services/factory/rawStockLockedRate";
 import {
   writeDaybookEntry,
   getOrFetchFxRateToUsd,
@@ -327,6 +328,21 @@ export function registerRawStockOffloadRoutes(app: Express) {
       let rawStock: any;
 
       await db.transaction(async (tx) => {
+        // 0. Update the supplier's locked raw-material rate using the moving-average
+        //    formula, BEFORE inserting the new raw-stock row, so "remaining kg" reflects
+        //    stock immediately before this offload (already-consumed stock never
+        //    re-enters the average). Row-locks the supplier to serialize concurrent
+        //    offloads. Only applies to a real supplier — manual/no-supplier containers
+        //    have no locked rate to maintain.
+        if (container.supplierId) {
+          await applyOffloadMovingAverage(tx, {
+            companyId,
+            supplierId: container.supplierId,
+            newReceivedKg: parseFloat(actualKg),
+            newContainerLandedCostPerKgUsd: costPerKgUsd,
+          });
+        }
+
         // 1. Commission INSERT
         if (commInsertValues) {
           [commissionRecord] = await tx.insert(factoryContainerCommissions).values(commInsertValues).returning();

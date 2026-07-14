@@ -518,6 +518,12 @@ export const factorySuppliers = pgTable(
     supplierCategoryId: integer("supplier_category_id"),
     isActive: boolean("is_active").notNull().default(true),
     isBroker: boolean("is_broker").notNull().default(false),
+    // Authoritative, persisted locked raw-material cost/kg (USD) for this supplier.
+    // Must only change when a new container is offloaded for this supplier (moving
+    // average using pre-offload remaining kg) or an explicit landed-cost correction —
+    // never from mix batches, adjustments, or any other quantity-only movement.
+    // Null means "not yet established" (no offload/OB/ADD has ever set it).
+    currentRawMaterialCostPerKgUsd: decimal("current_raw_material_cost_per_kg_usd", { precision: 20, scale: 8 }),
     createdAt: timestamp("created_at").notNull().defaultNow(),
     updatedAt: timestamp("updated_at").notNull().defaultNow(),
   },

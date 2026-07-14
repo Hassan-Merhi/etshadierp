@@ -30,17 +30,14 @@ interface SupplierRawStock {
 }
 
 /**
- * The true current $/kg for a supplier's remaining stock is valueRemainingUsd ÷ freeKg,
- * not the received-weighted costPerKgUsd — that rate can drift from reality once charges
- * are edited or stock is partially used (see the Raw Stock card, which uses the same
- * formula). Falls back to costPerKgUsd/costPerKg when there's no free stock to derive a
- * rate from (e.g. fully-used supplier).
+ * The supplier's rate is the server-authoritative locked raw-material cost/kg
+ * (factorySuppliers.currentRawMaterialCostPerKgUsd), returned as costPerKgUsd by
+ * GET /api/factory/raw-stock. It never shifts with usage/remaining kg — deriving
+ * it from valueRemainingUsd ÷ freeKg would recompute a number that can drift once
+ * charges are edited or stock is partially used. This dialog only ever previews
+ * that locked rate; it must never send a client-computed cost back to the server.
  */
 function getSupplierRate(stock: SupplierRawStock): number {
-  const freeKg = parseFloat(stock.freeKg || "0");
-  if (freeKg > 0) {
-    return parseFloat(stock.valueRemainingUsd || "0") / freeKg;
-  }
   return parseFloat(stock.costPerKgUsd || "") || parseFloat(stock.costPerKg || "0");
 }
 
@@ -108,12 +105,13 @@ export function CreateMixBatchDialog({ open, onOpenChange, onCreated }: CreateMi
 
   const createMutation = useMutation({
     mutationFn: async () => {
+      // Never send costPerKg for supplier sources — the server always uses the
+      // supplier's locked rate; any client-supplied cost is ignored server-side.
       const supplierSources = selectedSources
         .filter((s) => s.type === "supplier")
         .map((s) => ({
           supplierId: s.sourceId,
           weightKg: s.weightKg.toString(),
-          costPerKg: s.costPerKg.toString(),
         }));
 
       const batchSources = selectedSources
@@ -183,12 +181,13 @@ export function CreateMixBatchDialog({ open, onOpenChange, onCreated }: CreateMi
     mutationFn: async () => {
       if (!targetBatchId) throw new Error("Please select a batch to add to");
 
+      // Never send costPerKg for supplier sources — the server always uses the
+      // supplier's locked rate; any client-supplied cost is ignored server-side.
       const supplierSources = selectedSources
         .filter((s) => s.type === "supplier")
         .map((s) => ({
           supplierId: s.sourceId,
           weightKg: s.weightKg.toString(),
-          costPerKg: s.costPerKg.toString(),
         }));
 
       const batchSources = selectedSources

@@ -5,6 +5,7 @@ import { db } from "../../../db";
 import { requireAuth } from "../../../auth";
 import { classifyNetPositionAccounts } from "../../../netPositionHelper";
 import { adjustInventory } from "../../../inventoryHelper";
+import { applyOffloadMovingAverage } from "../../../services/factory/rawStockLockedRate";
 import {
   writeDaybookEntry,
   getOrFetchFxRateToUsd,
@@ -258,6 +259,17 @@ export function registerRawStockBalanceRoutes(app: Express) {
             commissionSupplierId = created.id;
           }
         }
+
+        // Opening balance is an actual receipt of stock, so it establishes/updates the
+        // supplier's locked raw-material rate via the same moving-average formula as a
+        // real container offload — must run BEFORE the raw-stock insert so "remaining
+        // kg" reflects stock immediately before this receipt.
+        await applyOffloadMovingAverage(tx, {
+          companyId,
+          supplierId: existingSupplier.id,
+          newReceivedKg: kgVal,
+          newContainerLandedCostPerKgUsd: costPerKgUsd,
+        });
 
         const [rawStock] = await tx
           .insert(factoryRawStock)

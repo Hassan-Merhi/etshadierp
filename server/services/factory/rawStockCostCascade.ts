@@ -17,7 +17,7 @@
  * pass the `tx` handle so all writes are atomic with the caller's other work.
  */
 import { eq, and, sql } from "drizzle-orm";
-import { factoryRawStock, factoryMixBatchSources, factoryMixBatches, factoryBales } from "@shared/schema";
+import { factoryRawStock, factoryMixBatchSources, factoryMixBatches, factoryBales, factoryContainers, factorySuppliers } from "@shared/schema";
 
 export interface CascadeResult {
   rawStockRowsUpdated: number;
@@ -60,6 +60,49 @@ export async function cascadeContainerCostChange(
       .update(factoryRawStock)
       .set({ costPerKg: String(newCostPerKg), costPerKgUsd: String(newCostPerKgUsd) })
       .where(eq(factoryRawStock.id, row.id));
+  }
+
+  // This IS one of the two sanctioned ways a supplier's locked rate may change
+  // (an explicit authorized landed-cost correction to a specific container).
+  // Recompute the supplier's locked rate from ALL of its current raw-stock rows
+  // (receipt-weighted) so it reflects this correction, and persist it — this is
+  // the only place outside a real offload that's allowed to touch the field.
+  const [container] = await tx
+    .select({ supplierId: factoryContainers.supplierId })
+    .from(factoryContainers)
+    .where(and(eq(factoryContainers.id, containerId), eq(factoryContainers.companyId, companyId)));
+  if (container?.supplierId) {
+    const allSupplierRows = await tx
+      .select({
+        receivedKg: factoryRawStock.receivedKg,
+        costPerKg: factoryRawStock.costPerKg,
+        costPerKgUsd: factoryRawStock.costPerKgUsd,
+      })
+      .from(factoryRawStock)
+      .innerJoin(factoryContainers, eq(factoryRawStock.containerId, factoryContainers.id))
+      .where(
+        and(
+          eq(factoryRawStock.companyId, companyId),
+          eq(factoryContainers.supplierId, container.supplierId),
+          sql`${factoryContainers.status} != 'DELETED'`,
+          sql`${factoryRawStock.deletedAt} IS NULL`,
+          sql`${factoryContainers.deletedAt} IS NULL`
+        )
+      );
+    let weightedSum = 0;
+    let totalKg = 0;
+    for (const r of allSupplierRows) {
+      const kg = parseFloat(r.receivedKg as string) || 0;
+      const cost = parseFloat(r.costPerKgUsd as string) || parseFloat(r.costPerKg as string) || 0;
+      weightedSum += kg * cost;
+      totalKg += kg;
+    }
+    if (totalKg > 0) {
+      await tx
+        .update(factorySuppliers)
+        .set({ currentRawMaterialCostPerKgUsd: String(weightedSum / totalKg), updatedAt: new Date() })
+        .where(and(eq(factorySuppliers.id, container.supplierId), eq(factorySuppliers.companyId, companyId)));
+    }
   }
 
   // 2. Mix batch sources sourced from this container.
