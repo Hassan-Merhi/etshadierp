@@ -48,3 +48,4 @@
 - [Bare block+return in route handler](bare-block-return-in-route.md) — `try { { if(x) return; } } catch{}` inside a route exits the whole handler, skipping res.json and hanging the client.
 - [Company-wide daily state pattern](company-wide-daily-state-pattern.md) — shared "once per day per company" gates need DB uniqueness+upsert, server-computed company business date, and audited skip buttons.
 - [Supplier balance parent-company detection](supplier-parent-company-detection.md) — supplier.openingBalance only applies in the explicit parentCompanyId setting's company, never "lowest company ID"; all balance surfaces must share one helper.
+- [Raw-material exchange-rate "looks set" heuristic](raw-material-fx-default-to-1.md) — a stored fx rate of exactly 1 for a non-USD currency is indistinguishable from unset (schema default); centralized helper rejects instead of silently pricing at 1.

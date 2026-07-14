@@ -6,6 +6,7 @@ import { requireAuth } from "../../../auth";
 import { classifyNetPositionAccounts } from "../../../netPositionHelper";
 import { adjustInventory } from "../../../inventoryHelper";
 import { applyOffloadMovingAverage } from "../../../services/factory/rawStockLockedRate";
+import { convertToUsdOrThrow, UnresolvedExchangeRateError } from "../../../services/factory/currencyConversion";
 import {
   writeDaybookEntry,
   getOrFetchFxRateToUsd,
@@ -146,10 +147,16 @@ export function registerRawStockBalanceRoutes(app: Express) {
         return res.status(400).json({ message: "Cost per KG must be non-negative" });
 
       const currencyCode = reqCurrency || "USD";
-      const fxRate = parseFloat(reqFxRate || "1");
       const kgVal = parseFloat(receivedKg);
       const rateVal = parseFloat(costPerKg);
-      const costPerKgUsd = currencyCode === "USD" ? rateVal : rateVal * fxRate;
+      let costPerKgUsd: number;
+      try {
+        costPerKgUsd = convertToUsdOrThrow(rateVal, currencyCode, reqFxRate);
+      } catch (err: any) {
+        if (err instanceof UnresolvedExchangeRateError) return res.status(400).json({ message: err.message });
+        throw err;
+      }
+      const fxRate = currencyCode === "USD" ? 1 : parseFloat(reqFxRate);
       const totalPayable = kgVal * rateVal;
       const totalPayableUsd = kgVal * costPerKgUsd;
       const trimmedSupplierName = String(supplierName).trim();

@@ -1118,7 +1118,8 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
       });
     } catch (error: any) {
       console.error("Error in daybook cost-edit:", error);
-      res.status(500).json({ message: error.message });
+      const status = error?.name === "UnresolvedExchangeRateError" ? 400 : 500;
+      res.status(status).json({ message: error.message });
     }
   });
 
