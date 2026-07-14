@@ -4,6 +4,7 @@ import { registerSupplierFxRoutes } from "./supplierFxRoutes";
 import { registerSupplierBalanceRoutes } from "./supplierBalanceRoutes";
 import { registerSupplierStatementRoutes } from "./supplierStatementRoutes";
 import { registerSupplierBrokerRoutes } from "./supplierBrokerRoutes";
+import { registerFactoryFxDiagnosticRoutes } from "./fxDiagnosticRoutes";
 
 export function registerFactorySuppliersRoutes(app: Express) {
   registerSupplierCrudRoutes(app);
@@ -11,4 +12,5 @@ export function registerFactorySuppliersRoutes(app: Express) {
   registerSupplierBalanceRoutes(app);
   registerSupplierStatementRoutes(app);
   registerSupplierBrokerRoutes(app);
+  registerFactoryFxDiagnosticRoutes(app);
 }
