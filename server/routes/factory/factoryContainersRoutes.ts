@@ -326,6 +326,8 @@ export function registerFactoryContainersRoutes(app: Express) {
         fxRateSource: fxRateSource === "manual" ? "manual" : "auto",
         fxRateDateImport: importDate,
         ratePerKgUsd: String(ratePerKgUsd),
+        // Explicitly resolved above (manual user entry or a real auto-fetch) — trust it.
+        fxRateConfirmed: true,
       };
 
       // Auto-set commissionSupplierId to broker (parentId) if supplier has one and not already set
@@ -588,23 +590,31 @@ export function registerFactoryContainersRoutes(app: Express) {
           updateData.fxRateToUsdImport = fxRate;
           updateData.fxRateDateImport = importDate;
           updateData.fxRateSource = "auto";
+          updateData.fxRateConfirmed = true; // real auto-fetch, not a guess
           const ratePerKg = parseFloat(updateData.ratePerKg || existing.ratePerKg || "0");
           const fxRateNum = parseFloat(fxRate);
           updateData.ratePerKgUsd = String(applyFxRate(ratePerKg, currencyCode, fxRateNum));
         } else {
           // Manual: trust an fxRateToUsd explicitly provided in THIS request regardless of
-          // value; otherwise fall back to the existing stored rate, but only if it looks
-          // like a real explicitly-set rate (not the unset schema default of "1").
+          // value; otherwise fall back to the existing stored rate, but only if it's actually
+          // confirmed already (or, absent the flag on this row, looks like a real explicit
+          // rate under the legacy heuristic).
           const explicitRate = b.fxRateToUsd !== undefined ? parseFloat(dec(b.fxRateToUsd) ?? "") : NaN;
           let fxRateNum: number;
           if (!isNaN(explicitRate) && explicitRate > 0) {
             fxRateNum = explicitRate;
+            updateData.fxRateConfirmed = true; // freshly supplied by this request
           } else {
-            const { fxRate, looksSet } = resolveStoredFxRate(currencyCode, existing.fxRateToUsd);
+            const { fxRate, looksSet } = resolveStoredFxRate(
+              currencyCode,
+              existing.fxRateToUsd,
+              (existing as any).fxRateConfirmed
+            );
             if (!looksSet) {
               return res.status(400).json({ message: new UnresolvedExchangeRateError(currencyCode).message });
             }
             fxRateNum = fxRate;
+            // Carries forward an already-confirmed rate; leave fxRateConfirmed untouched.
           }
           const ratePerKg = parseFloat(updateData.ratePerKg || existing.ratePerKg || "0");
           updateData.fxRateToUsd = String(fxRateNum);
@@ -1228,6 +1238,7 @@ export function registerFactoryContainersRoutes(app: Express) {
             containerNumber: factoryContainers.containerNumber,
             currencyCode: factoryContainers.currencyCode,
             fxRateToUsd: factoryContainers.fxRateToUsd,
+            fxRateConfirmed: (factoryContainers as any).fxRateConfirmed,
             arrivalDate: factoryContainers.arrivalDate,
             createdAt: factoryContainers.createdAt,
           })
@@ -1249,7 +1260,17 @@ export function registerFactoryContainersRoutes(app: Express) {
             if (chargeCcy === "USD") {
               chargeFxRate = "1";
             } else if (chargeCcy === (container.currencyCode || "USD")) {
-              chargeFxRate = String(parseFloat(container.fxRateToUsd || "1"));
+              const { fxRate, looksSet } = resolveStoredFxRate(
+                chargeCcy,
+                container.fxRateToUsd,
+                (container as any).fxRateConfirmed
+              );
+              if (!looksSet) {
+                return res
+                  .status(400)
+                  .json({ message: new UnresolvedExchangeRateError(chargeCcy).message });
+              }
+              chargeFxRate = String(fxRate);
             } else {
               chargeFxRate = await getOrFetchFxRateToUsd(companyId, chargeCcy, voucherDate);
             }
@@ -1661,6 +1682,8 @@ export function registerFactoryContainersRoutes(app: Express) {
                 fxRateSource: fxSource,
                 fxRateDateImport: importDate,
                 ratePerKgUsd: String(ratePerKgUsd),
+                // Explicitly resolved above (validated manual entry or a real auto-fetch).
+                fxRateConfirmed: true,
                 arrivalDate: row.arrivalDate || null,
                 notes: row.notes || null,
                 status,

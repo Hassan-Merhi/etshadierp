@@ -6,6 +6,7 @@ import { requireAuth } from "../../../auth";
 import { classifyNetPositionAccounts } from "../../../netPositionHelper";
 import { adjustInventory } from "../../../inventoryHelper";
 import { sqlArray } from "../../../lib/sqlArray";
+import { resolveStoredFxRate } from "../../../services/factory/currencyConversion";
 import {
   writeDaybookEntry,
   getOrFetchFxRateToUsd,
@@ -963,15 +964,19 @@ export function registerSupplierBrokerRoutes(app: Express) {
 
       for (const p of payments as any[]) {
         const amt = parseFloat(p.amount || "0");
-        const rate = parseFloat(p.fxRateToUsd || "1") || 1;
+        const cc = p.currencyCode || "USD";
+        // factory_supplier_payments has no fxRateConfirmed column yet — legacy heuristic stopgap.
+        // usdAmount always uses the actually-persisted amountUsd (never recomputed here); this
+        // rate is purely a display hint, and is shown as null (not a guessed 1) when unresolved.
+        const { fxRate: rate, looksSet } = resolveStoredFxRate(cc, p.fxRateToUsd);
         const usd = parseFloat(p.amountUsd || String(amt));
         paymentRows.push({
           id: `pay-${p.id}`,
           date: p.date ? String(p.date) : null,
           type: "payment",
-          fromCurrency: p.currencyCode || "USD",
+          fromCurrency: cc,
           fromAmount: amt,
-          fxRate: p.currencyCode === "USD" ? null : rate,
+          fxRate: cc === "USD" || !looksSet ? null : rate,
           usdAmount: usd,
           notes: p.notes || null,
           supplierName: nameMap[p.supplierId],
