@@ -47,3 +47,4 @@
 - [Locked raw-material rate — final design](locked-raw-material-rate.md) — persisted event-driven rate; moves only on real offload (remaining-kg moving avg), landed-cost delta correction, or explicit update-cost; all reads must share one helper.
 - [Bare block+return in route handler](bare-block-return-in-route.md) — `try { { if(x) return; } } catch{}` inside a route exits the whole handler, skipping res.json and hanging the client.
 - [Company-wide daily state pattern](company-wide-daily-state-pattern.md) — shared "once per day per company" gates need DB uniqueness+upsert, server-computed company business date, and audited skip buttons.
+- [Supplier balance parent-company detection](supplier-parent-company-detection.md) — supplier.openingBalance only applies in the explicit parentCompanyId setting's company, never "lowest company ID"; all balance surfaces must share one helper.
