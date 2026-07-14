@@ -46,3 +46,4 @@
 - [Mix-batch stable supplier cost rate](mix-batch-stable-supplier-cost.md) — supplier cost/kg for mix-batch costing must be weighted by received kg, not remaining kg, or FIFO consumption drifts it.
 - [Bare block+return in route handler](bare-block-return-in-route.md) — `try { { if(x) return; } } catch{}` inside a route exits the whole handler, skipping res.json and hanging the client.
 - [Company-wide daily state pattern](company-wide-daily-state-pattern.md) — shared "once per day per company" gates need DB uniqueness+upsert, server-computed company business date, and audited skip buttons.
+- [Cross-version DB copy](cross-version-db-copy.md) — pg_dump blocks on newer source major version (e.g. Render PG18 vs nix's PG16); use drizzle push + per-table \copy with explicit column names instead.
