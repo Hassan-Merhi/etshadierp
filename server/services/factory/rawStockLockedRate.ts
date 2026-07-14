@@ -14,10 +14,18 @@
  * `getLockedSupplierRate`. Nothing should recompute a rate from remaining
  * value / free kg, or from all-time received kg, at read time.
  */
-import { eq, and, sql } from "drizzle-orm";
+import { eq, and, sql, isNull } from "drizzle-orm";
 import Decimal from "decimal.js";
-import { factorySuppliers, factoryRawStock, factoryContainers, factoryRawMaterialAdjustments } from "@shared/schema";
+import {
+  factorySuppliers,
+  factoryRawStock,
+  factoryContainers,
+  factoryRawMaterialAdjustments,
+  factoryMixBatchSources,
+  factoryMixBatches,
+} from "@shared/schema";
 import { getStableSupplierCost } from "./rawStockStableCost";
+import { db as sharedDb } from "../../db";
 
 /**
  * The single authoritative "how much of this supplier's raw material is
@@ -143,6 +151,100 @@ export async function getLockedSupplierRateReadOnly(
   // Never-established — compute what the lazy backfill WOULD persist, without writing.
   const { costPerKgUsd } = await getStableSupplierCost(tx, companyId, supplierId);
   return { rate: costPerKgUsd, wasBackfilled: false };
+}
+
+export interface LockedRateDiagnosticRow {
+  companyId: number;
+  supplierId: number;
+  supplierName: string;
+  persistedLockedRate: number | null;
+  rawMaterialsDisplayedRate: number;
+  mixBatchDialogRate: number;
+  remainingKg: number;
+  reservedKg: number;
+  freeKg: number;
+  displayedValue: string;
+  expectedValue: string;
+  difference: string;
+  backfillRequired: boolean;
+}
+
+/**
+ * Shared, read-only per-supplier locked-rate reconciliation for a company.
+ * Reused by the `/raw-stock/diagnostics/locked-rates` route AND the broader
+ * FX/raw-material reconciliation report so both surfaces report identical
+ * numbers from one implementation instead of two independently-maintained
+ * copies of this math. Zero writes: uses getLockedSupplierRateReadOnly (no
+ * lazy backfill side effect).
+ */
+export async function getLockedRateDiagnosticsForCompany(companyId: number): Promise<LockedRateDiagnosticRow[]> {
+  const db = sharedDb;
+  const suppliers = await db
+    .select({
+      id: factorySuppliers.id,
+      name: factorySuppliers.name,
+      currentRawMaterialCostPerKgUsd: factorySuppliers.currentRawMaterialCostPerKgUsd,
+    })
+    .from(factorySuppliers)
+    .where(eq(factorySuppliers.companyId, companyId));
+
+  const reservedRows = await db
+    .select({
+      supplierId: factoryMixBatchSources.supplierId,
+      reservedKg: sql<string>`SUM(${factoryMixBatchSources.weightKg})`,
+    })
+    .from(factoryMixBatchSources)
+    .innerJoin(factoryMixBatches, eq(factoryMixBatchSources.mixBatchId, factoryMixBatches.id))
+    .where(
+      and(
+        eq(factoryMixBatches.companyId, companyId),
+        sql`${factoryMixBatchSources.supplierId} IS NOT NULL`,
+        sql`${factoryMixBatches.status} NOT IN ('CLOSED', 'COMPLETED')`,
+        isNull(factoryMixBatches.deletedAt)
+      )
+    )
+    .groupBy(factoryMixBatchSources.supplierId);
+  const reservedBySupplierId = new Map<number, number>();
+  for (const r of reservedRows) {
+    if (r.supplierId) reservedBySupplierId.set(r.supplierId, parseFloat(r.reservedKg as string) || 0);
+  }
+
+  return db.transaction(async (tx: any) => {
+    const out: LockedRateDiagnosticRow[] = [];
+    for (const supplier of suppliers) {
+      const persistedRaw = supplier.currentRawMaterialCostPerKgUsd;
+      const persistedLockedRate =
+        persistedRaw !== null && persistedRaw !== undefined ? parseFloat(persistedRaw as string) || 0 : null;
+
+      const { rate: rawMaterialsDisplayedRate } = await getLockedSupplierRateReadOnly(tx, companyId, supplier.id);
+      const mixBatchDialogRate = rawMaterialsDisplayedRate;
+
+      const remainingKg = await getAuthoritativeSupplierRemainingKg(tx, companyId, supplier.id);
+      const reservedKg = reservedBySupplierId.get(supplier.id) || 0;
+      const freeKg = remainingKg;
+
+      const displayedValue = freeKg * rawMaterialsDisplayedRate;
+      const expectedValue = freeKg * (persistedLockedRate ?? 0);
+      const difference = displayedValue - expectedValue;
+
+      out.push({
+        companyId,
+        supplierId: supplier.id,
+        supplierName: supplier.name,
+        persistedLockedRate,
+        rawMaterialsDisplayedRate,
+        mixBatchDialogRate,
+        remainingKg,
+        reservedKg,
+        freeKg,
+        displayedValue: displayedValue.toFixed(2),
+        expectedValue: expectedValue.toFixed(2),
+        difference: difference.toFixed(2),
+        backfillRequired: persistedLockedRate === null,
+      });
+    }
+    return out;
+  });
 }
 
 /**

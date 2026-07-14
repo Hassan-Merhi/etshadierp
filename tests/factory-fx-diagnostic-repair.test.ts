@@ -16,6 +16,8 @@ import { seedTestData, cleanupTestData, closeTestServer, type TestContext } from
 import { db, pool } from "../server/db";
 import { eq } from "drizzle-orm";
 import * as schema from "../shared/schema";
+import { signRepairToken } from "../server/services/factory/repairToken";
+import { applyFxResolutionRepair } from "../server/services/factory/fxResolutionRepair";
 
 const TEST_PREFIX = "fxdiag";
 
@@ -271,5 +273,261 @@ describe("Factory FX diagnostic + safe repair", () => {
 
     const [reloaded] = await db.select().from(schema.factoryContainers).where(eq(schema.factoryContainers.id, container.id));
     expect((reloaded as any).fxRateConfirmed).toBe(false); // historical costing left untouched
+  });
+
+  it("rejects the diagnostic GET for non-admin roles too", async () => {
+    const res = await nonAdminAgent.get("/api/factory/suppliers/fx-diagnostic");
+    expect(res.status).toBe(403);
+  });
+
+  it("detects a non-USD charge attached to a USD-currency container", async () => {
+    const [container] = await db
+      .insert(schema.factoryContainers)
+      .values({
+        companyId: ctx.companyId,
+        containerNumber: `${TEST_PREFIX}-C8`,
+        supplierId,
+        currencyCode: "USD",
+        fxRateToUsd: "1",
+        fxRateConfirmed: true,
+        status: "PENDING",
+      })
+      .returning();
+
+    const [charge] = await db
+      .insert(schema.factoryOffloadAdditionalCharges)
+      .values({
+        companyId: ctx.companyId,
+        containerId: container.id,
+        description: "Non-USD charge on a USD container",
+        amount: "500",
+        currencyCode: "EUR",
+        fxRateToUsd: "1",
+        fxRateConfirmed: false,
+      })
+      .returning();
+
+    const res = await agent.get("/api/factory/suppliers/fx-diagnostic");
+    expect(res.status).toBe(200);
+    const row = res.body.rows.find((r: any) => r.source === "offload_additional_charge" && r.id === charge.id);
+    expect(row).toBeTruthy();
+    expect(row.currencyCode).toBe("EUR");
+    // The charge's container status must be resolved correctly even though the
+    // container itself is USD (and therefore not in the non-USD container scan).
+    expect(row.status).toBe("PENDING");
+  });
+
+  it("classifies a non-USD charge on a CLOSED USD container as manual-review-only, and its GET/POST repair path is refused", async () => {
+    const [container] = await db
+      .insert(schema.factoryContainers)
+      .values({
+        companyId: ctx.companyId,
+        containerNumber: `${TEST_PREFIX}-C9`,
+        supplierId,
+        currencyCode: "USD",
+        fxRateToUsd: "1",
+        fxRateConfirmed: true,
+        status: "CLOSED",
+      })
+      .returning();
+
+    const [charge] = await db
+      .insert(schema.factoryOffloadAdditionalCharges)
+      .values({
+        companyId: ctx.companyId,
+        containerId: container.id,
+        description: "Non-USD charge on a historical closed USD container",
+        amount: "250",
+        currencyCode: "CDF",
+        fxRateToUsd: "1",
+        fxRateConfirmed: false,
+      })
+      .returning();
+
+    const res = await agent.get("/api/factory/suppliers/fx-diagnostic");
+    expect(res.status).toBe(200);
+    const row = res.body.rows.find((r: any) => r.source === "offload_additional_charge" && r.id === charge.id);
+    expect(row).toBeTruthy();
+    expect(row.status).toBe("CLOSED");
+    expect(res.body.manualReviewRequired.some((r: any) => r.id === charge.id && r.source === "offload_additional_charge")).toBe(
+      true
+    );
+
+    const preview = await agent
+      .post("/api/factory/suppliers/fx-diagnostic/repair")
+      .send({ source: "offload_additional_charge", id: charge.id, fxRateToUsd: 1.5 });
+    expect(preview.status).toBe(200);
+    expect(preview.body.plan.manualReviewRequired).toBe(true);
+
+    const apply = await agent.post("/api/factory/suppliers/fx-diagnostic/repair").send({
+      source: "offload_additional_charge",
+      id: charge.id,
+      fxRateToUsd: 1.5,
+      confirm: true,
+      confirmationToken: preview.body.confirmationToken,
+    });
+    expect(apply.status).toBe(409);
+    expect(apply.body.code).toBe("MANUAL_REVIEW_REQUIRED");
+
+    const [reloaded] = await db
+      .select()
+      .from(schema.factoryOffloadAdditionalCharges)
+      .where(eq(schema.factoryOffloadAdditionalCharges.id, charge.id));
+    expect((reloaded as any).fxRateConfirmed).toBe(false);
+  });
+
+  it("returns 409 ALREADY_CONFIRMED instead of overwriting a confirmed rate that differs from the request", async () => {
+    const [container] = await db
+      .insert(schema.factoryContainers)
+      .values({
+        companyId: ctx.companyId,
+        containerNumber: `${TEST_PREFIX}-C10`,
+        supplierId,
+        currencyCode: "EUR",
+        fxRateToUsd: "1.1",
+        fxRateConfirmed: true, // already confirmed at 1.1
+        status: "PENDING",
+      })
+      .returning();
+
+    const preview = await agent
+      .post("/api/factory/suppliers/fx-diagnostic/repair")
+      .send({ source: "container", id: container.id, fxRateToUsd: 1.25 });
+    expect(preview.status).toBe(409);
+    expect(preview.body.code).toBe("ALREADY_CONFIRMED");
+
+    const [reloaded] = await db.select().from(schema.factoryContainers).where(eq(schema.factoryContainers.id, container.id));
+    expect(parseFloat((reloaded as any).fxRateToUsd)).toBeCloseTo(1.1, 6); // untouched
+  });
+
+  it("rejects an expired confirmation token", async () => {
+    const [container] = await db
+      .insert(schema.factoryContainers)
+      .values({
+        companyId: ctx.companyId,
+        containerNumber: `${TEST_PREFIX}-C11`,
+        supplierId,
+        currencyCode: "EUR",
+        fxRateToUsd: "1",
+        fxRateConfirmed: false,
+        status: "PENDING",
+      })
+      .returning();
+
+    const staleToken = signRepairToken({
+      companyId: ctx.companyId,
+      source: "container",
+      id: container.id,
+      newFxRateToUsd: 1.08,
+      oldFxRateToUsd: "1",
+      oldFxRateConfirmed: false,
+      versionTag: null,
+      userId: "someone",
+      expiresAt: Date.now() - 1000, // already expired
+    });
+
+    const res = await agent.post("/api/factory/suppliers/fx-diagnostic/repair").send({
+      source: "container",
+      id: container.id,
+      fxRateToUsd: 1.08,
+      confirm: true,
+      confirmationToken: staleToken,
+    });
+    expect(res.status).toBe(400);
+    expect(res.body.code).toBe("TOKEN_EXPIRED");
+
+    const [reloaded] = await db.select().from(schema.factoryContainers).where(eq(schema.factoryContainers.id, container.id));
+    expect((reloaded as any).fxRateConfirmed).toBe(false);
+  });
+
+  it("rolls back the FX update if the atomic audit-log insert fails", async () => {
+    const [container] = await db
+      .insert(schema.factoryContainers)
+      .values({
+        companyId: ctx.companyId,
+        containerNumber: `${TEST_PREFIX}-C12`,
+        supplierId,
+        currencyCode: "EUR",
+        fxRateToUsd: "1",
+        fxRateConfirmed: false,
+        status: "PENDING",
+      })
+      .returning();
+
+    await expect(
+      applyFxResolutionRepair("container", container.id, ctx.companyId, 1.08, {
+        onAudit: async () => {
+          throw new Error("simulated audit-log failure");
+        },
+      })
+    ).rejects.toThrow("simulated audit-log failure");
+
+    const [reloaded] = await db.select().from(schema.factoryContainers).where(eq(schema.factoryContainers.id, container.id));
+    // The FX write must have rolled back along with the failed audit insert —
+    // never left half-applied.
+    expect((reloaded as any).fxRateConfirmed).toBe(false);
+    expect(parseFloat((reloaded as any).fxRateToUsd)).toBeCloseTo(1, 6);
+  });
+
+  it("row-locks concurrent repair attempts on the same row so only one apply succeeds", async () => {
+    const [container] = await db
+      .insert(schema.factoryContainers)
+      .values({
+        companyId: ctx.companyId,
+        containerNumber: `${TEST_PREFIX}-C13`,
+        supplierId,
+        currencyCode: "EUR",
+        fxRateToUsd: "1",
+        fxRateConfirmed: false,
+        status: "PENDING",
+      })
+      .returning();
+
+    const [r1, r2] = await Promise.all([
+      applyFxResolutionRepair("container", container.id, ctx.companyId, 1.2),
+      applyFxResolutionRepair("container", container.id, ctx.companyId, 1.2),
+    ]);
+    // Serialized by the advisory + row lock: the first to acquire the lock applies,
+    // the second sees the already-confirmed-same-rate state and safely no-ops.
+    const appliedCount = [r1, r2].filter((r) => r.applied).length;
+    expect(appliedCount).toBe(1);
+
+    const [reloaded] = await db.select().from(schema.factoryContainers).where(eq(schema.factoryContainers.id, container.id));
+    expect((reloaded as any).fxRateConfirmed).toBe(true);
+    expect(parseFloat((reloaded as any).fxRateToUsd)).toBeCloseTo(1.2, 6);
+  });
+
+  it("full reconciliation report is present with kg accounting, locked-rate diagnostics, and zero writes", async () => {
+    const before = await db
+      .select()
+      .from(schema.factoryContainers)
+      .where(eq(schema.factoryContainers.companyId, ctx.companyId));
+
+    const res = await agent.get("/api/factory/suppliers/fx-diagnostic");
+    expect(res.status).toBe(200);
+    const recon = res.body.reconciliation;
+    expect(recon).toBeTruthy();
+    expect(recon.companyId).toBe(ctx.companyId);
+    expect(recon.kgSummary).toBeTruthy();
+    expect(typeof recon.kgSummary.receivedKg).toBe("number");
+    expect(typeof recon.kgSummary.usedKg).toBe("number");
+    expect(typeof recon.kgSummary.reservedKg).toBe("number");
+    expect(typeof recon.kgSummary.freeKg).toBe("number");
+    expect(Array.isArray(recon.kgSummary.negativeStockRows)).toBe(true);
+    expect(Array.isArray(recon.lockedRateDiagnostics)).toBe(true);
+    expect(Array.isArray(recon.supplierCurrencyExposure)).toBe(true);
+    expect(Array.isArray(recon.crossCompanyContamination)).toBe(true);
+    expect(Array.isArray(recon.doubleReservedDeductions)).toBe(true);
+
+    // Zero-write guarantee: the GET must never modify container rows.
+    const after = await db
+      .select()
+      .from(schema.factoryContainers)
+      .where(eq(schema.factoryContainers.companyId, ctx.companyId));
+    expect(after.length).toBe(before.length);
+    const beforeById = new Map(before.map((c: any) => [c.id, JSON.stringify(c)]));
+    for (const c of after as any[]) {
+      expect(beforeById.get(c.id)).toBe(JSON.stringify(c));
+    }
   });
 });

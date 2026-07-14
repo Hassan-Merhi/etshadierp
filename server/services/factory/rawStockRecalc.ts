@@ -17,7 +17,7 @@
  *
  * Read-only preview never writes anything. Apply runs inside a transaction per container.
  */
-import { eq, and, isNull } from "drizzle-orm";
+import { eq, and, isNull, sql } from "drizzle-orm";
 import Decimal from "decimal.js";
 import { db } from "../../db";
 import {
@@ -237,49 +237,131 @@ export async function getRawStockRecalcPreview(companyId: number): Promise<Recal
 export interface ApplyResult {
   containerId: number;
   containerNumber: string;
+  applied: boolean;
+  skippedReason?: string;
   rawStockRowsUpdated: number;
   affectedBatches: number;
   affectedBales: number;
 }
 
-/** Apply the corrected cost for a specific set of containers, cascading down the chain. */
-export async function applyRawStockRecalc(companyId: number, containerIds: number[]): Promise<ApplyResult[]> {
+// Recalc is a forward-looking correction to an already-offloaded container's
+// landed cost — OFFLOADED is the NORMAL state of every eligible container, so
+// (unlike the FX-confirmation lock) it is never refused here. Only genuinely
+// historical/closed containers are off-limits.
+const RECALC_REFUSED_STATUSES = new Set(["CLOSED", "COMPLETED"]);
+
+// Advisory-lock namespace distinct from fxResolutionRepair's (1/2/3) so the two
+// repair tools never collide on the same numeric key space.
+const RECALC_LOCK_NAMESPACE = 9001;
+
+export interface ApplyRawStockRecalcOptions {
+  /** Called with the transaction handle AFTER the container/cascade writes but
+   * BEFORE commit for each individual container, so an audit-log insert here
+   * is atomic with that container's update: if it throws, that container's
+   * transaction (and only that one) rolls back. */
+  onAudit?: (tx: any, result: ApplyResult) => Promise<void>;
+}
+
+/**
+ * Apply the corrected cost for a specific set of containers, cascading down the chain.
+ * Each container is applied in its own transaction with a `SELECT ... FOR UPDATE` row
+ * lock plus an advisory lock, so a concurrent apply/offload on the same container
+ * serializes instead of racing. Refuses (reports, does not throw) CLOSED/COMPLETED
+ * containers — historical costing is never auto-rewritten. Idempotent: re-applying
+ * to a container whose stored cost already matches the corrected value is a no-op
+ * (applied=false).
+ */
+export async function applyRawStockRecalc(
+  companyId: number,
+  containerIds: number[],
+  opts: ApplyRawStockRecalcOptions = {}
+): Promise<ApplyResult[]> {
   const results: ApplyResult[] = [];
 
   for (const containerId of containerIds) {
-    const [container] = await db
-      .select()
-      .from(factoryContainers)
-      .where(and(eq(factoryContainers.id, containerId), eq(factoryContainers.companyId, companyId)));
-    if (!container) continue;
-
-    const [additionalCharges, commissionRecords] = await Promise.all([
-      db
-        .select()
-        .from(factoryOffloadAdditionalCharges)
-        .where(
-          and(
-            eq(factoryOffloadAdditionalCharges.containerId, containerId),
-            eq(factoryOffloadAdditionalCharges.companyId, companyId)
-          )
-        ),
-      db
-        .select()
-        .from(factoryContainerCommissions)
-        .where(
-          and(
-            eq(factoryContainerCommissions.containerId, containerId),
-            eq(factoryContainerCommissions.companyId, companyId)
-          )
-        ),
-    ]);
-    const commissionRecord = commissionRecords.sort((a, b) => b.id - a.id)[0] || null;
-
-    const next = computeCorrectContainerCost(container, additionalCharges, commissionRecord);
-    if (next.fxUnresolved) continue; // never auto-apply a recompute derived from an unresolved FX rate
-    if (next.costPerKgUsd === 0 && next.costPerKg === 0) continue; // no received kg, nothing to fix
-
     const result = await db.transaction(async (tx) => {
+      await tx.execute(sql`SELECT pg_advisory_xact_lock(${RECALC_LOCK_NAMESPACE}, ${containerId})`);
+
+      const [container] = await tx
+        .select()
+        .from(factoryContainers)
+        .where(and(eq(factoryContainers.id, containerId), eq(factoryContainers.companyId, companyId)))
+        .for("update");
+      if (!container) return null;
+
+      if (RECALC_REFUSED_STATUSES.has(container.status)) {
+        return {
+          containerId,
+          containerNumber: container.containerNumber,
+          applied: false,
+          skippedReason: `Container status is ${container.status} — historical costing on closed containers is never auto-rewritten.`,
+          rawStockRowsUpdated: 0,
+          affectedBatches: 0,
+          affectedBales: 0,
+        } as ApplyResult;
+      }
+
+      const [additionalCharges, commissionRecords] = await Promise.all([
+        tx
+          .select()
+          .from(factoryOffloadAdditionalCharges)
+          .where(
+            and(
+              eq(factoryOffloadAdditionalCharges.containerId, containerId),
+              eq(factoryOffloadAdditionalCharges.companyId, companyId)
+            )
+          ),
+        tx
+          .select()
+          .from(factoryContainerCommissions)
+          .where(
+            and(
+              eq(factoryContainerCommissions.containerId, containerId),
+              eq(factoryContainerCommissions.companyId, companyId)
+            )
+          ),
+      ]);
+      const commissionRecord = commissionRecords.sort((a: any, b: any) => b.id - a.id)[0] || null;
+
+      const next = computeCorrectContainerCost(container, additionalCharges, commissionRecord);
+      if (next.fxUnresolved) {
+        return {
+          containerId,
+          containerNumber: container.containerNumber,
+          applied: false,
+          skippedReason: "FX rate is unresolved for this container — never auto-apply a recompute derived from a guessed rate.",
+          rawStockRowsUpdated: 0,
+          affectedBatches: 0,
+          affectedBales: 0,
+        } as ApplyResult;
+      }
+      if (next.costPerKgUsd === 0 && next.costPerKg === 0) {
+        return {
+          containerId,
+          containerNumber: container.containerNumber,
+          applied: false,
+          skippedReason: "No received kg — nothing to recompute.",
+          rawStockRowsUpdated: 0,
+          affectedBatches: 0,
+          affectedBales: 0,
+        } as ApplyResult;
+      }
+
+      const oldCostPerKgUsd = parseFloat(container.ratePerKgUsd || "0");
+      const EPS = 0.0005;
+      const alreadyCorrect = Math.abs(next.costPerKgUsd - oldCostPerKgUsd) <= EPS;
+      if (alreadyCorrect) {
+        return {
+          containerId,
+          containerNumber: container.containerNumber,
+          applied: false,
+          skippedReason: "Stored cost already matches the corrected value — idempotent no-op.",
+          rawStockRowsUpdated: 0,
+          affectedBatches: 0,
+          affectedBales: 0,
+        } as ApplyResult;
+      }
+
       await tx
         .update(factoryContainers)
         .set({
@@ -297,16 +379,25 @@ export async function applyRawStockRecalc(companyId: number, containerIds: numbe
         newCostPerKgUsd: next.costPerKgUsd,
       });
 
-      return cascadeResult;
+      const applyResult: ApplyResult = {
+        containerId,
+        containerNumber: container.containerNumber,
+        applied: true,
+        rawStockRowsUpdated: cascadeResult.rawStockRowsUpdated,
+        affectedBatches: cascadeResult.affectedBatches.length,
+        affectedBales: cascadeResult.affectedBales.length,
+      };
+
+      // Atomic with the writes above: if this throws, this container's entire
+      // transaction (container update + cascade) rolls back too.
+      if (opts.onAudit) {
+        await opts.onAudit(tx, applyResult);
+      }
+
+      return applyResult;
     });
 
-    results.push({
-      containerId,
-      containerNumber: container.containerNumber,
-      rawStockRowsUpdated: result.rawStockRowsUpdated,
-      affectedBatches: result.affectedBatches.length,
-      affectedBales: result.affectedBales.length,
-    });
+    if (result) results.push(result);
   }
 
   return results;
