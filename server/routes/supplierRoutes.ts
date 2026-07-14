@@ -3,6 +3,7 @@ import { db, pool } from "../db";
 import { storage } from "../storage";
 import { requireAuth, requireRole, canDelete, requireNonPOS, checkPOSLocation } from "../auth";
 import { upload, logAudit, getCurrentExchangeRate, syncEmployeeBalancesFromEntries } from "./_helpers";
+import { resolveParentCompanyId, getSupplierBalanceForContext } from "./helpers/supplierBalanceHelpers";
 import {
   locations,
   inventory,
@@ -129,23 +130,18 @@ export function registerSupplierRoutes(app: Express) {
       const companyId = (req.session as any).currentCompanyId;
       const suppliers = await storage.getAllSuppliers();
 
-      // The supplier opening balance is a global property set up in the PARENT (main)
-      // company's books before the ERP was created.  Sub-companies that transact with
-      // the same supplier start from zero — they must not inherit the parent's
-      // historical debt.  The parent company is identified as the one with the lowest
-      // database ID (it was created first during initial ERP setup).
-      const allCompaniesForGate = await storage.getAllCompanies();
-      const primaryCompanyId =
-        allCompaniesForGate.length > 0 ? Math.min(...allCompaniesForGate.map((c: any) => c.id)) : null;
-      // Opening balance only applies when viewing cross-company (no filter) or from
-      // the primary/parent company itself.
-      const isParentContext = !companyId || companyId === primaryCompanyId;
-
+      // The supplier opening balance is a historical value that belongs only to
+      // the explicitly configured parent company's books (never guessed via
+      // "lowest company ID"). Sub-companies that transact with the same
+      // supplier start from zero.
       const suppliersWithStats = await Promise.all(
         suppliers.map(async (supplier) => {
           const containerCount = await storage.getContainerCountBySupplier(supplier.id, companyId || undefined);
 
-          const entries = await storage.getVoucherEntriesBySupplier(supplier.id, companyId || undefined);
+          const { balance, openingBalance, hasActivity: hasEntries } = await getSupplierBalanceForContext(
+            supplier,
+            companyId || undefined
+          );
 
           let poCount = 0;
           if (companyId) {
@@ -153,25 +149,11 @@ export function registerSupplierRoutes(app: Express) {
             poCount = pos.length;
           }
 
-          const openingBalance = isParentContext ? parseFloat(supplier.openingBalance || "0") : 0;
-
-          const balance = entries.reduce((sum, entry) => {
-            const credit = parseFloat(entry.creditAmount || "0");
-            const debit = parseFloat(entry.debitAmount || "0");
-
-            if (credit > 0 && debit === 0) {
-              return sum + credit;
-            } else if (debit > 0 && credit === 0) {
-              return sum - debit;
-            }
-            return sum;
-          }, openingBalance);
-
           return {
             ...supplier,
             containerCount,
             balance,
-            hasActivity: containerCount > 0 || entries.length > 0 || poCount > 0,
+            hasActivity: containerCount > 0 || hasEntries || poCount > 0,
           };
         })
       );
@@ -215,20 +197,9 @@ export function registerSupplierRoutes(app: Express) {
       if (!supplier) {
         return res.status(404).json({ message: "Supplier not found" });
       }
-      // Opening balance belongs only to the primary (lowest-ID) company.
-      const allCompaniesForGate = await storage.getAllCompanies();
-      const primaryCompanyId =
-        allCompaniesForGate.length > 0 ? Math.min(...allCompaniesForGate.map((c: any) => c.id)) : null;
-      const isParentContext = !companyId || companyId === primaryCompanyId;
-      const entries = await storage.getVoucherEntriesBySupplier(supplierId, companyId || undefined);
-      const openingBalance = isParentContext ? parseFloat(supplier.openingBalance || "0") : 0;
-      const balance = entries.reduce((sum, entry) => {
-        const credit = parseFloat(entry.creditAmount || "0");
-        const debit = parseFloat(entry.debitAmount || "0");
-        if (credit > 0 && debit === 0) return sum + credit;
-        if (debit > 0 && credit === 0) return sum - debit;
-        return sum;
-      }, openingBalance);
+      // Opening balance belongs only to the explicitly configured parent
+      // company — never guessed via "lowest company ID".
+      const { balance } = await getSupplierBalanceForContext(supplier, companyId || undefined);
       res.json({ balance });
     } catch (error: any) {
       res.status(500).json({ message: error.message });

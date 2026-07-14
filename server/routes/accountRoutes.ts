@@ -6,6 +6,12 @@ import { storage } from "../storage";
 import { requireAuth, requireRole, canDelete, requireNonPOS, checkPOSLocation } from "../auth";
 import { upload, logAudit, getCurrentExchangeRate, calculateHistoricalLocationInventory } from "./_helpers";
 import {
+  resolveParentCompanyId,
+  isParentCompanyContext,
+  getSupplierBalanceForContext,
+  authorizeCompanyIdParam,
+} from "./helpers/supplierBalanceHelpers";
+import {
   inventory,
   stockItems,
   stockGroups,
@@ -552,58 +558,48 @@ export function registerAccountRoutes(app: Express) {
         }),
       ];
 
-      // Determine whether the current company is the primary (parent) company.
-      // The opening balance is a one-time historical entry that only belongs to the
-      // parent company's books — child/sub companies start from zero.
-      // Primary = lowest database ID across all ERP companies (created first during setup).
-      const allErpCompanies = (await storage.getAllCompanies()).filter(
-        (c: any) => !c.companyType || c.companyType === "erp"
-      );
-      const primaryErpCompanyId =
-        allErpCompanies.length > 0 ? Math.min(...allErpCompanies.map((c: any) => c.id)) : null;
-      const isParentContext = companyId === primaryErpCompanyId;
+      // Determine whether the current company is the parent company. The opening
+      // balance is a one-time historical entry that only belongs to the parent
+      // company's books — child/sub companies start from zero and only accrue a
+      // balance from their OWN vouchers. The parent is NEVER inferred from
+      // "lowest company ID" — only the explicit parentCompanyId setting decides.
+      const parentCompanyId = await resolveParentCompanyId();
+      const isChildCompany = companyId !== parentCompanyId;
 
-      // Calculate supplier balances separately using global entries (matching /api/suppliers/stats)
-      // Suppliers are global entities, so their balances should include entries from ALL companies
-      const supplierAccountsList = await Promise.all(
-        suppliers.map(async (supplier) => {
-          // Get entries across ALL companies (same as supplier stats endpoint)
-          const entries = await storage.getVoucherEntriesBySupplier(supplier.id);
-          const openingBalance = isParentContext ? parseFloat(supplier.openingBalance || "0") : 0;
+      // Calculate each supplier's balance scoped to THIS company only (opening
+      // balance applies solely in the parent company's context). Child companies
+      // additionally omit suppliers with no activity in that company at all.
+      const supplierAccountsList = (
+        await Promise.all(
+          suppliers.map(async (supplier) => {
+            const {
+              balance: calculatedBalance,
+              openingBalance,
+              hasActivity,
+            } = await getSupplierBalanceForContext(supplier, companyId);
 
-          // Calculate balance: Opening Balance + Credits - Debits
-          // This gives a signed value where positive = we owe them, negative = they owe us/prepaid
-          const calculatedBalance = entries.reduce((sum, entry) => {
-            const credit = parseFloat(entry.creditAmount || "0");
-            const debit = parseFloat(entry.debitAmount || "0");
-            // Only count pure credit or pure debit entries
-            if (credit > 0 && debit === 0) {
-              return sum + credit;
-            } else if (debit > 0 && credit === 0) {
-              return sum - debit;
-            }
-            return sum;
-          }, openingBalance);
+            if (isChildCompany && !hasActivity) return null;
 
-          // For suppliers, return the signed balance (same format as /api/suppliers/stats)
-          // Positive = we owe them (Cr), Negative = they owe us/prepaid (Dr)
-          const balanceSide = calculatedBalance >= 0 ? "Cr" : "Dr";
+            // For suppliers, return the signed balance (same format as /api/suppliers/stats)
+            // Positive = we owe them (Cr), Negative = they owe us/prepaid (Dr)
+            const balanceSide = calculatedBalance >= 0 ? "Cr" : "Dr";
 
-          return {
-            id: `supplier-${supplier.id}`,
-            accountId: supplier.id,
-            type: "supplier",
-            code: supplier.code,
-            name: supplier.legalName,
-            balance: calculatedBalance.toFixed(2), // Signed value, not absolute
-            balanceSide,
-            openingBalance: openingBalance,
-            openingBalanceSide: "Cr", // Suppliers are always credit balance (payable)
-            active: supplier.active,
-            parentId: null,
-          };
-        })
-      );
+            return {
+              id: `supplier-${supplier.id}`,
+              accountId: supplier.id,
+              type: "supplier",
+              code: supplier.code,
+              name: supplier.legalName,
+              balance: calculatedBalance.toFixed(2), // Signed value, not absolute
+              balanceSide,
+              openingBalance: openingBalance,
+              openingBalanceSide: "Cr", // Suppliers are always credit balance (payable)
+              active: supplier.active,
+              parentId: null,
+            };
+          })
+        )
+      ).filter((s): s is NonNullable<typeof s> => s !== null);
 
       // Combine all accounts — customers are excluded from the voucher account selector
       const allAccounts = [...accounts, ...supplierAccountsList];
@@ -617,21 +613,29 @@ export function registerAccountRoutes(app: Express) {
   // Get payable accounts (creditors - suppliers with positive balance)
   app.get("/api/accounts/payables", requireAuth, async (req, res) => {
     try {
-      const suppliers = await storage.getAllSuppliers();
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const payableAccounts = suppliers
-        .map((supplier) => {
-          const openingBalance = parseFloat(supplier.openingBalance || "0");
-          // Positive balance = we owe them
-          return {
-            id: supplier.id,
-            accountId: supplier.id,
-            code: supplier.code,
-            name: supplier.legalName,
-            balance: openingBalance,
-          };
-        })
-        .filter((account) => account.balance > 0)
+      const suppliers = await storage.getAllSuppliers();
+      const parentCompanyId = await resolveParentCompanyId();
+      const isChildCompany = companyId !== parentCompanyId;
+
+      const payableAccounts = (
+        await Promise.all(
+          suppliers.map(async (supplier) => {
+            const { balance, hasActivity } = await getSupplierBalanceForContext(supplier, companyId);
+            if (isChildCompany && !hasActivity) return null;
+            return {
+              id: supplier.id,
+              accountId: supplier.id,
+              code: supplier.code,
+              name: supplier.legalName,
+              balance,
+            };
+          })
+        )
+      )
+        .filter((account): account is NonNullable<typeof account> => account !== null && account.balance > 0)
         .sort((a, b) => b.balance - a.balance);
 
       res.json(payableAccounts);
@@ -728,6 +732,12 @@ export function registerAccountRoutes(app: Express) {
       if (_vsCached && Date.now() < _vsCached.expiresAt) {
         return res.json(_vsCached.data);
       }
+
+      // Parent is never inferred by "lowest company ID" — only the explicit
+      // parentCompanyId setting decides whether this company's suppliers carry
+      // their historical opening balance.
+      const parentCompanyId = await resolveParentCompanyId();
+      const isChildCompany = companyId !== parentCompanyId;
 
       // Phase 1: determine company type (other fetches are conditional on this)
       const currentCompany = await storage.getCompanyById(companyId);
@@ -880,10 +890,9 @@ export function registerAccountRoutes(app: Express) {
         }
       }
 
-      // DO NOT add opening balance for suppliers in sidebar calculation
-      // The sidebar should only show transactions from the current company
-      // Opening balance is a global property - it's already factored into the /api/suppliers/stats endpoint
-      // Here we just track movements within this company's vouchers
+      // Opening balance only applies in the parent company's context (see
+      // isChildCompany above) — child companies start every supplier at $0 and
+      // only reflect movements from this company's own vouchers.
 
       // Helper function to calculate signed balance (positive = Dr, negative = Cr)
       const calculateSignedBalance = (
@@ -967,21 +976,24 @@ export function registerAccountRoutes(app: Express) {
             balance,
           };
         }),
-        // ERP Suppliers — only included for ERP companies (factory and properties use different account structures)
-        ...suppliers.map((supplier) => {
-          const transactionBalance = supplierBalances.get(supplier.id) || 0;
-          const openingBalance = parseFloat(supplier.openingBalance || "0");
-          // Suppliers are always Cr (we owe them). Negate so credit balance is negative in the signed system.
-          const balance = -(openingBalance + transactionBalance);
+        // ERP Suppliers — only included for ERP companies (factory and properties use different account structures).
+        // Child companies additionally omit suppliers with no activity in this company.
+        ...suppliers
+          .filter((supplier) => !isChildCompany || supplierBalances.has(supplier.id))
+          .map((supplier) => {
+            const transactionBalance = supplierBalances.get(supplier.id) || 0;
+            const openingBalance = isChildCompany ? 0 : parseFloat(supplier.openingBalance || "0");
+            // Suppliers are always Cr (we owe them). Negate so credit balance is negative in the signed system.
+            const balance = -(openingBalance + transactionBalance);
 
-          return {
-            id: supplier.id,
-            type: "supplier",
-            name: supplier.legalName,
-            code: supplier.code,
-            balance,
-          };
-        }),
+            return {
+              id: supplier.id,
+              type: "supplier",
+              name: supplier.legalName,
+              code: supplier.code,
+              balance,
+            };
+          }),
         // Factory Suppliers — only included for factory companies
         // Balance computed from factory tables (containers + payments) for accuracy,
         // matching the computeStats formula: includes freight, voucher payments, broker aggregation.
@@ -1423,27 +1435,45 @@ export function registerAccountRoutes(app: Express) {
       }
 
       const { startDate, endDate, companyId } = req.query;
+      const requestedCompanyId = companyId ? parseInt(companyId as string) : undefined;
 
-      // Use query param companyId or session companyId, or undefined for all companies
-      const filterCompanyId = companyId ? parseInt(companyId as string) : req.session.currentCompanyId;
+      // Suppliers are shared across companies, so a caller-supplied companyId
+      // must be authorized against the user's actual company access — never
+      // trusted blindly (it would otherwise let one company's session peek at
+      // another company's supplier ledger).
+      const filterCompanyId = await authorizeCompanyIdParam(req as any, requestedCompanyId);
+      if (requestedCompanyId && filterCompanyId === null) {
+        return res.status(403).json({ message: "No access to this company" });
+      }
 
       const transactions = await storage.getVoucherEntriesBySupplier(
         supplierId,
-        filterCompanyId,
+        filterCompanyId ?? undefined,
         startDate as string | undefined,
         endDate as string | undefined
       );
 
       if (startDate) {
+        // Brought-forward balance must be scoped to the same company as the
+        // transactions above — otherwise it silently pulls in every other
+        // company's history for this (globally shared) supplier record.
+        const conditions = [
+          `ve.supplier_id = $1`,
+          `v.optional = false`,
+          `v.deleted_at IS NULL`,
+          `v.voucher_date < $2`,
+        ];
+        const params: any[] = [supplierId, startDate];
+        if (filterCompanyId) {
+          conditions.push(`v.company_id = $3`);
+          params.push(filterCompanyId);
+        }
         const bfResult = await pool.query(
           `SELECT COALESCE(SUM(ve.debit_amount::numeric - ve.credit_amount::numeric), 0) AS net
            FROM voucher_entries ve
            JOIN vouchers v ON ve.voucher_id = v.id
-           WHERE ve.supplier_id = $1
-             AND v.optional = false
-             AND v.deleted_at IS NULL
-             AND v.voucher_date < $2`,
-          [supplierId, startDate]
+           WHERE ${conditions.join(" AND ")}`,
+          params
         );
         return res.json({ transactions, preNetBalance: parseFloat(bfResult.rows[0]?.net ?? "0") });
       }
@@ -1733,11 +1763,18 @@ export function registerAccountRoutes(app: Express) {
         rawOB = parseFloat(acct?.ob ?? "0") || 0;
         obSide = acct?.side ?? "Dr";
       } else if (accountType === "supplier") {
-        const [acct] = await db
-          .select({ ob: suppliers.openingBalance })
-          .from(suppliers)
-          .where(eq(suppliers.id, accountId));
-        rawOB = parseFloat(acct?.ob ?? "0") || 0;
+        // The supplier opening balance only belongs to the parent company's
+        // books — never guess this via "lowest company ID".
+        const isParentForSupplier = await isParentCompanyContext(companyId);
+        if (isParentForSupplier) {
+          const [acct] = await db
+            .select({ ob: suppliers.openingBalance })
+            .from(suppliers)
+            .where(eq(suppliers.id, accountId));
+          rawOB = parseFloat(acct?.ob ?? "0") || 0;
+        } else {
+          rawOB = 0;
+        }
         obSide = "Cr";
       } else if (accountType === "employee") {
         const [acct] = await db
@@ -1776,6 +1813,12 @@ export function registerAccountRoutes(app: Express) {
           isNull(vouchers.deletedAt),
           sql`${vouchers.voucherDate} < ${endDate}`,
         ];
+        // Suppliers are shared across companies — scope strictly to this
+        // company's own vouchers or the pre-period balance would silently
+        // include every other company's history for the same supplier.
+        if (isSupplier) {
+          conditions.push(eq(vouchers.companyId, companyId));
+        }
         const [totals] = await db
           .select({
             totalDebit: sql<string>`COALESCE(SUM(${voucherEntries.debitAmount}), 0)`,
