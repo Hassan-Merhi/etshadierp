@@ -117,6 +117,7 @@ import multer from "multer";
 import path from "path";
 import fs from "fs";
 import { getStableSupplierCost } from "../../services/factory/rawStockStableCost";
+import { getLockedSupplierRate } from "../../services/factory/rawStockLockedRate";
 
 export function registerFactoryMixBatchRoutes(app: Express) {
   app.get("/api/factory/mix-batches", requireAuth, async (req: any, res: any) => {
@@ -275,17 +276,17 @@ export function registerFactoryMixBatchRoutes(app: Express) {
         const sourceRecords: any[] = [];
 
         for (const source of supplierSources || []) {
+          // costPerKg from the client is NEVER trusted for a real supplier.
           const { supplierId, weightKg } = source;
           const weight = parseFloat(weightKg);
 
-          // Stable receipt-weighted rate — never derived from remaining/available kg,
-          // so it doesn't shift depending on which container FIFO happens to draw from.
-          const { costPerKgUsd: costPerKg, rows: supplierRawStocks } = await getStableSupplierCost(
-            tx,
-            companyId,
-            supplierId,
-            { forUpdate: true }
-          );
+          // Locked, offload-time moving-average rate — never derived from remaining/
+          // available kg or all-time received kg, so it doesn't shift depending on
+          // which container FIFO happens to draw from.
+          const [costPerKg, { rows: supplierRawStocks }] = await Promise.all([
+            getLockedSupplierRate(tx, companyId, supplierId, { forUpdate: true }),
+            getStableSupplierCost(tx, companyId, supplierId, { forUpdate: true }),
+          ]);
 
           // FIFO allocation of usedKg only — this determines WHICH container rows get
           // debited, never the cost rate itself (that's fixed above).
@@ -316,6 +317,19 @@ export function registerFactoryMixBatchRoutes(app: Express) {
 
           totalWeightKg += weight;
           totalCost += weight * costPerKg;
+          if (supplierRawStocks.length === 0) {
+            if (costPerKg <= 0) {
+              throw new Error(
+                `Supplier has no established raw-material rate yet. Record a container offload or opening-balance/ADD adjustment before using it as a mix-batch source.`
+              );
+            }
+            sourceRecords.push({
+              supplierId,
+              weightKg: String(weight),
+              costPerKg: String(costPerKg),
+              totalCost: String(weight * costPerKg),
+            });
+          }
           for (const d of perRsDeductions) {
             sourceRecords.push({
               supplierId,
@@ -614,17 +628,19 @@ export function registerFactoryMixBatchRoutes(app: Express) {
         }
 
         for (const source of supplierSources) {
-          const { supplierId, weightKg, costPerKg: srcCostPerKg } = source;
+          // costPerKg from the client is NEVER trusted for a real supplier — the
+          // authoritative locked rate is always read server-side.
+          const { supplierId, weightKg } = source;
           const weight = parseFloat(weightKg);
 
-          // Stable receipt-weighted rate — never derived from remaining/available kg,
-          // so it doesn't shift depending on which container FIFO happens to draw from.
-          const { costPerKgUsd: costPerKg, rows: supplierRawStocks } = await getStableSupplierCost(
-            tx,
-            companyId,
-            supplierId,
-            { forUpdate: true }
-          );
+          // Locked, offload-time moving-average rate — this NEVER shifts from mix
+          // batch operations. FIFO row selection (which container gets debited)
+          // is independent of the rate and still comes from getStableSupplierCost's
+          // row listing.
+          const [costPerKg, { rows: supplierRawStocks }] = await Promise.all([
+            getLockedSupplierRate(tx, companyId, supplierId, { forUpdate: true }),
+            getStableSupplierCost(tx, companyId, supplierId, { forUpdate: true }),
+          ]);
 
           // FIFO allocation of usedKg only — this determines WHICH container rows get
           // debited, never the cost rate itself (that's fixed above).
@@ -661,15 +677,19 @@ export function registerFactoryMixBatchRoutes(app: Express) {
           totalCost += weight * costPerKg;
 
           if (supplierRawStocks.length === 0) {
-            // MANUAL supplier — no container raw-stock rows to deduct from.
-            // Record a source entry with supplierId only so the raw-stock API
-            // can count this kg as consumed from the manual stock.
-            const cost = srcCostPerKg ? parseFloat(srcCostPerKg) : 0;
+            // MANUAL supplier — no container raw-stock rows to deduct from. Still
+            // must use the supplier's locked rate (e.g. set by a prior ADD/OB), never
+            // a client-supplied value; reject if no rate has ever been established.
+            if (costPerKg <= 0) {
+              throw new Error(
+                `Supplier has no established raw-material rate yet. Record a container offload or opening-balance/ADD adjustment before using it as a mix-batch source.`
+              );
+            }
             sourceRecords.push({
               supplierId,
               weightKg: String(weight),
-              costPerKg: String(cost),
-              totalCost: String(weight * cost),
+              costPerKg: String(costPerKg),
+              totalCost: String(weight * costPerKg),
             });
           } else {
             // Push one source record per raw stock container so deletion can correctly reverse each one
@@ -686,7 +706,9 @@ export function registerFactoryMixBatchRoutes(app: Express) {
         }
 
         for (const source of sources) {
-          const { containerId, weightKg, costPerKg: srcCostPerKg } = source;
+          // Container-linked source: the rate is that specific container's own
+          // persisted landed cost — client-supplied costPerKg is always ignored.
+          const { containerId, weightKg } = source;
           const [rawStock] = await tx
             .select()
             .from(factoryRawStock)
@@ -697,9 +719,7 @@ export function registerFactoryMixBatchRoutes(app: Express) {
 
           const weight = parseFloat(weightKg);
 
-          const costUsd = srcCostPerKg
-            ? parseFloat(srcCostPerKg)
-            : parseFloat(rawStock.costPerKgUsd) || parseFloat(rawStock.costPerKg) || 0;
+          const costUsd = parseFloat(rawStock.costPerKgUsd) || parseFloat(rawStock.costPerKg) || 0;
 
           // Allow over-use: usedKg may exceed receivedKg, driving stock negative
           await tx
@@ -838,32 +858,35 @@ export function registerFactoryMixBatchRoutes(app: Express) {
         const sourceRecords: any[] = [];
 
         for (const source of supplierSources) {
-          const { supplierId, weightKg, costPerKg: srcCostPerKg } = source;
+          // costPerKg from the client is NEVER trusted for a real supplier.
+          const { supplierId, weightKg } = source;
           const weight = parseFloat(weightKg);
 
-          // Stable receipt-weighted rate — never derived from remaining/available kg,
-          // so it doesn't shift depending on which container FIFO happens to draw from.
-          const { costPerKgUsd: stableCostPerKg, rows: supplierRawStocks } = await getStableSupplierCost(
-            tx,
-            companyId,
-            supplierId,
-            { forUpdate: true }
-          );
+          // Locked, offload-time moving-average rate — never derived from remaining/
+          // available kg, so it doesn't shift depending on which container FIFO
+          // happens to draw from.
+          const [stableCostPerKg, { rows: supplierRawStocks }] = await Promise.all([
+            getLockedSupplierRate(tx, companyId, supplierId, { forUpdate: true }),
+            getStableSupplierCost(tx, companyId, supplierId, { forUpdate: true }),
+          ]);
 
           const isManualSupplier = supplierRawStocks.length === 0;
 
           if (isManualSupplier) {
-            // MANUAL supplier — no container raw-stock rows to update.
-            // Record a source entry with supplierId only so the raw-stock API
-            // can count this kg as consumed from the manual stock.
-            const cost = srcCostPerKg ? parseFloat(srcCostPerKg) : 0;
+            // MANUAL supplier — no container raw-stock rows to update. Still must use
+            // the supplier's locked rate; reject if none has ever been established.
+            if (stableCostPerKg <= 0) {
+              throw new Error(
+                `Supplier has no established raw-material rate yet. Record a container offload or opening-balance/ADD adjustment before using it as a mix-batch source.`
+              );
+            }
             addedWeightKg += weight;
-            addedCost += weight * cost;
+            addedCost += weight * stableCostPerKg;
             sourceRecords.push({
               supplierId,
               weightKg: String(weight),
-              costPerKg: String(cost),
-              totalCost: String(weight * cost),
+              costPerKg: String(stableCostPerKg),
+              totalCost: String(weight * stableCostPerKg),
             });
           } else {
             // FIFO deduction of usedKg only — this determines WHICH container rows get
@@ -891,21 +914,23 @@ export function registerFactoryMixBatchRoutes(app: Express) {
                 .where(eq(factoryRawStock.id, lastRs.id));
             }
 
-            const costUsed = srcCostPerKg ? parseFloat(srcCostPerKg) : stableCostPerKg;
-
+            // Cost is always the supplier's locked rate — client-supplied cost is
+            // never trusted, regardless of which raw-stock rows FIFO happened to hit.
             addedWeightKg += weight;
-            addedCost += weight * costUsed;
+            addedCost += weight * stableCostPerKg;
             sourceRecords.push({
               supplierId,
               weightKg: String(weight),
-              costPerKg: String(costUsed),
-              totalCost: String(weight * costUsed),
+              costPerKg: String(stableCostPerKg),
+              totalCost: String(weight * stableCostPerKg),
             });
           }
         }
 
         for (const source of sources) {
-          const { containerId, weightKg, costPerKg: srcCostPerKg } = source;
+          // Container-linked source: rate is that container's own persisted landed
+          // cost — client-supplied costPerKg is always ignored.
+          const { containerId, weightKg } = source;
           const [rawStockRow] = await tx
             .select()
             .from(factoryRawStock)
@@ -916,9 +941,7 @@ export function registerFactoryMixBatchRoutes(app: Express) {
 
           const weight = parseFloat(weightKg);
 
-          const costUsd = srcCostPerKg
-            ? parseFloat(srcCostPerKg)
-            : parseFloat(rawStockRow.costPerKgUsd) || parseFloat(rawStockRow.costPerKg) || 0;
+          const costUsd = parseFloat(rawStockRow.costPerKgUsd) || parseFloat(rawStockRow.costPerKg) || 0;
 
           // Allow over-use: usedKg may exceed receivedKg, driving stock negative
           await tx

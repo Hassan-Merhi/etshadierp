@@ -22,6 +22,7 @@ interface SupplierRawStock {
   usedKg: string;
   remainingKg: string;
   costPerKg: string;
+  costPerKgUsd?: string;
   valueRemaining: string;
   lastOffloaded: string;
 }
@@ -104,21 +105,27 @@ export function EditMixBatchDialog({ batch, open, onOpenChange }: EditMixBatchDi
           availableKg: existingRemaining + parseFloat(src.weightKg),
         });
       } else if (src.supplierId) {
-        // Supplier source (may span multiple containers — aggregate by supplierId)
+        // Supplier source (may span multiple containers — aggregate by supplierId).
+        // Cost/kg ALWAYS comes from the current server-authoritative locked rate
+        // (GET /api/factory/raw-stock), never from the stored source's historical
+        // costPerKg — the locked rate is the single source of truth for a supplier's
+        // rate and must be what's previewed/edited-against, not a stale snapshot.
         const existing = supplierMap.get(src.supplierId);
         const stockRow = supplierStock.find((s) => s.supplierId === src.supplierId);
         // Available = current remaining + what was consumed (returns on edit)
         const currentRemaining = stockRow ? parseFloat(stockRow.remainingKg) : 0;
+        const currentRate = stockRow ? parseFloat(stockRow.costPerKgUsd || stockRow.costPerKg || "0") : 0;
         const srcWeight = parseFloat(src.weightKg);
         if (existing) {
           existing.weightKg += srcWeight;
+          existing.costPerKg = currentRate;
           existing.totalCost = existing.weightKg * existing.costPerKg;
           existing.availableKg = currentRemaining + existing.weightKg;
         } else {
           supplierMap.set(src.supplierId, {
             weightKg: srcWeight,
-            costPerKg: parseFloat(src.costPerKg),
-            totalCost: srcWeight * parseFloat(src.costPerKg),
+            costPerKg: currentRate,
+            totalCost: srcWeight * currentRate,
             label: src.supplierName || `Supplier #${src.supplierId}`,
             availableKg: currentRemaining + srcWeight,
           });
@@ -171,9 +178,11 @@ export function EditMixBatchDialog({ batch, open, onOpenChange }: EditMixBatchDi
 
   const saveMutation = useMutation({
     mutationFn: async () => {
+      // Never send costPerKg for supplier sources — the server always applies the
+      // supplier's locked rate and ignores any client-supplied cost.
       const supplierSourcesPayload = selectedSources
         .filter((s) => s.type === "supplier")
-        .map((s) => ({ supplierId: s.sourceId, weightKg: s.weightKg.toString(), costPerKg: s.costPerKg.toString() }));
+        .map((s) => ({ supplierId: s.sourceId, weightKg: s.weightKg.toString() }));
 
       const batchSourcesPayload = selectedSources
         .filter((s) => s.type === "batch")
@@ -251,7 +260,8 @@ export function EditMixBatchDialog({ batch, open, onOpenChange }: EditMixBatchDi
       if (!stock || !stock.supplierId) return;
       const available = parseFloat(stock.remainingKg);
       // Over-use allowed: no guard on weight > available
-      const costPerKg = parseFloat(stock.costPerKg);
+      // Always the current locked rate — never editable, never sent to the server.
+      const costPerKg = parseFloat(stock.costPerKgUsd || stock.costPerKg || "0");
       setSelectedSources((prev) => [
         ...prev,
         {
@@ -307,7 +317,10 @@ export function EditMixBatchDialog({ batch, open, onOpenChange }: EditMixBatchDi
     );
   };
 
+  // Supplier-source cost/kg is never user-editable — it's always the server's locked
+  // rate. Only batch sources (using their own historical stored cost) can be edited here.
   const handleUpdateSourceCost = (type: string, sourceId: number, newCostPerKg: string) => {
+    if (type !== "batch") return;
     const costPerKg = parseFloat(newCostPerKg);
     if (isNaN(costPerKg) || costPerKg < 0) return;
     setSelectedSources((prev) =>
@@ -503,20 +516,32 @@ export function EditMixBatchDialog({ batch, open, onOpenChange }: EditMixBatchDi
                           />
                         </TableCell>
                         <TableCell className="text-right">
-                          <div className="relative ml-auto w-28">
-                            <span className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
-                              $
+                          {sel.type === "supplier" ? (
+                            // Supplier rate is always the server-locked rate — read-only,
+                            // it only changes via a real container offload/correction.
+                            <span
+                              className="font-mono text-xs text-muted-foreground"
+                              data-testid={`text-cost-per-kg-${sel.type}-${sel.sourceId}`}
+                              title="Locked supplier rate — only changes via a container offload or an explicit correction"
+                            >
+                              ${sel.costPerKg.toFixed(4)}
                             </span>
-                            <Input
-                              type="number"
-                              className="h-7 w-28 pl-4 text-right font-mono text-xs"
-                              value={sel.costPerKg.toFixed(4)}
-                              step="0.0001"
-                              min="0"
-                              onChange={(e) => handleUpdateSourceCost(sel.type, sel.sourceId, e.target.value)}
-                              data-testid={`input-cost-per-kg-${sel.type}-${sel.sourceId}`}
-                            />
-                          </div>
+                          ) : (
+                            <div className="relative ml-auto w-28">
+                              <span className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
+                                $
+                              </span>
+                              <Input
+                                type="number"
+                                className="h-7 w-28 pl-4 text-right font-mono text-xs"
+                                value={sel.costPerKg.toFixed(4)}
+                                step="0.0001"
+                                min="0"
+                                onChange={(e) => handleUpdateSourceCost(sel.type, sel.sourceId, e.target.value)}
+                                data-testid={`input-cost-per-kg-${sel.type}-${sel.sourceId}`}
+                              />
+                            </div>
+                          )}
                         </TableCell>
                         <TableCell className="text-right font-mono text-sm">${formatNumber(sel.totalCost, 4)}</TableCell>
                         <TableCell>

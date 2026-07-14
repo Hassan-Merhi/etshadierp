@@ -146,8 +146,10 @@ export default function ProductionRawStock() {
 
   const addToBatchMutation = useMutation({
     mutationFn: async (data: any) => {
+      // Never send costPerKg for a supplier source — the server always applies the
+      // supplier's locked rate and ignores any client-supplied cost.
       const res = await modeApiRequest("POST", `/api/factory/mix-batches/${data.batchId}/top-up`, {
-        supplierSources: [{ supplierId: data.supplierId, weightKg: data.weightKg, costPerKg: data.costPerKg }],
+        supplierSources: [{ supplierId: data.supplierId, weightKg: data.weightKg }],
       });
       if (!res.ok) throw new Error((await res.json()).message || "Failed to add to batch");
       return res.json();
@@ -200,17 +202,13 @@ export default function ProductionRawStock() {
 
   const kpiData = useMemo(() => {
     const rs = rawStock || [];
-    const mb = mixBatches || [];
-    // Total Used $ mirrors the "Combined Total" blended cost shown under Recent Mix
-    // Batches — the blended cost/kg across all mix batches (weighted by each batch's own
-    // total weight) times the kg actually used — not the supplier-level received rate,
-    // which doesn't reflect what a mix batch actually cost to produce.
-    const mbSumTotal = mb.reduce((s, b) => s + (parseFloat(b.totalWeightKg) || 0), 0);
-    const mbWeightedCost = mb.reduce(
-      (s, b) => s + (parseFloat(b.totalWeightKg) || 0) * (parseFloat(b.costPerKg) || 0),
-      0
-    );
-    const mbBlendedCost = mbSumTotal > 0 ? mbWeightedCost / mbSumTotal : 0;
+    // Total Used $ = SUM of each mix-batch source's own recorded totalCost (the
+    // supplier's locked rate AT THE TIME that source was created), summed server-side
+    // per supplier into row.usedValueUsd. NOT one global blended mix-batch rate ×
+    // total used kg — that drifts the instant two suppliers/batches have different
+    // rates. This keeps Free Stock Value + Total Used Value reconciling against
+    // Total Received Value under one documented formula, since every kg's value is
+    // attributed to the rate it actually carried when it moved.
     const totalUsed = rs.reduce((sum, r) => sum + parseFloat(r.usedKg || "0"), 0);
     return {
       totalReceived: rs.reduce((sum, r) => sum + parseFloat(r.receivedKg || "0"), 0),
@@ -219,11 +217,11 @@ export default function ProductionRawStock() {
         0
       ),
       totalUsed,
-      totalUsedValue: mbBlendedCost * totalUsed,
+      totalUsedValue: rs.reduce((sum, r) => sum + parseFloat((r as any).usedValueUsd || "0"), 0),
       totalFree: rs.reduce((sum, r) => sum + parseFloat(r.freeKg || "0"), 0),
       totalValue: rs.reduce((sum, r) => sum + parseFloat(r.valueRemainingUsd || r.valueRemaining || "0"), 0),
     };
-  }, [rawStock, mixBatches]);
+  }, [rawStock]);
 
   return (
     <div className="space-y-6 p-6">

@@ -5,6 +5,7 @@ import { db } from "../../../db";
 import { requireAuth } from "../../../auth";
 import { classifyNetPositionAccounts } from "../../../netPositionHelper";
 import { adjustInventory } from "../../../inventoryHelper";
+import { getLockedSupplierRate } from "../../../services/factory/rawStockLockedRate";
 import {
   writeDaybookEntry,
   getOrFetchFxRateToUsd,
@@ -336,9 +337,27 @@ export function registerRawStockAdjRoutes(app: Express) {
       if (!date) return res.status(400).json({ message: "date is required" });
 
       const kgNum = parseFloat(kg);
-      const costNum = costPerKg ? parseFloat(costPerKg) : 0;
       const ccy = currencyCode || "USD";
       const resolvedSupplierId = supplierId ? Number(supplierId) : null;
+
+      // ADD is a quantity-only adjustment for a REAL supplier — it must NEVER
+      // establish or shift the supplier's locked raw-material rate. Any client-
+      // supplied costPerKg is ignored; the existing locked rate is used instead.
+      // If no rate has ever been established for this supplier, reject and direct
+      // to the real receipt paths (container offload / opening balance) that are
+      // authorized to set it. A supplier-less (MANUAL) adjustment isn't tied to a
+      // locked rate, so the client-supplied cost is still accepted there.
+      let costNum = costPerKg ? parseFloat(costPerKg) : 0;
+      if (type === "ADD" && resolvedSupplierId) {
+        const lockedRate = await getLockedSupplierRate(db, companyId, resolvedSupplierId);
+        if (lockedRate <= 0) {
+          return res.status(400).json({
+            message:
+              "This supplier has no established raw-material rate yet. Use a container offload or the opening-balance workflow to record the first receipt.",
+          });
+        }
+        costNum = lockedRate;
+      }
       const totalAmount = kgNum * costNum;
 
       // Pre-fetch ledger account IDs before transaction (getOrCreateLedgerAccount must run outside tx)

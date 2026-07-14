@@ -5,6 +5,7 @@ import { db } from "../../../db";
 import { requireAuth } from "../../../auth";
 import { classifyNetPositionAccounts } from "../../../netPositionHelper";
 import { adjustInventory } from "../../../inventoryHelper";
+import { getLockedSupplierRate } from "../../../services/factory/rawStockLockedRate";
 import {
   writeDaybookEntry,
   getOrFetchFxRateToUsd,
@@ -130,16 +131,32 @@ export function registerRawStockReceiptRoutes(app: Express) {
           id: factorySuppliers.id,
           supplierCategoryId: factorySuppliers.supplierCategoryId,
           categoryName: factorySupplierCategories.name,
+          currentRawMaterialCostPerKgUsd: factorySuppliers.currentRawMaterialCostPerKgUsd,
         })
         .from(factorySuppliers)
         .leftJoin(factorySupplierCategories, eq(factorySuppliers.supplierCategoryId, factorySupplierCategories.id))
         .where(eq(factorySuppliers.companyId, companyId));
       const supplierCategoryMap = new Map<number, { categoryId: number | null; categoryName: string | null }>();
+      // Authoritative locked rate (USD) per supplier — the single source of truth for
+      // display everywhere. Never recomputed here from receipt history. For a supplier
+      // whose locked rate has never been established (persisted column still NULL — e.g.
+      // pre-dates the migration/backfill, or its container rows were seeded directly
+      // rather than through a real offload), fall through to the SAME one-time lazy
+      // derive-and-persist helper every other read path uses, so this endpoint can never
+      // disagree with getLockedSupplierRate (used by the offload/mix-batch/diagnostic
+      // code) about what a supplier's rate is.
+      const supplierLockedRateMap = new Map<number, number>();
       for (const s of supplierRows) {
         supplierCategoryMap.set(s.id, {
           categoryId: s.supplierCategoryId ?? null,
           categoryName: s.categoryName ?? null,
         });
+        const persisted = s.currentRawMaterialCostPerKgUsd;
+        if (persisted !== null && persisted !== undefined) {
+          supplierLockedRateMap.set(s.id, parseFloat(persisted as string) || 0);
+        } else {
+          supplierLockedRateMap.set(s.id, await getLockedSupplierRate(db, companyId, s.id));
+        }
       }
 
       const results = await db
@@ -278,17 +295,21 @@ export function registerRawStockReceiptRoutes(app: Express) {
         if (supplierMap.has(key)) {
           const existing = supplierMap.get(key)!;
           if (isAdd) {
-            // New stock added at its own cost — nothing used from it yet, so its full
-            // value joins the remaining-value pool (manual adjustments have no separate
-            // USD leg, so local and USD value move together). This also shifts the
-            // received-weighted rate, same as receiving a new container would.
-            const prevCost = existing._totalReceived * existing._avgCostPerKg;
-            const newCost = kg * costPerKgAdj;
+            // ADD is a quantity-only movement — for a REAL supplier its cost is already
+            // forced server-side to equal the locked rate (see rawStockAdjRoutes.ts), so
+            // it must never shift the displayed rate here; only the received-kg pool
+            // grows (feeds freeKg). Value is derived later from freeKg × locked rate for
+            // real suppliers. Standalone MANUAL materials (no supplierId) aren't tied to
+            // a locked rate, so they keep their own blended-average tracking.
             existing._totalReceived += kg;
-            existing._avgCostPerKg = existing._totalReceived > 0 ? (prevCost + newCost) / existing._totalReceived : 0;
-            existing._avgCostPerKgUsd = existing._avgCostPerKg;
-            existing._remainingValueLocal += kg * costPerKgAdj;
-            existing._remainingValueUsd += kg * costPerKgAdj;
+            if (!supplierId) {
+              const prevCost = (existing._totalReceived - kg) * existing._avgCostPerKg;
+              const newCost = kg * costPerKgAdj;
+              existing._avgCostPerKg = existing._totalReceived > 0 ? (prevCost + newCost) / existing._totalReceived : 0;
+              existing._avgCostPerKgUsd = existing._avgCostPerKg;
+              existing._remainingValueLocal += kg * costPerKgAdj;
+              existing._remainingValueUsd += kg * costPerKgAdj;
+            }
           } else {
             // Manual usage isn't tied to a specific container/source, so it draws down
             // the supplier's remaining stock at that stock's current blended cost/kg —
@@ -343,10 +364,40 @@ export function registerRawStockReceiptRoutes(app: Express) {
           and(
             eq(factoryMixBatches.companyId, companyId),
             sql`${factoryMixBatchSources.supplierId} IS NOT NULL`,
-            sql`${factoryMixBatches.status} NOT IN ('CLOSED', 'COMPLETED')`
+            sql`${factoryMixBatches.status} NOT IN ('CLOSED', 'COMPLETED')`,
+            isNull(factoryMixBatches.deletedAt)
           )
         )
         .groupBy(factoryMixBatchSources.supplierId);
+
+      // Consumed value per supplier — the sum of what each mix-batch source was ACTUALLY
+      // recorded at when it was created/edited (already the supplier's locked rate at
+      // that moment, per the fixes above), across every batch regardless of status. This
+      // is the only correct "Total Used Value": a single global blended mix-batch rate
+      // multiplied by total used kg is unreliable once suppliers/batches have different
+      // rates, since it attributes every kg to a rate it may never have actually cost.
+      // Exclude soft-deleted/reversed batches — once a batch is deleted its sources no
+      // longer contribute to "used" stock, so they must not still count toward Total
+      // Used Value (the corresponding usedKg was already restored by the delete route).
+      const usedValueRows = await db
+        .select({
+          supplierId: factoryMixBatchSources.supplierId,
+          usedValueUsd: sql<string>`SUM(${factoryMixBatchSources.totalCost})`,
+        })
+        .from(factoryMixBatchSources)
+        .innerJoin(factoryMixBatches, eq(factoryMixBatchSources.mixBatchId, factoryMixBatches.id))
+        .where(
+          and(
+            eq(factoryMixBatches.companyId, companyId),
+            sql`${factoryMixBatchSources.supplierId} IS NOT NULL`,
+            isNull(factoryMixBatches.deletedAt)
+          )
+        )
+        .groupBy(factoryMixBatchSources.supplierId);
+      const usedValueBySupplierId = new Map<number, number>();
+      for (const r of usedValueRows) {
+        if (r.supplierId) usedValueBySupplierId.set(r.supplierId, parseFloat(r.usedValueUsd as string) || 0);
+      }
 
       const reservedBySupplierId = new Map<number, number>();
       for (const r of reservedRows) {
@@ -401,18 +452,14 @@ export function registerRawStockReceiptRoutes(app: Express) {
       // Build aggregated rows (reservedKg / freeKg will be fixed below for multi-row suppliers)
       const aggregated = Array.from(supplierMap.values()).map((s: any) => {
         const remainingKg = s._totalReceived - s._totalUsed;
-        // Value is the tracked remaining cost basis itself (sum of each row's own
-        // (received-used)*cost), not a recomputed blended-average * remainingKg — the
-        // latter re-derives a number that can drift from the true remaining basis once
-        // multiple containers/adjustments with different costs are involved.
-        const valueRemaining = s._remainingValueLocal;
-        const valueRemainingUsd = s._remainingValueUsd;
-        // The displayed rate is the received-weighted purchase cost/kg — it only moves when
-        // new stock is received (a new container offload or an ADD adjustment), never when
-        // existing stock is drawn down in a mix batch. It is intentionally not re-derived
-        // from valueRemaining/remainingKg (that ratio does shift with usage; the rate must not).
-        const avgCostPerKg = s._avgCostPerKg;
-        const avgCostPerKgUsd = s._avgCostPerKgUsd;
+        // For a REAL supplier, the displayed rate is ALWAYS the persisted locked rate —
+        // never a recomputed receipt-weighted or remaining-value-derived figure. Only
+        // an actual offload / opening balance / explicit correction can move it.
+        // Standalone MANUAL materials (no supplierId) have no locked rate to read, so
+        // they keep their own tracked blended-average cost.
+        const lockedRateUsd = s.supplierId ? supplierLockedRateMap.get(s.supplierId) ?? 0 : null;
+        const avgCostPerKg = lockedRateUsd !== null ? lockedRateUsd : s._avgCostPerKg;
+        const avgCostPerKgUsd = lockedRateUsd !== null ? lockedRateUsd : s._avgCostPerKgUsd;
         return {
           supplierName: s.supplierName,
           supplierId: s.supplierId,
@@ -427,8 +474,13 @@ export function registerRawStockReceiptRoutes(app: Express) {
           freeKg: "0.000",
           costPerKg: avgCostPerKg.toFixed(6),
           costPerKgUsd: avgCostPerKgUsd.toFixed(6),
-          valueRemaining: valueRemaining.toFixed(2),
-          valueRemainingUsd: valueRemainingUsd.toFixed(2),
+          // Value is set below, AFTER freeKg is computed: for real suppliers it's
+          // freeKg × locked rate (spec-mandated formula); MANUAL materials keep the
+          // tracked remaining cost basis since they have no locked rate.
+          valueRemaining: (lockedRateUsd !== null ? 0 : s._remainingValueLocal).toFixed(2),
+          valueRemainingUsd: (lockedRateUsd !== null ? 0 : s._remainingValueUsd).toFixed(2),
+          _isLockedRateSupplier: lockedRateUsd !== null,
+          _lockedRateUsd: lockedRateUsd,
           lastOffloaded: s.lastOffloaded,
           adjustmentIds: s._adjustmentIds || [],
         };
@@ -445,22 +497,47 @@ export function registerRawStockReceiptRoutes(app: Express) {
         }
       }
       for (const [suppId, rows] of rowsBySupplierId) {
+        // Model A: creating/editing/topping-up a mix batch already increments
+        // factoryRawStock.usedKg (and factoryMixBatches.usedKg) via FIFO at the moment
+        // the batch is created — see factoryMixBatchRoutes.ts. That consumption is
+        // therefore already reflected in remainingKg (received - used) above.
+        // reservedKg (active, non-CLOSED/COMPLETED batch source weight) is purely
+        // informational here — showing how much of the already-deducted usedKg is
+        // still "in an open batch" versus fully consumed — and must NOT be subtracted
+        // again from freeKg, or the same kilograms are deducted twice.
         const reserved = reservedBySupplierId.get(suppId) || 0;
         const totalRemaining = rows.reduce((sum, r) => sum + parseFloat(r.remainingKg), 0);
-        // Allow negative freeKg so over-used stock is visible in the UI
-        const totalFree = totalRemaining - reserved;
         if (rows.length === 1) {
           rows[0].reservedKg = reserved.toFixed(3);
-          rows[0].freeKg = totalFree.toFixed(3);
+          rows[0].freeKg = totalRemaining.toFixed(3);
         } else {
           // Proportional distribution across multiple rows
-          for (const row of rows) {
+          for (const row of rows as any[]) {
             const rem = parseFloat(row.remainingKg);
             const proportion = totalRemaining > 0 ? rem / totalRemaining : 0;
             row.reservedKg = (reserved * proportion).toFixed(3);
-            row.freeKg = (totalFree * proportion).toFixed(3);
+            row.freeKg = rem.toFixed(3);
           }
         }
+      }
+
+      // Spec-mandated formula for suppliers with a locked rate: displayed value is
+      // ALWAYS freeKg × lockedRateUsd, computed only now that freeKg is final —
+      // never remaining-value-basis or received-weighted derivations. This keeps
+      // the Raw Materials table, category totals, KPIs, and the mix-batch dialog
+      // (which reads this same endpoint) numerically consistent by construction.
+      for (const row of aggregated as any[]) {
+        if (row._isLockedRateSupplier) {
+          const freeKg = parseFloat(row.freeKg) || 0;
+          const value = freeKg * (row._lockedRateUsd || 0);
+          row.valueRemaining = value.toFixed(2);
+          row.valueRemainingUsd = value.toFixed(2);
+        }
+        // Total consumed value at each source's own recorded (locked-at-creation) rate —
+        // NOT a blended-rate × total-used-kg guess. See usedValueRows above.
+        row.usedValueUsd = (row.supplierId ? usedValueBySupplierId.get(row.supplierId) || 0 : 0).toFixed(2);
+        delete row._isLockedRateSupplier;
+        delete row._lockedRateUsd;
       }
 
       res.json(aggregated);
@@ -470,7 +547,14 @@ export function registerRawStockReceiptRoutes(app: Express) {
     }
   });
 
-  // POST update cost per kg for a supplier and cascade to mix batches + bales
+  // POST update cost per kg for a supplier — the explicit, user-authorized landed-cost
+  // correction path (selected deliberately via the "Update Cost per KG" adjustment type,
+  // never the default ADD/REMOVE quantity adjustments). Because this sets ONE uniform
+  // new cost across every one of the supplier's raw-stock rows, the supplier's locked
+  // rate afterward is simply that new cost — no historical-received-kg recompute is
+  // needed or allowed. The cascade to mix-batch sources/batches/bales is scoped to
+  // OPEN batches only (ACTIVE/OPEN/CARRY_FORWARD) — completed/closed batches and their
+  // bales already have finalized costing and must not be silently rewritten.
   app.post("/api/factory/raw-stock/update-cost", requireAuth, async (req: any, res: any) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
@@ -503,6 +587,14 @@ export function registerRawStockReceiptRoutes(app: Express) {
             .where(eq(factoryRawStock.id, row.id));
         }
 
+        // 1a. Every raw-stock row for this supplier now shares the same corrected cost,
+        // so the locked rate is simply that new cost — an atomic, direct set (not a
+        // recompute from all-time received kg, which would reintroduce consumed stock).
+        await tx
+          .update(factorySuppliers)
+          .set({ currentRawMaterialCostPerKgUsd: String(newCost), updatedAt: new Date() })
+          .where(and(eq(factorySuppliers.id, Number(supplierId)), eq(factorySuppliers.companyId, companyId)));
+
         // 1b. Also update ADD adjustments for this supplier so the weighted avg isn't pulled back
         await tx
           .update(factoryRawMaterialAdjustments)
@@ -515,7 +607,9 @@ export function registerRawStockReceiptRoutes(app: Express) {
             )
           );
 
-        // 2. Update costPerKg + totalCost on factory_mix_batch_sources for this supplier
+        // 2. Update costPerKg + totalCost on factory_mix_batch_sources for this supplier —
+        // ONLY for batches still OPEN. Completed/closed batches keep their finalized
+        // historical cost; this correction must not silently rewrite them.
         const batchSources = await tx
           .select({
             id: factoryMixBatchSources.id,
@@ -523,7 +617,14 @@ export function registerRawStockReceiptRoutes(app: Express) {
             weightKg: factoryMixBatchSources.weightKg,
           })
           .from(factoryMixBatchSources)
-          .where(eq(factoryMixBatchSources.supplierId, Number(supplierId)));
+          .innerJoin(factoryMixBatches, eq(factoryMixBatchSources.mixBatchId, factoryMixBatches.id))
+          .where(
+            and(
+              eq(factoryMixBatchSources.supplierId, Number(supplierId)),
+              eq(factoryMixBatches.companyId, companyId),
+              sql`${factoryMixBatches.status} IN ('ACTIVE', 'OPEN', 'CARRY_FORWARD')`
+            )
+          );
 
         const affectedBatchIds = new Set<number>();
         for (const src of batchSources) {
@@ -538,7 +639,7 @@ export function registerRawStockReceiptRoutes(app: Express) {
           affectedBatchIds.add(src.mixBatchId);
         }
 
-        // 3. Recalculate blended cost for each affected mix batch
+        // 3. Recalculate blended cost for each affected (still-open) mix batch
         for (const batchId of affectedBatchIds) {
           const allSources = await tx
             .select({
