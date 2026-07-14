@@ -52,3 +52,4 @@
 - [Supplier balance parent-company detection](supplier-parent-company-detection.md) — supplier.openingBalance only applies in the explicit parentCompanyId setting's company, never "lowest company ID"; all balance surfaces must share one helper.
 - [Raw-material exchange-rate "looks set" heuristic](raw-material-fx-default-to-1.md) — a stored fx rate of exactly 1 for a non-USD currency is indistinguishable from unset (schema default); centralized helper rejects instead of silently pricing at 1.
 - [FX safe-repair service design](fx-safe-repair-service.md) — repair only accepts an admin-supplied explicit rate, never recomputes cost; admin+dry-run+confirmation-token+advisory-lock+audit-log shape for any raw-material repair endpoint.
+- [Raw-material FX fallback site sweep](raw-material-fx-fallback-sites.md) — which "|| 1" sites were converted to reject/flag unresolved rates vs. deliberately left alone (general-ledger daybook narration, out of scope).
