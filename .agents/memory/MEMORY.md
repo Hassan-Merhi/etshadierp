@@ -56,3 +56,5 @@
 - [Signed repair confirmation tokens](repair-token-pattern.md) — generic dry-run/apply HMAC token design; idempotent replay of an already-applied token must NOT be treated as staleness.
 - [Diagnostic pre-filtered lookup map bug](diagnostic-prefiltered-map-bug.md) — building a parent lookup map from a currency/status-filtered query silently drops context for children whose own filter differs from the parent's.
 - [Atomic audit+repair transactions](atomic-audit-repair-pattern.md) — financial write and its audit-log insert must share one transaction (onAudit callback) plus advisory+row locking, or a failed audit leaves an untracked change.
+- [Model A reservedKg is informational, not a deduction](model-a-reserved-kg-not-deduction.md) — never flag reservedKg > remainingKg as a bug; a fully-consumed container is always fully "reserved" by design.
+- [Repair-token signing key must be lazy + prod-gated](repair-token-lazy-signing-key.md) — cache the HMAC key at call time not module load, and hard-refuse a dev-fallback secret in production.
