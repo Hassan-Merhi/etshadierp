@@ -930,9 +930,13 @@ export function registerRawStockOffloadRoutes(app: Express) {
               description: `Freight on container ${container.containerNumber}`,
               totalAmount: String(restoredFreightAmt),
               currency: restoredFreightCurrencyCode,
-              exchangeRate: String(
-                resolveStoredFxRateOrThrow(container.currencyCode, container.fxRateToUsd, (container as any).fxRateConfirmed)
-              ),
+              // This re-posts a voucher that already existed pre-offload, using the
+              // exact rate the original offload already booked its financials with —
+              // it is not a new forward-going financial decision, so we reuse the
+              // container's stored rate as-is rather than requiring it to be
+              // "confirmed" (which would incorrectly block reversing legacy
+              // containers offloaded before the fxRateConfirmed flag existed).
+              exchangeRate: String(container.fxRateToUsd ?? "1"),
               sourceModule: "FACTORY",
             })
             .returning();
