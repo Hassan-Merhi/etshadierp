@@ -419,6 +419,17 @@ export function registerRawStockOffloadRoutes(app: Express) {
             otherChargesAccountId: reqOtherChargesAccountId ? parseInt(reqOtherChargesAccountId) : null,
             otherChargesSupplierId: reqOtherChargesSupplierId ? parseInt(reqOtherChargesSupplierId) : null,
             commissionAmount: commTotalVal > 0 ? String(commTotalVal) : container.commissionAmount || "0",
+            // BUG FIX: this used to leave commissionCurrencyCode untouched (stale from
+            // container creation, defaulting to "USD"), while commissionAmount above was
+            // overwritten with the raw offload-entered value in whatever currency the user
+            // actually picked (commCurrencyForUsd). Every downstream reader that groups by
+            // container.commissionCurrencyCode (broker ledgers, supplier statements, Net
+            // Position OTW) trusted that stale "USD" tag and silently treated a non-USD
+            // commission amount as if it were already USD — this is why brokers and any
+            // non-USD commission never converted correctly. The authoritative per-offload
+            // record (factoryContainerCommissions, via commissionRecord) always had the
+            // right currency/fxRate; only this denormalized container-level snapshot lagged.
+            commissionCurrencyCode: commTotalVal > 0 ? commCurrencyForUsd : (container as any).commissionCurrencyCode || "USD",
             dutyAmount: dutyStatus !== "NONE" ? String(parseFloat(reqDutyAmount || "0")) : null,
             dutyAccountId: reqDutyAccountId ? parseInt(reqDutyAccountId) : null,
             dutyStatus,
