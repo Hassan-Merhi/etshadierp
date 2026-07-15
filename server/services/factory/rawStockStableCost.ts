@@ -11,6 +11,7 @@
  * rate is computed identically everywhere.
  */
 import { eq, and, isNull, sql } from "drizzle-orm";
+import Decimal from "decimal.js";
 import { factoryRawStock, factoryContainers } from "@shared/schema";
 
 export interface StableSupplierRawStockRow {
@@ -72,18 +73,21 @@ export async function getStableSupplierCost(
 
   const rawRows = await query;
 
-  let weightedCostSum = 0;
-  let totalReceivedKg = 0;
+  let weightedCostSumD = new Decimal(0);
+  let totalReceivedKgD = new Decimal(0);
   const rows: StableSupplierRawStockRow[] = [];
 
   for (const r of rawRows) {
-    const receivedKg = parseFloat(r.receivedKg as string) || 0;
-    const usedKg = parseFloat(r.usedKg as string) || 0;
+    const receivedKgD = new Decimal(r.receivedKg || 0);
+    const usedKg = new Decimal(r.usedKg || 0).toNumber();
     // Fall back to costPerKg only for legacy rows that predate the USD column.
-    const costPerKgUsd = parseFloat(r.costPerKgUsd as string) || parseFloat(r.costPerKg as string) || 0;
+    const costPerKgUsdRaw = new Decimal(r.costPerKgUsd || 0);
+    const costPerKgUsdD = costPerKgUsdRaw.gt(0) ? costPerKgUsdRaw : new Decimal(r.costPerKg || 0);
+    const receivedKg = receivedKgD.toNumber();
+    const costPerKgUsd = costPerKgUsdD.toNumber();
 
-    weightedCostSum += receivedKg * costPerKgUsd;
-    totalReceivedKg += receivedKg;
+    weightedCostSumD = weightedCostSumD.plus(receivedKgD.times(costPerKgUsdD));
+    totalReceivedKgD = totalReceivedKgD.plus(receivedKgD);
     rows.push({
       id: r.id,
       containerId: r.containerId,
@@ -94,7 +98,8 @@ export async function getStableSupplierCost(
     });
   }
 
-  const costPerKgUsd = totalReceivedKg > 0 ? weightedCostSum / totalReceivedKg : 0;
+  const costPerKgUsd = totalReceivedKgD.gt(0) ? weightedCostSumD.dividedBy(totalReceivedKgD).toNumber() : 0;
+  const totalReceivedKg = totalReceivedKgD.toNumber();
 
   return { costPerKgUsd, totalReceivedKg, rows };
 }

@@ -21,3 +21,11 @@ export { runIntercompanyPosTransfer, recalculateIntercompanyForDate } from "./he
 export { calculateHistoricalLocationInventory } from "./helpers/inventoryHistoryHelpers";
 
 export { syncEmployeeBalancesFromEntries } from "./helpers/employeeHelpers";
+
+export {
+  resolveParentCompanyId,
+  isParentCompanyContext,
+  getSupplierBalanceForContext,
+  authorizeCompanyIdParam,
+  ParentCompanyNotConfiguredError,
+} from "./helpers/supplierBalanceHelpers";

@@ -6,6 +6,7 @@ import { requireAuth } from "../../../auth";
 import { classifyNetPositionAccounts } from "../../../netPositionHelper";
 import { adjustInventory } from "../../../inventoryHelper";
 import { applyOffloadMovingAverage } from "../../../services/factory/rawStockLockedRate";
+import { resolveStoredFxRate, resolveStoredFxRateOrThrow } from "../../../services/factory/currencyConversion";
 import {
   writeDaybookEntry,
   getOrFetchFxRateToUsd,
@@ -187,8 +188,11 @@ export function registerRawStockOffloadRoutes(app: Express) {
           // trace of why. The container's own fxRateToUsd is only a legitimate fallback
           // if it was itself explicitly set (not left at the schema default of "1" for
           // a non-USD currency, which means "never actually set").
-          const containerRate = parseFloat(container.fxRateToUsd || "0");
-          const containerRateLooksSet = containerRate > 0 && !(container.currencyCode !== "USD" && containerRate === 1);
+          const { fxRate: containerRate, looksSet: containerRateLooksSet } = resolveStoredFxRate(
+            container.currencyCode,
+            container.fxRateToUsd,
+            (container as any).fxRateConfirmed
+          );
           if (!containerRateLooksSet) {
             return res.status(400).json({
               message: `No valid FX rate available for ${currencyCode} on ${offloadDate}, and the container has no explicitly-set fxRateToUsd to fall back on. Provide fxRateToUsd explicitly to offload this container. (${err.message})`,
@@ -465,7 +469,11 @@ export function registerRawStockOffloadRoutes(app: Express) {
             description: `Commission for ${commissionRecord.personName} on container ${container.containerNumber}`,
             currencyCode: commissionRecord.currencyCode || "USD",
             amountCurrency: parseFloat(commissionRecord.commissionTotal),
-            fxRateToUsd: parseFloat(commissionRecord.fxRateToUsd || "1"),
+            fxRateToUsd: resolveStoredFxRateOrThrow(
+              commissionRecord.currencyCode,
+              commissionRecord.fxRateToUsd,
+              (commissionRecord as any).fxRateConfirmed
+            ),
             metaJson: JSON.stringify({ containerId, sourceType: "COMMISSION", commissionId: commissionRecord.id }),
           });
         }
@@ -763,7 +771,14 @@ export function registerRawStockOffloadRoutes(app: Express) {
             and(
               eq(factoryMixBatches.companyId, companyId),
               inArray(factoryMixBatches.id, linkedBatchIds),
-              sql`${factoryMixBatches.usedKg}::numeric > 0`
+              sql`${factoryMixBatches.usedKg}::numeric > 0`,
+              // A soft-deleted batch no longer holds live production usage — its
+              // consumption of this container's stock was already reversed by the
+              // delete route (factoryMixBatchRoutes.ts). Without this filter, a
+              // deleted batch's stale, never-reset usedKg field permanently blocks
+              // reversing the offload even though nothing is actually consuming
+              // the stock anymore.
+              isNull(factoryMixBatches.deletedAt)
             )
           );
 
@@ -915,7 +930,9 @@ export function registerRawStockOffloadRoutes(app: Express) {
               description: `Freight on container ${container.containerNumber}`,
               totalAmount: String(restoredFreightAmt),
               currency: restoredFreightCurrencyCode,
-              exchangeRate: String(parseFloat(container.fxRateToUsd || "1")),
+              exchangeRate: String(
+                resolveStoredFxRateOrThrow(container.currencyCode, container.fxRateToUsd, (container as any).fxRateConfirmed)
+              ),
               sourceModule: "FACTORY",
             })
             .returning();

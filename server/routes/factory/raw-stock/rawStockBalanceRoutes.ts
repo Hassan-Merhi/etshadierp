@@ -6,13 +6,16 @@ import { requireAuth } from "../../../auth";
 import { classifyNetPositionAccounts } from "../../../netPositionHelper";
 import { adjustInventory } from "../../../inventoryHelper";
 import { applyOffloadMovingAverage } from "../../../services/factory/rawStockLockedRate";
+import { convertToUsdOrThrow, resolveStoredFxRateOrThrow, UnresolvedExchangeRateError } from "../../../services/factory/currencyConversion";
 import {
   writeDaybookEntry,
   getOrFetchFxRateToUsd,
   getOrCreateLedgerAccount,
   isLegacySHA256Hash,
   verifySupervisorPassword,
+  checkFactoryAdmin,
 } from "../_helpers";
+import { logAudit } from "../../helpers/auditHelpers";
 import {
   factorySuppliers,
   factoryCategories,
@@ -146,13 +149,34 @@ export function registerRawStockBalanceRoutes(app: Express) {
         return res.status(400).json({ message: "Cost per KG must be non-negative" });
 
       const currencyCode = reqCurrency || "USD";
-      const fxRate = parseFloat(reqFxRate || "1");
       const kgVal = parseFloat(receivedKg);
       const rateVal = parseFloat(costPerKg);
-      const costPerKgUsd = currencyCode === "USD" ? rateVal : rateVal * fxRate;
+      let costPerKgUsd: number;
+      try {
+        costPerKgUsd = convertToUsdOrThrow(rateVal, currencyCode, reqFxRate);
+      } catch (err: any) {
+        if (err instanceof UnresolvedExchangeRateError) return res.status(400).json({ message: err.message });
+        throw err;
+      }
+      const fxRate = currencyCode === "USD" ? 1 : parseFloat(reqFxRate);
       const totalPayable = kgVal * rateVal;
       const totalPayableUsd = kgVal * costPerKgUsd;
       const trimmedSupplierName = String(supplierName).trim();
+
+      // Commission is a separate new record on this same write — its non-USD rate must be
+      // explicitly supplied too, never silently defaulted to 1 like the main container rate.
+      const hasCommissionReq = reqCommAmount && parseFloat(reqCommAmount) > 0;
+      const commCurrencyCode = reqCommCurrency || "USD";
+      let commFxRateResolved = 1;
+      if (hasCommissionReq && commCurrencyCode !== "USD") {
+        try {
+          commFxRateResolved = resolveStoredFxRateOrThrow(commCurrencyCode, reqCommFxRate);
+        } catch (err: any) {
+          if (err instanceof UnresolvedExchangeRateError)
+            return res.status(400).json({ message: `Commission: ${err.message}` });
+          throw err;
+        }
+      }
 
       const result = await db.transaction(async (tx: any) => {
         // Use supplierId directly if provided, otherwise find-or-create by name
@@ -229,9 +253,9 @@ export function registerRawStockBalanceRoutes(app: Express) {
           .returning();
 
         // Commission processing — auto-create/reuse "[SupplierName] Commission" sub-account
-        const hasCommission = reqCommAmount && parseFloat(reqCommAmount) > 0;
-        const commCurrency = reqCommCurrency || "USD";
-        const commFxRate = parseFloat(reqCommFxRate || "1");
+        const hasCommission = hasCommissionReq;
+        const commCurrency = commCurrencyCode;
+        const commFxRate = commFxRateResolved;
         const commAmountNum = hasCommission ? parseFloat(reqCommAmount) : 0;
         const commAmountUsd = hasCommission ? (commCurrency === "USD" ? commAmountNum : commAmountNum * commFxRate) : 0;
 
@@ -363,6 +387,8 @@ export function registerRawStockBalanceRoutes(app: Express) {
   });
 
   // PATCH a single opening-balance raw stock record
+  // (This route's catch block already returns 400 for any thrown error, including
+  // UnresolvedExchangeRateError from the FX helpers used below.)
   app.patch("/api/factory/raw-stock/opening-balance/:id", requireAuth, async (req: any, res: any) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
@@ -441,6 +467,7 @@ export function registerRawStockBalanceRoutes(app: Express) {
               costPerKg: factoryRawStock.costPerKg,
               currencyCode: factoryContainers.currencyCode,
               fxRateToUsd: factoryContainers.fxRateToUsd,
+              fxRateConfirmed: (factoryContainers as any).fxRateConfirmed,
             })
             .from(factoryRawStock)
             .innerJoin(factoryContainers, eq(factoryRawStock.containerId, factoryContainers.id))
@@ -448,8 +475,18 @@ export function registerRawStockBalanceRoutes(app: Express) {
             .limit(1);
 
           const resolvedCost = effectiveCost ?? parseFloat(current?.costPerKg || "0");
-          const resolvedFx = effectiveFx ?? parseFloat(current?.fxRateToUsd || "1");
           const resolvedCurrency = effectiveCurrency ?? current?.currencyCode ?? "USD";
+          // effectiveFx is the caller's explicit new rate (already validated positive above);
+          // otherwise fall back to the stored rate — but only if it's actually resolved, never
+          // guessed as 1, since this edit may also be changing the currency to non-USD.
+          let resolvedFx: number;
+          if (effectiveFx !== undefined) {
+            resolvedFx = effectiveFx;
+          } else if (resolvedCurrency === "USD") {
+            resolvedFx = 1;
+          } else {
+            resolvedFx = resolveStoredFxRateOrThrow(resolvedCurrency, current?.fxRateToUsd, current?.fxRateConfirmed);
+          }
           const costUsd = resolvedCurrency === "USD" ? resolvedCost : resolvedCost * resolvedFx;
           rawUpdates.costPerKgUsd = String(costUsd);
           containerUpdates.ratePerKgUsd = String(costUsd);
@@ -478,7 +515,10 @@ export function registerRawStockBalanceRoutes(app: Express) {
             .where(eq(factoryRawStock.id, id))
             .limit(1);
           const resolvedCommCurr = commissionCurrencyCode ?? cur?.commissionCurrencyCode ?? "USD";
-          const resolvedCommFx = parseFloat(commissionFxRateToUsd ?? cur?.commissionFxRateToUsd ?? "1");
+          const resolvedCommFx =
+            resolvedCommCurr === "USD"
+              ? 1
+              : resolveStoredFxRateOrThrow(resolvedCommCurr, commissionFxRateToUsd ?? cur?.commissionFxRateToUsd);
           const resolvedCommAmt = parseFloat(commissionAmount ?? "0");
           rawUpdates.commissionAmountUsd =
             resolvedCommCurr === "USD" ? String(resolvedCommAmt) : String(resolvedCommAmt * resolvedCommFx);
@@ -711,17 +751,21 @@ export function registerRawStockBalanceRoutes(app: Express) {
   });
 
   // Recalculate usedKg for all factory_raw_stock records based on active mix batch sources
+  // Dangerous bulk recalc — bulk-overwrites usedKg for every raw stock record in the
+  // company. Admin-only, defaults to a dry-run diff preview, and audit-logs every apply.
   app.post("/api/factory/raw-stock/recalculate-used", requireAuth, async (req: any, res: any) => {
     try {
+      if (!checkFactoryAdmin(req, res)) return;
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
+      const dryRun = req.body?.confirm !== true;
 
       const allRawStock = await db
-        .select({ id: factoryRawStock.id, containerId: factoryRawStock.containerId })
+        .select({ id: factoryRawStock.id, containerId: factoryRawStock.containerId, usedKg: factoryRawStock.usedKg })
         .from(factoryRawStock)
         .where(eq(factoryRawStock.companyId, companyId));
 
-      if (allRawStock.length === 0) return res.json({ updated: 0 });
+      if (allRawStock.length === 0) return res.json({ updated: 0, dryRun, changes: [] });
 
       const containerIds = allRawStock.map((r: any) => r.containerId);
 
@@ -740,18 +784,44 @@ export function registerRawStockBalanceRoutes(app: Express) {
         if (row.containerId) usedByContainer[row.containerId] = parseFloat(row.totalUsedKg || "0");
       }
 
+      const changes = allRawStock
+        .map((rs: any) => {
+          const newUsedKg = (usedByContainer[rs.containerId] || 0).toFixed(3);
+          const oldUsedKg = rs.usedKg || "0.000";
+          return { rawStockId: rs.id, containerId: rs.containerId, oldUsedKg, newUsedKg };
+        })
+        .filter((c) => c.oldUsedKg !== c.newUsedKg);
+
+      if (dryRun) {
+        return res.json({
+          dryRun: true,
+          wouldUpdate: changes.length,
+          changes,
+          message: `Dry run: ${changes.length} of ${allRawStock.length} raw stock record(s) would change. Re-submit with { confirm: true } to apply.`,
+        });
+      }
+
       let updated = 0;
       const now = new Date();
-      for (const rs of allRawStock) {
-        const usedKg = usedByContainer[rs.containerId] || 0;
+      for (const c of changes) {
         await db
           .update(factoryRawStock)
-          .set({ usedKg: usedKg.toFixed(3), updatedAt: now } as any)
-          .where(eq(factoryRawStock.id, rs.id));
+          .set({ usedKg: c.newUsedKg, updatedAt: now } as any)
+          .where(eq(factoryRawStock.id, c.rawStockId));
         updated++;
       }
 
-      res.json({ updated, message: `Recalculated used KG for ${updated} raw stock records.` });
+      await logAudit({
+        userId: req.session.userId,
+        username: req.session.username || req.session.userId,
+        companyId,
+        action: "update",
+        tableName: "factory_raw_stock",
+        recordIdentifier: "bulk recalculate-used",
+        changes: { updated: { new: updated }, rows: { new: changes } },
+      });
+
+      res.json({ dryRun: false, updated, changes, message: `Recalculated used KG for ${updated} raw stock records.` });
     } catch (error: any) {
       console.error("Error recalculating raw stock used:", error);
       res.status(500).json({ message: error.message });
@@ -759,25 +829,41 @@ export function registerRawStockBalanceRoutes(app: Express) {
   });
 
   // ── Recalculate bale costs from current mix batch cost/kg (one-time historical fix) ──
+  // Dangerous one-time historical fix — bulk-overwrites costPerKg/totalCost on every bale
+  // in every mix batch for the company. Admin-only, defaults to a dry-run diff preview,
+  // and audit-logs every apply.
   app.post("/api/factory/raw-stock/recalculate-bale-costs", requireAuth, async (req: any, res: any) => {
     try {
+      if (!checkFactoryAdmin(req, res)) return;
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
+      const dryRun = req.body?.confirm !== true;
 
       const allBatches = await db
         .select({ id: factoryMixBatches.id, costPerKg: factoryMixBatches.costPerKg })
         .from(factoryMixBatches)
         .where(and(eq(factoryMixBatches.companyId, companyId), sql`${factoryMixBatches.status} != 'DELETED'`));
 
-      let balesUpdated = 0;
-      const now = new Date();
+      const changes: {
+        baleId: number;
+        mixBatchId: number;
+        oldCostPerKg: string | null;
+        newCostPerKg: string;
+        oldTotalCost: string | null;
+        newTotalCost: string;
+      }[] = [];
 
       for (const batch of allBatches) {
         const batchCost = parseFloat(batch.costPerKg || "0");
         if (batchCost <= 0) continue;
 
         const bales = await db
-          .select({ id: factoryBales.id, weightKg: factoryBales.weightKg })
+          .select({
+            id: factoryBales.id,
+            weightKg: factoryBales.weightKg,
+            costPerKg: factoryBales.costPerKg,
+            totalCost: factoryBales.totalCost,
+          })
           .from(factoryBales)
           .where(
             and(
@@ -789,21 +875,52 @@ export function registerRawStockBalanceRoutes(app: Express) {
 
         for (const bale of bales) {
           const baleWt = parseFloat(bale.weightKg as string) || 0;
-          await db
-            .update(factoryBales)
-            .set({
-              costPerKg: String(batchCost.toFixed(4)),
-              totalCost: String((baleWt * batchCost).toFixed(2)),
-              updatedAt: now,
-            })
-            .where(eq(factoryBales.id, bale.id));
-          balesUpdated++;
+          const newCostPerKg = batchCost.toFixed(4);
+          const newTotalCost = (baleWt * batchCost).toFixed(2);
+          if (String(bale.costPerKg) === newCostPerKg && String(bale.totalCost) === newTotalCost) continue;
+          changes.push({
+            baleId: bale.id,
+            mixBatchId: batch.id,
+            oldCostPerKg: bale.costPerKg,
+            newCostPerKg,
+            oldTotalCost: bale.totalCost,
+            newTotalCost,
+          });
         }
       }
 
+      if (dryRun) {
+        return res.json({
+          dryRun: true,
+          wouldUpdate: changes.length,
+          changes,
+          message: `Dry run: ${changes.length} bale(s) across ${allBatches.length} batch(es) would change. Re-submit with { confirm: true } to apply.`,
+        });
+      }
+
+      const now = new Date();
+      for (const c of changes) {
+        await db
+          .update(factoryBales)
+          .set({ costPerKg: c.newCostPerKg, totalCost: c.newTotalCost, updatedAt: now })
+          .where(eq(factoryBales.id, c.baleId));
+      }
+
+      await logAudit({
+        userId: req.session.userId,
+        username: req.session.username || req.session.userId,
+        companyId,
+        action: "update",
+        tableName: "factory_bales",
+        recordIdentifier: "bulk recalculate-bale-costs",
+        changes: { updated: { new: changes.length }, rows: { new: changes } },
+      });
+
       res.json({
-        balesUpdated,
-        message: `Updated cost/kg on ${balesUpdated} bale(s) across ${allBatches.length} batch(es).`,
+        dryRun: false,
+        balesUpdated: changes.length,
+        changes,
+        message: `Updated cost/kg on ${changes.length} bale(s) across ${allBatches.length} batch(es).`,
       });
     } catch (error: any) {
       console.error("Error recalculating bale costs:", error);

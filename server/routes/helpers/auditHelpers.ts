@@ -11,18 +11,26 @@ import {
 import { inArray } from "drizzle-orm";
 
 // ─── Audit log ────────────────────────────────────────────────────────────────
-export async function logAudit(params: {
-  userId: string;
-  username: string;
-  companyId?: number | null;
-  action: "create" | "update" | "delete";
-  tableName: string;
-  recordId?: number | null;
-  recordIdentifier?: string | null;
-  changes?: Record<string, { old?: any; new?: any }> | null;
-}) {
+export async function logAudit(
+  params: {
+    userId: string;
+    username: string;
+    companyId?: number | null;
+    action: "create" | "update" | "delete";
+    tableName: string;
+    recordId?: number | null;
+    recordIdentifier?: string | null;
+    changes?: Record<string, { old?: any; new?: any }> | null;
+  },
+  // Optional transaction/connection handle. Pass the same `tx` used for the
+  // financial write so the audit INSERT is atomic with it — if the audit
+  // insert fails, the whole transaction (including the financial write)
+  // rolls back instead of silently losing the audit trail. Defaults to the
+  // pool-level `db` for existing non-transactional callers.
+  dbConn: { insert: typeof db.insert } = db
+) {
   try {
-    await db.insert(auditLog).values({
+    await dbConn.insert(auditLog).values({
       userId: params.userId,
       username: params.username,
       companyId: params.companyId,

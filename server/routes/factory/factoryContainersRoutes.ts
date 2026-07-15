@@ -6,6 +6,7 @@ import { db } from "../../db";
 import { requireAuth } from "../../auth";
 import { classifyNetPositionAccounts } from "../../netPositionHelper";
 import { adjustInventory } from "../../inventoryHelper";
+import { resolveStoredFxRate, resolveStoredFxRateOrThrow, applyFxRate, UnresolvedExchangeRateError } from "../../services/factory/currencyConversion";
 import {
   writeDaybookEntry,
   getOrFetchFxRateToUsd,
@@ -325,6 +326,8 @@ export function registerFactoryContainersRoutes(app: Express) {
         fxRateSource: fxRateSource === "manual" ? "manual" : "auto",
         fxRateDateImport: importDate,
         ratePerKgUsd: String(ratePerKgUsd),
+        // Explicitly resolved above (manual user entry or a real auto-fetch) — trust it.
+        fxRateConfirmed: true,
       };
 
       // Auto-set commissionSupplierId to broker (parentId) if supplier has one and not already set
@@ -398,7 +401,7 @@ export function registerFactoryContainersRoutes(app: Express) {
         description: descParts.join(" · "),
         currencyCode: ccyForDesc,
         amountCurrency: parseFloat(container.ratePerKg || "0") * parseFloat(container.totalKg || "0"),
-        fxRateToUsd: parseFloat(container.fxRateToUsd || "1"),
+        fxRateToUsd: resolveStoredFxRateOrThrow(ccyForDesc, container.fxRateToUsd, (container as any).fxRateConfirmed),
       });
 
       // Double-entry: Goods value — Dr Factory Import Cost / Cr Supplier Payable
@@ -416,7 +419,9 @@ export function registerFactoryContainersRoutes(app: Express) {
             description: `Goods import - container ${container.containerNumber}`,
             totalAmount: String(goodsValue),
             currency: container.currencyCode || "USD",
-            exchangeRate: String(parseFloat(container.fxRateToUsd || "1")),
+            exchangeRate: String(
+              resolveStoredFxRateOrThrow(container.currencyCode, container.fxRateToUsd, (container as any).fxRateConfirmed)
+            ),
             sourceModule: "FACTORY",
           })
           .returning();
@@ -460,7 +465,9 @@ export function registerFactoryContainersRoutes(app: Express) {
             totalAmount: String(freightAmt),
             currency: freightCcy,
             exchangeRate:
-              freightCcy === (container.currencyCode || "USD") ? String(parseFloat(container.fxRateToUsd || "1")) : "1",
+              freightCcy === (container.currencyCode || "USD")
+                ? String(resolveStoredFxRateOrThrow(container.currencyCode, container.fxRateToUsd, (container as any).fxRateConfirmed))
+                : "1",
             sourceModule: "FACTORY",
           })
           .returning();
@@ -541,7 +548,7 @@ export function registerFactoryContainersRoutes(app: Express) {
       if (b.status !== undefined) updateData.status = String(b.status || "PENDING");
       if (b.currencyCode !== undefined) updateData.currencyCode = String(b.currencyCode || "USD");
       if (b.fxRateSource !== undefined) updateData.fxRateSource = String(b.fxRateSource || "auto");
-      if (b.fxRateToUsd !== undefined) updateData.fxRateToUsd = dec(b.fxRateToUsd) ?? "1";
+      if (b.fxRateToUsd !== undefined) updateData.fxRateToUsd = dec(b.fxRateToUsd);
       // Freight
       if (b.freight !== undefined) updateData.freight = dec(b.freight) ?? "0";
       if (b.freightCurrencyCode !== undefined) updateData.freightCurrencyCode = str(b.freightCurrencyCode);
@@ -582,23 +589,43 @@ export function registerFactoryContainersRoutes(app: Express) {
         const importDate = updateData.arrivalDate || existing.arrivalDate || getClientDate(req);
 
         if (fxRateSource === "auto") {
-          try {
-            const fxRate = await getOrFetchFxRateToUsd(companyId, currencyCode, importDate);
-            updateData.fxRateToUsd = fxRate;
-            updateData.fxRateToUsdImport = fxRate;
-            updateData.fxRateDateImport = importDate;
-            updateData.fxRateSource = "auto";
-            const ratePerKg = parseFloat(updateData.ratePerKg || existing.ratePerKg || "0");
-            const fxRateNum = parseFloat(fxRate);
-            updateData.ratePerKgUsd = String(currencyCode === "USD" ? ratePerKg : ratePerKg * fxRateNum);
-          } catch {}
-        } else {
-          const fxRateNum = parseFloat(updateData.fxRateToUsd || existing.fxRateToUsd || "1");
+          const fxRate = await getOrFetchFxRateToUsd(companyId, currencyCode, importDate);
+          updateData.fxRateToUsd = fxRate;
+          updateData.fxRateToUsdImport = fxRate;
+          updateData.fxRateDateImport = importDate;
+          updateData.fxRateSource = "auto";
+          updateData.fxRateConfirmed = true; // real auto-fetch, not a guess
           const ratePerKg = parseFloat(updateData.ratePerKg || existing.ratePerKg || "0");
+          const fxRateNum = parseFloat(fxRate);
+          updateData.ratePerKgUsd = String(applyFxRate(ratePerKg, currencyCode, fxRateNum));
+        } else {
+          // Manual: trust an fxRateToUsd explicitly provided in THIS request regardless of
+          // value; otherwise fall back to the existing stored rate, but only if it's actually
+          // confirmed already (or, absent the flag on this row, looks like a real explicit
+          // rate under the legacy heuristic).
+          const explicitRate = b.fxRateToUsd !== undefined ? parseFloat(dec(b.fxRateToUsd) ?? "") : NaN;
+          let fxRateNum: number;
+          if (!isNaN(explicitRate) && explicitRate > 0) {
+            fxRateNum = explicitRate;
+            updateData.fxRateConfirmed = true; // freshly supplied by this request
+          } else {
+            const { fxRate, looksSet } = resolveStoredFxRate(
+              currencyCode,
+              existing.fxRateToUsd,
+              (existing as any).fxRateConfirmed
+            );
+            if (!looksSet) {
+              return res.status(400).json({ message: new UnresolvedExchangeRateError(currencyCode).message });
+            }
+            fxRateNum = fxRate;
+            // Carries forward an already-confirmed rate; leave fxRateConfirmed untouched.
+          }
+          const ratePerKg = parseFloat(updateData.ratePerKg || existing.ratePerKg || "0");
+          updateData.fxRateToUsd = String(fxRateNum);
           updateData.fxRateToUsdImport = String(fxRateNum);
           updateData.fxRateDateImport = importDate;
           updateData.fxRateSource = "manual";
-          updateData.ratePerKgUsd = String(currencyCode === "USD" ? ratePerKg : ratePerKg * fxRateNum);
+          updateData.ratePerKgUsd = String(applyFxRate(ratePerKg, currencyCode, fxRateNum));
         }
       }
 
@@ -1049,6 +1076,7 @@ export function registerFactoryContainersRoutes(app: Express) {
 
       let created = 0;
       let skipped = 0;
+      const fxUnresolvedSkipped: string[] = [];
 
       for (const container of allContainers) {
         if (!container.supplierId) {
@@ -1078,6 +1106,21 @@ export function registerFactoryContainersRoutes(app: Express) {
           continue;
         }
 
+        // Unresolved non-USD rate: skip this one container (report it) rather than
+        // aborting the whole bulk backfill or silently posting a mispriced voucher.
+        let backfillFxRate: number;
+        try {
+          backfillFxRate = resolveStoredFxRateOrThrow(
+            container.currencyCode,
+            container.fxRateToUsd,
+            (container as any).fxRateConfirmed
+          );
+        } catch {
+          skipped++;
+          fxUnresolvedSkipped.push(container.containerNumber);
+          continue;
+        }
+
         const today = getClientDate(req);
         const importCostAccId = await getOrCreateLedgerAccount(companyId, "FACTORY_IMPORT_COST", "Factory Import Cost");
         const importVoucherNum = `FACTORY-IMPORT-${container.id}-${Date.now()}`;
@@ -1091,7 +1134,7 @@ export function registerFactoryContainersRoutes(app: Express) {
             description: `Goods import - container ${container.containerNumber}`,
             totalAmount: String(goodsValue),
             currency: container.currencyCode || "USD",
-            exchangeRate: String(parseFloat(container.fxRateToUsd || "1")),
+            exchangeRate: String(backfillFxRate),
             sourceModule: "FACTORY",
           })
           .returning();
@@ -1112,7 +1155,7 @@ export function registerFactoryContainersRoutes(app: Express) {
         created++;
       }
 
-      res.json({ created, skipped, total: allContainers.length });
+      res.json({ created, skipped, total: allContainers.length, fxUnresolvedSkipped });
     } catch (error: any) {
       console.error("Error backfilling import credits:", error);
       res.status(500).json({ message: error.message });
@@ -1215,6 +1258,7 @@ export function registerFactoryContainersRoutes(app: Express) {
             containerNumber: factoryContainers.containerNumber,
             currencyCode: factoryContainers.currencyCode,
             fxRateToUsd: factoryContainers.fxRateToUsd,
+            fxRateConfirmed: (factoryContainers as any).fxRateConfirmed,
             arrivalDate: factoryContainers.arrivalDate,
             createdAt: factoryContainers.createdAt,
           })
@@ -1236,7 +1280,17 @@ export function registerFactoryContainersRoutes(app: Express) {
             if (chargeCcy === "USD") {
               chargeFxRate = "1";
             } else if (chargeCcy === (container.currencyCode || "USD")) {
-              chargeFxRate = String(parseFloat(container.fxRateToUsd || "1"));
+              const { fxRate, looksSet } = resolveStoredFxRate(
+                chargeCcy,
+                container.fxRateToUsd,
+                (container as any).fxRateConfirmed
+              );
+              if (!looksSet) {
+                return res
+                  .status(400)
+                  .json({ message: new UnresolvedExchangeRateError(chargeCcy).message });
+              }
+              chargeFxRate = String(fxRate);
             } else {
               chargeFxRate = await getOrFetchFxRateToUsd(companyId, chargeCcy, voucherDate);
             }
@@ -1588,7 +1642,17 @@ export function registerFactoryContainersRoutes(app: Express) {
 
           let fxRate: number;
           if (fxSource === "manual" && row.fxRateToUsd) {
-            fxRate = parseFloat(row.fxRateToUsd) || 1;
+            const parsedManualRate = parseFloat(row.fxRateToUsd);
+            if (currencyCode !== "USD" && !(parsedManualRate > 0)) {
+              errors.push(`Row ${rowNum} (${row.containerNumber}): Invalid manual fxRateToUsd for ${currencyCode}`);
+              continue;
+            }
+            fxRate = parsedManualRate;
+          } else if (fxSource === "manual") {
+            errors.push(
+              `Row ${rowNum} (${row.containerNumber}): fxSource is MANUAL but fxRateToUsd was not provided`
+            );
+            continue;
           } else {
             try {
               fxRate = parseFloat(await getOrFetchFxRateToUsd(companyId, currencyCode, importDate));
@@ -1638,6 +1702,8 @@ export function registerFactoryContainersRoutes(app: Express) {
                 fxRateSource: fxSource,
                 fxRateDateImport: importDate,
                 ratePerKgUsd: String(ratePerKgUsd),
+                // Explicitly resolved above (validated manual entry or a real auto-fetch).
+                fxRateConfirmed: true,
                 arrivalDate: row.arrivalDate || null,
                 notes: row.notes || null,
                 status,

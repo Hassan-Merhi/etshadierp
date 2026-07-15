@@ -975,6 +975,19 @@ export function registerSupplierCrudRoutes(app: Express) {
 
       const parsed = insertFactorySupplierPaymentSchema.parse({ ...req.body, companyId });
 
+      // Reject writes with an unresolved non-USD rate rather than silently posting the
+      // payment voucher at an assumed rate of 1 — factory_supplier_payments has no
+      // fxRateConfirmed flag yet, so any explicitly-supplied rate is trusted as-is.
+      const payCurrency = (parsed as any).currencyCode || "USD";
+      if (payCurrency !== "USD") {
+        const suppliedRate = parseFloat((parsed as any).fxRateToUsd || "0");
+        if (!(suppliedRate > 0)) {
+          return res.status(400).json({
+            message: `Cannot record a ${payCurrency} payment without an explicit exchange rate to USD.`,
+          });
+        }
+      }
+
       const created = await db.transaction(async (tx: any) => {
         const [payment] = await tx.insert(factorySupplierPayments).values(parsed).returning();
 

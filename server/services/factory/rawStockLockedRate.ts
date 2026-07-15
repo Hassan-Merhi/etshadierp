@@ -14,9 +14,18 @@
  * `getLockedSupplierRate`. Nothing should recompute a rate from remaining
  * value / free kg, or from all-time received kg, at read time.
  */
-import { eq, and, sql } from "drizzle-orm";
-import { factorySuppliers, factoryRawStock, factoryContainers, factoryRawMaterialAdjustments } from "@shared/schema";
+import { eq, and, sql, isNull } from "drizzle-orm";
+import Decimal from "decimal.js";
+import {
+  factorySuppliers,
+  factoryRawStock,
+  factoryContainers,
+  factoryRawMaterialAdjustments,
+  factoryMixBatchSources,
+  factoryMixBatches,
+} from "@shared/schema";
 import { getStableSupplierCost } from "./rawStockStableCost";
+import { db as sharedDb } from "../../db";
 
 /**
  * The single authoritative "how much of this supplier's raw material is
@@ -64,7 +73,9 @@ export async function getAuthoritativeSupplierRemainingKg(
       )
     );
 
-  return (parseFloat(remainingKg as string) || 0) + (parseFloat(netAdjustedKg as string) || 0);
+  const rk = new Decimal(remainingKg || 0);
+  const nk = new Decimal(netAdjustedKg || 0);
+  return rk.plus(nk).toNumber();
 }
 
 /**
@@ -100,7 +111,7 @@ export async function getLockedSupplierRate(
 
   const existing = supplier.currentRawMaterialCostPerKgUsd;
   if (existing !== null && existing !== undefined) {
-    return parseFloat(existing as string) || 0;
+    return new Decimal(existing || 0).toNumber();
   }
 
   // Never-established rate — lazy one-time backfill from legacy stable cost so
@@ -134,12 +145,106 @@ export async function getLockedSupplierRateReadOnly(
 
   const existing = supplier.currentRawMaterialCostPerKgUsd;
   if (existing !== null && existing !== undefined) {
-    return { rate: parseFloat(existing as string) || 0, wasBackfilled: false };
+    return { rate: new Decimal(existing || 0).toNumber(), wasBackfilled: false };
   }
 
   // Never-established — compute what the lazy backfill WOULD persist, without writing.
   const { costPerKgUsd } = await getStableSupplierCost(tx, companyId, supplierId);
   return { rate: costPerKgUsd, wasBackfilled: false };
+}
+
+export interface LockedRateDiagnosticRow {
+  companyId: number;
+  supplierId: number;
+  supplierName: string;
+  persistedLockedRate: number | null;
+  rawMaterialsDisplayedRate: number;
+  mixBatchDialogRate: number;
+  remainingKg: number;
+  reservedKg: number;
+  freeKg: number;
+  displayedValue: string;
+  expectedValue: string;
+  difference: string;
+  backfillRequired: boolean;
+}
+
+/**
+ * Shared, read-only per-supplier locked-rate reconciliation for a company.
+ * Reused by the `/raw-stock/diagnostics/locked-rates` route AND the broader
+ * FX/raw-material reconciliation report so both surfaces report identical
+ * numbers from one implementation instead of two independently-maintained
+ * copies of this math. Zero writes: uses getLockedSupplierRateReadOnly (no
+ * lazy backfill side effect).
+ */
+export async function getLockedRateDiagnosticsForCompany(companyId: number): Promise<LockedRateDiagnosticRow[]> {
+  const db = sharedDb;
+  const suppliers = await db
+    .select({
+      id: factorySuppliers.id,
+      name: factorySuppliers.name,
+      currentRawMaterialCostPerKgUsd: factorySuppliers.currentRawMaterialCostPerKgUsd,
+    })
+    .from(factorySuppliers)
+    .where(eq(factorySuppliers.companyId, companyId));
+
+  const reservedRows = await db
+    .select({
+      supplierId: factoryMixBatchSources.supplierId,
+      reservedKg: sql<string>`SUM(${factoryMixBatchSources.weightKg})`,
+    })
+    .from(factoryMixBatchSources)
+    .innerJoin(factoryMixBatches, eq(factoryMixBatchSources.mixBatchId, factoryMixBatches.id))
+    .where(
+      and(
+        eq(factoryMixBatches.companyId, companyId),
+        sql`${factoryMixBatchSources.supplierId} IS NOT NULL`,
+        sql`${factoryMixBatches.status} NOT IN ('CLOSED', 'COMPLETED')`,
+        isNull(factoryMixBatches.deletedAt)
+      )
+    )
+    .groupBy(factoryMixBatchSources.supplierId);
+  const reservedBySupplierId = new Map<number, number>();
+  for (const r of reservedRows) {
+    if (r.supplierId) reservedBySupplierId.set(r.supplierId, parseFloat(r.reservedKg as string) || 0);
+  }
+
+  return db.transaction(async (tx: any) => {
+    const out: LockedRateDiagnosticRow[] = [];
+    for (const supplier of suppliers) {
+      const persistedRaw = supplier.currentRawMaterialCostPerKgUsd;
+      const persistedLockedRate =
+        persistedRaw !== null && persistedRaw !== undefined ? parseFloat(persistedRaw as string) || 0 : null;
+
+      const { rate: rawMaterialsDisplayedRate } = await getLockedSupplierRateReadOnly(tx, companyId, supplier.id);
+      const mixBatchDialogRate = rawMaterialsDisplayedRate;
+
+      const remainingKg = await getAuthoritativeSupplierRemainingKg(tx, companyId, supplier.id);
+      const reservedKg = reservedBySupplierId.get(supplier.id) || 0;
+      const freeKg = remainingKg;
+
+      const displayedValue = freeKg * rawMaterialsDisplayedRate;
+      const expectedValue = freeKg * (persistedLockedRate ?? 0);
+      const difference = displayedValue - expectedValue;
+
+      out.push({
+        companyId,
+        supplierId: supplier.id,
+        supplierName: supplier.name,
+        persistedLockedRate,
+        rawMaterialsDisplayedRate,
+        mixBatchDialogRate,
+        remainingKg,
+        reservedKg,
+        freeKg,
+        displayedValue: displayedValue.toFixed(2),
+        expectedValue: expectedValue.toFixed(2),
+        difference: difference.toFixed(2),
+        backfillRequired: persistedLockedRate === null,
+      });
+    }
+    return out;
+  });
 }
 
 /**
@@ -174,11 +279,16 @@ export async function applyOffloadMovingAverage(
   // quantity (not just raw-stock rows). The new container's row has not been
   // inserted yet when this is called, so it's correctly excluded here.
   const oldRemainingKg = Math.max(0, await getAuthoritativeSupplierRemainingKg(tx, companyId, supplierId));
-  const totalKg = oldRemainingKg + newReceivedKg;
-  const newLockedRate =
-    totalKg > 0
-      ? (oldRemainingKg * oldLockedRate + newReceivedKg * newContainerLandedCostPerKgUsd) / totalKg
-      : newContainerLandedCostPerKgUsd;
+  const oldRemainingKgD = new Decimal(oldRemainingKg);
+  const newReceivedKgD = new Decimal(newReceivedKg);
+  const totalKgD = oldRemainingKgD.plus(newReceivedKgD);
+  const newLockedRateD = totalKgD.gt(0)
+    ? oldRemainingKgD
+        .times(oldLockedRate)
+        .plus(newReceivedKgD.times(newContainerLandedCostPerKgUsd))
+        .dividedBy(totalKgD)
+    : new Decimal(newContainerLandedCostPerKgUsd);
+  const newLockedRate = newLockedRateD.toNumber();
 
   await tx
     .update(factorySuppliers)

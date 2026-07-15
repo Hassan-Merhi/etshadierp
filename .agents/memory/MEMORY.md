@@ -1,3 +1,5 @@
+- [fxRateConfirmed explicit flag](fx-rate-confirmed-flag.md) — replaces rate===1 heuristic on factory_containers/offload-charges/commissions; lists tables/routes not yet converted.
+- [drizzle-kit push needs a TTY](drizzle-push-no-tty.md) — push/generate fail non-interactively on ANY column-rename ambiguity in the whole schema, even unrelated to your change; apply new columns via direct idempotent ALTER TABLE instead.
 - [SP container supplier linking](sp-container-supplier.md) — sp_containers needs supplierId FK to suppliers; voucher must have supplierId set for supplier balance to appear in ledger.
 - [SP Intercompany Agent Charges](sp-intercompany.md) — SP offload posts Voucher C in HADI L'SHI (Dr Agent / Cr SP-IC); "Intercompany" account type excluded from Net Position.
 - [ExcelJS write-stream bug](exceljs-write-stream.md) — ExcelJS 3.x wb.xlsx.write(stream) throws "ea.results is not a Promise"; use writeBuffer() instead.
@@ -48,3 +50,12 @@
 - [Bare block+return in route handler](bare-block-return-in-route.md) — `try { { if(x) return; } } catch{}` inside a route exits the whole handler, skipping res.json and hanging the client.
 - [Company-wide daily state pattern](company-wide-daily-state-pattern.md) — shared "once per day per company" gates need DB uniqueness+upsert, server-computed company business date, and audited skip buttons.
 - [Cross-version DB copy](cross-version-db-copy.md) — pg_dump blocks on newer source major version (e.g. Render PG18 vs nix's PG16); use drizzle push + per-table \copy with explicit column names instead.
+- [Supplier balance parent-company detection](supplier-parent-company-detection.md) — supplier.openingBalance only applies in the explicit parentCompanyId setting's company, never "lowest company ID"; all balance surfaces must share one helper.
+- [Raw-material exchange-rate "looks set" heuristic](raw-material-fx-default-to-1.md) — a stored fx rate of exactly 1 for a non-USD currency is indistinguishable from unset (schema default); centralized helper rejects instead of silently pricing at 1.
+- [FX safe-repair service design](fx-safe-repair-service.md) — repair only accepts an admin-supplied explicit rate, never recomputes cost; admin+dry-run+confirmation-token+advisory-lock+audit-log shape for any raw-material repair endpoint.
+- [Raw-material FX fallback site sweep](raw-material-fx-fallback-sites.md) — which "|| 1" sites were converted to reject/flag unresolved rates vs. deliberately left alone (general-ledger daybook narration, out of scope).
+- [Signed repair confirmation tokens](repair-token-pattern.md) — generic dry-run/apply HMAC token design; idempotent replay of an already-applied token must NOT be treated as staleness.
+- [Diagnostic pre-filtered lookup map bug](diagnostic-prefiltered-map-bug.md) — building a parent lookup map from a currency/status-filtered query silently drops context for children whose own filter differs from the parent's.
+- [Atomic audit+repair transactions](atomic-audit-repair-pattern.md) — financial write and its audit-log insert must share one transaction (onAudit callback) plus advisory+row locking, or a failed audit leaves an untracked change.
+- [Model A reservedKg is informational, not a deduction](model-a-reserved-kg-not-deduction.md) — never flag reservedKg > remainingKg as a bug; a fully-consumed container is always fully "reserved" by design.
+- [Repair-token signing key must be lazy + prod-gated](repair-token-lazy-signing-key.md) — cache the HMAC key at call time not module load, and hard-refuse a dev-fallback secret in production.

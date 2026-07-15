@@ -6,6 +6,7 @@ import { requireAuth } from "../../../auth";
 import { classifyNetPositionAccounts } from "../../../netPositionHelper";
 import { adjustInventory } from "../../../inventoryHelper";
 import { cascadeContainerCostChange } from "../../../services/factory/rawStockCostCascade";
+import { resolveStoredFxRate, resolveStoredFxRateOrThrow, applyFxRate, UnresolvedExchangeRateError } from "../../../services/factory/currencyConversion";
 import {
   writeDaybookEntry,
   getOrFetchFxRateToUsd,
@@ -183,9 +184,13 @@ export function registerRawStockContainerRoutes(app: Express) {
       const totalCost =
         basePayable + freightVal + otherChargesVal + additionalChargesTotal + commissionVal + newDutyAmount;
       const newInclusiveCostPerKg = actualKg > 0 ? totalCost / actualKg : 0;
-      const fxRate = parseFloat(container.fxRateToUsd || "1");
-      const costPerKgUsd =
-        (container.currencyCode || "USD") === "USD" ? newInclusiveCostPerKg : newInclusiveCostPerKg * fxRate;
+      const { fxRate, looksSet: dutyFxLooksSet } = resolveStoredFxRate(container.currencyCode, container.fxRateToUsd);
+      if (!dutyFxLooksSet) {
+        return res.status(400).json({
+          message: new UnresolvedExchangeRateError(container.currencyCode || "USD").message,
+        });
+      }
+      const costPerKgUsd = applyFxRate(newInclusiveCostPerKg, container.currencyCode, fxRate);
       const finalPayableAmountUsd = String(actualKg * costPerKgUsd);
 
       await db
@@ -201,60 +206,20 @@ export function registerRawStockContainerRoutes(app: Express) {
         })
         .where(eq(factoryContainers.id, containerId));
 
-      const [rawStock] = await db
-        .select()
-        .from(factoryRawStock)
-        .where(and(eq(factoryRawStock.companyId, companyId), eq(factoryRawStock.containerId, containerId)));
-
-      if (rawStock) {
-        await db
-          .update(factoryRawStock)
-          .set({
-            costPerKg: String(newInclusiveCostPerKg),
-            costPerKgUsd: String(costPerKgUsd),
-          })
-          .where(eq(factoryRawStock.id, rawStock.id));
-      }
-
-      // Propagate the updated cost to any mix batch sources that drew from this container,
-      // then recalculate the weighted-average costPerKg on the parent mix batches.
-      const containerMixSources = await db
-        .select()
-        .from(factoryMixBatchSources)
-        .where(eq(factoryMixBatchSources.containerId, containerId));
-
-      if (containerMixSources.length > 0) {
-        for (const src of containerMixSources) {
-          const newSourceTotalCost = parseFloat(src.weightKg) * newInclusiveCostPerKg;
-          await db
-            .update(factoryMixBatchSources)
-            .set({
-              costPerKg: String(newInclusiveCostPerKg),
-              totalCost: String(newSourceTotalCost.toFixed(2)),
-            })
-            .where(eq(factoryMixBatchSources.id, src.id));
-        }
-
-        // Recalculate the weighted cost for every affected mix batch
-        const affectedBatchIds = [...new Set(containerMixSources.map((s: any) => s.mixBatchId))];
-        for (const batchId of affectedBatchIds) {
-          const allSources = await db
-            .select()
-            .from(factoryMixBatchSources)
-            .where(eq(factoryMixBatchSources.mixBatchId, batchId));
-          const batchTotalCost = allSources.reduce((sum: number, s: any) => sum + parseFloat(s.totalCost || "0"), 0);
-          const batchTotalWeight = allSources.reduce((sum: number, s: any) => sum + parseFloat(s.weightKg || "0"), 0);
-          const batchCostPerKg = batchTotalWeight > 0 ? batchTotalCost / batchTotalWeight : 0;
-          await db
-            .update(factoryMixBatches)
-            .set({
-              costPerKg: String(batchCostPerKg.toFixed(4)),
-              totalCost: String(batchTotalCost.toFixed(2)),
-              updatedAt: new Date(),
-            })
-            .where(eq(factoryMixBatches.id, batchId));
-        }
-      }
+      // Propagate the updated cost to raw stock and to any still-OPEN mix batch
+      // sources/batches/bales that drew from this container, via the same shared,
+      // tested cascade used by the post-offload-charges route — this guarantees
+      // CLOSED/COMPLETED batches (and their pressed bales) are never rewritten and
+      // the supplier's locked rate is nudged consistently rather than duplicated
+      // inline logic drifting from that behavior.
+      await db.transaction(async (tx: any) => {
+        await cascadeContainerCostChange(tx, {
+          companyId,
+          containerId,
+          newCostPerKg: newInclusiveCostPerKg,
+          newCostPerKgUsd: costPerKgUsd,
+        });
+      });
 
       const today = req.body.txDate || getClientDate(req);
       await writeDaybookEntry(db, {
@@ -304,7 +269,10 @@ export function registerRawStockContainerRoutes(app: Express) {
 
       const txDate = reqTxDate || getClientDate(req);
       const containerCcy = container.currencyCode || "USD";
-      const fxRate = parseFloat(container.fxRateToUsd || "1");
+      const { fxRate, looksSet: pocFxLooksSet } = resolveStoredFxRate(containerCcy, container.fxRateToUsd);
+      if (!pocFxLooksSet) {
+        return res.status(400).json({ message: new UnresolvedExchangeRateError(containerCcy).message });
+      }
       const actualKg = parseFloat(container.actualReceivedKg || "0");
       if (actualKg <= 0) return res.status(400).json({ message: "Container has no received weight" });
 
@@ -458,7 +426,7 @@ export function registerRawStockContainerRoutes(app: Express) {
           const chargeAmt = parseFloat(charge.amount || "0");
           if (chargeAmt <= 0) continue;
           const chargeCcy = charge.currencyCode || "USD";
-          const chargeFx = parseFloat(charge.fxRateToUsd || "1");
+          const chargeFx = resolveStoredFxRateOrThrow(chargeCcy, charge.fxRateToUsd, (charge as any).fxRateConfirmed);
           await writeDaybookEntry(tx, {
             companyId,
             txDate,
@@ -467,7 +435,7 @@ export function registerRawStockContainerRoutes(app: Express) {
             description: `${charge.description} (post-offload) — container ${container.containerNumber}`,
             currencyCode: chargeCcy,
             amountCurrency: chargeAmt,
-            fxRateToUsd: chargeCcy === "USD" ? 1 : chargeFx,
+            fxRateToUsd: chargeFx,
             metaJson: JSON.stringify({ containerId, sourceType: "POST_OFFLOAD_ADDITIONAL", chargeId: charge.id }),
           });
           if (charge.ledgerAccountId || charge.supplierId) {

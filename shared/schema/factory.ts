@@ -663,6 +663,14 @@ export const factoryContainers = pgTable(
     fxRateToUsdImport: decimal("fx_rate_to_usd_import", { precision: 20, scale: 8 }),
     fxRateToUsdOffload: decimal("fx_rate_to_usd_offload", { precision: 20, scale: 8 }),
     fxRateSource: text("fx_rate_source").notNull().default("auto"),
+    // Explicit "was this rate ever actually resolved" flag — independent of the
+    // numeric value, since the column above defaults to '1' and a genuine 1:1
+    // confirmed rate must remain valid. USD rows are trivially resolved; non-USD
+    // rows are only resolved once a real auto-fetch or manual entry sets this true.
+    // Historical rows predating this column default to false (NOT a claim they were
+    // wrong — see migration note) so diagnostics can flag them for manual review
+    // without silently trusting or silently rejecting old data.
+    fxRateConfirmed: boolean("fx_rate_confirmed").notNull().default(false),
     fxRateDateImport: date("fx_rate_date_import"),
     fxRateDateOffload: date("fx_rate_date_offload"),
     ratePerKgUsd: decimal("rate_per_kg_usd", { precision: 20, scale: 7 }),
@@ -745,6 +753,7 @@ export const insertFactoryContainerSchema = createInsertSchema(factoryContainers
     ratePerKg: z.string().optional().nullable(),
     currencyCode: z.string().optional(),
     fxRateToUsd: z.string().optional(),
+    fxRateConfirmed: z.boolean().optional(),
     fxRateToUsdImport: z.string().optional().nullable(),
     fxRateToUsdOffload: z.string().optional().nullable(),
     fxRateSource: z.string().optional(),
@@ -822,6 +831,7 @@ export const factoryOffloadAdditionalCharges = pgTable(
     amount: decimal("amount", { precision: 20, scale: 2 }).notNull(),
     currencyCode: text("currency_code").default("USD"),
     fxRateToUsd: decimal("fx_rate_to_usd", { precision: 20, scale: 6 }).default("1"),
+    fxRateConfirmed: boolean("fx_rate_confirmed").notNull().default(false),
     ledgerAccountId: integer("ledger_account_id"),
     supplierId: integer("supplier_id").references(() => factorySuppliers.id, { onDelete: "restrict" }),
     createdAt: timestamp("created_at").notNull().defaultNow(),
@@ -1315,6 +1325,7 @@ export const factoryContainerCommissions = pgTable(
     commissionTotal: decimal("commission_total", { precision: 20, scale: 4 }).notNull(),
     currencyCode: varchar("currency_code", { length: 10 }).notNull().default("USD"),
     fxRateToUsd: decimal("fx_rate_to_usd", { precision: 20, scale: 8 }).notNull().default("1"),
+    fxRateConfirmed: boolean("fx_rate_confirmed").notNull().default(false),
     commissionTotalUsd: decimal("commission_total_usd", { precision: 20, scale: 4 }),
     ledgerAccountId: integer("ledger_account_id"),
     createdAt: timestamp("created_at").notNull().defaultNow(),

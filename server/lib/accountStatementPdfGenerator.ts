@@ -24,6 +24,7 @@ import {
   getCustomerByLedgerId,
   getFactoryCustomerLedgerPrePeriodTotals,
 } from "./factoryCustomerLedger";
+import { isParentCompanyContext } from "../routes/helpers/supplierBalanceHelpers";
 
 export interface StatementPdfOptions {
   accountType: string;
@@ -165,7 +166,10 @@ export async function generateAccountStatementPdf(opts: StatementPdfOptions): Pr
     rawEntries = await storage.getVoucherEntriesBySupplier(accountId, companyId, startDate, endDate);
     const [acct] = await db.select().from(suppliers).where(eq(suppliers.id, accountId));
     accountName = (acct as any)?.legalName ?? "Supplier";
-    rawOB = parseFloat((acct as any)?.openingBalance ?? "0") || 0;
+    // The supplier opening balance only belongs to the explicitly configured
+    // parent company's books — never guessed via "lowest company ID".
+    const isParentForSupplier = await isParentCompanyContext(companyId);
+    rawOB = isParentForSupplier ? parseFloat((acct as any)?.openingBalance ?? "0") || 0 : 0;
     obSide = "Cr";
   } else if (accountType === "employee") {
     rawEntries = await storage.getVoucherEntriesByEmployee(accountId, companyId, startDate, endDate);
@@ -225,6 +229,9 @@ export async function generateAccountStatementPdf(opts: StatementPdfOptions): Pr
     }
     const col = typeToColumn[accountType];
     if (col) {
+      // Suppliers are shared master records across companies — the pre-period
+      // total must be scoped to this company's own vouchers only.
+      const scopeCondition = isSupplier ? eq(vouchers.companyId, companyId) : sql`true`;
       const [tot] = await db
         .select({
           d: sql<string>`COALESCE(SUM(${voucherEntries.debitAmount}),0)`,
@@ -232,7 +239,15 @@ export async function generateAccountStatementPdf(opts: StatementPdfOptions): Pr
         })
         .from(voucherEntries)
         .leftJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
-        .where(and(eq(col, accountId), eq(vouchers.optional, false), isNull(vouchers.deletedAt), sql`${vouchers.voucherDate} < ${startDate}`));
+        .where(
+          and(
+            eq(col, accountId),
+            eq(vouchers.optional, false),
+            isNull(vouchers.deletedAt),
+            sql`${vouchers.voucherDate} < ${startDate}`,
+            scopeCondition
+          )
+        );
       const d = parseFloat(tot?.d ?? "0") || 0;
       const c = parseFloat(tot?.c ?? "0") || 0;
       openingBalance += isSupplier ? c - d : d - c;

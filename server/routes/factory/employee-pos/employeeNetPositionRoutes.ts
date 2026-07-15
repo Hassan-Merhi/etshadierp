@@ -5,6 +5,7 @@ import { requireAuth } from "../../../auth";
 import { classifyNetPositionAccounts, type AccountLike } from "../../../netPositionHelper";
 import { buildBrokerStatement } from "../suppliers/supplierBrokerRoutes";
 import { adjustInventory } from "../../../inventoryHelper";
+import { resolveStoredFxRate } from "../../../services/factory/currencyConversion";
 import {
   writeDaybookEntry,
   getOrFetchFxRateToUsd,
@@ -255,6 +256,7 @@ export function registerEmployeeNetPositionRoutes(app: Express) {
       // Voucher-based payments (exclude auto-generated FACTORY-PAY-* and optional vouchers)
       const allSupplierIds = (suppliersList as any[]).map((s: any) => s.id);
       const voucherPaidBySupplier: Record<number, number> = {};
+      const voucherFxUnresolvedSuppliers = new Set<number>();
       // Per-currency voucher amounts needed for broker consolidated calculation
       const voucherPaidByCurrencyBySupplierId: Record<number, Record<string, number>> = {};
       if (allSupplierIds.length > 0) {
@@ -281,9 +283,19 @@ export function registerEmployeeNetPositionRoutes(app: Express) {
           if (!sid) continue;
           if (row.optional) continue; // optional vouchers don't affect the balance
           const amt = parseFloat(row.debitAmount || "0");
-          const fx = parseFloat(row.exchangeRate || "1") || 1;
           const cc = row.currency || "USD";
-          const usd = cc === "USD" ? amt : amt / fx;
+          let usd: number;
+          if (cc === "USD") {
+            usd = amt;
+          } else {
+            // vouchers.exchangeRate has no fxRateConfirmed column yet — legacy heuristic stopgap.
+            const { fxRate, looksSet } = resolveStoredFxRate(cc, row.exchangeRate);
+            if (!looksSet) {
+              voucherFxUnresolvedSuppliers.add(sid);
+              continue; // exclude this payment from the total rather than guess at 1
+            }
+            usd = amt / fxRate;
+          }
           voucherPaidBySupplier[sid] = (voucherPaidBySupplier[sid] || 0) + usd;
           if (!voucherPaidByCurrencyBySupplierId[sid]) voucherPaidByCurrencyBySupplierId[sid] = {};
           voucherPaidByCurrencyBySupplierId[sid][cc] = (voucherPaidByCurrencyBySupplierId[sid][cc] || 0) + amt;

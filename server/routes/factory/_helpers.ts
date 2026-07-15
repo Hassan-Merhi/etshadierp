@@ -20,6 +20,7 @@ import {
 import { eq, and, desc } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 import CryptoJS from "crypto-js";
+import { resolveStoredFxRate, applyFxRate, UnresolvedExchangeRateError } from "../../services/factory/currencyConversion";
 
 function buildValidatedUrl(baseUrl: string, dateISO: string, currencyCode: string): string {
   try {
@@ -57,8 +58,20 @@ export async function writeDaybookEntry(
   }
 ) {
   const currency = opts.currencyCode || "USD";
-  const fxRate = opts.fxRateToUsd || 1;
   const amtCurrency = opts.amountCurrency || 0;
+  // This helper backs many non-raw-material daybook entries (payroll, sales, etc.)
+  // as well as raw-material cost entries, so an unresolved rate here must not
+  // block the write the way it does on the dedicated raw-material cost-recompute
+  // paths (rawStockBalanceRoutes/rawStockContainerRoutes/recalculateContainerCosts)
+  // — instead flag it loudly so it surfaces in logs/diagnostics rather than
+  // silently mispricing.
+  const { looksSet: daybookFxLooksSet } = resolveStoredFxRate(currency, opts.fxRateToUsd ?? null);
+  if (!daybookFxLooksSet && currency !== "USD") {
+    console.warn(
+      `[writeDaybookEntry] Unresolved exchange rate for ${currency} on txType=${opts.txType} companyId=${opts.companyId} — amountUsd may be inaccurate`
+    );
+  }
+  const fxRate = opts.fxRateToUsd || 1;
   const amtUsd =
     opts.amountUsd !== undefined ? opts.amountUsd : currency === "USD" ? amtCurrency : amtCurrency * fxRate;
   await dbOrTx.insert(factoryDaybookEntries).values({
@@ -312,7 +325,10 @@ export async function recalculateContainerCosts(
   if (actualKg <= 0) throw new Error("Container has no received weight");
 
   const containerCcy = container.currencyCode || "USD";
-  const fxRate = parseFloat(container.fxRateToUsd || "1");
+  const { fxRate, looksSet: containerFxLooksSet } = resolveStoredFxRate(containerCcy, container.fxRateToUsd);
+  if (!containerFxLooksSet) {
+    throw new UnresolvedExchangeRateError(containerCcy);
+  }
 
   // Base material cost
   const baseRate = parseFloat(container.ratePerKg || "0");
@@ -343,7 +359,20 @@ export async function recalculateContainerCosts(
     ? parseFloat(commission.commissionTotal || "0")
     : parseFloat(container.commissionAmount || "0");
   const commCcy = commission ? commission.currencyCode || "USD" : containerCcy;
-  const commFx = commission ? parseFloat(commission.fxRateToUsd || "1") : fxRate;
+  let commFx = fxRate;
+  if (commission && commCcy !== "USD") {
+    if (commCcy === containerCcy) {
+      commFx = fxRate; // same currency as container — reuse the already-validated container rate
+    } else {
+      const { fxRate: resolvedCommFx, looksSet: commFxLooksSet } = resolveStoredFxRate(
+        commCcy,
+        commission.fxRateToUsd,
+        (commission as any).fxRateConfirmed
+      );
+      if (!commFxLooksSet) throw new UnresolvedExchangeRateError(commCcy);
+      commFx = resolvedCommFx;
+    }
+  }
   const commUsdAmt = commCcy === "USD" ? commVal : commVal * commFx;
   const commInCcy = commCcy === containerCcy ? commVal : fxRate > 0 ? commUsdAmt / fxRate : commVal;
 
@@ -370,7 +399,7 @@ export async function recalculateContainerCosts(
 
   const totalCost = basePayable + freightInCcy + ocInCcy + commInCcy + dutyVal + additionalTotal;
   const inclusiveCostPerKg = totalCost / actualKg;
-  const costPerKgUsd = containerCcy === "USD" ? inclusiveCostPerKg : inclusiveCostPerKg * fxRate;
+  const costPerKgUsd = applyFxRate(inclusiveCostPerKg, containerCcy, fxRate);
   const finalPayableAmountUsd = actualKg * costPerKgUsd;
 
   // 1. Update container summary fields

@@ -13,6 +13,7 @@ import {
   verifySupervisorPassword,
   recalculateContainerCosts,
 } from "./_helpers";
+import { resolveStoredFxRate, UnresolvedExchangeRateError } from "../../services/factory/currencyConversion";
 import {
   factorySuppliers,
   factoryCategories,
@@ -972,9 +973,19 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
             .where(eq(factoryContainers.id, containerId!));
         } else if (sourceType === "FREIGHT" || entry.txType === "FREIGHT") {
           const ccy = newCurrencyCode || (container as any).freightCurrencyCode || container.currencyCode || "USD";
-          const fx = newFxRate
-            ? String(newFxRate)
-            : (container as any).fxRateToUsdOffload || container.fxRateToUsd || "1";
+          let fx: string;
+          if (newFxRate) {
+            fx = String(newFxRate); // fresh explicit request input — trust it even if it equals 1
+          } else {
+            const fallbackRaw = (container as any).fxRateToUsdOffload || container.fxRateToUsd;
+            const { fxRate: resolvedFx, looksSet } = resolveStoredFxRate(
+              ccy,
+              fallbackRaw,
+              (container as any).fxRateConfirmed
+            );
+            if (!looksSet) throw new UnresolvedExchangeRateError(ccy);
+            fx = String(resolvedFx);
+          }
           await tx
             .update(factoryContainers)
             .set({ freight: String(parsedAmount), updatedAt: new Date() })
@@ -1052,8 +1063,18 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
         const { totalCost, inclusiveCostPerKg } = await recalculateContainerCosts(tx, companyId, containerId!);
 
         // ── 3. Update THIS daybook entry amount ──────────────────────────────────
-        const fx = parseFloat(newFxRate || entry.fxRateToUsd || "1");
         const entryCcy = newCurrencyCode || entry.currencyCode || "USD";
+        let fx: number;
+        if (newFxRate) {
+          fx = parseFloat(String(newFxRate)); // fresh explicit request input — trust it even if it equals 1
+        } else {
+          // factory_daybook_entries has no fxRateConfirmed column yet, so this still relies on
+          // the legacy value-based heuristic (rate>0 && rate!==1) as a stopgap — a genuine
+          // confirmed 1.0 rate stored directly on a daybook entry would be misflagged here.
+          const { fxRate: resolvedFx, looksSet } = resolveStoredFxRate(entryCcy, entry.fxRateToUsd);
+          if (!looksSet) throw new UnresolvedExchangeRateError(entryCcy);
+          fx = resolvedFx;
+        }
         const amtUsd = entryCcy === "USD" ? parsedAmount : parsedAmount * fx;
         const updatedMetaJson = JSON.stringify({ ...meta, containerId, sourceType });
         await tx
@@ -1070,7 +1091,12 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
             .where(and(eq(factoryRawStock.companyId, companyId), eq(factoryRawStock.containerId, containerId!)));
           if (rawStockRow) {
             const containerCcy = container.currencyCode || "USD";
-            const containerFx = parseFloat(container.fxRateToUsd || "1");
+            const { fxRate: containerFx, looksSet: containerFxLooksSet } = resolveStoredFxRate(
+              containerCcy,
+              container.fxRateToUsd,
+              (container as any).fxRateConfirmed
+            );
+            if (!containerFxLooksSet) throw new UnresolvedExchangeRateError(containerCcy);
             const totalUsd = containerCcy === "USD" ? totalCost : totalCost * containerFx;
             await tx
               .update(factoryDaybookEntries)
@@ -1118,7 +1144,8 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
       });
     } catch (error: any) {
       console.error("Error in daybook cost-edit:", error);
-      res.status(500).json({ message: error.message });
+      const status = error?.name === "UnresolvedExchangeRateError" ? 400 : 500;
+      res.status(status).json({ message: error.message });
     }
   });
 

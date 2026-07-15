@@ -128,6 +128,7 @@ import fs from "fs";
 
 import { registerVoucherEntryRoutes } from "../voucherEntryRoutes";
 import { recalculateOrderTotals } from "../factory/_helpers";
+import { isParentCompanyContext } from "../helpers/supplierBalanceHelpers";
 import {
   customerOrderCharges,
   customerOrders,
@@ -268,15 +269,13 @@ export function registerVoucherQueryRoutes(app: Express) {
       const supplier = await storage.getSupplierById(supplierId);
       const globalOpeningBalance = parseFloat(supplier?.openingBalance || "0");
 
-      // Opening balance is a historical property belonging to the PARENT (primary)
-      // company.  Sub-companies that transact with the same supplier start from zero.
-      // The primary company is the one with the lowest database ID.
+      // Opening balance is a historical property belonging to the explicitly
+      // configured parent company — never guessed via "lowest company ID".
       // Use filterCompanyId if set, otherwise fall back to the session company so that
       // viewing "All Companies" from a sub-company session also hides the opening balance.
       const sessionCompanyId = (req.session as any).currentCompanyId;
       const effectiveCompanyId = filterCompanyId ?? sessionCompanyId ?? null;
-      const primaryCompanyId = companies.length > 0 ? Math.min(...companies.map((c: any) => c.id)) : null;
-      const isParentContext = !effectiveCompanyId || effectiveCompanyId === primaryCompanyId;
+      const isParentContext = await isParentCompanyContext(effectiveCompanyId);
       const openingBalance = isParentContext ? globalOpeningBalance : 0;
 
       // Add opening balance as first row if it exists

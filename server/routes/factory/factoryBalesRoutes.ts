@@ -3086,7 +3086,8 @@ export function registerFactoryBalesRoutes(app: Express) {
           const kgVal = parseFloat(item.kg);
           const rateVal = parseFloat(item.costPerKg);
           const currency = String(item.currency || "USD").trim();
-          const fxRate = parseFloat(item.fxRateToUsd || "1");
+          // Never silently default a non-USD row's missing rate to 1 — require it explicitly.
+          const fxRate = currency === "USD" ? 1 : parseFloat(item.fxRateToUsd ?? "");
           const openingDate = String(item.openingDate || "").trim();
 
           if (!supplierStr) {
@@ -3143,6 +3144,7 @@ export function registerFactoryBalesRoutes(app: Express) {
               differenceKg: "0",
               currencyCode: currency,
               fxRateToUsd: String(fxRate),
+              fxRateConfirmed: true,
               ratePerKgUsd: String(costPerKgUsd),
               finalPayableAmountUsd: String(kgVal * costPerKgUsd),
               notes: String(item.notes || "Opening stock import"),

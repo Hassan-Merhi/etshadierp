@@ -4,6 +4,7 @@ import { db } from "../db";
 import { storage } from "../storage";
 import { requireAuth, requireRole, canDelete, requireNonPOS, checkPOSLocation } from "../auth";
 import { upload, logAudit, getCurrentExchangeRate, calculateHistoricalLocationInventory } from "./_helpers";
+import { isParentCompanyContext } from "./helpers/supplierBalanceHelpers";
 import { getOrCreateLedgerAccount, recalculateOrderTotals } from "./factory/_helpers";
 import {
   inventory,
@@ -535,11 +536,10 @@ export function registerDebugRoutes(app: Express) {
           )
         );
 
-      // Include supplier opening balances only for the primary (parent) company.
-      // Sub-companies start from zero — they must not inherit the parent's historical debt.
-      const allCompaniesBS = await storage.getAllCompanies();
-      const primaryCompanyIdBS = allCompaniesBS.length > 0 ? Math.min(...allCompaniesBS.map((c: any) => c.id)) : null;
-      const isParentContextBS = companyId === primaryCompanyIdBS;
+      // Include supplier opening balances only for the explicitly configured
+      // parent company (never guessed via "lowest company ID"). Sub-companies
+      // start from zero — they must not inherit the parent's historical debt.
+      const isParentContextBS = await isParentCompanyContext(companyId);
 
       let supplierOpeningTotalBS = 0;
       if (isParentContextBS) {

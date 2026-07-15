@@ -17,7 +17,9 @@
  *
  * Read-only preview never writes anything. Apply runs inside a transaction per container.
  */
-import { eq, and, isNull } from "drizzle-orm";
+import { eq, and, isNull, sql } from "drizzle-orm";
+import Decimal from "decimal.js";
+import crypto from "crypto";
 import { db } from "../../db";
 import {
   factoryContainers,
@@ -27,6 +29,7 @@ import {
   factorySuppliers,
 } from "@shared/schema";
 import { cascadeContainerCostChange } from "./rawStockCostCascade";
+import { resolveStoredFxRate } from "./currencyConversion";
 
 export interface RecalcRow {
   containerId: number;
@@ -40,6 +43,10 @@ export interface RecalcRow {
   next: { costPerKg: number; costPerKgUsd: number };
   diffPct: number; // % change in costPerKgUsd, signed
   changed: boolean;
+  /** True when the container's currency is non-USD and no explicitly-resolved exchange
+   * rate is available — `next` is NOT trustworthy in this case and must never be applied
+   * automatically; surfaced for MANUAL_REVIEW_REQUIRED instead of an auto-fixable diff. */
+  fxUnresolved: boolean;
 }
 
 /**
@@ -52,79 +59,217 @@ export function computeCorrectContainerCost(
   container: typeof factoryContainers.$inferSelect,
   additionalCharges: (typeof factoryOffloadAdditionalCharges.$inferSelect)[],
   commissionRecord: typeof factoryContainerCommissions.$inferSelect | null
-): { costPerKg: number; costPerKgUsd: number; totalCost: number; totalUsd: number } {
+): { costPerKg: number; costPerKgUsd: number; totalCost: number; totalUsd: number; fxUnresolved: boolean } {
   const containerCcy = container.currencyCode || "USD";
   // The offload/edit fx rate actually applied to this container's charges — prefer the
-  // rate captured at offload time, falling back to the general one if not set.
-  const fxRate = parseFloat(container.fxRateToUsdOffload || container.fxRateToUsd || "1") || 1;
-  const actualKg = parseFloat(container.actualReceivedKg || "0");
-  if (actualKg <= 0) {
-    return { costPerKg: 0, costPerKgUsd: 0, totalCost: 0, totalUsd: 0 };
+  // rate captured at offload time, falling back to the general one if not set. Never
+  // silently default an unresolved non-USD rate to 1 — surface it as fxUnresolved instead.
+  const { fxRate, looksSet: fxLooksSet } = resolveStoredFxRate(
+    containerCcy,
+    container.fxRateToUsdOffload || container.fxRateToUsd,
+    (container as any).fxRateConfirmed
+  );
+  if (!fxLooksSet) {
+    return { costPerKg: 0, costPerKgUsd: 0, totalCost: 0, totalUsd: 0, fxUnresolved: true };
+  }
+  const actualKg = new Decimal(container.actualReceivedKg || "0");
+  if (actualKg.lte(0)) {
+    return { costPerKg: 0, costPerKgUsd: 0, totalCost: 0, totalUsd: 0, fxUnresolved: false };
   }
 
-  const baseRate = parseFloat(container.ratePerKg || "0");
-  const basePayable = actualKg * baseRate;
-  const baseMaterialUsd = containerCcy === "USD" ? basePayable : basePayable * fxRate;
+  const dFxRate = new Decimal(fxRate);
+  const baseRate = new Decimal(container.ratePerKg || "0");
+  const basePayable = actualKg.times(baseRate);
+  const baseMaterialUsd = containerCcy === "USD" ? basePayable : basePayable.times(dFxRate);
 
   // Freight — has its own currency field, no separate stored fx rate, so it uses the
   // container's fx rate for conversion (same as at offload time).
-  const freightVal = parseFloat(container.freight || "0");
+  const freightVal = new Decimal(container.freight || "0");
   const freightCcy = container.freightCurrencyCode || containerCcy;
-  const freightUsd = freightCcy === "USD" ? freightVal : freightVal * fxRate;
+  const freightUsd = freightCcy === "USD" ? freightVal : freightVal.times(dFxRate);
   const freightInContainerCcy =
-    freightCcy === containerCcy ? freightVal : fxRate > 0 ? freightUsd / fxRate : freightVal;
+    freightCcy === containerCcy ? freightVal : dFxRate.gt(0) ? freightUsd.div(dFxRate) : freightVal;
 
   // Other charges — has its own currency field (otherChargesCurrencyCode) that the
   // buggy post-offload-charge route ignored. Convert it properly here.
-  const ocVal = parseFloat(container.otherCharges || "0");
+  const ocVal = new Decimal(container.otherCharges || "0");
   const ocCcy = (container as any).otherChargesCurrencyCode || containerCcy;
-  const ocUsd = ocCcy === "USD" ? ocVal : ocVal * fxRate;
-  const ocInContainerCcy = ocCcy === containerCcy ? ocVal : fxRate > 0 ? ocUsd / fxRate : ocVal;
+  const ocUsd = ocCcy === "USD" ? ocVal : ocVal.times(dFxRate);
+  const ocInContainerCcy = ocCcy === containerCcy ? ocVal : dFxRate.gt(0) ? ocUsd.div(dFxRate) : ocVal;
 
   // Commission — prefer the dedicated commission record (it stores its own currency +
   // fx rate explicitly), falling back to the container's mirrored fields.
-  let commUsd: number;
-  let commInContainerCcy: number;
+  let commUsd: Decimal;
+  let commInContainerCcy: Decimal;
   if (commissionRecord) {
-    const commVal = parseFloat(commissionRecord.commissionTotal || "0");
+    const commVal = new Decimal(commissionRecord.commissionTotal || "0");
     const commCcy = commissionRecord.currencyCode || containerCcy;
-    const commFx = parseFloat(commissionRecord.fxRateToUsd || String(fxRate)) || fxRate;
-    commUsd = commCcy === "USD" ? commVal : commVal * commFx;
-    commInContainerCcy = commCcy === containerCcy ? commVal : fxRate > 0 ? commUsd / fxRate : commVal;
+    const rawCommFx = parseFloat(commissionRecord.fxRateToUsd || "");
+    const commFx = Number.isFinite(rawCommFx) && rawCommFx > 0 ? new Decimal(rawCommFx) : dFxRate;
+    commUsd = commCcy === "USD" ? commVal : commVal.times(commFx);
+    commInContainerCcy = commCcy === containerCcy ? commVal : dFxRate.gt(0) ? commUsd.div(dFxRate) : commVal;
   } else {
-    const commVal = parseFloat(container.commissionAmount || "0");
+    const commVal = new Decimal(container.commissionAmount || "0");
     const commCcy = (container as any).commissionCurrencyCode || containerCcy;
-    commUsd = commCcy === "USD" ? commVal : commVal * fxRate;
-    commInContainerCcy = commCcy === containerCcy ? commVal : fxRate > 0 ? commUsd / fxRate : commVal;
+    commUsd = commCcy === "USD" ? commVal : commVal.times(dFxRate);
+    commInContainerCcy = commCcy === containerCcy ? commVal : dFxRate.gt(0) ? commUsd.div(dFxRate) : commVal;
   }
 
   // Duty — no separate currency field on the container; always container currency.
-  const dutyVal = container.dutyStatus === "CONFIRMED" ? parseFloat(container.dutyAmount || "0") : 0;
-  const dutyUsd = containerCcy === "USD" ? dutyVal : dutyVal * fxRate;
+  const dutyVal = container.dutyStatus === "CONFIRMED" ? new Decimal(container.dutyAmount || "0") : new Decimal(0);
+  const dutyUsd = containerCcy === "USD" ? dutyVal : dutyVal.times(dFxRate);
 
   // Additional charges — each row already stores its own currency + fx rate explicitly;
   // this part was already correct in the live code, kept identical here.
-  let addlInContainerCcy = 0;
-  let addlUsd = 0;
+  let addlInContainerCcy = new Decimal(0);
+  let addlUsd = new Decimal(0);
   for (const c of additionalCharges) {
-    const amt = parseFloat(c.amount || "0");
+    const amt = new Decimal(c.amount || "0");
     const ccy = c.currencyCode || containerCcy;
-    const cfx = parseFloat(c.fxRateToUsd || String(fxRate)) || fxRate;
-    const amtUsd = ccy === "USD" ? amt : amt * cfx;
-    const amtInContainerCcy = ccy === containerCcy ? amt : fxRate > 0 ? amtUsd / fxRate : amt;
-    addlInContainerCcy += amtInContainerCcy;
-    addlUsd += amtUsd;
+    const rawCfx = parseFloat(c.fxRateToUsd || "");
+    const cfx = Number.isFinite(rawCfx) && rawCfx > 0 ? new Decimal(rawCfx) : dFxRate;
+    const amtUsd = ccy === "USD" ? amt : amt.times(cfx);
+    const amtInContainerCcy = ccy === containerCcy ? amt : dFxRate.gt(0) ? amtUsd.div(dFxRate) : amt;
+    addlInContainerCcy = addlInContainerCcy.plus(amtInContainerCcy);
+    addlUsd = addlUsd.plus(amtUsd);
   }
 
-  const totalCost = basePayable + freightInContainerCcy + ocInContainerCcy + commInContainerCcy + dutyVal + addlInContainerCcy;
-  const totalUsd = baseMaterialUsd + freightUsd + ocUsd + commUsd + dutyUsd + addlUsd;
+  const totalCost = basePayable
+    .plus(freightInContainerCcy)
+    .plus(ocInContainerCcy)
+    .plus(commInContainerCcy)
+    .plus(dutyVal)
+    .plus(addlInContainerCcy);
+  const totalUsd = baseMaterialUsd.plus(freightUsd).plus(ocUsd).plus(commUsd).plus(dutyUsd).plus(addlUsd);
 
   return {
-    costPerKg: totalCost / actualKg,
-    costPerKgUsd: totalUsd / actualKg,
-    totalCost,
-    totalUsd,
+    costPerKg: totalCost.div(actualKg).toNumber(),
+    costPerKgUsd: totalUsd.div(actualKg).toNumber(),
+    totalCost: totalCost.toNumber(),
+    totalUsd: totalUsd.toNumber(),
+    fxUnresolved: false,
   };
+}
+
+export interface RecalcFingerprintInputs {
+  container: typeof factoryContainers.$inferSelect;
+  additionalCharges: (typeof factoryOffloadAdditionalCharges.$inferSelect)[];
+  commissionRecord: typeof factoryContainerCommissions.$inferSelect | null;
+  rawStock: typeof factoryRawStock.$inferSelect | null;
+}
+
+function toIso(v: Date | string | null | undefined): string | null {
+  if (!v) return null;
+  return v instanceof Date ? v.toISOString() : String(v);
+}
+
+/**
+ * Deterministic fingerprint of every input that feeds a container's corrected
+ * landed cost, plus the current stored cost and the expected corrected
+ * result. Used to bind a recalc confirmation token to the EXACT approved
+ * calculation — not just its numeric output — so ANY change to a
+ * contributing field (container status/updatedAt, rate, currency, FX rate or
+ * confirmed state, freight, duty, commission, other charges, or any
+ * individual additional-charge row's amount/currency/rate/version) between
+ * dry-run and apply invalidates the token, even if the corrected numbers
+ * happen to net out the same.
+ */
+export function computeRecalcFingerprint(inputs: RecalcFingerprintInputs): string {
+  const c = inputs.container;
+  const next = computeCorrectContainerCost(c, inputs.additionalCharges, inputs.commissionRecord);
+  const canonical = {
+    containerId: c.id,
+    status: c.status,
+    updatedAt: toIso((c as any).updatedAt),
+    actualReceivedKg: c.actualReceivedKg,
+    ratePerKg: c.ratePerKg,
+    currencyCode: c.currencyCode,
+    fxRateToUsd: c.fxRateToUsd,
+    fxRateToUsdOffload: c.fxRateToUsdOffload,
+    fxRateConfirmed: c.fxRateConfirmed,
+    freight: c.freight,
+    freightCurrencyCode: c.freightCurrencyCode,
+    dutyAmount: c.dutyAmount,
+    dutyStatus: c.dutyStatus,
+    commissionAmount: c.commissionAmount,
+    commissionCurrencyCode: c.commissionCurrencyCode,
+    otherCharges: c.otherCharges,
+    otherChargesCurrencyCode: (c as any).otherChargesCurrencyCode,
+    additionalCharges: [...inputs.additionalCharges]
+      .map((a) => ({
+        id: a.id,
+        amount: a.amount,
+        currencyCode: a.currencyCode,
+        fxRateToUsd: a.fxRateToUsd,
+        version: toIso((a as any).updatedAt) ?? toIso(a.createdAt),
+      }))
+      .sort((a, b) => a.id - b.id),
+    commissionRecord: inputs.commissionRecord
+      ? {
+          id: inputs.commissionRecord.id,
+          commissionTotal: inputs.commissionRecord.commissionTotal,
+          currencyCode: inputs.commissionRecord.currencyCode,
+          fxRateToUsd: inputs.commissionRecord.fxRateToUsd,
+          version: toIso((inputs.commissionRecord as any).updatedAt) ?? toIso(inputs.commissionRecord.createdAt),
+        }
+      : null,
+    currentCostPerKg: inputs.rawStock?.costPerKg ?? null,
+    currentCostPerKgUsd: inputs.rawStock?.costPerKgUsd ?? null,
+    expectedCostPerKg: next.costPerKg,
+    expectedCostPerKgUsd: next.costPerKgUsd,
+    expectedFxUnresolved: next.fxUnresolved,
+  };
+  return crypto.createHash("sha256").update(JSON.stringify(canonical)).digest("hex");
+}
+
+/** Loads the current, fresh inputs for one container (outside any transaction —
+ * used for dry-run preview fingerprinting; the apply path re-loads under a row
+ * lock and calls computeRecalcFingerprint again itself). Returns null if the
+ * container doesn't exist in this company. */
+export async function loadRecalcFingerprintInputs(
+  companyId: number,
+  containerId: number,
+  dbOrTx: any = db
+): Promise<RecalcFingerprintInputs | null> {
+  const [container] = await dbOrTx
+    .select()
+    .from(factoryContainers)
+    .where(and(eq(factoryContainers.id, containerId), eq(factoryContainers.companyId, companyId)));
+  if (!container) return null;
+
+  const [additionalCharges, commissionRecords, rawStockRows] = await Promise.all([
+    dbOrTx
+      .select()
+      .from(factoryOffloadAdditionalCharges)
+      .where(
+        and(
+          eq(factoryOffloadAdditionalCharges.containerId, containerId),
+          eq(factoryOffloadAdditionalCharges.companyId, companyId)
+        )
+      ),
+    dbOrTx
+      .select()
+      .from(factoryContainerCommissions)
+      .where(
+        and(
+          eq(factoryContainerCommissions.containerId, containerId),
+          eq(factoryContainerCommissions.companyId, companyId)
+        )
+      ),
+    dbOrTx
+      .select()
+      .from(factoryRawStock)
+      .where(
+        and(
+          eq(factoryRawStock.containerId, containerId),
+          eq(factoryRawStock.companyId, companyId),
+          isNull(factoryRawStock.deletedAt)
+        )
+      ),
+  ]);
+  const commissionRecord = commissionRecords.sort((a: any, b: any) => b.id - a.id)[0] || null;
+
+  return { container, additionalCharges, commissionRecord, rawStock: rawStockRows[0] || null };
 }
 
 /** Read-only: build the full diff list for every offloaded container in this company. */
@@ -181,7 +326,8 @@ export async function getRawStockRecalcPreview(companyId: number): Promise<Recal
     // Tiny float-noise tolerance — anything above this is a real, actionable diff.
     const EPS = 0.0005;
     const changed =
-      Math.abs(next.costPerKg - oldCostPerKg) > EPS || Math.abs(next.costPerKgUsd - oldCostPerKgUsd) > EPS;
+      !next.fxUnresolved &&
+      (Math.abs(next.costPerKg - oldCostPerKg) > EPS || Math.abs(next.costPerKgUsd - oldCostPerKgUsd) > EPS);
     const diffPct = oldCostPerKgUsd > 0 ? ((next.costPerKgUsd - oldCostPerKgUsd) / oldCostPerKgUsd) * 100 : 0;
 
     results.push({
@@ -194,13 +340,15 @@ export async function getRawStockRecalcPreview(companyId: number): Promise<Recal
       receivedKg: parseFloat(row.receivedKg || "0"),
       old: { costPerKg: oldCostPerKg, costPerKgUsd: oldCostPerKgUsd },
       next: { costPerKg: next.costPerKg, costPerKgUsd: next.costPerKgUsd },
-      diffPct,
+      diffPct: next.fxUnresolved ? 0 : diffPct,
       changed,
+      fxUnresolved: next.fxUnresolved,
     });
   }
 
-  // Changed rows first, biggest impact first.
+  // Unresolved-FX rows need human attention first, then changed rows, biggest impact first.
   results.sort((a, b) => {
+    if (a.fxUnresolved !== b.fxUnresolved) return a.fxUnresolved ? -1 : 1;
     if (a.changed !== b.changed) return a.changed ? -1 : 1;
     return Math.abs(b.diffPct) - Math.abs(a.diffPct);
   });
@@ -211,48 +359,178 @@ export async function getRawStockRecalcPreview(companyId: number): Promise<Recal
 export interface ApplyResult {
   containerId: number;
   containerNumber: string;
+  applied: boolean;
+  skippedReason?: string;
+  staleToken?: boolean;
   rawStockRowsUpdated: number;
   affectedBatches: number;
   affectedBales: number;
 }
 
-/** Apply the corrected cost for a specific set of containers, cascading down the chain. */
-export async function applyRawStockRecalc(companyId: number, containerIds: number[]): Promise<ApplyResult[]> {
+// Recalc is a forward-looking correction to an already-offloaded container's
+// landed cost — OFFLOADED is the NORMAL state of every eligible container, so
+// (unlike the FX-confirmation lock) it is never refused here. Only genuinely
+// historical/closed containers are off-limits.
+const RECALC_REFUSED_STATUSES = new Set(["CLOSED", "COMPLETED"]);
+
+// Advisory-lock namespace distinct from fxResolutionRepair's (1/2/3) so the two
+// repair tools never collide on the same numeric key space.
+const RECALC_LOCK_NAMESPACE = 9001;
+
+export interface ApplyRawStockRecalcOptions {
+  /** Called with the transaction handle AFTER the container/cascade writes but
+   * BEFORE commit for each individual container, so an audit-log insert here
+   * is atomic with that container's update: if it throws, that container's
+   * transaction (and only that one) rolls back. */
+  onAudit?: (tx: any, result: ApplyResult) => Promise<void>;
+  /** Per-container fingerprint captured at dry-run/token-issue time (see
+   * computeRecalcFingerprint). When provided, the fingerprint is RECOMPUTED
+   * from the fresh, row-locked state inside this container's own transaction
+   * — not just compared before the transaction opens — and the write is
+   * refused (staleToken=true) if anything the token approved has changed.
+   * Skipped for a container already sitting at its corrected value: that is
+   * a safe idempotent replay of an already-applied token, not staleness. */
+  expectedFingerprints?: Record<number, string>;
+}
+
+/**
+ * Apply the corrected cost for a specific set of containers, cascading down the chain.
+ * Each container is applied in its own transaction with a `SELECT ... FOR UPDATE` row
+ * lock plus an advisory lock, so a concurrent apply/offload on the same container
+ * serializes instead of racing. Refuses (reports, does not throw) CLOSED/COMPLETED
+ * containers — historical costing is never auto-rewritten. Idempotent: re-applying
+ * to a container whose stored cost already matches the corrected value is a no-op
+ * (applied=false).
+ */
+export async function applyRawStockRecalc(
+  companyId: number,
+  containerIds: number[],
+  opts: ApplyRawStockRecalcOptions = {}
+): Promise<ApplyResult[]> {
   const results: ApplyResult[] = [];
 
   for (const containerId of containerIds) {
-    const [container] = await db
-      .select()
-      .from(factoryContainers)
-      .where(and(eq(factoryContainers.id, containerId), eq(factoryContainers.companyId, companyId)));
-    if (!container) continue;
-
-    const [additionalCharges, commissionRecords] = await Promise.all([
-      db
-        .select()
-        .from(factoryOffloadAdditionalCharges)
-        .where(
-          and(
-            eq(factoryOffloadAdditionalCharges.containerId, containerId),
-            eq(factoryOffloadAdditionalCharges.companyId, companyId)
-          )
-        ),
-      db
-        .select()
-        .from(factoryContainerCommissions)
-        .where(
-          and(
-            eq(factoryContainerCommissions.containerId, containerId),
-            eq(factoryContainerCommissions.companyId, companyId)
-          )
-        ),
-    ]);
-    const commissionRecord = commissionRecords.sort((a, b) => b.id - a.id)[0] || null;
-
-    const next = computeCorrectContainerCost(container, additionalCharges, commissionRecord);
-    if (next.costPerKgUsd === 0 && next.costPerKg === 0) continue; // no received kg, nothing to fix
-
     const result = await db.transaction(async (tx) => {
+      await tx.execute(sql`SELECT pg_advisory_xact_lock(${RECALC_LOCK_NAMESPACE}, ${containerId})`);
+
+      const [container] = await tx
+        .select()
+        .from(factoryContainers)
+        .where(and(eq(factoryContainers.id, containerId), eq(factoryContainers.companyId, companyId)))
+        .for("update");
+      if (!container) return null;
+
+      if (RECALC_REFUSED_STATUSES.has(container.status)) {
+        return {
+          containerId,
+          containerNumber: container.containerNumber,
+          applied: false,
+          skippedReason: `Container status is ${container.status} — historical costing on closed containers is never auto-rewritten.`,
+          rawStockRowsUpdated: 0,
+          affectedBatches: 0,
+          affectedBales: 0,
+        } as ApplyResult;
+      }
+
+      const [additionalCharges, commissionRecords] = await Promise.all([
+        tx
+          .select()
+          .from(factoryOffloadAdditionalCharges)
+          .where(
+            and(
+              eq(factoryOffloadAdditionalCharges.containerId, containerId),
+              eq(factoryOffloadAdditionalCharges.companyId, companyId)
+            )
+          ),
+        tx
+          .select()
+          .from(factoryContainerCommissions)
+          .where(
+            and(
+              eq(factoryContainerCommissions.containerId, containerId),
+              eq(factoryContainerCommissions.companyId, companyId)
+            )
+          ),
+      ]);
+      const commissionRecord = commissionRecords.sort((a: any, b: any) => b.id - a.id)[0] || null;
+
+      const rawStockRows = await tx
+        .select()
+        .from(factoryRawStock)
+        .where(
+          and(
+            eq(factoryRawStock.containerId, containerId),
+            eq(factoryRawStock.companyId, companyId),
+            isNull(factoryRawStock.deletedAt)
+          )
+        );
+      const rawStockRow = rawStockRows[0] || null;
+
+      const next = computeCorrectContainerCost(container, additionalCharges, commissionRecord);
+      if (next.fxUnresolved) {
+        return {
+          containerId,
+          containerNumber: container.containerNumber,
+          applied: false,
+          skippedReason: "FX rate is unresolved for this container — never auto-apply a recompute derived from a guessed rate.",
+          rawStockRowsUpdated: 0,
+          affectedBatches: 0,
+          affectedBales: 0,
+        } as ApplyResult;
+      }
+      if (next.costPerKgUsd === 0 && next.costPerKg === 0) {
+        return {
+          containerId,
+          containerNumber: container.containerNumber,
+          applied: false,
+          skippedReason: "No received kg — nothing to recompute.",
+          rawStockRowsUpdated: 0,
+          affectedBatches: 0,
+          affectedBales: 0,
+        } as ApplyResult;
+      }
+
+      const oldCostPerKgUsd = parseFloat(container.ratePerKgUsd || "0");
+      const EPS = 0.0005;
+      const alreadyCorrect = Math.abs(next.costPerKgUsd - oldCostPerKgUsd) <= EPS;
+      if (alreadyCorrect) {
+        return {
+          containerId,
+          containerNumber: container.containerNumber,
+          applied: false,
+          skippedReason: "Stored cost already matches the corrected value — idempotent no-op.",
+          rawStockRowsUpdated: 0,
+          affectedBatches: 0,
+          affectedBales: 0,
+        } as ApplyResult;
+      }
+
+      // Recalculate the fingerprint from THIS fresh, row-locked read — not the
+      // one taken before the transaction opened — so a concurrent edit that
+      // landed between dry-run/token-issue and this exact apply attempt is
+      // caught even under concurrency, not just via a best-effort pre-check.
+      const expectedFingerprint = opts.expectedFingerprints?.[containerId];
+      if (expectedFingerprint) {
+        const freshFingerprint = computeRecalcFingerprint({
+          container,
+          additionalCharges,
+          commissionRecord,
+          rawStock: rawStockRow,
+        });
+        if (freshFingerprint !== expectedFingerprint) {
+          return {
+            containerId,
+            containerNumber: container.containerNumber,
+            applied: false,
+            staleToken: true,
+            skippedReason: "Container's approved calculation inputs changed since the confirmation token was issued — re-run the dry-run preview and try again.",
+            rawStockRowsUpdated: 0,
+            affectedBatches: 0,
+            affectedBales: 0,
+          } as ApplyResult;
+        }
+      }
+
       await tx
         .update(factoryContainers)
         .set({
@@ -270,16 +548,25 @@ export async function applyRawStockRecalc(companyId: number, containerIds: numbe
         newCostPerKgUsd: next.costPerKgUsd,
       });
 
-      return cascadeResult;
+      const applyResult: ApplyResult = {
+        containerId,
+        containerNumber: container.containerNumber,
+        applied: true,
+        rawStockRowsUpdated: cascadeResult.rawStockRowsUpdated,
+        affectedBatches: cascadeResult.affectedBatches.length,
+        affectedBales: cascadeResult.affectedBales.length,
+      };
+
+      // Atomic with the writes above: if this throws, this container's entire
+      // transaction (container update + cascade) rolls back too.
+      if (opts.onAudit) {
+        await opts.onAudit(tx, applyResult);
+      }
+
+      return applyResult;
     });
 
-    results.push({
-      containerId,
-      containerNumber: container.containerNumber,
-      rawStockRowsUpdated: result.rawStockRowsUpdated,
-      affectedBatches: result.affectedBatches.length,
-      affectedBales: result.affectedBales.length,
-    });
+    if (result) results.push(result);
   }
 
   return results;
