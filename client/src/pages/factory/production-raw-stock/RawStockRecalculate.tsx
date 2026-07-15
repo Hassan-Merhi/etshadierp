@@ -25,6 +25,7 @@ interface RecalcRow {
   next: { costPerKg: number; costPerKgUsd: number };
   diffPct: number;
   changed: boolean;
+  fxUnresolved: boolean;
 }
 
 export default function RawStockRecalculate() {
@@ -39,7 +40,8 @@ export default function RawStockRecalculate() {
   });
 
   const changedRows = useMemo(() => (rows || []).filter((r) => r.changed), [rows]);
-  const unchangedCount = (rows?.length || 0) - changedRows.length;
+  const fxUnresolvedRows = useMemo(() => (rows || []).filter((r) => r.fxUnresolved), [rows]);
+  const unchangedCount = (rows?.length || 0) - changedRows.length - fxUnresolvedRows.length;
 
   const allSelected = changedRows.length > 0 && changedRows.every((r) => selected.has(r.containerId));
 
@@ -126,71 +128,96 @@ export default function RawStockRecalculate() {
 
       {isLoading ? (
         <div className="text-sm text-muted-foreground py-12 text-center">Computing recalculation preview...</div>
-      ) : changedRows.length === 0 ? (
-        <div className="text-sm text-muted-foreground py-12 text-center border rounded-md bg-card">
-          Nothing to fix — every container's cost/kg already matches its stored charges.
-          {unchangedCount > 0 && ` (${unchangedCount} container(s) checked, all correct.)`}
-        </div>
       ) : (
         <>
-          <div className="text-xs text-muted-foreground">
-            {changedRows.length} container(s) have a mismatch
-            {unchangedCount > 0 ? ` — ${unchangedCount} other container(s) are already correct and hidden.` : "."}
-          </div>
-          <div className="border rounded-md overflow-hidden bg-card shadow-sm">
-            <Table>
-              <TableHeader className="bg-muted/50">
-                <TableRow>
-                  <TableHead className="w-10">
-                    <Checkbox checked={allSelected} onCheckedChange={toggleAll} data-testid="checkbox-select-all" />
-                  </TableHead>
-                  <TableHead>Container</TableHead>
-                  <TableHead>Supplier</TableHead>
-                  <TableHead className="text-right">Received (kg)</TableHead>
-                  <TableHead className="text-right">Current $/kg</TableHead>
-                  <TableHead className="text-right">Corrected $/kg</TableHead>
-                  <TableHead className="text-right">Change</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {changedRows.map((row) => (
-                  <TableRow key={row.containerId} className="group">
-                    <TableCell>
-                      <Checkbox
-                        checked={selected.has(row.containerId)}
-                        onCheckedChange={() => toggleOne(row.containerId)}
-                        data-testid={`checkbox-row-${row.containerId}`}
-                      />
-                    </TableCell>
-                    <TableCell className="font-mono text-xs">{row.containerNumber}</TableCell>
-                    <TableCell className="text-sm">{row.supplierName}</TableCell>
-                    <TableCell className="text-right font-mono text-xs text-muted-foreground">
-                      {formatNumber(row.receivedKg)}
-                    </TableCell>
-                    <TableCell className="text-right font-mono text-xs text-muted-foreground">
-                      ${row.old.costPerKgUsd.toFixed(6)}
-                    </TableCell>
-                    <TableCell className="text-right font-mono text-xs font-medium text-foreground">
-                      ${row.next.costPerKgUsd.toFixed(6)}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Badge
-                        variant="outline"
-                        className={
-                          row.diffPct > 0
-                            ? "text-red-500 border-red-500/30 bg-red-500/10"
-                            : "text-emerald-500 border-emerald-500/30 bg-emerald-500/10"
-                        }
-                      >
-                        {row.diffPct > 0 ? "+" : ""}
-                        {row.diffPct.toFixed(2)}%
-                      </Badge>
-                    </TableCell>
-                  </TableRow>
+          {fxUnresolvedRows.length > 0 && (
+            <div className="border border-amber-500/30 bg-amber-500/10 rounded-md p-3 text-xs text-amber-700 dark:text-amber-400 space-y-1">
+              <div className="font-medium">
+                {fxUnresolvedRows.length} container(s) have an unresolved/unconfirmed exchange rate and were
+                skipped — their true landed cost can't be safely computed without a confirmed rate.
+              </div>
+              <div className="flex flex-wrap gap-x-3 gap-y-0.5 font-mono">
+                {fxUnresolvedRows.map((r) => (
+                  <span key={r.containerId}>
+                    {r.containerNumber} ({r.currencyCode})
+                  </span>
                 ))}
-              </TableBody>
-            </Table>
-          </div>
+              </div>
+              <div>Resolve/confirm these containers' exchange rates first, then refresh this preview.</div>
+            </div>
+          )}
+
+          {changedRows.length === 0 ? (
+            <div className="text-sm text-muted-foreground py-12 text-center border rounded-md bg-card">
+              Nothing to fix — every container's cost/kg already matches its stored charges.
+              {unchangedCount > 0 && ` (${unchangedCount} container(s) checked, all correct.)`}
+            </div>
+          ) : (
+            <>
+              <div className="text-xs text-muted-foreground">
+                {changedRows.length} container(s) have a mismatch
+                {unchangedCount > 0 ? ` — ${unchangedCount} other container(s) are already correct and hidden.` : "."}
+              </div>
+              <div className="border rounded-md overflow-hidden bg-card shadow-sm">
+                <Table>
+                  <TableHeader className="bg-muted/50">
+                    <TableRow>
+                      <TableHead className="w-10">
+                        <Checkbox
+                          checked={allSelected}
+                          onCheckedChange={toggleAll}
+                          data-testid="checkbox-select-all"
+                        />
+                      </TableHead>
+                      <TableHead>Container</TableHead>
+                      <TableHead>Supplier</TableHead>
+                      <TableHead className="text-right">Received (kg)</TableHead>
+                      <TableHead className="text-right">Current $/kg</TableHead>
+                      <TableHead className="text-right">Corrected $/kg</TableHead>
+                      <TableHead className="text-right">Change</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {changedRows.map((row) => (
+                      <TableRow key={row.containerId} className="group">
+                        <TableCell>
+                          <Checkbox
+                            checked={selected.has(row.containerId)}
+                            onCheckedChange={() => toggleOne(row.containerId)}
+                            data-testid={`checkbox-row-${row.containerId}`}
+                          />
+                        </TableCell>
+                        <TableCell className="font-mono text-xs">{row.containerNumber}</TableCell>
+                        <TableCell className="text-sm">{row.supplierName}</TableCell>
+                        <TableCell className="text-right font-mono text-xs text-muted-foreground">
+                          {formatNumber(row.receivedKg)}
+                        </TableCell>
+                        <TableCell className="text-right font-mono text-xs text-muted-foreground">
+                          ${row.old.costPerKgUsd.toFixed(6)}
+                        </TableCell>
+                        <TableCell className="text-right font-mono text-xs font-medium text-foreground">
+                          ${row.next.costPerKgUsd.toFixed(6)}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Badge
+                            variant="outline"
+                            className={
+                              row.diffPct > 0
+                                ? "text-red-500 border-red-500/30 bg-red-500/10"
+                                : "text-emerald-500 border-emerald-500/30 bg-emerald-500/10"
+                            }
+                          >
+                            {row.diffPct > 0 ? "+" : ""}
+                            {row.diffPct.toFixed(2)}%
+                          </Badge>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </>
+          )}
         </>
       )}
 
