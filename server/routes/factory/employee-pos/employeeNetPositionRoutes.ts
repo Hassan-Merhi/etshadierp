@@ -6,6 +6,7 @@ import { classifyNetPositionAccounts, type AccountLike } from "../../../netPosit
 import { buildBrokerStatement } from "../suppliers/supplierBrokerRoutes";
 import { adjustInventory } from "../../../inventoryHelper";
 import { resolveStoredFxRate } from "../../../services/factory/currencyConversion";
+import { getLockedSupplierRate } from "../../../services/factory/rawStockLockedRate";
 import {
   writeDaybookEntry,
   getOrFetchFxRateToUsd,
@@ -187,6 +188,19 @@ export function registerEmployeeNetPositionRoutes(app: Express) {
         .from(factorySuppliers)
         .where(eq(factorySuppliers.companyId, companyId))
         .orderBy(factorySuppliers.name);
+
+      // Authoritative locked rate (USD) per supplier — same map rawStockReceiptRoutes.ts
+      // builds, so "Factory Raw Material Stock" here can never disagree with the Raw
+      // Materials page's "Stock Value". Never recompute a rate from receipt history.
+      const supplierLockedRateMapNp = new Map<number, number>();
+      for (const s of suppliersList as any[]) {
+        const persisted = s.currentRawMaterialCostPerKgUsd;
+        if (persisted !== null && persisted !== undefined) {
+          supplierLockedRateMapNp.set(s.id, parseFloat(persisted as string) || 0);
+        } else {
+          supplierLockedRateMapNp.set(s.id, await getLockedSupplierRate(db, companyId, s.id));
+        }
+      }
 
       const allContainersF = await db
         .select()
@@ -1189,17 +1203,25 @@ export function registerEmployeeNetPositionRoutes(app: Express) {
         if (r.supplier_id) reservedBySupKey.set(`s${r.supplier_id}`, parseFloat(String(r.reserved_kg ?? "0")) || 0);
       }
 
-      // Sum each supplier's own tracked remaining cost basis (remValUsd) — mirrors the
-      // "valueRemainingUsd" field that rawStockReceiptRoutes computes and that the Raw
-      // Materials page sums for "Stock Value". This must NOT be re-derived as
-      // remainingKg * avgCostPerKg: once a supplier has multiple receipts at different
-      // cost/kg, that re-derivation misattributes whatever was consumed onto every other
-      // container in the blend and drifts from the per-row-tracked total.
+      // Sum each supplier's stock value the SAME way rawStockReceiptRoutes.ts computes
+      // "Stock Value" on the Raw Materials page: for a real supplier with a locked rate,
+      // value = remainingKg × lockedRateUsd (the spec-mandated formula — the locked rate
+      // supersedes whatever blended/tracked cost basis this supplier's receipts drifted to
+      // over time). Only MANUAL/standalone materials (no supplierId, key "u") have no
+      // locked rate — those keep the tracked remaining-value basis (remValUsd), since that
+      // page-side formula only applies to real suppliers too.
       // (Reserved kg still have physical value in the warehouse; they are subtracted from the
       // displayed kg count but not from the dollar value, matching the raw-materials KPI.)
       let rawTotal = 0;
-      for (const [, s] of supMap.entries()) {
-        rawTotal += s.remValUsd;
+      for (const [key, s] of supMap.entries()) {
+        const supplierId = key.startsWith("s") ? parseInt(key.slice(1)) : null;
+        const lockedRate = supplierId !== null ? supplierLockedRateMapNp.get(supplierId) : undefined;
+        if (lockedRate !== undefined) {
+          const remainingKg = s.recv - s.used;
+          rawTotal += remainingKg * lockedRate;
+        } else {
+          rawTotal += s.remValUsd;
+        }
       }
       const rawMaterialStockValue = round2(rawTotal);
 
