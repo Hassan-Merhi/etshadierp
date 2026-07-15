@@ -265,6 +265,15 @@ export function registerRawStockOffloadRoutes(app: Express) {
           commissionTotal: String(commTotalVal),
           currencyCode: commCurrency,
           fxRateToUsd: String(commFxRate),
+          // fxRate was already resolved above (explicit request rate, USD, a fetched
+          // live rate, or the container's own already-confirmed rate) — never left at
+          // the unset default. commFxRate falls back to that same resolved fxRate when
+          // the commission doesn't specify its own, so it's equally trustworthy here.
+          // Without this flag, resolveStoredFxRateOrThrow (called right after insert to
+          // book the commission daybook entry) sees the schema's default false and
+          // rejects a rate that was, in fact, explicitly known — blocking every
+          // commissioned non-USD offload.
+          fxRateConfirmed: true,
           commissionTotalUsd: String(commTotalUsd),
           ledgerAccountId: commission.ledgerAccountId ? parseInt(commission.ledgerAccountId) : null,
         };
@@ -391,6 +400,13 @@ export function registerRawStockOffloadRoutes(app: Express) {
             differenceKg,
             currencyCode,
             fxRateToUsd: String(fxRate),
+            // fxRate was already resolved above (explicit rate, USD, a fetched live
+            // rate, or the container's own already-confirmed rate) — never left at the
+            // unset default — so this offload's rate is confirmed. Without this flag,
+            // every freshly-offloaded non-USD container would still read back as
+            // "unresolved" everywhere fxRateConfirmed is checked (recalc, reverse-offload,
+            // supplier balance reconciliation), even though the rate is known-good.
+            fxRateConfirmed: true,
             fxRateToUsdOffload: String(fxRate),
             fxRateDateOffload: offloadDate,
             ratePerKgUsd: String(costPerKgUsd),
@@ -439,6 +455,12 @@ export function registerRawStockOffloadRoutes(app: Express) {
                   amount: String(charge.amount),
                   currencyCode: charge.currencyCode || currencyCode,
                   fxRateToUsd: String(charge.fxRateToUsd || (currencyCode === "USD" ? "1" : String(fxRate))),
+                  // Same reasoning as the container/commission fix above: the rate used
+                  // here is either explicitly supplied on the charge or the already-
+                  // resolved offload fxRate, never an unset default — mark it confirmed
+                  // so downstream reads (recalc, reversal, reconciliation) don't treat
+                  // a known-good rate as unresolved.
+                  fxRateConfirmed: true,
                   ledgerAccountId: charge.ledgerAccountId ? parseInt(charge.ledgerAccountId) : null,
                   supplierId: charge.supplierId ? parseInt(charge.supplierId) : null,
                 })
