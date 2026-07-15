@@ -33,3 +33,17 @@ audited domain.
 **How to apply:** if a future raw-material change touches a site not in this list,
 check whether it reads a container/offload-charge/commission FX field — if so, route it
 through the shared resolver rather than adding a new bare fallback.
+
+## Exception: restore/undo paths reuse the stored rate as-is
+Reverse-offload re-posts a pre-offload freight voucher using the container's already-stored
+`fxRateToUsd`. Requiring `resolveStoredFxRateOrThrow` (i.e. `fxRateConfirmed`) there wrongly
+blocked reversing legacy containers offloaded before the `fxRateConfirmed` flag existed, even
+though that exact rate had already been used to book the financials now being undone.
+
+**Why:** the anti-silent-default guard exists to stop *new* forward-going financial decisions
+from silently pricing at 1 — it should not block reproducing history that already happened at
+a given (possibly unconfirmed) rate.
+
+**How to apply:** any restore/undo code path that re-posts a voucher using data that already
+existed pre-reversal should reuse the raw stored rate directly (e.g. `container.fxRateToUsd ?? "1"`),
+not `resolveStoredFxRateOrThrow`. Only require confirmation for genuinely new postings.

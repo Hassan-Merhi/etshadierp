@@ -265,6 +265,15 @@ export function registerRawStockOffloadRoutes(app: Express) {
           commissionTotal: String(commTotalVal),
           currencyCode: commCurrency,
           fxRateToUsd: String(commFxRate),
+          // fxRate was already resolved above (explicit request rate, USD, a fetched
+          // live rate, or the container's own already-confirmed rate) — never left at
+          // the unset default. commFxRate falls back to that same resolved fxRate when
+          // the commission doesn't specify its own, so it's equally trustworthy here.
+          // Without this flag, resolveStoredFxRateOrThrow (called right after insert to
+          // book the commission daybook entry) sees the schema's default false and
+          // rejects a rate that was, in fact, explicitly known — blocking every
+          // commissioned non-USD offload.
+          fxRateConfirmed: true,
           commissionTotalUsd: String(commTotalUsd),
           ledgerAccountId: commission.ledgerAccountId ? parseInt(commission.ledgerAccountId) : null,
         };
@@ -391,6 +400,13 @@ export function registerRawStockOffloadRoutes(app: Express) {
             differenceKg,
             currencyCode,
             fxRateToUsd: String(fxRate),
+            // fxRate was already resolved above (explicit rate, USD, a fetched live
+            // rate, or the container's own already-confirmed rate) — never left at the
+            // unset default — so this offload's rate is confirmed. Without this flag,
+            // every freshly-offloaded non-USD container would still read back as
+            // "unresolved" everywhere fxRateConfirmed is checked (recalc, reverse-offload,
+            // supplier balance reconciliation), even though the rate is known-good.
+            fxRateConfirmed: true,
             fxRateToUsdOffload: String(fxRate),
             fxRateDateOffload: offloadDate,
             ratePerKgUsd: String(costPerKgUsd),
@@ -403,6 +419,17 @@ export function registerRawStockOffloadRoutes(app: Express) {
             otherChargesAccountId: reqOtherChargesAccountId ? parseInt(reqOtherChargesAccountId) : null,
             otherChargesSupplierId: reqOtherChargesSupplierId ? parseInt(reqOtherChargesSupplierId) : null,
             commissionAmount: commTotalVal > 0 ? String(commTotalVal) : container.commissionAmount || "0",
+            // BUG FIX: this used to leave commissionCurrencyCode untouched (stale from
+            // container creation, defaulting to "USD"), while commissionAmount above was
+            // overwritten with the raw offload-entered value in whatever currency the user
+            // actually picked (commCurrencyForUsd). Every downstream reader that groups by
+            // container.commissionCurrencyCode (broker ledgers, supplier statements, Net
+            // Position OTW) trusted that stale "USD" tag and silently treated a non-USD
+            // commission amount as if it were already USD — this is why brokers and any
+            // non-USD commission never converted correctly. The authoritative per-offload
+            // record (factoryContainerCommissions, via commissionRecord) always had the
+            // right currency/fxRate; only this denormalized container-level snapshot lagged.
+            commissionCurrencyCode: commTotalVal > 0 ? commCurrencyForUsd : (container as any).commissionCurrencyCode || "USD",
             dutyAmount: dutyStatus !== "NONE" ? String(parseFloat(reqDutyAmount || "0")) : null,
             dutyAccountId: reqDutyAccountId ? parseInt(reqDutyAccountId) : null,
             dutyStatus,
@@ -439,6 +466,12 @@ export function registerRawStockOffloadRoutes(app: Express) {
                   amount: String(charge.amount),
                   currencyCode: charge.currencyCode || currencyCode,
                   fxRateToUsd: String(charge.fxRateToUsd || (currencyCode === "USD" ? "1" : String(fxRate))),
+                  // Same reasoning as the container/commission fix above: the rate used
+                  // here is either explicitly supplied on the charge or the already-
+                  // resolved offload fxRate, never an unset default — mark it confirmed
+                  // so downstream reads (recalc, reversal, reconciliation) don't treat
+                  // a known-good rate as unresolved.
+                  fxRateConfirmed: true,
                   ledgerAccountId: charge.ledgerAccountId ? parseInt(charge.ledgerAccountId) : null,
                   supplierId: charge.supplierId ? parseInt(charge.supplierId) : null,
                 })
@@ -603,11 +636,19 @@ export function registerRawStockOffloadRoutes(app: Express) {
               narration: `Freight payable to supplier - container ${container.containerNumber}`,
             });
           } else {
-            // No supplier: Dr Factory Charges Payable / Cr chosen account
+            // No supplier: Dr Factory Charges Payable / Cr chosen account.
+            // Both legs are plain ledger accounts here (no factorySupplierId), and
+            // voucherEntries has no currency/fxRate column of its own — Net Position
+            // and every other GL reader sum debitAmount/creditAmount assuming USD.
+            // (Supplier-linked legs are the one exception: supplier balance routes
+            // re-derive USD from vouchers.currency/exchangeRate downstream, so those
+            // legs correctly stay in native currency — see the `if` branch above.)
+            // Posting freightVal (native currency) here would silently misstate any
+            // non-USD chosen account by the entire FX differential.
             await tx.insert(voucherEntries).values({
               voucherId: freightVoucher.id,
               ledgerAccountId: chargesPayableAcctId,
-              debitAmount: String(freightVal),
+              debitAmount: String(freightUsd),
               creditAmount: "0",
               narration: `Freight payable - container ${container.containerNumber}`,
             });
@@ -615,7 +656,7 @@ export function registerRawStockOffloadRoutes(app: Express) {
               voucherId: freightVoucher.id,
               ledgerAccountId: parseInt(reqFreightAccountId),
               debitAmount: "0",
-              creditAmount: String(freightVal),
+              creditAmount: String(freightUsd),
               narration: `Freight - container ${container.containerNumber}`,
             });
           }
@@ -657,11 +698,16 @@ export function registerRawStockOffloadRoutes(app: Express) {
               narration: `Other charges payable to supplier - container ${container.containerNumber}`,
             });
           } else {
-            // No supplier: Dr Factory Charges Payable / Cr chosen account
+            // No supplier: Dr Factory Charges Payable / Cr chosen account.
+            // Same reasoning as the freight branch above — both legs are plain
+            // ledger accounts, so they must be posted in USD (ocUsd), not the raw
+            // native-currency otherChargesVal, or a non-USD chosen account silently
+            // misstates the true balance in every USD-summed report (Net Position,
+            // balance sheet, etc).
             await tx.insert(voucherEntries).values({
               voucherId: ocMainVoucher.id,
               ledgerAccountId: chargesPayableAcctId,
-              debitAmount: String(otherChargesVal),
+              debitAmount: String(ocUsd),
               creditAmount: "0",
               narration: `Other charges payable - container ${container.containerNumber}`,
             });
@@ -669,7 +715,7 @@ export function registerRawStockOffloadRoutes(app: Express) {
               voucherId: ocMainVoucher.id,
               ledgerAccountId: parseInt(reqOtherChargesAccountId),
               debitAmount: "0",
-              creditAmount: String(otherChargesVal),
+              creditAmount: String(ocUsd),
               narration: `Other charges - container ${container.containerNumber}`,
             });
           }
@@ -681,7 +727,9 @@ export function registerRawStockOffloadRoutes(app: Express) {
           if (chargeAmount <= 0) continue;
           if (!inserted.ledgerAccountId && !inserted.supplierId) continue;
           const addlChargeCcy = inserted.currencyCode || currencyCode;
-          const addlChargeFx = String(parseFloat(inserted.fxRateToUsd || String(fxRate)));
+          const addlChargeFxNum = parseFloat(inserted.fxRateToUsd || String(fxRate));
+          const addlChargeFx = String(addlChargeFxNum);
+          const addlChargeUsd = addlChargeCcy === "USD" ? chargeAmount : chargeAmount * addlChargeFxNum;
           const ocVoucherNum = `FACTORY-OC-${containerId}-${inserted.id}-${Date.now()}`;
           const [ocVoucher] = await tx
             .insert(vouchers)
@@ -697,22 +745,37 @@ export function registerRawStockOffloadRoutes(app: Express) {
               sourceModule: "FACTORY",
             })
             .returning();
-          await tx.insert(voucherEntries).values({
-            voucherId: ocVoucher.id,
-            ledgerAccountId: chargesPayableAcctId,
-            debitAmount: String(chargeAmount),
-            creditAmount: "0",
-            narration: `${inserted.description} payable - container ${container.containerNumber}`,
-          });
           if (inserted.ledgerAccountId) {
+            // Both legs are plain ledger accounts (no factorySupplierId) — post in
+            // USD (addlChargeUsd), not the raw native-currency chargeAmount, for the
+            // same reason as the freight/other-charges branches above: nothing
+            // downstream converts a bare ledgerAccountId leg, so a non-USD amount
+            // here silently misstates Net Position and every other USD-summed report.
+            await tx.insert(voucherEntries).values({
+              voucherId: ocVoucher.id,
+              ledgerAccountId: chargesPayableAcctId,
+              debitAmount: String(addlChargeUsd),
+              creditAmount: "0",
+              narration: `${inserted.description} payable - container ${container.containerNumber}`,
+            });
             await tx.insert(voucherEntries).values({
               voucherId: ocVoucher.id,
               ledgerAccountId: inserted.ledgerAccountId,
               debitAmount: "0",
-              creditAmount: String(chargeAmount),
+              creditAmount: String(addlChargeUsd),
               narration: `${inserted.description} - container ${container.containerNumber}`,
             });
           } else if (inserted.supplierId) {
+            // Supplier-linked leg: keep native currency. Supplier balance routes
+            // re-derive USD downstream from vouchers.currency/exchangeRate, so both
+            // legs of this voucher stay in the charge's own currency.
+            await tx.insert(voucherEntries).values({
+              voucherId: ocVoucher.id,
+              ledgerAccountId: chargesPayableAcctId,
+              debitAmount: String(chargeAmount),
+              creditAmount: "0",
+              narration: `${inserted.description} payable - container ${container.containerNumber}`,
+            });
             await tx.insert(voucherEntries).values({
               voucherId: ocVoucher.id,
               factorySupplierId: inserted.supplierId,
@@ -930,9 +993,13 @@ export function registerRawStockOffloadRoutes(app: Express) {
               description: `Freight on container ${container.containerNumber}`,
               totalAmount: String(restoredFreightAmt),
               currency: restoredFreightCurrencyCode,
-              exchangeRate: String(
-                resolveStoredFxRateOrThrow(container.currencyCode, container.fxRateToUsd, (container as any).fxRateConfirmed)
-              ),
+              // This re-posts a voucher that already existed pre-offload, using the
+              // exact rate the original offload already booked its financials with —
+              // it is not a new forward-going financial decision, so we reuse the
+              // container's stored rate as-is rather than requiring it to be
+              // "confirmed" (which would incorrectly block reversing legacy
+              // containers offloaded before the fxRateConfirmed flag existed).
+              exchangeRate: String(container.fxRateToUsd ?? "1"),
               sourceModule: "FACTORY",
             })
             .returning();
