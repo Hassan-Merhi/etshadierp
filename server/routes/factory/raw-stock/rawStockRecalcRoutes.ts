@@ -29,6 +29,9 @@ interface RecalcTokenPayload {
   fingerprintByContainer: Record<number, string>;
   userId: string;
   expiresAt: number;
+  /** Bound into the token so a confirm request can never silently expand scope
+   * beyond what the admin saw and approved at dry-run time. */
+  includeCompletedBatches: boolean;
 }
 
 export function registerRawStockRecalcRoutes(app: Express) {
@@ -68,7 +71,8 @@ export function registerRawStockRecalcRoutes(app: Express) {
       try {
         const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
         if (!companyId) return res.status(400).json({ message: "No company selected" });
-        const { containerIds, confirm, confirmationToken } = req.body;
+        const { containerIds, confirm, confirmationToken, includeCompletedBatches } = req.body;
+        const wantsCompletedBatches = includeCompletedBatches === true;
         if (!Array.isArray(containerIds) || containerIds.length === 0) {
           return res.status(400).json({ message: "containerIds must be a non-empty array" });
         }
@@ -98,6 +102,7 @@ export function registerRawStockRecalcRoutes(app: Express) {
             fingerprintByContainer,
             userId: req.session.userId,
             expiresAt: Date.now() + REPAIR_TOKEN_TTL_MS,
+            includeCompletedBatches: wantsCompletedBatches,
           };
           const token = signRepairToken(tokenPayload);
           return res.json({
@@ -123,7 +128,12 @@ export function registerRawStockRecalcRoutes(app: Express) {
         const sameIds =
           tokenPayload.containerIds.length === parsedIds.length &&
           tokenPayload.containerIds.every((id, i) => id === parsedIds[i]);
-        if (tokenPayload.companyId !== companyId || !sameIds || tokenPayload.userId !== req.session.userId) {
+        if (
+          tokenPayload.companyId !== companyId ||
+          !sameIds ||
+          tokenPayload.userId !== req.session.userId ||
+          tokenPayload.includeCompletedBatches !== wantsCompletedBatches
+        ) {
           return res.status(400).json({
             code: "INVALID_TOKEN",
             message: "confirmationToken does not match this exact recalc request — re-run the dry-run preview first.",
@@ -151,6 +161,7 @@ export function registerRawStockRecalcRoutes(app: Express) {
 
         const results = await applyRawStockRecalc(companyId, parsedIds, {
           expectedFingerprints: tokenPayload.fingerprintByContainer,
+          includeCompletedBatches: wantsCompletedBatches,
           onAudit: async (tx, result) => {
             await logAudit(
               {
@@ -161,7 +172,7 @@ export function registerRawStockRecalcRoutes(app: Express) {
                 tableName: "factory_raw_stock",
                 recordId: result.containerId,
                 recordIdentifier: `recalc/apply — container ${result.containerNumber}`,
-                changes: { result: { new: result } },
+                changes: { result: { new: { ...result, includeCompletedBatches: wantsCompletedBatches } } },
               },
               tx
             );

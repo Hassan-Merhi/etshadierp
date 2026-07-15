@@ -365,6 +365,7 @@ export interface ApplyResult {
   rawStockRowsUpdated: number;
   affectedBatches: number;
   affectedBales: number;
+  completedBatchesRewritten?: number;
 }
 
 // Recalc is a forward-looking correction to an already-offloaded container's
@@ -391,6 +392,10 @@ export interface ApplyRawStockRecalcOptions {
    * Skipped for a container already sitting at its corrected value: that is
    * a safe idempotent replay of an already-applied token, not staleness. */
   expectedFingerprints?: Record<number, string>;
+  /** Explicit, per-request admin override: also rewrite COMPLETED/CLOSED mix
+   * batches (and their bales) sourced from these containers, instead of leaving
+   * them as locked historical record. Off by default — see rawStockCostCascade.ts. */
+  includeCompletedBatches?: boolean;
 }
 
 /**
@@ -541,12 +546,16 @@ export async function applyRawStockRecalc(
         })
         .where(eq(factoryContainers.id, containerId));
 
-      const cascadeResult = await cascadeContainerCostChange(tx, {
-        companyId,
-        containerId,
-        newCostPerKg: next.costPerKg,
-        newCostPerKgUsd: next.costPerKgUsd,
-      });
+      const cascadeResult = await cascadeContainerCostChange(
+        tx,
+        {
+          companyId,
+          containerId,
+          newCostPerKg: next.costPerKg,
+          newCostPerKgUsd: next.costPerKgUsd,
+        },
+        { includeCompletedBatches: opts.includeCompletedBatches }
+      );
 
       const applyResult: ApplyResult = {
         containerId,
@@ -555,6 +564,7 @@ export async function applyRawStockRecalc(
         rawStockRowsUpdated: cascadeResult.rawStockRowsUpdated,
         affectedBatches: cascadeResult.affectedBatches.length,
         affectedBales: cascadeResult.affectedBales.length,
+        completedBatchesRewritten: cascadeResult.affectedBatches.filter((b) => b.wasCompleted).length,
       };
 
       // Atomic with the writes above: if this throws, this container's entire

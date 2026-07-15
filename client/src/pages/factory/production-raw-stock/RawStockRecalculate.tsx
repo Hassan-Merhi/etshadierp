@@ -34,6 +34,7 @@ export default function RawStockRecalculate() {
   const appMode = useAppMode();
   const modeApiRequest = getApiRequest(appMode);
   const [selected, setSelected] = useState<Set<number>>(new Set());
+  const [includeCompletedBatches, setIncludeCompletedBatches] = useState(false);
 
   const { data: rows, isLoading, refetch } = useQuery<RecalcRow[]>({
     queryKey: ["/api/factory/raw-stock/recalc/preview"],
@@ -63,8 +64,19 @@ export default function RawStockRecalculate() {
   };
 
   const applyMutation = useMutation({
-    mutationFn: async (containerIds: number[]) => {
-      const res = await modeApiRequest("POST", "/api/factory/raw-stock/recalc/apply", { containerIds });
+    mutationFn: async ({ containerIds, includeCompletedBatches }: { containerIds: number[]; includeCompletedBatches: boolean }) => {
+      const dryRun = await modeApiRequest("POST", "/api/factory/raw-stock/recalc/apply", {
+        containerIds,
+        includeCompletedBatches,
+      });
+      if (!dryRun.ok) throw new Error((await dryRun.json()).message || "Failed to prepare recalculation");
+      const dryRunData = await dryRun.json();
+      const res = await modeApiRequest("POST", "/api/factory/raw-stock/recalc/apply", {
+        containerIds,
+        includeCompletedBatches,
+        confirm: true,
+        confirmationToken: dryRunData.confirmationToken,
+      });
       if (!res.ok) throw new Error((await res.json()).message || "Failed to apply recalculation");
       return res.json();
     },
@@ -76,9 +88,12 @@ export default function RawStockRecalculate() {
       setSelected(new Set());
       const totalBatches = results.reduce((s: number, r: any) => s + r.affectedBatches, 0);
       const totalBales = results.reduce((s: number, r: any) => s + r.affectedBales, 0);
+      const totalCompletedBatches = results.reduce((s: number, r: any) => s + (r.completedBatchesRewritten || 0), 0);
       toast({
         title: "Recalculation applied",
-        description: `Fixed ${results.length} container(s). Updated ${totalBatches} mix batch(es) and ${totalBales} bale(s).`,
+        description:
+          `Fixed ${results.length} container(s). Updated ${totalBatches} mix batch(es) and ${totalBales} bale(s).` +
+          (totalCompletedBatches > 0 ? ` (${totalCompletedBatches} were completed/closed batches.)` : ""),
       });
     },
     onError: (err: any) => {
@@ -88,9 +103,12 @@ export default function RawStockRecalculate() {
 
   const handleApply = () => {
     if (selected.size === 0) return;
+    const label = includeCompletedBatches
+      ? `Apply cost recalculation to ${selected.size} container(s), including rewriting completed/closed mix batches`
+      : `Apply cost recalculation to ${selected.size} container(s)`;
     wrapAdminAction(() => {
-      applyMutation.mutate(Array.from(selected));
-    }, `Apply cost recalculation to ${selected.size} container(s)`);
+      applyMutation.mutate({ containerIds: Array.from(selected), includeCompletedBatches });
+    }, label);
   };
 
   return (
@@ -110,7 +128,15 @@ export default function RawStockRecalculate() {
             </p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
+          <label className="flex items-center gap-2 text-xs text-muted-foreground cursor-pointer select-none">
+            <Checkbox
+              checked={includeCompletedBatches}
+              onCheckedChange={(v) => setIncludeCompletedBatches(v === true)}
+              data-testid="checkbox-include-completed-batches"
+            />
+            Also rewrite completed/closed mix batches
+          </label>
           <Button variant="outline" size="sm" onClick={() => refetch()} className="gap-2">
             <RefreshCw className="h-3.5 w-3.5" /> Refresh
           </Button>
@@ -125,6 +151,14 @@ export default function RawStockRecalculate() {
           </Button>
         </div>
       </div>
+
+      {includeCompletedBatches && (
+        <div className="text-xs text-amber-700 dark:text-amber-400 bg-amber-500/10 border border-amber-500/30 rounded-md px-3 py-2">
+          This will rewrite the cost of completed/closed mix batches (and any bales pressed from them) sourced from
+          the selected containers — normally protected as locked historical record. Only enable this if you want
+          past batches corrected too.
+        </div>
+      )}
 
       {isLoading ? (
         <div className="text-sm text-muted-foreground py-12 text-center">Computing recalculation preview...</div>

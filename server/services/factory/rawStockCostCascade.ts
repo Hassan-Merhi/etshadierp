@@ -28,6 +28,7 @@ export interface CascadeResult {
     oldCostPerKg: number;
     newCostPerKg: number;
     weightKg: number;
+    wasCompleted: boolean;
   }[];
   affectedBales: { baleId: number; baleCode?: string }[];
 }
@@ -46,9 +47,17 @@ export async function cascadeContainerCostChange(
     containerId: number;
     newCostPerKg: number; // native currency, inclusive landed cost per kg
     newCostPerKgUsd: number; // USD equivalent
-  }
+  },
+  opts: {
+    /** When true, also rewrites COMPLETED/CLOSED mix batches (and their bales)
+     * sourced from this container. This is an explicit, admin-approved override
+     * of the normal "historical record is locked" rule above — only ever set
+     * from the recalc apply route, and only when the admin opted in per-request. */
+    includeCompletedBatches?: boolean;
+  } = {}
 ): Promise<CascadeResult> {
   const { companyId, containerId, newCostPerKg, newCostPerKgUsd } = params;
+  const { includeCompletedBatches = false } = opts;
 
   // 1. Raw stock — update ALL rows for this container/company (normally exactly one,
   //    enforced by the factory_raw_stock_company_container_unique index). Capture
@@ -106,20 +115,27 @@ export async function cascadeContainerCostChange(
       .where(and(eq(factorySuppliers.id, container.supplierId), eq(factorySuppliers.companyId, companyId)));
   }
 
-  // 2. Mix batch sources sourced from this container — restricted to batches still
-  //    OPEN (ACTIVE/OPEN/CARRY_FORWARD). A landed-cost correction is a forward-looking
-  //    fix to current stock; it must never rewrite the recorded cost of a batch that
-  //    has already been CLOSED/COMPLETED (or soft-deleted) — those costs, and any bales
-  //    pressed from them, are historical record and must stay exactly as they were.
+  // 2. Mix batch sources sourced from this container — by default restricted to
+  //    batches still OPEN (ACTIVE/OPEN/CARRY_FORWARD). A landed-cost correction is
+  //    normally a forward-looking fix to current stock; it must never rewrite the
+  //    recorded cost of a batch that has already been CLOSED/COMPLETED (or
+  //    soft-deleted) — those costs, and any bales pressed from them, are historical
+  //    record. `includeCompletedBatches` is an explicit, per-request admin override
+  //    of that rule (wired from the recalc apply route) for when accuracy of the
+  //    historical record matters more than leaving it untouched.
   const OPEN_BATCH_STATUSES = ["ACTIVE", "OPEN", "CARRY_FORWARD"];
+  const COMPLETED_BATCH_STATUSES = ["COMPLETED", "CLOSED"];
+  const batchStatusFilter = includeCompletedBatches
+    ? [...OPEN_BATCH_STATUSES, ...COMPLETED_BATCH_STATUSES]
+    : OPEN_BATCH_STATUSES;
   const mixSources = await tx
-    .select({ src: factoryMixBatchSources })
+    .select({ src: factoryMixBatchSources, batchStatus: factoryMixBatches.status })
     .from(factoryMixBatchSources)
     .innerJoin(factoryMixBatches, eq(factoryMixBatchSources.mixBatchId, factoryMixBatches.id))
     .where(
       and(
         eq(factoryMixBatchSources.containerId, containerId),
-        inArray(factoryMixBatches.status, OPEN_BATCH_STATUSES),
+        inArray(factoryMixBatches.status, batchStatusFilter),
         sql`${factoryMixBatches.deletedAt} IS NULL`
       )
     )
@@ -143,6 +159,7 @@ export async function cascadeContainerCostChange(
     for (const batchId of affectedBatchIds) {
       const [batch] = await tx.select().from(factoryMixBatches).where(eq(factoryMixBatches.id, batchId));
       const oldCostPerKg = batch ? parseFloat(batch.costPerKg || "0") : 0;
+      const wasCompleted = !!batch && COMPLETED_BATCH_STATUSES.includes(batch.status);
       const allSources = await tx
         .select()
         .from(factoryMixBatchSources)
@@ -168,6 +185,7 @@ export async function cascadeContainerCostChange(
         oldCostPerKg,
         newCostPerKg: batchCostPerKg,
         weightKg: srcWeight,
+        wasCompleted,
       });
 
       // 4. Cascade the blended batch cost down to every bale still pressed from it.
