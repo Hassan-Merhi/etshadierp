@@ -17,7 +17,7 @@
  *
  * Read-only preview never writes anything. Apply runs inside a transaction per container.
  */
-import { eq, and, isNull, sql } from "drizzle-orm";
+import { eq, and, isNull, sql, inArray } from "drizzle-orm";
 import Decimal from "decimal.js";
 import crypto from "crypto";
 import { db } from "../../db";
@@ -27,6 +27,9 @@ import {
   factoryOffloadAdditionalCharges,
   factoryContainerCommissions,
   factorySuppliers,
+  factoryMixBatchSources,
+  factoryMixBatches,
+  factoryBales,
 } from "@shared/schema";
 import { cascadeContainerCostChange } from "./rawStockCostCascade";
 import { resolveStoredFxRate } from "./currencyConversion";
@@ -353,6 +356,134 @@ export async function getRawStockRecalcPreview(companyId: number): Promise<Recal
     return Math.abs(b.diffPct) - Math.abs(a.diffPct);
   });
 
+  return results;
+}
+
+export interface AffectedMixBatchPreviewRow {
+  batchId: number;
+  batchCode: string;
+  name: string | null;
+  status: string;
+  batchDate: string | null;
+  wasCompleted: boolean;
+  totalWeightKg: number;
+  oldCostPerKg: number;
+  newCostPerKg: number;
+  diffPct: number;
+  baleCount: number;
+  sourceContainerNumbers: string[];
+}
+
+const OPEN_BATCH_STATUSES = ["ACTIVE", "OPEN", "CARRY_FORWARD"];
+const COMPLETED_BATCH_STATUSES = ["COMPLETED", "CLOSED"];
+
+/**
+ * Read-only preview of every mix batch that would be touched by applying the
+ * given containers' corrected cost — mirrors cascadeContainerCostChange's
+ * batch-selection and weighted-average math exactly, but never writes
+ * anything. Used to show an admin the downstream blast radius (and, when
+ * includeCompletedBatches is true, which already-completed/closed batches
+ * would also be rewritten) before they click Apply.
+ */
+export async function getAffectedMixBatchesPreview(
+  companyId: number,
+  containerIds: number[],
+  includeCompletedBatches: boolean
+): Promise<AffectedMixBatchPreviewRow[]> {
+  if (containerIds.length === 0) return [];
+
+  const preview = await getRawStockRecalcPreview(companyId);
+  const correctedCostByContainer = new Map(
+    preview.filter((r) => containerIds.includes(r.containerId) && !r.fxUnresolved).map((r) => [r.containerId, r.next.costPerKg])
+  );
+  if (correctedCostByContainer.size === 0) return [];
+
+  const statusFilter = includeCompletedBatches
+    ? [...OPEN_BATCH_STATUSES, ...COMPLETED_BATCH_STATUSES]
+    : OPEN_BATCH_STATUSES;
+
+  const sourceRows = await db
+    .select({
+      src: factoryMixBatchSources,
+      batch: factoryMixBatches,
+      containerNumber: factoryContainers.containerNumber,
+    })
+    .from(factoryMixBatchSources)
+    .innerJoin(factoryMixBatches, eq(factoryMixBatchSources.mixBatchId, factoryMixBatches.id))
+    .leftJoin(factoryContainers, eq(factoryContainers.id, factoryMixBatchSources.containerId))
+    .where(
+      and(
+        inArray(factoryMixBatchSources.containerId, [...correctedCostByContainer.keys()]),
+        eq(factoryMixBatches.companyId, companyId),
+        inArray(factoryMixBatches.status, statusFilter),
+        isNull(factoryMixBatches.deletedAt)
+      )
+    );
+
+  const touchedBatchIds = [...new Set(sourceRows.map((r) => r.batch.id))];
+  if (touchedBatchIds.length === 0) return [];
+
+  // Recompute each touched batch's weighted-average cost from ALL of its
+  // sources (not just the ones from the corrected containers) — a batch may
+  // blend multiple suppliers/containers, exactly like the real cascade does.
+  const [allSourcesForTouchedBatches, baleCounts] = await Promise.all([
+    db
+      .select({ src: factoryMixBatchSources, containerNumber: factoryContainers.containerNumber })
+      .from(factoryMixBatchSources)
+      .leftJoin(factoryContainers, eq(factoryContainers.id, factoryMixBatchSources.containerId))
+      .where(inArray(factoryMixBatchSources.mixBatchId, touchedBatchIds)),
+    db
+      .select({ mixBatchId: factoryBales.mixBatchId, count: sql<number>`count(*)` })
+      .from(factoryBales)
+      .where(
+        and(
+          inArray(factoryBales.mixBatchId, touchedBatchIds),
+          eq(factoryBales.companyId, companyId),
+          sql`${factoryBales.status} NOT IN ('DELETED','REMOVED')`
+        )
+      )
+      .groupBy(factoryBales.mixBatchId),
+  ]);
+
+  const baleCountByBatch = new Map(baleCounts.map((b) => [b.mixBatchId as number, Number(b.count)]));
+  const batchById = new Map(sourceRows.map((r) => [r.batch.id, r.batch]));
+
+  const results: AffectedMixBatchPreviewRow[] = [];
+  for (const batchId of touchedBatchIds) {
+    const batch = batchById.get(batchId)!;
+    const sourcesForBatch = allSourcesForTouchedBatches.filter((r) => r.src.mixBatchId === batchId);
+    let totalCost = 0;
+    let totalWeight = 0;
+    const containerNumbers = new Set<string>();
+    for (const { src, containerNumber } of sourcesForBatch) {
+      const weight = parseFloat(src.weightKg || "0");
+      const correctedCost = src.containerId != null ? correctedCostByContainer.get(src.containerId) : undefined;
+      const costPerKg = correctedCost !== undefined ? correctedCost : parseFloat(src.costPerKg || "0");
+      totalCost += weight * costPerKg;
+      totalWeight += weight;
+      if (containerNumber) containerNumbers.add(containerNumber);
+    }
+    const oldCostPerKg = parseFloat(batch.costPerKg || "0");
+    const newCostPerKg = totalWeight > 0 ? totalCost / totalWeight : oldCostPerKg;
+    const diffPct = oldCostPerKg > 0 ? ((newCostPerKg - oldCostPerKg) / oldCostPerKg) * 100 : 0;
+
+    results.push({
+      batchId,
+      batchCode: batch.batchCode,
+      name: batch.name,
+      status: batch.status,
+      batchDate: batch.batchDate ? String(batch.batchDate) : null,
+      wasCompleted: COMPLETED_BATCH_STATUSES.includes(batch.status),
+      totalWeightKg: totalWeight,
+      oldCostPerKg,
+      newCostPerKg,
+      diffPct,
+      baleCount: baleCountByBatch.get(batchId) || 0,
+      sourceContainerNumbers: [...containerNumbers],
+    });
+  }
+
+  results.sort((a, b) => Math.abs(b.diffPct) - Math.abs(a.diffPct));
   return results;
 }
 

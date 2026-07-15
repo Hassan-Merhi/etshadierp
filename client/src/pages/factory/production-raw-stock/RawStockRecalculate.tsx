@@ -1,17 +1,21 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, Suspense, lazy } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link } from "wouter";
-import { ArrowLeft, RefreshCw, CheckCircle2 } from "lucide-react";
+import { ArrowLeft, RefreshCw, CheckCircle2, Layers } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { useAdminOverride } from "@/hooks/use-admin-override";
 import { queryClient } from "@/lib/queryClient";
 import { useAppMode } from "@/contexts/AppModeContext";
 import { getApiRequest } from "@/lib/factoryApi";
 import { formatNumber } from "@/lib/formatNumber";
+
+const BatchDetail = lazy(() => import("@/pages/BatchDetail"));
 
 interface RecalcRow {
   containerId: number;
@@ -28,6 +32,21 @@ interface RecalcRow {
   fxUnresolved: boolean;
 }
 
+interface AffectedMixBatchRow {
+  batchId: number;
+  batchCode: string;
+  name: string | null;
+  status: string;
+  batchDate: string | null;
+  wasCompleted: boolean;
+  totalWeightKg: number;
+  oldCostPerKg: number;
+  newCostPerKg: number;
+  diffPct: number;
+  baleCount: number;
+  sourceContainerNumbers: string[];
+}
+
 export default function RawStockRecalculate() {
   const { toast } = useToast();
   const { wrapAdminAction, AdminDialog } = useAdminOverride();
@@ -35,6 +54,7 @@ export default function RawStockRecalculate() {
   const modeApiRequest = getApiRequest(appMode);
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [includeCompletedBatches, setIncludeCompletedBatches] = useState(false);
+  const [detailBatchId, setDetailBatchId] = useState<number | null>(null);
 
   const { data: rows, isLoading, refetch } = useQuery<RecalcRow[]>({
     queryKey: ["/api/factory/raw-stock/recalc/preview"],
@@ -45,6 +65,21 @@ export default function RawStockRecalculate() {
   const unchangedCount = (rows?.length || 0) - changedRows.length - fxUnresolvedRows.length;
 
   const allSelected = changedRows.length > 0 && changedRows.every((r) => selected.has(r.containerId));
+
+  const selectedIds = useMemo(() => Array.from(selected).sort((a, b) => a - b), [selected]);
+
+  const { data: affectedBatches, isLoading: batchesLoading } = useQuery<AffectedMixBatchRow[]>({
+    queryKey: ["/api/factory/raw-stock/recalc/mix-batches-preview", selectedIds, includeCompletedBatches],
+    queryFn: async () => {
+      const res = await modeApiRequest("POST", "/api/factory/raw-stock/recalc/mix-batches-preview", {
+        containerIds: selectedIds,
+        includeCompletedBatches,
+      });
+      if (!res.ok) throw new Error("Failed to load affected mix batches");
+      return res.json();
+    },
+    enabled: selectedIds.length > 0,
+  });
 
   const toggleAll = () => {
     if (allSelected) {
@@ -250,10 +285,111 @@ export default function RawStockRecalculate() {
                   </TableBody>
                 </Table>
               </div>
+
+              {selectedIds.length > 0 && (
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <Layers className="h-3.5 w-3.5" />
+                    Mix batches that would be affected by the selected container(s)
+                    {batchesLoading && " — loading..."}
+                  </div>
+                  {!batchesLoading && (affectedBatches || []).length === 0 ? (
+                    <div className="text-xs text-muted-foreground py-6 text-center border rounded-md bg-card">
+                      No mix batches are sourced from the selected container(s)
+                      {!includeCompletedBatches ? " (that are still open)." : "."}
+                    </div>
+                  ) : (
+                    <div className="border rounded-md overflow-hidden bg-card shadow-sm">
+                      <Table>
+                        <TableHeader className="bg-muted/50">
+                          <TableRow>
+                            <TableHead>Batch</TableHead>
+                            <TableHead>Status</TableHead>
+                            <TableHead className="text-right">Weight (kg)</TableHead>
+                            <TableHead className="text-right">Current $/kg</TableHead>
+                            <TableHead className="text-right">Corrected $/kg</TableHead>
+                            <TableHead className="text-right">Change</TableHead>
+                            <TableHead className="text-right">Bales</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {(affectedBatches || []).map((b) => (
+                            <TableRow
+                              key={b.batchId}
+                              className="cursor-pointer hover:bg-muted/40"
+                              onClick={() => setDetailBatchId(b.batchId)}
+                              data-testid={`row-affected-batch-${b.batchId}`}
+                            >
+                              <TableCell className="font-mono text-xs">
+                                {b.batchCode}
+                                {b.name ? <span className="text-muted-foreground"> — {b.name}</span> : null}
+                              </TableCell>
+                              <TableCell>
+                                <Badge
+                                  variant="outline"
+                                  className={
+                                    b.wasCompleted
+                                      ? "text-amber-600 border-amber-500/30 bg-amber-500/10"
+                                      : "text-muted-foreground"
+                                  }
+                                >
+                                  {b.status}
+                                </Badge>
+                              </TableCell>
+                              <TableCell className="text-right font-mono text-xs text-muted-foreground">
+                                {formatNumber(b.totalWeightKg)}
+                              </TableCell>
+                              <TableCell className="text-right font-mono text-xs text-muted-foreground">
+                                ${b.oldCostPerKg.toFixed(4)}
+                              </TableCell>
+                              <TableCell className="text-right font-mono text-xs font-medium text-foreground">
+                                ${b.newCostPerKg.toFixed(4)}
+                              </TableCell>
+                              <TableCell className="text-right">
+                                <Badge
+                                  variant="outline"
+                                  className={
+                                    b.diffPct > 0
+                                      ? "text-red-500 border-red-500/30 bg-red-500/10"
+                                      : "text-emerald-500 border-emerald-500/30 bg-emerald-500/10"
+                                  }
+                                >
+                                  {b.diffPct > 0 ? "+" : ""}
+                                  {b.diffPct.toFixed(2)}%
+                                </Badge>
+                              </TableCell>
+                              <TableCell className="text-right font-mono text-xs text-muted-foreground">
+                                {b.baleCount}
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  )}
+                  <div className="text-xs text-muted-foreground">
+                    Click a batch to open its full detail (sources, bales, notes) without leaving this page.
+                  </div>
+                </div>
+              )}
             </>
           )}
         </>
       )}
+
+      <Dialog open={detailBatchId !== null} onOpenChange={(open) => !open && setDetailBatchId(null)}>
+        <DialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader className="sr-only">
+            <DialogTitle>Mix Batch Detail</DialogTitle>
+            <DialogDescription>Sources, bales, and cost breakdown for this mix batch.</DialogDescription>
+          </DialogHeader>
+          {detailBatchId !== null && (
+            <Suspense fallback={<Skeleton className="h-64 w-full" />}>
+              <BatchDetail batchId={detailBatchId} onBack={() => setDetailBatchId(null)} />
+            </Suspense>
+          )}
+        </DialogContent>
+      </Dialog>
 
       {AdminDialog}
     </div>

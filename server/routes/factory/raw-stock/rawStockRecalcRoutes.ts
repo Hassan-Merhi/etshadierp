@@ -5,6 +5,7 @@ import {
   applyRawStockRecalc,
   loadRecalcFingerprintInputs,
   computeRecalcFingerprint,
+  getAffectedMixBatchesPreview,
 } from "../../../services/factory/rawStockRecalc";
 import { logAudit } from "../../helpers/auditHelpers";
 import {
@@ -50,6 +51,32 @@ export function registerRawStockRecalcRoutes(app: Express) {
       } catch (err: any) {
         console.error("[raw-stock recalc preview] error:", err);
         res.status(500).json({ message: err.message || "Failed to compute recalculation preview" });
+      }
+    }
+  );
+
+  // Read-only preview of every mix batch (and bale count) that would be touched
+  // by applying the given containers' corrected cost — the same batch-selection
+  // and weighted-average math cascadeContainerCostChange uses, but never writes
+  // anything. Lets the admin see the downstream blast radius before clicking Apply.
+  app.post(
+    "/api/factory/raw-stock/recalc/mix-batches-preview",
+    requireAuth,
+    requireRole(...ADMIN_ROLES),
+    async (req: any, res: any) => {
+      try {
+        const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+        if (!companyId) return res.status(400).json({ message: "No company selected" });
+        const { containerIds, includeCompletedBatches } = req.body;
+        if (!Array.isArray(containerIds) || containerIds.length === 0) {
+          return res.json([]);
+        }
+        const parsedIds = containerIds.map((id: any) => parseInt(id)).filter((id: number) => !isNaN(id));
+        const rows = await getAffectedMixBatchesPreview(companyId, parsedIds, includeCompletedBatches === true);
+        res.json(rows);
+      } catch (err: any) {
+        console.error("[raw-stock recalc mix-batches-preview] error:", err);
+        res.status(500).json({ message: err.message || "Failed to compute affected mix batches preview" });
       }
     }
   );
