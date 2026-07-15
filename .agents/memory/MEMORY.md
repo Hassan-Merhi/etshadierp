@@ -59,3 +59,4 @@
 - [Atomic audit+repair transactions](atomic-audit-repair-pattern.md) — financial write and its audit-log insert must share one transaction (onAudit callback) plus advisory+row locking, or a failed audit leaves an untracked change.
 - [Model A reservedKg is informational, not a deduction](model-a-reserved-kg-not-deduction.md) — never flag reservedKg > remainingKg as a bug; a fully-consumed container is always fully "reserved" by design.
 - [Repair-token signing key must be lazy + prod-gated](repair-token-lazy-signing-key.md) — cache the HMAC key at call time not module load, and hard-refuse a dev-fallback secret in production.
+- [Mix-batch-source-level zero cost](mix-batch-source-zero-cost.md) — a container's own cost can be correct while its factory_mix_batch_sources rows still carry cost 0; detect at source level, not just via container-cost diff.

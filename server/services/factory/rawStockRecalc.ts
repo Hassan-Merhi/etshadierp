@@ -31,7 +31,7 @@ import {
   factoryMixBatches,
   factoryBales,
 } from "@shared/schema";
-import { cascadeContainerCostChange } from "./rawStockCostCascade";
+import { cascadeContainerCostChange, recomputeBatchAndCascadeBales } from "./rawStockCostCascade";
 import { resolveStoredFxRate } from "./currencyConversion";
 
 export interface RecalcRow {
@@ -705,6 +705,232 @@ export async function applyRawStockRecalc(
       }
 
       return applyResult;
+    });
+
+    if (result) results.push(result);
+  }
+
+  return results;
+}
+
+// ---------------------------------------------------------------------------
+// Zero-cost mix-batch-source repair.
+//
+// A mix batch's blended cost/kg is a weighted average of its sources
+// (factoryMixBatchSources). A handful of historical batches were created from
+// a container (or, in one known case, direct-from-supplier) whose source row
+// never got its costPerKg/totalCost populated at all — it was left at 0. This
+// is a DIFFERENT bug from the container-level landed-cost drift the recalc
+// preview/apply above targets: the container's own stored cost can be
+// perfectly correct (so it never appears as a "changed" row above and is
+// never selectable there) while its mix-batch-source rows still silently
+// drag every batch that drew from it toward zero. This section finds those
+// source rows directly and repairs them + cascades to their batch/bales,
+// independent of whether the parent container's cost changed.
+// ---------------------------------------------------------------------------
+
+export interface ZeroCostSourceRow {
+  sourceId: number;
+  batchId: number;
+  batchCode: string;
+  batchStatus: string;
+  containerId: number | null;
+  containerNumber: string | null;
+  supplierId: number | null;
+  supplierName: string | null;
+  weightKg: number;
+  currentCostPerKg: number;
+  correctedCostPerKg: number | null;
+  fixable: boolean;
+  reason: string;
+}
+
+/**
+ * Read-only scan for mix-batch-source rows recorded with cost 0 despite
+ * having real weight — i.e. a batch whose blended cost is understated
+ * because a piece of it was never priced. For container-linked sources the
+ * correction is unambiguous: the container's own current raw-stock cost/kg
+ * (run the container recalc above FIRST if that container's own cost is also
+ * wrong, so this reads the already-corrected value). Direct-from-supplier
+ * sources with no container link have no stored historical rate to recover,
+ * so they're surfaced as non-fixable — an admin has to supply a rate manually.
+ */
+export async function getZeroCostMixBatchSourcesPreview(companyId: number): Promise<ZeroCostSourceRow[]> {
+  const rows = await db
+    .select({
+      src: factoryMixBatchSources,
+      batch: factoryMixBatches,
+      containerNumber: factoryContainers.containerNumber,
+      supplierName: factorySuppliers.name,
+    })
+    .from(factoryMixBatchSources)
+    .innerJoin(factoryMixBatches, eq(factoryMixBatchSources.mixBatchId, factoryMixBatches.id))
+    .leftJoin(factoryContainers, eq(factoryContainers.id, factoryMixBatchSources.containerId))
+    .leftJoin(factorySuppliers, eq(factorySuppliers.id, factoryMixBatchSources.supplierId))
+    .where(
+      and(
+        eq(factoryMixBatches.companyId, companyId),
+        isNull(factoryMixBatches.deletedAt),
+        sql`${factoryMixBatchSources.costPerKg}::numeric <= 0`,
+        sql`${factoryMixBatchSources.weightKg}::numeric > 0`
+      )
+    );
+
+  if (rows.length === 0) return [];
+
+  const containerIds = [...new Set(rows.map((r) => r.src.containerId).filter((id): id is number => id != null))];
+  const rawStockByContainer = containerIds.length
+    ? new Map(
+        (
+          await db
+            .select()
+            .from(factoryRawStock)
+            .where(and(inArray(factoryRawStock.containerId, containerIds), isNull(factoryRawStock.deletedAt)))
+        ).map((r) => [r.containerId as number, r])
+      )
+    : new Map();
+
+  return rows
+    .map(({ src, batch, containerNumber, supplierName }) => {
+      const weightKg = parseFloat(src.weightKg || "0");
+      const rawStock = src.containerId != null ? rawStockByContainer.get(src.containerId) : undefined;
+      const correctedCostPerKg = rawStock ? parseFloat(rawStock.costPerKg || "0") : null;
+      const fixable = correctedCostPerKg != null && correctedCostPerKg > 0;
+      return {
+        sourceId: src.id,
+        batchId: batch.id,
+        batchCode: batch.batchCode,
+        batchStatus: batch.status,
+        containerId: src.containerId,
+        containerNumber: containerNumber || null,
+        supplierId: src.supplierId,
+        supplierName: supplierName || null,
+        weightKg,
+        currentCostPerKg: parseFloat(src.costPerKg || "0"),
+        correctedCostPerKg,
+        fixable,
+        reason: fixable
+          ? "Container's current landed cost is known — safe to backfill."
+          : src.containerId != null
+            ? "Container has no priced raw-stock row to copy a cost from."
+            : "Sourced directly from a supplier with no container link — no historical rate on file; requires a manually entered cost/kg.",
+      };
+    })
+    .sort((a, b) => b.weightKg - a.weightKg);
+}
+
+const ZERO_COST_SOURCE_LOCK_NAMESPACE = 9002;
+
+export interface ZeroCostSourceFixResult {
+  sourceId: number;
+  batchId: number;
+  batchCode: string;
+  applied: boolean;
+  skippedReason?: string;
+  costPerKgApplied?: number;
+  affectedBales: number;
+}
+
+/**
+ * Apply the fix for a specific set of zero-cost mix-batch-source rows.
+ * `manualRates` lets an admin supply an explicit cost/kg for sources that
+ * have no container to copy a rate from (e.g. direct-from-supplier sources);
+ * container-linked sources always use the container's current raw-stock
+ * cost — never a manual override, so this can't be used to smuggle in an
+ * arbitrary number for a source that already has a real answer on file.
+ * Each source's batch is locked (advisory + row) and recomputed/cascaded in
+ * its own transaction, mirroring applyRawStockRecalc's per-item isolation.
+ */
+export async function applyZeroCostMixBatchSourcesFix(
+  companyId: number,
+  sourceIds: number[],
+  opts: { manualRates?: Record<number, number>; onAudit?: (tx: any, result: ZeroCostSourceFixResult) => Promise<void> } = {}
+): Promise<ZeroCostSourceFixResult[]> {
+  const results: ZeroCostSourceFixResult[] = [];
+
+  for (const sourceId of sourceIds) {
+    const result = await db.transaction(async (tx) => {
+      await tx.execute(sql`SELECT pg_advisory_xact_lock(${ZERO_COST_SOURCE_LOCK_NAMESPACE}, ${sourceId})`);
+
+      const [src] = await tx
+        .select()
+        .from(factoryMixBatchSources)
+        .where(and(eq(factoryMixBatchSources.id, sourceId)))
+        .for("update");
+      if (!src) return null;
+
+      const [batch] = await tx
+        .select()
+        .from(factoryMixBatches)
+        .where(and(eq(factoryMixBatches.id, src.mixBatchId), eq(factoryMixBatches.companyId, companyId)));
+      if (!batch) return null;
+
+      const currentCostPerKg = parseFloat(src.costPerKg || "0");
+      const weightKg = parseFloat(src.weightKg || "0");
+      if (currentCostPerKg > 0 || weightKg <= 0) {
+        return {
+          sourceId,
+          batchId: batch.id,
+          batchCode: batch.batchCode,
+          applied: false,
+          skippedReason: "Source is no longer zero-cost — idempotent no-op.",
+          affectedBales: 0,
+        } as ZeroCostSourceFixResult;
+      }
+
+      let correctedCostPerKg: number | null = null;
+      if (src.containerId != null) {
+        const [rawStock] = await tx
+          .select()
+          .from(factoryRawStock)
+          .where(and(eq(factoryRawStock.containerId, src.containerId), isNull(factoryRawStock.deletedAt)));
+        correctedCostPerKg = rawStock ? parseFloat(rawStock.costPerKg || "0") : null;
+        if (!correctedCostPerKg || correctedCostPerKg <= 0) {
+          return {
+            sourceId,
+            batchId: batch.id,
+            batchCode: batch.batchCode,
+            applied: false,
+            skippedReason: "Container has no priced raw-stock row to copy a cost from.",
+            affectedBales: 0,
+          } as ZeroCostSourceFixResult;
+        }
+      } else {
+        const manualRate = opts.manualRates?.[sourceId];
+        if (!manualRate || manualRate <= 0) {
+          return {
+            sourceId,
+            batchId: batch.id,
+            batchCode: batch.batchCode,
+            applied: false,
+            skippedReason: "Direct-from-supplier source with no container link — requires a manually entered cost/kg.",
+            affectedBales: 0,
+          } as ZeroCostSourceFixResult;
+        }
+        correctedCostPerKg = manualRate;
+      }
+
+      await tx
+        .update(factoryMixBatchSources)
+        .set({ costPerKg: String(correctedCostPerKg), totalCost: String((weightKg * correctedCostPerKg).toFixed(2)) })
+        .where(eq(factoryMixBatchSources.id, sourceId));
+
+      const { bales } = await recomputeBatchAndCascadeBales(tx, companyId, batch.id);
+
+      const fixResult: ZeroCostSourceFixResult = {
+        sourceId,
+        batchId: batch.id,
+        batchCode: batch.batchCode,
+        applied: true,
+        costPerKgApplied: correctedCostPerKg,
+        affectedBales: bales.length,
+      };
+
+      if (opts.onAudit) {
+        await opts.onAudit(tx, fixResult);
+      }
+
+      return fixResult;
     });
 
     if (result) results.push(result);

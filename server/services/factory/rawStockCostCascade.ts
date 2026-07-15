@@ -33,6 +33,78 @@ export interface CascadeResult {
   affectedBales: { baleId: number; baleCode?: string }[];
 }
 
+const COMPLETED_BATCH_STATUSES_SHARED = ["COMPLETED", "CLOSED"];
+
+/**
+ * Recompute a single mix batch's weighted-average cost/kg from ALL of its
+ * current sources, then cascade that blended cost down to every non-deleted
+ * bale still pressed from it. Shared by cascadeContainerCostChange (triggered
+ * by a container's cost changing) and any source-level repair (e.g. a
+ * mix-batch-source that was recorded with cost 0) — both need the exact same
+ * weighted-average + bale-cascade math, just triggered from different callers.
+ */
+export async function recomputeBatchAndCascadeBales(
+  tx: any,
+  companyId: number,
+  batchId: number
+): Promise<{
+  batchCode: string;
+  oldCostPerKg: number;
+  newCostPerKg: number;
+  weightKg: number;
+  wasCompleted: boolean;
+  bales: { baleId: number; baleCode?: string }[];
+}> {
+  const [batch] = await tx.select().from(factoryMixBatches).where(eq(factoryMixBatches.id, batchId));
+  const oldCostPerKg = batch ? parseFloat(batch.costPerKg || "0") : 0;
+  const wasCompleted = !!batch && COMPLETED_BATCH_STATUSES_SHARED.includes(batch.status);
+  const allSources = await tx.select().from(factoryMixBatchSources).where(eq(factoryMixBatchSources.mixBatchId, batchId));
+  const batchTotalCost = allSources.reduce((sum: number, s: any) => sum + parseFloat(s.totalCost || "0"), 0);
+  const batchTotalWeight = allSources.reduce((sum: number, s: any) => sum + parseFloat(s.weightKg || "0"), 0);
+  const batchCostPerKg = batchTotalWeight > 0 ? batchTotalCost / batchTotalWeight : 0;
+  await tx
+    .update(factoryMixBatches)
+    .set({
+      costPerKg: String(batchCostPerKg.toFixed(4)),
+      totalCost: String(batchTotalCost.toFixed(2)),
+      updatedAt: new Date(),
+    })
+    .where(eq(factoryMixBatches.id, batchId));
+
+  const balesInBatch = await tx
+    .select({ id: factoryBales.id, baleCode: factoryBales.baleCode, weightKg: factoryBales.weightKg })
+    .from(factoryBales)
+    .where(
+      and(
+        eq(factoryBales.mixBatchId, batchId),
+        eq(factoryBales.companyId, companyId),
+        sql`${factoryBales.status} NOT IN ('DELETED','REMOVED')`
+      )
+    );
+  const bales: { baleId: number; baleCode?: string }[] = [];
+  for (const bale of balesInBatch) {
+    const baleWt = parseFloat(bale.weightKg as string) || 0;
+    await tx
+      .update(factoryBales)
+      .set({
+        costPerKg: String(batchCostPerKg.toFixed(4)),
+        totalCost: String((baleWt * batchCostPerKg).toFixed(2)),
+        updatedAt: new Date(),
+      })
+      .where(eq(factoryBales.id, bale.id));
+    bales.push({ baleId: bale.id, baleCode: bale.baleCode });
+  }
+
+  return {
+    batchCode: batch?.batchCode || `#${batchId}`,
+    oldCostPerKg,
+    newCostPerKg: batchCostPerKg,
+    weightKg: allSources.reduce((sum: number, s: any) => sum + parseFloat(s.weightKg || "0"), 0),
+    wasCompleted,
+    bales,
+  };
+}
+
 /**
  * Recalculate and write the corrected inclusive cost/kg for a single container's
  * raw stock row(s), then cascade the change through every mix-batch source that
@@ -154,63 +226,13 @@ export async function cascadeContainerCostChange(
     }
 
     // 3. Recompute weighted-average cost for every batch touched (from ALL its
-    //    sources, not just this container's — a batch may blend multiple suppliers).
+    //    sources, not just this container's — a batch may blend multiple suppliers),
+    //    then cascade to bales — shared with the zero-cost-source repair path.
     const affectedBatchIds = [...new Set(mixSources.map((s: any) => s.mixBatchId as number))] as number[];
     for (const batchId of affectedBatchIds) {
-      const [batch] = await tx.select().from(factoryMixBatches).where(eq(factoryMixBatches.id, batchId));
-      const oldCostPerKg = batch ? parseFloat(batch.costPerKg || "0") : 0;
-      const wasCompleted = !!batch && COMPLETED_BATCH_STATUSES.includes(batch.status);
-      const allSources = await tx
-        .select()
-        .from(factoryMixBatchSources)
-        .where(eq(factoryMixBatchSources.mixBatchId, batchId));
-      const batchTotalCost = allSources.reduce((sum: number, s: any) => sum + parseFloat(s.totalCost || "0"), 0);
-      const batchTotalWeight = allSources.reduce((sum: number, s: any) => sum + parseFloat(s.weightKg || "0"), 0);
-      const batchCostPerKg = batchTotalWeight > 0 ? batchTotalCost / batchTotalWeight : 0;
-      await tx
-        .update(factoryMixBatches)
-        .set({
-          costPerKg: String(batchCostPerKg.toFixed(4)),
-          totalCost: String(batchTotalCost.toFixed(2)),
-          updatedAt: new Date(),
-        })
-        .where(eq(factoryMixBatches.id, batchId));
-
-      const srcWeight = mixSources
-        .filter((s: any) => s.mixBatchId === batchId)
-        .reduce((sum: number, s: any) => sum + parseFloat(s.weightKg || "0"), 0);
-      affectedBatches.push({
-        batchId,
-        batchCode: batch?.batchCode || `#${batchId}`,
-        oldCostPerKg,
-        newCostPerKg: batchCostPerKg,
-        weightKg: srcWeight,
-        wasCompleted,
-      });
-
-      // 4. Cascade the blended batch cost down to every bale still pressed from it.
-      const balesInBatch = await tx
-        .select({ id: factoryBales.id, baleCode: factoryBales.baleCode, weightKg: factoryBales.weightKg })
-        .from(factoryBales)
-        .where(
-          and(
-            eq(factoryBales.mixBatchId, batchId),
-            eq(factoryBales.companyId, companyId),
-            sql`${factoryBales.status} NOT IN ('DELETED','REMOVED')`
-          )
-        );
-      for (const bale of balesInBatch) {
-        const baleWt = parseFloat(bale.weightKg as string) || 0;
-        await tx
-          .update(factoryBales)
-          .set({
-            costPerKg: String(batchCostPerKg.toFixed(4)),
-            totalCost: String((baleWt * batchCostPerKg).toFixed(2)),
-            updatedAt: new Date(),
-          })
-          .where(eq(factoryBales.id, bale.id));
-        affectedBales.push({ baleId: bale.id, baleCode: bale.baleCode });
-      }
+      const { bales, ...batchResult } = await recomputeBatchAndCascadeBales(tx, companyId, batchId);
+      affectedBatches.push({ batchId, ...batchResult });
+      affectedBales.push(...bales);
     }
   }
 

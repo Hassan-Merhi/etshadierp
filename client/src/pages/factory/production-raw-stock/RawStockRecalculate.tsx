@@ -47,6 +47,22 @@ interface AffectedMixBatchRow {
   sourceContainerNumbers: string[];
 }
 
+interface ZeroCostSourceRow {
+  sourceId: number;
+  batchId: number;
+  batchCode: string;
+  batchStatus: string;
+  containerId: number | null;
+  containerNumber: string | null;
+  supplierId: number | null;
+  supplierName: string | null;
+  weightKg: number;
+  currentCostPerKg: number;
+  correctedCostPerKg: number | null;
+  fixable: boolean;
+  reason: string;
+}
+
 export default function RawStockRecalculate() {
   const { toast } = useToast();
   const { wrapAdminAction, AdminDialog } = useAdminOverride();
@@ -55,6 +71,8 @@ export default function RawStockRecalculate() {
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [includeCompletedBatches, setIncludeCompletedBatches] = useState(false);
   const [detailBatchId, setDetailBatchId] = useState<number | null>(null);
+  const [selectedZeroCostSources, setSelectedZeroCostSources] = useState<Set<number>>(new Set());
+  const [manualRates, setManualRates] = useState<Record<number, string>>({});
 
   const { data: rows, isLoading, refetch } = useQuery<RecalcRow[]>({
     queryKey: ["/api/factory/raw-stock/recalc/preview"],
@@ -144,6 +162,91 @@ export default function RawStockRecalculate() {
     wrapAdminAction(() => {
       applyMutation.mutate({ containerIds: Array.from(selected), includeCompletedBatches });
     }, label);
+  };
+
+  // Mix-batch-source rows recorded with cost 0 despite real weight — a
+  // container-agnostic bug (the parent container's own cost may already be
+  // correct, so it never appears in the table above at all).
+  const { data: zeroCostSources, isLoading: zeroCostLoading } = useQuery<ZeroCostSourceRow[]>({
+    queryKey: ["/api/factory/raw-stock/recalc/zero-cost-sources"],
+    queryFn: async () => {
+      const res = await modeApiRequest("GET", "/api/factory/raw-stock/recalc/zero-cost-sources");
+      if (!res.ok) throw new Error("Failed to load zero-cost mix-batch sources");
+      return res.json();
+    },
+  });
+
+  const fixableZeroCostSources = useMemo(() => (zeroCostSources || []).filter((r) => r.fixable), [zeroCostSources]);
+  const manualZeroCostSources = useMemo(
+    () => (zeroCostSources || []).filter((r) => !r.fixable && r.containerId == null),
+    [zeroCostSources]
+  );
+  const allZeroCostSelected =
+    fixableZeroCostSources.length > 0 && fixableZeroCostSources.every((r) => selectedZeroCostSources.has(r.sourceId));
+
+  const toggleZeroCostSource = (sourceId: number) => {
+    setSelectedZeroCostSources((prev) => {
+      const next = new Set(prev);
+      if (next.has(sourceId)) next.delete(sourceId);
+      else next.add(sourceId);
+      return next;
+    });
+  };
+  const toggleAllZeroCostSources = () => {
+    if (allZeroCostSelected) {
+      setSelectedZeroCostSources(new Set());
+    } else {
+      setSelectedZeroCostSources(new Set(fixableZeroCostSources.map((r) => r.sourceId)));
+    }
+  };
+
+  const zeroCostFixMutation = useMutation({
+    mutationFn: async ({ sourceIds, rates }: { sourceIds: number[]; rates: Record<number, number> }) => {
+      const dryRun = await modeApiRequest("POST", "/api/factory/raw-stock/recalc/zero-cost-sources/apply", {
+        sourceIds,
+        manualRates: rates,
+      });
+      if (!dryRun.ok) throw new Error((await dryRun.json()).message || "Failed to prepare fix");
+      const dryRunData = await dryRun.json();
+      const res = await modeApiRequest("POST", "/api/factory/raw-stock/recalc/zero-cost-sources/apply", {
+        sourceIds,
+        manualRates: rates,
+        confirm: true,
+        confirmationToken: dryRunData.confirmationToken,
+      });
+      if (!res.ok) throw new Error((await res.json()).message || "Failed to apply fix");
+      return res.json();
+    },
+    onSuccess: (data) => {
+      const results = data.results || [];
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/raw-stock/recalc/zero-cost-sources"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/mix-batches"] });
+      const applied = results.filter((r: any) => r.applied);
+      const totalBales = results.reduce((s: number, r: any) => s + (r.affectedBales || 0), 0);
+      setSelectedZeroCostSources(new Set());
+      toast({
+        title: "Zero-cost sources fixed",
+        description: `Repaired ${applied.length} source(s) across their mix batches. Updated ${totalBales} bale(s).`,
+      });
+    },
+    onError: (err: any) => {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const handleFixZeroCostSources = () => {
+    if (selectedZeroCostSources.size === 0) return;
+    const rates: Record<number, number> = {};
+    for (const id of selectedZeroCostSources) {
+      const raw = manualRates[id];
+      if (raw) {
+        const parsed = parseFloat(raw);
+        if (!isNaN(parsed) && parsed > 0) rates[id] = parsed;
+      }
+    }
+    wrapAdminAction(() => {
+      zeroCostFixMutation.mutate({ sourceIds: Array.from(selectedZeroCostSources), rates });
+    }, `Backfill cost for ${selectedZeroCostSources.size} zero-cost mix-batch source(s)`);
   };
 
   return (
@@ -376,6 +479,111 @@ export default function RawStockRecalculate() {
           )}
         </>
       )}
+
+      <div className="space-y-3 border-t pt-6">
+        <div>
+          <h2 className="text-sm font-semibold leading-tight">Mix batch sources with zero cost</h2>
+          <p className="text-xs text-muted-foreground leading-tight">
+            Old containers whose weight was pulled into a mix batch but never priced — the container's own cost can be
+            correct today, yet these batches still carry $0 for that portion. Independent of the container list above.
+          </p>
+        </div>
+        {zeroCostLoading ? (
+          <Skeleton className="h-24 w-full" />
+        ) : (zeroCostSources || []).length === 0 ? (
+          <div className="text-xs text-muted-foreground py-6 text-center border rounded-md bg-card">
+            No zero-cost mix-batch sources found.
+          </div>
+        ) : (
+          <>
+            <div className="border rounded-md overflow-hidden bg-card shadow-sm">
+              <Table>
+                <TableHeader className="bg-muted/50">
+                  <TableRow>
+                    <TableHead className="w-10">
+                      <Checkbox checked={allZeroCostSelected} onCheckedChange={toggleAllZeroCostSources} disabled={fixableZeroCostSources.length === 0} />
+                    </TableHead>
+                    <TableHead>Batch</TableHead>
+                    <TableHead>Source</TableHead>
+                    <TableHead className="text-right">Weight (kg)</TableHead>
+                    <TableHead className="text-right">Corrected $/kg</TableHead>
+                    <TableHead>Status</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {(zeroCostSources || []).map((r) => (
+                    <TableRow key={r.sourceId}>
+                      <TableCell>
+                        <Checkbox
+                          checked={selectedZeroCostSources.has(r.sourceId)}
+                          onCheckedChange={() => toggleZeroCostSource(r.sourceId)}
+                          disabled={!r.fixable && r.containerId != null}
+                        />
+                      </TableCell>
+                      <TableCell
+                        className="font-mono text-xs cursor-pointer hover:underline"
+                        onClick={() => setDetailBatchId(r.batchId)}
+                      >
+                        {r.batchCode}
+                      </TableCell>
+                      <TableCell className="text-xs text-muted-foreground">
+                        {r.containerNumber ? `Container ${r.containerNumber}` : r.supplierName ? `Supplier: ${r.supplierName}` : "—"}
+                      </TableCell>
+                      <TableCell className="text-right font-mono text-xs text-muted-foreground">
+                        {formatNumber(r.weightKg)}
+                      </TableCell>
+                      <TableCell className="text-right font-mono text-xs font-medium">
+                        {r.fixable ? (
+                          `${r.correctedCostPerKg!.toFixed(4)}`
+                        ) : r.containerId == null ? (
+                          <input
+                            type="number"
+                            step="0.0001"
+                            placeholder="Enter $/kg"
+                            className="w-24 text-right text-xs border rounded px-1.5 py-0.5 bg-background"
+                            value={manualRates[r.sourceId] || ""}
+                            onChange={(e) => setManualRates((prev) => ({ ...prev, [r.sourceId]: e.target.value }))}
+                          />
+                        ) : (
+                          "—"
+                        )}
+                      </TableCell>
+                      <TableCell className="text-xs text-muted-foreground" title={r.reason}>
+                        {r.fixable ? (
+                          <Badge variant="outline" className="text-emerald-500 border-emerald-500/30 bg-emerald-500/10">
+                            Ready
+                          </Badge>
+                        ) : r.containerId == null ? (
+                          <Badge variant="outline" className="text-amber-600 border-amber-500/30 bg-amber-500/10">
+                            Needs manual rate
+                          </Badge>
+                        ) : (
+                          <Badge variant="outline" className="text-muted-foreground">
+                            Unresolved
+                          </Badge>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+            <div className="flex items-center justify-between">
+              <p className="text-xs text-muted-foreground">
+                {fixableZeroCostSources.length} fixable automatically · {manualZeroCostSources.length} need a manual rate.
+              </p>
+              <Button
+                size="sm"
+                disabled={selectedZeroCostSources.size === 0 || zeroCostFixMutation.isPending}
+                onClick={handleFixZeroCostSources}
+              >
+                <CheckCircle2 className="h-4 w-4 mr-1.5" />
+                Fix Selected ({selectedZeroCostSources.size})
+              </Button>
+            </div>
+          </>
+        )}
+      </div>
 
       <Dialog open={detailBatchId !== null} onOpenChange={(open) => !open && setDetailBatchId(null)}>
         <DialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto">
