@@ -16,7 +16,8 @@ export function drCrClass(side: string | null | undefined): string {
  * @param maxDecimals - Maximum decimal places to show (default 2)
  * @returns Formatted string with commas and smart decimals
  */
-export function formatNumber(num: number, maxDecimals: number = 2): string {
+export function formatNumber(num: number | null | undefined, maxDecimals: number = 2): string {
+  if (num == null || !Number.isFinite(num)) return "0";
   return num.toLocaleString(undefined, {
     minimumFractionDigits: 0,
     maximumFractionDigits: maxDecimals,
@@ -28,7 +29,7 @@ export function formatNumber(num: number, maxDecimals: number = 2): string {
  * @param num - The number to format
  * @returns Formatted string ready for currency display (add $ prefix separately)
  */
-export function formatCurrency(num: number): string {
+export function formatCurrency(num: number | null | undefined): string {
   return formatNumber(num, 2);
 }
 

@@ -446,19 +446,22 @@ export default function RawStockRecalculate() {
   };
 
   // ─── Helpers ──────────────────────────────────────────────────────────────
-  const badgePct = (pct: number) => (
-    <Badge
-      variant="outline"
-      className={
-        pct > 0
-          ? "text-red-500 border-red-500/30 bg-red-500/10"
-          : "text-emerald-500 border-emerald-500/30 bg-emerald-500/10"
-      }
-    >
-      {pct > 0 ? "+" : ""}
-      {pct.toFixed(2)}%
-    </Badge>
-  );
+  const badgePct = (pct: number | null | undefined) => {
+    const v = pct ?? 0;
+    return (
+      <Badge
+        variant="outline"
+        className={
+          v > 0
+            ? "text-red-500 border-red-500/30 bg-red-500/10"
+            : "text-emerald-500 border-emerald-500/30 bg-emerald-500/10"
+        }
+      >
+        {v > 0 ? "+" : ""}
+        {v.toFixed(2)}%
+      </Badge>
+    );
+  };
 
   const statusBadge = (status: string) => {
     const cls =
@@ -677,10 +680,10 @@ export default function RawStockRecalculate() {
                               )}
                             </TableCell>
                             <TableCell className="text-right font-mono text-xs text-muted-foreground">
-                              ${row.old.costPerKgUsd.toFixed(6)}
+                              ${(row.old?.costPerKgUsd ?? 0).toFixed(6)}
                             </TableCell>
                             <TableCell className="text-right font-mono text-xs font-medium text-foreground">
-                              ${row.next.costPerKgUsd.toFixed(6)}
+                              ${(row.next?.costPerKgUsd ?? 0).toFixed(6)}
                             </TableCell>
                             <TableCell className="text-right">{badgePct(row.diffPct)}</TableCell>
                           </TableRow>
@@ -774,16 +777,16 @@ export default function RawStockRecalculate() {
                                   {formatNumber(b.weightKgFromSelectedContainers)}
                                 </TableCell>
                                 <TableCell className="text-right font-mono text-xs text-muted-foreground">
-                                  ${b.oldCostPerKg.toFixed(6)}
+                                  ${(b.oldCostPerKg ?? 0).toFixed(6)}
                                 </TableCell>
                                 <TableCell className="text-right font-mono text-xs font-medium">
-                                  ${b.newCostPerKg.toFixed(6)}
+                                  ${(b.newCostPerKg ?? 0).toFixed(6)}
                                 </TableCell>
                                 <TableCell className="text-right font-mono text-xs">
-                                  {b.costDifferencePerKg > 0 ? "+" : ""}${b.costDifferencePerKg.toFixed(6)}
+                                  {(b.costDifferencePerKg ?? 0) > 0 ? "+" : ""}${(b.costDifferencePerKg ?? 0).toFixed(6)}
                                 </TableCell>
                                 <TableCell className="text-right font-mono text-xs">
-                                  {b.totalCostDifference > 0 ? "+" : ""}${b.totalCostDifference.toFixed(2)}
+                                  {(b.totalCostDifference ?? 0) > 0 ? "+" : ""}${(b.totalCostDifference ?? 0).toFixed(2)}
                                 </TableCell>
                                 <TableCell className="text-right">{badgePct(b.diffPct)}</TableCell>
                                 <TableCell className="text-right font-mono text-xs text-muted-foreground">
@@ -809,10 +812,10 @@ export default function RawStockRecalculate() {
                                       {formatNumber(sc.weightKg)} kg
                                     </TableCell>
                                     <TableCell className="text-right font-mono text-[10px] text-muted-foreground">
-                                      ${sc.oldCostPerKgUsd.toFixed(6)}
+                                      ${(sc.oldCostPerKgUsd ?? 0).toFixed(6)}
                                     </TableCell>
                                     <TableCell className="text-right font-mono text-[10px]">
-                                      ${sc.newCostPerKgUsd.toFixed(6)}
+                                      ${(sc.newCostPerKgUsd ?? 0).toFixed(6)}
                                     </TableCell>
                                     <TableCell colSpan={4} />
                                   </TableRow>
@@ -897,11 +900,11 @@ export default function RawStockRecalculate() {
                           {formatNumber(r.weightKg)}
                         </TableCell>
                         <TableCell className="text-right font-mono text-xs text-muted-foreground">
-                          ${r.oldCostPerKgUsd.toFixed(6)}
+                          ${(r.oldCostPerKgUsd ?? 0).toFixed(6)}
                         </TableCell>
                         <TableCell className="text-right font-mono text-xs font-medium">
                           {r.fixable ? (
-                            `$${r.newCostPerKgUsd.toFixed(6)}`
+                            `${(r.newCostPerKgUsd ?? 0).toFixed(6)}`
                           ) : r.containerId == null ? (
                             <input
                               type="number"
