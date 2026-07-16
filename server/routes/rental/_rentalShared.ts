@@ -2,6 +2,7 @@ import { parseId, parseOptionalId } from "../../lib/parseId";
 import { logAudit } from "../_helpers";
 import type { Express, Request, Response } from "express";
 import { db } from "../../db";
+import { getDuePeriods, getRentalBillingDay, getUtcTodayString } from "../../services/rental/rentalPeriodService";
 import { requireAuth } from "../../auth";
 import { getClientDate } from "../../lib/dateUtils";
 import {
@@ -230,86 +231,38 @@ export async function maybeRunAutoTransfer(
   }
 }
 
-export async function ensureMonthlyLedgerRows(contractId: number) {
+export async function ensureMonthlyLedgerRows(contractId: number, asOfDate?: string) {
   const [contract] = await db.select().from(propertyContracts).where(eq(propertyContracts.id, contractId));
   if (!contract || contract.status !== "ACTIVE") return;
 
-  const start = new Date(contract.startDate as any);
-  const startYear = start.getUTCFullYear();
-  const startMonth = start.getUTCMonth() + 1;
-  const billingDay = start.getUTCDate(); // day-of-month the tenant started = monthly billing day
-  const now = new Date();
-  const curYear = now.getUTCFullYear();
-  const curMonth = now.getUTCMonth() + 1;
-  const curDay = now.getUTCDate();
+  const billingDay = getRentalBillingDay(contract.startDate as string);
+  const targetDate = asOfDate ?? getUtcTodayString();
 
-  // If today is before the billing day, remove any unpaid current-month row that was
-  // created prematurely — BUT only if no SCHEDULED payment already references it.
-  if (curDay < billingDay) {
-    // Find the ledger row for this month
-    const [curMonthRow] = await db
-      .select({ id: propertyMonthlyLedger.id })
-      .from(propertyMonthlyLedger)
-      .where(
-        and(
-          eq(propertyMonthlyLedger.contractId, contract.id),
-          eq(propertyMonthlyLedger.year, curYear),
-          eq(propertyMonthlyLedger.month, curMonth),
-          sql`${propertyMonthlyLedger.paidAmount} = '0'`
-        )
-      );
-    if (curMonthRow) {
-      // Check if any SCHEDULED payment references this row
-      const [scheduledRef] = await db
-        .select({ id: propertyPayments.id })
-        .from(propertyPayments)
-        .where(
-          and(
-            eq(propertyPayments.ledgerRowId, curMonthRow.id),
-            sql`${propertyPayments.postingStatus} = 'SCHEDULED'`
-          )
-        )
-        .limit(1);
-      if (!scheduledRef) {
-        await db.delete(propertyMonthlyLedger).where(eq(propertyMonthlyLedger.id, curMonthRow.id));
-      }
-    }
+  // Get all periods whose billing date has arrived as of targetDate.
+  // getDuePeriods uses the contract's startDate and billingDay to determine
+  // which month/year periods should have ledger rows.
+  const duePeriods = getDuePeriods(contract.startDate as string, billingDay, targetDate);
+  if (duePeriods.length === 0) return;
+
+  // Upsert each period: insert new rows; update expectedAmount if it was stored as 0
+  // (handles the case where a row was created before the contract amount was set).
+  for (const period of duePeriods) {
+    await db.execute(sql`
+      INSERT INTO property_monthly_ledger (
+        company_id, module, contract_id, unit_id, year, month, expected_amount, paid_amount
+      ) VALUES (
+        ${contract.companyId}, ${contract.module as any}, ${contract.id}, ${contract.unitId},
+        ${period.year}, ${period.month}, ${contract.rentalAmount}, 0
+      )
+      ON CONFLICT (contract_id, year, month)
+      DO UPDATE SET
+        expected_amount = CASE
+          WHEN property_monthly_ledger.expected_amount::numeric = 0
+          THEN EXCLUDED.expected_amount
+          ELSE property_monthly_ledger.expected_amount
+        END
+    `);
   }
-
-  const periods: Array<{ year: number; month: number }> = [];
-  let y = startYear,
-    m = startMonth;
-  // Include a period if it is a past month, OR if it is the current month AND today's
-  // day-of-month has reached the tenant's billing day (so a tenant starting on the 15th
-  // won't have the current month's charge appear until the 15th).
-  while (y < curYear || (y === curYear && m < curMonth) || (y === curYear && m === curMonth && curDay >= billingDay)) {
-    periods.push({ year: y, month: m });
-    m++;
-    if (m > 12) {
-      m = 1;
-      y++;
-    }
-    if (periods.length > 600) break;
-  }
-  if (periods.length === 0) return;
-
-  await db
-    .insert(propertyMonthlyLedger)
-    .values(
-      periods.map((p) => ({
-        companyId: contract.companyId,
-        module: contract.module,
-        contractId: contract.id,
-        unitId: contract.unitId,
-        year: p.year,
-        month: p.month,
-        expectedAmount: contract.rentalAmount,
-        paidAmount: "0",
-      }))
-    )
-    .onConflictDoNothing({
-      target: [propertyMonthlyLedger.contractId, propertyMonthlyLedger.year, propertyMonthlyLedger.month],
-    });
 }
 
 // ── Oldest unpaid month finder ─────────────────────────────────────────────
@@ -439,7 +392,7 @@ export async function buildAllocations(
   return allocations;
 }
 
-export async function ensureMonthlyForCompany(companyId: number, module: RentalModule) {
+export async function ensureMonthlyForCompany(companyId: number, module: RentalModule, asOfDate?: string) {
   const active = await db
     .select({ id: propertyContracts.id })
     .from(propertyContracts)
@@ -450,7 +403,7 @@ export async function ensureMonthlyForCompany(companyId: number, module: RentalM
         eq(propertyContracts.status, "ACTIVE")
       )
     );
-  for (const c of active) await ensureMonthlyLedgerRows(c.id);
+  for (const c of active) await ensureMonthlyLedgerRows(c.id, asOfDate);
 }
 
 /**

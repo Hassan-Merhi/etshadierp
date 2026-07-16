@@ -56,6 +56,11 @@ type Unit = {
   notes: string | null;
   contract: Contract | null;
   outstanding: number | null;
+  totalPaid?: number | null;
+  scheduledAmount?: number | null;
+  prepaidCredit?: number | null;
+  billingDay?: number | null;
+  nextBillingDate?: string | null;
   isShared?: boolean;
   ownerCompanyName?: string | null;
 };
@@ -577,6 +582,8 @@ export default function PropertyRentalPage({
                       <th className="text-right px-3 py-2 font-semibold">Monthly Rent</th>
                       <th className="text-right px-3 py-2 font-semibold">Guarantee</th>
                       <th className="text-right px-3 py-2 font-semibold">Outstanding</th>
+                    <th className="text-right px-3 py-2 font-semibold text-muted-foreground">Scheduled</th>
+                    <th className="text-left px-3 py-2 font-semibold text-muted-foreground">Next Billing</th>
                       <th className="text-left px-3 py-2 font-semibold">Start</th>
                       <th className="px-2 py-2"></th>
                     </tr>
@@ -602,7 +609,7 @@ export default function PropertyRentalPage({
                         <>
                           <tr key={`grp-${group}`} className="border-t">
                             <td
-                              colSpan={10}
+                              colSpan={12}
                               className="px-3 py-1.5 text-xs font-bold uppercase tracking-widest text-center"
                               style={{ backgroundColor: p.headerBg, color: p.headerText }}
                             >
@@ -704,6 +711,16 @@ export default function PropertyRentalPage({
                               >
                                 {u.outstanding !== null
                                   ? fmtMoneyCurrency(Math.abs(u.outstanding), u.contract?.currency)
+                                  : "—"}
+                              </td>
+                              <td className="px-3 py-2 text-right tabular-nums text-muted-foreground text-xs">
+                                {(u as any).scheduledAmount > 0
+                                  ? fmtMoneyCurrency((u as any).scheduledAmount, u.contract?.currency)
+                                  : "—"}
+                              </td>
+                              <td className="px-3 py-2 text-xs text-muted-foreground whitespace-nowrap">
+                                {(u as any).nextBillingDate
+                                  ? format(new Date((u as any).nextBillingDate + "T00:00:00Z"), "dd MMM")
                                   : "—"}
                               </td>
                               <td className="px-3 py-2 text-xs text-muted-foreground">
@@ -1380,6 +1397,7 @@ function BulkPaymentDialog({
 
   const today = new Date().toISOString().slice(0, 10);
   const [paymentDate, setPaymentDate] = useState(today);
+  const [scheduleFuturePayment, setScheduleFuturePayment] = useState(false);
   const [cashAccountId, setCashAccountId] = useState("");
   const [notes, setNotes] = useState("");
   // Per-unit amounts, defaulting to their outstanding (min 0)
@@ -1406,6 +1424,7 @@ function BulkPaymentDialog({
           amount: amounts[u.contract!.id],
           paymentDate,
           notes: notes || undefined,
+          scheduleFuturePayment,
         }));
       if (items.length === 0) throw new Error("No valid amounts entered");
       return apiRequest("POST", apiBase + "/payments/bulk", items);
@@ -1467,6 +1486,20 @@ function BulkPaymentDialog({
               data-testid={`input-${testIdPrefix}-bulk-notes`}
             />
           </div>
+          {paymentDate > new Date().toISOString().slice(0, 10) && (
+            <div className="col-span-2 flex items-center gap-3">
+              <Switch
+                id={`${testIdPrefix}-bulk-schedule-future`}
+                checked={scheduleFuturePayment}
+                onCheckedChange={setScheduleFuturePayment}
+                data-testid={`switch-${testIdPrefix}-bulk-schedule-future`}
+              />
+              <label htmlFor={`${testIdPrefix}-bulk-schedule-future`} className="text-sm cursor-pointer select-none">
+                Schedule future payments{" "}
+                <span className="text-muted-foreground text-xs">(hold as SCHEDULED until {paymentDate})</span>
+              </label>
+            </div>
+          )}
         </div>
 
         <div className="overflow-auto flex-1 mt-3 rounded-md border">
@@ -1649,6 +1682,7 @@ function PaymentForm({
     currency: contract.currency || "USD",
     exchangeRate: "1",
   });
+  const [scheduleFuturePayment, setScheduleFuturePayment] = useState(false);
 
   const pay = useMutation({
     mutationFn: () =>
@@ -1660,6 +1694,7 @@ function PaymentForm({
         notes: form.notes,
         currency: form.currency,
         exchangeRate: form.exchangeRate,
+        scheduleFuturePayment,
       }),
     onSuccess: (data: any) => {
       if (data?.scheduled) {
@@ -1762,6 +1797,20 @@ function PaymentForm({
             data-testid={`input-${testIdPrefix}-payment-notes`}
           />
         </div>
+        {form.paymentDate > new Date().toISOString().slice(0, 10) && (
+          <div className="col-span-2 flex items-center gap-3">
+            <Switch
+              id={`${testIdPrefix}-schedule-future`}
+              checked={scheduleFuturePayment}
+              onCheckedChange={setScheduleFuturePayment}
+              data-testid={`switch-${testIdPrefix}-schedule-future`}
+            />
+            <label htmlFor={`${testIdPrefix}-schedule-future`} className="text-sm cursor-pointer select-none">
+              Schedule future payment{" "}
+              <span className="text-muted-foreground text-xs">(hold as SCHEDULED until {form.paymentDate})</span>
+            </label>
+          </div>
+        )}
       </div>
 
       {isMultiMonth && (
@@ -3044,6 +3093,7 @@ function LedgerView({
               const out = isFutureRow
                 ? 0 - Number(r.paidAmount) // negative = credit
                 : Number(r.expectedAmount) - Number(r.paidAmount);
+              const isPrepaid = !isFutureRow && Number(r.paidAmount) > Number(r.expectedAmount);
               return (
                 <tr key={r.id} className="border-t" data-testid={`row-ledger-${r.year}-${r.month}`}>
                   <td className="px-3 py-1.5">
@@ -3052,6 +3102,7 @@ function LedgerView({
                         {MONTH_NAMES[r.month]} {r.year}
                       </span>
                       {isFutureRow && <span className="text-[10px] text-muted-foreground italic">prepaid</span>}
+                      {isPrepaid && <span className="text-[10px] text-green-600 dark:text-green-400 font-medium">+credit</span>}
                       {r.accrualVoucherId && (
                         <>
                           <Badge

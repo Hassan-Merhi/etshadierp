@@ -289,7 +289,7 @@ export function registerEmployeeNetPositionRoutes(app: Express) {
               inArray(voucherEntries.factorySupplierId, allSupplierIds),
               sql`${voucherEntries.debitAmount}::numeric > 0`,
               sql`${vouchers.voucherNumber} NOT LIKE 'FACTORY-PAY-%'`,
-              lte(vouchers.voucherDate, asOf)
+              sql`COALESCE(${vouchers.effectiveDate}, ${vouchers.voucherDate}) <= ${asOf}`
             )
           );
         for (const row of voucherRows as any[]) {
@@ -775,7 +775,7 @@ export function registerEmployeeNetPositionRoutes(app: Express) {
             eq(vouchers.companyId, companyId),
             eq(vouchers.optional, false),
             isNull(vouchers.deletedAt),
-            lte(vouchers.voucherDate, asOf)
+            sql`COALESCE(${vouchers.effectiveDate}, ${vouchers.voucherDate}) <= ${asOf}`
           )
         );
 

@@ -12,8 +12,9 @@ import {
   type RentalModule,
 } from "./_rentalShared";
 import { postDueScheduledRentalPayments } from "../../services/rental/rentalPaymentPostingService";
+import { getRentalBillingDay, getRentalPeriodDueDate } from "../../services/rental/rentalPeriodService";
 import { getClientDate } from "../../lib/dateUtils";
-import { db } from "../../db";
+import { db, pool } from "../../db";
 import { requireAuth } from "../../auth";
 import { z } from "zod";
 import { eq, and, sql, desc, inArray, isNull, isNotNull, ne } from "drizzle-orm";
@@ -34,6 +35,18 @@ import {
 import { parseId, parseOptionalId } from "../../lib/parseId";
 import { logAudit } from "../_helpers";
 
+/** Returns the next billing date on or after asOf for a given billingDay (1-28). */
+function computeNextBillingDate(billingDay: number, asOf: string): string {
+  const d = new Date(asOf + "T00:00:00Z");
+  const y = d.getUTCFullYear();
+  const m = d.getUTCMonth() + 1;
+  const thisMonthBilling = getRentalPeriodDueDate(y, m, billingDay);
+  if (thisMonthBilling >= asOf) return thisMonthBilling;
+  const nextM = m === 12 ? 1 : m + 1;
+  const nextY = m === 12 ? y + 1 : y;
+  return getRentalPeriodDueDate(nextY, nextM, billingDay);
+}
+
 export function registerRentalUnitsContractsRoutes(
   app: Express,
   module: RentalModule,
@@ -49,16 +62,16 @@ export function registerRentalUnitsContractsRoutes(
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const unitType = (req.query.unitType as string) || "WAREHOUSE";
 
-      await ensureMonthlyForCompany(companyId, module);
+      const asOf = getClientDate(req);
+      await ensureMonthlyForCompany(companyId, module, asOf);
 
       // For ERP/FACTORY SHOP view: silently post any pending rent accruals and
       // any due SCHEDULED payments on page load.  Fire-and-forget.
       if ((module === "ERP" || module === "FACTORY") && unitType === "SHOP") {
-        const asOfForPost = getClientDate(req);
         postRentAccrualForCompany(companyId, shopExpenseAccountName, module, incomeAccountName).catch((e) =>
           console.warn(`${tag} page-load accrual failed:`, e.message?.split("\n")[0])
         );
-        postDueScheduledRentalPayments(companyId, module, asOfForPost, shopExpenseAccountName).catch((e) =>
+        postDueScheduledRentalPayments(companyId, module, asOf, shopExpenseAccountName).catch((e) =>
           console.warn(`${tag} page-load scheduled-posting failed:`, e.message?.split("\n")[0])
         );
       }
@@ -137,35 +150,74 @@ export function registerRentalUnitsContractsRoutes(
 
       const contractIds = contracts.map((c) => c.id);
       const outstandingByContract = new Map<number, number>();
+      const paidAsOfByContract = new Map<number, number>();
+      const scheduledAmountByContract = new Map<number, number>();
       const totalPaidByContract = new Map<number, number>();
       const guaranteeAppliedByContract = new Map<number, number>();
+
       if (contractIds.length > 0) {
-        // Only count expectedAmount for months up to the current calendar month.
-        // All paidAmount is counted regardless of month so advance payments create
-        // a negative outstanding (credit) instead of silently zeroing out.
-        const rows = await db
+        // Billing-day-aware expected: only sum months whose billing date has arrived as of asOf
+        const ledgerRowsForExp = await db
           .select({
             contractId: propertyMonthlyLedger.contractId,
-            expected: sql<string>`COALESCE(SUM(
-            CASE WHEN (
-              ${propertyMonthlyLedger.year} < EXTRACT(YEAR FROM NOW())
-              OR (
-                ${propertyMonthlyLedger.year} = EXTRACT(YEAR FROM NOW())
-                AND ${propertyMonthlyLedger.month} <= EXTRACT(MONTH FROM NOW())
-              )
-            ) THEN ${propertyMonthlyLedger.expectedAmount} ELSE 0 END
-          ), 0)`,
-            paid: sql<string>`COALESCE(SUM(${propertyMonthlyLedger.paidAmount}), 0)`,
+            year: propertyMonthlyLedger.year,
+            month: propertyMonthlyLedger.month,
+            expectedAmount: propertyMonthlyLedger.expectedAmount,
           })
           .from(propertyMonthlyLedger)
-          .where(inArray(propertyMonthlyLedger.contractId, contractIds))
-          .groupBy(propertyMonthlyLedger.contractId);
-        rows.forEach((r) => {
-          outstandingByContract.set(r.contractId, Number(r.expected) - Number(r.paid));
-          totalPaidByContract.set(r.contractId, Number(r.paid));
+          .where(inArray(propertyMonthlyLedger.contractId, contractIds));
+
+        const ledgerByContract = new Map<number, typeof ledgerRowsForExp>();
+        for (const row of ledgerRowsForExp) {
+          const arr = ledgerByContract.get(row.contractId) ?? [];
+          arr.push(row);
+          ledgerByContract.set(row.contractId, arr);
+        }
+
+        const expectedAsOfByContract = new Map<number, number>();
+        for (const c of contracts) {
+          const billingDay = getRentalBillingDay(c.startDate as string);
+          const rows = ledgerByContract.get(c.id) ?? [];
+          let expected = 0;
+          for (const row of rows) {
+            const billingDate = getRentalPeriodDueDate(row.year, row.month, billingDay);
+            if (billingDate <= asOf) expected += parseFloat(row.expectedAmount as string) || 0;
+          }
+          expectedAsOfByContract.set(c.id, expected);
+        }
+
+        // POSTED payments as of asOf date (authoritative — not the paidAmount cache)
+        const { rows: postedRows } = await pool.query<{ contract_id: string; paid: string }>(
+          `SELECT contract_id, COALESCE(SUM(amount::numeric), 0) AS paid
+           FROM property_payments
+           WHERE contract_id = ANY($1) AND posting_status = 'POSTED' AND payment_date <= $2
+           GROUP BY contract_id`,
+          [contractIds, asOf]
+        );
+        postedRows.forEach((r) => {
+          const n = parseInt(r.contract_id);
+          paidAsOfByContract.set(n, parseFloat(r.paid));
+          totalPaidByContract.set(n, parseFloat(r.paid));
         });
 
-        // Sum payments tagged [Guarantee applied] to compute remaining guarantee
+        // SCHEDULED (future) payment totals
+        const { rows: scheduledRows } = await pool.query<{ contract_id: string; scheduled: string }>(
+          `SELECT contract_id, COALESCE(SUM(amount::numeric), 0) AS scheduled
+           FROM property_payments
+           WHERE contract_id = ANY($1) AND posting_status = 'SCHEDULED'
+           GROUP BY contract_id`,
+          [contractIds]
+        );
+        scheduledRows.forEach((r) => scheduledAmountByContract.set(parseInt(r.contract_id), parseFloat(r.scheduled)));
+
+        // outstanding = expected - POSTED paid (negative = prepaid credit)
+        for (const c of contracts) {
+          const expected = expectedAsOfByContract.get(c.id) ?? 0;
+          const paid = paidAsOfByContract.get(c.id) ?? 0;
+          outstandingByContract.set(c.id, expected - paid);
+        }
+
+        // [Guarantee applied] payments
         const appliedRows = await db
           .select({
             contractId: propertyPayments.contractId,
@@ -186,11 +238,21 @@ export function registerRentalUnitsContractsRoutes(
         const c = contractByUnit.get(u.id);
         const appliedAsRent = c ? (guaranteeAppliedByContract.get(c.id) ?? 0) : 0;
         const guaranteeRemaining = c ? Math.max(0, parseFloat(String(c.guaranteeAmount || "0")) - appliedAsRent) : null;
+        const outstanding = c ? (outstandingByContract.get(c.id) ?? 0) : null;
+        const paidAsOf = c ? (paidAsOfByContract.get(c.id) ?? 0) : null;
+        const scheduledAmount = c ? (scheduledAmountByContract.get(c.id) ?? 0) : null;
+        const prepaidCredit = outstanding !== null && outstanding < 0 ? Math.abs(outstanding) : null;
+        const billingDay = c ? getRentalBillingDay(c.startDate as string) : null;
+        const nextBillingDate = c && billingDay !== null ? computeNextBillingDate(billingDay, asOf) : null;
         return {
           ...u,
           contract: c ?? null,
-          outstanding: c ? (outstandingByContract.get(c.id) ?? 0) : null,
-          totalPaid: c ? (totalPaidByContract.get(c.id) ?? 0) : null,
+          outstanding,
+          totalPaid: paidAsOf,
+          scheduledAmount,
+          prepaidCredit,
+          billingDay,
+          nextBillingDate,
           guaranteeRemaining,
           isShared: false,
           ownerCompanyName: null as string | null,
@@ -219,29 +281,65 @@ export function registerRentalUnitsContractsRoutes(
             const sharedUnitMap = new Map(sharedUnits.map((u) => [u.id, u]));
 
             const sharedContractIds = sharedContracts.map((c) => c.id);
+            const sharedOutstanding = new Map<number, number>();
+            const sharedPaid = new Map<number, number>();
+            const sharedScheduled = new Map<number, number>();
+
+            // Billing-day-aware expected for shared contracts
             const sharedLedgerRows = await db
               .select({
                 contractId: propertyMonthlyLedger.contractId,
-                expected: sql<string>`COALESCE(SUM(
-              CASE WHEN (
-                ${propertyMonthlyLedger.year} < EXTRACT(YEAR FROM NOW())
-                OR (
-                  ${propertyMonthlyLedger.year} = EXTRACT(YEAR FROM NOW())
-                  AND ${propertyMonthlyLedger.month} <= EXTRACT(MONTH FROM NOW())
-                )
-              ) THEN ${propertyMonthlyLedger.expectedAmount} ELSE 0 END
-            ), 0)`,
-                paid: sql<string>`COALESCE(SUM(${propertyMonthlyLedger.paidAmount}), 0)`,
+                year: propertyMonthlyLedger.year,
+                month: propertyMonthlyLedger.month,
+                expectedAmount: propertyMonthlyLedger.expectedAmount,
               })
               .from(propertyMonthlyLedger)
-              .where(inArray(propertyMonthlyLedger.contractId, sharedContractIds))
-              .groupBy(propertyMonthlyLedger.contractId);
-            const sharedOutstanding = new Map<number, number>();
-            const sharedPaid = new Map<number, number>();
-            sharedLedgerRows.forEach((r) => {
-              sharedOutstanding.set(r.contractId, Number(r.expected) - Number(r.paid));
-              sharedPaid.set(r.contractId, Number(r.paid));
-            });
+              .where(inArray(propertyMonthlyLedger.contractId, sharedContractIds));
+
+            const sharedLedgerByContract = new Map<number, typeof sharedLedgerRows>();
+            for (const row of sharedLedgerRows) {
+              const arr = sharedLedgerByContract.get(row.contractId) ?? [];
+              arr.push(row);
+              sharedLedgerByContract.set(row.contractId, arr);
+            }
+            for (const c of sharedContracts) {
+              const billingDay = getRentalBillingDay(c.startDate as string);
+              const rows = sharedLedgerByContract.get(c.id) ?? [];
+              let expected = 0;
+              for (const row of rows) {
+                const billingDate = getRentalPeriodDueDate(row.year, row.month, billingDay);
+                if (billingDate <= asOf) expected += parseFloat(row.expectedAmount as string) || 0;
+              }
+              // Will set outstanding after loading paid
+              sharedOutstanding.set(c.id, expected);
+            }
+
+            // POSTED payments for shared contracts
+            const { rows: sharedPostedRows } = await pool.query<{ contract_id: string; paid: string }>(
+              `SELECT contract_id, COALESCE(SUM(amount::numeric), 0) AS paid
+               FROM property_payments
+               WHERE contract_id = ANY($1) AND posting_status = 'POSTED' AND payment_date <= $2
+               GROUP BY contract_id`,
+              [sharedContractIds, asOf]
+            );
+            sharedPostedRows.forEach((r) => sharedPaid.set(parseInt(r.contract_id), parseFloat(r.paid)));
+
+            // SCHEDULED for shared
+            const { rows: sharedSchedRows } = await pool.query<{ contract_id: string; scheduled: string }>(
+              `SELECT contract_id, COALESCE(SUM(amount::numeric), 0) AS scheduled
+               FROM property_payments
+               WHERE contract_id = ANY($1) AND posting_status = 'SCHEDULED'
+               GROUP BY contract_id`,
+              [sharedContractIds]
+            );
+            sharedSchedRows.forEach((r) => sharedScheduled.set(parseInt(r.contract_id), parseFloat(r.scheduled)));
+
+            // Finalize outstanding = expected - paid
+            for (const c of sharedContracts) {
+              const expected = sharedOutstanding.get(c.id) ?? 0;
+              const paid = sharedPaid.get(c.id) ?? 0;
+              sharedOutstanding.set(c.id, expected - paid);
+            }
 
             // Fetch owner company names
             const ownerCompanyIds = [...new Set(sharedContracts.map((c) => c.companyId))];
@@ -274,11 +372,21 @@ export function registerRentalUnitsContractsRoutes(
                 if (!u) return null;
                 const appliedAsRent = sharedGuaranteeApplied.get(c.id) ?? 0;
                 const guaranteeRemaining = Math.max(0, parseFloat(String(c.guaranteeAmount || "0")) - appliedAsRent);
+                const outstanding = sharedOutstanding.get(c.id) ?? 0;
+                const paidAsOf = sharedPaid.get(c.id) ?? 0;
+                const scheduledAmount = sharedScheduled.get(c.id) ?? 0;
+                const prepaidCredit = outstanding < 0 ? Math.abs(outstanding) : null;
+                const billingDay = getRentalBillingDay(c.startDate as string);
+                const nextBillingDate = computeNextBillingDate(billingDay, asOf);
                 return {
                   ...u,
                   contract: c,
-                  outstanding: sharedOutstanding.get(c.id) ?? 0,
-                  totalPaid: sharedPaid.get(c.id) ?? 0,
+                  outstanding,
+                  totalPaid: paidAsOf,
+                  scheduledAmount,
+                  prepaidCredit,
+                  billingDay,
+                  nextBillingDate,
                   guaranteeRemaining,
                   isShared: true,
                   ownerCompanyName: ownerNameMap.get(c.companyId) ?? null,

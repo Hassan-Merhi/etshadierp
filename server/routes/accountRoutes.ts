@@ -107,6 +107,7 @@ import { z } from "zod";
 import { readExcel, sheetToJson, createWorkbook, jsonToSheet, aoaToSheet, writeWorkbook } from "../excelHelper";
 import { adjustInventory, reverseInventoryByExactValue } from "../inventoryHelper";
 import { classifyNetPositionAccounts, getAccountNetBalance } from "../netPositionHelper";
+import { getClientDate } from "../lib/dateUtils";
 import { buildFactoryCustomerLedgerEntries, getCustomerByLedgerId } from "../lib/factoryCustomerLedger";
 
 export function registerAccountRoutes(app: Express) {
@@ -280,9 +281,11 @@ export function registerAccountRoutes(app: Express) {
         }
       }
 
-      // Optional date range filter for account balances
+      // Optional date range filter for account balances.
+      // balEndDate defaults to today so that future-dated vouchers are excluded
+      // when the caller doesn't provide an explicit end date (e.g. Cash #707 link).
       const balStartDate = req.query.startDate as string | undefined;
-      const balEndDate = req.query.endDate as string | undefined;
+      const balEndDate = (req.query.endDate as string | undefined) || getClientDate(req);
 
       // Get all voucher entries for this company's vouchers (excluding optional and deleted)
       // Use COALESCE(effectiveDate, voucherDate) so period filtering respects effective date

@@ -4197,6 +4197,13 @@ END $$`,
     // ── Prepaid rent accounting: track which ledger rows used Prepaid/Deferred accounts ──
     `ALTER TABLE property_monthly_ledger ADD COLUMN IF NOT EXISTS used_prepaid_account boolean NOT NULL DEFAULT false`,
     `ALTER TABLE property_monthly_ledger ADD COLUMN IF NOT EXISTS used_advance_account boolean NOT NULL DEFAULT false`,
+    // ── Rental payment scheduling & posting columns ──────────────────────────
+    `ALTER TABLE property_payments ADD COLUMN IF NOT EXISTS posting_status TEXT NOT NULL DEFAULT 'POSTED'`,
+    `ALTER TABLE property_payments ADD COLUMN IF NOT EXISTS payment_group_id TEXT`,
+    `ALTER TABLE property_payments ADD COLUMN IF NOT EXISTS posted_at TIMESTAMP`,
+    `CREATE INDEX IF NOT EXISTS property_payments_status_idx ON property_payments (company_id, module, posting_status, payment_date)`,
+    `UPDATE property_payments SET posting_status = 'POSTED' WHERE posting_status IS NULL OR posting_status = ''`,
+    `UPDATE property_payments SET payment_group_id = 'PG-LEGACY-' || voucher_id::text WHERE payment_group_id IS NULL AND voucher_id IS NOT NULL`,
     // ── Starred proforma for container verification comparison ──
     `ALTER TABLE supplier_proformas ADD COLUMN IF NOT EXISTS is_starred boolean NOT NULL DEFAULT false`,
     // ── Effective Date for factory transactions ──
