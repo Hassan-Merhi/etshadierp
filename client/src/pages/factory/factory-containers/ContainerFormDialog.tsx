@@ -18,6 +18,25 @@ import type { FactorySupplier } from "@shared/schema";
 import type { ContainerWithSupplier } from "./otwHelpers";
 import { ContainerFormBody } from "./ContainerFormBody";
 
+/**
+ * Strip unnecessary trailing decimal zeros without scientific notation.
+ * "19780.000" → "19780"  "0.3800" → "0.38"  "1.18000000" → "1.18"
+ */
+function stripTrailingZeros(value: string | number | null | undefined): string {
+  if (value === null || value === undefined) return "";
+  const s = String(value).trim();
+  if (!s || s === "null" || s === "undefined") return "";
+  if (!/^-?\d+(\.\d+)?$/.test(s)) return s;
+  return s.replace(/(\.\d*?)0+$/, "$1").replace(/\.$/, "");
+}
+
+/** Normalize null / "null" / undefined / "undefined" to empty string. */
+function normalizeText(value: string | null | undefined): string {
+  if (value === null || value === undefined) return "";
+  const s = String(value);
+  return s === "null" || s === "undefined" ? "" : s;
+}
+
 type FormData = {
   containerNumber: string;
   supplierId: string;
@@ -106,29 +125,29 @@ export function ContainerFormDialog({
     }
     const c = editingContainer as any;
     setFormData({
-      containerNumber: c.containerNumber,
+      containerNumber: normalizeText(c.containerNumber),
       supplierId: c.supplierId?.toString() || "",
-      origin: c.origin || "",
-      totalKg: c.totalKg || "",
-      ratePerKg: c.ratePerKg || "",
-      arrivalDate: c.arrivalDate || "",
-      notes: c.notes || "",
+      origin: normalizeText(c.origin),
+      totalKg: stripTrailingZeros(c.totalKg),
+      ratePerKg: stripTrailingZeros(c.ratePerKg),
+      arrivalDate: normalizeText(c.arrivalDate),
+      notes: normalizeText(c.notes),
       status: c.status,
-      commissionAmount: c.commissionAmount || "",
+      commissionAmount: stripTrailingZeros(c.commissionAmount),
       commissionCurrencyCode: c.commissionCurrencyCode || "USD",
       commissionAccountId: c.commissionAccountId ? String(c.commissionAccountId) : "",
       commissionSupplierId: c.commissionSupplierId ? String(c.commissionSupplierId) : "",
-      commissionNotes: c.commissionNotes || "",
-      freight: c.freight || "",
+      commissionNotes: normalizeText(c.commissionNotes),
+      freight: stripTrailingZeros(c.freight),
       freightCurrencyCode: c.freightCurrencyCode || "USD",
       freightAccountId: c.freightAccountId ? String(c.freightAccountId) : "",
       freightPaidBy: (c.freightPaidBy as "supplier" | "own") || "supplier",
       freightOwnAccountId: c.freightOwnAccountId ? String(c.freightOwnAccountId) : "",
-      otherCharges: c.otherCharges || "",
+      otherCharges: stripTrailingZeros(c.otherCharges),
       otherChargesAccountId: c.otherChargesAccountId ? String(c.otherChargesAccountId) : "",
     });
     setCurrency(c.currencyCode || "USD");
-    setFxRate(c.fxRateToUsd || "1");
+    setFxRate(stripTrailingZeros(c.fxRateToUsd) || "1");
     setFxRateSource(c.fxRateSource || "auto");
     setFxEffectiveDate(c.fxRateDateImport || "");
   }, [editingContainer]);
@@ -144,7 +163,7 @@ export function ContainerFormDialog({
       .then((charges: any[]) => {
         setOtherChargeLines(
           charges.map((c: any) => ({
-            amount: c.amount || "",
+            amount: stripTrailingZeros(c.amount),
             currencyCode: c.currencyCode || containerCcy,
             ledgerAccountId: c.ledgerAccountId ? String(c.ledgerAccountId) : "",
           }))
@@ -201,6 +220,8 @@ export function ContainerFormDialog({
 
   const createMutation = useMutation({
     mutationFn: async (data: FormData) => {
+      const freightAmt = parseFloat(data.freight || "0");
+      const freightPaidBy = data.freightPaidBy || "supplier";
       const payload = {
         ...data,
         supplierId: data.supplierId ? parseInt(data.supplierId) : null,
@@ -215,6 +236,16 @@ export function ContainerFormDialog({
         freight: data.freight || "0",
         freightCurrencyCode: data.freightCurrencyCode || "USD",
         freightAccountId: data.freightAccountId ? parseInt(data.freightAccountId) : null,
+        // Always send payer fields explicitly — never rely on spread alone
+        freightPaidBy,
+        freightOwnAccountId:
+          freightAmt > 0 && freightPaidBy === "own" && data.freightOwnAccountId
+            ? parseInt(data.freightOwnAccountId)
+            : null,
+        freightSupplierId:
+          freightAmt > 0 && freightPaidBy === "supplier" && data.supplierId
+            ? parseInt(data.supplierId)
+            : null,
         otherCharges: "0",
         otherChargesAccountId: null,
       };
@@ -256,6 +287,8 @@ export function ContainerFormDialog({
 
   const updateMutation = useMutation({
     mutationFn: async ({ id, data }: { id: number; data: FormData }) => {
+      const freightAmt = parseFloat(data.freight || "0");
+      const freightPaidBy = data.freightPaidBy || "supplier";
       const payload = {
         ...data,
         supplierId: data.supplierId ? parseInt(data.supplierId) : null,
@@ -270,6 +303,16 @@ export function ContainerFormDialog({
         freight: data.freight || "0",
         freightCurrencyCode: data.freightCurrencyCode || "USD",
         freightAccountId: data.freightAccountId ? parseInt(data.freightAccountId) : null,
+        // Always send payer fields explicitly — never rely on spread alone
+        freightPaidBy,
+        freightOwnAccountId:
+          freightAmt > 0 && freightPaidBy === "own" && data.freightOwnAccountId
+            ? parseInt(data.freightOwnAccountId)
+            : null,
+        freightSupplierId:
+          freightAmt > 0 && freightPaidBy === "supplier" && data.supplierId
+            ? parseInt(data.supplierId)
+            : null,
         otherCharges: data.otherCharges || "0",
         otherChargesAccountId: data.otherChargesAccountId ? parseInt(data.otherChargesAccountId) : null,
       };
@@ -321,6 +364,11 @@ export function ContainerFormDialog({
   });
 
   const handleSubmit = () => {
+    const freightAmt = parseFloat(formData.freight || "0");
+    if (freightAmt > 0 && formData.freightPaidBy === "own" && !formData.freightOwnAccountId) {
+      toast({ title: "Select the account that paid the freight.", variant: "destructive" });
+      return;
+    }
     if (editingContainer)
       wrapAdminAction(() => updateMutation.mutate({ id: editingContainer.id, data: formData }), "Update Container");
     else createMutation.mutate(formData);
@@ -337,7 +385,7 @@ export function ContainerFormDialog({
           }
         }}
       >
-        <DialogContent className="max-w-xl">
+        <DialogContent className="sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle>{editingContainer ? "Edit Container" : "Add Factory Container"}</DialogTitle>
             <DialogDescription>

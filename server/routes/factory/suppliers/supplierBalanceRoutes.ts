@@ -140,6 +140,10 @@ const PAYABLE_CONTAINER_STATUSES = new Set(["OFFLOADED", "RECEIVED", "PARTIALLY_
 
 const isPayableContainer = (c: any) => PAYABLE_CONTAINER_STATUSES.has(String(c.status || "").toUpperCase());
 
+/** True when freight should be included in the supplier's payable balance.
+ *  Defaults to "supplier" for legacy rows where freightPaidBy is null. */
+const isSupplierPaidFreight = (c: any) => (c.freightPaidBy || "supplier") === "supplier";
+
 export async function buildBrokerStatement(brokerId: number, companyId: number, includeOtw = false) {
   // Fetch broker
   const [broker] = await db
@@ -316,7 +320,8 @@ export async function buildBrokerStatement(brokerId: number, companyId: number, 
     const cc = c.currencyCode || "USD";
     const kg = parseFloat(c.totalKg || "0");
     const rate = parseFloat(c.ratePerKg || "0");
-    const freight = parseFloat(c.freight || "0");
+    // Own-paid freight must not appear in the supplier/broker balance ledger
+    const freight = isSupplierPaidFreight(c) ? parseFloat(c.freight || "0") : 0;
     // Use freightCurrencyCode directly (DB default is "USD", so AUD containers correctly separate USD freight)
     const freightCc = c.freightCurrencyCode || cc;
     const freightSameCcy = freightCc === cc;
@@ -748,7 +753,7 @@ export function registerSupplierBalanceRoutes(app: Express) {
           // at offload affect inventory only, not what is owed to the supplier.
           const kg = parseFloat(c.totalKg || "0");
           const rate = parseFloat(c.ratePerKg || "0");
-          const freight = parseFloat(c.freight || "0");
+          const freight = isSupplierPaidFreight(c) ? parseFloat(c.freight || "0") : 0;
           const containerCc = c.currencyCode || "USD";
           const { fxRate: fx, looksSet: fxLooksSet } = resolveStoredFxRate(
             containerCc,
@@ -980,7 +985,7 @@ export function registerSupplierBalanceRoutes(app: Express) {
           // at offload affect inventory only, not what is owed to the supplier.
           const kg = parseFloat(c.totalKg || "0");
           const rate = parseFloat(c.ratePerKg || "0");
-          const freight = parseFloat(c.freight || "0");
+          const freight = isSupplierPaidFreight(c) ? parseFloat(c.freight || "0") : 0;
           const containerCc = c.currencyCode || "USD";
           const fx = resolveDisplayFx(containerCc, configuredFxRates[containerCc], c.fxRateToUsd, (c as any).fxRateConfirmed);
           const freightCc = c.freightCurrencyCode || containerCc;
@@ -1073,7 +1078,7 @@ export function registerSupplierBalanceRoutes(app: Express) {
         for (const c of payableContainers) {
           const cc = c.currencyCode || "USD";
           const baseVal = parseFloat(c.totalKg || "0") * parseFloat(c.ratePerKg || "0");
-          const freightAmt = parseFloat(c.freight || "0");
+          const freightAmt = isSupplierPaidFreight(c) ? parseFloat(c.freight || "0") : 0;
           const freightCc = c.freightCurrencyCode || cc;
           const fx = resolveDisplayFx(cc, configuredFxRates[cc], c.fxRateToUsd, (c as any).fxRateConfirmed);
           markIfUnresolved(cc, fx);
@@ -1208,7 +1213,7 @@ export function registerSupplierBalanceRoutes(app: Express) {
                   currencyCode: c.currencyCode || "USD",
                   value: (
                     parseFloat(c.actualReceivedKg || c.totalKg || "0") * parseFloat(c.ratePerKg || "0") +
-                    parseFloat(c.freight || "0")
+                    (isSupplierPaidFreight(c) ? parseFloat(c.freight || "0") : 0)
                   ).toFixed(2),
                   daysPastDue:
                     Math.floor((now.getTime() - new Date(c.offloadDate).getTime()) / (24 * 60 * 60 * 1000)) - 30,
@@ -1226,7 +1231,7 @@ export function registerSupplierBalanceRoutes(app: Express) {
         const fxWeightedSum = fxContainers.reduce((s: number, c: any) => {
           const val =
             parseFloat(c.actualReceivedKg || c.totalKg || "0") * parseFloat(c.ratePerKg || "0") +
-            parseFloat(c.freight || "0");
+            (isSupplierPaidFreight(c) ? parseFloat(c.freight || "0") : 0);
           // fxContainers was already filtered to looksSet===true rows above, so this rate
           // is guaranteed resolved — resolve it through the same helper rather than a bare
           // "|| 1" fallback (which would silently mask a bug if that filter is ever loosened).
@@ -1237,7 +1242,7 @@ export function registerSupplierBalanceRoutes(app: Express) {
           return (
             s +
             (parseFloat(c.actualReceivedKg || c.totalKg || "0") * parseFloat(c.ratePerKg || "0") +
-              parseFloat(c.freight || "0"))
+              (isSupplierPaidFreight(c) ? parseFloat(c.freight || "0") : 0))
           );
         }, 0);
         const approxFxRate = fxWeightBase > 0 ? fxWeightedSum / fxWeightBase : 0;
@@ -1248,6 +1253,7 @@ export function registerSupplierBalanceRoutes(app: Express) {
         const autoSettledFreightUsd =
           s.parentId !== null && s.parentId !== undefined
             ? payableContainers.reduce((sum: number, c: any) => {
+                if (!isSupplierPaidFreight(c)) return sum;
                 const freightCc = c.freightCurrencyCode || c.currencyCode || "USD";
                 const containerCc = c.currencyCode || "USD";
                 if (freightCc === "USD" && containerCc !== "USD") {

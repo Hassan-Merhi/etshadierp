@@ -156,6 +156,9 @@ export function registerFactoryContainersRoutes(app: Express) {
           freight: factoryContainers.freight,
           freightCurrencyCode: factoryContainers.freightCurrencyCode,
           freightAccountId: factoryContainers.freightAccountId,
+          freightPaidBy: factoryContainers.freightPaidBy,
+          freightOwnAccountId: factoryContainers.freightOwnAccountId,
+          freightSupplierId: factoryContainers.freightSupplierId,
           otherCharges: factoryContainers.otherCharges,
           otherChargesAccountId: factoryContainers.otherChargesAccountId,
           commissionAmount: factoryContainers.commissionAmount,
@@ -273,6 +276,10 @@ export function registerFactoryContainersRoutes(app: Express) {
           finalPayableAmountUsd: factoryContainers.finalPayableAmountUsd,
           freight: factoryContainers.freight,
           freightCurrencyCode: factoryContainers.freightCurrencyCode,
+          freightAccountId: factoryContainers.freightAccountId,
+          freightPaidBy: factoryContainers.freightPaidBy,
+          freightOwnAccountId: factoryContainers.freightOwnAccountId,
+          freightSupplierId: factoryContainers.freightSupplierId,
           otherCharges: factoryContainers.otherCharges,
           commissionAmount: factoryContainers.commissionAmount,
           commissionCurrencyCode: factoryContainers.commissionCurrencyCode,
@@ -362,15 +369,25 @@ export function registerFactoryContainersRoutes(app: Express) {
         values.freightAccountId = await getOrCreateLedgerAccount(companyId, "FREIGHT", "Freight");
       }
 
-      // Persist which supplier freight is payable to when freightPaidBy='supplier' (default).
-      // Without this, factoryContainers.freightSupplierId stays null even though the freight
-      // voucher below correctly credits container.supplierId — later steps (offload prefill,
-      // PATCH freight-sync) read freightSupplierId, not supplierId, to know freight has a
-      // supplier payee. Leaving it null makes them fall back to a no-supplier posting branch
-      // and silently re-book freight against the wrong ledger.
+      // Canonicalize freight payer fields on create.
+      // Rule A — Own Account: require freightOwnAccountId, clear supplier link.
+      // Rule B — By Supplier: clear own account, auto-fill freightSupplierId from purchase supplier.
+      // Rule C — No freight: clear both payer fields.
       const freightPaidByOnCreate = values.freightPaidBy || "supplier";
-      if (freightPaidByOnCreate === "supplier" && !values.freightSupplierId && values.supplierId) {
-        values.freightSupplierId = values.supplierId;
+      const freightAmtOnCreate = parseFloat(values.freight || "0");
+      if (freightAmtOnCreate > 0 && freightPaidByOnCreate === "own") {
+        if (!values.freightOwnAccountId) {
+          return res.status(400).json({ message: "freightOwnAccountId is required when freightPaidBy is 'own'" });
+        }
+        values.freightSupplierId = null;
+      } else if (freightPaidByOnCreate === "supplier") {
+        values.freightOwnAccountId = null;
+        if (!values.freightSupplierId && values.supplierId) {
+          values.freightSupplierId = values.supplierId;
+        }
+      } else {
+        values.freightSupplierId = null;
+        values.freightOwnAccountId = null;
       }
 
       const [container] = await db.insert(factoryContainers).values(values).returning();
@@ -634,6 +651,28 @@ export function registerFactoryContainersRoutes(app: Express) {
         updateData.freightAccountId = await getOrCreateLedgerAccount(companyId, "FREIGHT", "Freight");
       }
 
+      // Canonicalize freight payer fields so switching "own" ↔ "supplier" never
+      // leaves a stale value in the opposing field.
+      {
+        const canonFreightAmt = parseFloat(updateData.freight ?? "0");
+        const canonPaidBy: string = updateData.freightPaidBy ?? "supplier";
+        if (canonFreightAmt > 0 && canonPaidBy === "own") {
+          // Own-account: no supplier credit
+          updateData.freightSupplierId = null;
+        } else if (canonFreightAmt > 0 && canonPaidBy === "supplier") {
+          // By-supplier: no own-account credit
+          updateData.freightOwnAccountId = null;
+          if (!updateData.freightSupplierId) {
+            const sid = updateData.supplierId ?? int(b.supplierId);
+            if (sid) updateData.freightSupplierId = sid;
+          }
+        } else {
+          // No freight: clear both
+          updateData.freightSupplierId = null;
+          updateData.freightOwnAccountId = null;
+        }
+      }
+
       const [updated] = await db
         .update(factoryContainers)
         .set(updateData)
@@ -741,7 +780,7 @@ export function registerFactoryContainersRoutes(app: Express) {
               creditAmount: String(newFreightAmt),
               narration: `Freight paid via own account - container ${updated.containerNumber}`,
             });
-          } else if (updated.supplierId) {
+          } else if (newFreightPaidBy === "supplier" && updated.supplierId) {
             await db.insert(voucherEntries).values({
               voucherId: newFV.id,
               factorySupplierId: updated.supplierId,

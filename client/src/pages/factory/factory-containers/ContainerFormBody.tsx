@@ -89,15 +89,6 @@ export function ContainerFormBody({
             data-testid="input-container-number"
           />
         </div>
-        <div>
-          <Label>Origin</Label>
-          <Input
-            value={formData.origin}
-            onChange={(e) => setFormData((f) => ({ ...f, origin: e.target.value }))}
-            placeholder="Country/city of origin"
-            data-testid="input-container-origin"
-          />
-        </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
             <Label>Arrival Date</Label>
@@ -122,15 +113,6 @@ export function ContainerFormBody({
               </SelectContent>
             </Select>
           </div>
-        </div>
-        <div>
-          <Label>Notes</Label>
-          <Input
-            value={formData.notes}
-            onChange={(e) => setFormData((f) => ({ ...f, notes: e.target.value }))}
-            placeholder="Additional notes"
-            data-testid="input-container-notes"
-          />
         </div>
       </div>
 
@@ -385,17 +367,6 @@ export function ContainerFormBody({
         </div>
         <div>
           <Label>
-            Commission Notes <span className="text-muted-foreground text-xs font-normal">(optional)</span>
-          </Label>
-          <Input
-            value={formData.commissionNotes}
-            onChange={(e) => setFormData((f) => ({ ...f, commissionNotes: e.target.value }))}
-            placeholder="e.g. Commission for container facilitation"
-            data-testid="input-commission-notes"
-          />
-        </div>
-        <div>
-          <Label>
             ERP Commission Account <span className="text-muted-foreground text-xs font-normal">(optional)</span>
           </Label>
           <Select
@@ -427,9 +398,9 @@ export function ContainerFormBody({
           <p className="text-sm font-semibold">Freight &amp; Other Charges</p>
           <Separator className="flex-1" />
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 md:grid-cols-[1fr_0.85fr_1.25fr] gap-3 items-end">
           <div>
-            <Label>
+            <Label className="whitespace-nowrap">
               Freight Amount <span className="text-muted-foreground text-xs font-normal">(optional)</span>
             </Label>
             <Input
@@ -441,7 +412,7 @@ export function ContainerFormBody({
             />
           </div>
           <div>
-            <Label>Freight Currency</Label>
+            <Label className="whitespace-nowrap">Freight Currency</Label>
             <Select
               value={formData.freightCurrencyCode}
               onValueChange={(val) => setFormData((f) => ({ ...f, freightCurrencyCode: val }))}
@@ -459,7 +430,7 @@ export function ContainerFormBody({
             </Select>
           </div>
           <div>
-            <Label>
+            <Label className="whitespace-nowrap">
               Freight Expense Account <span className="text-muted-foreground text-xs font-normal">(optional)</span>
             </Label>
             <Select

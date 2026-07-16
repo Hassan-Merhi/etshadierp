@@ -124,6 +124,10 @@ const PAYABLE_CONTAINER_STATUSES = new Set(["OFFLOADED", "RECEIVED", "PARTIALLY_
 
 const isPayableContainer = (c: any) => PAYABLE_CONTAINER_STATUSES.has(String(c.status || "").toUpperCase());
 
+/** True when freight should be included in the supplier's payable balance.
+ *  Defaults to "supplier" for legacy rows where freightPaidBy is null. */
+const isSupplierPaidFreight = (c: any) => (c.freightPaidBy || "supplier") === "supplier";
+
 export async function buildBrokerStatement(brokerId: number, companyId: number, includeOtw = false) {
   // Fetch broker
   const [broker] = await db
@@ -300,7 +304,8 @@ export async function buildBrokerStatement(brokerId: number, companyId: number, 
     const cc = c.currencyCode || "USD";
     const kg = parseFloat(c.totalKg || "0");
     const rate = parseFloat(c.ratePerKg || "0");
-    const freight = parseFloat(c.freight || "0");
+    // Own-paid freight must not appear in the supplier/broker balance ledger
+    const freight = isSupplierPaidFreight(c) ? parseFloat(c.freight || "0") : 0;
     // Use freightCurrencyCode directly (DB default is "USD", so AUD containers correctly separate USD freight)
     const freightCc = c.freightCurrencyCode || cc;
     const freightSameCcy = freightCc === cc;
