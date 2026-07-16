@@ -411,7 +411,7 @@ export function registerFactoryDaybookRoutes(app: Express) {
             return {
               id: -v.id, // negative id so FE can distinguish; won't clash with real ids
               companyId: v.companyId,
-              txDate: v.voucherDate,
+              txDate: v.effectiveDate || v.voucherDate,
               txType: txTypeVal,
               referenceId: v.id,
               referenceTable: "vouchers",

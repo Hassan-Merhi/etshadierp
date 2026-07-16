@@ -2009,7 +2009,9 @@ export default function FactoryDaybook() {
       });
     }
     result = [...result].sort((a, b) => {
-      const dateCmp = a.txDate.localeCompare(b.txDate) || a.id - b.id;
+      const aDate = a.effectiveDate || a.txDate;
+      const bDate = b.effectiveDate || b.txDate;
+      const dateCmp = aDate.localeCompare(bDate) || a.id - b.id;
       return sortOrder === "desc" ? -dateCmp : dateCmp;
     });
     return result;
@@ -2031,10 +2033,11 @@ export default function FactoryDaybook() {
       }
     > = {};
     filteredEntries.forEach((e) => {
-      const key = `${e.txDate}|${e.txType}|${e.currencyCode}`;
+      const eDate = e.effectiveDate || e.txDate;
+      const key = `${eDate}|${e.txType}|${e.currencyCode}`;
       if (!grouped[key]) {
         grouped[key] = {
-          date: e.txDate,
+          date: eDate,
           txType: e.txType,
           currencyCode: e.currencyCode,
           count: 0,
@@ -2060,7 +2063,7 @@ export default function FactoryDaybook() {
   const getEntriesForCondensedRow = (rowKey: string): DisplayEntry[] => {
     const [date, txType, currencyCode] = rowKey.split("|");
     const raw = filteredEntries.filter(
-      (e) => e.txDate === date && e.txType === txType && e.currencyCode === currencyCode
+      (e) => (e.effectiveDate || e.txDate) === date && e.txType === txType && e.currencyCode === currencyCode
     );
     if (txType === "BALE_STOCK_ENTRY") {
       return raw.map((e) => ({ ...e, _vKey: String(e.id), _source: e }) as DisplayEntry);
