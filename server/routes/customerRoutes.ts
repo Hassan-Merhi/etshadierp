@@ -213,11 +213,15 @@ export function registerCustomerRoutes(app: Express) {
 
       let transactions: any[] = [];
       if (customer.ledgerAccountId) {
-        // Old path: entries stored against ledger account
+        // Old path: entries stored against ledger account.
+        // Scope to the current company so cross-company vouchers don't inflate
+        // the customer balance (mirrors getVoucherEntriesByLedger company param).
+        const companyId = req.session.currentCompanyId;
         transactions = await storage.getVoucherEntriesByLedger(
           customer.ledgerAccountId,
           startDate as string | undefined,
-          endDate as string | undefined
+          endDate as string | undefined,
+          companyId
         );
       } else {
         // New path (post-migration): entries stored against customer_id

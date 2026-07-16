@@ -41,7 +41,7 @@ export function registerPosCustomerRoutes(app: Express): void {
       const customersWithBalances = await Promise.all(
         customers.map(async (customer) => {
           if (customer.ledgerAccountId) {
-            const entries = await storage.getVoucherEntriesByLedger(customer.ledgerAccountId);
+            const entries = await storage.getVoucherEntriesByLedger(customer.ledgerAccountId, undefined, undefined, req.session.currentCompanyId);
             const openingBalance = parseFloat(customer.openingBalance || "0");
             const openingSide = customer.openingBalanceSide || "Dr";
 
@@ -172,7 +172,8 @@ export function registerPosCustomerRoutes(app: Express): void {
         transactions = await storage.getVoucherEntriesByLedger(
           customer.ledgerAccountId,
           startDate as string | undefined,
-          endDate as string | undefined
+          endDate as string | undefined,
+          companyId
         );
       } else {
         transactions = await storage.getVoucherEntriesByCustomer(

@@ -148,7 +148,7 @@ export async function generateAccountStatementPdf(opts: StatementPdfOptions): Pr
     if (useFactoryView && linkedCust) {
       rawEntries = await buildFactoryCustomerLedgerEntries(linkedCust.id, accountId, linkedCust.companyId, startDate, endDate);
     } else {
-      rawEntries = await storage.getVoucherEntriesByLedger(accountId, startDate, endDate);
+      rawEntries = await storage.getVoucherEntriesByLedger(accountId, startDate, endDate, companyId);
     }
   } else if (accountType === "bank") {
     rawEntries = await storage.getVoucherEntriesByBankAccount(accountId, startDate, endDate);
@@ -229,9 +229,11 @@ export async function generateAccountStatementPdf(opts: StatementPdfOptions): Pr
     }
     const col = typeToColumn[accountType];
     if (col) {
-      // Suppliers are shared master records across companies — the pre-period
-      // total must be scoped to this company's own vouchers only.
-      const scopeCondition = isSupplier ? eq(vouchers.companyId, companyId) : sql`true`;
+      // Suppliers and ledger accounts are scoped to this company's own
+      // vouchers only to prevent cross-company entries from skewing the
+      // pre-period opening balance.
+      const scopeCondition =
+        isSupplier || accountType === "ledger" ? eq(vouchers.companyId, companyId) : sql`true`;
       const [tot] = await db
         .select({
           d: sql<string>`COALESCE(SUM(${voucherEntries.debitAmount}),0)`,

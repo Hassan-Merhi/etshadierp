@@ -1210,7 +1210,8 @@ export function registerAccountRoutes(app: Express) {
         }
       }
 
-      const transactions = await storage.getVoucherEntriesByLedger(ledgerAccountId);
+      const companyIdForBalance = (req.session as any).currentCompanyId as number | undefined;
+      const transactions = await storage.getVoucherEntriesByLedger(ledgerAccountId, undefined, undefined, companyIdForBalance);
       let debits = 0;
       let credits = 0;
       for (const tx of transactions) {
@@ -1325,13 +1326,25 @@ export function registerAccountRoutes(app: Express) {
         console.error("[ledger transactions] factory-customer lookup failed:", e);
       }
 
+      const companyId = (req.session as any).currentCompanyId as number | undefined;
+
       const transactions = await storage.getVoucherEntriesByLedger(
         ledgerAccountId,
         startDate as string | undefined,
-        endDate as string | undefined
+        endDate as string | undefined,
+        companyId
       );
 
       if (startDate) {
+        // Pre-period (brought-forward) balance: sum of all entries before the
+        // period start, scoped to the same company so cross-company vouchers
+        // don't inflate or deflate the opening figure.
+        const bfParams: any[] = [ledgerAccountId, startDate];
+        let bfCompanyFilter = "";
+        if (companyId) {
+          bfParams.push(companyId);
+          bfCompanyFilter = `AND v.company_id = ${bfParams.length}`;
+        }
         const bfResult = await pool.query(
           `SELECT COALESCE(SUM(ve.debit_amount::numeric - ve.credit_amount::numeric), 0) AS net
            FROM voucher_entries ve
@@ -1339,8 +1352,9 @@ export function registerAccountRoutes(app: Express) {
            WHERE ve.ledger_account_id = $1
              AND v.optional = false
              AND v.deleted_at IS NULL
-             AND v.voucher_date < $2`,
-          [ledgerAccountId, startDate]
+             AND v.voucher_date < $2
+             ${bfCompanyFilter}`,
+          bfParams
         );
         return res.json({ transactions, preNetBalance: parseFloat(bfResult.rows[0]?.net ?? "0") });
       }
@@ -1959,7 +1973,7 @@ export function registerAccountRoutes(app: Express) {
       // Fetch transactions
       let txRows: any[] = [];
       if (accountType === "ledger") {
-        txRows = await storage.getVoucherEntriesByLedger(accountId, startDate, endDate);
+        txRows = await storage.getVoucherEntriesByLedger(accountId, startDate, endDate, companyId);
       } else if (accountType === "bank") {
         txRows = await storage.getVoucherEntriesByBankAccount(accountId, startDate, endDate);
       } else if (accountType === "supplier") {
@@ -1971,7 +1985,7 @@ export function registerAccountRoutes(app: Express) {
       // Compute brought-forward balance (entries before startDate when filtering)
       let allTxForBF: any[] = [];
       if (startDate && accountType === "ledger") {
-        allTxForBF = await storage.getVoucherEntriesByLedger(accountId, undefined, undefined);
+        allTxForBF = await storage.getVoucherEntriesByLedger(accountId, undefined, undefined, companyId);
       }
       let bfBalance = openingBalanceSide === "Dr" ? openingBalance : -openingBalance;
       if (startDate && allTxForBF.length > 0) {

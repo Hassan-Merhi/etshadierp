@@ -461,8 +461,8 @@ export function registerLedgerRoutes(app: Express) {
         });
       }
 
-      // Check if account is used in any voucher entries
-      const entries = await storage.getVoucherEntriesByLedger(accountId);
+      // Check if account is used in any voucher entries (scoped to this company)
+      const entries = await storage.getVoucherEntriesByLedger(accountId, undefined, undefined, req.session.currentCompanyId);
       if (entries && entries.length > 0) {
         return res.status(400).json({
           message:

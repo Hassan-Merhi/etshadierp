@@ -339,17 +339,27 @@ export async function getVouchersByDateRange(companyId: number, startDate: strin
 export async function getVoucherEntriesByLedger(
   ledgerAccountId: number,
   startDate?: string,
-  endDate?: string
+  endDate?: string,
+  companyId?: number
 ): Promise<any[]> {
   const params: any[] = [ledgerAccountId];
   let dateFilters = "";
   if (startDate) {
     params.push(startDate);
-    dateFilters += ` AND v.voucher_date >= $${params.length}`;
+    dateFilters += ` AND v.voucher_date >= ${params.length}`;
   }
   if (endDate) {
     params.push(endDate);
-    dateFilters += ` AND v.voucher_date <= $${params.length}`;
+    dateFilters += ` AND v.voucher_date <= ${params.length}`;
+  }
+  // Scope to a specific company when provided. Without this, cross-company
+  // vouchers (e.g. ERP-side intercompany entries that post to a factory
+  // ledger account) would appear in the account statement, causing a
+  // discrepancy against Net Position which only looks at the owner company.
+  let companyFilter = "";
+  if (companyId) {
+    params.push(companyId);
+    companyFilter = ` AND v.company_id = ${params.length}`;
   }
 
   // GROUP BY voucher so that a single voucher with multiple lines all posting
@@ -372,6 +382,7 @@ export async function getVoucherEntriesByLedger(
      WHERE ve.ledger_account_id = $1
        AND v.optional = false
        AND v.deleted_at IS NULL
+       ${companyFilter}
        ${dateFilters}
      GROUP BY v.id, v.voucher_number, v.voucher_type, v.voucher_date, v.description, v.currency
      ORDER BY v.voucher_date, v.id`,
@@ -974,7 +985,8 @@ export async function closeFiscalPeriod(
             sql`${schema.vouchers.voucherDate} >= ${periodStartDate}`,
             sql`${schema.vouchers.voucherDate} <= ${periodEndDate}`,
             eq(schema.vouchers.companyId, companyId),
-            eq(schema.vouchers.optional, false)
+            eq(schema.vouchers.optional, false),
+            isNull(schema.vouchers.deletedAt)
           )
         );
 
