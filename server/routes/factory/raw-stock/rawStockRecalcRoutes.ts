@@ -20,8 +20,108 @@ import {
   RepairTokenConfigurationError,
   REPAIR_TOKEN_TTL_MS,
 } from "../../../services/factory/repairToken";
+import { pool } from "../../../db";
 
 const ADMIN_ROLES = ["Admin", "Developer"] as const;
+
+// ─── Undo log helpers ─────────────────────────────────────────────────────────
+
+/** Ensure the undo log table exists. Called once at route registration. */
+async function ensureUndoLogTable(): Promise<void> {
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS factory_recalc_undo_log (
+      id                   SERIAL PRIMARY KEY,
+      company_id           INTEGER      NOT NULL,
+      user_id              INTEGER,
+      username             TEXT,
+      description          TEXT         NOT NULL,
+      container_count      INTEGER      NOT NULL DEFAULT 0,
+      container_numbers    TEXT[]       NOT NULL DEFAULT '{}',
+      snapshot             JSONB        NOT NULL,
+      applied_at           TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+      undone_at            TIMESTAMPTZ,
+      undone_by_user_id    INTEGER,
+      undone_by_username   TEXT
+    )
+  `);
+}
+
+/** Capture a point-in-time snapshot of every row that applyRawStockRecalc will touch. */
+async function captureRecalcSnapshot(companyId: number, containerIds: number[]) {
+  if (containerIds.length === 0) {
+    return { containers: [], rawStockRows: [], mixBatchSources: [], mixBatches: [], bales: [], suppliers: [] };
+  }
+
+  const [
+    { rows: containers },
+    { rows: rawStockRows },
+    { rows: mixBatchSources },
+  ] = await Promise.all([
+    pool.query(
+      `SELECT id,
+              final_payable_amount       AS "finalPayableAmount",
+              rate_per_kg_usd            AS "ratePerKgUsd",
+              final_payable_amount_usd   AS "finalPayableAmountUsd"
+       FROM factory_containers
+       WHERE id = ANY($1) AND company_id = $2`,
+      [containerIds, companyId]
+    ),
+    pool.query(
+      `SELECT id,
+              cost_per_kg     AS "costPerKg",
+              cost_per_kg_usd AS "costPerKgUsd"
+       FROM factory_raw_stock
+       WHERE container_id = ANY($1) AND company_id = $2 AND deleted_at IS NULL`,
+      [containerIds, companyId]
+    ),
+    // Snapshot ALL sources (open + completed) so the undo is always complete
+    pool.query(
+      `SELECT mbs.id,
+              mbs.mix_batch_id AS "mixBatchId",
+              mbs.cost_per_kg  AS "costPerKg",
+              mbs.total_cost   AS "totalCost"
+       FROM factory_mix_batch_sources mbs
+       JOIN factory_mix_batches mb ON mbs.mix_batch_id = mb.id
+       WHERE mbs.container_id = ANY($1) AND mb.company_id = $2 AND mb.deleted_at IS NULL`,
+      [containerIds, companyId]
+    ),
+  ]);
+
+  const batchIds = [...new Set(mixBatchSources.map((s: any) => s.mixBatchId as number))];
+
+  let mixBatches: any[] = [];
+  let bales: any[] = [];
+  if (batchIds.length > 0) {
+    const [{ rows: batchRows }, { rows: baleRows }] = await Promise.all([
+      pool.query(
+        `SELECT id, cost_per_kg AS "costPerKg", total_cost AS "totalCost"
+         FROM factory_mix_batches WHERE id = ANY($1)`,
+        [batchIds]
+      ),
+      pool.query(
+        `SELECT id, cost_per_kg AS "costPerKg", total_cost AS "totalCost"
+         FROM factory_bales
+         WHERE mix_batch_id = ANY($1) AND company_id = $2 AND status NOT IN ('DELETED','REMOVED')`,
+        [batchIds, companyId]
+      ),
+    ]);
+    mixBatches = batchRows;
+    bales = baleRows;
+  }
+
+  // Supplier locked rates
+  const { rows: supplierRows } = await pool.query(
+    `SELECT DISTINCT ON (fs.id)
+            fs.id,
+            fs.current_raw_material_cost_per_kg_usd AS "currentRawMaterialCostPerKgUsd"
+     FROM factory_suppliers fs
+     JOIN factory_containers fc ON fc.supplier_id = fs.id
+     WHERE fc.id = ANY($1) AND fc.company_id = $2 AND fs.company_id = $2`,
+    [containerIds, companyId]
+  );
+
+  return { containers, rawStockRows, mixBatchSources, mixBatches, bales, suppliers: supplierRows };
+}
 
 interface RecalcTokenPayload {
   companyId: number;
@@ -60,6 +160,9 @@ interface ZeroCostSourceTokenPayload {
 }
 
 export function registerRawStockRecalcRoutes(app: Express) {
+  // Ensure the undo log table exists (idempotent, runs once at startup).
+  ensureUndoLogTable().catch((err) => console.error("[recalc] Failed to create undo log table:", err));
+
   // Read-only diff preview — never writes anything. Admin/Developer-only: this
   // surfaces exact stored vs. corrected landed-cost figures for every container.
   app.get(
@@ -218,6 +321,9 @@ export function registerRawStockRecalcRoutes(app: Express) {
           }
         }
 
+        // Capture before-state snapshot (must happen before any writes)
+        const snapshot = await captureRecalcSnapshot(companyId, parsedIds);
+
         const results = await applyRawStockRecalc(companyId, parsedIds, {
           expectedFingerprints: tokenPayload.fingerprintByContainer,
           includeCompletedBatches: wantsCompletedBatches,
@@ -245,6 +351,28 @@ export function registerRawStockRecalcRoutes(app: Express) {
             code: "STALE_TOKEN",
             message: `Container #${staleResult.containerId} changed since the dry-run preview was issued — re-run the preview and try again.`,
           });
+        }
+
+        // Persist undo snapshot (non-fatal if it fails — apply already committed)
+        const appliedContainerNumbers = (snapshot.containers as any[]).map((c: any) => String(c.finalPayableAmount !== undefined ? c.id : c.id));
+        const containerNumbersForDescription = results.filter((r) => r.applied).map((r) => r.containerNumber);
+        try {
+          await pool.query(
+            `INSERT INTO factory_recalc_undo_log
+               (company_id, user_id, username, description, container_count, container_numbers, snapshot)
+             VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+            [
+              companyId,
+              req.session.userId ?? null,
+              req.session.username ?? null,
+              `Applied cost recalc to ${results.filter((r) => r.applied).length} container(s)`,
+              parsedIds.length,
+              containerNumbersForDescription,
+              JSON.stringify(snapshot),
+            ]
+          );
+        } catch (undoErr) {
+          console.error("[recalc] Failed to save undo snapshot:", undoErr);
         }
 
         res.json({ dryRun: false, results });
@@ -501,6 +629,9 @@ export function registerRawStockRecalcRoutes(app: Express) {
 
         const { safeContainerIds } = tokenPayload;
 
+        // Capture before-state snapshot (must happen before any writes)
+        const snapshot = await captureRecalcSnapshot(companyId, safeContainerIds);
+
         const results = await applyRawStockRecalc(companyId, safeContainerIds, {
           includeCompletedBatches: wantsCompletedBatches,
           includeHistoricalContainers: wantsHistorical,
@@ -529,6 +660,27 @@ export function registerRawStockRecalcRoutes(app: Express) {
           });
         }
 
+        // Persist undo snapshot (non-fatal if it fails)
+        const containerNumbersForDescription = results.filter((r) => r.applied).map((r) => r.containerNumber);
+        try {
+          await pool.query(
+            `INSERT INTO factory_recalc_undo_log
+               (company_id, user_id, username, description, container_count, container_numbers, snapshot)
+             VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+            [
+              companyId,
+              req.session.userId ?? null,
+              req.session.username ?? null,
+              `Applied all-safe cost recalc to ${results.filter((r) => r.applied).length} container(s)`,
+              safeContainerIds.length,
+              containerNumbersForDescription,
+              JSON.stringify(snapshot),
+            ]
+          );
+        } catch (undoErr) {
+          console.error("[recalc] Failed to save undo snapshot:", undoErr);
+        }
+
         res.json({ dryRun: false, results });
       } catch (err: any) {
         if (err instanceof RepairTokenConfigurationError) {
@@ -537,6 +689,148 @@ export function registerRawStockRecalcRoutes(app: Express) {
         }
         console.error("[raw-stock recalc apply-all-safe] error:", err);
         res.status(500).json({ message: err.message || "Failed to apply all safe repairs" });
+      }
+    }
+  );
+
+  // ── Undo log — list recent applies ─────────────────────────────────────────
+  app.get(
+    "/api/factory/raw-stock/recalc/undo-log",
+    requireAuth,
+    requireRole(...ADMIN_ROLES),
+    async (req: any, res: any) => {
+      try {
+        const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+        if (!companyId) return res.status(400).json({ message: "No company selected" });
+        const { rows } = await pool.query(
+          `SELECT id, company_id AS "companyId", user_id AS "userId", username,
+                  description, container_count AS "containerCount",
+                  container_numbers AS "containerNumbers",
+                  applied_at AS "appliedAt",
+                  undone_at AS "undoneAt",
+                  undone_by_user_id AS "undoneByUserId",
+                  undone_by_username AS "undoneByUsername"
+           FROM factory_recalc_undo_log
+           WHERE company_id = $1
+           ORDER BY applied_at DESC
+           LIMIT 30`,
+          [companyId]
+        );
+        res.json(rows);
+      } catch (err: any) {
+        console.error("[recalc undo-log] error:", err);
+        res.status(500).json({ message: err.message || "Failed to load undo log" });
+      }
+    }
+  );
+
+  // ── Undo — restore a previous apply from its snapshot ──────────────────────
+  app.post(
+    "/api/factory/raw-stock/recalc/undo",
+    requireAuth,
+    requireRole(...ADMIN_ROLES),
+    async (req: any, res: any) => {
+      try {
+        const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+        if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+        const { undoLogId } = req.body;
+        if (!undoLogId || isNaN(parseInt(undoLogId))) {
+          return res.status(400).json({ message: "undoLogId is required" });
+        }
+
+        // Load the snapshot row
+        const { rows } = await pool.query(
+          `SELECT * FROM factory_recalc_undo_log WHERE id = $1 AND company_id = $2`,
+          [parseInt(undoLogId), companyId]
+        );
+        const logRow = rows[0];
+        if (!logRow) return res.status(404).json({ message: "Undo log entry not found" });
+        if (logRow.undone_at) {
+          return res.status(400).json({ message: "This recalculation has already been undone." });
+        }
+
+        const snapshot = logRow.snapshot as {
+          containers: Array<{ id: number; finalPayableAmount: string; ratePerKgUsd: string; finalPayableAmountUsd: string }>;
+          rawStockRows: Array<{ id: number; costPerKg: string; costPerKgUsd: string }>;
+          mixBatchSources: Array<{ id: number; costPerKg: string; totalCost: string }>;
+          mixBatches: Array<{ id: number; costPerKg: string; totalCost: string }>;
+          bales: Array<{ id: number; costPerKg: string; totalCost: string }>;
+          suppliers: Array<{ id: number; currentRawMaterialCostPerKgUsd: string }>;
+        };
+
+        // Apply the undo in a single DB transaction using a pool client
+        const client = await pool.connect();
+        try {
+          await client.query("BEGIN");
+
+          for (const c of snapshot.containers) {
+            await client.query(
+              `UPDATE factory_containers
+               SET final_payable_amount = $1, rate_per_kg_usd = $2, final_payable_amount_usd = $3, updated_at = NOW()
+               WHERE id = $4`,
+              [c.finalPayableAmount, c.ratePerKgUsd, c.finalPayableAmountUsd, c.id]
+            );
+          }
+          for (const rs of snapshot.rawStockRows) {
+            await client.query(
+              `UPDATE factory_raw_stock SET cost_per_kg = $1, cost_per_kg_usd = $2 WHERE id = $3`,
+              [rs.costPerKg, rs.costPerKgUsd, rs.id]
+            );
+          }
+          for (const src of snapshot.mixBatchSources) {
+            await client.query(
+              `UPDATE factory_mix_batch_sources SET cost_per_kg = $1, total_cost = $2 WHERE id = $3`,
+              [src.costPerKg, src.totalCost, src.id]
+            );
+          }
+          for (const b of snapshot.mixBatches) {
+            await client.query(
+              `UPDATE factory_mix_batches SET cost_per_kg = $1, total_cost = $2, updated_at = NOW() WHERE id = $3`,
+              [b.costPerKg, b.totalCost, b.id]
+            );
+          }
+          for (const bale of snapshot.bales) {
+            await client.query(
+              `UPDATE factory_bales SET cost_per_kg = $1, total_cost = $2, updated_at = NOW() WHERE id = $3`,
+              [bale.costPerKg, bale.totalCost, bale.id]
+            );
+          }
+          for (const sup of snapshot.suppliers) {
+            await client.query(
+              `UPDATE factory_suppliers SET current_raw_material_cost_per_kg_usd = $1, updated_at = NOW() WHERE id = $2`,
+              [sup.currentRawMaterialCostPerKgUsd, sup.id]
+            );
+          }
+
+          await client.query("COMMIT");
+        } catch (txErr) {
+          await client.query("ROLLBACK");
+          throw txErr;
+        } finally {
+          client.release();
+        }
+
+        // Mark the log entry as undone
+        await pool.query(
+          `UPDATE factory_recalc_undo_log
+           SET undone_at = NOW(), undone_by_user_id = $1, undone_by_username = $2
+           WHERE id = $3`,
+          [req.session.userId ?? null, req.session.username ?? null, parseInt(undoLogId)]
+        );
+
+        res.json({
+          success: true,
+          containersRestored: snapshot.containers.length,
+          rawStockRowsRestored: snapshot.rawStockRows.length,
+          mixBatchSourcesRestored: snapshot.mixBatchSources.length,
+          mixBatchesRestored: snapshot.mixBatches.length,
+          balesRestored: snapshot.bales.length,
+          suppliersRestored: snapshot.suppliers.length,
+        });
+      } catch (err: any) {
+        console.error("[recalc undo] error:", err);
+        res.status(500).json({ message: err.message || "Failed to undo recalculation" });
       }
     }
   );

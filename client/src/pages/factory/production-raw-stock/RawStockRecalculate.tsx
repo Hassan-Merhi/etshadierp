@@ -10,6 +10,7 @@ import {
   History,
   ChevronDown,
   ChevronRight,
+  Undo2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -136,6 +137,20 @@ interface FullAuditResult {
   rows: FullAuditRow[];
 }
 
+interface UndoLogRow {
+  id: number;
+  companyId: number;
+  userId: number | null;
+  username: string | null;
+  description: string;
+  containerCount: number;
+  containerNumbers: string[];
+  appliedAt: string;
+  undoneAt: string | null;
+  undoneByUserId: number | null;
+  undoneByUsername: string | null;
+}
+
 // ─── Component ───────────────────────────────────────────────────────────────
 
 export default function RawStockRecalculate() {
@@ -150,7 +165,7 @@ export default function RawStockRecalculate() {
   const [selectedZeroCostSources, setSelectedZeroCostSources] = useState<Set<number>>(new Set());
   const [manualRates, setManualRates] = useState<Record<number, string>>({});
   const [expandedBatchSources, setExpandedBatchSources] = useState<Set<number>>(new Set());
-  const [activeTab, setActiveTab] = useState<"recalc" | "sources" | "audit">("recalc");
+  const [activeTab, setActiveTab] = useState<"recalc" | "sources" | "audit" | "history">("recalc");
 
   // ── Main preview ──────────────────────────────────────────────────────────
   const { data: rows, isLoading, refetch } = useQuery<RecalcRow[]>({
@@ -227,6 +242,52 @@ export default function RawStockRecalculate() {
     },
     enabled: activeTab === "audit",
   });
+
+  // ── Undo log ──────────────────────────────────────────────────────────────
+  const {
+    data: undoLog,
+    isLoading: undoLogLoading,
+    refetch: refetchUndoLog,
+  } = useQuery<UndoLogRow[]>({
+    queryKey: ["/api/factory/raw-stock/recalc/undo-log"],
+    queryFn: async () => {
+      const res = await modeApiRequest("GET", "/api/factory/raw-stock/recalc/undo-log");
+      if (!res.ok) throw new Error("Failed to load undo log");
+      return res.json();
+    },
+    enabled: activeTab === "history",
+  });
+
+  const undoMutation = useMutation({
+    mutationFn: async (undoLogId: number) => {
+      const res = await modeApiRequest("POST", "/api/factory/raw-stock/recalc/undo", { undoLogId });
+      if (!res.ok) throw new Error((await res.json()).message || "Failed to undo");
+      return res.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/raw-stock"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/raw-stock/recalc/preview"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/raw-stock/recalc/full-audit"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/raw-stock/recalc/undo-log"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/mix-batches"] });
+      toast({
+        title: "Undo applied",
+        description:
+          `Restored ${data.containersRestored} container(s), ` +
+          `${data.mixBatchesRestored} mix batch(es), ` +
+          `${data.balesRestored} bale(s) to their previous values.`,
+      });
+    },
+    onError: (err: any) => {
+      toast({ title: "Undo failed", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const handleUndo = (row: UndoLogRow) => {
+    wrapAdminAction(() => {
+      undoMutation.mutate(row.id);
+    }, `Undo recalculation applied ${new Date(row.appliedAt).toLocaleString()} — restores ${row.containerCount} container(s)`);
+  };
 
   // ── Actions ───────────────────────────────────────────────────────────────
   const toggleAll = () => {
@@ -494,6 +555,7 @@ export default function RawStockRecalculate() {
     { id: "recalc" as const, label: "Container Cost Recalc" },
     { id: "sources" as const, label: "Source Cost Mismatches" },
     { id: "audit" as const, label: "Full Audit" },
+    { id: "history" as const, label: "History & Undo" },
   ];
 
   return (
@@ -1055,6 +1117,99 @@ export default function RawStockRecalculate() {
               </div>
             </>
           )}
+        </div>
+      )}
+
+      {/* ── Tab: History & Undo ────────────────────────────────────────────── */}
+      {activeTab === "history" && (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-sm font-semibold leading-tight">Recalculation history</h2>
+              <p className="text-xs text-muted-foreground leading-tight">
+                Each row is a saved snapshot of the before-state. Undo restores all affected containers,
+                mix batches, bales, and supplier locked rates atomically.
+              </p>
+            </div>
+            <Button variant="outline" size="sm" onClick={() => refetchUndoLog()} className="gap-2">
+              <RefreshCw className="h-3.5 w-3.5" /> Refresh
+            </Button>
+          </div>
+
+          {undoLogLoading ? (
+            <Skeleton className="h-40 w-full" />
+          ) : !undoLog || undoLog.length === 0 ? (
+            <div className="text-sm text-muted-foreground py-12 text-center border rounded-md bg-card">
+              No recalculation history yet. Apply a recalculation and it will appear here.
+            </div>
+          ) : (
+            <div className="border rounded-md overflow-hidden bg-card shadow-sm">
+              <Table>
+                <TableHeader className="bg-muted/50">
+                  <TableRow>
+                    <TableHead>Applied at</TableHead>
+                    <TableHead>By</TableHead>
+                    <TableHead>Containers</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="text-right">Action</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {undoLog.map((row) => (
+                    <TableRow key={row.id} className={row.undoneAt ? "opacity-50" : ""}>
+                      <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
+                        {new Date(row.appliedAt).toLocaleString()}
+                      </TableCell>
+                      <TableCell className="text-xs text-muted-foreground">
+                        {row.username ?? `User #${row.userId ?? "?"}`}
+                      </TableCell>
+                      <TableCell className="text-xs">
+                        <div className="font-medium text-foreground">{row.description}</div>
+                        {row.containerNumbers && row.containerNumbers.length > 0 && (
+                          <div className="font-mono text-[10px] text-muted-foreground mt-0.5">
+                            {row.containerNumbers.slice(0, 6).join(", ")}
+                            {row.containerNumbers.length > 6 && ` +${row.containerNumbers.length - 6} more`}
+                          </div>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {row.undoneAt ? (
+                          <Badge variant="outline" className="text-muted-foreground text-[10px]">
+                            Undone {new Date(row.undoneAt).toLocaleDateString()}
+                            {row.undoneByUsername ? ` by ${row.undoneByUsername}` : ""}
+                          </Badge>
+                        ) : (
+                          <Badge variant="outline" className="text-emerald-500 border-emerald-500/30 bg-emerald-500/10 text-[10px]">
+                            Applied
+                          </Badge>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {!row.undoneAt && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="gap-1.5 h-7 text-xs border-amber-500/40 text-amber-700 hover:bg-amber-500/10 dark:text-amber-400"
+                            disabled={undoMutation.isPending}
+                            onClick={() => handleUndo(row)}
+                          >
+                            <Undo2 className="h-3 w-3" />
+                            Undo
+                          </Button>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+
+          <div className="text-xs text-muted-foreground bg-amber-500/10 border border-amber-500/30 rounded-md px-3 py-2">
+            <strong>Important:</strong> Undo restores the exact numerical values that were in place before the
+            recalculation. If any other changes were made to the same containers between the recalculation and now
+            (e.g. new charges, new offloads), those will also be reverted. Review before confirming.
+          </div>
         </div>
       )}
 
