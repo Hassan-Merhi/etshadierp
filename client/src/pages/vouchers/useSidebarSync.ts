@@ -29,7 +29,6 @@ export function useSidebarSync({
     const searchLower = sidebarSearchValue.toLowerCase().trim();
     return sidebarAccounts
       .filter((acc) => {
-        if (acc.type === "customer") return false;
         if (paymentAccountId > 0 && acc.id === paymentAccountId && acc.type === paymentAccountType) {
           return false;
         }

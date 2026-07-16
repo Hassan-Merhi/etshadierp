@@ -86,7 +86,17 @@ export function useVoucherHydration({
       let paymentId = 0;
       let paymentName = "";
 
-      if (paymentEntry.bankAccountId) {
+      if (paymentEntry.customerId) {
+        // Customer as Pay-From/Receive-Into: prefer "customer" type so the form
+        // restores the customer name correctly.  buildAccountField stamps BOTH
+        // customerId AND ledgerAccountId on the same entry, so we must check
+        // customerId first or the ledgerAccountId branch would win and show the
+        // wrong account name.
+        paymentType = "customer";
+        paymentId = paymentEntry.customerId;
+        const customer = customers.find((c) => c.id === paymentId);
+        paymentName = customer?.legalName || "";
+      } else if (paymentEntry.bankAccountId) {
         paymentType = "bank";
         paymentId = paymentEntry.bankAccountId;
         const account = bankAccounts.find((b) => b.id === paymentId);
@@ -180,10 +190,12 @@ export function useVoucherHydration({
             accountName = customer?.legalName || "";
           }
 
+          // Customers are assets (receivables), not liabilities, so they follow the
+          // same debit/credit direction as bank/ledger accounts, NOT the
+          // supplier/employee liability path.
           const isLiabilityPayment =
             paymentEntry.supplierId ||
             paymentEntry.employeeId ||
-            paymentEntry.customerId ||
             paymentEntry.factorySupplierId;
           if (voucherToEdit.voucherType === "Payment") {
             amount = isLiabilityPayment ? entry.creditAmount || "0" : entry.debitAmount || "0";
