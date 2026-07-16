@@ -350,12 +350,13 @@ export function registerRawStockContainerRoutes(app: Express) {
           chargeFx = fxRate;
         } else {
           const fetched = await getOrFetchFxRateToUsd(companyId, chargeCcy, txDate);
-          if (!fetched || fetched <= 0) {
+          const fetchedNum = parseFloat(fetched as any);
+          if (!fetchedNum || fetchedNum <= 0) {
             return res.status(400).json({
               message: `Cannot resolve FX rate for charge currency ${chargeCcy} on ${txDate}. Add an FX rate for this currency first.`,
             });
           }
-          chargeFx = fetched;
+          chargeFx = fetchedNum;
         }
         resolvedChargeFxRates.push(chargeFx);
       }
@@ -550,7 +551,7 @@ export function registerRawStockContainerRoutes(app: Express) {
           batchCode: b.batchCode,
           status: b.status ?? null,
           wasCompleted: b.wasCompleted,
-          weightKgFromContainer: b.weightKg,
+          weightKgFromContainer: b.weightKgFromContainer,
           oldCostPerKg: b.oldCostPerKg,
           newCostPerKg: b.newCostPerKg,
         })),

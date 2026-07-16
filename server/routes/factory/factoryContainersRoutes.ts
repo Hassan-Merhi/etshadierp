@@ -370,24 +370,30 @@ export function registerFactoryContainersRoutes(app: Express) {
       }
 
       // Canonicalize freight payer fields on create.
-      // Rule A — Own Account: require freightOwnAccountId, clear supplier link.
-      // Rule B — By Supplier: clear own account, auto-fill freightSupplierId from purchase supplier.
-      // Rule C — No freight: clear both payer fields.
+      // Rule A — No freight (amount <= 0): clear both payer fields unconditionally.
+      // Rule B — Own Account: require freightOwnAccountId, clear supplier link.
+      // Rule C — By Supplier: require a purchase supplier, clear own account, auto-fill freightSupplierId.
       const freightPaidByOnCreate = values.freightPaidBy || "supplier";
       const freightAmtOnCreate = parseFloat(values.freight || "0");
-      if (freightAmtOnCreate > 0 && freightPaidByOnCreate === "own") {
+      if (freightAmtOnCreate <= 0) {
+        // Rule A: no freight → clear both
+        values.freightSupplierId = null;
+        values.freightOwnAccountId = null;
+      } else if (freightPaidByOnCreate === "own") {
+        // Rule B: own-account
         if (!values.freightOwnAccountId) {
           return res.status(400).json({ message: "freightOwnAccountId is required when freightPaidBy is 'own'" });
         }
         values.freightSupplierId = null;
-      } else if (freightPaidByOnCreate === "supplier") {
+      } else {
+        // Rule C: supplier-paid (default)
+        if (!values.supplierId && !values.freightSupplierId) {
+          return res.status(400).json({ message: "A purchase supplier is required when freightPaidBy is 'supplier' and freight > 0" });
+        }
         values.freightOwnAccountId = null;
         if (!values.freightSupplierId && values.supplierId) {
           values.freightSupplierId = values.supplierId;
         }
-      } else {
-        values.freightSupplierId = null;
-        values.freightOwnAccountId = null;
       }
 
       const [container] = await db.insert(factoryContainers).values(values).returning();
@@ -592,15 +598,18 @@ export function registerFactoryContainersRoutes(app: Express) {
       if (b.dutyStatus !== undefined) updateData.dutyStatus = String(b.dutyStatus || "NONE");
       if (b.dutyNotes !== undefined) updateData.dutyNotes = str(b.dutyNotes);
 
+      // Always load the existing container — needed for both FX calc and the
+      // freight canonicalization below (a partial PATCH may omit freight fields,
+      // but we must never clear them based on missing-field defaults).
+      const [existing] = await db
+        .select()
+        .from(factoryContainers)
+        .where(and(eq(factoryContainers.id, id), eq(factoryContainers.companyId, companyId)));
+      if (!existing) return res.status(404).json({ message: "Container not found" });
+
       // FX rate computation (same logic as before)
       const needsFxCalc = updateData.currencyCode || updateData.ratePerKg || updateData.fxRateSource;
       if (needsFxCalc) {
-        const [existing] = await db
-          .select()
-          .from(factoryContainers)
-          .where(and(eq(factoryContainers.id, id), eq(factoryContainers.companyId, companyId)));
-        if (!existing) return res.status(404).json({ message: "Container not found" });
-
         const currencyCode = updateData.currencyCode || existing.currencyCode || "USD";
         const fxRateSource = updateData.fxRateSource || existing.fxRateSource || "auto";
         const importDate = updateData.arrivalDate || existing.arrivalDate || getClientDate(req);
@@ -646,30 +655,58 @@ export function registerFactoryContainersRoutes(app: Express) {
         }
       }
 
-      // Auto-create freight ledger account if freight > 0 and no account selected
-      if (!updateData.freightAccountId && parseFloat(updateData.freight || "0") > 0) {
+      // Resolve freight effective values — a partial PATCH may omit any freight
+      // field, so we must fall back to the existing stored value rather than
+      // treating an absent field as "zero" or "supplier".
+      const effectiveFreight =
+        updateData.freight !== undefined ? updateData.freight : existing.freight;
+      const effectiveFreightPaidBy: string =
+        updateData.freightPaidBy !== undefined
+          ? updateData.freightPaidBy
+          : existing.freightPaidBy || "supplier";
+      const effectiveFreightOwnAccountId =
+        updateData.freightOwnAccountId !== undefined
+          ? updateData.freightOwnAccountId
+          : existing.freightOwnAccountId;
+      const effectiveSupplierId =
+        updateData.supplierId !== undefined ? updateData.supplierId : existing.supplierId;
+
+      // Auto-create freight ledger account if effective freight > 0 and no account selected
+      if (!updateData.freightAccountId && parseFloat(effectiveFreight || "0") > 0) {
         updateData.freightAccountId = await getOrCreateLedgerAccount(companyId, "FREIGHT", "Freight");
       }
 
       // Canonicalize freight payer fields so switching "own" ↔ "supplier" never
-      // leaves a stale value in the opposing field.
+      // leaves a stale value in the opposing field.  Rules are enforced using
+      // the EFFECTIVE values (not just what was sent in this request).
       {
-        const canonFreightAmt = parseFloat(updateData.freight ?? "0");
-        const canonPaidBy: string = updateData.freightPaidBy ?? "supplier";
-        if (canonFreightAmt > 0 && canonPaidBy === "own") {
-          // Own-account: no supplier credit
+        const canonFreightAmt = parseFloat(effectiveFreight || "0");
+        if (canonFreightAmt <= 0) {
+          // Rule A: no freight → clear both payer fields
           updateData.freightSupplierId = null;
-        } else if (canonFreightAmt > 0 && canonPaidBy === "supplier") {
-          // By-supplier: no own-account credit
+          updateData.freightOwnAccountId = null;
+        } else if (effectiveFreightPaidBy === "own") {
+          // Rule B: own-account freight → require freightOwnAccountId, clear supplier link
+          const ownAcctId = updateData.freightOwnAccountId !== undefined
+            ? updateData.freightOwnAccountId
+            : effectiveFreightOwnAccountId;
+          if (!ownAcctId) {
+            return res.status(400).json({
+              message: "freightOwnAccountId is required when freightPaidBy is 'own'",
+            });
+          }
+          updateData.freightSupplierId = null;
+        } else {
+          // Rule C: supplier-paid freight → require a purchase supplier, clear own account
+          if (!effectiveSupplierId) {
+            return res.status(400).json({
+              message: "A purchase supplier (supplierId) is required when freightPaidBy is 'supplier'",
+            });
+          }
           updateData.freightOwnAccountId = null;
           if (!updateData.freightSupplierId) {
-            const sid = updateData.supplierId ?? int(b.supplierId);
-            if (sid) updateData.freightSupplierId = sid;
+            updateData.freightSupplierId = effectiveSupplierId;
           }
-        } else {
-          // No freight: clear both
-          updateData.freightSupplierId = null;
-          updateData.freightOwnAccountId = null;
         }
       }
 

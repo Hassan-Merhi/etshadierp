@@ -61,3 +61,4 @@
 - [Repair-token signing key must be lazy + prod-gated](repair-token-lazy-signing-key.md) — cache the HMAC key at call time not module load, and hard-refuse a dev-fallback secret in production.
 - [Mix-batch-source-level zero cost](mix-batch-source-zero-cost.md) — a container's own cost can be correct while its factory_mix_batch_sources rows still carry cost 0; detect at source level, not just via container-cost diff.
 - [Ledger account cross-company balance discrepancy](ledger-account-cross-company-balance.md) — getVoucherEntriesByLedger needs companyId param; closeFiscalPeriod needs isNull(deletedAt) guard.
+- [Edit tool dollar-sign bug](edit-tool-dollar-sign-bug.md) — $ in new_string is stripped to $; $label$ immediately before closing backtick corrupts the file. Use plain ALTER TABLE for idempotent migrations; add semicolon after closing label for DO blocks.

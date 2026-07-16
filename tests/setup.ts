@@ -102,9 +102,18 @@ export async function cleanupTestData(prefix: string): Promise<void> {
     // deleting the company so the test-only fixture teardown remains deterministic.
     await pool.query("DELETE FROM audit_log WHERE company_id = $1", [company.id]);
     await pool.query("DELETE FROM login_history WHERE company_id = $1", [company.id]);
-    // A crashed/interrupted factory test can leave rows in factory_daybook_entries
-    // (and other factory_* tables) referencing this company; those FKs otherwise
-    // block the company delete below on the NEXT run that reuses this prefix.
+    // A crashed/interrupted factory test can leave rows in factory_* tables
+    // referencing this company; those FKs otherwise block the company delete
+    // below on the NEXT run that reuses this prefix. Delete in FK-safe order.
+    await pool.query("DELETE FROM factory_bales WHERE company_id = $1", [company.id]);
+    await pool.query("DELETE FROM factory_mix_batch_sources WHERE mix_batch_id IN (SELECT id FROM factory_mix_batches WHERE company_id = $1)", [company.id]);
+    await pool.query("DELETE FROM factory_mix_batches WHERE company_id = $1", [company.id]);
+    await pool.query("DELETE FROM factory_raw_stock WHERE company_id = $1", [company.id]);
+    await pool.query("DELETE FROM factory_container_other_charges WHERE company_id = $1", [company.id]);
+    await pool.query("DELETE FROM factory_offload_additional_charges WHERE company_id = $1", [company.id]);
+    await pool.query("DELETE FROM factory_container_commissions WHERE company_id = $1", [company.id]);
+    await pool.query("DELETE FROM factory_containers WHERE company_id = $1", [company.id]);
+    await pool.query("DELETE FROM factory_suppliers WHERE company_id = $1", [company.id]);
     await pool.query("DELETE FROM factory_daybook_entries WHERE company_id = $1", [company.id]);
     await db.delete(schema.companies).where(eq(schema.companies.id, company.id));
   }

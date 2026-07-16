@@ -26,6 +26,7 @@ import {
   factoryRawStock,
   factoryOffloadAdditionalCharges,
   factoryContainerCommissions,
+  factoryContainerOtherCharges,
   factorySuppliers,
   factoryMixBatchSources,
   factoryMixBatches,
@@ -57,11 +58,18 @@ export interface RecalcRow {
  * its commission record (if any), compute the correct inclusive cost/kg.
  * Mirrors rawStockOffloadRoutes.ts's original math exactly, but reads from the
  * container's CURRENT stored fields (which reflect all edits made since offload).
+ *
+ * @param otherChargesRows  Optional: detailed factoryContainerOtherCharges rows.
+ *   When present (and non-empty), they are used INSTEAD of the aggregate
+ *   container.otherCharges field — avoids double-counting.  Each row carries its
+ *   own fxRateToUsd so multi-currency other-charges are converted correctly.
+ *   When absent, falls back to container.otherCharges (legacy path).
  */
 export function computeCorrectContainerCost(
   container: typeof factoryContainers.$inferSelect,
   additionalCharges: (typeof factoryOffloadAdditionalCharges.$inferSelect)[],
-  commissionRecord: typeof factoryContainerCommissions.$inferSelect | null
+  commissionRecord: typeof factoryContainerCommissions.$inferSelect | null,
+  otherChargesRows?: (typeof factoryContainerOtherCharges.$inferSelect)[]
 ): { costPerKg: number; costPerKgUsd: number; totalCost: number; totalUsd: number; fxUnresolved: boolean } {
   const containerCcy = container.currencyCode || "USD";
   // The offload/edit fx rate actually applied to this container's charges — prefer the
@@ -85,20 +93,60 @@ export function computeCorrectContainerCost(
   const basePayable = actualKg.times(baseRate);
   const baseMaterialUsd = containerCcy === "USD" ? basePayable : basePayable.times(dFxRate);
 
-  // Freight — has its own currency field, no separate stored fx rate, so it uses the
-  // container's fx rate for conversion (same as at offload time).
+  // Freight — may have its own FX rate stored separately (freightFxRateToUsd /
+  // freightFxRateConfirmed), populated when freight is in a third currency.
+  // Fall back to the container's own FX rate when not set (unchanged legacy path).
   const freightVal = new Decimal(container.freight || "0");
   const freightCcy = container.freightCurrencyCode || containerCcy;
-  const freightUsd = freightCcy === "USD" ? freightVal : freightVal.times(dFxRate);
+  const rawFreightFx = parseFloat((container as any).freightFxRateToUsd || "");
+  const freightFxConfirmed = !!(container as any).freightFxRateConfirmed;
+  let dFreightFx: Decimal;
+  if (freightCcy === "USD") {
+    dFreightFx = new Decimal(1);
+  } else if (Number.isFinite(rawFreightFx) && rawFreightFx > 0 && freightFxConfirmed) {
+    // Freight-specific rate takes priority over the container's rate.
+    dFreightFx = new Decimal(rawFreightFx);
+  } else {
+    dFreightFx = dFxRate;
+  }
+  const freightUsd = freightCcy === "USD" ? freightVal : freightVal.times(dFreightFx);
   const freightInContainerCcy =
     freightCcy === containerCcy ? freightVal : dFxRate.gt(0) ? freightUsd.div(dFxRate) : freightVal;
 
-  // Other charges — has its own currency field (otherChargesCurrencyCode) that the
-  // buggy post-offload-charge route ignored. Convert it properly here.
-  const ocVal = new Decimal(container.otherCharges || "0");
-  const ocCcy = (container as any).otherChargesCurrencyCode || containerCcy;
-  const ocUsd = ocCcy === "USD" ? ocVal : ocVal.times(dFxRate);
-  const ocInContainerCcy = ocCcy === containerCcy ? ocVal : dFxRate.gt(0) ? ocUsd.div(dFxRate) : ocVal;
+  // Other charges — use per-row detail when available, otherwise the aggregate field.
+  // Using both would double-count.
+  let ocInContainerCcy: Decimal;
+  let ocUsd: Decimal;
+  if (otherChargesRows && otherChargesRows.length > 0) {
+    // Detailed path: each row carries its own currency + FX rate.
+    ocInContainerCcy = new Decimal(0);
+    ocUsd = new Decimal(0);
+    for (const oc of otherChargesRows) {
+      const ocAmt = new Decimal(oc.amount || "0");
+      const ocCcy = oc.currencyCode || containerCcy;
+      const rawOcFx = parseFloat((oc as any).fxRateToUsd || "");
+      const ocFxConfirmed = !!(oc as any).fxRateConfirmed;
+      let dOcFx: Decimal;
+      if (ocCcy === "USD") {
+        dOcFx = new Decimal(1);
+      } else if (Number.isFinite(rawOcFx) && rawOcFx > 0 && ocFxConfirmed) {
+        dOcFx = new Decimal(rawOcFx);
+      } else {
+        dOcFx = dFxRate;
+      }
+      const ocAmtUsd = ocCcy === "USD" ? ocAmt : ocAmt.times(dOcFx);
+      const ocAmtInContainerCcy = ocCcy === containerCcy ? ocAmt : dFxRate.gt(0) ? ocAmtUsd.div(dFxRate) : ocAmt;
+      ocInContainerCcy = ocInContainerCcy.plus(ocAmtInContainerCcy);
+      ocUsd = ocUsd.plus(ocAmtUsd);
+    }
+  } else {
+    // Legacy aggregate path — the buggy post-offload-charge route ignored the
+    // OC currency; use otherChargesCurrencyCode if present, default to containerCcy.
+    const ocVal = new Decimal(container.otherCharges || "0");
+    const ocCcy = (container as any).otherChargesCurrencyCode || containerCcy;
+    ocUsd = ocCcy === "USD" ? ocVal : ocVal.times(dFxRate);
+    ocInContainerCcy = ocCcy === containerCcy ? ocVal : dFxRate.gt(0) ? ocUsd.div(dFxRate) : ocVal;
+  }
 
   // Commission — prefer the dedicated commission record (it stores its own currency +
   // fx rate explicitly), falling back to the container's mirrored fields.

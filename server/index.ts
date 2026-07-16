@@ -4516,6 +4516,32 @@ END $$`,
       END IF;
     END $lockrate_backfill$;
   `,
+
+    // -- Decimal precision: increase cost_per_kg / total_cost scale to 7dp (July 2026) --
+    // The old scale(2) / scale(4) compounded into multi-dollar errors on large (20 000+ kg) batches.
+    // PostgreSQL silently accepts ALTER COLUMN...TYPE NUMERIC(20,7) as a no-op when the column is
+    // already NUMERIC(20,7), so these statements are safe to run on every deploy.
+    `ALTER TABLE factory_mix_batch_sources ALTER COLUMN cost_per_kg TYPE NUMERIC(20,7)`,
+    `ALTER TABLE factory_mix_batch_sources ALTER COLUMN total_cost TYPE NUMERIC(20,7)`,
+    `ALTER TABLE factory_mix_batches ALTER COLUMN cost_per_kg TYPE NUMERIC(20,7)`,
+    `ALTER TABLE factory_mix_batches ALTER COLUMN total_cost TYPE NUMERIC(20,7)`,
+    `ALTER TABLE factory_bales ALTER COLUMN cost_per_kg TYPE NUMERIC(20,7)`,
+    `ALTER TABLE factory_bales ALTER COLUMN total_cost TYPE NUMERIC(20,7)`,
+
+    // -- Freight-specific FX rate fields on factory_containers (July 2026) --
+    // Freight may be in a different currency than the container itself. These columns persist
+    // the resolved FX rate at the time the container was saved so computeCorrectContainerCost
+    // always uses the same rate regardless of when it is called again.
+    `ALTER TABLE factory_containers ADD COLUMN IF NOT EXISTS freight_fx_rate_to_usd NUMERIC(20,8)`,
+    `ALTER TABLE factory_containers ADD COLUMN IF NOT EXISTS freight_fx_rate_confirmed BOOLEAN NOT NULL DEFAULT false`,
+    `ALTER TABLE factory_containers ADD COLUMN IF NOT EXISTS freight_fx_rate_date DATE`,
+
+    // -- Per-line FX rate on factory_container_other_charges (July 2026) --
+    // Each other-charge line may be denominated in its own currency. Store the resolved
+    // rate so computeCorrectContainerCost can use it without re-fetching from the exchange_rates table.
+    `ALTER TABLE factory_container_other_charges ADD COLUMN IF NOT EXISTS fx_rate_to_usd NUMERIC(20,8) DEFAULT 1`,
+    `ALTER TABLE factory_container_other_charges ADD COLUMN IF NOT EXISTS fx_rate_confirmed BOOLEAN NOT NULL DEFAULT false`,
+    `ALTER TABLE factory_container_other_charges ADD COLUMN IF NOT EXISTS fx_rate_date DATE`,
   ];
 
   // /api/health/db — reports migration status but does NOT block deployment.
