@@ -933,6 +933,7 @@ let migrationsDone = false;
     `ALTER TABLE factory_containers ADD COLUMN IF NOT EXISTS fx_rate_to_usd_import decimal(20,8)`,
     `ALTER TABLE factory_containers ADD COLUMN IF NOT EXISTS fx_rate_to_usd_offload decimal(20,8)`,
     `ALTER TABLE factory_containers ADD COLUMN IF NOT EXISTS fx_rate_source text NOT NULL DEFAULT 'auto'`,
+    `ALTER TABLE factory_containers ADD COLUMN IF NOT EXISTS fx_rate_confirmed boolean NOT NULL DEFAULT false`,
     `ALTER TABLE factory_containers ADD COLUMN IF NOT EXISTS fx_rate_date_import date`,
     `ALTER TABLE factory_containers ADD COLUMN IF NOT EXISTS fx_rate_date_offload date`,
     `ALTER TABLE factory_containers ADD COLUMN IF NOT EXISTS rate_per_kg_usd decimal(20,4)`,
