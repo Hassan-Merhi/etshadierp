@@ -512,6 +512,7 @@ let migrationsDone = false;
     `CREATE UNIQUE INDEX IF NOT EXISTS factory_supplier_categories_company_name_unique
        ON factory_supplier_categories(company_id, name)`,
     `ALTER TABLE factory_suppliers ADD COLUMN IF NOT EXISTS supplier_category_id integer`,
+    `ALTER TABLE factory_suppliers ADD COLUMN IF NOT EXISTS current_raw_material_cost_per_kg_usd NUMERIC(20,8)`,
     // Factory supplier support in voucher entries
     `ALTER TABLE voucher_entries ADD COLUMN IF NOT EXISTS factory_supplier_id integer`,
     // Factory raw stock OB commission fields
