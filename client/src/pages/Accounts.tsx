@@ -111,7 +111,7 @@ export default function Accounts() {
     if (urlStartDate && urlEndDate) {
       return { fromDate: urlStartDate, toDate: urlEndDate, preset: "custom" as const };
     }
-    return getDefaultPeriodValue("month_to_date");
+    return getDefaultPeriodValue("this_month");
   });
 
   const [accountToEdit, setAccountToEdit] = useState<LedgerAccount | null>(null);
