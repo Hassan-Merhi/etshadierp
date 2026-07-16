@@ -198,7 +198,6 @@ export default function POSImport() {
         title: "Import successful",
         description: `${data.itemsCount} items imported. Total sales: ${data.totalSales}`,
       });
-      queryClient.invalidateQueries({ queryKey: ["/api/inventory"] });
       queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] });
 
       const location = locations.find((l) => l.id === parseInt(selectedLocation));
@@ -240,7 +239,6 @@ export default function POSImport() {
         title: "Credit Sale Import successful",
         description: `${data.itemsCount} items imported. Total: $${data.totalSales} to ${data.customerName}`,
       });
-      queryClient.invalidateQueries({ queryKey: ["/api/inventory"] });
       queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] });
       queryClient.invalidateQueries({ queryKey: ["/api/customers"] });
       queryClient.invalidateQueries({ queryKey: ["/api/customers/for-pos"] });

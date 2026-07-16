@@ -95,7 +95,6 @@ export default function OrphanedRecordsPage() {
     onSuccess: () => {
       toast({ title: "Success", description: "Stock group inventory restored successfully" });
       queryClient.invalidateQueries({ queryKey: ["/api/stock-group-archives"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/inventory"] });
       queryClient.invalidateQueries({ queryKey: ["/api/stock-items"] });
     },
     onError: (error: any) => {

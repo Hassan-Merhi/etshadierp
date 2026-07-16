@@ -221,7 +221,6 @@ export function useChatActions(state: ChatActionsState) {
       const data = await resp.json();
       if (!resp.ok) throw new Error(data.message || "Transfer failed");
       setPendingStockTransfer(null);
-      queryClient.invalidateQueries({ queryKey: ["/api/inventory"] });
       const voucherRef = data.voucher?.voucherNumber ? ` (voucher ${data.voucher.voucherNumber})` : "";
       sendMutation.mutate(
         optional

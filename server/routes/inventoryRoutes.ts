@@ -82,15 +82,11 @@ export function registerInventoryRoutes(app: Express) {
       const companyId = req.session.currentCompanyId;
       const { page, pageSize, search, locationId, stockGroupId } = req.query;
 
-      // No page param → flat array (backward-compat for offline sync and cache invalidation)
-      if (!page) {
-        const rows = await storage.getCompanyInventory(companyId);
-        return res.json(rows);
-      }
-
-      // Paginated path
-      const pageNum = Math.max(1, parseInt(page as string) || 1);
-      const pageSizeNum = Math.min(500, Math.max(1, parseInt(pageSize as string) || 50));
+      // Always return paginated format { data, page, pageSize, total, totalPages }.
+      // Page and pageSize are optional and default when not supplied so that legacy
+      // callers (offline prep, cache invalidation) still work without changes.
+      const pageNum = Math.max(1, parseInt((page as string) || "1") || 1);
+      const pageSizeNum = Math.min(250, Math.max(1, parseInt((pageSize as string) || "100") || 100));
       const offset = (pageNum - 1) * pageSizeNum;
 
       const conditions: any[] = [

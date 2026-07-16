@@ -2,6 +2,7 @@ import { useState, useMemo } from "react";
 import { useQuery, useQueries } from "@tanstack/react-query";
 import { useAppMode } from "@/contexts/AppModeContext";
 import { getApiRequest } from "@/lib/factoryApi";
+import { useCompany } from "@/contexts/CompanyContext";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -9,7 +10,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
-import { Layers, Search, ChevronRight, ArrowLeft, List, FolderOpen, Download, Loader2 } from "lucide-react";
+import { Layers, Search, ChevronRight, ArrowLeft, List, FolderOpen, Download, Loader2, RefreshCw } from "lucide-react";
 import { formatNumber } from "@/lib/formatNumber";
 import { PageHeader } from "@/components/PageHeader";
 
@@ -72,6 +73,7 @@ export default function CombinedInventory() {
   const { formatAmount } = useCurrencyContext();
   const appMode = useAppMode();
   const modeApiRequest = getApiRequest(appMode);
+  const { selectedCompany } = useCompany();
 
   const { data: containers = [], isLoading: loadingContainers } = useQuery<Container[]>({
     queryKey: ["/api/containers"],
@@ -86,9 +88,34 @@ export default function CombinedInventory() {
     })),
   });
 
-  const { data: inventoryRows = [], isLoading: loadingInventory } = useQuery<InventoryRow[]>({
-    queryKey: ["/api/inventory"],
+  const {
+    data: inventoryPage,
+    isLoading: loadingInventory,
+    isFetching: isFetchingInventory,
+    refetch: refetchInventory,
+  } = useQuery<{ data: InventoryRow[]; total: number; page: number; pageSize: number; totalPages: number }>({
+    // Include company ID so each company's data is cached separately and
+    // cross-company cache reuse is impossible when switching companies.
+    queryKey: ["/api/inventory", selectedCompany?.id],
+    queryFn: async () => {
+      const res = await fetch("/api/inventory?page=1&pageSize=100", { credentials: "include" });
+      if (!res.ok) throw new Error(await res.text());
+      return res.json();
+    },
+    enabled: !!selectedCompany?.id,
+    // Long stale time — combined inventory is large; only re-download when the
+    // user explicitly clicks Refresh, not on focus / mount / reconnect.
+    staleTime: 10 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+    refetchOnMount: false,
+    retry: false,
   });
+
+  const inventoryRows = inventoryPage?.data ?? [];
+  const inventoryTotal = inventoryPage?.total ?? 0;
+  const inventoryTotalPages = inventoryPage?.totalPages ?? 1;
 
   const { data: allStockItems = [], isLoading: loadingStockItems } = useQuery<StockItem[]>({
     queryKey: ["/api/stock-items"],
@@ -369,6 +396,16 @@ export default function CombinedInventory() {
           subtitle="In-transit (OTW) + in-hand stock combined per item"
           icon={<Layers className="h-5 w-5" />}
         >
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => refetchInventory()}
+            disabled={isFetchingInventory}
+            data-testid="button-refresh-inventory"
+          >
+            <RefreshCw className={`h-3.5 w-3.5 mr-1.5${isFetchingInventory ? " animate-spin" : ""}`} />
+            Refresh
+          </Button>
           <Button variant="outline" size="sm" onClick={handleExport} data-testid="button-export-excel">
             <Download className="h-3.5 w-3.5 mr-1.5" />
             Export Excel
@@ -459,6 +496,14 @@ export default function CombinedInventory() {
           </Button>
         )}
       </div>
+
+      {/* Partial-load notice — only shown when total rows exceed the first page */}
+      {inventoryTotalPages > 1 && (
+        <p className="text-xs text-muted-foreground -mt-2">
+          Showing first {inventoryRows.length.toLocaleString()} of {inventoryTotal.toLocaleString()} inventory rows.
+          Use search to narrow results, or click Refresh to reload.
+        </p>
+      )}
 
       {/* Content */}
       {viewMode === "groups" && !isDrillMode ? (

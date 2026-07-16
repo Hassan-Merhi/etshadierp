@@ -178,7 +178,9 @@ function buildPacks(): PrepPack[] {
           endpoint: "/api/inventory",
           tableKey: "inventoryByLocation",
           extractItems: (data, cid) =>
-            extractArray(data).map((i: any) =>
+            // Backend returns paginated { data, ... } — handle both flat-array
+            // and paginated-object formats for forward/backward compatibility.
+            (Array.isArray(data) ? data : (data?.data ?? [])).map((i: any) =>
               toEntity(`${i.stockItemId ?? i.stock_item_id}_${i.locationId ?? i.location_id}`, cid, i)
             ),
         },

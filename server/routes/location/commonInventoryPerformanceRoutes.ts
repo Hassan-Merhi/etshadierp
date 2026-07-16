@@ -9,7 +9,7 @@ function parsePage(value: unknown): number {
 }
 
 function parsePageSize(value: unknown): number {
-  return Math.min(500, Math.max(1, Number.parseInt(String(value), 10) || 50));
+  return Math.min(250, Math.max(1, Number.parseInt(String(value), 10) || 100));
 }
 
 export function registerCommonInventoryPerformanceRoutes(app: Express): void {

@@ -242,7 +242,6 @@ export default function StockItems() {
     mutationFn: async (data: { stockItemId: number; locationId: number; quantity: number; type: "add" | "subtract" }) =>
       apiRequest("POST", "/api/inventory/quick-adjust", data),
     onSuccess: (data: any) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/inventory"] });
       queryClient.invalidateQueries({ queryKey: ["/api/locations"] });
       queryClient.invalidateQueries({ queryKey: ["/api/stock-items"] });
       setAdjustDialogOpen(false);

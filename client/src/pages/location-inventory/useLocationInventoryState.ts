@@ -63,7 +63,10 @@ export function useLocationInventoryState({ companyId, toast }: UseLocationInven
     setGroupSearchTerm("");
     setItemSearchTerm("");
     queryClient.invalidateQueries({ queryKey: ["/api/locations"] });
-    queryClient.invalidateQueries({ queryKey: ["/api/inventory"] });
+    // The full inventory query key already includes companyId — React Query
+    // uses a different cache entry automatically when the company changes,
+    // so no manual invalidation is needed here (it would only cause a
+    // redundant 1.2 MB refetch for every company switch).
     queryClient.invalidateQueries({ queryKey: ["/api/stock-categories"] });
   }, [companyId]);
 
@@ -109,7 +112,7 @@ export function useLocationInventoryState({ companyId, toast }: UseLocationInven
         locationId: selectedLocationLocal.id,
         stockGroupId: selectedGroup.groupId,
       });
-      queryClient.invalidateQueries({ queryKey: ["/api/inventory"] });
+      queryClient.invalidateQueries({ queryKey: [`/api/locations/${selectedLocationLocal.id}/inventory`] });
       toast({ title: "Stock Group Archived" });
       setSelectedGroup(null);
       setArchiveDialogOpen(false);

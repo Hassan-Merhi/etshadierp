@@ -114,7 +114,6 @@ export default function StockTransferImport({ posUser }: StockTransferImportProp
         title: "Import successful",
         description: `${data.itemsCount} items transferred successfully.`,
       });
-      queryClient.invalidateQueries({ queryKey: ["/api/inventory"] });
       queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] });
       queryClient.invalidateQueries({ queryKey: ["/api/inventory-by-location"] });
       navigate("/stock-transfers");

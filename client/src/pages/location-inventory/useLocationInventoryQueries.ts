@@ -104,16 +104,27 @@ export function useLocationInventoryQueries({
     enabled: !!selectedLocationLocal && !!asOfDate && !!companyId,
   });
 
-  const { data: allInventoryData = [], isLoading: allInventoryLoading } = useQuery<any[]>({
+  const { data: allInventoryRaw, isLoading: allInventoryLoading } = useQuery<any>({
     queryKey: companyId ? ["/api/inventory", companyId] : [],
     queryFn: async () => {
-      const res = await fetch("/api/inventory", { credentials: "include" });
+      const res = await fetch("/api/inventory?page=1&pageSize=100", { credentials: "include" });
       if (!res.ok) throw new Error(await res.text());
       return res.json();
     },
     enabled: showAllStock && !!companyId,
-    staleTime: 30000,
+    // Extended stale time: the full inventory list is expensive; avoid re-downloading
+    // it on every mutation or focus event. Users can navigate away and back to refresh.
+    staleTime: 10 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+    refetchOnMount: false,
+    retry: false,
   });
+  // Backend returns paginated { data, page, pageSize, total, totalPages }; extract array.
+  const allInventoryData: any[] = Array.isArray(allInventoryRaw)
+    ? allInventoryRaw
+    : (allInventoryRaw?.data ?? []);
 
   const { data: allNegativeStock = [], isLoading: negativeStockLoading } = useQuery<any[]>({
     queryKey: companyId ? ["/api/inventory/negative", companyId] : [],

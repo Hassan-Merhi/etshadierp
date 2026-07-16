@@ -685,7 +685,6 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [`/api/containers/${containerId}`] });
       queryClient.invalidateQueries({ queryKey: ["/api/containers/active", selectedCompany?.id] });
-      queryClient.invalidateQueries({ queryKey: ["/api/inventory"] });
       toast({
         title: "Offload Reversed",
         description: "Container status restored to IN_TRANSIT",

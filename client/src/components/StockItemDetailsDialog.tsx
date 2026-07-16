@@ -184,7 +184,6 @@ export function StockItemDetailsDialog({
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [`/api/stock-items/${stockItemId}`] });
       queryClient.invalidateQueries({ queryKey: ["/api/stock-items"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/inventory"] });
       setIsEditingDetails(false);
       toast({
         title: "Stock Item Updated",
@@ -210,7 +209,6 @@ export function StockItemDetailsDialog({
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [`/api/stock-items/${stockItemId}/voucher-history`] });
-      queryClient.invalidateQueries({ queryKey: ["/api/inventory"] });
       setEditingTransaction(null);
       toast({
         title: "Transaction Updated",
