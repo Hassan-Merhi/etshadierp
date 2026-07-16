@@ -7,17 +7,10 @@
  * commission, duty, additional charges) converted from its OWN currency, not
  * assumed to already be in the container's currency.
  *
- * This exists because the post-offload "add charge" route (rawStockContainerRoutes.ts)
- * historically added otherCharges/commission/duty straight into the container-currency
- * total WITHOUT converting them from their own currency first — so any container that
- * had a post-offload charge added in a different currency than the container drifted
- * out of sync with its true landed cost. This module lets us find every such container,
- * show the old vs. corrected numbers, and — only for the ones an admin approves — apply
- * the fix and cascade it down to mix batches/bales via cascadeContainerCostChange.
- *
  * Read-only preview never writes anything. Apply runs inside a transaction per container.
  */
-import { eq, and, isNull, sql, inArray } from "drizzle-orm";
+import { eq, and, isNull, sql, inArray, gt } from "drizzle-orm";
+import { pool } from "../../db";
 import Decimal from "decimal.js";
 import crypto from "crypto";
 import { db } from "../../db";
@@ -35,23 +28,29 @@ import {
 import { cascadeContainerCostChange, recomputeBatchAndCascadeBales } from "./rawStockCostCascade";
 import { resolveStoredFxRate } from "./currencyConversion";
 
-export interface RecalcRow {
-  containerId: number;
-  rawStockId: number;
-  containerNumber: string;
-  supplierId: number | null;
-  supplierName: string;
-  currencyCode: string;
-  receivedKg: number;
-  old: { costPerKg: number; costPerKgUsd: number };
-  next: { costPerKg: number; costPerKgUsd: number };
-  diffPct: number; // % change in costPerKgUsd, signed
-  changed: boolean;
-  /** True when the container's currency is non-USD and no explicitly-resolved exchange
-   * rate is available — `next` is NOT trustworthy in this case and must never be applied
-   * automatically; surfaced for MANUAL_REVIEW_REQUIRED instead of an auto-fixable diff. */
-  fxUnresolved: boolean;
+// ─────────────────────────────────────────────────────────────────────────────
+// Precision helpers
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** All per-KG cost comparisons are normalised to 6 decimal places. */
+export const COST_SCALE = 6;
+
+/** True when two cost/kg values are equal at six-decimal precision. */
+export function costEquals(
+  a: string | number | null | undefined,
+  b: string | number | null | undefined
+): boolean {
+  return new Decimal(a ?? 0).toDecimalPlaces(COST_SCALE).equals(new Decimal(b ?? 0).toDecimalPlaces(COST_SCALE));
 }
+
+/** Round a cost/kg to exactly COST_SCALE decimals; returns a string for DB writes. */
+export function costRound(v: string | number | null | undefined): string {
+  return new Decimal(v ?? 0).toDecimalPlaces(COST_SCALE).toFixed(COST_SCALE);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// computeCorrectContainerCost — authoritative landed-cost formula
+// ─────────────────────────────────────────────────────────────────────────────
 
 /**
  * Pure computation: given a container row + its post-offload additional charges +
@@ -72,9 +71,6 @@ export function computeCorrectContainerCost(
   otherChargesRows?: (typeof factoryContainerOtherCharges.$inferSelect)[]
 ): { costPerKg: number; costPerKgUsd: number; totalCost: number; totalUsd: number; fxUnresolved: boolean } {
   const containerCcy = container.currencyCode || "USD";
-  // The offload/edit fx rate actually applied to this container's charges — prefer the
-  // rate captured at offload time, falling back to the general one if not set. Never
-  // silently default an unresolved non-USD rate to 1 — surface it as fxUnresolved instead.
   const { fxRate, looksSet: fxLooksSet } = resolveStoredFxRate(
     containerCcy,
     container.fxRateToUsdOffload || container.fxRateToUsd,
@@ -93,9 +89,7 @@ export function computeCorrectContainerCost(
   const basePayable = actualKg.times(baseRate);
   const baseMaterialUsd = containerCcy === "USD" ? basePayable : basePayable.times(dFxRate);
 
-  // Freight — may have its own FX rate stored separately (freightFxRateToUsd /
-  // freightFxRateConfirmed), populated when freight is in a third currency.
-  // Fall back to the container's own FX rate when not set (unchanged legacy path).
+  // Freight
   const freightVal = new Decimal(container.freight || "0");
   const freightCcy = container.freightCurrencyCode || containerCcy;
   const rawFreightFx = parseFloat((container as any).freightFxRateToUsd || "");
@@ -104,7 +98,6 @@ export function computeCorrectContainerCost(
   if (freightCcy === "USD") {
     dFreightFx = new Decimal(1);
   } else if (Number.isFinite(rawFreightFx) && rawFreightFx > 0 && freightFxConfirmed) {
-    // Freight-specific rate takes priority over the container's rate.
     dFreightFx = new Decimal(rawFreightFx);
   } else {
     dFreightFx = dFxRate;
@@ -114,11 +107,9 @@ export function computeCorrectContainerCost(
     freightCcy === containerCcy ? freightVal : dFxRate.gt(0) ? freightUsd.div(dFxRate) : freightVal;
 
   // Other charges — use per-row detail when available, otherwise the aggregate field.
-  // Using both would double-count.
   let ocInContainerCcy: Decimal;
   let ocUsd: Decimal;
   if (otherChargesRows && otherChargesRows.length > 0) {
-    // Detailed path: each row carries its own currency + FX rate.
     ocInContainerCcy = new Decimal(0);
     ocUsd = new Decimal(0);
     for (const oc of otherChargesRows) {
@@ -140,26 +131,17 @@ export function computeCorrectContainerCost(
       ocUsd = ocUsd.plus(ocAmtUsd);
     }
   } else {
-    // Legacy aggregate path — the buggy post-offload-charge route ignored the
-    // OC currency; use otherChargesCurrencyCode if present, default to containerCcy.
     const ocVal = new Decimal(container.otherCharges || "0");
     const ocCcy = (container as any).otherChargesCurrencyCode || containerCcy;
     ocUsd = ocCcy === "USD" ? ocVal : ocVal.times(dFxRate);
     ocInContainerCcy = ocCcy === containerCcy ? ocVal : dFxRate.gt(0) ? ocUsd.div(dFxRate) : ocVal;
   }
 
-  // Commission — prefer the dedicated commission record (it stores its own currency +
-  // fx rate explicitly), falling back to the container's commission snapshot fields.
-  //
-  // IMPORTANT: never use the container's material fxRateToUsd (dFxRate) as a fallback
-  // for a commission that is denominated in a different currency. Example: an AUD
-  // container (fxRate=0.67) with a EUR commission (EUR/USD=1.18) would produce
-  // commUsd = EUR_amount × 0.67 = wrong. Each currency must have its own confirmed rate.
+  // Commission
   let commUsd: Decimal = new Decimal(0);
   let commInContainerCcy: Decimal = new Decimal(0);
   let commFxUnresolved = false;
 
-  /** Helper: compute commUsd + commInContainerCcy given value, currency, and a resolved fx */
   function applyCommFx(commVal: Decimal, commCcy: string, commFx: Decimal): void {
     if (commCcy === "USD") {
       commUsd = commVal;
@@ -168,7 +150,6 @@ export function computeCorrectContainerCost(
       commInContainerCcy = commVal;
       commUsd = dFxRate.gt(0) ? commVal.times(dFxRate) : commVal;
     } else {
-      // Different non-USD currency: use the dedicated commission FX rate
       commUsd = commVal.times(commFx);
       commInContainerCcy = dFxRate.gt(0) ? commUsd.div(dFxRate) : commVal;
     }
@@ -179,24 +160,19 @@ export function computeCorrectContainerCost(
     const commCcy = commissionRecord.currencyCode || containerCcy;
     const rawCommFx = parseFloat(commissionRecord.fxRateToUsd || "");
     const commConfirmed = (commissionRecord as any).fxRateConfirmed === true;
-
     if (commCcy === "USD") {
       applyCommFx(commVal, "USD", new Decimal(1));
     } else if (commCcy === containerCcy) {
-      // Same currency as container: use confirmed container FX
       applyCommFx(commVal, commCcy, dFxRate);
     } else {
-      // Different non-USD: commission record must carry its own confirmed rate
       if (Number.isFinite(rawCommFx) && rawCommFx > 0 && commConfirmed) {
         applyCommFx(commVal, commCcy, new Decimal(rawCommFx));
       } else {
-        // Fall back to container snapshot commission FX fields
         const snapFx = parseFloat((container as any).commissionFxRateToUsd || "");
         const snapConfirmed = (container as any).commissionFxRateConfirmed === true;
         if (Number.isFinite(snapFx) && snapFx > 0 && snapConfirmed) {
           applyCommFx(commVal, commCcy, new Decimal(snapFx));
         } else {
-          // No valid commission-specific FX: flag as unresolved, contribute zero
           commFxUnresolved = true;
           commUsd = new Decimal(0);
           commInContainerCcy = new Decimal(0);
@@ -206,19 +182,16 @@ export function computeCorrectContainerCost(
   } else {
     const commVal = new Decimal(container.commissionAmount || "0");
     const commCcy = (container as any).commissionCurrencyCode || containerCcy;
-
     if (commCcy === "USD") {
       applyCommFx(commVal, "USD", new Decimal(1));
     } else if (commCcy === containerCcy) {
       applyCommFx(commVal, commCcy, dFxRate);
     } else {
-      // Different non-USD: must use commission snapshot FX fields (not container material FX)
       const snapFx = parseFloat((container as any).commissionFxRateToUsd || "");
       const snapConfirmed = (container as any).commissionFxRateConfirmed === true;
       if (Number.isFinite(snapFx) && snapFx > 0 && snapConfirmed) {
         applyCommFx(commVal, commCcy, new Decimal(snapFx));
       } else if (commVal.gt(0)) {
-        // Commission exists but no commission-specific FX: flag as unresolved
         commFxUnresolved = true;
         commUsd = new Decimal(0);
         commInContainerCcy = new Decimal(0);
@@ -229,12 +202,11 @@ export function computeCorrectContainerCost(
     }
   }
 
-  // Duty — no separate currency field on the container; always container currency.
+  // Duty — always container currency
   const dutyVal = container.dutyStatus === "CONFIRMED" ? new Decimal(container.dutyAmount || "0") : new Decimal(0);
   const dutyUsd = containerCcy === "USD" ? dutyVal : dutyVal.times(dFxRate);
 
-  // Additional charges — each row already stores its own currency + fx rate explicitly;
-  // this part was already correct in the live code, kept identical here.
+  // Additional charges — each row stores its own currency + fx rate
   let addlInContainerCcy = new Decimal(0);
   let addlUsd = new Decimal(0);
   for (const c of additionalCharges) {
@@ -257,19 +229,25 @@ export function computeCorrectContainerCost(
   const totalUsd = baseMaterialUsd.plus(freightUsd).plus(ocUsd).plus(commUsd).plus(dutyUsd).plus(addlUsd);
 
   return {
-    costPerKg: totalCost.div(actualKg).toNumber(),
-    costPerKgUsd: totalUsd.div(actualKg).toNumber(),
+    costPerKg: totalCost.div(actualKg).toDecimalPlaces(COST_SCALE).toNumber(),
+    costPerKgUsd: totalUsd.div(actualKg).toDecimalPlaces(COST_SCALE).toNumber(),
     totalCost: totalCost.toNumber(),
     totalUsd: totalUsd.toNumber(),
     fxUnresolved: commFxUnresolved,
   };
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Fingerprint helpers
+// ─────────────────────────────────────────────────────────────────────────────
+
 export interface RecalcFingerprintInputs {
   container: typeof factoryContainers.$inferSelect;
   additionalCharges: (typeof factoryOffloadAdditionalCharges.$inferSelect)[];
   commissionRecord: typeof factoryContainerCommissions.$inferSelect | null;
   rawStock: typeof factoryRawStock.$inferSelect | null;
+  /** Detailed per-line other-charges — required for correct fingerprinting. */
+  otherChargesRows: (typeof factoryContainerOtherCharges.$inferSelect)[];
 }
 
 function toIso(v: Date | string | null | undefined): string | null {
@@ -279,18 +257,12 @@ function toIso(v: Date | string | null | undefined): string | null {
 
 /**
  * Deterministic fingerprint of every input that feeds a container's corrected
- * landed cost, plus the current stored cost and the expected corrected
- * result. Used to bind a recalc confirmation token to the EXACT approved
- * calculation — not just its numeric output — so ANY change to a
- * contributing field (container status/updatedAt, rate, currency, FX rate or
- * confirmed state, freight, duty, commission, other charges, or any
- * individual additional-charge row's amount/currency/rate/version) between
- * dry-run and apply invalidates the token, even if the corrected numbers
- * happen to net out the same.
+ * landed cost. Used to bind a recalc confirmation token to the EXACT approved
+ * calculation so ANY field change between dry-run and apply invalidates the token.
  */
 export function computeRecalcFingerprint(inputs: RecalcFingerprintInputs): string {
   const c = inputs.container;
-  const next = computeCorrectContainerCost(c, inputs.additionalCharges, inputs.commissionRecord);
+  const next = computeCorrectContainerCost(c, inputs.additionalCharges, inputs.commissionRecord, inputs.otherChargesRows);
   const canonical = {
     containerId: c.id,
     status: c.status,
@@ -321,6 +293,16 @@ export function computeRecalcFingerprint(inputs: RecalcFingerprintInputs): strin
         version: toIso((a as any).updatedAt) ?? toIso(a.createdAt),
       }))
       .sort((a, b) => a.id - b.id),
+    otherChargesRows: [...inputs.otherChargesRows]
+      .map((oc) => ({
+        id: oc.id,
+        amount: oc.amount,
+        currencyCode: oc.currencyCode,
+        fxRateToUsd: oc.fxRateToUsd,
+        fxRateConfirmed: oc.fxRateConfirmed,
+        version: toIso((oc as any).updatedAt) ?? toIso(oc.createdAt),
+      }))
+      .sort((a, b) => a.id - b.id),
     commissionRecord: inputs.commissionRecord
       ? {
           id: inputs.commissionRecord.id,
@@ -340,10 +322,8 @@ export function computeRecalcFingerprint(inputs: RecalcFingerprintInputs): strin
   return crypto.createHash("sha256").update(JSON.stringify(canonical)).digest("hex");
 }
 
-/** Loads the current, fresh inputs for one container (outside any transaction —
- * used for dry-run preview fingerprinting; the apply path re-loads under a row
- * lock and calls computeRecalcFingerprint again itself). Returns null if the
- * container doesn't exist in this company. */
+/** Loads all inputs needed to fingerprint one container. Returns null if the
+ *  container doesn't exist in this company. */
 export async function loadRecalcFingerprintInputs(
   companyId: number,
   containerId: number,
@@ -355,7 +335,7 @@ export async function loadRecalcFingerprintInputs(
     .where(and(eq(factoryContainers.id, containerId), eq(factoryContainers.companyId, companyId)));
   if (!container) return null;
 
-  const [additionalCharges, commissionRecords, rawStockRows] = await Promise.all([
+  const [additionalCharges, commissionRecords, rawStockRows, otherChargesRows] = await Promise.all([
     dbOrTx
       .select()
       .from(factoryOffloadAdditionalCharges)
@@ -384,19 +364,71 @@ export async function loadRecalcFingerprintInputs(
           isNull(factoryRawStock.deletedAt)
         )
       ),
+    dbOrTx
+      .select()
+      .from(factoryContainerOtherCharges)
+      .where(
+        and(
+          eq(factoryContainerOtherCharges.containerId, containerId),
+          eq(factoryContainerOtherCharges.companyId, companyId)
+        )
+      ),
   ]);
   const commissionRecord = commissionRecords.sort((a: any, b: any) => b.id - a.id)[0] || null;
 
-  return { container, additionalCharges, commissionRecord, rawStock: rawStockRows[0] || null };
+  return {
+    container,
+    additionalCharges,
+    commissionRecord,
+    rawStock: rawStockRows[0] || null,
+    otherChargesRows,
+  };
 }
 
-/** Read-only: build the full diff list for every offloaded container in this company. */
+// ─────────────────────────────────────────────────────────────────────────────
+// getRawStockRecalcPreview
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface RecalcRow {
+  containerId: number;
+  /** null when the active raw-stock row is missing/deleted */
+  rawStockId: number | null;
+  containerNumber: string;
+  containerStatus: string;
+  supplierId: number | null;
+  supplierName: string;
+  currencyCode: string;
+  receivedKg: number;
+  usedKg: number;
+  remainingKg: number;
+  fullyUsed: boolean;
+  activeRawStockRowExists: boolean;
+  /** A soft-deleted raw-stock row exists for this container */
+  rawStockDeleted: boolean;
+  mixSourceCount: number;
+  affectedOpenBatchCount: number;
+  affectedCompletedBatchCount: number;
+  old: { costPerKg: number; costPerKgUsd: number };
+  next: { costPerKg: number; costPerKgUsd: number };
+  diffPct: number;
+  changed: boolean;
+  fxUnresolved: boolean;
+}
+
+const OPEN_BATCH_STATUSES = ["ACTIVE", "OPEN", "CARRY_FORWARD"];
+const COMPLETED_BATCH_STATUSES = ["COMPLETED", "CLOSED"];
+
+/** Read-only: build the full diff list.
+ *  Covers containers with an active raw-stock row AND historical/fully-consumed
+ *  containers that have linked mix-batch sources but no active raw-stock row. */
 export async function getRawStockRecalcPreview(companyId: number): Promise<RecalcRow[]> {
-  const rows = await db
+  // A. Containers with an active raw-stock row
+  const rowsWithStock = await db
     .select({
       rawStockId: factoryRawStock.id,
       containerId: factoryRawStock.containerId,
       receivedKg: factoryRawStock.receivedKg,
+      usedKg: factoryRawStock.usedKg,
       costPerKg: factoryRawStock.costPerKg,
       costPerKgUsd: factoryRawStock.costPerKgUsd,
       container: factoryContainers,
@@ -407,17 +439,72 @@ export async function getRawStockRecalcPreview(companyId: number): Promise<Recal
     .leftJoin(factorySuppliers, eq(factorySuppliers.id, factoryContainers.supplierId))
     .where(and(eq(factoryRawStock.companyId, companyId), isNull(factoryRawStock.deletedAt)));
 
-  if (rows.length === 0) return [];
+  // B. Containers without active raw-stock but with linked mix-batch sources
+  const stockedIds = rowsWithStock.length > 0
+    ? rowsWithStock.map((r) => r.containerId)
+    : [-1];
 
-  const containerIds = rows.map((r) => r.containerId);
-  const [allAdditionalCharges, allCommissions] = await Promise.all([
-    db
-      .select()
-      .from(factoryOffloadAdditionalCharges)
-      .where(eq(factoryOffloadAdditionalCharges.companyId, companyId)),
-    db.select().from(factoryContainerCommissions).where(eq(factoryContainerCommissions.companyId, companyId)),
-  ]);
+  const historicalRows = await db
+    .select({
+      container: factoryContainers,
+      supplierName: factorySuppliers.name,
+    })
+    .from(factoryContainers)
+    .leftJoin(factorySuppliers, eq(factorySuppliers.id, factoryContainers.supplierId))
+    .where(
+      and(
+        eq(factoryContainers.companyId, companyId),
+        sql`${factoryContainers.id} NOT IN (${sql.join(stockedIds.map((id) => sql`${id}`), sql`, `)})`,
+        sql`EXISTS (SELECT 1 FROM factory_mix_batch_sources fmbs WHERE fmbs.container_id = ${factoryContainers.id})`,
+        gt(factoryContainers.actualReceivedKg, "0")
+      )
+    );
 
+  if (rowsWithStock.length === 0 && historicalRows.length === 0) return [];
+
+  const allContainerIds = [
+    ...rowsWithStock.map((r) => r.containerId),
+    ...historicalRows.map((r) => r.container.id),
+  ];
+
+  // Load supporting data in parallel
+  const [allAdditionalCharges, allCommissions, allOtherCharges, sourceCountResult, deletedRsRows] =
+    await Promise.all([
+      db.select().from(factoryOffloadAdditionalCharges).where(eq(factoryOffloadAdditionalCharges.companyId, companyId)),
+      db.select().from(factoryContainerCommissions).where(eq(factoryContainerCommissions.companyId, companyId)),
+      db.select().from(factoryContainerOtherCharges).where(eq(factoryContainerOtherCharges.companyId, companyId)),
+      pool.query<{
+        container_id: string;
+        source_count: string;
+        open_batch_count: string;
+        completed_batch_count: string;
+      }>(
+        `SELECT
+          fmbs.container_id,
+          COUNT(*)::int AS source_count,
+          COUNT(DISTINCT CASE WHEN fmb.status IN ('ACTIVE','OPEN','CARRY_FORWARD') THEN fmb.id END)::int AS open_batch_count,
+          COUNT(DISTINCT CASE WHEN fmb.status IN ('COMPLETED','CLOSED') THEN fmb.id END)::int AS completed_batch_count
+        FROM factory_mix_batch_sources fmbs
+        JOIN factory_mix_batches fmb ON fmb.id = fmbs.mix_batch_id
+        WHERE fmbs.container_id = ANY($1)
+          AND fmb.deleted_at IS NULL
+        GROUP BY fmbs.container_id`,
+        [allContainerIds]
+      ),
+      // Soft-deleted raw-stock per container
+      db
+        .select({ containerId: factoryRawStock.containerId })
+        .from(factoryRawStock)
+        .where(
+          and(
+            eq(factoryRawStock.companyId, companyId),
+            inArray(factoryRawStock.containerId, allContainerIds),
+            sql`${factoryRawStock.deletedAt} IS NOT NULL`
+          )
+        ),
+    ]);
+
+  // Build lookup maps
   const chargesByContainer = new Map<number, (typeof factoryOffloadAdditionalCharges.$inferSelect)[]>();
   for (const c of allAdditionalCharges) {
     if (!chargesByContainer.has(c.containerId)) chargesByContainer.set(c.containerId, []);
@@ -425,37 +512,63 @@ export async function getRawStockRecalcPreview(companyId: number): Promise<Recal
   }
   const commissionByContainer = new Map<number, typeof factoryContainerCommissions.$inferSelect>();
   for (const c of allCommissions) {
-    // A container may have multiple commission edits over time; keep the latest.
     const existing = commissionByContainer.get(c.containerId);
     if (!existing || c.id > existing.id) commissionByContainer.set(c.containerId, c);
   }
+  const otherChargesByContainer = new Map<number, (typeof factoryContainerOtherCharges.$inferSelect)[]>();
+  for (const oc of allOtherCharges) {
+    if (!otherChargesByContainer.has(oc.containerId)) otherChargesByContainer.set(oc.containerId, []);
+    otherChargesByContainer.get(oc.containerId)!.push(oc);
+  }
+  const sourceCountByContainer = new Map<number, { source_count: number; open_batch_count: number; completed_batch_count: number }>();
+  for (const r of sourceCountResult.rows) {
+    sourceCountByContainer.set(Number(r.container_id), {
+      source_count: Number(r.source_count),
+      open_batch_count: Number(r.open_batch_count),
+      completed_batch_count: Number(r.completed_batch_count),
+    });
+  }
+  const deletedRsContainerIds = new Set(deletedRsRows.map((r) => r.containerId as number));
 
   const results: RecalcRow[] = [];
-  for (const row of rows) {
-    if (!containerIds.includes(row.containerId)) continue;
+
+  // Process containers with active raw-stock
+  for (const row of rowsWithStock) {
     const container = row.container;
     const additionalCharges = chargesByContainer.get(container.id) || [];
     const commissionRecord = commissionByContainer.get(container.id) || null;
-    const next = computeCorrectContainerCost(container, additionalCharges, commissionRecord);
+    const ocRows = otherChargesByContainer.get(container.id) || [];
+    const next = computeCorrectContainerCost(container, additionalCharges, commissionRecord, ocRows);
 
     const oldCostPerKg = parseFloat(row.costPerKg || "0");
     const oldCostPerKgUsd = parseFloat(row.costPerKgUsd || "0");
-
-    // Tiny float-noise tolerance — anything above this is a real, actionable diff.
-    const EPS = 0.0005;
     const changed =
       !next.fxUnresolved &&
-      (Math.abs(next.costPerKg - oldCostPerKg) > EPS || Math.abs(next.costPerKgUsd - oldCostPerKgUsd) > EPS);
+      (!costEquals(next.costPerKg, oldCostPerKg) || !costEquals(next.costPerKgUsd, oldCostPerKgUsd));
     const diffPct = oldCostPerKgUsd > 0 ? ((next.costPerKgUsd - oldCostPerKgUsd) / oldCostPerKgUsd) * 100 : 0;
+
+    const receivedKg = parseFloat(row.receivedKg || "0");
+    const usedKg = parseFloat((row.usedKg as any) || "0");
+    const remainingKg = Math.max(0, receivedKg - usedKg);
+    const sc = sourceCountByContainer.get(container.id);
 
     results.push({
       containerId: container.id,
       rawStockId: row.rawStockId,
+      containerStatus: container.status,
       containerNumber: container.containerNumber,
       supplierId: container.supplierId,
       supplierName: row.supplierName || "Unknown Supplier",
       currencyCode: container.currencyCode || "USD",
-      receivedKg: parseFloat(row.receivedKg || "0"),
+      receivedKg,
+      usedKg,
+      remainingKg,
+      fullyUsed: receivedKg > 0 && remainingKg === 0,
+      activeRawStockRowExists: true,
+      rawStockDeleted: deletedRsContainerIds.has(container.id),
+      mixSourceCount: sc?.source_count || 0,
+      affectedOpenBatchCount: sc?.open_batch_count || 0,
+      affectedCompletedBatchCount: sc?.completed_batch_count || 0,
       old: { costPerKg: oldCostPerKg, costPerKgUsd: oldCostPerKgUsd },
       next: { costPerKg: next.costPerKg, costPerKgUsd: next.costPerKgUsd },
       diffPct: next.fxUnresolved ? 0 : diffPct,
@@ -464,7 +577,48 @@ export async function getRawStockRecalcPreview(companyId: number): Promise<Recal
     });
   }
 
-  // Unresolved-FX rows need human attention first, then changed rows, biggest impact first.
+  // Process historical containers without active raw-stock
+  for (const { container, supplierName } of historicalRows) {
+    const additionalCharges = chargesByContainer.get(container.id) || [];
+    const commissionRecord = commissionByContainer.get(container.id) || null;
+    const ocRows = otherChargesByContainer.get(container.id) || [];
+    const next = computeCorrectContainerCost(container, additionalCharges, commissionRecord, ocRows);
+
+    // For historical containers compare against ratePerKgUsd snapshot
+    const oldCostPerKgUsd = parseFloat(container.ratePerKgUsd || "0");
+    const oldCostPerKg = parseFloat(container.ratePerKg || "0");
+    const changed = !next.fxUnresolved && (!costEquals(next.costPerKg, oldCostPerKg) || !costEquals(next.costPerKgUsd, oldCostPerKgUsd));
+    const diffPct = oldCostPerKgUsd > 0 ? ((next.costPerKgUsd - oldCostPerKgUsd) / oldCostPerKgUsd) * 100 : 0;
+
+    const receivedKg = parseFloat(container.actualReceivedKg || "0");
+    const sc = sourceCountByContainer.get(container.id);
+
+    results.push({
+      containerId: container.id,
+      rawStockId: null,
+      containerStatus: container.status,
+      containerNumber: container.containerNumber,
+      supplierId: container.supplierId,
+      supplierName: supplierName || "Unknown Supplier",
+      currencyCode: container.currencyCode || "USD",
+      receivedKg,
+      usedKg: receivedKg,
+      remainingKg: 0,
+      fullyUsed: true,
+      activeRawStockRowExists: false,
+      rawStockDeleted: deletedRsContainerIds.has(container.id),
+      mixSourceCount: sc?.source_count || 0,
+      affectedOpenBatchCount: sc?.open_batch_count || 0,
+      affectedCompletedBatchCount: sc?.completed_batch_count || 0,
+      old: { costPerKg: oldCostPerKg, costPerKgUsd: oldCostPerKgUsd },
+      next: { costPerKg: next.costPerKg, costPerKgUsd: next.costPerKgUsd },
+      diffPct: next.fxUnresolved ? 0 : diffPct,
+      // Historical containers always need review if they have sources
+      changed: changed || (sc?.source_count || 0) > 0,
+      fxUnresolved: next.fxUnresolved,
+    });
+  }
+
   results.sort((a, b) => {
     if (a.fxUnresolved !== b.fxUnresolved) return a.fxUnresolved ? -1 : 1;
     if (a.changed !== b.changed) return a.changed ? -1 : 1;
@@ -474,6 +628,85 @@ export async function getRawStockRecalcPreview(companyId: number): Promise<Recal
   return results;
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// calculateBatchCostPreview — shared Decimal.js weighted-average helper
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface BatchSourceChange {
+  sourceId: number;
+  containerId: number | null;
+  containerNumber: string | null;
+  weightKg: number;
+  oldCostPerKgUsd: number;
+  newCostPerKgUsd: number;
+  oldTotalCost: number;
+  newTotalCost: number;
+  changed: boolean;
+}
+
+export interface BatchCostPreviewResult {
+  newCostPerKg: Decimal;
+  newTotalCost: Decimal;
+  totalWeightKg: Decimal;
+  weightKgFromSelectedContainers: Decimal;
+  sourceChanges: BatchSourceChange[];
+}
+
+/**
+ * Pure Decimal.js weighted-average recompute for ONE batch, given a map of
+ * corrected USD costs for the containers being repaired.
+ * Sources whose container is NOT in the map keep their current stored cost.
+ * Mirrors the exact arithmetic that recomputeBatchAndCascadeBales uses — so
+ * preview === apply.
+ */
+export function calculateBatchCostPreview(
+  allSources: Array<{ src: typeof factoryMixBatchSources.$inferSelect; containerNumber: string | null }>,
+  correctedCostUsdByContainer: Map<number, Decimal>
+): BatchCostPreviewResult {
+  let dTotalCost = new Decimal(0);
+  let dTotalWeight = new Decimal(0);
+  let dWeightFromSelected = new Decimal(0);
+  const sourceChanges: BatchSourceChange[] = [];
+
+  for (const { src, containerNumber } of allSources) {
+    const dWeight = new Decimal(src.weightKg || "0");
+    const correctedUsd =
+      src.containerId != null ? correctedCostUsdByContainer.get(src.containerId) : undefined;
+    const oldCostPerKgUsd = parseFloat(src.costPerKg || "0");
+    const dEffectiveCost = correctedUsd !== undefined ? correctedUsd : new Decimal(oldCostPerKgUsd);
+    const dSourceTotalCost = dWeight.times(dEffectiveCost);
+    const oldTotalCost = parseFloat(src.totalCost || "0");
+
+    dTotalCost = dTotalCost.plus(dSourceTotalCost);
+    dTotalWeight = dTotalWeight.plus(dWeight);
+    if (correctedUsd !== undefined) {
+      dWeightFromSelected = dWeightFromSelected.plus(dWeight);
+    }
+
+    sourceChanges.push({
+      sourceId: src.id,
+      containerId: src.containerId,
+      containerNumber: containerNumber || null,
+      weightKg: dWeight.toNumber(),
+      oldCostPerKgUsd,
+      newCostPerKgUsd: dEffectiveCost.toDecimalPlaces(COST_SCALE).toNumber(),
+      oldTotalCost,
+      newTotalCost: dSourceTotalCost.toDecimalPlaces(COST_SCALE).toNumber(),
+      changed: correctedUsd !== undefined && !costEquals(oldCostPerKgUsd, dEffectiveCost.toNumber()),
+    });
+  }
+
+  const newCostPerKg = dTotalWeight.gt(0)
+    ? dTotalCost.div(dTotalWeight).toDecimalPlaces(COST_SCALE)
+    : new Decimal(0);
+
+  return { newCostPerKg, newTotalCost: dTotalCost, totalWeightKg: dTotalWeight, weightKgFromSelectedContainers: dWeightFromSelected, sourceChanges };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// getAffectedMixBatchesPreview
+// ─────────────────────────────────────────────────────────────────────────────
+
 export interface AffectedMixBatchPreviewRow {
   batchId: number;
   batchCode: string;
@@ -482,53 +715,49 @@ export interface AffectedMixBatchPreviewRow {
   batchDate: string | null;
   wasCompleted: boolean;
   totalWeightKg: number;
+  weightKgFromSelectedContainers: number;
   oldCostPerKg: number;
   newCostPerKg: number;
+  oldTotalCost: number;
+  newTotalCost: number;
+  costDifferencePerKg: number;
+  totalCostDifference: number;
   diffPct: number;
   baleCount: number;
   sourceContainerNumbers: string[];
+  sourceChanges: BatchSourceChange[];
 }
 
-const OPEN_BATCH_STATUSES = ["ACTIVE", "OPEN", "CARRY_FORWARD"];
-const COMPLETED_BATCH_STATUSES = ["COMPLETED", "CLOSED"];
-
-/**
- * Read-only preview of every mix batch that would be touched by applying the
- * given containers' corrected cost — mirrors cascadeContainerCostChange's
- * batch-selection and weighted-average math exactly, but never writes
- * anything. Used to show an admin the downstream blast radius (and, when
- * includeCompletedBatches is true, which already-completed/closed batches
- * would also be rewritten) before they click Apply.
- */
 export async function getAffectedMixBatchesPreview(
   companyId: number,
   containerIds: number[],
-  includeCompletedBatches: boolean
+  includeCompletedBatches: boolean,
+  previewRows?: RecalcRow[]
 ): Promise<AffectedMixBatchPreviewRow[]> {
   if (containerIds.length === 0) return [];
 
-  const preview = await getRawStockRecalcPreview(companyId);
-  const correctedCostByContainer = new Map(
-    preview.filter((r) => containerIds.includes(r.containerId) && !r.fxUnresolved).map((r) => [r.containerId, r.next.costPerKg])
+  const preview = previewRows ?? (await getRawStockRecalcPreview(companyId));
+
+  // Build corrected USD cost map — use costPerKgUsd (sources are USD-denominated)
+  const correctedCostUsdByContainer = new Map<number, Decimal>(
+    preview
+      .filter((r) => containerIds.includes(r.containerId) && !r.fxUnresolved)
+      .map((r) => [r.containerId, new Decimal(r.next.costPerKgUsd)])
   );
-  if (correctedCostByContainer.size === 0) return [];
+  if (correctedCostUsdByContainer.size === 0) return [];
 
   const statusFilter = includeCompletedBatches
     ? [...OPEN_BATCH_STATUSES, ...COMPLETED_BATCH_STATUSES]
     : OPEN_BATCH_STATUSES;
 
   const sourceRows = await db
-    .select({
-      src: factoryMixBatchSources,
-      batch: factoryMixBatches,
-      containerNumber: factoryContainers.containerNumber,
-    })
+    .select({ src: factoryMixBatchSources, batch: factoryMixBatches, containerNumber: factoryContainers.containerNumber })
     .from(factoryMixBatchSources)
     .innerJoin(factoryMixBatches, eq(factoryMixBatchSources.mixBatchId, factoryMixBatches.id))
     .leftJoin(factoryContainers, eq(factoryContainers.id, factoryMixBatchSources.containerId))
     .where(
       and(
-        inArray(factoryMixBatchSources.containerId, [...correctedCostByContainer.keys()]),
+        inArray(factoryMixBatchSources.containerId, [...correctedCostUsdByContainer.keys()]),
         eq(factoryMixBatches.companyId, companyId),
         inArray(factoryMixBatches.status, statusFilter),
         isNull(factoryMixBatches.deletedAt)
@@ -538,9 +767,6 @@ export async function getAffectedMixBatchesPreview(
   const touchedBatchIds = [...new Set(sourceRows.map((r) => r.batch.id))];
   if (touchedBatchIds.length === 0) return [];
 
-  // Recompute each touched batch's weighted-average cost from ALL of its
-  // sources (not just the ones from the corrected containers) — a batch may
-  // blend multiple suppliers/containers, exactly like the real cascade does.
   const [allSourcesForTouchedBatches, baleCounts] = await Promise.all([
     db
       .select({ src: factoryMixBatchSources, containerNumber: factoryContainers.containerNumber })
@@ -567,20 +793,20 @@ export async function getAffectedMixBatchesPreview(
   for (const batchId of touchedBatchIds) {
     const batch = batchById.get(batchId)!;
     const sourcesForBatch = allSourcesForTouchedBatches.filter((r) => r.src.mixBatchId === batchId);
-    let totalCost = 0;
-    let totalWeight = 0;
+    const calc = calculateBatchCostPreview(sourcesForBatch, correctedCostUsdByContainer);
+
+    const oldCostPerKg = parseFloat(batch.costPerKg || "0");
+    const newCostPerKg = calc.newCostPerKg.toNumber();
+    const oldTotalCost = calc.totalWeightKg.times(new Decimal(oldCostPerKg)).toNumber();
+    const newTotalCost = calc.newTotalCost.toNumber();
+    const diffPct = oldCostPerKg > 0 ? ((newCostPerKg - oldCostPerKg) / oldCostPerKg) * 100 : 0;
+
     const containerNumbers = new Set<string>();
     for (const { src, containerNumber } of sourcesForBatch) {
-      const weight = parseFloat(src.weightKg || "0");
-      const correctedCost = src.containerId != null ? correctedCostByContainer.get(src.containerId) : undefined;
-      const costPerKg = correctedCost !== undefined ? correctedCost : parseFloat(src.costPerKg || "0");
-      totalCost += weight * costPerKg;
-      totalWeight += weight;
-      if (containerNumber) containerNumbers.add(containerNumber);
+      if (containerNumber && src.containerId != null && correctedCostUsdByContainer.has(src.containerId)) {
+        containerNumbers.add(containerNumber);
+      }
     }
-    const oldCostPerKg = parseFloat(batch.costPerKg || "0");
-    const newCostPerKg = totalWeight > 0 ? totalCost / totalWeight : oldCostPerKg;
-    const diffPct = oldCostPerKg > 0 ? ((newCostPerKg - oldCostPerKg) / oldCostPerKg) * 100 : 0;
 
     results.push({
       batchId,
@@ -589,12 +815,18 @@ export async function getAffectedMixBatchesPreview(
       status: batch.status,
       batchDate: batch.batchDate ? String(batch.batchDate) : null,
       wasCompleted: COMPLETED_BATCH_STATUSES.includes(batch.status),
-      totalWeightKg: totalWeight,
+      totalWeightKg: calc.totalWeightKg.toNumber(),
+      weightKgFromSelectedContainers: calc.weightKgFromSelectedContainers.toNumber(),
       oldCostPerKg,
       newCostPerKg,
+      oldTotalCost,
+      newTotalCost,
+      costDifferencePerKg: new Decimal(newCostPerKg).minus(new Decimal(oldCostPerKg)).toDecimalPlaces(COST_SCALE).toNumber(),
+      totalCostDifference: new Decimal(newTotalCost).minus(new Decimal(oldTotalCost)).toDecimalPlaces(COST_SCALE).toNumber(),
       diffPct,
       baleCount: baleCountByBatch.get(batchId) || 0,
       sourceContainerNumbers: [...containerNumbers],
+      sourceChanges: calc.sourceChanges,
     });
   }
 
@@ -602,57 +834,76 @@ export async function getAffectedMixBatchesPreview(
   return results;
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// applyRawStockRecalc
+// ─────────────────────────────────────────────────────────────────────────────
+
 export interface ApplyResult {
   containerId: number;
   containerNumber: string;
+  fullyUsed: boolean;
+  remainingKg: number;
   applied: boolean;
   skippedReason?: string;
   staleToken?: boolean;
   rawStockRowsUpdated: number;
+  /** Backward-compat count fields */
   affectedBatches: number;
   affectedBales: number;
   completedBatchesRewritten?: number;
 }
 
-// Recalc is a forward-looking correction to an already-offloaded container's
-// landed cost — OFFLOADED is the NORMAL state of every eligible container, so
-// (unlike the FX-confirmation lock) it is never refused here. Only genuinely
-// historical/closed containers are off-limits.
 const RECALC_REFUSED_STATUSES = new Set(["CLOSED", "COMPLETED"]);
-
-// Advisory-lock namespace distinct from fxResolutionRepair's (1/2/3) so the two
-// repair tools never collide on the same numeric key space.
 const RECALC_LOCK_NAMESPACE = 9001;
 
 export interface ApplyRawStockRecalcOptions {
-  /** Called with the transaction handle AFTER the container/cascade writes but
-   * BEFORE commit for each individual container, so an audit-log insert here
-   * is atomic with that container's update: if it throws, that container's
-   * transaction (and only that one) rolls back. */
   onAudit?: (tx: any, result: ApplyResult) => Promise<void>;
-  /** Per-container fingerprint captured at dry-run/token-issue time (see
-   * computeRecalcFingerprint). When provided, the fingerprint is RECOMPUTED
-   * from the fresh, row-locked state inside this container's own transaction
-   * — not just compared before the transaction opens — and the write is
-   * refused (staleToken=true) if anything the token approved has changed.
-   * Skipped for a container already sitting at its corrected value: that is
-   * a safe idempotent replay of an already-applied token, not staleness. */
   expectedFingerprints?: Record<number, string>;
-  /** Explicit, per-request admin override: also rewrite COMPLETED/CLOSED mix
-   * batches (and their bales) sourced from these containers, instead of leaving
-   * them as locked historical record. Off by default — see rawStockCostCascade.ts. */
   includeCompletedBatches?: boolean;
+  /** Allow CLOSED/COMPLETED containers when all safety checks pass. */
+  includeHistoricalContainers?: boolean;
 }
 
 /**
- * Apply the corrected cost for a specific set of containers, cascading down the chain.
- * Each container is applied in its own transaction with a `SELECT ... FOR UPDATE` row
- * lock plus an advisory lock, so a concurrent apply/offload on the same container
- * serializes instead of racing. Refuses (reports, does not throw) CLOSED/COMPLETED
- * containers — historical costing is never auto-rewritten. Idempotent: re-applying
- * to a container whose stored cost already matches the corrected value is a no-op
- * (applied=false).
+ * Check whether ALL relevant valuation layers for a container already match
+ * the corrected values (using 6dp precision). Returns true only when nothing
+ * needs to be written.
  */
+async function isFullyCorrect(
+  tx: any,
+  containerId: number,
+  next: ReturnType<typeof computeCorrectContainerCost>,
+  container: any,
+  rawStockRow: any
+): Promise<boolean> {
+  // A. Container snapshot
+  if (
+    !costEquals(next.costPerKgUsd, container.ratePerKgUsd) ||
+    !costEquals(next.totalCost, container.finalPayableAmount) ||
+    !costEquals(next.totalUsd, container.finalPayableAmountUsd)
+  ) {
+    return false;
+  }
+  // B. Raw-stock row
+  if (rawStockRow) {
+    if (!costEquals(next.costPerKg, rawStockRow.costPerKg) || !costEquals(next.costPerKgUsd, rawStockRow.costPerKgUsd)) {
+      return false;
+    }
+  }
+  // C. Mix-batch sources
+  const sources = await tx.select().from(factoryMixBatchSources).where(eq(factoryMixBatchSources.containerId, containerId));
+  for (const src of sources) {
+    const expectedTotal = new Decimal(src.weightKg || "0")
+      .times(new Decimal(next.costPerKgUsd))
+      .toDecimalPlaces(COST_SCALE)
+      .toFixed(COST_SCALE);
+    if (!costEquals(src.costPerKg, next.costPerKgUsd) || !costEquals(src.totalCost, expectedTotal)) {
+      return false;
+    }
+  }
+  return true;
+}
+
 export async function applyRawStockRecalc(
   companyId: number,
   containerIds: number[],
@@ -671,37 +922,31 @@ export async function applyRawStockRecalc(
         .for("update");
       if (!container) return null;
 
-      if (RECALC_REFUSED_STATUSES.has(container.status)) {
+      // Guard: refuse CLOSED/COMPLETED unless admin explicitly opts in
+      if (RECALC_REFUSED_STATUSES.has(container.status) && !opts.includeHistoricalContainers) {
         return {
           containerId,
           containerNumber: container.containerNumber,
+          fullyUsed: false,
+          remainingKg: 0,
           applied: false,
-          skippedReason: `Container status is ${container.status} — historical costing on closed containers is never auto-rewritten.`,
+          skippedReason: `Container status is ${container.status} — pass includeHistoricalContainers to repair historical containers.`,
           rawStockRowsUpdated: 0,
           affectedBatches: 0,
           affectedBales: 0,
         } as ApplyResult;
       }
 
-      const [additionalCharges, commissionRecords] = await Promise.all([
-        tx
-          .select()
-          .from(factoryOffloadAdditionalCharges)
-          .where(
-            and(
-              eq(factoryOffloadAdditionalCharges.containerId, containerId),
-              eq(factoryOffloadAdditionalCharges.companyId, companyId)
-            )
-          ),
-        tx
-          .select()
-          .from(factoryContainerCommissions)
-          .where(
-            and(
-              eq(factoryContainerCommissions.containerId, containerId),
-              eq(factoryContainerCommissions.companyId, companyId)
-            )
-          ),
+      const [additionalCharges, commissionRecords, otherChargesRows] = await Promise.all([
+        tx.select().from(factoryOffloadAdditionalCharges).where(
+          and(eq(factoryOffloadAdditionalCharges.containerId, containerId), eq(factoryOffloadAdditionalCharges.companyId, companyId))
+        ),
+        tx.select().from(factoryContainerCommissions).where(
+          and(eq(factoryContainerCommissions.containerId, containerId), eq(factoryContainerCommissions.companyId, companyId))
+        ),
+        tx.select().from(factoryContainerOtherCharges).where(
+          and(eq(factoryContainerOtherCharges.containerId, containerId), eq(factoryContainerOtherCharges.companyId, companyId))
+        ),
       ]);
       const commissionRecord = commissionRecords.sort((a: any, b: any) => b.id - a.id)[0] || null;
 
@@ -717,13 +962,16 @@ export async function applyRawStockRecalc(
         );
       const rawStockRow = rawStockRows[0] || null;
 
-      const next = computeCorrectContainerCost(container, additionalCharges, commissionRecord);
+      const next = computeCorrectContainerCost(container, additionalCharges, commissionRecord, otherChargesRows);
+
       if (next.fxUnresolved) {
         return {
           containerId,
           containerNumber: container.containerNumber,
+          fullyUsed: false,
+          remainingKg: 0,
           applied: false,
-          skippedReason: "FX rate is unresolved for this container — never auto-apply a recompute derived from a guessed rate.",
+          skippedReason: "FX rate is unresolved — never auto-apply a recompute derived from a guessed rate.",
           rawStockRowsUpdated: 0,
           affectedBatches: 0,
           affectedBales: 0,
@@ -733,6 +981,8 @@ export async function applyRawStockRecalc(
         return {
           containerId,
           containerNumber: container.containerNumber,
+          fullyUsed: false,
+          remainingKg: 0,
           applied: false,
           skippedReason: "No received kg — nothing to recompute.",
           rawStockRowsUpdated: 0,
@@ -741,25 +991,26 @@ export async function applyRawStockRecalc(
         } as ApplyResult;
       }
 
-      const oldCostPerKgUsd = parseFloat(container.ratePerKgUsd || "0");
-      const EPS = 0.0005;
-      const alreadyCorrect = Math.abs(next.costPerKgUsd - oldCostPerKgUsd) <= EPS;
+      // Multi-layer "already correct" check (all 3 layers must match)
+      const alreadyCorrect = await isFullyCorrect(tx, containerId, next, container, rawStockRow);
       if (alreadyCorrect) {
+        const receivedKg = parseFloat(container.actualReceivedKg || "0");
+        const usedKg = rawStockRow ? parseFloat((rawStockRow as any).usedKg || "0") : receivedKg;
+        const remainingKg = Math.max(0, receivedKg - usedKg);
         return {
           containerId,
           containerNumber: container.containerNumber,
+          fullyUsed: receivedKg > 0 && remainingKg === 0,
+          remainingKg,
           applied: false,
-          skippedReason: "Stored cost already matches the corrected value — idempotent no-op.",
+          skippedReason: "All valuation layers already match the corrected value — idempotent no-op.",
           rawStockRowsUpdated: 0,
           affectedBatches: 0,
           affectedBales: 0,
         } as ApplyResult;
       }
 
-      // Recalculate the fingerprint from THIS fresh, row-locked read — not the
-      // one taken before the transaction opened — so a concurrent edit that
-      // landed between dry-run/token-issue and this exact apply attempt is
-      // caught even under concurrency, not just via a best-effort pre-check.
+      // Fingerprint check (inside row lock — catches concurrent edits)
       const expectedFingerprint = opts.expectedFingerprints?.[containerId];
       if (expectedFingerprint) {
         const freshFingerprint = computeRecalcFingerprint({
@@ -767,14 +1018,18 @@ export async function applyRawStockRecalc(
           additionalCharges,
           commissionRecord,
           rawStock: rawStockRow,
+          otherChargesRows,
         });
         if (freshFingerprint !== expectedFingerprint) {
           return {
             containerId,
             containerNumber: container.containerNumber,
+            fullyUsed: false,
+            remainingKg: 0,
             applied: false,
             staleToken: true,
-            skippedReason: "Container's approved calculation inputs changed since the confirmation token was issued — re-run the dry-run preview and try again.",
+            skippedReason:
+              "Container's approved calculation inputs changed since the confirmation token was issued — re-run the dry-run preview and try again.",
             rawStockRowsUpdated: 0,
             affectedBatches: 0,
             affectedBales: 0,
@@ -782,30 +1037,36 @@ export async function applyRawStockRecalc(
         }
       }
 
+      // Determine fully-used before writing (for locked-rate decision)
+      const receivedKg = parseFloat(container.actualReceivedKg || "0");
+      const usedKg = rawStockRow ? parseFloat((rawStockRow as any).usedKg || "0") : receivedKg;
+      const remainingKg = Math.max(0, receivedKg - usedKg);
+      const fullyUsed = receivedKg > 0 && remainingKg === 0;
+
+      // Update container snapshot
       await tx
         .update(factoryContainers)
         .set({
           finalPayableAmount: String(next.totalCost),
-          ratePerKgUsd: String(next.costPerKgUsd),
+          ratePerKgUsd: costRound(next.costPerKgUsd),
           finalPayableAmountUsd: String(next.totalUsd),
           updatedAt: new Date(),
         })
         .where(eq(factoryContainers.id, containerId));
 
+      // The cascade naturally skips supplier locked-rate for fully-used containers
+      // because remainingKg=0 makes dCorrectedContainerRemainingKg=0. No extra param needed.
       const cascadeResult = await cascadeContainerCostChange(
         tx,
-        {
-          companyId,
-          containerId,
-          newCostPerKg: next.costPerKg,
-          newCostPerKgUsd: next.costPerKgUsd,
-        },
+        { companyId, containerId, newCostPerKg: next.costPerKg, newCostPerKgUsd: next.costPerKgUsd },
         { includeCompletedBatches: opts.includeCompletedBatches }
       );
 
       const applyResult: ApplyResult = {
         containerId,
         containerNumber: container.containerNumber,
+        fullyUsed,
+        remainingKg,
         applied: true,
         rawStockRowsUpdated: cascadeResult.rawStockRowsUpdated,
         affectedBatches: cascadeResult.affectedBatches.length,
@@ -813,8 +1074,6 @@ export async function applyRawStockRecalc(
         completedBatchesRewritten: cascadeResult.affectedBatches.filter((b) => b.wasCompleted).length,
       };
 
-      // Atomic with the writes above: if this throws, this container's entire
-      // transaction (container update + cascade) rolls back too.
       if (opts.onAudit) {
         await opts.onAudit(tx, applyResult);
       }
@@ -828,55 +1087,57 @@ export async function applyRawStockRecalc(
   return results;
 }
 
-// ---------------------------------------------------------------------------
-// Zero-cost mix-batch-source repair.
-//
-// A mix batch's blended cost/kg is a weighted average of its sources
-// (factoryMixBatchSources). A handful of historical batches were created from
-// a container (or, in one known case, direct-from-supplier) whose source row
-// never got its costPerKg/totalCost populated at all — it was left at 0. This
-// is a DIFFERENT bug from the container-level landed-cost drift the recalc
-// preview/apply above targets: the container's own stored cost can be
-// perfectly correct (so it never appears as a "changed" row above and is
-// never selectable there) while its mix-batch-source rows still silently
-// drag every batch that drew from it toward zero. This section finds those
-// source rows directly and repairs them + cascades to their batch/bales,
-// independent of whether the parent container's cost changed.
-// ---------------------------------------------------------------------------
+// ─────────────────────────────────────────────────────────────────────────────
+// getMixBatchSourceCostMismatchPreview — full scan (replaces zero-cost-only)
+// ─────────────────────────────────────────────────────────────────────────────
 
-export interface ZeroCostSourceRow {
+export interface MixBatchSourceCostMismatchRow {
   sourceId: number;
   batchId: number;
   batchCode: string;
   batchStatus: string;
   containerId: number | null;
   containerNumber: string | null;
+  containerStatus: string | null;
   supplierId: number | null;
   supplierName: string | null;
   weightKg: number;
-  currentCostPerKg: number;
-  correctedCostPerKg: number | null;
+  oldCostPerKgUsd: number;
+  newCostPerKgUsd: number;
+  oldTotalCost: number;
+  newTotalCost: number;
+  difference: number;
   fixable: boolean;
   reason: string;
+  rawStockExists: boolean;
+  remainingKg: number;
+  fullyUsed: boolean;
 }
 
+/** Backward-compat type — all the old fields plus new ones. */
+export type ZeroCostSourceRow = MixBatchSourceCostMismatchRow & {
+  currentCostPerKg: number;
+  correctedCostPerKg: number | null;
+};
+
 /**
- * Read-only scan for mix-batch-source rows recorded with cost 0 despite
- * having real weight — i.e. a batch whose blended cost is understated
- * because a piece of it was never priced. For container-linked sources the
- * correction is unambiguous: the container's own current raw-stock cost/kg
- * (run the container recalc above FIRST if that container's own cost is also
- * wrong, so this reads the already-corrected value). Direct-from-supplier
- * sources with no container link have no stored historical rate to recover,
- * so they're surfaced as non-fixable — an admin has to supply a rate manually.
+ * Read-only scan for ALL mix-batch-source rows whose cost doesn't match the
+ * container's authoritative corrected USD landed cost. Catches:
+ *   - zero cost
+ *   - nonzero but incorrect cost
+ *   - incorrect totalCost even when costPerKg looks right
  */
-export async function getZeroCostMixBatchSourcesPreview(companyId: number): Promise<ZeroCostSourceRow[]> {
+export async function getMixBatchSourceCostMismatchPreview(
+  companyId: number
+): Promise<MixBatchSourceCostMismatchRow[]> {
   const rows = await db
     .select({
       src: factoryMixBatchSources,
       batch: factoryMixBatches,
       containerNumber: factoryContainers.containerNumber,
+      containerStatus: factoryContainers.status,
       supplierName: factorySuppliers.name,
+      container: factoryContainers,
     })
     .from(factoryMixBatchSources)
     .innerJoin(factoryMixBatches, eq(factoryMixBatchSources.mixBatchId, factoryMixBatches.id))
@@ -886,53 +1147,189 @@ export async function getZeroCostMixBatchSourcesPreview(companyId: number): Prom
       and(
         eq(factoryMixBatches.companyId, companyId),
         isNull(factoryMixBatches.deletedAt),
-        sql`${factoryMixBatchSources.costPerKg}::numeric <= 0`,
         sql`${factoryMixBatchSources.weightKg}::numeric > 0`
       )
     );
 
   if (rows.length === 0) return [];
 
-  const containerIds = [...new Set(rows.map((r) => r.src.containerId).filter((id): id is number => id != null))];
-  const rawStockByContainer = containerIds.length
-    ? new Map(
-        (
-          await db
-            .select()
-            .from(factoryRawStock)
-            .where(and(inArray(factoryRawStock.containerId, containerIds), isNull(factoryRawStock.deletedAt)))
-        ).map((r) => [r.containerId as number, r])
-      )
-    : new Map();
+  const containerIds = [
+    ...new Set(rows.map((r) => r.src.containerId).filter((id): id is number => id != null)),
+  ];
 
-  return rows
-    .map(({ src, batch, containerNumber, supplierName }) => {
-      const weightKg = parseFloat(src.weightKg || "0");
-      const rawStock = src.containerId != null ? rawStockByContainer.get(src.containerId) : undefined;
-      const correctedCostPerKg = rawStock ? parseFloat(rawStock.costPerKg || "0") : null;
-      const fixable = correctedCostPerKg != null && correctedCostPerKg > 0;
-      return {
+  // Load raw-stock for existence checks
+  const rawStockRows = containerIds.length
+    ? await db
+        .select()
+        .from(factoryRawStock)
+        .where(
+          and(
+            inArray(factoryRawStock.containerId, containerIds),
+            eq(factoryRawStock.companyId, companyId),
+            isNull(factoryRawStock.deletedAt)
+          )
+        )
+    : [];
+  const rawStockByContainer = new Map(rawStockRows.map((r) => [r.containerId as number, r]));
+
+  // Load charges for corrected-cost computation
+  const [allAdditionalCharges, allCommissions, allOtherCharges] = containerIds.length
+    ? await Promise.all([
+        db.select().from(factoryOffloadAdditionalCharges).where(inArray(factoryOffloadAdditionalCharges.containerId, containerIds)),
+        db.select().from(factoryContainerCommissions).where(inArray(factoryContainerCommissions.containerId, containerIds)),
+        db.select().from(factoryContainerOtherCharges).where(inArray(factoryContainerOtherCharges.containerId, containerIds)),
+      ])
+    : [[], [], []];
+
+  const chargesByContainer = new Map<number, any[]>();
+  for (const c of allAdditionalCharges) {
+    if (!chargesByContainer.has(c.containerId)) chargesByContainer.set(c.containerId, []);
+    chargesByContainer.get(c.containerId)!.push(c);
+  }
+  const commissionByContainer = new Map<number, any>();
+  for (const c of allCommissions) {
+    const ex = commissionByContainer.get(c.containerId);
+    if (!ex || c.id > ex.id) commissionByContainer.set(c.containerId, c);
+  }
+  const otherChargesByContainer = new Map<number, any[]>();
+  for (const oc of allOtherCharges) {
+    if (!otherChargesByContainer.has(oc.containerId)) otherChargesByContainer.set(oc.containerId, []);
+    otherChargesByContainer.get(oc.containerId)!.push(oc);
+  }
+
+  // Compute corrected USD cost per container
+  const correctedUsdByContainer = new Map<number, { costPerKgUsd: number; fxUnresolved: boolean }>();
+  const uniqueContainers = new Map<number, any>();
+  for (const { container } of rows) {
+    if (container && !uniqueContainers.has(container.id)) uniqueContainers.set(container.id, container);
+  }
+  for (const [cid, container] of uniqueContainers) {
+    const computed = computeCorrectContainerCost(
+      container,
+      chargesByContainer.get(cid) || [],
+      commissionByContainer.get(cid) || null,
+      otherChargesByContainer.get(cid) || []
+    );
+    correctedUsdByContainer.set(cid, { costPerKgUsd: computed.costPerKgUsd, fxUnresolved: computed.fxUnresolved });
+  }
+
+  const result: MixBatchSourceCostMismatchRow[] = [];
+
+  for (const { src, batch, containerNumber, containerStatus, supplierName, container } of rows) {
+    const weightKg = parseFloat(src.weightKg || "0");
+    const oldCostPerKgUsd = parseFloat(src.costPerKg || "0");
+    const oldTotalCost = parseFloat(src.totalCost || "0");
+
+    if (src.containerId == null) {
+      result.push({
+        sourceId: src.id,
+        batchId: batch.id,
+        batchCode: batch.batchCode,
+        batchStatus: batch.status,
+        containerId: null,
+        containerNumber: null,
+        containerStatus: null,
+        supplierId: src.supplierId,
+        supplierName: supplierName || null,
+        weightKg,
+        oldCostPerKgUsd,
+        newCostPerKgUsd: 0,
+        oldTotalCost,
+        newTotalCost: 0,
+        difference: 0,
+        fixable: false,
+        reason: "Direct-from-supplier source — requires manually entered cost/kg.",
+        rawStockExists: false,
+        remainingKg: 0,
+        fullyUsed: false,
+      });
+      continue;
+    }
+
+    const corrected = correctedUsdByContainer.get(src.containerId);
+    if (!corrected) continue;
+
+    if (corrected.fxUnresolved) {
+      result.push({
         sourceId: src.id,
         batchId: batch.id,
         batchCode: batch.batchCode,
         batchStatus: batch.status,
         containerId: src.containerId,
         containerNumber: containerNumber || null,
+        containerStatus: containerStatus || null,
         supplierId: src.supplierId,
         supplierName: supplierName || null,
         weightKg,
-        currentCostPerKg: parseFloat(src.costPerKg || "0"),
-        correctedCostPerKg,
-        fixable,
-        reason: fixable
-          ? "Container's current landed cost is known — safe to backfill."
-          : src.containerId != null
-            ? "Container has no priced raw-stock row to copy a cost from."
-            : "Sourced directly from a supplier with no container link — no historical rate on file; requires a manually entered cost/kg.",
-      };
-    })
-    .sort((a, b) => b.weightKg - a.weightKg);
+        oldCostPerKgUsd,
+        newCostPerKgUsd: 0,
+        oldTotalCost,
+        newTotalCost: 0,
+        difference: 0,
+        fixable: false,
+        reason: "Container FX rate is unresolved — cannot determine authoritative USD cost.",
+        rawStockExists: rawStockByContainer.has(src.containerId),
+        remainingKg: 0,
+        fullyUsed: false,
+      });
+      continue;
+    }
+
+    const newCostPerKgUsd = corrected.costPerKgUsd;
+    const newTotalCost = new Decimal(weightKg).times(new Decimal(newCostPerKgUsd)).toDecimalPlaces(COST_SCALE).toNumber();
+
+    if (costEquals(oldCostPerKgUsd, newCostPerKgUsd) && costEquals(oldTotalCost, newTotalCost)) continue;
+
+    const rawStock = rawStockByContainer.get(src.containerId);
+    const containerReceivedKg = parseFloat(container?.actualReceivedKg || "0");
+    const rawStockUsedKg = rawStock ? parseFloat((rawStock as any).usedKg || "0") : containerReceivedKg;
+    const remainingKg = rawStock ? Math.max(0, parseFloat(rawStock.receivedKg || "0") - rawStockUsedKg) : 0;
+
+    result.push({
+      sourceId: src.id,
+      batchId: batch.id,
+      batchCode: batch.batchCode,
+      batchStatus: batch.status,
+      containerId: src.containerId,
+      containerNumber: containerNumber || null,
+      containerStatus: containerStatus || null,
+      supplierId: src.supplierId,
+      supplierName: supplierName || null,
+      weightKg,
+      oldCostPerKgUsd,
+      newCostPerKgUsd,
+      oldTotalCost,
+      newTotalCost,
+      difference: new Decimal(newCostPerKgUsd).minus(new Decimal(oldCostPerKgUsd)).toDecimalPlaces(COST_SCALE).toNumber(),
+      fixable: newCostPerKgUsd > 0,
+      reason:
+        oldCostPerKgUsd === 0
+          ? "Source has zero cost — container's authoritative USD landed cost is known."
+          : `Source cost differs from container's authoritative USD landed cost (diff: ${(newCostPerKgUsd - oldCostPerKgUsd).toFixed(COST_SCALE)}).`,
+      rawStockExists: !!rawStock,
+      remainingKg,
+      fullyUsed: containerReceivedKg > 0 && remainingKg === 0,
+    });
+  }
+
+  return result.sort((a, b) => Math.abs(b.difference) - Math.abs(a.difference));
 }
+
+/** Backward-compat: returns only zero-cost rows from the full mismatch scan. */
+export async function getZeroCostMixBatchSourcesPreview(companyId: number): Promise<ZeroCostSourceRow[]> {
+  const all = await getMixBatchSourceCostMismatchPreview(companyId);
+  return all
+    .filter((r) => r.oldCostPerKgUsd === 0)
+    .map((r) => ({
+      ...r,
+      currentCostPerKg: r.oldCostPerKgUsd,
+      correctedCostPerKg: r.newCostPerKgUsd > 0 ? r.newCostPerKgUsd : null,
+    }));
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// applyZeroCostMixBatchSourcesFix
+// ─────────────────────────────────────────────────────────────────────────────
 
 const ZERO_COST_SOURCE_LOCK_NAMESPACE = 9002;
 
@@ -947,14 +1344,9 @@ export interface ZeroCostSourceFixResult {
 }
 
 /**
- * Apply the fix for a specific set of zero-cost mix-batch-source rows.
- * `manualRates` lets an admin supply an explicit cost/kg for sources that
- * have no container to copy a rate from (e.g. direct-from-supplier sources);
- * container-linked sources always use the container's current raw-stock
- * cost — never a manual override, so this can't be used to smuggle in an
- * arbitrary number for a source that already has a real answer on file.
- * Each source's batch is locked (advisory + row) and recomputed/cascaded in
- * its own transaction, mirroring applyRawStockRecalc's per-item isolation.
+ * Apply the fix for a specific set of mix-batch-source rows (zero-cost or
+ * any mismatch). Container-linked sources use the container's authoritative
+ * USD cost/kg (costPerKgUsd, not costPerKg). Manual rates only for no-container sources.
  */
 export async function applyZeroCostMixBatchSourcesFix(
   companyId: number,
@@ -980,56 +1372,64 @@ export async function applyZeroCostMixBatchSourcesFix(
         .where(and(eq(factoryMixBatches.id, src.mixBatchId), eq(factoryMixBatches.companyId, companyId)));
       if (!batch) return null;
 
-      const currentCostPerKg = parseFloat(src.costPerKg || "0");
       const weightKg = parseFloat(src.weightKg || "0");
-      if (currentCostPerKg > 0 || weightKg <= 0) {
-        return {
-          sourceId,
-          batchId: batch.id,
-          batchCode: batch.batchCode,
-          applied: false,
-          skippedReason: "Source is no longer zero-cost — idempotent no-op.",
-          affectedBales: 0,
-        } as ZeroCostSourceFixResult;
+      if (weightKg <= 0) {
+        return { sourceId, batchId: batch.id, batchCode: batch.batchCode, applied: false, skippedReason: "Source has zero weight.", affectedBales: 0 } as ZeroCostSourceFixResult;
       }
 
-      let correctedCostPerKg: number | null = null;
+      let correctedCostPerKgUsd: number | null = null;
+
       if (src.containerId != null) {
+        // Container-linked: use costPerKgUsd (mix-batch sources are USD-denominated)
         const [rawStock] = await tx
           .select()
           .from(factoryRawStock)
-          .where(and(eq(factoryRawStock.containerId, src.containerId), isNull(factoryRawStock.deletedAt)));
-        correctedCostPerKg = rawStock ? parseFloat(rawStock.costPerKg || "0") : null;
-        if (!correctedCostPerKg || correctedCostPerKg <= 0) {
-          return {
-            sourceId,
-            batchId: batch.id,
-            batchCode: batch.batchCode,
-            applied: false,
-            skippedReason: "Container has no priced raw-stock row to copy a cost from.",
-            affectedBales: 0,
-          } as ZeroCostSourceFixResult;
+          .where(and(eq(factoryRawStock.containerId, src.containerId), eq(factoryRawStock.companyId, companyId), isNull(factoryRawStock.deletedAt)));
+
+        if (rawStock) {
+          correctedCostPerKgUsd = parseFloat(rawStock.costPerKgUsd || "0");
+        } else {
+          // No active raw-stock: derive from container record
+          const [container] = await tx
+            .select()
+            .from(factoryContainers)
+            .where(and(eq(factoryContainers.id, src.containerId), eq(factoryContainers.companyId, companyId)));
+          if (container) {
+            const [addl, comms, ocs] = await Promise.all([
+              tx.select().from(factoryOffloadAdditionalCharges).where(and(eq(factoryOffloadAdditionalCharges.containerId, src.containerId), eq(factoryOffloadAdditionalCharges.companyId, companyId))),
+              tx.select().from(factoryContainerCommissions).where(and(eq(factoryContainerCommissions.containerId, src.containerId), eq(factoryContainerCommissions.companyId, companyId))),
+              tx.select().from(factoryContainerOtherCharges).where(and(eq(factoryContainerOtherCharges.containerId, src.containerId), eq(factoryContainerOtherCharges.companyId, companyId))),
+            ]);
+            const comm = comms.sort((a: any, b: any) => b.id - a.id)[0] || null;
+            const computed = computeCorrectContainerCost(container, addl, comm, ocs);
+            if (!computed.fxUnresolved && computed.costPerKgUsd > 0) {
+              correctedCostPerKgUsd = computed.costPerKgUsd;
+            }
+          }
+        }
+
+        if (!correctedCostPerKgUsd || correctedCostPerKgUsd <= 0) {
+          return { sourceId, batchId: batch.id, batchCode: batch.batchCode, applied: false, skippedReason: "Container has no resolvable USD cost.", affectedBales: 0 } as ZeroCostSourceFixResult;
         }
       } else {
         const manualRate = opts.manualRates?.[sourceId];
         if (!manualRate || manualRate <= 0) {
-          return {
-            sourceId,
-            batchId: batch.id,
-            batchCode: batch.batchCode,
-            applied: false,
-            skippedReason: "Direct-from-supplier source with no container link — requires a manually entered cost/kg.",
-            affectedBales: 0,
-          } as ZeroCostSourceFixResult;
+          return { sourceId, batchId: batch.id, batchCode: batch.batchCode, applied: false, skippedReason: "Direct-from-supplier source — requires a manually entered cost/kg.", affectedBales: 0 } as ZeroCostSourceFixResult;
         }
-        correctedCostPerKg = manualRate;
+        correctedCostPerKgUsd = manualRate;
+      }
+
+      // Idempotency check
+      const newTotalCost = new Decimal(weightKg).times(new Decimal(correctedCostPerKgUsd)).toDecimalPlaces(COST_SCALE).toFixed(COST_SCALE);
+      if (costEquals(src.costPerKg, correctedCostPerKgUsd) && costEquals(src.totalCost, newTotalCost)) {
+        return { sourceId, batchId: batch.id, batchCode: batch.batchCode, applied: false, skippedReason: "Source cost already matches — idempotent no-op.", affectedBales: 0 } as ZeroCostSourceFixResult;
       }
 
       await tx
         .update(factoryMixBatchSources)
         .set({
-          costPerKg: new Decimal(correctedCostPerKg).toDecimalPlaces(6).toFixed(6),
-          totalCost: new Decimal(weightKg).times(new Decimal(correctedCostPerKg)).toDecimalPlaces(6).toFixed(6),
+          costPerKg: costRound(correctedCostPerKgUsd),
+          totalCost: newTotalCost,
         })
         .where(eq(factoryMixBatchSources.id, sourceId));
 
@@ -1040,7 +1440,7 @@ export async function applyZeroCostMixBatchSourcesFix(
         batchId: batch.id,
         batchCode: batch.batchCode,
         applied: true,
-        costPerKgApplied: correctedCostPerKg,
+        costPerKgApplied: correctedCostPerKgUsd,
         affectedBales: bales.length,
       };
 
@@ -1055,4 +1455,214 @@ export async function applyZeroCostMixBatchSourcesFix(
   }
 
   return results;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// getFullAuditScan
+// ─────────────────────────────────────────────────────────────────────────────
+
+export type AuditCode =
+  | "CORRECT"
+  | "CONTAINER_COST_MISMATCH"
+  | "RAW_STOCK_COST_MISMATCH"
+  | "SOURCE_ZERO_COST"
+  | "SOURCE_COST_MISMATCH"
+  | "FULLY_USED"
+  | "RAW_STOCK_MISSING"
+  | "RAW_STOCK_DELETED"
+  | "UNRESOLVED_FX"
+  | "MANUAL_REVIEW_REQUIRED";
+
+export interface FullAuditRow {
+  containerId: number;
+  containerNumber: string;
+  containerStatus: string;
+  supplierId: number | null;
+  supplierName: string;
+  currencyCode: string;
+  receivedKg: number;
+  usedKg: number;
+  remainingKg: number;
+  fullyUsed: boolean;
+  activeRawStockRowExists: boolean;
+  rawStockDeleted: boolean;
+  mixSourceCount: number;
+  affectedOpenBatchCount: number;
+  affectedCompletedBatchCount: number;
+  old: { costPerKg: number; costPerKgUsd: number };
+  next: { costPerKg: number; costPerKgUsd: number };
+  diffPct: number;
+  fxUnresolved: boolean;
+  codes: AuditCode[];
+  safeToRepair: boolean;
+}
+
+export interface FullAuditSummary {
+  totalContainersScanned: number;
+  containersCorrect: number;
+  containerCostMismatches: number;
+  activeRawStockMismatches: number;
+  fullyUsedContainers: number;
+  fullyUsedContainersWithMismatches: number;
+  missingRawStockContainers: number;
+  zeroCostSources: number;
+  nonZeroSourceCostMismatches: number;
+  unresolvedFxContainers: number;
+  safeRepairsAvailable: number;
+  manualReviewRequired: number;
+}
+
+export interface FullAuditResult {
+  summary: FullAuditSummary;
+  rows: FullAuditRow[];
+}
+
+/** Comprehensive read-only audit of every relevant container in the company. */
+export async function getFullAuditScan(companyId: number): Promise<FullAuditResult> {
+  const [previewRows, sourceMismatches] = await Promise.all([
+    getRawStockRecalcPreview(companyId),
+    getMixBatchSourceCostMismatchPreview(companyId),
+  ]);
+
+  const sourceMismatchByContainer = new Map<number, MixBatchSourceCostMismatchRow[]>();
+  for (const sm of sourceMismatches) {
+    if (sm.containerId == null) continue;
+    if (!sourceMismatchByContainer.has(sm.containerId)) sourceMismatchByContainer.set(sm.containerId, []);
+    sourceMismatchByContainer.get(sm.containerId)!.push(sm);
+  }
+
+  const auditRows: FullAuditRow[] = [];
+  const summary: FullAuditSummary = {
+    totalContainersScanned: 0,
+    containersCorrect: 0,
+    containerCostMismatches: 0,
+    activeRawStockMismatches: 0,
+    fullyUsedContainers: 0,
+    fullyUsedContainersWithMismatches: 0,
+    missingRawStockContainers: 0,
+    zeroCostSources: 0,
+    nonZeroSourceCostMismatches: 0,
+    unresolvedFxContainers: 0,
+    safeRepairsAvailable: 0,
+    manualReviewRequired: 0,
+  };
+
+  for (const row of previewRows) {
+    const codes = new Set<AuditCode>();
+
+    if (row.fxUnresolved) {
+      codes.add("UNRESOLVED_FX");
+      codes.add("MANUAL_REVIEW_REQUIRED");
+    } else if (row.changed) {
+      codes.add("CONTAINER_COST_MISMATCH");
+      if (row.activeRawStockRowExists) codes.add("RAW_STOCK_COST_MISMATCH");
+    }
+
+    if (row.fullyUsed) codes.add("FULLY_USED");
+    if (!row.activeRawStockRowExists) {
+      if (row.rawStockDeleted) codes.add("RAW_STOCK_DELETED");
+      else codes.add("RAW_STOCK_MISSING");
+    }
+
+    const containerSourceMismatches = sourceMismatchByContainer.get(row.containerId) || [];
+    for (const sm of containerSourceMismatches) {
+      if (sm.oldCostPerKgUsd === 0) codes.add("SOURCE_ZERO_COST");
+      else codes.add("SOURCE_COST_MISMATCH");
+    }
+
+    if (codes.size === 0) codes.add("CORRECT");
+
+    const safeToRepair =
+      !codes.has("UNRESOLVED_FX") &&
+      !codes.has("MANUAL_REVIEW_REQUIRED") &&
+      !codes.has("CORRECT") &&
+      (row.activeRawStockRowExists || row.rawStockDeleted || containerSourceMismatches.length > 0);
+
+    summary.totalContainersScanned++;
+    if (codes.has("CORRECT")) summary.containersCorrect++;
+    if (codes.has("CONTAINER_COST_MISMATCH")) summary.containerCostMismatches++;
+    if (codes.has("RAW_STOCK_COST_MISMATCH")) summary.activeRawStockMismatches++;
+    if (codes.has("FULLY_USED")) summary.fullyUsedContainers++;
+    if (codes.has("FULLY_USED") && !codes.has("CORRECT")) summary.fullyUsedContainersWithMismatches++;
+    if (codes.has("RAW_STOCK_MISSING") || codes.has("RAW_STOCK_DELETED")) summary.missingRawStockContainers++;
+    if (codes.has("UNRESOLVED_FX")) summary.unresolvedFxContainers++;
+    if (codes.has("MANUAL_REVIEW_REQUIRED")) summary.manualReviewRequired++;
+    if (safeToRepair) summary.safeRepairsAvailable++;
+    summary.zeroCostSources += containerSourceMismatches.filter((s) => s.oldCostPerKgUsd === 0).length;
+    summary.nonZeroSourceCostMismatches += containerSourceMismatches.filter((s) => s.oldCostPerKgUsd !== 0).length;
+
+    auditRows.push({
+      containerId: row.containerId,
+      containerNumber: row.containerNumber,
+      containerStatus: row.containerStatus,
+      supplierId: row.supplierId,
+      supplierName: row.supplierName,
+      currencyCode: row.currencyCode,
+      receivedKg: row.receivedKg,
+      usedKg: row.usedKg,
+      remainingKg: row.remainingKg,
+      fullyUsed: row.fullyUsed,
+      activeRawStockRowExists: row.activeRawStockRowExists,
+      rawStockDeleted: row.rawStockDeleted,
+      mixSourceCount: row.mixSourceCount,
+      affectedOpenBatchCount: row.affectedOpenBatchCount,
+      affectedCompletedBatchCount: row.affectedCompletedBatchCount,
+      old: row.old,
+      next: row.next,
+      diffPct: row.diffPct,
+      fxUnresolved: row.fxUnresolved,
+      codes: [...codes],
+      safeToRepair,
+    });
+  }
+
+  return { summary, rows: auditRows };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// computeApplyAllDryRun — dry-run estimate for "Apply All Safe Repairs"
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface ApplyAllDryRunResult {
+  containersToUpdate: number;
+  rawStockRowsToUpdate: number;
+  openBatchesToUpdate: number;
+  completedBatchesToUpdate: number;
+  fullyUsedContainersIncluded: number;
+  unresolvedRecordsExcluded: number;
+  supplierRatesThatWillChange: number;
+  fullyUsedContainersNoSupplierRateChange: number;
+  safeContainerIds: number[];
+}
+
+export async function computeApplyAllDryRun(
+  companyId: number,
+  opts: { includeHistoricalContainers?: boolean; includeCompletedBatches?: boolean } = {}
+): Promise<ApplyAllDryRunResult> {
+  const audit = await getFullAuditScan(companyId);
+  let safeRows = audit.rows.filter((r) => r.safeToRepair);
+  if (!opts.includeHistoricalContainers) {
+    safeRows = safeRows.filter((r) => !["CLOSED", "COMPLETED"].includes(r.containerStatus));
+  }
+
+  const safeContainerIds = safeRows.map((r) => r.containerId);
+  const batchPreview = safeContainerIds.length
+    ? await getAffectedMixBatchesPreview(companyId, safeContainerIds, opts.includeCompletedBatches ?? false)
+    : [];
+
+  const openBatches = batchPreview.filter((b) => !b.wasCompleted).length;
+  const completedBatches = batchPreview.filter((b) => b.wasCompleted).length;
+  const fullyUsed = safeRows.filter((r) => r.fullyUsed).length;
+
+  return {
+    containersToUpdate: safeContainerIds.length,
+    rawStockRowsToUpdate: safeRows.filter((r) => r.activeRawStockRowExists).length,
+    openBatchesToUpdate: openBatches,
+    completedBatchesToUpdate: completedBatches,
+    fullyUsedContainersIncluded: fullyUsed,
+    unresolvedRecordsExcluded: audit.rows.filter((r) => r.fxUnresolved).length,
+    supplierRatesThatWillChange: safeRows.filter((r) => !r.fullyUsed && r.supplierId != null).length,
+    fullyUsedContainersNoSupplierRateChange: fullyUsed,
+    safeContainerIds,
+  };
 }

@@ -1,12 +1,34 @@
 import { useMemo, useState, Suspense, lazy } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link } from "wouter";
-import { ArrowLeft, RefreshCw, CheckCircle2, Layers } from "lucide-react";
+import {
+  ArrowLeft,
+  RefreshCw,
+  CheckCircle2,
+  Layers,
+  ShieldAlert,
+  History,
+  ChevronDown,
+  ChevronRight,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { useAdminOverride } from "@/hooks/use-admin-override";
@@ -17,14 +39,25 @@ import { formatNumber } from "@/lib/formatNumber";
 
 const BatchDetail = lazy(() => import("@/pages/BatchDetail"));
 
+// ─── Interfaces ──────────────────────────────────────────────────────────────
+
 interface RecalcRow {
   containerId: number;
-  rawStockId: number;
+  rawStockId: number | null;
   containerNumber: string;
+  containerStatus: string;
   supplierId: number | null;
   supplierName: string;
   currencyCode: string;
   receivedKg: number;
+  usedKg: number;
+  remainingKg: number;
+  fullyUsed: boolean;
+  activeRawStockRowExists: boolean;
+  rawStockDeleted: boolean;
+  mixSourceCount: number;
+  affectedOpenBatchCount: number;
+  affectedCompletedBatchCount: number;
   old: { costPerKg: number; costPerKgUsd: number };
   next: { costPerKg: number; costPerKgUsd: number };
   diffPct: number;
@@ -40,14 +73,26 @@ interface AffectedMixBatchRow {
   batchDate: string | null;
   wasCompleted: boolean;
   totalWeightKg: number;
+  weightKgFromSelectedContainers: number;
   oldCostPerKg: number;
   newCostPerKg: number;
+  costDifferencePerKg: number;
+  totalCostDifference: number;
+  oldTotalCost: number;
+  newTotalCost: number;
   diffPct: number;
   baleCount: number;
   sourceContainerNumbers: string[];
+  sourceChanges: Array<{
+    containerId: number;
+    containerNumber: string;
+    weightKg: number;
+    oldCostPerKgUsd: number;
+    newCostPerKgUsd: number;
+  }>;
 }
 
-interface ZeroCostSourceRow {
+interface SourceMismatchRow {
   sourceId: number;
   batchId: number;
   batchCode: string;
@@ -57,11 +102,41 @@ interface ZeroCostSourceRow {
   supplierId: number | null;
   supplierName: string | null;
   weightKg: number;
-  currentCostPerKg: number;
-  correctedCostPerKg: number | null;
+  oldCostPerKgUsd: number;
+  newCostPerKgUsd: number;
   fixable: boolean;
   reason: string;
 }
+
+interface FullAuditSummary {
+  totalContainersScanned: number;
+  containersCorrect: number;
+  containerCostMismatches: number;
+  activeRawStockMismatches: number;
+  fullyUsedContainersWithMismatches: number;
+  missingRawStockContainers: number;
+  zeroCostSources: number;
+  nonZeroSourceCostMismatches: number;
+  unresolvedFxContainers: number;
+  safeRepairsAvailable: number;
+}
+
+interface FullAuditRow {
+  containerId: number;
+  containerNumber: string;
+  containerStatus: string;
+  codes: string[];
+  safeToRepair: boolean;
+  fxUnresolved: boolean;
+  fullyUsed: boolean;
+}
+
+interface FullAuditResult {
+  summary: FullAuditSummary;
+  rows: FullAuditRow[];
+}
+
+// ─── Component ───────────────────────────────────────────────────────────────
 
 export default function RawStockRecalculate() {
   const { toast } = useToast();
@@ -70,10 +145,14 @@ export default function RawStockRecalculate() {
   const modeApiRequest = getApiRequest(appMode);
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [includeCompletedBatches, setIncludeCompletedBatches] = useState(false);
+  const [includeHistoricalContainers, setIncludeHistoricalContainers] = useState(false);
   const [detailBatchId, setDetailBatchId] = useState<number | null>(null);
   const [selectedZeroCostSources, setSelectedZeroCostSources] = useState<Set<number>>(new Set());
   const [manualRates, setManualRates] = useState<Record<number, string>>({});
+  const [expandedBatchSources, setExpandedBatchSources] = useState<Set<number>>(new Set());
+  const [activeTab, setActiveTab] = useState<"recalc" | "sources" | "audit">("recalc");
 
+  // ── Main preview ──────────────────────────────────────────────────────────
   const { data: rows, isLoading, refetch } = useQuery<RecalcRow[]>({
     queryKey: ["/api/factory/raw-stock/recalc/preview"],
   });
@@ -82,10 +161,22 @@ export default function RawStockRecalculate() {
   const fxUnresolvedRows = useMemo(() => (rows || []).filter((r) => r.fxUnresolved), [rows]);
   const unchangedCount = (rows?.length || 0) - changedRows.length - fxUnresolvedRows.length;
 
-  const allSelected = changedRows.length > 0 && changedRows.every((r) => selected.has(r.containerId));
+  // Hide CLOSED/COMPLETED containers unless "include historical" is toggled
+  const visibleChangedRows = useMemo(
+    () =>
+      includeHistoricalContainers
+        ? changedRows
+        : changedRows.filter((r) => !["CLOSED", "COMPLETED"].includes(r.containerStatus)),
+    [changedRows, includeHistoricalContainers]
+  );
+  const hiddenHistoricalCount = changedRows.length - visibleChangedRows.length;
 
+  const allSelected =
+    visibleChangedRows.length > 0 &&
+    visibleChangedRows.every((r) => selected.has(r.containerId));
   const selectedIds = useMemo(() => Array.from(selected).sort((a, b) => a - b), [selected]);
 
+  // ── Affected mix batches ──────────────────────────────────────────────────
   const { data: affectedBatches, isLoading: batchesLoading } = useQuery<AffectedMixBatchRow[]>({
     queryKey: ["/api/factory/raw-stock/recalc/mix-batches-preview", selectedIds, includeCompletedBatches],
     queryFn: async () => {
@@ -99,14 +190,52 @@ export default function RawStockRecalculate() {
     enabled: selectedIds.length > 0,
   });
 
+  // ── Source cost mismatches (full scan, replaces zero-cost-only) ───────────
+  const { data: sourceMismatches, isLoading: sourceMismatchLoading, refetch: refetchSources } = useQuery<SourceMismatchRow[]>({
+    queryKey: ["/api/factory/raw-stock/recalc/source-cost-mismatches"],
+    queryFn: async () => {
+      const res = await modeApiRequest("GET", "/api/factory/raw-stock/recalc/source-cost-mismatches");
+      if (!res.ok) throw new Error("Failed to load source cost mismatches");
+      return res.json();
+    },
+    enabled: activeTab === "sources",
+  });
+
+  const fixableSourceMismatches = useMemo(
+    () => (sourceMismatches || []).filter((r) => r.fixable),
+    [sourceMismatches]
+  );
+  const manualSourceMismatches = useMemo(
+    () => (sourceMismatches || []).filter((r) => !r.fixable && r.containerId == null),
+    [sourceMismatches]
+  );
+  const allSourceMismatchSelected =
+    fixableSourceMismatches.length > 0 &&
+    fixableSourceMismatches.every((r) => selectedZeroCostSources.has(r.sourceId));
+
+  // ── Full audit ────────────────────────────────────────────────────────────
+  const {
+    data: fullAudit,
+    isLoading: auditLoading,
+    refetch: refetchAudit,
+  } = useQuery<FullAuditResult>({
+    queryKey: ["/api/factory/raw-stock/recalc/full-audit"],
+    queryFn: async () => {
+      const res = await modeApiRequest("GET", "/api/factory/raw-stock/recalc/full-audit");
+      if (!res.ok) throw new Error("Failed to run full audit");
+      return res.json();
+    },
+    enabled: activeTab === "audit",
+  });
+
+  // ── Actions ───────────────────────────────────────────────────────────────
   const toggleAll = () => {
     if (allSelected) {
       setSelected(new Set());
     } else {
-      setSelected(new Set(changedRows.map((r) => r.containerId)));
+      setSelected(new Set(visibleChangedRows.map((r) => r.containerId)));
     }
   };
-
   const toggleOne = (containerId: number) => {
     setSelected((prev) => {
       const next = new Set(prev);
@@ -116,17 +245,53 @@ export default function RawStockRecalculate() {
     });
   };
 
+  const toggleSourceMismatch = (sourceId: number) => {
+    setSelectedZeroCostSources((prev) => {
+      const next = new Set(prev);
+      if (next.has(sourceId)) next.delete(sourceId);
+      else next.add(sourceId);
+      return next;
+    });
+  };
+  const toggleAllSourceMismatches = () => {
+    if (allSourceMismatchSelected) {
+      setSelectedZeroCostSources(new Set());
+    } else {
+      setSelectedZeroCostSources(new Set(fixableSourceMismatches.map((r) => r.sourceId)));
+    }
+  };
+
+  const toggleBatchSourcesExpanded = (batchId: number) => {
+    setExpandedBatchSources((prev) => {
+      const next = new Set(prev);
+      if (next.has(batchId)) next.delete(batchId);
+      else next.add(batchId);
+      return next;
+    });
+  };
+
+  // ── Apply container cost recalculation ───────────────────────────────────
   const applyMutation = useMutation({
-    mutationFn: async ({ containerIds, includeCompletedBatches }: { containerIds: number[]; includeCompletedBatches: boolean }) => {
+    mutationFn: async ({
+      containerIds,
+      includeCompletedBatches,
+      includeHistoricalContainers,
+    }: {
+      containerIds: number[];
+      includeCompletedBatches: boolean;
+      includeHistoricalContainers: boolean;
+    }) => {
       const dryRun = await modeApiRequest("POST", "/api/factory/raw-stock/recalc/apply", {
         containerIds,
         includeCompletedBatches,
+        includeHistoricalContainers,
       });
       if (!dryRun.ok) throw new Error((await dryRun.json()).message || "Failed to prepare recalculation");
       const dryRunData = await dryRun.json();
       const res = await modeApiRequest("POST", "/api/factory/raw-stock/recalc/apply", {
         containerIds,
         includeCompletedBatches,
+        includeHistoricalContainers,
         confirm: true,
         confirmationToken: dryRunData.confirmationToken,
       });
@@ -141,12 +306,15 @@ export default function RawStockRecalculate() {
       setSelected(new Set());
       const totalBatches = results.reduce((s: number, r: any) => s + r.affectedBatches, 0);
       const totalBales = results.reduce((s: number, r: any) => s + r.affectedBales, 0);
-      const totalCompletedBatches = results.reduce((s: number, r: any) => s + (r.completedBatchesRewritten || 0), 0);
+      const totalCompleted = results.reduce(
+        (s: number, r: any) => s + (r.completedBatchesRewritten || 0),
+        0
+      );
       toast({
         title: "Recalculation applied",
         description:
           `Fixed ${results.length} container(s). Updated ${totalBatches} mix batch(es) and ${totalBales} bale(s).` +
-          (totalCompletedBatches > 0 ? ` (${totalCompletedBatches} were completed/closed batches.)` : ""),
+          (totalCompleted > 0 ? ` (${totalCompleted} were completed/closed batches.)` : ""),
       });
     },
     onError: (err: any) => {
@@ -156,51 +324,78 @@ export default function RawStockRecalculate() {
 
   const handleApply = () => {
     if (selected.size === 0) return;
-    const label = includeCompletedBatches
-      ? `Apply cost recalculation to ${selected.size} container(s), including rewriting completed/closed mix batches`
-      : `Apply cost recalculation to ${selected.size} container(s)`;
+    const label =
+      `Apply cost recalculation to ${selected.size} container(s)` +
+      (includeCompletedBatches ? ", including rewriting completed/closed mix batches" : "") +
+      (includeHistoricalContainers ? ", including CLOSED/COMPLETED containers" : "");
     wrapAdminAction(() => {
-      applyMutation.mutate({ containerIds: Array.from(selected), includeCompletedBatches });
+      applyMutation.mutate({
+        containerIds: Array.from(selected),
+        includeCompletedBatches,
+        includeHistoricalContainers,
+      });
     }, label);
   };
 
-  // Mix-batch-source rows recorded with cost 0 despite real weight — a
-  // container-agnostic bug (the parent container's own cost may already be
-  // correct, so it never appears in the table above at all).
-  const { data: zeroCostSources, isLoading: zeroCostLoading } = useQuery<ZeroCostSourceRow[]>({
-    queryKey: ["/api/factory/raw-stock/recalc/zero-cost-sources"],
-    queryFn: async () => {
-      const res = await modeApiRequest("GET", "/api/factory/raw-stock/recalc/zero-cost-sources");
-      if (!res.ok) throw new Error("Failed to load zero-cost mix-batch sources");
+  // ── Apply All Safe (full-scan batch repair) ───────────────────────────────
+  const applyAllSafeMutation = useMutation({
+    mutationFn: async ({
+      includeHistoricalContainers,
+      includeCompletedBatches,
+    }: {
+      includeHistoricalContainers: boolean;
+      includeCompletedBatches: boolean;
+    }) => {
+      const dryRun = await modeApiRequest("POST", "/api/factory/raw-stock/recalc/apply-all-safe", {
+        includeHistoricalContainers,
+        includeCompletedBatches,
+      });
+      if (!dryRun.ok) throw new Error((await dryRun.json()).message || "Failed to prepare apply-all-safe");
+      const dryRunData = await dryRun.json();
+      if (!dryRunData.confirmationToken) {
+        return dryRunData; // 0 safe containers — nothing to do
+      }
+      const res = await modeApiRequest("POST", "/api/factory/raw-stock/recalc/apply-all-safe", {
+        includeHistoricalContainers,
+        includeCompletedBatches,
+        confirm: true,
+        confirmationToken: dryRunData.confirmationToken,
+      });
+      if (!res.ok) throw new Error((await res.json()).message || "Failed to apply safe repairs");
       return res.json();
+    },
+    onSuccess: (data) => {
+      if (!data.results) {
+        toast({ title: "Nothing to repair", description: "All containers are already correct." });
+        return;
+      }
+      const results = data.results || [];
+      const applied = results.filter((r: any) => r.applied);
+      const totalBatches = results.reduce((s: number, r: any) => s + r.affectedBatches, 0);
+      const totalBales = results.reduce((s: number, r: any) => s + r.affectedBales, 0);
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/raw-stock"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/raw-stock/recalc/preview"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/raw-stock/recalc/full-audit"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/mix-batches"] });
+      toast({
+        title: "All safe repairs applied",
+        description: `Fixed ${applied.length} container(s). Updated ${totalBatches} mix batch(es) and ${totalBales} bale(s).`,
+      });
+    },
+    onError: (err: any) => {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
     },
   });
 
-  const fixableZeroCostSources = useMemo(() => (zeroCostSources || []).filter((r) => r.fixable), [zeroCostSources]);
-  const manualZeroCostSources = useMemo(
-    () => (zeroCostSources || []).filter((r) => !r.fixable && r.containerId == null),
-    [zeroCostSources]
-  );
-  const allZeroCostSelected =
-    fixableZeroCostSources.length > 0 && fixableZeroCostSources.every((r) => selectedZeroCostSources.has(r.sourceId));
-
-  const toggleZeroCostSource = (sourceId: number) => {
-    setSelectedZeroCostSources((prev) => {
-      const next = new Set(prev);
-      if (next.has(sourceId)) next.delete(sourceId);
-      else next.add(sourceId);
-      return next;
-    });
-  };
-  const toggleAllZeroCostSources = () => {
-    if (allZeroCostSelected) {
-      setSelectedZeroCostSources(new Set());
-    } else {
-      setSelectedZeroCostSources(new Set(fixableZeroCostSources.map((r) => r.sourceId)));
-    }
+  const handleApplyAllSafe = () => {
+    const count = fullAudit?.summary.safeRepairsAvailable ?? "all";
+    wrapAdminAction(() => {
+      applyAllSafeMutation.mutate({ includeHistoricalContainers, includeCompletedBatches });
+    }, `Apply all safe raw-material cost repairs (${count} container(s))`);
   };
 
-  const zeroCostFixMutation = useMutation({
+  // ── Fix source mismatches ─────────────────────────────────────────────────
+  const sourceMismatchFixMutation = useMutation({
     mutationFn: async ({ sourceIds, rates }: { sourceIds: number[]; rates: Record<number, number> }) => {
       const dryRun = await modeApiRequest("POST", "/api/factory/raw-stock/recalc/zero-cost-sources/apply", {
         sourceIds,
@@ -219,14 +414,15 @@ export default function RawStockRecalculate() {
     },
     onSuccess: (data) => {
       const results = data.results || [];
-      queryClient.invalidateQueries({ queryKey: ["/api/factory/raw-stock/recalc/zero-cost-sources"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/factory/mix-batches"] });
       const applied = results.filter((r: any) => r.applied);
       const totalBales = results.reduce((s: number, r: any) => s + (r.affectedBales || 0), 0);
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/raw-stock/recalc/source-cost-mismatches"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/raw-stock/recalc/zero-cost-sources"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/mix-batches"] });
       setSelectedZeroCostSources(new Set());
       toast({
-        title: "Zero-cost sources fixed",
-        description: `Repaired ${applied.length} source(s) across their mix batches. Updated ${totalBales} bale(s).`,
+        title: "Source cost repairs applied",
+        description: `Repaired ${applied.length} source(s). Updated ${totalBales} bale(s).`,
       });
     },
     onError: (err: any) => {
@@ -234,7 +430,7 @@ export default function RawStockRecalculate() {
     },
   });
 
-  const handleFixZeroCostSources = () => {
+  const handleFixSourceMismatches = () => {
     if (selectedZeroCostSources.size === 0) return;
     const rates: Record<number, number> = {};
     for (const id of selectedZeroCostSources) {
@@ -245,12 +441,61 @@ export default function RawStockRecalculate() {
       }
     }
     wrapAdminAction(() => {
-      zeroCostFixMutation.mutate({ sourceIds: Array.from(selectedZeroCostSources), rates });
-    }, `Backfill cost for ${selectedZeroCostSources.size} zero-cost mix-batch source(s)`);
+      sourceMismatchFixMutation.mutate({ sourceIds: Array.from(selectedZeroCostSources), rates });
+    }, `Repair source cost for ${selectedZeroCostSources.size} mix-batch source(s)`);
   };
+
+  // ─── Helpers ──────────────────────────────────────────────────────────────
+  const badgePct = (pct: number) => (
+    <Badge
+      variant="outline"
+      className={
+        pct > 0
+          ? "text-red-500 border-red-500/30 bg-red-500/10"
+          : "text-emerald-500 border-emerald-500/30 bg-emerald-500/10"
+      }
+    >
+      {pct > 0 ? "+" : ""}
+      {pct.toFixed(2)}%
+    </Badge>
+  );
+
+  const statusBadge = (status: string) => {
+    const cls =
+      status === "CLOSED" || status === "COMPLETED"
+        ? "text-amber-600 border-amber-500/30 bg-amber-500/10"
+        : "text-muted-foreground";
+    return (
+      <Badge variant="outline" className={cls}>
+        {status}
+      </Badge>
+    );
+  };
+
+  const codeBadge = (code: string) => {
+    const cls =
+      code === "CORRECT"
+        ? "text-emerald-500 border-emerald-500/30 bg-emerald-500/10"
+        : code === "UNRESOLVED_FX" || code === "MANUAL_REVIEW_REQUIRED"
+        ? "text-amber-600 border-amber-500/30 bg-amber-500/10"
+        : "text-red-500 border-red-500/30 bg-red-500/10";
+    return (
+      <Badge key={code} variant="outline" className={`${cls} text-[10px] mr-1`}>
+        {code}
+      </Badge>
+    );
+  };
+
+  // ─── Tabs ─────────────────────────────────────────────────────────────────
+  const tabs = [
+    { id: "recalc" as const, label: "Container Cost Recalc" },
+    { id: "sources" as const, label: "Source Cost Mismatches" },
+    { id: "audit" as const, label: "Full Audit" },
+  ];
 
   return (
     <div className="space-y-6 p-6">
+      {/* Header */}
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div className="flex items-center gap-3">
           <Link href="/factory/raw-stock">
@@ -266,128 +511,185 @@ export default function RawStockRecalculate() {
             </p>
           </div>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 flex-wrap">
           <label className="flex items-center gap-2 text-xs text-muted-foreground cursor-pointer select-none">
             <Checkbox
               checked={includeCompletedBatches}
               onCheckedChange={(v) => setIncludeCompletedBatches(v === true)}
               data-testid="checkbox-include-completed-batches"
             />
-            Also rewrite completed/closed mix batches
+            Also rewrite completed mix batches
           </label>
-          <Button variant="outline" size="sm" onClick={() => refetch()} className="gap-2">
+          <label className="flex items-center gap-2 text-xs text-muted-foreground cursor-pointer select-none">
+            <Checkbox
+              checked={includeHistoricalContainers}
+              onCheckedChange={(v) => setIncludeHistoricalContainers(v === true)}
+              data-testid="checkbox-include-historical"
+            />
+            <History className="h-3 w-3" />
+            Include CLOSED/COMPLETED containers
+          </label>
+          <Button variant="outline" size="sm" onClick={() => { refetch(); refetchAudit(); refetchSources(); }} className="gap-2">
             <RefreshCw className="h-3.5 w-3.5" /> Refresh
           </Button>
-          <Button
-            size="sm"
-            disabled={selected.size === 0 || applyMutation.isPending}
-            onClick={handleApply}
-            className="gap-2 bg-emerald-600 hover:bg-emerald-600 text-white"
-          >
-            <CheckCircle2 className="h-3.5 w-3.5" />
-            {applyMutation.isPending ? "Applying..." : `Apply Selected (${selected.size})`}
-          </Button>
         </div>
+      </div>
+
+      {/* Tabs */}
+      <div className="flex gap-1 border-b">
+        {tabs.map((t) => (
+          <button
+            key={t.id}
+            className={`px-4 py-2 text-xs font-medium transition-colors border-b-2 -mb-px ${
+              activeTab === t.id
+                ? "border-primary text-foreground"
+                : "border-transparent text-muted-foreground hover:text-foreground"
+            }`}
+            onClick={() => setActiveTab(t.id)}
+          >
+            {t.label}
+            {t.id === "sources" && (sourceMismatches?.length ?? 0) > 0 && (
+              <span className="ml-1.5 rounded-full bg-red-500/15 text-red-600 text-[10px] px-1.5 py-0.5">
+                {sourceMismatches!.length}
+              </span>
+            )}
+            {t.id === "audit" && (fullAudit?.summary.safeRepairsAvailable ?? 0) > 0 && (
+              <span className="ml-1.5 rounded-full bg-amber-500/15 text-amber-600 text-[10px] px-1.5 py-0.5">
+                {fullAudit!.summary.safeRepairsAvailable}
+              </span>
+            )}
+          </button>
+        ))}
       </div>
 
       {includeCompletedBatches && (
         <div className="text-xs text-amber-700 dark:text-amber-400 bg-amber-500/10 border border-amber-500/30 rounded-md px-3 py-2">
           This will rewrite the cost of completed/closed mix batches (and any bales pressed from them) sourced from
-          the selected containers — normally protected as locked historical record. Only enable this if you want
-          past batches corrected too.
+          the selected containers — normally protected as locked historical record.
+        </div>
+      )}
+      {includeHistoricalContainers && (
+        <div className="text-xs text-amber-700 dark:text-amber-400 bg-amber-500/10 border border-amber-500/30 rounded-md px-3 py-2">
+          CLOSED/COMPLETED containers will be included. Their supplier locked rate will NOT be changed (they have no
+          remaining kg), but their raw-stock row and mix-batch sources will be corrected.
         </div>
       )}
 
-      {isLoading ? (
-        <div className="text-sm text-muted-foreground py-12 text-center">Computing recalculation preview...</div>
-      ) : (
+      {/* ── Tab: Container Cost Recalc ─────────────────────────────────────── */}
+      {activeTab === "recalc" && (
         <>
-          {fxUnresolvedRows.length > 0 && (
-            <div className="border border-amber-500/30 bg-amber-500/10 rounded-md p-3 text-xs text-amber-700 dark:text-amber-400 space-y-1">
-              <div className="font-medium">
-                {fxUnresolvedRows.length} container(s) have an unresolved/unconfirmed exchange rate and were
-                skipped — their true landed cost can't be safely computed without a confirmed rate.
-              </div>
-              <div className="flex flex-wrap gap-x-3 gap-y-0.5 font-mono">
-                {fxUnresolvedRows.map((r) => (
-                  <span key={r.containerId}>
-                    {r.containerNumber} ({r.currencyCode})
-                  </span>
-                ))}
-              </div>
-              <div>Resolve/confirm these containers' exchange rates first, then refresh this preview.</div>
-            </div>
-          )}
+          <div className="flex items-center justify-between gap-2 flex-wrap">
+            <div />
+            <Button
+              size="sm"
+              disabled={selected.size === 0 || applyMutation.isPending}
+              onClick={handleApply}
+              className="gap-2 bg-emerald-600 hover:bg-emerald-700 text-white"
+            >
+              <CheckCircle2 className="h-3.5 w-3.5" />
+              {applyMutation.isPending ? "Applying..." : `Apply Selected (${selected.size})`}
+            </Button>
+          </div>
 
-          {changedRows.length === 0 ? (
-            <div className="text-sm text-muted-foreground py-12 text-center border rounded-md bg-card">
-              Nothing to fix — every container's cost/kg already matches its stored charges.
-              {unchangedCount > 0 && ` (${unchangedCount} container(s) checked, all correct.)`}
-            </div>
+          {isLoading ? (
+            <div className="text-sm text-muted-foreground py-12 text-center">Computing recalculation preview...</div>
           ) : (
             <>
-              <div className="text-xs text-muted-foreground">
-                {changedRows.length} container(s) have a mismatch
-                {unchangedCount > 0 ? ` — ${unchangedCount} other container(s) are already correct and hidden.` : "."}
-              </div>
-              <div className="border rounded-md overflow-hidden bg-card shadow-sm">
-                <Table>
-                  <TableHeader className="bg-muted/50">
-                    <TableRow>
-                      <TableHead className="w-10">
-                        <Checkbox
-                          checked={allSelected}
-                          onCheckedChange={toggleAll}
-                          data-testid="checkbox-select-all"
-                        />
-                      </TableHead>
-                      <TableHead>Container</TableHead>
-                      <TableHead>Supplier</TableHead>
-                      <TableHead className="text-right">Received (kg)</TableHead>
-                      <TableHead className="text-right">Current $/kg</TableHead>
-                      <TableHead className="text-right">Corrected $/kg</TableHead>
-                      <TableHead className="text-right">Change</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {changedRows.map((row) => (
-                      <TableRow key={row.containerId} className="group">
-                        <TableCell>
-                          <Checkbox
-                            checked={selected.has(row.containerId)}
-                            onCheckedChange={() => toggleOne(row.containerId)}
-                            data-testid={`checkbox-row-${row.containerId}`}
-                          />
-                        </TableCell>
-                        <TableCell className="font-mono text-xs">{row.containerNumber}</TableCell>
-                        <TableCell className="text-sm">{row.supplierName}</TableCell>
-                        <TableCell className="text-right font-mono text-xs text-muted-foreground">
-                          {formatNumber(row.receivedKg)}
-                        </TableCell>
-                        <TableCell className="text-right font-mono text-xs text-muted-foreground">
-                          ${row.old.costPerKgUsd.toFixed(6)}
-                        </TableCell>
-                        <TableCell className="text-right font-mono text-xs font-medium text-foreground">
-                          ${row.next.costPerKgUsd.toFixed(6)}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <Badge
-                            variant="outline"
-                            className={
-                              row.diffPct > 0
-                                ? "text-red-500 border-red-500/30 bg-red-500/10"
-                                : "text-emerald-500 border-emerald-500/30 bg-emerald-500/10"
-                            }
-                          >
-                            {row.diffPct > 0 ? "+" : ""}
-                            {row.diffPct.toFixed(2)}%
-                          </Badge>
-                        </TableCell>
-                      </TableRow>
+              {fxUnresolvedRows.length > 0 && (
+                <div className="border border-amber-500/30 bg-amber-500/10 rounded-md p-3 text-xs text-amber-700 dark:text-amber-400 space-y-1">
+                  <div className="font-medium">
+                    {fxUnresolvedRows.length} container(s) have an unresolved/unconfirmed exchange rate and were
+                    skipped.
+                  </div>
+                  <div className="flex flex-wrap gap-x-3 gap-y-0.5 font-mono">
+                    {fxUnresolvedRows.map((r) => (
+                      <span key={r.containerId}>
+                        {r.containerNumber} ({r.currencyCode})
+                      </span>
                     ))}
-                  </TableBody>
-                </Table>
-              </div>
+                  </div>
+                  <div>Resolve/confirm these containers' exchange rates first, then refresh.</div>
+                </div>
+              )}
+
+              {hiddenHistoricalCount > 0 && (
+                <div className="text-xs text-muted-foreground bg-muted/40 border rounded-md px-3 py-2">
+                  {hiddenHistoricalCount} CLOSED/COMPLETED container(s) with mismatches are hidden — enable
+                  "Include CLOSED/COMPLETED containers" to see and repair them.
+                </div>
+              )}
+
+              {visibleChangedRows.length === 0 ? (
+                <div className="text-sm text-muted-foreground py-12 text-center border rounded-md bg-card">
+                  Nothing to fix — every container's cost/kg already matches its stored charges.
+                  {unchangedCount > 0 && ` (${unchangedCount} container(s) checked, all correct.)`}
+                </div>
+              ) : (
+                <>
+                  <div className="text-xs text-muted-foreground">
+                    {visibleChangedRows.length} container(s) have a mismatch
+                    {unchangedCount > 0
+                      ? ` — ${unchangedCount} other container(s) are already correct and hidden.`
+                      : "."}
+                  </div>
+                  <div className="border rounded-md overflow-hidden bg-card shadow-sm">
+                    <Table>
+                      <TableHeader className="bg-muted/50">
+                        <TableRow>
+                          <TableHead className="w-10">
+                            <Checkbox
+                              checked={allSelected}
+                              onCheckedChange={toggleAll}
+                              data-testid="checkbox-select-all"
+                            />
+                          </TableHead>
+                          <TableHead>Container</TableHead>
+                          <TableHead>Status</TableHead>
+                          <TableHead>Supplier</TableHead>
+                          <TableHead className="text-right">Received (kg)</TableHead>
+                          <TableHead className="text-right">Remaining (kg)</TableHead>
+                          <TableHead className="text-right">Current $/kg</TableHead>
+                          <TableHead className="text-right">Corrected $/kg</TableHead>
+                          <TableHead className="text-right">Change</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {visibleChangedRows.map((row) => (
+                          <TableRow key={row.containerId} className="group">
+                            <TableCell>
+                              <Checkbox
+                                checked={selected.has(row.containerId)}
+                                onCheckedChange={() => toggleOne(row.containerId)}
+                                data-testid={`checkbox-row-${row.containerId}`}
+                              />
+                            </TableCell>
+                            <TableCell className="font-mono text-xs">{row.containerNumber}</TableCell>
+                            <TableCell>{statusBadge(row.containerStatus)}</TableCell>
+                            <TableCell className="text-sm">{row.supplierName}</TableCell>
+                            <TableCell className="text-right font-mono text-xs text-muted-foreground">
+                              {formatNumber(row.receivedKg)}
+                            </TableCell>
+                            <TableCell className="text-right font-mono text-xs text-muted-foreground">
+                              {row.fullyUsed ? (
+                                <span className="text-amber-600">fully used</span>
+                              ) : (
+                                formatNumber(row.remainingKg)
+                              )}
+                            </TableCell>
+                            <TableCell className="text-right font-mono text-xs text-muted-foreground">
+                              ${row.old.costPerKgUsd.toFixed(6)}
+                            </TableCell>
+                            <TableCell className="text-right font-mono text-xs font-medium text-foreground">
+                              ${row.next.costPerKgUsd.toFixed(6)}
+                            </TableCell>
+                            <TableCell className="text-right">{badgePct(row.diffPct)}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </>
+              )}
 
               {selectedIds.length > 0 && (
                 <div className="space-y-2">
@@ -406,72 +708,123 @@ export default function RawStockRecalculate() {
                       <Table>
                         <TableHeader className="bg-muted/50">
                           <TableRow>
+                            <TableHead className="w-6" />
                             <TableHead>Batch</TableHead>
+                            <TableHead>Date</TableHead>
                             <TableHead>Status</TableHead>
-                            <TableHead className="text-right">Weight (kg)</TableHead>
-                            <TableHead className="text-right">Current $/kg</TableHead>
-                            <TableHead className="text-right">Corrected $/kg</TableHead>
+                            <TableHead className="text-right">Total (kg)</TableHead>
+                            <TableHead className="text-right">From Selected (kg)</TableHead>
+                            <TableHead className="text-right">Old $/kg</TableHead>
+                            <TableHead className="text-right">New $/kg</TableHead>
+                            <TableHead className="text-right">Δ $/kg</TableHead>
+                            <TableHead className="text-right">Total Δ</TableHead>
                             <TableHead className="text-right">Change</TableHead>
                             <TableHead className="text-right">Bales</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
                           {(affectedBatches || []).map((b) => (
-                            <TableRow
-                              key={b.batchId}
-                              className="cursor-pointer hover:bg-muted/40"
-                              onClick={() => setDetailBatchId(b.batchId)}
-                              data-testid={`row-affected-batch-${b.batchId}`}
-                            >
-                              <TableCell className="font-mono text-xs">
-                                {b.batchCode}
-                                {b.name ? <span className="text-muted-foreground"> — {b.name}</span> : null}
-                              </TableCell>
-                              <TableCell>
-                                <Badge
-                                  variant="outline"
-                                  className={
-                                    b.wasCompleted
-                                      ? "text-amber-600 border-amber-500/30 bg-amber-500/10"
-                                      : "text-muted-foreground"
-                                  }
+                            <>
+                              <TableRow
+                                key={b.batchId}
+                                className="cursor-pointer hover:bg-muted/40"
+                                onClick={() => toggleBatchSourcesExpanded(b.batchId)}
+                                data-testid={`row-affected-batch-${b.batchId}`}
+                              >
+                                <TableCell className="text-muted-foreground">
+                                  {expandedBatchSources.has(b.batchId) ? (
+                                    <ChevronDown className="h-3.5 w-3.5" />
+                                  ) : (
+                                    <ChevronRight className="h-3.5 w-3.5" />
+                                  )}
+                                </TableCell>
+                                <TableCell
+                                  className="font-mono text-xs"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setDetailBatchId(b.batchId);
+                                  }}
                                 >
-                                  {b.status}
-                                </Badge>
-                              </TableCell>
-                              <TableCell className="text-right font-mono text-xs text-muted-foreground">
-                                {formatNumber(b.totalWeightKg)}
-                              </TableCell>
-                              <TableCell className="text-right font-mono text-xs text-muted-foreground">
-                                ${b.oldCostPerKg.toFixed(4)}
-                              </TableCell>
-                              <TableCell className="text-right font-mono text-xs font-medium text-foreground">
-                                ${b.newCostPerKg.toFixed(4)}
-                              </TableCell>
-                              <TableCell className="text-right">
-                                <Badge
-                                  variant="outline"
-                                  className={
-                                    b.diffPct > 0
-                                      ? "text-red-500 border-red-500/30 bg-red-500/10"
-                                      : "text-emerald-500 border-emerald-500/30 bg-emerald-500/10"
-                                  }
-                                >
-                                  {b.diffPct > 0 ? "+" : ""}
-                                  {b.diffPct.toFixed(2)}%
-                                </Badge>
-                              </TableCell>
-                              <TableCell className="text-right font-mono text-xs text-muted-foreground">
-                                {b.baleCount}
-                              </TableCell>
-                            </TableRow>
+                                  <span className="hover:underline cursor-pointer">{b.batchCode}</span>
+                                  {b.name ? (
+                                    <span className="text-muted-foreground"> — {b.name}</span>
+                                  ) : null}
+                                </TableCell>
+                                <TableCell className="text-xs text-muted-foreground">
+                                  {b.batchDate
+                                    ? new Date(b.batchDate).toLocaleDateString()
+                                    : "—"}
+                                </TableCell>
+                                <TableCell>
+                                  <Badge
+                                    variant="outline"
+                                    className={
+                                      b.wasCompleted
+                                        ? "text-amber-600 border-amber-500/30 bg-amber-500/10"
+                                        : "text-muted-foreground"
+                                    }
+                                  >
+                                    {b.status}
+                                  </Badge>
+                                </TableCell>
+                                <TableCell className="text-right font-mono text-xs text-muted-foreground">
+                                  {formatNumber(b.totalWeightKg)}
+                                </TableCell>
+                                <TableCell className="text-right font-mono text-xs text-muted-foreground">
+                                  {formatNumber(b.weightKgFromSelectedContainers)}
+                                </TableCell>
+                                <TableCell className="text-right font-mono text-xs text-muted-foreground">
+                                  ${b.oldCostPerKg.toFixed(6)}
+                                </TableCell>
+                                <TableCell className="text-right font-mono text-xs font-medium">
+                                  ${b.newCostPerKg.toFixed(6)}
+                                </TableCell>
+                                <TableCell className="text-right font-mono text-xs">
+                                  {b.costDifferencePerKg > 0 ? "+" : ""}${b.costDifferencePerKg.toFixed(6)}
+                                </TableCell>
+                                <TableCell className="text-right font-mono text-xs">
+                                  {b.totalCostDifference > 0 ? "+" : ""}${b.totalCostDifference.toFixed(2)}
+                                </TableCell>
+                                <TableCell className="text-right">{badgePct(b.diffPct)}</TableCell>
+                                <TableCell className="text-right font-mono text-xs text-muted-foreground">
+                                  {b.baleCount}
+                                </TableCell>
+                              </TableRow>
+                              {expandedBatchSources.has(b.batchId) &&
+                                (b.sourceChanges || []).map((sc) => (
+                                  <TableRow
+                                    key={`${b.batchId}-${sc.containerId}`}
+                                    className="bg-muted/20"
+                                  >
+                                    <TableCell />
+                                    <TableCell
+                                      colSpan={2}
+                                      className="font-mono text-[10px] text-muted-foreground pl-8"
+                                    >
+                                      ↳ {sc.containerNumber}
+                                    </TableCell>
+                                    <TableCell />
+                                    <TableCell />
+                                    <TableCell className="text-right font-mono text-[10px] text-muted-foreground">
+                                      {formatNumber(sc.weightKg)} kg
+                                    </TableCell>
+                                    <TableCell className="text-right font-mono text-[10px] text-muted-foreground">
+                                      ${sc.oldCostPerKgUsd.toFixed(6)}
+                                    </TableCell>
+                                    <TableCell className="text-right font-mono text-[10px]">
+                                      ${sc.newCostPerKgUsd.toFixed(6)}
+                                    </TableCell>
+                                    <TableCell colSpan={4} />
+                                  </TableRow>
+                                ))}
+                            </>
                           ))}
                         </TableBody>
                       </Table>
                     </div>
                   )}
                   <div className="text-xs text-muted-foreground">
-                    Click a batch to open its full detail (sources, bales, notes) without leaving this page.
+                    Click a batch row to expand per-container sources · click the batch code to open its full detail.
                   </div>
                 </div>
               )}
@@ -480,111 +833,229 @@ export default function RawStockRecalculate() {
         </>
       )}
 
-      <div className="space-y-3 border-t pt-6">
-        <div>
-          <h2 className="text-sm font-semibold leading-tight">Mix batch sources with zero cost</h2>
-          <p className="text-xs text-muted-foreground leading-tight">
-            Old containers whose weight was pulled into a mix batch but never priced — the container's own cost can be
-            correct today, yet these batches still carry $0 for that portion. Independent of the container list above.
-          </p>
-        </div>
-        {zeroCostLoading ? (
-          <Skeleton className="h-24 w-full" />
-        ) : (zeroCostSources || []).length === 0 ? (
-          <div className="text-xs text-muted-foreground py-6 text-center border rounded-md bg-card">
-            No zero-cost mix-batch sources found.
+      {/* ── Tab: Source Cost Mismatches ────────────────────────────────────── */}
+      {activeTab === "sources" && (
+        <div className="space-y-3">
+          <div>
+            <h2 className="text-sm font-semibold leading-tight">Mix-batch source cost mismatches</h2>
+            <p className="text-xs text-muted-foreground leading-tight">
+              Sources whose recorded cost/kg doesn't match the container's corrected USD cost — includes both zero-cost
+              and nonzero-but-wrong values.
+            </p>
           </div>
-        ) : (
-          <>
-            <div className="border rounded-md overflow-hidden bg-card shadow-sm">
-              <Table>
-                <TableHeader className="bg-muted/50">
-                  <TableRow>
-                    <TableHead className="w-10">
-                      <Checkbox checked={allZeroCostSelected} onCheckedChange={toggleAllZeroCostSources} disabled={fixableZeroCostSources.length === 0} />
-                    </TableHead>
-                    <TableHead>Batch</TableHead>
-                    <TableHead>Source</TableHead>
-                    <TableHead className="text-right">Weight (kg)</TableHead>
-                    <TableHead className="text-right">Corrected $/kg</TableHead>
-                    <TableHead>Status</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {(zeroCostSources || []).map((r) => (
-                    <TableRow key={r.sourceId}>
-                      <TableCell>
+          {sourceMismatchLoading ? (
+            <Skeleton className="h-24 w-full" />
+          ) : (sourceMismatches || []).length === 0 ? (
+            <div className="text-xs text-muted-foreground py-6 text-center border rounded-md bg-card">
+              No source cost mismatches found.
+            </div>
+          ) : (
+            <>
+              <div className="border rounded-md overflow-hidden bg-card shadow-sm">
+                <Table>
+                  <TableHeader className="bg-muted/50">
+                    <TableRow>
+                      <TableHead className="w-10">
                         <Checkbox
-                          checked={selectedZeroCostSources.has(r.sourceId)}
-                          onCheckedChange={() => toggleZeroCostSource(r.sourceId)}
-                          disabled={!r.fixable && r.containerId != null}
+                          checked={allSourceMismatchSelected}
+                          onCheckedChange={toggleAllSourceMismatches}
+                          disabled={fixableSourceMismatches.length === 0}
                         />
-                      </TableCell>
-                      <TableCell
-                        className="font-mono text-xs cursor-pointer hover:underline"
-                        onClick={() => setDetailBatchId(r.batchId)}
-                      >
-                        {r.batchCode}
-                      </TableCell>
-                      <TableCell className="text-xs text-muted-foreground">
-                        {r.containerNumber ? `Container ${r.containerNumber}` : r.supplierName ? `Supplier: ${r.supplierName}` : "—"}
-                      </TableCell>
-                      <TableCell className="text-right font-mono text-xs text-muted-foreground">
-                        {formatNumber(r.weightKg)}
-                      </TableCell>
-                      <TableCell className="text-right font-mono text-xs font-medium">
-                        {r.fixable ? (
-                          `${r.correctedCostPerKg!.toFixed(4)}`
-                        ) : r.containerId == null ? (
-                          <input
-                            type="number"
-                            step="0.0001"
-                            placeholder="Enter $/kg"
-                            className="w-24 text-right text-xs border rounded px-1.5 py-0.5 bg-background"
-                            value={manualRates[r.sourceId] || ""}
-                            onChange={(e) => setManualRates((prev) => ({ ...prev, [r.sourceId]: e.target.value }))}
-                          />
-                        ) : (
-                          "—"
-                        )}
-                      </TableCell>
-                      <TableCell className="text-xs text-muted-foreground" title={r.reason}>
-                        {r.fixable ? (
-                          <Badge variant="outline" className="text-emerald-500 border-emerald-500/30 bg-emerald-500/10">
-                            Ready
-                          </Badge>
-                        ) : r.containerId == null ? (
-                          <Badge variant="outline" className="text-amber-600 border-amber-500/30 bg-amber-500/10">
-                            Needs manual rate
-                          </Badge>
-                        ) : (
-                          <Badge variant="outline" className="text-muted-foreground">
-                            Unresolved
-                          </Badge>
-                        )}
-                      </TableCell>
+                      </TableHead>
+                      <TableHead>Batch</TableHead>
+                      <TableHead>Source</TableHead>
+                      <TableHead className="text-right">Weight (kg)</TableHead>
+                      <TableHead className="text-right">Current $/kg (USD)</TableHead>
+                      <TableHead className="text-right">Corrected $/kg (USD)</TableHead>
+                      <TableHead>Status</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-            <div className="flex items-center justify-between">
-              <p className="text-xs text-muted-foreground">
-                {fixableZeroCostSources.length} fixable automatically · {manualZeroCostSources.length} need a manual rate.
-              </p>
-              <Button
-                size="sm"
-                disabled={selectedZeroCostSources.size === 0 || zeroCostFixMutation.isPending}
-                onClick={handleFixZeroCostSources}
-              >
-                <CheckCircle2 className="h-4 w-4 mr-1.5" />
-                Fix Selected ({selectedZeroCostSources.size})
-              </Button>
-            </div>
-          </>
-        )}
-      </div>
+                  </TableHeader>
+                  <TableBody>
+                    {(sourceMismatches || []).map((r) => (
+                      <TableRow key={r.sourceId}>
+                        <TableCell>
+                          <Checkbox
+                            checked={selectedZeroCostSources.has(r.sourceId)}
+                            onCheckedChange={() => toggleSourceMismatch(r.sourceId)}
+                            disabled={!r.fixable && r.containerId != null}
+                          />
+                        </TableCell>
+                        <TableCell
+                          className="font-mono text-xs cursor-pointer hover:underline"
+                          onClick={() => setDetailBatchId(r.batchId)}
+                        >
+                          {r.batchCode}
+                        </TableCell>
+                        <TableCell className="text-xs text-muted-foreground">
+                          {r.containerNumber
+                            ? `Container ${r.containerNumber}`
+                            : r.supplierName
+                            ? `Supplier: ${r.supplierName}`
+                            : "—"}
+                        </TableCell>
+                        <TableCell className="text-right font-mono text-xs text-muted-foreground">
+                          {formatNumber(r.weightKg)}
+                        </TableCell>
+                        <TableCell className="text-right font-mono text-xs text-muted-foreground">
+                          ${r.oldCostPerKgUsd.toFixed(6)}
+                        </TableCell>
+                        <TableCell className="text-right font-mono text-xs font-medium">
+                          {r.fixable ? (
+                            `$${r.newCostPerKgUsd.toFixed(6)}`
+                          ) : r.containerId == null ? (
+                            <input
+                              type="number"
+                              step="0.000001"
+                              placeholder="Enter $/kg USD"
+                              className="w-28 text-right text-xs border rounded px-1.5 py-0.5 bg-background"
+                              value={manualRates[r.sourceId] || ""}
+                              onChange={(e) =>
+                                setManualRates((prev) => ({ ...prev, [r.sourceId]: e.target.value }))
+                              }
+                            />
+                          ) : (
+                            "—"
+                          )}
+                        </TableCell>
+                        <TableCell className="text-xs" title={r.reason}>
+                          {r.fixable ? (
+                            <Badge
+                              variant="outline"
+                              className="text-emerald-500 border-emerald-500/30 bg-emerald-500/10"
+                            >
+                              Ready
+                            </Badge>
+                          ) : r.containerId == null ? (
+                            <Badge
+                              variant="outline"
+                              className="text-amber-600 border-amber-500/30 bg-amber-500/10"
+                            >
+                              Needs manual rate
+                            </Badge>
+                          ) : (
+                            <Badge variant="outline" className="text-muted-foreground">
+                              Unresolved
+                            </Badge>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+              <div className="flex items-center justify-between">
+                <p className="text-xs text-muted-foreground">
+                  {fixableSourceMismatches.length} fixable automatically ·{" "}
+                  {manualSourceMismatches.length} need a manual rate.
+                </p>
+                <Button
+                  size="sm"
+                  disabled={selectedZeroCostSources.size === 0 || sourceMismatchFixMutation.isPending}
+                  onClick={handleFixSourceMismatches}
+                >
+                  <CheckCircle2 className="h-4 w-4 mr-1.5" />
+                  Fix Selected ({selectedZeroCostSources.size})
+                </Button>
+              </div>
+            </>
+          )}
+        </div>
+      )}
 
+      {/* ── Tab: Full Audit ────────────────────────────────────────────────── */}
+      {activeTab === "audit" && (
+        <div className="space-y-4">
+          {auditLoading ? (
+            <Skeleton className="h-48 w-full" />
+          ) : !fullAudit ? (
+            <div className="text-sm text-muted-foreground py-12 text-center">Loading audit...</div>
+          ) : (
+            <>
+              {/* Summary cards */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                {[
+                  { label: "Scanned", value: fullAudit.summary.totalContainersScanned, cls: "text-foreground" },
+                  { label: "Correct", value: fullAudit.summary.containersCorrect, cls: "text-emerald-600" },
+                  { label: "Safe repairs", value: fullAudit.summary.safeRepairsAvailable, cls: "text-red-600" },
+                  { label: "Unresolved FX", value: fullAudit.summary.unresolvedFxContainers, cls: "text-amber-600" },
+                  { label: "Container cost mismatch", value: fullAudit.summary.containerCostMismatches, cls: "text-red-600" },
+                  { label: "Active RS mismatch", value: fullAudit.summary.activeRawStockMismatches, cls: "text-red-600" },
+                  { label: "Zero-cost sources", value: fullAudit.summary.zeroCostSources, cls: "text-red-600" },
+                  { label: "Nonzero source mismatch", value: fullAudit.summary.nonZeroSourceCostMismatches, cls: "text-red-600" },
+                ].map(({ label, value, cls }) => (
+                  <div key={label} className="border rounded-md p-3 bg-card text-center space-y-1">
+                    <div className={`text-xl font-bold ${cls}`}>{value}</div>
+                    <div className="text-[10px] text-muted-foreground leading-tight">{label}</div>
+                  </div>
+                ))}
+              </div>
+
+              {fullAudit.summary.safeRepairsAvailable > 0 && (
+                <div className="flex items-center gap-3 border border-amber-500/30 bg-amber-500/10 rounded-md p-3">
+                  <ShieldAlert className="h-4 w-4 text-amber-600 shrink-0" />
+                  <p className="text-xs text-amber-700 dark:text-amber-400 flex-1">
+                    {fullAudit.summary.safeRepairsAvailable} container(s) can be automatically repaired. Use "Apply
+                    All Safe" to fix them all in one operation.
+                  </p>
+                  <Button
+                    size="sm"
+                    className="shrink-0 gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white"
+                    disabled={applyAllSafeMutation.isPending}
+                    onClick={handleApplyAllSafe}
+                  >
+                    <CheckCircle2 className="h-3.5 w-3.5" />
+                    {applyAllSafeMutation.isPending ? "Applying..." : "Apply All Safe"}
+                  </Button>
+                </div>
+              )}
+
+              {/* Audit rows table */}
+              <div className="border rounded-md overflow-hidden bg-card shadow-sm">
+                <Table>
+                  <TableHeader className="bg-muted/50">
+                    <TableRow>
+                      <TableHead>Container</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Issue Codes</TableHead>
+                      <TableHead className="text-right">Repairable?</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {fullAudit.rows.map((r) => (
+                      <TableRow key={r.containerId}>
+                        <TableCell className="font-mono text-xs">{r.containerNumber}</TableCell>
+                        <TableCell>{statusBadge(r.containerStatus)}</TableCell>
+                        <TableCell>{r.codes.map(codeBadge)}</TableCell>
+                        <TableCell className="text-right">
+                          {r.safeToRepair ? (
+                            <Badge
+                              variant="outline"
+                              className="text-emerald-500 border-emerald-500/30 bg-emerald-500/10"
+                            >
+                              Yes
+                            </Badge>
+                          ) : r.codes.includes("CORRECT") ? (
+                            <span className="text-xs text-muted-foreground">—</span>
+                          ) : (
+                            <Badge
+                              variant="outline"
+                              className="text-amber-600 border-amber-500/30 bg-amber-500/10"
+                            >
+                              Manual review
+                            </Badge>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
+      {/* Batch detail dialog */}
       <Dialog open={detailBatchId !== null} onOpenChange={(open) => !open && setDetailBatchId(null)}>
         <DialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto">
           <DialogHeader className="sr-only">

@@ -7,7 +7,10 @@ import {
   computeRecalcFingerprint,
   getAffectedMixBatchesPreview,
   getZeroCostMixBatchSourcesPreview,
+  getMixBatchSourceCostMismatchPreview,
   applyZeroCostMixBatchSourcesFix,
+  getFullAuditScan,
+  computeApplyAllDryRun,
 } from "../../../services/factory/rawStockRecalc";
 import { logAudit } from "../../helpers/auditHelpers";
 import {
@@ -34,6 +37,17 @@ interface RecalcTokenPayload {
   expiresAt: number;
   /** Bound into the token so a confirm request can never silently expand scope
    * beyond what the admin saw and approved at dry-run time. */
+  includeCompletedBatches: boolean;
+  /** Whether to allow CLOSED/COMPLETED containers — bound in token so scope can't expand at confirm. */
+  includeHistoricalContainers: boolean;
+}
+
+interface ApplyAllSafeTokenPayload {
+  companyId: number;
+  safeContainerIds: number[];
+  userId: string;
+  expiresAt: number;
+  includeHistoricalContainers: boolean;
   includeCompletedBatches: boolean;
 }
 
@@ -108,8 +122,9 @@ export function registerRawStockRecalcRoutes(app: Express) {
       try {
         const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
         if (!companyId) return res.status(400).json({ message: "No company selected" });
-        const { containerIds, confirm, confirmationToken, includeCompletedBatches } = req.body;
+        const { containerIds, confirm, confirmationToken, includeCompletedBatches, includeHistoricalContainers } = req.body;
         const wantsCompletedBatches = includeCompletedBatches === true;
+        const wantsHistorical = includeHistoricalContainers === true;
         if (!Array.isArray(containerIds) || containerIds.length === 0) {
           return res.status(400).json({ message: "containerIds must be a non-empty array" });
         }
@@ -140,6 +155,7 @@ export function registerRawStockRecalcRoutes(app: Express) {
             userId: req.session.userId,
             expiresAt: Date.now() + REPAIR_TOKEN_TTL_MS,
             includeCompletedBatches: wantsCompletedBatches,
+            includeHistoricalContainers: wantsHistorical,
           };
           const token = signRepairToken(tokenPayload);
           return res.json({
@@ -169,7 +185,8 @@ export function registerRawStockRecalcRoutes(app: Express) {
           tokenPayload.companyId !== companyId ||
           !sameIds ||
           tokenPayload.userId !== req.session.userId ||
-          tokenPayload.includeCompletedBatches !== wantsCompletedBatches
+          tokenPayload.includeCompletedBatches !== wantsCompletedBatches ||
+          (tokenPayload.includeHistoricalContainers ?? false) !== wantsHistorical
         ) {
           return res.status(400).json({
             code: "INVALID_TOKEN",
@@ -178,17 +195,14 @@ export function registerRawStockRecalcRoutes(app: Express) {
         }
 
         // The authoritative stale check is inside applyRawStockRecalc's row-locked
-        // transaction (fingerprint recomputed from a fresh read there), so a change
-        // that lands after this point but before that lock is still caught. This is
-        // only a cheap early-exit for the common case.
-        const EPS = 0.0005;
+        // transaction (fingerprint recomputed from a fresh read there), so any change
+        // that lands after this point but before that lock is still caught. This is a
+        // cheap early-exit for the common case — no EPS tolerance; 6dp exact match.
         for (const id of parsedIds) {
-          const freshRow = previewByContainer.get(id);
-          if (freshRow && freshRow.changed === false) continue;
           const inputs = await loadRecalcFingerprintInputs(companyId, id);
           const freshFingerprint = inputs ? computeRecalcFingerprint(inputs) : undefined;
           const tokenFingerprint = tokenPayload.fingerprintByContainer[id];
-          if (tokenFingerprint && freshFingerprint !== tokenFingerprint) {
+          if (tokenFingerprint && freshFingerprint && freshFingerprint !== tokenFingerprint) {
             return res.status(400).json({
               code: "STALE_TOKEN",
               message: `Container #${id} changed since the dry-run preview was issued — re-run the preview and try again.`,
@@ -199,6 +213,7 @@ export function registerRawStockRecalcRoutes(app: Express) {
         const results = await applyRawStockRecalc(companyId, parsedIds, {
           expectedFingerprints: tokenPayload.fingerprintByContainer,
           includeCompletedBatches: wantsCompletedBatches,
+          includeHistoricalContainers: wantsHistorical,
           onAudit: async (tx, result) => {
             await logAudit(
               {
@@ -360,6 +375,160 @@ export function registerRawStockRecalcRoutes(app: Express) {
         }
         console.error("[raw-stock recalc zero-cost-sources apply] error:", err);
         res.status(500).json({ message: err.message || "Failed to apply zero-cost source fix" });
+      }
+    }
+  );
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // Full audit scan — all containers, all layers, all issue codes
+  // GET /api/factory/raw-stock/recalc/full-audit
+  // ──────────────────────────────────────────────────────────────────────────
+  app.get(
+    "/api/factory/raw-stock/recalc/full-audit",
+    requireAuth,
+    requireRole(...ADMIN_ROLES),
+    async (req: any, res: any) => {
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      try {
+        const result = await getFullAuditScan(companyId);
+        res.json(result);
+      } catch (err: any) {
+        console.error("[raw-stock recalc full-audit] error:", err);
+        res.status(500).json({ message: err.message || "Failed to run full audit scan" });
+      }
+    }
+  );
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // Source cost mismatches — full scan (not just zero-cost)
+  // GET /api/factory/raw-stock/recalc/source-cost-mismatches
+  // ──────────────────────────────────────────────────────────────────────────
+  app.get(
+    "/api/factory/raw-stock/recalc/source-cost-mismatches",
+    requireAuth,
+    requireRole(...ADMIN_ROLES),
+    async (req: any, res: any) => {
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      try {
+        const result = await getMixBatchSourceCostMismatchPreview(companyId);
+        res.json(result);
+      } catch (err: any) {
+        console.error("[raw-stock recalc source-cost-mismatches] error:", err);
+        res.status(500).json({ message: err.message || "Failed to scan source cost mismatches" });
+      }
+    }
+  );
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // Apply all safe repairs — dry-run → token → confirm
+  // POST /api/factory/raw-stock/recalc/apply-all-safe
+  // Body (dry-run): { includeHistoricalContainers?, includeCompletedBatches? }
+  // Body (confirm): { confirm: true, confirmationToken: "...", ... same flags }
+  // ──────────────────────────────────────────────────────────────────────────
+  app.post(
+    "/api/factory/raw-stock/recalc/apply-all-safe",
+    requireAuth,
+    requireRole(...ADMIN_ROLES),
+    async (req: any, res: any) => {
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const { confirm, confirmationToken, includeHistoricalContainers, includeCompletedBatches } = req.body;
+      const wantsHistorical = includeHistoricalContainers === true;
+      const wantsCompletedBatches = includeCompletedBatches === true;
+
+      try {
+        if (!confirm) {
+          // ── Dry-run: identify all safe containers, build token ──────────
+          const dryRun = await computeApplyAllDryRun(companyId, { includeHistoricalContainers: wantsHistorical });
+          if (dryRun.safeContainerIds.length === 0) {
+            return res.json({ dryRun: true, safeCount: 0, confirmationToken: null, summary: dryRun });
+          }
+
+          // Build per-container fingerprints so we can reject stale tokens at confirm
+          const fingerprintByContainer: Record<number, string> = {};
+          for (const cid of dryRun.safeContainerIds) {
+            const inputs = await loadRecalcFingerprintInputs(companyId, cid);
+            if (inputs) fingerprintByContainer[cid] = computeRecalcFingerprint(inputs);
+          }
+
+          const tokenPayload: ApplyAllSafeTokenPayload = {
+            companyId,
+            safeContainerIds: dryRun.safeContainerIds,
+            userId: req.session.userId,
+            expiresAt: Date.now() + REPAIR_TOKEN_TTL_MS,
+            includeHistoricalContainers: wantsHistorical,
+            includeCompletedBatches: wantsCompletedBatches,
+          };
+
+          const token = signRepairToken(tokenPayload);
+          return res.json({ dryRun: true, summary: dryRun, confirmationToken: token });
+        }
+
+        // ── Confirm: verify token, check staleness, apply ─────────────────
+        if (!confirmationToken || typeof confirmationToken !== "string") {
+          return res.status(400).json({ code: "MISSING_TOKEN", message: "confirmationToken is required for confirm=true" });
+        }
+
+        let tokenPayload: ApplyAllSafeTokenPayload;
+        try {
+          tokenPayload = verifyRepairToken<ApplyAllSafeTokenPayload>(confirmationToken);
+        } catch (err: any) {
+          if (err instanceof ExpiredRepairTokenError) {
+            return res.status(400).json({ code: "EXPIRED_TOKEN", message: "Dry-run preview has expired — please re-run it." });
+          }
+          return res.status(400).json({ code: "INVALID_TOKEN", message: err.message });
+        }
+
+        if (
+          tokenPayload.companyId !== companyId ||
+          tokenPayload.userId !== req.session.userId ||
+          (tokenPayload.includeHistoricalContainers ?? false) !== wantsHistorical ||
+          (tokenPayload.includeCompletedBatches ?? false) !== wantsCompletedBatches
+        ) {
+          return res.status(400).json({ code: "INVALID_TOKEN", message: "Token does not match this request — re-run the dry-run." });
+        }
+
+        const { safeContainerIds } = tokenPayload;
+
+        const results = await applyRawStockRecalc(companyId, safeContainerIds, {
+          includeCompletedBatches: wantsCompletedBatches,
+          includeHistoricalContainers: wantsHistorical,
+          onAudit: async (tx, result) => {
+            await logAudit(
+              {
+                userId: req.session.userId,
+                username: req.session.username || req.session.userId,
+                companyId,
+                action: "update",
+                tableName: "factory_raw_stock",
+                recordId: result.containerId,
+                recordIdentifier: `recalc/apply-all-safe — container ${result.containerNumber}`,
+                changes: { result: { new: { ...result, includeHistoricalContainers: wantsHistorical } } },
+              },
+              tx
+            );
+          },
+        });
+
+        const staleResult = results.find((r) => r.staleToken);
+        if (staleResult) {
+          return res.status(400).json({
+            code: "STALE_TOKEN",
+            message: `Container #${staleResult.containerId} changed since the dry-run — re-run.`,
+          });
+        }
+
+        res.json({ dryRun: false, results });
+      } catch (err: any) {
+        if (err instanceof RepairTokenConfigurationError) {
+          console.error("Repair token configuration error:", err.message);
+          return res.status(500).json({ message: err.message, code: "REPAIR_TOKEN_MISCONFIGURED" });
+        }
+        console.error("[raw-stock recalc apply-all-safe] error:", err);
+        res.status(500).json({ message: err.message || "Failed to apply all safe repairs" });
       }
     }
   );
