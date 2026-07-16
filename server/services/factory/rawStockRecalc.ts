@@ -1062,6 +1062,26 @@ export async function applyRawStockRecalc(
         { includeCompletedBatches: opts.includeCompletedBatches }
       );
 
+      // Quantity invariant: verify the cascade touched ONLY cost fields.
+      // If receivedKg or usedKg changed inside the transaction, roll back immediately.
+      if (rawStockRow) {
+        const [rsAfter] = await tx
+          .select({ receivedKg: factoryRawStock.receivedKg, usedKg: factoryRawStock.usedKg })
+          .from(factoryRawStock)
+          .where(eq(factoryRawStock.id, (rawStockRow as any).id));
+        if (rsAfter) {
+          const receivedBefore = new Decimal(rawStockRow.receivedKg || "0").toDecimalPlaces(3);
+          const usedBefore = new Decimal((rawStockRow as any).usedKg || "0").toDecimalPlaces(3);
+          const receivedAfter = new Decimal(rsAfter.receivedKg || "0").toDecimalPlaces(3);
+          const usedAfter = new Decimal(rsAfter.usedKg || "0").toDecimalPlaces(3);
+          if (!receivedBefore.equals(receivedAfter) || !usedBefore.equals(usedAfter)) {
+            throw new Error(
+              "Cost recalculation attempted to change raw-stock quantities. Operation rolled back."
+            );
+          }
+        }
+      }
+
       const applyResult: ApplyResult = {
         containerId,
         containerNumber: container.containerNumber,

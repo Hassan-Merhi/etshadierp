@@ -116,6 +116,7 @@ import {
   factorySupplierCategories,
 } from "@shared/schema";
 import { eq, and, or, asc, desc, sql, inArray, ilike, ne, isNull, not, gte, lte, lt, gt } from "drizzle-orm";
+import Decimal from "decimal.js";
 import bcrypt from "bcryptjs";
 import CryptoJS from "crypto-js";
 import multer from "multer";
@@ -750,9 +751,10 @@ export function registerRawStockBalanceRoutes(app: Express) {
     }
   });
 
-  // Recalculate usedKg for all factory_raw_stock records based on active mix batch sources
+  // Recalculate usedKg for all factory_raw_stock records based on ACTIVE (non-deleted) mix batch sources.
   // Dangerous bulk recalc — bulk-overwrites usedKg for every raw stock record in the
   // company. Admin-only, defaults to a dry-run diff preview, and audit-logs every apply.
+  // Only counts sources from mix batches that are NOT soft-deleted and NOT status='DELETED'.
   app.post("/api/factory/raw-stock/recalculate-used", requireAuth, async (req: any, res: any) => {
     try {
       if (!checkFactoryAdmin(req, res)) return;
@@ -760,68 +762,201 @@ export function registerRawStockBalanceRoutes(app: Express) {
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const dryRun = req.body?.confirm !== true;
 
+      // 1. Load only non-deleted raw-stock whose container is also not deleted.
       const allRawStock = await db
-        .select({ id: factoryRawStock.id, containerId: factoryRawStock.containerId, usedKg: factoryRawStock.usedKg })
+        .select({
+          id: factoryRawStock.id,
+          containerId: factoryRawStock.containerId,
+          usedKg: factoryRawStock.usedKg,
+          receivedKg: factoryRawStock.receivedKg,
+          containerNumber: factoryContainers.containerNumber,
+          supplierId: factoryContainers.supplierId,
+          supplierName: factorySuppliers.name,
+        })
         .from(factoryRawStock)
-        .where(eq(factoryRawStock.companyId, companyId));
+        .innerJoin(factoryContainers, eq(factoryContainers.id, factoryRawStock.containerId))
+        .leftJoin(factorySuppliers, eq(factorySuppliers.id, factoryContainers.supplierId))
+        .where(
+          and(
+            eq(factoryRawStock.companyId, companyId),
+            isNull(factoryRawStock.deletedAt),
+            isNull(factoryContainers.deletedAt),
+            ne(factoryContainers.status, "DELETED")
+          )
+        );
 
       if (allRawStock.length === 0) return res.json({ updated: 0, dryRun, changes: [] });
 
-      const containerIds = allRawStock.map((r: any) => r.containerId);
+      const containerIds = allRawStock.map((r: any) => r.containerId as number);
 
-      // Sum used kg from active mix batch source records (only existing batches, deleted batches have no sources)
+      // 2. Sum used kg only from VALID (non-deleted) mix batch sources.
       const sourceSums = await db
         .select({
           containerId: factoryMixBatchSources.containerId,
-          totalUsedKg: sql<string>`SUM(${factoryMixBatchSources.weightKg})`,
+          totalUsedKg: sql<string>`COALESCE(SUM(${factoryMixBatchSources.weightKg}), 0)`,
+          validSourceCount: sql<string>`COUNT(*)`,
         })
         .from(factoryMixBatchSources)
-        .where(inArray(factoryMixBatchSources.containerId, containerIds))
+        .innerJoin(factoryMixBatches, eq(factoryMixBatchSources.mixBatchId, factoryMixBatches.id))
+        .where(
+          and(
+            eq(factoryMixBatches.companyId, companyId),
+            isNull(factoryMixBatches.deletedAt),
+            ne(factoryMixBatches.status, "DELETED"),
+            inArray(factoryMixBatchSources.containerId, containerIds)
+          )
+        )
         .groupBy(factoryMixBatchSources.containerId);
 
-      const usedByContainer: Record<number, number> = {};
+      // 3. Separately tally excluded (deleted-batch) source rows for transparency.
+      const excludedSums = await db
+        .select({
+          containerId: factoryMixBatchSources.containerId,
+          excludedWeight: sql<string>`COALESCE(SUM(${factoryMixBatchSources.weightKg}), 0)`,
+          excludedCount: sql<string>`COUNT(*)`,
+        })
+        .from(factoryMixBatchSources)
+        .innerJoin(factoryMixBatches, eq(factoryMixBatchSources.mixBatchId, factoryMixBatches.id))
+        .where(
+          and(
+            inArray(factoryMixBatchSources.containerId, containerIds),
+            or(
+              sql`${factoryMixBatches.deletedAt} IS NOT NULL`,
+              eq(factoryMixBatches.status, "DELETED")
+            )
+          )
+        )
+        .groupBy(factoryMixBatchSources.containerId);
+
+      const validByContainer = new Map<number, { used: number; count: number }>();
       for (const row of sourceSums) {
-        if (row.containerId) usedByContainer[row.containerId] = parseFloat(row.totalUsedKg || "0");
+        if (row.containerId != null) {
+          validByContainer.set(row.containerId, {
+            used: parseFloat(row.totalUsedKg || "0"),
+            count: parseInt(row.validSourceCount || "0"),
+          });
+        }
+      }
+      const excludedByContainer = new Map<number, { weight: number; count: number }>();
+      for (const row of excludedSums) {
+        if (row.containerId != null) {
+          excludedByContainer.set(row.containerId, {
+            weight: parseFloat(row.excludedWeight || "0"),
+            count: parseInt(row.excludedCount || "0"),
+          });
+        }
       }
 
-      const changes = allRawStock
-        .map((rs: any) => {
-          const newUsedKg = (usedByContainer[rs.containerId] || 0).toFixed(3);
-          const oldUsedKg = rs.usedKg || "0.000";
-          return { rawStockId: rs.id, containerId: rs.containerId, oldUsedKg, newUsedKg };
-        })
-        .filter((c) => c.oldUsedKg !== c.newUsedKg);
+      // 4. Build the change list with full per-row detail.
+      const changes: any[] = [];
+      let totalOldUsed = new Decimal(0);
+      let totalNewUsed = new Decimal(0);
+      let totalReceived = new Decimal(0);
+      let totalValidSourceWeight = new Decimal(0);
+      let totalExcludedWeight = new Decimal(0);
+
+      for (const rs of allRawStock as any[]) {
+        const valid = validByContainer.get(rs.containerId) || { used: 0, count: 0 };
+        const excluded = excludedByContainer.get(rs.containerId) || { weight: 0, count: 0 };
+        const oldUsedKg = new Decimal(rs.usedKg || "0").toDecimalPlaces(3);
+        const newUsedKg = new Decimal(valid.used).toDecimalPlaces(3);
+
+        totalOldUsed = totalOldUsed.plus(oldUsedKg);
+        totalNewUsed = totalNewUsed.plus(newUsedKg);
+        totalReceived = totalReceived.plus(new Decimal(rs.receivedKg || "0"));
+        totalValidSourceWeight = totalValidSourceWeight.plus(new Decimal(valid.used));
+        totalExcludedWeight = totalExcludedWeight.plus(new Decimal(excluded.weight));
+
+        if (!oldUsedKg.equals(newUsedKg)) {
+          changes.push({
+            rawStockId: rs.id,
+            containerId: rs.containerId,
+            containerNumber: rs.containerNumber,
+            supplierId: rs.supplierId ?? null,
+            supplierName: rs.supplierName ?? null,
+            receivedKg: new Decimal(rs.receivedKg || "0").toDecimalPlaces(3).toFixed(3),
+            oldUsedKg: oldUsedKg.toFixed(3),
+            correctedUsedKg: newUsedKg.toFixed(3),
+            differenceKg: newUsedKg.minus(oldUsedKg).toFixed(3),
+            validSourceCount: valid.count,
+            validSourceWeightKg: new Decimal(valid.used).toFixed(3),
+            excludedDeletedSourceCount: excluded.count,
+            excludedDeletedSourceWeightKg: new Decimal(excluded.weight).toFixed(3),
+          });
+        }
+      }
+
+      const summary = {
+        totalReceivedKg: totalReceived.toFixed(3),
+        currentTotalUsedKg: totalOldUsed.toFixed(3),
+        correctedTotalUsedKg: totalNewUsed.toFixed(3),
+        totalDifferenceKg: totalNewUsed.minus(totalOldUsed).toFixed(3),
+        validSourceWeightKg: totalValidSourceWeight.toFixed(3),
+        excludedDeletedSourceWeightKg: totalExcludedWeight.toFixed(3),
+      };
 
       if (dryRun) {
         return res.json({
           dryRun: true,
           wouldUpdate: changes.length,
+          summary,
           changes,
           message: `Dry run: ${changes.length} of ${allRawStock.length} raw stock record(s) would change. Re-submit with { confirm: true } to apply.`,
         });
       }
 
+      // 5. Apply inside a single transaction — lock each row FOR UPDATE, compare with Decimal.js.
       let updated = 0;
+      const appliedChanges: any[] = [];
       const now = new Date();
-      for (const c of changes) {
-        await db
-          .update(factoryRawStock)
-          .set({ usedKg: c.newUsedKg, updatedAt: now } as any)
-          .where(eq(factoryRawStock.id, c.rawStockId));
-        updated++;
-      }
 
-      await logAudit({
-        userId: req.session.userId,
-        username: req.session.username || req.session.userId,
-        companyId,
-        action: "update",
-        tableName: "factory_raw_stock",
-        recordIdentifier: "bulk recalculate-used",
-        changes: { updated: { new: updated }, rows: { new: changes } },
+      await db.transaction(async (tx) => {
+        for (const c of changes) {
+          const [locked] = await tx
+            .select({ id: factoryRawStock.id, usedKg: factoryRawStock.usedKg })
+            .from(factoryRawStock)
+            .where(eq(factoryRawStock.id, c.rawStockId))
+            .for("update");
+
+          if (!locked) continue;
+
+          // Re-compare inside the lock in case of concurrent writes
+          const currentUsedKg = new Decimal(locked.usedKg || "0").toDecimalPlaces(3);
+          const correctedUsedKg = new Decimal(c.correctedUsedKg).toDecimalPlaces(3);
+          if (currentUsedKg.equals(correctedUsedKg)) continue;
+
+          await tx
+            .update(factoryRawStock)
+            .set({ usedKg: correctedUsedKg.toFixed(3), updatedAt: now } as any)
+            .where(eq(factoryRawStock.id, c.rawStockId));
+
+          appliedChanges.push(c);
+          updated++;
+        }
+
+        // Single audit record for the whole batch
+        await logAudit({
+          userId: req.session.userId,
+          username: req.session.username || req.session.userId,
+          companyId,
+          action: "update",
+          tableName: "factory_raw_stock",
+          recordIdentifier: "bulk recalculate-used",
+          changes: {
+            updated: { new: updated },
+            summary: { new: summary },
+            rows: { new: appliedChanges },
+          },
+        });
       });
 
-      res.json({ dryRun: false, updated, changes, message: `Recalculated used KG for ${updated} raw stock records.` });
+      res.json({
+        dryRun: false,
+        updated,
+        summary,
+        changes: appliedChanges,
+        message: `Recalculated used KG for ${updated} raw stock records.`,
+      });
     } catch (error: any) {
       console.error("Error recalculating raw stock used:", error);
       res.status(500).json({ message: error.message });

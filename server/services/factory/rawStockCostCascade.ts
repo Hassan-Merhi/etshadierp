@@ -21,6 +21,28 @@ import Decimal from "decimal.js";
 import { factoryRawStock, factoryMixBatchSources, factoryMixBatches, factoryBales, factoryContainers, factorySuppliers } from "@shared/schema";
 import { getLockedSupplierRate, getAuthoritativeSupplierRemainingKg } from "./rawStockLockedRate";
 
+/**
+ * Guard: reject any cost-update object that contains quantity fields.
+ * Cost-only services (cascadeContainerCostChange, rawStockRecalc apply) must
+ * never pass receivedKg or usedKg to a db update — call this before every
+ * .set({...}) that touches factory_raw_stock, factory_mix_batches, or
+ * factory_mix_batch_sources.
+ */
+export function assertNoQuantityFields(
+  update: Record<string, unknown>,
+  context = "cost update"
+): void {
+  const forbidden = ["receivedKg", "received_kg", "usedKg", "used_kg", "totalWeightKg", "total_weight_kg", "weightKg", "weight_kg"];
+  for (const field of forbidden) {
+    if (field in update) {
+      throw new Error(
+        `assertNoQuantityFields [${context}]: forbidden quantity field "${field}" found. ` +
+        `Cost recalculation must never modify quantities.`
+      );
+    }
+  }
+}
+
 export interface CascadeResult {
   rawStockRowsUpdated: number;
   affectedBatches: {
@@ -170,9 +192,11 @@ export async function cascadeContainerCostChange(
     dCorrectedContainerRemainingKg = dCorrectedContainerRemainingKg.plus(dRemaining);
     dOldValueOfRemaining = dOldValueOfRemaining.plus(dRemaining.times(dOldCostUsd));
 
+    const rawStockCostUpdate = { costPerKg: String(newCostPerKg), costPerKgUsd: String(newCostPerKgUsd) };
+    assertNoQuantityFields(rawStockCostUpdate, "cascadeContainerCostChange → factoryRawStock");
     await tx
       .update(factoryRawStock)
-      .set({ costPerKg: String(newCostPerKg), costPerKgUsd: String(newCostPerKgUsd) })
+      .set(rawStockCostUpdate)
       .where(eq(factoryRawStock.id, row.id));
   }
 
