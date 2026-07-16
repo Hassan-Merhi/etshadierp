@@ -346,11 +346,11 @@ export async function getVoucherEntriesByLedger(
   let dateFilters = "";
   if (startDate) {
     params.push(startDate);
-    dateFilters += " AND COALESCE(v.effective_date, v.voucher_date) >= $" + params.length;
+    dateFilters += " AND COALESCE(v.effective_date::date, v.voucher_date::date) >= $" + params.length + "::date";
   }
   if (endDate) {
     params.push(endDate);
-    dateFilters += " AND COALESCE(v.effective_date, v.voucher_date) <= $" + params.length;
+    dateFilters += " AND COALESCE(v.effective_date::date, v.voucher_date::date) <= $" + params.length + "::date";
   }
   // Scope to a specific company when provided. Without this, cross-company
   // vouchers (e.g. ERP-side intercompany entries that post to a factory
@@ -374,7 +374,7 @@ export async function getVoucherEntriesByLedger(
        STRING_AGG(DISTINCT NULLIF(TRIM(ve.narration), ''), ' | ') AS narration,
        v.voucher_number                                            AS "voucherNumber",
        v.voucher_type                                              AS "voucherType",
-       v.voucher_date                                              AS "voucherDate",
+       COALESCE(v.effective_date::date, v.voucher_date::date)      AS "voucherDate",
        v.description                                               AS "voucherDescription",
        v.currency
      FROM voucher_entries ve
@@ -384,8 +384,8 @@ export async function getVoucherEntriesByLedger(
        AND v.deleted_at IS NULL
        ${companyFilter}
        ${dateFilters}
-     GROUP BY v.id, v.voucher_number, v.voucher_type, v.voucher_date, v.description, v.currency
-     ORDER BY COALESCE(v.effective_date, v.voucher_date), v.id`,
+     GROUP BY v.id, v.voucher_number, v.voucher_type, v.voucher_date, v.effective_date, v.description, v.currency
+     ORDER BY COALESCE(v.effective_date::date, v.voucher_date::date), v.id`,
     params
   );
 

@@ -108,7 +108,7 @@ export default function Accounts() {
 
   const [searchTerm, setSearchTerm] = useState("");
   const [periodFilter, setPeriodFilter] = useState<PeriodFilterValue>(() => {
-    if (urlStartDate && urlEndDate) {
+    if (urlStartDate || urlEndDate) {
       return { fromDate: urlStartDate, toDate: urlEndDate, preset: "custom" as const };
     }
     return getDefaultPeriodValue("this_month");
@@ -368,13 +368,15 @@ export default function Accounts() {
     enabled: !!selectedCompany,
   });
 
-  const { data: rawTransactionData, isLoading: transactionsLoading } = useQuery<any>({
+  const { data: rawTransactionData, isLoading: transactionsLoading, isError: transactionsError } = useQuery<any>({
     queryKey: selectedAccount
       ? [
-          selectedAccount.type === "factoryWorker"
-            ? `/api/factory/workers/${selectedAccount.accountId}/statement`
-            : `/api/accounts/${(selectedAccount.type || "").toLowerCase().replace(" ", "-")}/${selectedAccount.accountId}/transactions`,
-          { startDate: periodFilter.fromDate, endDate: periodFilter.toDate },
+          "account-statement",
+          selectedCompany?.id,
+          selectedAccount.type,
+          selectedAccount.accountId,
+          periodFilter.fromDate || null,
+          periodFilter.toDate || null,
         ]
       : [],
     queryFn: async () => {
@@ -664,6 +666,7 @@ export default function Accounts() {
               closingBalance={closingBalance}
               openingBalance={broughtForwardBalance}
               transactionsLoading={transactionsLoading}
+              transactionError={transactionsError}
               selectedVoucherIds={selectedVoucherIds}
               toggleSelectAll={toggleSelectAll}
               setShowBulkDeleteConfirm={setShowBulkDeleteConfirm}

@@ -164,7 +164,7 @@ export function registerEmployeeNetPositionRoutes(app: Express) {
       const asOf: string =
         typeof req.query.asOf === "string" && /^\d{4}-\d{2}-\d{2}$/.test(req.query.asOf)
           ? req.query.asOf
-          : new Date().toISOString().slice(0, 10);
+          : getClientDate(req);
 
       const round2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
 

@@ -37,7 +37,6 @@ export type PeriodPreset =
   | "today"
   | "yesterday"
   | "this_week"
-  | "month_to_date"
   | "this_month"
   | "last_1_month"
   | "last_6_months"
@@ -81,17 +80,12 @@ function getPresetDates(preset: PeriodPreset): { fromDate: string; toDate: strin
     case "this_week":
       return {
         fromDate: formatDate(startOfWeek(today, { weekStartsOn: 1 })),
-        toDate: formatDate(endOfWeek(today, { weekStartsOn: 1 })),
-      };
-    case "month_to_date":
-      return {
-        fromDate: formatDate(startOfMonth(today)),
         toDate: formatDate(today),
       };
     case "this_month":
       return {
         fromDate: formatDate(startOfMonth(today)),
-        toDate: formatDate(endOfMonth(today)),
+        toDate: formatDate(today),
       };
     case "last_1_month": {
       const lastMonth = subMonths(today, 1);
@@ -109,13 +103,13 @@ function getPresetDates(preset: PeriodPreset): { fromDate: string; toDate: strin
     case "this_year":
       return {
         fromDate: formatDate(startOfYear(today)),
-        toDate: formatDate(endOfYear(today)),
+        toDate: formatDate(today),
       };
     case "custom":
     default:
       return {
         fromDate: formatDate(startOfMonth(today)),
-        toDate: formatDate(endOfMonth(today)),
+        toDate: formatDate(today),
       };
   }
 }
@@ -167,9 +161,11 @@ export function PeriodFilter({
 
   function buildLabel(): string {
     if (value.preset === "all_time") return "All Time";
+    if (value.preset === "today") return "Today";
     if (value.preset === "yesterday") return "Yesterday";
     if (value.preset === "this_week") return "This Week";
-    if (value.preset === "month_to_date") return "Month to Date";
+    if (value.preset === "this_month") return "This Month";
+    if (value.preset === "this_year") return "This Year";
     if (fromDateObj && toDateObj) {
       const from = formatDisplayDate(fromDateObj);
       const to = formatDisplayDate(toDateObj);
@@ -206,9 +202,6 @@ export function PeriodFilter({
           </DropdownMenuItem>
           <DropdownMenuItem onClick={() => handlePresetChange("this_week")} data-testid="period-preset-this-week">
             This Week
-          </DropdownMenuItem>
-          <DropdownMenuItem onClick={() => handlePresetChange("month_to_date")} data-testid="period-preset-month-to-date">
-            Month to Date
           </DropdownMenuItem>
           <DropdownMenuItem onClick={() => handlePresetChange("this_month")} data-testid="period-preset-this-month">
             This Month

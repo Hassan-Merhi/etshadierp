@@ -1305,11 +1305,34 @@ export function registerAccountRoutes(app: Express) {
         return res.status(400).json({ message: "Invalid ledger account ID" });
       }
 
-      const { startDate, endDate } = req.query;
+      const asOfDate = getClientDate(req);
+      const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+      const rawStart =
+        typeof req.query.startDate === "string" && ISO_DATE.test(req.query.startDate)
+          ? req.query.startDate
+          : undefined;
+      const rawEnd =
+        typeof req.query.endDate === "string" && ISO_DATE.test(req.query.endDate)
+          ? req.query.endDate
+          : undefined;
+      // Cap the end date at today so future-dated vouchers are never shown
+      const effectiveEndDate = rawEnd && rawEnd < asOfDate ? rawEnd : asOfDate;
 
-      // If this ledger is linked to a factory customer, return the unified
-      // factory-customer ledger view so the running balance reconciles with
-      // the figure shown on the Customers page (sales + balances + vouchers).
+      // 1. Load the ledger account to get its authoritative company scope.
+      //    Using ledgerAccount.companyId (not req.session.currentCompanyId) so the
+      //    correct company is used even when the caller is in factory mode.
+      const [ledgerAccount] = await db
+        .select()
+        .from(ledgerAccounts)
+        .where(and(eq(ledgerAccounts.id, ledgerAccountId), isNull(ledgerAccounts.deletedAt)));
+
+      if (!ledgerAccount) {
+        return res.status(404).json({ message: "Ledger account not found" });
+      }
+      const companyId: number = ledgerAccount.companyId;
+
+      // 2. If this ledger is linked to a factory customer, return the unified
+      //    factory-customer ledger view (plain array — frontend handles both shapes).
       try {
         const linkedCust = await getCustomerByLedgerId(ledgerAccountId);
         if (linkedCust) {
@@ -1319,8 +1342,8 @@ export function registerAccountRoutes(app: Express) {
               linkedCust.id,
               ledgerAccountId,
               linkedCust.companyId,
-              startDate as string | undefined,
-              endDate as string | undefined
+              rawStart,
+              effectiveEndDate
             );
             return res.json(entries);
           }
@@ -1331,24 +1354,23 @@ export function registerAccountRoutes(app: Express) {
         console.error("[ledger transactions] factory-customer lookup failed:", e);
       }
 
-      const companyId = (req.session as any).currentCompanyId as number | undefined;
-
+      // 3. Main query: period transactions capped at today
       const transactions = await storage.getVoucherEntriesByLedger(
         ledgerAccountId,
-        startDate as string | undefined,
-        endDate as string | undefined,
+        rawStart,
+        effectiveEndDate,
         companyId
       );
 
-      if (startDate) {
-        // Pre-period (brought-forward) balance: sum of all entries before the
-        // period start, scoped to the same company so cross-company vouchers
-        // don't inflate or deflate the opening figure.
-        const bfParams: any[] = [ledgerAccountId, startDate];
+      // 4. Brought-forward balance: sum of entries strictly before the period start.
+      //    For All Time (no rawStart), preNetBalance = 0 — the stored opening balance suffices.
+      let preNetBalance = 0;
+      if (rawStart) {
+        const bfParams: any[] = [ledgerAccountId, rawStart];
         let bfCompanyFilter = "";
         if (companyId) {
           bfParams.push(companyId);
-          bfCompanyFilter = `AND v.company_id = ${bfParams.length}`;
+          bfCompanyFilter = "AND v.company_id = $" + bfParams.length;
         }
         const bfResult = await pool.query(
           `SELECT COALESCE(SUM(ve.debit_amount::numeric - ve.credit_amount::numeric), 0) AS net
@@ -1357,14 +1379,20 @@ export function registerAccountRoutes(app: Express) {
            WHERE ve.ledger_account_id = $1
              AND v.optional = false
              AND v.deleted_at IS NULL
-             AND COALESCE(v.effective_date, v.voucher_date) < $2
+             AND COALESCE(v.effective_date::date, v.voucher_date::date) < $2::date
              ${bfCompanyFilter}`,
           bfParams
         );
-        return res.json({ transactions, preNetBalance: parseFloat(bfResult.rows[0]?.net ?? "0") });
+        preNetBalance = parseFloat(bfResult.rows[0]?.net ?? "0");
       }
 
-      res.json(transactions);
+      return res.json({
+        transactions,
+        preNetBalance,
+        asOfDate,
+        startDate: rawStart ?? null,
+        endDate: effectiveEndDate,
+      });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }

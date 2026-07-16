@@ -54,6 +54,7 @@ export function AccountStatementView({
   factorySupplierStatement,
   factoryStatementLoading,
   brokerStatementLoading,
+  transactionError,
 }: AccountStatementViewProps) {
   const isFactorySupplierAccount = selectedAccount?.type === "factorySupplier";
   const [pdfLang, setPdfLang] = useState<"en" | "fr" | "ar">("en");
@@ -143,9 +144,9 @@ export function AccountStatementView({
             <>
               <span className="text-muted-foreground text-xs shrink-0">|</span>
               <span className="text-sm font-mono tabular-nums shrink-0">
-                {formatAmount(Math.abs(selectedAccount?.balance ?? 0))}
+                {formatAmount(Math.abs(closingBalance))}
                 <span className="ml-1 text-[10px] opacity-70">
-                  {selectedAccount?.balanceSide ?? balSide(selectedAccount?.balance ?? 0)}
+                  {closingBalance >= 0 ? "Dr" : "Cr"}
                 </span>
               </span>
             </>
@@ -272,8 +273,15 @@ export function AccountStatementView({
         </div>
       </div>
 
+      {/* Error state */}
+      {transactionError && !transactionsLoading && (
+        <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+          Failed to load this account period. Try adjusting the date range or refreshing the page.
+        </div>
+      )}
+
       {/* Stats row */}
-      {!hideBalances && !transactionsLoading && (
+      {!hideBalances && !transactionsLoading && !transactionError && (
         <div className="flex flex-wrap gap-3">
           <div className="rounded-lg border bg-muted/30 px-4 py-2.5 flex items-center gap-3 min-w-[130px]">
             <FileText className="w-4 h-4 text-muted-foreground shrink-0" />
