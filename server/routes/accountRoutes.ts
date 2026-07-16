@@ -1357,7 +1357,7 @@ export function registerAccountRoutes(app: Express) {
            WHERE ve.ledger_account_id = $1
              AND v.optional = false
              AND v.deleted_at IS NULL
-             AND v.voucher_date < $2
+             AND COALESCE(v.effective_date, v.voucher_date) < $2
              ${bfCompanyFilter}`,
           bfParams
         );
@@ -1395,7 +1395,7 @@ export function registerAccountRoutes(app: Express) {
            WHERE ve.bank_account_id = $1
              AND v.optional = false
              AND v.deleted_at IS NULL
-             AND v.voucher_date < $2`,
+             AND COALESCE(v.effective_date, v.voucher_date) < $2`,
           [bankAccountId, startDate]
         );
         return res.json({ transactions, preNetBalance: parseFloat(bfResult.rows[0]?.net ?? "0") });
@@ -1432,7 +1432,7 @@ export function registerAccountRoutes(app: Express) {
            WHERE ve.fixed_asset_id = $1
              AND v.optional = false
              AND v.deleted_at IS NULL
-             AND v.voucher_date < $2`,
+             AND COALESCE(v.effective_date, v.voucher_date) < $2`,
           [fixedAssetId, startDate]
         );
         return res.json({ transactions, preNetBalance: parseFloat(bfResult.rows[0]?.net ?? "0") });
@@ -1480,7 +1480,7 @@ export function registerAccountRoutes(app: Express) {
           `ve.supplier_id = $1`,
           `v.optional = false`,
           `v.deleted_at IS NULL`,
-          `v.voucher_date < $2`,
+          `COALESCE(v.effective_date, v.voucher_date) < $2`,
         ];
         const params: any[] = [supplierId, startDate];
         if (filterCompanyId) {
@@ -1532,7 +1532,7 @@ export function registerAccountRoutes(app: Express) {
            WHERE ve.employee_id = $1
              AND v.optional = false
              AND v.deleted_at IS NULL
-             AND v.voucher_date < $2`,
+             AND COALESCE(v.effective_date, v.voucher_date) < $2`,
           [employeeId, startDate]
         );
         return res.json({ transactions, preNetBalance: parseFloat(bfResult.rows[0]?.net ?? "0") });
