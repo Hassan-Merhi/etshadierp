@@ -274,7 +274,8 @@ async function postGroupCore(
 
     for (const alloc of allocs) {
       const chunk = new Decimal(alloc.chunk);
-      const due = isRentalPeriodDue(alloc.forYear, alloc.forMonth, billingDay, asOfDate);
+      // FIX #2: classify using paymentDate, not asOfDate
+      const due = isRentalPeriodDue(alloc.forYear, alloc.forMonth, billingDay, paymentDate);
 
       if (due) {
         let wasAccrued = false;
@@ -530,14 +531,19 @@ export async function createRentalPaymentGroup(
 
   // Create SCHEDULED rows + ensure ledger rows exist
   const scheduledRows = await db.transaction(async (tx) => {
-    // Upsert ledger rows for every allocated month
+    // Upsert ledger rows for every allocated month.
+    // FIX #1: expected_amount = 0 for future months (not yet due at paymentDate).
+    //          ensureMonthlyLedgerRows() will promote 0 → rentalAmount when the billing date arrives.
     for (const alloc of allocations) {
+      const allocDueDate = getRentalPeriodDueDate(alloc.year, alloc.month, billingDay);
+      const allocIsDue = allocDueDate <= paymentDate;
+      const expectedForAlloc = allocIsDue ? contract.rentalAmount : "0";
       await tx.execute(sql`
         INSERT INTO property_monthly_ledger (
           company_id, module, contract_id, unit_id, year, month, expected_amount, paid_amount
         ) VALUES (
           ${contractCompanyId}, ${mod}, ${contract.id}, ${contract.unitId},
-          ${alloc.year}, ${alloc.month}, ${contract.rentalAmount}, 0
+          ${alloc.year}, ${alloc.month}, ${expectedForAlloc}, 0
         )
         ON CONFLICT (contract_id, year, month)
         DO UPDATE SET
@@ -562,10 +568,11 @@ export async function createRentalPaymentGroup(
           )
         );
 
+      // FIX #3: payment row belongs to the PAYER company so payer can list/post its own scheduled payments
       const [p] = await tx
         .insert(propertyPayments)
         .values({
-          companyId: contractCompanyId,
+          companyId: companyId,
           module: mod,
           contractId: contract.id,
           unitId: contract.unitId,
@@ -669,8 +676,10 @@ export async function postDueScheduledRentalPayments(
 
       const isShared = !!(contract?.linkedCompanyId);
 
+      // FIX #3 follow-up: contractCompanyId comes from the contract, not the payment row
+      // (after fix #3 firstRow.companyId is the payer, not the contract owner)
       const didPost = await postScheduledGroup(
-        companyId, firstRow.companyId, module, contract, unit,
+        companyId, contract.companyId, module, contract, unit,
         row.payment_group_id, row.payment_date, asOfDate,
         row.cash_account_id, row.currency, firstRow.notes as string | null,
         shopExpenseAccountName, incomeAccountName, isShared

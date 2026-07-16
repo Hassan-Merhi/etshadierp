@@ -21,11 +21,16 @@ export function registerRentalRoutes(
   registerRentalPaymentsAccrualRoutes(app, module, urlPrefix, incomeAccountName, shopExpenseAccountName);
   registerRentalAccrualConfigRoutes(app, module, urlPrefix, incomeAccountName, shopExpenseAccountName);
 
-  // ── Reconciliation endpoint ──
+  // ── Reconciliation endpoint (Admin / Developer only) ──
   app.get(`${urlPrefix}/reconciliation`, requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = getCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
+      // FIX #10: restrict to Administrator / Developer roles
+      const userRole = (req.session as any)?.role;
+      if (userRole !== "Admin" && userRole !== "Developer") {
+        return res.status(403).json({ message: "Administrator or Developer role required" });
+      }
       const asOf = (req.query.asOf as string | undefined) || getClientDate(req);
       const result = await runRentalReconciliation(companyId, module, asOf);
       res.json(result);

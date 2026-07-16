@@ -1,8 +1,8 @@
 import { parseId, parseOptionalId } from "../../lib/parseId";
 import { logAudit } from "../_helpers";
 import type { Express, Request, Response } from "express";
-import { db } from "../../db";
-import { getDuePeriods, getRentalBillingDay, getUtcTodayString } from "../../services/rental/rentalPeriodService";
+import { db, pool } from "../../db";
+import { getDuePeriods, getRentalBillingDay, getUtcTodayString, isRentalPeriodDue, getRentalPeriodDueDate } from "../../services/rental/rentalPeriodService";
 import { requireAuth } from "../../auth";
 import { getClientDate } from "../../lib/dateUtils";
 import {
@@ -455,8 +455,12 @@ export async function postRentAccrualForCompany(
   companyId: number,
   shopExpenseAccountName: string,
   moduleParam: string = "ERP",
-  incomeAccountName: string = "Rental Income"
+  incomeAccountName: string = "Rental Income",
+  asOfDate?: string
 ): Promise<{ accrued: number; skipped: number }> {
+  // FIX #4: use explicit asOfDate instead of hidden new Date() so accruals
+  //          are reproducible and safe to call from any date context.
+  const effectiveAsOf = asOfDate ?? getUtcTodayString();
   // Load all active SHOP contracts owned by this company for the given module
   const shopContracts = await db
     .select({
@@ -520,19 +524,15 @@ export async function postRentAccrualForCompany(
   // Billing day (day-of-month) keyed by contractId
   const billingDayByContract = new Map(allContracts.map((c) => [c.id, new Date(c.startDate as any).getUTCDate()]));
 
-  const now = new Date();
-  const curYear = now.getUTCFullYear();
-  const curMonth = now.getUTCMonth() + 1;
-  const curDay = now.getUTCDate();
+  const [asY, asM, asD] = effectiveAsOf.split("-").map(Number);
+  const curYear = asY;
+  const curMonth = asM;
+  const curDay = asD;
 
-  // isDue is defined here (outer scope) so pass 2 can use it even when
-  // contractIds is empty (landlord-only company case).
+  // isDue: billing-day-aware using explicit effectiveAsOf (not server-local now())
   const isDue = (row: { year: number; month: number; contractId: number }) => {
     const billingDay = billingDayByContract.get(row.contractId) ?? 1;
-    if (row.year < curYear) return true;
-    if (row.year === curYear && row.month < curMonth) return true;
-    if (row.year === curYear && row.month === curMonth && curDay >= billingDay) return true;
-    return false;
+    return isRentalPeriodDue(row.year, row.month, billingDay, effectiveAsOf);
   };
 
   let accrued = 0;
@@ -648,22 +648,28 @@ export async function postRentAccrualForCompany(
           };
           const lockedRows = lockResult.rows as LockedRow[];
 
+          // FIX #4: query actual POSTED payments (payment_date <= effectiveAsOf) per locked row
+          //          instead of the potentially-stale paid_amount cache column.
+          const lockedIdList = lockedRows.map((r) => Number(r.id)).join(",");
+          const paidQueryResult = await tx.execute(
+            sql.raw(
+              `SELECT ledger_row_id, COALESCE(SUM(amount::numeric), 0) AS total_paid
+               FROM property_payments
+               WHERE ledger_row_id IN (${lockedIdList})
+                 AND posting_status = 'POSTED'
+                 AND payment_date <= '${effectiveAsOf}'
+               GROUP BY ledger_row_id`
+            )
+          );
+          const actualPaidByRowId = new Map<number, number>(
+            (paidQueryResult.rows as any[]).map((r) => [Number(r.ledger_row_id), Number(r.total_paid)])
+          );
+
           type Entry = { id: number; amount: number; unitId: number; month: number; year: number };
           const entries: Entry[] = [];
           for (const locked of lockedRows) {
-            // Accrue only the UNPAID portion (expectedAmount − paidAmount).
-            //
-            // When payment is made AFTER accrual the flow is:
-            //   Accrual:  Dr Rent Expense / Cr Accrued Rent Payable  (full expected)
-            //   Payment:  Dr Accrued Rent Payable / Cr Cash           (full paid)
-            // → at accrual time paid_amount = 0, so we accrue the full expected amount ✓
-            //
-            // When payment is made BEFORE accrual the flow is:
-            //   Payment:  Dr Rent Expense / Cr Cash  (isAccrued=false path, no AP entry)
-            //   Accrual:  should only record the REMAINING unpaid portion
-            // → using (expected − paid) avoids creating phantom AP balance ✓
             const expected = Number(locked.expected_amount);
-            const paid = Number(locked.paid_amount || "0");
+            const paid = actualPaidByRowId.get(Number(locked.id)) ?? 0;
             const amount = expected - paid;
             if (amount <= 0) continue;
             entries.push({
@@ -705,7 +711,7 @@ export async function postRentAccrualForCompany(
               companyId,
               voucherNumber: `ACCR-RENT-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
               voucherType: "Journal",
-              voucherDate: new Date().toISOString().slice(0, 10) as any,
+              voucherDate: effectiveAsOf as any,
               description: voucherDesc,
               totalAmount: String(totalAmount),
               currency: batchCurrency,
@@ -857,7 +863,7 @@ export async function postRentAccrualForCompany(
               companyId,
               voucherNumber: `ADV-REC-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
               voucherType: "Journal",
-              voucherDate: new Date().toISOString().slice(0, 10) as any,
+              voucherDate: effectiveAsOf as any,
               description: desc15,
               totalAmount: String(totalExpense15),
               currency: batchCurrency,
@@ -959,7 +965,7 @@ export async function postRentAccrualForCompany(
               companyId,
               voucherNumber: `PREP-RENT-REC-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
               voucherType: "Journal",
-              voucherDate: new Date().toISOString().slice(0, 10) as any,
+              voucherDate: effectiveAsOf as any,
               description: vDesc,
               totalAmount: String(totalExpected),
               currency: batchCurrency,
@@ -1049,10 +1055,7 @@ export async function postRentAccrualForCompany(
       );
       const isLandlordDue = (row: { year: number; month: number; contractId: number }) => {
         const bd = landlordBillingDay.get(row.contractId) ?? 1;
-        if (row.year < curYear) return true;
-        if (row.year === curYear && row.month < curMonth) return true;
-        if (row.year === curYear && row.month === curMonth && curDay >= bd) return true;
-        return false;
+        return isRentalPeriodDue(row.year, row.month, bd, effectiveAsOf);
       };
       const deferredUnaccrued = await db
         .select()
@@ -1104,7 +1107,7 @@ export async function postRentAccrualForCompany(
               companyId,
               voucherNumber: `DEF-RENT-REC-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
               voucherType: "Journal",
-              voucherDate: new Date().toISOString().slice(0, 10) as any,
+              voucherDate: effectiveAsOf as any,
               description: vDesc,
               totalAmount: String(totalDeferred),
               currency: lBatchCurrency,

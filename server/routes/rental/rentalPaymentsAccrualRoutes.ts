@@ -11,7 +11,8 @@ import {
   type RentalModule,
 } from "./_rentalShared";
 import { postDueScheduledRentalPayments, createRentalPaymentGroup } from "../../services/rental/rentalPaymentPostingService";
-import { db } from "../../db";
+import { db, pool } from "../../db";
+import { getRentalBillingDay, getRentalPeriodDueDate } from "../../services/rental/rentalPeriodService";
 import { requireAuth } from "../../auth";
 import { z } from "zod";
 import { eq, and, sql, desc, inArray, isNull, isNotNull, ne } from "drizzle-orm";
@@ -321,12 +322,16 @@ export function registerRentalPaymentsAccrualRoutes(
   });
 
   // ── UNIT DETAIL (ledger view) ──
+  // FIX #6: uses asOfDate for all calculations; returns backend-calculated
+  //          per-row fields and separate postedPayments/scheduledPayments.
   app.get(`${urlPrefix}/units/:id/detail`, requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = getCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const unitId = parseId(req.params.id);
       if (unitId === null) return res.status(400).json({ message: "Invalid id" });
+
+      const asOfDate = getClientDate(req);
 
       let isShared = false;
       let [unit] = await db
@@ -336,8 +341,6 @@ export function registerRentalPaymentsAccrualRoutes(
           and(eq(propertyUnits.id, unitId), eq(propertyUnits.companyId, companyId), eq(propertyUnits.module, module))
         );
 
-      // If unit doesn't belong to this company, check if it's shared with this company
-      // Wrapped in try/catch — gracefully skips if column not migrated yet in production
       if (!unit) {
         try {
           const [sharedContract] = await db
@@ -352,10 +355,7 @@ export function registerRentalPaymentsAccrualRoutes(
             );
           if (sharedContract) {
             const [ownerUnit] = await db.select().from(propertyUnits).where(eq(propertyUnits.id, unitId));
-            if (ownerUnit) {
-              unit = ownerUnit;
-              isShared = true;
-            }
+            if (ownerUnit) { unit = ownerUnit; isShared = true; }
           }
         } catch (sharedErr: any) {
           console.warn(`${tag} shared-detail skipped:`, sharedErr.message?.split("\n")[0]);
@@ -369,37 +369,109 @@ export function registerRentalPaymentsAccrualRoutes(
         .where(
           and(
             isShared ? eq(propertyContracts.linkedCompanyId, companyId) : eq(propertyContracts.companyId, companyId),
-            // Shared contracts may live in any module on the owner's side; skip module filter
             ...(isShared ? [] : [eq(propertyContracts.module, module)]),
             eq(propertyContracts.unitId, unitId),
             eq(propertyContracts.status, "ACTIVE")
           )
         );
 
-      let ledger: any[] = [],
-        rentPayments: any[] = [],
-        guaranteePayments: any[] = [];
+      let ledger: any[] = [];
+      let postedPayments: any[] = [];
+      let scheduledPayments: any[] = [];
+      let guaranteePayments: any[] = [];
+
       if (contract) {
-        await ensureMonthlyLedgerRows(contract.id);
-        ledger = await db
+        await ensureMonthlyLedgerRows(contract.id, asOfDate);
+
+        const billingDay = getRentalBillingDay(contract.startDate as string);
+
+        const rawLedger = await db
           .select()
           .from(propertyMonthlyLedger)
           .where(eq(propertyMonthlyLedger.contractId, contract.id))
           .orderBy(propertyMonthlyLedger.year, propertyMonthlyLedger.month);
+
         const allPayments = await db
           .select()
           .from(propertyPayments)
           .where(eq(propertyPayments.contractId, contract.id))
           .orderBy(desc(propertyPayments.paymentDate));
-        // Separate guarantee/deposit activity from normal rent payments.
-        // A payment is a guarantee activity if its notes contain "[Guarantee release]"
-        // OR if ledgerRowId is null (guarantee-to-cash inserts with ledgerRowId: null).
+
         guaranteePayments = allPayments.filter(
           (p) => p.ledgerRowId === null || (p.notes ?? "").includes("[Guarantee release]")
         );
-        rentPayments = allPayments.filter(
+        const rentPaymentsAll = allPayments.filter(
           (p) => p.ledgerRowId !== null && !(p.notes ?? "").includes("[Guarantee release]")
         );
+
+        // Separate posted (effective) and scheduled
+        postedPayments = rentPaymentsAll.filter(
+          (p: any) => p.postingStatus === "POSTED" && String(p.paymentDate) <= asOfDate
+        );
+        scheduledPayments = rentPaymentsAll.filter((p: any) => p.postingStatus === "SCHEDULED");
+
+        // Per-row effective paid totals (POSTED + payment_date <= asOfDate)
+        const { rows: paymentSums } = await pool.query<{ ledger_row_id: string; total_paid: string }>(
+          `SELECT ledger_row_id, COALESCE(SUM(amount::numeric), 0) AS total_paid
+           FROM property_payments
+           WHERE contract_id = $1 AND posting_status = 'POSTED' AND payment_date <= $2
+           GROUP BY ledger_row_id`,
+          [contract.id, asOfDate]
+        );
+        const paidByRowId = new Map(paymentSums.map((r) => [parseInt(r.ledger_row_id), parseFloat(r.total_paid)]));
+
+        // Per-row scheduled totals
+        const { rows: scheduledSums } = await pool.query<{ ledger_row_id: string; total_scheduled: string }>(
+          `SELECT ledger_row_id, COALESCE(SUM(amount::numeric), 0) AS total_scheduled
+           FROM property_payments
+           WHERE contract_id = $1 AND posting_status = 'SCHEDULED'
+           GROUP BY ledger_row_id`,
+          [contract.id]
+        );
+        const scheduledByRowId = new Map(
+          scheduledSums.map((r) => [parseInt(r.ledger_row_id), parseFloat(r.total_scheduled)])
+        );
+
+        // Enrich each ledger row with backend-calculated fields
+        ledger = rawLedger.map((r) => {
+          const dueDate = getRentalPeriodDueDate(r.year, r.month, billingDay);
+          const isDue = dueDate <= asOfDate;
+          const effectivePaidAmount = paidByRowId.get(r.id) ?? 0;
+          const scheduledAmt = scheduledByRowId.get(r.id) ?? 0;
+          const expectedAmount = parseFloat(r.expectedAmount as string) || 0;
+          const expectedAsOf = isDue ? expectedAmount : 0;
+          const outstanding = Math.max(0, expectedAsOf - effectivePaidAmount);
+          const prepaidCredit = Math.max(0, effectivePaidAmount - expectedAsOf);
+
+          let status: string;
+          if (scheduledAmt > 0.005 && effectivePaidAmount < 0.005) {
+            status = "SCHEDULED";
+          } else if (!isDue && effectivePaidAmount < 0.005 && scheduledAmt < 0.005) {
+            status = "NOT_DUE";
+          } else if (!isDue && effectivePaidAmount > 0.005) {
+            status = "PREPAID";
+          } else if (isDue && effectivePaidAmount < 0.005) {
+            status = "DUE";
+          } else if (isDue && effectivePaidAmount > 0.005 && outstanding > 0.005) {
+            status = "PARTIALLY_PAID";
+          } else if (isDue && prepaidCredit > 0.005) {
+            status = "OVERPAID";
+          } else {
+            status = "PAID";
+          }
+
+          return {
+            ...r,
+            dueDate,
+            isDue,
+            expectedAsOf,
+            effectivePaidAmount,
+            scheduledAmount: scheduledAmt,
+            outstanding,
+            prepaidCredit,
+            status,
+          };
+        });
       }
 
       const pastContracts = await db
@@ -419,7 +491,8 @@ export function registerRentalPaymentsAccrualRoutes(
         unit,
         contract: contract ?? null,
         ledger,
-        payments: rentPayments,
+        postedPayments,
+        scheduledPayments,
         guaranteePayments,
         pastContracts,
         isShared,
@@ -520,14 +593,16 @@ export function registerRentalPaymentsAccrualRoutes(
       const companyId = getCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      await ensureMonthlyForCompany(companyId, module);
+      const asOf = getClientDate(req);
+      await ensureMonthlyForCompany(companyId, module, asOf);
 
       // Post all due, unaccrued rows as ONE combined journal voucher
       const { accrued, skipped } = await postRentAccrualForCompany(
         companyId,
         shopExpenseAccountName,
         module,
-        incomeAccountName
+        incomeAccountName,
+        asOf
       );
 
       res.json({ accrued, skipped });

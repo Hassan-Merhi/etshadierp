@@ -65,15 +65,20 @@ export function registerRentalUnitsContractsRoutes(
       const asOf = getClientDate(req);
       await ensureMonthlyForCompany(companyId, module, asOf);
 
-      // For ERP/FACTORY SHOP view: silently post any pending rent accruals and
-      // any due SCHEDULED payments on page load.  Fire-and-forget.
+      // FIX #5: sequential awaited processing so scheduled posting runs before
+      //          accrual classification (avoids a race where an already-posted
+      //          payment is re-classified as due-unaccrued in the same request).
       if ((module === "ERP" || module === "FACTORY") && unitType === "SHOP") {
-        postRentAccrualForCompany(companyId, shopExpenseAccountName, module, incomeAccountName).catch((e) =>
-          console.warn(`${tag} page-load accrual failed:`, e.message?.split("\n")[0])
-        );
-        postDueScheduledRentalPayments(companyId, module, asOf, shopExpenseAccountName).catch((e) =>
-          console.warn(`${tag} page-load scheduled-posting failed:`, e.message?.split("\n")[0])
-        );
+        try {
+          await postDueScheduledRentalPayments(companyId, module, asOf, shopExpenseAccountName);
+        } catch (e: any) {
+          console.warn(`${tag} page-load scheduled-posting failed:`, e.message?.split("\n")[0]);
+        }
+        try {
+          await postRentAccrualForCompany(companyId, shopExpenseAccountName, module, incomeAccountName, asOf);
+        } catch (e: any) {
+          console.warn(`${tag} page-load accrual failed:`, e.message?.split("\n")[0]);
+        }
       }
 
       const regularUnits = await db
@@ -149,7 +154,8 @@ export function registerRentalUnitsContractsRoutes(
       contracts.forEach((c) => contractByUnit.set(c.unitId, c));
 
       const contractIds = contracts.map((c) => c.id);
-      const outstandingByContract = new Map<number, number>();
+      const outstandingByContract = new Map<number, number>(); // stores (expectedAsOf - paidAsOf), can be negative
+      const expectedAsOfByContractOuter = new Map<number, number>(); // FIX #8: expose expectedAsOf
       const paidAsOfByContract = new Map<number, number>();
       const scheduledAmountByContract = new Map<number, number>();
       const totalPaidByContract = new Map<number, number>();
@@ -215,6 +221,7 @@ export function registerRentalUnitsContractsRoutes(
           const expected = expectedAsOfByContract.get(c.id) ?? 0;
           const paid = paidAsOfByContract.get(c.id) ?? 0;
           outstandingByContract.set(c.id, expected - paid);
+          expectedAsOfByContractOuter.set(c.id, expected); // FIX #8
         }
 
         // [Guarantee applied] payments
@@ -238,16 +245,21 @@ export function registerRentalUnitsContractsRoutes(
         const c = contractByUnit.get(u.id);
         const appliedAsRent = c ? (guaranteeAppliedByContract.get(c.id) ?? 0) : 0;
         const guaranteeRemaining = c ? Math.max(0, parseFloat(String(c.guaranteeAmount || "0")) - appliedAsRent) : null;
-        const outstanding = c ? (outstandingByContract.get(c.id) ?? 0) : null;
+        // FIX #8: separate non-negative outstanding and credit fields
+        const rawOutstanding = c ? (outstandingByContract.get(c.id) ?? 0) : null;
+        const expectedAsOf = c ? (expectedAsOfByContractOuter.get(c.id) ?? 0) : null;
         const paidAsOf = c ? (paidAsOfByContract.get(c.id) ?? 0) : null;
         const scheduledAmount = c ? (scheduledAmountByContract.get(c.id) ?? 0) : null;
-        const prepaidCredit = outstanding !== null && outstanding < 0 ? Math.abs(outstanding) : null;
+        const outstanding = rawOutstanding !== null ? Math.max(0, rawOutstanding) : null;
+        const prepaidCredit = rawOutstanding !== null && rawOutstanding < 0 ? Math.abs(rawOutstanding) : null;
         const billingDay = c ? getRentalBillingDay(c.startDate as string) : null;
         const nextBillingDate = c && billingDay !== null ? computeNextBillingDate(billingDay, asOf) : null;
         return {
           ...u,
           contract: c ?? null,
+          expectedAsOf,
           outstanding,
+          paidAsOf,
           totalPaid: paidAsOf,
           scheduledAmount,
           prepaidCredit,
@@ -372,16 +384,21 @@ export function registerRentalUnitsContractsRoutes(
                 if (!u) return null;
                 const appliedAsRent = sharedGuaranteeApplied.get(c.id) ?? 0;
                 const guaranteeRemaining = Math.max(0, parseFloat(String(c.guaranteeAmount || "0")) - appliedAsRent);
-                const outstanding = sharedOutstanding.get(c.id) ?? 0;
+                // FIX #8: separate non-negative outstanding and credit fields for shared contracts
+                const rawOutstanding = sharedOutstanding.get(c.id) ?? 0;
+                const expectedAsOf = rawOutstanding + (sharedPaid.get(c.id) ?? 0); // reverse: outstanding = expected - paid
                 const paidAsOf = sharedPaid.get(c.id) ?? 0;
                 const scheduledAmount = sharedScheduled.get(c.id) ?? 0;
-                const prepaidCredit = outstanding < 0 ? Math.abs(outstanding) : null;
+                const outstanding = Math.max(0, rawOutstanding);
+                const prepaidCredit = rawOutstanding < 0 ? Math.abs(rawOutstanding) : null;
                 const billingDay = getRentalBillingDay(c.startDate as string);
                 const nextBillingDate = computeNextBillingDate(billingDay, asOf);
                 return {
                   ...u,
                   contract: c,
+                  expectedAsOf,
                   outstanding,
+                  paidAsOf,
                   totalPaid: paidAsOf,
                   scheduledAmount,
                   prepaidCredit,

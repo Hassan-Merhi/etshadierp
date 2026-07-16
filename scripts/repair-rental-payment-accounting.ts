@@ -173,22 +173,77 @@ async function main() {
     if (wrongEntry.length === 0) {
       console.log("  ✓ No wrong-entry shop vouchers found.\n");
     } else {
-      console.log(`  Found ${wrongEntry.length} wrong-entry voucher(s) — flagged for review:`);
+      console.log(`  Found ${wrongEntry.length} wrong-entry voucher(s):`);
       for (const r of wrongEntry) {
-        console.log(`    Payment #${r.payment_id} | Voucher #${r.voucher_id} | Company ${r.company_id} | $${r.amount} on ${r.payment_date}`);
-        console.log(`      Desc: ${r.voucher_desc}`);
-        console.log(`      → Manual re-post recommended (run postGroupCore for this payment group)`);
+        console.log(`    Payment #${r.payment_id} | Voucher #${r.voucher_id} | Company ${r.company_id} | ${r.amount} on ${r.payment_date}`);
       }
       if (!isDryRun) {
-        // Type B repair is advisory — we add a description flag to the voucher for auditors.
+        // FIX #9: Type B — try to rebuild entries: swap Dr Rent Expense → Dr Accrued Rent Payable.
+        let rebuilt = 0;
+        let flaggedOnly = 0;
         for (const r of wrongEntry) {
-          await pool.query(
-            `UPDATE vouchers SET description = CONCAT('[REVIEW-WRONG-ENTRY] ', description) WHERE id = $1 AND description NOT ILIKE '%REVIEW-WRONG-ENTRY%'`,
-            [r.voucher_id]
-          );
+          const client = await pool.connect();
+          try {
+            // Find the Accrued Rent Payable account for this company
+            const { rows: apAcct } = await client.query(
+              `SELECT id FROM ledger_accounts WHERE company_id = $1 AND name ILIKE '%Accrued Rent Payable%' LIMIT 1`,
+              [r.company_id]
+            );
+            // Find the Cash/Bank account (credit side) from existing entries
+            const { rows: cashEntry } = await client.query(
+              `SELECT ve.ledger_account_id, ABS(ve.credit_amount::numeric) AS amount
+               FROM voucher_entries ve
+               JOIN ledger_accounts la ON la.id = ve.ledger_account_id
+               WHERE ve.voucher_id = $1 AND ve.credit_amount::numeric > 0
+               ORDER BY ve.credit_amount::numeric DESC LIMIT 1`,
+              [r.voucher_id]
+            );
+            // Only rebuild if we found both accounts and this payment's ledger row has an accrual
+            const { rows: accrualCheck } = await client.query(
+              `SELECT 1 FROM property_monthly_ledger ml
+               JOIN property_payments pp ON pp.ledger_row_id = ml.id
+               WHERE pp.id = $1 AND ml.accrual_voucher_id IS NOT NULL`,
+              [r.payment_id]
+            );
+            if (apAcct.length > 0 && cashEntry.length > 0 && accrualCheck.length > 0) {
+              await client.query("BEGIN");
+              const totalAmt = parseFloat(cashEntry[0].amount);
+              // Replace the Rent Expense debit with Accrued Rent Payable debit
+              await client.query(
+                `DELETE FROM voucher_entries WHERE voucher_id = $1`,
+                [r.voucher_id]
+              );
+              await client.query(
+                `INSERT INTO voucher_entries (voucher_id, ledger_account_id, debit_amount, credit_amount, narration)
+                 VALUES ($1, $2, $3, 0, 'Rent payment — entry corrected by repair script'),
+                        ($1, $4, 0, $3, 'Rent payment — entry corrected by repair script')`,
+                [r.voucher_id, apAcct[0].id, totalAmt, cashEntry[0].ledger_account_id]
+              );
+              await client.query(
+                `UPDATE vouchers SET description = REPLACE(description, '[REVIEW-WRONG-ENTRY] ', '') WHERE id = $1`,
+                [r.voucher_id]
+              );
+              await client.query("COMMIT");
+              console.log(`  ✓ Rebuilt entries for Voucher #${r.voucher_id} (${totalAmt.toFixed(2)})`);
+              rebuilt++;
+            } else {
+              // Cannot auto-rebuild — flag for review
+              await pool.query(
+                `UPDATE vouchers SET description = CONCAT('[REVIEW-WRONG-ENTRY] ', description) WHERE id = $1 AND description NOT ILIKE '%REVIEW-WRONG-ENTRY%'`,
+                [r.voucher_id]
+              );
+              flaggedOnly++;
+            }
+          } catch (e: any) {
+            await client.query("ROLLBACK").catch(() => {});
+            console.error(`  ✗ Failed to rebuild voucher #${r.voucher_id}:`, e.message);
+          } finally {
+            client.release();
+          }
         }
-        console.log(`  ✓ Flagged ${wrongEntry.length} voucher(s) with [REVIEW-WRONG-ENTRY] prefix`);
-        totalRepaired += wrongEntry.length;
+        if (rebuilt > 0) console.log(`  ✓ Rebuilt ${rebuilt} voucher(s)`);
+        if (flaggedOnly > 0) console.log(`  ⚠ Flagged ${flaggedOnly} voucher(s) with [REVIEW-WRONG-ENTRY] (could not auto-rebuild)`);
+        totalRepaired += rebuilt + flaggedOnly;
       }
     }
   }
@@ -259,10 +314,11 @@ async function main() {
           const hasPrepaid = entries.some((e) => e.name?.toLowerCase().includes("prepaid rent"));
           const hasAdvance = entries.some((e) => e.name?.toLowerCase().includes("advance rent paid"));
           if (hasPrepaid || hasAdvance) {
+            // FIX #9 Type D: set boolean flags, not the integer accrual_voucher_id value
             await pool.query(
               `UPDATE property_monthly_ledger
-               SET used_prepaid_account = CASE WHEN $1 THEN accrual_voucher_id ELSE used_prepaid_account END,
-                   used_advance_account = CASE WHEN $2 THEN accrual_voucher_id ELSE used_advance_account END
+               SET used_prepaid_account = CASE WHEN $1 THEN true ELSE used_prepaid_account END,
+                   used_advance_account = CASE WHEN $2 THEN true ELSE used_advance_account END
                WHERE id = $3`,
               [hasPrepaid, hasAdvance, r.ledger_row_id]
             );
@@ -275,39 +331,42 @@ async function main() {
     }
   }
 
-  // ── Type E: Orphan accruals (no subsequent POSTED payment) ──────────────
+  // ── Type E: Orphan accruals — accrual_voucher_id references deleted/missing voucher ─
+  // FIX #9: only flag rows whose accrual voucher is DELETED or does not exist.
+  //          A row with accrual_voucher_id AND no payment is NORMAL while waiting
+  //          for cash (accrue first, collect later). True orphans are those where
+  //          the voucher is gone but the flag still points to it.
   if (selectedTypes.includes("E")) {
-    console.log(`── Type E: Orphan accruals (accrual without payment) ──`);
+    console.log(`── Type E: Orphan accruals (accrual_voucher_id references deleted/missing voucher) ──`);
     const { rows: orphans } = await pool.query(
-      `SELECT ml.id AS ledger_row_id, ml.contract_id, ml.year, ml.month, ml.accrual_voucher_id
+      `SELECT ml.id AS ledger_row_id, ml.contract_id, ml.year, ml.month, ml.accrual_voucher_id,
+              v.deleted_at AS voucher_deleted_at
        FROM property_monthly_ledger ml
+       LEFT JOIN vouchers v ON v.id = ml.accrual_voucher_id
        WHERE 1=1 ${mlCompanyFilter}
          AND ml.accrual_voucher_id IS NOT NULL
-         AND ml.paid_amount::numeric = 0
-         AND NOT EXISTS (
-           SELECT 1 FROM property_payments pp
-           WHERE pp.ledger_row_id = ml.id AND pp.posting_status = 'POSTED'
-         )
+         AND (v.id IS NULL OR v.deleted_at IS NOT NULL)
        ORDER BY ml.contract_id, ml.year, ml.month`,
       []
     );
     if (orphans.length === 0) {
-      console.log("  ✓ No orphan accruals found.\n");
+      console.log("  ✓ No orphan accruals (deleted/missing voucher) found.\n");
     } else {
-      console.log(`  Found ${orphans.length} orphan accrual(s) — flagged for review:`);
+      console.log(`  Found ${orphans.length} genuinely orphaned accrual row(s):`);
       for (const r of orphans) {
-        console.log(`    Row #${r.ledger_row_id} | Contract ${r.contract_id} | ${r.year}-${String(r.month).padStart(2,"0")} | AccrualVoucher #${r.accrual_voucher_id}`);
+        const reason = r.voucher_deleted_at ? `deleted at ${r.voucher_deleted_at}` : "voucher record missing";
+        console.log(`    Row #${r.ledger_row_id} | Contract ${r.contract_id} | ${r.year}-${String(r.month).padStart(2,"0")} | AccrualVoucher #${r.accrual_voucher_id} (${reason})`);
       }
       if (!isDryRun) {
+        // Clear the dangling accrual_voucher_id reference from each orphaned ledger row
         for (const r of orphans) {
           await pool.query(
-            `UPDATE vouchers SET description = CONCAT('[ORPHAN-ACCRUAL] ', description)
-             WHERE id = $1 AND description NOT ILIKE '%ORPHAN-ACCRUAL%'`,
-            [r.accrual_voucher_id]
+            `UPDATE property_monthly_ledger SET accrual_voucher_id = NULL WHERE id = $1`,
+            [r.ledger_row_id]
           );
         }
-        console.log(`  ⚠ Flagged ${orphans.length} orphan accrual voucher(s) with [ORPHAN-ACCRUAL] prefix`);
-        console.log(`    Manual action: either post the payment or reverse the accrual voucher.`);
+        console.log(`  ✓ Cleared accrual_voucher_id on ${orphans.length} orphaned row(s)`);
+        console.log(`    Rows are now eligible to re-accrue via the normal accrual service.`);
         totalRepaired += orphans.length;
       }
     }
@@ -339,9 +398,48 @@ async function main() {
         console.log(`    Group ${groupId} | Company ${rows[0].company_id} | $${total.toFixed(2)} | ${rows[0].payment_date}`);
       }
       if (!isDryRun) {
-        console.log(`  ℹ Type F repair: trigger postDueScheduledRentalPayments via the app's scheduler.`);
-        console.log(`    Or call: curl -X POST <APP_URL>/api/erp/rental/post-scheduled`);
-        console.log(`    (Repair script does not directly invoke the posting service to avoid re-importing all server code)`);
+        // FIX #9 Type F: apply DB-level posting (status + paid_amount cache).
+        // Note: this does NOT create new accounting vouchers — use the app UI or POST
+        // /api/erp/rental/post-scheduled afterwards to ensure full voucher creation.
+        let posted = 0;
+        for (const [groupId, rows] of byGroup) {
+          const client = await pool.connect();
+          try {
+            await client.query("BEGIN");
+            const rowIds = rows.map((r) => r.id);
+            // Mark as POSTED
+            await client.query(
+              `UPDATE property_payments SET posting_status = 'POSTED', posted_at = NOW() WHERE id = ANY($1::int[])`,
+              [rowIds]
+            );
+            // Update paid_amount cache on ledger rows
+            for (const r of rows) {
+              const { rows: ledgerRef } = await client.query(
+                `SELECT ledger_row_id FROM property_payments WHERE id = $1`,
+                [r.id]
+              );
+              if (ledgerRef[0]?.ledger_row_id) {
+                await client.query(
+                  `UPDATE property_monthly_ledger SET paid_amount = paid_amount + $1::numeric WHERE id = $2`,
+                  [r.amount, ledgerRef[0].ledger_row_id]
+                );
+              }
+            }
+            await client.query("COMMIT");
+            const total = rows.reduce((s, r) => s + parseFloat(r.amount), 0);
+            console.log(`  ✓ Posted group ${groupId} | ${total.toFixed(2)} | ${rows[0].payment_date}`);
+            posted++;
+          } catch (e: any) {
+            await client.query("ROLLBACK");
+            console.error(`  ✗ Failed group ${groupId}:`, e.message);
+          } finally {
+            client.release();
+          }
+        }
+        if (posted > 0) {
+          console.log(`  ✓ Posted ${posted} group(s). Run the app's /api/erp/rental/post-scheduled to create vouchers.`);
+        }
+        totalRepaired += posted;
       }
     }
   }

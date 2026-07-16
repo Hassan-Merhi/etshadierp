@@ -41,6 +41,14 @@ export interface ReconciliationSummary {
     F_scheduledDue: number;
     total: number;
   };
+  // FIX #10: cash / rent-payable balance comparison
+  balances: {
+    totalExpectedAsOf: number;
+    totalPostedPaid: number;
+    totalScheduledPending: number;
+    totalAccrualPayablePosted: number;
+    netOutstanding: number;
+  };
 }
 
 export async function runRentalReconciliation(
@@ -135,55 +143,65 @@ export async function runRentalReconciliation(
     });
   }
 
-  // ── Type D: orphan accruals (accrual voucher exists but no POSTED payment) ─
+  // ── Type D: orphan accruals — accrual_voucher_id references a deleted/missing voucher ─
+  // FIX #10: only flag rows whose accrual voucher is DELETED or missing,
+  //          not every accrued-but-not-yet-paid row (those are normal pending state).
   const { rows: orphanAccruals } = await pool.query(
-    `SELECT ml.id AS ledger_row_id, ml.contract_id, ml.year, ml.month, ml.accrual_voucher_id
+    `SELECT ml.id AS ledger_row_id, ml.contract_id, ml.year, ml.month, ml.accrual_voucher_id,
+            v.deleted_at AS voucher_deleted_at
      FROM property_monthly_ledger ml
+     LEFT JOIN vouchers v ON v.id = ml.accrual_voucher_id
      WHERE ml.company_id = $1 AND ml.module = $2
        AND ml.accrual_voucher_id IS NOT NULL
-       AND ml.paid_amount::numeric = 0
-       AND NOT EXISTS (
-         SELECT 1 FROM property_payments pp
-         WHERE pp.ledger_row_id = ml.id AND pp.posting_status = 'POSTED'
-       )`,
+       AND (v.id IS NULL OR v.deleted_at IS NOT NULL)`,
     [companyId, module]
   );
   for (const r of orphanAccruals) {
     mismatches.push({
       type: "D",
-      description: `Orphan accrual: accrualVoucherId=${r.accrual_voucher_id} exists but no POSTED payment (contract ${r.contract_id}, ${r.year}-${String(r.month).padStart(2,"0")})`,
+      description: `Orphan accrual: accrualVoucherId=${r.accrual_voucher_id} references a deleted/missing voucher (contract ${r.contract_id}, ${r.year}-${String(r.month).padStart(2,"0")})`,
       contractId: r.contract_id,
       ledgerRowId: r.ledger_row_id,
-      detail: { accrualVoucherId: r.accrual_voucher_id },
+      detail: { accrualVoucherId: r.accrual_voucher_id, voucherDeletedAt: r.voucher_deleted_at },
     });
   }
 
   // ── Type E: premature accruals (month accrued before billing date) ───────
-  // A ledger row has an accrual if accrual_voucher_id IS NOT NULL.
-  // For billing-day check: billing date = startDate's day-of-month within that month.
+  // FIX #10: use real last-day-of-month to cap billing day (not LEAST(..., 28)).
+  //          MAKE_DATE(year, month+1, 1) - 1 = last day of that month.
   const { rows: prematureAccruals } = await pool.query(
     `SELECT ml.id AS ledger_row_id, ml.contract_id, ml.year, ml.month, ml.accrual_voucher_id,
-            pc.start_date
+            pc.start_date,
+            MAKE_DATE(
+              ml.year,
+              ml.month,
+              LEAST(
+                EXTRACT(DAY FROM pc.start_date::date)::int,
+                EXTRACT(DAY FROM (
+                  DATE_TRUNC('MONTH', MAKE_DATE(ml.year, ml.month, 1)) + INTERVAL '1 MONTH' - INTERVAL '1 DAY'
+                ))::int
+              )
+            ) AS billing_date
      FROM property_monthly_ledger ml
      JOIN property_contracts pc ON pc.id = ml.contract_id
+     LEFT JOIN vouchers v ON v.id = ml.accrual_voucher_id
      WHERE ml.company_id = $1 AND ml.module = $2
        AND ml.accrual_voucher_id IS NOT NULL
-       AND (
-         -- The billing date for this period is the start_date's day in that month/year.
-         -- We compare against the voucher's created date; here we use NOW() as a proxy.
-         -- The real check: was accrual_voucher_id created before the billing date?
-         -- Simplified: check if the billing date (year-month-day_of_start) is still in the future
-         TO_DATE(
-           ml.year || '-' || LPAD(ml.month::text, 2, '0') || '-' ||
-           LEAST(EXTRACT(DAY FROM pc.start_date::date)::int, 28)::text,
-           'YYYY-MM-DD'
-         ) > $3::date
-       )`,
+       AND v.id IS NOT NULL AND v.deleted_at IS NULL
+       AND MAKE_DATE(
+             ml.year,
+             ml.month,
+             LEAST(
+               EXTRACT(DAY FROM pc.start_date::date)::int,
+               EXTRACT(DAY FROM (
+                 DATE_TRUNC('MONTH', MAKE_DATE(ml.year, ml.month, 1)) + INTERVAL '1 MONTH' - INTERVAL '1 DAY'
+               ))::int
+             )
+           ) > $3::date`,
     [companyId, module, asOf]
   );
   for (const r of prematureAccruals) {
-    const billingDay = new Date(r.start_date).getUTCDate();
-    const billingDate = `${r.year}-${String(r.month).padStart(2,"0")}-${String(Math.min(billingDay, 28)).padStart(2,"0")}`;
+    const billingDate = String(r.billing_date).slice(0, 10);
     mismatches.push({
       type: "E",
       description: `Premature accrual: month ${r.year}-${String(r.month).padStart(2,"0")} accrued before billing date ${billingDate} (contract ${r.contract_id})`,
@@ -221,6 +239,42 @@ export async function runRentalReconciliation(
     total: mismatches.length,
   };
 
+  // ── FIX #10: cash / rent-payable balance summary ─────────────────────────
+  const { rows: balanceRows } = await pool.query(
+    `SELECT
+       COALESCE(SUM(CASE WHEN ml.accrual_voucher_id IS NOT NULL THEN ml.expected_amount::numeric ELSE 0 END), 0) AS total_accrual_payable_posted,
+       COALESCE(SUM(
+         CASE WHEN bill_date.billing_date <= $3::date THEN ml.expected_amount::numeric ELSE 0 END
+       ), 0) AS total_expected_as_of
+     FROM property_monthly_ledger ml
+     JOIN property_contracts pc ON pc.id = ml.contract_id
+     CROSS JOIN LATERAL (
+       SELECT MAKE_DATE(
+         ml.year, ml.month,
+         LEAST(
+           EXTRACT(DAY FROM pc.start_date::date)::int,
+           EXTRACT(DAY FROM (DATE_TRUNC('MONTH', MAKE_DATE(ml.year, ml.month, 1)) + INTERVAL '1 MONTH' - INTERVAL '1 DAY'))::int
+         )
+       ) AS billing_date
+     ) bill_date
+     WHERE ml.company_id = $1 AND ml.module = $2`,
+    [companyId, module, asOf]
+  );
+  const { rows: paymentBalRows } = await pool.query(
+    `SELECT
+       COALESCE(SUM(CASE WHEN posting_status = 'POSTED' AND payment_date <= $3 THEN amount::numeric ELSE 0 END), 0) AS total_posted_paid,
+       COALESCE(SUM(CASE WHEN posting_status = 'SCHEDULED' THEN amount::numeric ELSE 0 END), 0) AS total_scheduled_pending
+     FROM property_payments
+     WHERE company_id = $1 AND module = $2`,
+    [companyId, module, asOf]
+  );
+
+  const totalExpectedAsOf = Number(balanceRows[0]?.total_expected_as_of ?? 0);
+  const totalPostedPaid = Number(paymentBalRows[0]?.total_posted_paid ?? 0);
+  const totalScheduledPending = Number(paymentBalRows[0]?.total_scheduled_pending ?? 0);
+  const totalAccrualPayablePosted = Number(balanceRows[0]?.total_accrual_payable_posted ?? 0);
+  const netOutstanding = totalExpectedAsOf - totalPostedPaid;
+
   return {
     totalChecked: {
       contracts: parseInt(contractRows[0]?.count ?? "0"),
@@ -229,5 +283,12 @@ export async function runRentalReconciliation(
     },
     mismatches,
     counts,
+    balances: {
+      totalExpectedAsOf,
+      totalPostedPaid,
+      totalScheduledPending,
+      totalAccrualPayablePosted,
+      netOutstanding,
+    },
   };
 }

@@ -91,6 +91,15 @@ type LedgerRow = {
   paidAmount: string;
   notes?: string | null;
   accrualVoucherId?: number | null;
+  // FIX #7: backend-calculated fields from detail endpoint
+  dueDate?: string;
+  isDue?: boolean;
+  expectedAsOf?: number;
+  effectivePaidAmount?: number;
+  scheduledAmount?: number;
+  outstanding?: number;
+  prepaidCredit?: number;
+  status?: "SCHEDULED" | "NOT_DUE" | "PREPAID" | "DUE" | "PARTIALLY_PAID" | "PAID" | "OVERPAID";
 };
 type Payment = {
   id: number;
@@ -100,6 +109,8 @@ type Payment = {
   forMonth: number;
   cashAccountId: number | null;
   notes: string | null;
+  postingStatus?: string;
+  paymentGroupId?: string;
 };
 
 const MONTH_NAMES = ["", "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -939,7 +950,8 @@ function UnitActionDialog({
     unit: Unit;
     contract: Contract | null;
     ledger: LedgerRow[];
-    payments: Payment[];
+    postedPayments: Payment[];
+    scheduledPayments: Payment[];
     guaranteePayments: Payment[];
     pastContracts: Contract[];
     isShared?: boolean;
@@ -1019,7 +1031,8 @@ function UnitActionDialog({
             <TabsContent value="ledger">
               <LedgerView
                 ledger={detail?.ledger ?? []}
-                payments={detail?.payments ?? []}
+                postedPayments={detail?.postedPayments ?? []}
+                scheduledPayments={detail?.scheduledPayments ?? []}
                 guaranteePayments={detail?.guaranteePayments ?? []}
                 contract={contract}
                 unitId={unit.id}
@@ -1066,7 +1079,8 @@ function UnitActionDialog({
             <TabsContent value="ledger">
               <LedgerView
                 ledger={detail?.ledger ?? []}
-                payments={detail?.payments ?? []}
+                postedPayments={detail?.postedPayments ?? []}
+                scheduledPayments={detail?.scheduledPayments ?? []}
                 guaranteePayments={detail?.guaranteePayments ?? []}
                 contract={contract}
                 unitId={unit.id}
@@ -1093,7 +1107,7 @@ function UnitActionDialog({
                 cashAccounts={cashAccounts}
                 testIdPrefix={testIdPrefix}
                 unitId={unit.id}
-                payments={detail?.payments ?? []}
+                payments={detail?.postedPayments ?? []}
               />
             </TabsContent>
             <TabsContent value="end">
@@ -2815,7 +2829,8 @@ function EditInfoForm({
 // ──────────────────────────────────────────────────────────
 function LedgerView({
   ledger,
-  payments,
+  postedPayments,
+  scheduledPayments,
   guaranteePayments,
   contract,
   unitId,
@@ -2823,7 +2838,8 @@ function LedgerView({
   readOnly,
 }: {
   ledger: LedgerRow[];
-  payments: Payment[];
+  postedPayments: Payment[];
+  scheduledPayments: Payment[];
   guaranteePayments: Payment[];
   contract: Contract;
   unitId: number;
@@ -2879,37 +2895,36 @@ function LedgerView({
     onError: (e: any) => toast({ title: "Reversal failed", description: e.message, variant: "destructive" }),
   });
 
-  const now = new Date();
-  const nowYear = now.getFullYear();
-  const nowMonth = now.getMonth() + 1; // 1-based
-  // Only count expected amounts for months up to the current calendar month.
-  // All paid amounts are counted so advance payments show as credit (negative balance).
-  const totalExpected = ledger.reduce((s, r) => {
-    const isFuture = r.year > nowYear || (r.year === nowYear && r.month > nowMonth);
-    return s + (isFuture ? 0 : Number(r.expectedAmount));
-  }, 0);
-  const totalPaid = ledger.reduce((s, r) => s + Number(r.paidAmount), 0);
+  // FIX #7: use backend-calculated fields when available; fall back to frontend calculation
+  const useBackendFields = ledger.length === 0 || ledger[0].expectedAsOf !== undefined;
+  const totalExpected = useBackendFields
+    ? ledger.reduce((s, r) => s + (r.expectedAsOf ?? 0), 0)
+    : ledger.reduce((s, r) => s + Number(r.expectedAmount), 0);
+  const totalPaid = useBackendFields
+    ? ledger.reduce((s, r) => s + (r.effectivePaidAmount ?? Number(r.paidAmount)), 0)
+    : ledger.reduce((s, r) => s + Number(r.paidAmount), 0);
   const balance = totalExpected - totalPaid;
 
   const handlePrint = () => {
+    const sym = contract.currency === "EUR" ? "€" : contract.currency === "CFA" ? "FC " : "$";
+    const fmtPdf = (v: number) =>
+      sym + v.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: contract.currency === "CFA" ? 0 : 2 });
+
     const rows = ledger
       .map((r) => {
-        const isFutureRow = r.year > nowYear || (r.year === nowYear && r.month > nowMonth);
-        const out = isFutureRow ? 0 - Number(r.paidAmount) : Number(r.expectedAmount) - Number(r.paidAmount);
-        const outColor = out > 0 ? "#cc0000" : out < 0 ? "#006600" : "#888888";
-        const sym = contract.currency === "EUR" ? "€" : contract.currency === "CFA" ? "FC " : "$";
-        const fmtPdf = (v: number) =>
-          sym +
-          v.toLocaleString("en-US", {
-            minimumFractionDigits: 0,
-            maximumFractionDigits: contract.currency === "CFA" ? 0 : 2,
-          });
-        const expDisplay = isFutureRow ? "—" : fmtPdf(Number(r.expectedAmount));
+        // FIX #7: use backend status/outstanding when available
+        const isDue = r.isDue !== undefined ? r.isDue : true;
+        const paid = r.effectivePaidAmount !== undefined ? r.effectivePaidAmount : Number(r.paidAmount);
+        const expected = r.expectedAsOf !== undefined ? r.expectedAsOf : (isDue ? Number(r.expectedAmount) : 0);
+        const out = r.outstanding !== undefined ? r.outstanding : Math.max(0, expected - paid);
+        const credit = r.prepaidCredit !== undefined ? r.prepaidCredit : Math.max(0, paid - expected);
+        const outColor = out > 0.005 ? "#cc0000" : credit > 0.005 ? "#006600" : "#888888";
+        const statusLabel = r.status ?? (isDue ? "" : "not-due");
         return `<tr>
-        <td>${MONTH_NAMES[r.month]} ${r.year}${isFutureRow ? " <em style='color:#888;font-size:9px'>prepaid</em>" : ""}</td>
-        <td class="num">${expDisplay}</td>
-        <td class="num">${fmtPdf(Number(r.paidAmount))}</td>
-        <td class="num" style="color:${outColor};font-weight:600">${fmtPdf(Math.abs(out))}${out < 0 ? " CR" : ""}</td>
+        <td>${MONTH_NAMES[r.month]} ${r.year}${!isDue ? ` <em style='color:#888;font-size:9px'>${statusLabel}</em>` : ""}</td>
+        <td class="num">${isDue ? fmtPdf(expected) : "—"}</td>
+        <td class="num">${fmtPdf(paid)}</td>
+        <td class="num" style="color:${outColor};font-weight:600">${credit > 0.005 ? `${fmtPdf(credit)} CR` : fmtPdf(out)}</td>
         <td class="note">${r.notes || ""}</td>
       </tr>`;
       })
@@ -2933,7 +2948,8 @@ function LedgerView({
     </tr>`
         )
         .join("");
-    const payRows = buildPayRows(payments);
+    const payRows = buildPayRows(postedPayments);
+    const schedRows = buildPayRows(scheduledPayments);
     const guarRows = buildPayRows(guaranteePayments);
 
     const balColor = balance > 0 ? "#cc0000" : balance < 0 ? "#006600" : "#000";
@@ -2986,10 +3002,17 @@ function LedgerView({
         : ""
     }
     ${
-      payments.length > 0
+      postedPayments.length > 0
         ? `<h2>Rent Payment History</h2>
     <table><thead><tr><th>Date</th><th>For</th><th class="num">Amount</th><th>Notes</th></tr></thead>
     <tbody>${payRows}</tbody></table>`
+        : ""
+    }
+    ${
+      scheduledPayments.length > 0
+        ? `<h2 style="color:#b45309">Scheduled Payments (Pending)</h2>
+    <table><thead><tr><th>Date</th><th>For</th><th class="num">Amount</th><th>Notes</th></tr></thead>
+    <tbody>${schedRows}</tbody></table>`
         : ""
     }
     ${
@@ -3088,12 +3111,14 @@ function LedgerView({
           </thead>
           <tbody>
             {ledger.map((r) => {
-              const isFutureRow = r.year > nowYear || (r.year === nowYear && r.month > nowMonth);
-              // For future months: expected counts as 0 (not yet due), paid is a credit
-              const out = isFutureRow
-                ? 0 - Number(r.paidAmount) // negative = credit
-                : Number(r.expectedAmount) - Number(r.paidAmount);
-              const isPrepaid = !isFutureRow && Number(r.paidAmount) > Number(r.expectedAmount);
+              // FIX #7: prefer backend-calculated fields, fall back to frontend estimation
+              const isDue = r.isDue !== undefined ? r.isDue : true;
+              const paid = r.effectivePaidAmount !== undefined ? r.effectivePaidAmount : Number(r.paidAmount);
+              const expected = r.expectedAsOf !== undefined ? r.expectedAsOf : (isDue ? Number(r.expectedAmount) : 0);
+              const outstanding = r.outstanding !== undefined ? r.outstanding : Math.max(0, expected - paid);
+              const credit = r.prepaidCredit !== undefined ? r.prepaidCredit : Math.max(0, paid - expected);
+              const statusLabel = r.status;
+              const showAsCreditRow = !isDue && paid > 0.005;
               return (
                 <tr key={r.id} className="border-t" data-testid={`row-ledger-${r.year}-${r.month}`}>
                   <td className="px-3 py-1.5">
@@ -3101,8 +3126,11 @@ function LedgerView({
                       <span>
                         {MONTH_NAMES[r.month]} {r.year}
                       </span>
-                      {isFutureRow && <span className="text-[10px] text-muted-foreground italic">prepaid</span>}
-                      {isPrepaid && <span className="text-[10px] text-green-600 dark:text-green-400 font-medium">+credit</span>}
+                      {!isDue && <span className="text-[10px] text-muted-foreground italic">{statusLabel ?? "not due"}</span>}
+                      {isDue && credit > 0.005 && <span className="text-[10px] text-green-600 dark:text-green-400 font-medium">+credit</span>}
+                      {statusLabel === "SCHEDULED" && (
+                        <Badge variant="outline" className="text-[10px] border-amber-500 text-amber-600">Scheduled</Badge>
+                      )}
                       {r.accrualVoucherId && (
                         <>
                           <Badge
@@ -3112,7 +3140,7 @@ function LedgerView({
                           >
                             Accrued
                           </Badge>
-                          {isAdmin && apiBase.includes("/erp/") && Number(r.paidAmount) === 0 && (
+                          {isAdmin && apiBase.includes("/erp/") && paid < 0.005 && (
                             <Button
                               size="icon"
                               variant="ghost"
@@ -3132,17 +3160,17 @@ function LedgerView({
                     </span>
                   </td>
                   <td className="px-3 py-1.5 text-right tabular-nums text-muted-foreground">
-                    {isFutureRow ? "—" : fmtMoneyCurrency(r.expectedAmount, contract.currency)}
+                    {isDue ? fmtMoneyCurrency(expected, contract.currency) : "—"}
                   </td>
                   <td className="px-3 py-1.5 text-right tabular-nums">
-                    {fmtMoneyCurrency(r.paidAmount, contract.currency)}
+                    {fmtMoneyCurrency(paid, contract.currency)}
                   </td>
                   <td
-                    className={`px-3 py-1.5 text-right tabular-nums font-semibold ${out > 0 ? "text-red-600 dark:text-red-400" : out < 0 ? "text-green-600 dark:text-green-400" : "text-muted-foreground"}`}
+                    className={`px-3 py-1.5 text-right tabular-nums font-semibold ${outstanding > 0.005 ? "text-red-600 dark:text-red-400" : credit > 0.005 || showAsCreditRow ? "text-green-600 dark:text-green-400" : "text-muted-foreground"}`}
                   >
-                    {out < 0
-                      ? `${fmtMoneyCurrency(Math.abs(out), contract.currency)} CR`
-                      : fmtMoneyCurrency(out, contract.currency)}
+                    {credit > 0.005 || showAsCreditRow
+                      ? `${fmtMoneyCurrency(showAsCreditRow ? paid : credit, contract.currency)} CR`
+                      : fmtMoneyCurrency(outstanding, contract.currency)}
                   </td>
                   <td className="px-3 py-1.5 text-xs text-muted-foreground">{r.notes || ""}</td>
                 </tr>
@@ -3168,10 +3196,11 @@ function LedgerView({
           </tbody>
         </table>
       </div>
-      {payments.length > 0 && (
+      {/* FIX #7: separate posted payment history from scheduled payments */}
+      {postedPayments.length > 0 && (
         <details className="bg-muted/30 rounded-md p-2" open>
           <summary className="text-sm font-semibold cursor-pointer" data-testid="summary-rent-payment-history">
-            Rent Payment History ({payments.length})
+            Rent Payment History ({postedPayments.length})
           </summary>
           <table className="w-full text-xs mt-2">
             <thead>
@@ -3183,13 +3212,45 @@ function LedgerView({
               </tr>
             </thead>
             <tbody>
-              {payments.map((p) => (
+              {postedPayments.map((p) => (
                 <tr key={p.id} className="border-t" data-testid={`row-rent-payment-${p.id}`}>
                   <td className="px-2 py-1">{format(new Date(p.paymentDate), "dd MMM yyyy")}</td>
                   <td className="px-2 py-1">
                     {MONTH_NAMES[p.forMonth]} {p.forYear}
                   </td>
                   <td className="px-2 py-1 text-right tabular-nums">${fmtMoney(p.amount)}</td>
+                  <td className="px-2 py-1 text-muted-foreground">{p.notes || ""}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </details>
+      )}
+      {scheduledPayments.length > 0 && (
+        <details className="rounded-md border border-amber-200 dark:border-amber-900 bg-amber-50/50 dark:bg-amber-950/20 p-2" open>
+          <summary className="text-sm font-semibold cursor-pointer text-amber-800 dark:text-amber-300" data-testid="summary-scheduled-payments">
+            Scheduled Payments ({scheduledPayments.length})
+          </summary>
+          <p className="text-xs text-muted-foreground mt-1 mb-2">
+            These payments are recorded but <strong>not yet posted</strong> — the cash entry will be created on the payment date.
+          </p>
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="text-muted-foreground">
+                <th className="text-left px-2 py-1">Due Date</th>
+                <th className="text-left px-2 py-1">For</th>
+                <th className="text-right px-2 py-1">Amount</th>
+                <th className="text-left px-2 py-1">Notes</th>
+              </tr>
+            </thead>
+            <tbody>
+              {scheduledPayments.map((p) => (
+                <tr key={p.id} className="border-t border-amber-100 dark:border-amber-900" data-testid={`row-scheduled-payment-${p.id}`}>
+                  <td className="px-2 py-1">{format(new Date(p.paymentDate), "dd MMM yyyy")}</td>
+                  <td className="px-2 py-1">
+                    {MONTH_NAMES[p.forMonth]} {p.forYear}
+                  </td>
+                  <td className="px-2 py-1 text-right tabular-nums font-medium">${fmtMoney(p.amount)}</td>
                   <td className="px-2 py-1 text-muted-foreground">{p.notes || ""}</td>
                 </tr>
               ))}

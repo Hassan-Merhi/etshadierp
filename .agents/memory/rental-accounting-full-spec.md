@@ -1,6 +1,6 @@
 ---
 name: Rental accounting full spec
-description: All 17 sections of the rental accounting spec implemented; key architecture decisions and file locations.
+description: All 17 sections + 11 follow-up fixes implemented. Fixes cover: expected_amount for future months, paymentDate vs asOfDate classification, payer companyId on payments, asOfDate propagation through accrual service, sequential shop processing, detail endpoint with per-row backend fields, frontend split payment sections, shops summary non-negative outstanding, repair script (B/D/E/F), reconciliation Type D/E + balance fields, Admin-only reconciliation endpoint.
 ---
 
 ## What was built
@@ -19,14 +19,18 @@ Full rental payment accounting overhaul across 17 sections.
 - Outstanding computation in `/api/*/rental/units` uses POSTED `property_payments` sum (not `paidAmount` cache) and `getRentalPeriodDueDate` per contract for accurate expected amounts.
 - `scheduledAmount`, `prepaidCredit`, `billingDay`, `nextBillingDate` now returned in units endpoint response.
 
-### Repair script (6 types A–F)
-- `scripts/repair-rental-payment-accounting.ts` covers: A=future POSTED→SCHEDULED, B=wrong-entry shop voucher flagging, C=paid_amount cache drift, D=flag drift, E=orphan accruals, F=overdue SCHEDULED.
-- Type E (orphan accruals) correctly shows existing unmatched accruals — not a bug.
-- Type F repair is advisory — triggers via app's scheduler, not inline.
+### Repair script (6 types A–F) — updated
+- `scripts/repair-rental-payment-accounting.ts` covers A=future POSTED→SCHEDULED, B=wrong-entry (now rebuilds Dr-AP/Cr-Cash entries), C=paid_amount cache drift, D=boolean flag repair (uses `true` not accrual_voucher_id), E=deleted-voucher orphan (clears dangling accrual_voucher_id), F=DB-level posting (status+ledger; vouchers need app re-run).
+- Type D bug was: `CASE WHEN $1 THEN accrual_voucher_id` assigned integer to boolean column — fixed to `true`.
+- Type E only flags rows where accrual_voucher_id references a deleted or missing voucher record.
+- Type F now updates posting_status + paid_amount; call `/api/erp/rental/post-scheduled` afterwards for full voucher creation.
 
-### Reconciliation service
+### Reconciliation service — updated
 - `server/services/rental/rentalReconciliationService.ts` — `runRentalReconciliation(companyId, module, asOf)`.
-- Endpoint: `GET /api/*/rental/reconciliation?asOf=YYYY-MM-DD` — registered in `rentalRouteFactory.ts`.
+- Endpoint: `GET /api/*/rental/reconciliation?asOf=YYYY-MM-DD` — **Admin/Developer role required** (enforced in `rentalRouteFactory.ts`).
+- Type D: only flags rows whose `accrual_voucher_id` references deleted/missing voucher (not all unpaid accruals).
+- Type E: uses `MAKE_DATE` + real last-day-of-month calc (not `LEAST(..., 28)`).
+- Response now includes `balances` object: `{totalExpectedAsOf, totalPostedPaid, totalScheduledPending, totalAccrualPayablePosted, netOutstanding}`.
 
 ### Other fixes
 - `accountRoutes.ts` line ~285: `balEndDate` now defaults to `getClientDate(req)` so future vouchers are excluded from account balances.
