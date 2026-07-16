@@ -198,7 +198,15 @@ export function registerRawStockRecalcRoutes(app: Express) {
         // transaction (fingerprint recomputed from a fresh read there), so any change
         // that lands after this point but before that lock is still caught. This is a
         // cheap early-exit for the common case — no EPS tolerance; 6dp exact match.
+        //
+        // Skip the fingerprint check for containers already correct (changed === false):
+        // idempotent replay of a token whose cost was applied in a prior call should
+        // reach the service-layer no-op path rather than hitting STALE_TOKEN here.
+        const freshPreview = await getRawStockRecalcPreview(companyId);
+        const freshPreviewByContainer = new Map(freshPreview.map((r) => [r.containerId, r]));
         for (const id of parsedIds) {
+          const freshRow = freshPreviewByContainer.get(id);
+          if (freshRow && freshRow.changed === false) continue; // already correct — let service handle idempotency
           const inputs = await loadRecalcFingerprintInputs(companyId, id);
           const freshFingerprint = inputs ? computeRecalcFingerprint(inputs) : undefined;
           const tokenFingerprint = tokenPayload.fingerprintByContainer[id];

@@ -5,8 +5,11 @@
   "license": "MIT",
   "scripts": {
     "dev": "NODE_ENV=development tsx server/index.ts",
-    "prebuild": "node -e \"require.resolve('vite'); require.resolve('esbuild'); console.log('Build dependencies OK')\"",
-    "build": "node node_modules/vite/bin/vite.js build && node scripts/build-server.mjs",
+    "prebuild": "node -e \"require.resolve('vite'); require.resolve('esbuild'); console.log('Build dependencies OK')\" && node scripts/verify-lockfile-registry.mjs",
+    "build": "node node_modules/vite/bin/vite.js build && node scripts/build-server.mjs && node scripts/verify-server-bundle.mjs",
+    "verify:lockfile": "node scripts/verify-lockfile-registry.mjs",
+    "verify:server-bundle": "node scripts/verify-server-bundle.mjs",
+    "verify:production-dependencies": "node scripts/verify-production-dependencies.mjs",
     "start": "node dist/index.js",
     "check": "node node_modules/typescript/bin/tsc --noEmit",
     "db:push": "drizzle-kit push",

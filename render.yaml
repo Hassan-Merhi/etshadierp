@@ -3,7 +3,7 @@ services:
     name: erp-pos-system
     runtime: node
     plan: starter
-    buildCommand: rm -rf node_modules && npm ci && NODE_OPTIONS=--max-old-space-size=4096 node build.mjs
+    buildCommand: npm ci --registry=https://registry.npmjs.org/ && npm run build
     startCommand: npm start
     envVars:
       - key: NODE_ENV
