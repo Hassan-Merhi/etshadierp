@@ -1,3 +1,4 @@
+import Decimal from "decimal.js";
 import { parseId, parseOptionalId } from "../../../lib/parseId";
 import { getClientDate } from "../../../lib/dateUtils";
 import type { Express } from "express";
@@ -317,7 +318,10 @@ export function registerRawStockOffloadRoutes(app: Express) {
 
       const totalCost =
         basePayable + freightInContainerCcy + ocInContainerCcy + additionalChargesTotal + commInContainerCcy + dutyVal;
-      const inclusiveCostPerKg = parseFloat(actualKg) > 0 ? totalCost / parseFloat(actualKg) : 0;
+      // Use Decimal.js for per-KG division so we get exact 6-decimal-place
+      // precision without binary floating-point drift across large containers.
+      const dActualKg = new Decimal(actualKg);
+      const dInclusiveCostPerKg = dActualKg.gt(0) ? new Decimal(totalCost).div(dActualKg) : new Decimal(0);
       const finalPayableAmount = String(totalCost);
 
       const commUsd = commCurrencyForUsd === "USD" ? commTotalVal : commTotalVal * commFxRateForUsd;
@@ -332,7 +336,7 @@ export function registerRawStockOffloadRoutes(app: Express) {
       const dutyUsd = currencyCode === "USD" ? dutyVal : dutyVal * fxRate;
 
       const totalUsd = baseMaterialUsd + freightUsd + commUsd + ocUsd + addlUsd + dutyUsd;
-      const costPerKgUsd = parseFloat(actualKg) > 0 ? totalUsd / parseFloat(actualKg) : 0;
+      const dCostPerKgUsd = dActualKg.gt(0) ? new Decimal(totalUsd).div(dActualKg) : new Decimal(0);
       const finalPayableAmountUsd = String(totalUsd);
 
       const newStatus = parseFloat(actualKg) < parseFloat(declaredKg) ? "PARTIALLY_RECEIVED" : "OFFLOADED";
@@ -374,7 +378,7 @@ export function registerRawStockOffloadRoutes(app: Express) {
             companyId,
             supplierId: container.supplierId,
             newReceivedKg: parseFloat(actualKg),
-            newContainerLandedCostPerKgUsd: costPerKgUsd,
+            newContainerLandedCostPerKgUsd: dCostPerKgUsd.toNumber(),
           });
         }
 
@@ -390,8 +394,8 @@ export function registerRawStockOffloadRoutes(app: Express) {
             companyId,
             containerId,
             receivedKg: String(actualKg),
-            costPerKg: String(inclusiveCostPerKg),
-            costPerKgUsd: String(costPerKgUsd),
+            costPerKg: dInclusiveCostPerKg.toDecimalPlaces(6).toFixed(6),
+            costPerKgUsd: dCostPerKgUsd.toDecimalPlaces(6).toFixed(6),
           })
           .returning();
 
@@ -399,15 +403,19 @@ export function registerRawStockOffloadRoutes(app: Express) {
         for (const alloc of mixBatchAllocationsArr) {
           const allocKg = parseFloat(alloc.weightKg || "0");
           if (!alloc.mixBatchId || allocKg <= 0) continue;
-          const allocCost = inclusiveCostPerKg * allocKg;
+          // Mix-batch sources are valued in USD (cascade uses USD for blended
+          // cost; writing native-currency cost here would skew multi-container
+          // batches that blend different base currencies).
+          const dAllocKg = new Decimal(allocKg);
+          const dAllocCostUsd = dCostPerKgUsd.times(dAllocKg);
           await tx.insert(factoryMixBatchSources).values({
             mixBatchId: parseInt(alloc.mixBatchId),
             containerId,
             supplierId: container.supplierId || null,
             sourceType: "container",
             weightKg: String(allocKg),
-            costPerKg: String(inclusiveCostPerKg),
-            totalCost: String(allocCost),
+            costPerKg: dCostPerKgUsd.toDecimalPlaces(6).toFixed(6),
+            totalCost: dAllocCostUsd.toDecimalPlaces(6).toFixed(6),
           });
         }
 
@@ -431,7 +439,7 @@ export function registerRawStockOffloadRoutes(app: Express) {
             fxRateConfirmed: true,
             fxRateToUsdOffload: String(fxRate),
             fxRateDateOffload: offloadDate,
-            ratePerKgUsd: String(costPerKgUsd),
+            ratePerKgUsd: dCostPerKgUsd.toDecimalPlaces(6).toFixed(6),
             finalPayableAmountUsd,
             freight: String(freightVal),
             freightAccountId: reqFreightAccountId ? parseInt(reqFreightAccountId) : null,
@@ -505,7 +513,7 @@ export function registerRawStockOffloadRoutes(app: Express) {
           txDate: offloadDate,
           txType: "OFFLOAD_RAW_STOCK",
           referenceId: rawStock.id,
-          description: `Offloaded container ${container.containerNumber}: ${actualKg} kg at ${inclusiveCostPerKg.toFixed(4)}/kg (inclusive)`,
+          description: `Offloaded container ${container.containerNumber}: ${actualKg} kg at ${dInclusiveCostPerKg.toDecimalPlaces(6).toFixed(6)}/kg (inclusive)`,
           currencyCode,
           amountCurrency: totalCost,
           fxRateToUsd: fxRate,

@@ -62,3 +62,4 @@
 - [Mix-batch-source-level zero cost](mix-batch-source-zero-cost.md) — a container's own cost can be correct while its factory_mix_batch_sources rows still carry cost 0; detect at source level, not just via container-cost diff.
 - [Ledger account cross-company balance discrepancy](ledger-account-cross-company-balance.md) — getVoucherEntriesByLedger needs companyId param; closeFiscalPeriod needs isNull(deletedAt) guard.
 - [Edit tool dollar-sign bug](edit-tool-dollar-sign-bug.md) — $ in new_string is stripped to $; $label$ immediately before closing backtick corrupts the file. Use plain ALTER TABLE for idempotent migrations; add semicolon after closing label for DO blocks.
+- [Per-KG 6dp precision upgrade](per-kg-6dp-precision.md) — which factory columns changed to scale 6, what stayed, and the decimal.js Render bundling fix.

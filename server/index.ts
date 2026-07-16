@@ -4551,6 +4551,21 @@ END $$`,
     `ALTER TABLE factory_container_other_charges ADD COLUMN IF NOT EXISTS fx_rate_to_usd NUMERIC(20,8) DEFAULT 1`,
     `ALTER TABLE factory_container_other_charges ADD COLUMN IF NOT EXISTS fx_rate_confirmed BOOLEAN NOT NULL DEFAULT false`,
     `ALTER TABLE factory_container_other_charges ADD COLUMN IF NOT EXISTS fx_rate_date DATE`,
+
+    // -- Per-KG cost/rate/price column precision: upgrade to numeric(x,6) (July 2026) --
+    // Standardise every per-KG cost, rate, and price column in the Factory module
+    // to exactly 6 decimal places. Re-running on an already-upgraded column is safe:
+    // PostgreSQL silently accepts ALTER COLUMN TYPE to the same type, and
+    // ROUND(col::numeric, 6) is a no-op on values that are already 6-dp.
+    `ALTER TABLE factory_containers ALTER COLUMN rate_per_kg TYPE numeric(20,6) USING ROUND(rate_per_kg::numeric, 6)`,
+    `ALTER TABLE factory_containers ALTER COLUMN rate_per_kg_usd TYPE numeric(20,6) USING ROUND(rate_per_kg_usd::numeric, 6)`,
+    `ALTER TABLE factory_raw_material_adjustments ALTER COLUMN cost_per_kg TYPE numeric(20,6) USING ROUND(cost_per_kg::numeric, 6)`,
+    `ALTER TABLE factory_mix_batches ALTER COLUMN cost_per_kg TYPE numeric(20,6) USING ROUND(cost_per_kg::numeric, 6)`,
+    `ALTER TABLE factory_container_commissions ALTER COLUMN commission_rate TYPE numeric(20,6) USING ROUND(commission_rate::numeric, 6)`,
+    `ALTER TABLE customer_proforma_lines ALTER COLUMN price_per_kg TYPE numeric(20,6) USING ROUND(price_per_kg::numeric, 6)`,
+    `ALTER TABLE customer_order_lines ALTER COLUMN price_per_kg TYPE numeric(20,6) USING ROUND(price_per_kg::numeric, 6)`,
+    `ALTER TABLE factory_settings ALTER COLUMN labor_cost_per_kg TYPE numeric(10,6) USING ROUND(labor_cost_per_kg::numeric, 6)`,
+    `ALTER TABLE factory_settings ALTER COLUMN overhead_per_kg TYPE numeric(10,6) USING ROUND(overhead_per_kg::numeric, 6)`,
   ];
 
   // /api/health/db — reports migration status but does NOT block deployment.

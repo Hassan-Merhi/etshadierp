@@ -1027,7 +1027,10 @@ export async function applyZeroCostMixBatchSourcesFix(
 
       await tx
         .update(factoryMixBatchSources)
-        .set({ costPerKg: String(correctedCostPerKg), totalCost: String((weightKg * correctedCostPerKg).toFixed(2)) })
+        .set({
+          costPerKg: new Decimal(correctedCostPerKg).toDecimalPlaces(6).toFixed(6),
+          totalCost: new Decimal(weightKg).times(new Decimal(correctedCostPerKg)).toDecimalPlaces(6).toFixed(6),
+        })
         .where(eq(factoryMixBatchSources.id, sourceId));
 
       const { bales } = await recomputeBatchAndCascadeBales(tx, companyId, batch.id);

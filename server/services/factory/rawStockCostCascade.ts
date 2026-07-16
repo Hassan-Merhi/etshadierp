@@ -80,8 +80,8 @@ export async function recomputeBatchAndCascadeBales(
   await tx
     .update(factoryMixBatches)
     .set({
-      costPerKg: dBatchCostPerKg.toDecimalPlaces(7).toFixed(7),
-      totalCost: dTotalCost.toDecimalPlaces(7).toFixed(7),
+      costPerKg: dBatchCostPerKg.toDecimalPlaces(6).toFixed(6),
+      totalCost: dTotalCost.toDecimalPlaces(6).toFixed(6),
       updatedAt: new Date(),
     })
     .where(eq(factoryMixBatches.id, batchId));
@@ -103,8 +103,8 @@ export async function recomputeBatchAndCascadeBales(
     await tx
       .update(factoryBales)
       .set({
-        costPerKg: dBatchCostPerKg.toDecimalPlaces(7).toFixed(7),
-        totalCost: dBaleTotalCost.toDecimalPlaces(7).toFixed(7),
+        costPerKg: dBatchCostPerKg.toDecimalPlaces(6).toFixed(6),
+        totalCost: dBaleTotalCost.toDecimalPlaces(6).toFixed(6),
         updatedAt: new Date(),
       })
       .where(eq(factoryBales.id, bale.id));
@@ -236,8 +236,8 @@ export async function cascadeContainerCostChange(
       await tx
         .update(factoryMixBatchSources)
         .set({
-          costPerKg: dNewCostPerKgUsd.toDecimalPlaces(7).toFixed(7),
-          totalCost: dNewSourceTotalCost.toDecimalPlaces(7).toFixed(7),
+          costPerKg: dNewCostPerKgUsd.toDecimalPlaces(6).toFixed(6),
+          totalCost: dNewSourceTotalCost.toDecimalPlaces(6).toFixed(6),
         })
         .where(eq(factoryMixBatchSources.id, src.id));
     }
