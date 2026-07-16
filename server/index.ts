@@ -4528,6 +4528,15 @@ END $$`,
     `ALTER TABLE factory_bales ALTER COLUMN cost_per_kg TYPE NUMERIC(20,7)`,
     `ALTER TABLE factory_bales ALTER COLUMN total_cost TYPE NUMERIC(20,7)`,
 
+    // -- Commission-specific FX rate fields on factory_containers (July 2026) --
+    // A commission may be denominated in a currency different from the container (e.g. AUD
+    // container with EUR commission). Using the container's fxRateToUsd for such a commission
+    // produces an incorrect commissionTotalUsd. These three columns persist the commission-
+    // specific rate so computeCorrectContainerCost always uses the right rate.
+    `ALTER TABLE factory_containers ADD COLUMN IF NOT EXISTS commission_fx_rate_to_usd NUMERIC(20,8)`,
+    `ALTER TABLE factory_containers ADD COLUMN IF NOT EXISTS commission_fx_rate_confirmed BOOLEAN NOT NULL DEFAULT false`,
+    `ALTER TABLE factory_containers ADD COLUMN IF NOT EXISTS commission_fx_rate_date DATE`,
+
     // -- Freight-specific FX rate fields on factory_containers (July 2026) --
     // Freight may be in a different currency than the container itself. These columns persist
     // the resolved FX rate at the time the container was saved so computeCorrectContainerCost

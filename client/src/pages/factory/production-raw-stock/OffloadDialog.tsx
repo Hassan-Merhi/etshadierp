@@ -69,6 +69,11 @@ export function OffloadDialog({
   const [commissionType, setCommissionType] = useState<"PER_KG" | "FIXED">("PER_KG");
   const [commissionRate, setCommissionRate] = useState("");
   const [commissionLedgerAccountId, setCommissionLedgerAccountId] = useState("");
+  // Commission-specific FX rate — kept independent from the container's material FX so a
+  // EUR commission on an AUD container uses EUR/USD (1.18), not AUD/USD (0.67).
+  const [commissionFxRate, setCommissionFxRate] = useState("1");
+  const [commissionFxRateLoading, setCommissionFxRateLoading] = useState(false);
+  const [commissionFxEffectiveDate, setCommissionFxEffectiveDate] = useState<string | null>(null);
   const [dutyAmount, setDutyAmount] = useState("");
   const [dutyAccountId, setDutyAccountId] = useState("");
   const [dutyPending, setDutyPending] = useState(false);
@@ -118,6 +123,37 @@ export function OffloadDialog({
       .finally(() => setOtherChargesFxRateLoading(false));
   }, [otherChargesCurrencyCode, otherChargesFromContainer]);
 
+  // Auto-fetch commission FX when commission currency differs from both USD and the
+  // container currency.  A EUR commission on an AUD container must use EUR/USD (1.18),
+  // not the container's AUD/USD rate (0.67).
+  useEffect(() => {
+    const commCcy = containerCommissionCcy.toUpperCase();
+    const containerCcy = currencyCode.toUpperCase();
+    if (commCcy === "USD") {
+      setCommissionFxRate("1");
+      setCommissionFxEffectiveDate(null);
+      return;
+    }
+    if (commCcy === containerCcy) {
+      // Same currency as container — reuse the already-resolved container FX
+      setCommissionFxRate(fxRateToUsd || "1");
+      setCommissionFxEffectiveDate(null);
+      return;
+    }
+    // Different non-USD currency — resolve independently
+    setCommissionFxRateLoading(true);
+    factoryApiRequest("GET", `/api/factory/fx-rates/latest/${commCcy}`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data?.rate) {
+          setCommissionFxRate(String(data.rate));
+          setCommissionFxEffectiveDate(data.date ?? null);
+        }
+      })
+      .catch(() => {})
+      .finally(() => setCommissionFxRateLoading(false));
+  }, [containerCommissionCcy, currencyCode, fxRateToUsd]);
+
   const handleContainerSelect = (id: string) => {
     setSelectedContainerId(id);
     const container = availableContainers?.find((c) => c.id.toString() === id);
@@ -151,11 +187,27 @@ export function OffloadDialog({
       setCommissionType("FIXED");
       setCommissionRate(String(commAmt));
       setCommissionFromContainer(true);
-      setContainerCommissionCcy(container.commissionCurrencyCode || ccy);
+      const commCcy = (container.commissionCurrencyCode || ccy).toUpperCase();
+      setContainerCommissionCcy(commCcy);
       const broker = container.commissionSupplierId
         ? factorySuppliers?.find((s: any) => s.id === container.commissionSupplierId)
         : null;
       setCommissionPersonName(broker?.name || "Commission");
+      // Initialize commission FX: prefer the container's stored commission-specific rate,
+      // then fall back to container material FX (valid only when same currency).
+      const storedCommFx = parseFloat((container as any).commissionFxRateToUsd || "");
+      const storedCommFxConfirmed = (container as any).commissionFxRateConfirmed === true;
+      if (commCcy === "USD") {
+        setCommissionFxRate("1");
+      } else if (Number.isFinite(storedCommFx) && storedCommFx > 0 && storedCommFxConfirmed) {
+        setCommissionFxRate(String(storedCommFx));
+      } else if (commCcy === ccy.toUpperCase()) {
+        // Same currency as container — container FX applies
+        setCommissionFxRate(container.fxRateToUsd || "1");
+      } else {
+        // Different non-USD currency: will be fetched by the useEffect below
+        setCommissionFxRate("");
+      }
     }
   };
 
@@ -231,12 +283,16 @@ export function OffloadDialog({
     };
 
     if (commissionPersonName.trim() && parseFloat(commissionRate || "0") > 0) {
+      const commCcy = (commissionFromContainer ? containerCommissionCcy : "USD").toUpperCase();
       payload.commission = {
         personName: commissionPersonName.trim(),
         commissionType,
         commissionRate,
-        currencyCode: commissionFromContainer ? containerCommissionCcy : "USD",
-        fxRateToUsd: (commissionFromContainer ? containerCommissionCcy : "USD") === "USD" ? "1" : fxRateToUsd,
+        currencyCode: commCcy,
+        // Always send the commission-specific FX rate, not the container's material FX.
+        // The server validates/resolves this independently and is the authoritative source.
+        fxRateToUsd: commCcy === "USD" ? "1" : commissionFxRate,
+        fxRateDate: commissionFxEffectiveDate,
         ledgerAccountId: commissionLedgerAccountId || null,
       };
     }
@@ -428,7 +484,15 @@ export function OffloadDialog({
             </Button>
             <Button
               onClick={() => wrapAdminAction(handleSubmit, "Offload Container")}
-              disabled={offloadMutation.isPending || !selectedContainerId}
+              disabled={
+                offloadMutation.isPending ||
+                !selectedContainerId ||
+                // Block when a non-USD commission has no resolved commission-specific FX rate
+                (commissionFromContainer &&
+                  containerCommissionCcy !== "USD" &&
+                  containerCommissionCcy !== currencyCode &&
+                  (commissionFxRateLoading || !(parseFloat(commissionFxRate) > 0)))
+              }
             >
               {offloadMutation.isPending ? "Offloading..." : "Confirm Offload"}
             </Button>

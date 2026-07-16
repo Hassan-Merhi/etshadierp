@@ -42,6 +42,11 @@ export default function FactoryContainerCreate() {
   const [otherChargeLines, setOtherChargeLines] = useState<OtherChargeLine[]>([]);
   const [fxRate, setFxRate] = useState("1");
   const [fxRateLoading, setFxRateLoading] = useState(false);
+  // Commission-specific FX — kept independent so a EUR commission on an AUD container
+  // uses EUR/USD (1.18), not the container's AUD/USD rate (0.67).
+  const [commissionFxRate, setCommissionFxRate] = useState("1");
+  const [commissionFxRateLoading, setCommissionFxRateLoading] = useState(false);
+  const [commissionFxRateDate, setCommissionFxRateDate] = useState<string | null>(null);
 
   // Auto-fetch the live USD exchange rate whenever a non-USD currency is selected.
   // Without this, fxRateToUsd was previously hardcoded to "1" for every currency,
@@ -73,6 +78,39 @@ export default function FactoryContainerCreate() {
   useEffect(() => {
     setFormData((f) => ({ ...f, commissionCurrencyCode: currency, freightCurrencyCode: currency }));
   }, [currency]);
+
+  // Auto-fetch commission FX whenever the commission currency changes.
+  // Must stay independent from the container FX so that, e.g., a EUR commission
+  // on an AUD container gets 1 EUR = 1.18 USD, not 1 AUD = 0.67 USD.
+  useEffect(() => {
+    const commCcy = (formData.commissionCurrencyCode || currency).toUpperCase();
+    const containerCcy = currency.toUpperCase();
+    if (commCcy === "USD") {
+      setCommissionFxRate("1");
+      setCommissionFxRateDate(null);
+      return;
+    }
+    if (commCcy === containerCcy) {
+      // Same currency as container — reuse the container's already-fetched FX rate
+      setCommissionFxRate(fxRate);
+      setCommissionFxRateDate(null);
+      return;
+    }
+    // Different non-USD currency: fetch independently
+    setCommissionFxRateLoading(true);
+    factoryApiRequest("GET", `/api/factory/fx-rates/latest/${commCcy}`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data?.rate) {
+          setCommissionFxRate(String(data.rate));
+          setCommissionFxRateDate(data.date ?? null);
+        } else {
+          setCommissionFxRate("");
+        }
+      })
+      .catch(() => setCommissionFxRate(""))
+      .finally(() => setCommissionFxRateLoading(false));
+  }, [formData.commissionCurrencyCode, currency, fxRate]);
 
   const { data: suppliers } = useQuery<FactorySupplier[]>({
     queryKey: ["/api/factory/suppliers"],
@@ -164,10 +202,19 @@ export default function FactoryContainerCreate() {
     },
   });
 
+  const commissionCcy = (formData.commissionCurrencyCode || currency).toUpperCase();
+  const commissionAmt2 = parseFloat(formData.commissionAmount || "0");
+  const commissionFxUnresolved =
+    commissionAmt2 > 0 &&
+    commissionCcy !== "USD" &&
+    commissionCcy !== currency.toUpperCase() &&
+    (commissionFxRateLoading || !(parseFloat(commissionFxRate) > 0));
+
   const canSubmit =
     !!formData.containerNumber &&
     !createMutation.isPending &&
-    !(currency !== "USD" && (fxRateLoading || !(parseFloat(fxRate) > 0)));
+    !(currency !== "USD" && (fxRateLoading || !(parseFloat(fxRate) > 0))) &&
+    !commissionFxUnresolved;
 
   return (
     <div className="max-w-2xl mx-auto p-4 sm:p-6 space-y-6">
@@ -338,6 +385,16 @@ export default function FactoryContainerCreate() {
               </Select>
             </div>
           </div>
+
+          {commissionAmt2 > 0 && commissionCcy !== "USD" && (
+            <div className="text-xs text-muted-foreground -mt-1">
+              {commissionFxRateLoading
+                ? `Fetching ${commissionCcy}/USD rate…`
+                : parseFloat(commissionFxRate) > 0
+                  ? `1 ${commissionCcy} = ${parseFloat(commissionFxRate).toFixed(8).replace(/\.?0+$/, "")} USD${commissionCcy === currency.toUpperCase() ? " (using container rate)" : commissionFxRateDate ? ` · ${commissionFxRateDate}` : ""}`
+                  : `No ${commissionCcy}/USD rate available — container creation blocked until resolved.`}
+            </div>
+          )}
 
           <div>
             <Label>

@@ -699,6 +699,14 @@ export const factoryContainers = pgTable(
     commissionAccountId: integer("commission_account_id"),
     commissionSupplierId: integer("commission_supplier_id"),
     commissionNotes: text("commission_notes"),
+    // Commission-specific FX rate — the commission may be denominated in a currency
+    // different from both USD and the container's own currency (e.g. AUD container with
+    // EUR commission). Using the container's fxRateToUsd for such a commission produces
+    // a wrong commissionTotalUsd. These three columns persist the resolved commission-
+    // specific rate so computeCorrectContainerCost always uses the right rate.
+    commissionFxRateToUsd: decimal("commission_fx_rate_to_usd", { precision: 20, scale: 8 }),
+    commissionFxRateConfirmed: boolean("commission_fx_rate_confirmed").notNull().default(false),
+    commissionFxRateDate: date("commission_fx_rate_date"),
     dutyAmount: decimal("duty_amount", { precision: 20, scale: 2 }),
     dutyAccountId: integer("duty_account_id"),
     dutyStatus: text("duty_status").notNull().default("NONE"),

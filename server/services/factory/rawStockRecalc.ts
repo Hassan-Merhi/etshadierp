@@ -149,21 +149,84 @@ export function computeCorrectContainerCost(
   }
 
   // Commission — prefer the dedicated commission record (it stores its own currency +
-  // fx rate explicitly), falling back to the container's mirrored fields.
-  let commUsd: Decimal;
-  let commInContainerCcy: Decimal;
+  // fx rate explicitly), falling back to the container's commission snapshot fields.
+  //
+  // IMPORTANT: never use the container's material fxRateToUsd (dFxRate) as a fallback
+  // for a commission that is denominated in a different currency. Example: an AUD
+  // container (fxRate=0.67) with a EUR commission (EUR/USD=1.18) would produce
+  // commUsd = EUR_amount × 0.67 = wrong. Each currency must have its own confirmed rate.
+  let commUsd: Decimal = new Decimal(0);
+  let commInContainerCcy: Decimal = new Decimal(0);
+  let commFxUnresolved = false;
+
+  /** Helper: compute commUsd + commInContainerCcy given value, currency, and a resolved fx */
+  function applyCommFx(commVal: Decimal, commCcy: string, commFx: Decimal): void {
+    if (commCcy === "USD") {
+      commUsd = commVal;
+      commInContainerCcy = containerCcy === "USD" ? commVal : dFxRate.gt(0) ? commVal.div(dFxRate) : commVal;
+    } else if (commCcy === containerCcy) {
+      commInContainerCcy = commVal;
+      commUsd = dFxRate.gt(0) ? commVal.times(dFxRate) : commVal;
+    } else {
+      // Different non-USD currency: use the dedicated commission FX rate
+      commUsd = commVal.times(commFx);
+      commInContainerCcy = dFxRate.gt(0) ? commUsd.div(dFxRate) : commVal;
+    }
+  }
+
   if (commissionRecord) {
     const commVal = new Decimal(commissionRecord.commissionTotal || "0");
     const commCcy = commissionRecord.currencyCode || containerCcy;
     const rawCommFx = parseFloat(commissionRecord.fxRateToUsd || "");
-    const commFx = Number.isFinite(rawCommFx) && rawCommFx > 0 ? new Decimal(rawCommFx) : dFxRate;
-    commUsd = commCcy === "USD" ? commVal : commVal.times(commFx);
-    commInContainerCcy = commCcy === containerCcy ? commVal : dFxRate.gt(0) ? commUsd.div(dFxRate) : commVal;
+    const commConfirmed = (commissionRecord as any).fxRateConfirmed === true;
+
+    if (commCcy === "USD") {
+      applyCommFx(commVal, "USD", new Decimal(1));
+    } else if (commCcy === containerCcy) {
+      // Same currency as container: use confirmed container FX
+      applyCommFx(commVal, commCcy, dFxRate);
+    } else {
+      // Different non-USD: commission record must carry its own confirmed rate
+      if (Number.isFinite(rawCommFx) && rawCommFx > 0 && commConfirmed) {
+        applyCommFx(commVal, commCcy, new Decimal(rawCommFx));
+      } else {
+        // Fall back to container snapshot commission FX fields
+        const snapFx = parseFloat((container as any).commissionFxRateToUsd || "");
+        const snapConfirmed = (container as any).commissionFxRateConfirmed === true;
+        if (Number.isFinite(snapFx) && snapFx > 0 && snapConfirmed) {
+          applyCommFx(commVal, commCcy, new Decimal(snapFx));
+        } else {
+          // No valid commission-specific FX: flag as unresolved, contribute zero
+          commFxUnresolved = true;
+          commUsd = new Decimal(0);
+          commInContainerCcy = new Decimal(0);
+        }
+      }
+    }
   } else {
     const commVal = new Decimal(container.commissionAmount || "0");
     const commCcy = (container as any).commissionCurrencyCode || containerCcy;
-    commUsd = commCcy === "USD" ? commVal : commVal.times(dFxRate);
-    commInContainerCcy = commCcy === containerCcy ? commVal : dFxRate.gt(0) ? commUsd.div(dFxRate) : commVal;
+
+    if (commCcy === "USD") {
+      applyCommFx(commVal, "USD", new Decimal(1));
+    } else if (commCcy === containerCcy) {
+      applyCommFx(commVal, commCcy, dFxRate);
+    } else {
+      // Different non-USD: must use commission snapshot FX fields (not container material FX)
+      const snapFx = parseFloat((container as any).commissionFxRateToUsd || "");
+      const snapConfirmed = (container as any).commissionFxRateConfirmed === true;
+      if (Number.isFinite(snapFx) && snapFx > 0 && snapConfirmed) {
+        applyCommFx(commVal, commCcy, new Decimal(snapFx));
+      } else if (commVal.gt(0)) {
+        // Commission exists but no commission-specific FX: flag as unresolved
+        commFxUnresolved = true;
+        commUsd = new Decimal(0);
+        commInContainerCcy = new Decimal(0);
+      } else {
+        commUsd = new Decimal(0);
+        commInContainerCcy = new Decimal(0);
+      }
+    }
   }
 
   // Duty — no separate currency field on the container; always container currency.
@@ -198,7 +261,7 @@ export function computeCorrectContainerCost(
     costPerKgUsd: totalUsd.div(actualKg).toNumber(),
     totalCost: totalCost.toNumber(),
     totalUsd: totalUsd.toNumber(),
-    fxUnresolved: false,
+    fxUnresolved: commFxUnresolved,
   };
 }
 
@@ -244,6 +307,9 @@ export function computeRecalcFingerprint(inputs: RecalcFingerprintInputs): strin
     dutyStatus: c.dutyStatus,
     commissionAmount: c.commissionAmount,
     commissionCurrencyCode: c.commissionCurrencyCode,
+    commissionFxRateToUsd: (c as any).commissionFxRateToUsd,
+    commissionFxRateConfirmed: (c as any).commissionFxRateConfirmed,
+    commissionFxRateDate: (c as any).commissionFxRateDate,
     otherCharges: c.otherCharges,
     otherChargesCurrencyCode: (c as any).otherChargesCurrencyCode,
     additionalCharges: [...inputs.additionalCharges]
@@ -261,6 +327,7 @@ export function computeRecalcFingerprint(inputs: RecalcFingerprintInputs): strin
           commissionTotal: inputs.commissionRecord.commissionTotal,
           currencyCode: inputs.commissionRecord.currencyCode,
           fxRateToUsd: inputs.commissionRecord.fxRateToUsd,
+          fxRateConfirmed: (inputs.commissionRecord as any).fxRateConfirmed,
           version: toIso((inputs.commissionRecord as any).updatedAt) ?? toIso(inputs.commissionRecord.createdAt),
         }
       : null,

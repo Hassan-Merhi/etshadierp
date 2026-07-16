@@ -249,13 +249,40 @@ export function registerRawStockOffloadRoutes(app: Express) {
         const commType = commission.commissionType || "PER_KG";
         const commRate = parseFloat(commission.commissionRate) || 0;
         commTotalVal = commType === "PER_KG" ? commRate * parseFloat(actualKg) : commRate;
-        const commCurrency = commission.currencyCode || currencyCode;
-        const commFxRate = parseFloat(commission.fxRateToUsd || String(fxRate));
+        const commCurrency = (commission.currencyCode || currencyCode).toUpperCase();
         commCurrencyForUsd = commCurrency;
-        commFxRateForUsd = commFxRate;
-        const commTotalUsd = commCurrency === "USD" ? commTotalVal : commTotalVal * commFxRate;
+
+        // ── Commission FX: resolve independently from the container FX ──────────
+        // The commission may be denominated in a currency different from both USD
+        // and the container currency (e.g. AUD container with EUR commission).
+        // Using the container fxRate for a different-currency commission produces
+        // a wrong commissionTotalUsd and cascades all the way to bale cost.
+        let resolvedCommFxRate: number;
+        if (commCurrency === "USD") {
+          resolvedCommFxRate = 1;
+        } else if (commCurrency === currencyCode.toUpperCase()) {
+          // Same currency as container — confirmed container FX is correct.
+          resolvedCommFxRate = fxRate;
+        } else {
+          // Different non-USD currency: must resolve independently.
+          try {
+            resolvedCommFxRate = parseFloat(
+              await getOrFetchFxRateToUsd(companyId, commCurrency, offloadDate)
+            );
+          } catch (err: any) {
+            return res.status(400).json({
+              message: `Cannot resolve FX rate for commission currency ${commCurrency} on ${offloadDate}. ${err.message}`,
+            });
+          }
+        }
+        commFxRateForUsd = resolvedCommFxRate;
+        const commTotalUsd = commCurrency === "USD" ? commTotalVal : commTotalVal * resolvedCommFxRate;
         commInContainerCcy =
-          commCurrency === currencyCode ? commTotalVal : fxRate > 0 ? commTotalUsd / fxRate : commTotalUsd;
+          commCurrency === currencyCode.toUpperCase()
+            ? commTotalVal
+            : fxRate > 0
+              ? commTotalUsd / fxRate
+              : commTotalUsd;
         commInsertValues = {
           companyId,
           containerId,
@@ -264,15 +291,10 @@ export function registerRawStockOffloadRoutes(app: Express) {
           commissionRate: String(commRate),
           commissionTotal: String(commTotalVal),
           currencyCode: commCurrency,
-          fxRateToUsd: String(commFxRate),
-          // fxRate was already resolved above (explicit request rate, USD, a fetched
-          // live rate, or the container's own already-confirmed rate) — never left at
-          // the unset default. commFxRate falls back to that same resolved fxRate when
-          // the commission doesn't specify its own, so it's equally trustworthy here.
-          // Without this flag, resolveStoredFxRateOrThrow (called right after insert to
-          // book the commission daybook entry) sees the schema's default false and
-          // rejects a rate that was, in fact, explicitly known — blocking every
-          // commissioned non-USD offload.
+          fxRateToUsd: String(resolvedCommFxRate),
+          // The rate was resolved above (USD=1, same-ccy=confirmed container rate, or a
+          // real live fetch) — flag it confirmed so resolveStoredFxRateOrThrow does not
+          // reject it when booking the commission daybook entry.
           fxRateConfirmed: true,
           commissionTotalUsd: String(commTotalUsd),
           ledgerAccountId: commission.ledgerAccountId ? parseInt(commission.ledgerAccountId) : null,
@@ -419,17 +441,13 @@ export function registerRawStockOffloadRoutes(app: Express) {
             otherChargesAccountId: reqOtherChargesAccountId ? parseInt(reqOtherChargesAccountId) : null,
             otherChargesSupplierId: reqOtherChargesSupplierId ? parseInt(reqOtherChargesSupplierId) : null,
             commissionAmount: commTotalVal > 0 ? String(commTotalVal) : container.commissionAmount || "0",
-            // BUG FIX: this used to leave commissionCurrencyCode untouched (stale from
-            // container creation, defaulting to "USD"), while commissionAmount above was
-            // overwritten with the raw offload-entered value in whatever currency the user
-            // actually picked (commCurrencyForUsd). Every downstream reader that groups by
-            // container.commissionCurrencyCode (broker ledgers, supplier statements, Net
-            // Position OTW) trusted that stale "USD" tag and silently treated a non-USD
-            // commission amount as if it were already USD — this is why brokers and any
-            // non-USD commission never converted correctly. The authoritative per-offload
-            // record (factoryContainerCommissions, via commissionRecord) always had the
-            // right currency/fxRate; only this denormalized container-level snapshot lagged.
             commissionCurrencyCode: commTotalVal > 0 ? commCurrencyForUsd : (container as any).commissionCurrencyCode || "USD",
+            // Persist the resolved commission-specific FX rate so computeCorrectContainerCost
+            // and repair scripts can use it without re-fetching.  When there is no commission
+            // (commTotalVal == 0) clear all three fields so stale pre-offload values don't linger.
+            commissionFxRateToUsd: commTotalVal > 0 ? String(commFxRateForUsd) : null,
+            commissionFxRateConfirmed: commTotalVal > 0,
+            commissionFxRateDate: commTotalVal > 0 ? offloadDate : null,
             dutyAmount: dutyStatus !== "NONE" ? String(parseFloat(reqDutyAmount || "0")) : null,
             dutyAccountId: reqDutyAccountId ? parseInt(reqDutyAccountId) : null,
             dutyStatus,

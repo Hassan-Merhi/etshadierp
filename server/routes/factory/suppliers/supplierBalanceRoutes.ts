@@ -772,17 +772,27 @@ export function registerSupplierBalanceRoutes(app: Express) {
         const ownCommission = supplierContainers.reduce((sum: number, c: any) => {
           const commAmt = parseFloat(c.commissionAmount || "0");
           if (commAmt <= 0) return sum;
-          const commCurr = c.commissionCurrencyCode || c.currencyCode || "USD";
+          const commCurr = (c.commissionCurrencyCode || c.currencyCode || "USD").toUpperCase();
+          const containerCcy = (c.currencyCode || "USD").toUpperCase();
           if (commCurr === "USD") return sum + commAmt;
+          // Commission in same currency as container: use the container's confirmed FX
+          if (commCurr === containerCcy) {
+            const { fxRate: commFx, looksSet: commFxLooksSet } = resolveStoredFxRate(
+              commCurr,
+              c.fxRateToUsd,
+              (c as any).fxRateConfirmed
+            );
+            if (!commFxLooksSet) { balanceFxUnresolved.add(sid); return sum; }
+            return sum + commAmt * commFx;
+          }
+          // Commission in a different non-USD currency: must use commission-specific FX
+          // (not the container's material FX — those are different currencies)
           const { fxRate: commFx, looksSet: commFxLooksSet } = resolveStoredFxRate(
             commCurr,
-            c.fxRateToUsd,
-            (c as any).fxRateConfirmed
+            c.commissionFxRateToUsd,
+            (c as any).commissionFxRateConfirmed
           );
-          if (!commFxLooksSet) {
-            balanceFxUnresolved.add(sid);
-            return sum;
-          }
+          if (!commFxLooksSet) { balanceFxUnresolved.add(sid); return sum; }
           return sum + commAmt * commFx;
         }, 0);
         // Other charges from other suppliers' containers where this supplier is the charge recipient

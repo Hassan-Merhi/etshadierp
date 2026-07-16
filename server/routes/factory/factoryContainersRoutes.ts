@@ -364,6 +364,39 @@ export function registerFactoryContainersRoutes(app: Express) {
         }
       }
 
+      // Resolve commission FX independently — the commission may be in a different
+      // currency than both USD and the container (e.g. AUD container, EUR commission).
+      // Using the container fxRateToUsd for that case gives a wrong commissionTotalUsd.
+      const commFxCcy = (values.commissionCurrencyCode || currencyCode || "USD").toUpperCase();
+      const containerCcyUpper = (currencyCode || "USD").toUpperCase();
+      if (commissionAmt > 0) {
+        let commFxResolved: number;
+        if (commFxCcy === "USD") {
+          commFxResolved = 1;
+        } else if (commFxCcy === containerCcyUpper) {
+          // Same currency as container — container FX is correct
+          commFxResolved = parseFloat(fxRate);
+        } else {
+          // Different non-USD currency: resolve independently
+          try {
+            commFxResolved = parseFloat(
+              await getOrFetchFxRateToUsd(companyId, commFxCcy, importDate)
+            );
+          } catch (err: any) {
+            return res.status(400).json({
+              message: `Cannot resolve FX rate for commission currency ${commFxCcy} on ${importDate}. ${err.message}`,
+            });
+          }
+        }
+        values.commissionFxRateToUsd = String(commFxResolved);
+        values.commissionFxRateConfirmed = true;
+        values.commissionFxRateDate = importDate;
+      } else {
+        values.commissionFxRateToUsd = null;
+        values.commissionFxRateConfirmed = false;
+        values.commissionFxRateDate = null;
+      }
+
       // Auto-create freight ledger account if freight > 0 and no account selected
       if (!values.freightAccountId && parseFloat(values.freight || "0") > 0) {
         values.freightAccountId = await getOrCreateLedgerAccount(companyId, "FREIGHT", "Freight");
@@ -606,6 +639,58 @@ export function registerFactoryContainersRoutes(app: Express) {
         .from(factoryContainers)
         .where(and(eq(factoryContainers.id, id), eq(factoryContainers.companyId, companyId)));
       if (!existing) return res.status(404).json({ message: "Container not found" });
+
+      // Resolve commission FX when commission amount or currency changed.
+      // A partial PATCH that touches an unrelated field must preserve existing commission FX.
+      const commissionChanged = b.commissionAmount !== undefined || b.commissionCurrencyCode !== undefined;
+      if (commissionChanged) {
+        const effCommAmt = parseFloat(
+          updateData.commissionAmount !== undefined ? (updateData.commissionAmount ?? "0") : (existing.commissionAmount ?? "0")
+        );
+        const effCommCcy = (
+          updateData.commissionCurrencyCode !== undefined
+            ? (updateData.commissionCurrencyCode || "USD")
+            : ((existing as any).commissionCurrencyCode || "USD")
+        ).toUpperCase();
+        const effContainerCcy = (updateData.currencyCode || existing.currencyCode || "USD").toUpperCase();
+        const effDate = updateData.arrivalDate || existing.arrivalDate || getClientDate(req);
+        if (effCommAmt > 0) {
+          let commFxResolved: number;
+          if (effCommCcy === "USD") {
+            commFxResolved = 1;
+          } else if (effCommCcy === effContainerCcy) {
+            // Same currency as container: use the (possibly just-updated) container FX
+            const containerFxNum =
+              updateData.fxRateToUsd !== undefined
+                ? parseFloat(updateData.fxRateToUsd ?? "0")
+                : parseFloat(existing.fxRateToUsd ?? "0");
+            if (!containerFxNum || containerFxNum <= 0) {
+              return res.status(400).json({
+                message: `Cannot resolve commission FX for ${effCommCcy}: container FX rate is not confirmed.`,
+              });
+            }
+            commFxResolved = containerFxNum;
+          } else {
+            try {
+              commFxResolved = parseFloat(
+                await getOrFetchFxRateToUsd(companyId, effCommCcy, effDate)
+              );
+            } catch (err: any) {
+              return res.status(400).json({
+                message: `Cannot resolve FX rate for commission currency ${effCommCcy} on ${effDate}. ${err.message}`,
+              });
+            }
+          }
+          updateData.commissionFxRateToUsd = String(commFxResolved);
+          updateData.commissionFxRateConfirmed = true;
+          updateData.commissionFxRateDate = effDate;
+        } else {
+          // Commission zeroed out — clear commission FX fields
+          updateData.commissionFxRateToUsd = null;
+          updateData.commissionFxRateConfirmed = false;
+          updateData.commissionFxRateDate = null;
+        }
+      }
 
       // FX rate computation (same logic as before)
       const needsFxCalc = updateData.currencyCode || updateData.ratePerKg || updateData.fxRateSource;
