@@ -104,7 +104,7 @@ export interface AccountStatementViewProps {
   closingBalance: number;
   openingBalance: number;
   transactionsLoading: boolean;
-  transactionError?: boolean;
+  transactionError?: string | null;
   selectedVoucherIds: Set<number>;
   toggleSelectAll: () => void;
   setShowBulkDeleteConfirm: (show: boolean) => void;

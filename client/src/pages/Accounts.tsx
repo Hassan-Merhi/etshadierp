@@ -104,7 +104,8 @@ export default function Accounts() {
       : null
   );
 
-  // Query key includes selectedCompany?.id so React Query refetches automatically on company switch — no manual useEffect needed.
+  // Query key includes selectedCompany?.id and periodFilter.toDate so React Query refetches
+  // when company or selected end date changes, keeping list balance in sync with statement.
 
   const [searchTerm, setSearchTerm] = useState("");
   const [periodFilter, setPeriodFilter] = useState<PeriodFilterValue>(() => {
@@ -326,11 +327,26 @@ export default function Accounts() {
     documentTitle: selectedAccount ? `Statement - ${selectedAccount.name}` : "Account Statement",
   });
 
-  // Queries (Simplified for brevity, but logically same as original)
-  const { data: allAccounts = [], isLoading: accountsLoading } = useQuery<Account[]>({
-    queryKey: ["/api/accounts/all", selectedCompany?.id],
+  // Accounts query — includes the selected period end date so the list balance
+  // is always computed through the same cut-off as the opened statement.
+  const { data: accountsResponse, isLoading: accountsLoading } = useQuery<{
+    accounts: Account[];
+    asOfDate: string;
+  }>({
+    queryKey: ["/api/accounts/all", selectedCompany?.id, periodFilter.toDate || null],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (periodFilter.toDate) params.set("endDate", periodFilter.toDate);
+      const res = await fetch(`/api/accounts/all?${params.toString()}`, { credentials: "include" });
+      if (!res.ok) {
+        const body = await res.json().catch(() => null);
+        throw new Error(body?.message || `Failed to load accounts (${res.status})`);
+      }
+      return res.json();
+    },
     enabled: !!selectedCompany,
   });
+  const allAccounts: Account[] = accountsResponse?.accounts ?? [];
 
   // Auto-select account when navigated here from ledger monthly summary (or any deep-link with ?accountId=)
   useEffect(() => {
@@ -368,7 +384,7 @@ export default function Accounts() {
     enabled: !!selectedCompany,
   });
 
-  const { data: rawTransactionData, isLoading: transactionsLoading, isError: transactionsError } = useQuery<any>({
+  const { data: rawTransactionData, isLoading: transactionsLoading, error: transactionsQueryError } = useQuery<any>({
     queryKey: selectedAccount
       ? [
           "account-statement",
@@ -393,8 +409,14 @@ export default function Accounts() {
         url = `/api/accounts/${accountType}/${selectedAccount.accountId}/transactions?${params.toString()}`;
       }
       const response = await fetch(url, { credentials: "include" });
-      if (!response.ok) throw new Error("Failed to fetch transactions");
-      return await response.json();
+      const payload = await response.json().catch(() => null);
+      if (!response.ok) {
+        throw new Error(
+          payload?.message ||
+          `Failed to load account statement (${response.status})`
+        );
+      }
+      return payload;
     },
     enabled: !!selectedAccount,
     staleTime: 30 * 1000,
@@ -666,7 +688,7 @@ export default function Accounts() {
               closingBalance={closingBalance}
               openingBalance={broughtForwardBalance}
               transactionsLoading={transactionsLoading}
-              transactionError={transactionsError}
+              transactionError={(transactionsQueryError as Error | null)?.message ?? null}
               selectedVoucherIds={selectedVoucherIds}
               toggleSelectAll={toggleSelectAll}
               setShowBulkDeleteConfirm={setShowBulkDeleteConfirm}

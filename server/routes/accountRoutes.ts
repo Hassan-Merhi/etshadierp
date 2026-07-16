@@ -282,10 +282,18 @@ export function registerAccountRoutes(app: Express) {
       }
 
       // Optional date range filter for account balances.
-      // balEndDate defaults to today so that future-dated vouchers are excluded
-      // when the caller doesn't provide an explicit end date (e.g. Cash #707 link).
-      const balStartDate = req.query.startDate as string | undefined;
-      const balEndDate = (req.query.endDate as string | undefined) || getClientDate(req);
+      // effectiveEndDate defaults to today so future-dated vouchers are excluded.
+      const asOfDate = getClientDate(req);
+      const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+      const balStartDate =
+        typeof req.query.startDate === "string" && ISO_DATE.test(req.query.startDate)
+          ? req.query.startDate
+          : undefined;
+      const rawEndDate =
+        typeof req.query.endDate === "string" && ISO_DATE.test(req.query.endDate)
+          ? req.query.endDate
+          : undefined;
+      const effectiveEndDate = rawEndDate && rawEndDate < asOfDate ? rawEndDate : asOfDate;
 
       // Get all voucher entries for this company's vouchers (excluding optional and deleted)
       // Use COALESCE(effectiveDate, voucherDate) so period filtering respects effective date
@@ -294,26 +302,27 @@ export function registerAccountRoutes(app: Express) {
         eq(vouchers.optional, false),
         isNull(vouchers.deletedAt),
         ...(balStartDate ? [sql`COALESCE(${vouchers.effectiveDate}, ${vouchers.voucherDate}) >= ${balStartDate}`] : []),
-        ...(balEndDate ? [sql`COALESCE(${vouchers.effectiveDate}, ${vouchers.voucherDate}) <= ${balEndDate}`] : []),
+        sql`COALESCE(${vouchers.effectiveDate}, ${vouchers.voucherDate}) <= ${effectiveEndDate}`,
       ];
 
       // Ledger account IDs that belong to this company (already fetched above)
       const ledgerIds = ledgers.map((a) => a.id);
 
-      // For ledger accounts: query entries across ALL companies' vouchers so that
-      // migrated accounts include entries from shared vouchers that stayed in the
-      // source company (avoids a wrong/zero balance after account migration).
-      const crossCompanyLedgerConditions: any[] = [
+      // For ledger accounts: query entries scoped strictly to THIS company's vouchers.
+      // Cross-company aggregation causes the account-list balance to differ from the
+      // opened statement and Factory Net Position (both company-scoped).
+      const companyLedgerConditions: any[] = [
+        eq(vouchers.companyId, companyId),
         eq(vouchers.optional, false),
         isNull(vouchers.deletedAt),
         isNotNull(voucherEntries.ledgerAccountId),
         ...(balStartDate ? [sql`COALESCE(${vouchers.effectiveDate}, ${vouchers.voucherDate}) >= ${balStartDate}`] : []),
-        ...(balEndDate ? [sql`COALESCE(${vouchers.effectiveDate}, ${vouchers.voucherDate}) <= ${balEndDate}`] : []),
+        sql`COALESCE(${vouchers.effectiveDate}, ${vouchers.voucherDate}) <= ${effectiveEndDate}`,
         ...(ledgerIds.length > 0 ? [inArray(voucherEntries.ledgerAccountId as any, ledgerIds)] : [sql`1=0`]),
       ];
 
       // Run both fetches in parallel
-      const [companyVouchers, crossCompanyLedgerEntries] = await Promise.all([
+      const [companyVouchers, companyLedgerEntries] = await Promise.all([
         db
           .select({ id: vouchers.id })
           .from(vouchers)
@@ -327,7 +336,7 @@ export function registerAccountRoutes(app: Express) {
               })
               .from(voucherEntries)
               .innerJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
-              .where(and(...crossCompanyLedgerConditions))
+              .where(and(...companyLedgerConditions))
           : Promise.resolve([]),
       ]);
 
@@ -340,9 +349,9 @@ export function registerAccountRoutes(app: Express) {
           : [];
 
       // Group entries by account type and calculate balances
-      // Ledger balances use the cross-company query so migrated accounts are correct.
+      // Ledger balances use the company-scoped query above.
       const ledgerBalances = new Map<number, { debits: number; credits: number }>();
-      for (const entry of crossCompanyLedgerEntries) {
+      for (const entry of companyLedgerEntries) {
         if (!entry.ledgerAccountId) continue;
         const debit = parseFloat((entry as any).debitAmount || "0");
         const credit = parseFloat((entry as any).creditAmount || "0");
@@ -609,7 +618,7 @@ export function registerAccountRoutes(app: Express) {
       // Combine all accounts — customers are excluded from the voucher account selector
       const allAccounts = [...accounts, ...supplierAccountsList];
 
-      res.json(allAccounts);
+      res.json({ accounts: allAccounts, asOfDate: effectiveEndDate });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
@@ -1402,20 +1411,40 @@ export function registerAccountRoutes(app: Express) {
   app.get("/api/accounts/bank/:id/transactions", requireAuth, async (req, res) => {
     try {
       const bankAccountId = parseInt(req.params.id);
-
       if (isNaN(bankAccountId)) {
         return res.status(400).json({ message: "Invalid bank account ID" });
       }
 
-      const { startDate, endDate } = req.query;
+      const asOfDate = getClientDate(req);
+      const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+      const rawStart =
+        typeof req.query.startDate === "string" && ISO_DATE.test(req.query.startDate)
+          ? req.query.startDate : undefined;
+      const rawEnd =
+        typeof req.query.endDate === "string" && ISO_DATE.test(req.query.endDate)
+          ? req.query.endDate : undefined;
+      const effectiveEndDate = rawEnd && rawEnd < asOfDate ? rawEnd : asOfDate;
+
+      // Load account to get authoritative company scope
+      const [bankAccount] = await db.select().from(bankAccounts).where(eq(bankAccounts.id, bankAccountId));
+      if (!bankAccount) return res.status(404).json({ message: "Bank account not found" });
+      const companyId = bankAccount.companyId;
+
+      // Authorize: confirm the logged-in user can access this company
+      const authorizedCompanyId = await authorizeCompanyIdParam(req as any, companyId);
+      if (authorizedCompanyId === null) {
+        return res.status(403).json({ message: "No access to this account's company" });
+      }
 
       const transactions = await storage.getVoucherEntriesByBankAccount(
         bankAccountId,
-        startDate as string | undefined,
-        endDate as string | undefined
+        rawStart,
+        effectiveEndDate,
+        companyId
       );
 
-      if (startDate) {
+      let preNetBalance = 0;
+      if (rawStart) {
         const bfResult = await pool.query(
           `SELECT COALESCE(SUM(ve.debit_amount::numeric - ve.credit_amount::numeric), 0) AS net
            FROM voucher_entries ve
@@ -1423,13 +1452,20 @@ export function registerAccountRoutes(app: Express) {
            WHERE ve.bank_account_id = $1
              AND v.optional = false
              AND v.deleted_at IS NULL
-             AND COALESCE(v.effective_date, v.voucher_date) < $2`,
-          [bankAccountId, startDate]
+             AND v.company_id = $2
+             AND COALESCE(v.effective_date::date, v.voucher_date::date) < $3::date`,
+          [bankAccountId, companyId, rawStart]
         );
-        return res.json({ transactions, preNetBalance: parseFloat(bfResult.rows[0]?.net ?? "0") });
+        preNetBalance = parseFloat(bfResult.rows[0]?.net ?? "0");
       }
 
-      res.json(transactions);
+      return res.json({
+        transactions,
+        preNetBalance,
+        asOfDate,
+        startDate: rawStart ?? null,
+        endDate: effectiveEndDate,
+      });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
@@ -1439,20 +1475,40 @@ export function registerAccountRoutes(app: Express) {
   app.get("/api/accounts/fixed-asset/:id/transactions", requireAuth, async (req, res) => {
     try {
       const fixedAssetId = parseInt(req.params.id);
-
       if (isNaN(fixedAssetId)) {
         return res.status(400).json({ message: "Invalid fixed asset ID" });
       }
 
-      const { startDate, endDate } = req.query;
+      const asOfDate = getClientDate(req);
+      const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+      const rawStart =
+        typeof req.query.startDate === "string" && ISO_DATE.test(req.query.startDate)
+          ? req.query.startDate : undefined;
+      const rawEnd =
+        typeof req.query.endDate === "string" && ISO_DATE.test(req.query.endDate)
+          ? req.query.endDate : undefined;
+      const effectiveEndDate = rawEnd && rawEnd < asOfDate ? rawEnd : asOfDate;
+
+      // Load account to get authoritative company scope
+      const [fixedAsset] = await db.select().from(fixedAssets).where(eq(fixedAssets.id, fixedAssetId));
+      if (!fixedAsset) return res.status(404).json({ message: "Fixed asset not found" });
+      const companyId = fixedAsset.companyId;
+
+      // Authorize: confirm the logged-in user can access this company
+      const authorizedCompanyId = await authorizeCompanyIdParam(req as any, companyId);
+      if (authorizedCompanyId === null) {
+        return res.status(403).json({ message: "No access to this account's company" });
+      }
 
       const transactions = await storage.getVoucherEntriesByFixedAsset(
         fixedAssetId,
-        startDate as string | undefined,
-        endDate as string | undefined
+        rawStart,
+        effectiveEndDate,
+        companyId
       );
 
-      if (startDate) {
+      let preNetBalance = 0;
+      if (rawStart) {
         const bfResult = await pool.query(
           `SELECT COALESCE(SUM(ve.debit_amount::numeric - ve.credit_amount::numeric), 0) AS net
            FROM voucher_entries ve
@@ -1460,13 +1516,20 @@ export function registerAccountRoutes(app: Express) {
            WHERE ve.fixed_asset_id = $1
              AND v.optional = false
              AND v.deleted_at IS NULL
-             AND COALESCE(v.effective_date, v.voucher_date) < $2`,
-          [fixedAssetId, startDate]
+             AND v.company_id = $2
+             AND COALESCE(v.effective_date::date, v.voucher_date::date) < $3::date`,
+          [fixedAssetId, companyId, rawStart]
         );
-        return res.json({ transactions, preNetBalance: parseFloat(bfResult.rows[0]?.net ?? "0") });
+        preNetBalance = parseFloat(bfResult.rows[0]?.net ?? "0");
       }
 
-      res.json(transactions);
+      return res.json({
+        transactions,
+        preNetBalance,
+        asOfDate,
+        startDate: rawStart ?? null,
+        endDate: effectiveEndDate,
+      });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
@@ -1476,13 +1539,21 @@ export function registerAccountRoutes(app: Express) {
   app.get("/api/accounts/supplier/:id/transactions", requireAuth, async (req, res) => {
     try {
       const supplierId = parseInt(req.params.id);
-
       if (isNaN(supplierId)) {
         return res.status(400).json({ message: "Invalid supplier ID" });
       }
 
-      const { startDate, endDate, companyId } = req.query;
-      const requestedCompanyId = companyId ? parseInt(companyId as string) : undefined;
+      const asOfDate = getClientDate(req);
+      const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+      const rawStart =
+        typeof req.query.startDate === "string" && ISO_DATE.test(req.query.startDate)
+          ? req.query.startDate : undefined;
+      const rawEnd =
+        typeof req.query.endDate === "string" && ISO_DATE.test(req.query.endDate)
+          ? req.query.endDate : undefined;
+      const effectiveEndDate = rawEnd && rawEnd < asOfDate ? rawEnd : asOfDate;
+
+      const requestedCompanyId = req.query.companyId ? parseInt(req.query.companyId as string) : undefined;
 
       // Suppliers are shared across companies, so a caller-supplied companyId
       // must be authorized against the user's actual company access — never
@@ -1496,11 +1567,12 @@ export function registerAccountRoutes(app: Express) {
       const transactions = await storage.getVoucherEntriesBySupplier(
         supplierId,
         filterCompanyId ?? undefined,
-        startDate as string | undefined,
-        endDate as string | undefined
+        rawStart,
+        effectiveEndDate
       );
 
-      if (startDate) {
+      let preNetBalance = 0;
+      if (rawStart) {
         // Brought-forward balance must be scoped to the same company as the
         // transactions above — otherwise it silently pulls in every other
         // company's history for this (globally shared) supplier record.
@@ -1508,11 +1580,11 @@ export function registerAccountRoutes(app: Express) {
           `ve.supplier_id = $1`,
           `v.optional = false`,
           `v.deleted_at IS NULL`,
-          `COALESCE(v.effective_date, v.voucher_date) < $2`,
+          `COALESCE(v.effective_date::date, v.voucher_date::date) < $2::date`,
         ];
-        const params: any[] = [supplierId, startDate];
+        const params: any[] = [supplierId, rawStart];
         if (filterCompanyId) {
-          conditions.push(`v.company_id = $3`);
+          conditions.push("v.company_id = $" + (params.length + 1));
           params.push(filterCompanyId);
         }
         const bfResult = await pool.query(
@@ -1522,10 +1594,16 @@ export function registerAccountRoutes(app: Express) {
            WHERE ${conditions.join(" AND ")}`,
           params
         );
-        return res.json({ transactions, preNetBalance: parseFloat(bfResult.rows[0]?.net ?? "0") });
+        preNetBalance = parseFloat(bfResult.rows[0]?.net ?? "0");
       }
 
-      res.json(transactions);
+      return res.json({
+        transactions,
+        preNetBalance,
+        asOfDate,
+        startDate: rawStart ?? null,
+        endDate: effectiveEndDate,
+      });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
@@ -1535,24 +1613,40 @@ export function registerAccountRoutes(app: Express) {
   app.get("/api/accounts/employee/:id/transactions", requireAuth, async (req, res) => {
     try {
       const employeeId = parseInt(req.params.id);
-
       if (isNaN(employeeId)) {
         return res.status(400).json({ message: "Invalid employee ID" });
       }
 
-      const { startDate, endDate, companyId } = req.query;
+      const asOfDate = getClientDate(req);
+      const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+      const rawStart =
+        typeof req.query.startDate === "string" && ISO_DATE.test(req.query.startDate)
+          ? req.query.startDate : undefined;
+      const rawEnd =
+        typeof req.query.endDate === "string" && ISO_DATE.test(req.query.endDate)
+          ? req.query.endDate : undefined;
+      const effectiveEndDate = rawEnd && rawEnd < asOfDate ? rawEnd : asOfDate;
 
-      // Use query param companyId or session companyId, or undefined for all companies
-      const filterCompanyId = companyId ? parseInt(companyId as string) : req.session.currentCompanyId;
+      // Load employee to get authoritative company scope
+      const [employee] = await db.select().from(employees).where(eq(employees.id, employeeId));
+      if (!employee) return res.status(404).json({ message: "Employee not found" });
+      const companyId = employee.companyId;
+
+      // Authorize: confirm the logged-in user can access this company
+      const authorizedCompanyId = await authorizeCompanyIdParam(req as any, companyId);
+      if (authorizedCompanyId === null) {
+        return res.status(403).json({ message: "No access to this account's company" });
+      }
 
       const transactions = await storage.getVoucherEntriesByEmployee(
         employeeId,
-        filterCompanyId,
-        startDate as string | undefined,
-        endDate as string | undefined
+        companyId,
+        rawStart,
+        effectiveEndDate
       );
 
-      if (startDate) {
+      let preNetBalance = 0;
+      if (rawStart) {
         const bfResult = await pool.query(
           `SELECT COALESCE(SUM(ve.debit_amount::numeric - ve.credit_amount::numeric), 0) AS net
            FROM voucher_entries ve
@@ -1560,13 +1654,20 @@ export function registerAccountRoutes(app: Express) {
            WHERE ve.employee_id = $1
              AND v.optional = false
              AND v.deleted_at IS NULL
-             AND COALESCE(v.effective_date, v.voucher_date) < $2`,
-          [employeeId, startDate]
+             AND v.company_id = $2
+             AND COALESCE(v.effective_date::date, v.voucher_date::date) < $3::date`,
+          [employeeId, companyId, rawStart]
         );
-        return res.json({ transactions, preNetBalance: parseFloat(bfResult.rows[0]?.net ?? "0") });
+        preNetBalance = parseFloat(bfResult.rows[0]?.net ?? "0");
       }
 
-      res.json(transactions);
+      return res.json({
+        transactions,
+        preNetBalance,
+        asOfDate,
+        startDate: rawStart ?? null,
+        endDate: effectiveEndDate,
+      });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
@@ -1579,16 +1680,33 @@ export function registerAccountRoutes(app: Express) {
       if (isNaN(customerId)) {
         return res.status(400).json({ message: "Invalid customer ID" });
       }
-      const companyId = req.session.currentCompanyId;
-      if (!companyId) {
-        return res.status(400).json({ message: "No company selected" });
+
+      const asOfDate = getClientDate(req);
+      const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+      const rawStart =
+        typeof req.query.startDate === "string" && ISO_DATE.test(req.query.startDate)
+          ? req.query.startDate : undefined;
+      const rawEnd =
+        typeof req.query.endDate === "string" && ISO_DATE.test(req.query.endDate)
+          ? req.query.endDate : undefined;
+      const effectiveEndDate = rawEnd && rawEnd < asOfDate ? rawEnd : asOfDate;
+
+      // Load customer to get authoritative company scope
+      const [customer] = await db.select().from(customers).where(eq(customers.id, customerId));
+      if (!customer) return res.status(404).json({ message: "Customer not found" });
+      const companyId = customer.companyId;
+
+      // Authorize: confirm the logged-in user can access this company
+      const authorizedCompanyId = await authorizeCompanyIdParam(req as any, companyId);
+      if (authorizedCompanyId === null) {
+        return res.status(403).json({ message: "No access to this account's company" });
       }
-      const { startDate, endDate } = req.query;
+
       const statement = await storage.getCustomerStatement(
         customerId,
         companyId,
-        startDate as string | undefined,
-        endDate as string | undefined
+        rawStart,
+        effectiveEndDate
       );
       // Map CustomerBalance rows to the same shape the Accounts page expects for transactions
       const mapped = statement.map((row) => ({
@@ -1603,19 +1721,26 @@ export function registerAccountRoutes(app: Express) {
         creditAmount: row.creditAmount,
       }));
 
-      if (startDate) {
+      let preNetBalance = 0;
+      if (rawStart) {
         const bfResult = await pool.query(
           `SELECT COALESCE(SUM(cb.debit_amount::numeric - cb.credit_amount::numeric), 0) AS net
            FROM customer_balances cb
            WHERE cb.customer_id = $1
              AND cb.company_id = $2
-             AND cb.transaction_date < $3`,
-          [customerId, companyId, startDate]
+             AND cb.transaction_date < $3::date`,
+          [customerId, companyId, rawStart]
         );
-        return res.json({ transactions: mapped, preNetBalance: parseFloat(bfResult.rows[0]?.net ?? "0") });
+        preNetBalance = parseFloat(bfResult.rows[0]?.net ?? "0");
       }
 
-      res.json(mapped);
+      return res.json({
+        transactions: mapped,
+        preNetBalance,
+        asOfDate,
+        startDate: rawStart ?? null,
+        endDate: effectiveEndDate,
+      });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }

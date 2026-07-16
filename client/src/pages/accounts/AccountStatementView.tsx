@@ -276,7 +276,7 @@ export function AccountStatementView({
       {/* Error state */}
       {transactionError && !transactionsLoading && (
         <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
-          Failed to load this account period. Try adjusting the date range or refreshing the page.
+          Failed to load this account period: {transactionError}
         </div>
       )}
 
@@ -320,7 +320,7 @@ export function AccountStatementView({
       {/* Table */}
       {transactionsLoading ? (
         <Skeleton className="h-40 w-full" />
-      ) : (
+      ) : transactionError ? null : (
         <div ref={printRef}>
           <AccountTransactionRows
             vouchersWithBalance={vouchersWithBalance}

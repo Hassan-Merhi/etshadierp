@@ -395,94 +395,139 @@ export async function getVoucherEntriesByLedger(
 export async function getVoucherEntriesByCustomer(
   customerId: number,
   startDate?: string,
-  endDate?: string
+  endDate?: string,
+  companyId?: number
 ): Promise<any[]> {
-  const conditions = [
-    eq(schema.voucherEntries.customerId, customerId),
-    eq(schema.vouchers.optional, false),
-    isNull(schema.vouchers.deletedAt),
-  ];
-  if (startDate) conditions.push(sql`${schema.vouchers.voucherDate} >= ${startDate}`);
-  if (endDate) conditions.push(sql`${schema.vouchers.voucherDate} <= ${endDate}`);
-
-  return await db
-    .select({
-      entryId: schema.voucherEntries.id,
-      voucherId: schema.voucherEntries.voucherId,
-      debitAmount: schema.voucherEntries.debitAmount,
-      creditAmount: schema.voucherEntries.creditAmount,
-      narration: schema.voucherEntries.narration,
-      voucherNumber: schema.vouchers.voucherNumber,
-      voucherType: schema.vouchers.voucherType,
-      voucherDate: schema.vouchers.voucherDate,
-      voucherDescription: schema.vouchers.description,
-      currency: schema.vouchers.currency,
-    })
-    .from(schema.voucherEntries)
-    .leftJoin(schema.vouchers, eq(schema.voucherEntries.voucherId, schema.vouchers.id))
-    .where(and(...conditions));
+  const params: any[] = [customerId];
+  let dateFilters = "";
+  let companyFilter = "";
+  if (startDate) {
+    params.push(startDate);
+    dateFilters += " AND COALESCE(v.effective_date::date, v.voucher_date::date) >= $" + params.length + "::date";
+  }
+  if (endDate) {
+    params.push(endDate);
+    dateFilters += " AND COALESCE(v.effective_date::date, v.voucher_date::date) <= $" + params.length + "::date";
+  }
+  if (companyId) {
+    params.push(companyId);
+    companyFilter = " AND v.company_id = $" + params.length;
+  }
+  const result = await pool.query(
+    `SELECT
+       ve.id                                                        AS "entryId",
+       ve.voucher_id                                                AS "voucherId",
+       ve.debit_amount                                              AS "debitAmount",
+       ve.credit_amount                                             AS "creditAmount",
+       ve.narration,
+       v.voucher_number                                             AS "voucherNumber",
+       v.voucher_type                                               AS "voucherType",
+       COALESCE(v.effective_date::date, v.voucher_date::date)       AS "voucherDate",
+       v.description                                                AS "voucherDescription",
+       v.currency
+     FROM voucher_entries ve
+     JOIN vouchers v ON ve.voucher_id = v.id
+     WHERE ve.customer_id = $1
+       AND v.optional = false
+       AND v.deleted_at IS NULL
+       ${companyFilter}
+       ${dateFilters}
+     ORDER BY COALESCE(v.effective_date::date, v.voucher_date::date), v.id`,
+    params
+  );
+  return result.rows;
 }
 
 export async function getVoucherEntriesByBankAccount(
   bankAccountId: number,
   startDate?: string,
-  endDate?: string
+  endDate?: string,
+  companyId?: number
 ): Promise<any[]> {
-  const conditions = [
-    eq(schema.voucherEntries.bankAccountId, bankAccountId),
-    eq(schema.vouchers.optional, false),
-    isNull(schema.vouchers.deletedAt),
-  ];
-  if (startDate) conditions.push(sql`${schema.vouchers.voucherDate} >= ${startDate}`);
-  if (endDate) conditions.push(sql`${schema.vouchers.voucherDate} <= ${endDate}`);
-
-  return await db
-    .select({
-      entryId: schema.voucherEntries.id,
-      voucherId: schema.voucherEntries.voucherId,
-      debitAmount: schema.voucherEntries.debitAmount,
-      creditAmount: schema.voucherEntries.creditAmount,
-      narration: schema.voucherEntries.narration,
-      voucherNumber: schema.vouchers.voucherNumber,
-      voucherType: schema.vouchers.voucherType,
-      voucherDate: schema.vouchers.voucherDate,
-      voucherDescription: schema.vouchers.description,
-      currency: schema.vouchers.currency,
-    })
-    .from(schema.voucherEntries)
-    .leftJoin(schema.vouchers, eq(schema.voucherEntries.voucherId, schema.vouchers.id))
-    .where(and(...conditions));
+  const params: any[] = [bankAccountId];
+  let dateFilters = "";
+  let companyFilter = "";
+  if (startDate) {
+    params.push(startDate);
+    dateFilters += " AND COALESCE(v.effective_date::date, v.voucher_date::date) >= $" + params.length + "::date";
+  }
+  if (endDate) {
+    params.push(endDate);
+    dateFilters += " AND COALESCE(v.effective_date::date, v.voucher_date::date) <= $" + params.length + "::date";
+  }
+  if (companyId) {
+    params.push(companyId);
+    companyFilter = " AND v.company_id = $" + params.length;
+  }
+  const result = await pool.query(
+    `SELECT
+       ve.id                                                        AS "entryId",
+       ve.voucher_id                                                AS "voucherId",
+       ve.debit_amount                                              AS "debitAmount",
+       ve.credit_amount                                             AS "creditAmount",
+       ve.narration,
+       v.voucher_number                                             AS "voucherNumber",
+       v.voucher_type                                               AS "voucherType",
+       COALESCE(v.effective_date::date, v.voucher_date::date)       AS "voucherDate",
+       v.description                                                AS "voucherDescription",
+       v.currency
+     FROM voucher_entries ve
+     JOIN vouchers v ON ve.voucher_id = v.id
+     WHERE ve.bank_account_id = $1
+       AND v.optional = false
+       AND v.deleted_at IS NULL
+       ${companyFilter}
+       ${dateFilters}
+     ORDER BY COALESCE(v.effective_date::date, v.voucher_date::date), v.id`,
+    params
+  );
+  return result.rows;
 }
 
 export async function getVoucherEntriesByFixedAsset(
   fixedAssetId: number,
   startDate?: string,
-  endDate?: string
+  endDate?: string,
+  companyId?: number
 ): Promise<any[]> {
-  const conditions = [
-    eq(schema.voucherEntries.fixedAssetId, fixedAssetId),
-    eq(schema.vouchers.optional, false),
-    isNull(schema.vouchers.deletedAt),
-  ];
-  if (startDate) conditions.push(sql`${schema.vouchers.voucherDate} >= ${startDate}`);
-  if (endDate) conditions.push(sql`${schema.vouchers.voucherDate} <= ${endDate}`);
-
-  return await db
-    .select({
-      entryId: schema.voucherEntries.id,
-      voucherId: schema.voucherEntries.voucherId,
-      debitAmount: schema.voucherEntries.debitAmount,
-      creditAmount: schema.voucherEntries.creditAmount,
-      narration: schema.voucherEntries.narration,
-      voucherNumber: schema.vouchers.voucherNumber,
-      voucherType: schema.vouchers.voucherType,
-      voucherDate: schema.vouchers.voucherDate,
-      voucherDescription: schema.vouchers.description,
-      currency: schema.vouchers.currency,
-    })
-    .from(schema.voucherEntries)
-    .leftJoin(schema.vouchers, eq(schema.voucherEntries.voucherId, schema.vouchers.id))
-    .where(and(...conditions));
+  const params: any[] = [fixedAssetId];
+  let dateFilters = "";
+  let companyFilter = "";
+  if (startDate) {
+    params.push(startDate);
+    dateFilters += " AND COALESCE(v.effective_date::date, v.voucher_date::date) >= $" + params.length + "::date";
+  }
+  if (endDate) {
+    params.push(endDate);
+    dateFilters += " AND COALESCE(v.effective_date::date, v.voucher_date::date) <= $" + params.length + "::date";
+  }
+  if (companyId) {
+    params.push(companyId);
+    companyFilter = " AND v.company_id = $" + params.length;
+  }
+  const result = await pool.query(
+    `SELECT
+       ve.id                                                        AS "entryId",
+       ve.voucher_id                                                AS "voucherId",
+       ve.debit_amount                                              AS "debitAmount",
+       ve.credit_amount                                             AS "creditAmount",
+       ve.narration,
+       v.voucher_number                                             AS "voucherNumber",
+       v.voucher_type                                               AS "voucherType",
+       COALESCE(v.effective_date::date, v.voucher_date::date)       AS "voucherDate",
+       v.description                                                AS "voucherDescription",
+       v.currency
+     FROM voucher_entries ve
+     JOIN vouchers v ON ve.voucher_id = v.id
+     WHERE ve.fixed_asset_id = $1
+       AND v.optional = false
+       AND v.deleted_at IS NULL
+       ${companyFilter}
+       ${dateFilters}
+     ORDER BY COALESCE(v.effective_date::date, v.voucher_date::date), v.id`,
+    params
+  );
+  return result.rows;
 }
 
 export async function getVoucherEntriesBySupplier(
@@ -491,33 +536,45 @@ export async function getVoucherEntriesBySupplier(
   startDate?: string,
   endDate?: string
 ): Promise<any[]> {
-  const conditions = [
-    eq(schema.voucherEntries.supplierId, supplierId),
-    eq(schema.vouchers.optional, false),
-    isNull(schema.vouchers.deletedAt),
-  ];
-  if (companyId) conditions.push(eq(schema.vouchers.companyId, companyId));
-  if (startDate) conditions.push(sql`${schema.vouchers.voucherDate} >= ${startDate}`);
-  if (endDate) conditions.push(sql`${schema.vouchers.voucherDate} <= ${endDate}`);
-
-  return await db
-    .select({
-      entryId: schema.voucherEntries.id,
-      voucherId: schema.voucherEntries.voucherId,
-      debitAmount: schema.voucherEntries.debitAmount,
-      creditAmount: schema.voucherEntries.creditAmount,
-      narration: schema.voucherEntries.narration,
-      voucherNumber: schema.vouchers.voucherNumber,
-      voucherType: schema.vouchers.voucherType,
-      voucherDate: schema.vouchers.voucherDate,
-      voucherDescription: schema.vouchers.description,
-      companyId: schema.vouchers.companyId,
-      currency: schema.vouchers.currency,
-    })
-    .from(schema.voucherEntries)
-    .leftJoin(schema.vouchers, eq(schema.voucherEntries.voucherId, schema.vouchers.id))
-    .where(and(...conditions))
-    .orderBy(sql`${schema.vouchers.voucherDate} DESC`);
+  const params: any[] = [supplierId];
+  let dateFilters = "";
+  let companyFilter = "";
+  if (companyId) {
+    params.push(companyId);
+    companyFilter = " AND v.company_id = $" + params.length;
+  }
+  if (startDate) {
+    params.push(startDate);
+    dateFilters += " AND COALESCE(v.effective_date::date, v.voucher_date::date) >= $" + params.length + "::date";
+  }
+  if (endDate) {
+    params.push(endDate);
+    dateFilters += " AND COALESCE(v.effective_date::date, v.voucher_date::date) <= $" + params.length + "::date";
+  }
+  const result = await pool.query(
+    `SELECT
+       ve.id                                                        AS "entryId",
+       ve.voucher_id                                                AS "voucherId",
+       ve.debit_amount                                              AS "debitAmount",
+       ve.credit_amount                                             AS "creditAmount",
+       ve.narration,
+       v.voucher_number                                             AS "voucherNumber",
+       v.voucher_type                                               AS "voucherType",
+       COALESCE(v.effective_date::date, v.voucher_date::date)       AS "voucherDate",
+       v.description                                                AS "voucherDescription",
+       v.company_id                                                 AS "companyId",
+       v.currency
+     FROM voucher_entries ve
+     JOIN vouchers v ON ve.voucher_id = v.id
+     WHERE ve.supplier_id = $1
+       AND v.optional = false
+       AND v.deleted_at IS NULL
+       ${companyFilter}
+       ${dateFilters}
+     ORDER BY COALESCE(v.effective_date::date, v.voucher_date::date) DESC, v.id DESC`,
+    params
+  );
+  return result.rows;
 }
 
 export async function getVoucherEntriesByEmployee(
@@ -526,33 +583,45 @@ export async function getVoucherEntriesByEmployee(
   startDate?: string,
   endDate?: string
 ): Promise<any[]> {
-  const conditions = [
-    eq(schema.voucherEntries.employeeId, employeeId),
-    eq(schema.vouchers.optional, false),
-    isNull(schema.vouchers.deletedAt),
-  ];
-  if (companyId) conditions.push(eq(schema.vouchers.companyId, companyId));
-  if (startDate) conditions.push(sql`${schema.vouchers.voucherDate} >= ${startDate}`);
-  if (endDate) conditions.push(sql`${schema.vouchers.voucherDate} <= ${endDate}`);
-
-  return await db
-    .select({
-      entryId: schema.voucherEntries.id,
-      voucherId: schema.voucherEntries.voucherId,
-      debitAmount: schema.voucherEntries.debitAmount,
-      creditAmount: schema.voucherEntries.creditAmount,
-      narration: schema.voucherEntries.narration,
-      voucherNumber: schema.vouchers.voucherNumber,
-      voucherType: schema.vouchers.voucherType,
-      voucherDate: schema.vouchers.voucherDate,
-      voucherDescription: schema.vouchers.description,
-      companyId: schema.vouchers.companyId,
-      currency: schema.vouchers.currency,
-    })
-    .from(schema.voucherEntries)
-    .leftJoin(schema.vouchers, eq(schema.voucherEntries.voucherId, schema.vouchers.id))
-    .where(and(...conditions))
-    .orderBy(sql`${schema.vouchers.voucherDate} DESC`);
+  const params: any[] = [employeeId];
+  let dateFilters = "";
+  let companyFilter = "";
+  if (companyId) {
+    params.push(companyId);
+    companyFilter = " AND v.company_id = $" + params.length;
+  }
+  if (startDate) {
+    params.push(startDate);
+    dateFilters += " AND COALESCE(v.effective_date::date, v.voucher_date::date) >= $" + params.length + "::date";
+  }
+  if (endDate) {
+    params.push(endDate);
+    dateFilters += " AND COALESCE(v.effective_date::date, v.voucher_date::date) <= $" + params.length + "::date";
+  }
+  const result = await pool.query(
+    `SELECT
+       ve.id                                                        AS "entryId",
+       ve.voucher_id                                                AS "voucherId",
+       ve.debit_amount                                              AS "debitAmount",
+       ve.credit_amount                                             AS "creditAmount",
+       ve.narration,
+       v.voucher_number                                             AS "voucherNumber",
+       v.voucher_type                                               AS "voucherType",
+       COALESCE(v.effective_date::date, v.voucher_date::date)       AS "voucherDate",
+       v.description                                                AS "voucherDescription",
+       v.company_id                                                 AS "companyId",
+       v.currency
+     FROM voucher_entries ve
+     JOIN vouchers v ON ve.voucher_id = v.id
+     WHERE ve.employee_id = $1
+       AND v.optional = false
+       AND v.deleted_at IS NULL
+       ${companyFilter}
+       ${dateFilters}
+     ORDER BY COALESCE(v.effective_date::date, v.voucher_date::date) DESC, v.id DESC`,
+    params
+  );
+  return result.rows;
 }
 
 export async function createVoucher(voucher: InsertVoucher): Promise<Voucher> {
