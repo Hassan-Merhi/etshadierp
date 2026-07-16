@@ -4561,6 +4561,16 @@ END $$`,
     `ALTER TABLE factory_container_other_charges ADD COLUMN IF NOT EXISTS fx_rate_confirmed BOOLEAN NOT NULL DEFAULT false`,
     `ALTER TABLE factory_container_other_charges ADD COLUMN IF NOT EXISTS fx_rate_date DATE`,
 
+    // -- fx_rate_to_usd / fx_rate_confirmed on offload charges and commissions (July 2026) --
+    // factory_offload_additional_charges was created with fx_rate_to_usd in its CREATE TABLE body,
+    // but IF NOT EXISTS means existing production tables that predate the column never got it.
+    // factory_container_commissions has no CREATE TABLE at all — it was created before the column
+    // was added to the schema — so a standalone ALTER TABLE is required for both columns.
+    `ALTER TABLE factory_offload_additional_charges ADD COLUMN IF NOT EXISTS fx_rate_to_usd NUMERIC(20,6) DEFAULT 1`,
+    `ALTER TABLE factory_offload_additional_charges ADD COLUMN IF NOT EXISTS fx_rate_confirmed BOOLEAN NOT NULL DEFAULT false`,
+    `ALTER TABLE factory_container_commissions ADD COLUMN IF NOT EXISTS fx_rate_to_usd NUMERIC(20,8) NOT NULL DEFAULT 1`,
+    `ALTER TABLE factory_container_commissions ADD COLUMN IF NOT EXISTS fx_rate_confirmed BOOLEAN NOT NULL DEFAULT false`,
+
     // -- Per-KG cost/rate/price column precision: upgrade to numeric(x,6) (July 2026) --
     // Standardise every per-KG cost, rate, and price column in the Factory module
     // to exactly 6 decimal places. Re-running on an already-upgraded column is safe:
