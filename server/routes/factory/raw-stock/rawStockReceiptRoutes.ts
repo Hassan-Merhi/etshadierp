@@ -155,7 +155,12 @@ export function registerRawStockReceiptRoutes(app: Express) {
         if (persisted !== null && persisted !== undefined) {
           supplierLockedRateMap.set(s.id, parseFloat(persisted as string) || 0);
         } else {
-          supplierLockedRateMap.set(s.id, await getLockedSupplierRate(db, companyId, s.id));
+          try {
+            supplierLockedRateMap.set(s.id, await getLockedSupplierRate(db, companyId, s.id));
+          } catch (rateErr: any) {
+            console.error(`[raw-stock] getLockedSupplierRate failed for supplier ${s.id}:`, rateErr?.message);
+            supplierLockedRateMap.set(s.id, 0);
+          }
         }
       }
 
