@@ -29,13 +29,25 @@ type PostOffloadCharge = {
 };
 
 type PostOffloadResult = {
+  message: string;
+  containerId: number;
+  oldContainerCostPerKgUsd: number;
+  newContainerCostPerKgUsd: number;
+  oldContainerTotalUsd: number;
+  newContainerTotalUsd: number;
+  rawStockRowsUpdated: number;
+  supplierLockedRateOld: number | null;
+  supplierLockedRateNew: number | null;
   affectedBatches: {
     batchId: number;
     batchCode: string;
+    status: string | null;
+    wasCompleted: boolean;
+    weightKgFromContainer: number;
     oldCostPerKg: number;
     newCostPerKg: number;
-    weightKg: number;
   }[];
+  affectedBalesCount: number;
 };
 
 interface PostOffloadDialogProps {
@@ -82,6 +94,9 @@ export function PostOffloadDialog({ container, ledgerAccounts, onClose }: PostOf
       queryClient.invalidateQueries({ queryKey: ["/api/factory/raw-stock"] });
       queryClient.invalidateQueries({ queryKey: ["/api/factory/raw-stock/by-container"] });
       queryClient.invalidateQueries({ queryKey: ["/api/factory/mix-batches"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/bales"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/suppliers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/suppliers/with-balances"] });
       setResult(data);
       setCharges([]);
     },
@@ -118,30 +133,75 @@ export function PostOffloadDialog({ container, ledgerAccounts, onClose }: PostOf
                   <CheckCircle2 className="h-4 w-4 mt-0.5 shrink-0" />
                   <div>
                     <p className="font-semibold">Charges saved successfully</p>
-                    <p className="text-xs mt-0.5 opacity-80">
-                      The container cost per kg and all related mix batch costs have been updated.
-                    </p>
+                    {result.rawStockRowsUpdated > 0 && (
+                      <p className="text-xs mt-0.5 opacity-80">
+                        The container cost per kg and all related mix batch costs have been updated.
+                      </p>
+                    )}
                   </div>
                 </div>
+
+                {/* Cost summary table */}
+                <div className="rounded-md border text-sm divide-y">
+                  <div className="grid grid-cols-3 gap-2 px-3 py-1.5 text-xs text-muted-foreground font-medium bg-muted/30">
+                    <span>Metric</span>
+                    <span className="text-right">Previous</span>
+                    <span className="text-right">New</span>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2 px-3 py-2">
+                    <span className="text-muted-foreground">Container cost/kg (USD)</span>
+                    <span className="text-right font-mono">${result.oldContainerCostPerKgUsd.toFixed(4)}</span>
+                    <span className="text-right font-mono font-semibold text-green-700 dark:text-green-400">
+                      ${result.newContainerCostPerKgUsd.toFixed(4)}
+                    </span>
+                  </div>
+                  {result.supplierLockedRateOld !== null && (
+                    <div className="grid grid-cols-3 gap-2 px-3 py-2">
+                      <span className="text-muted-foreground">Supplier locked rate (USD/kg)</span>
+                      <span className="text-right font-mono">${(result.supplierLockedRateOld ?? 0).toFixed(4)}</span>
+                      <span className="text-right font-mono font-semibold">
+                        ${(result.supplierLockedRateNew ?? 0).toFixed(4)}
+                      </span>
+                    </div>
+                  )}
+                  <div className="grid grid-cols-3 gap-2 px-3 py-2 text-muted-foreground">
+                    <span>Raw-stock rows updated</span>
+                    <span className="text-right">—</span>
+                    <span className="text-right font-mono">{result.rawStockRowsUpdated}</span>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2 px-3 py-2 text-muted-foreground">
+                    <span>Bales updated</span>
+                    <span className="text-right">—</span>
+                    <span className="text-right font-mono">{result.affectedBalesCount}</span>
+                  </div>
+                </div>
+
                 {result.affectedBatches.length > 0 ? (
                   <div className="space-y-2">
                     <p className="text-sm font-semibold">Affected Mix Batches</p>
                     <div className="border rounded-md divide-y text-sm">
-                      <div className="grid grid-cols-4 gap-2 px-3 py-1.5 text-xs text-muted-foreground font-medium">
+                      <div className="grid grid-cols-[2fr_1fr_1fr_1fr] gap-2 px-3 py-1.5 text-xs text-muted-foreground font-medium bg-muted/30">
                         <span>Batch</span>
                         <span className="text-right">Old Cost/kg</span>
                         <span className="text-right">New Cost/kg</span>
-                        <span className="text-right">Weight from this container</span>
+                        <span className="text-right">Wt from container</span>
                       </div>
                       {result.affectedBatches.map((b) => (
-                        <div key={b.batchId} className="grid grid-cols-4 gap-2 px-3 py-2 items-center">
-                          <span className="font-mono font-medium">{b.batchCode}</span>
+                        <div key={b.batchId} className="grid grid-cols-[2fr_1fr_1fr_1fr] gap-2 px-3 py-2 items-center">
+                          <span className="font-mono font-medium flex items-center gap-1.5 flex-wrap">
+                            {b.batchCode}
+                            {b.wasCompleted && (
+                              <span className="text-xs bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 px-1.5 py-0.5 rounded whitespace-nowrap">
+                                Completed
+                              </span>
+                            )}
+                          </span>
                           <span className="text-right font-mono text-muted-foreground">
                             ${b.oldCostPerKg.toFixed(4)}
                           </span>
                           <span className="text-right font-mono font-semibold">${b.newCostPerKg.toFixed(4)}</span>
                           <span className="text-right font-mono text-muted-foreground">
-                            {formatNumber(b.weightKg)} kg
+                            {formatNumber(b.weightKgFromContainer)} kg
                           </span>
                         </div>
                       ))}

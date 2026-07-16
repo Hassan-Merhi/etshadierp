@@ -25,6 +25,7 @@ export interface CascadeResult {
   affectedBatches: {
     batchId: number;
     batchCode: string;
+    status: string;
     oldCostPerKg: number;
     newCostPerKg: number;
     weightKg: number;
@@ -49,6 +50,7 @@ export async function recomputeBatchAndCascadeBales(
   batchId: number
 ): Promise<{
   batchCode: string;
+  status: string;
   oldCostPerKg: number;
   newCostPerKg: number;
   weightKg: number;
@@ -97,6 +99,7 @@ export async function recomputeBatchAndCascadeBales(
 
   return {
     batchCode: batch?.batchCode || `#${batchId}`,
+    status: batch?.status || "UNKNOWN",
     oldCostPerKg,
     newCostPerKg: batchCostPerKg,
     weightKg: allSources.reduce((sum: number, s: any) => sum + parseFloat(s.weightKg || "0"), 0),
@@ -218,10 +221,15 @@ export async function cascadeContainerCostChange(
 
   if (mixSources.length > 0) {
     for (const src of mixSources) {
-      const newSourceTotalCost = parseFloat(src.weightKg) * newCostPerKg;
+      // Mix-batch sources store cost in USD — use newCostPerKgUsd, not the native-currency value.
+      const srcWeight = parseFloat(src.weightKg as string) || 0;
+      const newSourceTotalCost = srcWeight * newCostPerKgUsd;
       await tx
         .update(factoryMixBatchSources)
-        .set({ costPerKg: String(newCostPerKg), totalCost: String(newSourceTotalCost.toFixed(2)) })
+        .set({
+          costPerKg: String(newCostPerKgUsd.toFixed(6)),
+          totalCost: String(newSourceTotalCost.toFixed(2)),
+        })
         .where(eq(factoryMixBatchSources.id, src.id));
     }
 
