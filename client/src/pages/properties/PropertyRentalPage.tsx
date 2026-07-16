@@ -307,7 +307,7 @@ export default function PropertyRentalPage({
         totalGuarantee += (u as any).guaranteeRemaining ?? Number(u.contract.guaranteeAmount || 0);
         const outstanding = u.outstanding ?? 0;
         if (outstanding > 0) totalOwed += outstanding;
-        else if (outstanding < 0) totalCredit += Math.abs(outstanding);
+        totalCredit += (u as any).prepaidCredit ?? 0;
         totalPaid += (u as any).totalPaid ?? 0;
         if (u.contract.status === "ACTIVE" || !(u.contract as any).status) {
           totalMonthlyRent += Number(u.contract.rentalAmount || 0);
@@ -718,10 +718,17 @@ export default function PropertyRentalPage({
                                   : "—"}
                               </td>
                               <td
-                                className={`px-3 py-2 text-right tabular-nums font-semibold ${(u.outstanding ?? 0) > 0 ? "text-red-600 dark:text-red-400" : (u.outstanding ?? 0) < 0 ? "text-green-600 dark:text-green-400" : "text-muted-foreground"}`}
+                                className={`px-3 py-2 text-right tabular-nums font-semibold ${(u.outstanding ?? 0) > 0 ? "text-red-600 dark:text-red-400" : (u as any).prepaidCredit > 0 ? "text-green-600 dark:text-green-400" : "text-muted-foreground"}`}
                               >
                                 {u.outstanding !== null
-                                  ? fmtMoneyCurrency(Math.abs(u.outstanding), u.contract?.currency)
+                                  ? fmtMoneyCurrency(
+                                      (u.outstanding ?? 0) > 0
+                                        ? u.outstanding!
+                                        : (u as any).prepaidCredit > 0
+                                        ? (u as any).prepaidCredit
+                                        : 0,
+                                      u.contract?.currency
+                                    )
                                   : "—"}
                               </td>
                               <td className="px-3 py-2 text-right tabular-nums text-muted-foreground text-xs">
