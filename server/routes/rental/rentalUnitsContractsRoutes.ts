@@ -11,6 +11,8 @@ import {
   buildAllocations,
   type RentalModule,
 } from "./_rentalShared";
+import { postDueScheduledRentalPayments } from "../../services/rental/rentalPaymentPostingService";
+import { getClientDate } from "../../lib/dateUtils";
 import { db } from "../../db";
 import { requireAuth } from "../../auth";
 import { z } from "zod";
@@ -31,7 +33,6 @@ import {
 } from "@shared/schema";
 import { parseId, parseOptionalId } from "../../lib/parseId";
 import { logAudit } from "../_helpers";
-import { getClientDate } from "../../lib/dateUtils";
 
 export function registerRentalUnitsContractsRoutes(
   app: Express,
@@ -50,12 +51,15 @@ export function registerRentalUnitsContractsRoutes(
 
       await ensureMonthlyForCompany(companyId, module);
 
-      // For ERP/FACTORY SHOP view: silently post any pending rent accruals on page load.
-      // All due rows are combined into ONE journal voucher per run.
-      // Fire-and-forget (errors are logged but do not block the response).
+      // For ERP/FACTORY SHOP view: silently post any pending rent accruals and
+      // any due SCHEDULED payments on page load.  Fire-and-forget.
       if ((module === "ERP" || module === "FACTORY") && unitType === "SHOP") {
+        const asOfForPost = getClientDate(req);
         postRentAccrualForCompany(companyId, shopExpenseAccountName, module, incomeAccountName).catch((e) =>
           console.warn(`${tag} page-load accrual failed:`, e.message?.split("\n")[0])
+        );
+        postDueScheduledRentalPayments(companyId, module, asOfForPost, shopExpenseAccountName).catch((e) =>
+          console.warn(`${tag} page-load scheduled-posting failed:`, e.message?.split("\n")[0])
         );
       }
 

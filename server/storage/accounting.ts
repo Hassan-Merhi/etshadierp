@@ -346,11 +346,11 @@ export async function getVoucherEntriesByLedger(
   let dateFilters = "";
   if (startDate) {
     params.push(startDate);
-    dateFilters += ` AND v.voucher_date >= ${params.length}`;
+    dateFilters += " AND COALESCE(v.effective_date, v.voucher_date) >= $" + params.length;
   }
   if (endDate) {
     params.push(endDate);
-    dateFilters += ` AND v.voucher_date <= ${params.length}`;
+    dateFilters += " AND COALESCE(v.effective_date, v.voucher_date) <= $" + params.length;
   }
   // Scope to a specific company when provided. Without this, cross-company
   // vouchers (e.g. ERP-side intercompany entries that post to a factory
@@ -359,7 +359,7 @@ export async function getVoucherEntriesByLedger(
   let companyFilter = "";
   if (companyId) {
     params.push(companyId);
-    companyFilter = ` AND v.company_id = ${params.length}`;
+    companyFilter = " AND v.company_id = $" + params.length;
   }
 
   // GROUP BY voucher so that a single voucher with multiple lines all posting
@@ -385,7 +385,7 @@ export async function getVoucherEntriesByLedger(
        ${companyFilter}
        ${dateFilters}
      GROUP BY v.id, v.voucher_number, v.voucher_type, v.voucher_date, v.description, v.currency
-     ORDER BY v.voucher_date, v.id`,
+     ORDER BY COALESCE(v.effective_date, v.voucher_date), v.id`,
     params
   );
 

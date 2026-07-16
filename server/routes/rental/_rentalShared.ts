@@ -244,10 +244,12 @@ export async function ensureMonthlyLedgerRows(contractId: number) {
   const curDay = now.getUTCDate();
 
   // If today is before the billing day, remove any unpaid current-month row that was
-  // created prematurely (e.g. by the old code or after a startDate edit).
+  // created prematurely — BUT only if no SCHEDULED payment already references it.
   if (curDay < billingDay) {
-    await db
-      .delete(propertyMonthlyLedger)
+    // Find the ledger row for this month
+    const [curMonthRow] = await db
+      .select({ id: propertyMonthlyLedger.id })
+      .from(propertyMonthlyLedger)
       .where(
         and(
           eq(propertyMonthlyLedger.contractId, contract.id),
@@ -256,6 +258,22 @@ export async function ensureMonthlyLedgerRows(contractId: number) {
           sql`${propertyMonthlyLedger.paidAmount} = '0'`
         )
       );
+    if (curMonthRow) {
+      // Check if any SCHEDULED payment references this row
+      const [scheduledRef] = await db
+        .select({ id: propertyPayments.id })
+        .from(propertyPayments)
+        .where(
+          and(
+            eq(propertyPayments.ledgerRowId, curMonthRow.id),
+            sql`${propertyPayments.postingStatus} = 'SCHEDULED'`
+          )
+        )
+        .limit(1);
+      if (!scheduledRef) {
+        await db.delete(propertyMonthlyLedger).where(eq(propertyMonthlyLedger.id, curMonthRow.id));
+      }
+    }
   }
 
   const periods: Array<{ year: number; month: number }> = [];

@@ -37,6 +37,7 @@ export type PeriodPreset =
   | "today"
   | "yesterday"
   | "this_week"
+  | "month_to_date"
   | "this_month"
   | "last_1_month"
   | "last_6_months"
@@ -81,6 +82,11 @@ function getPresetDates(preset: PeriodPreset): { fromDate: string; toDate: strin
       return {
         fromDate: formatDate(startOfWeek(today, { weekStartsOn: 1 })),
         toDate: formatDate(endOfWeek(today, { weekStartsOn: 1 })),
+      };
+    case "month_to_date":
+      return {
+        fromDate: formatDate(startOfMonth(today)),
+        toDate: formatDate(today),
       };
     case "this_month":
       return {
@@ -163,6 +169,7 @@ export function PeriodFilter({
     if (value.preset === "all_time") return "All Time";
     if (value.preset === "yesterday") return "Yesterday";
     if (value.preset === "this_week") return "This Week";
+    if (value.preset === "month_to_date") return "Month to Date";
     if (fromDateObj && toDateObj) {
       const from = formatDisplayDate(fromDateObj);
       const to = formatDisplayDate(toDateObj);
@@ -199,6 +206,9 @@ export function PeriodFilter({
           </DropdownMenuItem>
           <DropdownMenuItem onClick={() => handlePresetChange("this_week")} data-testid="period-preset-this-week">
             This Week
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={() => handlePresetChange("month_to_date")} data-testid="period-preset-month-to-date">
+            Month to Date
           </DropdownMenuItem>
           <DropdownMenuItem onClick={() => handlePresetChange("this_month")} data-testid="period-preset-this-month">
             This Month

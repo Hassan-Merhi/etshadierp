@@ -1410,9 +1410,16 @@ function BulkPaymentDialog({
       if (items.length === 0) throw new Error("No valid amounts entered");
       return apiRequest("POST", apiBase + "/payments/bulk", items);
     },
-    onSuccess: () => {
-      toast({ title: "Bulk payment recorded", description: `${units.length} tenant(s) paid` });
+    onSuccess: (data: any) => {
+      const isScheduled = paymentDate > new Date().toISOString().slice(0, 10);
+      toast({
+        title: isScheduled ? "Payments scheduled" : "Bulk payment recorded",
+        description: isScheduled
+          ? `Payments of ${units.length} tenant(s) scheduled for ${paymentDate}`
+          : `${units.length} tenant(s) paid`,
+      });
       queryClient.invalidateQueries({ queryKey: [apiBase + "/units"] });
+      queryClient.invalidateQueries({ queryKey: [apiBase + "/payments/scheduled"] });
       onSuccess();
       onClose();
     },
@@ -1654,10 +1661,18 @@ function PaymentForm({
         currency: form.currency,
         exchangeRate: form.exchangeRate,
       }),
-    onSuccess: () => {
-      toast({ title: "Payment recorded" });
+    onSuccess: (data: any) => {
+      if (data?.scheduled) {
+        toast({
+          title: "Payment scheduled",
+          description: `${parseFloat(form.amount).toFixed(2)} scheduled for ${form.paymentDate}. It will be posted automatically on that date.`,
+        });
+      } else {
+        toast({ title: "Payment recorded" });
+      }
       queryClient.invalidateQueries({ queryKey: [apiBase + "/units"] });
       queryClient.invalidateQueries({ queryKey: [apiBase + "/units", unitId, "detail"] });
+      queryClient.invalidateQueries({ queryKey: [apiBase + "/payments/scheduled"] });
       setForm((f) => ({ ...f, amount: "", notes: "" }));
     },
     onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),

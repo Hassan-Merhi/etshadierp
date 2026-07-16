@@ -10,6 +10,7 @@ import {
   postRentAccrualForCompany,
   type RentalModule,
 } from "./_rentalShared";
+import { postDueScheduledRentalPayments } from "../../services/rental/rentalPaymentPostingService";
 import { db } from "../../db";
 import { requireAuth } from "../../auth";
 import { z } from "zod";
@@ -109,6 +110,82 @@ export function registerRentalPaymentsAccrualRoutes(
       const rentalAmountNum = parseFloat(contract.rentalAmount as string);
       const { year: y, month: m } = await findEarliestOutstandingMonth(contract.id, payYear, payMonth);
       const allocations = await buildAllocations(contract.id, y, m, totalAmountNum, rentalAmountNum);
+
+      // ── Future-dated payment → SCHEDULED (no voucher, no ledger impact) ────
+      // If the payment date is beyond today, record the intent as SCHEDULED rows.
+      // The postDueScheduledRentalPayments service will post them on their date.
+      const clientToday = getClientDate(req);
+      if (data.paymentDate > clientToday) {
+        const paymentGroupId = `PG-${Date.now()}-${Math.random().toString(36).slice(2, 7)}-${contract.id}`;
+        const scheduledRows = await db.transaction(async (tx) => {
+          // Ensure ledger rows exist for every allocated month (needed for FK ledgerRowId)
+          for (const alloc of allocations) {
+            await tx
+              .insert(propertyMonthlyLedger)
+              .values({
+                companyId: contractCompanyId,
+                module,
+                contractId: contract.id,
+                unitId: contract.unitId,
+                year: alloc.year,
+                month: alloc.month,
+                expectedAmount: contract.rentalAmount,
+                paidAmount: "0",
+              })
+              .onConflictDoNothing({
+                target: [propertyMonthlyLedger.contractId, propertyMonthlyLedger.year, propertyMonthlyLedger.month],
+              });
+          }
+          const created: (typeof propertyPayments.$inferSelect)[] = [];
+          for (const alloc of allocations) {
+            const [row] = await tx
+              .select()
+              .from(propertyMonthlyLedger)
+              .where(
+                and(
+                  eq(propertyMonthlyLedger.contractId, contract.id),
+                  eq(propertyMonthlyLedger.year, alloc.year),
+                  eq(propertyMonthlyLedger.month, alloc.month)
+                )
+              );
+            const [p] = await tx
+              .insert(propertyPayments)
+              .values({
+                companyId: contractCompanyId,
+                module,
+                contractId: contract.id,
+                unitId: contract.unitId,
+                ledgerRowId: row?.id ?? null,
+                cashAccountId: data.cashAccountId ?? null,
+                voucherId: null,
+                amount: alloc.chunk,
+                paymentDate: data.paymentDate as any,
+                forYear: alloc.year,
+                forMonth: alloc.month,
+                currency: data.currency || "USD",
+                exchangeRate: data.exchangeRate || "1",
+                notes: allocations.length > 1
+                  ? `${data.notes ? data.notes + " | " : ""}Split from ${data.amount} payment`
+                  : (data.notes ?? null),
+                postingStatus: "SCHEDULED",
+                paymentGroupId,
+              } as any)
+              .returning();
+            created.push(p);
+            // NOTE: paid_amount is NOT updated for SCHEDULED payments.
+            // It will be updated when the group is posted.
+          }
+          return created;
+        });
+        return res.json({
+          scheduled: true,
+          paymentDate: data.paymentDate,
+          paymentGroupId,
+          allocations: scheduledRows.map((r) => ({ year: r.forYear, month: r.forMonth, amount: r.amount })),
+          message: `Payment of ${data.amount} scheduled for ${data.paymentDate} (today is ${clientToday}). It will be posted automatically on that date.`,
+        });
+      }
+      // ── END SCHEDULED branch ─────────────────────────────────────────────────
 
       const payments = await db.transaction(async (tx) => {
         // Ensure a ledger row exists for every allocated month
@@ -978,6 +1055,120 @@ export function registerRentalPaymentsAccrualRoutes(
       res.json({ accrued, skipped });
     } catch (e: any) {
       console.error(`${tag} accrue:`, e);
+      res.status(500).json({ message: e.message });
+    }
+  });
+
+  // ── SCHEDULED PAYMENTS — list ──────────────────────────────────────────────
+  // Returns all SCHEDULED payment groups for this company/module.
+  // Useful for the "pending payments" indicator in the UI.
+  app.get(`${urlPrefix}/payments/scheduled`, requireAuth, async (req: Request, res: Response) => {
+    try {
+      const companyId = getCompanyId(req);
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const rows = await db
+        .select({
+          id: propertyPayments.id,
+          paymentGroupId: (propertyPayments as any).paymentGroupId,
+          contractId: propertyPayments.contractId,
+          unitId: propertyPayments.unitId,
+          amount: propertyPayments.amount,
+          paymentDate: propertyPayments.paymentDate,
+          forYear: propertyPayments.forYear,
+          forMonth: propertyPayments.forMonth,
+          currency: propertyPayments.currency,
+          notes: propertyPayments.notes,
+          postingStatus: (propertyPayments as any).postingStatus,
+          cashAccountId: propertyPayments.cashAccountId,
+          createdAt: propertyPayments.createdAt,
+        })
+        .from(propertyPayments)
+        .where(
+          and(
+            eq(propertyPayments.companyId, companyId),
+            eq(propertyPayments.module, module),
+            sql`${propertyPayments.postingStatus} = 'SCHEDULED'`
+          )
+        )
+        .orderBy(propertyPayments.paymentDate, propertyPayments.contractId);
+
+      // Group by paymentGroupId
+      const groups = new Map<string, {
+        paymentGroupId: string;
+        contractId: number;
+        unitId: number;
+        paymentDate: string;
+        currency: string;
+        notes: string | null;
+        cashAccountId: number | null;
+        totalAmount: number;
+        allocations: Array<{ id: number; year: number; month: number; amount: string }>;
+      }>();
+
+      for (const row of rows) {
+        const gid = row.paymentGroupId ?? `no-group-${row.id}`;
+        if (!groups.has(gid)) {
+          groups.set(gid, {
+            paymentGroupId: gid,
+            contractId: row.contractId,
+            unitId: row.unitId,
+            paymentDate: String(row.paymentDate),
+            currency: row.currency,
+            notes: row.notes,
+            cashAccountId: row.cashAccountId,
+            totalAmount: 0,
+            allocations: [],
+          });
+        }
+        const g = groups.get(gid)!;
+        g.totalAmount += parseFloat(row.amount as string);
+        g.allocations.push({ id: row.id, year: row.forYear, month: row.forMonth, amount: row.amount as string });
+      }
+
+      res.json(Array.from(groups.values()).map((g) => ({ ...g, totalAmount: g.totalAmount.toFixed(2) })));
+    } catch (e: any) {
+      res.status(500).json({ message: e.message });
+    }
+  });
+
+  // ── SCHEDULED PAYMENTS — manually trigger posting ─────────────────────────
+  // Admin endpoint to manually post all due SCHEDULED payment groups.
+  app.post(`${urlPrefix}/payments/post-scheduled`, requireAuth, async (req: Request, res: Response) => {
+    try {
+      const companyId = getCompanyId(req);
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      const asOf = getClientDate(req);
+      const posted = await postDueScheduledRentalPayments(companyId, module, asOf, shopExpenseAccountName);
+      res.json({ posted, asOf });
+    } catch (e: any) {
+      res.status(500).json({ message: e.message });
+    }
+  });
+
+  // ── CANCEL SCHEDULED PAYMENT GROUP ────────────────────────────────────────
+  app.delete(`${urlPrefix}/payments/scheduled/:groupId`, requireAuth, async (req: Request, res: Response) => {
+    try {
+      const companyId = getCompanyId(req);
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      const { groupId } = req.params;
+
+      // Only cancel rows that are still SCHEDULED
+      const deleted = await db
+        .delete(propertyPayments)
+        .where(
+          and(
+            eq(propertyPayments.companyId, companyId),
+            eq(propertyPayments.module, module),
+            sql`${propertyPayments.paymentGroupId} = ${groupId}`,
+            sql`${propertyPayments.postingStatus} = 'SCHEDULED'`
+          )
+        )
+        .returning({ id: propertyPayments.id });
+
+      if (deleted.length === 0) return res.status(404).json({ message: "Scheduled payment group not found or already posted" });
+      res.json({ cancelled: deleted.length, groupId });
+    } catch (e: any) {
       res.status(500).json({ message: e.message });
     }
   });

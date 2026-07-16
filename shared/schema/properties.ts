@@ -154,11 +154,23 @@ export const propertyPayments = pgTable(
     notes: text("notes"),
     currency: text("currency").notNull().default("USD"),
     exchangeRate: decimal("exchange_rate", { precision: 20, scale: 6 }).notNull().default("1"),
+    /**
+     * Lifecycle status for this payment split row.
+     * SCHEDULED — created for a future paymentDate; no voucher/ledger impact yet.
+     * POSTED     — voucher created, cash credited, monthly ledger paid_amount updated.
+     * VOID       — reversed/deleted; no accounting effect.
+     */
+    postingStatus: text("posting_status").notNull().default("POSTED"),
+    /** Groups all split rows that belong to the same payment transaction. */
+    paymentGroupId: text("payment_group_id"),
+    /** Timestamp when the row transitioned from SCHEDULED → POSTED. */
+    postedAt: timestamp("posted_at"),
     createdAt: timestamp("created_at").notNull().defaultNow(),
   },
   (t) => ({
     byContract: index("property_payments_contract_idx").on(t.contractId),
     byCompany: index("property_payments_company_idx").on(t.companyId, t.paymentDate),
+    byStatus: index("property_payments_status_idx").on(t.companyId, t.module, t.postingStatus, t.paymentDate),
   })
 );
 
