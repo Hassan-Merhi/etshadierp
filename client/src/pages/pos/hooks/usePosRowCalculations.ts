@@ -40,9 +40,15 @@ export function usePosRowCalculations({
       setZeroStockAlert(true);
       return;
     }
-    let targetRow = targetRowOverride ?? activeRow ?? rows.findIndex((r) => !r.itemName);
+    // Prefer the active row, then the first draft row (typed text but no item
+    // selected yet), then the first truly empty row.  Using only !r.itemName
+    // would skip a draft row whose itemName is already "eg", causing the item
+    // to land in a brand-new appended row instead of the row being edited.
+    const draftIdx = rows.findIndex((r) => !r.stockItemId && (r.itemName?.trim() ?? "") !== "");
+    const emptyIdx = rows.findIndex((r) => !r.itemName);
+    let targetRow = targetRowOverride ?? activeRow ?? (draftIdx !== -1 ? draftIdx : emptyIdx);
     const newRows = [...rows];
-    // If no empty row found, append one
+    // If no suitable row found, append one
     if (targetRow === -1 || targetRow == null) {
       targetRow = newRows.length;
       newRows.push({ id: Date.now().toString(), itemName: "", quantity: 0, rate: 0, rateUSD: 0, amount: 0 });
