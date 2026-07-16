@@ -131,9 +131,12 @@ export function ExportAccountsSection() {
   const [exporting, setExporting] = useState(false);
   const [search, setSearch] = useState("");
   const { toast } = useToast();
+  const { selectedCompany } = useCompany();
 
   const { data: allAccounts = [] } = useQuery<any[]>({
-    queryKey: ["/api/accounts/all"],
+    // Include company ID in the cache key so that switching companies forces a
+    // fresh fetch instead of reusing a different company's cached response.
+    queryKey: ["/api/accounts/all", selectedCompany?.id],
   });
 
   const typeLabels: Record<string, string> = {

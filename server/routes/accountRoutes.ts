@@ -353,7 +353,9 @@ export function registerAccountRoutes(app: Express) {
       const bankBalances = new Map<number, { debits: number; credits: number }>();
       const assetBalances = new Map<number, { debits: number; credits: number }>();
       const employeeBalances = new Map<number, { debits: number; credits: number }>();
-      // Note: Supplier balances are calculated separately below using global entries
+      // Note: Supplier balances are calculated separately below using getSupplierBalanceForContext,
+      // which correctly scopes entries to the selected company and applies opening-balance rules
+      // (opening balance only applies in the parent company's context — zero for all others).
 
       for (const entry of allEntries) {
         const debit = parseFloat(entry.debitAmount || "0");

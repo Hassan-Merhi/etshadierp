@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
+import { useCompany } from "@/contexts/CompanyContext";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -19,6 +20,7 @@ function fmt(v: any, dec = 2) {
 export default function SpReports() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { selectedCompany } = useCompany();
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [splitPeriod, setSplitPeriod] = useState(new Date().toISOString().slice(0, 7));
@@ -44,7 +46,9 @@ export default function SpReports() {
   const { data: profit, isLoading: profitLoading } = useQuery<any>({ queryKey: [profitUrl] });
   const { data: splits = [], isLoading: splitsLoading } = useQuery<any[]>({ queryKey: [splitsUrl] });
   const { data: locations = [] } = useQuery<any[]>({ queryKey: ["/api/locations"] });
-  const { data: accounts = [] } = useQuery<any[]>({ queryKey: ["/api/accounts/all"] });
+  // Include company ID in the cache key so switching companies always fetches
+  // fresh data rather than reusing the previous company's cached response.
+  const { data: accounts = [] } = useQuery<any[]>({ queryKey: ["/api/accounts/all", selectedCompany?.id] });
 
   const finalizeMutation = useMutation({
     mutationFn: (body: any) => apiRequest("POST", "/api/sp/profit-splits", body),
