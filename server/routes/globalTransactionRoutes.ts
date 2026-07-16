@@ -492,7 +492,7 @@ export function registerGlobalTransactionRoutes(app: Express, requireAuth: any) 
       }
 
       // Stock Transfer
-      if (type === "Stock Transfer" || type === "StockTransfer") {
+      if (type === "Stock Transfer" || type === "StockTransfer" || type === "Transfer") {
         const tv = await db.query.stockTransferVouchers.findFirst({
           where: eq(stockTransferVouchers.voucherId, voucherId),
         });

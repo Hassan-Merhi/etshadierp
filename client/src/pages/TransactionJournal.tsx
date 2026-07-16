@@ -1314,7 +1314,7 @@ export default function TransactionJournal() {
                   }
 
                   // ── STOCK TRANSFER ──────────────────────────────────────────────────
-                  if ((vtype === "Stock Transfer" || vtype === "StockTransfer") && stockRows.length > 0) {
+                  if ((vtype === "Stock Transfer" || vtype === "StockTransfer" || vtype === "Transfer") && stockRows.length > 0) {
                     const grandTotal = stockRows.reduce((s, r) => s + parseFloat(r.totalAmount || "0"), 0);
                     const grandQty = stockRows.reduce((s, r) => s + parseFloat(r.quantity || "0"), 0);
                     return (
