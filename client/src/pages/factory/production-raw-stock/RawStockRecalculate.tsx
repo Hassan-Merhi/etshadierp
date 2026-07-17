@@ -455,6 +455,33 @@ export default function RawStockRecalculate() {
     }, `Apply all safe raw-material cost repairs (${count} container(s))`);
   };
 
+  // ── Recompute all supplier locked rates ───────────────────────────────────
+  const recomputeSupplierRatesMutation = useMutation({
+    mutationFn: async () => {
+      const res = await modeApiRequest("POST", "/api/factory/raw-stock/supplier-rate/recompute");
+      if (!res.ok) throw new Error((await res.json()).message || "Failed to recompute supplier rates");
+      return res.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/raw-stock"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/raw-stock/recalc/preview"] });
+      toast({
+        title: "Supplier rates updated",
+        description: `Updated ${data.updated} supplier(s), skipped ${data.skipped} (already correct or no data).`,
+      });
+    },
+    onError: (err: any) => {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const handleRecomputeSupplierRates = () => {
+    wrapAdminAction(
+      () => recomputeSupplierRatesMutation.mutate(),
+      "Recompute locked rate for ALL suppliers from receipt-weighted average of corrected raw-stock rows"
+    );
+  };
+
   // ── Fix ALL source mismatches in one shot (no dry-run) ────────────────────
   const fixAllSourcesMutation = useMutation({
     mutationFn: async () => {
@@ -622,6 +649,16 @@ export default function RawStockRecalculate() {
             <History className="h-3 w-3" />
             Include CLOSED/COMPLETED containers
           </label>
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={recomputeSupplierRatesMutation.isPending}
+            onClick={handleRecomputeSupplierRates}
+            title="Recompute all supplier locked rates from receipt-weighted average of their corrected raw-stock rows. Use after a recalc run where all containers were fully used."
+            className="gap-2"
+          >
+            <RefreshCw className="h-3.5 w-3.5" /> Recompute Supplier Rates
+          </Button>
           <Button variant="outline" size="sm" onClick={() => { refetch(); refetchAudit(); refetchSources(); }} className="gap-2">
             <RefreshCw className="h-3.5 w-3.5" /> Refresh
           </Button>

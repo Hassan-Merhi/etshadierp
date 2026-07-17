@@ -564,13 +564,13 @@ export function registerRawStockRecalcRoutes(app: Express) {
   // ──────────────────────────────────────────────────────────────────────────
   // Retroactive supplier locked-rate recompute (admin-only, no dry-run needed)
   // POST /api/factory/raw-stock/supplier-rate/recompute
-  // Body: { supplierId: number }
+  // Body: { supplierId?: number }  — omit to recompute ALL suppliers
   //
-  // Recalculates a supplier's current_raw_material_cost_per_kg_usd using the
-  // receipt-weighted stable cost across all factory_raw_stock rows (which must
-  // already carry the correct cost_per_kg_usd from a prior recalc apply).
-  // Use this when the cascade skipped the supplier update because the container
-  // was fully used at the time the recalc ran (remainingKg=0 branch not fired).
+  // Recalculates current_raw_material_cost_per_kg_usd using the receipt-weighted
+  // stable cost across all factory_raw_stock rows (which must already carry the
+  // correct cost_per_kg_usd from a prior recalc apply). Skips suppliers whose
+  // stable cost is 0 (no raw-stock rows). Use after a recalc that ran while all
+  // containers were fully used and the cascade skipped the locked-rate update.
   // ──────────────────────────────────────────────────────────────────────────
   app.post(
     "/api/factory/raw-stock/supplier-rate/recompute",
@@ -580,38 +580,69 @@ export function registerRawStockRecalcRoutes(app: Express) {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const { supplierId } = req.body;
-      if (!supplierId || isNaN(parseInt(supplierId))) {
-        return res.status(400).json({ message: "supplierId is required" });
-      }
-      const sid = parseInt(supplierId);
+
       try {
-        const { costPerKgUsd, totalReceivedKg, rows } = await db.transaction(async (tx: any) => {
-          return getStableSupplierCost(tx, companyId, sid);
-        });
-        if (costPerKgUsd <= 0) {
-          return res.status(400).json({ message: "No usable raw-stock rows found for this supplier — cannot recompute." });
+        // Resolve the list of supplier IDs to process
+        let supplierIds: number[];
+        if (supplierId != null) {
+          const sid = parseInt(supplierId);
+          if (isNaN(sid)) return res.status(400).json({ message: "Invalid supplierId" });
+          supplierIds = [sid];
+        } else {
+          // Recompute all suppliers for this company
+          const allSuppliers = await db
+            .select({ id: factorySuppliers.id })
+            .from(factorySuppliers)
+            .where(eq(factorySuppliers.companyId, companyId));
+          supplierIds = allSuppliers.map((s) => s.id);
         }
-        const [supplier] = await db
-          .select({ id: factorySuppliers.id, name: (factorySuppliers as any).name, currentRawMaterialCostPerKgUsd: factorySuppliers.currentRawMaterialCostPerKgUsd })
-          .from(factorySuppliers)
-          .where(and(eq(factorySuppliers.id, sid), eq(factorySuppliers.companyId, companyId)));
-        if (!supplier) return res.status(404).json({ message: "Supplier not found" });
-        const oldRate = parseFloat(supplier.currentRawMaterialCostPerKgUsd as string || "0");
-        await db
-          .update(factorySuppliers)
-          .set({ currentRawMaterialCostPerKgUsd: String(costPerKgUsd), updatedAt: new Date() })
-          .where(and(eq(factorySuppliers.id, sid), eq(factorySuppliers.companyId, companyId)));
-        await logAudit({
-          userId: req.session.userId,
-          username: req.session.username || req.session.userId,
-          companyId,
-          action: "update",
-          tableName: "factory_suppliers",
-          recordId: sid,
-          recordIdentifier: `supplier-rate/recompute — stable weighted avg from ${rows.length} raw-stock rows`,
-          changes: { old: { currentRawMaterialCostPerKgUsd: oldRate }, new: { currentRawMaterialCostPerKgUsd: costPerKgUsd } },
+
+        const results: Array<{ supplierId: number; oldRate: number; newRate: number; rowCount: number; skipped?: string }> = [];
+
+        for (const sid of supplierIds) {
+          const [existing] = await db
+            .select({ currentRawMaterialCostPerKgUsd: factorySuppliers.currentRawMaterialCostPerKgUsd })
+            .from(factorySuppliers)
+            .where(and(eq(factorySuppliers.id, sid), eq(factorySuppliers.companyId, companyId)));
+          if (!existing) continue;
+
+          const oldRate = parseFloat(existing.currentRawMaterialCostPerKgUsd as string || "0");
+          const { costPerKgUsd, totalReceivedKg, rows } = await db.transaction(async (tx: any) => {
+            return getStableSupplierCost(tx, companyId, sid);
+          });
+
+          if (costPerKgUsd <= 0) {
+            results.push({ supplierId: sid, oldRate, newRate: 0, rowCount: 0, skipped: "No usable raw-stock rows" });
+            continue;
+          }
+          if (Math.abs(costPerKgUsd - oldRate) < 0.000001) {
+            results.push({ supplierId: sid, oldRate, newRate: costPerKgUsd, rowCount: rows.length, skipped: "Already correct" });
+            continue;
+          }
+
+          await db
+            .update(factorySuppliers)
+            .set({ currentRawMaterialCostPerKgUsd: String(costPerKgUsd), updatedAt: new Date() })
+            .where(and(eq(factorySuppliers.id, sid), eq(factorySuppliers.companyId, companyId)));
+
+          await logAudit({
+            userId: req.session.userId,
+            username: req.session.username || req.session.userId,
+            companyId,
+            action: "update",
+            tableName: "factory_suppliers",
+            recordId: sid,
+            recordIdentifier: `supplier-rate/recompute — stable avg from ${rows.length} rows, totalReceived ${totalReceivedKg}kg`,
+            changes: { old: { currentRawMaterialCostPerKgUsd: oldRate }, new: { currentRawMaterialCostPerKgUsd: costPerKgUsd } },
+          });
+          results.push({ supplierId: sid, oldRate, newRate: costPerKgUsd, rowCount: rows.length });
+        }
+
+        res.json({
+          updated: results.filter((r) => !r.skipped).length,
+          skipped: results.filter((r) => !!r.skipped).length,
+          results,
         });
-        res.json({ supplierId: sid, oldRate, newRate: costPerKgUsd, totalReceivedKg, rowCount: rows.length });
       } catch (err: any) {
         console.error("[supplier-rate/recompute] error:", err);
         res.status(500).json({ message: err.message || "Failed to recompute supplier rate" });
