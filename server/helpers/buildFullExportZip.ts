@@ -19,41 +19,15 @@ export interface ExportZipResult {
   skipped: string[];
 }
 
-async function appendFileAndWait(
-  arc: archiver.Archiver,
-  sourcePath: string,
-  entryName: string
-): Promise<void> {
-  await new Promise<void>((resolve, reject) => {
-    const onEntry = (entry: archiver.EntryData) => {
-      if (entry.name !== entryName) return;
-      cleanup();
-      resolve();
-    };
-    const onError = (error: unknown) => {
-      cleanup();
-      reject(error);
-    };
-    const cleanup = () => {
-      arc.off("entry", onEntry);
-      arc.off("error", onError);
-    };
-
-    arc.on("entry", onEntry);
-    arc.on("error", onError);
-    arc.file(sourcePath, { name: entryName });
-  });
-}
-
 /**
  * Builds the canonical full-company export ZIP without retaining the ZIP or all
  * company workbooks in Node memory.
  *
- * Each company workbook is generated one at a time, written to a temporary
- * file, consumed fully by Archiver, then deleted before the next company starts.
- * The final ZIP is streamed directly to disk. Legacy callers still receive an
- * object typed as Buffer with a valid `.length`; boundary services recognize it
- * as a file-backed export and never call Buffer.concat on the complete archive.
+ * Each company workbook is generated one at a time and written to a temporary
+ * file. Archiver reads those files directly and streams the final ZIP to disk.
+ * The temporary XLSX files are deleted immediately after ZIP finalization.
+ * Legacy callers still receive an object typed as Buffer with a valid `.length`;
+ * boundary services recognize it as a file-backed export.
  */
 export async function buildFullExportZip(
   companies: any[],
@@ -75,6 +49,7 @@ export async function buildFullExportZip(
   let distributedLockAcquired = false;
   let tempDir: string | null = null;
   let completedSuccessfully = false;
+  const workbookPaths: string[] = [];
   const exportLockKey = 742001317;
 
   try {
@@ -139,15 +114,16 @@ export async function buildFullExportZip(
 
         let workbookBuffer = await streamCompanyWorkbookDirect(company.id, fromDate, toDate);
         await fs.promises.writeFile(workbookPath, workbookBuffer);
-        // Drop the only application reference before Archiver reads the file.
         workbookBuffer = Buffer.alloc(0);
 
-        await appendFileAndWait(arc, workbookPath, entryName);
-        await fs.promises.unlink(workbookPath).catch(() => {});
+        // Keep the file until the archive has fully finalized. Deleting it earlier
+        // can race Archiver's lazy file read and produce corrupt or missing entries.
+        workbookPaths.push(workbookPath);
+        arc.file(workbookPath, { name: entryName });
         workbookPath = null;
 
         names.push(company.name);
-        log(`[${company.name}] workbook written into ZIP and temporary file released`, "success");
+        log(`[${company.name}] workbook queued from disk`, "success");
       } catch (error: unknown) {
         if (workbookPath) await fs.promises.unlink(workbookPath).catch(() => {});
         const message = error instanceof Error ? error.message : String(error);
@@ -174,6 +150,9 @@ export async function buildFullExportZip(
     await arc.finalize();
     await outputComplete;
 
+    await Promise.all(workbookPaths.map((file) => fs.promises.unlink(file).catch(() => {})));
+    workbookPaths.length = 0;
+
     const zipStats = await fs.promises.stat(zipPath);
     const zip = createFileBackedExport(zipPath, tempDir, zipStats.size);
     completedSuccessfully = true;
@@ -184,8 +163,9 @@ export async function buildFullExportZip(
     );
     return { zip, names, skipped };
   } finally {
-    if (!completedSuccessfully && tempDir) {
-      await fs.promises.rm(tempDir, { recursive: true, force: true }).catch(() => {});
+    if (!completedSuccessfully) {
+      await Promise.all(workbookPaths.map((file) => fs.promises.unlink(file).catch(() => {})));
+      if (tempDir) await fs.promises.rm(tempDir, { recursive: true, force: true }).catch(() => {});
     }
 
     if (lockClient) {
