@@ -106,26 +106,29 @@ export function EditMixBatchDialog({ batch, open, onOpenChange }: EditMixBatchDi
         });
       } else if (src.supplierId) {
         // Supplier source (may span multiple containers — aggregate by supplierId).
-        // Cost/kg ALWAYS comes from the current server-authoritative locked rate
-        // (GET /api/factory/raw-stock), never from the stored source's historical
-        // costPerKg — the locked rate is the single source of truth for a supplier's
-        // rate and must be what's previewed/edited-against, not a stale snapshot.
+        // Cost/kg comes from the stored source row (the rate that was actually used
+        // when this batch was created/last edited), so the modal reflects the real
+        // historical cost. When the user adds a brand-new source, the live locked
+        // rate is used instead (see handleAddSource below).
         const existing = supplierMap.get(src.supplierId);
         const stockRow = supplierStock.find((s) => s.supplierId === src.supplierId);
         // Available = current remaining + what was consumed (returns on edit)
         const currentRemaining = stockRow ? parseFloat(stockRow.remainingKg) : 0;
-        const currentRate = stockRow ? parseFloat(stockRow.costPerKgUsd || stockRow.costPerKg || "0") : 0;
+        const storedRate = parseFloat(src.costPerKg) || 0;
         const srcWeight = parseFloat(src.weightKg);
         if (existing) {
-          existing.weightKg += srcWeight;
-          existing.costPerKg = currentRate;
-          existing.totalCost = existing.weightKg * existing.costPerKg;
-          existing.availableKg = currentRemaining + existing.weightKg;
+          // Weighted-average the stored rates across multiple source rows for the same supplier
+          const combinedWeight = existing.weightKg + srcWeight;
+          const combinedCost = existing.totalCost + srcWeight * storedRate;
+          existing.weightKg = combinedWeight;
+          existing.costPerKg = combinedWeight > 0 ? combinedCost / combinedWeight : storedRate;
+          existing.totalCost = combinedCost;
+          existing.availableKg = currentRemaining + combinedWeight;
         } else {
           supplierMap.set(src.supplierId, {
             weightKg: srcWeight,
-            costPerKg: currentRate,
-            totalCost: srcWeight * currentRate,
+            costPerKg: storedRate,
+            totalCost: srcWeight * storedRate,
             label: src.supplierName || `Supplier #${src.supplierId}`,
             availableKg: currentRemaining + srcWeight,
           });
