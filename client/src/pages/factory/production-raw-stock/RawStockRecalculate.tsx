@@ -258,6 +258,25 @@ export default function RawStockRecalculate() {
     enabled: activeTab === "history",
   });
 
+  const autoApplyFxMutation = useMutation({
+    mutationFn: async (containerIds: number[]) => {
+      const res = await modeApiRequest("POST", "/api/factory/raw-stock/recalc/auto-apply-fx", { containerIds });
+      if (!res.ok) throw new Error((await res.json()).message || "Failed to auto-apply FX");
+      return res.json() as Promise<{ results: { containerNumber: string; rate: number | null; applied: boolean; reason?: string }[]; applied: number }>;
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/raw-stock/recalc/full-audit"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/raw-stock/recalc/preview"] });
+      const lines = data.results.map((r) =>
+        r.applied ? `${r.containerNumber}: applied ${r.rate}` : `${r.containerNumber}: skipped (${r.reason})`
+      );
+      toast({ title: `FX applied to ${data.applied} container(s)`, description: lines.join(" · ") });
+    },
+    onError: (err: any) => {
+      toast({ title: "Auto-apply FX failed", description: err.message, variant: "destructive" });
+    },
+  });
+
   const undoMutation = useMutation({
     mutationFn: async (undoLogId: number) => {
       const res = await modeApiRequest("POST", "/api/factory/raw-stock/recalc/undo", { undoLogId });
@@ -1099,12 +1118,23 @@ export default function RawStockRecalculate() {
                               Yes
                             </Badge>
                           ) : r.codes.includes("MANUAL_REVIEW_REQUIRED") ? (
-                            <Badge
-                              variant="outline"
-                              className="text-amber-600 border-amber-500/30 bg-amber-500/10"
-                            >
-                              Manual review
-                            </Badge>
+                            <div className="flex items-center justify-end gap-2">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-6 text-xs px-2 text-blue-600 border-blue-500/30 bg-blue-500/10 hover:bg-blue-500/20"
+                                disabled={autoApplyFxMutation.isPending}
+                                onClick={() => autoApplyFxMutation.mutate([r.containerId])}
+                              >
+                                Apply rate from FX table
+                              </Button>
+                              <Badge
+                                variant="outline"
+                                className="text-amber-600 border-amber-500/30 bg-amber-500/10"
+                              >
+                                Manual review
+                              </Badge>
+                            </div>
                           ) : (
                             <span className="text-xs text-muted-foreground">—</span>
                           )}
