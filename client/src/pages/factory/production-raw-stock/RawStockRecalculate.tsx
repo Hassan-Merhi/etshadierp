@@ -382,7 +382,10 @@ export default function RawStockRecalculate() {
       const results = data.results || [];
       queryClient.invalidateQueries({ queryKey: ["/api/factory/raw-stock"] });
       queryClient.invalidateQueries({ queryKey: ["/api/factory/raw-stock/recalc/preview"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/raw-stock/recalc/full-audit"] });
       queryClient.invalidateQueries({ queryKey: ["/api/factory/mix-batches"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/containers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/raw-stock/available-containers"] });
       setSelected(new Set());
       const totalBatches = results.reduce((s: number, r: any) => s + r.affectedBatches, 0);
       const totalBales = results.reduce((s: number, r: any) => s + r.affectedBales, 0);
@@ -472,6 +475,30 @@ export default function RawStockRecalculate() {
     wrapAdminAction(() => {
       applyAllSafeMutation.mutate({ includeHistoricalContainers, includeCompletedBatches });
     }, `Apply all safe raw-material cost repairs (${count} container(s))`);
+  };
+
+  // ── Fix All Partial Offloads ───────────────────────────────────────────────
+  // Filters the preview to PARTIALLY_RECEIVED containers that have a changed cost
+  // and a resolved FX rate, then applies the recalculation with both historical
+  // and completed-batch flags on — since partial offload containers span history.
+  const partialOffloadCandidates = useMemo(
+    () =>
+      (rows || []).filter(
+        (r) => r.containerStatus === "PARTIALLY_RECEIVED" && r.changed && !r.fxUnresolved
+      ),
+    [rows]
+  );
+
+  const handleFixPartialOffloads = () => {
+    if (partialOffloadCandidates.length === 0) return;
+    const ids = partialOffloadCandidates.map((r) => r.containerId);
+    wrapAdminAction(() => {
+      applyMutation.mutate({
+        containerIds: ids,
+        includeHistoricalContainers: true,
+        includeCompletedBatches: true,
+      });
+    }, `Fix cost on ${ids.length} PARTIALLY_RECEIVED container(s) — includes historical and completed batches`);
   };
 
   // ── Recompute all supplier locked rates ───────────────────────────────────
@@ -728,7 +755,21 @@ export default function RawStockRecalculate() {
       {activeTab === "recalc" && (
         <>
           <div className="flex items-center justify-between gap-2 flex-wrap">
-            <div />
+            <div>
+              {partialOffloadCandidates.length > 0 && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={applyMutation.isPending}
+                  onClick={handleFixPartialOffloads}
+                  title="Apply the correct fixed landed cost/kg to all PARTIALLY_RECEIVED containers with a changed cost and resolved FX rate — uses includeHistoricalContainers + includeCompletedBatches."
+                  className="gap-2 text-blue-700 border-blue-400/50 hover:bg-blue-500/10"
+                >
+                  <Layers className="h-3.5 w-3.5" />
+                  {applyMutation.isPending ? "Applying..." : `Fix All Partial Offloads (${partialOffloadCandidates.length})`}
+                </Button>
+              )}
+            </div>
             <Button
               size="sm"
               disabled={selected.size === 0 || applyMutation.isPending}
