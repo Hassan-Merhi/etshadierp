@@ -91,6 +91,10 @@ if (!globalThis[BRIDGE_FLAG]) {
     }
   }
 
+  function requestTargetOf(store) {
+    return `${store?.pathname || ""} ${store?.req?.url || ""}`;
+  }
+
   function headerValue(res, name) {
     const value = res?.getHeader?.(name);
     if (Array.isArray(value)) return value.join(",");
@@ -102,7 +106,7 @@ if (!globalThis[BRIDGE_FLAG]) {
   }
 
   function looksLikeWorkbookDownload(store) {
-    if (!store || bridgeDisabled || isExcludedDeliveryPath(store.pathname)) return false;
+    if (!store || bridgeDisabled || isExcludedDeliveryPath(requestTargetOf(store))) return false;
     const disposition = headerValue(store.res, "Content-Disposition").toLowerCase();
     const contentType = headerValue(store.res, "Content-Type").toLowerCase();
     const attachmentWorkbook =
@@ -111,20 +115,24 @@ if (!globalThis[BRIDGE_FLAG]) {
     if (attachmentWorkbook) return true;
     return (
       (store.req?.method === "GET" || store.req?.method === "HEAD") &&
-      /(?:export|download|excel|xlsx)/i.test(store.pathname)
+      /(?:export|download|excel|xlsx|format=(?:excel|xlsx))/i.test(requestTargetOf(store))
     );
   }
 
   function looksLikeChunkDownload(store) {
-    if (!store || bridgeDisabled || isExcludedDeliveryPath(store.pathname)) return false;
+    if (!store || bridgeDisabled || isExcludedDeliveryPath(requestTargetOf(store))) return false;
     const disposition = headerValue(store.res, "Content-Disposition").toLowerCase();
-    if (!disposition.includes("attachment")) return false;
     const contentType = headerValue(store.res, "Content-Type").toLowerCase();
+    const attachmentChunk =
+      disposition.includes("attachment") &&
+      (contentType.includes("application/pdf") ||
+        contentType.includes("application/zip") ||
+        contentType.includes("application/x-zip") ||
+        (contentType.includes("application/octet-stream") && /\.(?:pdf|zip)(?:"|$)/i.test(disposition)));
+    if (attachmentChunk) return true;
     return (
-      contentType.includes("application/pdf") ||
-      contentType.includes("application/zip") ||
-      contentType.includes("application/x-zip") ||
-      (contentType.includes("application/octet-stream") && /\.(?:pdf|zip)(?:"|$)/i.test(disposition))
+      (store.req?.method === "GET" || store.req?.method === "HEAD") &&
+      /(?:export|download|pdf|zip|format=(?:pdf|zip))/i.test(requestTargetOf(store))
     );
   }
 
@@ -146,6 +154,20 @@ if (!globalThis[BRIDGE_FLAG]) {
 
   function createMarker(payload) {
     const marker = Buffer.alloc(0);
+    if (Number.isFinite(payload.length) && payload.length >= 0) {
+      Object.defineProperty(marker, "length", {
+        configurable: false,
+        enumerable: false,
+        writable: false,
+        value: payload.length,
+      });
+      Object.defineProperty(marker, "byteLength", {
+        configurable: false,
+        enumerable: false,
+        writable: false,
+        value: payload.length,
+      });
+    }
     Object.defineProperty(marker, EXPORT_MARKER_KEY, {
       configurable: false,
       enumerable: false,
