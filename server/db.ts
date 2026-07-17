@@ -61,10 +61,14 @@ export const pool = new Pool({
   connectionString,
   ssl: requiresSSL ? { rejectUnauthorized: false } : false,
   max: poolMax,
+  // Keep at least 2 warm connections so requests never pay SSL-handshake overhead
+  // on the first query after an idle period (each new connection to Render ≈ 500ms).
+  min: 2,
   // Fail fast so requests error quickly rather than queuing indefinitely.
   connectionTimeoutMillis: 8000,
-  // Release idle connections after 30 seconds.
-  idleTimeoutMillis: 30000,
+  // Keep idle connections for 2 minutes (was 30s). Reduces SSL-reconnect overhead
+  // on cross-region deployments where re-establishing a connection costs ~500ms.
+  idleTimeoutMillis: 120_000,
   // Keep the pool alive across idle periods instead of draining to zero.
   allowExitOnIdle: false,
 });
