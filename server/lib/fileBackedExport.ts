@@ -1,4 +1,5 @@
 import fs from "fs";
+import os from "os";
 import path from "path";
 import { logger } from "./logger";
 
@@ -79,18 +80,50 @@ export async function cleanupExportPath(filePath: string | null | undefined): Pr
     return;
   }
 
-  // Only delete paths inside the OS temp export prefix. Never accept an arbitrary
-  // path from an HTTP request or database row.
   const parent = path.dirname(filePath);
   if (path.basename(parent).startsWith("erp-export-")) {
     await fs.promises.rm(parent, { recursive: true, force: true }).catch(() => {});
   }
 }
 
+async function cleanupStaleExportDirectories(): Promise<void> {
+  const cutoff = Date.now() - cleanupTtlMs;
+  let entries: fs.Dirent[] = [];
+
+  try {
+    entries = await fs.promises.readdir(os.tmpdir(), { withFileTypes: true });
+  } catch {
+    return;
+  }
+
+  for (const entry of entries) {
+    if (!entry.isDirectory() || !entry.name.startsWith("erp-export-")) continue;
+    const tempDir = path.join(os.tmpdir(), entry.name);
+
+    // Never remove a directory currently registered in this process.
+    if (Array.from(artifacts.values()).some((artifact) => artifact.tempDir === tempDir)) continue;
+
+    try {
+      const stat = await fs.promises.stat(tempDir);
+      if (stat.mtimeMs >= cutoff) continue;
+      await fs.promises.rm(tempDir, { recursive: true, force: true });
+      logger.info("Removed stale export temporary directory", {
+        module: "file-backed-export",
+        action: "stale-cleanup",
+        tempDir,
+      });
+    } catch {
+      // Directory disappeared or is temporarily inaccessible.
+    }
+  }
+}
+
+void cleanupStaleExportDirectories();
 const cleanupTimer = setInterval(() => {
   const cutoff = Date.now() - cleanupTtlMs;
   for (const artifact of artifacts.values()) {
     if (artifact.createdAt < cutoff) void cleanupFileBackedExport(artifact);
   }
+  void cleanupStaleExportDirectories();
 }, 5 * 60 * 1000);
 cleanupTimer.unref();
