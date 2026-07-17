@@ -8,13 +8,19 @@
  * duplicated.
  *
  * Business rules:
- *   valuationKg = container.totalKg || container.declaredKg || container.actualReceivedKg
- *   fixedLandedCostPerKg = fullLandedValue / valuationKg
  *
- * Fixed charges (freight, commission, duty, additional charges) are spread
- * over the full declared quantity, not just the kilograms received in one
- * partial receipt. This keeps the per-kg rate stable across all partial
- * receipts of the same container.
+ *   Full value basis (originalCostBasisKg):
+ *     container.totalKg || container.declaredKg || container.actualReceivedKg
+ *   The full material value (basePayable = originalCostBasisKg × ratePerKg) and
+ *   all fixed charges (freight, commission, duty, additional) are computed from
+ *   this quantity and are NEVER reduced because fewer kilograms were received.
+ *
+ *   Per-kg allocation basis (receivedAllocationKg):
+ *     container.actualReceivedKg when > 0, otherwise originalCostBasisKg
+ *   This quantity is used ONLY as the denominator for costPerKg / costPerKgUsd.
+ *   When the actual received weight is lower than the original agreed quantity,
+ *   the full container value is spread over fewer kilograms, producing a higher
+ *   cost/kg — which is the correct business outcome.
  */
 import Decimal from "decimal.js";
 import {
@@ -29,15 +35,26 @@ import { resolveStoredFxRate } from "./currencyConversion";
 export const COST_SCALE = 6;
 
 export interface ContainerLandedCostResult {
-  /** The denominator used for rate calculations (totalKg → declaredKg → actualReceivedKg). */
+  /**
+   * Original agreed quantity (totalKg → declaredKg → actualReceivedKg).
+   * Used as the full-value basis; kept for backward compatibility with
+   * historical-detection code that reads this field.
+   */
   valuationKg: number;
+  /**
+   * Actual received quantity used as the cost/kg denominator.
+   * Equals container.actualReceivedKg when > 0, otherwise valuationKg.
+   * When actualReceivedKg < valuationKg, the full container value is spread
+   * over fewer kilograms, producing a higher cost/kg.
+   */
+  allocationKg: number;
   /** Full container landed value in native container currency. */
   fullCost: number;
   /** Full container landed value in USD. */
   fullCostUsd: number;
-  /** fullCost / valuationKg, rounded to COST_SCALE decimal places. */
+  /** fullCost / allocationKg, rounded to COST_SCALE decimal places. */
   costPerKg: number;
-  /** fullCostUsd / valuationKg, rounded to COST_SCALE decimal places. */
+  /** fullCostUsd / allocationKg, rounded to COST_SCALE decimal places. */
   costPerKgUsd: number;
   /** True when a non-USD currency has no confirmed FX rate — do NOT store or cascade. */
   fxUnresolved: boolean;
@@ -66,22 +83,32 @@ export function computeContainerLandedCost(
     (container as any).fxRateConfirmed
   );
   if (!fxLooksSet) {
-    return { valuationKg: 0, fullCost: 0, fullCostUsd: 0, costPerKg: 0, costPerKgUsd: 0, fxUnresolved: true };
+    return { valuationKg: 0, allocationKg: 0, fullCost: 0, fullCostUsd: 0, costPerKg: 0, costPerKgUsd: 0, fxUnresolved: true };
   }
 
-  // valuationKg: totalKg first, declaredKg second, actualReceivedKg only for legacy records
-  // with neither field set. This denominator is FIXED at first offload — partial receipts
-  // do not change it — so the cost/kg is stable across all receipts of the same container.
-  const canonicalKg = new Decimal(
+  // originalCostBasisKg: the original agreed quantity used to compute the full material
+  // value (totalKg → declaredKg → actualReceivedKg for legacy records with neither set).
+  // This drives basePayable and all fixed charges — it never decreases because some kg
+  // were missing on arrival.
+  const originalCostBasisKg = new Decimal(
     (container as any).totalKg || container.declaredKg || container.actualReceivedKg || "0"
   );
-  if (canonicalKg.lte(0)) {
-    return { valuationKg: 0, fullCost: 0, fullCostUsd: 0, costPerKg: 0, costPerKgUsd: 0, fxUnresolved: false };
+  if (originalCostBasisKg.lte(0)) {
+    return { valuationKg: 0, allocationKg: 0, fullCost: 0, fullCostUsd: 0, costPerKg: 0, costPerKgUsd: 0, fxUnresolved: false };
   }
+
+  // receivedAllocationKg: the actual received quantity used ONLY as the cost/kg denominator.
+  // When the factory received fewer kilograms than originally agreed, the full container
+  // value is spread over the smaller received quantity, raising cost/kg accordingly.
+  const rawReceivedKg = parseFloat(container.actualReceivedKg || "0");
+  const receivedAllocationKg = rawReceivedKg > 0
+    ? new Decimal(container.actualReceivedKg!)
+    : originalCostBasisKg;
 
   const dFxRate = new Decimal(fxRate);
   const baseRate = new Decimal(container.ratePerKg || "0");
-  const basePayable = canonicalKg.times(baseRate);
+  // Full material value always uses the original agreed quantity — not reduced by short delivery.
+  const basePayable = originalCostBasisKg.times(baseRate);
   const baseMaterialUsd = containerCcy === "USD" ? basePayable : basePayable.times(dFxRate);
 
   // ── Freight ──────────────────────────────────────────────────────────────
@@ -276,11 +303,12 @@ export function computeContainerLandedCost(
     .plus(addlUsd);
 
   return {
-    valuationKg: canonicalKg.toNumber(),
+    valuationKg: originalCostBasisKg.toNumber(),
+    allocationKg: receivedAllocationKg.toNumber(),
     fullCost: totalCost.toNumber(),
     fullCostUsd: totalUsd.toNumber(),
-    costPerKg: totalCost.div(canonicalKg).toDecimalPlaces(COST_SCALE).toNumber(),
-    costPerKgUsd: totalUsd.div(canonicalKg).toDecimalPlaces(COST_SCALE).toNumber(),
+    costPerKg: totalCost.div(receivedAllocationKg).toDecimalPlaces(COST_SCALE).toNumber(),
+    costPerKgUsd: totalUsd.div(receivedAllocationKg).toDecimalPlaces(COST_SCALE).toNumber(),
     fxUnresolved: commFxUnresolved || freightFxUnresolved || ocFxUnresolved || addlFxUnresolved,
   };
 }
