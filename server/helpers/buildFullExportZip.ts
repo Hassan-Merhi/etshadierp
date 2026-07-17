@@ -1,6 +1,8 @@
 import archiver from "archiver";
 import { streamCompanyWorkbookDirect } from "../services/exportExcelService";
 import { logger } from "../lib/logger";
+import { pool } from "../db";
+import { tryAcquireExclusiveTask } from "../lib/resourceGuard";
 
 export interface ExportZipResult {
   zip: Buffer;
@@ -29,77 +31,121 @@ export async function buildFullExportZip(
   toDate?: string,
   onProgress?: (msg: string, level?: "info" | "success" | "warning" | "error") => void
 ): Promise<ExportZipResult> {
-  const log =
-    onProgress ??
-    ((message: string, level: "info" | "success" | "warning" | "error" = "info") => {
-      const context = { module: "full-export", action: "build-zip" };
-      if (level === "error") logger.error(message, context);
-      else if (level === "warning") logger.warn(message, context);
-      else logger.info(message, context);
-    });
+  const releaseTask = tryAcquireExclusiveTask("full-export", `pid:${process.pid}`);
 
-  const dateLabel = new Date().toISOString().substring(0, 10);
-  const names: string[] = [];
-  const skipped: string[] = [];
+  if (!releaseTask) {
+    const message = "Another full export is already running. Wait for it to finish before starting a new one.";
+    onProgress?.(message, "warning");
+    const error = new Error(message);
+    (error as any).code = "EXPORT_ALREADY_RUNNING";
+    throw error;
+  }
 
-  // Start the archiver up front so we can stream into it company-by-company.
-  const chunks: Buffer[] = [];
-  const arc = archiver("zip", { zlib: { level: 6 } });
-  arc.on("data", (chunk: Buffer) => chunks.push(chunk));
-  arc.on("warning", (error: unknown) => {
-    logger.warn("Export ZIP archiver warning", {
-      module: "full-export",
-      action: "archive",
-      error,
-    });
-  });
+  let lockClient: Awaited<ReturnType<typeof pool.connect>> | null = null;
+  let distributedLockAcquired = false;
+  const exportLockKey = 742001317;
 
-  const zipPromise = new Promise<Buffer>((resolve, reject) => {
-    arc.on("end", () => resolve(Buffer.concat(chunks)));
-    arc.on("error", reject);
-  });
+  try {
+    lockClient = await pool.connect();
+    const lockResult = await lockClient.query("SELECT pg_try_advisory_lock($1) AS locked", [exportLockKey]);
+    distributedLockAcquired = lockResult.rows[0]?.locked === true;
 
-  for (const company of companies) {
-    try {
-      log(`[${company.name}] Building workbook (streaming, one sheet at a time)...`, "info");
+    if (!distributedLockAcquired) {
+      const message = "Another full export is already running on a different server instance.";
+      onProgress?.(message, "warning");
+      const error = new Error(message);
+      (error as any).code = "EXPORT_ALREADY_RUNNING";
+      throw error;
+    }
 
-      const safeName = company.name.replace(/[^a-zA-Z0-9_\- ]/g, "").trim();
-      const entryName = `${safeName}_Export_${dateLabel}.xlsx`;
+    const log =
+      onProgress ??
+      ((message: string, level: "info" | "success" | "warning" | "error" = "info") => {
+        const context = { module: "full-export", action: "build-zip" };
+        if (level === "error") logger.error(message, context);
+        else if (level === "warning") logger.warn(message, context);
+        else logger.info(message, context);
+      });
 
-      // Build the workbook and get a Buffer, then append the buffer
-      // directly to the archiver — no PassThrough stream needed.
-      const xlsBuf = await streamCompanyWorkbookDirect(company.id, fromDate, toDate);
-      arc.append(xlsBuf, { name: entryName });
+    const dateLabel = new Date().toISOString().substring(0, 10);
+    const names: string[] = [];
+    const skipped: string[] = [];
 
-      names.push(company.name);
-      log(`[${company.name}] workbook streamed into ZIP`, "success");
-    } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : String(error);
-      log(`[${company.name}] Failed: ${message}`, "error");
-      logger.error("Company workbook export failed", {
+    // Start the archiver up front so we can stream into it company-by-company.
+    const chunks: Buffer[] = [];
+    const arc = archiver("zip", { zlib: { level: 6 } });
+    arc.on("data", (chunk: Buffer) => chunks.push(chunk));
+    arc.on("warning", (error: unknown) => {
+      logger.warn("Export ZIP archiver warning", {
         module: "full-export",
-        action: "company-workbook",
-        companyId: company.id,
-        companyName: company.name,
+        action: "archive",
         error,
       });
-      skipped.push(company.name);
+    });
+
+    const zipPromise = new Promise<Buffer>((resolve, reject) => {
+      arc.on("end", () => resolve(Buffer.concat(chunks)));
+      arc.on("error", reject);
+    });
+
+    for (const company of companies) {
+      try {
+        log(`[${company.name}] Building workbook (streaming, one sheet at a time)...`, "info");
+
+        const safeName = company.name.replace(/[^a-zA-Z0-9_\- ]/g, "").trim();
+        const entryName = `${safeName}_Export_${dateLabel}.xlsx`;
+
+        // Build the workbook and get a Buffer, then append the buffer
+        // directly to the archiver — no PassThrough stream needed.
+        const xlsBuf = await streamCompanyWorkbookDirect(company.id, fromDate, toDate);
+        arc.append(xlsBuf, { name: entryName });
+
+        names.push(company.name);
+        log(`[${company.name}] workbook streamed into ZIP`, "success");
+      } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : String(error);
+        log(`[${company.name}] Failed: ${message}`, "error");
+        logger.error("Company workbook export failed", {
+          module: "full-export",
+          action: "company-workbook",
+          companyId: company.id,
+          companyName: company.name,
+          error,
+        });
+        skipped.push(company.name);
+      }
     }
+
+    if (names.length === 0) {
+      arc.abort();
+      const message = `Export aborted — all ${companies.length} company/companies failed to generate workbooks. ZIP would be empty. Check server logs for per-company errors.`;
+      log(message, "error");
+      throw new Error(message);
+    }
+
+    arc.finalize();
+    const zip = await zipPromise;
+
+    log(
+      `ZIP ready — ${(zip.length / 1024 / 1024).toFixed(1)} MB (${names.length} companies, ${skipped.length} skipped)`,
+      "success"
+    );
+    return { zip, names, skipped };
+  } finally {
+    if (lockClient) {
+      if (distributedLockAcquired) {
+        await lockClient
+          .query("SELECT pg_advisory_unlock($1)", [exportLockKey])
+          .catch((error: unknown) =>
+            logger.warn("Failed to release full-export advisory lock", {
+              module: "full-export",
+              action: "release-lock",
+              error,
+            })
+          );
+      }
+      lockClient.release();
+    }
+    releaseTask();
   }
-
-  if (names.length === 0) {
-    arc.abort();
-    const message = `Export aborted — all ${companies.length} company/companies failed to generate workbooks. ZIP would be empty. Check server logs for per-company errors.`;
-    log(message, "error");
-    throw new Error(message);
-  }
-
-  arc.finalize();
-  const zip = await zipPromise;
-
-  log(
-    `ZIP ready — ${(zip.length / 1024 / 1024).toFixed(1)} MB (${names.length} companies, ${skipped.length} skipped)`,
-    "success"
-  );
-  return { zip, names, skipped };
 }
