@@ -2,6 +2,7 @@ import archiver from "archiver";
 import type { Writable } from "stream";
 import { streamCompanyWorkbookDirect } from "../services/exportExcelService";
 import { logger } from "../lib/logger";
+import { withHeavyExportSlot } from "../services/heavyExportCoordinator";
 
 export interface ExportZipResult {
   zip: Buffer;
@@ -89,11 +90,7 @@ async function appendCompanyWorkbooks(
   return { names, skipped };
 }
 
-/**
- * Direct-download path. The ZIP bytes flow from archiver to the HTTP response or
- * another Writable and are never retained as Buffer chunks in Node memory.
- */
-export async function streamFullExportZip(
+async function streamFullExportZipUnsafe(
   destination: Writable,
   companies: any[],
   fromDate?: string,
@@ -125,10 +122,23 @@ export async function streamFullExportZip(
 }
 
 /**
- * Attachment compatibility path used by email and WhatsApp providers, which
- * require final bytes. Direct browser downloads must use streamFullExportZip.
+ * Direct-download path. The ZIP bytes flow from archiver to the HTTP response or
+ * another Writable and are never retained as Buffer chunks in Node memory.
+ * All callers share the global heavy-export slot to prevent overlapping builds.
  */
-export async function buildFullExportZip(
+export async function streamFullExportZip(
+  destination: Writable,
+  companies: any[],
+  fromDate?: string,
+  toDate?: string,
+  onProgress?: ExportProgress
+): Promise<StreamExportZipResult> {
+  return withHeavyExportSlot("full-export-stream", () =>
+    streamFullExportZipUnsafe(destination, companies, fromDate, toDate, onProgress)
+  );
+}
+
+async function buildFullExportZipUnsafe(
   companies: any[],
   fromDate?: string,
   toDate?: string,
@@ -154,4 +164,19 @@ export async function buildFullExportZip(
     "success"
   );
   return { zip, names, skipped };
+}
+
+/**
+ * Attachment compatibility path used by email and WhatsApp providers, which
+ * require final bytes. It is still serialized through the heavy-export slot.
+ */
+export async function buildFullExportZip(
+  companies: any[],
+  fromDate?: string,
+  toDate?: string,
+  onProgress?: ExportProgress
+): Promise<ExportZipResult> {
+  return withHeavyExportSlot("full-export-buffered", () =>
+    buildFullExportZipUnsafe(companies, fromDate, toDate, onProgress)
+  );
 }
