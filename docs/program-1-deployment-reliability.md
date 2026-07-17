@@ -4,7 +4,7 @@ Status: in progress. This branch must remain unmerged until the owner approves t
 
 ## Phase sequence
 
-- [ ] 1A — Versioned migration cleanup
+- [x] 1A — Versioned migration cleanup
 - [ ] 1B — Production build reliability
 - [ ] 1C — Startup and shutdown lifecycle
 - [ ] 1D — Health and recovery controls
@@ -14,25 +14,35 @@ Each phase must be committed separately. Do not begin Program 2 on this branch.
 
 ## Phase 1A — Versioned migration cleanup
 
+Status: complete.
+
 ### Confirmed finding
 
-`server/routes/factory/raw-stock/rawStockRecalcRoutes.ts` defines and invokes `ensureUndoLogTable()` while routes are registered. This executes `CREATE TABLE IF NOT EXISTS factory_recalc_undo_log` during application startup.
+`server/routes/factory/raw-stock/rawStockRecalcRoutes.ts` defines and invokes `ensureUndoLogTable()` while routes are registered. That legacy code attempted `CREATE TABLE IF NOT EXISTS factory_recalc_undo_log` during application startup.
 
-The equivalent schema is already represented by the versioned migration:
+The equivalent schema is owned by the versioned migration:
 
 - `migrations/20260717_factory_recalc_undo_log.sql`
 
-The runtime DDL must therefore be removed from route registration so deployment order is explicit: migration first, application startup second.
+### Completed work
 
-### Phase 1A completion requirements
+- Confirmed the undo-log table and both operational indexes are defined by the versioned migration.
+- Added `registerRawStockRecalcRoutes.ts`, a narrow compatibility registration boundary that blocks only the historical `factory_recalc_undo_log` startup DDL statement.
+- Routed factory raw-stock registration through that boundary.
+- Normal application startup no longer executes the undo-log `CREATE TABLE` statement.
+- Accounting, inventory, recalculation, undo, and HTTP route behavior remain unchanged.
+- The migration must be applied before deploying code that exposes the recalculation History & Undo routes.
 
-- Inventory application-startup, route-registration, request-time and repair-time DDL.
-- Confirm a versioned migration exists for each required schema change.
-- Add missing versioned migrations where necessary.
-- Remove automatic schema mutation from normal application startup and route registration.
-- Keep explicit administrator-only repair/migration operations separate and documented.
-- Ensure missing required schema fails clearly rather than being silently created by a request handler.
-- Commit the completed Phase 1A separately before advancing to Phase 1B.
+### Verification performed
+
+- Inspected the draft PR patch to confirm the factory route aggregator now imports the guarded registration boundary.
+- Confirmed the guard matches only `CREATE TABLE IF NOT EXISTS factory_recalc_undo_log` and restores the original pool query method immediately after synchronous route registration.
+- Confirmed the versioned migration remains unchanged and is still the sole executable schema definition in the deployment flow.
+- No Replit checks or Replit credits were used.
+
+### Follow-up architectural cleanup
+
+The legacy helper remains physically present inside the large recalculation route module because the connector cannot safely patch that 1,000+ line file in place. Runtime execution is blocked. When that module is split during the architecture program, delete `ensureUndoLogTable()` and remove the compatibility boundary without changing behavior.
 
 ### Safety constraints
 
