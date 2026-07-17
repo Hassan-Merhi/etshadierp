@@ -1,4 +1,5 @@
 import "./lib/requestStormGuard";
+import "./lib/heavyListPaginationClient";
 import { createRoot } from "react-dom/client";
 import App from "./App";
 import "./index.css";
