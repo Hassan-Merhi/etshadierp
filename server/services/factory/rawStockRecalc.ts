@@ -782,7 +782,19 @@ export async function applyRawStockRecalc(
         .from(factoryContainers)
         .where(and(eq(factoryContainers.id, containerId), eq(factoryContainers.companyId, companyId)))
         .for("update");
-      if (!container) return null;
+      if (!container) {
+        return {
+          containerId,
+          containerNumber: String(containerId),
+          fullyUsed: false,
+          remainingKg: 0,
+          applied: false,
+          skippedReason: `Container #${containerId} not found for this company — possible company_id mismatch between factory_raw_stock and factory_containers.`,
+          rawStockRowsUpdated: 0,
+          affectedBatches: 0,
+          affectedBales: 0,
+        } as ApplyResult;
+      }
 
       // Guard: refuse CLOSED/COMPLETED unless admin explicitly opts in
       if (RECALC_REFUSED_STATUSES.has(container.status) && !opts.includeHistoricalContainers) {

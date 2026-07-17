@@ -391,17 +391,23 @@ export default function RawStockRecalculate() {
       queryClient.invalidateQueries({ queryKey: ["/api/factory/raw-stock/available-containers"] });
       queryClient.invalidateQueries({ queryKey: ["/api/factory/bales"] });
       setSelected(new Set());
+      const applied = results.filter((r: any) => r.applied === true);
+      const skipped = results.filter((r: any) => !r.applied);
       const totalBatches = results.reduce((s: number, r: any) => s + r.affectedBatches, 0);
       const totalBales = results.reduce((s: number, r: any) => s + r.affectedBales, 0);
       const totalCompleted = results.reduce(
         (s: number, r: any) => s + (r.completedBatchesRewritten || 0),
         0
       );
+      const skipSummary = skipped.length > 0
+        ? ` (${skipped.length} skipped: ${[...new Set(skipped.map((r: any) => r.skippedReason).filter(Boolean))].join("; ")})`
+        : "";
       toast({
         title: "Recalculation applied",
         description:
-          `Fixed ${results.length} container(s). Updated ${totalBatches} mix batch(es) and ${totalBales} bale(s).` +
-          (totalCompleted > 0 ? ` (${totalCompleted} were completed/closed batches.)` : ""),
+          `Fixed ${applied.length} of ${results.length} container(s). Updated ${totalBatches} mix batch(es) and ${totalBales} bale(s).` +
+          (totalCompleted > 0 ? ` (${totalCompleted} were completed/closed batches.)` : "") +
+          skipSummary,
       });
     },
     onError: (err: any) => {
