@@ -21,6 +21,7 @@ import { registerProductionPlannerRoutes } from "./factory/factoryProductionPlan
 import { registerPerformanceReadMicrocache } from "./performance/readMicrocache";
 import { registerFactoryDaybookPaginationRoutes } from "./factory/factoryDaybookPaginationRoutes";
 import { registerFactoryStockEntryHistoryPaginationRoutes } from "./factory/factoryStockEntryHistoryPaginationRoutes";
+import { registerFactoryStockAllocationV5PaginationRoutes } from "./factory/factoryStockAllocationV5PaginationRoutes";
 
 export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
   // ─────────────────────────────────────────────────────────────────────────────
@@ -116,6 +117,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
   // Unpaged requests call next() and continue into the unchanged legacy handlers.
   registerFactoryDaybookPaginationRoutes(app);
   registerFactoryStockEntryHistoryPaginationRoutes(app);
+  registerFactoryStockAllocationV5PaginationRoutes(app);
 
   registerFactoryStockRoutes(app);
   registerFactorySuppliersRoutes(app);
