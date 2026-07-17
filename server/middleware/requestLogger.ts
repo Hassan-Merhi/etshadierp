@@ -9,6 +9,7 @@ import type { Request, Response, NextFunction } from "express";
 import { pool } from "../db";
 import { logger } from "../lib/logger";
 import { getOperationalEventSnapshot, recordOperationalEvent } from "../lib/operationalEvents";
+import { getRuntimeDiagnosticsSnapshot } from "../lib/runtimeDiagnostics";
 import {
   beginTrackedApiRequest,
   endTrackedApiRequest,
@@ -116,11 +117,13 @@ export function getRequestMetricsSnapshot() {
   const poolWaiting = Number((pool as any).waitingCount || 0);
   const completed = metrics.success + metrics.clientError + metrics.serverError;
   const resourceGuard = getResourceGuardSnapshot();
+  const runtimeDiagnostics = getRuntimeDiagnosticsSnapshot();
   const degraded =
     poolWaiting > 0 ||
     resourceGuard.draining ||
     resourceGuard.memory.level === "critical" ||
-    resourceGuard.memory.level === "hard";
+    resourceGuard.memory.level === "hard" ||
+    runtimeDiagnostics.eventLoop.p99Ms >= Number(process.env.EVENT_LOOP_WARN_P99_MS || 500);
 
   return {
     status: degraded ? "degraded" : "ok",
@@ -169,6 +172,7 @@ export function getRequestMetricsSnapshot() {
       utilizationPercent: poolMax > 0 ? Math.round(((poolTotal - poolIdle) / poolMax) * 100) : null,
     },
     resourceGuard,
+    runtimeDiagnostics,
     heavyReadCache: getHeavyReadCacheSnapshot(),
     operationalEvents: getOperationalEventSnapshot(),
   };
