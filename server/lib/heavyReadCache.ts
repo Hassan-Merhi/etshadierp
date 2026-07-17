@@ -6,6 +6,7 @@ interface CachePolicy {
 }
 
 interface CacheEntry {
+  resource: string;
   body: unknown;
   bytes: number;
   expiresAt: number;
@@ -24,10 +25,12 @@ function companyScope(req: Request): string {
   return String(session?.factoryCompanyId || session?.currentCompanyId || "global");
 }
 
-function authScope(req: Request): string {
+function authenticatedScope(req: Request): string | null {
   const session = (req as any).session;
   const user = (req as any).user;
-  const userId = user?.id || session?.userId || "anonymous";
+  const userId = user?.id || session?.userId;
+  if (userId === undefined || userId === null || userId === "") return null;
+
   const role = session?.currentRole || user?.role || "unknown";
   return `${String(userId)}:${String(role)}`;
 }
@@ -46,9 +49,9 @@ function classify(req: Request): CachePolicy | null {
   return null;
 }
 
-function keyFor(req: Request, policy: CachePolicy): string {
+function keyFor(req: Request, policy: CachePolicy, authScope: string): string {
   const query = req.originalUrl.includes("?") ? req.originalUrl.slice(req.originalUrl.indexOf("?")) : "";
-  return `${policy.name}:company=${companyScope(req)}:user=${authScope(req)}:${req.path}${query}`;
+  return `${policy.name}:company=${companyScope(req)}:user=${authScope}:${req.path}${query}`;
 }
 
 function removeKey(key: string): void {
@@ -74,29 +77,50 @@ function enforceBudget(): void {
 
 export function getHeavyReadCache(req: Request): { body: unknown; ageMs: number } | null {
   const policy = classify(req);
-  if (!policy) return null;
+  const authScope = authenticatedScope(req);
+  if (!policy || !authScope) return null;
+
   const now = Date.now();
   pruneExpired(now);
-  const key = keyFor(req, policy);
+  const key = keyFor(req, policy, authScope);
   const entry = cache.get(key);
   if (!entry || entry.expiresAt <= now) {
     if (entry) removeKey(key);
     return null;
   }
+
+  // Refresh insertion order so budget eviction behaves like a small LRU.
   cache.delete(key);
   cache.set(key, entry);
   return { body: entry.body, ageMs: now - entry.createdAt };
 }
 
-export function storeHeavyReadCache(req: Request, body: unknown, bytes: number): void {
+export function storeHeavyReadCache(req: Request, body: unknown, bytes: number): boolean {
   const policy = classify(req);
-  if (!policy || !Number.isFinite(bytes) || bytes <= 0 || bytes > maxEntryBytes) return;
-  const key = keyFor(req, policy);
+  const authScope = authenticatedScope(req);
+  if (
+    !policy ||
+    !authScope ||
+    !Number.isFinite(bytes) ||
+    bytes <= 0 ||
+    bytes > maxEntryBytes
+  ) {
+    return false;
+  }
+
+  const key = keyFor(req, policy, authScope);
   removeKey(key);
   const now = Date.now();
-  cache.set(key, { body, bytes, createdAt: now, expiresAt: now + policy.ttlMs });
+  cache.set(key, {
+    resource: policy.name,
+    body,
+    bytes,
+    createdAt: now,
+    expiresAt: now + policy.ttlMs,
+  });
   totalBytes += bytes;
   enforceBudget();
+  return true;
 }
 
 export function invalidateHeavyReadCache(req?: Request): void {
@@ -105,6 +129,7 @@ export function invalidateHeavyReadCache(req?: Request): void {
     totalBytes = 0;
     return;
   }
+
   const scope = companyScope(req);
   for (const key of Array.from(cache.keys())) {
     if (key.includes(`:company=${scope}:`)) removeKey(key);
@@ -113,11 +138,16 @@ export function invalidateHeavyReadCache(req?: Request): void {
 
 export function getHeavyReadCacheSnapshot() {
   pruneExpired();
+  const entriesByResource: Record<string, number> = {};
+  for (const entry of cache.values()) {
+    entriesByResource[entry.resource] = (entriesByResource[entry.resource] || 0) + 1;
+  }
+
   return {
     entries: cache.size,
     totalBytes,
     maxEntryBytes,
     maxTotalBytes,
-    keys: Array.from(cache.keys()),
+    entriesByResource,
   };
 }
