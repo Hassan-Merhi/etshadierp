@@ -1,3 +1,4 @@
+import "./runtimeLifecycleGuard.mjs";
 import { Server } from "node:http";
 import process from "node:process";
 
@@ -44,46 +45,15 @@ function sampleMemory(trigger = "interval") {
   }
 
   if (pressureState.level !== "normal") {
-    console.warn(
-      JSON.stringify({
-        timestamp: new Date().toISOString(),
-        level: pressureState.level === "critical" ? "ERROR" : "WARN",
-        message: "Runtime memory pressure detected",
-        module: "memory-guard",
-        action: "memory-sample",
-        trigger,
-        rssMb: pressureState.rssMb,
-        heapUsedMb: pressureState.heapUsedMb,
-        externalMb: pressureState.externalMb,
-        arrayBuffersMb: pressureState.arrayBuffersMb,
-        softLimitMb: SOFT_RSS_MB,
-        hardLimitMb: HARD_RSS_MB,
-        hardSamples: pressureState.hardSamples,
-      })
-    );
+    console.warn(JSON.stringify({ timestamp: new Date().toISOString(), level: pressureState.level === "critical" ? "ERROR" : "WARN", message: "Runtime memory pressure detected", module: "memory-guard", action: "memory-sample", trigger, rssMb: pressureState.rssMb, heapUsedMb: pressureState.heapUsedMb, externalMb: pressureState.externalMb, arrayBuffersMb: pressureState.arrayBuffersMb, softLimitMb: SOFT_RSS_MB, hardLimitMb: HARD_RSS_MB, hardSamples: pressureState.hardSamples }));
   }
 
   if (pressureState.level === "critical" && typeof globalThis.gc === "function") {
-    try {
-      globalThis.gc();
-    } catch {
-      // Best-effort only. Request shedding remains the primary protection.
-    }
+    try { globalThis.gc(); } catch {}
   }
 
   if (pressureState.hardSamples >= HARD_SAMPLES_BEFORE_EXIT) {
-    console.error(
-      JSON.stringify({
-        timestamp: new Date().toISOString(),
-        level: "FATAL",
-        message: "Memory stayed above the hard RSS limit; exiting before an OOM kill",
-        module: "memory-guard",
-        action: "controlled-restart",
-        rssMb: pressureState.rssMb,
-        hardLimitMb: HARD_RSS_MB,
-        samples: pressureState.hardSamples,
-      })
-    );
+    console.error(JSON.stringify({ timestamp: new Date().toISOString(), level: "FATAL", message: "Memory stayed above the hard RSS limit; exiting before an OOM kill", module: "memory-guard", action: "controlled-restart", rssMb: pressureState.rssMb, hardLimitMb: HARD_RSS_MB, samples: pressureState.hardSamples }));
     process.exit(1);
   }
 }
@@ -96,15 +66,9 @@ const pathLimits = [
 ];
 
 const activeByName = new Map();
-
 function pathnameOf(req) {
-  try {
-    return new URL(req.url || "/", "http://localhost").pathname;
-  } catch {
-    return req.url || "/";
-  }
+  try { return new URL(req.url || "/", "http://localhost").pathname; } catch { return req.url || "/"; }
 }
-
 function reject(res, statusCode, code, message, retryAfterSeconds = 5) {
   if (res.headersSent || res.writableEnded) return;
   res.statusCode = statusCode;
@@ -117,30 +81,25 @@ function reject(res, statusCode, code, message, retryAfterSeconds = 5) {
 const originalEmit = Server.prototype.emit;
 Server.prototype.emit = function patchedEmit(event, ...args) {
   if (event !== "request") return originalEmit.call(this, event, ...args);
-
   const [req, res] = args;
   const path = pathnameOf(req);
-
-  if (path === "/api/health" || path === "/api/health/db" || path === "/api/health/metrics") {
-    return originalEmit.call(this, event, ...args);
+  if (path === "/api/health" || path === "/api/health/db" || path === "/api/health/metrics") return originalEmit.call(this, event, ...args);
+  if (globalThis.__erpRuntimeShuttingDown) {
+    reject(res, 503, "SERVER_SHUTTING_DOWN", "Server is restarting. Please retry shortly.", 5);
+    return true;
   }
-
   sampleMemory("request");
-
   if (pressureState.level === "critical" && path.startsWith("/api/")) {
     reject(res, 503, "MEMORY_PRESSURE", "Server is temporarily protecting itself from high memory usage.", 10);
     return true;
   }
-
   const rule = pathLimits.find((candidate) => candidate.test(path));
   if (!rule) return originalEmit.call(this, event, ...args);
-
   const current = activeByName.get(rule.name) ?? 0;
   if (current >= rule.max) {
     reject(res, 429, "ENDPOINT_BUSY", "This heavy operation is already running. Please retry shortly.", 5);
     return true;
   }
-
   activeByName.set(rule.name, current + 1);
   let released = false;
   const release = () => {
@@ -150,24 +109,10 @@ Server.prototype.emit = function patchedEmit(event, ...args) {
   };
   res.once("finish", release);
   res.once("close", release);
-
   return originalEmit.call(this, event, ...args);
 };
 
 const timer = setInterval(() => sampleMemory("interval"), SAMPLE_INTERVAL_MS);
 timer.unref();
 sampleMemory("startup");
-
-console.log(
-  JSON.stringify({
-    timestamp: new Date().toISOString(),
-    level: "INFO",
-    message: "Runtime memory guard enabled",
-    module: "memory-guard",
-    action: "startup",
-    softRssMb: SOFT_RSS_MB,
-    hardRssMb: HARD_RSS_MB,
-    sampleIntervalMs: SAMPLE_INTERVAL_MS,
-    hardSamplesBeforeExit: HARD_SAMPLES_BEFORE_EXIT,
-  })
-);
+console.log(JSON.stringify({ timestamp: new Date().toISOString(), level: "INFO", message: "Runtime memory guard enabled", module: "memory-guard", action: "startup", softRssMb: SOFT_RSS_MB, hardRssMb: HARD_RSS_MB, sampleIntervalMs: SAMPLE_INTERVAL_MS, hardSamplesBeforeExit: HARD_SAMPLES_BEFORE_EXIT }));
