@@ -1,4 +1,6 @@
 import ExcelJS from "exceljs";
+import type { ServerResponse } from "http";
+import type { Writable } from "stream";
 
 export interface ExcelWorkbook {
   workbook: ExcelJS.Workbook;
@@ -93,7 +95,32 @@ export function aoaToSheet(workbook: ExcelJS.Workbook, data: any[][], sheetName:
   return worksheet;
 }
 
+/**
+ * Compatibility path for callers that genuinely need attachment bytes.
+ * HTTP download routes should prefer writeWorkbookToResponse so ExcelJS writes
+ * directly to the socket instead of allocating a second full workbook buffer.
+ */
 export async function writeWorkbook(workbook: ExcelJS.Workbook): Promise<Buffer> {
   const buffer = await workbook.xlsx.writeBuffer();
   return Buffer.from(buffer);
+}
+
+export async function writeWorkbookToStream(workbook: ExcelJS.Workbook, stream: Writable): Promise<void> {
+  await workbook.xlsx.write(stream);
+}
+
+export async function writeWorkbookToResponse(
+  workbook: ExcelJS.Workbook,
+  res: ServerResponse,
+  filename: string
+): Promise<void> {
+  const safeFilename = filename.replace(/[\r\n"]/g, "_");
+  res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+  res.setHeader("Content-Disposition", `attachment; filename="${safeFilename}"`);
+  res.setHeader("Cache-Control", "no-store, max-age=0");
+  res.setHeader("Pragma", "no-cache");
+  res.setHeader("X-Accel-Buffering", "no");
+
+  await workbook.xlsx.write(res);
+  if (!res.writableEnded) res.end();
 }
