@@ -9,6 +9,7 @@
 
 import { pool } from "../db";
 import FormDataLib from "form-data";
+import { readExportBuffer } from "../lib/fileBackedExport";
 
 export interface WaSettings {
   instanceId: string;
@@ -148,10 +149,8 @@ export async function fetchGreenApiChats(instanceId: string, apiToken: string): 
  * form.getBuffer() + form.getHeaders() is the correct pattern for node-fetch
  * and produces well-formed multipart/form-data that Green API accepts.
  *
- * NOTE: Native Web FormData + File was tried but silently fails with Green API
- * because the boundary isn't propagated to the Content-Type header when using
- * native fetch + native FormData in Node 20 — resulting in a malformed upload
- * that Green API rejects, causing the text fallback to fire instead of the image.
+ * Disk-backed export artifacts are only materialized here, at the final Green
+ * API boundary, and only when they fit the configured upload safety limit.
  */
 async function sendGreenApiFileUpload({
   settings,
@@ -169,16 +168,19 @@ async function sendGreenApiFileUpload({
   mimeType: string;
 }): Promise<{ success: boolean; error?: string }> {
   const url = baseUrl(settings.instanceId, settings.apiToken, "sendFileByUpload");
+  const maxUploadBytes = Math.max(1, Number(process.env.WHATSAPP_MAX_BUFFER_MB || 20)) * 1024 * 1024;
 
-  // Use the `form-data` npm package — its getBuffer()+getHeaders() pattern
-  // produces a well-formed multipart body with correct Content-Disposition
-  // (including filename=) and a matching Content-Type boundary that Green API
-  // requires. Native Web FormData in Node 20 does not propagate the boundary
-  // correctly through native fetch, causing Green API to reject the upload.
+  let resolvedBuffer: Buffer;
+  try {
+    resolvedBuffer = await readExportBuffer(buffer, maxUploadBytes);
+  } catch (error: any) {
+    return { success: false, error: error?.message || String(error) };
+  }
+
   const form = new FormDataLib();
   form.append("chatId", chatId);
   if (caption) form.append("caption", caption);
-  form.append("file", buffer, { filename: fileName, contentType: mimeType });
+  form.append("file", resolvedBuffer, { filename: fileName, contentType: mimeType });
 
   const response = await fetch(url, {
     method: "POST",
@@ -188,12 +190,20 @@ async function sendGreenApiFileUpload({
 
   if (!response.ok) {
     const body = await response.text();
-    console.error("[WA upload] Green API error", response.status, body, { chatId, fileName, size: buffer.length });
+    console.error("[WA upload] Green API error", response.status, body, {
+      chatId,
+      fileName,
+      size: resolvedBuffer.length,
+    });
     return { success: false, error: `Green API ${response.status}: ${body}` };
   }
 
   const json = (await response.json().catch(() => ({}))) as any;
-  console.log("[WA upload] Green API response", json, { chatId, fileName, size: buffer.length });
+  console.log("[WA upload] Green API response", json, {
+    chatId,
+    fileName,
+    size: resolvedBuffer.length,
+  });
   return { success: true };
 }
 
@@ -548,32 +558,34 @@ export async function sendWhatsAppFile(
     return { success: false, sent: 0, failed: 0, errors: ["No active WhatsApp recipients"] };
   }
 
-  const results = await Promise.allSettled(
-    recipients.map(async (r): Promise<SendResult> => {
+  let sent = 0;
+  let failed = 0;
+  const errors: string[] = [];
+
+  // Sequential sends prevent one file from being materialized and multipart-
+  // encoded several times at once when many recipients are configured.
+  for (const recipient of recipients) {
+    try {
+      const result: SendResult = {
+        chatId: recipient.chatId,
+        success: false,
+      };
       const res = await sendGreenApiFileUpload({
         settings,
-        chatId: r.chatId,
+        chatId: recipient.chatId,
         buffer,
         fileName,
         caption,
         mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
       });
-      if (!res.success) throw new Error(res.error ?? "Upload failed");
-      return { chatId: r.chatId, success: true };
-    })
-  );
-
-  let sent = 0;
-  let failed = 0;
-  const errors: string[] = [];
-
-  for (const r of results) {
-    if (r.status === "fulfilled") {
+      result.success = res.success;
+      result.error = res.error;
+      if (!result.success) throw new Error(result.error ?? "Upload failed");
       sent++;
-    } else {
+    } catch (error: any) {
       failed++;
-      errors.push((r as PromiseRejectedResult).reason?.message ?? "Unknown error");
-      console.error("[WhatsApp] Send failed:", (r as PromiseRejectedResult).reason);
+      errors.push(error?.message ?? "Unknown error");
+      console.error("[WhatsApp] Send failed:", error);
     }
   }
 
