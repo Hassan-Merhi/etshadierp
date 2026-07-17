@@ -11,6 +11,8 @@ import {
   ChevronDown,
   ChevronRight,
   Undo2,
+  RotateCcw,
+  AlertTriangle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -154,6 +156,31 @@ interface UndoLogRow {
   undoneByUsername: string | null;
 }
 
+interface SupplierRateAuditRow {
+  supplierId: number;
+  supplierName: string;
+  /** The moving-average rate that was in place before "Recompute Supplier Rates" overwrote it. */
+  oldRate: number;
+  /** The all-time stable rate that the recompute wrote. */
+  recomputedRate: number;
+  /** The rate currently stored in the DB (may differ from recomputedRate if something else changed it since). */
+  currentRate: number;
+  overwroteAt: string;
+  changedBy: string | null;
+  /** True only when currentRate still matches what the recompute wrote — safe to restore. */
+  canRestore: boolean;
+}
+
+interface SupplierRatePreviewRow {
+  supplierId: number;
+  supplierName: string;
+  oldRate: number;
+  newRate: number;
+  rowCount: number;
+  totalReceivedKg: number;
+  skipped?: string;
+}
+
 // ─── Component ───────────────────────────────────────────────────────────────
 
 export default function RawStockRecalculate() {
@@ -169,6 +196,13 @@ export default function RawStockRecalculate() {
   const [manualRates, setManualRates] = useState<Record<number, string>>({});
   const [expandedBatchSources, setExpandedBatchSources] = useState<Set<number>>(new Set());
   const [activeTab, setActiveTab] = useState<"recalc" | "sources" | "audit" | "history">("recalc");
+
+  // ── Recompute dry-run / confirmation dialog ────────────────────────────────
+  const [recomputePreviewRows, setRecomputePreviewRows] = useState<SupplierRatePreviewRow[] | null>(null);
+  const [showRecomputeDialog, setShowRecomputeDialog] = useState(false);
+
+  // ── Restore from audit — per-row selection ────────────────────────────────
+  const [selectedRestoreIds, setSelectedRestoreIds] = useState<Set<number>>(new Set());
 
   // ── Main preview ──────────────────────────────────────────────────────────
   const { data: rows, isLoading, refetch } = useQuery<RecalcRow[]>({
@@ -260,6 +294,26 @@ export default function RawStockRecalculate() {
     },
     enabled: activeTab === "history",
   });
+
+  // ── Rate recompute audit (what did "Recompute Supplier Rates" overwrite?) ──
+  const {
+    data: rateAuditRows,
+    isLoading: rateAuditLoading,
+    refetch: refetchRateAudit,
+  } = useQuery<SupplierRateAuditRow[]>({
+    queryKey: ["/api/factory/raw-stock/supplier-rate/recompute-audit"],
+    queryFn: async () => {
+      const res = await modeApiRequest("GET", "/api/factory/raw-stock/supplier-rate/recompute-audit");
+      if (!res.ok) throw new Error("Failed to load rate audit");
+      return res.json();
+    },
+    enabled: activeTab === "history",
+  });
+
+  const restorableRows = useMemo(
+    () => (rateAuditRows || []).filter((r) => r.canRestore),
+    [rateAuditRows]
+  );
 
   const autoApplyFxMutation = useMutation({
     mutationFn: async (containerIds: number[]) => {
@@ -513,16 +567,41 @@ export default function RawStockRecalculate() {
     }, `Fix cost on ${ids.length} PARTIALLY_RECEIVED container(s) — includes historical and completed batches`);
   };
 
-  // ── Recompute all supplier locked rates ───────────────────────────────────
-  const recomputeSupplierRatesMutation = useMutation({
+  // ── Recompute supplier rates — dry-run first, then confirm ────────────────
+  // Step 1: dry run — fetches preview without writing anything
+  const recomputeDryRunMutation = useMutation({
     mutationFn: async () => {
-      const res = await modeApiRequest("POST", "/api/factory/raw-stock/supplier-rate/recompute");
+      const res = await modeApiRequest("POST", "/api/factory/raw-stock/supplier-rate/recompute", { dryRun: true });
+      if (!res.ok) throw new Error((await res.json()).message || "Failed to fetch recompute preview");
+      return res.json();
+    },
+    onSuccess: (data) => {
+      const changedRows = (data.results as SupplierRatePreviewRow[]).filter((r) => !r.skipped);
+      if (changedRows.length === 0) {
+        toast({ title: "No changes needed", description: "All supplier rates already match the all-time stable average." });
+        return;
+      }
+      setRecomputePreviewRows(data.results);
+      setShowRecomputeDialog(true);
+    },
+    onError: (err: any) => {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    },
+  });
+
+  // Step 2: actual apply (called from inside the confirmation dialog after admin override)
+  const recomputeApplyMutation = useMutation({
+    mutationFn: async () => {
+      const res = await modeApiRequest("POST", "/api/factory/raw-stock/supplier-rate/recompute", { dryRun: false });
       if (!res.ok) throw new Error((await res.json()).message || "Failed to recompute supplier rates");
       return res.json();
     },
     onSuccess: (data) => {
+      setShowRecomputeDialog(false);
+      setRecomputePreviewRows(null);
       queryClient.invalidateQueries({ queryKey: ["/api/factory/raw-stock"] });
       queryClient.invalidateQueries({ queryKey: ["/api/factory/raw-stock/recalc/preview"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/raw-stock/supplier-rate/recompute-audit"] });
       toast({
         title: "Supplier rates updated",
         description: `Updated ${data.updated} supplier(s), skipped ${data.skipped} (already correct or no data).`,
@@ -534,9 +613,54 @@ export default function RawStockRecalculate() {
   });
 
   const handleRecomputeSupplierRates = () => {
+    recomputeDryRunMutation.mutate();
+  };
+
+  const handleRecomputeConfirm = () => {
     wrapAdminAction(
-      () => recomputeSupplierRatesMutation.mutate(),
-      "Recompute locked rate for ALL suppliers from receipt-weighted average of corrected raw-stock rows"
+      () => recomputeApplyMutation.mutate(),
+      "Recompute locked rate for ALL suppliers from all-time receipt-weighted average — overwrites moving-average rates"
+    );
+  };
+
+  // ── Restore supplier rates from audit log ─────────────────────────────────
+  const restoreRatesMutation = useMutation({
+    mutationFn: async (restorations: Array<{ supplierId: number; rate: number }>) => {
+      const res = await modeApiRequest("POST", "/api/factory/raw-stock/supplier-rate/restore-from-audit", { restorations });
+      if (!res.ok) throw new Error((await res.json()).message || "Failed to restore supplier rates");
+      return res.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/raw-stock"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/raw-stock/recalc/preview"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/raw-stock/supplier-rate/recompute-audit"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/raw-stock/recalc/source-cost-mismatches"] });
+      setSelectedRestoreIds(new Set());
+      toast({
+        title: "Rates restored",
+        description: `Restored ${data.restored} supplier rate(s). Refresh "Source Cost Mismatches" to see and fix affected batches.`,
+      });
+    },
+    onError: (err: any) => {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const handleRestoreAll = () => {
+    const rows = (rateAuditRows || []).filter((r) => r.canRestore);
+    if (rows.length === 0) return;
+    wrapAdminAction(
+      () => restoreRatesMutation.mutate(rows.map((r) => ({ supplierId: r.supplierId, rate: r.oldRate }))),
+      `Restore ${rows.length} supplier rate(s) to their pre-recompute moving-average values`
+    );
+  };
+
+  const handleRestoreSelected = () => {
+    const rows = (rateAuditRows || []).filter((r) => r.canRestore && selectedRestoreIds.has(r.supplierId));
+    if (rows.length === 0) return;
+    wrapAdminAction(
+      () => restoreRatesMutation.mutate(rows.map((r) => ({ supplierId: r.supplierId, rate: r.oldRate }))),
+      `Restore ${rows.length} supplier rate(s) to their pre-recompute moving-average values`
     );
   };
 
@@ -669,6 +793,7 @@ export default function RawStockRecalculate() {
     { id: "recalc" as const, label: "Container Cost Recalc" },
     { id: "sources" as const, label: "Source Cost Mismatches" },
     { id: "audit" as const, label: "Full Audit" },
+    { id: "history" as const, label: "History & Rates" },
   ];
 
   return (
@@ -710,7 +835,7 @@ export default function RawStockRecalculate() {
           <Button
             variant="outline"
             size="sm"
-            disabled={recomputeSupplierRatesMutation.isPending}
+            disabled={recomputeDryRunMutation.isPending || recomputeApplyMutation.isPending}
             onClick={handleRecomputeSupplierRates}
             title="Recompute all supplier locked rates from receipt-weighted average of their corrected raw-stock rows. Use after a recalc run where all containers were fully used."
             className="gap-2"
@@ -1284,7 +1409,148 @@ export default function RawStockRecalculate() {
 
       {/* ── Tab: History & Undo ────────────────────────────────────────────── */}
       {activeTab === "history" && (
-        <div className="space-y-4">
+        <div className="space-y-6">
+
+          {/* ── Supplier Rate Recovery ──────────────────────────────────────── */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between gap-2">
+              <div>
+                <h2 className="text-sm font-semibold leading-tight flex items-center gap-2">
+                  <RotateCcw className="h-4 w-4 text-amber-500" />
+                  Restore supplier rates from audit log
+                </h2>
+                <p className="text-xs text-muted-foreground leading-tight mt-0.5">
+                  When "Recompute Supplier Rates" overwrites moving-average rates with all-time stable averages,
+                  the original values are captured in the audit log. Restore them here — 100% accurate, no guessing.
+                  After restoring, refresh "Source Cost Mismatches" to fix all affected mix-batch costs.
+                </p>
+              </div>
+              <Button variant="outline" size="sm" onClick={() => { refetchRateAudit(); refetchUndoLog(); }} className="gap-2 shrink-0">
+                <RefreshCw className="h-3.5 w-3.5" /> Refresh
+              </Button>
+            </div>
+
+            {rateAuditLoading ? (
+              <Skeleton className="h-32 w-full" />
+            ) : !rateAuditRows || rateAuditRows.length === 0 ? (
+              <div className="text-sm text-muted-foreground py-8 text-center border rounded-md bg-card">
+                No "Recompute Supplier Rates" events found in the audit log for this company.
+              </div>
+            ) : (
+              <>
+                {restorableRows.length > 0 && (
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <div className="text-xs text-amber-700 dark:text-amber-400 bg-amber-500/10 border border-amber-500/30 rounded-md px-3 py-2 flex-1">
+                      <strong>{restorableRows.length} supplier rate(s)</strong> were overwritten and can be restored to their
+                      pre-recompute moving-average values. After restoring, go to{" "}
+                      <button className="underline font-medium" onClick={() => setActiveTab("sources")}>Source Cost Mismatches</button>{" "}
+                      and click "Fix All" to correct all affected mix-batch costs.
+                    </div>
+                    <div className="flex gap-2 shrink-0">
+                      {selectedRestoreIds.size > 0 && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="gap-1.5 border-amber-500/40 text-amber-700 hover:bg-amber-500/10 dark:text-amber-400"
+                          disabled={restoreRatesMutation.isPending}
+                          onClick={handleRestoreSelected}
+                        >
+                          <RotateCcw className="h-3.5 w-3.5" />
+                          Restore Selected ({selectedRestoreIds.size})
+                        </Button>
+                      )}
+                      <Button
+                        size="sm"
+                        className="gap-1.5 bg-amber-600 hover:bg-amber-700 text-white"
+                        disabled={restoreRatesMutation.isPending}
+                        onClick={handleRestoreAll}
+                      >
+                        <RotateCcw className="h-3.5 w-3.5" />
+                        {restoreRatesMutation.isPending ? "Restoring..." : `Restore All (${restorableRows.length})`}
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
+                <div className="border rounded-md overflow-hidden bg-card shadow-sm">
+                  <Table>
+                    <TableHeader className="bg-muted/50">
+                      <TableRow>
+                        <TableHead className="w-8">
+                          <input
+                            type="checkbox"
+                            className="h-3.5 w-3.5"
+                            checked={restorableRows.length > 0 && restorableRows.every((r) => selectedRestoreIds.has(r.supplierId))}
+                            onChange={(e) => {
+                              if (e.target.checked) setSelectedRestoreIds(new Set(restorableRows.map((r) => r.supplierId)));
+                              else setSelectedRestoreIds(new Set());
+                            }}
+                          />
+                        </TableHead>
+                        <TableHead>Supplier</TableHead>
+                        <TableHead className="text-right">Pre-recompute rate (restore to)</TableHead>
+                        <TableHead className="text-right">Recomputed (wrong)</TableHead>
+                        <TableHead className="text-right">Current rate</TableHead>
+                        <TableHead>Overwritten at</TableHead>
+                        <TableHead>Status</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {rateAuditRows.map((row) => (
+                        <TableRow key={row.supplierId} className={!row.canRestore ? "opacity-50" : ""}>
+                          <TableCell>
+                            {row.canRestore && (
+                              <input
+                                type="checkbox"
+                                className="h-3.5 w-3.5"
+                                checked={selectedRestoreIds.has(row.supplierId)}
+                                onChange={(e) => {
+                                  const next = new Set(selectedRestoreIds);
+                                  if (e.target.checked) next.add(row.supplierId);
+                                  else next.delete(row.supplierId);
+                                  setSelectedRestoreIds(next);
+                                }}
+                              />
+                            )}
+                          </TableCell>
+                          <TableCell className="text-sm font-medium">{row.supplierName}</TableCell>
+                          <TableCell className="text-right font-mono text-sm text-emerald-600 dark:text-emerald-400">
+                            ${row.oldRate.toFixed(6)}
+                          </TableCell>
+                          <TableCell className="text-right font-mono text-sm text-red-500">
+                            ${row.recomputedRate.toFixed(6)}
+                          </TableCell>
+                          <TableCell className="text-right font-mono text-xs text-muted-foreground">
+                            ${row.currentRate.toFixed(6)}
+                          </TableCell>
+                          <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
+                            {new Date(row.overwroteAt).toLocaleString()}
+                            {row.changedBy && <span className="ml-1">by {row.changedBy}</span>}
+                          </TableCell>
+                          <TableCell>
+                            {row.canRestore ? (
+                              <Badge variant="outline" className="text-amber-600 border-amber-500/30 bg-amber-500/10 text-[10px]">
+                                Restorable
+                              </Badge>
+                            ) : (
+                              <Badge variant="outline" className="text-muted-foreground text-[10px]" title="Current rate no longer matches what recompute wrote — something else changed it since.">
+                                Already changed
+                              </Badge>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </>
+            )}
+          </div>
+
+          <div className="border-t" />
+
+          {/* ── Recalculation undo log ──────────────────────────────────────── */}
+          <div className="space-y-4">
           <div className="flex items-center justify-between">
             <div>
               <h2 className="text-sm font-semibold leading-tight">Recalculation history</h2>
@@ -1293,9 +1559,6 @@ export default function RawStockRecalculate() {
                 mix batches, bales, and supplier locked rates atomically.
               </p>
             </div>
-            <Button variant="outline" size="sm" onClick={() => refetchUndoLog()} className="gap-2">
-              <RefreshCw className="h-3.5 w-3.5" /> Refresh
-            </Button>
           </div>
 
           {undoLogLoading ? (
@@ -1372,8 +1635,96 @@ export default function RawStockRecalculate() {
             recalculation. If any other changes were made to the same containers between the recalculation and now
             (e.g. new charges, new offloads), those will also be reverted. Review before confirming.
           </div>
+          </div>
         </div>
       )}
+
+      {/* ── Recompute Supplier Rates — dry-run preview & confirmation dialog ── */}
+      <Dialog open={showRecomputeDialog} onOpenChange={(open) => { if (!open) { setShowRecomputeDialog(false); setRecomputePreviewRows(null); } }}>
+        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-4 w-4 text-amber-500" />
+              Confirm: Recompute Supplier Rates
+            </DialogTitle>
+            <DialogDescription className="text-xs">
+              This will overwrite each supplier's locked rate with the{" "}
+              <strong>all-time receipt-weighted average</strong> across all raw-stock rows.
+              This differs from the <strong>moving-average formula</strong> used during real offloads, which
+              weights by remaining kg at the moment of each offload.
+              <br /><br />
+              <span className="text-amber-700 dark:text-amber-400 font-medium">
+                If you accidentally clicked this, close the dialog and use
+                "History &amp; Rates → Restore from Audit Log" instead.
+              </span>
+            </DialogDescription>
+          </DialogHeader>
+
+          {recomputePreviewRows && (
+            <div className="space-y-3 mt-2">
+              {/* Suppliers that would change */}
+              {recomputePreviewRows.filter((r) => !r.skipped).length > 0 && (
+                <div className="border rounded-md overflow-hidden">
+                  <div className="bg-muted/50 px-3 py-1.5 text-xs font-medium text-muted-foreground">
+                    Would update ({recomputePreviewRows.filter((r) => !r.skipped).length} suppliers)
+                  </div>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Supplier</TableHead>
+                        <TableHead className="text-right">Current rate</TableHead>
+                        <TableHead className="text-right">→ New rate</TableHead>
+                        <TableHead className="text-right">Δ</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {recomputePreviewRows.filter((r) => !r.skipped).map((r) => {
+                        const delta = r.newRate - r.oldRate;
+                        return (
+                          <TableRow key={r.supplierId}>
+                            <TableCell className="text-sm font-medium">{r.supplierName}</TableCell>
+                            <TableCell className="text-right font-mono text-xs">${r.oldRate.toFixed(6)}</TableCell>
+                            <TableCell className="text-right font-mono text-xs">${r.newRate.toFixed(6)}</TableCell>
+                            <TableCell className={`text-right font-mono text-xs ${delta > 0 ? "text-red-500" : "text-emerald-500"}`}>
+                              {delta > 0 ? "+" : ""}{delta.toFixed(6)}
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+
+              {/* Skipped suppliers */}
+              {recomputePreviewRows.filter((r) => !!r.skipped).length > 0 && (
+                <p className="text-xs text-muted-foreground">
+                  {recomputePreviewRows.filter((r) => !!r.skipped).length} supplier(s) skipped (already correct or no data).
+                </p>
+              )}
+
+              <div className="flex justify-end gap-2 pt-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => { setShowRecomputeDialog(false); setRecomputePreviewRows(null); }}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  size="sm"
+                  className="gap-1.5 bg-amber-600 hover:bg-amber-700 text-white"
+                  disabled={recomputeApplyMutation.isPending}
+                  onClick={handleRecomputeConfirm}
+                >
+                  <RefreshCw className="h-3.5 w-3.5" />
+                  {recomputeApplyMutation.isPending ? "Applying..." : "Apply — Overwrite Rates"}
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
 
       {/* Batch detail dialog */}
       <Dialog open={detailBatchId !== null} onOpenChange={(open) => !open && setDetailBatchId(null)}>
