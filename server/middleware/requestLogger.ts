@@ -285,8 +285,6 @@ export function requestLogger(req: Request, res: Response, next: NextFunction): 
     res.once("close", finalize);
 
     if (!isReadMethod(req.method)) {
-      // Any mutation can affect one or more summary endpoints. Invalidate before
-      // route execution so a fast follow-up GET cannot observe an older snapshot.
       invalidateHeavyReadCache(req);
     }
 
@@ -311,10 +309,12 @@ export function requestLogger(req: Request, res: Response, next: NextFunction): 
         try {
           const serialized = JSON.stringify(body);
           if (serialized !== undefined) {
+            (res.locals as any).preSerializedJson = serialized;
             const bytes = Buffer.byteLength(serialized);
             if (storeHeavyReadCache(req, body, bytes)) metrics.cacheMisses += 1;
           }
         } catch {
+          delete (res.locals as any).preSerializedJson;
           // The normal response serializer remains authoritative.
         }
       }
