@@ -117,6 +117,7 @@ export const FACTORY_NAV_SECTIONS: FactoryNavSection[] = [
     label: "Finance",
     color: NAV_COLOR.finance,
     items: [
+      { title: "Daybook", url: "/factory/daybook", icon: BookOpen },
       { title: "Parties", url: "/factory/parties", icon: Users },
       { title: "Payroll & Benefits", url: "/factory/payroll-hub", icon: HardHat },
       { title: "Analytics", url: "/factory/analytics", icon: TrendingUp, adminOnly: true },
