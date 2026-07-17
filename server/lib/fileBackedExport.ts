@@ -1,4 +1,4 @@
-import fs from "fs";
+import fs, { type Dirent } from "fs";
 import os from "os";
 import path from "path";
 import { logger } from "./logger";
@@ -25,13 +25,6 @@ export function isFileBackedExport(value: unknown): value is FileBackedExport {
   );
 }
 
-/**
- * Compatibility adapter for legacy callers that type the ZIP as Buffer and only
- * inspect `.length` before passing it to email/WhatsApp/job services.
- *
- * The returned value is intentionally NOT a real Buffer. Boundary services must
- * call isFileBackedExport() and stream/read the file as appropriate.
- */
 export function createFileBackedExport(filePath: string, tempDir: string, length: number): Buffer {
   const artifact: FileBackedExport = Object.freeze({
     __erpFileBackedExport: true,
@@ -88,7 +81,7 @@ export async function cleanupExportPath(filePath: string | null | undefined): Pr
 
 async function cleanupStaleExportDirectories(): Promise<void> {
   const cutoff = Date.now() - cleanupTtlMs;
-  let entries: fs.Dirent[] = [];
+  let entries: Dirent[] = [];
 
   try {
     entries = await fs.promises.readdir(os.tmpdir(), { withFileTypes: true });
@@ -100,7 +93,6 @@ async function cleanupStaleExportDirectories(): Promise<void> {
     if (!entry.isDirectory() || !entry.name.startsWith("erp-export-")) continue;
     const tempDir = path.join(os.tmpdir(), entry.name);
 
-    // Never remove a directory currently registered in this process.
     if (Array.from(artifacts.values()).some((artifact) => artifact.tempDir === tempDir)) continue;
 
     try {
