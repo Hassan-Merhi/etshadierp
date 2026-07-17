@@ -14,6 +14,10 @@ import type { CarrierTrackResult, TrackingEvent } from "./types";
 
 const BASE_URL = "https://apis.cma-cgm.net/operation/trackandtrace/v1/events";
 const TIMEOUT_MS = 15_000;
+const AUTH_FAILURE_COOLDOWN_MS = 15 * 60 * 1000;
+
+let authFailureCooldownUntil = 0;
+let lastAuthFailureStatus: 401 | 403 | null = null;
 
 export function isConfigured(): boolean {
   return !!process.env.CMA_CGM_API_KEY;
@@ -75,6 +79,14 @@ export async function track(containerNumber: string): Promise<CarrierTrackResult
     return { ...base, notConfigured: true, error: "CMA_CGM_API_KEY not set" };
   }
 
+  if (Date.now() < authFailureCooldownUntil) {
+    const status = lastAuthFailureStatus ?? 403;
+    console.warn(
+      `[CmaCgmApi] ${containerNumber}: skipped during auth cooldown after HTTP ${status}`
+    );
+    return { ...base, blocked: true, error: `auth_${status}_cooldown` };
+  }
+
   try {
     const url = `${BASE_URL}?equipmentReference=${encodeURIComponent(containerNumber)}`;
     console.log(`[CmaCgmApi] ${containerNumber}: calling official DCSA API...`);
@@ -88,8 +100,12 @@ export async function track(containerNumber: string): Promise<CarrierTrackResult
     });
 
     if (res.status === 401 || res.status === 403) {
-      console.log(`[CmaCgmApi] ${containerNumber}: auth failed (HTTP ${res.status})`);
-      return { ...base, error: `auth_${res.status}` };
+      lastAuthFailureStatus = res.status;
+      authFailureCooldownUntil = Date.now() + AUTH_FAILURE_COOLDOWN_MS;
+      console.warn(
+        `[CmaCgmApi] ${containerNumber}: authentication rejected (HTTP ${res.status}); pausing CMA API calls for 15 minutes`
+      );
+      return { ...base, blocked: true, error: `auth_${res.status}` };
     }
 
     if (res.status === 404) {
@@ -102,6 +118,9 @@ export async function track(containerNumber: string): Promise<CarrierTrackResult
       console.log(`[CmaCgmApi] ${containerNumber}: HTTP ${res.status} — ${body.slice(0, 200)}`);
       return { ...base, error: `http_${res.status}` };
     }
+
+    authFailureCooldownUntil = 0;
+    lastAuthFailureStatus = null;
 
     const rawEvents: DcsaEvent[] = await res.json();
 
