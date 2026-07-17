@@ -343,6 +343,7 @@ export function registerIntercompanyNotificationRoutes(app: Express) {
           )
         );
 
+      res.set("Cache-Control", "private, max-age=30");
       res.json({ count: row?.count ?? 0 });
     } catch (err: any) {
       res.status(500).json({ message: err.message });

@@ -2158,6 +2158,17 @@ let migrationsDone = false;
     `CREATE INDEX IF NOT EXISTS factory_v3_loads_company_idx ON factory_v3_loads (company_id)`,
     `CREATE INDEX IF NOT EXISTS factory_invoice_loading_bales_company_idx ON factory_invoice_loading_bales (company_id)`,
 
+    // ── Performance indexes — prevent pool exhaustion from full table scans ──
+    // factory_bales: the bale-ledger and BalesHistory both filter by company_id+status.
+    // Without this index the query scans the entire table (observed: 220s on Render).
+    `CREATE INDEX IF NOT EXISTS factory_bales_company_status_idx ON factory_bales (company_id, status)`,
+    // customer_orders: pending-count and bale-ledger join on company_id+status.
+    `CREATE INDEX IF NOT EXISTS customer_orders_company_status_idx ON customer_orders (company_id, status)`,
+    // customer_order_bales: bale-ledger joins this on order_id (may already exist).
+    `CREATE INDEX IF NOT EXISTS customer_order_bales_order_id_idx ON customer_order_bales (order_id)`,
+    // intercompany_payment_requests: pending-count filters on linkId+status.
+    `CREATE INDEX IF NOT EXISTS icp_requests_link_status_idx ON intercompany_payment_requests (link_id, status)`,
+
     // ── F-Phase 0 (May 2026) — Add missing PRIMARY KEY (id) constraints ──
     // Historical drift: ~143 tables in dev (and presumably prod) were created
     // with `id integer NOT NULL DEFAULT nextval(...)` but no PRIMARY KEY

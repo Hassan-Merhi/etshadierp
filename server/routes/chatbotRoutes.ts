@@ -199,6 +199,7 @@ export function registerChatbotRoutes(app: Express) {
         providerName = "Gemini";
       }
 
+      res.set("Cache-Control", "private, max-age=120");
       res.json({
         enabled: true,
         providerName,

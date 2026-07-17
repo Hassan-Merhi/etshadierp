@@ -16,7 +16,7 @@ export default function FactoryBalesHub() {
     staleTime: 60000,
   });
 
-  const { data: myAccess } = useQuery<any>({ queryKey: ["/api/factory/my-access"], staleTime: 60000 });
+  const { data: myAccess } = useQuery<any>({ queryKey: ["/api/factory/my-access"], staleTime: 5 * 60000 });
   const hiddenTabs = myAccess?.hiddenCostFields ?? [];
 
   const showBarcode = settings?.balesTabBarcodeEnabled !== false && !hiddenTabs.includes("hide_tab_bales_barcode");

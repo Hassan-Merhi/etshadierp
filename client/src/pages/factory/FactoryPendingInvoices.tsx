@@ -53,7 +53,7 @@ export default function FactoryPendingInvoices() {
   const [statusFilter, setStatusFilter] = useState<string>("PENDING_VERIFIED");
   const { toast } = useToast();
 
-  const { data: myAccess } = useQuery<any>({ queryKey: ["/api/factory/my-access"], staleTime: 60000 });
+  const { data: myAccess } = useQuery<any>({ queryKey: ["/api/factory/my-access"], staleTime: 5 * 60000 });
   const isAdmin = myAccess?.fullAccess === true;
 
   const { data: pendingOrders = [], isLoading: pendingLoading } = useQuery<CustomerOrder[]>({
