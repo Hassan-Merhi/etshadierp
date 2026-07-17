@@ -49,31 +49,24 @@ function classify(pathname: string): RequestPolicy | null {
   if (/^\/api\/factory\/customer-orders\/\d+$/.test(pathname)) {
     return { name: "customer-order-detail", minIntervalMs: 30_000 };
   }
-
   if (pathname === "/api/factory/customer-orders") {
     return { name: "customer-orders-list", minIntervalMs: 30_000 };
   }
-
   if (pathname.startsWith("/api/factory/customer-orders/") && pathname.endsWith("/bale-removals")) {
     return { name: "customer-order-removals", minIntervalMs: 60_000 };
   }
-
   if (pathname === "/api/factory/bale-stock-count") {
     return { name: "bale-stock-count", minIntervalMs: 60_000 };
   }
-
   if (pathname === "/api/factory/raw-stock") {
     return { name: "raw-stock", minIntervalMs: 30_000 };
   }
-
   if (pathname === "/api/factory/bale-ledger") {
     return { name: "bale-ledger", minIntervalMs: 60_000 };
   }
-
   if (pathname === "/api/factory/net-position") {
     return { name: "net-position", minIntervalMs: 30_000 };
   }
-
   return null;
 }
 
@@ -93,23 +86,19 @@ function waitForEvent(
     }
 
     let timer: ReturnType<typeof setTimeout> | null = null;
-
     const cleanup = () => {
       document.removeEventListener(eventName, onEvent);
       signal?.removeEventListener("abort", onAbort);
       if (timer) clearTimeout(timer);
     };
-
     const finish = () => {
       cleanup();
       resolve();
     };
-
     const onEvent = () => {
-      if (eventName === "visibilitychange" && document.visibilityState !== "visible") return;
+      if (document.visibilityState !== "visible") return;
       finish();
     };
-
     const onAbort = () => {
       cleanup();
       reject(abortError());
@@ -117,7 +106,6 @@ function waitForEvent(
 
     document.addEventListener(eventName, onEvent);
     signal?.addEventListener("abort", onAbort, { once: true });
-
     if (delayMs !== null) timer = setTimeout(finish, delayMs);
   });
 }
@@ -139,7 +127,6 @@ function delayWithAbort(delayMs: number, signal?: AbortSignal | null): Promise<v
       cleanup();
       reject(abortError());
     };
-
     signal?.addEventListener("abort", onAbort, { once: true });
   });
 }
@@ -154,10 +141,7 @@ async function waitForThrottle(key: string, minIntervalMs: number, signal?: Abor
   const last = lastStartedAt.get(key) || 0;
   const remaining = last + minIntervalMs - Date.now();
   if (remaining <= 0) return;
-
-  await waitForEvent("visibilitychange", remaining, signal).catch((error) => {
-    if (error?.name === "AbortError") throw error;
-  });
+  await waitForEvent("visibilitychange", remaining, signal);
 }
 
 function staggerDelay(key: string): number {
@@ -207,7 +191,9 @@ if (typeof window !== "undefined" && !(window as any)[installedKey]) {
     }
 
     await waitForThrottle(key, policy.minIntervalMs, signal);
+    await waitUntilVisible(signal);
     await delayWithAbort(staggerDelay(key), signal);
+    await waitUntilVisible(signal);
     lastStartedAt.set(key, Date.now());
 
     let resolveSnapshot!: (snapshot: ResponseSnapshot | null) => void;
