@@ -4623,6 +4623,10 @@ END $$`,
     // ROUND(col::numeric, 6) is a no-op on values that are already 6-dp.
     `ALTER TABLE factory_containers ALTER COLUMN rate_per_kg TYPE numeric(20,6) USING ROUND(rate_per_kg::numeric, 6)`,
     `ALTER TABLE factory_containers ALTER COLUMN rate_per_kg_usd TYPE numeric(20,6) USING ROUND(rate_per_kg_usd::numeric, 6)`,
+    // factory_raw_stock cost_per_kg / cost_per_kg_usd were incorrectly assumed to already be
+    // scale-6 in the original migration batch — production still has NUMERIC(20,4). Upgrade now.
+    `ALTER TABLE factory_raw_stock ALTER COLUMN cost_per_kg TYPE numeric(20,6) USING ROUND(cost_per_kg::numeric, 6)`,
+    `ALTER TABLE factory_raw_stock ALTER COLUMN cost_per_kg_usd TYPE numeric(20,6) USING ROUND(cost_per_kg_usd::numeric, 6)`,
     `ALTER TABLE factory_raw_material_adjustments ALTER COLUMN cost_per_kg TYPE numeric(20,6) USING ROUND(cost_per_kg::numeric, 6)`,
     `ALTER TABLE factory_mix_batches ALTER COLUMN cost_per_kg TYPE numeric(20,6) USING ROUND(cost_per_kg::numeric, 6)`,
     `ALTER TABLE factory_container_commissions ALTER COLUMN commission_rate TYPE numeric(20,6) USING ROUND(commission_rate::numeric, 6)`,
