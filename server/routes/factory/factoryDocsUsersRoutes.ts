@@ -1678,6 +1678,7 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
         userId &&
         (role === "Admin" || role === "Owner" || role === "Developer")
       ) {
+        res.set("Cache-Control", "private, max-age=120");
         return res.json({
           fullAccess: true,
           pageKeys: [],
@@ -1751,6 +1752,7 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
       (req.session as any).factoryCompanyName = companyName;
 
       if (role === "Admin" || role === "Owner" || role === "Developer") {
+        res.set("Cache-Control", "private, max-age=120");
         return res.json({
           fullAccess: true,
           pageKeys: [],
@@ -1794,6 +1796,7 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
         .from(factoryUserPageAccess)
         .where(and(eq(factoryUserPageAccess.companyId, companyId), eq(factoryUserPageAccess.userId, userId)));
 
+      res.set("Cache-Control", "private, max-age=120");
       if (access.length === 0) {
         return res.json({
           fullAccess: true,

@@ -117,8 +117,9 @@ function BaleDetailRows({
       if (!res.ok) throw new Error("Failed to fetch bale details");
       return res.json();
     },
-    staleTime: 60_000,
+    staleTime: 5 * 60_000,
     refetchOnWindowFocus: false,
+    refetchOnMount: false,
   });
 
   if (isLoading) {
@@ -390,8 +391,9 @@ function SectionTable({
 export default function BaleLedger() {
   const { data, isLoading, refetch, isFetching } = useQuery<LedgerData>({
     queryKey: ["/api/factory/bale-ledger"],
-    staleTime: 60_000,
+    staleTime: 5 * 60_000,
     refetchOnWindowFocus: false,
+    refetchOnMount: false,
   });
 
   const grand = data?.totals.grand;

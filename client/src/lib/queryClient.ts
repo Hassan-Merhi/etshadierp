@@ -166,7 +166,13 @@ async function throwIfResNotOk(res: Response) {
     try {
       errorData = JSON.parse(text);
     } catch {
-      errorData = { message: text || res.statusText };
+      // If the body is an HTML page (e.g. a Render/proxy 502 error page) don't
+      // dump raw markup into the toast — show a clean status-code message instead.
+      const isHtml = text.trimStart().startsWith("<");
+      const fallback = isHtml
+        ? `Server error (${res.status}${res.statusText ? ` – ${res.statusText}` : ""}). Please try again.`
+        : text || res.statusText;
+      errorData = { message: fallback };
     }
 
     // Create error with structured data for proper handling

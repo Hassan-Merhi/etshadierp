@@ -143,6 +143,13 @@ export function registerEmployeeLedgerWasteRoutes(app: Express) {
           FROM factory_bales fb
           WHERE fb.company_id = ${companyId}
           AND fb.status IN ('IN_STOCK', 'FINALIZED', 'SOLD', 'DISPATCHED', 'RESERVED_FOR_ORDER')
+          AND (
+            -- Always include current/active bales regardless of age.
+            fb.status IN ('IN_STOCK', 'RESERVED_FOR_ORDER')
+            -- Limit historical (sold/dispatched) rows to the last 90 days to avoid
+            -- scanning years of data (root cause of the 220-second query / pool crash).
+            OR fb.created_at >= NOW() - INTERVAL '90 days'
+          )
         `),
         db
           .select({
@@ -351,6 +358,7 @@ export function registerEmployeeLedgerWasteRoutes(app: Express) {
       const wasteDispatched = bucketToArray(buckets.wasteDispatched);
       const pendingLoading = bucketToArray(buckets.pendingLoading);
 
+      res.set("Cache-Control", "private, max-age=120");
       res.json({
         currentStock,
         wasteStock,

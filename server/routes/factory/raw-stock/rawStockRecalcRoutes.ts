@@ -13,6 +13,10 @@ import {
   computeApplyAllDryRun,
 } from "../../../services/factory/rawStockRecalc";
 import { logAudit } from "../../helpers/auditHelpers";
+import { getStableSupplierCost } from "../../../services/factory/rawStockStableCost";
+import { db } from "../../../db";
+import { factorySuppliers } from "@shared/schema";
+import { eq, and } from "drizzle-orm";
 import {
   signRepairToken,
   verifyRepairToken,
@@ -649,6 +653,147 @@ export function registerRawStockRecalcRoutes(app: Express) {
       } catch (err: any) {
         console.error("[raw-stock recalc source-cost-mismatches] error:", err);
         res.status(500).json({ message: err.message || "Failed to scan source cost mismatches" });
+      }
+    }
+  );
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // Retroactive supplier locked-rate recompute (admin-only, no dry-run needed)
+  // POST /api/factory/raw-stock/supplier-rate/recompute
+  // Body: { supplierId?: number }  — omit to recompute ALL suppliers
+  //
+  // Recalculates current_raw_material_cost_per_kg_usd using the receipt-weighted
+  // stable cost across all factory_raw_stock rows (which must already carry the
+  // correct cost_per_kg_usd from a prior recalc apply). Skips suppliers whose
+  // stable cost is 0 (no raw-stock rows). Use after a recalc that ran while all
+  // containers were fully used and the cascade skipped the locked-rate update.
+  // ──────────────────────────────────────────────────────────────────────────
+  app.post(
+    "/api/factory/raw-stock/supplier-rate/recompute",
+    requireAuth,
+    requireRole(...ADMIN_ROLES),
+    async (req: any, res: any) => {
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      const { supplierId } = req.body;
+
+      try {
+        // Resolve the list of supplier IDs to process
+        let supplierIds: number[];
+        if (supplierId != null) {
+          const sid = parseInt(supplierId);
+          if (isNaN(sid)) return res.status(400).json({ message: "Invalid supplierId" });
+          supplierIds = [sid];
+        } else {
+          // Recompute all suppliers for this company
+          const allSuppliers = await db
+            .select({ id: factorySuppliers.id })
+            .from(factorySuppliers)
+            .where(eq(factorySuppliers.companyId, companyId));
+          supplierIds = allSuppliers.map((s) => s.id);
+        }
+
+        const results: Array<{ supplierId: number; oldRate: number; newRate: number; rowCount: number; skipped?: string }> = [];
+
+        for (const sid of supplierIds) {
+          const [existing] = await db
+            .select({ currentRawMaterialCostPerKgUsd: factorySuppliers.currentRawMaterialCostPerKgUsd })
+            .from(factorySuppliers)
+            .where(and(eq(factorySuppliers.id, sid), eq(factorySuppliers.companyId, companyId)));
+          if (!existing) continue;
+
+          const oldRate = parseFloat(existing.currentRawMaterialCostPerKgUsd as string || "0");
+          const { costPerKgUsd, totalReceivedKg, rows } = await db.transaction(async (tx: any) => {
+            return getStableSupplierCost(tx, companyId, sid);
+          });
+
+          if (costPerKgUsd <= 0) {
+            results.push({ supplierId: sid, oldRate, newRate: 0, rowCount: 0, skipped: "No usable raw-stock rows" });
+            continue;
+          }
+          if (Math.abs(costPerKgUsd - oldRate) < 0.000001) {
+            results.push({ supplierId: sid, oldRate, newRate: costPerKgUsd, rowCount: rows.length, skipped: "Already correct" });
+            continue;
+          }
+
+          await db
+            .update(factorySuppliers)
+            .set({ currentRawMaterialCostPerKgUsd: String(costPerKgUsd), updatedAt: new Date() })
+            .where(and(eq(factorySuppliers.id, sid), eq(factorySuppliers.companyId, companyId)));
+
+          await logAudit({
+            userId: req.session.userId,
+            username: req.session.username || req.session.userId,
+            companyId,
+            action: "update",
+            tableName: "factory_suppliers",
+            recordId: sid,
+            recordIdentifier: `supplier-rate/recompute — stable avg from ${rows.length} rows, totalReceived ${totalReceivedKg}kg`,
+            changes: { old: { currentRawMaterialCostPerKgUsd: oldRate }, new: { currentRawMaterialCostPerKgUsd: costPerKgUsd } },
+          });
+          results.push({ supplierId: sid, oldRate, newRate: costPerKgUsd, rowCount: rows.length });
+        }
+
+        res.json({
+          updated: results.filter((r) => !r.skipped).length,
+          skipped: results.filter((r) => !!r.skipped).length,
+          results,
+        });
+      } catch (err: any) {
+        console.error("[supplier-rate/recompute] error:", err);
+        res.status(500).json({ message: err.message || "Failed to recompute supplier rate" });
+      }
+    }
+  );
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // Apply all fixable source cost mismatches — no dry-run/token required
+  // POST /api/factory/raw-stock/recalc/fix-source-mismatches
+  //
+  // Scans all mix_batch_source rows for cost mismatches against their
+  // container's authoritative corrected rate, and applies fixes for all
+  // "fixable" ones in a single pass. Safe to call after a recalc apply that
+  // excluded completed batches — it will bring their source costs up to date
+  // without cascading batch totals or bale costs.
+  // ──────────────────────────────────────────────────────────────────────────
+  app.post(
+    "/api/factory/raw-stock/recalc/fix-source-mismatches",
+    requireAuth,
+    requireRole(...ADMIN_ROLES),
+    async (req: any, res: any) => {
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      try {
+        const mismatches = await getMixBatchSourceCostMismatchPreview(companyId);
+        const fixableIds = mismatches.filter((r) => r.fixable).map((r) => r.sourceId);
+        if (fixableIds.length === 0) {
+          return res.json({ applied: 0, skipped: 0, results: [] });
+        }
+        const results = await applyZeroCostMixBatchSourcesFix(companyId, fixableIds, {
+          onAudit: async (tx, result) => {
+            await logAudit(
+              {
+                userId: req.session.userId,
+                username: req.session.username || req.session.userId,
+                companyId,
+                action: "update",
+                tableName: "factory_mix_batch_sources",
+                recordId: result.sourceId,
+                recordIdentifier: `fix-source-mismatches — batch ${result.batchCode}`,
+                changes: { result: { new: result } },
+              },
+              tx
+            );
+          },
+        });
+        res.json({
+          applied: results.filter((r) => r.applied).length,
+          skipped: results.filter((r) => !r.applied).length,
+          results,
+        });
+      } catch (err: any) {
+        console.error("[recalc fix-source-mismatches] error:", err);
+        res.status(500).json({ message: err.message || "Failed to fix source mismatches" });
       }
     }
   );

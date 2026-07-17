@@ -19,7 +19,7 @@ export default function FactoryPayrollHub() {
   const [, navigate] = useLocation();
   const search = useSearch();
 
-  const { data: myAccess } = useQuery<any>({ queryKey: ["/api/factory/my-access"], staleTime: 60000 });
+  const { data: myAccess } = useQuery<any>({ queryKey: ["/api/factory/my-access"], staleTime: 5 * 60000 });
 
   // Insurance tab mirrors the sidebar pageKeys guard for factory/insurance
   const hasInsuranceAccess =

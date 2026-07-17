@@ -1157,6 +1157,7 @@ export async function getMixBatchSourceCostMismatchPreview(
       containerNumber: factoryContainers.containerNumber,
       containerStatus: factoryContainers.status,
       supplierName: factorySuppliers.name,
+      supplierLockedRate: factorySuppliers.currentRawMaterialCostPerKgUsd,
       container: factoryContainers,
     })
     .from(factoryMixBatchSources)
@@ -1235,12 +1236,25 @@ export async function getMixBatchSourceCostMismatchPreview(
 
   const result: MixBatchSourceCostMismatchRow[] = [];
 
-  for (const { src, batch, containerNumber, containerStatus, supplierName, container } of rows) {
+  for (const { src, batch, containerNumber, containerStatus, supplierName, supplierLockedRate, container } of rows) {
     const weightKg = parseFloat(src.weightKg || "0");
     const oldCostPerKgUsd = parseFloat(src.costPerKg || "0");
     const oldTotalCost = parseFloat(src.totalCost || "0");
 
     if (src.containerId == null) {
+      // Supplier-type source (no specific container). Compare against the supplier's
+      // current locked rate — this is the corrected receipt-weighted average computed
+      // after a recalc apply. If the locked rate differs from the stored source cost,
+      // the source is stale and can be auto-fixed.
+      const lockedRate = parseFloat(supplierLockedRate as string || "0");
+      const newTotalCost = lockedRate > 0
+        ? new Decimal(weightKg).times(new Decimal(lockedRate)).toDecimalPlaces(COST_SCALE).toNumber()
+        : 0;
+      const isStale = lockedRate > 0 && !costEquals(oldCostPerKgUsd, lockedRate);
+      if (!isStale) {
+        // Source cost matches the current supplier locked rate — no mismatch to report.
+        continue;
+      }
       result.push({
         sourceId: src.id,
         batchId: batch.id,
@@ -1253,12 +1267,12 @@ export async function getMixBatchSourceCostMismatchPreview(
         supplierName: supplierName || null,
         weightKg,
         oldCostPerKgUsd,
-        newCostPerKgUsd: 0,
+        newCostPerKgUsd: lockedRate,
         oldTotalCost,
-        newTotalCost: 0,
-        difference: 0,
-        fixable: false,
-        reason: "Direct-from-supplier source — requires manually entered cost/kg.",
+        newTotalCost,
+        difference: new Decimal(lockedRate).minus(new Decimal(oldCostPerKgUsd)).toDecimalPlaces(COST_SCALE).toNumber(),
+        fixable: true,
+        reason: `Source cost differs from supplier's corrected locked rate (diff: ${(lockedRate - oldCostPerKgUsd).toFixed(COST_SCALE)}).`,
         rawStockExists: false,
         remainingKg: 0,
         fullyUsed: false,
@@ -1432,11 +1446,28 @@ export async function applyZeroCostMixBatchSourcesFix(
           return { sourceId, batchId: batch.id, batchCode: batch.batchCode, applied: false, skippedReason: "Container has no resolvable USD cost.", affectedBales: 0 } as ZeroCostSourceFixResult;
         }
       } else {
+        // Supplier-type source (containerId=null): prefer the supplier's current
+        // locked rate (set by recomputeSupplierRates after a recalc apply). Fall
+        // back to a manually supplied rate if available.
         const manualRate = opts.manualRates?.[sourceId];
-        if (!manualRate || manualRate <= 0) {
+        if (src.supplierId != null) {
+          const [supplierRow] = await tx
+            .select({ currentRawMaterialCostPerKgUsd: factorySuppliers.currentRawMaterialCostPerKgUsd })
+            .from(factorySuppliers)
+            .where(and(eq(factorySuppliers.id, src.supplierId), eq(factorySuppliers.companyId, companyId)));
+          const lockedRate = parseFloat(supplierRow?.currentRawMaterialCostPerKgUsd as string || "0");
+          if (lockedRate > 0) {
+            correctedCostPerKgUsd = lockedRate;
+          } else if (manualRate && manualRate > 0) {
+            correctedCostPerKgUsd = manualRate;
+          } else {
+            return { sourceId, batchId: batch.id, batchCode: batch.batchCode, applied: false, skippedReason: "Supplier has no corrected locked rate yet — run Recompute Supplier Rates first.", affectedBales: 0 } as ZeroCostSourceFixResult;
+          }
+        } else if (manualRate && manualRate > 0) {
+          correctedCostPerKgUsd = manualRate;
+        } else {
           return { sourceId, batchId: batch.id, batchCode: batch.batchCode, applied: false, skippedReason: "Direct-from-supplier source — requires a manually entered cost/kg.", affectedBales: 0 } as ZeroCostSourceFixResult;
         }
-        correctedCostPerKgUsd = manualRate;
       }
 
       // Idempotency check

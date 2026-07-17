@@ -71,6 +71,10 @@ export const pool = new Pool({
   idleTimeoutMillis: 120_000,
   // Keep the pool alive across idle periods instead of draining to zero.
   allowExitOnIdle: false,
+  // Kill any individual SQL statement that runs longer than 30 seconds.
+  // Without this, a single slow query can hold a connection for minutes,
+  // exhausting the pool and crashing the server (observed: 220s bale-ledger scan).
+  options: "-c statement_timeout=30000",
 });
 
 // Log unexpected errors on idle clients.

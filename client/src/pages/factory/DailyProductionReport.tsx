@@ -1170,8 +1170,9 @@ export default function DailyProductionReport() {
     isFetching: ledgerFetching,
   } = useQuery<LedgerData>({
     queryKey: ["/api/factory/bale-ledger"],
-    staleTime: 60_000,
+    staleTime: 5 * 60_000,
     refetchOnWindowFocus: false,
+    refetchOnMount: false,
   });
 
   const { data: attendanceData } = useQuery<{

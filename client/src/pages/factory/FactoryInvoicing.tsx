@@ -12,7 +12,7 @@ export default function FactoryInvoicing() {
   const [, navigate] = useLocation();
   const search = useSearch();
 
-  const { data: myAccess } = useQuery<any>({ queryKey: ["/api/factory/my-access"], staleTime: 60000 });
+  const { data: myAccess } = useQuery<any>({ queryKey: ["/api/factory/my-access"], staleTime: 5 * 60000 });
   const hidden: string[] = myAccess?.hiddenCostFields ?? [];
 
   // ── Proformas tab access (existing restriction) ──────────────────────────
