@@ -66,12 +66,17 @@ export async function runFullExportWorker(
 
   return new Promise<WorkerExportResult>((resolve, reject) => {
     let settled = false;
+    let processingResult = false;
     let stderrTail = "";
 
     const worker = fork(workerPath, [], {
       env: {
         ...process.env,
         ERP_EXPORT_WORKER: "1",
+        SKIP_PERFORMANCE_INDEX_INSTALL: "1",
+        PG_POOL_MAX: process.env.EXPORT_WORKER_PG_POOL_MAX || "2",
+        PG_SESSION_POOL_MAX: "1",
+        ENABLE_SCHEDULERS: "false",
       },
       execArgv: [`--max-old-space-size=${heapMb}`],
       serialization: "json",
@@ -128,29 +133,52 @@ export async function runFullExportWorker(
       }
 
       if (message.type === "result") {
-        const validResult =
-          path.isAbsolute(message.filePath) &&
-          path.isAbsolute(message.tempDir) &&
-          Number.isFinite(message.length) &&
-          message.length >= 0 &&
-          Array.isArray(message.names) &&
-          Array.isArray(message.skipped);
+        if (processingResult) return;
+        processingResult = true;
 
-        if (!validResult) {
-          finish(() => {
-            const error = new Error("Full export worker returned an invalid result payload.");
-            (error as any).code = "EXPORT_WORKER_INVALID_RESULT";
-            reject(error);
-          });
-          safeDisconnect();
-          return;
-        }
+        void (async () => {
+          try {
+            const resolvedTempDir = path.resolve(message.tempDir);
+            const resolvedFilePath = path.resolve(message.filePath);
+            const shapeValid =
+              path.isAbsolute(message.filePath) &&
+              path.isAbsolute(message.tempDir) &&
+              path.basename(resolvedTempDir).startsWith("erp-export-") &&
+              resolvedFilePath.startsWith(`${resolvedTempDir}${path.sep}`) &&
+              Number.isFinite(message.length) &&
+              message.length >= 0 &&
+              Array.isArray(message.names) &&
+              Array.isArray(message.skipped);
 
-        finish(() => {
-          const zip = createFileBackedExport(message.filePath, message.tempDir, message.length);
-          resolve({ zip, names: message.names, skipped: message.skipped });
-        });
-        safeDisconnect();
+            if (!shapeValid) throw new Error("Full export worker returned an invalid result payload.");
+
+            const [realTempDir, realFilePath] = await Promise.all([
+              fs.promises.realpath(resolvedTempDir),
+              fs.promises.realpath(resolvedFilePath),
+            ]);
+            if (!realFilePath.startsWith(`${realTempDir}${path.sep}`)) {
+              throw new Error("Full export worker returned a file outside its temporary directory.");
+            }
+
+            const stat = await fs.promises.stat(realFilePath);
+            if (!stat.isFile() || stat.size <= 0) {
+              throw new Error("Full export worker returned a missing or empty ZIP artifact.");
+            }
+
+            finish(() => {
+              const zip = createFileBackedExport(realFilePath, realTempDir, stat.size);
+              resolve({ zip, names: message.names, skipped: message.skipped });
+            });
+          } catch (validationError: any) {
+            finish(() => {
+              const error = new Error(validationError?.message || "Full export worker returned an invalid result payload.");
+              (error as any).code = "EXPORT_WORKER_INVALID_RESULT";
+              reject(error);
+            });
+          } finally {
+            safeDisconnect();
+          }
+        })();
         return;
       }
 
@@ -170,7 +198,7 @@ export async function runFullExportWorker(
     });
 
     worker.once("exit", (code, signal) => {
-      if (settled) return;
+      if (settled || processingResult) return;
       finish(() => {
         const suffix = stderrTail.trim() ? ` Last diagnostics: ${stderrTail.trim()}` : "";
         const error = new Error(
