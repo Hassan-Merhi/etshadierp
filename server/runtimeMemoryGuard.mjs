@@ -1,3 +1,5 @@
+import "./runtimeHealthGuard.mjs";
+import "./runtimeObservability.mjs";
 import "./runtimeLifecycleGuard.mjs";
 import { Server } from "node:http";
 import process from "node:process";
@@ -83,7 +85,7 @@ Server.prototype.emit = function patchedEmit(event, ...args) {
   if (event !== "request") return originalEmit.call(this, event, ...args);
   const [req, res] = args;
   const path = pathnameOf(req);
-  if (path === "/api/health" || path === "/api/health/db" || path === "/api/health/metrics") return originalEmit.call(this, event, ...args);
+  if (path === "/api/health" || path === "/api/health/db" || path === "/api/health/live" || path === "/api/health/ready" || path === "/api/health/metrics") return originalEmit.call(this, event, ...args);
   if (globalThis.__erpRuntimeShuttingDown) {
     reject(res, 503, "SERVER_SHUTTING_DOWN", "Server is restarting. Please retry shortly.", 5);
     return true;
