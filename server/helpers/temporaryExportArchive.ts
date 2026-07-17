@@ -93,6 +93,17 @@ export async function createTemporaryExportArchive(
   }
 }
 
+export async function releaseTemporaryExportArchive(filePath: string | undefined): Promise<void> {
+  if (!filePath) return;
+  try {
+    await fs.promises.rm(filePath, { force: true });
+  } catch (error: any) {
+    if (error?.code !== "ENOENT") {
+      console.warn(`[ExportArchive] Failed to release temporary archive ${filePath}:`, error);
+    }
+  }
+}
+
 export async function streamTemporaryExportArchive(
   res: Response,
   filePath: string,
