@@ -78,6 +78,14 @@ export async function runFullExportWorker(
       stdio: ["ignore", "pipe", "pipe", "ipc"],
     });
 
+    const safeDisconnect = () => {
+      try {
+        if (worker.connected) worker.disconnect();
+      } catch {
+        // Worker may have exited between the connected check and disconnect.
+      }
+    };
+
     const finish = (callback: () => void) => {
       if (settled) return;
       settled = true;
@@ -110,31 +118,50 @@ export async function runFullExportWorker(
       });
     });
 
-    worker.on("message", (raw: WorkerMessage) => {
-      if (!raw || typeof raw !== "object") return;
+    worker.on("message", (raw: unknown) => {
+      if (!raw || typeof raw !== "object" || typeof (raw as any).type !== "string") return;
+      const message = raw as WorkerMessage;
 
-      if (raw.type === "progress") {
-        onProgress?.(raw.message, raw.level);
+      if (message.type === "progress") {
+        onProgress?.(message.message, message.level);
         return;
       }
 
-      if (raw.type === "result") {
+      if (message.type === "result") {
+        const validResult =
+          path.isAbsolute(message.filePath) &&
+          path.isAbsolute(message.tempDir) &&
+          Number.isFinite(message.length) &&
+          message.length >= 0 &&
+          Array.isArray(message.names) &&
+          Array.isArray(message.skipped);
+
+        if (!validResult) {
+          finish(() => {
+            const error = new Error("Full export worker returned an invalid result payload.");
+            (error as any).code = "EXPORT_WORKER_INVALID_RESULT";
+            reject(error);
+          });
+          safeDisconnect();
+          return;
+        }
+
         finish(() => {
-          const zip = createFileBackedExport(raw.filePath, raw.tempDir, raw.length);
-          resolve({ zip, names: raw.names, skipped: raw.skipped });
+          const zip = createFileBackedExport(message.filePath, message.tempDir, message.length);
+          resolve({ zip, names: message.names, skipped: message.skipped });
         });
-        worker.disconnect();
+        safeDisconnect();
         return;
       }
 
-      if (raw.type === "error") {
+      if (message.type === "error") {
         finish(() => {
-          const error = new Error(raw.message);
-          (error as any).code = raw.code || "EXPORT_WORKER_FAILED";
-          (error as any).stack = raw.stack || error.stack;
+          const error = new Error(message.message);
+          (error as any).code = message.code || "EXPORT_WORKER_FAILED";
+          (error as any).stack = message.stack || error.stack;
           reject(error);
         });
-        worker.disconnect();
+        safeDisconnect();
       }
     });
 
@@ -154,11 +181,18 @@ export async function runFullExportWorker(
       });
     });
 
-    worker.send({
-      type: "start",
-      companies,
-      fromDate: fromDate || null,
-      toDate: toDate || null,
-    });
+    worker.send(
+      {
+        type: "start",
+        companies,
+        fromDate: fromDate || null,
+        toDate: toDate || null,
+      },
+      (error) => {
+        if (!error) return;
+        finish(() => reject(error));
+        safeDisconnect();
+      }
+    );
   });
 }
