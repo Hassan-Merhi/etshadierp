@@ -179,9 +179,9 @@ export const FACTORY_NAV_PAGES: { key: string; label: string; group: string }[] 
 
 const FACTORY_PINNED_DEFAULTS: NavItem[] = [
   { title: "Overview", url: "/factory/production-report", icon: BarChart3 },
-  { title: "Daybook", url: "/factory/daybook", icon: BookOpen },
   { title: "Agent Ledger", url: "/factory/agents", icon: UserRound },
   { title: "Accounts", url: "/factory/accounts", icon: Landmark },
+  { title: "Daybook", url: "/factory/daybook", icon: BookOpen },
   { title: "Vouchers", url: "/factory/vouchers", icon: FileText },
 ];
 
@@ -216,7 +216,11 @@ export function useFactoryVisibleSections(user?: any): {
       return !myAccess?.hiddenCostFields?.includes("hide_tab_production_analytics");
     }
     if (item.url === "/factory/daybook") {
-      return settings?.daybookEnabled !== false && !myAccess?.hiddenCostFields?.includes("hide_tab_daybook");
+      if (myAccess?.hiddenCostFields?.includes("hide_tab_daybook")) return false;
+      if (myAccess && !myAccess.fullAccess && myAccess.pageKeys.length > 0) {
+        return myAccess.pageKeys.includes("factory/daybook");
+      }
+      return true;
     }
     if (item.url === "/factory/agents") {
       return !myAccess?.hiddenCostFields?.includes("hide_tab_agents");
