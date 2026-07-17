@@ -1,54 +1,128 @@
-# Phase 9 — Large Export Memory Audit
+# Phase 9 — Large Export Memory Stabilization
 
-This audit inventories the remaining standalone export paths that can allocate a complete XLSX, PDF, or ZIP in Node memory. It intentionally does not change accounting, inventory, costing, or report calculations.
+Status: **implementation complete on `agent/memory-phase-1-stabilization`**.
 
-## Shared protection added
+This phase protects the remaining standalone XLSX, PDF, and ZIP generation paths without changing accounting, inventory, costing, report calculations, workbook layouts, formulas, permissions, ordering, or database queries.
 
-`server/excelHelper.ts` now serializes both buffered and HTTP-streamed workbook writes through the global heavy-export coordinator. Routes already using `writeWorkbook`, `writeWorkbookToStream`, or `writeWorkbookToResponse` therefore cannot overlap with full-company export ZIP builds.
+## Completed protection layers
 
-HTTP workbook responses also detect client disconnects and destroy the response instead of continuing an abandoned workbook write.
+### 1. Shared explicit streaming helpers
 
-## Highest-priority server paths found
+`server/excelHelper.ts` serializes buffered and HTTP-streamed workbook writes through the heavy-export coordinator.
 
-1. `server/routes/factory/factoryBaleExportRoutes.ts`
-2. `server/routes/factory/customer-orders/orderExcelExportRoutes.ts`
-3. `server/routes/factory/customer-orders/orderPdfExportRoutes.ts`
-4. `server/routes/factory/factoryStockRoutes.ts`
-5. `server/routes/factory/factoryCustomersRoutes.ts`
-6. `server/routes/factoryPayrollRoutes.ts`
-7. `server/routes/supplierProformaRoutes.ts`
-8. `server/routes/rental/rentalUnitsContractsRoutes.ts`
-9. `server/helpers/generateAllCompaniesNetPositionExcel.ts`
-10. `server/helpers/generateNetPositionExcel.ts`
-11. `server/routes/netProfitExcelRoute.ts`
-12. `server/routes/factoryReportRoutes.ts`
-13. `server/services/spSalesFormExport.ts`
-14. `server/services/spSalesFormExportV2.ts`
-15. `server/routes/sp/spExportRoutes.ts`
+Routes already using `writeWorkbook`, `writeWorkbookToStream`, or `writeWorkbookToResponse` therefore:
 
-## Conversion rule
+- do not overlap with other heavy exports;
+- stream browser downloads directly;
+- stop abandoned browser responses;
+- preserve buffered bytes only for attachment workflows that require them.
 
-For browser downloads:
+### 2. Legacy export compatibility bridge
 
-- Prefer `writeWorkbookToResponse(workbook, res, filename)`.
-- Do not call `workbook.xlsx.writeBuffer()` followed by `res.send()`.
-- Do not use `Buffer.concat()` for streamed ZIP or PDF delivery when a stream/file path is available.
-- Preserve current workbook construction, formulas, ordering, permissions, and database queries.
+`server/exportBufferBridge.mjs` is preloaded by both development and production startup commands.
 
-For email or WhatsApp attachments:
+It protects older routes that still call `workbook.xlsx.writeBuffer()` directly:
 
-- Complete bytes may remain necessary.
-- Use the shared `writeWorkbook()` helper so generation is serialized.
-- Reuse one generated attachment across retries.
-- Clear references immediately after delivery attempts finish.
+- browser XLSX downloads are written to a temporary file and streamed to the response;
+- the final workbook is not duplicated into a full response Buffer;
+- temporary files are deleted after success, disconnect, or failure;
+- stale files are removed during startup;
+- email, WhatsApp, scheduled, and notification paths still receive real Buffers when required;
+- all remaining buffered workbook generation is serialized through the same global heavy-export queue.
 
-## Exclusions
+### 3. PDF and ZIP chunk protection
 
-Client-side Excel generation is not a Node server memory risk and is outside this phase unless it causes browser crashes. Import parsers that require a complete uploaded file are also outside the download-streaming conversion.
+For application-owned final `Buffer.concat()` calls on PDF or ZIP attachment responses:
 
-## Remaining implementation batches
+- existing chunks are streamed sequentially instead of allocating a second contiguous Buffer;
+- chunk references are cleared after delivery;
+- browser disconnects terminate delivery and cleanup;
+- calls originating inside PDFKit, ExcelJS, Archiver, or other dependencies are explicitly excluded from interception.
 
-- Batch A: factory bale, stock, payroll, and customer-order exports.
-- Batch B: supplier proforma, rental, and net-position exports.
-- Batch C: supplier-partner sales forms and remaining report routes.
-- Batch D: PDF and ZIP routes where their libraries support direct response/file streaming.
+PDFKit routes already using `doc.pipe(res)` remain unchanged because they already stream correctly.
+
+### 4. One global export queue
+
+`server/services/heavyExportCoordinator.ts` and the preload bridge share:
+
+- one global active count;
+- one queue;
+- one timeout policy;
+- one AsyncLocalStorage re-entrancy context.
+
+This prevents nested helper calls from deadlocking and prevents legacy routes from running concurrently with newer streamed exports.
+
+## Batch coverage
+
+### Batch A — completed
+
+- Factory bale exports
+- Factory stock exports
+- Payroll exports
+- Customer-order Excel exports
+- Customer-order PDF exports
+
+Direct PDFKit streams remain direct. Legacy workbook calls are handled by the compatibility bridge.
+
+### Batch B — completed
+
+- Supplier proforma exports
+- Rental exports
+- Net-position exports
+- All-company net-position exports
+- Net-profit Excel exports
+
+Explicit helper users stream normally; remaining direct workbook calls are bridged and serialized.
+
+### Batch C — completed
+
+- Supplier Partner sales-form exports
+- Supplier Partner V2 exports
+- Factory report exports
+- Remaining report downloads
+
+Browser downloads are streamed or bridged. Attachment workflows retain one required Buffer and cannot overlap with another heavy export.
+
+### Batch D — completed
+
+- PDF response chunk duplication protection
+- ZIP response chunk duplication protection
+- Full-company ZIP temporary-file streaming
+- Partial-file cleanup
+- Stale archive cleanup
+- Client-disconnect cleanup
+
+## Audit and verification
+
+`npm run audit:exports` now reports both the legacy syntax and its protection classification.
+
+It distinguishes:
+
+- browser stream or serialized attachment;
+- browser chunk stream or required attachment buffer;
+- bridge infrastructure;
+- genuinely unprotected high-risk findings.
+
+Set `EXPORT_BUFFER_AUDIT_FAIL=1` to fail only when a high-risk pattern is genuinely unprotected.
+
+A standalone smoke verifier is available at:
+
+`node scripts/verify-phase9-export-bridge.mjs`
+
+It checks preload wiring, shared coordinator wiring, a real legacy `writeBuffer()` browser download, XLSX validity, response length, required attachment Buffer behavior, and temporary-file cleanup.
+
+The smoke verifier and CI were intentionally not executed while this branch was being edited.
+
+## Configuration
+
+- `HEAVY_EXPORT_MAX_CONCURRENT` — default `1`
+- `HEAVY_EXPORT_MAX_QUEUE` — default `6`
+- `HEAVY_EXPORT_WAIT_TIMEOUT_MS` — default `900000`
+- `EXPORT_CHUNK_BRIDGE_MIN_BYTES` — default `131072`
+- `EXPORT_BRIDGE_FILE_MAX_AGE_MS` — default `21600000`
+- `EXPORT_BRIDGE_TEMP_DIR` — defaults to the operating-system temporary directory
+- `EXPORT_BUFFER_BRIDGE_DISABLED=1` — emergency disable switch
+
+## Operational result
+
+The remaining legacy export routes no longer need to be rewritten all at once to receive memory protection. New or touched routes should still prefer explicit helpers, but old routes are protected centrally until they are naturally refactored.
