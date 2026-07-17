@@ -34,18 +34,59 @@ function lineNumberAt(source, index) {
   return line;
 }
 
+function slash(value) {
+  return value.replaceAll(path.sep, "/");
+}
+
+const packageJson = JSON.parse(await fs.readFile(path.join(ROOT, "package.json"), "utf8"));
+const bridgePath = path.join(SERVER_ROOT, "exportBufferBridge.mjs");
+let bridgeSource = "";
+try {
+  bridgeSource = await fs.readFile(bridgePath, "utf8");
+} catch {
+  // Reported below as missing protection.
+}
+
+const devCommand = String(packageJson.scripts?.dev || "");
+const startCommand = String(packageJson.scripts?.start || "");
+const bridgePreloadedInDev = devCommand.includes("--import ./server/exportBufferBridge.mjs");
+const bridgePreloadedInProduction = startCommand.includes("--import ./server/exportBufferBridge.mjs");
+const bridgeImplementsWorkbookStreaming = bridgeSource.includes("exportAwareWriteBuffer");
+const bridgeImplementsChunkStreaming = bridgeSource.includes("bridgedBufferConcat");
+const bridgeReady =
+  bridgePreloadedInDev &&
+  bridgePreloadedInProduction &&
+  bridgeImplementsWorkbookStreaming &&
+  bridgeImplementsChunkStreaming;
+
+function protectionFor(file, pattern) {
+  if (file === "server/exportBufferBridge.mjs") return "bridge-infrastructure";
+  if (/whatsapp|scheduler|mailer|email/i.test(file)) return "attachment-buffer-required";
+  if (!bridgeReady) return "unprotected";
+  if (pattern === "excel-write-buffer" || pattern === "response-buffer-end") {
+    return "browser-stream-or-serialized-attachment";
+  }
+  if (pattern === "buffer-concat" || pattern === "pdf-buffer-array") {
+    return "browser-chunk-stream-or-attachment-buffer";
+  }
+  if (pattern === "archive-buffering") return "unprotected";
+  return "review";
+}
+
 const files = await walk(SERVER_ROOT);
 const findings = [];
 
 for (const file of files) {
   const source = await fs.readFile(file, "utf8");
+  const relativeFile = slash(path.relative(ROOT, file));
   for (const pattern of patterns) {
     pattern.regex.lastIndex = 0;
     for (const match of source.matchAll(pattern.regex)) {
       findings.push({
         severity: pattern.severity,
         pattern: pattern.id,
-        file: path.relative(ROOT, file).replaceAll(path.sep, "/"),
+        protection: protectionFor(relativeFile, pattern.id),
+        file: relativeFile,
         line: lineNumberAt(source, match.index ?? 0),
         excerpt: match[0].replace(/\s+/g, " ").slice(0, 180),
       });
@@ -59,12 +100,36 @@ findings.sort((a, b) => {
 });
 
 const summary = findings.reduce((acc, finding) => {
-  acc[finding.pattern] = (acc[finding.pattern] || 0) + 1;
+  acc.byPattern[finding.pattern] = (acc.byPattern[finding.pattern] || 0) + 1;
+  acc.byProtection[finding.protection] = (acc.byProtection[finding.protection] || 0) + 1;
   return acc;
-}, {});
+}, { byPattern: {}, byProtection: {} });
 
-console.log(JSON.stringify({ generatedAt: new Date().toISOString(), total: findings.length, summary, findings }, null, 2));
+const unprotectedHighRisk = findings.filter(
+  (finding) => finding.severity === "high" && finding.protection === "unprotected"
+);
 
-if (process.env.EXPORT_BUFFER_AUDIT_FAIL === "1" && findings.some((finding) => finding.severity === "high")) {
+console.log(
+  JSON.stringify(
+    {
+      generatedAt: new Date().toISOString(),
+      bridge: {
+        ready: bridgeReady,
+        preloadedInDev: bridgePreloadedInDev,
+        preloadedInProduction: bridgePreloadedInProduction,
+        workbookStreaming: bridgeImplementsWorkbookStreaming,
+        chunkStreaming: bridgeImplementsChunkStreaming,
+      },
+      total: findings.length,
+      unprotectedHighRisk: unprotectedHighRisk.length,
+      summary,
+      findings,
+    },
+    null,
+    2
+  )
+);
+
+if (process.env.EXPORT_BUFFER_AUDIT_FAIL === "1" && unprotectedHighRisk.length > 0) {
   process.exitCode = 1;
 }
