@@ -19,6 +19,7 @@ import { registerFactoryContainerTrackingRoutes } from "./factory/factoryContain
 import { registerEndProductionRoutes } from "./factory/endProductionRoutes";
 import { registerProductionPlannerRoutes } from "./factory/factoryProductionPlannerRoutes";
 import { registerPerformanceReadMicrocache } from "./performance/readMicrocache";
+import { registerFactoryDaybookPaginationRoutes } from "./factory/factoryDaybookPaginationRoutes";
 
 export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
   // ─────────────────────────────────────────────────────────────────────────────
@@ -109,6 +110,10 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       requiresAdminOverride: true,
     });
   });
+
+  // Paged requests are intercepted here and perform count/limit/offset in SQL.
+  // Unpaged requests call next() and continue into the unchanged legacy handler.
+  registerFactoryDaybookPaginationRoutes(app);
 
   registerFactoryStockRoutes(app);
   registerFactorySuppliersRoutes(app);
