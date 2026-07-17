@@ -125,6 +125,7 @@ if (typeof window !== "undefined" && !window.__erpV5AllocationPaginationInstalle
   let selectedPage = 1;
   let selectedLimit = DEFAULT_LIMIT;
   let negativeOnlyMode = false;
+  let wasOnRoute = window.location.pathname === ROUTE;
   let controlsRoot: HTMLDivElement | null = null;
 
   function resolveUrl(input: RequestInfo | URL): URL | null {
@@ -291,6 +292,19 @@ if (typeof window !== "undefined" && !window.__erpV5AllocationPaginationInstalle
     root.append(previous, label, next, sizeLabel);
   }
 
+  function handleRouteState(): void {
+    const onRoute = window.location.pathname === ROUTE;
+    if (!onRoute && wasOnRoute) {
+      negativeOnlyMode = false;
+      activeMeta = null;
+      activeBaseKey = "";
+      selectedPage = 1;
+      selectedLimit = DEFAULT_LIMIT;
+    }
+    wasOnRoute = onRoute;
+    renderControls();
+  }
+
   window.fetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
     const match = shouldPaginate(input, init);
     if (!match) return previousFetch(input, init);
@@ -342,17 +356,17 @@ if (typeof window !== "undefined" && !window.__erpV5AllocationPaginationInstalle
     queueMicrotask(refetchAllocation);
   });
 
-  window.addEventListener("popstate", renderControls);
+  window.addEventListener("popstate", handleRouteState);
   const originalPushState = history.pushState.bind(history);
   history.pushState = (...args) => {
     originalPushState(...args);
-    queueMicrotask(renderControls);
+    queueMicrotask(handleRouteState);
   };
   const originalReplaceState = history.replaceState.bind(history);
   history.replaceState = (...args) => {
     originalReplaceState(...args);
-    queueMicrotask(renderControls);
+    queueMicrotask(handleRouteState);
   };
 
-  setInterval(renderControls, 1000);
+  setInterval(handleRouteState, 1000);
 }
