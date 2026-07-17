@@ -3230,3 +3230,41 @@ export const insertInsuranceMemberSchema = createInsertSchema(insuranceMembers)
 
 export type InsertInsuranceMember = z.infer<typeof insertInsuranceMemberSchema>;
 export type InsuranceMember = typeof insuranceMembers.$inferSelect;
+
+// ─── Factory Container Receipts ───────────────────────────────────────────────
+// Records each individual partial-receipt event for a container.
+// factory_raw_stock keeps one cumulative row per container (receivedKg is the
+// running total). This table is the per-receipt audit log with the immutable
+// fixed-rate snapshot established at first offload time.
+export const factoryContainerReceipts = pgTable(
+  "factory_container_receipts",
+  {
+    id: serial("id").primaryKey(),
+    companyId: integer("company_id").notNull(),
+    containerId: integer("container_id").notNull(),
+    receiptDate: date("receipt_date").notNull(),
+    /** Kg received in THIS receipt event (incremental, not cumulative). */
+    receivedKg: decimal("received_kg", { precision: 15, scale: 3 }).notNull(),
+    /** Running total of kg received across ALL receipts up to and including this one. */
+    cumulativeReceivedKg: decimal("cumulative_received_kg", { precision: 15, scale: 3 }).notNull(),
+    /** Fixed landed cost/kg in container native currency — established at first offload, never changes. */
+    fixedCostPerKg: decimal("fixed_cost_per_kg", { precision: 20, scale: 6 }),
+    /** Fixed landed cost/kg in USD. */
+    fixedCostPerKgUsd: decimal("fixed_cost_per_kg_usd", { precision: 20, scale: 6 }),
+    /** Value of this receipt in container native currency (receivedKg × fixedCostPerKg). */
+    receiptValue: decimal("receipt_value", { precision: 20, scale: 6 }),
+    /** Value of this receipt in USD. */
+    receiptValueUsd: decimal("receipt_value_usd", { precision: 20, scale: 6 }),
+    currencyCode: varchar("currency_code", { length: 3 }),
+    fxRateToUsd: decimal("fx_rate_to_usd", { precision: 20, scale: 8 }),
+    createdBy: varchar("created_by", { length: 255 }),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    deletedAt: timestamp("deleted_at"),
+  },
+  (t) => ({
+    containerIdx: index("factory_container_receipts_container_idx").on(t.companyId, t.containerId),
+    dateIdx: index("factory_container_receipts_date_idx").on(t.companyId, t.receiptDate),
+  })
+);
+
+export type FactoryContainerReceipt = typeof factoryContainerReceipts.$inferSelect;

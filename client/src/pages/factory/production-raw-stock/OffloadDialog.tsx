@@ -16,7 +16,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
-import { Plus, X, Gavel } from "lucide-react";
+import { Plus, X, Gavel, Info, Lock } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 import { formatNumber } from "@/lib/formatNumber";
@@ -84,6 +84,18 @@ export function OffloadDialog({
   const selectedContainer = useMemo(() => {
     return availableContainers?.find((c) => c.id.toString() === selectedContainerId);
   }, [availableContainers, selectedContainerId]);
+
+  /** True when the selected container already has a partial receipt — charges are locked. */
+  const isSubsequentReceipt = selectedContainer?.status === "PARTIALLY_RECEIVED";
+
+  /** Breakdown info for PARTIALLY_RECEIVED containers. */
+  const partialReceiptInfo = useMemo(() => {
+    if (!isSubsequentReceipt || !selectedContainer) return null;
+    const declared = parseFloat(selectedContainer.totalKg || "0");
+    const alreadyReceived = parseFloat(selectedContainer.actualReceivedKg || "0");
+    const remaining = Math.max(0, declared - alreadyReceived);
+    return { declared, alreadyReceived, remaining };
+  }, [isSubsequentReceipt, selectedContainer]);
 
   // Auto-fetch the live USD exchange rate whenever the freight currency is changed
   // away from USD (and isn't already pinned to the container's own fx rate). Without
@@ -159,11 +171,28 @@ export function OffloadDialog({
     const container = availableContainers?.find((c) => c.id.toString() === id);
     if (!container) return;
 
-    setActualReceivedKg(container.totalKg || "");
-    setCostPerKg(container.ratePerKg || "");
     const ccy = container.currencyCode || "USD";
     setCurrencyCode(ccy);
     setFxRateToUsd(container.fxRateToUsd || "1");
+    setCostPerKg(container.ratePerKg || "");
+
+    // For PARTIALLY_RECEIVED containers the charges were posted at first offload.
+    // Default the received-kg field to the remaining amount instead of the full declared weight.
+    if (container.status === "PARTIALLY_RECEIVED") {
+      const declared = parseFloat(container.totalKg || "0");
+      const alreadyReceived = parseFloat(container.actualReceivedKg || "0");
+      const remaining = Math.max(0, declared - alreadyReceived);
+      setActualReceivedKg(String(remaining.toFixed(3)));
+      // Clear charge fields — they are locked for subsequent receipts
+      setFreight(""); setFreightAccountId(""); setFreightFromContainer(false);
+      setOtherCharges(""); setOtherChargesAccountId(""); setOtherChargesFromContainer(false);
+      setCommissionPersonName(""); setCommissionRate(""); setCommissionFromContainer(false);
+      setDutyAmount(""); setDutyAccountId(""); setDutyPending(false);
+      setAdditionalCharges([]);
+      return;
+    }
+
+    setActualReceivedKg(container.totalKg || "");
 
     const freightVal = parseFloat(container.freight || "0");
     setFreight(freightVal > 0 ? String(freightVal) : "");
@@ -323,7 +352,7 @@ export function OffloadDialog({
                 <SelectContent>
                   {availableContainers?.map((c) => (
                     <SelectItem key={c.id} value={c.id.toString()}>
-                      {c.containerNumber} ({c.totalKg} kg — {c.supplierName})
+                      {c.containerNumber} ({c.totalKg} kg — {c.supplierName}){c.status === "PARTIALLY_RECEIVED" ? " [Partial]" : ""}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -335,9 +364,28 @@ export function OffloadDialog({
             </div>
           </div>
 
+          {/* Subsequent receipt info banner */}
+          {isSubsequentReceipt && partialReceiptInfo && (
+            <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 space-y-1">
+              <div className="flex items-center gap-2 text-blue-700 font-semibold text-sm">
+                <Info className="h-4 w-4" />
+                Subsequent Receipt — Partial Container
+              </div>
+              <div className="grid grid-cols-3 gap-2 text-sm text-blue-800">
+                <span>Declared: <strong>{formatNumber(partialReceiptInfo.declared)} kg</strong></span>
+                <span>Already received: <strong>{formatNumber(partialReceiptInfo.alreadyReceived)} kg</strong></span>
+                <span>Remaining: <strong>{formatNumber(partialReceiptInfo.remaining)} kg</strong></span>
+              </div>
+              <p className="text-xs text-blue-600 flex items-center gap-1">
+                <Lock className="h-3 w-3" />
+                Freight, charges, and commission are locked — they were posted on the first receipt. Only the received weight applies here.
+              </p>
+            </div>
+          )}
+
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label>Received Weight (KG)</Label>
+              <Label>Received Weight (KG){isSubsequentReceipt && partialReceiptInfo ? ` (max ${formatNumber(partialReceiptInfo.remaining)} kg remaining)` : ""}</Label>
               <Input
                 type="number"
                 step="0.001"
@@ -354,10 +402,21 @@ export function OffloadDialog({
                 value={costPerKg}
                 onChange={(e) => setCostPerKg(e.target.value)}
                 placeholder="0.0000"
+                disabled={isSubsequentReceipt}
               />
+              {isSubsequentReceipt && (
+                <p className="text-xs text-muted-foreground">Rate established at first offload — not editable here.</p>
+              )}
             </div>
           </div>
 
+          {isSubsequentReceipt ? (
+            <div className="rounded-lg border border-muted bg-muted/30 p-4 text-sm text-muted-foreground flex items-center gap-2">
+              <Lock className="h-4 w-4 shrink-0" />
+              Freight, other charges, commission, duty, and additional charges were recorded on the first receipt and are not re-posted here. The fixed landed cost/kg ({selectedContainer?.currencyCode}) already covers the full container.
+            </div>
+          ) : (
+          <>
           <Separator />
           <div className="grid grid-cols-2 gap-6">
             <div className="space-y-4">
@@ -477,6 +536,8 @@ export function OffloadDialog({
               </div>
             </div>
           </div>
+          </>
+          )}
 
           <div className="flex justify-end gap-2 pt-4">
             <Button variant="outline" onClick={() => onOpenChange(false)}>

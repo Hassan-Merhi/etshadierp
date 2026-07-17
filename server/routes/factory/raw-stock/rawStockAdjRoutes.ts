@@ -791,31 +791,19 @@ export function registerRawStockAdjRoutes(app: Express) {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const offloaded = await db
-        .select({ containerId: factoryRawStock.containerId })
-        .from(factoryRawStock)
-        .where(eq(factoryRawStock.companyId, companyId));
-
-      const offloadedIds = offloaded.map((o: any) => o.containerId).filter(Boolean);
-
-      const baseConditions = [
-        eq(factoryContainers.companyId, companyId),
-        sql`${factoryContainers.status} NOT IN ('DELETED', 'OPENING_BALANCE')`,
-      ];
-
-      if (offloadedIds.length > 0) {
-        baseConditions.push(
-          sql`${factoryContainers.id} NOT IN (${sql.join(
-            offloadedIds.map((id: number) => sql`${id}`),
-            sql`, `
-          )})`
-        );
-      }
-
+      // Include PARTIALLY_RECEIVED containers — they have a raw-stock row but still
+      // accept additional receipts up to their declared kg. Exclude only containers
+      // that are fully OFFLOADED, soft-deleted, or are opening-balance entries.
       const results = await db
         .select()
         .from(factoryContainers)
-        .where(and(...baseConditions));
+        .where(
+          and(
+            eq(factoryContainers.companyId, companyId),
+            sql`${factoryContainers.status} NOT IN ('DELETED', 'OPENING_BALANCE', 'OFFLOADED')`,
+            isNull(factoryContainers.deletedAt)
+          )
+        );
 
       res.json(results);
     } catch (error: any) {

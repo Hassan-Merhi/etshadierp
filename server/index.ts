@@ -4582,6 +4582,31 @@ END $$`,
     `ALTER TABLE factory_container_commissions ADD COLUMN IF NOT EXISTS fx_rate_to_usd NUMERIC(20,8) NOT NULL DEFAULT 1`,
     `ALTER TABLE factory_container_commissions ADD COLUMN IF NOT EXISTS fx_rate_confirmed BOOLEAN NOT NULL DEFAULT false`,
 
+    // -- factory_container_receipts: per-receipt audit log for partial offloads (July 2026) --
+    // Each row captures exactly one receipt event (incremental kg, cumulative kg, and
+    // the immutable fixed landed cost/kg established at first offload time).
+    // factory_raw_stock remains a single cumulative row per container; this table is the
+    // per-event detail so the system can support multiple partial receipts per container.
+    `CREATE TABLE IF NOT EXISTS factory_container_receipts (
+      id serial PRIMARY KEY,
+      company_id integer NOT NULL,
+      container_id integer NOT NULL,
+      receipt_date date NOT NULL,
+      received_kg numeric(15,3) NOT NULL,
+      cumulative_received_kg numeric(15,3) NOT NULL,
+      fixed_cost_per_kg numeric(20,6),
+      fixed_cost_per_kg_usd numeric(20,6),
+      receipt_value numeric(20,6),
+      receipt_value_usd numeric(20,6),
+      currency_code varchar(3),
+      fx_rate_to_usd numeric(20,8),
+      created_by varchar(255),
+      created_at timestamp NOT NULL DEFAULT now(),
+      deleted_at timestamp
+    )`,
+    `CREATE INDEX IF NOT EXISTS factory_container_receipts_container_idx ON factory_container_receipts(company_id, container_id)`,
+    `CREATE INDEX IF NOT EXISTS factory_container_receipts_date_idx ON factory_container_receipts(company_id, receipt_date)`,
+
     // -- Per-KG cost/rate/price column precision: upgrade to numeric(x,6) (July 2026) --
     // Standardise every per-KG cost, rate, and price column in the Factory module
     // to exactly 6 decimal places. Re-running on an already-upgraded column is safe:
