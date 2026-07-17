@@ -3,6 +3,7 @@ import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
 import * as schema from "@shared/schema";
 import { logger } from "./lib/logger";
+import { installPerformanceIndexes } from "./performanceIndexes";
 
 // Database connection configuration
 // Supports: DATABASE_URL (Render, external) or individual PG* variables (Replit)
@@ -126,5 +127,9 @@ export function logPoolStats(trigger: string) {
     logger.debug("Database pool stats", context);
   }
 }
+
+// Build additional high-value indexes after startup settles. CREATE INDEX
+// CONCURRENTLY keeps production reads and writes available while each index is built.
+installPerformanceIndexes(pool);
 
 export const db = drizzle(pool, { schema });
