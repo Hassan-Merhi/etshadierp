@@ -1,6 +1,8 @@
 import type { Express } from "express";
 import { db, pool } from "../../db";
 import { requireAuth } from "../../auth";
+import Decimal from "decimal.js";
+import { getLockedSupplierRateReadOnly } from "../../services/factory/rawStockLockedRate";
 import { classifyNetPositionAccounts } from "../../netPositionHelper";
 import { adjustInventory } from "../../inventoryHelper";
 import {
@@ -1642,8 +1644,77 @@ export function registerFactoryBaleExportRoutes(app: Express) {
         .where(and(...mixBatchConditions))
         .orderBy(sql`COALESCE(${factoryMixBatches.batchDate}, DATE(${factoryMixBatches.createdAt}))`);
 
-      const totalMixWeightKg = mixBatchRows.reduce((s: number, r: any) => s + parseFloat(r.totalWeightKg || "0"), 0);
-      const totalMixCost = mixBatchRows.reduce((s: number, r: any) => s + parseFloat(r.totalCost || "0"), 0);
+      // ── Recompute each batch's display cost using current supplier locked rates ──
+      // Mirrors GET /api/factory/mix-batches and EditMixBatchDialog: never uses the stored
+      // batch cost fields directly; supplier-source rows always use the current locked USD rate.
+      const reportBatchIds = mixBatchRows.map((r: any) => r.id);
+      let mixSourceRows: any[] = [];
+      if (reportBatchIds.length > 0) {
+        mixSourceRows = await db
+          .select()
+          .from(factoryMixBatchSources)
+          .where(inArray(factoryMixBatchSources.mixBatchId, reportBatchIds));
+      }
+
+      // Resolve current locked USD rate for every unique supplier referenced by sources
+      const reportSupplierIds = [
+        ...new Set(mixSourceRows.filter((s: any) => s.supplierId != null).map((s: any) => s.supplierId as number)),
+      ];
+      const reportSupplierRateMap = new Map<number, number>();
+      for (const sid of reportSupplierIds) {
+        const { rate } = await getLockedSupplierRateReadOnly(db, companyId, sid);
+        reportSupplierRateMap.set(sid, rate);
+      }
+
+      // Group sources by batch
+      const reportSourcesByBatch = new Map<number, any[]>();
+      for (const src of mixSourceRows) {
+        if (!reportSourcesByBatch.has(src.mixBatchId)) reportSourcesByBatch.set(src.mixBatchId, []);
+        reportSourcesByBatch.get(src.mixBatchId)!.push(src);
+      }
+
+      // Build corrected batch objects for the report (read-only; no DB writes)
+      const correctedBatchRows = mixBatchRows.map((b: any) => {
+        const sources = reportSourcesByBatch.get(b.id) || [];
+        let displayWeightKg = new Decimal(0);
+        let displayCost = new Decimal(0);
+
+        for (const src of sources) {
+          const w = new Decimal(src.weightKg || 0);
+          let effectiveCpk: Decimal;
+          if (src.sourceBatchId != null) {
+            // A. Existing-batch source — use stored costPerKg from source row
+            effectiveCpk = new Decimal(src.costPerKg || 0);
+          } else if (src.supplierId != null) {
+            // B. Supplier source (with or without containerId) — use current locked rate
+            effectiveCpk = new Decimal(reportSupplierRateMap.get(src.supplierId) || 0);
+          } else {
+            // C. Safe fallback
+            effectiveCpk = new Decimal(src.costPerKg || 0);
+          }
+          displayWeightKg = displayWeightKg.plus(w);
+          displayCost = displayCost.plus(w.times(effectiveCpk));
+        }
+
+        let displayCostPerKg: Decimal;
+        if (displayWeightKg.gt(0)) {
+          displayCostPerKg = displayCost.dividedBy(displayWeightKg);
+        } else {
+          // No source rows — fall back to stored batch values
+          displayWeightKg = new Decimal(b.totalWeightKg || 0);
+          displayCost = new Decimal(b.totalCost || 0);
+          displayCostPerKg = new Decimal(b.costPerKg || 0);
+        }
+
+        return {
+          ...b,
+          costPerKg: displayCostPerKg.toDecimalPlaces(6).toString(),
+          totalCost: displayCost.toDecimalPlaces(6).toString(),
+        };
+      });
+
+      const totalMixWeightKg = correctedBatchRows.reduce((s: number, r: any) => s + parseFloat(r.totalWeightKg || "0"), 0);
+      const totalMixCost = correctedBatchRows.reduce((s: number, r: any) => s + parseFloat(r.totalCost || "0"), 0);
 
       // Material from period batches that is still on the pressing table (not yet turned into bales).
       // Only ACTIVE batches have meaningful on-table material; COMPLETED batches set usedKg = totalWeightKg
@@ -1714,12 +1785,12 @@ export function registerFactoryBaleExportRoutes(app: Express) {
           rows: wgRows,
         },
         rawMaterial: {
-          totalBatches: mixBatchRows.length,
+          totalBatches: correctedBatchRows.length,
           totalWeightKg: totalMixWeightKg,
           onTableKg: periodOnTableKg,
           totalCost: totalMixCost,
           blendedCostPerKg,
-          batches: mixBatchRows,
+          batches: correctedBatchRows,
         },
         balanceOnTable: {
           weightKg: balanceWeightKg,

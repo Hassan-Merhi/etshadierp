@@ -2122,7 +2122,7 @@ export default function DailyProductionReport() {
                           {fmtKg(parseFloat(b.totalWeightKg))}
                         </TableCell>
                         <TableCell className="text-right font-mono text-sm">
-                          {fmtRate(parseFloat(b.costPerKg))}
+                          {`${Number(b.costPerKg || 0).toFixed(4)}`}
                         </TableCell>
                         <TableCell className="text-right font-mono font-semibold">
                           {fmtMoney(parseFloat(b.totalCost))}
