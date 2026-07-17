@@ -1,6 +1,8 @@
 import archiver from "archiver";
+import type { Writable } from "stream";
 import { streamCompanyWorkbookDirect } from "../services/exportExcelService";
 import { logger } from "../lib/logger";
+import { withHeavyExportSlot } from "../services/heavyExportCoordinator";
 
 export interface ExportZipResult {
   zip: Buffer;
@@ -8,44 +10,27 @@ export interface ExportZipResult {
   skipped: string[];
 }
 
-/**
- * Builds the canonical full-company export ZIP.
- * Includes one Excel workbook per company (all accounts, ledger, vouchers, etc.)
- *
- * Memory-safe approach: each company's data is fetched one sheet at a time
- * and streamed directly into the archiver via a PassThrough — no dataset is
- * held in RAM while the next is fetched. Peak RAM is bounded to roughly one
- * sheet's worth of raw rows + the ExcelJS workbook being built (instead of
- * ALL table data + workbook simultaneously, which caused OOM crashes).
- *
- * This is the single source of truth used by:
- *  - Manual "Export Now → Email / Download" (exportRoutes.ts)
- *  - Daily Auto-Send WhatsApp trigger (schedulerService.ts)
- *  - Scheduled 6 PM cron job
- */
-export async function buildFullExportZip(
-  companies: any[],
-  fromDate?: string,
-  toDate?: string,
-  onProgress?: (msg: string, level?: "info" | "success" | "warning" | "error") => void
-): Promise<ExportZipResult> {
-  const log =
+export interface StreamExportZipResult {
+  names: string[];
+  skipped: string[];
+  bytesWritten: number;
+}
+
+type ExportProgress = (msg: string, level?: "info" | "success" | "warning" | "error") => void;
+
+function createProgressLogger(onProgress?: ExportProgress): ExportProgress {
+  return (
     onProgress ??
     ((message: string, level: "info" | "success" | "warning" | "error" = "info") => {
       const context = { module: "full-export", action: "build-zip" };
       if (level === "error") logger.error(message, context);
       else if (level === "warning") logger.warn(message, context);
       else logger.info(message, context);
-    });
+    })
+  );
+}
 
-  const dateLabel = new Date().toISOString().substring(0, 10);
-  const names: string[] = [];
-  const skipped: string[] = [];
-
-  // Start the archiver up front so we can stream into it company-by-company.
-  const chunks: Buffer[] = [];
-  const arc = archiver("zip", { zlib: { level: 6 } });
-  arc.on("data", (chunk: Buffer) => chunks.push(chunk));
+function attachArchiveLogging(arc: archiver.Archiver): void {
   arc.on("warning", (error: unknown) => {
     logger.warn("Export ZIP archiver warning", {
       module: "full-export",
@@ -53,26 +38,34 @@ export async function buildFullExportZip(
       error,
     });
   });
+}
 
-  const zipPromise = new Promise<Buffer>((resolve, reject) => {
-    arc.on("end", () => resolve(Buffer.concat(chunks)));
-    arc.on("error", reject);
-  });
+async function appendCompanyWorkbooks(
+  arc: archiver.Archiver,
+  companies: any[],
+  fromDate: string | undefined,
+  toDate: string | undefined,
+  log: ExportProgress
+): Promise<{ names: string[]; skipped: string[] }> {
+  const dateLabel = new Date().toISOString().substring(0, 10);
+  const names: string[] = [];
+  const skipped: string[] = [];
 
   for (const company of companies) {
     try {
-      log(`[${company.name}] Building workbook (streaming, one sheet at a time)...`, "info");
+      log(`[${company.name}] Building workbook one sheet at a time...`, "info");
 
       const safeName = company.name.replace(/[^a-zA-Z0-9_\- ]/g, "").trim();
       const entryName = `${safeName}_Export_${dateLabel}.xlsx`;
 
-      // Build the workbook and get a Buffer, then append the buffer
-      // directly to the archiver — no PassThrough stream needed.
+      // ExcelJS's document workbook still creates one workbook buffer. Append it
+      // immediately, then release the reference before starting the next company.
+      // The surrounding ZIP is streamed and is never accumulated in Buffer[].
       const xlsBuf = await streamCompanyWorkbookDirect(company.id, fromDate, toDate);
       arc.append(xlsBuf, { name: entryName });
 
       names.push(company.name);
-      log(`[${company.name}] workbook streamed into ZIP`, "success");
+      log(`[${company.name}] workbook appended to ZIP`, "success");
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error);
       log(`[${company.name}] Failed: ${message}`, "error");
@@ -94,12 +87,124 @@ export async function buildFullExportZip(
     throw new Error(message);
   }
 
-  arc.finalize();
-  const zip = await zipPromise;
+  return { names, skipped };
+}
 
-  log(
-    `ZIP ready — ${(zip.length / 1024 / 1024).toFixed(1)} MB (${names.length} companies, ${skipped.length} skipped)`,
-    "success"
+async function streamFullExportZipUnsafe(
+  destination: Writable,
+  companies: any[],
+  fromDate?: string,
+  toDate?: string,
+  onProgress?: ExportProgress
+): Promise<StreamExportZipResult> {
+  const log = createProgressLogger(onProgress);
+  const arc = archiver("zip", { zlib: { level: 6 } });
+  attachArchiveLogging(arc);
+
+  const complete = new Promise<void>((resolve, reject) => {
+    destination.once("finish", resolve);
+    destination.once("error", reject);
+    destination.once("close", () => {
+      if (!destination.writableFinished) reject(new Error("Export destination closed before completion"));
+    });
+    arc.once("error", reject);
+  });
+
+  arc.pipe(destination);
+
+  try {
+    const { names, skipped } = await appendCompanyWorkbooks(arc, companies, fromDate, toDate, log);
+    await arc.finalize();
+    await complete;
+
+    const bytesWritten = arc.pointer();
+    log(
+      `ZIP streamed — ${(bytesWritten / 1024 / 1024).toFixed(1)} MB (${names.length} companies, ${skipped.length} skipped)`,
+      "success"
+    );
+
+    return { names, skipped, bytesWritten };
+  } catch (error) {
+    try {
+      arc.abort();
+    } catch {
+      // Best effort; the original error remains authoritative.
+    }
+    if (!destination.destroyed) destination.destroy(error instanceof Error ? error : new Error(String(error)));
+    throw error;
+  } finally {
+    arc.removeAllListeners();
+  }
+}
+
+/**
+ * Direct-download path. The ZIP bytes flow from archiver to the HTTP response or
+ * another Writable and are never retained as Buffer chunks in Node memory.
+ * All callers share the global heavy-export slot to prevent overlapping builds.
+ */
+export async function streamFullExportZip(
+  destination: Writable,
+  companies: any[],
+  fromDate?: string,
+  toDate?: string,
+  onProgress?: ExportProgress
+): Promise<StreamExportZipResult> {
+  return withHeavyExportSlot("full-export-stream", () =>
+    streamFullExportZipUnsafe(destination, companies, fromDate, toDate, onProgress)
   );
-  return { zip, names, skipped };
+}
+
+async function buildFullExportZipUnsafe(
+  companies: any[],
+  fromDate?: string,
+  toDate?: string,
+  onProgress?: ExportProgress
+): Promise<ExportZipResult> {
+  const log = createProgressLogger(onProgress);
+  const chunks: Buffer[] = [];
+  const arc = archiver("zip", { zlib: { level: 6 } });
+  attachArchiveLogging(arc);
+  arc.on("data", (chunk: Buffer) => chunks.push(chunk));
+
+  const zipPromise = new Promise<Buffer>((resolve, reject) => {
+    arc.on("end", () => resolve(Buffer.concat(chunks)));
+    arc.on("error", reject);
+  });
+
+  try {
+    const { names, skipped } = await appendCompanyWorkbooks(arc, companies, fromDate, toDate, log);
+    await arc.finalize();
+    const zip = await zipPromise;
+
+    log(
+      `ZIP ready — ${(zip.length / 1024 / 1024).toFixed(1)} MB (${names.length} companies, ${skipped.length} skipped)`,
+      "success"
+    );
+    return { zip, names, skipped };
+  } catch (error) {
+    chunks.length = 0;
+    try {
+      arc.abort();
+    } catch {
+      // Best effort; the original error remains authoritative.
+    }
+    throw error;
+  } finally {
+    arc.removeAllListeners();
+  }
+}
+
+/**
+ * Attachment compatibility path used by email and WhatsApp providers, which
+ * require final bytes. It is still serialized through the heavy-export slot.
+ */
+export async function buildFullExportZip(
+  companies: any[],
+  fromDate?: string,
+  toDate?: string,
+  onProgress?: ExportProgress
+): Promise<ExportZipResult> {
+  return withHeavyExportSlot("full-export-buffered", () =>
+    buildFullExportZipUnsafe(companies, fromDate, toDate, onProgress)
+  );
 }

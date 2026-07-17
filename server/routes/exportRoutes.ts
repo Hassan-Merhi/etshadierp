@@ -5,7 +5,19 @@ import { logger } from "../lib/logger";
 import { fetchAllCompanies } from "../services/exportDataService";
 import { sendExportEmail } from "../services/emailService";
 import { buildFullExportZip } from "../helpers/buildFullExportZip";
-import { createJob, getJob, addStep, finishJob, failJob } from "../services/exportJobManager";
+import {
+  createJob,
+  getJob,
+  addStep,
+  finishJob,
+  finishJobWithFile,
+  failJob,
+  releaseJobArchive,
+} from "../services/exportJobManager";
+import {
+  createTemporaryExportArchive,
+  streamTemporaryExportArchive,
+} from "../helpers/temporaryExportArchive";
 import { retryAsync, isEmailConfigError } from "../helpers/retryAsync";
 import { createExportRun, updateExportRun, finishExportRun } from "../helpers/exportRunTracker";
 
@@ -141,7 +153,7 @@ export function registerExportRoutes(app: Express) {
     const job = createJob(mode);
     res.json({ jobId: job.id });
 
-    // Run async without blocking the response
+    // Run async without blocking the response.
     (async () => {
       const runType = mode === "email" ? "manual_email" : "manual_download";
       const runId = await createExportRun(runType);
@@ -156,6 +168,52 @@ export function registerExportRoutes(app: Express) {
         }
         addStep(job, `Found ${companies.length} company/companies to export`, "success");
 
+        const dateLabel = new Date().toISOString().substring(0, 10);
+
+        if (mode === "download") {
+          const { filePath, names, skipped, bytesWritten } = await createTemporaryExportArchive(
+            job.id,
+            companies,
+            fromDate,
+            toDate,
+            (msg, level) => addStep(job, msg, level ?? "info")
+          );
+
+          if (names.length === 0) {
+            const msg = "ZIP is empty — no companies exported successfully. Nothing will be downloaded.";
+            failJob(job, msg);
+            await finishExportRun(runId, { status: "failed", skippedReason: msg, companiesCount: companies.length });
+            return;
+          }
+
+          if (skipped.length > 0) {
+            addStep(job, `Skipped ${skipped.length} companies: ${skipped.join(", ")}`, "warning");
+          }
+
+          const sizeMB = (bytesWritten / 1024 / 1024).toFixed(1);
+          addStep(job, `ZIP archive ready — ${sizeMB} MB, ${names.length} companies`, "success");
+
+          await updateExportRun(runId, {
+            companiesCount: companies.length,
+            companyFilesCount: names.length,
+            zipSizeBytes: bytesWritten,
+            skippedCompanies: skipped.join(", ") || null,
+          });
+
+          finishJobWithFile(job, filePath, bytesWritten);
+          addStep(job, "Ready to download — starting download now", "success");
+          logger.info("Export job completed", {
+            module: "export",
+            action: "start",
+            status: "download_ready",
+            durationMs: Date.now() - _t,
+          });
+          await finishExportRun(runId, { status: "success" });
+          return;
+        }
+
+        // Email providers require complete attachment bytes, so this compatibility
+        // path remains buffered. It is still protected by the heavy-export coordinator.
         const {
           zip: zipBuf,
           names,
@@ -163,7 +221,7 @@ export function registerExportRoutes(app: Express) {
         } = await buildFullExportZip(companies, fromDate, toDate, (msg, level) => addStep(job, msg, level ?? "info"));
 
         if (names.length === 0) {
-          const msg = "ZIP is empty — no companies exported successfully. Nothing will be sent or downloaded.";
+          const msg = "ZIP is empty — no companies exported successfully. Nothing will be sent.";
           failJob(job, msg);
           await finishExportRun(runId, { status: "failed", skippedReason: msg, companiesCount: companies.length });
           return;
@@ -173,7 +231,6 @@ export function registerExportRoutes(app: Express) {
           addStep(job, `Skipped ${skipped.length} companies: ${skipped.join(", ")}`, "warning");
         }
 
-        const dateLabel = new Date().toISOString().substring(0, 10);
         const sizeMB = (zipBuf.length / 1024 / 1024).toFixed(1);
         const zipSizeBytes = zipBuf.length;
         addStep(job, `ZIP archive ready — ${sizeMB} MB, ${names.length} companies`, "success");
@@ -185,52 +242,58 @@ export function registerExportRoutes(app: Express) {
           skippedCompanies: skipped.join(", ") || null,
         });
 
-        if (mode === "email") {
-          await updateExportRun(runId, { emailAttempted: true });
-          addStep(job, "Sending email (up to 3 attempts, 30 s between retries)...", "info");
-          let emailAttempts = 0;
+        await updateExportRun(runId, { emailAttempted: true });
+        addStep(job, "Sending email (up to 3 attempts, 30 s between retries)...", "info");
 
-          const emailRes = await retryAsync({
-            label: "ManualEmail",
-            attempts: 3,
-            delayMs: 30 * 1000,
-            fn: () => sendExportEmail(zipBuf, dateLabel, names),
-            isSuccess: (r) => r.success,
-            shouldRetry: (r) => !r.error || !isEmailConfigError(r.error),
-            onAttempt: (n) => {
-              emailAttempts = n;
-              if (n > 1) addStep(job, `Retry attempt ${n}/3...`, "info");
-            },
+        const emailRes = await retryAsync({
+          label: "ManualEmail",
+          attempts: 3,
+          delayMs: 30 * 1000,
+          fn: () => sendExportEmail(zipBuf, dateLabel, names),
+          isSuccess: (r) => r.success,
+          shouldRetry: (r) => !r.error || !isEmailConfigError(r.error),
+          onAttempt: (n) => {
+            if (n > 1) addStep(job, `Retry attempt ${n}/3...`, "info");
+          },
+        });
+
+        if (emailRes.result.success) {
+          addStep(job, `Email sent successfully to all recipients (attempt ${emailRes.attempts})`, "success");
+          finishJob(job);
+          logger.info("Export job completed", {
+            module: "export",
+            action: "start",
+            status: "success",
+            durationMs: Date.now() - _t,
           });
-
-          if (emailRes.result.success) {
-            addStep(job, `Email sent successfully to all recipients (attempt ${emailRes.attempts})`, "success");
-            finishJob(job);
-            logger.info("Export job completed", { module: "export", action: "start", status: "success", durationMs: Date.now() - _t });
-            await finishExportRun(runId, {
-              status: "success",
-              emailSuccess: true,
-              emailAttempts: emailRes.attempts,
-            });
-          } else {
-            const errMsg = emailRes.result.error || "Email send failed";
-            failJob(job, errMsg);
-            logger.warn("Export job email failed", { module: "export", action: "start", status: "emailFailed", durationMs: Date.now() - _t });
-            await finishExportRun(runId, {
-              status: "failed",
-              emailSuccess: false,
-              emailError: errMsg,
-              emailAttempts: emailRes.attempts,
-            });
-          }
+          await finishExportRun(runId, {
+            status: "success",
+            emailSuccess: true,
+            emailAttempts: emailRes.attempts,
+          });
         } else {
-          finishJob(job, zipBuf);
-          addStep(job, "Ready to download — starting download now", "success");
-          logger.info("Export job completed", { module: "export", action: "start", status: "download_ready", durationMs: Date.now() - _t });
-          await finishExportRun(runId, { status: "success" });
+          const errMsg = emailRes.result.error || "Email send failed";
+          failJob(job, errMsg);
+          logger.warn("Export job email failed", {
+            module: "export",
+            action: "start",
+            status: "emailFailed",
+            durationMs: Date.now() - _t,
+          });
+          await finishExportRun(runId, {
+            status: "failed",
+            emailSuccess: false,
+            emailError: errMsg,
+            emailAttempts: emailRes.attempts,
+          });
         }
       } catch (err: any) {
-        logger.error("Export job failed", { module: "export", action: "start", durationMs: Date.now() - _t, error: err });
+        logger.error("Export job failed", {
+          module: "export",
+          action: "start",
+          durationMs: Date.now() - _t,
+          error: err,
+        });
         failJob(job, err.message || "Unexpected error");
         await finishExportRun(runId, { status: "failed", skippedReason: err.message || "Unexpected error" }).catch(
           () => {}
@@ -248,22 +311,38 @@ export function registerExportRoutes(app: Express) {
       status: job.status,
       steps: job.steps,
       error: job.error,
-      hasZip: !!job.zipBuffer,
+      hasZip: Boolean(job.zipFilePath || job.zipBuffer),
+      zipSizeBytes: job.zipSizeBytes,
     });
   });
 
   // ── Async export job: download zip ─────────────────────────────────────────
 
-  app.get("/api/export/download/:jobId", guard, (req: Request, res: Response) => {
+  app.get("/api/export/download/:jobId", guard, async (req: Request, res: Response) => {
     const job = getJob(req.params.jobId);
     if (!job) return res.status(404).json({ message: "Job not found" });
-    if (!job.zipBuffer) return res.status(400).json({ message: "ZIP not ready" });
+    if (!job.zipFilePath) return res.status(400).json({ message: "ZIP not ready" });
+
     const dateLabel = new Date().toISOString().substring(0, 10);
-    res.setHeader("Content-Type", "application/zip");
-    res.setHeader("Content-Disposition", `attachment; filename="DailyExport_${dateLabel}.zip"`);
-    res.send(job.zipBuffer);
-    // Free memory after download
-    job.zipBuffer = undefined;
+    try {
+      await streamTemporaryExportArchive(res, job.zipFilePath, `DailyExport_${dateLabel}.zip`);
+    } catch (err: any) {
+      logger.error("Export archive download failed", {
+        module: "export",
+        action: "download",
+        jobId: job.id,
+        error: err,
+      });
+      if (!res.headersSent) {
+        res.status(500).json({ message: err.message || "Export archive is unavailable" });
+      } else if (!res.writableEnded) {
+        res.destroy(err);
+      }
+    } finally {
+      // A completed archive is single-use. Remove it after success, disconnect,
+      // or stream failure so large temporary files cannot accumulate on disk.
+      releaseJobArchive(job);
+    }
   });
 
   // ── Companies list for UI ───────────────────────────────────────────────────
