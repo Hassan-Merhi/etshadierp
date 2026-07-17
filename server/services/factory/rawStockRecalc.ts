@@ -1592,10 +1592,23 @@ export async function getFullAuditScan(companyId: number): Promise<FullAuditResu
 
     if (codes.size === 0) codes.add("CORRECT");
 
+    // A container is only safe to repair if it has an ACTUAL cost-layer issue.
+    // FULLY_USED alone is informational — it must not trigger a "safe repair"
+    // for a container whose costs are already correct.
+    const COST_ISSUE_CODES = new Set<AuditCode>([
+      "CONTAINER_COST_MISMATCH",
+      "RAW_STOCK_COST_MISMATCH",
+      "SOURCE_ZERO_COST",
+      "SOURCE_COST_MISMATCH",
+      "RAW_STOCK_DELETED",
+    ]);
+    const hasCostIssue = [...codes].some((c) => COST_ISSUE_CODES.has(c));
+
     const safeToRepair =
       !codes.has("UNRESOLVED_FX") &&
       !codes.has("MANUAL_REVIEW_REQUIRED") &&
       !codes.has("CORRECT") &&
+      hasCostIssue &&
       (row.activeRawStockRowExists || row.rawStockDeleted || containerSourceMismatches.length > 0);
 
     summary.totalContainersScanned++;
