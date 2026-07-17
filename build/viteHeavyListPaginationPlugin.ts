@@ -57,6 +57,13 @@ function transformV5Allocation(source: string): string {
 
   code = replaceExactly(
     code,
+    `      setEditDraftDialog(null);\n      queryClient.invalidateQueries({ queryKey: ["/api/factory/v5/stock-allocation"] });`,
+    `      setEditDraftDialog(null);\n      setActionRows(null);\n      queryClient.invalidateQueries({ queryKey: ["/api/factory/v5/stock-allocation"] });`,
+    "V5 draft save cleanup"
+  );
+
+  code = replaceExactly(
+    code,
     `    editOpenedRef.current = true;\n    setEditDrawerProformaId(focusProformaId);`,
     `    editOpenedRef.current = true;\n    void openEditDrawerWithAllRows(focusProformaId);`,
     "V5 focused proforma edit drawer"
@@ -109,6 +116,13 @@ function transformV5Allocation(source: string): string {
     `          onClose={() => setEditDrawerProformaId(null)}\n          proformaId={editDrawerProformaId}\n          articleRows={drawerRows}\n          onSuccess={() => query.refetch()}`,
     `          onClose={() => {\n            setEditDrawerProformaId(null);\n            setActionRows(null);\n          }}\n          proformaId={editDrawerProformaId}\n          articleRows={drawerRows}\n          onSuccess={() => {\n            setActionRows(null);\n            query.refetch();\n          }}`,
     "V5 edit drawer cleanup"
+  );
+
+  code = replaceExactly(
+    code,
+    `        onOpenChange={(open) => {\n          if (!open) setEditDraftDialog(null);\n        }}`,
+    `        onOpenChange={(open) => {\n          if (!open) {\n            setEditDraftDialog(null);\n            setActionRows(null);\n          }\n        }}`,
+    "V5 draft dialog cleanup"
   );
 
   return code;
