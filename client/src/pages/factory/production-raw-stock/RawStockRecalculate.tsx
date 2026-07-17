@@ -555,7 +555,6 @@ export default function RawStockRecalculate() {
     { id: "recalc" as const, label: "Container Cost Recalc" },
     { id: "sources" as const, label: "Source Cost Mismatches" },
     { id: "audit" as const, label: "Full Audit" },
-    { id: "history" as const, label: "History & Undo" },
   ];
 
   return (
