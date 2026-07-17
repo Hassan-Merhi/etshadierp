@@ -1,6 +1,5 @@
 import { queryClient } from "./queryClient";
 
-const INSTALL_KEY = "__erpHeavyListPaginationClientInstalled";
 const STOCK_ENTRY_ENDPOINT = "/api/factory/bales/stock-entry-history";
 const STOCK_ENTRY_ROUTE = "/factory/stock-entry";
 const DEFAULT_LIMIT = 50;
@@ -22,7 +21,7 @@ declare global {
   }
 }
 
-if (typeof window !== "undefined" && !window[INSTALL_KEY as keyof Window]) {
+if (typeof window !== "undefined" && !window.__erpHeavyListPaginationClientInstalled) {
   window.__erpHeavyListPaginationClientInstalled = true;
 
   const previousFetch = window.fetch.bind(window);
@@ -30,6 +29,7 @@ if (typeof window !== "undefined" && !window[INSTALL_KEY as keyof Window]) {
   let activeBaseKey = "";
   let selectedPage = 1;
   let selectedLimit = DEFAULT_LIMIT;
+  let condensedMode = true;
   let controlsRoot: HTMLDivElement | null = null;
 
   function resolveUrl(input: RequestInfo | URL): URL | null {
@@ -94,16 +94,20 @@ if (typeof window !== "undefined" && !window[INSTALL_KEY as keyof Window]) {
     return button;
   }
 
+  function refetchStockEntry(): void {
+    queryClient.invalidateQueries({
+      predicate: (query) => Array.isArray(query.queryKey) && query.queryKey[0] === STOCK_ENTRY_ENDPOINT,
+      refetchType: "active",
+    });
+  }
+
   function requestPage(page: number, limit = selectedLimit): void {
     if (!activeMeta) return;
     const nextPage = Math.max(1, Math.min(page, Math.max(activeMeta.totalPages, 1)));
     selectedPage = nextPage;
     selectedLimit = limit;
     renderControls();
-    queryClient.invalidateQueries({
-      predicate: (query) => Array.isArray(query.queryKey) && query.queryKey[0] === STOCK_ENTRY_ENDPOINT,
-      refetchType: "active",
-    });
+    refetchStockEntry();
   }
 
   function ensureControls(): HTMLDivElement {
@@ -137,7 +141,7 @@ if (typeof window !== "undefined" && !window[INSTALL_KEY as keyof Window]) {
 
   function renderControls(): void {
     const root = ensureControls();
-    if (!activeMeta || !isVisibleRoute()) {
+    if (!activeMeta || !isVisibleRoute() || !condensedMode) {
       root.style.display = "none";
       return;
     }
@@ -153,7 +157,7 @@ if (typeof window !== "undefined" && !window[INSTALL_KEY as keyof Window]) {
     const label = document.createElement("span");
     const from = activeMeta.total === 0 ? 0 : (selectedPage - 1) * selectedLimit + 1;
     const to = Math.min(selectedPage * selectedLimit, activeMeta.total);
-    label.textContent = `${from}-${to} of ${activeMeta.total} groups · Page ${selectedPage} of ${Math.max(activeMeta.totalPages, 1)}`;
+    label.textContent = `${from}-${to} of ${activeMeta.total} groups · Page ${selectedPage} of ${Math.max(activeMeta.totalPages, 1)} · screen totals are this page`;
     label.dataset.testid = "stock-entry-page-label";
     label.style.fontSize = "12px";
     label.style.whiteSpace = "nowrap";
@@ -164,7 +168,6 @@ if (typeof window !== "undefined" && !window[INSTALL_KEY as keyof Window]) {
     next.style.cursor = next.disabled ? "not-allowed" : "pointer";
 
     const sizeLabel = document.createElement("label");
-    sizeLabel.textContent = "Rows";
     sizeLabel.style.display = "flex";
     sizeLabel.style.alignItems = "center";
     sizeLabel.style.gap = "5px";
@@ -172,6 +175,7 @@ if (typeof window !== "undefined" && !window[INSTALL_KEY as keyof Window]) {
 
     const select = document.createElement("select");
     select.dataset.testid = "stock-entry-page-size";
+    select.setAttribute("aria-label", "Groups per page");
     select.style.border = "1px solid hsl(var(--border))";
     select.style.borderRadius = "6px";
     select.style.padding = "5px 7px";
@@ -194,6 +198,7 @@ if (typeof window !== "undefined" && !window[INSTALL_KEY as keyof Window]) {
     const match = shouldPaginate(input, init);
     if (!match) return previousFetch(input, init);
 
+    condensedMode = true;
     if (match.key !== activeBaseKey) {
       activeBaseKey = match.key;
       selectedPage = 1;
@@ -215,16 +220,24 @@ if (typeof window !== "undefined" && !window[INSTALL_KEY as keyof Window]) {
       const limit = Number(payload.limit || selectedLimit) || selectedLimit;
       const totalPages = Number(payload.totalPages || 0);
       const serverPage = Number(payload.page || selectedPage) || selectedPage;
-      selectedPage = serverPage;
+
+      // A deletion can make the current page disappear. Move to the final valid
+      // page instead of leaving an apparently empty screen with records elsewhere.
+      if (totalPages > 0 && serverPage > totalPages) {
+        selectedPage = totalPages;
+        queueMicrotask(refetchStockEntry);
+      } else {
+        selectedPage = serverPage;
+      }
       selectedLimit = limit;
       activeMeta = {
         key: match.key,
-        page: serverPage,
+        page: selectedPage,
         limit,
         total,
         totalPages,
-        hasNextPage: Boolean(payload.hasNextPage),
-        hasPreviousPage: Boolean(payload.hasPreviousPage),
+        hasNextPage: selectedPage < totalPages,
+        hasPreviousPage: selectedPage > 1 && totalPages > 0,
       };
       renderControls();
 
@@ -239,6 +252,18 @@ if (typeof window !== "undefined" && !window[INSTALL_KEY as keyof Window]) {
       return response;
     }
   };
+
+  document.addEventListener("click", (event) => {
+    const target = event.target instanceof Element ? event.target.closest("[data-testid]") : null;
+    const testId = target?.getAttribute("data-testid");
+    if (testId === "button-view-detailed") {
+      condensedMode = false;
+      renderControls();
+    } else if (testId === "button-view-condensed") {
+      condensedMode = true;
+      renderControls();
+    }
+  });
 
   window.addEventListener("popstate", renderControls);
   const originalPushState = history.pushState.bind(history);
