@@ -410,7 +410,7 @@ export function registerRentalPaymentsAccrualRoutes(
         );
         scheduledPayments = rentPaymentsAll.filter((p: any) => p.postingStatus === "SCHEDULED");
 
-        // Per-row effective paid totals (POSTED + payment_date <= asOfDate)
+        // Per-row effective paid totals (POSTED + payment_date <= asOfDate) — used for balance widget
         const { rows: paymentSums } = await pool.query<{ ledger_row_id: string; total_paid: string }>(
           `SELECT ledger_row_id, COALESCE(SUM(amount::numeric), 0) AS total_paid
            FROM property_payments
@@ -419,6 +419,21 @@ export function registerRentalPaymentsAccrualRoutes(
           [contract.id, asOfDate]
         );
         const paidByRowId = new Map(paymentSums.map((r) => [parseInt(r.ledger_row_id), parseFloat(r.total_paid)]));
+
+        // Per-row ALL posted paid totals (no date filter) — used for the statement PAID column.
+        // Needed because payments can be POSTED with a future payment_date (e.g. tenant pays on
+        // Jul 17 for a Jul 20 due date). Those payments are fully posted and should show in the
+        // statement even though payment_date > asOfDate.
+        const { rows: allPostedSums } = await pool.query<{ ledger_row_id: string; total_paid: string }>(
+          `SELECT ledger_row_id, COALESCE(SUM(amount::numeric), 0) AS total_paid
+           FROM property_payments
+           WHERE contract_id = $1 AND posting_status = 'POSTED'
+           GROUP BY ledger_row_id`,
+          [contract.id]
+        );
+        const allPostedByRowId = new Map(
+          allPostedSums.map((r) => [parseInt(r.ledger_row_id), parseFloat(r.total_paid)])
+        );
 
         // Per-row scheduled totals
         const { rows: scheduledSums } = await pool.query<{ ledger_row_id: string; total_scheduled: string }>(
@@ -437,24 +452,30 @@ export function registerRentalPaymentsAccrualRoutes(
           const dueDate = getRentalPeriodDueDate(r.year, r.month, billingDay);
           const isDue = dueDate <= asOfDate;
           const effectivePaidAmount = paidByRowId.get(r.id) ?? 0;
+          // allPostedPaid: all POSTED payments for this ledger row, regardless of payment_date.
+          // This is what the statement PAID column should display so that future-dated posted
+          // payments (e.g. paid a few days early) are shown correctly.
+          const allPostedPaid = allPostedByRowId.get(r.id) ?? 0;
           const scheduledAmt = scheduledByRowId.get(r.id) ?? 0;
           const expectedAmount = parseFloat(r.expectedAmount as string) || 0;
           const expectedAsOf = isDue ? expectedAmount : 0;
           const outstanding = Math.max(0, expectedAsOf - effectivePaidAmount);
           const prepaidCredit = Math.max(0, effectivePaidAmount - expectedAsOf);
 
+          // Use allPostedPaid (not effectivePaidAmount) for status so that a POSTED future-dated
+          // payment is correctly labelled PAID/PREPAID rather than NOT_DUE.
           let status: string;
-          if (scheduledAmt > 0.005 && effectivePaidAmount < 0.005) {
+          if (scheduledAmt > 0.005 && allPostedPaid < 0.005) {
             status = "SCHEDULED";
-          } else if (!isDue && effectivePaidAmount < 0.005 && scheduledAmt < 0.005) {
+          } else if (!isDue && allPostedPaid < 0.005 && scheduledAmt < 0.005) {
             status = "NOT_DUE";
-          } else if (!isDue && effectivePaidAmount > 0.005) {
+          } else if (!isDue && allPostedPaid > 0.005) {
             status = "PREPAID";
-          } else if (isDue && effectivePaidAmount < 0.005) {
+          } else if (isDue && allPostedPaid < 0.005) {
             status = "DUE";
-          } else if (isDue && effectivePaidAmount > 0.005 && outstanding > 0.005) {
+          } else if (isDue && allPostedPaid > 0.005 && outstanding > 0.005 && allPostedPaid < expectedAmount - 0.005) {
             status = "PARTIALLY_PAID";
-          } else if (isDue && prepaidCredit > 0.005) {
+          } else if (isDue && allPostedPaid > expectedAmount + 0.005) {
             status = "OVERPAID";
           } else {
             status = "PAID";
@@ -466,6 +487,7 @@ export function registerRentalPaymentsAccrualRoutes(
             isDue,
             expectedAsOf,
             effectivePaidAmount,
+            allPostedPaid,
             scheduledAmount: scheduledAmt,
             outstanding,
             prepaidCredit,
