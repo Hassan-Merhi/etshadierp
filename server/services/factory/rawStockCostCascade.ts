@@ -314,6 +314,42 @@ export async function cascadeContainerCostChange(
       });
       affectedBales.push(...bales);
     }
+
+    // 4. For completed/closed batches that were skipped from the full cascade,
+    //    still sync the batch header (cost_per_kg + total_cost) to match the
+    //    updated source rows. Bale costs are intentionally left alone to preserve
+    //    the historical production record. Without this step, the header drifts
+    //    away from its own sources every time a container rate is corrected.
+    const skippedCompletedBatchIds = [
+      ...new Set(
+        mixSourcesWithStatus
+          .filter((r: any) => !cascadeStatusFilter.includes(r.batchStatus))
+          .map((r: any) => r.src.mixBatchId as number)
+      ),
+    ] as number[];
+    for (const batchId of skippedCompletedBatchIds) {
+      const allBatchSources = await tx
+        .select({ weightKg: factoryMixBatchSources.weightKg, costPerKg: factoryMixBatchSources.costPerKg })
+        .from(factoryMixBatchSources)
+        .where(eq(factoryMixBatchSources.mixBatchId, batchId));
+      let dTotal = new Decimal(0);
+      let dWeight = new Decimal(0);
+      for (const s of allBatchSources) {
+        dTotal = dTotal.plus(new Decimal(s.weightKg || "0").times(new Decimal(s.costPerKg || "0")));
+        dWeight = dWeight.plus(new Decimal(s.weightKg || "0"));
+      }
+      if (dWeight.gt(0)) {
+        const dCpk = dTotal.div(dWeight);
+        await tx
+          .update(factoryMixBatches)
+          .set({
+            costPerKg: dCpk.toDecimalPlaces(6).toFixed(6),
+            totalCost: dTotal.toDecimalPlaces(6).toFixed(6),
+            updatedAt: new Date(),
+          })
+          .where(eq(factoryMixBatches.id, batchId));
+      }
+    }
   }
 
   return { rawStockRowsUpdated: rawStockRows.length, affectedBatches, affectedBales };
