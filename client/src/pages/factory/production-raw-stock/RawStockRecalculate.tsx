@@ -455,6 +455,35 @@ export default function RawStockRecalculate() {
     }, `Apply all safe raw-material cost repairs (${count} container(s))`);
   };
 
+  // ── Fix ALL source mismatches in one shot (no dry-run) ────────────────────
+  const fixAllSourcesMutation = useMutation({
+    mutationFn: async () => {
+      const res = await modeApiRequest("POST", "/api/factory/raw-stock/recalc/fix-source-mismatches");
+      if (!res.ok) throw new Error((await res.json()).message || "Failed to fix source mismatches");
+      return res.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/raw-stock/recalc/source-cost-mismatches"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/raw-stock"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/raw-stock/history"] });
+      toast({
+        title: "Source costs updated",
+        description: `Applied ${data.applied} fix(es), skipped ${data.skipped} (already correct).`,
+      });
+    },
+    onError: (err: any) => {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const handleFixAllSources = () => {
+    const fixable = (sourceMismatches || []).filter((r) => r.fixable).length;
+    wrapAdminAction(
+      () => fixAllSourcesMutation.mutate(),
+      `Fix all ${fixable} fixable source cost mismatch(es) — no dry-run`
+    );
+  };
+
   // ── Fix source mismatches ─────────────────────────────────────────────────
   const sourceMismatchFixMutation = useMutation({
     mutationFn: async ({ sourceIds, rates }: { sourceIds: number[]; rates: Record<number, number> }) => {
@@ -1007,19 +1036,33 @@ export default function RawStockRecalculate() {
                   </TableBody>
                 </Table>
               </div>
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between gap-2">
                 <p className="text-xs text-muted-foreground">
                   {fixableSourceMismatches.length} fixable automatically ·{" "}
                   {manualSourceMismatches.length} need a manual rate.
                 </p>
-                <Button
-                  size="sm"
-                  disabled={selectedZeroCostSources.size === 0 || sourceMismatchFixMutation.isPending}
-                  onClick={handleFixSourceMismatches}
-                >
-                  <CheckCircle2 className="h-4 w-4 mr-1.5" />
-                  Fix Selected ({selectedZeroCostSources.size})
-                </Button>
+                <div className="flex items-center gap-2">
+                  {fixableSourceMismatches.length > 0 && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={fixAllSourcesMutation.isPending || sourceMismatchFixMutation.isPending}
+                      onClick={handleFixAllSources}
+                      title="Fix all fixable mismatches in one shot — no dry-run, admin-confirmed"
+                    >
+                      <RefreshCw className="h-4 w-4 mr-1.5" />
+                      Fix All ({fixableSourceMismatches.length})
+                    </Button>
+                  )}
+                  <Button
+                    size="sm"
+                    disabled={selectedZeroCostSources.size === 0 || sourceMismatchFixMutation.isPending || fixAllSourcesMutation.isPending}
+                    onClick={handleFixSourceMismatches}
+                  >
+                    <CheckCircle2 className="h-4 w-4 mr-1.5" />
+                    Fix Selected ({selectedZeroCostSources.size})
+                  </Button>
+                </div>
               </div>
             </>
           )}

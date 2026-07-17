@@ -16,7 +16,7 @@
  * Must be called inside an existing `db.transaction(async (tx) => {...})` —
  * pass the `tx` handle so all writes are atomic with the caller's other work.
  */
-import { eq, and, sql, inArray } from "drizzle-orm";
+import { eq, and, sql } from "drizzle-orm";
 import Decimal from "decimal.js";
 import { factoryRawStock, factoryMixBatchSources, factoryMixBatches, factoryBales, factoryContainers, factorySuppliers } from "@shared/schema";
 import { getLockedSupplierRate, getAuthoritativeSupplierRemainingKg } from "./rawStockLockedRate";
@@ -203,58 +203,87 @@ export async function cascadeContainerCostChange(
   // 1a. Nudge the supplier's locked rate to reflect only the value delta that
   // still belongs to current remaining stock — exactly as a moving-average
   // correction (see rawStockLockedRate.ts for the rationale).
+  //
+  // Edge case: when the container being corrected is fully used (remainingKg=0),
+  // the delta formula produces 0 and would normally be skipped. But if the
+  // supplier also has NO remaining inventory across all containers (e.g. all
+  // material was consumed), the locked rate never gets updated and the Raw
+  // Materials overview keeps showing the stale pre-recalc rate. In that case
+  // we set the locked rate directly to the corrected container rate so the
+  // overview always reflects the true landed cost.
   const [container] = await tx
     .select({ supplierId: factoryContainers.supplierId })
     .from(factoryContainers)
     .where(and(eq(factoryContainers.id, containerId), eq(factoryContainers.companyId, companyId)));
-  if (container?.supplierId && dCorrectedContainerRemainingKg.gt(0)) {
+  if (container?.supplierId) {
     const oldLockedRate = await getLockedSupplierRate(tx, companyId, container.supplierId, { forUpdate: true });
     const supplierTotalRemainingKg = await getAuthoritativeSupplierRemainingKg(tx, companyId, container.supplierId);
-    const dOldCostWeightedAvg = dOldValueOfRemaining.div(dCorrectedContainerRemainingKg);
-    const dValueDelta = dCorrectedContainerRemainingKg.times(dNewCostPerKgUsd.minus(dOldCostWeightedAvg));
     const dSupplierTotal = new Decimal(supplierTotalRemainingKg);
-    const dNewLockedRate = dSupplierTotal.gt(0)
-      ? new Decimal(oldLockedRate).plus(dValueDelta.div(dSupplierTotal))
-      : dNewCostPerKgUsd;
-    await tx
-      .update(factorySuppliers)
-      .set({ currentRawMaterialCostPerKgUsd: Decimal.max(0, dNewLockedRate).toFixed(8), updatedAt: new Date() })
-      .where(and(eq(factorySuppliers.id, container.supplierId), eq(factorySuppliers.companyId, companyId)));
+    if (dCorrectedContainerRemainingKg.gt(0)) {
+      // Normal path: delta-weighted moving-average correction.
+      const dOldCostWeightedAvg = dOldValueOfRemaining.div(dCorrectedContainerRemainingKg);
+      const dValueDelta = dCorrectedContainerRemainingKg.times(dNewCostPerKgUsd.minus(dOldCostWeightedAvg));
+      const dNewLockedRate = dSupplierTotal.gt(0)
+        ? new Decimal(oldLockedRate).plus(dValueDelta.div(dSupplierTotal))
+        : dNewCostPerKgUsd;
+      await tx
+        .update(factorySuppliers)
+        .set({ currentRawMaterialCostPerKgUsd: Decimal.max(0, dNewLockedRate).toFixed(8), updatedAt: new Date() })
+        .where(and(eq(factorySuppliers.id, container.supplierId), eq(factorySuppliers.companyId, companyId)));
+    } else if (dSupplierTotal.eq(0)) {
+      // Fully-used supplier: no remaining inventory across ALL containers.
+      // Update directly to the corrected rate so the overview is not stale.
+      await tx
+        .update(factorySuppliers)
+        .set({ currentRawMaterialCostPerKgUsd: Decimal.max(0, dNewCostPerKgUsd).toFixed(8), updatedAt: new Date() })
+        .where(and(eq(factorySuppliers.id, container.supplierId), eq(factorySuppliers.companyId, companyId)));
+    }
   }
 
   // 2. Mix batch sources sourced from this container.
+  //
+  // SOURCE COST UPDATE (cost_per_kg + total_cost): applied to ALL sources
+  // regardless of batch status. The raw material's true landed cost applies to
+  // every batch it fed — keeping stale source costs causes the Raw Material
+  // History view to show the wrong rate for completed batches.
+  //
+  // BATCH-TOTAL CASCADE (factory_mix_batches.cost_per_kg + bale costs): only
+  // applied to open/active batches, or to completed batches when the admin
+  // explicitly opted in via includeCompletedBatches. This preserves the
+  // integrity of historical production records (dispatched bales).
   const OPEN_BATCH_STATUSES = ["ACTIVE", "OPEN", "CARRY_FORWARD"];
   const COMPLETED_BATCH_STATUSES = ["COMPLETED", "CLOSED"];
-  const batchStatusFilter = includeCompletedBatches
+  const cascadeStatusFilter = includeCompletedBatches
     ? [...OPEN_BATCH_STATUSES, ...COMPLETED_BATCH_STATUSES]
     : OPEN_BATCH_STATUSES;
-  const mixSources = await tx
+
+  // Fetch ALL sources regardless of batch status for the source cost update.
+  const mixSourcesWithStatus = await tx
     .select({ src: factoryMixBatchSources, batchStatus: factoryMixBatches.status })
     .from(factoryMixBatchSources)
     .innerJoin(factoryMixBatches, eq(factoryMixBatchSources.mixBatchId, factoryMixBatches.id))
     .where(
       and(
         eq(factoryMixBatchSources.containerId, containerId),
-        inArray(factoryMixBatches.status, batchStatusFilter),
         sql`${factoryMixBatches.deletedAt} IS NULL`
       )
-    )
-    .then((rows: any[]) => rows.map((r) => r.src));
+    );
 
   const affectedBatches: CascadeResult["affectedBatches"] = [];
   const affectedBales: CascadeResult["affectedBales"] = [];
 
-  if (mixSources.length > 0) {
-    // Track how much weight the target container contributes to each batch
-    // (the cascade may touch several batches, each possibly blending many containers).
+  if (mixSourcesWithStatus.length > 0) {
+    const allSources = mixSourcesWithStatus.map((r: any) => r.src);
+
+    // Track how much weight the target container contributes to each batch.
     const containerWeightByBatch = new Map<number, Decimal>();
-    for (const src of mixSources) {
+    for (const src of allSources) {
       const prev = containerWeightByBatch.get(src.mixBatchId) || new Decimal(0);
       containerWeightByBatch.set(src.mixBatchId, prev.plus(new Decimal(src.weightKg || "0")));
     }
 
-    for (const src of mixSources) {
-      // Mix-batch sources store cost in USD — use newCostPerKgUsd, not the native-currency value.
+    // Update source cost for ALL sources (regardless of batch status).
+    for (const src of allSources) {
       const dSrcWeight = new Decimal(src.weightKg as string || "0");
       const dNewSourceTotalCost = dSrcWeight.times(dNewCostPerKgUsd);
       await tx
@@ -266,10 +295,17 @@ export async function cascadeContainerCostChange(
         .where(eq(factoryMixBatchSources.id, src.id));
     }
 
-    // 3. Recompute weighted-average cost for every batch touched (from ALL its
-    //    sources, not just this container's), then cascade to bales.
-    const affectedBatchIds = [...new Set(mixSources.map((s: any) => s.mixBatchId as number))] as number[];
-    for (const batchId of affectedBatchIds) {
+    // 3. Recompute weighted-average cost for every CASCADE-ELIGIBLE batch
+    //    (from ALL its sources, not just this container's), then cascade to bales.
+    //    COMPLETED/CLOSED batches are only included when the admin opted in.
+    const cascadeEligibleBatchIds = [
+      ...new Set(
+        mixSourcesWithStatus
+          .filter((r: any) => cascadeStatusFilter.includes(r.batchStatus))
+          .map((r: any) => r.src.mixBatchId as number)
+      ),
+    ] as number[];
+    for (const batchId of cascadeEligibleBatchIds) {
       const { bales, totalBatchWeightKg: _totalWeight, ...batchResult } = await recomputeBatchAndCascadeBales(tx, companyId, batchId);
       affectedBatches.push({
         batchId,
