@@ -104,21 +104,37 @@ async function streamFullExportZipUnsafe(
   const complete = new Promise<void>((resolve, reject) => {
     destination.once("finish", resolve);
     destination.once("error", reject);
+    destination.once("close", () => {
+      if (!destination.writableFinished) reject(new Error("Export destination closed before completion"));
+    });
     arc.once("error", reject);
   });
 
   arc.pipe(destination);
-  const { names, skipped } = await appendCompanyWorkbooks(arc, companies, fromDate, toDate, log);
-  await arc.finalize();
-  await complete;
 
-  const bytesWritten = arc.pointer();
-  log(
-    `ZIP streamed — ${(bytesWritten / 1024 / 1024).toFixed(1)} MB (${names.length} companies, ${skipped.length} skipped)`,
-    "success"
-  );
+  try {
+    const { names, skipped } = await appendCompanyWorkbooks(arc, companies, fromDate, toDate, log);
+    await arc.finalize();
+    await complete;
 
-  return { names, skipped, bytesWritten };
+    const bytesWritten = arc.pointer();
+    log(
+      `ZIP streamed — ${(bytesWritten / 1024 / 1024).toFixed(1)} MB (${names.length} companies, ${skipped.length} skipped)`,
+      "success"
+    );
+
+    return { names, skipped, bytesWritten };
+  } catch (error) {
+    try {
+      arc.abort();
+    } catch {
+      // Best effort; the original error remains authoritative.
+    }
+    if (!destination.destroyed) destination.destroy(error instanceof Error ? error : new Error(String(error)));
+    throw error;
+  } finally {
+    arc.removeAllListeners();
+  }
 }
 
 /**
@@ -155,15 +171,27 @@ async function buildFullExportZipUnsafe(
     arc.on("error", reject);
   });
 
-  const { names, skipped } = await appendCompanyWorkbooks(arc, companies, fromDate, toDate, log);
-  await arc.finalize();
-  const zip = await zipPromise;
+  try {
+    const { names, skipped } = await appendCompanyWorkbooks(arc, companies, fromDate, toDate, log);
+    await arc.finalize();
+    const zip = await zipPromise;
 
-  log(
-    `ZIP ready — ${(zip.length / 1024 / 1024).toFixed(1)} MB (${names.length} companies, ${skipped.length} skipped)`,
-    "success"
-  );
-  return { zip, names, skipped };
+    log(
+      `ZIP ready — ${(zip.length / 1024 / 1024).toFixed(1)} MB (${names.length} companies, ${skipped.length} skipped)`,
+      "success"
+    );
+    return { zip, names, skipped };
+  } catch (error) {
+    chunks.length = 0;
+    try {
+      arc.abort();
+    } catch {
+      // Best effort; the original error remains authoritative.
+    }
+    throw error;
+  } finally {
+    arc.removeAllListeners();
+  }
 }
 
 /**
