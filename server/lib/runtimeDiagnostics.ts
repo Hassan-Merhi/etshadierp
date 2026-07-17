@@ -9,6 +9,7 @@ const MB = 1024 * 1024;
 const SAMPLE_INTERVAL_MS = Math.max(5_000, Number(process.env.RUNTIME_DIAGNOSTICS_INTERVAL_MS || 10_000));
 const EVENT_LOOP_WARN_MS = Math.max(100, Number(process.env.EVENT_LOOP_WARN_P99_MS || 500));
 const MAX_SAMPLES = Math.max(12, Number(process.env.RUNTIME_DIAGNOSTICS_MAX_SAMPLES || 60));
+const MAX_REASONABLE_DELAY_MS = 5 * 60 * 1000;
 
 const eventLoop = monitorEventLoopDelay({ resolution: 20 });
 eventLoop.enable();
@@ -23,6 +24,7 @@ interface RuntimeSample {
   externalMb: number;
   arrayBuffersMb: number;
   cgroupCurrentMb: number | null;
+  cgroupWorkingSetMb: number | null;
   childRssMb: number;
 }
 
@@ -33,9 +35,16 @@ const highWater = {
   externalMb: 0,
   arrayBuffersMb: 0,
   cgroupCurrentMb: 0,
+  cgroupWorkingSetMb: 0,
   childRssMb: 0,
   combinedProcessAndChildrenMb: 0,
 };
+
+function safeDelayMs(nanoseconds: number): number {
+  const milliseconds = nanoseconds / 1e6;
+  if (!Number.isFinite(milliseconds) || milliseconds < 0 || milliseconds > MAX_REASONABLE_DELAY_MS) return 0;
+  return Math.round(milliseconds * 10) / 10;
+}
 
 function readNumericFile(paths: string[]): number | null {
   for (const file of paths) {
@@ -51,12 +60,40 @@ function readNumericFile(paths: string[]): number | null {
   return null;
 }
 
-function readCgroupCurrentMb(): number | null {
-  const bytes = readNumericFile([
+function readInactiveFileBytes(): number | null {
+  for (const file of ["/sys/fs/cgroup/memory.stat", "/sys/fs/cgroup/memory/memory.stat"]) {
+    try {
+      const values = new Map<string, number>();
+      for (const line of fs.readFileSync(file, "utf8").split(/\r?\n/)) {
+        const [key, rawValue] = line.trim().split(/\s+/);
+        const value = Number(rawValue);
+        if (key && Number.isFinite(value)) values.set(key, value);
+      }
+      const inactive = values.get("inactive_file") ?? values.get("total_inactive_file");
+      if (inactive !== undefined) return Math.max(0, inactive);
+    } catch {
+      // Try the next cgroup layout.
+    }
+  }
+  return null;
+}
+
+function readCgroupMemory() {
+  const currentBytes = readNumericFile([
     "/sys/fs/cgroup/memory.current",
     "/sys/fs/cgroup/memory/memory.usage_in_bytes",
   ]);
-  return bytes === null ? null : Math.round(bytes / MB);
+  const inactiveFileBytes = currentBytes === null ? null : readInactiveFileBytes();
+  const workingSetBytes =
+    currentBytes === null
+      ? null
+      : Math.max(0, currentBytes - Math.min(currentBytes, inactiveFileBytes ?? 0));
+
+  return {
+    currentMb: currentBytes === null ? null : Math.round(currentBytes / MB),
+    inactiveFileMb: inactiveFileBytes === null ? null : Math.round(inactiveFileBytes / MB),
+    workingSetMb: workingSetBytes === null ? null : Math.round(workingSetBytes / MB),
+  };
 }
 
 function readCgroupLimitMb(): number | null {
@@ -177,14 +214,15 @@ function getTempExportDiskSnapshot() {
 function sampleRuntime(): RuntimeSample {
   const memory = process.memoryUsage();
   const child = getChildProcessSnapshot();
-  const cgroupCurrentMb = readCgroupCurrentMb();
+  const cgroup = readCgroupMemory();
   const sample: RuntimeSample = {
     timestamp: new Date().toISOString(),
     rssMb: Math.round(memory.rss / MB),
     heapUsedMb: Math.round(memory.heapUsed / MB),
     externalMb: Math.round(memory.external / MB),
     arrayBuffersMb: Math.round(memory.arrayBuffers / MB),
-    cgroupCurrentMb,
+    cgroupCurrentMb: cgroup.currentMb,
+    cgroupWorkingSetMb: cgroup.workingSetMb,
     childRssMb: child.rssMb,
   };
 
@@ -195,21 +233,22 @@ function sampleRuntime(): RuntimeSample {
   highWater.heapUsedMb = Math.max(highWater.heapUsedMb, sample.heapUsedMb);
   highWater.externalMb = Math.max(highWater.externalMb, sample.externalMb);
   highWater.arrayBuffersMb = Math.max(highWater.arrayBuffersMb, sample.arrayBuffersMb);
-  highWater.cgroupCurrentMb = Math.max(highWater.cgroupCurrentMb, cgroupCurrentMb || 0);
+  highWater.cgroupCurrentMb = Math.max(highWater.cgroupCurrentMb, cgroup.currentMb || 0);
+  highWater.cgroupWorkingSetMb = Math.max(highWater.cgroupWorkingSetMb, cgroup.workingSetMb || 0);
   highWater.childRssMb = Math.max(highWater.childRssMb, child.rssMb);
   highWater.combinedProcessAndChildrenMb = Math.max(
     highWater.combinedProcessAndChildrenMb,
     sample.rssMb + child.rssMb
   );
 
-  const p99Ms = eventLoop.percentile(99) / 1e6;
-  if (p99Ms >= EVENT_LOOP_WARN_MS && Date.now() - lastEventLoopWarningAt >= 60_000) {
+  const p99Ms = safeDelayMs(eventLoop.percentile(99));
+  if (p99Ms > 0 && p99Ms >= EVENT_LOOP_WARN_MS && Date.now() - lastEventLoopWarningAt >= 60_000) {
     lastEventLoopWarningAt = Date.now();
     logger.warn("High event-loop delay detected", {
       module: "runtime-diagnostics",
       action: "event-loop-delay",
-      p99Ms: Math.round(p99Ms),
-      maxMs: Math.round(eventLoop.max / 1e6),
+      p99Ms,
+      maxMs: safeDelayMs(eventLoop.max),
       memory: sample,
     });
   }
@@ -227,19 +266,19 @@ export function getRuntimeDiagnosticsSnapshot() {
   const child = getChildProcessSnapshot();
   const elu = performance.eventLoopUtilization(lastElu);
   lastElu = performance.eventLoopUtilization();
-  const cgroupCurrentMb = readCgroupCurrentMb();
+  const cgroup = readCgroupMemory();
   const cgroupLimitMb = readCgroupLimitMb();
   const resourceUsage = process.resourceUsage();
 
   return {
     sampledAt: new Date().toISOString(),
     eventLoop: {
-      minMs: Number.isFinite(eventLoop.min) ? Math.round((eventLoop.min / 1e6) * 10) / 10 : 0,
-      meanMs: Number.isFinite(eventLoop.mean) ? Math.round((eventLoop.mean / 1e6) * 10) / 10 : 0,
-      p50Ms: Math.round((eventLoop.percentile(50) / 1e6) * 10) / 10,
-      p95Ms: Math.round((eventLoop.percentile(95) / 1e6) * 10) / 10,
-      p99Ms: Math.round((eventLoop.percentile(99) / 1e6) * 10) / 10,
-      maxMs: Math.round((eventLoop.max / 1e6) * 10) / 10,
+      minMs: safeDelayMs(eventLoop.min),
+      meanMs: safeDelayMs(eventLoop.mean),
+      p50Ms: safeDelayMs(eventLoop.percentile(50)),
+      p95Ms: safeDelayMs(eventLoop.percentile(95)),
+      p99Ms: safeDelayMs(eventLoop.percentile(99)),
+      maxMs: safeDelayMs(eventLoop.max),
       utilizationPercent: Math.round(elu.utilization * 10_000) / 100,
     },
     memory: {
@@ -252,11 +291,13 @@ export function getRuntimeDiagnosticsSnapshot() {
       mallocedMb: Math.round(heap.malloced_memory / MB),
       peakMallocedMb: Math.round(heap.peak_malloced_memory / MB),
       processMaxRssMb: Math.round(resourceUsage.maxRSS / 1024),
-      cgroupCurrentMb,
+      cgroupCurrentMb: cgroup.currentMb,
+      cgroupInactiveFileMb: cgroup.inactiveFileMb,
+      cgroupWorkingSetMb: cgroup.workingSetMb,
       cgroupLimitMb,
       cgroupUtilizationPercent:
-        cgroupCurrentMb !== null && cgroupLimitMb
-          ? Math.round((cgroupCurrentMb / cgroupLimitMb) * 1000) / 10
+        cgroup.workingSetMb !== null && cgroupLimitMb
+          ? Math.round((cgroup.workingSetMb / cgroupLimitMb) * 1000) / 10
           : null,
     },
     children: child,
