@@ -375,9 +375,9 @@ export function OffloadDialog({
                   <SelectValue placeholder="Select container..." />
                 </SelectTrigger>
                 <SelectContent>
-                  {availableContainers?.filter((c) => c.status !== "PARTIALLY_RECEIVED").map((c) => (
+                  {availableContainers?.map((c) => (
                     <SelectItem key={c.id} value={c.id.toString()}>
-                      {c.containerNumber} ({c.totalKg} kg — {c.supplierName})
+                      {c.containerNumber} ({c.totalKg} kg — {c.supplierName}){c.status === "PARTIALLY_RECEIVED" ? " [Partial]" : ""}
                     </SelectItem>
                   ))}
                 </SelectContent>
