@@ -1067,6 +1067,22 @@ async function trackViaParcelsApp(
   return { success: true, lastStatus, lastLocation, lastDescription, lastCheckedAt: now, error: null };
 }
 
+// ── In-flight tracking cap ────────────────────────────────────────────────────
+// Prevents "Track All" from launching unlimited concurrent background jobs
+// which, combined with Chrome's memory footprint, OOMs a 2 GB host.
+const MAX_CONCURRENT_TRACK_JOBS = 5;
+let _activeTrackJobs = 0;
+
+/** True when the server already has the maximum number of tracking jobs running. */
+export function isFactoryTrackingAtCapacity(): boolean {
+  return _activeTrackJobs >= MAX_CONCURRENT_TRACK_JOBS;
+}
+
+/** Number of factory tracking jobs currently in flight. */
+export function factoryTrackingInFlightCount(): number {
+  return _activeTrackJobs;
+}
+
 // ── Public API ────────────────────────────────────────────────────────────────
 
 export interface FactoryTrackNowResult {
@@ -1085,6 +1101,12 @@ export interface FactoryTrackNowResult {
 }
 
 export async function trackOneFactoryContainerById(containerId: number): Promise<FactoryTrackNowResult> {
+  if (_activeTrackJobs >= MAX_CONCURRENT_TRACK_JOBS) {
+    throw Object.assign(new Error("Server is busy — too many tracking jobs in flight. Try again shortly."), {
+      code: "TRACKING_BUSY",
+    });
+  }
+
   const [row] = await db
     .select({
       id: factoryContainers.id,
@@ -1104,55 +1126,60 @@ export async function trackOneFactoryContainerById(containerId: number): Promise
     throw new Error("Tracking is disabled for offloaded/closed/completed containers.");
   }
 
-  const oldEta = row.arrivalDate ?? null;
-  const trackStartedAt = new Date();
-  const destinationCountry = row.destination || "Congo";
-  const manualCarrierHint = row.trackingCarrierHint ?? null;
-  console.log(
-    `[FactoryTracking] trackOneFactoryContainerById: container=${row.containerNumber} dest="${destinationCountry}" manualHint=${manualCarrierHint ?? "none"}`
-  );
+  _activeTrackJobs++;
+  try {
+    const oldEta = row.arrivalDate ?? null;
+    const trackStartedAt = new Date();
+    const destinationCountry = row.destination || "Congo";
+    const manualCarrierHint = row.trackingCarrierHint ?? null;
+    console.log(
+      `[FactoryTracking] trackOneFactoryContainerById: container=${row.containerNumber} dest="${destinationCountry}" manualHint=${manualCarrierHint ?? "none"}`
+    );
 
-  const result = await trackOneContainer(row.id, row.containerNumber, destinationCountry, manualCarrierHint);
-  await setSchedulerMeta(row.id, null, new Date(Date.now() + 24 * 60 * 60 * 1000));
+    const result = await trackOneContainer(row.id, row.containerNumber, destinationCountry, manualCarrierHint);
+    await setSchedulerMeta(row.id, null, new Date(Date.now() + 24 * 60 * 60 * 1000));
 
-  const [postRow] = await db
-    .select({ arrivalDate: factoryContainers.arrivalDate, trackingProvider: factoryContainers.trackingProvider })
-    .from(factoryContainers)
-    .where(eq(factoryContainers.id, containerId))
-    .limit(1);
+    const [postRow] = await db
+      .select({ arrivalDate: factoryContainers.arrivalDate, trackingProvider: factoryContainers.trackingProvider })
+      .from(factoryContainers)
+      .where(eq(factoryContainers.id, containerId))
+      .limit(1);
 
-  const newEta = postRow?.arrivalDate ?? null;
-  const finalProvider = postRow?.trackingProvider ?? null;
+    const newEta = postRow?.arrivalDate ?? null;
+    const finalProvider = postRow?.trackingProvider ?? null;
 
-  const attemptRows = await db
-    .select({
-      provider: factoryContainerTrackingChecks.provider,
-      status: factoryContainerTrackingChecks.status,
-      error: factoryContainerTrackingChecks.errorMessage,
-    })
-    .from(factoryContainerTrackingChecks)
-    .where(
-      and(
-        eq(factoryContainerTrackingChecks.containerId, containerId),
-        gte(factoryContainerTrackingChecks.checkedAt, trackStartedAt)
+    const attemptRows = await db
+      .select({
+        provider: factoryContainerTrackingChecks.provider,
+        status: factoryContainerTrackingChecks.status,
+        error: factoryContainerTrackingChecks.errorMessage,
+      })
+      .from(factoryContainerTrackingChecks)
+      .where(
+        and(
+          eq(factoryContainerTrackingChecks.containerId, containerId),
+          gte(factoryContainerTrackingChecks.checkedAt, trackStartedAt)
+        )
       )
-    )
-    .orderBy(factoryContainerTrackingChecks.checkedAt);
+      .orderBy(factoryContainerTrackingChecks.checkedAt);
 
-  return {
-    success: result.success,
-    containerNumber: row.containerNumber,
-    provider: finalProvider,
-    lastStatus: result.lastStatus,
-    lastLocation: result.lastLocation,
-    lastDescription: result.lastDescription,
-    lastCheckedAt: result.lastCheckedAt,
-    oldEta,
-    newEta,
-    etaChanged: newEta !== oldEta,
-    attempts: attemptRows,
-    error: result.error,
-  };
+    return {
+      success: result.success,
+      containerNumber: row.containerNumber,
+      provider: finalProvider,
+      lastStatus: result.lastStatus,
+      lastLocation: result.lastLocation,
+      lastDescription: result.lastDescription,
+      lastCheckedAt: result.lastCheckedAt,
+      oldEta,
+      newEta,
+      etaChanged: newEta !== oldEta,
+      attempts: attemptRows,
+      error: result.error,
+    };
+  } finally {
+    _activeTrackJobs--;
+  }
 }
 
 export async function trackDueFactoryContainers(): Promise<void> {

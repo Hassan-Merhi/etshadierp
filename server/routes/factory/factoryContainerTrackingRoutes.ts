@@ -12,6 +12,7 @@ import {
   trackOneFactoryContainerById,
   getFactoryTrackingProgress,
   updateFactoryContainerTrackingSettings,
+  isFactoryTrackingAtCapacity,
 } from "../../services/factoryContainerTrackingService";
 import {
   refreshFactoryContainerEta,
@@ -174,6 +175,15 @@ export function registerFactoryContainerTrackingRoutes(app: Express) {
 
       if (!container) return res.status(404).json({ message: "Container not found" });
 
+      // Reject early if the server is already at the concurrency ceiling.
+      // This prevents "Track All (N)" from queuing more goroutines than Chrome can handle.
+      if (isFactoryTrackingAtCapacity()) {
+        return res.status(429).json({
+          message: "Server is busy — too many tracking jobs in flight. Try again shortly.",
+          code: "TRACKING_BUSY",
+        });
+      }
+
       // Fire tracking in background so we never block the HTTP response
       trackOneFactoryContainerById(containerId).catch((err: any) => {
         console.error(`[FactoryTracking] Background track error for container ${containerId}:`, err?.message);
@@ -181,14 +191,17 @@ export function registerFactoryContainerTrackingRoutes(app: Express) {
 
       res.json({ success: true, queued: true, containerId });
     } catch (err: any) {
-      const status = err.message?.includes("not found")
-        ? 404
-        : err.message?.includes("disabled")
-          ? 400
-          : err.message?.includes("quota")
-            ? 429
-            : 500;
-      res.status(status).json({ message: err.message || "Tracking failed" });
+      const status =
+        err.code === "TRACKING_BUSY" || err.message === "PUPPETEER_QUEUE_FULL"
+          ? 429
+          : err.message?.includes("not found")
+            ? 404
+            : err.message?.includes("disabled")
+              ? 400
+              : err.message?.includes("quota")
+                ? 429
+                : 500;
+      res.status(status).json({ message: err.message || "Tracking failed", code: err.code ?? null });
     }
   });
 

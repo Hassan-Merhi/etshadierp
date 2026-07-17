@@ -364,8 +364,18 @@ export async function scrapeMaerskDirect(containerNumber: string): Promise<Carri
   }
 
   // ── Acquire global Puppeteer slot (shared with ParcelsApp scraper) ───────
+  // Returns a "no_data" result immediately when the queue is full.
   console.log(`[MaerskDirect] ${containerNumber}: waiting for Puppeteer slot…`);
-  const release = await acquirePuppeteerSlot();
+  let release: (() => void) | null = null;
+  try {
+    release = await acquirePuppeteerSlot();
+  } catch (err: any) {
+    if (err?.message === "PUPPETEER_QUEUE_FULL") {
+      console.warn(`[MaerskDirect] ${containerNumber}: Puppeteer queue full — skipping (server busy)`);
+      return emptyResult(containerNumber, "PUPPETEER_QUEUE_FULL");
+    }
+    throw err;
+  }
   console.log(`[MaerskDirect] ${containerNumber}: Puppeteer slot acquired`);
 
   let page: any = null;
@@ -631,7 +641,7 @@ export async function scrapeMaerskDirect(containerNumber: string): Promise<Carri
     } catch {
       /* ignore */
     }
-    release();
+    release?.();
     console.log(`[MaerskDirect] ${containerNumber}: Puppeteer slot released`);
   }
 }

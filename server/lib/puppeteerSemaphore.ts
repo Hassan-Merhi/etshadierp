@@ -17,11 +17,19 @@
 // a hard cap of 1 (leaving ~1 GB for Node, Express, PG, etc.).
 const MAX_CONCURRENT = 1;
 
+// Hard limit on waiting callers. If the queue is already this deep, reject
+// immediately rather than letting unbounded promises accumulate and OOM the
+// process. Callers should surface a 429 / "busy" response to the client.
+const MAX_QUEUE_DEPTH = 6;
+
 let _running = 0;
 const _queue: Array<() => void> = [];
 
 export function acquirePuppeteerSlot(): Promise<() => void> {
-  return new Promise((resolve) => {
+  return new Promise((resolve, reject) => {
+    if (_running >= MAX_CONCURRENT && _queue.length >= MAX_QUEUE_DEPTH) {
+      return reject(new Error("PUPPETEER_QUEUE_FULL"));
+    }
     function tryGrab() {
       if (_running < MAX_CONCURRENT) {
         _running++;

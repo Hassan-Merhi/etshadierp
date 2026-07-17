@@ -600,7 +600,27 @@ export interface TrackNowResult {
   quotaWarning?: string;
 }
 
+// ── In-flight tracking cap ─────────────────────────────────────────────────────
+const MAX_CONCURRENT_TRACK_JOBS = 5;
+let _activeTrackJobs = 0;
+
+/** True when the server already has the maximum number of tracking jobs running. */
+export function isTrackingAtCapacity(): boolean {
+  return _activeTrackJobs >= MAX_CONCURRENT_TRACK_JOBS;
+}
+
+/** Number of ERP tracking jobs currently in flight. */
+export function trackingInFlightCount(): number {
+  return _activeTrackJobs;
+}
+
 export async function trackOneContainerById(containerId: number): Promise<TrackNowResult> {
+  if (_activeTrackJobs >= MAX_CONCURRENT_TRACK_JOBS) {
+    throw Object.assign(new Error("Server is busy — too many tracking jobs in flight. Try again shortly."), {
+      code: "TRACKING_BUSY",
+    });
+  }
+
   const [row] = await db
     .select({
       id: containers.id,
@@ -632,52 +652,60 @@ export async function trackOneContainerById(containerId: number): Promise<TrackN
     quotaWarning = `ParcelsApp quota is low — ${remaining} of ${limit} credits remaining this month.`;
   }
 
-  const oldEta = row.eta ?? null;
-  const trackStartedAt = new Date();
+  _activeTrackJobs++;
+  try {
+    const oldEta = row.eta ?? null;
+    const trackStartedAt = new Date();
 
-  const result = await trackOneContainer(row.id, row.containerNumber, row.trackingCarrierHint ?? undefined);
+    const result = await trackOneContainer(row.id, row.containerNumber, row.trackingCarrierHint ?? undefined);
 
-  // Manual track: clear skip reason, set next check to 24 h from now
-  await setSchedulerMeta(row.id, null, new Date(Date.now() + 24 * 60 * 60 * 1000));
+    // Manual track: clear skip reason, set next check to 24 h from now
+    await setSchedulerMeta(row.id, null, new Date(Date.now() + 24 * 60 * 60 * 1000));
 
-  // Read back the persisted values so we can report exactly what was saved
-  const [postRow] = await db
-    .select({ eta: containers.eta, trackingProvider: containers.trackingProvider })
-    .from(containers)
-    .where(eq(containers.id, containerId))
-    .limit(1);
+    // Read back the persisted values so we can report exactly what was saved
+    const [postRow] = await db
+      .select({ eta: containers.eta, trackingProvider: containers.trackingProvider })
+      .from(containers)
+      .where(eq(containers.id, containerId))
+      .limit(1);
 
-  const newEta = postRow?.eta ?? null;
-  const finalProvider = postRow?.trackingProvider ?? null;
+    const newEta = postRow?.eta ?? null;
+    const finalProvider = postRow?.trackingProvider ?? null;
 
-  // Collect every provider attempt recorded during this tracking run
-  const attemptRows = await db
-    .select({
-      provider: containerTrackingChecks.provider,
-      status: containerTrackingChecks.status,
-      error: containerTrackingChecks.errorMessage,
-    })
-    .from(containerTrackingChecks)
-    .where(
-      and(eq(containerTrackingChecks.containerId, containerId), gte(containerTrackingChecks.checkedAt, trackStartedAt))
-    )
-    .orderBy(containerTrackingChecks.checkedAt);
+    // Collect every provider attempt recorded during this tracking run
+    const attemptRows = await db
+      .select({
+        provider: containerTrackingChecks.provider,
+        status: containerTrackingChecks.status,
+        error: containerTrackingChecks.errorMessage,
+      })
+      .from(containerTrackingChecks)
+      .where(
+        and(
+          eq(containerTrackingChecks.containerId, containerId),
+          gte(containerTrackingChecks.checkedAt, trackStartedAt)
+        )
+      )
+      .orderBy(containerTrackingChecks.checkedAt);
 
-  return {
-    success: result.success,
-    containerNumber: row.containerNumber,
-    provider: finalProvider,
-    lastStatus: result.lastStatus,
-    lastLocation: result.lastLocation,
-    lastDescription: result.lastDescription,
-    lastCheckedAt: result.lastCheckedAt,
-    oldEta,
-    newEta,
-    etaChanged: newEta !== oldEta,
-    attempts: attemptRows,
-    error: result.error,
-    quotaWarning,
-  };
+    return {
+      success: result.success,
+      containerNumber: row.containerNumber,
+      provider: finalProvider,
+      lastStatus: result.lastStatus,
+      lastLocation: result.lastLocation,
+      lastDescription: result.lastDescription,
+      lastCheckedAt: result.lastCheckedAt,
+      oldEta,
+      newEta,
+      etaChanged: newEta !== oldEta,
+      attempts: attemptRows,
+      error: result.error,
+      quotaWarning,
+    };
+  } finally {
+    _activeTrackJobs--;
+  }
 }
 
 // ─── ETA resolution helpers ───────────────────────────────────────────────────

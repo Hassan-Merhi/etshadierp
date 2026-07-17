@@ -21,6 +21,7 @@ import {
   getParcelsAppUsageStats,
   get17trackUsageStats,
   getTrackingProgress,
+  isTrackingAtCapacity,
 } from "../services/containerTrackingService";
 import { testConnection } from "../lib/parcelsAppClient";
 import { isConfigured as isMaerskConfigured } from "../lib/trackingProviders/maerskProvider";
@@ -216,6 +217,15 @@ export function registerContainerTrackingRoutes(app: Express) {
       if (remaining === 0 && !hasDirectProvider && !hasFallbackProvider) {
         res.status(402).json({
           message: `ParcelsApp monthly quota exhausted (${used}/${limit}) and no alternative providers are configured. Track Now is not available.`,
+        });
+        return;
+      }
+
+      // Reject early when the server is already at its concurrent tracking cap.
+      if (isTrackingAtCapacity()) {
+        res.status(429).json({
+          message: "Server is busy — too many tracking jobs in flight. Try again shortly.",
+          code: "TRACKING_BUSY",
         });
         return;
       }
