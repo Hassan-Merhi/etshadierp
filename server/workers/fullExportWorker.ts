@@ -1,4 +1,5 @@
 import { isFileBackedExport } from "../lib/fileBackedExport";
+import { startResourceGuard } from "../lib/resourceGuard";
 import { buildFullExportZipInProcess } from "../helpers/buildFullExportZipInProcess";
 
 interface StartMessage {
@@ -14,6 +15,7 @@ function send(message: Record<string, unknown>): void {
   }
 }
 
+startResourceGuard();
 let started = false;
 
 process.on("message", (raw: unknown) => {
