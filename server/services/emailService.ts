@@ -1,5 +1,6 @@
 import nodemailer from "nodemailer";
 import { pool } from "../db";
+import { isFileBackedExport } from "../lib/fileBackedExport";
 
 export interface EmailSettings {
   gmailUser: string;
@@ -38,8 +39,11 @@ export async function sendExportEmail(
   const recipients = await getRecipients();
   if (recipients.length === 0) return { success: false, error: "No email recipients configured." };
 
-  // Gmail attachment limit is 25MB — warn at 20MB
-  const sizeMB = zipBuffer.length / 1024 / 1024;
+  // The ZIP may be a real Buffer (legacy/small exports) or the disk-backed
+  // descriptor returned by buildFullExportZip. Nodemailer streams `path`
+  // attachments, so the complete ZIP never needs to enter the Node heap.
+  const sizeBytes = zipBuffer.length;
+  const sizeMB = sizeBytes / 1024 / 1024;
   if (sizeMB > 24) {
     return {
       success: false,
@@ -55,10 +59,10 @@ export async function sendExportEmail(
     tls: { rejectUnauthorized: true },
   });
 
-  // Verify the connection before sending
   try {
     await transporter.verify();
   } catch (verifyErr: any) {
+    transporter.close();
     return {
       success: false,
       error: `Gmail authentication failed: ${verifyErr.message}. Check your Gmail address and App Password in settings.`,
@@ -82,37 +86,49 @@ Generated automatically at ${new Date().toUTCString()}.
 
 — ERP System`;
 
+  const attachment = isFileBackedExport(zipBuffer)
+    ? {
+        filename: `DailyExport_${dateLabel}.zip`,
+        path: zipBuffer.filePath,
+        contentType: "application/zip",
+      }
+    : {
+        filename: `DailyExport_${dateLabel}.zip`,
+        content: zipBuffer,
+        contentType: "application/zip",
+      };
+
   try {
-    // Send one email per recipient to avoid group disclosure and improve deliverability
-    const results = await Promise.allSettled(
-      recipients.map((recipient) =>
-        transporter.sendMail({
+    // Send sequentially. Concurrent sends of the same large attachment caused
+    // multiple simultaneous MIME encoders/streams and avoidable memory spikes.
+    let sent = 0;
+    const errors: string[] = [];
+    for (const recipient of recipients) {
+      try {
+        await transporter.sendMail({
           from: `"ERP Daily Export" <${settings.gmailUser}>`,
           to: recipient,
           subject,
           text,
-          attachments: [
-            {
-              filename: `DailyExport_${dateLabel}.zip`,
-              content: zipBuffer,
-              contentType: "application/zip",
-            },
-          ],
-        })
-      )
-    );
-
-    const failed = results.filter((r) => r.status === "rejected");
-    if (failed.length === results.length) {
-      const firstError = (failed[0] as PromiseRejectedResult).reason;
-      return { success: false, error: firstError?.message || "All emails failed to send." };
+          attachments: [attachment],
+        });
+        sent += 1;
+      } catch (error: any) {
+        errors.push(error?.message || String(error));
+      }
     }
-    if (failed.length > 0) {
-      console.warn(`[EmailService] ${failed.length}/${results.length} emails failed to deliver.`);
+
+    if (sent === 0) {
+      return { success: false, error: errors[0] || "All emails failed to send." };
+    }
+    if (errors.length > 0) {
+      console.warn(`[EmailService] ${errors.length}/${recipients.length} emails failed to deliver.`);
     }
 
     return { success: true };
   } catch (err: any) {
     return { success: false, error: err.message || String(err) };
+  } finally {
+    transporter.close();
   }
 }
