@@ -34,6 +34,13 @@ interface ExclusiveTaskLock {
   startedAt: number;
 }
 
+interface CgroupMemorySnapshot {
+  currentMb: number | null;
+  inactiveFileMb: number | null;
+  workingSetMb: number | null;
+  sampledAt: number;
+}
+
 const MB = 1024 * 1024;
 const DEFAULT_MEMORY_LIMIT_MB = 2048;
 const DEFAULT_WARNING_PERCENT = 70;
@@ -42,6 +49,7 @@ const DEFAULT_HARD_PERCENT = 92;
 const DEFAULT_MONITOR_INTERVAL_MS = 15_000;
 const DEFAULT_DRAIN_TIMEOUT_MS = 15_000;
 const DEFAULT_API_JSON_LIMIT_MB = 25;
+const CGROUP_SAMPLE_CACHE_MS = 500;
 
 const activeHeavyRequests = new Map<string, number>();
 const exclusiveTasks = new Map<string, ExclusiveTaskLock>();
@@ -61,6 +69,12 @@ let cleanExitTimer: NodeJS.Timeout | null = null;
 let lastWarningLogAt = 0;
 let lastCriticalLogAt = 0;
 let lastHardLogAt = 0;
+let cachedCgroupMemory: CgroupMemorySnapshot = {
+  currentMb: null,
+  inactiveFileMb: null,
+  workingSetMb: null,
+  sampledAt: 0,
+};
 
 function positiveNumber(value: unknown, fallback: number): number {
   const parsed = Number(value);
@@ -86,17 +100,58 @@ function readCgroupLimitMb(): number | null {
     "/sys/fs/cgroup/memory.max",
     "/sys/fs/cgroup/memory/memory.limit_in_bytes",
   ]);
-  // Ignore effectively-unlimited sentinel values.
   if (bytes === null || bytes <= 0 || bytes > 1024 ** 5) return null;
   return Math.max(1, Math.floor(bytes / MB));
 }
 
-function readCgroupCurrentMb(): number | null {
-  const bytes = readNumericFile([
+function readInactiveFileBytes(): number | null {
+  const candidates = [
+    "/sys/fs/cgroup/memory.stat",
+    "/sys/fs/cgroup/memory/memory.stat",
+  ];
+
+  for (const file of candidates) {
+    try {
+      const raw = fs.readFileSync(file, "utf8");
+      const values = new Map<string, number>();
+      for (const line of raw.split(/\r?\n/)) {
+        const [key, value] = line.trim().split(/\s+/);
+        const parsed = Number(value);
+        if (key && Number.isFinite(parsed)) values.set(key, parsed);
+      }
+      const inactive = values.get("inactive_file") ?? values.get("total_inactive_file");
+      if (inactive !== undefined) return Math.max(0, inactive);
+    } catch {
+      // Try the next cgroup layout.
+    }
+  }
+
+  return null;
+}
+
+function getCgroupMemorySnapshot(force = false): CgroupMemorySnapshot {
+  const now = Date.now();
+  if (!force && now - cachedCgroupMemory.sampledAt < CGROUP_SAMPLE_CACHE_MS) {
+    return cachedCgroupMemory;
+  }
+
+  const currentBytes = readNumericFile([
     "/sys/fs/cgroup/memory.current",
     "/sys/fs/cgroup/memory/memory.usage_in_bytes",
   ]);
-  return bytes === null ? null : Math.max(0, bytes / MB);
+  const inactiveFileBytes = currentBytes === null ? null : readInactiveFileBytes();
+  const workingSetBytes =
+    currentBytes === null
+      ? null
+      : Math.max(0, currentBytes - Math.min(currentBytes, inactiveFileBytes ?? 0));
+
+  cachedCgroupMemory = {
+    currentMb: currentBytes === null ? null : currentBytes / MB,
+    inactiveFileMb: inactiveFileBytes === null ? null : inactiveFileBytes / MB,
+    workingSetMb: workingSetBytes === null ? null : workingSetBytes / MB,
+    sampledAt: now,
+  };
+  return cachedCgroupMemory;
 }
 
 const configuredMemoryLimitMb = Number(process.env.APP_MEMORY_LIMIT_MB);
@@ -131,21 +186,30 @@ function pressureLevelFor(usedMb: number): MemoryPressureLevel {
 function currentMemorySnapshot() {
   const usage = process.memoryUsage();
   const rssMbRaw = usage.rss / MB;
-  const cgroupCurrentMbRaw = readCgroupCurrentMb();
+  const cgroup = getCgroupMemorySnapshot();
 
-  // cgroup memory includes Node, Chrome, export workers and filesystem cache—the
-  // same total the hosting platform uses to OOM-kill the service. Fall back to
-  // Node RSS only where cgroups are unavailable.
-  const effectiveUsedMbRaw = cgroupCurrentMbRaw ?? rssMbRaw;
+  // Working set includes Node, Chrome and export workers, but excludes reclaimable
+  // inactive filesystem cache. This prevents a large disk export from triggering
+  // a false hard-memory restart merely because Linux cached recently written files.
+  const effectiveUsedMbRaw = cgroup.workingSetMb ?? cgroup.currentMb ?? rssMbRaw;
   const utilizationPercent = (effectiveUsedMbRaw / memoryLimitMb) * 100;
 
   return {
     level: pressureLevelFor(effectiveUsedMbRaw),
-    source: cgroupCurrentMbRaw === null ? "process-rss" : "cgroup-container",
+    source:
+      cgroup.workingSetMb !== null
+        ? "cgroup-working-set"
+        : cgroup.currentMb !== null
+          ? "cgroup-current"
+          : "process-rss",
     limitMb: Math.round(memoryLimitMb),
     detectedCgroupLimitMb: detectedMemoryLimitMb,
     effectiveUsedMb: Math.round(effectiveUsedMbRaw),
-    cgroupCurrentMb: cgroupCurrentMbRaw === null ? null : Math.round(cgroupCurrentMbRaw),
+    cgroupCurrentMb: cgroup.currentMb === null ? null : Math.round(cgroup.currentMb),
+    cgroupInactiveFileMb:
+      cgroup.inactiveFileMb === null ? null : Math.round(cgroup.inactiveFileMb),
+    cgroupWorkingSetMb:
+      cgroup.workingSetMb === null ? null : Math.round(cgroup.workingSetMb),
     rssMb: Math.round(rssMbRaw),
     heapUsedMb: Math.round(usage.heapUsed / MB),
     heapTotalMb: Math.round(usage.heapTotal / MB),
@@ -220,17 +284,17 @@ function evaluateMemoryPressure(): ReturnType<typeof currentMemorySnapshot> {
   if (snapshot.level === "hard") {
     if (now - lastHardLogAt >= 30_000) {
       lastHardLogAt = now;
-      logger.error("Hard container memory limit reached", {
+      logger.error("Hard container working-set memory limit reached", {
         module: "resource-guard",
         action: "memory-hard",
         memory: snapshot,
       });
     }
-    beginDrain("container-memory-hard-limit");
+    beginDrain("container-working-set-hard-limit");
   } else if (snapshot.level === "critical") {
     if (now - lastCriticalLogAt >= 30_000) {
       lastCriticalLogAt = now;
-      logger.warn("Critical container memory pressure detected", {
+      logger.warn("Critical container working-set memory pressure detected", {
         module: "resource-guard",
         action: "memory-critical",
         memory: snapshot,
@@ -238,7 +302,7 @@ function evaluateMemoryPressure(): ReturnType<typeof currentMemorySnapshot> {
     }
   } else if (snapshot.level === "warning" && now - lastWarningLogAt >= 60_000) {
     lastWarningLogAt = now;
-    logger.warn("Elevated container memory usage detected", {
+    logger.warn("Elevated container working-set memory usage detected", {
       module: "resource-guard",
       action: "memory-warning",
       memory: snapshot,
@@ -316,8 +380,12 @@ export function startResourceGuard(): void {
     monitorIntervalMs,
   });
 
+  getCgroupMemorySnapshot(true);
   evaluateMemoryPressure();
-  const timer = setInterval(evaluateMemoryPressure, monitorIntervalMs);
+  const timer = setInterval(() => {
+    getCgroupMemorySnapshot(true);
+    evaluateMemoryPressure();
+  }, monitorIntervalMs);
   timer.unref();
 }
 
