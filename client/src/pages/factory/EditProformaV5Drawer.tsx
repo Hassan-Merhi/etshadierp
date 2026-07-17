@@ -218,7 +218,7 @@ export default function EditProformaV5Drawer({ open, onClose, proformaId, articl
       await Promise.all(ops);
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["/api/factory/v5/stock-allocation"] });
+      qc.invalidateQueries({ queryKey: ["/api/factory/v5/stock-allocation"], refetchType: "active" });
       qc.invalidateQueries({ queryKey: ["/api/factory/customer-proformas", proformaId] });
       qc.invalidateQueries({
         predicate: (q) => {

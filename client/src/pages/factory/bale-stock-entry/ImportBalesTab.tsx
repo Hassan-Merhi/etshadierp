@@ -157,7 +157,7 @@ export function ImportBalesTab() {
       return await response.json();
     },
     onSuccess: (result) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/factory/bales"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/bales"], refetchType: "active" });
       queryClient.invalidateQueries({ queryKey: ["/api/factory/stock-entry/in-stock"] });
       queryClient.invalidateQueries({ queryKey: ["/api/factory/bale-products"] });
       toast({

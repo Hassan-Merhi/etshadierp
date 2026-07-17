@@ -231,7 +231,7 @@ export default function WipersReEntry() {
       setCreatedBales(data.bales || []);
       setCart([]);
       setConfirmOpen(false);
-      queryClient.invalidateQueries({ queryKey: ["/api/factory/bales"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/bales"], refetchType: "active" });
       queryClient.invalidateQueries({ queryKey: ["/api/factory/bale-products"] });
       queryClient.invalidateQueries({ queryKey: ["/api/factory/stock-entry/in-stock"] });
       queryClient.invalidateQueries({ queryKey: ["/api/factory/mix-batches"] });
@@ -261,7 +261,7 @@ export default function WipersReEntry() {
       setCleanupSelectedIds(new Set());
       setSupervisorUsername("");
       setSupervisorPassword("");
-      queryClient.invalidateQueries({ queryKey: ["/api/factory/bales"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/bales"], refetchType: "active" });
       toast({
         title: "Bales Removed",
         description: `${data.removedCount || cleanupSelectedIds.size} bales removed from stock`,

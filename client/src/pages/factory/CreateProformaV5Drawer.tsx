@@ -258,7 +258,7 @@ export default function CreateProformaV5Drawer({ open, onClose, articleRows, onS
       }
       clearDraft();
       resetForm();
-      qc.invalidateQueries({ queryKey: ["/api/factory/v5/stock-allocation"] });
+      qc.invalidateQueries({ queryKey: ["/api/factory/v5/stock-allocation"], refetchType: "active" });
       toast({
         title: "Proforma created",
         description: sendToLoading

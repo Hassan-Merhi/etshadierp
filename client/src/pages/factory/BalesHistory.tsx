@@ -92,6 +92,8 @@ export default function BalesHistory() {
   const [batchFilter, setBatchFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
   const [dateFilter, setDateFilter] = useState(() => new Date().toLocaleDateString("en-CA"));
+  const [currentPage, setCurrentPage] = useState(1);
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [deleteConfirm, setDeleteConfirm] = useState<number | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [bulkStatus, setBulkStatus] = useState("");
@@ -135,6 +137,17 @@ export default function BalesHistory() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, []);
 
+  // Debounce search term — sends to server only after 300 ms of inactivity.
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(searchTerm), 300);
+    return () => clearTimeout(t);
+  }, [searchTerm]);
+
+  // Reset to page 1 whenever any filter that changes the result set changes.
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [dateFilter, statusFilter, batchFilter, debouncedSearch]);
+
   const handleExport = async () => {
     setExportLoading(true);
     try {
@@ -166,23 +179,40 @@ export default function BalesHistory() {
   });
   const hiddenCost = myAccess?.hiddenCostFields ?? [];
 
-  const { data: balesData, isLoading } = useQuery<any[]>({
-    queryKey: ["/api/factory/bales", dateFilter],
+  type BalesPage = { items: any[]; total: number; page: number; limit: number; totalPages: number };
+  const { data: balesResponse, isLoading } = useQuery<BalesPage>({
+    queryKey: [
+      "/api/factory/bales", dateFilter, currentPage,
+      statusFilter !== "all" ? statusFilter : undefined,
+      batchFilter !== "all" ? batchFilter : undefined,
+      debouncedSearch || undefined,
+    ],
     queryFn: async () => {
       const params = new URLSearchParams();
       if (dateFilter) params.set("date", dateFilter);
       // Lite mode: slim product/mixBatch payloads; skips lastPrintedAt lookup.
       params.set("lite", "1");
+      params.set("page", String(currentPage));
+      params.set("limit", "100");
+      if (statusFilter !== "all") params.set("status", statusFilter);
+      if (batchFilter !== "all") params.set("mixBatchId", batchFilter);
+      if (debouncedSearch.trim()) params.set("search", debouncedSearch.trim());
       const path = `/api/factory/bales?${params.toString()}`;
       const res = await modeApiRequest("GET", path);
       if (!res.ok) throw new Error("Failed to fetch bales");
       return res.json();
     },
-    staleTime: 60_000,
+    staleTime: 2 * 60 * 1000,
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,
+    refetchOnMount: false,
     placeholderData: (prev: any) => prev,
   });
+
+  // Extract flat items + pagination metadata from the paginated response.
+  const balesData = balesResponse?.items ?? null;
+  const serverTotalPages = balesResponse?.totalPages ?? 1;
+  const serverTotal = balesResponse?.total ?? 0;
 
   const { data: mixBatches } = useQuery<FactoryMixBatch[]>({
     queryKey: ["/api/factory/mix-batches"],
@@ -1228,6 +1258,35 @@ export default function BalesHistory() {
                 })}
               </TableBody>
             </Table>
+          </div>
+        )}
+
+        {/* ── Pagination ── */}
+        {serverTotalPages > 1 && (
+          <div className="flex items-center justify-between py-3 px-1">
+            <span className="text-sm text-muted-foreground">
+              Page {currentPage} of {serverTotalPages} &mdash; {serverTotal.toLocaleString()} bales total
+            </span>
+            <div className="flex items-center gap-1">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+              >
+                <ChevronLeft className="h-4 w-4" />
+                Prev
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage((p) => Math.min(serverTotalPages, p + 1))}
+                disabled={currentPage >= serverTotalPages}
+              >
+                Next
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
           </div>
         )}
       </div>
