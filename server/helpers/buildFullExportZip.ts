@@ -1,29 +1,59 @@
 import archiver from "archiver";
+import fs from "fs";
+import os from "os";
+import path from "path";
 import { streamCompanyWorkbookDirect } from "../services/exportExcelService";
 import { logger } from "../lib/logger";
 import { pool } from "../db";
 import { tryAcquireExclusiveTask } from "../lib/resourceGuard";
+import { createFileBackedExport } from "../lib/fileBackedExport";
 
 export interface ExportZipResult {
+  /**
+   * Legacy-compatible handle. It exposes `.length`, but the ZIP bytes live on
+   * disk. Email, WhatsApp and export-job boundaries detect the file-backed
+   * descriptor and stream/read it safely.
+   */
   zip: Buffer;
   names: string[];
   skipped: string[];
 }
 
+async function appendFileAndWait(
+  arc: archiver.Archiver,
+  sourcePath: string,
+  entryName: string
+): Promise<void> {
+  await new Promise<void>((resolve, reject) => {
+    const onEntry = (entry: archiver.EntryData) => {
+      if (entry.name !== entryName) return;
+      cleanup();
+      resolve();
+    };
+    const onError = (error: unknown) => {
+      cleanup();
+      reject(error);
+    };
+    const cleanup = () => {
+      arc.off("entry", onEntry);
+      arc.off("error", onError);
+    };
+
+    arc.on("entry", onEntry);
+    arc.on("error", onError);
+    arc.file(sourcePath, { name: entryName });
+  });
+}
+
 /**
- * Builds the canonical full-company export ZIP.
- * Includes one Excel workbook per company (all accounts, ledger, vouchers, etc.)
+ * Builds the canonical full-company export ZIP without retaining the ZIP or all
+ * company workbooks in Node memory.
  *
- * Memory-safe approach: each company's data is fetched one sheet at a time
- * and streamed directly into the archiver via a PassThrough — no dataset is
- * held in RAM while the next is fetched. Peak RAM is bounded to roughly one
- * sheet's worth of raw rows + the ExcelJS workbook being built (instead of
- * ALL table data + workbook simultaneously, which caused OOM crashes).
- *
- * This is the single source of truth used by:
- *  - Manual "Export Now → Email / Download" (exportRoutes.ts)
- *  - Daily Auto-Send WhatsApp trigger (schedulerService.ts)
- *  - Scheduled 6 PM cron job
+ * Each company workbook is generated one at a time, written to a temporary
+ * file, consumed fully by Archiver, then deleted before the next company starts.
+ * The final ZIP is streamed directly to disk. Legacy callers still receive an
+ * object typed as Buffer with a valid `.length`; boundary services recognize it
+ * as a file-backed export and never call Buffer.concat on the complete archive.
  */
 export async function buildFullExportZip(
   companies: any[],
@@ -43,6 +73,8 @@ export async function buildFullExportZip(
 
   let lockClient: Awaited<ReturnType<typeof pool.connect>> | null = null;
   let distributedLockAcquired = false;
+  let tempDir: string | null = null;
+  let completedSuccessfully = false;
   const exportLockKey = 742001317;
 
   try {
@@ -71,10 +103,17 @@ export async function buildFullExportZip(
     const names: string[] = [];
     const skipped: string[] = [];
 
-    // Start the archiver up front so we can stream into it company-by-company.
-    const chunks: Buffer[] = [];
+    tempDir = await fs.promises.mkdtemp(path.join(os.tmpdir(), "erp-export-"));
+    const zipPath = path.join(tempDir, `ERP_Full_Export_${dateLabel}.zip`);
+    const output = fs.createWriteStream(zipPath, { flags: "wx" });
     const arc = archiver("zip", { zlib: { level: 6 } });
-    arc.on("data", (chunk: Buffer) => chunks.push(chunk));
+
+    const outputComplete = new Promise<void>((resolve, reject) => {
+      output.once("close", resolve);
+      output.once("error", reject);
+      arc.once("error", reject);
+    });
+
     arc.on("warning", (error: unknown) => {
       logger.warn("Export ZIP archiver warning", {
         module: "full-export",
@@ -82,27 +121,35 @@ export async function buildFullExportZip(
         error,
       });
     });
+    arc.pipe(output);
 
-    const zipPromise = new Promise<Buffer>((resolve, reject) => {
-      arc.on("end", () => resolve(Buffer.concat(chunks)));
-      arc.on("error", reject);
-    });
+    for (let index = 0; index < companies.length; index++) {
+      const company = companies[index];
+      let workbookPath: string | null = null;
 
-    for (const company of companies) {
       try {
-        log(`[${company.name}] Building workbook (streaming, one sheet at a time)...`, "info");
+        log(`[${company.name}] Building workbook (one company at a time)...`, "info");
 
-        const safeName = company.name.replace(/[^a-zA-Z0-9_\- ]/g, "").trim();
+        const safeName =
+          String(company.name || `Company_${company.id}`)
+            .replace(/[^a-zA-Z0-9_\- ]/g, "")
+            .trim() || `Company_${company.id}`;
         const entryName = `${safeName}_Export_${dateLabel}.xlsx`;
+        workbookPath = path.join(tempDir, `${String(index + 1).padStart(3, "0")}-${safeName}.xlsx`);
 
-        // Build the workbook and get a Buffer, then append the buffer
-        // directly to the archiver — no PassThrough stream needed.
-        const xlsBuf = await streamCompanyWorkbookDirect(company.id, fromDate, toDate);
-        arc.append(xlsBuf, { name: entryName });
+        let workbookBuffer = await streamCompanyWorkbookDirect(company.id, fromDate, toDate);
+        await fs.promises.writeFile(workbookPath, workbookBuffer);
+        // Drop the only application reference before Archiver reads the file.
+        workbookBuffer = Buffer.alloc(0);
+
+        await appendFileAndWait(arc, workbookPath, entryName);
+        await fs.promises.unlink(workbookPath).catch(() => {});
+        workbookPath = null;
 
         names.push(company.name);
-        log(`[${company.name}] workbook streamed into ZIP`, "success");
+        log(`[${company.name}] workbook written into ZIP and temporary file released`, "success");
       } catch (error: unknown) {
+        if (workbookPath) await fs.promises.unlink(workbookPath).catch(() => {});
         const message = error instanceof Error ? error.message : String(error);
         log(`[${company.name}] Failed: ${message}`, "error");
         logger.error("Company workbook export failed", {
@@ -118,20 +165,29 @@ export async function buildFullExportZip(
 
     if (names.length === 0) {
       arc.abort();
+      output.destroy();
       const message = `Export aborted — all ${companies.length} company/companies failed to generate workbooks. ZIP would be empty. Check server logs for per-company errors.`;
       log(message, "error");
       throw new Error(message);
     }
 
-    arc.finalize();
-    const zip = await zipPromise;
+    await arc.finalize();
+    await outputComplete;
+
+    const zipStats = await fs.promises.stat(zipPath);
+    const zip = createFileBackedExport(zipPath, tempDir, zipStats.size);
+    completedSuccessfully = true;
 
     log(
-      `ZIP ready — ${(zip.length / 1024 / 1024).toFixed(1)} MB (${names.length} companies, ${skipped.length} skipped)`,
+      `ZIP ready on disk — ${(zipStats.size / 1024 / 1024).toFixed(1)} MB (${names.length} companies, ${skipped.length} skipped)`,
       "success"
     );
     return { zip, names, skipped };
   } finally {
+    if (!completedSuccessfully && tempDir) {
+      await fs.promises.rm(tempDir, { recursive: true, force: true }).catch(() => {});
+    }
+
     if (lockClient) {
       if (distributedLockAcquired) {
         await lockClient
