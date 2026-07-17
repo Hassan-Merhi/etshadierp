@@ -80,6 +80,7 @@ export function useContainerFilters({
         if (docsFilter === "RECEIVED" && !c.docReceived) return false;
         if (delayedFilter === "YES" && !(c.daysDelayed && c.daysDelayed > 0)) return false;
         if (delayedFilter === "OVERDUE" && !c.isOverdue) return false;
+        if (delayedFilter === "NO" && (c.daysDelayed && c.daysDelayed > 0)) return false;
         if (freightFilter === "HAS_FREIGHT" && !(parseFloat(c.poFreight ?? "0") > 0)) return false;
         if (freightFilter === "NO_FREIGHT" && parseFloat(c.poFreight ?? "0") > 0) return false;
         if (etaFilter !== "ALL") {
