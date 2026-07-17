@@ -1769,6 +1769,8 @@ export function registerAuthRoutes(app: Express) {
       }
 
       req.session.currentCompanyId = companyId;
+      // Clear cached factory company so the middleware re-resolves it for the new ERP company
+      delete (req.session as any).factoryCompanyId;
       req.session.currentRole = userRole.role;
       req.session.currentLocationId = userRole.assignedLocationId;
       req.session.currentPOSStation = userRole.posStation;
