@@ -122,6 +122,28 @@ function waitForEvent(
   });
 }
 
+function delayWithAbort(delayMs: number, signal?: AbortSignal | null): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (signal?.aborted) {
+      reject(abortError());
+      return;
+    }
+
+    const cleanup = () => signal?.removeEventListener("abort", onAbort);
+    const timer = setTimeout(() => {
+      cleanup();
+      resolve();
+    }, delayMs);
+    const onAbort = () => {
+      clearTimeout(timer);
+      cleanup();
+      reject(abortError());
+    };
+
+    signal?.addEventListener("abort", onAbort, { once: true });
+  });
+}
+
 async function waitUntilVisible(signal?: AbortSignal | null): Promise<void> {
   while (document.visibilityState !== "visible") {
     await waitForEvent("visibilitychange", null, signal);
@@ -185,16 +207,7 @@ if (typeof window !== "undefined" && !(window as any)[installedKey]) {
     }
 
     await waitForThrottle(key, policy.minIntervalMs, signal);
-    await new Promise<void>((resolve, reject) => {
-      const timer = setTimeout(resolve, staggerDelay(key));
-      const onAbort = () => {
-        clearTimeout(timer);
-        reject(abortError());
-      };
-      if (signal?.aborted) onAbort();
-      else signal?.addEventListener("abort", onAbort, { once: true });
-    });
-
+    await delayWithAbort(staggerDelay(key), signal);
     lastStartedAt.set(key, Date.now());
 
     let resolveSnapshot!: (snapshot: ResponseSnapshot | null) => void;
