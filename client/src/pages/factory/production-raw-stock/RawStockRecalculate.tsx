@@ -1098,15 +1098,15 @@ export default function RawStockRecalculate() {
                             >
                               Yes
                             </Badge>
-                          ) : r.codes.includes("CORRECT") ? (
-                            <span className="text-xs text-muted-foreground">—</span>
-                          ) : (
+                          ) : r.codes.includes("MANUAL_REVIEW_REQUIRED") ? (
                             <Badge
                               variant="outline"
                               className="text-amber-600 border-amber-500/30 bg-amber-500/10"
                             >
                               Manual review
                             </Badge>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">—</span>
                           )}
                         </TableCell>
                       </TableRow>
