@@ -276,13 +276,21 @@ async function trackOneContainer(
   // ETA-only, on its own weekly cadence (JSONCARGO_REFRESH_HOURS). Never blocks or
   // replaces the status/location provider chain below.
   if (normalizeJsonCargoCarrier(currentRow?.trackingCarrierHint)) {
+    ep(containerId, "JSON Cargo ETA", "running");
     try {
       const jc = await refreshJsonCargoEta(containerId);
       if (jc.newEta) currentEta = jc.newEta;
-      if (jc.status !== "skipped_recent") {
+      if (jc.status === "skipped_recent") {
+        ep(containerId, "JSON Cargo ETA", "skip", jc.message);
+      } else if (jc.status === "updated" || jc.status === "unchanged") {
+        ep(containerId, "JSON Cargo ETA", "success", jc.message);
+        console.log(`[FactoryTracking] ${containerNumber}: jsoncargo → ${jc.status} (${jc.message})`);
+      } else {
+        ep(containerId, "JSON Cargo ETA", "fail", jc.message);
         console.log(`[FactoryTracking] ${containerNumber}: jsoncargo → ${jc.status} (${jc.message})`);
       }
     } catch (err: any) {
+      ep(containerId, "JSON Cargo ETA", "fail", err?.message ?? "Unexpected error");
       console.warn(`[FactoryTracking] ${containerNumber}: jsoncargo pre-check error —`, err?.message ?? err);
     }
   }
