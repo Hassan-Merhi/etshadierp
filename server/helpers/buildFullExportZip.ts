@@ -1,33 +1,16 @@
-import archiver from "archiver";
-import fs from "fs";
-import os from "os";
-import path from "path";
-import { streamCompanyWorkbookDirect } from "../services/exportExcelService";
 import { logger } from "../lib/logger";
-import { pool } from "../db";
-import { tryAcquireExclusiveTask } from "../lib/resourceGuard";
-import { createFileBackedExport } from "../lib/fileBackedExport";
+import { buildFullExportZipInProcess, type ExportZipResult } from "./buildFullExportZipInProcess";
+import { isFullExportWorkerAvailable, runFullExportWorker } from "../services/fullExportWorkerClient";
 
-export interface ExportZipResult {
-  /**
-   * Legacy-compatible handle. It exposes `.length`, but the ZIP bytes live on
-   * disk. Email, WhatsApp and export-job boundaries detect the file-backed
-   * descriptor and stream/read it safely.
-   */
-  zip: Buffer;
-  names: string[];
-  skipped: string[];
-}
+export type { ExportZipResult } from "./buildFullExportZipInProcess";
 
 /**
- * Builds the canonical full-company export ZIP without retaining the ZIP or all
- * company workbooks in Node memory.
+ * Public full-export entry point.
  *
- * Each company workbook is generated one at a time and written to a temporary
- * file. Archiver reads those files directly and streams the final ZIP to disk.
- * The temporary XLSX files are deleted immediately after ZIP finalization.
- * Legacy callers still receive an object typed as Buffer with a valid `.length`;
- * boundary services recognize it as a file-backed export.
+ * Production uses a memory-capped child process. If ExcelJS or a large company
+ * workbook exhausts the worker heap, the worker fails while the live Express
+ * process stays available. Development can fall back to in-process execution
+ * when the separate worker bundle has not been built yet.
  */
 export async function buildFullExportZip(
   companies: any[],
@@ -35,153 +18,29 @@ export async function buildFullExportZip(
   toDate?: string,
   onProgress?: (msg: string, level?: "info" | "success" | "warning" | "error") => void
 ): Promise<ExportZipResult> {
-  const releaseTask = tryAcquireExclusiveTask("full-export", `pid:${process.pid}`);
+  const forceInProcess =
+    process.env.ERP_EXPORT_WORKER === "1" || process.env.EXPORT_WORKER_DISABLED === "1";
 
-  if (!releaseTask) {
-    const message = "Another full export is already running. Wait for it to finish before starting a new one.";
-    onProgress?.(message, "warning");
-    const error = new Error(message);
-    (error as any).code = "EXPORT_ALREADY_RUNNING";
+  if (!forceInProcess && isFullExportWorkerAvailable()) {
+    onProgress?.("Starting isolated export worker...", "info");
+    return runFullExportWorker(companies, fromDate, toDate, onProgress);
+  }
+
+  if (!forceInProcess && process.env.NODE_ENV === "production") {
+    const error = new Error(
+      "The isolated export worker bundle is missing. Rebuild the server before running a full export."
+    );
+    (error as any).code = "EXPORT_WORKER_NOT_AVAILABLE";
     throw error;
   }
 
-  let lockClient: Awaited<ReturnType<typeof pool.connect>> | null = null;
-  let distributedLockAcquired = false;
-  let tempDir: string | null = null;
-  let completedSuccessfully = false;
-  const workbookPaths: string[] = [];
-  const exportLockKey = 742001317;
+  logger.warn("Full export running in-process because worker bundle is unavailable or disabled", {
+    module: "full-export",
+    action: "in-process-fallback",
+    nodeEnv: process.env.NODE_ENV,
+    workerAvailable: isFullExportWorkerAvailable(),
+    explicitlyDisabled: process.env.EXPORT_WORKER_DISABLED === "1",
+  });
 
-  try {
-    lockClient = await pool.connect();
-    const lockResult = await lockClient.query("SELECT pg_try_advisory_lock($1) AS locked", [exportLockKey]);
-    distributedLockAcquired = lockResult.rows[0]?.locked === true;
-
-    if (!distributedLockAcquired) {
-      const message = "Another full export is already running on a different server instance.";
-      onProgress?.(message, "warning");
-      const error = new Error(message);
-      (error as any).code = "EXPORT_ALREADY_RUNNING";
-      throw error;
-    }
-
-    const log =
-      onProgress ??
-      ((message: string, level: "info" | "success" | "warning" | "error" = "info") => {
-        const context = { module: "full-export", action: "build-zip" };
-        if (level === "error") logger.error(message, context);
-        else if (level === "warning") logger.warn(message, context);
-        else logger.info(message, context);
-      });
-
-    const dateLabel = new Date().toISOString().substring(0, 10);
-    const names: string[] = [];
-    const skipped: string[] = [];
-
-    tempDir = await fs.promises.mkdtemp(path.join(os.tmpdir(), "erp-export-"));
-    const zipPath = path.join(tempDir, `ERP_Full_Export_${dateLabel}.zip`);
-    const output = fs.createWriteStream(zipPath, { flags: "wx" });
-    const arc = archiver("zip", { zlib: { level: 6 } });
-
-    const outputComplete = new Promise<void>((resolve, reject) => {
-      output.once("close", resolve);
-      output.once("error", reject);
-      arc.once("error", reject);
-    });
-
-    arc.on("warning", (error: unknown) => {
-      logger.warn("Export ZIP archiver warning", {
-        module: "full-export",
-        action: "archive",
-        error,
-      });
-    });
-    arc.pipe(output);
-
-    for (let index = 0; index < companies.length; index++) {
-      const company = companies[index];
-      let workbookPath: string | null = null;
-
-      try {
-        log(`[${company.name}] Building workbook (one company at a time)...`, "info");
-
-        const safeName =
-          String(company.name || `Company_${company.id}`)
-            .replace(/[^a-zA-Z0-9_\- ]/g, "")
-            .trim() || `Company_${company.id}`;
-        const entryName = `${safeName}_Export_${dateLabel}.xlsx`;
-        workbookPath = path.join(tempDir, `${String(index + 1).padStart(3, "0")}-${safeName}.xlsx`);
-
-        let workbookBuffer = await streamCompanyWorkbookDirect(company.id, fromDate, toDate);
-        await fs.promises.writeFile(workbookPath, workbookBuffer);
-        workbookBuffer = Buffer.alloc(0);
-
-        // Keep the file until the archive has fully finalized. Deleting it earlier
-        // can race Archiver's lazy file read and produce corrupt or missing entries.
-        workbookPaths.push(workbookPath);
-        arc.file(workbookPath, { name: entryName });
-        workbookPath = null;
-
-        names.push(company.name);
-        log(`[${company.name}] workbook queued from disk`, "success");
-      } catch (error: unknown) {
-        if (workbookPath) await fs.promises.unlink(workbookPath).catch(() => {});
-        const message = error instanceof Error ? error.message : String(error);
-        log(`[${company.name}] Failed: ${message}`, "error");
-        logger.error("Company workbook export failed", {
-          module: "full-export",
-          action: "company-workbook",
-          companyId: company.id,
-          companyName: company.name,
-          error,
-        });
-        skipped.push(company.name);
-      }
-    }
-
-    if (names.length === 0) {
-      arc.abort();
-      output.destroy();
-      const message = `Export aborted — all ${companies.length} company/companies failed to generate workbooks. ZIP would be empty. Check server logs for per-company errors.`;
-      log(message, "error");
-      throw new Error(message);
-    }
-
-    await arc.finalize();
-    await outputComplete;
-
-    await Promise.all(workbookPaths.map((file) => fs.promises.unlink(file).catch(() => {})));
-    workbookPaths.length = 0;
-
-    const zipStats = await fs.promises.stat(zipPath);
-    const zip = createFileBackedExport(zipPath, tempDir, zipStats.size);
-    completedSuccessfully = true;
-
-    log(
-      `ZIP ready on disk — ${(zipStats.size / 1024 / 1024).toFixed(1)} MB (${names.length} companies, ${skipped.length} skipped)`,
-      "success"
-    );
-    return { zip, names, skipped };
-  } finally {
-    if (!completedSuccessfully) {
-      await Promise.all(workbookPaths.map((file) => fs.promises.unlink(file).catch(() => {})));
-      if (tempDir) await fs.promises.rm(tempDir, { recursive: true, force: true }).catch(() => {});
-    }
-
-    if (lockClient) {
-      if (distributedLockAcquired) {
-        await lockClient
-          .query("SELECT pg_advisory_unlock($1)", [exportLockKey])
-          .catch((error: unknown) =>
-            logger.warn("Failed to release full-export advisory lock", {
-              module: "full-export",
-              action: "release-lock",
-              error,
-            })
-          );
-      }
-      lockClient.release();
-    }
-    releaseTask();
-  }
+  return buildFullExportZipInProcess(companies, fromDate, toDate, onProgress);
 }
