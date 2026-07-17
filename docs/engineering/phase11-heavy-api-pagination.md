@@ -1,6 +1,6 @@
 # Phase 11 — Heavy API Pagination and Response-Size Reduction
 
-Status: **backend implementation complete; frontend adoption remains explicit** on `agent/memory-phase-1-stabilization`.
+Status: **backend implementation complete; stock-entry frontend adopted; daybook and V5 frontend adoption remain** on `agent/memory-phase-1-stabilization`.
 
 This phase adds database-side pagination to the known heavy list endpoints while preserving every legacy response for callers that do not request pagination.
 
@@ -37,7 +37,7 @@ The standard pagination headers are:
 - `X-Page-Size`
 - `X-Total-Pages`
 
-Default page size is 100 and the hard maximum is 250.
+Default server page size is 100 and the hard maximum is 250.
 
 ## Protected endpoints
 
@@ -64,6 +64,25 @@ The original daybook handler remains unchanged and receives requests that do not
 
 The same date, worker, product, location, status, reference search, deleted-bale visibility, and unassigned-worker rules are retained.
 
+#### Frontend adoption
+
+`client/src/lib/heavyListPaginationClient.ts` now pages only the condensed `lite=1` screen request:
+
+- default 50 grouped rows per page;
+- selectable 25, 50, or 100 rows;
+- visible Previous and Next controls;
+- current range, total group count, and page count;
+- page resets when the filter URL changes;
+- detailed mode hides the controls and remains unpaged;
+- deleting the final row on a page moves the screen to the final valid page;
+- the existing page still receives a legacy array, so its grouping and lazy-expansion code is unchanged.
+
+The controls explicitly state that the totals shown on the screen are page totals.
+
+Detailed view, per-group bale expansion, print output, worker PDF, WhatsApp PDF, and complete export requests omit `lite=1` and are not paged.
+
+`build/viteHeavyListPaginationPlugin.ts` applies an exact, fail-loud source transform so Stock Entry History Excel exports build the Summary sheet from the complete filtered groups returned by `fetchGroupsWithBales()`, not only the visible page. The Bale Details and Worker Matrix sheets already used that full dataset.
+
 ### V5 stock allocation
 
 `server/routes/factory/factoryStockAllocationV5PaginationRoutes.ts` replaces the previous in-memory `filtered.slice(...)` path for paginated requests.
@@ -77,7 +96,7 @@ It now:
 5. Selects one article-code page.
 6. Loads proforma and container details only for those page article codes.
 
-Unpaged calls still use the original route, preserving full-list exports and focused-proforma navigation until the frontend receives explicit pagination controls.
+Unpaged calls still use the original route, preserving full-list exports and focused-proforma navigation until the V5 screen receives explicit pagination controls and full-filter export handling.
 
 ### Existing native pagination retained
 
@@ -107,6 +126,7 @@ Available scripts:
 npm run audit:heavy-apis
 node scripts/verify-phase11-api-pagination.mjs
 node scripts/verify-phase11-native-pagination.mjs
+node scripts/verify-phase11-frontend-pagination.mjs
 ```
 
 They check:
@@ -116,20 +136,25 @@ They check:
 - registration order;
 - legacy fallback behavior;
 - pagination response compatibility;
-- route-specific business-rule markers.
+- route-specific business-rule markers;
+- stock-entry lite-only paging;
+- visible page controls and detailed-mode isolation;
+- full-data Stock Entry History Excel summary generation;
+- fail-loud source-transform drift guards.
 
 These scripts and CI were intentionally not executed while editing the isolated branch.
 
-## Frontend adoption boundary
+## Remaining frontend adoption boundary
 
-The current daybook and V5 allocation screens perform whole-list client filtering, grouping, deep-link discovery, and exports. Automatically forcing those screens onto page 1 would hide records and produce incomplete exports.
+The current daybook and V5 allocation screens perform whole-list client filtering, grouping, deep-link discovery, editing workflows, and exports. Automatically forcing those screens onto page 1 would hide records or produce incomplete exports.
 
-Therefore Phase 11 does not silently change those callers. Their UI migration must include:
+Their UI migration still needs:
 
 - visible page controls;
 - page reset when filters change;
 - server-side search and amount/status filters;
-- dedicated full-filter export requests;
-- focused-record lookup when a deep-linked record is not on the current page.
+- dedicated complete-filter export requests;
+- focused-record lookup when a deep-linked record is not on the current page;
+- V5 drawer/edit actions that can retrieve articles outside the visible page.
 
 This boundary is intentional and prevents a bandwidth optimization from changing business-visible results.
