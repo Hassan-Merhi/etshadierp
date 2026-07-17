@@ -18,6 +18,12 @@ import {
   startResourceGuard,
   tryAcquireHeavyRequestSlot,
 } from "../lib/resourceGuard";
+import {
+  getHeavyReadCache,
+  getHeavyReadCacheSnapshot,
+  invalidateHeavyReadCache,
+  storeHeavyReadCache,
+} from "../lib/heavyReadCache";
 
 const SLOW_REQUEST_MS = Number(process.env.SLOW_REQUEST_MS || 500);
 const SUCCESS_SAMPLE_RATE = Math.min(1, Math.max(0, Number(process.env.REQUEST_LOG_SAMPLE_RATE || 0)));
@@ -34,6 +40,8 @@ interface RequestMetrics {
   serverError: number;
   slow: number;
   rejectedByResourceGuard: number;
+  cacheHits: number;
+  cacheMisses: number;
   durationTotalMs: number;
   durationMaxMs: number;
   responseBytesTotal: number;
@@ -49,6 +57,8 @@ const metrics: RequestMetrics = {
   serverError: 0,
   slow: 0,
   rejectedByResourceGuard: 0,
+  cacheHits: 0,
+  cacheMisses: 0,
   durationTotalMs: 0,
   durationMaxMs: 0,
   responseBytesTotal: 0,
@@ -95,6 +105,10 @@ function isMonitoringRole(req: Request): boolean {
   return role === "admin" || role === "developer";
 }
 
+function isReadMethod(method: string): boolean {
+  return method === "GET" || method === "HEAD" || method === "OPTIONS";
+}
+
 export function getRequestMetricsSnapshot() {
   const poolMax = Number((pool as any).options?.max || 0);
   const poolTotal = Number((pool as any).totalCount || 0);
@@ -135,6 +149,8 @@ export function getRequestMetricsSnapshot() {
       serverError: metrics.serverError,
       slow: metrics.slow,
       rejectedByResourceGuard: metrics.rejectedByResourceGuard,
+      cacheHits: metrics.cacheHits,
+      cacheMisses: metrics.cacheMisses,
       averageDurationMs: completed > 0 ? Math.round(metrics.durationTotalMs / completed) : 0,
       maxDurationMs: metrics.durationMaxMs,
       averageResponseBytes: completed > 0 ? Math.round(metrics.responseBytesTotal / completed) : 0,
@@ -153,6 +169,7 @@ export function getRequestMetricsSnapshot() {
       utilizationPercent: poolMax > 0 ? Math.round(((poolTotal - poolIdle) / poolMax) * 100) : null,
     },
     resourceGuard,
+    heavyReadCache: getHeavyReadCacheSnapshot(),
     operationalEvents: getOperationalEventSnapshot(),
   };
 }
@@ -193,10 +210,6 @@ export function requestLogger(req: Request, res: Response, next: NextFunction): 
     metrics.total += 1;
     metrics.active += 1;
     beginTrackedApiRequest();
-
-    const acquisition = tryAcquireHeavyRequestSlot(req);
-    releaseHeavySlot = acquisition.slot?.release;
-    installJsonResponseLimit(req, res, acquisition.slot?.policy);
 
     const finalize = () => {
       if (finalized) return;
@@ -259,12 +272,51 @@ export function requestLogger(req: Request, res: Response, next: NextFunction): 
         status: statusCode,
         durationMs,
         responseBytes,
+        cache: res.getHeader("X-ERP-Cache") || undefined,
         slow: isSlow,
       });
     };
 
     res.once("finish", finalize);
     res.once("close", finalize);
+
+    if (!isReadMethod(req.method)) {
+      // Any successful-looking mutation can affect one or more summary endpoints.
+      // Invalidate before route execution so even a very fast follow-up GET cannot
+      // observe an older cached snapshot. The cache is small and company-scoped.
+      invalidateHeavyReadCache(req);
+    }
+
+    const cacheHit = getHeavyReadCache(req);
+    if (cacheHit) {
+      metrics.cacheHits += 1;
+      installJsonResponseLimit(req, res);
+      res.setHeader("X-ERP-Cache", "HIT");
+      res.setHeader("Age", String(Math.max(0, Math.floor(cacheHit.ageMs / 1000))));
+      res.status(200).json(cacheHit.body);
+      return;
+    }
+
+    const acquisition = tryAcquireHeavyRequestSlot(req);
+    releaseHeavySlot = acquisition.slot?.release;
+    installJsonResponseLimit(req, res, acquisition.slot?.policy);
+
+    const cacheAwareJson = res.json.bind(res);
+    (res as any).json = (body: unknown) => {
+      if (res.statusCode < 400) {
+        try {
+          const serialized = JSON.stringify(body);
+          if (serialized !== undefined) {
+            const bytes = Buffer.byteLength(serialized);
+            storeHeavyReadCache(req, body, bytes);
+            if (bytes > 0) metrics.cacheMisses += 1;
+          }
+        } catch {
+          // The normal response serializer remains authoritative.
+        }
+      }
+      return cacheAwareJson(body);
+    };
 
     if (acquisition.rejection) {
       metrics.rejectedByResourceGuard += 1;
@@ -288,6 +340,8 @@ export function requestLogger(req: Request, res: Response, next: NextFunction): 
       });
       return;
     }
+
+    res.setHeader("X-ERP-Cache", "MISS");
   }
 
   next();
