@@ -1,6 +1,7 @@
 import { createRoot } from "react-dom/client";
 import App from "./App";
 import "./index.css";
+import "./lib/backgroundRequestGuard";
 
 // Clear stale chunk-retry/reload counters from sessionStorage on every fresh page load.
 // These keys are written before a hard-reload attempt; if a reload succeeds the keys are
