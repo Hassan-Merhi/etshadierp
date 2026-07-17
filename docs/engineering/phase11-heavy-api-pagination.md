@@ -1,8 +1,8 @@
 # Phase 11 — Heavy API Pagination and Response-Size Reduction
 
-Status: **backend implementation complete; stock-entry frontend adopted; daybook and V5 frontend adoption remain** on `agent/memory-phase-1-stabilization`.
+Status: **implementation complete; runtime validation not executed** on `agent/memory-phase-1-stabilization`.
 
-This phase adds database-side pagination to the known heavy list endpoints while preserving every legacy response for callers that do not request pagination.
+This phase adds database-side pagination to the known heavy list endpoints and adopts it on the three heavy factory screens without allowing pagination to shorten exports, drawers, detailed views, or deep-linked workflows.
 
 ## Pagination contract
 
@@ -28,7 +28,7 @@ The standard response contract is:
 }
 ```
 
-Endpoints whose existing business response uses another top-level key retain that key. V5 stock allocation therefore returns `rows`, `totals`, and `productNames` plus pagination metadata.
+Endpoints whose business response uses another top-level key retain that key. V5 stock allocation returns `rows`, `totals`, and `productNames` plus pagination metadata.
 
 The standard pagination headers are:
 
@@ -39,11 +39,9 @@ The standard pagination headers are:
 
 Default server page size is 100 and the hard maximum is 250.
 
-## Protected endpoints
+## Factory Daybook
 
-### Factory daybook
-
-`server/routes/factory/factoryDaybookPaginationRoutes.ts` performs in SQL:
+`server/routes/factory/factoryDaybookPaginationRoutes.ts` performs in PostgreSQL:
 
 - real daybook filtering;
 - live voucher replacement;
@@ -54,51 +52,86 @@ Default server page size is 100 and the hard maximum is 250.
 - singleton-event deduplication;
 - total count, ordering, limit, and offset.
 
-Only the returned page is passed through bale-production-price enrichment.
+Only the returned page receives bale-production-price enrichment.
 
-The original daybook handler remains unchanged and receives requests that do not ask for pagination.
+### Frontend adoption
 
-### Stock-entry history
+`client/src/lib/daybookPaginationClient.ts` pages the normal `/factory/daybook` and `/properties/daybook` screen requests:
 
-`server/routes/factory/factoryStockEntryHistoryPaginationRoutes.ts` preserves the existing lite/full grouped query behavior and adds grouped-result counting, limit, and offset in PostgreSQL.
+- default 100 transactions per page;
+- selectable 50, 100, or 250 transactions;
+- visible Previous and Next controls;
+- page reset when any server filter changes;
+- automatic correction when deletion removes the final row on the current page;
+- legacy array response preserved for `FactoryDaybook.tsx`;
+- page controls explicitly state that table grouping and displayed totals are page-scoped.
 
-The same date, worker, product, location, status, reference search, deleted-bale visibility, and unassigned-worker rules are retained.
+The Vite transform moves the existing search, optional-status, minimum amount, maximum amount, and sort direction into the server request. The component's existing client filtering remains as a safety check.
 
-#### Frontend adoption
+Entry and voucher deep links deliberately bypass paging so the existing full-list lookup and automatic detail opening continue to work.
 
-`client/src/lib/heavyListPaginationClient.ts` now pages only the condensed `lite=1` screen request:
+Both Daybook Excel modes use `fetchAllDaybookEntries()` to request every filtered server page. Summary and detailed exports therefore remain complete and continue excluding `WORKER_EDITED` audit rows.
+
+## Stock-entry history
+
+`server/routes/factory/factoryStockEntryHistoryPaginationRoutes.ts` preserves the existing lite/full grouped queries and adds grouped-result counting, limit, and offset in PostgreSQL.
+
+The same date, worker, product, location, status, reference search, deleted-bale visibility, and unassigned-worker rules remain.
+
+### Frontend adoption
+
+`client/src/lib/heavyListPaginationClient.ts` pages only the condensed `lite=1` request:
 
 - default 50 grouped rows per page;
 - selectable 25, 50, or 100 rows;
 - visible Previous and Next controls;
-- current range, total group count, and page count;
-- page resets when the filter URL changes;
-- detailed mode hides the controls and remains unpaged;
-- deleting the final row on a page moves the screen to the final valid page;
-- the existing page still receives a legacy array, so its grouping and lazy-expansion code is unchanged.
+- page reset when filters change;
+- detailed mode remains unpaged;
+- legacy array response preserved;
+- controls explicitly disclose that screen totals are page totals.
 
-The controls explicitly state that the totals shown on the screen are page totals.
+Per-group bale expansion, detailed mode, print output, Worker PDF, WhatsApp PDF, and complete export requests omit `lite=1` and remain unpaged.
 
-Detailed view, per-group bale expansion, print output, worker PDF, WhatsApp PDF, and complete export requests omit `lite=1` and are not paged.
+`build/viteHeavyListPaginationPlugin.ts` changes the Stock Entry History Excel Summary sheet to use the complete filtered groups returned by `fetchGroupsWithBales()`. Bale Details and Worker Matrix already use the same complete dataset.
 
-`build/viteHeavyListPaginationPlugin.ts` applies an exact, fail-loud source transform so Stock Entry History Excel exports build the Summary sheet from the complete filtered groups returned by `fetchGroupsWithBales()`, not only the visible page. The Bale Details and Worker Matrix sheets already used that full dataset.
+## V5 stock allocation
 
-### V5 stock allocation
-
-`server/routes/factory/factoryStockAllocationV5PaginationRoutes.ts` replaces the previous in-memory `filtered.slice(...)` path for paginated requests.
+`server/routes/factory/factoryStockAllocationV5PaginationRoutes.ts` replaces the previous paginated path that built the complete model and then called `slice()`.
 
 It now:
 
 1. Runs the existing idempotent expected-line backfill.
-2. Aggregates available stock, loading counts, expected quantities, shortages, weights, product names, and excluded-product flags in SQL.
-3. Applies product, customer, proforma, container, status, search, and hide-zero filters before pagination.
+2. Aggregates stock, loaded quantities, expected quantities, shortages, weights, names, and excluded-product flags in SQL.
+3. Applies product, customer, proforma, container, status, search, and hide-zero filters before paging.
 4. Computes totals over the complete filtered set.
 5. Selects one article-code page.
-6. Loads proforma and container details only for those page article codes.
+6. Loads proforma and container details only for the selected article codes.
 
-Unpaged calls still use the original route, preserving full-list exports and focused-proforma navigation until the V5 screen receives explicit pagination controls and full-filter export handling.
+### Frontend adoption
 
-### Existing native pagination retained
+`client/src/lib/v5AllocationPaginationClient.ts` pages normal table browsing:
+
+- default 50 products per page;
+- selectable 25, 50, or 100 products;
+- visible Previous and Next controls;
+- page reset when hide-zero or search filters change;
+- full filtered totals retained from the backend;
+- page state reset when leaving the route.
+
+The existing Negative Only switch deliberately changes the screen back to the complete legacy response while active, preserving its original global behavior. Focused-proforma and `openEdit=true` links also bypass paging so deep-link discovery remains complete.
+
+The garbage/wiper visibility switch remains page-scoped during normal paged browsing, and the pagination control states this explicitly. Excel applies that switch across the complete filtered result.
+
+`fetchAllV5AllocationData()` retrieves all server pages only for explicit business actions:
+
+- Create Proforma drawer;
+- Edit Proforma drawer;
+- Edit Draft Quantities;
+- Excel export.
+
+Drawers receive the complete unfiltered article catalog, not merely the visible page. Large temporary row references are cleared when create/edit/draft dialogs close or save.
+
+## Existing native pagination retained
 
 The following endpoints already had database count/limit/offset support and remain unchanged:
 
@@ -108,15 +141,15 @@ The following endpoints already had database count/limit/offset support and rema
 
 ## Compatibility bridge
 
-`server/apiPaginationBridge.mjs` provides a backward-compatible response pagination fallback for known heavy array routes. It only activates when pagination is explicitly requested and never re-wraps an endpoint that already returned an object.
+`server/apiPaginationBridge.mjs` provides an opt-in fallback for known heavy array routes. It never changes unpaged requests and never re-wraps routes that already return a paginated object.
 
-Native route pagination is preferred because it reduces database work as well as response size.
+Native route pagination remains preferred because it reduces database work as well as response size.
 
-## Registration order
+## Registration and source-transform safety
 
-The new factory pagination handlers are registered before the legacy factory modules in `server/routes/factoryRoutes.ts`.
+The new factory pagination handlers are registered before legacy factory modules in `server/routes/factoryRoutes.ts`. Each calls `next()` when pagination is not requested.
 
-Each new handler calls `next()` when pagination is not requested. This preserves legacy behavior without duplicating or deleting the original handlers.
+`build/viteHeavyListPaginationPlugin.ts` applies exact transforms to the large existing frontend files instead of replacing their full source through the GitHub connector. Every transform fails loudly when its source marker is missing or ambiguous.
 
 ## Audit and verification
 
@@ -127,34 +160,20 @@ npm run audit:heavy-apis
 node scripts/verify-phase11-api-pagination.mjs
 node scripts/verify-phase11-native-pagination.mjs
 node scripts/verify-phase11-frontend-pagination.mjs
+node scripts/verify-phase11-v5-frontend-pagination.mjs
+node scripts/verify-phase11-daybook-frontend-pagination.mjs
 ```
 
-They check:
+They cover:
 
 - known-heavy route coverage;
-- native database count/limit/offset presence;
-- registration order;
-- legacy fallback behavior;
+- native count/limit/offset behavior;
+- registration order and legacy fallback;
 - pagination response compatibility;
-- route-specific business-rule markers;
-- stock-entry lite-only paging;
-- visible page controls and detailed-mode isolation;
-- full-data Stock Entry History Excel summary generation;
-- fail-loud source-transform drift guards.
+- Stock Entry History mode and export isolation;
+- V5 full-data drawer, edit, export, and deep-link behavior;
+- Daybook server filters, deep-link behavior, and complete exports;
+- route-state reset and page correction;
+- fail-loud transform drift checks.
 
-These scripts and CI were intentionally not executed while editing the isolated branch.
-
-## Remaining frontend adoption boundary
-
-The current daybook and V5 allocation screens perform whole-list client filtering, grouping, deep-link discovery, editing workflows, and exports. Automatically forcing those screens onto page 1 would hide records or produce incomplete exports.
-
-Their UI migration still needs:
-
-- visible page controls;
-- page reset when filters change;
-- server-side search and amount/status filters;
-- dedicated complete-filter export requests;
-- focused-record lookup when a deep-linked record is not on the current page;
-- V5 drawer/edit actions that can retrieve articles outside the visible page.
-
-This boundary is intentional and prevents a bandwidth optimization from changing business-visible results.
+These scripts, typecheck, build, tests, and CI were intentionally not executed while editing the isolated branch.
