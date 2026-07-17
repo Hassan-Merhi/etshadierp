@@ -29,6 +29,9 @@ assert.match(client, /table groups and totals are this page/, "page-scoped total
 assert.match(client, /handleRouteState/, "route changes must clear transient paging state");
 
 assert.match(plugin, /FACTORY_DAYBOOK_SUFFIX/, "Vite plugin must target FactoryDaybook.tsx");
+assert.match(plugin, /queryParams\.set\("startDate", startDate\)/, "startDate must always be present");
+assert.match(plugin, /queryParams\.set\("endDate", endDate\)/, "endDate must always be present");
+assert.match(plugin, /All Time/, "empty dates must preserve All Time instead of backend today defaults");
 assert.match(plugin, /optionalStatus/, "optional-status filtering must be sent to the server");
 assert.match(plugin, /debouncedSearchQuery\.trim\(\)/, "debounced search must be sent to the server");
 assert.match(plugin, /queryParams\.set\("minAmount"/, "minimum amount must be sent to the server");
@@ -43,6 +46,8 @@ assert.match(plugin, /Ambiguous transform target/, "ambiguous replacements must 
 
 const exactMarkers = [
   'import { queryClient } from "@/lib/queryClient";',
+  'if (startDate) queryParams.set("startDate", startDate);',
+  'if (endDate) queryParams.set("endDate", endDate);',
   'queryKey: ["/api/factory/daybook", startDate, endDate, txTypeFilter, currencyFilter],',
   'const handleExportToExcel = async () => {',
   'const handleExportDetailedToExcel = async () => {',
@@ -61,6 +66,7 @@ console.log(
       checks: [
         "Daybook startup wiring",
         "100-row screen pagination",
+        "All Time empty-date preservation",
         "legacy array compatibility",
         "visible page controls",
         "server-side search/status/amount/sort filters",
