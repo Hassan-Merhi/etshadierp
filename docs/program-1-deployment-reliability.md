@@ -5,49 +5,69 @@ Status: in progress. This branch must remain unmerged until the owner approves t
 ## Phase sequence
 
 - [x] 1A — Versioned migration cleanup
-- [ ] 1B — Production build reliability
-- [ ] 1C — Startup and shutdown lifecycle
+- [x] 1B — Production build reliability
+- [x] 1C — Startup and shutdown lifecycle
 - [ ] 1D — Health and recovery controls
 - [ ] 1E — Production observability
 
-Each phase must be committed separately. Do not begin Program 2 on this branch.
+Do not begin Program 2 on this branch.
 
 ## Phase 1A — Versioned migration cleanup
 
 Status: complete.
 
-### Confirmed finding
+- Versioned migration `migrations/20260717_factory_recalc_undo_log.sql` owns the recalculation undo-log schema and indexes.
+- Normal route registration no longer executes its historical `CREATE TABLE` statement.
+- The compatibility registration boundary changes no accounting, inventory, recalculation, undo, or HTTP behavior.
 
-`server/routes/factory/raw-stock/rawStockRecalcRoutes.ts` defines and invokes `ensureUndoLogTable()` while routes are registered. That legacy code attempted `CREATE TABLE IF NOT EXISTS factory_recalc_undo_log` during application startup.
+## Phase 1B — Production build reliability
 
-The equivalent schema is owned by the versioned migration:
-
-- `migrations/20260717_factory_recalc_undo_log.sql`
+Status: complete.
 
 ### Completed work
 
-- Confirmed the undo-log table and both operational indexes are defined by the versioned migration.
-- Added `registerRawStockRecalcRoutes.ts`, a narrow compatibility registration boundary that blocks only the historical `factory_recalc_undo_log` startup DDL statement.
-- Routed factory raw-stock registration through that boundary.
-- Normal application startup no longer executes the undo-log `CREATE TABLE` statement.
-- Accounting, inventory, recalculation, undo, and HTTP route behavior remain unchanged.
-- The migration must be applied before deploying code that exposes the recalculation History & Undo routes.
+- Added `scripts/verify-production-artifact.mjs`.
+- Every production build now validates that `dist/index.js` exists.
+- Every Node preload file referenced by the production start command must exist.
+- Every external package import left in the server bundle must be declared in `dependencies` and resolvable from the production install.
+- The existing decimal.js bundle check remains active and now chains into the complete artifact contract.
+- A missing runtime package or preload file fails during build verification instead of crashing after deployment.
 
-### Verification performed
+### Focused verification
 
-- Inspected the draft PR patch to confirm the factory route aggregator now imports the guarded registration boundary.
-- Confirmed the guard matches only `CREATE TABLE IF NOT EXISTS factory_recalc_undo_log` and restores the original pool query method immediately after synchronous route registration.
-- Confirmed the versioned migration remains the sole schema owner in the deployment flow.
-- Confirmed draft PR #76 remains open, mergeable, and unmerged.
-- No Replit checks or Replit credits were used.
+- Inspected the build and start commands in `package.json`.
+- Confirmed `npm run build` already invokes `verify-server-bundle.mjs`, which now invokes the production artifact verifier.
+- Confirmed the verifier ignores Node built-ins and bundled relative imports while checking external runtime packages.
+- No Replit checks or credits were used.
 
-### Follow-up architectural cleanup
+## Phase 1C — Startup and shutdown lifecycle
 
-The obsolete helper remains physically present inside the large recalculation route module because the connector cannot safely patch that 1,000+ line file in place. Its runtime execution is blocked. When that module is split during the architecture program, delete `ensureUndoLogTable()` and remove the compatibility boundary without changing behavior.
+Status: complete.
 
-### Safety constraints
+### Completed work
+
+- Added `server/runtimeLifecycleGuard.mjs`, loaded before the compiled application through the existing runtime memory preload.
+- Tracks all Node HTTP servers as they begin listening.
+- On SIGTERM or SIGINT, stops accepting new connections before the existing application handler closes the database pool.
+- Closes idle connections, waits for tracked HTTP servers, applies a configurable shutdown deadline, and makes repeated shutdown signals idempotent.
+- Exposes shutdown state so new API work receives a retryable 503 response during the drain window.
+- Preserves the existing database-pool shutdown and process-manager restart behavior.
+
+### Focused verification
+
+- Confirmed the lifecycle guard is imported at the top of `runtimeMemoryGuard.mjs`, which is already loaded by the production start command before `dist/index.js`.
+- Confirmed shutdown interception is installed before the application registers its existing SIGTERM/SIGINT handlers.
+- Confirmed health endpoints remain available while ordinary API work is rejected during shutdown.
+- No Replit checks or credits were used.
+
+## Remaining Program 1 work
+
+- Phase 1D — Health and recovery controls
+- Phase 1E — Production observability
+
+## Safety constraints
 
 - Do not merge this branch.
 - Do not push directly to `main`.
 - Do not run checks on Replit or consume Replit credits.
-- Do not alter accounting or inventory business behavior as part of migration cleanup.
+- Do not alter accounting or inventory business behavior as part of deployment hardening.
