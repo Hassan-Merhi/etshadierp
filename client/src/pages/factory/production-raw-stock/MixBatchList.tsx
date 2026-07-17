@@ -22,6 +22,9 @@ interface MixBatchRow {
   batchDate: string | null;
   carryForwardFromId: number | null;
   createdAt: string;
+  displayTotalWeightKg?: string;
+  displayTotalCost?: string;
+  displayCostPerKg?: string;
 }
 
 interface MixBatchListProps {
@@ -160,8 +163,8 @@ export function MixBatchList({
               <div style={{ display: "flex", gap: "16px", marginBottom: "14px" }}>
                 {[
                   { label: "Total Weight", value: formatNumber(batch.totalWeightKg) + " kg" },
-                  { label: "Total Cost", value: "$" + formatNumber(batch.totalCost) },
-                  { label: "Cost/kg", value: "$" + (parseFloat(batch.costPerKg) || 0).toFixed(2) },
+                  { label: "Total Cost", value: "$" + formatNumber(batch.displayTotalCost ?? batch.totalCost) },
+                  { label: "Cost/kg", value: "$" + (parseFloat(batch.displayCostPerKg ?? batch.costPerKg) || 0).toFixed(2) },
                 ].map((stat) => (
                   <div
                     key={stat.label}
@@ -282,7 +285,7 @@ export function MixBatchList({
                       </TableCell>
                       <TableCell className="text-right font-mono text-sm">{formatNumber(total)}</TableCell>
                       <TableCell className="text-right font-mono text-sm">
-                        ${parseFloat(batch.costPerKg || "0").toFixed(4)}/kg
+                        ${parseFloat(batch.displayCostPerKg ?? batch.costPerKg ?? "0").toFixed(4)}/kg
                       </TableCell>
                       <TableCell onClick={(e) => e.stopPropagation()}>
                         <div className="flex items-center gap-1">

@@ -117,7 +117,8 @@ import multer from "multer";
 import path from "path";
 import fs from "fs";
 import { getStableSupplierCost } from "../../services/factory/rawStockStableCost";
-import { getLockedSupplierRate } from "../../services/factory/rawStockLockedRate";
+import { getLockedSupplierRate, getLockedSupplierRateReadOnly } from "../../services/factory/rawStockLockedRate";
+import Decimal from "decimal.js";
 
 export function registerFactoryMixBatchRoutes(app: Express) {
   app.get("/api/factory/mix-batches", requireAuth, async (req: any, res: any) => {
@@ -131,10 +132,77 @@ export function registerFactoryMixBatchRoutes(app: Express) {
         .where(and(eq(factoryMixBatches.companyId, companyId), isNull(factoryMixBatches.deletedAt)))
         .orderBy(desc(factoryMixBatches.createdAt));
 
+      // ── Display-blend calculation (read-only, no DB writes) ──
+      const batchIds = results.map((b: any) => b.id);
+      let sourceRows: any[] = [];
+      if (batchIds.length > 0) {
+        sourceRows = await db
+          .select()
+          .from(factoryMixBatchSources)
+          .where(inArray(factoryMixBatchSources.mixBatchId, batchIds));
+      }
+
+      // Collect unique supplier IDs referenced by any source row
+      const uniqueSupplierIds = [
+        ...new Set(sourceRows.filter((s: any) => s.supplierId != null).map((s: any) => s.supplierId as number)),
+      ];
+
+      // Load current locked USD raw-material rate for each supplier (read-only)
+      const supplierRateMap = new Map<number, number>();
+      for (const supplierId of uniqueSupplierIds) {
+        const { rate } = await getLockedSupplierRateReadOnly(db, companyId, supplierId);
+        supplierRateMap.set(supplierId, rate);
+      }
+
+      // Group source rows by mixBatchId
+      const sourcesByBatch = new Map<number, any[]>();
+      for (const src of sourceRows) {
+        if (!sourcesByBatch.has(src.mixBatchId)) sourcesByBatch.set(src.mixBatchId, []);
+        sourcesByBatch.get(src.mixBatchId)!.push(src);
+      }
+
       const enriched = results.map((b: any) => {
         const total = parseFloat(b.totalWeightKg) || 0;
         const used = parseFloat(b.usedKg) || 0;
-        return { ...b, remainingKg: (total - used).toFixed(3) };
+
+        // Compute display totals using the same source rules as EditMixBatchDialog:
+        //   A. sourceBatchId exists → use source row's stored costPerKg
+        //   B. supplierId exists (incl. FIFO rows with containerId+supplierId) → current locked rate
+        //   C. neither → fall back to source row's stored costPerKg
+        const sources = sourcesByBatch.get(b.id) || [];
+        let displayTotalWeightKg = new Decimal(0);
+        let displayTotalCost = new Decimal(0);
+        for (const src of sources) {
+          const w = new Decimal(src.weightKg || 0);
+          let effectiveCostPerKg: Decimal;
+          if (src.sourceBatchId != null) {
+            effectiveCostPerKg = new Decimal(src.costPerKg || 0);
+          } else if (src.supplierId != null) {
+            effectiveCostPerKg = new Decimal(supplierRateMap.get(src.supplierId) || 0);
+          } else {
+            effectiveCostPerKg = new Decimal(src.costPerKg || 0);
+          }
+          displayTotalWeightKg = displayTotalWeightKg.plus(w);
+          displayTotalCost = displayTotalCost.plus(w.times(effectiveCostPerKg));
+        }
+
+        let displayCostPerKg: Decimal;
+        if (displayTotalWeightKg.gt(0)) {
+          displayCostPerKg = displayTotalCost.dividedBy(displayTotalWeightKg);
+        } else {
+          // No source rows → fall back to stored batch values
+          displayTotalWeightKg = new Decimal(b.totalWeightKg || 0);
+          displayTotalCost = new Decimal(b.totalCost || 0);
+          displayCostPerKg = new Decimal(b.costPerKg || 0);
+        }
+
+        return {
+          ...b,
+          remainingKg: (total - used).toFixed(3),
+          displayTotalWeightKg: displayTotalWeightKg.toFixed(3),
+          displayTotalCost: displayTotalCost.toFixed(6),
+          displayCostPerKg: displayCostPerKg.toFixed(6),
+        };
       });
 
       res.json(enriched);
