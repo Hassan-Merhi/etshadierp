@@ -34,7 +34,13 @@ const INDEX_STATEMENTS = [
 ] as const;
 
 export function installPerformanceIndexes(pool: Pool): void {
-  if (installationStarted || process.env.SKIP_PERFORMANCE_INDEX_INSTALL === "1") return;
+  if (
+    installationStarted ||
+    process.env.SKIP_PERFORMANCE_INDEX_INSTALL === "1" ||
+    process.env.ERP_EXPORT_WORKER === "1"
+  ) {
+    return;
+  }
   installationStarted = true;
 
   const startDelayMs = Math.max(0, Number(process.env.PERFORMANCE_INDEX_START_DELAY_MS || 60_000));
