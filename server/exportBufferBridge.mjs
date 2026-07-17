@@ -1,5 +1,4 @@
 import { AsyncLocalStorage } from "node:async_hooks";
-import { once } from "node:events";
 import { createReadStream, createWriteStream } from "node:fs";
 import { mkdir, readdir, stat, unlink } from "node:fs/promises";
 import { Server } from "node:http";
@@ -129,6 +128,22 @@ if (!globalThis[BRIDGE_FLAG]) {
     );
   }
 
+  function applicationOwnsConcatCall() {
+    const stackLines = String(new Error().stack || "")
+      .split("\n")
+      .slice(2);
+    const caller = stackLines.find(
+      (line) => !line.includes("exportBufferBridge.mjs") && !line.includes("node:internal")
+    );
+    if (!caller || caller.includes("node_modules")) return false;
+    return (
+      caller.includes("/server/") ||
+      caller.includes("\\server\\") ||
+      caller.includes("/dist/index.js") ||
+      caller.includes("\\dist\\index.js")
+    );
+  }
+
   function createMarker(payload) {
     const marker = Buffer.alloc(0);
     Object.defineProperty(marker, EXPORT_MARKER_KEY, {
@@ -189,8 +204,7 @@ if (!globalThis[BRIDGE_FLAG]) {
 
     const rawWrite = res.write;
     const rawEnd = res.end;
-    const state = { rawWrite, rawEnd };
-    Object.defineProperty(res, RESPONSE_STATE_KEY, { value: state });
+    Object.defineProperty(res, RESPONSE_STATE_KEY, { value: { rawWrite, rawEnd } });
 
     res.end = function bridgedResponseEnd(chunk, encoding, callback) {
       const payload = markerPayload(chunk);
@@ -278,6 +292,7 @@ if (!globalThis[BRIDGE_FLAG]) {
   Buffer.concat = function bridgedBufferConcat(list, totalLength) {
     const store = requestContext.getStore();
     if (
+      applicationOwnsConcatCall() &&
       looksLikeChunkDownload(store) &&
       Array.isArray(list) &&
       list.length > 0 &&
