@@ -8,23 +8,27 @@ interface StartMessage {
   toDate: string | null;
 }
 
-function send(message: unknown): void {
-  if (typeof process.send === "function") process.send(message);
+function send(message: Record<string, unknown>): void {
+  if (typeof process.send === "function" && process.connected) {
+    process.send(message as any);
+  }
 }
 
 let started = false;
 
-process.on("message", (raw: StartMessage) => {
-  if (!raw || raw.type !== "start" || started) return;
+process.on("message", (raw: unknown) => {
+  if (!raw || typeof raw !== "object" || (raw as any).type !== "start" || started) return;
+  const message = raw as StartMessage;
   started = true;
 
   void (async () => {
     try {
       const result = await buildFullExportZipInProcess(
-        Array.isArray(raw.companies) ? raw.companies : [],
-        raw.fromDate || undefined,
-        raw.toDate || undefined,
-        (message, level = "info") => send({ type: "progress", message, level })
+        Array.isArray(message.companies) ? message.companies : [],
+        message.fromDate || undefined,
+        message.toDate || undefined,
+        (progressMessage, level = "info") =>
+          send({ type: "progress", message: progressMessage, level })
       );
 
       if (!isFileBackedExport(result.zip)) {
