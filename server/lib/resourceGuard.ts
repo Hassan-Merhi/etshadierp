@@ -3,6 +3,11 @@ import type { Request, Response } from "express";
 import { logger } from "./logger";
 
 type MemoryPressureLevel = "normal" | "warning" | "critical" | "hard";
+type RejectionCode =
+  | "RESOURCE_DRAINING"
+  | "MEMORY_PRESSURE"
+  | "HEAVY_REQUEST_LIMIT"
+  | "RESPONSE_TOO_LARGE";
 
 interface HeavyRequestPolicy {
   name: string;
@@ -17,7 +22,7 @@ interface HeavyRequestSlot {
 
 interface RequestSlotRejection {
   status: 429 | 503;
-  code: "RESOURCE_DRAINING" | "MEMORY_PRESSURE" | "HEAVY_REQUEST_LIMIT";
+  code: Exclude<RejectionCode, "RESPONSE_TOO_LARGE">;
   message: string;
   retryAfterSeconds: number;
   policy?: HeavyRequestPolicy;
@@ -40,6 +45,11 @@ const DEFAULT_API_JSON_LIMIT_MB = 25;
 
 const activeHeavyRequests = new Map<string, number>();
 const exclusiveTasks = new Map<string, ExclusiveTaskLock>();
+const rejectionCounts = {
+  total: 0,
+  byCode: {} as Record<string, number>,
+  byResource: {} as Record<string, number>,
+};
 
 let activeApiRequests = 0;
 let monitorStarted = false;
@@ -57,27 +67,36 @@ function positiveNumber(value: unknown, fallback: number): number {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
 }
 
-function readCgroupLimitMb(): number | null {
-  const candidates = ["/sys/fs/cgroup/memory.max", "/sys/fs/cgroup/memory/memory.limit_in_bytes"];
-
-  for (const file of candidates) {
+function readNumericFile(paths: string[]): number | null {
+  for (const file of paths) {
     try {
       const raw = fs.readFileSync(file, "utf8").trim();
       if (!raw || raw === "max") continue;
-
       const bytes = Number(raw);
-      if (!Number.isFinite(bytes) || bytes <= 0) continue;
-
-      // Some hosts expose an effectively-unlimited sentinel value. Ignore those.
-      if (bytes > 1024 ** 5) continue;
-
-      return Math.max(1, Math.floor(bytes / MB));
+      if (Number.isFinite(bytes) && bytes >= 0) return bytes;
     } catch {
-      // Not running under this cgroup layout.
+      // Try the next cgroup layout.
     }
   }
-
   return null;
+}
+
+function readCgroupLimitMb(): number | null {
+  const bytes = readNumericFile([
+    "/sys/fs/cgroup/memory.max",
+    "/sys/fs/cgroup/memory/memory.limit_in_bytes",
+  ]);
+  // Ignore effectively-unlimited sentinel values.
+  if (bytes === null || bytes <= 0 || bytes > 1024 ** 5) return null;
+  return Math.max(1, Math.floor(bytes / MB));
+}
+
+function readCgroupCurrentMb(): number | null {
+  const bytes = readNumericFile([
+    "/sys/fs/cgroup/memory.current",
+    "/sys/fs/cgroup/memory/memory.usage_in_bytes",
+  ]);
+  return bytes === null ? null : Math.max(0, bytes / MB);
 }
 
 const configuredMemoryLimitMb = Number(process.env.APP_MEMORY_LIMIT_MB);
@@ -101,10 +120,8 @@ const drainTimeoutMs = positiveNumber(process.env.MEMORY_DRAIN_TIMEOUT_MS, DEFAU
 const defaultApiJsonLimitBytes =
   positiveNumber(process.env.MAX_API_JSON_RESPONSE_MB, DEFAULT_API_JSON_LIMIT_MB) * MB;
 
-function currentMemoryLevel(): MemoryPressureLevel {
-  const rssMb = process.memoryUsage().rss / MB;
-  const percent = (rssMb / memoryLimitMb) * 100;
-
+function pressureLevelFor(usedMb: number): MemoryPressureLevel {
+  const percent = (usedMb / memoryLimitMb) * 100;
   if (percent >= hardPercent) return "hard";
   if (percent >= criticalPercent) return "critical";
   if (percent >= warningPercent) return "warning";
@@ -113,24 +130,40 @@ function currentMemoryLevel(): MemoryPressureLevel {
 
 function currentMemorySnapshot() {
   const usage = process.memoryUsage();
-  const rssMb = usage.rss / MB;
-  const percent = (rssMb / memoryLimitMb) * 100;
+  const rssMbRaw = usage.rss / MB;
+  const cgroupCurrentMbRaw = readCgroupCurrentMb();
+
+  // cgroup memory includes Node, Chrome, export workers and filesystem cache—the
+  // same total the hosting platform uses to OOM-kill the service. Fall back to
+  // Node RSS only where cgroups are unavailable.
+  const effectiveUsedMbRaw = cgroupCurrentMbRaw ?? rssMbRaw;
+  const utilizationPercent = (effectiveUsedMbRaw / memoryLimitMb) * 100;
 
   return {
-    level: currentMemoryLevel(),
+    level: pressureLevelFor(effectiveUsedMbRaw),
+    source: cgroupCurrentMbRaw === null ? "process-rss" : "cgroup-container",
     limitMb: Math.round(memoryLimitMb),
-    rssMb: Math.round(rssMb),
+    detectedCgroupLimitMb: detectedMemoryLimitMb,
+    effectiveUsedMb: Math.round(effectiveUsedMbRaw),
+    cgroupCurrentMb: cgroupCurrentMbRaw === null ? null : Math.round(cgroupCurrentMbRaw),
+    rssMb: Math.round(rssMbRaw),
     heapUsedMb: Math.round(usage.heapUsed / MB),
     heapTotalMb: Math.round(usage.heapTotal / MB),
     externalMb: Math.round(usage.external / MB),
     arrayBuffersMb: Math.round(usage.arrayBuffers / MB),
-    utilizationPercent: Math.round(percent * 10) / 10,
+    utilizationPercent: Math.round(utilizationPercent * 10) / 10,
     thresholds: {
       warningPercent,
       criticalPercent,
       hardPercent,
     },
   };
+}
+
+function recordRejection(code: RejectionCode, resource = "global"): void {
+  rejectionCounts.total += 1;
+  rejectionCounts.byCode[code] = (rejectionCounts.byCode[code] || 0) + 1;
+  rejectionCounts.byResource[resource] = (rejectionCounts.byResource[resource] || 0) + 1;
 }
 
 function scheduleCleanExitIfDrained(): void {
@@ -187,17 +220,17 @@ function evaluateMemoryPressure(): ReturnType<typeof currentMemorySnapshot> {
   if (snapshot.level === "hard") {
     if (now - lastHardLogAt >= 30_000) {
       lastHardLogAt = now;
-      logger.error("Hard memory limit reached", {
+      logger.error("Hard container memory limit reached", {
         module: "resource-guard",
         action: "memory-hard",
         memory: snapshot,
       });
     }
-    beginDrain("memory-hard-limit");
+    beginDrain("container-memory-hard-limit");
   } else if (snapshot.level === "critical") {
     if (now - lastCriticalLogAt >= 30_000) {
       lastCriticalLogAt = now;
-      logger.warn("Critical memory pressure detected", {
+      logger.warn("Critical container memory pressure detected", {
         module: "resource-guard",
         action: "memory-critical",
         memory: snapshot,
@@ -205,7 +238,7 @@ function evaluateMemoryPressure(): ReturnType<typeof currentMemorySnapshot> {
     }
   } else if (snapshot.level === "warning" && now - lastWarningLogAt >= 60_000) {
     lastWarningLogAt = now;
-    logger.warn("Elevated memory usage detected", {
+    logger.warn("Elevated container memory usage detected", {
       module: "resource-guard",
       action: "memory-warning",
       memory: snapshot,
@@ -223,7 +256,6 @@ function getCompanyScope(req: Request): string {
 
 function getHeavyRequestPolicy(req: Request): HeavyRequestPolicy | null {
   if (req.method !== "GET") return null;
-
   const path = req.path;
 
   if (path === "/api/factory/net-position") {
@@ -285,10 +317,7 @@ export function startResourceGuard(): void {
   });
 
   evaluateMemoryPressure();
-
-  const timer = setInterval(() => {
-    evaluateMemoryPressure();
-  }, monitorIntervalMs);
+  const timer = setInterval(evaluateMemoryPressure, monitorIntervalMs);
   timer.unref();
 }
 
@@ -313,6 +342,11 @@ export function getResourceGuardSnapshot() {
     activeApiRequests,
     memory: currentMemorySnapshot(),
     activeHeavyRequests: Object.fromEntries(activeHeavyRequests.entries()),
+    rejectionCounts: {
+      total: rejectionCounts.total,
+      byCode: { ...rejectionCounts.byCode },
+      byResource: { ...rejectionCounts.byResource },
+    },
     exclusiveTasks: Array.from(exclusiveTasks.values()).map((task) => ({
       name: task.name,
       owner: task.owner,
@@ -327,8 +361,10 @@ export function tryAcquireHeavyRequestSlot(
 ): { slot?: HeavyRequestSlot; rejection?: RequestSlotRejection } {
   const policy = getHeavyRequestPolicy(req);
   const memory = evaluateMemoryPressure();
+  const resource = policy?.name || "global";
 
   if (draining) {
+    recordRejection("RESOURCE_DRAINING", resource);
     return {
       rejection: {
         status: 503,
@@ -343,6 +379,7 @@ export function tryAcquireHeavyRequestSlot(
   if (!policy) return {};
 
   if (memory.level === "critical" || memory.level === "hard") {
+    recordRejection("MEMORY_PRESSURE", resource);
     return {
       rejection: {
         status: 503,
@@ -358,6 +395,7 @@ export function tryAcquireHeavyRequestSlot(
   const current = activeHeavyRequests.get(key) || 0;
 
   if (current >= policy.maxConcurrent) {
+    recordRejection("HEAVY_REQUEST_LIMIT", resource);
     return {
       rejection: {
         status: 429,
@@ -397,7 +435,9 @@ export function installJsonResponseLimit(req: Request, res: Response, policy?: H
     let serialized: string | undefined;
 
     try {
-      serialized = JSON.stringify(body);
+      const preSerialized = (res.locals as any).preSerializedJson;
+      serialized = typeof preSerialized === "string" ? preSerialized : JSON.stringify(body);
+      delete (res.locals as any).preSerializedJson;
     } catch {
       return originalJson(body);
     }
@@ -408,6 +448,7 @@ export function installJsonResponseLimit(req: Request, res: Response, policy?: H
     (res.locals as any).responseBytes = actualBytes;
 
     if (actualBytes > maxBytes) {
+      recordRejection("RESPONSE_TOO_LARGE", policy?.name || req.path);
       logger.warn("JSON response blocked because it exceeded the configured limit", {
         module: "resource-guard",
         action: "response-too-large",
