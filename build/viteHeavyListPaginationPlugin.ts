@@ -2,6 +2,7 @@ import type { Plugin } from "vite";
 
 const STOCK_ENTRY_SUFFIX = "/client/src/pages/StockEntryHistory.tsx";
 const V5_ALLOCATION_SUFFIX = "/client/src/pages/factory/FactoryStockAllocationV5.tsx";
+const FACTORY_DAYBOOK_SUFFIX = "/client/src/pages/factory/FactoryDaybook.tsx";
 
 function replaceExactly(source: string, before: string, after: string, label: string): string {
   const first = source.indexOf(before);
@@ -113,6 +114,61 @@ function transformV5Allocation(source: string): string {
   return code;
 }
 
+function transformFactoryDaybook(source: string): string {
+  let code = source;
+
+  code = replaceExactly(
+    code,
+    `import { queryClient } from "@/lib/queryClient";`,
+    `import { queryClient } from "@/lib/queryClient";\nimport { fetchAllDaybookEntries } from "@/lib/daybookPaginationClient";`,
+    "Factory Daybook full-data helper import"
+  );
+
+  code = replaceExactly(
+    code,
+    `  if (txTypeFilter !== "ALL") queryParams.set("txType", txTypeFilter);\n  if (currencyFilter !== "ALL") queryParams.set("currencyCode", currencyFilter);`,
+    `  if (txTypeFilter !== "ALL") queryParams.set("txType", txTypeFilter);\n  if (currencyFilter !== "ALL") queryParams.set("currencyCode", currencyFilter);\n  if (statusFilter !== "all") queryParams.set("optionalStatus", statusFilter);\n  if (debouncedSearchQuery.trim()) queryParams.set("search", debouncedSearchQuery.trim());\n  if (minAmount.trim()) queryParams.set("minAmount", minAmount.trim());\n  if (maxAmount.trim()) queryParams.set("maxAmount", maxAmount.trim());\n  queryParams.set("sortOrder", sortOrder);`,
+    "Factory Daybook server filter parameters"
+  );
+
+  code = replaceExactly(
+    code,
+    `    queryKey: ["/api/factory/daybook", startDate, endDate, txTypeFilter, currencyFilter],`,
+    `    queryKey: [\n      "/api/factory/daybook",\n      startDate,\n      endDate,\n      txTypeFilter,\n      currencyFilter,\n      statusFilter,\n      debouncedSearchQuery,\n      minAmount,\n      maxAmount,\n      sortOrder,\n    ],`,
+    "Factory Daybook paged query key"
+  );
+
+  code = replaceExactly(
+    code,
+    `  const handleExportToExcel = async () => {\n    if (filteredEntries.length === 0) {\n      toast({\n        title: "No data to export",\n        description: "No entries found for the current filters.",\n        variant: "destructive",\n      });\n      return;\n    }\n    const exportData = filteredEntries.map((e) => ({`,
+    `  const handleExportToExcel = async () => {\n    let exportEntries: DaybookEntry[];\n    try {\n      exportEntries = (await fetchAllDaybookEntries(new URLSearchParams(queryParams))).filter(\n        (entry) => entry.txType !== "WORKER_EDITED"\n      ) as DaybookEntry[];\n    } catch (error: any) {\n      toast({\n        title: "Export failed",\n        description: error?.message || "The complete filtered daybook could not be loaded.",\n        variant: "destructive",\n      });\n      return;\n    }\n    if (exportEntries.length === 0) {\n      toast({\n        title: "No data to export",\n        description: "No entries found for the current filters.",\n        variant: "destructive",\n      });\n      return;\n    }\n    const exportData = exportEntries.map((e) => ({`,
+    "Factory Daybook complete summary export"
+  );
+
+  code = replaceExactly(
+    code,
+    `      description: \`Downloaded \${fileName} with \${filteredEntries.length} entries.\`,`,
+    `      description: \`Downloaded \${fileName} with \${exportEntries.length} entries.\`,`,
+    "Factory Daybook summary export count"
+  );
+
+  code = replaceExactly(
+    code,
+    `  const handleExportDetailedToExcel = async () => {\n    if (filteredEntries.length === 0) {\n      toast({\n        title: "No data to export",\n        description: "No entries found for the current filters.",\n        variant: "destructive",\n      });\n      return;\n    }\n    setIsExportingDetailed(true);\n    try {\n      type DetailRow = {`,
+    `  const handleExportDetailedToExcel = async () => {\n    setIsExportingDetailed(true);\n    try {\n      const exportEntries = (await fetchAllDaybookEntries(new URLSearchParams(queryParams))).filter(\n        (entry) => entry.txType !== "WORKER_EDITED"\n      ) as DaybookEntry[];\n      if (exportEntries.length === 0) {\n        toast({\n          title: "No data to export",\n          description: "No entries found for the current filters.",\n          variant: "destructive",\n        });\n        return;\n      }\n      type DetailRow = {`,
+    "Factory Daybook complete detailed export"
+  );
+
+  code = replaceExactly(
+    code,
+    `      for (const entry of filteredEntries) {`,
+    `      for (const entry of exportEntries) {`,
+    "Factory Daybook detailed export iteration"
+  );
+
+  return code;
+}
+
 export function heavyListPaginationPlugin(): Plugin {
   return {
     name: "erp-heavy-list-pagination",
@@ -124,6 +180,9 @@ export function heavyListPaginationPlugin(): Plugin {
       }
       if (normalizedId.endsWith(V5_ALLOCATION_SUFFIX)) {
         return { code: transformV5Allocation(source), map: null };
+      }
+      if (normalizedId.endsWith(FACTORY_DAYBOOK_SUFFIX)) {
+        return { code: transformFactoryDaybook(source), map: null };
       }
       return null;
     },
