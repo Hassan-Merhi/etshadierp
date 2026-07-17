@@ -44,6 +44,11 @@ export function installPerformanceIndexes(pool: Pool): void {
   installationStarted = true;
 
   const startDelayMs = Math.max(0, Number(process.env.PERFORMANCE_INDEX_START_DELAY_MS || 60_000));
+  const statementTimeoutMs = Math.max(
+    60_000,
+    Number(process.env.PERFORMANCE_INDEX_STATEMENT_TIMEOUT_MS || 10 * 60 * 1000)
+  );
+  const lockTimeoutMs = Math.max(1_000, Number(process.env.PERFORMANCE_INDEX_LOCK_TIMEOUT_MS || 5_000));
 
   const timer = setTimeout(() => {
     void (async () => {
@@ -51,25 +56,51 @@ export function installPerformanceIndexes(pool: Pool): void {
         module: "performance-indexes",
         action: "start",
         count: INDEX_STATEMENTS.length,
+        statementTimeoutMs,
+        lockTimeoutMs,
       });
 
-      for (const statement of INDEX_STATEMENTS) {
-        const startedAt = Date.now();
-        try {
-          await pool.query(statement);
-          logger.info("Performance index ensured", {
-            module: "performance-indexes",
-            action: "ensure",
-            durationMs: Date.now() - startedAt,
-          });
-        } catch (error) {
-          logger.warn("Performance index could not be installed", {
-            module: "performance-indexes",
-            action: "ensure-failed",
-            durationMs: Date.now() - startedAt,
-            error,
-          });
+      const client = await pool.connect().catch((error) => {
+        logger.warn("Performance index installer could not acquire a database connection", {
+          module: "performance-indexes",
+          action: "connect-failed",
+          error,
+        });
+        return null;
+      });
+      if (!client) return;
+
+      try {
+        // The main pool intentionally kills normal application statements after
+        // 30 seconds. Large CREATE INDEX CONCURRENTLY operations need a longer,
+        // still-bounded timeout and a short lock timeout so they never block writes.
+        await client.query(`SET statement_timeout = '${Math.round(statementTimeoutMs)}ms'`);
+        await client.query(`SET lock_timeout = '${Math.round(lockTimeoutMs)}ms'`);
+
+        for (const statement of INDEX_STATEMENTS) {
+          const startedAt = Date.now();
+          try {
+            await client.query(statement);
+            logger.info("Performance index ensured", {
+              module: "performance-indexes",
+              action: "ensure",
+              durationMs: Date.now() - startedAt,
+            });
+          } catch (error) {
+            logger.warn("Performance index could not be installed", {
+              module: "performance-indexes",
+              action: "ensure-failed",
+              durationMs: Date.now() - startedAt,
+              error,
+            });
+          }
         }
+      } finally {
+        // Restore the normal application-session limits before returning this
+        // physical connection to the pool.
+        await client.query("SET statement_timeout = '30s'").catch(() => {});
+        await client.query("RESET lock_timeout").catch(() => {});
+        client.release();
       }
 
       logger.info("Performance index installation finished", {
