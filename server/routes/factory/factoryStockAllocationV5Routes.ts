@@ -62,6 +62,9 @@ export function registerFactoryStockAllocationV5Routes(app: Express) {
         fromDate,
         toDate,
         hideZero,
+        search,
+        page: pageQ,
+        limit: limitQ,
       } = req.query;
 
       // 0. Build set of excluded article codes — products whose category OR name is Wiper/Garbage/Rag
@@ -511,7 +514,16 @@ export function registerFactoryStockAllocationV5Routes(app: Express) {
         );
       }
 
-      const totals = {
+      // Search param (frontend search box — unified alias alongside productFilter)
+      if (search && !productFilter) {
+        const q = String(search).toLowerCase();
+        filtered = filtered.filter(
+          (r) => r.articleCode.toLowerCase().includes(q) || r.productName.toLowerCase().includes(q)
+        );
+      }
+
+      // Recompute totals over the final filtered set (search may have trimmed rows)
+      const finalTotals = {
         stockAvailable: filtered.reduce((s, r) => s + r.stockAvailable, 0),
         totalLoaded: filtered.reduce((s, r) => s + r.totalLoaded, 0),
         expectedToLoad: filtered.reduce((s, r) => s + r.expectedToLoad, 0),
@@ -520,9 +532,59 @@ export function registerFactoryStockAllocationV5Routes(app: Express) {
         shortageCount: filtered.filter((r) => r.freeToPromise < 0).length,
       };
 
-      res.json({ rows: filtered, totals, productNames: productNamesMap });
+      // In-memory pagination — only applied when ?page= is explicitly set.
+      const rowLimit = Math.min(Number(limitQ) || 100, 250);
+      const page = pageQ !== undefined ? Math.max(1, Number(pageQ) || 1) : null;
+      const total = filtered.length;
+      const totalPages = page !== null ? Math.max(1, Math.ceil(total / rowLimit)) : null;
+      const pagedRows = page !== null ? filtered.slice((page - 1) * rowLimit, page * rowLimit) : filtered;
+
+      res.set("Cache-Control", "private, max-age=60");
+      if (page !== null) {
+        res.json({ rows: pagedRows, totals: finalTotals, productNames: productNamesMap, total, page, limit: rowLimit, totalPages });
+      } else {
+        res.json({ rows: filtered, totals: finalTotals, productNames: productNamesMap });
+      }
     } catch (err: any) {
       console.error("[V5] stock-allocation error:", err);
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  // ── GET /api/factory/v5/stock-allocation/summary ─────────────────────────
+  // Returns aggregate totals only — used for dashboard cards without loading the full list.
+  app.get("/api/factory/v5/stock-allocation/summary", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const [inStockRaw, inLoadingRaw, expectedRaw] = await Promise.all([
+        db.execute(
+          sql`SELECT COUNT(*)::int AS count FROM factory_bales
+              WHERE company_id = ${companyId} AND status = 'IN_STOCK'`
+        ),
+        db.execute(
+          sql`SELECT COUNT(*)::int AS count
+              FROM customer_order_bales cob
+              JOIN customer_orders co ON co.id = cob.order_id
+              WHERE co.company_id = ${companyId} AND co.status = 'LOADING' AND co.proforma_id_used IS NOT NULL`
+        ),
+        db.execute(
+          sql`SELECT COALESCE(SUM(cel.expected_qty),0)::int AS qty
+              FROM customer_order_expected_lines cel
+              JOIN customer_orders co ON co.id = cel.order_id
+              WHERE co.company_id = ${companyId} AND co.status IN ('DRAFT','LOADING') AND co.proforma_id_used IS NOT NULL`
+        ),
+      ]);
+
+      const stockAvailable = Number(((inStockRaw as any).rows ?? [])[0]?.count ?? 0);
+      const totalLoaded = Number(((inLoadingRaw as any).rows ?? [])[0]?.count ?? 0);
+      const expectedToLoad = Number(((expectedRaw as any).rows ?? [])[0]?.qty ?? 0);
+      const freeToPromise = stockAvailable - expectedToLoad - totalLoaded;
+
+      res.set("Cache-Control", "private, max-age=60");
+      res.json({ stockAvailable, totalLoaded, expectedToLoad, freeToPromise });
+    } catch (err: any) {
       res.status(500).json({ message: err.message });
     }
   });

@@ -175,15 +175,15 @@ export function registerChatbotRoutes(app: Express) {
         return res.json({ enabled: false });
       }
 
-      // Get user chatbot status
-      const [user] = await db.select({ chatbotEnabled: users.chatbotEnabled }).from(users).where(eq(users.id, userId));
+      // Run both DB queries in parallel — they are independent.
+      const [userRows, providerRows] = await Promise.all([
+        db.select({ chatbotEnabled: users.chatbotEnabled }).from(users).where(eq(users.id, userId)),
+        db.select({ value: systemSettings.value }).from(systemSettings).where(eq(systemSettings.key, "ai_provider")).limit(1),
+      ]);
+      const [user] = userRows;
 
       // Get selected AI provider and check if its API key is configured
-      const providerSetting = await db
-        .select({ value: systemSettings.value })
-        .from(systemSettings)
-        .where(eq(systemSettings.key, "ai_provider"))
-        .limit(1);
+      const providerSetting = providerRows;
       const selectedProvider =
         providerSetting.length > 0 && providerSetting[0].value ? providerSetting[0].value.toLowerCase() : "gemini";
       let hasApiKey = false;

@@ -488,20 +488,32 @@ function TrackingSettingsSheet({
           </div>
           <Separator />
           <div className="space-y-2">
-            <Label htmlFor="carrier-hint-tab" className="text-sm font-medium">
-              Carrier Hint
-            </Label>
+            <Label className="text-sm font-medium">Carrier Hint</Label>
             <p className="text-xs text-muted-foreground">
-              Optional — helps the system find the right carrier faster (e.g. MAERSK, CMA)
+              Select the shipping line — enables JSON Cargo ETA tracking for Maersk, Hapag-Lloyd,
+              MSC, and CMA CGM.
             </p>
-            <Input
-              id="carrier-hint-tab"
-              value={carrierHint}
-              onChange={(e) => setCarrierHint(e.target.value.toUpperCase())}
-              placeholder="e.g. MAERSK"
+            <Select
+              value={carrierHint || "NONE"}
+              onValueChange={(v) => setCarrierHint(v === "NONE" ? "" : v)}
               disabled={!enabled}
-              data-testid="input-carrier-hint-tab"
-            />
+            >
+              <SelectTrigger data-testid="select-carrier-hint-tab">
+                <SelectValue placeholder="None (auto-detect)" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="NONE">None (auto-detect)</SelectItem>
+                <SelectItem value="MAERSK">Maersk</SelectItem>
+                <SelectItem value="HAPAG">Hapag-Lloyd</SelectItem>
+                <SelectItem value="MSC">MSC</SelectItem>
+                <SelectItem value="CMA">CMA CGM</SelectItem>
+              </SelectContent>
+            </Select>
+            {carrierHint && !["MAERSK","HAPAG","MSC","CMA"].includes(carrierHint) && (
+              <p className="text-[11px] text-amber-500">
+                Custom value &quot;{carrierHint}&quot; — JSON Cargo only activates for Maersk, Hapag-Lloyd, MSC, CMA CGM.
+              </p>
+            )}
           </div>
         </div>
         <div className="px-6 pb-6 shrink-0">
@@ -820,21 +832,38 @@ export default function FactoryOtwTrackingTab({ onEdit }: OtwTrackingTabProps = 
     }
     setBulkTracking(true);
     setBulkProgress({ done: 0, total: eligible.length });
-    // Dispatch all tracking requests — each responds immediately (fire-and-forget on server)
+    // Dispatch tracking requests with back-pressure: if the server is busy (429)
+    // we pause briefly before retrying, preventing OOM from too many concurrent jobs.
+    const RETRY_DELAY_MS = 4000;
+    const MAX_RETRIES = 8;
+    let queued = 0;
     for (let i = 0; i < eligible.length; i++) {
       const c = eligible[i];
-      try {
-        await factoryApiRequest("POST", `/api/factory/container-tracking/${c.id}/track-now`, {});
-      } catch {
-        /* ignore dispatch errors */
+      let retries = 0;
+      while (retries <= MAX_RETRIES) {
+        try {
+          const res = await factoryApiRequest("POST", `/api/factory/container-tracking/${c.id}/track-now`, {});
+          if (res.status === 429) {
+            retries++;
+            if (retries <= MAX_RETRIES) {
+              await new Promise((r) => setTimeout(r, RETRY_DELAY_MS));
+              continue;
+            }
+          } else {
+            queued++;
+          }
+          break;
+        } catch {
+          break;
+        }
       }
       setBulkProgress({ done: i + 1, total: eligible.length });
     }
     setBulkTracking(false);
     setBulkProgress(null);
     toast({
-      title: `Tracking ${eligible.length} containers…`,
-      description: "Results will appear automatically over the next minute.",
+      title: `Tracking ${queued} of ${eligible.length} containers…`,
+      description: "Results will appear automatically as each container is checked.",
     });
     // Poll for results as background tracking completes
     let elapsed = 0;

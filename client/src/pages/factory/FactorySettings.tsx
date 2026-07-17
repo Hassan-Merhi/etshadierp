@@ -473,7 +473,7 @@ export default function FactorySettings() {
       setBaleValidationResult(null);
       setBaleImportFile(null);
       if (baleFileInputRef.current) baleFileInputRef.current.value = "";
-      queryClient.invalidateQueries({ queryKey: ["/api/factory/bales"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/bales"], refetchType: "active" });
       toast({
         title: "Bale import complete",
         description: `${data.totalBalesCreated} bale(s) created${data.skippedRows > 0 ? `, ${data.skippedRows} row(s) skipped` : ""}`,

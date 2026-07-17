@@ -200,8 +200,8 @@ if (process.env.DATABASE_URL || process.env.PGHOST) {
     conObject: {
       connectionString,
       ssl: requiresSSL ? { rejectUnauthorized: false } : false,
-      // 1 connection is enough for session reads/writes. Configurable via PG_SESSION_POOL_MAX.
-      max: Number(process.env.PG_SESSION_POOL_MAX || 1),
+      // Allow a small pool so concurrent session reads don't serialize behind one connection.
+      max: Number(process.env.PG_SESSION_POOL_MAX || 3),
       connectionTimeoutMillis: 8000,
       idleTimeoutMillis: 30000,
     },

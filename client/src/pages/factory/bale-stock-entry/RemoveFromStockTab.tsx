@@ -73,7 +73,7 @@ export function RemoveFromStockTab() {
         title: "Names updated",
         description: `Updated ${data.updated} bale${data.updated !== 1 ? "s" : ""}, skipped ${data.skipped}.`,
       });
-      queryClient.invalidateQueries({ queryKey: ["/api/factory/bales"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/bales"], refetchType: "active" });
     },
     onError: (err: Error) => {
       toast({ title: "Import failed", description: err.message, variant: "destructive" });
@@ -101,7 +101,7 @@ export function RemoveFromStockTab() {
         title: "Bales reimported",
         description: `Successfully reimported ${data.imported} bale(s) (${parseFloat(data.totalWeight).toFixed(1)} kg) with original reference numbers.`,
       });
-      queryClient.invalidateQueries({ queryKey: ["/api/factory/bales"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/bales"], refetchType: "active" });
       queryClient.invalidateQueries({ queryKey: ["/api/factory/stock-entry/in-stock"] });
     },
     onError: (err: Error) => {

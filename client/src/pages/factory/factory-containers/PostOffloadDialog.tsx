@@ -94,7 +94,7 @@ export function PostOffloadDialog({ container, ledgerAccounts, onClose }: PostOf
       queryClient.invalidateQueries({ queryKey: ["/api/factory/raw-stock"] });
       queryClient.invalidateQueries({ queryKey: ["/api/factory/raw-stock/by-container"] });
       queryClient.invalidateQueries({ queryKey: ["/api/factory/mix-batches"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/factory/bales"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/bales"], refetchType: "active" });
       queryClient.invalidateQueries({ queryKey: ["/api/factory/suppliers"] });
       queryClient.invalidateQueries({ queryKey: ["/api/factory/suppliers/with-balances"] });
       setResult(data);

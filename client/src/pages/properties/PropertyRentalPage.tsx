@@ -96,6 +96,8 @@ type LedgerRow = {
   isDue?: boolean;
   expectedAsOf?: number;
   effectivePaidAmount?: number;
+  /** All POSTED payments for this row regardless of payment_date — used by the statement PAID column. */
+  allPostedPaid?: number;
   scheduledAmount?: number;
   outstanding?: number;
   prepaidCredit?: number;
@@ -2902,13 +2904,16 @@ function LedgerView({
     onError: (e: any) => toast({ title: "Reversal failed", description: e.message, variant: "destructive" }),
   });
 
-  // FIX #7: use backend-calculated fields when available; fall back to frontend calculation
+  // FIX #7: use backend-calculated fields when available; fall back to frontend calculation.
+  // totalPaid uses allPostedPaid (all POSTED, no date filter) so future-dated posted payments
+  // appear correctly in the statement.  effectivePaidAmount (with date filter) is still used
+  // for the balance widget on the main listing page.
   const useBackendFields = ledger.length === 0 || ledger[0].expectedAsOf !== undefined;
   const totalExpected = useBackendFields
     ? ledger.reduce((s, r) => s + (r.expectedAsOf ?? 0), 0)
     : ledger.reduce((s, r) => s + Number(r.expectedAmount), 0);
   const totalPaid = useBackendFields
-    ? ledger.reduce((s, r) => s + (r.effectivePaidAmount ?? Number(r.paidAmount)), 0)
+    ? ledger.reduce((s, r) => s + (r.allPostedPaid ?? r.effectivePaidAmount ?? Number(r.paidAmount)), 0)
     : ledger.reduce((s, r) => s + Number(r.paidAmount), 0);
   const balance = totalExpected - totalPaid;
 
@@ -2919,12 +2924,14 @@ function LedgerView({
 
     const rows = ledger
       .map((r) => {
-        // FIX #7: use backend status/outstanding when available
+        // FIX #7: use backend status/outstanding when available.
+        // Use allPostedPaid (no date filter) for the PAID column so future-dated posted
+        // payments are shown correctly.
         const isDue = r.isDue !== undefined ? r.isDue : true;
-        const paid = r.effectivePaidAmount !== undefined ? r.effectivePaidAmount : Number(r.paidAmount);
+        const paid = r.allPostedPaid ?? (r.effectivePaidAmount !== undefined ? r.effectivePaidAmount : Number(r.paidAmount));
         const expected = r.expectedAsOf !== undefined ? r.expectedAsOf : (isDue ? Number(r.expectedAmount) : 0);
-        const out = r.outstanding !== undefined ? r.outstanding : Math.max(0, expected - paid);
-        const credit = r.prepaidCredit !== undefined ? r.prepaidCredit : Math.max(0, paid - expected);
+        const out = Math.max(0, expected - paid);
+        const credit = Math.max(0, paid - expected);
         const outColor = out > 0.005 ? "#cc0000" : credit > 0.005 ? "#006600" : "#888888";
         const statusLabel = r.status ?? (isDue ? "" : "not-due");
         return `<tr>
@@ -3118,12 +3125,14 @@ function LedgerView({
           </thead>
           <tbody>
             {ledger.map((r) => {
-              // FIX #7: prefer backend-calculated fields, fall back to frontend estimation
+              // FIX #7: prefer backend-calculated fields, fall back to frontend estimation.
+              // Use allPostedPaid (no date filter) for the PAID column so future-dated posted
+              // payments are not hidden by the asOf cutoff.
               const isDue = r.isDue !== undefined ? r.isDue : true;
-              const paid = r.effectivePaidAmount !== undefined ? r.effectivePaidAmount : Number(r.paidAmount);
+              const paid = r.allPostedPaid ?? (r.effectivePaidAmount !== undefined ? r.effectivePaidAmount : Number(r.paidAmount));
               const expected = r.expectedAsOf !== undefined ? r.expectedAsOf : (isDue ? Number(r.expectedAmount) : 0);
-              const outstanding = r.outstanding !== undefined ? r.outstanding : Math.max(0, expected - paid);
-              const credit = r.prepaidCredit !== undefined ? r.prepaidCredit : Math.max(0, paid - expected);
+              const outstanding = Math.max(0, expected - paid);
+              const credit = Math.max(0, paid - expected);
               const statusLabel = r.status;
               const showAsCreditRow = !isDue && paid > 0.005;
               return (

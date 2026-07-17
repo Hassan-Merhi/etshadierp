@@ -258,6 +258,7 @@ export function FilterBar({
               <SelectItem value="ALL">All</SelectItem>
               <SelectItem value="YES">ETA Passed</SelectItem>
               <SelectItem value="OVERDUE">Offload Overdue</SelectItem>
+              <SelectItem value="NO">Not Delayed</SelectItem>
             </SelectContent>
           </Select>
         </Col>

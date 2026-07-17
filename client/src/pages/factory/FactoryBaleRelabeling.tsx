@@ -354,8 +354,8 @@ export default function FactoryBaleRelabeling() {
       return res.json();
     },
     onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/factory/bales"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/factory/bales/relabel/sessions"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/bales"], refetchType: "active" });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/bales/relabel/sessions"], refetchType: "active" });
       setApplyResult(data);
       setStep("done");
       toast({ title: "Relabeling applied", description: `${data.items.length} bales recoded successfully` });

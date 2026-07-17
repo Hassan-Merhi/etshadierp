@@ -149,7 +149,7 @@ async function getSharedBrowser(): Promise<any> {
   const chromePath = getChromiumPath();
   console.log("[ParcelsAppScraper] Launching shared Chrome instance…");
   _sharedBrowser = await puppeteerExtra.launch({
-    headless: "new" as any,
+    headless: true,
     ...(chromePath ? { executablePath: chromePath } : {}),
     args: [
       "--no-sandbox",
@@ -204,9 +204,19 @@ export async function scrapeTracking(containerNumber: string): Promise<ScraperRe
     return { success: false, shipment: null, blocked: false, error: "Puppeteer not installed" };
   }
 
-  // Acquire global slot — ensures at most 1 Puppeteer operation server-wide
+  // Acquire global slot — ensures at most 1 Puppeteer operation server-wide.
+  // Rejects immediately with PUPPETEER_QUEUE_FULL when too many callers are waiting.
   console.log(`[ParcelsAppScraper] ${containerNumber}: waiting for Puppeteer slot…`);
-  const release = await acquirePuppeteerSlot();
+  let release: (() => void) | null = null;
+  try {
+    release = await acquirePuppeteerSlot();
+  } catch (err: any) {
+    if (err?.message === "PUPPETEER_QUEUE_FULL") {
+      console.warn(`[ParcelsAppScraper] ${containerNumber}: Puppeteer queue full — skipping (server busy)`);
+      return { success: false, shipment: null, blocked: false, error: "PUPPETEER_QUEUE_FULL" };
+    }
+    throw err;
+  }
   console.log(`[ParcelsAppScraper] ${containerNumber}: Puppeteer slot acquired`);
 
   let page: any = null;
@@ -287,7 +297,7 @@ export async function scrapeTracking(containerNumber: string): Promise<ScraperRe
       /* ignore */
     }
     page = null;
-    release();
+    release?.();
 
     if (isBlocked) {
       return {
@@ -328,7 +338,7 @@ export async function scrapeTracking(containerNumber: string): Promise<ScraperRe
         /* ignore */
       }
     }
-    release();
+    release?.();
     return {
       success: false,
       shipment: null,

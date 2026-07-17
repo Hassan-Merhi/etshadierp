@@ -45,7 +45,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import CreateProformaV5Drawer from "./CreateProformaV5Drawer";
 import EditProformaV5Drawer from "./EditProformaV5Drawer";
 import { PageHeader } from "@/components/PageHeader";
@@ -126,6 +126,12 @@ export default function FactoryStockAllocationV5() {
   const [showGarbageWipers, setShowGarbageWipers] = useState(false);
   const [refreshFlash, setRefreshFlash] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  // Debounced value sent to the server — prevents one request per keystroke.
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(searchQuery), 300);
+    return () => clearTimeout(t);
+  }, [searchQuery]);
 
   /* ── Export dialog state ─────────────────────────────────────────────────── */
   const [exportDialogOpen, setExportDialogOpen] = useState(false);
@@ -171,7 +177,7 @@ export default function FactoryStockAllocationV5() {
     onSuccess: (_data, { names }) => {
       toast({ title: `Added ${names.length} container${names.length !== 1 ? "s" : ""}.` });
       setAddCtDialog(null);
-      query.refetch();
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/v5/stock-allocation"] });
     },
     onError: (err: any) => {
       toast({ title: "Error adding containers", description: err.message ?? "Unknown error", variant: "destructive" });
@@ -204,7 +210,7 @@ export default function FactoryStockAllocationV5() {
     onSuccess: () => {
       toast({ title: "Proforma closed." });
       setCloseDialog(null);
-      query.refetch();
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/v5/stock-allocation"] });
     },
     onError: (err: any) => {
       toast({ title: "Error closing proforma", description: err.message ?? "Unknown error", variant: "destructive" });
@@ -258,7 +264,7 @@ export default function FactoryStockAllocationV5() {
     onSuccess: (data: any) => {
       toast({ title: `Draft quantities updated (${data?.updated ?? 0} lines changed).` });
       setEditDraftDialog(null);
-      query.refetch();
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/v5/stock-allocation"] });
     },
     onError: (err: any) => {
       toast({
@@ -331,7 +337,7 @@ export default function FactoryStockAllocationV5() {
       toast({ title: `Linked ${orderIds.length} container${orderIds.length !== 1 ? "s" : ""} to proforma.` });
       setLinkDialog(null);
       setLinkSelected(new Set());
-      query.refetch();
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/v5/stock-allocation"] });
     },
     onError: (err: any) => {
       toast({ title: "Linking failed", description: err.message ?? "Unknown error", variant: "destructive" });
@@ -369,7 +375,7 @@ export default function FactoryStockAllocationV5() {
     onSuccess: (data: any) => {
       toast({ title: `Container restored to ${data?.restoredTo === "LOADING" ? "Loading" : "Draft"}.` });
       cancelledContainersQuery.refetch();
-      query.refetch();
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/v5/stock-allocation"] });
     },
     onError: (err: any) => {
       toast({ title: "Restore failed", description: err.message ?? "Unknown error", variant: "destructive" });
@@ -403,7 +409,7 @@ export default function FactoryStockAllocationV5() {
       setCancelDialog(null);
       setCancelSuperUser("");
       setCancelSuperPass("");
-      query.refetch();
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/v5/stock-allocation"] });
     },
     onError: (err: any) => {
       toast({ title: "Cancel failed", description: err.message ?? "Unknown error", variant: "destructive" });
@@ -412,10 +418,11 @@ export default function FactoryStockAllocationV5() {
 
   /* ── Query ──────────────────────────────────────────────────────────────── */
   const query = useQuery<V5Data>({
-    queryKey: ["/api/factory/v5/stock-allocation", hideZero],
+    queryKey: ["/api/factory/v5/stock-allocation", hideZero, debouncedSearch || undefined],
     queryFn: async () => {
       const params = new URLSearchParams();
       if (hideZero) params.set("hideZero", "true");
+      if (debouncedSearch.trim()) params.set("search", debouncedSearch.trim());
       const res = await fetch(`/api/factory/v5/stock-allocation?${params}`, { credentials: "include" });
       if (!res.ok) {
         const e = await res.json();
@@ -424,10 +431,11 @@ export default function FactoryStockAllocationV5() {
       return res.json();
     },
     retry: 1,
-    staleTime: 60000,
-    gcTime: 5 * 60 * 1000,
+    staleTime: 2 * 60 * 1000,
+    gcTime: 10 * 60 * 1000,
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,
+    refetchOnMount: false,
   });
 
   function isGarbageOrWipers(row: V5Row) {
