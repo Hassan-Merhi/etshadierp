@@ -1,11 +1,14 @@
+import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import type { BankAccount } from "./voucherTypes";
+import type { Account } from "@/components/AccountSidebar";
 
 interface UseAccountBalanceProps {
   paymentAccountType: string;
   paymentAccountId: number;
   bankAccounts: BankAccount[];
   selectedAccountOpeningBalance?: string;
+  sidebarAccounts?: Account[];
 }
 
 export function useAccountBalance({
@@ -13,10 +16,24 @@ export function useAccountBalance({
   paymentAccountId,
   bankAccounts,
   selectedAccountOpeningBalance,
+  sidebarAccounts,
 }: UseAccountBalanceProps) {
-  const { data: accountBalance = 0 } = useQuery({
+  // Prefer the pre-computed balance that the voucher-sidebar endpoint already
+  // calculates server-side from all voucher entries.  This is authoritative and
+  // avoids a second round-trip that can return 0 on first render or drift from
+  // the sidebar figure.
+  const sidebarAccount = useMemo(
+    () =>
+      sidebarAccounts?.find((a) => a.type === paymentAccountType && a.id === paymentAccountId) ??
+      null,
+    [sidebarAccounts, paymentAccountType, paymentAccountId]
+  );
+
+  // Only run the fetch-based fallback when the sidebar data hasn't arrived yet
+  // or (unlikely) doesn't include this particular account.
+  const { data: fetchedBalance = 0 } = useQuery({
     queryKey: ["/api/accounts", paymentAccountType, paymentAccountId, "balance"],
-    enabled: paymentAccountId > 0,
+    enabled: paymentAccountId > 0 && sidebarAccount === null,
     staleTime: 30 * 1000,
     refetchOnWindowFocus: false,
     queryFn: async () => {
@@ -74,6 +91,9 @@ export function useAccountBalance({
     },
   });
 
+  // Resolve final balance: sidebar wins when available.
+  const accountBalance = sidebarAccount !== null ? (sidebarAccount.balance ?? 0) : fetchedBalance;
+
   const { data: accountCurrencyBalances } = useQuery<{ currency: string; balance: number }[] | null>({
     queryKey: ["/api/accounts", paymentAccountType, paymentAccountId, "currencyBalances"],
     enabled: paymentAccountId > 0 && (paymentAccountType === "supplier" || paymentAccountType === "factorySupplier"),
@@ -121,5 +141,5 @@ export function useAccountBalance({
     },
   });
 
-  return { accountBalance, accountCurrencyBalances };
+  return { accountBalance, accountCurrencyBalances, sidebarAccount };
 }

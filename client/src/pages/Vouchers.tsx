@@ -264,6 +264,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
     paymentAccountId,
     bankAccounts,
     selectedAccountOpeningBalance: selectedAccount?.openingBalance,
+    sidebarAccounts,
   });
 
   const { handleSidebarAccountSelect, handleAmountCommit, handleAutoCreateAccount } = useVoucherHandlers({
