@@ -289,6 +289,24 @@ export function registerStatsNetProfitRoutes(app: Express) {
         }
       }
 
+      // Exclude ledger-based "Prepaid Rent" accounts — the rental-shops calculation
+      // below (propertyContracts: paid − expected) is always the authoritative source
+      // for prepaid rent. Keeping both would double-count it.
+      for (let i = forUsAccounts.length - 1; i >= 0; i--) {
+        const a = forUsAccounts[i] as any;
+        const nameLower = (a.name || "").toLowerCase();
+        if (nameLower.includes("prepaid rent")) {
+          forUsTotal = round2(forUsTotal - a.value);
+          // Subtract from whichever category bucket it landed in (typically "asset_Asset")
+          const catKey = `asset_${a.category}`;
+          if (categoryTotals[catKey] !== undefined) {
+            categoryTotals[catKey] = round2(categoryTotals[catKey] - a.value);
+            if (Math.abs(categoryTotals[catKey]) < 0.01) delete categoryTotals[catKey];
+          }
+          forUsAccounts.splice(i, 1);
+        }
+      }
+
       // CFA revaluation: Cash accounts hold physical CFA units whose USD worth changes with the rate.
       // Expenses, loans, receivables are locked at their historical CFA values — do NOT revalue them.
       // Only revalue if this company's base currency IS CFA (not a USD company that happens to have
