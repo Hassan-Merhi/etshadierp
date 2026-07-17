@@ -140,6 +140,13 @@ function transformFactoryDaybook(source: string): string {
 
   code = replaceExactly(
     code,
+    `  if (startDate) queryParams.set("startDate", startDate);\n  if (endDate) queryParams.set("endDate", endDate);`,
+    `  // Empty values are intentional: their presence prevents the paged backend\n  // from applying its today-only default when the UI selects All Time.\n  queryParams.set("startDate", startDate);\n  queryParams.set("endDate", endDate);`,
+    "Factory Daybook All Time date parameters"
+  );
+
+  code = replaceExactly(
+    code,
     `  if (txTypeFilter !== "ALL") queryParams.set("txType", txTypeFilter);\n  if (currencyFilter !== "ALL") queryParams.set("currencyCode", currencyFilter);`,
     `  if (txTypeFilter !== "ALL") queryParams.set("txType", txTypeFilter);\n  if (currencyFilter !== "ALL") queryParams.set("currencyCode", currencyFilter);\n  if (statusFilter !== "all") queryParams.set("optionalStatus", statusFilter);\n  if (debouncedSearchQuery.trim()) queryParams.set("search", debouncedSearchQuery.trim());\n  if (minAmount.trim()) queryParams.set("minAmount", minAmount.trim());\n  if (maxAmount.trim()) queryParams.set("maxAmount", maxAmount.trim());\n  queryParams.set("sortOrder", sortOrder);`,
     "Factory Daybook server filter parameters"
