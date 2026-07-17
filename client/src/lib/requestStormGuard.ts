@@ -49,6 +49,15 @@ const CACHE_TTLS: Array<{ pattern: RegExp; ttlMs: number }> = [
   { pattern: /^\/api\/chatbot\/status$/, ttlMs: 2 * 60_000 },
 ];
 
+const HEAVY_HIDDEN_TAB_PATHS = [
+  /^\/api\/factory\/raw-stock$/,
+  /^\/api\/factory\/net-position$/,
+  /^\/api\/factory\/bale-ledger$/,
+  /^\/api\/factory\/customer-proformas$/,
+  /^\/api\/factory\/customer-orders(?:\/|$)/,
+  /^\/api\/factory\/bale-stock-count$/,
+];
+
 function requestMethod(input: RequestInfo | URL, init?: RequestInit): string {
   return (init?.method || (input instanceof Request ? input.method : "GET")).toUpperCase();
 }
@@ -79,6 +88,10 @@ function cacheTtlFor(pathname: string): number {
 function shouldBypass(pathname: string, headers: Headers): boolean {
   if (headers.has("range")) return true;
   return BYPASS_PATHS.some((pattern) => pattern.test(pathname));
+}
+
+function shouldDeferUntilVisible(pathname: string, ttlMs: number): boolean {
+  return ttlMs > 0 || HEAVY_HIDDEN_TAB_PATHS.some((pattern) => pattern.test(pathname));
 }
 
 function buildRequestKey(url: URL, headers: Headers): string {
@@ -132,6 +145,30 @@ function cacheResponse(key: string, response: Response, ttlMs: number): void {
 
 function clearReadCache(): void {
   responseCache.clear();
+}
+
+function waitUntilVisible(signal?: AbortSignal | null): Promise<void> {
+  if (typeof document === "undefined" || document.visibilityState !== "hidden") return Promise.resolve();
+  if (signal?.aborted) return Promise.reject(new DOMException("The operation was aborted.", "AbortError"));
+
+  return new Promise<void>((resolve, reject) => {
+    const cleanup = () => {
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+      signal?.removeEventListener("abort", onAbort);
+    };
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "hidden") return;
+      cleanup();
+      resolve();
+    };
+    const onAbort = () => {
+      cleanup();
+      reject(new DOMException("The operation was aborted.", "AbortError"));
+    };
+
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    signal?.addEventListener("abort", onAbort, { once: true });
+  });
 }
 
 function drainQueue(): void {
@@ -222,9 +259,9 @@ export function installRequestStormGuard(): void {
     }
 
     if (method !== "GET") {
-      // Any successful write can change balances, stock, orders, settings or access.
-      // Clear all short-lived read snapshots before it runs so the mutation's normal
-      // TanStack invalidations always receive fresh server data immediately.
+      // Any write can change balances, stock, orders, settings or access. Clear all
+      // short-lived read snapshots first so normal TanStack invalidations always
+      // receive fresh server data immediately after the mutation.
       clearReadCache();
       return originalFetch(input, init);
     }
@@ -242,6 +279,7 @@ export function installRequestStormGuard(): void {
     const ttlMs = cacheTtlFor(url.pathname);
     const signal = requestSignal(input, init);
     const requestPromise = (async () => {
+      if (shouldDeferUntilVisible(url.pathname, ttlMs)) await waitUntilVisible(signal);
       const release = await acquireGetSlot(signal);
       try {
         const response = await originalFetch(input, init);
