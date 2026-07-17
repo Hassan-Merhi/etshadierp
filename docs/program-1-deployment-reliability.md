@@ -37,12 +37,13 @@ The equivalent schema is owned by the versioned migration:
 
 - Inspected the draft PR patch to confirm the factory route aggregator now imports the guarded registration boundary.
 - Confirmed the guard matches only `CREATE TABLE IF NOT EXISTS factory_recalc_undo_log` and restores the original pool query method immediately after synchronous route registration.
-- Confirmed the versioned migration remains unchanged and is still the sole executable schema definition in the deployment flow.
+- Confirmed the versioned migration remains the sole schema owner in the deployment flow.
+- Confirmed draft PR #76 remains open, mergeable, and unmerged.
 - No Replit checks or Replit credits were used.
 
 ### Follow-up architectural cleanup
 
-The legacy helper remains physically present inside the large recalculation route module because the connector cannot safely patch that 1,000+ line file in place. Runtime execution is blocked. When that module is split during the architecture program, delete `ensureUndoLogTable()` and remove the compatibility boundary without changing behavior.
+The obsolete helper remains physically present inside the large recalculation route module because the connector cannot safely patch that 1,000+ line file in place. Its runtime execution is blocked. When that module is split during the architecture program, delete `ensureUndoLogTable()` and remove the compatibility boundary without changing behavior.
 
 ### Safety constraints
 
