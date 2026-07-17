@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { factoryApiRequest } from "@/lib/factoryApi";
 import { Button } from "@/components/ui/button";
@@ -44,6 +44,12 @@ export function OffloadDialog({
   mixBatches,
 }: OffloadDialogProps) {
   const { toast } = useToast();
+  // Idempotency key is generated lazily on first submit and reused on retries.
+  // Reset when the dialog closes or when the user selects a different container.
+  const idempotencyKeyRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!open) idempotencyKeyRef.current = null;
+  }, [open]);
   const [offloadDate, setOffloadDate] = useState<string>(new Date().toLocaleDateString("en-CA"));
   const [offloadDestination, setOffloadDestination] = useState("");
   const [selectedContainerId, setSelectedContainerId] = useState("");
@@ -96,6 +102,15 @@ export function OffloadDialog({
     const remaining = Math.max(0, declared - alreadyReceived);
     return { declared, alreadyReceived, remaining };
   }, [isSubsequentReceipt, selectedContainer]);
+
+  /** Live receipt value for subsequent receipts — receivingNow × fixedCostPerKgUsd (USD). */
+  const receiptValue = useMemo(() => {
+    if (!isSubsequentReceipt || !selectedContainer) return null;
+    const kg = parseFloat(actualReceivedKg || "0");
+    const rate = parseFloat((selectedContainer as any).fixedCostPerKgUsd || "0");
+    if (!kg || !rate) return null;
+    return kg * rate;
+  }, [isSubsequentReceipt, selectedContainer, actualReceivedKg]);
 
   // Auto-fetch the live USD exchange rate whenever the freight currency is changed
   // away from USD (and isn't already pinned to the container's own fx rate). Without
@@ -183,12 +198,16 @@ export function OffloadDialog({
       const alreadyReceived = parseFloat(container.actualReceivedKg || "0");
       const remaining = Math.max(0, declared - alreadyReceived);
       setActualReceivedKg(String(remaining.toFixed(3)));
+      // For continuation receipts, pre-fill the fixed landed rate from raw stock (informational —
+      // the server uses the DB rate; the field is disabled so the user cannot override it).
+      setCostPerKg((container as any).fixedCostPerKgUsd || container.ratePerKg || "");
       // Clear charge fields — they are locked for subsequent receipts
       setFreight(""); setFreightAccountId(""); setFreightFromContainer(false);
       setOtherCharges(""); setOtherChargesAccountId(""); setOtherChargesFromContainer(false);
       setCommissionPersonName(""); setCommissionRate(""); setCommissionFromContainer(false);
       setDutyAmount(""); setDutyAccountId(""); setDutyPending(false);
       setAdditionalCharges([]);
+      idempotencyKeyRef.current = null; // reset key on new container selection
       return;
     }
 
@@ -326,6 +345,12 @@ export function OffloadDialog({
       };
     }
 
+    // Generate idempotency key lazily on first submit; reuse on retries until dialog closes.
+    if (!idempotencyKeyRef.current) {
+      idempotencyKeyRef.current = crypto.randomUUID();
+    }
+    payload.idempotencyKey = idempotencyKeyRef.current;
+
     offloadMutation.mutate(payload);
   };
 
@@ -366,7 +391,7 @@ export function OffloadDialog({
 
           {/* Subsequent receipt info banner */}
           {isSubsequentReceipt && partialReceiptInfo && (
-            <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 space-y-1">
+            <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 space-y-2">
               <div className="flex items-center gap-2 text-blue-700 font-semibold text-sm">
                 <Info className="h-4 w-4" />
                 Subsequent Receipt — Partial Container
@@ -375,6 +400,10 @@ export function OffloadDialog({
                 <span>Declared: <strong>{formatNumber(partialReceiptInfo.declared)} kg</strong></span>
                 <span>Already received: <strong>{formatNumber(partialReceiptInfo.alreadyReceived)} kg</strong></span>
                 <span>Remaining: <strong>{formatNumber(partialReceiptInfo.remaining)} kg</strong></span>
+              </div>
+              <div className="grid grid-cols-2 gap-2 text-sm text-blue-800">
+                <span>Fixed Landed Cost/KG (USD): <strong>{selectedContainer?.fixedCostPerKgUsd ? formatNumber(parseFloat(selectedContainer.fixedCostPerKgUsd), 6) : "—"} USD/kg</strong></span>
+                <span>Value of This Receipt: <strong>{receiptValue != null ? `${formatNumber(receiptValue, 2)} USD` : "—"}</strong></span>
               </div>
               <p className="text-xs text-blue-600 flex items-center gap-1">
                 <Lock className="h-3 w-3" />

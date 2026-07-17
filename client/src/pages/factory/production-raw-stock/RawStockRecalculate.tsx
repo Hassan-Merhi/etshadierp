@@ -64,6 +64,9 @@ interface RecalcRow {
   diffPct: number;
   changed: boolean;
   fxUnresolved: boolean;
+  valuationKg?: number;
+  actualReceivedKg?: number;
+  wasPartialReceipt?: boolean;
 }
 
 interface AffectedMixBatchRow {
@@ -386,6 +389,7 @@ export default function RawStockRecalculate() {
       queryClient.invalidateQueries({ queryKey: ["/api/factory/mix-batches"] });
       queryClient.invalidateQueries({ queryKey: ["/api/factory/containers"] });
       queryClient.invalidateQueries({ queryKey: ["/api/factory/raw-stock/available-containers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/bales"] });
       setSelected(new Set());
       const totalBatches = results.reduce((s: number, r: any) => s + r.affectedBatches, 0);
       const totalBales = results.reduce((s: number, r: any) => s + r.affectedBales, 0);
@@ -484,7 +488,9 @@ export default function RawStockRecalculate() {
   const partialOffloadCandidates = useMemo(
     () =>
       (rows || []).filter(
-        (r) => r.containerStatus === "PARTIALLY_RECEIVED" && r.changed && !r.fxUnresolved
+        // Catch historical containers already promoted to OFFLOADED by checking
+        // wasPartialReceipt rather than containerStatus === "PARTIALLY_RECEIVED".
+        (r) => r.changed && !r.fxUnresolved && r.wasPartialReceipt === true
       ),
     [rows]
   );

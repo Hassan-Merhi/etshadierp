@@ -257,6 +257,12 @@ export interface RecalcRow {
   diffPct: number;
   changed: boolean;
   fxUnresolved: boolean;
+  /** Declared/agreed KG for this container (totalKg || declaredKg || actualReceivedKg). */
+  valuationKg: number;
+  /** KG actually received (from raw-stock row or container.actualReceivedKg). */
+  actualReceivedKg: number;
+  /** True when the container had only a partial receipt (actualReceivedKg < valuationKg). */
+  wasPartialReceipt: boolean;
 }
 
 const OPEN_BATCH_STATUSES = ["ACTIVE", "OPEN", "CARRY_FORWARD"];
@@ -396,6 +402,9 @@ export async function getRawStockRecalcPreview(companyId: number): Promise<Recal
     const remainingKg = Math.max(0, receivedKg - usedKg);
     const sc = sourceCountByContainer.get(container.id);
 
+    const rawStockValuationKg = parseFloat(
+      (container as any).totalKg || container.declaredKg || container.actualReceivedKg || "0"
+    );
     results.push({
       containerId: container.id,
       rawStockId: row.rawStockId,
@@ -418,6 +427,9 @@ export async function getRawStockRecalcPreview(companyId: number): Promise<Recal
       diffPct: next.fxUnresolved ? 0 : diffPct,
       changed,
       fxUnresolved: next.fxUnresolved,
+      valuationKg: rawStockValuationKg,
+      actualReceivedKg: receivedKg,
+      wasPartialReceipt: receivedKg > 0 && receivedKg < rawStockValuationKg - 0.001,
     });
   }
 
@@ -437,6 +449,9 @@ export async function getRawStockRecalcPreview(companyId: number): Promise<Recal
     const receivedKg = parseFloat(container.actualReceivedKg || "0");
     const sc = sourceCountByContainer.get(container.id);
 
+    const histValuationKg = parseFloat(
+      (container as any).totalKg || container.declaredKg || container.actualReceivedKg || "0"
+    );
     results.push({
       containerId: container.id,
       rawStockId: null,
@@ -460,6 +475,9 @@ export async function getRawStockRecalcPreview(companyId: number): Promise<Recal
       // Historical containers always need review if they have sources
       changed: changed || (sc?.source_count || 0) > 0,
       fxUnresolved: next.fxUnresolved,
+      valuationKg: histValuationKg,
+      actualReceivedKg: receivedKg,
+      wasPartialReceipt: receivedKg > 0 && receivedKg < histValuationKg - 0.001,
     });
   }
 

@@ -3260,6 +3260,8 @@ export const factoryContainerReceipts = pgTable(
     createdBy: varchar("created_by", { length: 255 }),
     createdAt: timestamp("created_at").notNull().defaultNow(),
     deletedAt: timestamp("deleted_at"),
+    /** Caller-supplied idempotency key — resubmitting with the same key returns without re-applying. */
+    idempotencyKey: varchar("idempotency_key", { length: 100 }),
   },
   (t) => ({
     containerIdx: index("factory_container_receipts_container_idx").on(t.companyId, t.containerId),

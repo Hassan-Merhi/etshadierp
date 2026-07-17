@@ -4607,6 +4607,15 @@ END $$`,
     `CREATE INDEX IF NOT EXISTS factory_container_receipts_container_idx ON factory_container_receipts(company_id, container_id)`,
     `CREATE INDEX IF NOT EXISTS factory_container_receipts_date_idx ON factory_container_receipts(company_id, receipt_date)`,
 
+    // -- factory_container_receipts: integrity constraints + idempotency key (July 2026) --
+    // Each migration statement is individually caught by the runner; duplicate-constraint
+    // errors on re-deploy are non-fatal (logged but do not block startup).
+    `ALTER TABLE factory_container_receipts ADD COLUMN IF NOT EXISTS idempotency_key varchar(100)`,
+    `ALTER TABLE factory_container_receipts ADD CONSTRAINT fcr_positive_received_kg CHECK (received_kg > 0)`,
+    `ALTER TABLE factory_container_receipts ADD CONSTRAINT fcr_cumulative_gte_received CHECK (cumulative_received_kg >= received_kg)`,
+    `ALTER TABLE factory_container_receipts ADD CONSTRAINT fcr_container_fkey FOREIGN KEY (container_id) REFERENCES factory_containers(id) ON DELETE RESTRICT`,
+    `CREATE UNIQUE INDEX IF NOT EXISTS factory_container_receipts_idempotency_idx ON factory_container_receipts(company_id, container_id, idempotency_key) WHERE idempotency_key IS NOT NULL`,
+
     // -- Per-KG cost/rate/price column precision: upgrade to numeric(x,6) (July 2026) --
     // Standardise every per-KG cost, rate, and price column in the Factory module
     // to exactly 6 decimal places. Re-running on an already-upgraded column is safe:

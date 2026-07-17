@@ -147,117 +147,132 @@ export function registerRawStockContainerRoutes(app: Express) {
         return res.status(400).json({ message: "Only containers with PENDING duty can be confirmed" });
       }
 
-      const oldDutyAmount = container.dutyAmount;
       const newDutyAmount = parseFloat(dutyAmount);
+      let resultCostPerKg: number | null = null;
 
-      await db.insert(factoryDutyAuditLog).values({
-        companyId,
-        containerId,
-        oldDutyAmount: oldDutyAmount || "0",
-        newDutyAmount: String(newDutyAmount),
-        oldDutyStatus: container.dutyStatus,
-        newDutyStatus: "CONFIRMED",
-        notes: dutyNotes || null,
-        updatedByUserId: userId,
-      });
-
-      // 1. Persist the confirmed duty fields only. The shared landed-cost helper
-      //    will compute the full inclusive cost using all charges + this duty.
-      await db
-        .update(factoryContainers)
-        .set({
-          dutyAmount: String(newDutyAmount),
-          dutyStatus: "CONFIRMED",
-          dutyNotes: dutyNotes || container.dutyNotes,
-          updatedAt: new Date(),
-        })
-        .where(eq(factoryContainers.id, containerId));
-
-      // 2. Load the updated container (now with dutyStatus=CONFIRMED) and its
-      //    charges so the shared helper reads the correct, complete cost picture.
-      const [updatedContainer] = await db
-        .select()
-        .from(factoryContainers)
-        .where(eq(factoryContainers.id, containerId));
-
-      const additionalChargesRows = await db
-        .select()
-        .from(factoryOffloadAdditionalCharges)
-        .where(
-          and(
-            eq(factoryOffloadAdditionalCharges.containerId, containerId),
-            eq(factoryOffloadAdditionalCharges.companyId, companyId)
-          )
-        );
-
-      const commissionRows = await db
-        .select()
-        .from(factoryContainerCommissions)
-        .where(
-          and(
-            eq(factoryContainerCommissions.containerId, containerId),
-            eq(factoryContainerCommissions.companyId, companyId)
-          )
-        );
-      const commissionRecord = commissionRows.sort((a: any, b: any) => b.id - a.id)[0] || null;
-
-      // 3. Use the single authoritative landed-cost helper — same formula as the
-      //    offload route, post-offload-charges route, and the recalc tool. Avoids
-      //    a stale/simplified inline duplicate that can drift.
-      const next = computeCorrectContainerCost(updatedContainer, additionalChargesRows, commissionRecord);
-      if (next.fxUnresolved) {
-        return res.status(400).json({
-          message: new UnresolvedExchangeRateError(container.currencyCode || "USD").message,
-        });
-      }
-
-      // 4. Persist the recalculated financials.
-      await db
-        .update(factoryContainers)
-        .set({
-          finalPayableAmount: String(next.totalCost),
-          ratePerKgUsd: String(next.costPerKgUsd),
-          finalPayableAmountUsd: String(next.totalUsd),
-          updatedAt: new Date(),
-        })
-        .where(eq(factoryContainers.id, containerId));
-
-      // 5. Propagate the updated cost to raw stock and to any still-OPEN mix batch
-      //    sources/batches/bales that drew from this container, via the same shared,
-      //    tested cascade used by the post-offload-charges route — this guarantees
-      //    CLOSED/COMPLETED batches (and their pressed bales) are never rewritten and
-      //    the supplier's locked rate is nudged consistently rather than duplicated
-      //    inline logic drifting from that behavior.
+      // ── Single atomic transaction: all reads + writes happen together ─────────
+      // Locking the container FOR UPDATE prevents concurrent duty confirmations or
+      // offload mutations from racing this route. All financial writes (duty fields,
+      // financials, cascade, daybook) are inside one transaction — a partial failure
+      // rolls everything back.
       await db.transaction(async (tx: any) => {
+        // 1. Lock container FOR UPDATE — authoritative source for all reads below.
+        const [lockedContainer] = await tx
+          .select()
+          .from(factoryContainers)
+          .where(and(eq(factoryContainers.id, containerId), eq(factoryContainers.companyId, companyId)))
+          .for("update");
+
+        if (!lockedContainer) throw Object.assign(new Error("Container not found"), { status: 404 });
+        if (lockedContainer.dutyStatus !== "PENDING") {
+          throw Object.assign(
+            new Error("Only containers with PENDING duty can be confirmed"),
+            { status: 400 }
+          );
+        }
+
+        // 2. Load charges and commission inside the transaction.
+        const additionalChargesRows = await tx
+          .select()
+          .from(factoryOffloadAdditionalCharges)
+          .where(
+            and(
+              eq(factoryOffloadAdditionalCharges.containerId, containerId),
+              eq(factoryOffloadAdditionalCharges.companyId, companyId)
+            )
+          );
+
+        const commissionRows = await tx
+          .select()
+          .from(factoryContainerCommissions)
+          .where(
+            and(
+              eq(factoryContainerCommissions.containerId, containerId),
+              eq(factoryContainerCommissions.companyId, companyId)
+            )
+          );
+        const commissionRecord = commissionRows.sort((a: any, b: any) => b.id - a.id)[0] || null;
+
+        // 3. Build in-memory snapshot with the confirmed duty so the helper sees the
+        //    correct, complete cost picture without a second round-trip.
+        const containerSnapshot = {
+          ...lockedContainer,
+          dutyAmount: String(newDutyAmount),
+          dutyStatus: "CONFIRMED" as string,
+          dutyNotes: dutyNotes || lockedContainer.dutyNotes,
+        };
+
+        // 4. Compute new inclusive landed cost — pure computation, no db calls.
+        const next = computeCorrectContainerCost(
+          containerSnapshot as any,
+          additionalChargesRows,
+          commissionRecord
+        );
+        if (next.fxUnresolved) {
+          throw Object.assign(
+            new Error(new UnresolvedExchangeRateError(lockedContainer.currencyCode || "USD").message),
+            { status: 400 }
+          );
+        }
+        resultCostPerKg = next.costPerKg;
+
+        // 5. Insert duty audit log — atomic with the update.
+        await tx.insert(factoryDutyAuditLog).values({
+          companyId,
+          containerId,
+          oldDutyAmount: lockedContainer.dutyAmount || "0",
+          newDutyAmount: String(newDutyAmount),
+          oldDutyStatus: lockedContainer.dutyStatus,
+          newDutyStatus: "CONFIRMED",
+          notes: dutyNotes || null,
+          updatedByUserId: userId,
+        });
+
+        // 6. Persist confirmed duty + recalculated financials in one UPDATE.
+        await tx
+          .update(factoryContainers)
+          .set({
+            dutyAmount: String(newDutyAmount),
+            dutyStatus: "CONFIRMED",
+            dutyNotes: dutyNotes || lockedContainer.dutyNotes,
+            finalPayableAmount: String(next.totalCost),
+            ratePerKgUsd: String(next.costPerKgUsd),
+            finalPayableAmountUsd: String(next.totalUsd),
+            updatedAt: new Date(),
+          })
+          .where(eq(factoryContainers.id, containerId));
+
+        // 7. Cascade the updated cost to raw stock and any still-OPEN mix batches.
         await cascadeContainerCostChange(tx, {
           companyId,
           containerId,
           newCostPerKg: next.costPerKg,
           newCostPerKgUsd: next.costPerKgUsd,
         });
+
+        // 8. Daybook entry for the duty confirmation.
+        const { fxRate } = resolveStoredFxRate(
+          lockedContainer.currencyCode,
+          (lockedContainer as any).fxRateToUsdOffload || lockedContainer.fxRateToUsd,
+          (lockedContainer as any).fxRateConfirmed
+        );
+        const today = req.body.txDate || getClientDate(req);
+        await writeDaybookEntry(tx, {
+          companyId,
+          txDate: today,
+          txType: "DUTY",
+          referenceId: containerId,
+          description: `Duty confirmed for container ${lockedContainer.containerNumber}: ${newDutyAmount.toFixed(2)}`,
+          currencyCode: lockedContainer.currencyCode || "USD",
+          amountCurrency: newDutyAmount,
+          fxRateToUsd: fxRate,
+        });
       });
 
-      const { fxRate } = resolveStoredFxRate(
-        container.currencyCode,
-        (updatedContainer as any).fxRateToUsdOffload || updatedContainer.fxRateToUsd,
-        (updatedContainer as any).fxRateConfirmed
-      );
-      const today = req.body.txDate || getClientDate(req);
-      await writeDaybookEntry(db, {
-        companyId,
-        txDate: today,
-        txType: "DUTY",
-        referenceId: containerId,
-        description: `Duty confirmed for container ${container.containerNumber}: ${newDutyAmount.toFixed(2)}`,
-        currencyCode: container.currencyCode || "USD",
-        amountCurrency: newDutyAmount,
-        fxRateToUsd: fxRate,
-      });
-
-      res.json({ message: "Duty confirmed and costs recalculated", newCostPerKg: next.costPerKg });
+      res.json({ message: "Duty confirmed and costs recalculated", newCostPerKg: resultCostPerKg });
     } catch (error: any) {
       console.error("Error confirming duty:", error);
-      res.status(500).json({ message: error.message });
+      res.status((error as any).status || 500).json({ message: error.message });
     }
   });
 

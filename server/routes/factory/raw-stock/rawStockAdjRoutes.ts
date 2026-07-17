@@ -791,21 +791,69 @@ export function registerRawStockAdjRoutes(app: Express) {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      // Include PARTIALLY_RECEIVED containers — they have a raw-stock row but still
-      // accept additional receipts up to their declared kg. Exclude only containers
-      // that are fully OFFLOADED, soft-deleted, or are opening-balance entries.
-      const results = await db
+      // Include only containers in statuses that can still accept a receipt.
+      // ARRIVED/RECEIVED: awaiting first offload.
+      // PARTIALLY_RECEIVED: first receipt done, more kg remain.
+      // Exclude PENDING, IN_TRANSIT, CLOSED, COMPLETED, OFFLOADED, DELETED, OPENING_BALANCE.
+      const rawResults = await db
         .select()
         .from(factoryContainers)
         .where(
           and(
             eq(factoryContainers.companyId, companyId),
-            sql`${factoryContainers.status} NOT IN ('DELETED', 'OPENING_BALANCE', 'OFFLOADED')`,
+            sql`${factoryContainers.status} IN ('ARRIVED', 'RECEIVED', 'PARTIALLY_RECEIVED')`,
             isNull(factoryContainers.deletedAt)
           )
         );
 
-      res.json(results);
+      // For PARTIALLY_RECEIVED: only include when actualReceivedKg < valuationKg
+      // (catches edge cases where a partially-received container has been fully
+      // received outside the normal flow but status was not yet promoted).
+      const validContainers = rawResults.filter((c) => {
+        if (c.status !== "PARTIALLY_RECEIVED") return true;
+        const valuationKg = parseFloat((c as any).totalKg || c.declaredKg || c.actualReceivedKg || "0");
+        const receivedKg = parseFloat(c.actualReceivedKg || "0");
+        return valuationKg > 0 && receivedKg < valuationKg - 0.001;
+      });
+
+      // For PARTIALLY_RECEIVED containers, surface the fixed landed cost/kg from
+      // raw stock so the offload dialog can display the established rate without
+      // requiring the user to re-enter it.
+      const partialIds = validContainers
+        .filter((c) => c.status === "PARTIALLY_RECEIVED")
+        .map((c) => c.id);
+      const rawStockByContainer = new Map<number, { costPerKg: string | null; costPerKgUsd: string | null }>();
+
+      if (partialIds.length > 0) {
+        const rawStockRows = await db
+          .select({
+            containerId: factoryRawStock.containerId,
+            costPerKg: factoryRawStock.costPerKg,
+            costPerKgUsd: factoryRawStock.costPerKgUsd,
+          })
+          .from(factoryRawStock)
+          .where(
+            and(
+              eq(factoryRawStock.companyId, companyId),
+              inArray(factoryRawStock.containerId, partialIds),
+              isNull(factoryRawStock.deletedAt)
+            )
+          );
+        for (const row of rawStockRows) {
+          rawStockByContainer.set(row.containerId, {
+            costPerKg: row.costPerKg,
+            costPerKgUsd: row.costPerKgUsd,
+          });
+        }
+      }
+
+      const response = validContainers.map((c) => {
+        if (c.status !== "PARTIALLY_RECEIVED") return c;
+        const rs = rawStockByContainer.get(c.id);
+        return { ...c, fixedCostPerKg: rs?.costPerKg || null, fixedCostPerKgUsd: rs?.costPerKgUsd || null };
+      });
+
+      res.json(response);
     } catch (error: any) {
       console.error("Error fetching available containers:", error);
       res.status(500).json({ message: error.message });

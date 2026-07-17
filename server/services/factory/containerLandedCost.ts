@@ -90,12 +90,20 @@ export function computeContainerLandedCost(
   const rawFreightFx = parseFloat((container as any).freightFxRateToUsd || "");
   const freightFxConfirmed = !!(container as any).freightFxRateConfirmed;
   let dFreightFx: Decimal;
+  let freightFxUnresolved = false;
   if (freightCcy === "USD") {
     dFreightFx = new Decimal(1);
   } else if (Number.isFinite(rawFreightFx) && rawFreightFx > 0 && freightFxConfirmed) {
     dFreightFx = new Decimal(rawFreightFx);
-  } else {
+  } else if (freightCcy === containerCcy) {
+    // Same currency as container — the confirmed container offload FX applies.
     dFreightFx = dFxRate;
+  } else if (freightVal.gt(0)) {
+    // Non-USD, different currency, positive amount, no confirmed own FX rate.
+    freightFxUnresolved = true;
+    dFreightFx = new Decimal(0);
+  } else {
+    dFreightFx = dFxRate; // zero amount — rate irrelevant
   }
   const freightUsd = freightCcy === "USD" ? freightVal : freightVal.times(dFreightFx);
   const freightInContainerCcy =
@@ -104,6 +112,7 @@ export function computeContainerLandedCost(
   // ── Other charges ─────────────────────────────────────────────────────────
   let ocInContainerCcy: Decimal;
   let ocUsd: Decimal;
+  let ocFxUnresolved = false;
   if (otherChargesRows && otherChargesRows.length > 0) {
     ocInContainerCcy = new Decimal(0);
     ocUsd = new Decimal(0);
@@ -117,8 +126,15 @@ export function computeContainerLandedCost(
         dOcFx = new Decimal(1);
       } else if (Number.isFinite(rawOcFx) && rawOcFx > 0 && ocFxConfirmed) {
         dOcFx = new Decimal(rawOcFx);
-      } else {
+      } else if (ocCcy === containerCcy) {
+        // Same currency as container — confirmed container offload FX applies.
         dOcFx = dFxRate;
+      } else if (ocAmt.gt(0)) {
+        // Non-USD, different currency, positive amount, no confirmed own FX rate.
+        ocFxUnresolved = true;
+        continue; // skip this charge; don't accumulate zeros into the totals
+      } else {
+        dOcFx = dFxRate; // zero amount — rate irrelevant
       }
       const ocAmtUsd = ocCcy === "USD" ? ocAmt : ocAmt.times(dOcFx);
       const ocAmtInContainerCcy =
@@ -129,8 +145,21 @@ export function computeContainerLandedCost(
   } else {
     const ocVal = new Decimal(container.otherCharges || "0");
     const ocCcy = (container as any).otherChargesCurrencyCode || containerCcy;
-    ocUsd = ocCcy === "USD" ? ocVal : ocVal.times(dFxRate);
-    ocInContainerCcy = ocCcy === containerCcy ? ocVal : dFxRate.gt(0) ? ocUsd.div(dFxRate) : ocVal;
+    if (ocCcy === "USD") {
+      ocUsd = ocVal;
+      ocInContainerCcy = containerCcy === "USD" ? ocVal : dFxRate.gt(0) ? ocVal.div(dFxRate) : ocVal;
+    } else if (ocCcy === containerCcy) {
+      ocInContainerCcy = ocVal;
+      ocUsd = dFxRate.gt(0) ? ocVal.times(dFxRate) : ocVal;
+    } else if (ocVal.gt(0)) {
+      // Non-USD, different currency from the container, positive amount — unresolvable.
+      ocFxUnresolved = true;
+      ocUsd = new Decimal(0);
+      ocInContainerCcy = new Decimal(0);
+    } else {
+      ocUsd = new Decimal(0);
+      ocInContainerCcy = new Decimal(0);
+    }
   }
 
   // ── Commission ────────────────────────────────────────────────────────────
@@ -206,12 +235,28 @@ export function computeContainerLandedCost(
   // ── Additional charges (each row stores its own currency + fx rate) ───────
   let addlInContainerCcy = new Decimal(0);
   let addlUsd = new Decimal(0);
+  let addlFxUnresolved = false;
   for (const c of additionalCharges) {
     const amt = new Decimal(c.amount || "0");
     const ccy = c.currencyCode || containerCcy;
     const rawCfx = parseFloat(c.fxRateToUsd || "");
-    const cfx = Number.isFinite(rawCfx) && rawCfx > 0 ? new Decimal(rawCfx) : dFxRate;
-    const amtUsd = ccy === "USD" ? amt : amt.times(cfx);
+    const cfxConfirmed = !!(c as any).fxRateConfirmed;
+    let dCfx: Decimal;
+    if (ccy === "USD") {
+      dCfx = new Decimal(1);
+    } else if (Number.isFinite(rawCfx) && rawCfx > 0 && cfxConfirmed) {
+      dCfx = new Decimal(rawCfx);
+    } else if (ccy === containerCcy) {
+      // Same currency as container — confirmed container offload FX applies.
+      dCfx = dFxRate;
+    } else if (amt.gt(0)) {
+      // Non-USD, different currency, positive amount, no confirmed own FX rate.
+      addlFxUnresolved = true;
+      continue; // skip this charge; don't pollute totals with a wrong rate
+    } else {
+      dCfx = dFxRate; // zero amount — rate irrelevant
+    }
+    const amtUsd = ccy === "USD" ? amt : amt.times(dCfx);
     const amtInContainerCcy = ccy === containerCcy ? amt : dFxRate.gt(0) ? amtUsd.div(dFxRate) : amt;
     addlInContainerCcy = addlInContainerCcy.plus(amtInContainerCcy);
     addlUsd = addlUsd.plus(amtUsd);
@@ -236,6 +281,6 @@ export function computeContainerLandedCost(
     fullCostUsd: totalUsd.toNumber(),
     costPerKg: totalCost.div(canonicalKg).toDecimalPlaces(COST_SCALE).toNumber(),
     costPerKgUsd: totalUsd.div(canonicalKg).toDecimalPlaces(COST_SCALE).toNumber(),
-    fxUnresolved: commFxUnresolved,
+    fxUnresolved: commFxUnresolved || freightFxUnresolved || ocFxUnresolved || addlFxUnresolved,
   };
 }

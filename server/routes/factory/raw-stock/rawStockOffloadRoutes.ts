@@ -12,6 +12,7 @@ import {
   getLockedSupplierRate,
 } from "../../../services/factory/rawStockLockedRate";
 import { resolveStoredFxRate, resolveStoredFxRateOrThrow } from "../../../services/factory/currencyConversion";
+import { computeContainerLandedCost } from "../../../services/factory/containerLandedCost";
 import {
   writeDaybookEntry,
   getOrFetchFxRateToUsd,
@@ -157,8 +158,16 @@ export function registerRawStockOffloadRoutes(app: Express) {
         offloadDate: reqOffloadDate,
         mixBatchAllocations: reqMixBatchAllocations,
         destination: reqDestination,
+        idempotencyKey,
       } = req.body;
       if (!containerId) return res.status(400).json({ message: "Container ID is required" });
+
+      // Validate receivedKg upfront — required for both first and subsequent receipts.
+      // An explicit positive finite value is mandatory; the old `receivedKg || declaredKg`
+      // fallback silently accepted a missing receivedKg and treated it as a full offload.
+      if (!receivedKg || !Number.isFinite(parseFloat(receivedKg || "")) || parseFloat(receivedKg) <= 0) {
+        return res.status(400).json({ message: "receivedKg must be a positive finite number" });
+      }
 
       const [container] = await db
         .select()
@@ -214,15 +223,9 @@ export function registerRawStockOffloadRoutes(app: Express) {
       }
 
       const declaredKg = container.totalKg || "0";
-      const actualKg = receivedKg || declaredKg;
+      const dReceivedKg = new Decimal(receivedKg);
       const baseCostPerKg = costPerKg || container.ratePerKg || "0";
-      const differenceKg = String(parseFloat(declaredKg) - parseFloat(actualKg));
-      // basePayable uses the FULL declared weight, not just the kg received this trip.
-      // All fixed costs (freight, commission, duty, other charges) are contracted for the
-      // full container — spreading them over only the partial received weight inflates the
-      // per-kg rate on first receipt and means the rate changes on each subsequent receipt,
-      // making it impossible to establish a stable locked rate for mix-batch costing.
-      const basePayable = parseFloat(declaredKg) * parseFloat(baseCostPerKg);
+      const differenceKg = new Decimal(declaredKg).minus(dReceivedKg).toDecimalPlaces(3).toFixed(3);
 
       // Fall back to the container's own supplier for freight payee when the offload
       // request didn't explicitly resend one. Container creation and the PATCH freight-sync
@@ -240,49 +243,31 @@ export function registerRawStockOffloadRoutes(app: Express) {
       const freightVal = parseFloat(reqFreight || "0");
       const otherChargesVal = parseFloat(reqOtherCharges || "0");
       const additionalChargesArr = Array.isArray(reqAdditionalCharges) ? reqAdditionalCharges : [];
-      // Each charge may be in its own currency; convert each to container currency for totalCost
-      const additionalChargesTotal = additionalChargesArr.reduce((sum: number, c: any) => {
-        const amt = parseFloat(c.amount || "0");
-        const chargeCcy = c.currencyCode || currencyCode;
-        const chargeFx = parseFloat(c.fxRateToUsd || String(fxRate));
-        if (chargeCcy === currencyCode) return sum + amt;
-        const amtUsd = chargeCcy === "USD" ? amt : amt * chargeFx;
-        const amtInContainerCcy = currencyCode === "USD" ? amtUsd : fxRate > 0 ? amtUsd / fxRate : amtUsd;
-        return sum + amtInContainerCcy;
-      }, 0);
       const dutyVal = reqDutyStatus === "CONFIRMED" ? parseFloat(reqDutyAmount || "0") : 0;
       const dutyStatus = reqDutyStatus || "NONE";
 
-      // ── Commission computation (must happen before totalCost calculation) ──────
-      // The DB insert is deferred into the transaction below; only the math runs here.
+      // ── Commission computation (DB insert deferred into the transaction) ──────
       let commissionRecord: any = null;
       let commTotalVal = 0;
-      let commInContainerCcy = 0;
       let commCurrencyForUsd = currencyCode;
       let commFxRateForUsd = fxRate;
       let commInsertValues: any = null;
       if (commission && commission.personName && commission.commissionRate) {
         const commType = commission.commissionType || "PER_KG";
         const commRate = parseFloat(commission.commissionRate) || 0;
-        // Commission PER_KG is computed on the full declared weight — the commission
-        // is agreed for the whole container, not just the portion received so far.
+        // Commission PER_KG is computed on the full declared weight — agreed for the
+        // whole container, not just the portion received so far.
         commTotalVal = commType === "PER_KG" ? commRate * parseFloat(declaredKg) : commRate;
         const commCurrency = (commission.currencyCode || currencyCode).toUpperCase();
         commCurrencyForUsd = commCurrency;
 
-        // ── Commission FX: resolve independently from the container FX ──────────
-        // The commission may be denominated in a currency different from both USD
-        // and the container currency (e.g. AUD container with EUR commission).
-        // Using the container fxRate for a different-currency commission produces
-        // a wrong commissionTotalUsd and cascades all the way to bale cost.
+        // Commission FX: resolve independently — may differ from both USD and container ccy.
         let resolvedCommFxRate: number;
         if (commCurrency === "USD") {
           resolvedCommFxRate = 1;
         } else if (commCurrency === currencyCode.toUpperCase()) {
-          // Same currency as container — confirmed container FX is correct.
           resolvedCommFxRate = fxRate;
         } else {
-          // Different non-USD currency: must resolve independently.
           try {
             resolvedCommFxRate = parseFloat(
               await getOrFetchFxRateToUsd(companyId, commCurrency, offloadDate)
@@ -295,12 +280,6 @@ export function registerRawStockOffloadRoutes(app: Express) {
         }
         commFxRateForUsd = resolvedCommFxRate;
         const commTotalUsd = commCurrency === "USD" ? commTotalVal : commTotalVal * resolvedCommFxRate;
-        commInContainerCcy =
-          commCurrency === currencyCode.toUpperCase()
-            ? commTotalVal
-            : fxRate > 0
-              ? commTotalUsd / fxRate
-              : commTotalUsd;
         commInsertValues = {
           companyId,
           containerId,
@@ -310,56 +289,95 @@ export function registerRawStockOffloadRoutes(app: Express) {
           commissionTotal: String(commTotalVal),
           currencyCode: commCurrency,
           fxRateToUsd: String(resolvedCommFxRate),
-          // The rate was resolved above (USD=1, same-ccy=confirmed container rate, or a
-          // real live fetch) — flag it confirmed so resolveStoredFxRateOrThrow does not
-          // reject it when booking the commission daybook entry.
           fxRateConfirmed: true,
           commissionTotalUsd: String(commTotalUsd),
           ledgerAccountId: commission.ledgerAccountId ? parseInt(commission.ledgerAccountId) : null,
         };
       }
 
-      // Compute per-component USD values (each charge may be in its own currency)
+      // Compute per-component USD values — kept for daybook/voucher posting.
       const freightCcy = reqFreightCurrencyCode || currencyCode;
       const freightFxRateVal = parseFloat(reqFreightFxRate || String(fxRate));
       const freightUsd = freightCcy === "USD" ? freightVal : freightVal * freightFxRateVal;
-      // Convert freight to container currency for totalCost
-      const freightInContainerCcy =
-        freightCcy === currencyCode ? freightVal : fxRate > 0 ? freightUsd / fxRate : freightVal;
 
       const ocCcy = reqOtherChargesCurrencyCode || currencyCode;
       const ocFxRateVal = parseFloat(reqOtherChargesFxRate || String(fxRate));
       const ocUsd = ocCcy === "USD" ? otherChargesVal : otherChargesVal * ocFxRateVal;
-      // Convert OC to container currency for totalCost
-      const ocInContainerCcy = ocCcy === currencyCode ? otherChargesVal : fxRate > 0 ? ocUsd / fxRate : otherChargesVal;
 
-      const totalCost =
-        basePayable + freightInContainerCcy + ocInContainerCcy + additionalChargesTotal + commInContainerCcy + dutyVal;
-      // Divide by declared kg — the fixed denominator — not by this receipt's actual kg.
-      // This is the FIXED landed cost/kg: established once at first offload, unchanged
-      // by subsequent partial receipts, and correct for mix-batch cost inheritance.
-      const dDeclaredKg = new Decimal(declaredKg);
-      const dActualKg = new Decimal(actualKg); // kept for moving-average (incremental kg)
-      const dInclusiveCostPerKg = dDeclaredKg.gt(0) ? new Decimal(totalCost).div(dDeclaredKg) : new Decimal(0);
-      // finalPayableAmount is always the FULL container value (what we agreed to pay)
-      const finalPayableAmount = String(totalCost);
+      // ── Build container snapshot for the shared landed-cost helper ────────────
+      // All financial fields (inclusive cost/kg, finalPayableAmount, USD totals) are
+      // computed by the single authoritative helper to eliminate duplicate logic that
+      // could drift from the recalc tool or rawStockContainerRoutes.
+      const containerSnapshot = {
+        ...container,
+        currencyCode,
+        ratePerKg: String(baseCostPerKg),
+        totalKg: container.totalKg,
+        declaredKg: String(declaredKg),
+        actualReceivedKg: dReceivedKg.toDecimalPlaces(3).toFixed(3),
+        // Container FX confirmed — was resolved above before any charges were processed.
+        fxRateToUsd: String(fxRate),
+        fxRateToUsdOffload: String(fxRate),
+        fxRateConfirmed: true,
+        // Freight FX confirmed (user-supplied rate, or container FX for same-ccy freight).
+        freight: String(freightVal),
+        freightCurrencyCode: freightCcy,
+        freightFxRateToUsd: String(freightFxRateVal),
+        freightFxRateConfirmed: true,
+        // Duty (CONFIRMED includes the amount; PENDING/NONE → zero in the helper).
+        dutyAmount: String(dutyVal),
+        dutyStatus: dutyStatus as string,
+        // OC and commission are passed as explicit row/record args to avoid double-counting.
+        otherCharges: "0",
+        commissionAmount: "0",
+      };
 
-      const commUsd = commCurrencyForUsd === "USD" ? commTotalVal : commTotalVal * commFxRateForUsd;
+      // OC as a single per-row entry so the helper uses the confirmed-FX code path.
+      const ocRowsForHelper: any[] = otherChargesVal > 0
+        ? [{ amount: String(otherChargesVal), currencyCode: ocCcy, fxRateToUsd: String(ocFxRateVal), fxRateConfirmed: true }]
+        : [];
 
-      const baseMaterialUsd = currencyCode === "USD" ? basePayable : basePayable * fxRate;
-      const addlUsd = additionalChargesArr.reduce((sum: number, c: any) => {
-        const amt = parseFloat(c.amount || "0");
-        const chargeCcy = c.currencyCode || currencyCode;
-        const chargeFx = parseFloat(c.fxRateToUsd || String(fxRate));
-        return sum + (chargeCcy === "USD" ? amt : amt * chargeFx);
-      }, 0);
-      const dutyUsd = currencyCode === "USD" ? dutyVal : dutyVal * fxRate;
+      // Additional charges: confirmed when an explicit rate was supplied for a
+      // non-container-currency charge; same-ccy charges need no separate rate.
+      const addlForHelper: any[] = additionalChargesArr.map((c: any) => ({
+        amount: c.amount || "0",
+        currencyCode: c.currencyCode || currencyCode,
+        fxRateToUsd: c.fxRateToUsd || (c.currencyCode === "USD" ? "1" : String(fxRate)),
+        fxRateConfirmed: !!(c.fxRateToUsd && parseFloat(c.fxRateToUsd) > 0),
+      }));
 
-      const totalUsd = baseMaterialUsd + freightUsd + commUsd + ocUsd + addlUsd + dutyUsd;
-      const dCostPerKgUsd = dDeclaredKg.gt(0) ? new Decimal(totalUsd).div(dDeclaredKg) : new Decimal(0);
-      const finalPayableAmountUsd = String(totalUsd);
+      // Commission record: confirmed (rate was resolved above or is 1 for USD).
+      const commissionForHelper: any = commInsertValues
+        ? {
+            commissionTotal: String(commTotalVal),
+            currencyCode: commInsertValues.currencyCode,
+            fxRateToUsd: String(commFxRateForUsd),
+            fxRateConfirmed: true,
+          }
+        : null;
 
-      const newStatus = parseFloat(actualKg) < parseFloat(declaredKg) ? "PARTIALLY_RECEIVED" : "OFFLOADED";
+      const helperResult = computeContainerLandedCost(
+        containerSnapshot as any,
+        addlForHelper,
+        commissionForHelper,
+        ocRowsForHelper
+      );
+
+      if (helperResult.fxUnresolved) {
+        return res.status(400).json({
+          message:
+            "One or more charges have an unresolved exchange rate. " +
+            "Provide explicit FX rates for all non-USD charges in a currency different from the container.",
+        });
+      }
+
+      const dInclusiveCostPerKg = new Decimal(helperResult.costPerKg);
+      const dCostPerKgUsd = new Decimal(helperResult.costPerKgUsd);
+      const finalPayableAmount = new Decimal(helperResult.fullCost).toDecimalPlaces(6).toFixed(6);
+      const finalPayableAmountUsd = new Decimal(helperResult.fullCostUsd).toDecimalPlaces(6).toFixed(6);
+      const newStatus = dReceivedKg.lt(new Decimal(declaredKg).minus(new Decimal("0.001")))
+        ? "PARTIALLY_RECEIVED"
+        : "OFFLOADED";
 
       // ── Pre-fetch ledger accounts BEFORE opening the transaction ──────────────
       // getOrCreateLedgerAccount uses the raw db connection and must not run inside
@@ -397,37 +415,79 @@ export function registerRawStockOffloadRoutes(app: Express) {
         // Financial posting (commission, daybook, freight/OC vouchers) already happened
         // on the first receipt — do NOT repeat it here.
         if (isSubsequentReceipt) {
-          const fixedCostPerKg = parseFloat((existingRawStock as any).costPerKg || "0");
-          const fixedCostPerKgUsd = parseFloat((existingRawStock as any).costPerKgUsd || "0");
-          const prevReceivedKg = parseFloat((existingRawStock as any).receivedKg || "0");
-          const thisReceiptKg = parseFloat(actualKg);
-          const newCumulativeKg = prevReceivedKg + thisReceiptKg;
-          const declaredKgNum = parseFloat(declaredKg);
+          // ── Concurrency-safe continuation receipt ─────────────────────────────
+          // Lock container + raw-stock FOR UPDATE so two simultaneous receipts for
+          // the same container cannot race and produce wrong cumulative kg.
+          const [lockedContainer] = await tx
+            .select()
+            .from(factoryContainers)
+            .where(and(eq(factoryContainers.id, containerId), eq(factoryContainers.companyId, companyId)))
+            .for("update");
+          if (!lockedContainer) throw new Error("Container not found inside transaction");
+          if (lockedContainer.status === "OFFLOADED") throw new Error("This container has already been fully offloaded");
 
-          // Validate kg within remaining bounds
-          const remainingKg = declaredKgNum - prevReceivedKg;
-          if (thisReceiptKg > remainingKg + 0.001) {
+          const [lockedRawStock] = await tx
+            .select()
+            .from(factoryRawStock)
+            .where(and(eq(factoryRawStock.companyId, companyId), eq(factoryRawStock.containerId, containerId)))
+            .for("update");
+          if (!lockedRawStock) throw new Error("No raw-stock record found for this container");
+
+          // Re-derive all amounts from locked rows — never from pre-transaction reads.
+          const lockedValuationKg = new Decimal(
+            (lockedContainer as any).totalKg || lockedContainer.declaredKg || lockedContainer.actualReceivedKg || "0"
+          );
+          const dPrevReceivedKg = new Decimal(lockedRawStock.receivedKg || "0");
+          const dRemainingKg = lockedValuationKg.minus(dPrevReceivedKg);
+
+          if (dReceivedKg.gt(dRemainingKg.plus(new Decimal("0.001")))) {
             throw new Error(
-              `Cannot receive ${thisReceiptKg.toFixed(3)} kg — only ${remainingKg.toFixed(3)} kg remaining from declared ${declaredKgNum.toFixed(3)} kg`
+              `Cannot receive ${dReceivedKg.toDecimalPlaces(3).toFixed(3)} kg — only ${dRemainingKg.toDecimalPlaces(3).toFixed(3)} kg remaining from valuation ${lockedValuationKg.toDecimalPlaces(3).toFixed(3)} kg`
             );
           }
+          const dNewCumulativeKg = dPrevReceivedKg.plus(dReceivedKg);
+
+          // ── Idempotency check — must happen AFTER locking ────────────────────
+          if (idempotencyKey) {
+            const [existingReceipt] = await tx
+              .select({ id: factoryContainerReceipts.id })
+              .from(factoryContainerReceipts)
+              .where(
+                and(
+                  eq(factoryContainerReceipts.companyId, companyId),
+                  eq(factoryContainerReceipts.containerId, containerId),
+                  eq(factoryContainerReceipts.idempotencyKey, idempotencyKey),
+                  isNull(factoryContainerReceipts.deletedAt)
+                )
+              );
+            if (existingReceipt) {
+              rawStock = lockedRawStock;
+              return; // Already applied — return current state without re-posting
+            }
+          }
+
+          const fixedCostPerKg = parseFloat((lockedRawStock as any).costPerKg || "0");
+          const fixedCostPerKgUsd = parseFloat((lockedRawStock as any).costPerKgUsd || "0");
+          const thisReceiptKg = dReceivedKg.toNumber();
+          const newCumulativeKg = dNewCumulativeKg.toDecimalPlaces(3).toNumber();
+          const lockedValuationKgNum = lockedValuationKg.toDecimalPlaces(3).toNumber();
 
           // 0. Moving average with incremental kg + fixed rate (same as first receipt)
-          if (container.supplierId) {
+          if (lockedContainer.supplierId) {
             await applyOffloadMovingAverage(tx, {
               companyId,
-              supplierId: container.supplierId,
+              supplierId: lockedContainer.supplierId,
               newReceivedKg: thisReceiptKg,
               newContainerLandedCostPerKgUsd: fixedCostPerKgUsd,
             });
           }
 
-          // 1. Update raw-stock receivedKg (cumulative)
+          // 1. Update raw-stock receivedKg (cumulative) using locked row id
           await tx
             .update(factoryRawStock)
-            .set({ receivedKg: String(newCumulativeKg) })
-            .where(eq(factoryRawStock.id, (existingRawStock as any).id));
-          rawStock = { ...existingRawStock, receivedKg: String(newCumulativeKg) };
+            .set({ receivedKg: dNewCumulativeKg.toDecimalPlaces(3).toFixed(3) })
+            .where(eq(factoryRawStock.id, (lockedRawStock as any).id));
+          rawStock = { ...lockedRawStock, receivedKg: dNewCumulativeKg.toDecimalPlaces(3).toFixed(3) };
 
           // 2. Mix-batch sources at fixed rate
           for (const alloc of mixBatchAllocationsArr) {
@@ -438,7 +498,7 @@ export function registerRawStockOffloadRoutes(app: Express) {
             await tx.insert(factoryMixBatchSources).values({
               mixBatchId: parseInt(alloc.mixBatchId),
               containerId,
-              supplierId: container.supplierId || null,
+              supplierId: lockedContainer.supplierId || null,
               sourceType: "container",
               weightKg: String(allocKg),
               costPerKg: dFixedUsd.toDecimalPlaces(6).toFixed(6),
@@ -447,46 +507,45 @@ export function registerRawStockOffloadRoutes(app: Express) {
           }
 
           // 3. Update container cumulative actualReceivedKg and status
-          const subsequentStatus = newCumulativeKg >= declaredKgNum - 0.001 ? "OFFLOADED" : "PARTIALLY_RECEIVED";
+          const subsequentStatus =
+            newCumulativeKg >= lockedValuationKgNum - 0.001 ? "OFFLOADED" : "PARTIALLY_RECEIVED";
           await tx
             .update(factoryContainers)
             .set({
-              actualReceivedKg: String(newCumulativeKg),
-              differenceKg: String(Math.max(0, declaredKgNum - newCumulativeKg)),
+              actualReceivedKg: dNewCumulativeKg.toDecimalPlaces(3).toFixed(3),
+              differenceKg: String(Math.max(0, lockedValuationKgNum - newCumulativeKg)),
               status: subsequentStatus,
-              destination: reqDestination ? String(reqDestination).trim() : container.destination || null,
+              destination: reqDestination ? String(reqDestination).trim() : lockedContainer.destination || null,
               updatedAt: new Date(),
             })
             .where(eq(factoryContainers.id, containerId));
 
-          // 4. Record this receipt event
+          // 4. Record this receipt event — includes idempotencyKey for retry safety
           await tx.insert(factoryContainerReceipts).values({
             companyId,
             containerId,
             receiptDate: offloadDate,
-            receivedKg: String(thisReceiptKg),
-            cumulativeReceivedKg: String(newCumulativeKg),
+            receivedKg: dReceivedKg.toDecimalPlaces(3).toFixed(3),
+            cumulativeReceivedKg: dNewCumulativeKg.toDecimalPlaces(3).toFixed(3),
             fixedCostPerKg: String(fixedCostPerKg),
             fixedCostPerKgUsd: String(fixedCostPerKgUsd),
-            receiptValue: String(thisReceiptKg * fixedCostPerKg),
-            receiptValueUsd: String(thisReceiptKg * fixedCostPerKgUsd),
+            receiptValue: dReceivedKg.times(new Decimal(fixedCostPerKg)).toDecimalPlaces(6).toFixed(6),
+            receiptValueUsd: dReceivedKg.times(new Decimal(fixedCostPerKgUsd)).toDecimalPlaces(6).toFixed(6),
             currencyCode,
             fxRateToUsd: String(fxRate),
             createdBy: (req.session as any).userId || null,
+            idempotencyKey: idempotencyKey || null,
           });
 
-          // 5. Daybook entry for this incremental receipt — records the economic
-          //    event of receiving additional kg at the fixed landed cost/kg.
-          //    Financial charges (freight, commission, duty) were fully posted on
-          //    the first receipt and must NOT be re-posted here.
+          // 5. Daybook entry for this incremental receipt
           await writeDaybookEntry(tx, {
             companyId,
             txDate: offloadDate,
             txType: "OFFLOAD_RAW_STOCK",
-            referenceId: (existingRawStock as any).id,
-            description: `Continuation receipt — container ${container.containerNumber}: ${thisReceiptKg.toFixed(3)} kg at ${new Decimal(fixedCostPerKg).toDecimalPlaces(6).toFixed(6)}/kg (fixed landed rate)`,
+            referenceId: (lockedRawStock as any).id,
+            description: `Continuation receipt — container ${container.containerNumber}: ${dReceivedKg.toDecimalPlaces(3).toFixed(3)} kg at ${new Decimal(fixedCostPerKg).toDecimalPlaces(6).toFixed(6)}/kg (fixed landed rate)`,
             currencyCode,
-            amountCurrency: new Decimal(thisReceiptKg).times(new Decimal(fixedCostPerKg)).toNumber(),
+            amountCurrency: dReceivedKg.times(new Decimal(fixedCostPerKg)).toDecimalPlaces(6).toNumber(),
             fxRateToUsd: fxRate,
             metaJson: JSON.stringify({ containerId, sourceType: "BASE_MATERIAL", receiptKg: thisReceiptKg }),
           });
@@ -505,7 +564,7 @@ export function registerRawStockOffloadRoutes(app: Express) {
           await applyOffloadMovingAverage(tx, {
             companyId,
             supplierId: container.supplierId,
-            newReceivedKg: parseFloat(actualKg),
+            newReceivedKg: dReceivedKg.toNumber(),
             newContainerLandedCostPerKgUsd: dCostPerKgUsd.toNumber(),
           });
         }
@@ -521,13 +580,31 @@ export function registerRawStockOffloadRoutes(app: Express) {
           .values({
             companyId,
             containerId,
-            receivedKg: String(actualKg),
+            receivedKg: dReceivedKg.toDecimalPlaces(3).toFixed(3),
             costPerKg: dInclusiveCostPerKg.toDecimalPlaces(6).toFixed(6),
             costPerKgUsd: dCostPerKgUsd.toDecimalPlaces(6).toFixed(6),
           })
           .returning();
 
-        // 3. Mix batch source INSERTs
+        // 3. Record the first receipt event (enables idempotency on retries and audit history).
+        //    The subsequent-receipt idempotency check looks for this row by idempotencyKey.
+        await tx.insert(factoryContainerReceipts).values({
+          companyId,
+          containerId,
+          receiptDate: offloadDate,
+          receivedKg: dReceivedKg.toDecimalPlaces(3).toFixed(3),
+          cumulativeReceivedKg: dReceivedKg.toDecimalPlaces(3).toFixed(3),
+          fixedCostPerKg: dInclusiveCostPerKg.toDecimalPlaces(6).toFixed(6),
+          fixedCostPerKgUsd: dCostPerKgUsd.toDecimalPlaces(6).toFixed(6),
+          receiptValue: dReceivedKg.times(dInclusiveCostPerKg).toDecimalPlaces(6).toFixed(6),
+          receiptValueUsd: dReceivedKg.times(dCostPerKgUsd).toDecimalPlaces(6).toFixed(6),
+          currencyCode,
+          fxRateToUsd: String(fxRate),
+          createdBy: (req.session as any).userId || null,
+          idempotencyKey: idempotencyKey || null,
+        });
+
+        // 4. Mix batch source INSERTs
         for (const alloc of mixBatchAllocationsArr) {
           const allocKg = parseFloat(alloc.weightKg || "0");
           if (!alloc.mixBatchId || allocKg <= 0) continue;
@@ -547,13 +624,13 @@ export function registerRawStockOffloadRoutes(app: Express) {
           });
         }
 
-        // 4. Container UPDATE (status + financials + pre-offload snapshot)
+        // 5. Container UPDATE (status + financials + pre-offload snapshot)
         await tx
           .update(factoryContainers)
           .set({
             status: newStatus,
             declaredKg: String(declaredKg),
-            actualReceivedKg: String(actualKg),
+            actualReceivedKg: dReceivedKg.toDecimalPlaces(3).toFixed(3),
             finalPayableAmount,
             differenceKg,
             currencyCode,
@@ -606,7 +683,7 @@ export function registerRawStockOffloadRoutes(app: Express) {
           })
           .where(eq(factoryContainers.id, containerId));
 
-        // 5. Additional charges INSERTs
+        // 6. Additional charges INSERTs
         const insertedAdditionalCharges: any[] = [];
         if (additionalChargesArr.length > 0) {
           for (const charge of additionalChargesArr) {
@@ -635,9 +712,9 @@ export function registerRawStockOffloadRoutes(app: Express) {
           }
         }
 
-        // 6. Daybook entries
+        // 7. Daybook entries
         // Use the value of THIS RECEIPT's kg (incremental), not the full container
-        // value. For a fully-received container actualKg == declaredKg so the result
+        // value. For a fully-received container receivedKg == declaredKg so the result
         // is identical. For a partial first receipt, posting the full container value
         // would overstate the daybook — only what we actually received today is an
         // economic event today.
@@ -646,9 +723,9 @@ export function registerRawStockOffloadRoutes(app: Express) {
           txDate: offloadDate,
           txType: "OFFLOAD_RAW_STOCK",
           referenceId: rawStock.id,
-          description: `Offloaded container ${container.containerNumber}: ${actualKg} kg at ${dInclusiveCostPerKg.toDecimalPlaces(6).toFixed(6)}/kg (inclusive)`,
+          description: `Offloaded container ${container.containerNumber}: ${dReceivedKg.toDecimalPlaces(3).toFixed(3)} kg at ${dInclusiveCostPerKg.toDecimalPlaces(6).toFixed(6)}/kg (inclusive)`,
           currencyCode,
-          amountCurrency: dActualKg.times(dInclusiveCostPerKg).toNumber(),
+          amountCurrency: dReceivedKg.times(dInclusiveCostPerKg).toDecimalPlaces(6).toNumber(),
           fxRateToUsd: fxRate,
           metaJson: JSON.stringify({ containerId, sourceType: "BASE_MATERIAL" }),
         });
@@ -945,21 +1022,7 @@ export function registerRawStockOffloadRoutes(app: Express) {
           }
         }
 
-        // 11. Record this first receipt event
-        await tx.insert(factoryContainerReceipts).values({
-          companyId,
-          containerId,
-          receiptDate: offloadDate,
-          receivedKg: String(actualKg),
-          cumulativeReceivedKg: String(actualKg),
-          fixedCostPerKg: dInclusiveCostPerKg.toDecimalPlaces(6).toFixed(6),
-          fixedCostPerKgUsd: dCostPerKgUsd.toDecimalPlaces(6).toFixed(6),
-          receiptValue: dInclusiveCostPerKg.times(new Decimal(actualKg)).toDecimalPlaces(6).toFixed(6),
-          receiptValueUsd: dCostPerKgUsd.times(new Decimal(actualKg)).toDecimalPlaces(6).toFixed(6),
-          currencyCode,
-          fxRateToUsd: String(fxRate),
-          createdBy: (req.session as any).userId || null,
-        });
+        // (First-receipt event was recorded at step 3 above, inside this same transaction.)
       }); // ── end transaction ────────────────────────────────────────────────────
 
       res.json({ rawStock, commission: commissionRecord });
@@ -1157,6 +1220,21 @@ export function registerRawStockOffloadRoutes(app: Express) {
             })
             .where(and(eq(factorySuppliers.id, container.supplierId), eq(factorySuppliers.companyId, companyId)));
         }
+
+        // 4c. Soft-delete all receipt history for this container — marks every
+        //     factoryContainerReceipts row as deleted so subsequent receipt queries
+        //     (and the available-containers endpoint) see a clean slate. Hard-deletes
+        //     of raw stock and commission follow below.
+        await tx
+          .update(factoryContainerReceipts)
+          .set({ deletedAt: new Date() })
+          .where(
+            and(
+              eq(factoryContainerReceipts.companyId, companyId),
+              eq(factoryContainerReceipts.containerId, containerId),
+              isNull(factoryContainerReceipts.deletedAt)
+            )
+          );
 
         // 5. Delete offload records: raw stock, commission records, additional charges, mix-batch links
         await tx
