@@ -1,16 +1,16 @@
 # Program 1 — Deployment Reliability
 
-Status: in progress. This branch must remain unmerged until the owner approves the completed Program 1 package.
+Status: complete and awaiting owner approval. This branch must remain unmerged until the owner approves the completed Program 1 package.
 
 ## Phase sequence
 
 - [x] 1A — Versioned migration cleanup
 - [x] 1B — Production build reliability
 - [x] 1C — Startup and shutdown lifecycle
-- [ ] 1D — Health and recovery controls
-- [ ] 1E — Production observability
+- [x] 1D — Health and recovery controls
+- [x] 1E — Production observability
 
-Do not begin Program 2 on this branch.
+Do not merge this branch automatically.
 
 ## Phase 1A — Versioned migration cleanup
 
@@ -24,50 +24,51 @@ Status: complete.
 
 Status: complete.
 
-### Completed work
-
 - Added `scripts/verify-production-artifact.mjs`.
-- Every production build now validates that `dist/index.js` exists.
-- Every Node preload file referenced by the production start command must exist.
-- Every external package import left in the server bundle must be declared in `dependencies` and resolvable from the production install.
-- The existing decimal.js bundle check remains active and now chains into the complete artifact contract.
-- A missing runtime package or preload file fails during build verification instead of crashing after deployment.
-
-### Focused verification
-
-- Inspected the build and start commands in `package.json`.
-- Confirmed `npm run build` already invokes `verify-server-bundle.mjs`, which now invokes the production artifact verifier.
-- Confirmed the verifier ignores Node built-ins and bundled relative imports while checking external runtime packages.
-- No Replit checks or credits were used.
+- Production builds validate `dist/index.js`, required preload files, external runtime imports, dependency declarations, and package resolvability.
+- The decimal.js bundle check remains active and chains into the complete artifact contract.
+- Missing runtime packages or preload files now fail before deployment startup.
 
 ## Phase 1C — Startup and shutdown lifecycle
 
 Status: complete.
 
-### Completed work
+- Added `server/runtimeLifecycleGuard.mjs`.
+- SIGTERM/SIGINT stop new connections, drain HTTP work, close idle connections, enforce a shutdown deadline, and remain idempotent.
+- Ordinary API work receives a retryable 503 while health endpoints remain available.
+- Existing database-pool shutdown behavior is preserved.
 
-- Added `server/runtimeLifecycleGuard.mjs`, loaded before the compiled application through the existing runtime memory preload.
-- Tracks all Node HTTP servers as they begin listening.
-- On SIGTERM or SIGINT, stops accepting new connections before the existing application handler closes the database pool.
-- Closes idle connections, waits for tracked HTTP servers, applies a configurable shutdown deadline, and makes repeated shutdown signals idempotent.
-- Exposes shutdown state so new API work receives a retryable 503 response during the drain window.
-- Preserves the existing database-pool shutdown and process-manager restart behavior.
+## Phase 1D — Health and recovery controls
 
-### Focused verification
+Status: complete.
 
-- Confirmed the lifecycle guard is imported at the top of `runtimeMemoryGuard.mjs`, which is already loaded by the production start command before `dist/index.js`.
-- Confirmed shutdown interception is installed before the application registers its existing SIGTERM/SIGINT handlers.
-- Confirmed health endpoints remain available while ordinary API work is rejected during shutdown.
+- Added `server/runtimeHealthGuard.mjs`.
+- `/api/health/live` reports process liveness independently of dependencies.
+- `/api/health/ready` verifies the server is listening, shutdown has not begun, required production environment values are present, and PostgreSQL answers a real `SELECT 1` probe.
+- Production startup now fails clearly when `SESSION_SECRET` is absent instead of serving with unsafe configuration.
+- Readiness returns 503 with structured failure details when the database or configuration is unavailable.
+
+## Phase 1E — Production observability
+
+Status: complete.
+
+- Added `server/runtimeObservability.mjs`.
+- Tracks active, total, peak, slow, and 5xx requests.
+- Measures RSS, heap, external memory, and event-loop mean/max/p95/p99 delay.
+- Logs structured JSON for slow requests, 5xx responses, and runtime pressure.
+- `/api/health/metrics` exposes a no-store operational snapshot.
+- Health and observability modules load automatically through the existing production memory preload.
+
+## Focused verification
+
+- Inspected the production start chain and confirmed all Program 1 modules are loaded before `dist/index.js`.
+- Confirmed liveness, readiness, and metrics endpoints bypass request shedding and shutdown rejection.
+- Confirmed the readiness database client always closes after its probe.
+- Confirmed the draft PR remains open and unmerged.
 - No Replit checks or credits were used.
-
-## Remaining Program 1 work
-
-- Phase 1D — Health and recovery controls
-- Phase 1E — Production observability
 
 ## Safety constraints
 
-- Do not merge this branch.
+- Do not merge this branch without owner approval.
 - Do not push directly to `main`.
-- Do not run checks on Replit or consume Replit credits.
 - Do not alter accounting or inventory business behavior as part of deployment hardening.
