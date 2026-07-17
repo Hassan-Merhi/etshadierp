@@ -2,6 +2,7 @@ import type { Express, Request, Response } from "express";
 import { pool } from "../db";
 import { requireAuth, requireRole } from "../auth";
 import { logger } from "../lib/logger";
+import { cleanupExportPath, cleanupFileBackedExport } from "../lib/fileBackedExport";
 import { fetchAllCompanies } from "../services/exportDataService";
 import { sendExportEmail } from "../services/emailService";
 import { buildFullExportZip } from "../helpers/buildFullExportZip";
@@ -142,9 +143,10 @@ export function registerExportRoutes(app: Express) {
     res.json({ jobId: job.id });
 
     // Run async without blocking the response
-    (async () => {
+    void (async () => {
       const runType = mode === "email" ? "manual_email" : "manual_download";
       const runId = await createExportRun(runType);
+      let zipArtifact: Buffer | undefined;
 
       try {
         addStep(job, "Fetching company list...", "info");
@@ -161,6 +163,7 @@ export function registerExportRoutes(app: Express) {
           names,
           skipped,
         } = await buildFullExportZip(companies, fromDate, toDate, (msg, level) => addStep(job, msg, level ?? "info"));
+        zipArtifact = zipBuf;
 
         if (names.length === 0) {
           const msg = "ZIP is empty — no companies exported successfully. Nothing will be sent or downloaded.";
@@ -176,7 +179,7 @@ export function registerExportRoutes(app: Express) {
         const dateLabel = new Date().toISOString().substring(0, 10);
         const sizeMB = (zipBuf.length / 1024 / 1024).toFixed(1);
         const zipSizeBytes = zipBuf.length;
-        addStep(job, `ZIP archive ready — ${sizeMB} MB, ${names.length} companies`, "success");
+        addStep(job, `ZIP archive ready on disk — ${sizeMB} MB, ${names.length} companies`, "success");
 
         await updateExportRun(runId, {
           companiesCount: companies.length,
@@ -188,7 +191,6 @@ export function registerExportRoutes(app: Express) {
         if (mode === "email") {
           await updateExportRun(runId, { emailAttempted: true });
           addStep(job, "Sending email (up to 3 attempts, 30 s between retries)...", "info");
-          let emailAttempts = 0;
 
           const emailRes = await retryAsync({
             label: "ManualEmail",
@@ -198,7 +200,6 @@ export function registerExportRoutes(app: Express) {
             isSuccess: (r) => r.success,
             shouldRetry: (r) => !r.error || !isEmailConfigError(r.error),
             onAttempt: (n) => {
-              emailAttempts = n;
               if (n > 1) addStep(job, `Retry attempt ${n}/3...`, "info");
             },
           });
@@ -206,7 +207,12 @@ export function registerExportRoutes(app: Express) {
           if (emailRes.result.success) {
             addStep(job, `Email sent successfully to all recipients (attempt ${emailRes.attempts})`, "success");
             finishJob(job);
-            logger.info("Export job completed", { module: "export", action: "start", status: "success", durationMs: Date.now() - _t });
+            logger.info("Export job completed", {
+              module: "export",
+              action: "start",
+              status: "success",
+              durationMs: Date.now() - _t,
+            });
             await finishExportRun(runId, {
               status: "success",
               emailSuccess: true,
@@ -215,7 +221,12 @@ export function registerExportRoutes(app: Express) {
           } else {
             const errMsg = emailRes.result.error || "Email send failed";
             failJob(job, errMsg);
-            logger.warn("Export job email failed", { module: "export", action: "start", status: "emailFailed", durationMs: Date.now() - _t });
+            logger.warn("Export job email failed", {
+              module: "export",
+              action: "start",
+              status: "emailFailed",
+              durationMs: Date.now() - _t,
+            });
             await finishExportRun(runId, {
               status: "failed",
               emailSuccess: false,
@@ -223,13 +234,23 @@ export function registerExportRoutes(app: Express) {
               emailAttempts: emailRes.attempts,
             });
           }
+
+          await cleanupFileBackedExport(zipBuf);
+          zipArtifact = undefined;
         } else {
           finishJob(job, zipBuf);
+          zipArtifact = undefined; // the job manager now owns cleanup
           addStep(job, "Ready to download — starting download now", "success");
-          logger.info("Export job completed", { module: "export", action: "start", status: "download_ready", durationMs: Date.now() - _t });
+          logger.info("Export job completed", {
+            module: "export",
+            action: "start",
+            status: "download_ready",
+            durationMs: Date.now() - _t,
+          });
           await finishExportRun(runId, { status: "success" });
         }
       } catch (err: any) {
+        if (zipArtifact) await cleanupFileBackedExport(zipArtifact);
         logger.error("Export job failed", { module: "export", action: "start", durationMs: Date.now() - _t, error: err });
         failJob(job, err.message || "Unexpected error");
         await finishExportRun(runId, { status: "failed", skippedReason: err.message || "Unexpected error" }).catch(
@@ -248,7 +269,8 @@ export function registerExportRoutes(app: Express) {
       status: job.status,
       steps: job.steps,
       error: job.error,
-      hasZip: !!job.zipBuffer,
+      hasZip: !!(job.zipBuffer || job.zipFilePath),
+      zipSizeBytes: job.zipSizeBytes ?? null,
     });
   });
 
@@ -257,16 +279,39 @@ export function registerExportRoutes(app: Express) {
   app.get("/api/export/download/:jobId", guard, (req: Request, res: Response) => {
     const job = getJob(req.params.jobId);
     if (!job) return res.status(404).json({ message: "Job not found" });
-    if (!job.zipBuffer) return res.status(400).json({ message: "ZIP not ready" });
+    if (!job.zipBuffer && !job.zipFilePath) return res.status(400).json({ message: "ZIP not ready" });
+
     const dateLabel = new Date().toISOString().substring(0, 10);
+    const fileName = `DailyExport_${dateLabel}.zip`;
+
+    if (job.zipFilePath) {
+      const exportPath = job.zipFilePath;
+      res.download(exportPath, fileName, async (error) => {
+        job.zipFilePath = undefined;
+        job.zipSizeBytes = undefined;
+        await cleanupExportPath(exportPath);
+
+        if (error) {
+          logger.warn("Disk-backed export download failed", {
+            module: "export",
+            action: "download",
+            jobId: job.id,
+            error,
+          });
+          if (!res.headersSent) res.status(500).json({ message: "Download failed" });
+        }
+      });
+      return;
+    }
+
     res.setHeader("Content-Type", "application/zip");
-    res.setHeader("Content-Disposition", `attachment; filename="DailyExport_${dateLabel}.zip"`);
+    res.setHeader("Content-Disposition", `attachment; filename="${fileName}"`);
     res.send(job.zipBuffer);
-    // Free memory after download
     job.zipBuffer = undefined;
+    job.zipSizeBytes = undefined;
   });
 
-  // ── Companies list for UI ───────────────────────────────────────────────────
+  // ── Companies list for UI ─────────────────────────────────────────────────
 
   app.get("/api/export/companies", guard, async (_req: Request, res: Response) => {
     try {
@@ -277,9 +322,7 @@ export function registerExportRoutes(app: Express) {
     }
   });
 
-  // ── Force-cleanup stuck export runs ─────────────────────────────────────────
-  // Marks ALL 'running' rows as failed regardless of age. The UI only shows the
-  // button when a run has been running >5 min client-side, so this is safe.
+  // ── Force-cleanup stuck export runs ───────────────────────────────────────
   app.post("/api/export/cleanup-stuck-runs", guard, async (_req: Request, res: Response) => {
     try {
       const r = await pool.query(`
@@ -299,29 +342,18 @@ export function registerExportRoutes(app: Express) {
     }
   });
 
-  // ── Backup status ───────────────────────────────────────────────────────────
+  // ── Backup status ─────────────────────────────────────────────────────────
 
   app.get("/api/export/backup-status", guard, async (_req: Request, res: Response) => {
     try {
-      // Latest run
       const latestQ = await pool
-        .query(
-          `
-        SELECT * FROM daily_export_runs ORDER BY created_at DESC LIMIT 1
-      `
-        )
+        .query(`SELECT * FROM daily_export_runs ORDER BY created_at DESC LIMIT 1`)
         .catch(() => ({ rows: [] as any[] }));
 
-      // Recent runs — full detail for all 10 so UI can render each independently
       const recentQ = await pool
-        .query(
-          `
-        SELECT * FROM daily_export_runs ORDER BY created_at DESC LIMIT 10
-      `
-        )
+        .query(`SELECT * FROM daily_export_runs ORDER BY created_at DESC LIMIT 10`)
         .catch(() => ({ rows: [] as any[] }));
 
-      // Readiness data
       const esQ = await pool
         .query(`SELECT gmail_user, gmail_app_password, schedule_enabled FROM export_settings WHERE id = 1`)
         .catch(() => ({ rows: [] as any[] }));
