@@ -1,4 +1,4 @@
-import { createReadStream, createWriteStream, mkdirSync, openSync, closeSync, writeSync, readFileSync } from "node:fs";
+import { createWriteStream, mkdirSync, openSync, closeSync, writeSync, readFileSync } from "node:fs";
 import { mkdir, rm, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -25,6 +25,7 @@ if (!globalThis[INSTALL_KEY]) {
     process.env.SCHEDULED_ATTACHMENT_ORPHAN_CLEANUP_DELAY_MS,
     60 * 60 * 1000
   );
+  const forceBridge = process.env.SCHEDULED_ATTACHMENT_FORCE === "1";
   const tempRoot = process.env.EXPORT_BRIDGE_TEMP_DIR || path.join(tmpdir(), "erp-export-bridge");
 
   function markerPayload(value) {
@@ -45,17 +46,7 @@ if (!globalThis[INSTALL_KEY]) {
     payload.cleanupTimer.unref?.();
   }
 
-  function createFileMarker(filePath, length, source) {
-    const payload = {
-      kind: "file",
-      path: filePath,
-      length,
-      pathname: source,
-      started: false,
-      managedAttachment: true,
-      cleanupDelayMs,
-      cleanupTimer: undefined,
-    };
+  function createMarker(payload, length = 0) {
     const marker = Buffer.alloc(0);
     Object.defineProperty(marker, "length", {
       configurable: false,
@@ -75,6 +66,21 @@ if (!globalThis[INSTALL_KEY]) {
       writable: false,
       value: payload,
     });
+    return marker;
+  }
+
+  function createFileMarker(filePath, length, source) {
+    const payload = {
+      kind: "file",
+      path: filePath,
+      length,
+      pathname: source,
+      started: false,
+      managedAttachment: true,
+      cleanupDelayMs,
+      cleanupTimer: undefined,
+    };
+    const marker = createMarker(payload, length);
     armCleanup(payload, orphanCleanupDelayMs);
     return marker;
   }
@@ -87,6 +93,7 @@ if (!globalThis[INSTALL_KEY]) {
   }
 
   function isKnownAttachmentConcat() {
+    if (forceBridge) return true;
     const lines = applicationStack();
     const firstOwner = lines.find((line) => !line.includes("node_modules"));
     if (!firstOwner) return false;
@@ -94,6 +101,7 @@ if (!globalThis[INSTALL_KEY]) {
   }
 
   function isBackgroundWorkbookWrite() {
+    if (forceBridge) return true;
     const requestStore = globalThis[REQUEST_CONTEXT_KEY]?.getStore?.();
     if (requestStore) return false;
 
@@ -195,45 +203,90 @@ if (!globalThis[INSTALL_KEY]) {
     xlsxPrototype.writeBuffer = scheduledWriteBuffer;
   }
 
+  function materializeMarker(payload) {
+    if (payload.kind === "file" && payload.path) {
+      const buffer = readFileSync(payload.path);
+      armCleanup(payload);
+      return buffer;
+    }
+    if (payload.kind === "chunks" && Array.isArray(payload.chunks)) {
+      const buffer = Buffer.allocUnsafe(payload.length);
+      let offset = 0;
+      for (const chunk of payload.chunks) {
+        const part = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+        part.copy(buffer, offset);
+        offset += part.length;
+      }
+      return buffer;
+    }
+    throw new Error(`Unsupported deferred attachment marker: ${payload.kind}`);
+  }
+
   const formDataNamespace = await import("form-data");
   const FormDataClass = formDataNamespace.default || formDataNamespace;
   const formPrototype = FormDataClass?.prototype;
-  if (formPrototype?.getBuffer && !formPrototype.getBuffer[PATCH_KEY]) {
-    const originalGetBuffer = formPrototype.getBuffer;
-    const patchedGetBuffer = function scheduledAttachmentFormBuffer() {
-      const streams = Array.isArray(this._streams) ? this._streams : [];
-      const restored = [];
-      try {
-        for (let index = 0; index < streams.length; index += 1) {
-          const payload = markerPayload(streams[index]);
-          if (!payload) continue;
+  let originalFormGetBuffer;
 
-          let materialized;
-          if (payload.kind === "file" && payload.path) {
-            materialized = readFileSync(payload.path);
-            armCleanup(payload);
-          } else if (payload.kind === "chunks" && Array.isArray(payload.chunks)) {
-            materialized = Buffer.allocUnsafe(payload.length);
-            let offset = 0;
-            for (const chunk of payload.chunks) {
-              const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
-              buffer.copy(materialized, offset);
-              offset += buffer.length;
-            }
-          } else {
-            continue;
-          }
-
-          restored.push([index, streams[index]]);
-          streams[index] = materialized;
-        }
-        return originalGetBuffer.call(this);
-      } finally {
-        for (const [index, marker] of restored) streams[index] = marker;
+  function materializeFormBuffer(form) {
+    const streams = Array.isArray(form?._streams) ? form._streams : [];
+    const restored = [];
+    try {
+      for (let index = 0; index < streams.length; index += 1) {
+        const payload = markerPayload(streams[index]);
+        if (!payload || payload.kind === "deferred-form") continue;
+        restored.push([index, streams[index]]);
+        streams[index] = materializeMarker(payload);
       }
+      return originalFormGetBuffer.call(form);
+    } finally {
+      for (const [index, marker] of restored) streams[index] = marker;
+    }
+  }
+
+  if (formPrototype?.getBuffer && !formPrototype.getBuffer[PATCH_KEY]) {
+    originalFormGetBuffer = formPrototype.getBuffer;
+    const patchedGetBuffer = function deferredScheduledAttachmentFormBuffer() {
+      const streams = Array.isArray(this._streams) ? this._streams : [];
+      const containsManagedAttachment = streams.some((entry) => {
+        const payload = markerPayload(entry);
+        return payload && payload.kind !== "deferred-form";
+      });
+      if (!containsManagedAttachment) return originalFormGetBuffer.call(this);
+      return createMarker({ kind: "deferred-form", form: this }, 0);
     };
     Object.defineProperty(patchedGetBuffer, PATCH_KEY, { value: true });
     formPrototype.getBuffer = patchedGetBuffer;
+  }
+
+  const originalFetch = globalThis.fetch?.bind(globalThis);
+  let uploadTail = Promise.resolve();
+
+  async function withUploadSlot(work) {
+    const previous = uploadTail;
+    let release;
+    uploadTail = new Promise((resolve) => {
+      release = resolve;
+    });
+    await previous.catch(() => undefined);
+    try {
+      return await work();
+    } finally {
+      release();
+    }
+  }
+
+  if (originalFetch && !globalThis.fetch[PATCH_KEY]) {
+    const patchedFetch = async function scheduledAttachmentFetch(input, init) {
+      const payload = markerPayload(init?.body);
+      if (payload?.kind !== "deferred-form") return originalFetch(input, init);
+
+      return withUploadSlot(async () => {
+        const body = materializeFormBuffer(payload.form);
+        return originalFetch(input, { ...init, body });
+      });
+    };
+    Object.defineProperty(patchedFetch, PATCH_KEY, { value: true });
+    globalThis.fetch = patchedFetch;
   }
 
   console.log(
@@ -245,6 +298,7 @@ if (!globalThis[INSTALL_KEY]) {
       minimumBytes,
       cleanupDelayMs,
       orphanCleanupDelayMs,
+      forceBridge,
     })
   );
 }
