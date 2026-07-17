@@ -281,9 +281,8 @@ export function requestLogger(req: Request, res: Response, next: NextFunction): 
     res.once("close", finalize);
 
     if (!isReadMethod(req.method)) {
-      // Any successful-looking mutation can affect one or more summary endpoints.
-      // Invalidate before route execution so even a very fast follow-up GET cannot
-      // observe an older cached snapshot. The cache is small and company-scoped.
+      // Any mutation can affect one or more summary endpoints. Invalidate before
+      // route execution so a fast follow-up GET cannot observe an older snapshot.
       invalidateHeavyReadCache(req);
     }
 
@@ -293,6 +292,7 @@ export function requestLogger(req: Request, res: Response, next: NextFunction): 
       installJsonResponseLimit(req, res);
       res.setHeader("X-ERP-Cache", "HIT");
       res.setHeader("Age", String(Math.max(0, Math.floor(cacheHit.ageMs / 1000))));
+      res.setHeader("Cache-Control", "private, no-store");
       res.status(200).json(cacheHit.body);
       return;
     }
@@ -308,8 +308,7 @@ export function requestLogger(req: Request, res: Response, next: NextFunction): 
           const serialized = JSON.stringify(body);
           if (serialized !== undefined) {
             const bytes = Buffer.byteLength(serialized);
-            storeHeavyReadCache(req, body, bytes);
-            if (bytes > 0) metrics.cacheMisses += 1;
+            if (storeHeavyReadCache(req, body, bytes)) metrics.cacheMisses += 1;
           }
         } catch {
           // The normal response serializer remains authoritative.
