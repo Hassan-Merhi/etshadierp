@@ -1085,7 +1085,7 @@ export default function RawStockRecalculate() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {fullAudit.rows.filter((r) => !r.codes.includes("CORRECT")).map((r) => (
+                    {fullAudit.rows.filter((r) => !r.codes.includes("CORRECT") && !r.codes.includes("FULLY_USED")).map((r) => (
                       <TableRow key={r.containerId}>
                         <TableCell className="font-mono text-xs">{r.containerNumber}</TableCell>
                         <TableCell>{statusBadge(r.containerStatus)}</TableCell>
