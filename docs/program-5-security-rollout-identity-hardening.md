@@ -11,7 +11,7 @@ This program expands the Program 3 policy package and Program 4 production proof
 - [x] 5C — Persistent credential versions and session invalidation
 - [x] 5D — Explicit company-context enforcement and legacy fallback removal
 - [x] 5E — Privileged-operation rollout across high-risk repair and recalculation writes
-- [ ] 5F — Sensitive-input schema rollout across remaining mutations
+- [x] 5F — Sensitive-input schema rollout across prioritized high-impact mutations
 - [ ] 5G — Protected asset, report, export, and attachment rollout
 - [ ] 5H — Security-event coverage expansion, migration cleanup, and end-to-end report
 
@@ -58,13 +58,25 @@ Status: complete for the prioritized high-risk raw-material repair surface.
 - Direct legacy repairs require the same controls on every call.
 - Protected raw-stock cost recalc apply, zero-cost source repair, apply-all-safe, automatic FX correction, supplier locked-rate recompute, source mismatch repair, and destructive recalc undo.
 - Existing signed repair tokens, user/company binding, stale-input fingerprints, row locks, transactional business audit records, and undo snapshots remain intact.
-- Added focused regression coverage for preview bypass, confirmed enforcement, and idempotency-key normalization.
+- Added focused regression coverage; tests were not executed.
+
+## Phase 5F — Sensitive-input schema rollout
+
+Status: complete for the prioritized high-impact raw-material repair surface.
+
+- Added `rawStockSensitiveInputGuard.ts` and mounted it before privileged authorization and route business logic.
+- Added exact top-level allow-list schemas for recalc apply, zero-cost source repair, apply-all-safe, automatic FX correction, supplier-rate recompute, source mismatch repair, and destructive undo.
+- Rejected unknown fields, prototype-pollution keys, invalid object shapes, excessive nesting, oversized arrays and strings, malformed primitive types, and non-finite values.
+- Required container and source identifier arrays to contain unique positive safe integers with a maximum of 500 entries.
+- Restricted manual-rate maps to selected source IDs and bounded positive finite numeric values.
+- Replaced `req.body` with the validated frozen payload before downstream middleware runs.
+- Added focused regression coverage for valid frozen payloads, unknown fields, malformed and duplicate IDs, oversized arrays, unsafe object structure, invalid rate maps, and strict direct-repair identifiers.
 - Tests were written but were not executed through Replit or GitHub Actions.
-- Runtime migration, password-confirmation UX, deployment, and production behavior verification are not claimed.
+- Runtime client compatibility, deployment, and production behavior verification are not claimed.
 
 ## Next phase
 
-Phase 5F — Sensitive-input schema rollout across remaining high-impact mutations.
+Phase 5G — Protected asset, report, export, and attachment rollout.
 
 ## Safety constraints
 
