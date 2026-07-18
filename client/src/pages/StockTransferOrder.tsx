@@ -285,7 +285,9 @@ export default function StockTransferOrder() {
     queryFn: async () => {
       const res = await fetch(`/api/stock-transfers?voucherId=${editVoucherId}`, { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch transfer");
-      return res.json();
+      const data = await res.json();
+      // API returns an array; unwrap to get the single transfer object
+      return Array.isArray(data) ? data[0] : data;
     },
     enabled: !!editVoucherId,
   });
