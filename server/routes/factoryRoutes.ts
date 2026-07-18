@@ -22,6 +22,7 @@ import { registerPerformanceReadMicrocache } from "./performance/readMicrocache"
 import { registerFactoryDaybookPaginationRoutes } from "./factory/factoryDaybookPaginationRoutes";
 import { registerFactoryStockEntryHistoryPaginationRoutes } from "./factory/factoryStockEntryHistoryPaginationRoutes";
 import { registerFactoryStockAllocationV5PaginationRoutes } from "./factory/factoryStockAllocationV5PaginationRoutes";
+import { createContainerDocumentDownloadHandler } from "../services/security/protectedAssetDownloadAdapter";
 
 export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
   // ─────────────────────────────────────────────────────────────────────────────
@@ -112,6 +113,14 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       requiresAdminOverride: true,
     });
   });
+
+  // Container document downloads are intercepted before the legacy docs module
+  // so canonical company, storage-key, size, and filename checks run first.
+  app.get(
+    "/api/factory/uploads/:folder/:filename",
+    requireAuth,
+    createContainerDocumentDownloadHandler(db)
+  );
 
   // Paged requests are intercepted here and perform count/limit/offset in SQL.
   // Unpaged requests call next() and continue into the unchanged legacy handlers.

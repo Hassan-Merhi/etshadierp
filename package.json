@@ -15,6 +15,7 @@
     "audit:heavy-apis": "node scripts/audit-heavy-list-endpoints.mjs",
     "start": "node --expose-gc --import ./server/exportBufferBridge.mjs --import ./server/scheduledAttachmentBridge.mjs --import ./server/apiPaginationBridge.mjs --import ./server/runtimeMemoryGuard.mjs dist/index.js",
     "check": "node node_modules/typescript/bin/tsc --noEmit",
+    "check:program-6-security": "node scripts/run-program-6-focused-security-checks.mjs",
     "db:push": "drizzle-kit push",
     "build:cap": "vite build --mode production",
     "cap:sync": "npm run build:cap && npx cap sync",

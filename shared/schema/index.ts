@@ -1,6 +1,7 @@
 export * from "./common";
 export * from "./accounting";
 export * from "./users";
+export * from "./security";
 export * from "./inventory";
 export * from "./erp";
 export * from "./containers";
