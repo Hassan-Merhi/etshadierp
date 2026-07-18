@@ -9,7 +9,7 @@ This program expands the Program 3 policy package and Program 4 production proof
 - [x] 5A — Enterprise security adoption inventory and rollout map
 - [x] 5B — Persistent named permissions and administration
 - [x] 5C — Persistent credential versions and session invalidation
-- [ ] 5D — Explicit company-context enforcement and legacy fallback removal
+- [x] 5D — Explicit company-context enforcement and legacy fallback removal
 - [ ] 5E — Privileged-operation rollout across repair, recalculation, import, configuration, and diagnostic writes
 - [ ] 5F — Sensitive-input schema rollout across remaining mutations
 - [ ] 5G — Protected asset, report, export, and attachment rollout
@@ -31,34 +31,28 @@ Status: complete.
    - Persist named permissions instead of relying on the temporary Admin/Developer compatibility bridge.
    - Provide an administration boundary for assigning and revoking permissions.
    - Preserve least privilege and exact-permission checks for privileged actions.
-
 2. **Credential and session lifecycle**
    - Persist credential versions on user records.
    - Increment versions after password resets, password changes, credential recovery, or forced logout actions.
    - Reject sessions carrying stale credential versions.
-
 3. **Company context**
    - Remove implicit factory-company fallback after explicit company selection is guaranteed.
    - Treat request-supplied company identifiers only as same-company assertions.
    - Expand non-leaking cross-company enforcement to additional high-risk reads and writes.
-
 4. **Privileged writes**
    - Inventory repair and recalculation endpoints.
    - Data imports and migration-style writes.
    - Company and security configuration changes.
    - Diagnostic endpoints capable of mutation.
    - Destructive administrative operations.
-
 5. **Sensitive input boundaries**
    - Add exact allow-list schemas before remaining privileged and high-impact mutations.
    - Reject unknown fields, prototype-pollution keys, excessive depth, invalid types, oversized values, and unsafe arrays before business logic.
-
 6. **Protected assets and exports**
    - Additional attachments and uploaded-file folders.
    - Generated report and spreadsheet exports.
    - Temporary export archives.
    - Report-generation routes and download endpoints.
-
 7. **Security audit coverage**
    - Persist decisions from authentication, session, company-isolation, input-validation, and protected-asset boundaries.
    - Expand anomaly summaries without exposing cross-company details or secrets.
@@ -108,9 +102,23 @@ Status: complete.
 - Tests were written but were not executed through Replit or GitHub Actions.
 - Runtime migration, trigger execution, session-store behavior, deployment, and production database verification are not claimed.
 
+## Phase 5D — Explicit company-context enforcement and legacy fallback removal
+
+Status: complete.
+
+- Added `companyContextEnforcementAdapter.ts` with one authoritative source: authenticated `session.currentCompanyId`.
+- Legacy `session.factoryCompanyId` is no longer allowed to supply missing context; when present, it is accepted only as an assertion that must equal the authenticated company.
+- Request body, query, and route company identifiers are treated only as same-company assertions and produce a non-leaking `403` on mismatch.
+- Invalid assertion formats fail closed instead of being silently ignored.
+- Applied the middleware to the active `/api/factory/raw-stock` route boundary, covering raw-stock CRUD, container, offload, opening-balance, recalculation, repair, and diagnostic surfaces before their legacy handlers run.
+- After validation, the legacy factory session field is normalized to the authenticated company solely for compatibility with existing downstream handlers; it is never used as fallback resolution.
+- Added regression coverage for missing context, matching assertions, mismatched request assertions, mismatched legacy session context, and refusal to promote a legacy-only company value.
+- Tests were written but were not executed through Replit or GitHub Actions.
+- Runtime factory-session and deployment verification are not claimed.
+
 ## Next phase
 
-Phase 5D — Explicit company-context enforcement and legacy fallback removal.
+Phase 5E — Privileged-operation rollout across repair, recalculation, import, configuration, and diagnostic writes.
 
 ## Safety constraints
 
