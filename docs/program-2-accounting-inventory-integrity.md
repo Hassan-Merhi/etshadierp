@@ -1,6 +1,6 @@
 # Program 2 — Accounting and Inventory Integrity
 
-Status: in progress. This branch must remain unmerged until the owner approves the completed Program 2 package.
+Status: complete. This branch must remain unmerged until the owner approves the completed Program 2 package.
 
 ## Phase sequence
 
@@ -12,9 +12,9 @@ Status: in progress. This branch must remain unmerged until the owner approves t
 - [x] 2F — Factory raw-stock costing integrity
 - [x] 2G — Mix-batch costing integrity
 - [x] 2H — Period locking and closed-period protection
-- [ ] 2I — Automated reconciliation and repair reporting
+- [x] 2I — Automated reconciliation and repair reporting
 
-Each phase must be completed and committed separately. Do not begin Program 3 on this branch.
+Each phase was completed and committed separately. Do not begin Program 3 on this branch.
 
 ## Phase 2A — Posting inventory audit
 
@@ -77,8 +77,6 @@ Status: complete.
 
 Status: complete.
 
-### Completed work
-
 - Added `periodLockService.ts` as the shared transaction-owned boundary for accounting, inventory, and factory effective dates.
 - Added strict company, domain, and calendar-date validation.
 - Added `assertPeriodOpenTx` so all dated business writes can reject dates on or before the applicable locked-through date before their first write.
@@ -88,23 +86,42 @@ Status: complete.
 - Exported the period-lock boundary from the central accounting service for gradual route/service adoption.
 - Added focused invariant tests for open dates, blocked dates, reasoned overrides, repeat-safe overrides, stale lock versions, forbidden reopening, and lock-before-write ordering.
 
+## Phase 2I — Automated reconciliation and repair reporting
+
+Status: complete.
+
+### Completed work
+
+- Added `reconciliationRepairService.ts` as the transaction-owned reporting and controlled repair boundary.
+- Added immutable, idempotent reconciliation reports keyed by company and run identity.
+- Reused canonical voucher-entry reconciliation truth for cash, bank, customer, and supplier projections.
+- Added explicit repair classification: matched, manual review, or deterministic projection rebuild.
+- Prevented mismatches from being silently treated as repairable and prevented canonical voucher entries from being edited by the repair service.
+- Required approval token validation, operation idempotency, deterministic target locking, period-open checks, actor reason, repair recording, and audit recording before any projection rebuild can commit.
+- Required projection rebuilds to derive from canonical ledger truth rather than applying an arithmetic delta to an already-drifted balance.
+- Added focused tests for report generation, existing-run idempotency, company isolation, controlled repair ordering, repeat-safe repair retries, and manual-review protection.
+- Exported reporting and controlled repair contracts through the central accounting service index.
+
 ### Verification
 
-- Confirmed the closed date itself is protected, not only dates before it.
-- Confirmed normal reversal, repair, import, back-date, accounting, inventory, and factory paths are expected to invoke the same guard within their owning transaction.
-- Confirmed period extension cannot race silently because the adapter must lock state and enforce the expected version.
-- Confirmed an administrative override is idempotent and independently auditable without modifying the period lock.
-- Confirmed no production route was switched without a complete database adapter and caller-owned transaction integration.
+- Confirmed report generation is read-only until the immutable report is persisted.
+- Confirmed repair execution is separate from report generation and requires explicit approval.
+- Confirmed only deterministic projection rebuild items can execute automatically; manual-review items are reported and skipped.
+- Confirmed repair targets are locked and period-checked before a projection write.
+- Confirmed repair retries return the previously recorded result before approval checks, locks, writes, or duplicate audit records.
+- Confirmed canonical accounting truth is never overwritten by the repair boundary.
 - No production data or Replit checks/credits were used.
 
-## Next phase
+## Program 2 final state
 
-- Phase 2I — Automated reconciliation and repair reporting
+- All phases 2A–2I are complete on the dedicated Program 2 branch.
+- The draft pull request must remain open and unmerged until the owner explicitly approves merging.
+- Program 3 must not begin without new user instructions.
 
 ## Safety constraints
 
 - Do not merge automatically.
 - Do not push directly to `main`.
-- Commit every phase separately.
+- Preserve every phase commit separately.
 - Do not run checks on Replit or consume Replit credits.
-- Do not change accounting balances without transaction, idempotency, reversal, and audit guarantees.
+- Do not change accounting balances without transaction, idempotency, reversal, period, approval, and audit guarantees.
