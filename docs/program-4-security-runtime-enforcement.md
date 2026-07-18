@@ -9,7 +9,7 @@ Status: in progress. This branch is stacked on the completed, unmerged Program 3
 - [x] 4C — Company isolation enforcement on high-risk reads and writes
 - [x] 4D — Privileged operation enforcement on repair and administrative endpoints
 - [x] 4E — Unsafe input validation on sensitive mutations
-- [ ] 4F — Protected file, attachment, report, and export enforcement
+- [x] 4F — Protected file, attachment, report, and export enforcement
 - [ ] 4G — Security audit persistence and anomaly surfacing
 - [ ] 4H — End-to-end enforcement tests and integration report
 
@@ -56,9 +56,23 @@ Status: complete for the first sensitive production mutation.
 - Added focused regression coverage.
 - Tests were added but not executed through Replit or GitHub Actions.
 
+## Phase 4F
+
+Status: complete for the first protected production asset surface.
+
+- Added `server/services/security/protectedAssetDownloadAdapter.ts`.
+- Intercepted factory container-document downloads before the legacy upload route.
+- Canonical storage lookup now validates asset existence, company ownership, storage key, byte size, and filename before file access.
+- Same-company access remains available to existing authenticated factory roles; cross-company access is non-leaking.
+- Downloads are forced to attachment disposition with RFC 5987 filename encoding.
+- Added `X-Content-Type-Options: nosniff` and private no-store caching headers.
+- Disk cache and database-backed file fallback behavior are preserved.
+- Added focused regression coverage for same-company access, cross-company denial, unsafe storage keys, invalid sizes, and header injection resistance.
+- Tests were added but not executed through Replit or GitHub Actions.
+
 ## Next phase
 
-Phase 4F — Protected file, attachment, report, and export enforcement.
+Phase 4G — Security audit persistence and anomaly surfacing.
 
 ## Safety constraints
 
