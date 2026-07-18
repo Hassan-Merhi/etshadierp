@@ -7,7 +7,7 @@ Status: in progress. This branch must remain unmerged until the owner approves t
 - [x] 2A — Posting inventory audit
 - [x] 2B — Central posting engine
 - [x] 2C — Voucher lifecycle integrity
-- [ ] 2D — Cash, bank, customer, and supplier reconciliation
+- [x] 2D — Cash, bank, customer, and supplier reconciliation
 - [ ] 2E — Stock movement integrity
 - [ ] 2F — Factory raw-stock costing integrity
 - [ ] 2G — Mix-batch costing integrity
@@ -79,9 +79,33 @@ Status: complete.
 - Confirmed no existing production route was silently switched without an adapter for all of its secondary effects.
 - No Replit checks or credits were used.
 
+## Phase 2D — Cash, bank, customer, and supplier reconciliation
+
+Status: complete.
+
+### Completed work
+
+- Added `partyReconciliationService.ts` as a read-only, transaction-owned reconciliation boundary for cash, bank, customer, and supplier balances.
+- Defined voucher-entry balances as canonical accounting truth and operational account, bank, customer, and supplier balances as projections.
+- Required company, domain, target, and optional as-of-date identity for every comparison.
+- Added Decimal-based exact comparison and explicit projection-minus-canonical difference reporting.
+- Added currency compatibility validation so unlike currencies cannot be silently compared.
+- Added deterministic duplicate-target rejection for batch reconciliation.
+- Added batch matched/mismatched summaries without mutating balances or attempting repairs.
+- Exported the reconciliation contract through the accounting service index.
+- Added focused tests for exact matches, positive and negative drift, currency mismatch, batch summaries, and duplicate targets.
+
+### Verification
+
+- Confirmed canonical and projected balances are loaded from one caller-owned transaction/snapshot.
+- Confirmed the service is read-only and cannot repair, overwrite, or delete accounting data.
+- Confirmed no tolerance or floating-point rounding can hide a non-zero accounting difference.
+- Confirmed repair planning remains isolated to Phase 2I.
+- No production data or Replit checks/credits were used.
+
 ## Next phase
 
-- Phase 2D — Cash, bank, customer, and supplier reconciliation
+- Phase 2E — Stock movement integrity
 
 ## Safety constraints
 
