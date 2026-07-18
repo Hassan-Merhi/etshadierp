@@ -472,14 +472,19 @@ export function registerRawStockOffloadRoutes(app: Express) {
           const newCumulativeKg = dNewCumulativeKg.toDecimalPlaces(3).toNumber();
           const lockedValuationKgNum = lockedValuationKg.toDecimalPlaces(3).toNumber();
 
-          // 0. Moving average with incremental kg + fixed rate (same as first receipt)
+          // 0. Moving average with incremental kg + fixed rate (same as first receipt).
+          //    Capture newLockedRate so supplier-backed batch allocations use the
+          //    post-receipt supplier moving-average rate, not the container's own
+          //    individual landed cost.
+          let subseqNewLockedRate = fixedCostPerKgUsd; // fallback for no-supplier containers
           if (lockedContainer.supplierId) {
-            await applyOffloadMovingAverage(tx, {
+            const movAvgResult = await applyOffloadMovingAverage(tx, {
               companyId,
               supplierId: lockedContainer.supplierId,
               newReceivedKg: thisReceiptKg,
               newContainerLandedCostPerKgUsd: fixedCostPerKgUsd,
             });
+            subseqNewLockedRate = movAvgResult.newLockedRate;
           }
 
           // 1. Update raw-stock receivedKg (cumulative) using locked row id
@@ -489,20 +494,29 @@ export function registerRawStockOffloadRoutes(app: Express) {
             .where(eq(factoryRawStock.id, (lockedRawStock as any).id));
           rawStock = { ...lockedRawStock, receivedKg: dNewCumulativeKg.toDecimalPlaces(3).toFixed(3) };
 
-          // 2. Mix-batch sources at fixed rate
+          // 2. Mix-batch sources — supplier-backed allocations must be priced at the
+          //    post-receipt supplier moving-average rate (newLockedRate), not the
+          //    individual container landed cost. FIFO (containerId) is provenance only.
           for (const alloc of mixBatchAllocationsArr) {
             const allocKg = parseFloat(alloc.weightKg || "0");
             if (!alloc.mixBatchId || allocKg <= 0) continue;
             const dAllocKg = new Decimal(allocKg);
-            const dFixedUsd = new Decimal(fixedCostPerKgUsd);
+            // Rate: supplier moving-average for supplier-backed containers;
+            //       container's own USD rate for containers without a supplier.
+            const dAllocRate = lockedContainer.supplierId
+              ? new Decimal(subseqNewLockedRate)
+              : new Decimal(fixedCostPerKgUsd);
+            // sourceType: SUPPLIER_FIFO when both supplierId + containerId present,
+            //             CONTAINER_DIRECT when no supplier.
+            const subseqSrcType = lockedContainer.supplierId ? "SUPPLIER_FIFO" : "CONTAINER_DIRECT";
             await tx.insert(factoryMixBatchSources).values({
               mixBatchId: parseInt(alloc.mixBatchId),
               containerId,
               supplierId: lockedContainer.supplierId || null,
-              sourceType: "container",
+              sourceType: subseqSrcType,
               weightKg: String(allocKg),
-              costPerKg: dFixedUsd.toDecimalPlaces(6).toFixed(6),
-              totalCost: dAllocKg.times(dFixedUsd).toDecimalPlaces(6).toFixed(6),
+              costPerKg: dAllocRate.toDecimalPlaces(6).toFixed(6),
+              totalCost: dAllocKg.times(dAllocRate).toDecimalPlaces(6).toFixed(6),
             });
           }
 
@@ -560,13 +574,19 @@ export function registerRawStockOffloadRoutes(app: Express) {
         //    re-enters the average). Row-locks the supplier to serialize concurrent
         //    offloads. Only applies to a real supplier — manual/no-supplier containers
         //    have no locked rate to maintain.
+        // Capture newLockedRate so mix-batch allocations created in this same
+        // transaction use the post-offload supplier moving-average rate, not the
+        // individual container's landed cost (which is correct only for raw-stock
+        // valuation, not for supplier-level blended cost tracking).
+        let firstReceiptNewLockedRate = dCostPerKgUsd.toNumber(); // fallback for no-supplier
         if (container.supplierId) {
-          await applyOffloadMovingAverage(tx, {
+          const movAvgResult = await applyOffloadMovingAverage(tx, {
             companyId,
             supplierId: container.supplierId,
             newReceivedKg: dReceivedKg.toNumber(),
             newContainerLandedCostPerKgUsd: dCostPerKgUsd.toNumber(),
           });
+          firstReceiptNewLockedRate = movAvgResult.newLockedRate;
         }
 
         // 1. Commission INSERT
@@ -605,22 +625,32 @@ export function registerRawStockOffloadRoutes(app: Express) {
         });
 
         // 4. Mix batch source INSERTs
+        //    Supplier-backed sources must be priced at the post-offload supplier
+        //    moving-average rate (firstReceiptNewLockedRate), NOT the container's
+        //    individual landed cost (dCostPerKgUsd). The container's own USD rate
+        //    is the canonical raw-stock valuation; the supplier moving-average is
+        //    the correct blended rate for all material consumed from that supplier.
+        //    FIFO / containerId is stored for provenance only.
         for (const alloc of mixBatchAllocationsArr) {
           const allocKg = parseFloat(alloc.weightKg || "0");
           if (!alloc.mixBatchId || allocKg <= 0) continue;
-          // Mix-batch sources are valued in USD (cascade uses USD for blended
-          // cost; writing native-currency cost here would skew multi-container
-          // batches that blend different base currencies).
           const dAllocKg = new Decimal(allocKg);
-          const dAllocCostUsd = dCostPerKgUsd.times(dAllocKg);
+          // Rate: supplier moving-average for supplier-backed containers;
+          //       container's own USD rate for no-supplier containers.
+          const dAllocRate = container.supplierId
+            ? new Decimal(firstReceiptNewLockedRate)
+            : dCostPerKgUsd;
+          // sourceType: SUPPLIER_FIFO when supplierId + containerId present,
+          //             CONTAINER_DIRECT when no supplier.
+          const firstSrcType = container.supplierId ? "SUPPLIER_FIFO" : "CONTAINER_DIRECT";
           await tx.insert(factoryMixBatchSources).values({
             mixBatchId: parseInt(alloc.mixBatchId),
             containerId,
             supplierId: container.supplierId || null,
-            sourceType: "container",
+            sourceType: firstSrcType,
             weightKg: String(allocKg),
-            costPerKg: dCostPerKgUsd.toDecimalPlaces(6).toFixed(6),
-            totalCost: dAllocCostUsd.toDecimalPlaces(6).toFixed(6),
+            costPerKg: dAllocRate.toDecimalPlaces(6).toFixed(6),
+            totalCost: dAllocKg.times(dAllocRate).toDecimalPlaces(6).toFixed(6),
           });
         }
 

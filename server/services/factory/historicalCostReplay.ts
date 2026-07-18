@@ -120,6 +120,8 @@ export interface ReplaySummary {
   batchesToUpdate: number;
   completedBatchesToUpdate: number;
   balesToUpdate: number;
+  /** Bales whose status indicates they are sold/dispatched/invoiced and require includeFinalizedBales=true to update */
+  finalizedBalesToUpdate: number;
   unresolvedFx: number;
   missingDates: number;
   quantityTimelineMismatches: number;
@@ -799,13 +801,18 @@ async function replaySupplierTimeline(
         const canonRate = new Decimal(evt.canonicalRateUsd || 0);
         if (rcvKg.lte(0)) break;
 
-        // newRate = (remaining × oldRate + receiptKg × canonicalRate) / (remaining + receiptKg)
-        const totalKg = state.remaining.plus(rcvKg);
-        const newRate = totalKg.gt(0)
-          ? state.remaining.times(state.rate).plus(rcvKg.times(canonRate)).div(totalKg)
+        // newRate = (max(0,signedRemaining) × oldRate + receiptKg × canonRate)
+        //           ÷ (max(0,signedRemaining) + receiptKg)
+        // Per spec: use max(0, signedRemaining) as the old-quantity term so that
+        // a negative-stock position does not dilute the new receipt's rate.
+        // After the receipt, signedRemaining increases unconditionally (may still be negative).
+        const oldPositiveRemaining = Decimal.max(0, state.remaining);
+        const denominator = oldPositiveRemaining.plus(rcvKg);
+        const newRate = denominator.gt(0)
+          ? oldPositiveRemaining.times(state.rate).plus(rcvKg.times(canonRate)).div(denominator)
           : canonRate;
 
-        state = { remaining: totalKg, rate: newRate };
+        state = { remaining: state.remaining.plus(rcvKg), rate: newRate };
         if (evt.containerId) affectedContainerIds.add(evt.containerId);
         break;
       }
@@ -814,23 +821,26 @@ async function replaySupplierTimeline(
         if (addKg.lte(0)) break;
 
         if (evt.costPerKgUsd != null && evt.costPerKgUsd > 0) {
-          // ADD with valid USD cost → moving average update
+          // ADD with valid USD cost → moving average update (same max(0,...) guard)
           const addRate = new Decimal(evt.costPerKgUsd);
-          const totalKg = state.remaining.plus(addKg);
-          const newRate = totalKg.gt(0)
-            ? state.remaining.times(state.rate).plus(addKg.times(addRate)).div(totalKg)
+          const oldPositiveRemaining = Decimal.max(0, state.remaining);
+          const denominator = oldPositiveRemaining.plus(addKg);
+          const newRate = denominator.gt(0)
+            ? oldPositiveRemaining.times(state.rate).plus(addKg.times(addRate)).div(denominator)
             : addRate;
-          state = { remaining: totalKg, rate: newRate };
+          state = { remaining: state.remaining.plus(addKg), rate: newRate };
         } else {
-          // ADD without USD cost → just increase remaining
+          // ADD without USD cost → just increase remaining, rate unchanged
           state = { remaining: state.remaining.plus(addKg), rate: state.rate };
         }
         break;
       }
       case "REMOVE_ADJUSTMENT":
       case "DEDUCT_ADJUSTMENT": {
+        // Preserve signed quantity — do NOT clamp to zero. The system allows negative
+        // raw-material positions; clamping would produce incorrect replay totals.
         const rmKg = new Decimal(evt.removeKg || evt.adjustKg || 0);
-        state = { remaining: Decimal.max(0, state.remaining.minus(rmKg)), rate: state.rate };
+        state = { remaining: state.remaining.minus(rmKg), rate: state.rate };
         break;
       }
       case "BATCH_CONSUMPTION": {
@@ -838,8 +848,11 @@ async function replaySupplierTimeline(
         if (evt.batchId != null) {
           expectedRateAtBatch.set(evt.batchId, state.rate.toDecimalPlaces(8).toNumber());
         }
+        // Preserve signed quantity — do NOT clamp to zero. Consumption can push
+        // signedRemainingKg negative when batches consume more than received at
+        // that point in the timeline.
         const consumedKg = new Decimal(evt.consumptionKg || 0);
-        state = { remaining: Decimal.max(0, state.remaining.minus(consumedKg)), rate: state.rate };
+        state = { remaining: state.remaining.minus(consumedKg), rate: state.rate };
         break;
       }
     }
@@ -863,9 +876,12 @@ async function replaySupplierTimeline(
     reasons.push("MISSING_EVENT_DATES");
   }
   if (ambiguous) {
+    // Per spec: ambiguous event ordering (receipt + consumption on same date where the
+    // true order cannot be established) must block automatic repair. The admin must
+    // resolve the ambiguity before applying. safeToRepair is set regardless of whether
+    // quantity reconciles.
+    safeToRepair = false;
     reasons.push("TIMELINE_ORDER_AMBIGUOUS");
-    // Ambiguous ordering doesn't block the repair if quantity reconciles — the ordering
-    // we enforce (receipts before consumptions) is the safe assumption
   }
 
   return {
@@ -1030,21 +1046,41 @@ function computeBatchCorrections(
 // Step 9: count affected bales per batch
 // ─────────────────────────────────────────────────────────────────────────────
 
+interface BaleCountResult {
+  total: Map<number, number>;
+  finalized: Map<number, number>;
+}
+
 async function loadBaleCountsByBatch(
   companyId: number,
   batchIds: number[]
-): Promise<Map<number, number>> {
-  if (batchIds.length === 0) return new Map();
-  const { rows } = await pool.query<{ mix_batch_id: number; cnt: string }>(
-    `SELECT mix_batch_id, COUNT(*)::int AS cnt
-     FROM factory_bales
-     WHERE mix_batch_id = ANY($1) AND company_id = $2 AND status NOT IN ('DELETED','REMOVED')
-     GROUP BY mix_batch_id`,
-    [batchIds, companyId]
-  );
-  const m = new Map<number, number>();
-  for (const r of rows) m.set(r.mix_batch_id, parseInt(r.cnt));
-  return m;
+): Promise<BaleCountResult> {
+  if (batchIds.length === 0) return { total: new Map(), finalized: new Map() };
+
+  const finalizedIn = FINALIZED_BALE_STATUSES.map((s) => `'${s}'`).join(",");
+
+  const [{ rows: totalRows }, { rows: finalizedRows }] = await Promise.all([
+    pool.query<{ mix_batch_id: number; cnt: string }>(
+      `SELECT mix_batch_id, COUNT(*)::int AS cnt
+       FROM factory_bales
+       WHERE mix_batch_id = ANY($1) AND company_id = $2 AND status NOT IN ('DELETED','REMOVED')
+       GROUP BY mix_batch_id`,
+      [batchIds, companyId]
+    ),
+    pool.query<{ mix_batch_id: number; cnt: string }>(
+      `SELECT mix_batch_id, COUNT(*)::int AS cnt
+       FROM factory_bales
+       WHERE mix_batch_id = ANY($1) AND company_id = $2 AND status IN (${finalizedIn})
+       GROUP BY mix_batch_id`,
+      [batchIds, companyId]
+    ),
+  ]);
+
+  const total = new Map<number, number>();
+  for (const r of totalRows) total.set(r.mix_batch_id, parseInt(r.cnt));
+  const finalized = new Map<number, number>();
+  for (const r of finalizedRows) finalized.set(r.mix_batch_id, parseInt(r.cnt));
+  return { total, finalized };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1192,7 +1228,7 @@ export async function previewHistoricalCostReplay(
 
   const correctionByBatchId = new Map(batchCorrections.map((c) => [c.batchId, c]));
 
-  // 9. Count affected bales
+  // 9. Count affected bales (total + finalized separately)
   const correctedBatchIds = batchCorrections.map((c) => c.batchId);
   const baleCountsByBatch = await loadBaleCountsByBatch(companyId, correctedBatchIds);
 
@@ -1291,7 +1327,7 @@ export async function previewHistoricalCostReplay(
     expectedCostPerKg: c.expectedCostPerKg,
     storedTotalCost: c.storedTotalCost,
     expectedTotalCost: c.expectedTotalCost,
-    affectedBales: baleCountsByBatch.get(c.batchId) || 0,
+    affectedBales: baleCountsByBatch.total.get(c.batchId) || 0,
   }));
 
   // Supplier rows
@@ -1307,7 +1343,7 @@ export async function previewHistoricalCostReplay(
         .map((b) => b.batchId)
     );
     const affectedBaleCount = [...affectedBatchIds].reduce(
-      (sum, bId) => sum + (baleCountsByBatch.get(bId) || 0),
+      (sum, bId) => sum + (baleCountsByBatch.total.get(bId) || 0),
       0
     );
     return {
@@ -1335,6 +1371,10 @@ export async function previewHistoricalCostReplay(
     batchCorrections.filter((b) => ["COMPLETED", "CLOSED"].includes(b.status)).map((b) => b.batchId)
   );
   const totalBaleCount = batchRows.reduce((s, b) => s + b.affectedBales, 0);
+  const finalizedBaleCount = correctedBatchIds.reduce(
+    (sum, bId) => sum + (baleCountsByBatch.finalized.get(bId) || 0),
+    0
+  );
 
   const summary: ReplaySummary = {
     totalReceivedContainers,
@@ -1353,6 +1393,7 @@ export async function previewHistoricalCostReplay(
     batchesToUpdate: batchCorrections.length,
     completedBatchesToUpdate: completedBatchIds.size,
     balesToUpdate: totalBaleCount,
+    finalizedBalesToUpdate: finalizedBaleCount,
     unresolvedFx: canonicals.filter((c) => c.fxUnresolved).length,
     missingDates: timelineResults.reduce((s, t) => s + t.missingDates, 0),
     quantityTimelineMismatches: timelineResults.filter((t) => t.quantityMismatch).length,
@@ -1370,17 +1411,44 @@ export async function previewHistoricalCostReplay(
 export function computeReplayFingerprint(
   companyId: number,
   supplierIds: number[],
-  preview: HistoricalReplayPreviewResult
+  preview: HistoricalReplayPreviewResult,
+  opts: { includeCompletedBatches: boolean; includeFinalizedBales: boolean }
 ): string {
+  const sortedSupplierIds = [...supplierIds].sort((a, b) => a - b);
   const payload = {
+    algorithmVersion: REPLAY_ALGORITHM_VERSION,
     companyId,
-    supplierIds: [...supplierIds].sort((a, b) => a - b),
+    supplierIds: sortedSupplierIds,
+    includeCompletedBatches: opts.includeCompletedBatches,
+    includeFinalizedBales: opts.includeFinalizedBales,
     supplierEndingRates: preview.supplierRows
-      .filter((s) => supplierIds.includes(s.supplierId))
+      .filter((s) => sortedSupplierIds.includes(s.supplierId))
       .sort((a, b) => a.supplierId - b.supplierId)
-      .map((s) => ({ id: s.supplierId, endingRate: s.endingExpectedRate, replayKg: s.replayRemainingKg })),
-    sourceMismatchCount: preview.sourceRows.length,
-    batchMismatchCount: preview.batchRows.length,
+      .map((s) => ({
+        id: s.supplierId,
+        endingRate: s.endingExpectedRate,
+        replayKg: s.replayRemainingKg,
+        authoritativeKg: s.authoritativeRemainingKg,
+        currentStoredRate: s.currentStoredRate,
+        safeToRepair: s.safeToRepair,
+      })),
+    // Exact IDs of records that would be written — any DB change after the dry-run
+    // changes these arrays and the fingerprint, causing STALE_TOKEN on apply.
+    sourceIds: preview.sourceRows
+      .filter((s) => s.safeToRepair && sortedSupplierIds.includes(s.supplierId ?? -1))
+      .map((s) => s.sourceId)
+      .sort((a, b) => a - b),
+    batchIds: preview.batchRows
+      .map((b) => b.batchId)
+      .sort((a, b) => a - b),
+    summary: {
+      sourceMismatches: preview.summary.sourceMismatches,
+      batchesToUpdate: preview.summary.batchesToUpdate,
+      completedBatchesToUpdate: preview.summary.completedBatchesToUpdate,
+      balesToUpdate: preview.summary.balesToUpdate,
+      finalizedBalesToUpdate: preview.summary.finalizedBalesToUpdate,
+      unresolvedFx: preview.summary.unresolvedFx,
+    },
   };
   return crypto.createHash("sha256").update(JSON.stringify(payload)).digest("hex");
 }
@@ -1389,14 +1457,32 @@ export function computeReplayFingerprint(
 // Apply function
 // ─────────────────────────────────────────────────────────────────────────────
 
+/** Bale statuses that represent sold/dispatched/invoiced bales requiring explicit authorization to update */
+export const FINALIZED_BALE_STATUSES = [
+  "SOLD",
+  "DISPATCHED",
+  "RESERVED_FOR_DISPATCH",
+  "RESERVED_FOR_ORDER",
+  "FINALIZED",
+] as const;
+
 export interface ReplayApplyParams {
   companyId: number;
   /** Only apply timelines for these supplier IDs. Pass [] to apply all safe. */
   supplierIds: number[];
   includeCompletedBatches: boolean;
+  /**
+   * When false (default), bales whose status is in FINALIZED_BALE_STATUSES are skipped.
+   * Set true only when the admin has explicitly authorized updating sold/dispatched/invoiced bales.
+   */
+  includeFinalizedBales: boolean;
   preview: HistoricalReplayPreviewResult;
   /** Re-derived fingerprint from the verified token — must match preview fingerprint */
   expectedFingerprint: string;
+  /** Replay algorithm/version identifier — verified at apply to reject tokens from old versions */
+  algorithmVersion: string;
+  /** userId who issued the dry-run token — must match the applying user */
+  issuedByUserId: string;
 }
 
 export interface ReplayApplyResult {
@@ -1460,10 +1546,28 @@ export async function captureReplaySnapshot(
   return { rawStockRows, mixBatchSources, mixBatches, bales, suppliers: supplierRates, containers: [] };
 }
 
+/** Canonical algorithm version — increment whenever the replay formula changes. */
+export const REPLAY_ALGORITHM_VERSION = "v2-signed-quantity-max0-receipt";
+
 export async function applyHistoricalCostReplay(
   params: ReplayApplyParams
 ): Promise<ReplayApplyResult> {
-  const { companyId, supplierIds, includeCompletedBatches, preview, expectedFingerprint } = params;
+  const {
+    companyId,
+    supplierIds,
+    includeCompletedBatches,
+    includeFinalizedBales,
+    preview,
+    expectedFingerprint,
+    algorithmVersion,
+    issuedByUserId,
+  } = params;
+
+  if (algorithmVersion !== REPLAY_ALGORITHM_VERSION) {
+    throw new Error(
+      `Token algorithm version "${algorithmVersion}" does not match current engine "${REPLAY_ALGORITHM_VERSION}". Re-run the dry-run preview to get a fresh token.`
+    );
+  }
 
   // Verify fingerprint
   const actualFingerprint = computeReplayFingerprint(companyId, supplierIds, preview);
@@ -1536,7 +1640,11 @@ export async function applyHistoricalCostReplay(
     // Advisory lock: namespace 9003 = historical replay
     await client.query(`SELECT pg_advisory_xact_lock(9003, $1)`, [companyId]);
 
-    // 1. Update raw-stock costs for each supplier's containers
+    // 1. Update raw-stock costs for each supplier's containers.
+    //    Only cost_per_kg_usd is updated — that is the canonical USD landed cost.
+    //    cost_per_kg must remain the native-currency landed cost and must never
+    //    be overwritten with a USD value (spec: never write USD cost into both
+    //    cost_per_kg and cost_per_kg_usd for a non-USD container).
     for (const timeline of safeTimelines) {
       const { rows: rsRows } = await client.query<{ id: number; container_id: number }>(
         `SELECT frs.id, frs.container_id
@@ -1550,7 +1658,7 @@ export async function applyHistoricalCostReplay(
         const canonRate = canonicalRateByContainer.get(rs.container_id);
         if (canonRate == null) continue;
         await client.query(
-          `UPDATE factory_raw_stock SET cost_per_kg_usd = $1, cost_per_kg = $1 WHERE id = $2`,
+          `UPDATE factory_raw_stock SET cost_per_kg_usd = $1 WHERE id = $2`,
           [new Decimal(canonRate).toDecimalPlaces(6).toFixed(6), rs.id]
         );
         result.rawStockRowsUpdated++;
@@ -1599,10 +1707,15 @@ export async function applyHistoricalCostReplay(
       );
       result.batchesUpdated++;
 
-      // Cascade to bales
-      const { rows: baleRows } = await client.query<{ id: number; weight_kg: string }>(
-        `SELECT id, weight_kg FROM factory_bales
-         WHERE mix_batch_id = $1 AND company_id = $2 AND status NOT IN ('DELETED','REMOVED')`,
+      // Cascade to bales — skip finalized bales unless explicitly authorized.
+      // "Finalized" means the bale has been sold, dispatched, or invoiced; updating
+      // cost on those bales affects reported margins but must be an explicit choice.
+      const finalizedClause = includeFinalizedBales
+        ? `AND status NOT IN ('DELETED','REMOVED')`
+        : `AND status NOT IN ('DELETED','REMOVED','${FINALIZED_BALE_STATUSES.join("','")}')`;
+      const { rows: baleRows } = await client.query<{ id: number; weight_kg: string; status: string }>(
+        `SELECT id, weight_kg, status FROM factory_bales
+         WHERE mix_batch_id = $1 AND company_id = $2 ${finalizedClause}`,
         [correction.batchId, companyId]
       );
       for (const bale of baleRows) {

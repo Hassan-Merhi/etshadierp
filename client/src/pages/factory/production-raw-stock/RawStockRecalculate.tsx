@@ -13,9 +13,12 @@ import {
   Undo2,
   RotateCcw,
   AlertTriangle,
+  ShieldCheck,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Table,
   TableBody,
@@ -28,6 +31,7 @@ import { Badge } from "@/components/ui/badge";
 import {
   Dialog,
   DialogContent,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
   DialogDescription,
@@ -210,7 +214,9 @@ interface ReplaySummary {
   supplierPricedSourcesScanned: number;
   sourceMismatches: number;
   batchesToUpdate: number;
+  completedBatchesToUpdate?: number;
   balesToUpdate: number;
+  finalizedBalesToUpdate?: number;
   unresolvedFx: number;
   missingDates: number;
   quantityTimelineMismatches: number;
@@ -241,6 +247,12 @@ export default function RawStockRecalculate() {
   const [manualRates, setManualRates] = useState<Record<number, string>>({});
   const [expandedBatchSources, setExpandedBatchSources] = useState<Set<number>>(new Set());
   const [activeTab, setActiveTab] = useState<"recalc" | "sources" | "audit" | "history" | "replay">("recalc");
+
+  // ── Historical Replay confirmation dialog (requires typing "APPLY HISTORICAL REPLAY") ──
+  const [showReplayConfirmDialog, setShowReplayConfirmDialog] = useState(false);
+  const [replayConfirmText, setReplayConfirmText] = useState("");
+  const [includeFinalizedBales, setIncludeFinalizedBales] = useState(false);
+  const REPLAY_CONFIRM_PHRASE = "APPLY HISTORICAL REPLAY" as const;
 
   // ── Recompute dry-run / confirmation dialog ────────────────────────────────
   const [recomputePreviewRows, setRecomputePreviewRows] = useState<SupplierRatePreviewRow[] | null>(null);
@@ -385,12 +397,17 @@ export default function RawStockRecalculate() {
   });
 
   const replayApplyMutation = useMutation({
-    mutationFn: async (opts: { supplierIds: number[]; includeCompletedBatches: boolean }) => {
+    mutationFn: async (opts: {
+      supplierIds: number[];
+      includeCompletedBatches: boolean;
+      includeFinalizedBales: boolean;
+    }) => {
       // Step 1: issue dry-run confirmation token
       const dryRes = await modeApiRequest("POST", "/api/factory/raw-stock/recalc/historical-replay/apply", {
         dryRun: true,
         supplierIds: opts.supplierIds,
         includeCompletedBatches: opts.includeCompletedBatches,
+        includeFinalizedBales: opts.includeFinalizedBales,
       });
       if (!dryRes.ok) throw new Error((await dryRes.json().catch(() => ({}))).message || "Dry-run failed");
       const dryData = await dryRes.json();
@@ -401,6 +418,7 @@ export default function RawStockRecalculate() {
         confirmationToken: dryData.confirmationToken,
         supplierIds: opts.supplierIds,
         includeCompletedBatches: opts.includeCompletedBatches,
+        includeFinalizedBales: opts.includeFinalizedBales,
       });
       if (!applyRes.ok) throw new Error((await applyRes.json().catch(() => ({}))).message || "Apply failed");
       return applyRes.json();
@@ -1890,27 +1908,40 @@ export default function RawStockRecalculate() {
                 </div>
               )}
 
-              {/* Apply button — only show when there are safe suppliers and the preview loaded */}
+              {/* Options and apply — only show when there are safe suppliers */}
               {replayPreview.summary.safeSuppliers > 0 && (
-                <div className="flex justify-end pt-2">
-                  <Button
-                    size="sm"
-                    disabled={replayApplyMutation.isPending}
-                    onClick={() =>
-                      wrapAdminAction(() => {
-                        const safeIds = replayPreview.supplierRows
-                          .filter((s) => s.safeToRepair)
-                          .map((s) => s.supplierId);
-                        replayApplyMutation.mutate({ supplierIds: safeIds, includeCompletedBatches });
-                      }, `Apply historical cost replay for ${replayPreview.summary.safeSuppliers} safe supplier(s) — this corrects source costs, batch costs, and supplier locked rates.`)
-                    }
-                    className="gap-2 bg-emerald-600 hover:bg-emerald-700 text-white"
-                  >
-                    <CheckCircle2 className="h-3.5 w-3.5" />
-                    {replayApplyMutation.isPending
-                      ? "Applying…"
-                      : `Apply All Safe Historical Repairs (${replayPreview.summary.safeSuppliers} supplier(s))`}
-                  </Button>
+                <div className="space-y-2 pt-2">
+                  {/* includeFinalizedBales toggle */}
+                  {(replayPreview.summary.finalizedBalesToUpdate ?? 0) > 0 && (
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground border rounded-md px-3 py-2 bg-amber-50 border-amber-200">
+                      <Checkbox
+                        id="include-finalized-bales"
+                        checked={includeFinalizedBales}
+                        onCheckedChange={(v) => setIncludeFinalizedBales(Boolean(v))}
+                      />
+                      <label htmlFor="include-finalized-bales" className="cursor-pointer font-medium text-amber-800">
+                        Also update {replayPreview.summary.finalizedBalesToUpdate} finalized bale(s) (sold / dispatched / invoiced)
+                      </label>
+                    </div>
+                  )}
+                  <div className="flex justify-end">
+                    <Button
+                      size="sm"
+                      disabled={replayApplyMutation.isPending}
+                      onClick={() =>
+                        wrapAdminAction(() => {
+                          setReplayConfirmText("");
+                          setShowReplayConfirmDialog(true);
+                        }, `Prepare historical cost replay for ${replayPreview.summary.safeSuppliers} safe supplier(s) — this will correct source costs, batch costs, bale costs, and supplier locked rates.`)
+                      }
+                      className="gap-2 bg-emerald-600 hover:bg-emerald-700 text-white"
+                    >
+                      <ShieldCheck className="h-3.5 w-3.5" />
+                      {replayApplyMutation.isPending
+                        ? "Applying…"
+                        : `Prepare Historical Replay (${replayPreview.summary.safeSuppliers} supplier(s))`}
+                    </Button>
+                  </div>
                 </div>
               )}
 
@@ -1931,6 +1962,93 @@ export default function RawStockRecalculate() {
           )}
         </div>
       )}
+
+      {/* ── Historical Replay Confirmation Dialog ─────────────────────────── */}
+      {/* Requires the admin to type exactly "APPLY HISTORICAL REPLAY" before the
+          mutation fires — prevents accidental one-click financial corrections. */}
+      <Dialog
+        open={showReplayConfirmDialog}
+        onOpenChange={(open) => {
+          if (!open) { setShowReplayConfirmDialog(false); setReplayConfirmText(""); }
+        }}
+      >
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <ShieldCheck className="h-4 w-4 text-emerald-600" />
+              Confirm Historical Cost Replay
+            </DialogTitle>
+            <DialogDescription className="text-xs space-y-2 pt-1">
+              {replayPreview && (
+                <span className="block">
+                  This will update{" "}
+                  <strong>{replayPreview.summary.safeSuppliers}</strong> supplier(s),{" "}
+                  <strong>{replayPreview.summary.sourceMismatches}</strong> source row(s),{" "}
+                  <strong>{replayPreview.summary.batchesToUpdate}</strong> batch(es), and{" "}
+                  <strong>{replayPreview.summary.balesToUpdate}</strong> bale(s)
+                  {(replayPreview.summary.completedBatchesToUpdate ?? 0) > 0 && includeCompletedBatches && (
+                    <span> (including {replayPreview.summary.completedBatchesToUpdate} completed batch(es))</span>
+                  )}
+                  {(replayPreview.summary.finalizedBalesToUpdate ?? 0) > 0 && includeFinalizedBales && (
+                    <span> (including {replayPreview.summary.finalizedBalesToUpdate} finalized bale(s))</span>
+                  )}.
+                  <br />This operation <strong>corrects historical cost data</strong> and cannot be trivially reversed — an undo snapshot will be saved.
+                </span>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-3 pt-1">
+            <div className="space-y-1.5">
+              <Label htmlFor="replay-confirm-input" className="text-xs font-medium">
+                Type <span className="font-mono font-bold text-destructive">APPLY HISTORICAL REPLAY</span> to confirm:
+              </Label>
+              <Input
+                id="replay-confirm-input"
+                value={replayConfirmText}
+                onChange={(e) => setReplayConfirmText(e.target.value)}
+                placeholder="APPLY HISTORICAL REPLAY"
+                className="font-mono text-sm"
+                autoComplete="off"
+                autoFocus
+              />
+            </div>
+          </div>
+
+          <DialogFooter className="gap-2 pt-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => { setShowReplayConfirmDialog(false); setReplayConfirmText(""); }}
+            >
+              Cancel
+            </Button>
+            <Button
+              size="sm"
+              disabled={replayConfirmText !== REPLAY_CONFIRM_PHRASE || replayApplyMutation.isPending}
+              onClick={() => {
+                if (!replayPreview) return;
+                const safeIds = replayPreview.supplierRows
+                  .filter((s) => s.safeToRepair)
+                  .map((s) => s.supplierId);
+                replayApplyMutation.mutate(
+                  { supplierIds: safeIds, includeCompletedBatches, includeFinalizedBales },
+                  {
+                    onSettled: () => {
+                      setShowReplayConfirmDialog(false);
+                      setReplayConfirmText("");
+                    },
+                  }
+                );
+              }}
+              className="gap-2 bg-emerald-600 hover:bg-emerald-700 text-white"
+            >
+              <CheckCircle2 className="h-3.5 w-3.5" />
+              {replayApplyMutation.isPending ? "Applying…" : "Apply Historical Replay"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* ── Recompute Supplier Rates — dry-run preview & confirmation dialog ── */}
       <Dialog open={showRecomputeDialog} onOpenChange={(open) => { if (!open) { setShowRecomputeDialog(false); setRecomputePreviewRows(null); } }}>

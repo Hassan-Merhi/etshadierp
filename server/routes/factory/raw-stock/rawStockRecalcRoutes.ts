@@ -17,6 +17,7 @@ import {
   applyHistoricalCostReplay,
   captureReplaySnapshot,
   computeReplayFingerprint,
+  REPLAY_ALGORITHM_VERSION,
 } from "../../../services/factory/historicalCostReplay";
 import { logAudit } from "../../helpers/auditHelpers";
 import { getStableSupplierCost } from "../../../services/factory/rawStockStableCost";
@@ -1260,7 +1261,7 @@ export function registerRawStockRecalcRoutes(app: Express) {
   app.get(
     "/api/factory/raw-stock/recalc/historical-replay",
     requireAuth,
-    requireRole(ADMIN_ROLES),
+    requireRole(...ADMIN_ROLES),
     async (req: any, res) => {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -1277,7 +1278,7 @@ export function registerRawStockRecalcRoutes(app: Express) {
   app.post(
     "/api/factory/raw-stock/recalc/historical-replay/apply",
     requireAuth,
-    requireRole(ADMIN_ROLES),
+    requireRole(...ADMIN_ROLES),
     async (req: any, res) => {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       const userId = (req.session as any).userId;
@@ -1292,23 +1293,35 @@ export function registerRawStockRecalcRoutes(app: Express) {
       } = req.body;
 
       try {
+        const {
+          includeFinalizedBales = false,
+        } = req.body;
+        const wantsCompletedBatches: boolean = includeCompletedBatches === true;
+        const wantsFinalizedBales: boolean = includeFinalizedBales === true;
+
         if (dryRun || !providedToken) {
           // Issue a dry-run confirmation token
           const preview = await previewHistoricalCostReplay(companyId);
-          const requestedIds: number[] = supplierIds;
+          const requestedIds: number[] = Array.isArray(supplierIds) ? supplierIds : [];
           const safeSupplierIds: number[] = requestedIds.length > 0
             ? requestedIds.filter((id: number) =>
                 preview.supplierRows.some((s) => s.supplierId === id && s.safeToRepair)
               )
             : preview.supplierRows.filter((s) => s.safeToRepair).map((s) => s.supplierId);
 
-          const fingerprint = computeReplayFingerprint(companyId, safeSupplierIds, preview);
+          const fingerprint = computeReplayFingerprint(companyId, safeSupplierIds, preview, {
+            includeCompletedBatches: wantsCompletedBatches,
+            includeFinalizedBales: wantsFinalizedBales,
+          });
           const tokenPayload = {
             companyId,
             supplierIds: safeSupplierIds,
-            includeCompletedBatches,
+            includeCompletedBatches: wantsCompletedBatches,
+            includeFinalizedBales: wantsFinalizedBales,
             fingerprint,
             userId: String(userId),
+            algorithmVersion: REPLAY_ALGORITHM_VERSION,
+            expiresAt: Date.now() + REPAIR_TOKEN_TTL_MS,
           };
           const confirmationToken = signRepairToken(tokenPayload);
 
@@ -1319,6 +1332,7 @@ export function registerRawStockRecalcRoutes(app: Express) {
             suppliersToApply: preview.supplierRows.filter((s) => safeSupplierIds.includes(s.supplierId)),
             confirmationToken,
             expiresInMs: REPAIR_TOKEN_TTL_MS,
+            algorithmVersion: REPLAY_ALGORITHM_VERSION,
           });
         }
 
@@ -1338,8 +1352,18 @@ export function registerRawStockRecalcRoutes(app: Express) {
         if (payload.companyId !== companyId) {
           return res.status(400).json({ message: "Token company mismatch" });
         }
+        if (payload.userId !== String(userId)) {
+          return res.status(400).json({ message: "Token user mismatch — token was issued to a different user." });
+        }
+        if (payload.algorithmVersion !== REPLAY_ALGORITHM_VERSION) {
+          return res.status(400).json({
+            message: `Token algorithm version "${payload.algorithmVersion}" is outdated. Re-run the preview.`,
+          });
+        }
 
         const safeSupplierIds: number[] = payload.supplierIds || [];
+        const applyCompletedBatches: boolean = payload.includeCompletedBatches ?? false;
+        const applyFinalizedBales: boolean = payload.includeFinalizedBales ?? false;
 
         // Re-run preview with current DB state for fingerprint verification + apply
         const preview = await previewHistoricalCostReplay(companyId);
@@ -1351,9 +1375,12 @@ export function registerRawStockRecalcRoutes(app: Express) {
         const result = await applyHistoricalCostReplay({
           companyId,
           supplierIds: safeSupplierIds,
-          includeCompletedBatches: payload.includeCompletedBatches ?? false,
+          includeCompletedBatches: applyCompletedBatches,
+          includeFinalizedBales: applyFinalizedBales,
           preview,
           expectedFingerprint: payload.fingerprint,
+          algorithmVersion: payload.algorithmVersion,
+          issuedByUserId: payload.userId,
         });
 
         // Save undo log entry
