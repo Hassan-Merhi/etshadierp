@@ -197,6 +197,7 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
               filteredCombinedRows={filteredCombinedRows}
               allInventoryData={allInventoryData}
               allInventoryLocations={allInventoryLocations}
+              allLocations={locations}
               allInventoryGroups={allInventoryGroups}
               categoriesList={categoriesList}
               allStockSearchTerm={allStockSearchTerm}

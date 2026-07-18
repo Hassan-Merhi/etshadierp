@@ -16,6 +16,8 @@ interface CombinedStockViewProps {
   allInventoryData: any[];
   allInventoryLocations: any[];
   allInventoryGroups: any[];
+  /** Full location list from /api/locations — used for the dropdown so empty locations are still visible */
+  allLocations?: any[];
   categoriesList: any[];
   allStockSearchTerm: string;
   setAllStockSearchTerm: (s: string) => void;
@@ -43,6 +45,7 @@ export function CombinedStockView({
   allInventoryData,
   allInventoryLocations,
   allInventoryGroups,
+  allLocations,
   categoriesList,
   allStockSearchTerm,
   setAllStockSearchTerm,
@@ -58,8 +61,14 @@ export function CombinedStockView({
   posUser,
   allStockTableRef,
 }: CombinedStockViewProps) {
-  // Deduplicate locations by name — used for both dropdown and table columns
+  // Table columns: locations that actually have stock (derived from inventory data)
   const uniqueLocationNames = Array.from(new Map(allInventoryLocations.map((l) => [l.name, l])).values());
+
+  // Dropdown options: full location list so empty locations are still selectable.
+  // Falls back to inventory-derived list if allLocations wasn't passed.
+  const dropdownLocations = allLocations && allLocations.length > 0
+    ? [...allLocations].sort((a, b) => (a.name || "").localeCompare(b.name || ""))
+    : uniqueLocationNames;
   // Deduplicate categories by id (guard against any API-level duplicates)
   const uniqueCategories = Array.from(new Map(categoriesList.map((c) => [c.id, c])).values());
 
@@ -132,8 +141,8 @@ export function CombinedStockView({
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="__all__">All Locations</SelectItem>
-              {uniqueLocationNames.map((loc) => (
-                <SelectItem key={loc.name} value={loc.name}>
+              {dropdownLocations.map((loc) => (
+                <SelectItem key={loc.id ?? loc.name} value={loc.name}>
                   {loc.name}
                 </SelectItem>
               ))}
