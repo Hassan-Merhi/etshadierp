@@ -46,7 +46,7 @@ The endpoint applies company isolation, excludes deleted items, and uses determi
 
 ### Caller-classification guard
 
-`scripts/audit-program6c-stock-item-callers.mjs` now inventories every frontend reference to the full and lightweight stock-item contracts.
+`scripts/audit-program6c-stock-item-callers.mjs` inventories every frontend reference to the full and lightweight stock-item contracts.
 
 It classifies full-endpoint consumers as:
 
@@ -58,13 +58,22 @@ It classifies full-endpoint consumers as:
 
 The default mode is read-only and prints migration candidates. `--strict` additionally fails while selector-only or unresolved callers remain. The audit also fails if no frontend caller uses the registered lightweight endpoint, protecting the contract from becoming dead code.
 
+### Confirmed migration candidate: Bulk Rename
+
+`client/src/pages/settings/BulkRenameTab.tsx` currently downloads the complete `/api/stock-items` array before searching names. The flow reads only `id`, `code`, and `name`, then posts selected ids to the existing bulk-rename mutation. It does not consume prices, opening balances, quantities, inventory values, costing data, aliases, tax fields, or location pricing.
+
+The caller audit now explicitly classifies this file as `selector-only-migration-candidate` instead of leaving it as an unresolved legacy caller. This makes the remaining bandwidth change measurable and prevents the candidate from being accidentally treated as a full-data management screen.
+
+The eventual caller migration is behavior-preserving: only the read endpoint changes to `/api/stock-items/light`; the mutation, selected ids, rename matching, audit behavior, and stock/inventory records remain unchanged.
+
 ## Remaining work
 
 1. Run the caller audit in a checked-out repository and review every selector-only or unresolved result.
-2. Convert confirmed selector-only callers to the lightweight query key without changing screens that require prices or costing data.
-3. Verify inventory list consumers pass server-side filters instead of downloading broad pages and filtering locally.
-4. Audit location-inventory and stock-movement detail endpoints for unbounded history responses.
-5. Add focused runtime or integration coverage when a runnable checkout is available.
+2. Migrate Bulk Rename from `/api/stock-items` to `/api/stock-items/light` when a safe patch-capable checkout is available.
+3. Convert other confirmed selector-only callers to the lightweight query key without changing screens that require prices or costing data.
+4. Verify inventory list consumers pass server-side filters instead of downloading broad pages and filtering locally.
+5. Audit location-inventory and stock-movement detail endpoints for unbounded history responses.
+6. Add focused runtime or integration coverage when a runnable checkout is available.
 
 ## Safety rules
 
