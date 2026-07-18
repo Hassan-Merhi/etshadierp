@@ -47,8 +47,15 @@ Safety rules:
   - No speculative index was added because production-like `EXPLAIN (ANALYZE, BUFFERS)` evidence is not available.
   - Remaining completion gate: run the scanner in a real checkout, classify its exact high-severity findings, compare grouped net-profit SQL against current totals, and collect query plans before index changes.
   - Current review boundary documented in `docs/program-6d-database-query-optimization.md`.
-- [ ] 6E — Frontend bundle and caching
-  - Lazy-load Excel/PDF dependencies, stabilize React Query keys, and constrain invalidation/refetch behavior.
+- [x] 6E — Frontend bundle and caching
+  - Confirmed broad route-level code splitting through centralized `React.lazy` imports across ERP, POS, Factory, and Supplier Partner pages.
+  - Preserved dynamic Excel helper loading on heavy export screens so ExcelJS/XLSX work stays outside initial route bundles.
+  - Confirmed shared heavy query-key factories normalize filters and use the real request URL as key element zero.
+  - Preserved distinct full and lightweight stock-item cache prefixes so full-list invalidations cannot refetch selector payloads.
+  - Preserved global suppression of polling, window-focus, mount, and reconnect refetches.
+  - Preserved active-query-only invalidation helpers and parameterized-key prefix predicates.
+  - Added `scripts/verify-program6e-frontend-bundle-caching.mjs` to prevent bundle and caching regressions.
+  - Final audit documented in `docs/program-6e-frontend-bundle-caching.md`.
 - [ ] 6F — Exports and resource limits
   - Stream where supported, queue Puppeteer work, enforce memory/download/concurrency limits, and fail safely.
 
@@ -73,4 +80,4 @@ Existing performance work found:
 - HTML and dynamic API responses avoid stale caching.
 - Earlier heavy-API pagination and memory-stabilization scripts exist.
 
-Programs 6A, 6B, and 6C are implementation-complete. Program 6D has its audit, review, validation, and safety infrastructure complete but still requires real-checkout findings and database reconciliation evidence before behavior-changing query or index work can be marked complete. Programs 6E–6F, 7A–7D, and 8A–8C remain unfinished.
+Programs 6A, 6B, 6C, and 6E are implementation-complete. Program 6D still requires real-checkout findings and database reconciliation evidence before behavior-changing query or index work can be marked complete. Program 6F and Programs 7–8 remain unfinished.
