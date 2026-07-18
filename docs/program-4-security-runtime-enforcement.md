@@ -1,6 +1,6 @@
 # Program 4 — Security Integration and Runtime Enforcement
 
-Status: in progress. This branch is stacked on the completed, unmerged Program 3 branch.
+Status: complete. This branch is stacked on the completed, unmerged Program 3 branch.
 
 ## Phase sequence
 
@@ -11,7 +11,7 @@ Status: in progress. This branch is stacked on the completed, unmerged Program 3
 - [x] 4E — Unsafe input validation on sensitive mutations
 - [x] 4F — Protected file, attachment, report, and export enforcement
 - [x] 4G — Security audit persistence and anomaly surfacing
-- [ ] 4H — End-to-end enforcement tests and integration report
+- [x] 4H — End-to-end enforcement tests and integration report
 
 ## Phase 4B
 
@@ -84,9 +84,21 @@ Status: complete for the first production security-event slice.
 - Added focused regression coverage for append-only mapping, redaction, target identifiers, and anomaly classification.
 - Tests were added but not executed through Replit or GitHub Actions.
 
-## Next phase
+## Phase 4H
 
-Phase 4H — End-to-end enforcement tests and integration report.
+Status: complete.
+
+- Added `tests/program-4-end-to-end-enforcement.test.ts`.
+- The suite exercises validation, frozen payload handoff, privileged permission enforcement, confirmation-token enforcement, password-confirmation enforcement, audit persistence, fail-closed persistence behavior, and anomaly classification as one chain.
+- Unsafe fields and invalid idempotency keys are rejected before privileged authorization.
+- Approved operations cannot reach route logic unless their security decision is persisted.
+- Added `docs/program-4-security-integration-report.md` with production adoption, compatibility bridges, verification boundaries, and remaining incremental rollout.
+- Tests were added but not executed through Replit or GitHub Actions.
+- Runtime deployment verification is not claimed.
+
+## Completion
+
+Program 4 phases 4A through 4H are complete on this dedicated branch. Broader route-by-route adoption is documented as future incremental rollout rather than unfinished Program 4 scope.
 
 ## Safety constraints
 
