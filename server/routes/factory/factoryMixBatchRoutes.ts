@@ -798,10 +798,12 @@ export function registerFactoryMixBatchRoutes(app: Express) {
 
           if (!rawStock) throw new Error(`Raw stock not found for container ${containerId}`);
 
+          // DEFECT 6 FIX: Reject missing, deleted, or cross-company containers.
           const [ctnRow] = await tx
             .select({ supplierId: factoryContainers.supplierId })
             .from(factoryContainers)
-            .where(eq(factoryContainers.id, containerId));
+            .where(and(eq(factoryContainers.id, containerId), eq(factoryContainers.companyId, companyId), isNull(factoryContainers.deletedAt)));
+          if (!ctnRow) throw new Error(`Container ${containerId} not found, deleted, or belongs to another company`);
           const ctnSupplierId = ctnRow?.supplierId ?? null;
 
           const weight = parseFloat(weightKg);
@@ -1042,10 +1044,12 @@ export function registerFactoryMixBatchRoutes(app: Express) {
 
           if (!rawStockRow) throw new Error(`Raw stock not found for container ${containerId}`);
 
+          // DEFECT 6 FIX: Reject missing, deleted, or cross-company containers.
           const [ctnRow2] = await tx
             .select({ supplierId: factoryContainers.supplierId })
             .from(factoryContainers)
-            .where(eq(factoryContainers.id, containerId));
+            .where(and(eq(factoryContainers.id, containerId), eq(factoryContainers.companyId, companyId), isNull(factoryContainers.deletedAt)));
+          if (!ctnRow2) throw new Error(`Container ${containerId} not found, deleted, or belongs to another company`);
           const ctnSupplierId2 = ctnRow2?.supplierId ?? null;
 
           const weight = parseFloat(weightKg);

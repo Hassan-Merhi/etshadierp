@@ -18,6 +18,7 @@ import {
   applyHistoricalCostReplay,
   captureReplaySnapshot,
   computeReplayFingerprint,
+  computeReplayWriteScope,
   REPLAY_ALGORITHM_VERSION,
   StaleTokenError,
 } from "../../../services/factory/historicalCostReplay";
@@ -37,7 +38,42 @@ import { pool } from "../../../db";
 
 const ADMIN_ROLES = ["Admin", "Developer"] as const;
 
-// ─── Undo log helpers ─────────────────────────────────────────────────────────
+// ─── Undo log + consumed-token helpers ─────────────────────────────────────────
+
+/**
+ * DEFECT 11 FIX: Ensure the replay consumed-tokens table and all D11 columns exist.
+ *
+ * Uses ADD COLUMN IF NOT EXISTS so it is safe to call on existing deployments
+ * that have the original 4-column table without the new D11 columns. Called once
+ * at route registration (same pattern as ensureUndoLogTable).
+ */
+async function ensureTokenTable(): Promise<void> {
+  // Create the table if it does not exist at all (new deployments).
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS factory_replay_consumed_tokens (
+      token_hash               TEXT        PRIMARY KEY,
+      company_id               INTEGER     NOT NULL,
+      user_id                  TEXT        NOT NULL,
+      consumed_at              TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      replay_algorithm_version TEXT        NOT NULL DEFAULT '',
+      scope_fingerprint        TEXT        NOT NULL DEFAULT '',
+      undo_log_id              INTEGER     REFERENCES factory_recalc_undo_log(id) ON DELETE SET NULL
+    )
+  `);
+  // Idempotent column additions for existing deployments (original 4-column table).
+  await pool.query(`ALTER TABLE factory_replay_consumed_tokens
+    ADD COLUMN IF NOT EXISTS replay_algorithm_version TEXT NOT NULL DEFAULT ''`);
+  await pool.query(`ALTER TABLE factory_replay_consumed_tokens
+    ADD COLUMN IF NOT EXISTS scope_fingerprint TEXT NOT NULL DEFAULT ''`);
+  await pool.query(`ALTER TABLE factory_replay_consumed_tokens
+    ADD COLUMN IF NOT EXISTS undo_log_id INTEGER
+      REFERENCES factory_recalc_undo_log(id) ON DELETE SET NULL`);
+  // Index for per-company audit queries.
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS factory_replay_consumed_tokens_company_consumed
+      ON factory_replay_consumed_tokens (company_id, consumed_at DESC)
+  `);
+}
 
 /** Ensure the undo log table exists. Called once at route registration. */
 async function ensureUndoLogTable(): Promise<void> {
@@ -175,6 +211,8 @@ interface ZeroCostSourceTokenPayload {
 export function registerRawStockRecalcRoutes(app: Express) {
   // Ensure the undo log table exists (idempotent, runs once at startup).
   ensureUndoLogTable().catch((err) => console.error("[recalc] Failed to create undo log table:", err));
+  // DEFECT 11 FIX: ensure consumed-tokens table has all D11 columns (idempotent on existing DBs).
+  ensureTokenTable().catch((err) => console.error("[recalc] Failed to ensure token table schema:", err));
 
   // Read-only diff preview — never writes anything. Admin/Developer-only: this
   // surfaces exact stored vs. corrected landed-cost figures for every container.
@@ -998,6 +1036,30 @@ export function registerRawStockRecalcRoutes(app: Express) {
         if (!confirm) {
           // ── Dry-run: identify all safe containers, build token ──────────
           const dryRun = await computeApplyAllDryRun(companyId, { includeHistoricalContainers: wantsHistorical });
+
+          // DEFECT 12 FIX: Guard against applying to SUPPLIER_LOCKED_RATE sources via
+          // apply-all-safe.  These sources must be corrected via Historical Replay so the
+          // timeline-based expected rate is used (not the container canonical rate).
+          if (dryRun.safeContainerIds.length > 0) {
+            const { rows: supplierLinkedSources } = await pool.query<{ id: number }>(
+              `SELECT mbs.id
+               FROM factory_mix_batch_sources mbs
+               JOIN factory_mix_batches mb ON mb.id = mbs.mix_batch_id
+               WHERE mbs.container_id = ANY($1)
+                 AND mb.company_id = $2
+                 AND mbs.source_type = 'SUPPLIER_FIFO'
+               LIMIT 1`,
+              [dryRun.safeContainerIds, companyId]
+            );
+            if (supplierLinkedSources.length > 0) {
+              return res.status(400).json({
+                code: "SUPPLIER_LOCKED_RATE_SOURCES_PRESENT",
+                message:
+                  "Some containers have SUPPLIER_LOCKED_RATE (SUPPLIER_FIFO) sources. " +
+                  "These must be fixed via Historical Cost Replay, not apply-all-safe.",
+              });
+            }
+          }
           if (dryRun.safeContainerIds.length === 0) {
             return res.json({ dryRun: true, safeCount: 0, confirmationToken: null, summary: dryRun });
           }
@@ -1204,51 +1266,82 @@ export function registerRawStockRecalcRoutes(app: Express) {
             suppliers: Array<{ id: number; currentRawMaterialCostPerKgUsd: string }>;
           };
 
+          // DEFECT 7 FIX: All undo UPDATEs include company_id guard to prevent
+          // cross-company writes in case the snapshot contains IDs from another company.
           for (const c of lockedSnapshot.containers) {
             await client.query(
               `UPDATE factory_containers
                SET final_payable_amount = $1, rate_per_kg_usd = $2, final_payable_amount_usd = $3, updated_at = NOW()
-               WHERE id = $4`,
-              [c.finalPayableAmount, c.ratePerKgUsd, c.finalPayableAmountUsd, c.id]
+               WHERE id = $4 AND company_id = $5`,
+              [c.finalPayableAmount, c.ratePerKgUsd, c.finalPayableAmountUsd, c.id, companyId]
             );
           }
           for (const rs of lockedSnapshot.rawStockRows) {
             await client.query(
-              `UPDATE factory_raw_stock SET cost_per_kg = $1, cost_per_kg_usd = $2 WHERE id = $3`,
-              [rs.costPerKg, rs.costPerKgUsd, rs.id]
+              `UPDATE factory_raw_stock SET cost_per_kg = $1, cost_per_kg_usd = $2
+               WHERE id = $3 AND company_id = $4`,
+              [rs.costPerKg, rs.costPerKgUsd, rs.id, companyId]
             );
           }
           for (const src of lockedSnapshot.mixBatchSources) {
+            // Sources have no direct company_id — gate via their parent batch.
             await client.query(
-              `UPDATE factory_mix_batch_sources SET cost_per_kg = $1, total_cost = $2 WHERE id = $3`,
-              [src.costPerKg, src.totalCost, src.id]
+              `UPDATE factory_mix_batch_sources SET cost_per_kg = $1, total_cost = $2
+               WHERE id = $3
+                 AND mix_batch_id IN (SELECT id FROM factory_mix_batches WHERE company_id = $4)`,
+              [src.costPerKg, src.totalCost, src.id, companyId]
             );
           }
           for (const b of lockedSnapshot.mixBatches) {
             await client.query(
-              `UPDATE factory_mix_batches SET cost_per_kg = $1, total_cost = $2, updated_at = NOW() WHERE id = $3`,
-              [b.costPerKg, b.totalCost, b.id]
+              `UPDATE factory_mix_batches SET cost_per_kg = $1, total_cost = $2, updated_at = NOW()
+               WHERE id = $3 AND company_id = $4`,
+              [b.costPerKg, b.totalCost, b.id, companyId]
             );
           }
           for (const bale of lockedSnapshot.bales) {
             await client.query(
-              `UPDATE factory_bales SET cost_per_kg = $1, total_cost = $2, updated_at = NOW() WHERE id = $3`,
-              [bale.costPerKg, bale.totalCost, bale.id]
+              `UPDATE factory_bales SET cost_per_kg = $1, total_cost = $2, updated_at = NOW()
+               WHERE id = $3 AND company_id = $4`,
+              [bale.costPerKg, bale.totalCost, bale.id, companyId]
             );
           }
           for (const sup of lockedSnapshot.suppliers) {
             await client.query(
-              `UPDATE factory_suppliers SET current_raw_material_cost_per_kg_usd = $1, updated_at = NOW() WHERE id = $2`,
-              [sup.currentRawMaterialCostPerKgUsd, sup.id]
+              `UPDATE factory_suppliers SET current_raw_material_cost_per_kg_usd = $1, updated_at = NOW()
+               WHERE id = $2 AND company_id = $3`,
+              [sup.currentRawMaterialCostPerKgUsd, sup.id, companyId]
             );
           }
 
-          // Mark as undone atomically with the restore writes (DEFECT 5 FIX).
+          // DEFECT 7 FIX: Mark as undone atomically with the restore writes.
           await client.query(
             `UPDATE factory_recalc_undo_log
              SET undone_at = NOW(), undone_by_user_id = $1, undone_by_username = $2
              WHERE id = $3 AND company_id = $4`,
             [req.session.userId ?? null, req.session.username ?? null, parseInt(undoLogId), companyId]
+          );
+
+          // DEFECT 7 FIX: Insert undo audit log inside the same transaction.
+          await client.query(
+            `INSERT INTO audit_log
+               (user_id, username, company_id, action, table_name, record_id, record_identifier, changes, created_at)
+             VALUES ($1, $2, $3, 'undo', 'factory_recalc_undo_log', $4, $5, $6::jsonb, NOW())`,
+            [
+              req.session.userId ?? null,
+              req.session.username ?? null,
+              companyId,
+              parseInt(undoLogId),
+              `historical-replay undo — log ${undoLogId}`,
+              JSON.stringify({
+                containersRestored: lockedSnapshot.containers.length,
+                rawStockRowsRestored: lockedSnapshot.rawStockRows.length,
+                sourcesRestored: lockedSnapshot.mixBatchSources.length,
+                batchesRestored: lockedSnapshot.mixBatches.length,
+                balesRestored: lockedSnapshot.bales.length,
+                suppliersRestored: lockedSnapshot.suppliers.length,
+              }),
+            ]
           );
 
           await client.query("COMMIT");
@@ -1346,16 +1439,33 @@ export function registerRawStockRecalcRoutes(app: Express) {
           };
           const confirmationToken = signRepairToken(tokenPayload);
 
-          // DEFECT 9 (route) FIX: include fingerprint so the UI can display/log it.
+          // DEFECT 3 FIX: Use computeReplayWriteScope — the exact same closure/gates
+          // that applyHistoricalCostReplay uses — so the confirmation-dialog counts
+          // precisely match what will actually be written.
+          const writeScope = await computeReplayWriteScope(
+            companyId,
+            safeSupplierIds,
+            preview,
+            { includeCompletedBatches: wantsCompletedBatches, includeFinalizedBales: wantsFinalizedBales }
+          );
           return res.json({
             dryRun: true,
             summary: preview.summary,
             safeSupplierIds,
-            suppliersToApply: preview.supplierRows.filter((s) => safeSupplierIds.includes(s.supplierId)),
+            suppliersToApply: preview.supplierRows.filter((s) => writeScope.safeSupplierIds.has(s.supplierId)),
             confirmationToken,
             fingerprint,
             expiresInMs: REPAIR_TOKEN_TTL_MS,
             algorithmVersion: REPLAY_ALGORITHM_VERSION,
+            // DEFECT 3 FIX: Scope counts derived from the exact approved write closure.
+            scope: {
+              suppliersSelected: writeScope.safeSupplierIds.size,
+              containersInScope: writeScope.containerIds.size,
+              sourceMismatches: writeScope.sourceIds.size,
+              batchesInScope: writeScope.batchIdsToApply.size,
+              balesToUpdate: writeScope.baleCount,
+              finalizedBalesToUpdate: preview.summary.finalizedBalesToUpdate ?? 0,
+            },
           });
         }
 

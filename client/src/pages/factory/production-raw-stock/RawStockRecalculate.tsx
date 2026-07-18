@@ -258,17 +258,26 @@ export default function RawStockRecalculate() {
   // are selected will be included in the Prepare call.
   const [selectedSupplierIds, setSelectedSupplierIds] = useState<Set<number>>(new Set());
 
-  // DEFECT 9 FIX: Store the full dry-run response (not just the token string) so the
-  // confirm dialog can surface summary data and pass the complete token on apply.
+  // DEFECT 3+9 FIX: Store the full dry-run response so the confirm dialog can
+  // surface scope summary data and pass the STORED supplierIds on apply (not the
+  // UI selection state which may have changed after Prepare was clicked).
   interface PreparedReplayData {
     confirmationToken: string;
     summary: Record<string, any>;
     safeSupplierIds: number[];
     suppliersToApply: any[];
-    // DEFECT 9 (route) FIX: fingerprint is now included in the dry-run response.
     fingerprint?: string;
     expiresInMs: number;
     algorithmVersion: string;
+    /** DEFECT 3 FIX: Structured scope counts from the dry-run response. */
+    scope?: {
+      suppliersSelected: number;
+      containersInScope: number;
+      sourceMismatches: number;
+      batchesInScope: number;
+      balesToUpdate: number;
+      finalizedBalesToUpdate: number;
+    };
   }
   const [preparedReplayToken, setPreparedReplayToken] = useState<PreparedReplayData | null>(null);
 
@@ -768,38 +777,12 @@ export default function RawStockRecalculate() {
     },
   });
 
-  // Step 2: actual apply (called from inside the confirmation dialog after admin override)
-  const recomputeApplyMutation = useMutation({
-    mutationFn: async () => {
-      const res = await modeApiRequest("POST", "/api/factory/raw-stock/supplier-rate/recompute", { dryRun: false });
-      if (!res.ok) throw new Error((await res.json()).message || "Failed to recompute supplier rates");
-      return res.json();
-    },
-    onSuccess: (data) => {
-      setShowRecomputeDialog(false);
-      setRecomputePreviewRows(null);
-      queryClient.invalidateQueries({ queryKey: ["/api/factory/raw-stock"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/factory/raw-stock/recalc/preview"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/factory/raw-stock/supplier-rate/recompute-audit"] });
-      toast({
-        title: "Supplier rates updated",
-        description: `Updated ${data.updated} supplier(s), skipped ${data.skipped} (already correct or no data).`,
-      });
-    },
-    onError: (err: any) => {
-      toast({ title: "Error", description: err.message, variant: "destructive" });
-    },
-  });
+  // DEFECT 12 FIX: recomputeApplyMutation removed — applying supplier rates via this
+  // endpoint is deprecated. The dialog now shows a deprecation notice instead of an Apply
+  // button (see the Recompute Supplier Rates dialog below). Use Historical Cost Replay.
 
   const handleRecomputeSupplierRates = () => {
     recomputeDryRunMutation.mutate();
-  };
-
-  const handleRecomputeConfirm = () => {
-    wrapAdminAction(
-      () => recomputeApplyMutation.mutate(),
-      "Recompute locked rate for ALL suppliers from all-time receipt-weighted average — overwrites moving-average rates"
-    );
   };
 
   // ── Restore supplier rates from audit log ─────────────────────────────────
@@ -1015,7 +998,7 @@ export default function RawStockRecalculate() {
           <Button
             variant="outline"
             size="sm"
-            disabled={recomputeDryRunMutation.isPending || recomputeApplyMutation.isPending}
+            disabled={recomputeDryRunMutation.isPending}
             onClick={handleRecomputeSupplierRates}
             title="Recompute all supplier locked rates from receipt-weighted average of their corrected raw-stock rows. Use after a recalc run where all containers were fully used."
             className="gap-2"
@@ -1920,11 +1903,11 @@ export default function RawStockRecalculate() {
                     return safeIds.length > 0 ? (
                       <div className="flex items-center gap-2 px-3 py-1.5 border-b text-xs text-muted-foreground bg-muted/20">
                         <Button size="sm" variant="ghost" className="h-6 text-xs px-2"
-                          onClick={() => setSelectedSupplierIds(new Set(safeIds))}>
+                          onClick={() => { setSelectedSupplierIds(new Set(safeIds)); setPreparedReplayToken(null); }}>
                           Select All Safe
                         </Button>
                         <Button size="sm" variant="ghost" className="h-6 text-xs px-2"
-                          onClick={() => setSelectedSupplierIds(new Set())}>
+                          onClick={() => { setSelectedSupplierIds(new Set()); setPreparedReplayToken(null); }}>
                           Clear
                         </Button>
                         <span className="ml-auto font-medium">
@@ -1962,6 +1945,9 @@ export default function RawStockRecalculate() {
                                   const next = new Set(selectedSupplierIds);
                                   if (v) next.add(s.supplierId); else next.delete(s.supplierId);
                                   setSelectedSupplierIds(next);
+                                  // DEFECT 3 FIX: Changing supplier selection invalidates the
+                                  // prepared token — user must re-Prepare after changing scope.
+                                  setPreparedReplayToken(null);
                                 }}
                               />
                             </TableCell>
@@ -2141,7 +2127,11 @@ export default function RawStockRecalculate() {
                 if (!preparedReplayToken?.confirmationToken) return;
                 replayApplyMutation.mutate(
                   {
-                    supplierIds: Array.from(selectedSupplierIds),
+                    // DEFECT 3 FIX: Use the supplier IDs stored in the prepared token,
+                    // not the current UI selection state. The token was signed with
+                    // safeSupplierIds — sending a different set would fail the server's
+                    // supplier guard and could expand scope beyond what was reviewed.
+                    supplierIds: preparedReplayToken.safeSupplierIds,
                     includeCompletedBatches,
                     includeFinalizedBales,
                     confirmationToken: preparedReplayToken.confirmationToken,

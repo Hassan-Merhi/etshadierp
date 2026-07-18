@@ -150,6 +150,25 @@ export interface HistoricalReplayPreviewResult {
   batchRows: ReplayBatchRow[];
 }
 
+/**
+ * DEFECT 1 FIX: Exact set of DB row IDs approved for write by a signed replay token.
+ * Every write loop must check the corresponding approved ID set before touching any row.
+ */
+export interface HistoricalReplayScope {
+  /** Supplier IDs whose timelines are safe and were selected for this replay. */
+  supplierIds: number[];
+  /** Container IDs belonging to approved suppliers with resolved FX. */
+  containerIds: number[];
+  /** Source IDs that are safeToRepair and belong to approved suppliers / containers. */
+  sourceIds: number[];
+  /** Mix-batch IDs in the supplier-closure that pass the completed-batch gate. */
+  batchIds: number[];
+  /** Bale IDs that are non-finalized (or explicitly authorized) belonging to approved batches. */
+  baleIds: number[];
+  /** Batch IDs excluded from writes due to dependency errors. */
+  blockedBatchIds: number[];
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Internal event types
 // ─────────────────────────────────────────────────────────────────────────────
@@ -785,7 +804,8 @@ interface SupplierTimelineResult {
   affectedContainerCount: number;
 }
 
-async function replaySupplierTimeline(
+/** @internal exported for tests only — use applyHistoricalCostReplay for production writes */
+export async function replaySupplierTimeline(
   companyId: number,
   supplierId: number,
   supplierName: string,
@@ -1020,24 +1040,55 @@ function computeBatchCorrections(
     const sources = sourcesGroupedByBatch.get(batchId) || [];
     if (sources.length === 0) continue;
 
+    // DEFECT 9 FIX: Propagate blocked status from upstream batches recursively.
+    // Since processOrder is topological (upstream before downstream), any blocked
+    // upstream that was added to missingUpstreamBatchIds mid-loop is visible here.
+    const hasBlockedUpstreamBatch = sources.some(
+      (s) =>
+        s.pricingBasis === "BATCH" &&
+        s.sourceBatchId != null &&
+        (cycleBatchIds.has(s.sourceBatchId) || missingUpstreamBatchIds.has(s.sourceBatchId))
+    );
+    if (hasBlockedUpstreamBatch) {
+      missingUpstreamBatchIds.add(batchId); // propagate the block downstream
+      continue;
+    }
+
     let dTotalCost = new Decimal(0);
     let dTotalWeight = new Decimal(0);
     const correctedSourceCosts = new Map<number, number>();
+
+    // DEFECT 9 FIX: flag is set when the safety-net path detects an unresolvable
+    // upstream inside the inner source loop. The outer loop checks this flag and
+    // skips computing/registering any correction for the blocked batch, preventing
+    // partial-total corrections from being emitted.
+    let batchBlockedMidLoop = false;
 
     for (const src of sources) {
       const dWeight = new Decimal(src.weightKg);
       let correctedCostPerKg: number;
 
       if (src.pricingBasis === "BATCH" && src.sourceBatchId != null) {
-        // Use corrected upstream batch cost
-        correctedCostPerKg = correctedBatchCost.get(src.sourceBatchId) ?? src.storedCostPerKg;
+        // DEFECT 9 FIX: No ?? fallback — upstream MUST have a corrected cost by now
+        // because the pre-loop blocked-upstream check already skipped any batch whose
+        // BATCH-type sources reference a blocked upstream.
+        if (!correctedBatchCost.has(src.sourceBatchId)) {
+          // Safety net — should not occur in normal operation since the pre-loop check
+          // handles it, but guard here to be safe.
+          missingUpstreamBatchIds.add(batchId); // mark blocked so downstream batches skip too
+          batchBlockedMidLoop = true;
+          break; // break inner loop; outer loop checks batchBlockedMidLoop below
+        }
+        correctedCostPerKg = correctedBatchCost.get(src.sourceBatchId)!;
       } else if (src.pricingBasis === "SUPPLIER_LOCKED_RATE" && src.supplierId != null) {
-        // Use expected historical supplier rate at this batch
+        // Use expected historical supplier rate at this batch; skip if unavailable.
         const key = `${src.supplierId}:${src.batchId}`;
-        correctedCostPerKg = expectedRateAtBatch.get(key) ?? src.storedCostPerKg;
+        if (!expectedRateAtBatch.has(key)) continue;
+        correctedCostPerKg = expectedRateAtBatch.get(key)!;
       } else if (src.pricingBasis === "CONTAINER_DIRECT" && src.containerId != null) {
-        // Use canonical container rate
-        correctedCostPerKg = canonicalRateByContainer.get(src.containerId) ?? src.storedCostPerKg;
+        // Use canonical container rate; skip if FX unresolved.
+        if (!canonicalRateByContainer.has(src.containerId)) continue;
+        correctedCostPerKg = canonicalRateByContainer.get(src.containerId)!;
       } else {
         correctedCostPerKg = src.storedCostPerKg;
       }
@@ -1048,6 +1099,11 @@ function computeBatchCorrections(
       dTotalCost = dTotalCost.plus(dWeight.times(new Decimal(correctedCostPerKg)));
       dTotalWeight = dTotalWeight.plus(dWeight);
     }
+
+    // DEFECT 9 FIX: Do NOT register any correction or correctedBatchCost entry for a
+    // batch that was blocked mid-loop. Registering a partial-total correction would
+    // emit incorrect expected costs and let downstream batches use those wrong values.
+    if (batchBlockedMidLoop) continue;
 
     const expectedCostPerKg = dTotalWeight.gt(0) ? dTotalCost.div(dTotalWeight).toDecimalPlaces(6).toNumber() : 0;
     const expectedTotalCost = dTotalCost.toDecimalPlaces(6).toNumber();
@@ -1508,6 +1564,20 @@ export function computeReplayFingerprint(
         storedTotalCost: b.storedTotalCost,
         expectedTotalCost: b.expectedTotalCost,
       })),
+    // DEFECT 2 FIX: Include container data in fingerprint so any container-cost
+    // change (FX rate confirmed, additional charges added, etc.) invalidates the token.
+    containerData: preview.containerRows
+      .filter((c) => !c.fxUnresolved && sortedSupplierIds.includes(c.supplierId ?? -1))
+      .sort((a, b) => a.containerId - b.containerId)
+      .map((c) => ({
+        id: c.containerId,
+        supplierId: c.supplierId,
+        storedCostPerKgUsd: c.storedCostPerKgUsd,
+        canonicalCostPerKgUsd: c.canonicalCostPerKgUsd,
+        storedTotalUsd: c.storedTotalUsd,
+        canonicalTotalUsd: c.canonicalTotalUsd,
+        safeToRepair: c.safeToRepair,
+      })),
     summary: {
       sourceMismatches: preview.summary.sourceMismatches,
       batchesToUpdate: preview.summary.batchesToUpdate,
@@ -1621,9 +1691,10 @@ export async function captureReplaySnapshot(
     ),
     client.query(
       `SELECT id,
-              cost_per_kg  AS "costPerKg",
-              total_cost   AS "totalCost",
-              total_weight_kg AS "totalWeightKg"
+              cost_per_kg     AS "costPerKg",
+              total_cost      AS "totalCost",
+              total_weight_kg AS "totalWeightKg",
+              status          AS "status"
        FROM factory_mix_batches
        WHERE id = ANY($1)`,
       [safeBatchIds]
@@ -1632,7 +1703,9 @@ export async function captureReplaySnapshot(
       `SELECT id,
               cost_per_kg  AS "costPerKg",
               total_cost   AS "totalCost",
-              weight_kg    AS "weightKg"
+              weight_kg    AS "weightKg",
+              status       AS "status",
+              mix_batch_id AS "mixBatchId"
        FROM factory_bales
        WHERE id = ANY($1) AND company_id = $2`,
       [safeBaleIds, companyId]
@@ -1661,6 +1734,114 @@ export async function captureReplaySnapshot(
 
 /** Canonical algorithm version — increment whenever the replay formula changes. */
 export const REPLAY_ALGORITHM_VERSION = "v2-signed-quantity-max0-receipt";
+
+/**
+ * DEFECT 3 FIX: Compute the exact write scope for a Historical Replay dry-run.
+ *
+ * Uses the same supplier-closure logic as applyHistoricalCostReplay so the
+ * confirmation-dialog scope counts exactly match what the apply will write.
+ *
+ * Suitable for use in the dry-run route handler (before the advisory lock, as
+ * it is read-only — no writes or row locks).
+ */
+export async function computeReplayWriteScope(
+  companyId: number,
+  requestedSupplierIds: number[],
+  preview: HistoricalReplayPreviewResult,
+  opts: { includeCompletedBatches: boolean; includeFinalizedBales: boolean }
+): Promise<{
+  safeSupplierIds: Set<number>;
+  containerIds: Set<number>;
+  batchIdsToApply: Set<number>;
+  sourceIds: Set<number>;
+  /** Count of bales that would be updated (approximate — sampled via pool, not locked). */
+  baleCount: number;
+}> {
+  // Build the safe-supplier set using the same filter as applyHistoricalCostReplay.
+  const safeTimelines = preview.supplierRows.filter(
+    (s) => s.safeToRepair && (requestedSupplierIds.length === 0 || requestedSupplierIds.includes(s.supplierId))
+  );
+  const safeSupplierIds = new Set(safeTimelines.map((s) => s.supplierId));
+
+  if (safeSupplierIds.size === 0) {
+    return { safeSupplierIds, containerIds: new Set(), batchIdsToApply: new Set(), sourceIds: new Set(), baleCount: 0 };
+  }
+
+  // Build canonical rates (same logic as apply).
+  const { sourceInfos, batchInfoMap } = await buildBatchConsumptionEvents(companyId, safeSupplierIds);
+  const canonicals = await computeCanonicalCosts(companyId, await loadContainerUniverse(companyId));
+  const canonicalRateByContainer = new Map<number, number>();
+  for (const c of canonicals) {
+    if (!c.fxUnresolved) canonicalRateByContainer.set(c.universe.container.id, c.canonicalCostPerKgUsd);
+  }
+
+  // Container scope: same containers that would be updated.
+  const containerIds = new Set(
+    preview.containerRows
+      .filter((c) => !c.fxUnresolved && c.supplierId != null && safeSupplierIds.has(c.supplierId))
+      .map((c) => c.containerId)
+  );
+
+  // Rebuild expected rates from preview.
+  const allExpectedRatesAtBatch = new Map<string, number>();
+  for (const srcRow of preview.sourceRows) {
+    if (srcRow.pricingBasis === "SUPPLIER_LOCKED_RATE" && srcRow.supplierId != null) {
+      const key = `${srcRow.supplierId}:${srcRow.batchId}`;
+      if (!allExpectedRatesAtBatch.has(key)) {
+        allExpectedRatesAtBatch.set(key, srcRow.expectedHistoricalCostPerKg);
+      }
+    }
+  }
+
+  const { corrections: batchCorrections } = computeBatchCorrections(
+    batchInfoMap,
+    sourceInfos,
+    allExpectedRatesAtBatch,
+    canonicalRateByContainer
+  );
+
+  // Batch scope — same gates as apply.
+  const COMPLETED_STATUSES = ["COMPLETED", "CLOSED"];
+  const batchCorrectionIds = new Set(batchCorrections.map((c) => c.batchId));
+  const batchIdsToApply = new Set(
+    preview.batchRows
+      .filter((b) => {
+        if (!batchCorrectionIds.has(b.batchId)) return false;
+        if (COMPLETED_STATUSES.includes(b.status) && !opts.includeCompletedBatches) return false;
+        return true;
+      })
+      .map((b) => b.batchId)
+  );
+
+  // Source scope — same three-gate filter as apply.
+  const sourceIds = new Set(
+    preview.sourceRows
+      .filter((s) => {
+        if (!s.safeToRepair) return false;
+        if (!batchIdsToApply.has(s.batchId)) return false;
+        if (s.pricingBasis === "SUPPLIER_LOCKED_RATE" && s.supplierId != null)
+          return safeSupplierIds.has(s.supplierId);
+        if (s.pricingBasis === "CONTAINER_DIRECT" && s.containerId != null)
+          return canonicalRateByContainer.has(s.containerId);
+        return false;
+      })
+      .map((s) => s.sourceId)
+  );
+
+  // Bale count — approximate (not locked, but consistent with what apply would pick).
+  let baleCount = 0;
+  if (batchIdsToApply.size > 0) {
+    const notFinalizedClause = buildNotFinalizedClause(opts.includeFinalizedBales);
+    const { rows } = await pool.query<{ cnt: string }>(
+      `SELECT COUNT(*) AS cnt FROM factory_bales fb
+       WHERE fb.mix_batch_id = ANY($1) AND fb.company_id = $2 AND ${notFinalizedClause}`,
+      [[...batchIdsToApply], companyId]
+    );
+    baleCount = parseInt(rows[0]?.cnt ?? "0", 10);
+  }
+
+  return { safeSupplierIds, containerIds, batchIdsToApply, sourceIds, baleCount };
+}
 
 export async function applyHistoricalCostReplay(
   params: ReplayApplyParams & {
@@ -1733,8 +1914,13 @@ export async function applyHistoricalCostReplay(
     await loadContainerUniverse(companyId)
   );
   const canonicalRateByContainer = new Map<number, number>();
+  // DEFECT 8 FIX: Also track canonical total USD per container for accurate container UPDATE.
+  const canonicalTotalUsdByContainer = new Map<number, number>();
   for (const c of canonicals) {
-    if (!c.fxUnresolved) canonicalRateByContainer.set(c.universe.container.id, c.canonicalCostPerKgUsd);
+    if (!c.fxUnresolved) {
+      canonicalRateByContainer.set(c.universe.container.id, c.canonicalCostPerKgUsd);
+      canonicalTotalUsdByContainer.set(c.universe.container.id, c.canonicalTotalUsd);
+    }
   }
 
   // Rebuild expected rates from preview
@@ -1772,9 +1958,19 @@ export async function applyHistoricalCostReplay(
   );
 
   // Collect the exact IDs of every record that will be touched (FIX 14 — exact snapshot scope).
+  // DEFECT 1 FIX (complete): A source is in-scope ONLY when:
+  //   1. It is safeToRepair, AND
+  //   2. Its batch is in batchIdsToApply (supplier-closure + completed-gate), AND
+  //   3. Its supplier/container satisfies the pricing-basis membership check.
+  // Without gate 2, CONTAINER_DIRECT sources in batches outside the selected-supplier
+  // closure (e.g., a shared batch that also uses a different supplier's material) could
+  // be written when the user only approved a subset of suppliers.
   const sourceIdsToUpdate = preview.sourceRows
     .filter((s) => {
       if (!s.safeToRepair) return false;
+      // Gate 2: batch must be in the approved write scope.
+      if (!batchIdsToApply.has(s.batchId)) return false;
+      // Gate 3: pricing-basis-specific supplier/container membership.
       if (s.pricingBasis === "SUPPLIER_LOCKED_RATE" && s.supplierId != null) {
         return safeSupplierIds.has(s.supplierId);
       }
@@ -1845,12 +2041,29 @@ export async function applyHistoricalCostReplay(
         freshBatchRows = rows;
       }
 
+      // DEFECT 2 FIX (complete): Lock container rows for approved suppliers too.
+      const supplierIdArr = [...safeSupplierIds];
+      let freshContainerRows: { id: number; rate_per_kg_usd: string; final_payable_amount_usd: string }[] = [];
+      if (supplierIdArr.length > 0) {
+        const { rows } = await client.query<{ id: number; rate_per_kg_usd: string; final_payable_amount_usd: string }>(
+          `SELECT id, rate_per_kg_usd, final_payable_amount_usd
+           FROM factory_containers
+           WHERE supplier_id = ANY($1) AND company_id = $2 AND deleted_at IS NULL
+           FOR UPDATE`,
+          [supplierIdArr, companyId]
+        );
+        freshContainerRows = rows;
+      }
+
       const freshSrcCost = new Map(freshSrcRows.map((r) => [r.id, r.cost_per_kg]));
       const freshBatchCost = new Map(
         freshBatchRows.map((r) => [r.id, { cost: r.cost_per_kg, total: r.total_cost }])
       );
+      const freshContainerCost = new Map(
+        freshContainerRows.map((r) => [r.id, { rate: r.rate_per_kg_usd, totalUsd: r.final_payable_amount_usd }])
+      );
 
-      // Build fresh preview clone: replace storedCostPerKg/storedTotalCost with live values.
+      // Build fresh preview clone: replace stored costs with live DB values.
       const freshPreview: HistoricalReplayPreviewResult = {
         ...preview,
         sourceRows: preview.sourceRows.map((s) => {
@@ -1862,6 +2075,14 @@ export async function applyHistoricalCostReplay(
           return live !== undefined
             ? { ...b, storedCostPerKg: parseFloat(live.cost), storedTotalCost: parseFloat(live.total) }
             : b;
+        }),
+        // DEFECT 2 FIX: Include live container costs in freshPreview so the
+        // recomputed fingerprint reflects any changes to containers since dry-run.
+        containerRows: preview.containerRows.map((c) => {
+          const live = freshContainerCost.get(c.containerId);
+          return live !== undefined
+            ? { ...c, storedCostPerKgUsd: parseFloat(live.rate), storedTotalUsd: parseFloat(live.totalUsd) }
+            : c;
         }),
       };
 
@@ -1877,13 +2098,15 @@ export async function applyHistoricalCostReplay(
       }
     }
 
-    // FIX 16 / DEFECT 17: Token table is created by migration; just consume the token.
+    // FIX 16 / DEFECT 17: Token table is created by migration; consume the token and
+    // record algorithm version + scope fingerprint (DEFECT 11 FIX).
     if (tokenHash) {
       const { rowCount } = await client.query(
-        `INSERT INTO factory_replay_consumed_tokens (token_hash, company_id, user_id)
-         VALUES ($1, $2, $3)
+        `INSERT INTO factory_replay_consumed_tokens
+           (token_hash, company_id, user_id, replay_algorithm_version, scope_fingerprint)
+         VALUES ($1, $2, $3, $4, $5)
          ON CONFLICT (token_hash) DO NOTHING`,
-        [tokenHash, companyId, issuedByUserId]
+        [tokenHash, companyId, issuedByUserId, algorithmVersion, expectedFingerprint]
       );
       if (!rowCount || rowCount === 0) {
         throw new Error("This confirmation token has already been used. Re-run the preview to obtain a fresh token.");
@@ -1925,17 +2148,24 @@ export async function applyHistoricalCostReplay(
       }
     }
 
-    // DEFECT 7 FIX: update factory_containers so rate_per_kg_usd stays in sync.
+    // DEFECT 8 FIX: Update factory_containers using the canonicalTotalUsd from
+    // the landed-cost computation, NOT `kg * rate`. This is the authoritative total
+    // that accounts for all invoice adjustments and cannot be reconstructed from the
+    // rate alone (e.g. when actual_received_kg differs from total_kg or charges are split).
+    // DEFECT 1 FIX: Only update containers whose supplier is in the approved safe set.
     for (const [containerId, canonRate] of canonicalRateByContainer) {
+      const canonTotalUsd = canonicalTotalUsdByContainer.get(containerId);
+      if (canonTotalUsd == null) continue; // no canonical total computed — skip
       await client.query(
         `UPDATE factory_containers
          SET rate_per_kg_usd          = $1,
-             final_payable_amount_usd = COALESCE(actual_received_kg, total_kg)::numeric * $1
-         WHERE id = $2
-           AND company_id = $3
-           AND supplier_id = ANY($4)`,
+             final_payable_amount_usd = $2
+         WHERE id = $3
+           AND company_id = $4
+           AND supplier_id = ANY($5)`,
         [
           new Decimal(canonRate).toDecimalPlaces(6).toFixed(6),
+          new Decimal(canonTotalUsd).toDecimalPlaces(6).toFixed(6),
           containerId,
           companyId,
           [...safeSupplierIds],
@@ -1943,16 +2173,17 @@ export async function applyHistoricalCostReplay(
       );
     }
 
+    // DEFECT 1 FIX: Pre-build an approved sourceId Set from the scoped filter computed
+    // above. Write loop uses set membership — this is the authoritative gate; no inline
+    // re-evaluation of supplier/container membership inside the hot path.
+    const sourceIdsToUpdateSet = new Set(sourceIdsToUpdate);
+
     // 2. Update mix-batch source costs
     for (const srcRow of preview.sourceRows) {
       if (!srcRow.safeToRepair) continue;
-
-      // Check this source's supplier is in the safe set
-      if (srcRow.pricingBasis === "SUPPLIER_LOCKED_RATE" && srcRow.supplierId != null) {
-        if (!safeSupplierIds.has(srcRow.supplierId)) continue;
-      } else if (srcRow.pricingBasis === "CONTAINER_DIRECT" && srcRow.containerId != null) {
-        if (!canonicalRateByContainer.has(srcRow.containerId)) continue;
-      }
+      // DEFECT 1 FIX: Use pre-computed approved set (covers both SUPPLIER_LOCKED_RATE
+      // and CONTAINER_DIRECT; any source not in the set is outside the approved scope).
+      if (!sourceIdsToUpdateSet.has(srcRow.sourceId)) continue;
 
       const newCostPerKg = new Decimal(srcRow.expectedHistoricalCostPerKg).toDecimalPlaces(6).toFixed(6);
       const newTotalCost = new Decimal(srcRow.weightKg)
@@ -2027,31 +2258,89 @@ export async function applyHistoricalCostReplay(
       result.suppliersApplied++;
     }
 
-    // FIX 15: Verify quantity invariants before commit — batch total weights must be
-    // unchanged (cost-only repair; any weight discrepancy indicates a deeper data issue).
+    // DEFECT 10 FIX: Pre-commit cost-only invariant check.
+    // Historical replay only writes cost fields. If any non-cost field (weight, status,
+    // mix_batch_id, location) changed during our transaction, something is seriously wrong.
+    // Throw HISTORICAL_REPLAY_INVARIANT_VIOLATION so callers know to investigate.
     {
       const batchIdArr = [...batchIdsToApply];
       if (batchIdArr.length > 0) {
-        const { rows: postBatches } = await client.query<{ id: number; total_weight_kg: string }>(
-          `SELECT id, total_weight_kg FROM factory_mix_batches WHERE id = ANY($1)`,
+        const { rows: postBatches } = await client.query<{ id: number; total_weight_kg: string; status: string }>(
+          `SELECT id, total_weight_kg, status FROM factory_mix_batches WHERE id = ANY($1)`,
           [batchIdArr]
         );
-        const preWeightByBatch = new Map<number, string>(
-          (snapshot.mixBatches as Array<{ id: number; totalWeightKg: string }>).map((b) => [b.id, b.totalWeightKg])
+        const preByBatch = new Map<number, { totalWeightKg: string; status: string }>(
+          (snapshot.mixBatches as Array<{ id: number; totalWeightKg: string; status: string }>).map((b) => [b.id, { totalWeightKg: b.totalWeightKg, status: b.status }])
         );
         for (const post of postBatches) {
-          const pre = preWeightByBatch.get(post.id);
-          if (pre !== undefined && Math.abs(parseFloat(pre) - parseFloat(post.total_weight_kg)) > 0.001) {
-            throw new Error(
-              `Quantity invariant violated for batch ${post.id}: weight changed from ${pre} to ${post.total_weight_kg}. Rolling back.`
+          const pre = preByBatch.get(post.id);
+          if (!pre) continue;
+          if (Math.abs(parseFloat(pre.totalWeightKg) - parseFloat(post.total_weight_kg)) > 0.001) {
+            throw Object.assign(
+              new Error(
+                `HISTORICAL_REPLAY_INVARIANT_VIOLATION: batch ${post.id} weight changed from ${pre.totalWeightKg} to ${post.total_weight_kg}. Rolling back.`
+              ),
+              { code: "HISTORICAL_REPLAY_INVARIANT_VIOLATION" }
+            );
+          }
+          if (pre.status !== post.status) {
+            throw Object.assign(
+              new Error(
+                `HISTORICAL_REPLAY_INVARIANT_VIOLATION: batch ${post.id} status changed from ${pre.status} to ${post.status}. Rolling back.`
+              ),
+              { code: "HISTORICAL_REPLAY_INVARIANT_VIOLATION" }
+            );
+          }
+        }
+      }
+
+      // Also verify bale non-cost fields didn't change.
+      if (baleIdsToUpdate.length > 0) {
+        const { rows: postBales } = await client.query<{
+          id: number; weight_kg: string; status: string; mix_batch_id: number | null;
+        }>(
+          `SELECT id, weight_kg, status, mix_batch_id FROM factory_bales WHERE id = ANY($1)`,
+          [baleIdsToUpdate]
+        );
+        const preByBale = new Map<number, { weightKg: string; status: string; mixBatchId: number | null }>(
+          (snapshot.bales as Array<{ id: number; weightKg: string; status: string; mixBatchId: number | null }>).map(
+            (b) => [b.id, { weightKg: b.weightKg, status: b.status, mixBatchId: b.mixBatchId }]
+          )
+        );
+        for (const post of postBales) {
+          const pre = preByBale.get(post.id);
+          if (!pre) continue;
+          if (Math.abs(parseFloat(pre.weightKg) - parseFloat(post.weight_kg)) > 0.001) {
+            throw Object.assign(
+              new Error(
+                `HISTORICAL_REPLAY_INVARIANT_VIOLATION: bale ${post.id} weight changed from ${pre.weightKg} to ${post.weight_kg}. Rolling back.`
+              ),
+              { code: "HISTORICAL_REPLAY_INVARIANT_VIOLATION" }
+            );
+          }
+          if (pre.status !== post.status) {
+            throw Object.assign(
+              new Error(
+                `HISTORICAL_REPLAY_INVARIANT_VIOLATION: bale ${post.id} status changed from ${pre.status} to ${post.status}. Rolling back.`
+              ),
+              { code: "HISTORICAL_REPLAY_INVARIANT_VIOLATION" }
+            );
+          }
+          if (pre.mixBatchId !== post.mix_batch_id) {
+            throw Object.assign(
+              new Error(
+                `HISTORICAL_REPLAY_INVARIANT_VIOLATION: bale ${post.id} mix_batch_id changed from ${pre.mixBatchId} to ${post.mix_batch_id}. Rolling back.`
+              ),
+              { code: "HISTORICAL_REPLAY_INVARIANT_VIOLATION" }
             );
           }
         }
       }
     }
 
-    // DEFECT 11 FIX: Source-cost sum invariant — verify each updated batch's source cost
+    // DEFECT 9+11 FIX: Source-cost sum invariant — verify each updated batch's source cost
     // sum matches the expected total cost before committing.
+    // DEFECT 9 FIX: Skip sources that are NOT safeToRepair (no ?? storedCostPerKg fallback).
     for (const correction of batchCorrections) {
       if (!batchIdsToApply.has(correction.batchId)) continue;
       const sourcesForBatch = sourceInfos.filter((s) => s.batchId === correction.batchId);
@@ -2059,10 +2348,10 @@ export async function applyHistoricalCostReplay(
       let dSumCost = new Decimal(0);
       for (const src of sourcesForBatch) {
         const previewSrc = preview.sourceRows.find((ps) => ps.sourceId === src.sourceId);
-        const correctedCost =
-          previewSrc && previewSrc.safeToRepair
-            ? previewSrc.expectedHistoricalCostPerKg
-            : src.storedCostPerKg;
+        // DEFECT 9 FIX: Skip this source from the invariant sum if it is not safeToRepair.
+        // Using a storedCostPerKg fallback would mask genuine invariant violations.
+        if (!previewSrc || !previewSrc.safeToRepair) continue;
+        const correctedCost = previewSrc.expectedHistoricalCostPerKg;
         dSumCost = dSumCost.plus(new Decimal(src.weightKg).times(correctedCost));
       }
       const expectedTotal = new Decimal(correction.expectedTotalCost);

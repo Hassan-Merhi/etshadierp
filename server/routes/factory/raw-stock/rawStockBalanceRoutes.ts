@@ -702,10 +702,12 @@ export function registerRawStockBalanceRoutes(app: Express) {
       // USD moving-average rate (getLockedSupplierRate) instead of the container's
       // native-currency costPerKg — which is not a USD rate and should never be used
       // as a USD source cost.
+      // DEFECT 5+6 FIX: Add companyId + deletedAt guard (cross-company container rejection).
       const [containerRow] = await db
         .select({ supplierId: factoryContainers.supplierId })
         .from(factoryContainers)
-        .where(eq(factoryContainers.id, rs.containerId!));
+        .where(and(eq(factoryContainers.id, rs.containerId!), eq(factoryContainers.companyId, companyId), isNull(factoryContainers.deletedAt)));
+      if (!containerRow) return res.status(404).json({ message: "Container not found, deleted, or belongs to another company" });
       const containerSupplierId = containerRow?.supplierId ?? null;
 
       let costPerKgUsd: number;
@@ -751,11 +753,17 @@ export function registerRawStockBalanceRoutes(app: Express) {
           totalCost: new Decimal(totalCost).toDecimalPlaces(6).toFixed(6),
         });
 
-        // 3. Assign the mix batch to each bale
-        await tx
-          .update(factoryBales)
-          .set({ mixBatchId: newBatch.id, updatedAt: now })
-          .where(inArray(factoryBales.id, baleIds));
+        // 3. Assign the mix batch to each bale with correct cost fields (DEFECT 5 FIX).
+        //    Each bale may have a different weightKg, so costs are computed per-bale.
+        for (const bale of bales) {
+          const baleWeightKg = parseFloat(bale.weightKg as string);
+          const baleCostPerKg = new Decimal(costPerKgUsd).toDecimalPlaces(6).toFixed(6);
+          const baleTotalCost = new Decimal(baleWeightKg).times(costPerKgUsd).toDecimalPlaces(6).toFixed(6);
+          await tx
+            .update(factoryBales)
+            .set({ mixBatchId: newBatch.id, updatedAt: now, costPerKg: baleCostPerKg, totalCost: baleTotalCost })
+            .where(and(eq(factoryBales.id, bale.id), eq(factoryBales.companyId, companyId)));
+        }
 
         // 4. Increment usedKg on the raw stock record
         await tx
