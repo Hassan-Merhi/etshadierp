@@ -40,6 +40,7 @@ Safety rules:
   - Found and fixed a missing backend contract: frontend callers already used `/api/stock-items/light`, but the integration branch did not register the route.
   - Added `server/routes/stock/stockLightRoutes.ts`, returning only identity/classification fields and excluding prices, opening balances, values, rates, and timestamps.
   - Registered the lightweight route before the full stock routes and added focused static regression coverage.
+  - Added `scripts/audit-program6c-stock-item-callers.mjs` to classify full and lightweight frontend callers, print safe migration candidates, and provide an optional strict completion gate.
   - Audit and remaining caller migration work documented in `docs/program-6c-stock-inventory-api-audit.md`.
 - [ ] 6D — Database-query optimization
   - Review query plans, add evidence-backed indexes, remove N+1 queries, parallelize independent reads, and bound searches.
@@ -69,4 +70,4 @@ Existing performance work found:
 - HTML and dynamic API responses avoid stale caching.
 - Earlier heavy-API pagination and memory-stabilization scripts exist.
 
-Program 6A is implementation-complete. Programs 6B and 6C are in progress. Program 6B now has a repository-wide caller-classification guard for `/api/ledger-accounts`; the next safe code step is a field-limited parent-group selector contract followed by migration of only the confirmed Accounts combobox. Program 6C has a working lightweight stock-item backend contract aligned with existing frontend query keys; remaining work is caller classification/migration and location-inventory history auditing. Program 6B still requires selected report pagination and SQL summary migration.
+Program 6A is implementation-complete. Programs 6B and 6C are in progress. Program 6B still requires the field-limited parent-group selector contract, selected report pagination, and SQL summary migration. Program 6C now has both the working lightweight stock-item backend contract and a repository-wide caller-classification guard; the next step is running that audit in a checkout, migrating confirmed selector-only callers, and reviewing location-inventory history payloads. Programs 6D–6F, 7A–7D, and 8A–8C remain unstarted.
