@@ -1,6 +1,6 @@
 # Program 3 — Security, Authorization, and Data Isolation
 
-Status: in progress. This branch remains stacked on the completed, unmerged Program 2 branch.
+Status: complete on the dedicated draft branch. The branch remains stacked on the completed, unmerged Program 2 branch and must not be merged without owner approval.
 
 ## Phase sequence
 
@@ -12,45 +12,47 @@ Status: in progress. This branch remains stacked on the completed, unmerged Prog
 - [x] 3F — Input validation and unsafe-operation protection
 - [x] 3G — File, export, and attachment access controls
 - [x] 3H — Security audit logging and anomaly reporting
-- [ ] 3I — Security regression suite and remediation report
+- [x] 3I — Security regression suite and remediation report
 
-## Phase 3G — File, export, and attachment access controls
+## Completed security boundaries
 
-Status: complete.
+- Central default-deny authorization policy.
+- Canonical storage-backed company and tenant isolation.
+- Privileged-operation controls for destructive, repair, migration, credential, permission, configuration, and diagnostic actions.
+- Session expiry, inactivity, credential-version, company-context, and recent-password-confirmation validation.
+- Strict unsafe-operation input validation and mutation provenance.
+- Protected attachment, file, report-export, and generated-export access controls.
+- Security-event normalization, secret redaction, and anomaly classification.
 
-- Added canonical storage-backed access controls for attachments, uploads, generated exports, and report exports.
-- Enforced same-company isolation, safe storage keys, safe filenames, protected download disposition, and session-bound export scope.
-
-## Phase 3H — Security audit logging and anomaly reporting
+## Phase 3I — Security regression suite and remediation report
 
 Status: complete.
 
 ### Completed work
 
-- Added `server/services/security/securityAuditPolicy.ts` as the canonical pure boundary for security-event normalization and anomaly classification.
-- Added event categories for authentication, authorization, company isolation, privileged operations, sessions, input validation, and protected assets.
-- Added deterministic append-only event keys and normalized actor, company, target, reason, network, timestamp, outcome, and severity fields.
-- Added automatic critical severity for cross-company and privileged-operation failures, with warning classification for other denied or failed security events.
-- Added metadata redaction for passwords, secrets, tokens, cookies, authorization values, credentials, session IDs, and CSRF data.
-- Limited recorded metadata to primitive values and bounded long strings so audit records do not become a secret or payload-storage channel.
-- Added time-window anomaly detection for repeated denials, cross-company attempts, privileged-operation failures, credential/session anomalies, and protected-asset probing.
-- Kept the policy storage-agnostic so existing audit-log adapters can append records transactionally without changing accounting or inventory behavior.
+- Audited every Program 3 policy and focused test directly from PR #79.
+- Added `tests/program-3-security-regression.test.ts` to cover cross-company ordering, privileged operation controls, unsafe-input rejection, audit redaction, and anomaly detection across policy boundaries.
+- Added `docs/program-3-security-remediation-report.md` with the completed scope, verified invariants, regression inventory, integration limitation, and verification status.
+- Found and corrected a real consolidation mismatch: Admin and Developer bypass ordinary permissions in the general policy, but privileged operations are intended to require the exact named permission. `privilegedOperationPolicy.ts` now enforces that permission explicitly.
+- Added a regression case proving an Admin without the exact privileged permission is denied with `PERMISSION_REQUIRED`.
 
-### Verification
+### Verification status
 
-- Added focused tests for normalized records, immutable output, secret redaction, invalid company context, severity classification, repeated-denial detection, category-specific anomalies, and time-window filtering.
-- Confirmed allowed events do not create anomaly findings by themselves.
-- Confirmed audit output exposes machine-readable security details without retaining passwords, tokens, cookies, or credential material.
-- Verification was limited to focused static inspection and test-contract review; no Replit checks or credits were used.
+- The branch and PR patches were inspected directly through GitHub.
+- Focused tests exist for all seven Program 3 boundaries plus the consolidated regression suite.
+- Tests were not executed through Replit or GitHub Actions in this phase.
+- No Replit checks or credits were used.
+- Runtime deployment verification is not claimed.
+- Broad route and service adoption remains an integration requirement because the new policies are pure and additive; existing middleware was not globally replaced.
 
-## Next phase
+## Final status
 
-- Phase 3I — Security regression suite and remediation report
+Program 3 policy, regression, and remediation work is complete. Do not begin Program 4 on this branch. Keep PR #79 draft and unmerged until the owner explicitly approves the full stacked merge plan.
 
 ## Safety constraints
 
 - Do not merge automatically.
 - Do not push directly to `main`.
-- Preserve every phase as a separate commit group.
+- Preserve phase history in the draft PR.
 - Do not use Replit-hosted checks.
 - Do not change accounting balances, stock values, or historical transactions.
