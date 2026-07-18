@@ -33,7 +33,7 @@ async function walk(dir) {
   return files;
 }
 
-function classifyFullCaller(source, index) {
+function classifyFullCaller(source, index, relativePath) {
   const context = source.slice(Math.max(0, index - 650), index + 1400);
   const lower = context.toLowerCase();
 
@@ -59,6 +59,16 @@ function classifyFullCaller(source, index) {
 
   if (lower.includes("offline") || lower.includes("prefetch") || lower.includes("sync")) {
     return "offline-or-prefetch";
+  }
+
+  // Bulk Rename only reads id, code, and name before posting selected ids to the
+  // existing bulk-rename mutation. It does not read price, quantity, valuation,
+  // alias, tax, or location-pricing fields, so downloading the full stock-item
+  // record is unnecessary. Keep this explicit classification until the caller
+  // is migrated to /api/stock-items/light, after which strict mode will stop
+  // reporting it automatically.
+  if (relativePath === "client/src/pages/settings/BulkRenameTab.tsx") {
+    return "selector-only-migration-candidate";
   }
 
   if (
@@ -107,7 +117,7 @@ for (const file of files) {
       file: relativePath,
       line: source.slice(0, index).split("\n").length,
       endpoint: "full",
-      classification: classifyFullCaller(source, index),
+      classification: classifyFullCaller(source, index, relativePath),
     });
   }
 }
