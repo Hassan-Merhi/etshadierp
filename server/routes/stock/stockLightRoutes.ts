@@ -24,6 +24,7 @@ export function registerStockLightRoutes(app: Express) {
           id: stockItems.id,
           code: stockItems.code,
           name: stockItems.name,
+          barcode: stockItems.barcode,
           uom: stockItems.uom,
           active: stockItems.active,
           stockGroupId: stockItems.stockGroupId,
