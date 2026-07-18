@@ -35,12 +35,29 @@ Many forms use the endpoint as a complete account selector. Changing the default
 Required safe migration:
 
 1. Keep the existing array response for selector-style callers.
-2. Add an explicit paginated/list mode for the Accounts management screen.
+2. Add explicit bounded/list-specific modes rather than changing the default contract.
 3. Bound page size and search length.
-4. Select only fields required by the management table.
+4. Select only fields required by each list or selector.
 5. Compute counts and summaries independently of page size.
-6. Migrate only the heavy Accounts page to paginated mode.
-7. Add a static verifier preventing accidental removal of the compatibility path.
+6. Migrate only confirmed heavy callers.
+7. Keep static verification preventing accidental removal of the compatibility path.
+
+#### Caller classification checkpoint
+
+The main Accounts balance table does **not** use `/api/ledger-accounts`; it uses the balance-aware `/api/accounts/all` contract. Its direct ledger call exists only for the Parent Group combobox and currently downloads the full company ledger before filtering groups in the browser.
+
+`scripts/audit-program6b-ledger-account-callers.mjs` now inventories every frontend call site and classifies it as a parent-group selector, filtered selector, search selector, offline/prefetch consumer, management list, or legacy full selector. The script fails when:
+
+- the Accounts caller is no longer recognizable as a parent-group-only selector; or
+- a management-list caller is found still using the legacy unbounded endpoint.
+
+Run it with:
+
+```bash
+node scripts/audit-program6b-ledger-account-callers.mjs
+```
+
+This guard establishes the migration boundary before adding a lightweight parent-group contract and prevents broad endpoint changes that could break voucher, import, setup, or offline selectors.
 
 ### Reports
 
@@ -54,11 +71,11 @@ No financial report should calculate totals from only the visible page. Totals m
 ## Phase 6B acceptance criteria
 
 - Daybook heavy-screen consumers use pagination.
-- Ledger account management has a bounded paginated mode while selector callers retain compatibility.
+- Parent-group and other narrow selectors use field-limited contracts where safe, while legacy selector callers retain compatibility.
 - Interactive heavy reports expose bounded detail pages plus full-filter summaries.
 - No total, balance, debit, credit, or reconciliation value depends on page size.
 - Company and role filtering is applied before count, summary, and detail queries.
-- Static verification covers pagination limits and compatibility behavior.
+- Static verification covers pagination limits, caller classification, and compatibility behavior.
 
 ## Safety rules
 
