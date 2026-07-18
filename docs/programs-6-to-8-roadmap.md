@@ -31,9 +31,15 @@ Safety rules:
   - Added `scripts/verify-program6b-financial-pagination.mjs` to protect full-filter counts, deterministic ordering, brought-forward balances, and server-side account filtering.
   - Confirmed the main Accounts screen uses the balance-aware `/api/accounts/all` contract; the unbounded `/api/ledger-accounts` call on that screen is limited to parent-group options and should be narrowed rather than replacing the primary balance source.
   - Audit and acceptance criteria documented in `docs/program-6b-daybook-accounts-reports-audit.md`.
-- [ ] 6C — Stock and inventory APIs
+- [~] 6C — Stock and inventory APIs
   - Return only required fields, add bounded server-side filtering, and eliminate duplicate requests.
   - Preserve stock quantities, values, precision, and company isolation.
+  - Confirmed `/api/inventory` is already bounded to 250 rows with server-side company/location/group/search filters, independent counts, and explicit fields.
+  - Confirmed `/api/stock-items` retains a legacy full-array compatibility path plus a paginated management path with SQL filters.
+  - Found and fixed a missing backend contract: frontend callers already used `/api/stock-items/light`, but the integration branch did not register the route.
+  - Added `server/routes/stock/stockLightRoutes.ts`, returning only identity/classification fields and excluding prices, opening balances, values, rates, and timestamps.
+  - Registered the lightweight route before the full stock routes and added focused static regression coverage.
+  - Audit and remaining caller migration work documented in `docs/program-6c-stock-inventory-api-audit.md`.
 - [ ] 6D — Database-query optimization
   - Review query plans, add evidence-backed indexes, remove N+1 queries, parallelize independent reads, and bound searches.
 - [ ] 6E — Frontend bundle and caching
@@ -62,4 +68,4 @@ Existing performance work found:
 - HTML and dynamic API responses avoid stale caching.
 - Earlier heavy-API pagination and memory-stabilization scripts exist.
 
-Program 6A is implementation-complete. Program 6B is in progress. The shared bounded-pagination primitive, focused compatibility tests, and financial-pagination guard are committed; next work is wiring opt-in pagination into selected ledger/report routes, adding full-filter count/summary queries, and narrowing the Accounts parent-group lookup without changing legacy selectors or financial totals.
+Program 6A is implementation-complete. Programs 6B and 6C are in progress. Program 6C now has a working lightweight stock-item backend contract aligned with the existing frontend query keys; remaining work is caller classification/migration and location-inventory history auditing. Program 6B still requires selected ledger/report pagination and SQL summary migration.
