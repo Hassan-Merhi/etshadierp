@@ -29,7 +29,8 @@ Safety rules:
   - Added focused Program 6B unit coverage for legacy opt-in compatibility, endpoint-specific bounds, `pageSize` aliasing, oversized limits, and invalid/negative inputs.
   - Confirmed the net-profit statement already has a 30-second company/date keyed cache and parallel independent reads, but still materializes full period and all-time voucher-entry sets; SQL summary migration remains.
   - Added `scripts/verify-program6b-financial-pagination.mjs` to protect full-filter counts, deterministic ordering, brought-forward balances, and server-side account filtering.
-  - Confirmed the main Accounts screen uses the balance-aware `/api/accounts/all` contract; the unbounded `/api/ledger-accounts` call on that screen is limited to parent-group options and should be narrowed rather than replacing the primary balance source.
+  - Confirmed the main Accounts screen uses the balance-aware `/api/accounts/all` contract; its unbounded `/api/ledger-accounts` call is only for parent-group options.
+  - Added `scripts/audit-program6b-ledger-account-callers.mjs` to classify every frontend ledger caller and fail when a management list still uses the legacy unbounded contract or the Accounts parent-group assumption changes.
   - Audit and acceptance criteria documented in `docs/program-6b-daybook-accounts-reports-audit.md`.
 - [~] 6C — Stock and inventory APIs
   - Return only required fields, add bounded server-side filtering, and eliminate duplicate requests.
@@ -68,4 +69,4 @@ Existing performance work found:
 - HTML and dynamic API responses avoid stale caching.
 - Earlier heavy-API pagination and memory-stabilization scripts exist.
 
-Program 6A is implementation-complete. Programs 6B and 6C are in progress. Program 6C now has a working lightweight stock-item backend contract aligned with the existing frontend query keys; remaining work is caller classification/migration and location-inventory history auditing. Program 6B still requires selected ledger/report pagination and SQL summary migration.
+Program 6A is implementation-complete. Programs 6B and 6C are in progress. Program 6B now has a repository-wide caller-classification guard for `/api/ledger-accounts`; the next safe code step is a field-limited parent-group selector contract followed by migration of only the confirmed Accounts combobox. Program 6C has a working lightweight stock-item backend contract aligned with existing frontend query keys; remaining work is caller classification/migration and location-inventory history auditing. Program 6B still requires selected report pagination and SQL summary migration.
