@@ -11,6 +11,10 @@ export function runWithRequestPerformanceContext<T>(callback: () => T): T {
   return storage.run({ dbQueryCount: 0, dbDurationMs: 0 }, callback);
 }
 
+export function isRequestPerformanceContextActive(): boolean {
+  return storage.getStore() !== undefined;
+}
+
 export function recordDatabaseQuery(durationMs: number): void {
   const metrics = storage.getStore();
   if (!metrics) return;
