@@ -140,7 +140,7 @@ function transformFactoryDaybook(source: string): string {
 
   code = replaceExactly(
     code,
-    `  if (startDate) queryParams.set("startDate", startDate);\n  if (endDate) queryParams.set("endDate", endDate);`,
+    `  // Always send startDate/endDate explicitly — including as empty strings for the\n  // "All Time" preset — so the server can tell "user explicitly wants all time" apart\n  // from "caller omitted the params entirely" (e.g. a raw API call) and only applies\n  // its own safety-net default in the latter case.\n  queryParams.set("startDate", startDate || "");\n  queryParams.set("endDate", endDate || "");`,
     `  // Empty values are intentional: their presence prevents the paged backend\n  // from applying its today-only default when the UI selects All Time.\n  queryParams.set("startDate", startDate);\n  queryParams.set("endDate", endDate);`,
     "Factory Daybook All Time date parameters"
   );
