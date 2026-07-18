@@ -44,7 +44,7 @@ Program 6C now adds and registers a dedicated lightweight endpoint returning onl
 
 The endpoint applies company isolation, excludes deleted items, and uses deterministic ordering. It intentionally excludes selling prices, opening balances, values, rates, and timestamps.
 
-### Caller-classification guard
+### Caller-classification and migration guard
 
 `scripts/audit-program6c-stock-item-callers.mjs` inventories every frontend reference to the full and lightweight stock-item contracts.
 
@@ -56,20 +56,32 @@ It classifies full-endpoint consumers as:
 - selector-only migration candidate
 - unresolved legacy full caller
 
-The default mode is read-only and prints migration candidates. `--strict` additionally fails while selector-only or unresolved callers remain. The audit also fails if no frontend caller uses the registered lightweight endpoint, protecting the contract from becoming dead code.
+The default mode is read-only and prints migration candidates. `--strict` fails while selector-only or unresolved callers remain. `--json` emits a stable machine-readable report. The audit also fails if no frontend caller uses the registered lightweight endpoint, protecting the contract from becoming dead code.
+
+The script now also supports `--fix-safe`. This mode applies only allow-listed exact-string migrations. It refuses to modify a caller unless the expected source appears exactly once, reports already-migrated callers idempotently, and fails when an allow-listed migration no longer matches. It does not rewrite mutations, query invalidations, accounting logic, inventory calculations, costing, or historical records.
 
 ### Confirmed migration candidate: Bulk Rename
 
 `client/src/pages/settings/BulkRenameTab.tsx` currently downloads the complete `/api/stock-items` array before searching names. The flow reads only `id`, `code`, and `name`, then posts selected ids to the existing bulk-rename mutation. It does not consume prices, opening balances, quantities, inventory values, costing data, aliases, tax fields, or location pricing.
 
-The caller audit now explicitly classifies this file as `selector-only-migration-candidate` instead of leaving it as an unresolved legacy caller. This makes the remaining bandwidth change measurable and prevents the candidate from being accidentally treated as a full-data management screen.
+Bulk Rename is now the first allow-listed `--fix-safe` migration. The migration changes only its read request from `/api/stock-items` to `/api/stock-items/light`. The existing `/api/stock-items/bulk-rename` mutation and both full/light cache invalidations remain untouched.
 
-The eventual caller migration is behavior-preserving: only the read endpoint changes to `/api/stock-items/light`; the mutation, selected ids, rename matching, audit behavior, and stock/inventory records remain unchanged.
+This gives a patch-safe path for applying the one-line bandwidth fix from a checked-out repository without reconstructing the large shared settings source file through the GitHub contents API.
+
+## Usage
+
+```bash
+node scripts/audit-program6c-stock-item-callers.mjs
+node scripts/audit-program6c-stock-item-callers.mjs --strict --json
+node scripts/audit-program6c-stock-item-callers.mjs --fix-safe --strict --json
+```
+
+Review the working-tree diff after `--fix-safe` before committing. The command is intentionally narrow and idempotent.
 
 ## Remaining work
 
-1. Run the caller audit in a checked-out repository and review every selector-only or unresolved result.
-2. Migrate Bulk Rename from `/api/stock-items` to `/api/stock-items/light` when a safe patch-capable checkout is available.
+1. Run `--fix-safe --strict --json` in a checked-out repository, review the generated one-line Bulk Rename diff, and commit it to the integration branch.
+2. Review every remaining selector-only or unresolved full-endpoint caller.
 3. Convert other confirmed selector-only callers to the lightweight query key without changing screens that require prices or costing data.
 4. Verify inventory list consumers pass server-side filters instead of downloading broad pages and filtering locally.
 5. Audit location-inventory and stock-movement detail endpoints for unbounded history responses.
