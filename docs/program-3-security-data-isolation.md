@@ -6,7 +6,7 @@ Status: in progress. This branch is stacked on the completed, unmerged Program 2
 
 - [x] 3A — Security and authorization surface audit
 - [x] 3B — Central authorization policy boundary
-- [ ] 3C — Company and tenant isolation enforcement
+- [x] 3C — Company and tenant isolation enforcement
 - [ ] 3D — Privileged action and admin-operation controls
 - [ ] 3E — Session, authentication, and credential hardening
 - [ ] 3F — Input validation and unsafe-operation protection
@@ -28,29 +28,38 @@ Status: complete.
 
 Status: complete.
 
+- Added the canonical, pure authorization decision boundary.
+- Added authenticated actor, role, company, permission, action, and resource contracts.
+- Enforced company isolation before role or permission evaluation, including for privileged roles.
+- Added default-deny behavior and non-leaking authorization errors.
+
+## Phase 3C — Company and tenant isolation enforcement
+
+Status: complete.
+
 ### Completed work
 
-- Added `server/services/security/authorizationPolicy.ts` as the canonical, pure authorization decision boundary.
-- Added explicit accounting, inventory, factory, administration, reporting, and configuration domains.
-- Added authenticated actor, role, company, permission, action, and resource contracts.
-- Enforced company isolation before role or permission evaluation, including for Admin and Developer roles.
-- Added default-deny behavior when no explicit role or permission policy is supplied.
-- Added exact required-permission evaluation and explicit allowed-role evaluation.
-- Added a non-leaking `AuthorizationDeniedError` whose public message remains `Forbidden` while retaining a machine-readable denial code.
-- Added `assertAuthorized` for service and route adapters that require exception-based enforcement.
-- Preserved all existing route middleware; migration to this boundary will occur incrementally without weakening current checks.
+- Added `server/services/security/companyIsolationPolicy.ts` as the canonical object-level company-isolation boundary.
+- Required company ownership to be loaded from canonical storage rather than trusted from request parameters or payloads.
+- Added supported resource identities for vouchers, accounts, banks, customers, suppliers, inventory, factory records, reports, exports, and attachments.
+- Required resource IDs and adapter-returned company IDs to be valid before authorization.
+- Delegated role and permission evaluation to the Phase 3B authorization policy only after canonical company ownership is known.
+- Prevented Admin and Developer roles from bypassing cross-company isolation.
+- Added non-leaking `Not found` handling for missing resources and `Forbidden` handling for cross-company access.
+- Added `assertRequestCompanyMatchesSession` for list, report, and export filters that accept a company parameter.
+- Kept existing route middleware unchanged; route adapters can migrate incrementally without weakening current controls.
 
 ### Verification
 
-- Added focused tests for authorized access, unauthenticated requests, invalid company context, cross-company denial, default deny, missing permissions, privileged-role behavior, and non-leaking errors.
-- Confirmed privileged roles cannot bypass company isolation.
-- Confirmed undefined policies fail closed.
-- Confirmed this phase does not change accounting balances, inventory quantities, costing, sessions, or historical data.
-- No Replit checks or credits were used.
+- Added focused tests for same-company access, storage-backed ownership lookup, Admin cross-company denial, missing resources, invalid IDs, invalid stored ownership, role/permission preservation, and company-filter validation.
+- Confirmed caller-supplied company IDs are never accepted as proof of object ownership.
+- Confirmed cross-company checks occur before privileged-role authorization.
+- Confirmed no accounting balances, inventory quantities, costing, sessions, or historical data were changed.
+- Verification was limited to focused static inspection and test-contract review; no Replit checks or credits were used.
 
 ## Next phase
 
-- Phase 3C — Company and tenant isolation enforcement
+- Phase 3D — Privileged action and admin-operation controls
 
 ## Safety constraints
 
