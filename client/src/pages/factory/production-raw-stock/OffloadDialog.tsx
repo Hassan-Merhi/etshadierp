@@ -13,10 +13,12 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
-import { Plus, X, Gavel, Info, Lock } from "lucide-react";
+import { Plus, X, Gavel, Info, Lock, ChevronsUpDown, Check } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 import { formatNumber } from "@/lib/formatNumber";
@@ -53,6 +55,7 @@ export function OffloadDialog({
   const [offloadDate, setOffloadDate] = useState<string>(new Date().toLocaleDateString("en-CA"));
   const [offloadDestination, setOffloadDestination] = useState("");
   const [selectedContainerId, setSelectedContainerId] = useState("");
+  const [containerComboOpen, setContainerComboOpen] = useState(false);
   const [actualReceivedKg, setActualReceivedKg] = useState("");
   const [costPerKg, setCostPerKg] = useState("");
   const [currencyCode, setCurrencyCode] = useState("USD");
@@ -370,18 +373,56 @@ export function OffloadDialog({
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Select Container</Label>
-              <Select value={selectedContainerId} onValueChange={handleContainerSelect}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select container..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {availableContainers?.map((c) => (
-                    <SelectItem key={c.id} value={c.id.toString()}>
-                      {c.containerNumber} ({c.totalKg} kg — {c.supplierName}){c.status === "PARTIALLY_RECEIVED" ? " [Partial]" : ""}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Popover open={containerComboOpen} onOpenChange={setContainerComboOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    aria-expanded={containerComboOpen}
+                    className="w-full justify-between font-normal"
+                  >
+                    <span className="truncate">
+                      {selectedContainerId
+                        ? (() => {
+                            const c = availableContainers?.find((x) => x.id.toString() === selectedContainerId);
+                            return c
+                              ? `${c.containerNumber} (${c.totalKg} kg — ${c.supplierName})${c.status === "PARTIALLY_RECEIVED" ? " [Partial]" : ""}`
+                              : "Select container...";
+                          })()
+                        : "Select container..."}
+                    </span>
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="p-0" style={{ width: "var(--radix-popover-trigger-width)" }} align="start">
+                  <Command>
+                    <CommandInput placeholder="Search container number or supplier..." />
+                    <CommandList>
+                      <CommandEmpty>No container found.</CommandEmpty>
+                      <CommandGroup>
+                        {availableContainers?.map((c) => (
+                          <CommandItem
+                            key={c.id}
+                            value={`${c.containerNumber} ${c.supplierName}`}
+                            onSelect={() => {
+                              handleContainerSelect(c.id.toString());
+                              setContainerComboOpen(false);
+                            }}
+                          >
+                            <Check
+                              className={`mr-2 h-4 w-4 shrink-0 ${selectedContainerId === c.id.toString() ? "opacity-100" : "opacity-0"}`}
+                            />
+                            <span className="truncate">
+                              {c.containerNumber} ({c.totalKg} kg — {c.supplierName})
+                              {c.status === "PARTIALLY_RECEIVED" ? " [Partial]" : ""}
+                            </span>
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
             </div>
             <div className="space-y-2">
               <Label>Offload Date</Label>
