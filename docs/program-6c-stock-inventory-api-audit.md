@@ -44,10 +44,24 @@ Program 6C now adds and registers a dedicated lightweight endpoint returning onl
 
 The endpoint applies company isolation, excludes deleted items, and uses deterministic ordering. It intentionally excludes selling prices, opening balances, values, rates, and timestamps.
 
+### Caller-classification guard
+
+`scripts/audit-program6c-stock-item-callers.mjs` now inventories every frontend reference to the full and lightweight stock-item contracts.
+
+It classifies full-endpoint consumers as:
+
+- paginated management
+- full-data management
+- offline or prefetch
+- selector-only migration candidate
+- unresolved legacy full caller
+
+The default mode is read-only and prints migration candidates. `--strict` additionally fails while selector-only or unresolved callers remain. The audit also fails if no frontend caller uses the registered lightweight endpoint, protecting the contract from becoming dead code.
+
 ## Remaining work
 
-1. Audit all remaining direct `/api/stock-items` frontend callers and classify each as selector-only, management-full, or paginated-management.
-2. Convert selector-only callers to the lightweight query key without changing screens that require prices or costing data.
+1. Run the caller audit in a checked-out repository and review every selector-only or unresolved result.
+2. Convert confirmed selector-only callers to the lightweight query key without changing screens that require prices or costing data.
 3. Verify inventory list consumers pass server-side filters instead of downloading broad pages and filtering locally.
 4. Audit location-inventory and stock-movement detail endpoints for unbounded history responses.
 5. Add focused runtime or integration coverage when a runnable checkout is available.
