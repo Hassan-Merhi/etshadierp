@@ -7,7 +7,7 @@ This program expands the Program 3 policy package and Program 4 production proof
 ## Phase sequence
 
 - [x] 5A — Enterprise security adoption inventory and rollout map
-- [ ] 5B — Persistent named permissions and administration
+- [x] 5B — Persistent named permissions and administration
 - [ ] 5C — Persistent credential versions and session invalidation
 - [ ] 5D — Explicit company-context enforcement and legacy fallback removal
 - [ ] 5E — Privileged-operation rollout across repair, recalculation, import, configuration, and diagnostic writes
@@ -76,6 +76,26 @@ The phases intentionally begin with persistent identity primitives before broad 
 7. Audit expansion and cleanup.
 
 This order removes temporary compatibility bridges before they are multiplied across more routes.
+
+## Phase 5B — Persistent named permissions and administration
+
+Status: complete.
+
+- Added the company-scoped `user_security_permissions` model with a unique user/company/permission boundary.
+- Added versioned migration `0003_user_security_permissions.sql` and registered it in the Drizzle migration journal.
+- Seeded existing Admin and Developer memberships with the initial named grants required by the migrated security surfaces.
+- Added a central permission catalog, normalization, membership validation, replacement, session hydration, and targeted session invalidation service.
+- Added Admin/Developer management endpoints for permission catalogs, user grants, and grant replacement.
+- Permission-management endpoints themselves require the persisted `security.permissions.manage` grant.
+- Grant replacement is transactional, company-scoped, security-audited, and invalidates the affected user's sessions for that company.
+- Privileged-operation enforcement now hydrates persisted named permissions and no longer fabricates the required permission from role alone.
+- Added focused regression coverage for catalog validation, deduplication, company-switch hydration, replacement, and explicit-session compatibility.
+- Tests were written but were not executed through Replit or GitHub Actions.
+- Runtime migration and production database verification are not claimed.
+
+## Next phase
+
+Phase 5C — Persistent credential versions and session invalidation.
 
 ## Safety constraints
 
