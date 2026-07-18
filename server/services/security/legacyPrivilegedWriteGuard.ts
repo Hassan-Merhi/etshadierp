@@ -27,9 +27,16 @@ function text(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
 }
 
-function idempotencyKey(value: unknown): string {
+export function normalizeLegacyIdempotencyKey(value: unknown): string {
   const normalized = text(value);
   return /^[A-Za-z0-9][A-Za-z0-9._:-]{7,199}$/.test(normalized) ? normalized : "";
+}
+
+export function shouldEnforceLegacyPrivilegedWrite(
+  enforcement: LegacyPrivilegedWriteOptions["enforcement"],
+  body: Record<string, unknown>
+): boolean {
+  return enforcement === "always" || body.confirm === true;
 }
 
 function actor(req: Request, permissions: string[]): AuthorizationActor | null {
@@ -79,7 +86,7 @@ async function audit(
 export function requireLegacyPrivilegedWrite(options: LegacyPrivilegedWriteOptions) {
   return async (req: Request, res: Response, next: NextFunction) => {
     const body = req.body && typeof req.body === "object" ? req.body as Record<string, unknown> : {};
-    if (options.enforcement === "confirmed-only" && body.confirm !== true) return next();
+    if (!shouldEnforceLegacyPrivilegedWrite(options.enforcement, body)) return next();
 
     const sourceId = options.sourceId?.(req) || text(body.sourceId) || options.action;
     try {
@@ -92,7 +99,7 @@ export function requireLegacyPrivilegedWrite(options: LegacyPrivilegedWriteOptio
         kind: options.kind,
         requiredPermission: options.requiredPermission,
         reason: text(body.reason),
-        idempotencyKey: idempotencyKey(body.idempotencyKey),
+        idempotencyKey: normalizeLegacyIdempotencyKey(body.idempotencyKey),
         sourceType: options.sourceType,
         sourceId,
         passwordConfirmedAt: (req.session as any).passwordConfirmedAt,
