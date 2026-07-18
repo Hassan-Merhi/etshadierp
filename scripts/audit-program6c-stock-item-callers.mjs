@@ -10,6 +10,8 @@
  *
  * Run with --strict to fail when selector-only callers still use the full
  * endpoint or when an unclassified legacy caller remains.
+ * Run with --json to emit a stable machine-readable report for CI or follow-up
+ * migration tooling.
  */
 
 import { readFile, readdir } from "node:fs/promises";
@@ -21,6 +23,7 @@ const CLIENT_ROOT = join(ROOT, "client", "src");
 const FULL_ENDPOINT = "/api/stock-items";
 const LIGHT_ENDPOINT = "/api/stock-items/light";
 const STRICT = process.argv.includes("--strict");
+const JSON_OUTPUT = process.argv.includes("--json");
 
 async function walk(dir) {
   const entries = await readdir(dir, { withFileTypes: true });
@@ -129,37 +132,60 @@ const counts = callers.reduce((acc, caller) => {
   return acc;
 }, {});
 
-console.log("Program 6C stock-item caller audit");
-console.log(`Call sites: ${callers.length}`);
-console.log("");
-for (const caller of callers) {
-  console.log(`${caller.classification.padEnd(35)} ${caller.file}:${caller.line}`);
-}
-console.log("");
-console.log("Classification totals:");
-for (const [classification, count] of Object.entries(counts).sort()) {
-  console.log(`  ${classification}: ${count}`);
-}
-
 const lightCallers = callers.filter((caller) => caller.classification === "lightweight-selector");
-if (lightCallers.length === 0) {
-  console.error("\nFAIL: no frontend caller uses /api/stock-items/light; review the Program 6C contract registration.");
-  process.exitCode = 1;
-}
-
 const migrationCandidates = callers.filter(
   (caller) =>
     caller.classification === "selector-only-migration-candidate" ||
     caller.classification === "legacy-full-unclassified",
 );
+const failures = [];
 
-if (migrationCandidates.length > 0) {
-  console.log("\nReview required before removing the legacy full-array contract:");
-  for (const caller of migrationCandidates) {
-    console.log(`  ${caller.file}:${caller.line} (${caller.classification})`);
+if (lightCallers.length === 0) {
+  failures.push("no frontend caller uses /api/stock-items/light; review the Program 6C contract registration");
+}
+if (STRICT && migrationCandidates.length > 0) {
+  failures.push("strict mode requires every selector-only or unresolved full-endpoint caller to be migrated or classified");
+}
+
+const report = {
+  program: "6C",
+  audit: "stock-item-api-callers",
+  strict: STRICT,
+  callSiteCount: callers.length,
+  counts,
+  callers,
+  migrationCandidates,
+  failures,
+  passed: failures.length === 0,
+};
+
+if (JSON_OUTPUT) {
+  console.log(JSON.stringify(report, null, 2));
+} else {
+  console.log("Program 6C stock-item caller audit");
+  console.log(`Call sites: ${callers.length}`);
+  console.log("");
+  for (const caller of callers) {
+    console.log(`${caller.classification.padEnd(35)} ${caller.file}:${caller.line}`);
   }
-  if (STRICT) {
-    console.error("\nFAIL (--strict): migrate or explicitly classify the callers listed above.");
-    process.exitCode = 1;
+  console.log("");
+  console.log("Classification totals:");
+  for (const [classification, count] of Object.entries(counts).sort()) {
+    console.log(`  ${classification}: ${count}`);
   }
+
+  if (migrationCandidates.length > 0) {
+    console.log("\nReview required before removing the legacy full-array contract:");
+    for (const caller of migrationCandidates) {
+      console.log(`  ${caller.file}:${caller.line} (${caller.classification})`);
+    }
+  }
+
+  for (const failure of failures) {
+    console.error(`\nFAIL: ${failure}.`);
+  }
+}
+
+if (failures.length > 0) {
+  process.exitCode = 1;
 }
