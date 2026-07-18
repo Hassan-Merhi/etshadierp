@@ -7,11 +7,17 @@ import {
   containerDocumentTypes,
   containerFreight,
   containerFreightPayments,
-  factoryContainers,
+  containers,
 } from "@shared/schema";
 
-function resolveFactoryCompanyId(req: any): number | null {
-  const raw = req.session?.factoryCompanyId || req.session?.currentCompanyId;
+/**
+ * These endpoints live below /api/factory for historical reasons but are used by
+ * the ERP ContainerDetail screen and their tables reference the ERP `containers`
+ * table. Prefer the actively selected ERP company; factoryCompanyId can remain
+ * populated from a previous factory-mode session and must not override it here.
+ */
+function resolveErpContainerCompanyId(req: any): number | null {
+  const raw = req.session?.currentCompanyId || req.session?.factoryCompanyId;
   const companyId = Number(raw);
   return Number.isInteger(companyId) && companyId > 0 ? companyId : null;
 }
@@ -21,29 +27,28 @@ function parsePositiveId(raw: unknown): number | null {
   return Number.isInteger(value) && value > 0 ? value : null;
 }
 
-async function ownsFactoryContainer(containerId: number, companyId: number): Promise<boolean> {
+async function ownsErpContainer(containerId: number, companyId: number): Promise<boolean> {
   const [row] = await db
-    .select({ id: factoryContainers.id })
-    .from(factoryContainers)
-    .where(and(eq(factoryContainers.id, containerId), eq(factoryContainers.companyId, companyId)))
+    .select({ id: containers.id })
+    .from(containers)
+    .where(and(eq(containers.id, containerId), eq(containers.companyId, companyId)))
     .limit(1);
   return Boolean(row);
 }
 
 /**
- * Registers the factory-container document/freight read routes before the legacy
- * docs module. The legacy ownership helper checks the ERP `containers` table,
- * even though these endpoints receive IDs from `factory_containers`; valid
- * factory records were therefore rejected with 403.
+ * Registers corrected ERP-container document/freight reads before the legacy
+ * docs module. The legacy handlers choose factoryCompanyId first, producing 403
+ * responses when an ERP user has a stale factory company stored in the session.
  */
 export function registerFactoryContainerReadAccessRoutes(app: Express) {
   app.get("/api/factory/containers/:containerId/documents", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = resolveFactoryCompanyId(req);
+      const companyId = resolveErpContainerCompanyId(req);
       const containerId = parsePositiveId(req.params.containerId);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       if (!containerId) return res.status(400).json({ message: "Invalid container ID" });
-      if (!(await ownsFactoryContainer(containerId, companyId))) {
+      if (!(await ownsErpContainer(containerId, companyId))) {
         return res.status(403).json({ message: "Access denied" });
       }
 
@@ -52,7 +57,9 @@ export function registerFactoryContainerReadAccessRoutes(app: Express) {
         .from(containerDocuments)
         .where(and(eq(containerDocuments.containerId, containerId), eq(containerDocuments.companyId, companyId)));
       const docTypes = await db.select().from(containerDocumentTypes).orderBy(containerDocumentTypes.label);
-      const requiredTypes = docTypes.filter((docType: any) => docType.isRequired);
+      const requiredTypes = docTypes.filter(
+        (docType: any) => docType.isRequired && (docType.companyId == null || docType.companyId === companyId)
+      );
       const uploadedTypeIds = new Set(rawDocs.map((doc: any) => doc.docTypeId));
 
       const documents = rawDocs.map((doc: any) => ({
@@ -63,7 +70,7 @@ export function registerFactoryContainerReadAccessRoutes(app: Express) {
 
       return res.json({
         documents,
-        docTypes,
+        docTypes: docTypes.filter((docType: any) => docType.companyId == null || docType.companyId === companyId),
         completeness: {
           total: requiredTypes.length,
           uploaded: requiredTypes.filter((docType: any) => uploadedTypeIds.has(docType.id)).length,
@@ -77,11 +84,11 @@ export function registerFactoryContainerReadAccessRoutes(app: Express) {
 
   app.get("/api/factory/containers/:containerId/freight", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = resolveFactoryCompanyId(req);
+      const companyId = resolveErpContainerCompanyId(req);
       const containerId = parsePositiveId(req.params.containerId);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       if (!containerId) return res.status(400).json({ message: "Invalid container ID" });
-      if (!(await ownsFactoryContainer(containerId, companyId))) {
+      if (!(await ownsErpContainer(containerId, companyId))) {
         return res.status(403).json({ message: "Access denied" });
       }
 
