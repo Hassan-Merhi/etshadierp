@@ -1,9 +1,10 @@
-import type { Express } from "express";
+import type { Express, NextFunction, Request, Response } from "express";
 import { db, pool } from "../../db";
 import { requireAuth, requireRole } from "../../auth";
 import { persistSecurityEvent } from "../../services/security/securityAuditRuntime";
 import {
   KNOWN_SECURITY_PERMISSIONS,
+  hydrateSessionNamedPermissions,
   invalidateUserCompanySessions,
   loadNamedPermissions,
   normalizePermissionList,
@@ -15,12 +16,26 @@ function activeCompany(req: any): number | null {
   return Number.isSafeInteger(value) && value > 0 ? value : null;
 }
 
+async function requirePermissionAdministrator(req: Request, res: Response, next: NextFunction) {
+  try {
+    const permissions = await hydrateSessionNamedPermissions(db, req.session as any);
+    if (!permissions.includes("security.permissions.manage")) {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+    return next();
+  } catch (error) {
+    return next(error);
+  }
+}
+
 export function registerSecurityPermissionRoutes(app: Express) {
-  app.get("/api/admin/security-permissions/catalog", requireAuth, requireRole("Admin", "Developer"), (_req, res) => {
+  const guards = [requireAuth, requireRole("Admin", "Developer"), requirePermissionAdministrator] as const;
+
+  app.get("/api/admin/security-permissions/catalog", ...guards, (_req, res) => {
     res.json({ permissions: KNOWN_SECURITY_PERMISSIONS });
   });
 
-  app.get("/api/admin/users/:userId/security-permissions", requireAuth, requireRole("Admin", "Developer"), async (req, res) => {
+  app.get("/api/admin/users/:userId/security-permissions", ...guards, async (req, res) => {
     try {
       const companyId = activeCompany(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -31,7 +46,7 @@ export function registerSecurityPermissionRoutes(app: Express) {
     }
   });
 
-  app.put("/api/admin/users/:userId/security-permissions", requireAuth, requireRole("Admin", "Developer"), async (req, res) => {
+  app.put("/api/admin/users/:userId/security-permissions", ...guards, async (req, res) => {
     try {
       const companyId = activeCompany(req);
       const actorUserId = req.session.userId;
