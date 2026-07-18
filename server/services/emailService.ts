@@ -1,5 +1,11 @@
 import nodemailer from "nodemailer";
 import { pool } from "../db";
+import {
+  assertExportAttachmentAvailable,
+  getExportAttachmentSize,
+  toNodemailerAttachment,
+  type ExportAttachmentSource,
+} from "../helpers/exportAttachmentSource";
 
 export interface EmailSettings {
   gmailUser: string;
@@ -28,7 +34,7 @@ async function getRecipients(): Promise<string[]> {
 }
 
 export async function sendExportEmail(
-  zipBuffer: Buffer,
+  attachmentSource: ExportAttachmentSource,
   dateLabel: string,
   companyNames: string[]
 ): Promise<{ success: boolean; error?: string }> {
@@ -38,8 +44,15 @@ export async function sendExportEmail(
   const recipients = await getRecipients();
   if (recipients.length === 0) return { success: false, error: "No email recipients configured." };
 
-  // Gmail attachment limit is 25MB — warn at 20MB
-  const sizeMB = zipBuffer.length / 1024 / 1024;
+  try {
+    await assertExportAttachmentAvailable(attachmentSource);
+  } catch (error: any) {
+    return { success: false, error: error?.message || "Export attachment is unavailable." };
+  }
+
+  // Gmail attachment limit is 25MB — reject before opening an SMTP connection.
+  const sizeBytes = getExportAttachmentSize(attachmentSource);
+  const sizeMB = sizeBytes / 1024 / 1024;
   if (sizeMB > 24) {
     return {
       success: false,
@@ -55,10 +68,11 @@ export async function sendExportEmail(
     tls: { rejectUnauthorized: true },
   });
 
-  // Verify the connection before sending
+  // Verify the connection before sending.
   try {
     await transporter.verify();
   } catch (verifyErr: any) {
+    transporter.close();
     return {
       success: false,
       error: `Gmail authentication failed: ${verifyErr.message}. Check your Gmail address and App Password in settings.`,
@@ -82,37 +96,46 @@ Generated automatically at ${new Date().toUTCString()}.
 
 — ERP System`;
 
+  const attachment = toNodemailerAttachment(
+    attachmentSource,
+    `DailyExport_${dateLabel}.zip`,
+    "application/zip"
+  );
+
+  let sent = 0;
+  const errors: string[] = [];
+
   try {
-    // Send one email per recipient to avoid group disclosure and improve deliverability
-    const results = await Promise.allSettled(
-      recipients.map((recipient) =>
-        transporter.sendMail({
+    // Send sequentially. Parallel sends caused Nodemailer to retain multiple MIME
+    // encodings of the same large attachment at once. A file-path source is read
+    // as a stream for each recipient and a Buffer source is reused without copies.
+    for (const recipient of recipients) {
+      try {
+        await transporter.sendMail({
           from: `"ERP Daily Export" <${settings.gmailUser}>`,
           to: recipient,
           subject,
           text,
-          attachments: [
-            {
-              filename: `DailyExport_${dateLabel}.zip`,
-              content: zipBuffer,
-              contentType: "application/zip",
-            },
-          ],
-        })
-      )
-    );
-
-    const failed = results.filter((r) => r.status === "rejected");
-    if (failed.length === results.length) {
-      const firstError = (failed[0] as PromiseRejectedResult).reason;
-      return { success: false, error: firstError?.message || "All emails failed to send." };
+          attachments: [attachment],
+        });
+        sent += 1;
+      } catch (error: any) {
+        const message = error?.message || String(error);
+        errors.push(`${recipient}: ${message}`);
+        console.warn(`[EmailService] Export email failed for ${recipient}: ${message}`);
+      }
     }
-    if (failed.length > 0) {
-      console.warn(`[EmailService] ${failed.length}/${results.length} emails failed to deliver.`);
+
+    if (sent === 0) {
+      return { success: false, error: errors[0] || "All emails failed to send." };
+    }
+
+    if (errors.length > 0) {
+      console.warn(`[EmailService] ${errors.length}/${recipients.length} emails failed to deliver.`);
     }
 
     return { success: true };
-  } catch (err: any) {
-    return { success: false, error: err.message || String(err) };
+  } finally {
+    transporter.close();
   }
 }

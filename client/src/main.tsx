@@ -1,3 +1,7 @@
+import "./lib/requestStormGuard";
+import "./lib/heavyListPaginationClient";
+import "./lib/v5AllocationPaginationClient";
+import "./lib/daybookPaginationClient";
 import { createRoot } from "react-dom/client";
 import App from "./App";
 import "./index.css";

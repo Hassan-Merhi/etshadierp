@@ -1,3 +1,5 @@
+import fs from "fs";
+
 export type StepType = "info" | "success" | "error" | "warning";
 
 export interface JobStep {
@@ -11,23 +13,52 @@ export interface ExportJob {
   status: "running" | "done" | "error";
   mode: "download" | "email";
   steps: JobStep[];
+  /** Compatibility-only attachment bytes. Browser downloads should use zipFilePath. */
   zipBuffer?: Buffer;
+  /** Temporary ZIP file used by manual browser-download jobs. */
+  zipFilePath?: string;
+  zipSizeBytes?: number;
   error?: string;
   createdAt: Date;
 }
 
 const jobs = new Map<string, ExportJob>();
 
-// Clean up jobs older than 30 minutes
-setInterval(
+function removeFileQuietly(filePath: string | undefined): void {
+  if (!filePath) return;
+  try {
+    fs.rmSync(filePath, { force: true });
+  } catch (error) {
+    console.warn(`[ExportJob] Failed to remove temporary archive ${filePath}:`, error);
+  }
+}
+
+export function releaseJobArchive(job: ExportJob): void {
+  job.zipBuffer = undefined;
+  removeFileQuietly(job.zipFilePath);
+  job.zipFilePath = undefined;
+  job.zipSizeBytes = undefined;
+}
+
+export function deleteJob(id: string): void {
+  const job = jobs.get(id);
+  if (!job) return;
+  releaseJobArchive(job);
+  jobs.delete(id);
+}
+
+// Clean up jobs older than 30 minutes, including temporary ZIP files. The timer
+// is unref'd so it cannot keep a worker alive during deploy or controlled restart.
+const cleanupTimer = setInterval(
   () => {
     const cutoff = new Date(Date.now() - 30 * 60 * 1000);
     for (const [id, job] of jobs.entries()) {
-      if (job.createdAt < cutoff) jobs.delete(id);
+      if (job.createdAt < cutoff) deleteJob(id);
     }
   },
   5 * 60 * 1000
 );
+cleanupTimer.unref?.();
 
 export function createJob(mode: "download" | "email"): ExportJob {
   const id = `exp-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -62,9 +93,18 @@ export function addStep(job: ExportJob, message: string, type: StepType = "info"
 export function finishJob(job: ExportJob, zipBuffer?: Buffer) {
   job.status = "done";
   job.zipBuffer = zipBuffer;
+  job.zipSizeBytes = zipBuffer?.length;
+}
+
+export function finishJobWithFile(job: ExportJob, zipFilePath: string, zipSizeBytes: number) {
+  releaseJobArchive(job);
+  job.status = "done";
+  job.zipFilePath = zipFilePath;
+  job.zipSizeBytes = zipSizeBytes;
 }
 
 export function failJob(job: ExportJob, error: string) {
+  releaseJobArchive(job);
   job.status = "error";
   job.error = error;
   addStep(job, `Failed: ${error}`, "error");
