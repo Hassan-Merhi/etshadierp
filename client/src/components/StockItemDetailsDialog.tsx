@@ -145,8 +145,9 @@ export function StockItemDetailsDialog({
 
   // Fetch lightweight stock list for the transaction editor dropdown.
   // Only needs id/name/code/uom — use the light endpoint.
+  // companyId is resolved server-side from session; no need to pass it in the URL or key.
   const { data: allStockItems = [] } = useQuery<StockItem[]>({
-    queryKey: ["/api/stock-items/light", companyId],
+    queryKey: ["/api/stock-items/light"],
     enabled: open && editingTransaction !== null,
     staleTime: 10 * 60 * 1000,
     refetchOnWindowFocus: false,
