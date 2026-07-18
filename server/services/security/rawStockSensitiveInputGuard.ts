@@ -1,4 +1,6 @@
 import type { NextFunction, Request, Response } from "express";
+import { db } from "../../db";
+import { persistSecurityEvent } from "./securityAuditRuntime";
 import {
   UnsafeInputError,
   validateUnsafeOperationInput,
@@ -89,11 +91,31 @@ function validateManualRates(value: unknown, sourceIds: readonly number[]): void
   }
 }
 
+async function auditInputDecision(req: Request, outcome: "allowed" | "denied", reasonCode: string): Promise<void> {
+  await persistSecurityEvent(
+    db,
+    {
+      kind: "input-validation",
+      action: "raw-stock-sensitive-input.validate",
+      outcome,
+      companyId: req.session?.currentCompanyId ?? null,
+      actorUserId: req.session?.userId ?? null,
+      targetType: "route",
+      targetId: req.path,
+      reasonCode,
+      ipAddress: req.ip,
+      userAgent: req.get("user-agent"),
+      metadata: { method: req.method },
+    },
+    req.session?.username || req.session?.userId || "anonymous"
+  );
+}
+
 /**
  * Exact, fail-closed payload boundary for the high-impact raw-stock writes
  * protected in Program 5E. The validated frozen object replaces req.body.
  */
-export function requireRawStockSensitiveInput(req: Request, res: Response, next: NextFunction) {
+export async function requireRawStockSensitiveInput(req: Request, res: Response, next: NextFunction) {
   if (req.method.toUpperCase() !== "POST") return next();
   const routeSchema = ROUTE_SCHEMAS[req.path];
   if (!routeSchema) return next();
@@ -112,9 +134,16 @@ export function requireRawStockSensitiveInput(req: Request, res: Response, next:
     }
 
     req.body = validated;
+    await auditInputDecision(req, "allowed", "INPUT_VALIDATED");
     return next();
   } catch (error) {
     if (error instanceof UnsafeInputError) {
+      try {
+        await auditInputDecision(req, "denied", error.issues[0]?.code || error.code);
+      } catch (auditError) {
+        console.error("Security audit persistence failed:", auditError);
+        return res.status(500).json({ message: "Security audit unavailable" });
+      }
       return res.status(400).json({ message: "Invalid request" });
     }
     return next(error);
