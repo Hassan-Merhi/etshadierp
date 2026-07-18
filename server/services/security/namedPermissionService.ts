@@ -1,4 +1,4 @@
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { userCompanyRoles, userSecurityPermissions } from "@shared/schema";
 
 export const KNOWN_SECURITY_PERMISSIONS = Object.freeze([
@@ -66,8 +66,12 @@ export async function hydrateSessionNamedPermissions(db: any, session: any): Pro
     session.securityPermissionsCompanyId = null;
     return [];
   }
-  if (session.securityPermissionsCompanyId === companyId && Array.isArray(session.securityPermissions)) {
-    return session.securityPermissions;
+  if (Array.isArray(session.securityPermissions)) {
+    if (session.securityPermissionsCompanyId === companyId) return session.securityPermissions;
+    if (session.securityPermissionsCompanyId == null) {
+      session.securityPermissionsCompanyId = companyId;
+      return session.securityPermissions;
+    }
   }
   const permissions = await loadNamedPermissions(db, String(userId), companyId);
   session.securityPermissions = permissions;
