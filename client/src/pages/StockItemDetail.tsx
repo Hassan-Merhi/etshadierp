@@ -154,10 +154,13 @@ export default function StockItemDetail() {
     }
   };
 
+  // Only used for name-lookup; use the lightweight endpoint.
   const { data: stockItems = [] } = useQuery<StockItem[]>({
-    queryKey: ["/api/stock-items"],
-    staleTime: 5 * 60 * 1000,
+    queryKey: ["/api/stock-items/light", companyId],
+    staleTime: 10 * 60 * 1000,
     refetchOnWindowFocus: false,
+    refetchOnMount: false,
+    refetchOnReconnect: false,
   });
 
   const selectedItem = stockItems.find((item) => item.id === itemId);

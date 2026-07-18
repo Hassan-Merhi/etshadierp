@@ -60,7 +60,8 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { utils, writeFile } from "@/lib/excelHelper";
+// Note: excelHelper (ExcelJS) is imported lazily inside exportToExcel / exportSalesHistory
+// so the 1.3 MB ExcelJS bundle is not loaded on every page startup.
 
 interface Location {
   id: number;
@@ -229,6 +230,7 @@ export default function StockItems() {
     mutationFn: async (ids: number[]) => apiRequest("POST", "/api/stock-items/bulk-delete", { ids }),
     onSuccess: (data: any) => {
       queryClient.invalidateQueries({ queryKey: ["/api/stock-items"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/stock-items/light"] });
       setSelectedIds([]);
       toast({ title: "Success", description: data.message || "Stock items deleted successfully" });
     },
@@ -244,6 +246,7 @@ export default function StockItems() {
     onSuccess: (data: any) => {
       queryClient.invalidateQueries({ queryKey: ["/api/locations"] });
       queryClient.invalidateQueries({ queryKey: ["/api/stock-items"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/stock-items/light"] });
       setAdjustDialogOpen(false);
       setAdjustStockItemId("");
       setAdjustLocationId("");
@@ -262,6 +265,7 @@ export default function StockItems() {
       apiRequest("POST", "/api/stock-items/bulk-assign-category", { ids, categoryId }),
     onSuccess: (data: any) => {
       queryClient.invalidateQueries({ queryKey: ["/api/stock-items"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/stock-items/light"] });
       setSelectedIds([]);
       setAssignCategoryDialogOpen(false);
       setPendingCategoryId("");
@@ -307,6 +311,7 @@ export default function StockItems() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/stock-grades"] });
       queryClient.invalidateQueries({ queryKey: ["/api/stock-items"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/stock-items/light"] });
       toast({ title: "Grade deleted" });
     },
     onError: (error: Error) => {
@@ -349,6 +354,7 @@ export default function StockItems() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/stock-categories"] });
       queryClient.invalidateQueries({ queryKey: ["/api/stock-items"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/stock-items/light"] });
       toast({ title: "Category deleted" });
     },
     onError: (error: Error) => {
@@ -455,6 +461,7 @@ export default function StockItems() {
             : "",
         });
       }
+      const { utils, writeFile } = await import("@/lib/excelHelper");
       const worksheet = utils.json_to_sheet(data);
       const workbook = utils.book_new();
       utils.book_append_sheet(workbook, worksheet, "Sales History");
@@ -519,6 +526,7 @@ export default function StockItems() {
         row["Active"] = item.active ? "Yes" : "No";
         return row;
       });
+      const { utils, writeFile } = await import("@/lib/excelHelper");
       const worksheet = utils.json_to_sheet(data);
       const workbook = utils.book_new();
       utils.book_append_sheet(workbook, worksheet, "Stock Items");

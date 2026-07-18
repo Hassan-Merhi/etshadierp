@@ -42,6 +42,7 @@ export function CombinedImportDialog({ open, onOpenChange }: CombinedImportDialo
         variant: noneUpdated ? "destructive" : "default",
       });
       queryClient.invalidateQueries({ queryKey: ["/api/stock-items"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/stock-items/light"] });
       queryClient.invalidateQueries({ queryKey: ["/api/stock-item-location-prices"] });
       setPricesFile(null);
       setIsProcessing(false);
@@ -69,6 +70,7 @@ export function CombinedImportDialog({ open, onOpenChange }: CombinedImportDialo
         description: result.message || "Opening balances imported successfully",
       });
       queryClient.invalidateQueries({ queryKey: ["/api/stock-items"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/stock-items/light"] });
       queryClient.invalidateQueries({ queryKey: ["/api/reports/net-profit-statement"] });
       setOpeningFile(null);
       setIsProcessingOpening(false);

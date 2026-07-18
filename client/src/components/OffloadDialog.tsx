@@ -371,6 +371,7 @@ export function OffloadDialog({ open, onOpenChange, containerId, containerNumber
       queryClient.invalidateQueries({ queryKey: ["/api/containers"] });
       queryClient.invalidateQueries({ queryKey: [`/api/containers/${containerId}`] });
       queryClient.invalidateQueries({ queryKey: ["/api/stock-items"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/stock-items/light"] });
       queryClient.invalidateQueries({
         predicate: (query) => {
           const key = query.queryKey[0];

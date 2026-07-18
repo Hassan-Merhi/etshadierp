@@ -91,6 +91,7 @@ export function StockItemCreateDialog({ open, onOpenChange }: StockItemCreateDia
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/stock-items"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/stock-items/light"] });
       toast({
         title: "Stock Item Created",
         description: "The stock item has been created successfully.",

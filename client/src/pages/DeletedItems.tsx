@@ -169,6 +169,7 @@ export default function DeletedItems() {
       queryClient.invalidateQueries({ queryKey: ["/api/deleted-items"] });
       queryClient.invalidateQueries({ queryKey: ["/api/locations"] });
       queryClient.invalidateQueries({ queryKey: ["/api/stock-items"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/stock-items/light"] });
       queryClient.invalidateQueries({ queryKey: ["/api/stock-groups"] });
       queryClient.invalidateQueries({ queryKey: ["/api/ledger-accounts"] });
       queryClient.invalidateQueries({ queryKey: ["/api/employees"] });

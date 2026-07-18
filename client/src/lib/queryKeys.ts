@@ -4,6 +4,9 @@
  * Rules:
  *  - All callers of the same data MUST use exactly the same key so React Query
  *    deduplicates the request and shares the cache.
+ *  - The first element of every key MUST be the real URL that the shared
+ *    getQueryFn will fetch.  Do NOT put a fake discriminator after the URL
+ *    while relying on the shared query function.
  *  - Filters are normalised before inclusion: undefined/null/empty values are
  *    dropped, object keys are sorted, primitives are used directly.
  *  - Never place a new object literal directly in a key on every render.
@@ -51,11 +54,24 @@ export const inventoryKeys = {
 
 // ── Stock-item keys ───────────────────────────────────────────────────────────
 export const stockItemKeys = {
-  /** Lightweight list (id + name + code) used for dropdowns. */
+  /**
+   * Lightweight list (id, code, name, uom, barcode, active, stockGroupId,
+   * categoryId, gradeId) — for dropdowns and selectors only.
+   *
+   * The first element is the real URL fetched by the shared query function.
+   * This key does NOT share a cache with the full endpoint so broad
+   * invalidations of "/api/stock-items" do not trigger a 649 KB download.
+   */
   light: (companyId: number | string | undefined) =>
-    ["/api/stock-items", companyId, "light"] as const,
+    ["/api/stock-items/light", companyId] as const,
 
-  /** Full list including all fields. */
+  /**
+   * Full list including all fields.  Only used by screens that genuinely need
+   * price/costing/alias/location-pricing data.
+   *
+   * Prefer the paginated management-page query ("/api/stock-items?page=…")
+   * over this key for list screens.
+   */
   full: (companyId: number | string | undefined) =>
-    ["/api/stock-items", companyId, "full"] as const,
+    ["/api/stock-items", companyId] as const,
 };

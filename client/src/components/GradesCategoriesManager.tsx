@@ -325,6 +325,7 @@ function BulkExportImport() {
 
       // Invalidate stock items, grades, categories
       queryClient.invalidateQueries({ queryKey: ["/api/stock-items"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/stock-items/light"] });
       queryClient.invalidateQueries({ queryKey: ["/api/stock-grades"] });
       queryClient.invalidateQueries({ queryKey: ["/api/stock-categories"] });
 
