@@ -7,6 +7,7 @@ export const KNOWN_SECURITY_PERMISSIONS = Object.freeze([
   "security.anomalies.read",
   "factory.documents.download",
   "factory.raw-stock.repair",
+  "files.download",
 ] as const);
 
 export type KnownSecurityPermission = (typeof KNOWN_SECURITY_PERMISSIONS)[number];
