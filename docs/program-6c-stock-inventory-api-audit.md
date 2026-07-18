@@ -4,92 +4,83 @@ Branch: `integration/programs-1-to-6-validation`
 
 ## Scope
 
-Reduce stock and inventory payload size and repeated requests without changing quantities, average rates, total values, precision, company isolation, or historical records.
+Reduce stock and inventory payload size and repeated requests without changing quantities, average rates, total values, precision, company isolation, costing, or historical records.
 
-## Existing work confirmed
+## Completed implementation
 
 ### Inventory list
 
-`GET /api/inventory` is already server-paginated and bounded:
+`GET /api/inventory` remains server-paginated and bounded:
 
 - Default page size: 100
 - Maximum page size: 250
 - Server-side company, location, stock-group, and text filters
 - Independent filtered count
-- Explicit field selection rather than `select *`
+- Explicit fields rather than `select *`
 - Stable stock-code/location ordering
+- Authoritative stored quantity, average rate, and total value preserved
 
-The route returns inventory quantity, average rate, and total value directly from the authoritative inventory rows. Program 6C must not recalculate or derive those values in the client.
+### Full stock-item management contract
 
-### Full stock-item list
+`GET /api/stock-items` retains its legacy flat-array compatibility path and its opt-in paginated management path. Screens that require prices, opening balances, costing, aliases, tax, or location-pricing data remain on this full contract.
 
-`GET /api/stock-items` retains a legacy flat-array path for compatibility and has an opt-in paginated management path with server-side search, group, grade, category, and active filters.
+### Lightweight stock-item contract
 
-The full response remains necessary for screens that edit prices, opening balances, costing fields, or other management data. It must not be silently replaced by a reduced contract.
-
-### Lightweight stock-item selectors
-
-The frontend query-key factory and multiple selector-style callers already target `GET /api/stock-items/light`. The integration branch did not register that endpoint in the stock route module.
-
-Program 6C now adds and registers a dedicated lightweight endpoint returning only:
+`GET /api/stock-items/light` is registered before the full stock routes and returns only selector-safe identity/classification fields:
 
 - `id`
 - `code`
 - `name`
+- `barcode`
 - `uom`
 - `active`
 - `stockGroupId`
 - `categoryId`
 - `gradeId`
 
-The endpoint applies company isolation, excludes deleted items, and uses deterministic ordering. It intentionally excludes selling prices, opening balances, values, rates, and timestamps.
+It applies company isolation, excludes deleted items, and uses deterministic ordering. It excludes selling prices, opening quantities, opening rates, opening values, inventory quantities, average rates, total values, costing fields, and timestamps.
 
-### Caller-classification and migration guard
+### Caller migration
 
-`scripts/audit-program6c-stock-item-callers.mjs` inventories every frontend reference to the full and lightweight stock-item contracts.
+Selector-style callers use the lightweight URL through `stockItemKeys.light(...)` or a direct lightweight request. Existing bandwidth work already migrated voucher, transfer, proforma, reporting, purchase-order, detail-selector, credit-note, data-tool, and offline-preparation callers.
 
-It classifies full-endpoint consumers as:
+Bulk Rename was the remaining confirmed selector-only direct caller. Its read request now uses `/api/stock-items/light`; the existing bulk-rename mutation and both full/light cache invalidations are unchanged.
 
-- paginated management
-- full-data management
-- offline or prefetch
-- selector-only migration candidate
-- unresolved legacy full caller
+The following callers intentionally remain on the full contract:
 
-The default mode is read-only and prints migration candidates. `--strict` fails while selector-only or unresolved callers remain. `--json` emits a stable machine-readable report. The audit also fails if no frontend caller uses the registered lightweight endpoint, protecting the contract from becoming dead code.
+- Paginated Stock Items management
+- User-triggered full Stock Items export
+- Stock-item create/edit/import and repair tools that consume management fields
+- Deleted/orphaned record tools that require extended record state
 
-The script now also supports `--fix-safe`. This mode applies only allow-listed exact-string migrations. It refuses to modify a caller unless the expected source appears exactly once, reports already-migrated callers idempotently, and fails when an allow-listed migration no longer matches. It does not rewrite mutations, query invalidations, accounting logic, inventory calculations, costing, or historical records.
+### Stock and location history
 
-### Confirmed migration candidate: Bulk Rename
+The stock-movement APIs are bounded by explicit business periods rather than open-ended history downloads:
 
-`client/src/pages/settings/BulkRenameTab.tsx` currently downloads the complete `/api/stock-items` array before searching names. The flow reads only `id`, `code`, and `name`, then posts selected ids to the existing bulk-rename mutation. It does not consume prices, opening balances, quantities, inventory values, costing data, aliases, tax fields, or location pricing.
+- Monthly summary produces at most the requested year's month rows and returns a full-period grand total.
+- Transaction drill requires `stockItemId`, `year`, and `month`, and returns that month's transactions plus complete month totals.
+- Location-specific opening quantities and rates continue to use the historical inventory helper, preserving running quantity/value semantics.
 
-Bulk Rename is now the first allow-listed `--fix-safe` migration. The migration changes only its read request from `/api/stock-items` to `/api/stock-items/light`. The existing `/api/stock-items/bulk-rename` mutation and both full/light cache invalidations remain untouched.
+No page slicing was added inside a month because doing so without a separate opening-state cursor would change running balances and closing values.
 
-This gives a patch-safe path for applying the one-line bandwidth fix from a checked-out repository without reconstructing the large shared settings source file through the GitHub contents API.
+### Completion guards
 
-## Usage
+- `scripts/audit-program6c-stock-item-callers.mjs` inventories full and lightweight callers and supports strict, JSON, and exact allow-listed safe-fix modes.
+- `scripts/verify-program6c-stock-inventory-contracts.mjs` protects route registration, field limits, query-key separation, Bulk Rename and offline lightweight usage, inventory pagination, filtered counts, and period-bounded movement totals.
+- Existing `tests/stock-items-bandwidth.test.ts` protects the lightweight query-key URL and cache separation.
 
-```bash
-node scripts/audit-program6c-stock-item-callers.mjs
-node scripts/audit-program6c-stock-item-callers.mjs --strict --json
-node scripts/audit-program6c-stock-item-callers.mjs --fix-safe --strict --json
-```
+## Safety confirmation
 
-Review the working-tree diff after `--fix-safe` before committing. The command is intentionally narrow and idempotent.
+Program 6C does not alter:
 
-## Remaining work
+- Stock quantities
+- Average rates
+- Total values
+- Negative-stock behavior
+- Costing or valuation rules
+- Historical movement records
+- Mutation behavior
+- Company isolation
+- Legacy full stock-item compatibility
 
-1. Run `--fix-safe --strict --json` in a checked-out repository, review the generated one-line Bulk Rename diff, and commit it to the integration branch.
-2. Review every remaining selector-only or unresolved full-endpoint caller.
-3. Convert other confirmed selector-only callers to the lightweight query key without changing screens that require prices or costing data.
-4. Verify inventory list consumers pass server-side filters instead of downloading broad pages and filtering locally.
-5. Audit location-inventory and stock-movement detail endpoints for unbounded history responses.
-6. Add focused runtime or integration coverage when a runnable checkout is available.
-
-## Safety rules
-
-- Do not change quantity, average-rate, total-value, negative-stock, or costing behavior.
-- Do not derive financial totals from a visible page.
-- Do not remove the legacy full stock-item contract until every caller is explicitly migrated.
-- Do not merge or deploy automatically.
+No production migration, deployment, merge to `main`, or runtime data repair is part of this phase.
