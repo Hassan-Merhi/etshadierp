@@ -254,6 +254,14 @@ export default function RawStockRecalculate() {
   const [includeFinalizedBales, setIncludeFinalizedBales] = useState(false);
   const REPLAY_CONFIRM_PHRASE = "APPLY HISTORICAL REPLAY" as const;
 
+  // FIX 11: Per-supplier selection for Historical Replay. Only safe suppliers that
+  // are selected will be included in the Prepare call.
+  const [selectedSupplierIds, setSelectedSupplierIds] = useState<Set<number>>(new Set());
+
+  // FIX 12: Prepared token received from the dry-run (Prepare) call. The confirm
+  // dialog uses this token for the Apply call so the two steps are atomically linked.
+  const [preparedReplayToken, setPreparedReplayToken] = useState<string | null>(null);
+
   // ── Recompute dry-run / confirmation dialog ────────────────────────────────
   const [recomputePreviewRows, setRecomputePreviewRows] = useState<SupplierRatePreviewRow[] | null>(null);
   const [showRecomputeDialog, setShowRecomputeDialog] = useState(false);
@@ -396,26 +404,57 @@ export default function RawStockRecalculate() {
     retry: false,
   });
 
-  const replayApplyMutation = useMutation({
+  // FIX 12: Three-stage Prepare → Review → Apply flow.
+  //
+  // Stage 1 (Prepare) — dry-run call that issues a signed confirmation token.
+  //   The "Prepare Historical Replay" button fires this mutation. On success it
+  //   stores the token in `preparedReplayToken` and opens the confirm dialog.
+  //
+  // Stage 2 (Review) — the admin reads the exact scope shown in the dialog, types
+  //   the confirmation phrase to prove intent, then clicks "Apply".
+  //
+  // Stage 3 (Apply) — uses the already-stored token. No second dry-run is needed;
+  //   the route's fingerprint check guarantees the DB hasn't changed between stages.
+  //
+  // This separation means the token is fetched exactly once. In the old design a
+  // single mutation fetched the token AND immediately consumed it in the same JS
+  // microtask, so any mid-flight crash left an unconsumed token with no audit log.
+
+  const replayPrepareMutation = useMutation({
     mutationFn: async (opts: {
       supplierIds: number[];
       includeCompletedBatches: boolean;
       includeFinalizedBales: boolean;
     }) => {
-      // Step 1: issue dry-run confirmation token
-      const dryRes = await modeApiRequest("POST", "/api/factory/raw-stock/recalc/historical-replay/apply", {
+      const res = await modeApiRequest("POST", "/api/factory/raw-stock/recalc/historical-replay/apply", {
         dryRun: true,
         supplierIds: opts.supplierIds,
         includeCompletedBatches: opts.includeCompletedBatches,
         includeFinalizedBales: opts.includeFinalizedBales,
       });
-      if (!dryRes.ok) throw new Error((await dryRes.json().catch(() => ({}))).message || "Dry-run failed");
-      const dryData = await dryRes.json();
+      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).message || "Dry-run failed");
+      return res.json() as Promise<{ confirmationToken: string; summary: Record<string, any> }>;
+    },
+    onSuccess: (data) => {
+      setPreparedReplayToken(data.confirmationToken);
+      setReplayConfirmText("");
+      setShowReplayConfirmDialog(true);
+    },
+    onError: (err: any) => {
+      toast({ title: "Prepare failed", description: err.message, variant: "destructive" });
+    },
+  });
 
-      // Step 2: apply with signed token
+  const replayApplyMutation = useMutation({
+    mutationFn: async (opts: {
+      supplierIds: number[];
+      includeCompletedBatches: boolean;
+      includeFinalizedBales: boolean;
+      confirmationToken: string;
+    }) => {
       const applyRes = await modeApiRequest("POST", "/api/factory/raw-stock/recalc/historical-replay/apply", {
         dryRun: false,
-        confirmationToken: dryData.confirmationToken,
+        confirmationToken: opts.confirmationToken,
         supplierIds: opts.supplierIds,
         includeCompletedBatches: opts.includeCompletedBatches,
         includeFinalizedBales: opts.includeFinalizedBales,
@@ -435,6 +474,7 @@ export default function RawStockRecalculate() {
           `${data.batchesUpdated} batch(es), ` +
           `${data.balesUpdated} bale(s).`,
       });
+      setPreparedReplayToken(null);
       refetchReplay();
     },
     onError: (err: any) => {
@@ -1862,9 +1902,29 @@ export default function RawStockRecalculate() {
                       {replayPreview.supplierRows.length} supplier(s)
                     </Badge>
                   </div>
+                  {/* FIX 11: Select All / Clear controls */}
+                  {(() => {
+                    const safeIds = replayPreview.supplierRows.filter((s) => s.safeToRepair).map((s) => s.supplierId);
+                    return safeIds.length > 0 ? (
+                      <div className="flex items-center gap-2 px-3 py-1.5 border-b text-xs text-muted-foreground bg-muted/20">
+                        <Button size="sm" variant="ghost" className="h-6 text-xs px-2"
+                          onClick={() => setSelectedSupplierIds(new Set(safeIds))}>
+                          Select All Safe
+                        </Button>
+                        <Button size="sm" variant="ghost" className="h-6 text-xs px-2"
+                          onClick={() => setSelectedSupplierIds(new Set())}>
+                          Clear
+                        </Button>
+                        <span className="ml-auto font-medium">
+                          {selectedSupplierIds.size}/{safeIds.length} selected
+                        </span>
+                      </div>
+                    ) : null;
+                  })()}
                   <Table>
                     <TableHeader>
                       <TableRow className="text-xs">
+                        <TableHead className="w-8 pl-3"></TableHead>
                         <TableHead>Supplier</TableHead>
                         <TableHead className="text-right">Current rate</TableHead>
                         <TableHead className="text-right">Replay end rate</TableHead>
@@ -1878,8 +1938,21 @@ export default function RawStockRecalculate() {
                     <TableBody>
                       {replayPreview.supplierRows.map((s) => {
                         const delta = s.endingExpectedRate - s.currentStoredRate;
+                        const isChecked = selectedSupplierIds.has(s.supplierId);
                         return (
                           <TableRow key={s.supplierId} className="text-xs">
+                            {/* FIX 11: per-row checkbox; disabled for manual-review suppliers */}
+                            <TableCell className="pl-3">
+                              <Checkbox
+                                checked={isChecked}
+                                disabled={!s.safeToRepair}
+                                onCheckedChange={(v) => {
+                                  const next = new Set(selectedSupplierIds);
+                                  if (v) next.add(s.supplierId); else next.delete(s.supplierId);
+                                  setSelectedSupplierIds(next);
+                                }}
+                              />
+                            </TableCell>
                             <TableCell className="font-medium">{s.supplierName}</TableCell>
                             <TableCell className="text-right font-mono">${s.currentStoredRate.toFixed(6)}</TableCell>
                             <TableCell className="text-right font-mono">${s.endingExpectedRate.toFixed(6)}</TableCell>
@@ -1924,23 +1997,44 @@ export default function RawStockRecalculate() {
                       </label>
                     </div>
                   )}
-                  <div className="flex justify-end">
-                    <Button
-                      size="sm"
-                      disabled={replayApplyMutation.isPending}
-                      onClick={() =>
-                        wrapAdminAction(() => {
-                          setReplayConfirmText("");
-                          setShowReplayConfirmDialog(true);
-                        }, `Prepare historical cost replay for ${replayPreview.summary.safeSuppliers} safe supplier(s) — this will correct source costs, batch costs, bale costs, and supplier locked rates.`)
-                      }
-                      className="gap-2 bg-emerald-600 hover:bg-emerald-700 text-white"
-                    >
-                      <ShieldCheck className="h-3.5 w-3.5" />
-                      {replayApplyMutation.isPending
-                        ? "Applying…"
-                        : `Prepare Historical Replay (${replayPreview.summary.safeSuppliers} supplier(s))`}
-                    </Button>
+                  {/* FIX 12: "Prepare" fires the dry-run mutation only.
+                      The confirm dialog is opened by the mutation's onSuccess handler
+                      after the token is stored in state — ensuring every apply uses
+                      a freshly-signed token that was reviewed before clicking Apply. */}
+                  <div className="flex items-center justify-between gap-2">
+                    {selectedSupplierIds.size === 0 && replayPreview.summary.safeSuppliers > 0 && (
+                      <span className="text-xs text-amber-600">
+                        Select at least one safe supplier above to enable Prepare.
+                      </span>
+                    )}
+                    <div className="ml-auto">
+                      <Button
+                        size="sm"
+                        disabled={
+                          replayPrepareMutation.isPending ||
+                          replayApplyMutation.isPending ||
+                          selectedSupplierIds.size === 0
+                        }
+                        onClick={() =>
+                          wrapAdminAction(
+                            () => {
+                              replayPrepareMutation.mutate({
+                                supplierIds: Array.from(selectedSupplierIds),
+                                includeCompletedBatches,
+                                includeFinalizedBales,
+                              });
+                            },
+                            `Prepare historical cost replay for ${selectedSupplierIds.size} selected supplier(s) — a signed review token will be issued before any data is written.`
+                          )
+                        }
+                        className="gap-2 bg-emerald-600 hover:bg-emerald-700 text-white"
+                      >
+                        <ShieldCheck className="h-3.5 w-3.5" />
+                        {replayPrepareMutation.isPending
+                          ? "Preparing…"
+                          : `Prepare Historical Replay (${selectedSupplierIds.size} supplier(s))`}
+                      </Button>
+                    </div>
                   </div>
                 </div>
               )}
@@ -2023,20 +2117,28 @@ export default function RawStockRecalculate() {
             >
               Cancel
             </Button>
+            {/* FIX 12: Apply uses the stored token from the Prepare step — no second dry-run. */}
             <Button
               size="sm"
-              disabled={replayConfirmText !== REPLAY_CONFIRM_PHRASE || replayApplyMutation.isPending}
+              disabled={
+                replayConfirmText !== REPLAY_CONFIRM_PHRASE ||
+                replayApplyMutation.isPending ||
+                !preparedReplayToken
+              }
               onClick={() => {
-                if (!replayPreview) return;
-                const safeIds = replayPreview.supplierRows
-                  .filter((s) => s.safeToRepair)
-                  .map((s) => s.supplierId);
+                if (!preparedReplayToken) return;
                 replayApplyMutation.mutate(
-                  { supplierIds: safeIds, includeCompletedBatches, includeFinalizedBales },
+                  {
+                    supplierIds: Array.from(selectedSupplierIds),
+                    includeCompletedBatches,
+                    includeFinalizedBales,
+                    confirmationToken: preparedReplayToken,
+                  },
                   {
                     onSettled: () => {
                       setShowReplayConfirmDialog(false);
                       setReplayConfirmText("");
+                      setPreparedReplayToken(null);
                     },
                   }
                 );

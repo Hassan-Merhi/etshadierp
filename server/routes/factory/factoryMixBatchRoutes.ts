@@ -776,6 +776,9 @@ export function registerFactoryMixBatchRoutes(app: Express) {
         for (const source of sources) {
           // Container-linked source: the rate is that specific container's own
           // persisted landed cost — client-supplied costPerKg is always ignored.
+          // FIX 4: If the container has a linked supplier, use the supplier's
+          // authoritative moving-average locked rate instead of the container's
+          // native-currency cost.
           const { containerId, weightKg } = source;
           const [rawStock] = await tx
             .select()
@@ -785,9 +788,19 @@ export function registerFactoryMixBatchRoutes(app: Express) {
 
           if (!rawStock) throw new Error(`Raw stock not found for container ${containerId}`);
 
-          const weight = parseFloat(weightKg);
+          const [ctnRow] = await tx
+            .select({ supplierId: factoryContainers.supplierId })
+            .from(factoryContainers)
+            .where(eq(factoryContainers.id, containerId));
+          const ctnSupplierId = ctnRow?.supplierId ?? null;
 
-          const costUsd = parseFloat(rawStock.costPerKgUsd) || parseFloat(rawStock.costPerKg) || 0;
+          const weight = parseFloat(weightKg);
+          let costUsd: number;
+          if (ctnSupplierId) {
+            costUsd = await getLockedSupplierRate(tx, companyId, ctnSupplierId, { forUpdate: true });
+          } else {
+            costUsd = parseFloat(rawStock.costPerKgUsd) || parseFloat(rawStock.costPerKg) || 0;
+          }
 
           // Allow over-use: usedKg may exceed receivedKg, driving stock negative
           await tx
@@ -798,6 +811,7 @@ export function registerFactoryMixBatchRoutes(app: Express) {
           totalWeightKg += weight;
           totalCost += weight * costUsd;
           sourceRecords.push({
+            supplierId: ctnSupplierId ?? undefined,
             containerId,
             weightKg: String(weight),
             costPerKg: String(costUsd),
@@ -998,6 +1012,8 @@ export function registerFactoryMixBatchRoutes(app: Express) {
         for (const source of sources) {
           // Container-linked source: rate is that container's own persisted landed
           // cost — client-supplied costPerKg is always ignored.
+          // FIX 4: If the container has a linked supplier, use the supplier's
+          // authoritative moving-average locked rate.
           const { containerId, weightKg } = source;
           const [rawStockRow] = await tx
             .select()
@@ -1007,9 +1023,19 @@ export function registerFactoryMixBatchRoutes(app: Express) {
 
           if (!rawStockRow) throw new Error(`Raw stock not found for container ${containerId}`);
 
-          const weight = parseFloat(weightKg);
+          const [ctnRow2] = await tx
+            .select({ supplierId: factoryContainers.supplierId })
+            .from(factoryContainers)
+            .where(eq(factoryContainers.id, containerId));
+          const ctnSupplierId2 = ctnRow2?.supplierId ?? null;
 
-          const costUsd = parseFloat(rawStockRow.costPerKgUsd) || parseFloat(rawStockRow.costPerKg) || 0;
+          const weight = parseFloat(weightKg);
+          let costUsd: number;
+          if (ctnSupplierId2) {
+            costUsd = await getLockedSupplierRate(tx, companyId, ctnSupplierId2, { forUpdate: true });
+          } else {
+            costUsd = parseFloat(rawStockRow.costPerKgUsd) || parseFloat(rawStockRow.costPerKg) || 0;
+          }
 
           // Allow over-use: usedKg may exceed receivedKg, driving stock negative
           await tx
@@ -1020,6 +1046,7 @@ export function registerFactoryMixBatchRoutes(app: Express) {
           addedWeightKg += weight;
           addedCost += weight * costUsd;
           sourceRecords.push({
+            supplierId: ctnSupplierId2 ?? undefined,
             containerId,
             weightKg: String(weight),
             costPerKg: String(costUsd),

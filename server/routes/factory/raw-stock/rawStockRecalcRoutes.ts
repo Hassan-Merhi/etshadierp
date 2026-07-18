@@ -1,4 +1,5 @@
 import type { Express } from "express";
+import crypto from "crypto";
 import { requireAuth, requireRole } from "../../../auth";
 import {
   getRawStockRecalcPreview,
@@ -693,6 +694,16 @@ export function registerRawStockRecalcRoutes(app: Express) {
       const { supplierId, dryRun } = req.body;
       const isDryRun = dryRun === true;
 
+      // FIX 6: Deprecation warning — this endpoint uses the all-time receipt-weighted
+      // average, NOT the timeline moving-average. It can overwrite a correctly-computed
+      // rate with a different value, making Historical Replay inconsistent. Prefer
+      // "Historical Replay" (POST /recalc/historical-replay/apply) for any cost
+      // correction. Only use this endpoint when restoring from an audit-log entry.
+      res.setHeader(
+        "X-Deprecated",
+        "This endpoint computes the all-time receipt-weighted stable average, not the timeline moving average. Prefer Historical Replay."
+      );
+
       try {
         // Resolve the list of supplier IDs to process
         let supplierIds: number[];
@@ -945,7 +956,13 @@ export function registerRawStockRecalcRoutes(app: Express) {
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       try {
         const mismatches = await getMixBatchSourceCostMismatchPreview(companyId);
-        const fixableIds = mismatches.filter((r) => r.fixable).map((r) => r.sourceId);
+        // FIX 6: Supplier-priced source rows (supplierId set) must not be auto-fixed
+        // here — their correct rate depends on the Historical Replay timeline, not the
+        // current container rate or today's stable average. Silently auto-correcting
+        // them would freeze the wrong historical rate. Route the admin to Historical Replay.
+        const fixableIds = mismatches
+          .filter((r) => r.fixable && !r.supplierId)
+          .map((r) => r.sourceId);
         if (fixableIds.length === 0) {
           return res.json({ applied: 0, skipped: 0, results: [] });
         }
@@ -1368,9 +1385,16 @@ export function registerRawStockRecalcRoutes(app: Express) {
         // Re-run preview with current DB state for fingerprint verification + apply
         const preview = await previewHistoricalCostReplay(companyId);
 
-        // Capture undo snapshot before applying
-        const affectedBatchIds = preview.batchRows.map((b) => b.batchId);
-        const snapshot = await captureReplaySnapshot(companyId, safeSupplierIds, affectedBatchIds);
+        // FIX 2: All writes (cost updates, snapshot capture, undo log) are committed in
+        // a single advisory-locked transaction via the onCommit callback.
+        // FIX 16: tokenHash lets the service consume the token atomically so it can
+        // never be replayed by a second concurrent request.
+        const tokenHash = crypto.createHash("sha256").update(providedToken).digest("hex");
+        await ensureUndoLogTable();
+        const supplierNames = preview.supplierRows
+          .filter((s) => safeSupplierIds.includes(s.supplierId))
+          .map((s) => s.supplierName)
+          .join(", ");
 
         const result = await applyHistoricalCostReplay({
           companyId,
@@ -1381,31 +1405,28 @@ export function registerRawStockRecalcRoutes(app: Express) {
           expectedFingerprint: payload.fingerprint,
           algorithmVersion: payload.algorithmVersion,
           issuedByUserId: payload.userId,
+          tokenHash,
+          onCommit: async (client, applyResult, snapshot) => {
+            // Insert undo log inside the same advisory-locked transaction (FIX 2).
+            await client.query(
+              `INSERT INTO factory_recalc_undo_log
+                 (company_id, user_id, username, description, container_count, container_numbers, snapshot)
+               VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+              [
+                companyId,
+                userId || null,
+                username || null,
+                `Historical cost replay — ${safeSupplierIds.length} supplier(s): ${supplierNames}`,
+                0,
+                [],
+                JSON.stringify(snapshot),
+              ]
+            );
+          },
         });
 
-        // Save undo log entry
-        await ensureUndoLogTable();
-        const supplierNames = preview.supplierRows
-          .filter((s) => safeSupplierIds.includes(s.supplierId))
-          .map((s) => s.supplierName)
-          .join(", ");
-
-        await pool.query(
-          `INSERT INTO factory_recalc_undo_log
-             (company_id, user_id, username, description, container_count, container_numbers, snapshot)
-           VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-          [
-            companyId,
-            userId || null,
-            username || null,
-            `Historical cost replay — ${safeSupplierIds.length} supplier(s): ${supplierNames}`,
-            0,
-            [],
-            JSON.stringify(snapshot),
-          ]
-        );
-
-        await logAudit(req, "historical_cost_replay_applied", { result, safeSupplierIds });
+        // Audit log is best-effort (separate operation — logAudit opens its own connection)
+        try { await logAudit(req, "historical_cost_replay_applied", { result, safeSupplierIds }); } catch {}
 
         res.json({ success: true, ...result });
       } catch (err: any) {

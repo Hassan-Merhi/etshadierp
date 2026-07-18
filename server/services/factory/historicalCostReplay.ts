@@ -691,13 +691,17 @@ async function buildBatchConsumptionEvents(
 // Step 6: event sorting + ambiguity detection
 // ─────────────────────────────────────────────────────────────────────────────
 
-function sortEvents(events: SupplierEvent[]): { sorted: SupplierEvent[]; ambiguous: boolean } {
+export function sortEvents(events: SupplierEvent[]): { sorted: SupplierEvent[]; ambiguous: boolean } {
   // Primary: effectiveDate (empty dates sort last)
   // Secondary: createdAt
   // Tertiary: stableId
   const withDate = events.filter((e) => e.effectiveDate !== "");
   const withoutDate = events.filter((e) => e.effectiveDate === "");
 
+  // Single authoritative sort: effectiveDate → createdAt → stableId.
+  // No event-type priority forcing — the true sequence is determined by persisted
+  // timestamps. If timestamps establish the order (receipt.createdAt ≠ batch.createdAt
+  // and both are non-zero), we trust them and the replay is non-ambiguous.
   withDate.sort((a, b) => {
     const dateCmp = a.effectiveDate.localeCompare(b.effectiveDate);
     if (dateCmp !== 0) return dateCmp;
@@ -706,8 +710,13 @@ function sortEvents(events: SupplierEvent[]): { sorted: SupplierEvent[]; ambiguo
     return a.stableId - b.stableId;
   });
 
-  // Detect ambiguous ordering: two events on the same date where one is a
-  // RECEIPT that supplies material used in a BATCH_CONSUMPTION on the same date
+  // Detect truly ambiguous event ordering.
+  // A RECEIPT and BATCH_CONSUMPTION are ambiguous ONLY when:
+  //   1. They share the same effective business date, AND
+  //   2. Their createdAt timestamps are equal or both missing (cannot establish order), AND
+  //   3. Swapping their order would change the rate applied to the batch.
+  // When timestamps differ, the sort above has already placed them in the correct
+  // chronological order — that is NOT ambiguous.
   let ambiguous = false;
   const dateGroups = new Map<string, SupplierEvent[]>();
   for (const e of withDate) {
@@ -715,34 +724,22 @@ function sortEvents(events: SupplierEvent[]): { sorted: SupplierEvent[]; ambiguo
     dateGroups.get(e.effectiveDate)!.push(e);
   }
   for (const [, group] of dateGroups) {
-    const hasReceipt = group.some((e) => e.kind === "RECEIPT");
-    const hasConsumption = group.some((e) => e.kind === "BATCH_CONSUMPTION");
-    if (hasReceipt && hasConsumption) {
-      // Ambiguous: receipt and consumption on the same date
-      // We put receipts first (spec: receipt that supplies a batch must occur before)
-      // but mark as ambiguous for the summary
-      ambiguous = true;
+    const receipts = group.filter((e) => e.kind === "RECEIPT");
+    const consumptions = group.filter((e) => e.kind === "BATCH_CONSUMPTION");
+    if (receipts.length === 0 || consumptions.length === 0) continue;
+    // Check every pair — if any pair cannot be resolved by timestamp, mark ambiguous.
+    for (const rcv of receipts) {
+      for (const con of consumptions) {
+        // Timestamps resolve the order when both are non-zero and distinct.
+        const canResolveByTimestamp = rcv.createdAt !== con.createdAt
+          && rcv.createdAt > 0
+          && con.createdAt > 0;
+        if (!canResolveByTimestamp) {
+          ambiguous = true;
+        }
+      }
     }
   }
-
-  // Enforce: on same date, RECEIPT before BATCH_CONSUMPTION (required to prevent impossible negatives)
-  withDate.sort((a, b) => {
-    const dateCmp = a.effectiveDate.localeCompare(b.effectiveDate);
-    if (dateCmp !== 0) return dateCmp;
-    // On same date: RECEIPT first
-    const kindPriority = (k: EventKind) => {
-      if (k === "RECEIPT") return 0;
-      if (k === "ADD_ADJUSTMENT") return 1;
-      if (k === "REMOVE_ADJUSTMENT" || k === "DEDUCT_ADJUSTMENT") return 2;
-      if (k === "BATCH_CONSUMPTION") return 3;
-      return 4;
-    };
-    const kindCmp = kindPriority(a.kind) - kindPriority(b.kind);
-    if (kindCmp !== 0) return kindCmp;
-    const tsCmp = a.createdAt - b.createdAt;
-    if (tsCmp !== 0) return tsCmp;
-    return a.stableId - b.stableId;
-  });
 
   return { sorted: [...withDate, ...withoutDate], ambiguous };
 }
@@ -820,19 +817,15 @@ async function replaySupplierTimeline(
         const addKg = new Decimal(evt.adjustKg || 0);
         if (addKg.lte(0)) break;
 
-        if (evt.costPerKgUsd != null && evt.costPerKgUsd > 0) {
-          // ADD with valid USD cost → moving average update (same max(0,...) guard)
-          const addRate = new Decimal(evt.costPerKgUsd);
-          const oldPositiveRemaining = Decimal.max(0, state.remaining);
-          const denominator = oldPositiveRemaining.plus(addKg);
-          const newRate = denominator.gt(0)
-            ? oldPositiveRemaining.times(state.rate).plus(addKg.times(addRate)).div(denominator)
-            : addRate;
-          state = { remaining: state.remaining.plus(addKg), rate: newRate };
-        } else {
-          // ADD without USD cost → just increase remaining, rate unchanged
-          state = { remaining: state.remaining.plus(addKg), rate: state.rate };
-        }
+        // FIX 8: ADD adjustments are strictly quantity-only — they never update the
+        // supplier moving-average rate. A stored costPerKg on an ADD row is ambiguous:
+        // it could be a legacy data entry, a unit-conversion artefact, or a real
+        // opening-balance — the replay engine cannot distinguish them automatically.
+        // Only RECEIPT events (generated by the offload workflow) are authorised to
+        // move the rate. Legacy ADD rows with non-zero cost that should establish the
+        // rate must be converted to RECEIPT events by an admin before the timeline is
+        // marked safe to repair.
+        state = { remaining: state.remaining.plus(addKg), rate: state.rate };
         break;
       }
       case "REMOVE_ADJUSTMENT":
@@ -976,12 +969,31 @@ function computeBatchCorrections(
     }
   }
 
+  // FIX 13: Any batchId that survives the toposort unvisited is part of a dependency cycle.
+  // Mark those batches as not-safe-to-repair (they are excluded from corrections below).
+  const cycleBatchIds = new Set<number>();
+  for (const batchId of allBatchIds) {
+    if (!visited.has(batchId)) {
+      cycleBatchIds.add(batchId);
+    }
+  }
+  // Also detect missing upstream batches: a BATCH-type source whose sourceBatchId is not
+  // in allBatchIds means the upstream was deleted or belongs to a different company.
+  const missingUpstreamBatchIds = new Set<number>();
+  for (const src of sourceInfos) {
+    if (src.sourceBatchId != null && !allBatchIds.has(src.sourceBatchId)) {
+      missingUpstreamBatchIds.add(src.batchId); // the consumer is blocked
+    }
+  }
+
   // Corrected costPerKg per batch (computed as we process in order)
   const correctedBatchCost = new Map<number, number>(); // batchId → corrected costPerKg
 
   const corrections: BatchCorrection[] = [];
 
   for (const batchId of processOrder) {
+    // FIX 13: skip batches in a dependency cycle or with missing upstream batches
+    if (cycleBatchIds.has(batchId) || missingUpstreamBatchIds.has(batchId)) continue;
     const batch = batchInfoMap.get(batchId);
     if (!batch) continue;
     const sources = sourcesGroupedByBatch.get(batchId) || [];
@@ -1495,12 +1507,41 @@ export interface ReplayApplyResult {
   skippedSupplierIds: number[];
 }
 
-/** Capture full snapshot for undo support */
+/**
+ * Ensure the token-consumption table exists (idempotent — FIX 16).
+ * Called inside the apply transaction so the table is guaranteed present before
+ * the INSERT that marks the token as consumed.
+ */
+async function ensureReplayConsumedTokensTable(client: { query: Function }): Promise<void> {
+  await client.query(`
+    CREATE TABLE IF NOT EXISTS factory_replay_consumed_tokens (
+      token_hash   TEXT        PRIMARY KEY,
+      company_id   INTEGER     NOT NULL,
+      user_id      TEXT        NOT NULL,
+      consumed_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `);
+}
+
+/**
+ * Capture snapshot of only the exact records that will be written by this replay.
+ * FIX 14: scope snapshot to the token-approved supplier/source/batch/bale IDs,
+ * not to the entire company's data. Runs inside the caller's transaction so the
+ * reads are consistent with the writes that follow.
+ */
 export async function captureReplaySnapshot(
+  client: { query: Function },
   companyId: number,
   supplierIds: number[],
-  batchIds: number[]
+  batchIds: number[],
+  sourceIds: number[],
+  baleIds: number[]
 ) {
+  const safeSupplierIds = supplierIds.length > 0 ? supplierIds : [-1];
+  const safeBatchIds = batchIds.length > 0 ? batchIds : [-1];
+  const safeSourceIds = sourceIds.length > 0 ? sourceIds : [-1];
+  const safeBaleIds = baleIds.length > 0 ? baleIds : [-1];
+
   const [
     { rows: rawStockRows },
     { rows: mixBatchSources },
@@ -1508,39 +1549,49 @@ export async function captureReplaySnapshot(
     { rows: bales },
     { rows: supplierRates },
   ] = await Promise.all([
-    pool.query(
-      `SELECT id, cost_per_kg AS "costPerKg", cost_per_kg_usd AS "costPerKgUsd"
-       FROM factory_raw_stock
-       WHERE company_id = $1
-         AND container_id IN (
-           SELECT id FROM factory_containers WHERE company_id = $1 AND supplier_id = ANY($2)
-         )
-         AND deleted_at IS NULL`,
-      [companyId, supplierIds]
+    client.query(
+      `SELECT frs.id,
+              frs.cost_per_kg        AS "costPerKg",
+              frs.cost_per_kg_usd    AS "costPerKgUsd"
+       FROM factory_raw_stock frs
+       JOIN factory_containers fc ON fc.id = frs.container_id
+       WHERE frs.company_id = $1
+         AND fc.supplier_id = ANY($2)
+         AND frs.deleted_at IS NULL`,
+      [companyId, safeSupplierIds]
     ),
-    pool.query(
-      `SELECT id, cost_per_kg AS "costPerKg", total_cost AS "totalCost"
+    client.query(
+      `SELECT id,
+              cost_per_kg  AS "costPerKg",
+              total_cost   AS "totalCost"
        FROM factory_mix_batch_sources
-       WHERE mix_batch_id = ANY($1)`,
-      [batchIds.length > 0 ? batchIds : [-1]]
+       WHERE id = ANY($1)`,
+      [safeSourceIds]
     ),
-    pool.query(
-      `SELECT id, cost_per_kg AS "costPerKg", total_cost AS "totalCost"
+    client.query(
+      `SELECT id,
+              cost_per_kg  AS "costPerKg",
+              total_cost   AS "totalCost",
+              total_weight_kg AS "totalWeightKg"
        FROM factory_mix_batches
        WHERE id = ANY($1)`,
-      [batchIds.length > 0 ? batchIds : [-1]]
+      [safeBatchIds]
     ),
-    pool.query(
-      `SELECT id, cost_per_kg AS "costPerKg", total_cost AS "totalCost"
+    client.query(
+      `SELECT id,
+              cost_per_kg  AS "costPerKg",
+              total_cost   AS "totalCost",
+              weight_kg    AS "weightKg"
        FROM factory_bales
-       WHERE mix_batch_id = ANY($1) AND company_id = $2 AND status NOT IN ('DELETED','REMOVED')`,
-      [batchIds.length > 0 ? batchIds : [-1], companyId]
+       WHERE id = ANY($1) AND company_id = $2`,
+      [safeBaleIds, companyId]
     ),
-    pool.query(
-      `SELECT id, current_raw_material_cost_per_kg_usd AS "currentRawMaterialCostPerKgUsd"
+    client.query(
+      `SELECT id,
+              current_raw_material_cost_per_kg_usd AS "currentRawMaterialCostPerKgUsd"
        FROM factory_suppliers
        WHERE id = ANY($1) AND company_id = $2`,
-      [supplierIds, companyId]
+      [safeSupplierIds, companyId]
     ),
   ]);
   return { rawStockRows, mixBatchSources, mixBatches, bales, suppliers: supplierRates, containers: [] };
@@ -1550,7 +1601,25 @@ export async function captureReplaySnapshot(
 export const REPLAY_ALGORITHM_VERSION = "v2-signed-quantity-max0-receipt";
 
 export async function applyHistoricalCostReplay(
-  params: ReplayApplyParams
+  params: ReplayApplyParams & {
+    /**
+     * FIX 16: SHA-256 hex hash of the signed token being consumed. Stored in
+     * factory_replay_consumed_tokens inside the apply transaction so the same
+     * token cannot apply twice even if the caller retries concurrently.
+     */
+    tokenHash?: string;
+    /**
+     * FIX 2: Called inside the transaction after all cost writes succeed but before
+     * COMMIT. The route uses this to insert the undo-log row and audit-log row in the
+     * same atomic unit as the cost writes. The callback receives the snapshot so the
+     * route can store it without an extra DB round-trip.
+     */
+    onCommit?: (
+      client: any,
+      result: ReplayApplyResult,
+      snapshot: Awaited<ReturnType<typeof captureReplaySnapshot>>
+    ) => Promise<void>;
+  }
 ): Promise<ReplayApplyResult> {
   const {
     companyId,
@@ -1561,6 +1630,8 @@ export async function applyHistoricalCostReplay(
     expectedFingerprint,
     algorithmVersion,
     issuedByUserId,
+    tokenHash,
+    onCommit,
   } = params;
 
   if (algorithmVersion !== REPLAY_ALGORITHM_VERSION) {
@@ -1569,8 +1640,11 @@ export async function applyHistoricalCostReplay(
     );
   }
 
-  // Verify fingerprint
-  const actualFingerprint = computeReplayFingerprint(companyId, supplierIds, preview);
+  // Verify fingerprint (FIX 1: opts included so the hash matches what was signed)
+  const actualFingerprint = computeReplayFingerprint(companyId, supplierIds, preview, {
+    includeCompletedBatches,
+    includeFinalizedBales,
+  });
   if (actualFingerprint !== expectedFingerprint) {
     throw new Error("Fingerprint mismatch — replay data changed since dry-run was issued. Re-run the preview.");
   }
@@ -1581,14 +1655,6 @@ export async function applyHistoricalCostReplay(
   );
 
   const safeSupplierIds = new Set(safeTimelines.map((s) => s.supplierId));
-
-  // Determine batch IDs to update
-  const COMPLETED_STATUSES = ["COMPLETED", "CLOSED"];
-  const batchesToApply = preview.batchRows.filter((b) => {
-    if (COMPLETED_STATUSES.includes(b.status) && !includeCompletedBatches) return false;
-    return true;
-  });
-  const batchIdsToApply = new Set(batchesToApply.map((b) => b.batchId));
 
   const result: ReplayApplyResult = {
     suppliersApplied: 0,
@@ -1604,7 +1670,8 @@ export async function applyHistoricalCostReplay(
 
   if (safeTimelines.length === 0) return result;
 
-  // Re-compute corrections from preview data
+  // Re-compute corrections from preview data. sourceInfos is already scoped to safeSupplierIds,
+  // so batchInfoMap only contains batches with sources from the selected suppliers (FIX 3).
   const { sourceInfos, batchInfoMap } = await buildBatchConsumptionEvents(companyId, safeSupplierIds);
   const canonicals = await computeCanonicalCosts(
     companyId,
@@ -1633,18 +1700,91 @@ export async function applyHistoricalCostReplay(
     canonicalRateByContainer
   );
 
-  // Acquire company-level advisory lock and apply in one transaction
+  // FIX 3: Build exact batch scope — only batches in batchCorrections are in the supplier
+  // closure for the selected suppliers. preview.batchRows is not filtered by supplier so
+  // using it directly would include batches from unselected suppliers.
+  const COMPLETED_STATUSES = ["COMPLETED", "CLOSED"];
+  const batchCorrectionIds = new Set(batchCorrections.map((c) => c.batchId));
+  const batchIdsToApply = new Set(
+    preview.batchRows
+      .filter((b) => {
+        if (!batchCorrectionIds.has(b.batchId)) return false; // not in supplier closure
+        if (COMPLETED_STATUSES.includes(b.status) && !includeCompletedBatches) return false;
+        return true;
+      })
+      .map((b) => b.batchId)
+  );
+
+  // Collect the exact IDs of every record that will be touched (FIX 14 — exact snapshot scope).
+  const sourceIdsToUpdate = preview.sourceRows
+    .filter((s) => {
+      if (!s.safeToRepair) return false;
+      if (s.pricingBasis === "SUPPLIER_LOCKED_RATE" && s.supplierId != null) {
+        return safeSupplierIds.has(s.supplierId);
+      }
+      if (s.pricingBasis === "CONTAINER_DIRECT" && s.containerId != null) {
+        return canonicalRateByContainer.has(s.containerId);
+      }
+      return false;
+    })
+    .map((s) => s.sourceId);
+
+  // Pre-compute bale IDs that will be updated so snapshot is exact.
+  // We query them before the transaction to scope the snapshot correctly.
+  const baleIdsToUpdate: number[] = [];
+  if (batchIdsToApply.size > 0) {
+    // Finalised bales are excluded unless opted in (FIX 10: use real relationship check,
+    // not hardcoded status list)
+    const notFinalizedClause = includeFinalizedBales
+      ? `status NOT IN ('DELETED','REMOVED')`
+      : `status NOT IN ('DELETED','REMOVED','${FINALIZED_BALE_STATUSES.join("','")}')
+         AND dispatch_batch_id IS NULL
+         AND NOT EXISTS (SELECT 1 FROM customer_order_bales WHERE bale_id = fb.id)
+         AND NOT EXISTS (SELECT 1 FROM factory_invoice_loading_bales WHERE bale_id = fb.id)`;
+    const { rows: baleIdRows } = await pool.query<{ id: number }>(
+      `SELECT fb.id FROM factory_bales fb
+       WHERE fb.mix_batch_id = ANY($1) AND fb.company_id = $2 AND ${notFinalizedClause}`,
+      [[...batchIdsToApply], companyId]
+    );
+    for (const r of baleIdRows) baleIdsToUpdate.push(r.id);
+  }
+
+  // Acquire company-level advisory lock and apply ALL writes in one transaction (FIX 2)
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
     // Advisory lock: namespace 9003 = historical replay
     await client.query(`SELECT pg_advisory_xact_lock(9003, $1)`, [companyId]);
 
+    // FIX 16: Ensure token table exists and consume the token atomically.
+    // A duplicate token hash causes an immediate rollback with a clear message.
+    if (tokenHash) {
+      await ensureReplayConsumedTokensTable(client);
+      const { rowCount } = await client.query(
+        `INSERT INTO factory_replay_consumed_tokens (token_hash, company_id, user_id)
+         VALUES ($1, $2, $3)
+         ON CONFLICT (token_hash) DO NOTHING`,
+        [tokenHash, companyId, issuedByUserId]
+      );
+      if (!rowCount || rowCount === 0) {
+        throw new Error("This confirmation token has already been used. Re-run the preview to obtain a fresh token.");
+      }
+    }
+
+    // FIX 14: Capture snapshot of exact records inside the same transaction so the
+    // pre-image is consistent with the writes that follow (reads see the locked rows).
+    const snapshot = await captureReplaySnapshot(
+      client,
+      companyId,
+      [...safeSupplierIds],
+      [...batchIdsToApply],
+      sourceIdsToUpdate,
+      baleIdsToUpdate
+    );
+
     // 1. Update raw-stock costs for each supplier's containers.
-    //    Only cost_per_kg_usd is updated — that is the canonical USD landed cost.
-    //    cost_per_kg must remain the native-currency landed cost and must never
-    //    be overwritten with a USD value (spec: never write USD cost into both
-    //    cost_per_kg and cost_per_kg_usd for a non-USD container).
+    //    Only cost_per_kg_usd is updated — cost_per_kg is the native-currency landed
+    //    cost and must never be overwritten with a USD value.
     for (const timeline of safeTimelines) {
       const { rows: rsRows } = await client.query<{ id: number; container_id: number }>(
         `SELECT frs.id, frs.container_id
@@ -1672,12 +1812,8 @@ export async function applyHistoricalCostReplay(
       // Check this source's supplier is in the safe set
       if (srcRow.pricingBasis === "SUPPLIER_LOCKED_RATE" && srcRow.supplierId != null) {
         if (!safeSupplierIds.has(srcRow.supplierId)) continue;
-      }
-
-      if (srcRow.pricingBasis === "CONTAINER_DIRECT" && srcRow.containerId != null) {
-        // Only update if the container's supplier is in safe set (or no supplier)
-        const canonRate = canonicalRateByContainer.get(srcRow.containerId);
-        if (canonRate == null) continue;
+      } else if (srcRow.pricingBasis === "CONTAINER_DIRECT" && srcRow.containerId != null) {
+        if (!canonicalRateByContainer.has(srcRow.containerId)) continue;
       }
 
       const newCostPerKg = new Decimal(srcRow.expectedHistoricalCostPerKg).toDecimalPlaces(6).toFixed(6);
@@ -1693,7 +1829,7 @@ export async function applyHistoricalCostReplay(
       result.sourcesUpdated++;
     }
 
-    // 3. Update batch costs and bales
+    // 3. Update batch costs and cascade to bales (FIX 10: relationship-based finalized check)
     for (const correction of batchCorrections) {
       if (!batchIdsToApply.has(correction.batchId)) continue;
 
@@ -1707,15 +1843,17 @@ export async function applyHistoricalCostReplay(
       );
       result.batchesUpdated++;
 
-      // Cascade to bales — skip finalized bales unless explicitly authorized.
-      // "Finalized" means the bale has been sold, dispatched, or invoiced; updating
-      // cost on those bales affects reported margins but must be an explicit choice.
-      const finalizedClause = includeFinalizedBales
-        ? `AND status NOT IN ('DELETED','REMOVED')`
-        : `AND status NOT IN ('DELETED','REMOVED','${FINALIZED_BALE_STATUSES.join("','")}')`;
-      const { rows: baleRows } = await client.query<{ id: number; weight_kg: string; status: string }>(
-        `SELECT id, weight_kg, status FROM factory_bales
-         WHERE mix_batch_id = $1 AND company_id = $2 ${finalizedClause}`,
+      // FIX 10: Use real relationship query for finalized-bale detection instead of
+      // the hardcoded status list. Finalized = dispatched, customer-ordered, or invoiced.
+      const notFinalizedClause = includeFinalizedBales
+        ? `status NOT IN ('DELETED','REMOVED')`
+        : `status NOT IN ('DELETED','REMOVED','${FINALIZED_BALE_STATUSES.join("','")}')
+           AND dispatch_batch_id IS NULL
+           AND NOT EXISTS (SELECT 1 FROM customer_order_bales WHERE bale_id = fb.id)
+           AND NOT EXISTS (SELECT 1 FROM factory_invoice_loading_bales WHERE bale_id = fb.id)`;
+      const { rows: baleRows } = await client.query<{ id: number; weight_kg: string }>(
+        `SELECT fb.id, fb.weight_kg FROM factory_bales fb
+         WHERE fb.mix_batch_id = $1 AND fb.company_id = $2 AND ${notFinalizedClause}`,
         [correction.batchId, companyId]
       );
       for (const bale of baleRows) {
@@ -1748,6 +1886,35 @@ export async function applyHistoricalCostReplay(
         result.supplierRatesUpdated++;
       }
       result.suppliersApplied++;
+    }
+
+    // FIX 15: Verify quantity invariants before commit — batch total weights must be
+    // unchanged (cost-only repair; any weight discrepancy indicates a deeper data issue).
+    {
+      const batchIdArr = [...batchIdsToApply];
+      if (batchIdArr.length > 0) {
+        const { rows: postBatches } = await client.query<{ id: number; total_weight_kg: string }>(
+          `SELECT id, total_weight_kg FROM factory_mix_batches WHERE id = ANY($1)`,
+          [batchIdArr]
+        );
+        const preWeightByBatch = new Map<number, string>(
+          (snapshot.mixBatches as Array<{ id: number; totalWeightKg: string }>).map((b) => [b.id, b.totalWeightKg])
+        );
+        for (const post of postBatches) {
+          const pre = preWeightByBatch.get(post.id);
+          if (pre !== undefined && Math.abs(parseFloat(pre) - parseFloat(post.total_weight_kg)) > 0.001) {
+            throw new Error(
+              `Quantity invariant violated for batch ${post.id}: weight changed from ${pre} to ${post.total_weight_kg}. Rolling back.`
+            );
+          }
+        }
+      }
+    }
+
+    // FIX 2: Run the route-injected callback (undo log + audit log) inside the same
+    // transaction so they are committed or rolled back atomically with the cost writes.
+    if (onCommit) {
+      await onCommit(client, result, snapshot);
     }
 
     await client.query("COMMIT");

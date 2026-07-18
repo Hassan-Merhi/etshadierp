@@ -5,7 +5,7 @@ import { db } from "../../../db";
 import { requireAuth } from "../../../auth";
 import { classifyNetPositionAccounts } from "../../../netPositionHelper";
 import { adjustInventory } from "../../../inventoryHelper";
-import { applyOffloadMovingAverage } from "../../../services/factory/rawStockLockedRate";
+import { applyOffloadMovingAverage, getLockedSupplierRate } from "../../../services/factory/rawStockLockedRate";
 import { convertToUsdOrThrow, resolveStoredFxRateOrThrow, UnresolvedExchangeRateError } from "../../../services/factory/currencyConversion";
 import {
   writeDaybookEntry,
@@ -697,8 +697,24 @@ export function registerRawStockBalanceRoutes(app: Express) {
       const totalKg = bales.reduce((sum, b) => sum + parseFloat(b.weightKg as string), 0);
       // Allow over-use: no availability guard — stock can go negative
 
-      const costPerKg = parseFloat(rs.costPerKg as string);
-      const totalCost = totalKg * costPerKg;
+      // FIX 5: Load the container to check for a linked supplier.
+      // When the container belongs to a supplier, use the supplier's authoritative
+      // USD moving-average rate (getLockedSupplierRate) instead of the container's
+      // native-currency costPerKg — which is not a USD rate and should never be used
+      // as a USD source cost.
+      const [containerRow] = await db
+        .select({ supplierId: factoryContainers.supplierId })
+        .from(factoryContainers)
+        .where(eq(factoryContainers.id, rs.containerId!));
+      const containerSupplierId = containerRow?.supplierId ?? null;
+
+      let costPerKgUsd: number;
+      if (containerSupplierId) {
+        costPerKgUsd = await getLockedSupplierRate(db, companyId, containerSupplierId, { forUpdate: false });
+      } else {
+        costPerKgUsd = parseFloat(rs.costPerKgUsd as string) || parseFloat(rs.costPerKg as string) || 0;
+      }
+      const totalCost = new Decimal(totalKg).times(costPerKgUsd).toDecimalPlaces(6).toNumber();
       const now = new Date();
 
       const result = await db.transaction(async (tx) => {
@@ -713,20 +729,26 @@ export function registerRawStockBalanceRoutes(app: Express) {
             name: "OB Stock Assignment",
             totalWeightKg: totalKg.toFixed(3),
             usedKg: totalKg.toFixed(3),
-            costPerKg: rs.costPerKg,
-            totalCost: totalCost.toFixed(2),
+            costPerKg: new Decimal(costPerKgUsd).toDecimalPlaces(6).toFixed(6),
+            totalCost: new Decimal(totalCost).toDecimalPlaces(6).toFixed(6),
             status: "COMPLETED",
             updatedAt: now,
           })
           .returning({ id: factoryMixBatches.id });
 
-        // 2. Link the OB container as the source of this mix batch
+        // 2. Link the OB container as the source with FIX 5 corrections:
+        //    supplierId is set when the container belongs to a supplier so
+        //    the source gets SUPPLIER_FIFO pricing-basis and the replay engine
+        //    can correctly identify it in the timeline.
         await tx.insert(factoryMixBatchSources).values({
           mixBatchId: newBatch.id,
           containerId: rs.containerId,
+          supplierId: containerSupplierId ?? undefined,
+          sourceType: containerSupplierId ? "SUPPLIER_FIFO" : "CONTAINER_DIRECT",
           weightKg: totalKg.toFixed(3),
-          costPerKg: rs.costPerKg,
-          totalCost: totalCost.toFixed(2),
+          quantityKg: totalKg.toFixed(3),
+          costPerKg: new Decimal(costPerKgUsd).toDecimalPlaces(6).toFixed(6),
+          totalCost: new Decimal(totalCost).toDecimalPlaces(6).toFixed(6),
         });
 
         // 3. Assign the mix batch to each bale
