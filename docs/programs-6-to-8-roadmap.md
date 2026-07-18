@@ -10,14 +10,15 @@ Safety rules:
 
 ## Program 6 — Performance and bandwidth
 
-- [~] 6A — Measurement and endpoint ranking
+- [x] 6A — Measurement and endpoint ranking
   - Rank endpoints by response size, frequency, latency, memory, and database cost.
   - Retain the existing opt-in bandwidth logger, but extend measurement beyond responses above a fixed byte threshold.
-  - Produce a reproducible ranking report without logging bodies, credentials, cookies, or tokens.
-  - Implemented aggregate per-route measurement for request count, total/average/max response bytes, average/max latency, heap delta, error count, and optional database query count/duration.
-  - Implemented normalized route grouping so numeric and UUID identifiers do not fragment rankings or expose record identifiers.
-  - Implemented periodic top-N ranking events with configurable interval and rank size.
-  - Remaining: connect the database instrumentation to `res.locals.databaseMetrics`, add focused regression coverage, and document the exact operational collection procedure.
+  - Produce a reproducible ranking report without logging bodies, credentials, cookies, tokens, SQL text, query parameters, or record identifiers.
+  - Implemented aggregate per-route measurement for request count, errors, total/average/max response bytes, average/max latency, heap delta, PostgreSQL query count, and PostgreSQL duration.
+  - Implemented normalized route grouping so numeric and UUID identifiers do not fragment rankings or expose identifiers.
+  - Implemented request-scoped database attribution with AsyncLocalStorage and no database timing overhead outside an active profiled request.
+  - Implemented periodic configurable top-N ranking events and focused regression coverage.
+  - Operational procedure documented in `docs/program-6a-endpoint-ranking.md`.
 - [ ] 6B — Daybook, accounts, and reports
   - Paginate or summarize the heaviest accounting and reporting endpoints.
   - Preserve totals and reconciliation semantics independently of page size.
@@ -50,7 +51,6 @@ Existing performance work found:
 - Compression is enabled for text and JSON responses.
 - Hashed static assets use long-lived immutable caching.
 - HTML and dynamic API responses avoid stale caching.
-- An opt-in `BANDWIDTH_DEBUG` middleware logs very large responses.
 - Earlier heavy-API pagination and memory-stabilization scripts exist.
 
-Program 6A implementation now extends the existing logger into a multi-factor aggregate profiler. It remains opt-in and does not alter API response shapes, route behavior, accounting logic, stock logic, or database writes.
+Program 6A is implementation-complete. The profiler remains opt-in and does not alter API response shapes, route behavior, accounting logic, stock logic, or database writes. Program 6B is next.
