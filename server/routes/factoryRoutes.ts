@@ -7,6 +7,7 @@ import { registerFactoryProductsRoutes } from "./factory/factoryProductsRoutes";
 import { registerFactoryContainersRoutes } from "./factory/factoryContainersRoutes";
 import { registerFactoryBalesRoutes } from "./factory/factoryBalesRoutes";
 import { registerFactoryCustomersRoutes } from "./factory/factoryCustomersRoutes";
+import { registerFactoryContainerReadAccessRoutes } from "./factory/factoryContainerReadAccessRoutes";
 import { registerFactoryDocsUsersRoutes } from "./factory/factoryDocsUsersRoutes";
 import { registerFactoryEmployeesPosRoutes } from "./factory/factoryEmployeesPosRoutes";
 import { registerFactoryTransporterRoutes } from "./factory/factoryTransporterRoutes";
@@ -131,6 +132,9 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
   registerFactoryContainersRoutes(app);
   registerFactoryBalesRoutes(app);
   registerFactoryCustomersRoutes(app);
+  // ContainerDetail is an ERP screen but its historical document/freight URLs
+  // live below /api/factory. Register the ERP-company-aware GET handlers first.
+  registerFactoryContainerReadAccessRoutes(app);
   registerFactoryDocsUsersRoutes(app);
   registerFactoryEmployeesPosRoutes(app);
   registerFactoryTransporterRoutes(app);
