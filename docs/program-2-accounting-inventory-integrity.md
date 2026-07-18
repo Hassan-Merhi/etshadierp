@@ -8,7 +8,7 @@ Status: in progress. This branch must remain unmerged until the owner approves t
 - [x] 2B — Central posting engine
 - [x] 2C — Voucher lifecycle integrity
 - [x] 2D — Cash, bank, customer, and supplier reconciliation
-- [ ] 2E — Stock movement integrity
+- [x] 2E — Stock movement integrity
 - [ ] 2F — Factory raw-stock costing integrity
 - [ ] 2G — Mix-batch costing integrity
 - [ ] 2H — Period locking and closed-period protection
@@ -103,9 +103,34 @@ Status: complete.
 - Confirmed repair planning remains isolated to Phase 2I.
 - No production data or Replit checks/credits were used.
 
+## Phase 2E — Stock movement integrity
+
+Status: complete.
+
+### Completed work
+
+- Added `stockMovementIntegrityService.ts` as the canonical transaction-owned boundary for receipts, issues, transfers, adjustments, and reversals.
+- Required deterministic source identity and idempotency before any stock write.
+- Required company ownership validation for the stock item and every participating location.
+- Added deterministic balance locking in sorted location order before quantity validation or writes.
+- Added Decimal-based positive quantity, non-negative unit-cost, and movement-value calculation.
+- Enforced movement-specific location rules, including equal-and-opposite transfer rows at one unit cost.
+- Rejected insufficient stock before append unless an explicitly authorized caller enables negative stock.
+- Made stock history append-only: corrections require new movement rows and reversals require explicit original-movement linkage.
+- Required exact append counts, idempotency recording, and audit recording inside the caller-owned transaction.
+- Added focused tests for transfer symmetry, invalid locations, reversal linkage, negative-stock prevention, append ordering, and repeat-safe retries.
+
+### Verification
+
+- Confirmed validation and idempotency checks run before ownership, balance locks, and writes.
+- Confirmed stock source documents, accounting effects, movement rows, and audit records can share one transaction and rollback boundary.
+- Confirmed transfers cannot silently change quantity or cost between source and destination.
+- Confirmed existing production routes were not switched without complete adapters for their source-document and accounting effects.
+- No production data or Replit checks/credits were used.
+
 ## Next phase
 
-- Phase 2E — Stock movement integrity
+- Phase 2F — Factory raw-stock costing integrity
 
 ## Safety constraints
 
