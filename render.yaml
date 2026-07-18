@@ -4,6 +4,9 @@ services:
     runtime: node
     plan: starter
     buildCommand: npm ci --registry=https://registry.npmjs.org/ && npm run build
+    buildEnvVars:
+      - key: NODE_OPTIONS
+        value: "--max-old-space-size=4096"
     startCommand: npm start
     envVars:
       - key: NODE_ENV
