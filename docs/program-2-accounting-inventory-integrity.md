@@ -9,7 +9,7 @@ Status: in progress. This branch must remain unmerged until the owner approves t
 - [x] 2C — Voucher lifecycle integrity
 - [x] 2D — Cash, bank, customer, and supplier reconciliation
 - [x] 2E — Stock movement integrity
-- [ ] 2F — Factory raw-stock costing integrity
+- [x] 2F — Factory raw-stock costing integrity
 - [ ] 2G — Mix-batch costing integrity
 - [ ] 2H — Period locking and closed-period protection
 - [ ] 2I — Automated reconciliation and repair reporting
@@ -128,9 +128,33 @@ Status: complete.
 - Confirmed existing production routes were not switched without complete adapters for their source-document and accounting effects.
 - No production data or Replit checks/credits were used.
 
+## Phase 2F — Factory raw-stock costing integrity
+
+Status: complete.
+
+### Completed work
+
+- Added `rawStockCostingIntegrityService.ts` as the transaction-owned boundary for supplier raw-stock quantity and costing changes.
+- Added Decimal-only quantity, total-cost, and unit-cost calculations with strict state consistency validation.
+- Required one company/supplier/currency identity, deterministic source idempotency, ownership validation, and a locked versioned state before any mutation.
+- Added optimistic version checks so stale recalculation or charge requests cannot overwrite newer supplier costing.
+- Enforced event-specific rules: offloads must add quantity, post-offload charges/commission/freight cannot alter quantity, and empty events are rejected.
+- Added preserve-unit-cost deduction behavior that derives the cost reduction from the locked supplier rate instead of accepting a caller-supplied average.
+- Added protection against negative quantity, negative total cost, stranded cost after full depletion, currency mismatch, and unit-cost drift.
+- Required append-only cost-event history, state persistence, idempotency recording, and audit recording inside the caller-owned transaction.
+- Added focused tests for weighted offloads, stable-cost deductions, post-offload charges, depletion integrity, stale versions, idempotent retries, and currency isolation.
+
+### Verification
+
+- Confirmed idempotency is checked before ownership, locks, and writes.
+- Confirmed raw-stock quantity, total cost, and unit cost are derived from one locked supplier state and cannot be updated independently.
+- Confirmed deductions preserve the existing supplier cost/kg exactly while new offloads or cost-only charges recalculate it deterministically.
+- Confirmed no production route or historical balance was mutated without a complete adapter and transaction boundary.
+- No production data or Replit checks/credits were used.
+
 ## Next phase
 
-- Phase 2F — Factory raw-stock costing integrity
+- Phase 2G — Mix-batch costing integrity
 
 ## Safety constraints
 
