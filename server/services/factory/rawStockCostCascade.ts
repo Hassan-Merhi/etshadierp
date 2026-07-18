@@ -20,6 +20,7 @@ import { eq, and, sql } from "drizzle-orm";
 import Decimal from "decimal.js";
 import { factoryRawStock, factoryMixBatchSources, factoryMixBatches, factoryBales, factoryContainers, factorySuppliers } from "@shared/schema";
 import { getLockedSupplierRate, getAuthoritativeSupplierRemainingKg } from "./rawStockLockedRate";
+import { resolveMixSourcePricingBasis } from "./mixSourcePricingBasis";
 
 /**
  * Guard: reject any cost-update object that contains quantity fields.
@@ -304,8 +305,23 @@ export async function cascadeContainerCostChange(
       containerWeightByBatch.set(src.mixBatchId, prev.plus(new Decimal(src.weightKg || "0")));
     }
 
-    // Update source cost for ALL sources (regardless of batch status).
+    // Update source cost only for CONTAINER_DIRECT sources (containerId set, no supplierId,
+    // no sourceBatchId). Supplier-priced FIFO sources (supplierId != null) price at the
+    // supplier's locked rate at batch-creation time — cascading the individual container
+    // rate onto them would corrupt historical supplier costs. Those are corrected separately
+    // by the Historical Replay tool.
+    const supplierIdsRequiringReplay = new Set<number>();
     for (const src of allSources) {
+      const basis = resolveMixSourcePricingBasis({
+        sourceBatchId: src.sourceBatchId,
+        supplierId: src.supplierId,
+        containerId: src.containerId,
+      });
+      if (basis !== "CONTAINER_DIRECT") {
+        // Skip: supplier-priced or batch-priced — do not overwrite with container rate
+        if (src.supplierId != null) supplierIdsRequiringReplay.add(src.supplierId);
+        continue;
+      }
       const dSrcWeight = new Decimal(src.weightKg as string || "0");
       const dNewSourceTotalCost = dSrcWeight.times(dNewCostPerKgUsd);
       await tx

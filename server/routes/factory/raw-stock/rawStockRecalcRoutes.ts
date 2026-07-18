@@ -12,6 +12,12 @@ import {
   getFullAuditScan,
   computeApplyAllDryRun,
 } from "../../../services/factory/rawStockRecalc";
+import {
+  previewHistoricalCostReplay,
+  applyHistoricalCostReplay,
+  captureReplaySnapshot,
+  computeReplayFingerprint,
+} from "../../../services/factory/historicalCostReplay";
 import { logAudit } from "../../helpers/auditHelpers";
 import { getStableSupplierCost } from "../../../services/factory/rawStockStableCost";
 import { db } from "../../../db";
@@ -1245,6 +1251,139 @@ export function registerRawStockRecalcRoutes(app: Express) {
       } catch (err: any) {
         console.error("[recalc undo] error:", err);
         res.status(500).json({ message: err.message || "Failed to undo recalculation" });
+      }
+    }
+  );
+
+  // ─── Historical Cost Replay ──────────────────────────────────────────────
+
+  app.get(
+    "/api/factory/raw-stock/recalc/historical-replay",
+    requireAuth,
+    requireRole(ADMIN_ROLES),
+    async (req: any, res) => {
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      try {
+        const preview = await previewHistoricalCostReplay(companyId);
+        res.json(preview);
+      } catch (err: any) {
+        console.error("[historical-replay preview] error:", err);
+        res.status(500).json({ message: err.message || "Failed to compute historical replay preview" });
+      }
+    }
+  );
+
+  app.post(
+    "/api/factory/raw-stock/recalc/historical-replay/apply",
+    requireAuth,
+    requireRole(ADMIN_ROLES),
+    async (req: any, res) => {
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const userId = (req.session as any).userId;
+      const username = (req.session as any).username;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const {
+        dryRun,
+        confirmationToken: providedToken,
+        supplierIds = [] as number[],
+        includeCompletedBatches = false,
+      } = req.body;
+
+      try {
+        if (dryRun || !providedToken) {
+          // Issue a dry-run confirmation token
+          const preview = await previewHistoricalCostReplay(companyId);
+          const requestedIds: number[] = supplierIds;
+          const safeSupplierIds: number[] = requestedIds.length > 0
+            ? requestedIds.filter((id: number) =>
+                preview.supplierRows.some((s) => s.supplierId === id && s.safeToRepair)
+              )
+            : preview.supplierRows.filter((s) => s.safeToRepair).map((s) => s.supplierId);
+
+          const fingerprint = computeReplayFingerprint(companyId, safeSupplierIds, preview);
+          const tokenPayload = {
+            companyId,
+            supplierIds: safeSupplierIds,
+            includeCompletedBatches,
+            fingerprint,
+            userId: String(userId),
+          };
+          const confirmationToken = signRepairToken(tokenPayload);
+
+          return res.json({
+            dryRun: true,
+            summary: preview.summary,
+            safeSupplierIds,
+            suppliersToApply: preview.supplierRows.filter((s) => safeSupplierIds.includes(s.supplierId)),
+            confirmationToken,
+            expiresInMs: REPAIR_TOKEN_TTL_MS,
+          });
+        }
+
+        // Verified apply path
+        let payload: any;
+        try {
+          payload = verifyRepairToken(providedToken);
+        } catch (err: any) {
+          if (err instanceof ExpiredRepairTokenError) {
+            return res
+              .status(400)
+              .json({ message: "Confirmation token expired — re-run the preview to get a fresh token." });
+          }
+          return res.status(400).json({ message: `Invalid confirmation token: ${err.message}` });
+        }
+
+        if (payload.companyId !== companyId) {
+          return res.status(400).json({ message: "Token company mismatch" });
+        }
+
+        const safeSupplierIds: number[] = payload.supplierIds || [];
+
+        // Re-run preview with current DB state for fingerprint verification + apply
+        const preview = await previewHistoricalCostReplay(companyId);
+
+        // Capture undo snapshot before applying
+        const affectedBatchIds = preview.batchRows.map((b) => b.batchId);
+        const snapshot = await captureReplaySnapshot(companyId, safeSupplierIds, affectedBatchIds);
+
+        const result = await applyHistoricalCostReplay({
+          companyId,
+          supplierIds: safeSupplierIds,
+          includeCompletedBatches: payload.includeCompletedBatches ?? false,
+          preview,
+          expectedFingerprint: payload.fingerprint,
+        });
+
+        // Save undo log entry
+        await ensureUndoLogTable();
+        const supplierNames = preview.supplierRows
+          .filter((s) => safeSupplierIds.includes(s.supplierId))
+          .map((s) => s.supplierName)
+          .join(", ");
+
+        await pool.query(
+          `INSERT INTO factory_recalc_undo_log
+             (company_id, user_id, username, description, container_count, container_numbers, snapshot)
+           VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+          [
+            companyId,
+            userId || null,
+            username || null,
+            `Historical cost replay — ${safeSupplierIds.length} supplier(s): ${supplierNames}`,
+            0,
+            [],
+            JSON.stringify(snapshot),
+          ]
+        );
+
+        await logAudit(req, "historical_cost_replay_applied", { result, safeSupplierIds });
+
+        res.json({ success: true, ...result });
+      } catch (err: any) {
+        console.error("[historical-replay apply] error:", err);
+        res.status(500).json({ message: err.message || "Failed to apply historical replay" });
       }
     }
   );

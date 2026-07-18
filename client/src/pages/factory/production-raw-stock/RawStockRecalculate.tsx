@@ -181,6 +181,51 @@ interface SupplierRatePreviewRow {
   skipped?: string;
 }
 
+// ─── Historical Replay interfaces ────────────────────────────────────────────
+
+interface ReplaySupplierRow {
+  supplierId: number;
+  supplierName: string;
+  startingRate: number;
+  endingExpectedRate: number;
+  currentStoredRate: number;
+  replayRemainingKg: number;
+  authoritativeRemainingKg: number;
+  safeToRepair: boolean;
+  reasons: string[];
+  eventCount: number;
+  affectedContainerCount: number;
+  affectedSourceCount: number;
+  affectedBatchCount: number;
+  affectedBaleCount: number;
+}
+
+interface ReplaySummary {
+  totalReceivedContainers: number;
+  containersScanned: number;
+  canonicalContainerMismatches: number;
+  suppliersScanned: number;
+  safeSuppliers: number;
+  manualReviewSuppliers: number;
+  supplierPricedSourcesScanned: number;
+  sourceMismatches: number;
+  batchesToUpdate: number;
+  balesToUpdate: number;
+  unresolvedFx: number;
+  missingDates: number;
+  quantityTimelineMismatches: number;
+  ambiguousEventOrdering: number;
+  scanCoverageError: boolean;
+}
+
+interface HistoricalReplayResult {
+  summary: ReplaySummary;
+  supplierRows: ReplaySupplierRow[];
+  containerRows: any[];
+  sourceRows: any[];
+  batchRows: any[];
+}
+
 // ─── Component ───────────────────────────────────────────────────────────────
 
 export default function RawStockRecalculate() {
@@ -195,7 +240,7 @@ export default function RawStockRecalculate() {
   const [selectedZeroCostSources, setSelectedZeroCostSources] = useState<Set<number>>(new Set());
   const [manualRates, setManualRates] = useState<Record<number, string>>({});
   const [expandedBatchSources, setExpandedBatchSources] = useState<Set<number>>(new Set());
-  const [activeTab, setActiveTab] = useState<"recalc" | "sources" | "audit" | "history">("recalc");
+  const [activeTab, setActiveTab] = useState<"recalc" | "sources" | "audit" | "history" | "replay">("recalc");
 
   // ── Recompute dry-run / confirmation dialog ────────────────────────────────
   const [recomputePreviewRows, setRecomputePreviewRows] = useState<SupplierRatePreviewRow[] | null>(null);
@@ -205,8 +250,14 @@ export default function RawStockRecalculate() {
   const [selectedRestoreIds, setSelectedRestoreIds] = useState<Set<number>>(new Set());
 
   // ── Main preview ──────────────────────────────────────────────────────────
-  const { data: rows, isLoading, refetch } = useQuery<RecalcRow[]>({
+  const { data: rows, isLoading, isError: isPreviewError, error: previewErrorMsg, refetch } = useQuery<RecalcRow[]>({
     queryKey: ["/api/factory/raw-stock/recalc/preview"],
+    queryFn: async () => {
+      const res = await modeApiRequest("GET", "/api/factory/raw-stock/recalc/preview");
+      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).message || "Failed to load recalc preview");
+      return res.json();
+    },
+    retry: false,
   });
 
   const changedRows = useMemo(() => (rows || []).filter((r) => r.changed), [rows]);
@@ -314,6 +365,64 @@ export default function RawStockRecalculate() {
     () => (rateAuditRows || []).filter((r) => r.canRestore),
     [rateAuditRows]
   );
+
+  // ── Historical Cost Replay ────────────────────────────────────────────────
+  const {
+    data: replayPreview,
+    isLoading: replayLoading,
+    isError: isReplayError,
+    error: replayErrorMsg,
+    refetch: refetchReplay,
+  } = useQuery<HistoricalReplayResult>({
+    queryKey: ["/api/factory/raw-stock/recalc/historical-replay"],
+    queryFn: async () => {
+      const res = await modeApiRequest("GET", "/api/factory/raw-stock/recalc/historical-replay");
+      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).message || "Failed to load historical replay preview");
+      return res.json();
+    },
+    enabled: activeTab === "replay",
+    retry: false,
+  });
+
+  const replayApplyMutation = useMutation({
+    mutationFn: async (opts: { supplierIds: number[]; includeCompletedBatches: boolean }) => {
+      // Step 1: issue dry-run confirmation token
+      const dryRes = await modeApiRequest("POST", "/api/factory/raw-stock/recalc/historical-replay/apply", {
+        dryRun: true,
+        supplierIds: opts.supplierIds,
+        includeCompletedBatches: opts.includeCompletedBatches,
+      });
+      if (!dryRes.ok) throw new Error((await dryRes.json().catch(() => ({}))).message || "Dry-run failed");
+      const dryData = await dryRes.json();
+
+      // Step 2: apply with signed token
+      const applyRes = await modeApiRequest("POST", "/api/factory/raw-stock/recalc/historical-replay/apply", {
+        dryRun: false,
+        confirmationToken: dryData.confirmationToken,
+        supplierIds: opts.supplierIds,
+        includeCompletedBatches: opts.includeCompletedBatches,
+      });
+      if (!applyRes.ok) throw new Error((await applyRes.json().catch(() => ({}))).message || "Apply failed");
+      return applyRes.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/raw-stock"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/raw-stock/recalc"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/mix-batches"] });
+      toast({
+        title: "Historical replay applied",
+        description:
+          `Updated ${data.suppliersApplied} supplier(s), ` +
+          `${data.sourcesUpdated} source(s), ` +
+          `${data.batchesUpdated} batch(es), ` +
+          `${data.balesUpdated} bale(s).`,
+      });
+      refetchReplay();
+    },
+    onError: (err: any) => {
+      toast({ title: "Historical replay failed", description: err.message, variant: "destructive" });
+    },
+  });
 
   const autoApplyFxMutation = useMutation({
     mutationFn: async (containerIds: number[]) => {
@@ -794,6 +903,7 @@ export default function RawStockRecalculate() {
     { id: "sources" as const, label: "Source Cost Mismatches" },
     { id: "audit" as const, label: "Full Audit" },
     { id: "history" as const, label: "History & Rates" },
+    { id: "replay" as const, label: "Historical Replay" },
   ];
 
   return (
@@ -918,7 +1028,13 @@ export default function RawStockRecalculate() {
             </Button>
           </div>
 
-          {isLoading ? (
+          {isPreviewError ? (
+            <div className="border border-red-500/30 bg-red-500/10 rounded-md p-3 text-sm text-red-700 dark:text-red-400 space-y-2">
+              <div className="font-medium">Failed to load recalculation preview.</div>
+              <div className="text-xs">{(previewErrorMsg as any)?.message || "An unexpected error occurred. Check server logs."}</div>
+              <Button size="sm" variant="outline" onClick={() => refetch()}>Retry</Button>
+            </div>
+          ) : isLoading ? (
             <div className="text-sm text-muted-foreground py-12 text-center">Computing recalculation preview...</div>
           ) : (
             <>
@@ -946,7 +1062,7 @@ export default function RawStockRecalculate() {
                 </div>
               )}
 
-              {visibleChangedRows.length === 0 ? (
+              {visibleChangedRows.length === 0 && rows !== undefined ? (
                 <div className="text-sm text-muted-foreground py-12 text-center border rounded-md bg-card">
                   Nothing to fix — every container's cost/kg already matches its stored charges.
                   {unchangedCount > 0 && ` (${unchangedCount} container(s) checked, all correct.)`}
@@ -1636,6 +1752,183 @@ export default function RawStockRecalculate() {
             (e.g. new charges, new offloads), those will also be reverted. Review before confirming.
           </div>
           </div>
+        </div>
+      )}
+
+      {/* ── Tab: Historical Cost Replay ─────────────────────────────────── */}
+      {activeTab === "replay" && (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between gap-2 flex-wrap">
+            <div className="text-xs text-muted-foreground max-w-2xl">
+              Replays container receipts, adjustments, and mix-batch consumption events in strict chronological order
+              to compute the correct supplier moving-average rate at every point in time, then compares stored source
+              costs against those historically-correct rates.
+            </div>
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={replayLoading}
+              onClick={() => refetchReplay()}
+              className="gap-2"
+            >
+              <RefreshCw className="h-3.5 w-3.5" />
+              Refresh
+            </Button>
+          </div>
+
+          {isReplayError && (
+            <div className="border border-red-500/30 bg-red-500/10 rounded-md p-3 text-sm text-red-700 dark:text-red-400 space-y-2">
+              <div className="font-medium">Failed to load historical replay preview.</div>
+              <div className="text-xs">{(replayErrorMsg as any)?.message || "An unexpected error occurred. Check server logs."}</div>
+              <Button size="sm" variant="outline" onClick={() => refetchReplay()}>Retry</Button>
+            </div>
+          )}
+
+          {replayLoading && (
+            <div className="text-sm text-muted-foreground py-12 text-center">
+              Computing historical cost replay — this may take a moment…
+            </div>
+          )}
+
+          {replayPreview && !replayLoading && (
+            <div className="space-y-4">
+              {/* Summary cards */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                {[
+                  { label: "Containers scanned", value: replayPreview.summary.containersScanned },
+                  { label: "Suppliers scanned", value: replayPreview.summary.suppliersScanned },
+                  { label: "Safe to repair", value: replayPreview.summary.safeSuppliers, cls: "text-emerald-600" },
+                  { label: "Manual review", value: replayPreview.summary.manualReviewSuppliers, cls: "text-amber-600" },
+                  { label: "Source mismatches", value: replayPreview.summary.sourceMismatches, cls: replayPreview.summary.sourceMismatches > 0 ? "text-red-500" : undefined },
+                  { label: "Batches to update", value: replayPreview.summary.batchesToUpdate },
+                  { label: "Bales to update", value: replayPreview.summary.balesToUpdate },
+                  { label: "Unresolved FX", value: replayPreview.summary.unresolvedFx, cls: replayPreview.summary.unresolvedFx > 0 ? "text-amber-600" : undefined },
+                ].map(({ label, value, cls }) => (
+                  <div key={label} className="border rounded-md px-3 py-2 bg-card">
+                    <div className={`text-lg font-bold tabular-nums ${cls || ""}`}>{value}</div>
+                    <div className="text-xs text-muted-foreground">{label}</div>
+                  </div>
+                ))}
+              </div>
+
+              {replayPreview.summary.scanCoverageError && (
+                <div className="border border-amber-500/30 bg-amber-500/10 rounded-md p-3 text-xs text-amber-700 dark:text-amber-400">
+                  <strong>Scan coverage mismatch:</strong> Some containers could not be included in the replay.
+                  Containers scanned ({replayPreview.summary.containersScanned}) differs from universe
+                  ({replayPreview.summary.totalReceivedContainers}). Check server logs for details.
+                </div>
+              )}
+
+              {replayPreview.summary.missingDates > 0 && (
+                <div className="border border-amber-500/30 bg-amber-500/10 rounded-md p-3 text-xs text-amber-700 dark:text-amber-400">
+                  <strong>{replayPreview.summary.missingDates} event(s)</strong> have no effective date and were
+                  placed at the end of the timeline. These suppliers are marked as requiring manual review and
+                  will be skipped by the automated repair.
+                </div>
+              )}
+
+              {replayPreview.summary.quantityTimelineMismatches > 0 && (
+                <div className="border border-amber-500/30 bg-amber-500/10 rounded-md p-3 text-xs text-amber-700 dark:text-amber-400">
+                  <strong>{replayPreview.summary.quantityTimelineMismatches} supplier(s)</strong> have a quantity
+                  reconciliation mismatch — replay remaining kg differs from authoritative remaining kg. These
+                  suppliers require manual review and will be skipped.
+                </div>
+              )}
+
+              {/* Supplier rows */}
+              {replayPreview.supplierRows.length > 0 && (
+                <div className="border rounded-md overflow-hidden bg-card shadow-sm">
+                  <div className="bg-muted/50 px-3 py-1.5 text-xs font-medium text-muted-foreground flex items-center gap-2">
+                    Supplier Timelines
+                    <Badge variant="outline" className="text-[10px]">
+                      {replayPreview.supplierRows.length} supplier(s)
+                    </Badge>
+                  </div>
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="text-xs">
+                        <TableHead>Supplier</TableHead>
+                        <TableHead className="text-right">Current rate</TableHead>
+                        <TableHead className="text-right">Replay end rate</TableHead>
+                        <TableHead className="text-right">Δ</TableHead>
+                        <TableHead className="text-right">Sources</TableHead>
+                        <TableHead className="text-right">Batches</TableHead>
+                        <TableHead className="text-right">Bales</TableHead>
+                        <TableHead>Status</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {replayPreview.supplierRows.map((s) => {
+                        const delta = s.endingExpectedRate - s.currentStoredRate;
+                        return (
+                          <TableRow key={s.supplierId} className="text-xs">
+                            <TableCell className="font-medium">{s.supplierName}</TableCell>
+                            <TableCell className="text-right font-mono">${s.currentStoredRate.toFixed(6)}</TableCell>
+                            <TableCell className="text-right font-mono">${s.endingExpectedRate.toFixed(6)}</TableCell>
+                            <TableCell className={`text-right font-mono ${Math.abs(delta) > 0.000001 ? (delta > 0 ? "text-red-500" : "text-emerald-500") : "text-muted-foreground"}`}>
+                              {delta > 0 ? "+" : ""}{delta.toFixed(6)}
+                            </TableCell>
+                            <TableCell className="text-right">{s.affectedSourceCount}</TableCell>
+                            <TableCell className="text-right">{s.affectedBatchCount}</TableCell>
+                            <TableCell className="text-right">{s.affectedBaleCount}</TableCell>
+                            <TableCell>
+                              {s.safeToRepair ? (
+                                <Badge variant="outline" className="text-emerald-600 border-emerald-500/30 bg-emerald-500/10 text-[10px]">
+                                  Safe
+                                </Badge>
+                              ) : (
+                                <Badge variant="outline" className="text-amber-600 border-amber-500/30 bg-amber-500/10 text-[10px]">
+                                  {s.reasons[0] || "Manual review"}
+                                </Badge>
+                              )}
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+
+              {/* Apply button — only show when there are safe suppliers and the preview loaded */}
+              {replayPreview.summary.safeSuppliers > 0 && (
+                <div className="flex justify-end pt-2">
+                  <Button
+                    size="sm"
+                    disabled={replayApplyMutation.isPending}
+                    onClick={() =>
+                      wrapAdminAction(() => {
+                        const safeIds = replayPreview.supplierRows
+                          .filter((s) => s.safeToRepair)
+                          .map((s) => s.supplierId);
+                        replayApplyMutation.mutate({ supplierIds: safeIds, includeCompletedBatches });
+                      }, `Apply historical cost replay for ${replayPreview.summary.safeSuppliers} safe supplier(s) — this corrects source costs, batch costs, and supplier locked rates.`)
+                    }
+                    className="gap-2 bg-emerald-600 hover:bg-emerald-700 text-white"
+                  >
+                    <CheckCircle2 className="h-3.5 w-3.5" />
+                    {replayApplyMutation.isPending
+                      ? "Applying…"
+                      : `Apply All Safe Historical Repairs (${replayPreview.summary.safeSuppliers} supplier(s))`}
+                  </Button>
+                </div>
+              )}
+
+              {replayPreview.summary.safeSuppliers === 0 && replayPreview.supplierRows.length > 0 && (
+                <div className="text-sm text-muted-foreground py-8 text-center border rounded-md bg-card">
+                  No suppliers are safe to repair automatically.
+                  {replayPreview.summary.manualReviewSuppliers > 0 &&
+                    ` ${replayPreview.summary.manualReviewSuppliers} supplier(s) require manual review (missing event dates or quantity mismatches).`}
+                </div>
+              )}
+
+              {replayPreview.supplierRows.length === 0 && (
+                <div className="text-sm text-muted-foreground py-12 text-center border rounded-md bg-card">
+                  Nothing to fix — all supplier timelines are consistent with stored costs.
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
 
