@@ -16,6 +16,12 @@ export const userSecurityPermissions = pgTable("user_security_permissions", {
   companyUserIdx: index("user_security_permissions_company_user_idx").on(table.companyId, table.userId),
 }));
 
+export const userCredentialVersions = pgTable("user_credential_versions", {
+  userId: varchar("user_id").primaryKey().references(() => users.id, { onDelete: "cascade" }),
+  credentialVersion: integer("credential_version").notNull().default(0),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
 export const insertUserSecurityPermissionSchema = createInsertSchema(userSecurityPermissions)
   .omit({ id: true, createdAt: true, updatedAt: true })
   .extend({
@@ -27,3 +33,4 @@ export const insertUserSecurityPermissionSchema = createInsertSchema(userSecurit
 
 export type UserSecurityPermission = typeof userSecurityPermissions.$inferSelect;
 export type InsertUserSecurityPermission = z.infer<typeof insertUserSecurityPermissionSchema>;
+export type UserCredentialVersion = typeof userCredentialVersions.$inferSelect;
