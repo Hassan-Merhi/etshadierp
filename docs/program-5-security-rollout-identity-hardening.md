@@ -8,7 +8,7 @@ This program expands the Program 3 policy package and Program 4 production proof
 
 - [x] 5A — Enterprise security adoption inventory and rollout map
 - [x] 5B — Persistent named permissions and administration
-- [ ] 5C — Persistent credential versions and session invalidation
+- [x] 5C — Persistent credential versions and session invalidation
 - [ ] 5D — Explicit company-context enforcement and legacy fallback removal
 - [ ] 5E — Privileged-operation rollout across repair, recalculation, import, configuration, and diagnostic writes
 - [ ] 5F — Sensitive-input schema rollout across remaining mutations
@@ -93,9 +93,24 @@ Status: complete.
 - Tests were written but were not executed through Replit or GitHub Actions.
 - Runtime migration and production database verification are not claimed.
 
+## Phase 5C — Persistent credential versions and session invalidation
+
+Status: complete.
+
+- Added the persistent `user_credential_versions` model and versioned migration `0004_user_credential_versions.sql`.
+- Backfilled every existing user with credential version `0` and automatically creates a version row for new users.
+- Added a database trigger that increments the credential version whenever the stored password changes, covering self-service password changes, administrator resets, legacy-hash migrations, and any future password update path that writes through the `users` table.
+- The same trigger revokes all active sessions for the affected user when the session table exists, providing immediate invalidation after credential rotation.
+- Added a credential-version lifecycle service for persistence reads, bounded session refresh, explicit version bumps, and targeted session revocation.
+- Shared `requireLogin`, `requireAuth`, and `requirePasswordConfirmation` middleware now refresh the active persisted version through a bounded cache before invoking the pure Program 3 session policy.
+- Sessions created before this migration receive a one-time compatibility hydration; after hydration, a version mismatch produces `SESSION_CREDENTIALS_REVOKED` and destroys the stale session.
+- Added focused regression coverage for legacy-session hydration, bounded caching, stale-version rejection, complete session revocation, and current-session preservation when explicitly requested.
+- Tests were written but were not executed through Replit or GitHub Actions.
+- Runtime migration, trigger execution, session-store behavior, deployment, and production database verification are not claimed.
+
 ## Next phase
 
-Phase 5C — Persistent credential versions and session invalidation.
+Phase 5D — Explicit company-context enforcement and legacy fallback removal.
 
 ## Safety constraints
 
