@@ -109,13 +109,12 @@ export function authorizePrivilegedOperation(
 
   assertAuthorized({
     actor: request.actor,
-    companyId: request.companyId,
     domain: request.domain,
     action: request.action,
     resource: { companyId: request.companyId },
     requiredPermissions: [request.requiredPermission],
     allowedRoles: ["Admin", "Developer"],
-  } as any);
+  });
 
   const expectedToken = required(request.expectedConfirmationToken);
   if (expectedToken) {
