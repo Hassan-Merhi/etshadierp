@@ -90,6 +90,14 @@ export default function ProductionRawStock() {
       setOffloadDialogOpen(false);
       toast({ title: "Success", description: "Container offloaded successfully." });
     },
+    onError: (error: any) => {
+      if (error?._handledGlobally) return;
+      toast({
+        title: "Offload Failed",
+        description: error?.message || "Could not offload container. Please check your inputs and try again.",
+        variant: "destructive",
+      });
+    },
   });
 
   const openingBalanceMutation = useMutation({
