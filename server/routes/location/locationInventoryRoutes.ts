@@ -8,6 +8,8 @@ import { generateStockPdf } from "../../helpers/generateStockPdf";
 import { inventory, stockItems, companies, stockGroups } from "@shared/schema";
 import { eq, and, inArray } from "drizzle-orm";
 
+const MAX_INVENTORY_RATE_STOCK_ITEM_IDS = 250;
+
 export function registerLocationInventoryRoutes(app: Express) {
   app.get("/api/locations/:locationId/inventory-rates", requireAuth, checkPOSLocation, async (req, res) => {
     try {
@@ -28,12 +30,21 @@ export function registerLocationInventoryRoutes(app: Express) {
       if (!stockItemIdsParam) {
         return res.status(400).json({ message: "stockItemIds query parameter is required" });
       }
-      const stockItemIds = stockItemIdsParam
-        .split(",")
-        .map(Number)
-        .filter((n) => !isNaN(n) && n > 0);
+      const stockItemIds = Array.from(
+        new Set(
+          stockItemIdsParam
+            .split(",")
+            .map(Number)
+            .filter((n) => !isNaN(n) && n > 0)
+        )
+      );
       if (stockItemIds.length === 0) {
         return res.json([]);
+      }
+      if (stockItemIds.length > MAX_INVENTORY_RATE_STOCK_ITEM_IDS) {
+        return res.status(400).json({
+          message: `A maximum of ${MAX_INVENTORY_RATE_STOCK_ITEM_IDS} stock item IDs can be requested at once`,
+        });
       }
 
       const rows = await db
