@@ -22,8 +22,9 @@ type SecuritySession = Request["session"] & {
 
 function actorFromRequest(req: Request): AuthorizationActor | null {
   const session = req.session as SecuritySession;
-  const companyId = session.factoryCompanyId ?? session.currentCompanyId;
+  const companyId = session.currentCompanyId;
   if (!session.userId || !session.currentRole || !companyId) return null;
+  if (session.factoryCompanyId != null && session.factoryCompanyId !== companyId) return null;
   return {
     userId: session.userId,
     role: session.currentRole,
