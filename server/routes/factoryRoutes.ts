@@ -7,6 +7,7 @@ import { registerFactoryProductsRoutes } from "./factory/factoryProductsRoutes";
 import { registerFactoryContainersRoutes } from "./factory/factoryContainersRoutes";
 import { registerFactoryBalesRoutes } from "./factory/factoryBalesRoutes";
 import { registerFactoryCustomersRoutes } from "./factory/factoryCustomersRoutes";
+import { registerFactoryContainerReadAccessRoutes } from "./factory/factoryContainerReadAccessRoutes";
 import { registerFactoryDocsUsersRoutes } from "./factory/factoryDocsUsersRoutes";
 import { registerFactoryEmployeesPosRoutes } from "./factory/factoryEmployeesPosRoutes";
 import { registerFactoryTransporterRoutes } from "./factory/factoryTransporterRoutes";
@@ -131,6 +132,9 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
   registerFactoryContainersRoutes(app);
   registerFactoryBalesRoutes(app);
   registerFactoryCustomersRoutes(app);
+  // Correct factory-container document/freight GET ownership before the legacy
+  // docs module, whose helper still targets the ERP containers table.
+  registerFactoryContainerReadAccessRoutes(app);
   registerFactoryDocsUsersRoutes(app);
   registerFactoryEmployeesPosRoutes(app);
   registerFactoryTransporterRoutes(app);
