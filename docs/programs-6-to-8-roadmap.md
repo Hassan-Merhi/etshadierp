@@ -29,16 +29,15 @@ Safety rules:
   - Transferred the evidence-backed voucher-entry SQL aggregation rewrite to Program 6D because migrated-account attribution requires query-plan and reconciliation validation.
   - Added static guards for page limits, full-filter counts, deterministic ordering, parent-group field limits, legacy compatibility, and report page-independence.
   - Final audit documented in `docs/program-6b-daybook-accounts-reports-audit.md`.
-- [~] 6C — Stock and inventory APIs
-  - Return only required fields, add bounded server-side filtering, and eliminate duplicate requests.
-  - Preserve stock quantities, values, precision, and company isolation.
-  - Confirmed `/api/inventory` is already bounded to 250 rows with server-side company/location/group/search filters, independent counts, and explicit fields.
-  - Confirmed `/api/stock-items` retains a legacy full-array compatibility path plus a paginated management path with SQL filters.
-  - Found and fixed a missing backend contract: frontend callers already used `/api/stock-items/light`, but the integration branch did not register the route.
-  - Added `server/routes/stock/stockLightRoutes.ts`, returning only identity/classification fields and excluding prices, opening balances, values, rates, and timestamps.
-  - Registered the lightweight route before the full stock routes and added focused static regression coverage.
-  - Added `scripts/audit-program6c-stock-item-callers.mjs` to classify full and lightweight frontend callers, print safe migration candidates, and provide an optional strict completion gate.
-  - Audit and remaining caller migration work documented in `docs/program-6c-stock-inventory-api-audit.md`.
+- [x] 6C — Stock and inventory APIs
+  - Preserved the full stock-item compatibility and paginated management contracts for screens that require pricing, opening-balance, costing, alias, tax, and location-price fields.
+  - Completed and registered the field-limited `/api/stock-items/light` identity/classification contract with company isolation and deterministic ordering.
+  - Migrated the remaining confirmed selector-only direct caller, Bulk Rename, without changing its mutation or cache invalidation behavior.
+  - Confirmed existing selector, voucher, transfer, proforma, reporting, purchase-order, credit-note, data-tool, detail lookup, and offline-preparation callers use lightweight query keys where safe.
+  - Preserved `/api/inventory` server pagination, a 250-row maximum, independent counts, server filters, and authoritative quantity/rate/value fields.
+  - Confirmed movement summaries are year/month bounded and drills require one explicit month while retaining full-period totals and historical opening-state calculations.
+  - Added strict caller classification and completion guards in `scripts/audit-program6c-stock-item-callers.mjs` and `scripts/verify-program6c-stock-inventory-contracts.mjs`.
+  - Final audit documented in `docs/program-6c-stock-inventory-api-audit.md`.
 - [ ] 6D — Database-query optimization
   - Review query plans, add evidence-backed indexes, remove N+1 queries, parallelize independent reads, and bound searches.
   - Includes the net-profit voucher-entry SQL aggregation rewrite deferred from 6B, with migrated-account reconciliation evidence required before replacement.
@@ -68,4 +67,4 @@ Existing performance work found:
 - HTML and dynamic API responses avoid stale caching.
 - Earlier heavy-API pagination and memory-stabilization scripts exist.
 
-Programs 6A and 6B are implementation-complete. Program 6C is in progress. Programs 6D–6F, 7A–7D, and 8A–8C remain unfinished.
+Programs 6A, 6B, and 6C are implementation-complete. Programs 6D–6F, 7A–7D, and 8A–8C remain unfinished.
