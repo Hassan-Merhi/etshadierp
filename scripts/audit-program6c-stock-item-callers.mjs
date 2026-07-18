@@ -1,0 +1,155 @@
+#!/usr/bin/env node
+
+/**
+ * Program 6C static audit for stock-item API consumers.
+ *
+ * The legacy /api/stock-items array contract must remain available until each
+ * frontend caller is explicitly classified. This read-only script distinguishes
+ * lightweight selectors, paginated management lists, full-data management
+ * callers, offline/prefetch flows, and unresolved legacy callers.
+ *
+ * Run with --strict to fail when selector-only callers still use the full
+ * endpoint or when an unclassified legacy caller remains.
+ */
+
+import { readFile, readdir } from "node:fs/promises";
+import { join, relative } from "node:path";
+import process from "node:process";
+
+const ROOT = process.cwd();
+const CLIENT_ROOT = join(ROOT, "client", "src");
+const FULL_ENDPOINT = "/api/stock-items";
+const LIGHT_ENDPOINT = "/api/stock-items/light";
+const STRICT = process.argv.includes("--strict");
+
+async function walk(dir) {
+  const entries = await readdir(dir, { withFileTypes: true });
+  const files = [];
+  for (const entry of entries) {
+    const path = join(dir, entry.name);
+    if (entry.isDirectory()) files.push(...(await walk(path)));
+    else if (/\.(ts|tsx|js|jsx)$/.test(entry.name)) files.push(path);
+  }
+  return files;
+}
+
+function classifyFullCaller(source, index) {
+  const context = source.slice(Math.max(0, index - 650), index + 1400);
+  const lower = context.toLowerCase();
+
+  if (
+    /[?&](page|pagesize|limit|search|stockgroupid|gradeid|categoryid|active)=/i.test(context) ||
+    lower.includes("urlsearchparams")
+  ) {
+    return "paginated-management";
+  }
+
+  if (
+    lower.includes("sellingprice") ||
+    lower.includes("openingqty") ||
+    lower.includes("openingrate") ||
+    lower.includes("openingvalue") ||
+    lower.includes("locationprice") ||
+    lower.includes("costing") ||
+    lower.includes("bulk update") ||
+    lower.includes("stock item management")
+  ) {
+    return "full-data-management";
+  }
+
+  if (lower.includes("offline") || lower.includes("prefetch") || lower.includes("sync")) {
+    return "offline-or-prefetch";
+  }
+
+  if (
+    lower.includes("dropdown") ||
+    lower.includes("combobox") ||
+    lower.includes("selector") ||
+    lower.includes("selectitem") ||
+    lower.includes("itemoptions") ||
+    lower.includes("stockitemoptions")
+  ) {
+    return "selector-only-migration-candidate";
+  }
+
+  return "legacy-full-unclassified";
+}
+
+function findOccurrences(source, endpoint) {
+  const occurrences = [];
+  let index = source.indexOf(endpoint);
+  while (index !== -1) {
+    occurrences.push(index);
+    index = source.indexOf(endpoint, index + endpoint.length);
+  }
+  return occurrences;
+}
+
+const files = await walk(CLIENT_ROOT);
+const callers = [];
+
+for (const file of files) {
+  const source = await readFile(file, "utf8");
+  const relativePath = relative(ROOT, file).replaceAll("\\", "/");
+
+  for (const index of findOccurrences(source, LIGHT_ENDPOINT)) {
+    callers.push({
+      file: relativePath,
+      line: source.slice(0, index).split("\n").length,
+      endpoint: "light",
+      classification: "lightweight-selector",
+    });
+  }
+
+  for (const index of findOccurrences(source, FULL_ENDPOINT)) {
+    if (source.startsWith(LIGHT_ENDPOINT, index)) continue;
+    callers.push({
+      file: relativePath,
+      line: source.slice(0, index).split("\n").length,
+      endpoint: "full",
+      classification: classifyFullCaller(source, index),
+    });
+  }
+}
+
+callers.sort((a, b) => a.file.localeCompare(b.file) || a.line - b.line || a.endpoint.localeCompare(b.endpoint));
+
+const counts = callers.reduce((acc, caller) => {
+  acc[caller.classification] = (acc[caller.classification] || 0) + 1;
+  return acc;
+}, {});
+
+console.log("Program 6C stock-item caller audit");
+console.log(`Call sites: ${callers.length}`);
+console.log("");
+for (const caller of callers) {
+  console.log(`${caller.classification.padEnd(35)} ${caller.file}:${caller.line}`);
+}
+console.log("");
+console.log("Classification totals:");
+for (const [classification, count] of Object.entries(counts).sort()) {
+  console.log(`  ${classification}: ${count}`);
+}
+
+const lightCallers = callers.filter((caller) => caller.classification === "lightweight-selector");
+if (lightCallers.length === 0) {
+  console.error("\nFAIL: no frontend caller uses /api/stock-items/light; review the Program 6C contract registration.");
+  process.exitCode = 1;
+}
+
+const migrationCandidates = callers.filter(
+  (caller) =>
+    caller.classification === "selector-only-migration-candidate" ||
+    caller.classification === "legacy-full-unclassified",
+);
+
+if (migrationCandidates.length > 0) {
+  console.log("\nReview required before removing the legacy full-array contract:");
+  for (const caller of migrationCandidates) {
+    console.log(`  ${caller.file}:${caller.line} (${caller.classification})`);
+  }
+  if (STRICT) {
+    console.error("\nFAIL (--strict): migrate or explicitly classify the callers listed above.");
+    process.exitCode = 1;
+  }
+}
