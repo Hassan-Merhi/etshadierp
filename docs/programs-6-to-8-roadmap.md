@@ -56,8 +56,15 @@ Safety rules:
   - Preserved active-query-only invalidation helpers and parameterized-key prefix predicates.
   - Added `scripts/verify-program6e-frontend-bundle-caching.mjs` to prevent bundle and caching regressions.
   - Final audit documented in `docs/program-6e-frontend-bundle-caching.md`.
-- [ ] 6F — Exports and resource limits
-  - Stream where supported, queue Puppeteer work, enforce memory/download/concurrency limits, and fail safely.
+- [x] 6F — Exports and resource limits
+  - Preserved the process-wide heavy-export coordinator with bounded concurrency, queue depth, and wait timeout.
+  - Preserved disk-backed Excel workbook delivery, response backpressure, disconnect cleanup, and stale temporary-file cleanup.
+  - Preserved chunked browser delivery for large PDF/ZIP response buffers while leaving attachment-required email and scheduled workflows compatible.
+  - Preserved runtime soft/hard RSS monitoring, critical-memory API rejection, heavy-endpoint concurrency limits, and controlled restart behavior.
+  - Completed the Puppeteer semaphore with configurable concurrency, bounded queue depth, queue wait timeout, fail-fast saturation errors, and idempotent release.
+  - Preserved the large-export buffer audit and strict failure mode.
+  - Added `scripts/verify-program6f-export-resource-controls.mjs` to prevent export, queue, cleanup, and memory-guard regressions.
+  - Final audit documented in `docs/program-6f-exports-resource-limits.md`.
 
 ## Program 7 — User interface consistency
 
@@ -80,4 +87,4 @@ Existing performance work found:
 - HTML and dynamic API responses avoid stale caching.
 - Earlier heavy-API pagination and memory-stabilization scripts exist.
 
-Programs 6A, 6B, 6C, and 6E are implementation-complete. Program 6D still requires real-checkout findings and database reconciliation evidence before behavior-changing query or index work can be marked complete. Program 6F and Programs 7–8 remain unfinished.
+Programs 6A, 6B, 6C, 6E, and 6F are implementation-complete. Program 6D still requires real-checkout findings and database reconciliation evidence before behavior-changing query or index work can be marked complete. Programs 7–8 remain unfinished.
