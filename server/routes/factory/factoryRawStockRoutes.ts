@@ -1,6 +1,7 @@
 import type { Express } from "express";
 import { requireExplicitCompanyContext } from "../../services/security/companyContextEnforcementAdapter";
 import { requireLegacyPrivilegedWrite } from "../../services/security/legacyPrivilegedWriteGuard";
+import { requireRawStockSensitiveInput } from "../../services/security/rawStockSensitiveInputGuard";
 import { registerRawStockCrudRoutes } from "./raw-stock/rawStockCrudRoutes";
 import { registerRawStockOffloadRoutes } from "./raw-stock/rawStockOffloadRoutes";
 import { registerRawStockContainerRoutes } from "./raw-stock/rawStockContainerRoutes";
@@ -18,6 +19,10 @@ export function registerFactoryRawStockRoutes(app: Express) {
       includeLegacyFactorySessionAssertion: true,
     })
   );
+
+  // Validate and freeze high-impact repair payloads before permission,
+  // confirmation, audit, or business logic can consume them.
+  app.use("/api/factory/raw-stock", requireRawStockSensitiveInput);
 
   const confirmedRepair = (action: string, sourceType: string) =>
     requireLegacyPrivilegedWrite({
