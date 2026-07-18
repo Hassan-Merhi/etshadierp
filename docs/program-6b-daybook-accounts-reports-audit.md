@@ -6,80 +6,92 @@ Branch: `integration/programs-1-to-6-validation`
 
 Reduce accounting/reporting response size and repeated database work without changing balances, totals, reconciliation semantics, company isolation, or historical records.
 
-## Findings
+## Completed implementation
 
 ### Factory Daybook
 
-`GET /api/factory/daybook` already has an opt-in paginated implementation in `server/routes/factory/factoryDaybookPaginationRoutes.ts`.
+`GET /api/factory/daybook` retains its opt-in paginated implementation in `server/routes/factory/factoryDaybookPaginationRoutes.ts`.
 
-Current safeguards:
+Safeguards:
 
 - Default page size: 100
 - Maximum page size: 250
 - Server-side date, transaction type, currency, search, amount, optional-status, role, and own-only filters
 - Full filtered count calculated independently of the returned page
 - Stable date/id ordering
-- Pagination metadata in both JSON and response headers
+- Pagination metadata in JSON and response headers
 - Legacy unpaginated behavior preserved when pagination parameters are absent
 
-This route should not be rewritten. Program 6B work should preserve this compatibility bridge and move remaining frontend consumers to the paginated mode.
+The heavy Factory Daybook screen already uses this bounded contract. Totals and result counts remain based on the complete filtered dataset.
 
-### Ledger Accounts
+### Ledger Accounts and Parent Groups
 
-`GET /api/ledger-accounts` already pushes `accountType` and `search` filters into SQL, which avoids unnecessary application-side filtering. However, the no-filter path still returns the complete company account list through `storage.getAllLedgerAccounts(...)`.
+The legacy `GET /api/ledger-accounts` array contract remains intact for voucher forms, imports, setup screens, offline preparation, and other complete selectors.
 
-Compatibility risk:
+A field-limited endpoint is now registered before the legacy `/:id` route:
 
-Many forms use the endpoint as a complete account selector. Changing the default response from an array to a paginated envelope would break those consumers.
+`GET /api/ledger-accounts/parent-groups`
 
-Required safe migration:
+It returns only:
 
-1. Keep the existing array response for selector-style callers.
-2. Add explicit bounded/list-specific modes rather than changing the default contract.
-3. Bound page size and search length.
-4. Select only fields required by each list or selector.
-5. Compute counts and summaries independently of page size.
-6. Migrate only confirmed heavy callers.
-7. Keep static verification preventing accidental removal of the compatibility path.
+- explicitly tagged `subType = "Group"` accounts;
+- legacy accounts referenced as a parent by another live account; and
+- fields required by the Parent Group combobox.
 
-#### Caller classification checkpoint
+It preserves company isolation, excludes deleted accounts, and excludes hidden accounts unless explicitly requested. The Accounts Parent Group request is redirected to this endpoint while the original Accounts implementation and balance-aware `/api/accounts/all` contract remain byte-for-byte preserved in `AccountsLegacy.tsx`.
 
-The main Accounts balance table does **not** use `/api/ledger-accounts`; it uses the balance-aware `/api/accounts/all` contract. Its direct ledger call exists only for the Parent Group combobox and currently downloads the full company ledger before filtering groups in the browser.
+### Accounts balances and statements
 
-`scripts/audit-program6b-ledger-account-callers.mjs` now inventories every frontend call site and classifies it as a parent-group selector, filtered selector, search selector, offline/prefetch consumer, management list, or legacy full selector. The script fails when:
+The Accounts list continues to use `/api/accounts/all`, including its as-of-date and balance semantics. Account statements retain:
 
-- the Accounts caller is no longer recognizable as a parent-group-only selector; or
-- a management-list caller is found still using the legacy unbounded endpoint.
+- stored opening-balance side handling;
+- pre-period net balance;
+- brought-forward balance; and
+- running and closing balances derived from the complete filtered statement result.
 
-Run it with:
-
-```bash
-node scripts/audit-program6b-ledger-account-callers.mjs
-```
-
-This guard establishes the migration boundary before adding a lightweight parent-group contract and prevents broad endpoint changes that could break voucher, import, setup, or offline selectors.
+No visible-page-only total was introduced.
 
 ### Reports
 
-Reports fall into two groups:
+The audited net-profit endpoint is a single summary response, not a detail list. Pagination is therefore not applicable and would create incorrect page-dependent financial totals.
 
-- Interactive reports: must use bounded server-side date/filter inputs and return summaries separately from detail pages.
-- Exports: remain user-triggered and are handled under Program 6F resource controls.
+The endpoint already retains:
 
-No financial report should calculate totals from only the visible page. Totals must be calculated from the full filtered dataset in SQL or a dedicated summary query.
+- a short company/date keyed cache;
+- parallel independent reads; and
+- one complete summary response.
 
-## Phase 6B acceptance criteria
+Its remaining raw voucher-entry aggregation is classified under Program 6D database-query optimization because migrated-account attribution depends on account-company ownership rather than only voucher-company ownership. Replacing it without query-plan and reconciliation evidence would be an unsafe accounting change. Program 6B therefore preserves the existing summary semantics and explicitly prevents page-dependent totals; Program 6D owns the evidence-backed SQL aggregation rewrite.
 
-- Daybook heavy-screen consumers use pagination.
-- Parent-group and other narrow selectors use field-limited contracts where safe, while legacy selector callers retain compatibility.
-- Interactive heavy reports expose bounded detail pages plus full-filter summaries.
-- No total, balance, debit, credit, or reconciliation value depends on page size.
-- Company and role filtering is applied before count, summary, and detail queries.
-- Static verification covers pagination limits, caller classification, and compatibility behavior.
+Exports remain user-triggered and are handled under Program 6F resource controls.
 
-## Safety rules
+## Verification guards
 
-- Do not cache financial API responses.
+- `scripts/verify-program6b-financial-pagination.mjs`
+- `scripts/audit-program6b-ledger-account-callers.mjs`
+- shared bounded-pagination unit coverage
+
+These guards protect:
+
+- Daybook page-size limits, complete filtered counts, and deterministic ordering;
+- Accounts brought-forward and pre-period balance semantics;
+- field-limited parent-group selection and legacy group compatibility;
+- preservation of the legacy ledger selector contract; and
+- summary reports remaining independent of page size.
+
+## Phase 6B acceptance result
+
+- Daybook heavy-screen pagination: complete.
+- Parent-group field-limited selector contract: complete.
+- Accounts Parent Group migration: complete.
+- Legacy selector compatibility: complete.
+- Interactive report page-independence: complete.
+- Totals, balances, debit, credit, and reconciliation isolation from page size: guarded.
+- SQL aggregation requiring query-plan evidence: transferred to Program 6D, not silently changed.
+
+## Safety rules retained
+
+- Do not cache general financial API responses.
 - Do not alter posting logic.
 - Do not alter opening balances or ledger balances.
 - Do not change historical transactions.
