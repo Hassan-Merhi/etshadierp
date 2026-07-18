@@ -4,6 +4,7 @@ import { userLocations } from "@shared/schema";
 import { eq, and } from "drizzle-orm";
 import { getClientDate } from "./lib/dateUtils";
 import { enforceRuntimeSession } from "./services/security/sessionEnforcementAdapter";
+import { hydrateActiveCredentialVersion } from "./services/security/credentialVersionService";
 
 function logDenied(params: {
   userId?: string | null;
@@ -52,52 +53,70 @@ function rejectInvalidSession(
   return res.status(result.status).json({ message: fallbackMessage });
 }
 
-// Light authentication middleware — only requires a valid user session.
-// Does NOT require a company to be selected. Use for personal-account actions.
-export function requireLogin(req: Request, res: Response, next: NextFunction) {
-  const result = enforceRuntimeSession(req.session as any, {
-    requireCompanyContext: false,
-  });
-  if (!result.valid) {
-    return rejectInvalidSession(req, res, result, "Unauthorized");
+async function enforceCredentialAwareSession(
+  req: Request,
+  options: { requireCompanyContext: boolean; requireRecentPasswordConfirmation?: boolean }
+) {
+  if (req.session.userId) {
+    await hydrateActiveCredentialVersion(db, req.session as any);
   }
-  next();
+  return enforceRuntimeSession(req.session as any, options);
 }
 
-// Authentication middleware for company-scoped routes. Session validation stays
-// synchronous and uses only session state, preserving the existing zero-DB-call
-// hot path while adding idle, absolute-lifetime, company, and revocation checks.
-export function requireAuth(req: Request, res: Response, next: NextFunction) {
-  const sessionResult = enforceRuntimeSession(req.session as any, {
-    requireCompanyContext: true,
-  });
-  if (!sessionResult.valid) {
-    const message = sessionResult.code === "SESSION_COMPANY_REQUIRED" ? "No company selected" : "Unauthorized";
-    return rejectInvalidSession(req, res, sessionResult, message);
+// Light authentication middleware — only requires a valid user session.
+// Does NOT require a company to be selected. Use for personal-account actions.
+export async function requireLogin(req: Request, res: Response, next: NextFunction) {
+  try {
+    const result = await enforceCredentialAwareSession(req, {
+      requireCompanyContext: false,
+    });
+    if (!result.valid) {
+      return rejectInvalidSession(req, res, result, "Unauthorized");
+    }
+    next();
+  } catch (error) {
+    next(error);
   }
+}
 
-  const role = req.session.currentRole;
-  if (!role) {
-    return res.status(401).json({ message: "Unauthorized" });
+// Authentication middleware for company-scoped routes. Credential-version state
+// is refreshed at a bounded interval; the pure session policy remains synchronous
+// and rejects a session immediately when its stored version no longer matches.
+export async function requireAuth(req: Request, res: Response, next: NextFunction) {
+  try {
+    const sessionResult = await enforceCredentialAwareSession(req, {
+      requireCompanyContext: true,
+    });
+    if (!sessionResult.valid) {
+      const message = sessionResult.code === "SESSION_COMPANY_REQUIRED" ? "No company selected" : "Unauthorized";
+      return rejectInvalidSession(req, res, sessionResult, message);
+    }
+
+    const role = req.session.currentRole;
+    if (!role) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+
+    req.user = {
+      id: req.session.userId,
+      username: req.session.username,
+      role,
+      assignedLocationId: req.session.currentLocationId ?? null,
+      posStation: req.session.currentPOSStation ?? null,
+      cashAccountId: req.session.cashAccountId ?? null,
+      canSellNegativeStock: ["Admin", "Owner", "Manager", "Developer"].includes(role)
+        ? true
+        : (req.session.canSellNegativeStock ?? false),
+      posViewOnly: (req.session as any).posViewOnly ?? false,
+      daybookEditDays: req.session.daybookEditDays ?? 0,
+      canAccessCustomers: req.session.canAccessCustomers ?? false,
+      canDeleteRecords: req.session.canDeleteRecords ?? false,
+    } as any;
+
+    next();
+  } catch (error) {
+    next(error);
   }
-
-  req.user = {
-    id: req.session.userId,
-    username: req.session.username,
-    role,
-    assignedLocationId: req.session.currentLocationId ?? null,
-    posStation: req.session.currentPOSStation ?? null,
-    cashAccountId: req.session.cashAccountId ?? null,
-    canSellNegativeStock: ["Admin", "Owner", "Manager", "Developer"].includes(role)
-      ? true
-      : (req.session.canSellNegativeStock ?? false),
-    posViewOnly: (req.session as any).posViewOnly ?? false,
-    daybookEditDays: req.session.daybookEditDays ?? 0,
-    canAccessCustomers: req.session.canAccessCustomers ?? false,
-    canDeleteRecords: req.session.canDeleteRecords ?? false,
-  } as any;
-
-  next();
 }
 
 export function requireRole(...roles: string[]) {
@@ -227,18 +246,22 @@ export async function checkPOSLocation(req: Request, res: Response, next: NextFu
   next();
 }
 
-export function requirePasswordConfirmation(req: Request, res: Response, next: NextFunction) {
-  const result = enforceRuntimeSession(req.session as any, {
-    requireCompanyContext: true,
-    requireRecentPasswordConfirmation: true,
-  });
-  if (!result.valid) {
-    const message = result.code === "SESSION_PASSWORD_CONFIRMATION_REQUIRED"
-      ? "Password confirmation required"
-      : "Unauthorized";
-    return rejectInvalidSession(req, res, result, message);
+export async function requirePasswordConfirmation(req: Request, res: Response, next: NextFunction) {
+  try {
+    const result = await enforceCredentialAwareSession(req, {
+      requireCompanyContext: true,
+      requireRecentPasswordConfirmation: true,
+    });
+    if (!result.valid) {
+      const message = result.code === "SESSION_PASSWORD_CONFIRMATION_REQUIRED"
+        ? "Password confirmation required"
+        : "Unauthorized";
+      return rejectInvalidSession(req, res, result, message);
+    }
+    next();
+  } catch (error) {
+    next(error);
   }
-  next();
 }
 
 export function blockViewOnlyWrites(req: Request, res: Response, next: NextFunction) {
