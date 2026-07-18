@@ -51,6 +51,20 @@ describe("privileged operation policy", () => {
     ).toThrowError(AuthorizationDeniedError);
   });
 
+  it("requires the exact privileged permission even for Admin", () => {
+    try {
+      authorizePrivilegedOperation(
+        request({
+          actor: { userId: 1, role: "Admin", companyId: 10, permissions: [] },
+        })
+      );
+      throw new Error("expected privileged operation to be denied");
+    } catch (error) {
+      expect(error).toBeInstanceOf(AuthorizationDeniedError);
+      expect((error as AuthorizationDeniedError).code).toBe("PERMISSION_REQUIRED");
+    }
+  });
+
   it("requires an explicit reason", () => {
     expect(() => authorizePrivilegedOperation(request({ reason: " " }))).toThrowError(
       PrivilegedOperationError
