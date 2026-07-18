@@ -13,6 +13,7 @@ import {
   inventoryRebuildInputSchema,
   requireValidatedUnsafeInput,
 } from "../services/security/unsafeInputEnforcementAdapter";
+import { requireStoredFileAccess } from "../services/security/storedFileAccessAdapter";
 
 export function registerAdminRoutes(app: Express) {
   app.use(
@@ -31,6 +32,9 @@ export function registerAdminRoutes(app: Express) {
       allowDryRun: true,
     })
   );
+
+  app.use("/api/files/:id/download", requireStoredFileAccess("download"));
+  app.use("/api/files/:id/preview", requireStoredFileAccess("read"));
 
   registerDataToolsRoutes(app);
   registerUserManagementRoutes(app);
