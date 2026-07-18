@@ -6,11 +6,12 @@ interface StoredQueueItem {
   url?: unknown;
 }
 
+export function isUnsafeFactoryLoadingScanRequest(method: string, url: string): boolean {
+  return method.toUpperCase() === "POST" && LOADING_SCAN_PATTERN.test(url);
+}
+
 function isUnsafeLoadingScan(item: StoredQueueItem): boolean {
-  return (
-    String(item.method ?? "").toUpperCase() === "POST" &&
-    LOADING_SCAN_PATTERN.test(String(item.url ?? ""))
-  );
+  return isUnsafeFactoryLoadingScanRequest(String(item.method ?? ""), String(item.url ?? ""));
 }
 
 /**
