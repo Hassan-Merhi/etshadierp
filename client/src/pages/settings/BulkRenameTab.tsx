@@ -152,7 +152,7 @@ export function BulkRenameTab() {
     }
     setIsSearching(true);
     try {
-      const res = await fetch("/api/stock-items", { credentials: "include" });
+      const res = await fetch("/api/stock-items/light", { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch stock items");
       const allItems = await res.json();
       const regex = buildRegex();
