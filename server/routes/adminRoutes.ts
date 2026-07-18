@@ -7,10 +7,18 @@ import { registerAdminPoFixRoutes } from "./admin/adminPoFixRoutes";
 import { registerAdminRepairRoutes } from "./admin/adminRepairRoutes";
 import { registerDeletedItemsRoutes } from "./admin/deletedItemsRoutes";
 import { requirePrivilegedOperation } from "../services/security/privilegedOperationEnforcementAdapter";
+import {
+  inventoryRebuildInputSchema,
+  requireValidatedUnsafeInput,
+} from "../services/security/unsafeInputEnforcementAdapter";
 
 export function registerAdminRoutes(app: Express) {
   app.use(
     "/api/admin/rebuild-inventory",
+    requireValidatedUnsafeInput({
+      operation: "inventory.rebuild",
+      schema: inventoryRebuildInputSchema,
+    }),
     requirePrivilegedOperation({
       domain: "inventory",
       action: "inventory.rebuild",
