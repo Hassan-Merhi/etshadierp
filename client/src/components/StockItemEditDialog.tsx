@@ -87,6 +87,7 @@ export function StockItemEditDialog({ open, onOpenChange, stockItemId }: StockIt
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/stock-items"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/stock-items/light"] });
       queryClient.invalidateQueries({ queryKey: ["/api/stock-items", stockItemId] });
       queryClient.invalidateQueries({ queryKey: ["/api/pos/stock-items"] });
       toast({
@@ -112,6 +113,7 @@ export function StockItemEditDialog({ open, onOpenChange, stockItemId }: StockIt
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/stock-items"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/stock-items/light"] });
       toast({
         title: "Stock Item Deleted",
         description: "The stock item has been deleted successfully.",

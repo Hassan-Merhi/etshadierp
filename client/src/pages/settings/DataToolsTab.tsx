@@ -215,10 +215,14 @@ export function DataToolsTab() {
     enabled: !!selectedCompany,
   });
 
-  // Fetch stock items (for silent production picker)
+  // Fetch stock items for silent production picker (developer-only, lightweight)
   const { data: allStockItems = [] } = useQuery<any[]>({
-    queryKey: ["/api/stock-items", selectedCompany?.id],
+    queryKey: ["/api/stock-items/light", selectedCompany?.id],
     enabled: !!selectedCompany && dtCurrentUser?.role === "Developer",
+    staleTime: 10 * 60 * 1000,
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
   });
 
   // Fetch location inventory for silent prod (manual + import modes)
@@ -1971,7 +1975,11 @@ function MergeStockItemsCard({ embedded }: { embedded?: boolean } = {}) {
   const [isMerging, setIsMerging] = useState(false);
 
   const { data: allStockItems = [] } = useQuery<{ id: number; name: string; code: string }[]>({
-    queryKey: ["/api/stock-items"],
+    queryKey: ["/api/stock-items/light", selectedCompany?.id],
+    staleTime: 10 * 60 * 1000,
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
   });
 
   async function handlePreview() {
@@ -2008,6 +2016,7 @@ function MergeStockItemsCard({ embedded }: { embedded?: boolean } = {}) {
       }
       toast({ title: "Merge complete", description: `"${dupItem.name}" has been merged into "${keptItem.name}".` });
       queryClient.invalidateQueries({ queryKey: ["/api/stock-items"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/stock-items/light"] });
       queryClient.invalidateQueries({ queryKey: ["/api/location-summary"] });
       queryClient.invalidateQueries({ queryKey: ["/api/stats/net-profit"] });
       setKeptItem(null);
@@ -2246,6 +2255,7 @@ function BulkMergeStockItemsCard({ embedded }: { embedded?: boolean }) {
       if (!res.ok) throw new Error(data.message || "Bulk merge failed");
       setResults(data.results ?? []);
       queryClient.invalidateQueries({ queryKey: ["/api/stock-items"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/stock-items/light"] });
       const succeeded = (data.results as BulkMergeResult[]).filter((r) => r.status === "success").length;
       toast({ title: `Bulk merge done — ${succeeded} of ${data.results.length} merged` });
     } catch (err: any) {
@@ -2472,6 +2482,7 @@ function MergeHistoryCard({ embedded }: { embedded?: boolean }) {
       setUnmergeTarget(null);
       queryClient.invalidateQueries({ queryKey: ["/api/stock-items/merge-logs"] });
       queryClient.invalidateQueries({ queryKey: ["/api/stock-items"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/stock-items/light"] });
     } catch (err: any) {
       toast({ title: "Unmerge failed", description: err.message, variant: "destructive" });
     } finally {
@@ -2493,6 +2504,7 @@ function MergeHistoryCard({ embedded }: { embedded?: boolean }) {
       setHistoricalRestoreTarget(null);
       queryClient.invalidateQueries({ queryKey: ["/api/stock-items/merge-logs/historical"] });
       queryClient.invalidateQueries({ queryKey: ["/api/stock-items"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/stock-items/light"] });
     } catch (err: any) {
       toast({ title: "Restore failed", description: err.message, variant: "destructive" });
     } finally {

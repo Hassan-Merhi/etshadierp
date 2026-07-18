@@ -118,10 +118,12 @@ export default function CombinedInventory() {
   const inventoryTotalPages = inventoryPage?.totalPages ?? 1;
 
   const { data: allStockItems = [], isLoading: loadingStockItems } = useQuery<StockItem[]>({
-    queryKey: ["/api/stock-items"],
+    queryKey: ["/api/stock-items/light", selectedCompany?.id],
     enabled: includeZero,
-    staleTime: 5 * 60 * 1000,
+    staleTime: 10 * 60 * 1000,
     refetchOnWindowFocus: false,
+    refetchOnMount: false,
+    refetchOnReconnect: false,
   });
 
   // Only block on containers list + inventory — OTW details load progressively

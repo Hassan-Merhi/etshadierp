@@ -984,7 +984,8 @@ export function registerStockGroupsItemsRoutes(app: Express) {
 
       const rows = await pool.query(
         `SELECT id, code, name, stock_group_id AS "stockGroupId",
-                grade_id AS "gradeId", category_id AS "categoryId", uom
+                grade_id AS "gradeId", category_id AS "categoryId", uom,
+                barcode, active
          FROM stock_items
          WHERE company_id = $1 AND deleted_at IS NULL
          ORDER BY name`,

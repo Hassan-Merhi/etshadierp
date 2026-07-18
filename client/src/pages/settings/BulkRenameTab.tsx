@@ -223,6 +223,7 @@ export function BulkRenameTab() {
       });
       const data = await res.json();
       queryClient.invalidateQueries({ queryKey: ["/api/stock-items"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/stock-items/light"] });
       toast({
         title: "Bulk Rename Complete",
         description: `${data.updated} item(s) renamed successfully`,

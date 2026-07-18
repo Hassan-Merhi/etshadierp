@@ -168,7 +168,9 @@ function buildPacks(): PrepPack[] {
         {
           id: "stockItems",
           label: "Stock items",
-          endpoint: "/api/stock-items",
+          // Use the lightweight endpoint — only id/code/name/uom/barcode/active needed
+          // for offline lookups.  The full 649 KB payload is not required here.
+          endpoint: "/api/stock-items/light",
           tableKey: "stockItems",
           extractItems: (data, cid) => extractArray(data).map((s: any) => toEntity(s.id, cid, s)),
         },
@@ -292,7 +294,46 @@ async function ensureServiceWorker(): Promise<void> {
 
 // ─── Main Preparation Function ────────────────────────────────────────────────
 
+// ─── Per-company single-flight guard ─────────────────────────────────────────
+// Prevents a second runOfflinePrep from starting while one is already in
+// progress for the same company.  Also tracks the last completed timestamp
+// per company so callers can decide whether a fresh run is needed.
+
+const _inProgress = new Map<number, boolean>();
+const _lastPreparedAt = new Map<number, number>();
+
+/**
+ * Returns the Unix timestamp (ms) of the last completed offline preparation
+ * for the given company, or null if never prepared.
+ */
+export function getLastOfflinePrepTime(companyId: number): number | null {
+  return _lastPreparedAt.get(companyId) ?? null;
+}
+
+/**
+ * Returns true if offline preparation is currently running for the given company.
+ */
+export function isOfflinePrepInProgress(companyId: number): boolean {
+  return _inProgress.get(companyId) === true;
+}
+
 export async function runOfflinePrep(companyId: number, onProgress: (p: PrepProgress) => void): Promise<PrepProgress> {
+  if (_inProgress.get(companyId)) {
+    // Already running for this company — return a synthetic progress indicating so.
+    const inProgressResult: PrepProgress = {
+      phase: "preparing",
+      currentLabel: "Already in progress — skipping duplicate run",
+      totalDatasets: 0,
+      completedDatasets: 0,
+      failedDatasets: 0,
+      percent: 0,
+      results: [],
+      errors: ["Skipped: preparation already running for this company"],
+    };
+    onProgress(inProgressResult);
+    return inProgressResult;
+  }
+  _inProgress.set(companyId, true);
   const packs = buildPacks();
   const allDatasets = packs.flatMap((p) => p.datasets.map((d) => ({ ...d, packId: p.id })));
   let total = allDatasets.length;
@@ -559,6 +600,8 @@ export async function runOfflinePrep(companyId: number, onProgress: (p: PrepProg
     errors,
   };
   onProgress(finalProgress);
+  _inProgress.delete(companyId);
+  _lastPreparedAt.set(companyId, Date.now());
   return finalProgress;
 }
 

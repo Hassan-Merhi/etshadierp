@@ -165,11 +165,13 @@ export default function SalesReport() {
     queryKey: ["/api/locations"],
   });
 
-  // Fetch stock items
+  // Fetch stock items (lightweight — only needs id/name/code for filter dropdown)
   const { data: stockItems = [] } = useQuery<any[]>({
-    queryKey: ["/api/stock-items"],
-    staleTime: 5 * 60 * 1000,
+    queryKey: ["/api/stock-items/light", selectedCompany?.id],
+    staleTime: 10 * 60 * 1000,
     refetchOnWindowFocus: false,
+    refetchOnMount: false,
+    refetchOnReconnect: false,
   });
 
   // Fetch stock groups

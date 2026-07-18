@@ -278,6 +278,7 @@ export function useChatActions(state: ChatActionsState) {
         stockGroupId: resolved.stockGroupId,
       });
       queryClient.invalidateQueries({ queryKey: ["/api/stock-items"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/stock-items/light"] });
       setPendingStockItem(null);
       sendMutation.mutate(
         `Stock item "${resolved.name}" (${resolved.code}) created successfully in group "${resolved.stockGroupName}".`

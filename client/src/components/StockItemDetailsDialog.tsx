@@ -143,12 +143,15 @@ export function StockItemDetailsDialog({
     enabled: open,
   });
 
-  // Fetch all stock items for the transaction editor dropdown
+  // Fetch lightweight stock list for the transaction editor dropdown.
+  // Only needs id/name/code/uom — use the light endpoint.
   const { data: allStockItems = [] } = useQuery<StockItem[]>({
-    queryKey: ["/api/stock-items"],
+    queryKey: ["/api/stock-items/light", companyId],
     enabled: open && editingTransaction !== null,
-    staleTime: 5 * 60 * 1000,
+    staleTime: 10 * 60 * 1000,
     refetchOnWindowFocus: false,
+    refetchOnMount: false,
+    refetchOnReconnect: false,
   });
 
   // Fetch transactions
@@ -184,6 +187,7 @@ export function StockItemDetailsDialog({
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [`/api/stock-items/${stockItemId}`] });
       queryClient.invalidateQueries({ queryKey: ["/api/stock-items"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/stock-items/light"] });
       setIsEditingDetails(false);
       toast({
         title: "Stock Item Updated",

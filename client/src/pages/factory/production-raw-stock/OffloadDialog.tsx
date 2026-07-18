@@ -568,6 +568,19 @@ export function OffloadDialog({
           </>
           )}
 
+          {/* Warning: commission FX rate couldn't be resolved — user can still submit;
+              server will validate and return an error if the rate is truly missing. */}
+          {commissionFromContainer &&
+            containerCommissionCcy !== "USD" &&
+            containerCommissionCcy !== currencyCode &&
+            !commissionFxRateLoading &&
+            !(parseFloat(commissionFxRate) > 0) && (
+              <div className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+                Could not fetch the {containerCommissionCcy}/USD exchange rate automatically.
+                The offload will be validated by the server — if it fails, check that an exchange rate is configured for {containerCommissionCcy}.
+              </div>
+            )}
+
           <div className="flex justify-end gap-2 pt-4">
             <Button variant="outline" onClick={() => onOpenChange(false)}>
               Cancel
@@ -577,11 +590,14 @@ export function OffloadDialog({
               disabled={
                 offloadMutation.isPending ||
                 !selectedContainerId ||
-                // Block when a non-USD commission has no resolved commission-specific FX rate
+                // Only block while the commission FX rate is actively fetching.
+                // If the fetch completed but returned no rate, the server will
+                // validate and return an actionable error — do not silently lock
+                // the button with no user-visible explanation.
                 (commissionFromContainer &&
                   containerCommissionCcy !== "USD" &&
                   containerCommissionCcy !== currencyCode &&
-                  (commissionFxRateLoading || !(parseFloat(commissionFxRate) > 0)))
+                  commissionFxRateLoading)
               }
             >
               {offloadMutation.isPending ? "Offloading..." : "Confirm Offload"}

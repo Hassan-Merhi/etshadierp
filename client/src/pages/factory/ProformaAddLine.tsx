@@ -80,9 +80,11 @@ export default function ProformaAddLine() {
   const numericProformaId = parseInt(proformaId);
 
   const { data: allItems = [], isLoading: itemsLoading } = useQuery<StockItem[]>({
-    queryKey: ["/api/stock-items"],
-    staleTime: 5 * 60 * 1000,
+    queryKey: ["/api/stock-items/light"],
+    staleTime: 10 * 60 * 1000,
     refetchOnWindowFocus: false,
+    refetchOnMount: false,
+    refetchOnReconnect: false,
   });
 
   const { data: baleProducts = [] } = useQuery<BaleProductWeight[]>({
