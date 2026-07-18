@@ -7,7 +7,7 @@ This program verifies and operationalizes the completed Program 5 security imple
 ## Phase sequence
 
 - [x] 6A — Verification inventory, rollout gates, and evidence model
-- [ ] 6B — Static integration audit and compile-safety repair
+- [x] 6B — Static integration audit and compile-safety repair
 - [ ] 6C — Focused security test execution and defect repair
 - [ ] 6D — Migration dry-run and rollback validation
 - [ ] 6E — Session, credential, permission, and company-context runtime verification
@@ -76,9 +76,20 @@ Program 6 cannot be considered rollout-ready until all of the following are sati
 - Repair and file-access flows are verified without changing production data.
 - Final readiness report identifies zero unresolved critical defects.
 
+## Phase 6B — Static integration audit and compile-safety repair
+
+Status: source-level audit complete; command-based compile verification remains pending.
+
+- Repaired raw-stock sensitive-input route selection so mounted Express middleware uses the canonical path from `originalUrl` rather than a potentially rewritten `req.path`.
+- Bound stored-file audit classification to the configured read/download action instead of inferring it from a mounted path.
+- Changed container-document authorization to use authenticated `currentCompanyId` as the authoritative company and reject mismatched legacy factory context.
+- Updated the asynchronous audit-backed raw-stock validation test harness and added a mounted-route regression.
+- Added `docs/program-6-static-integration-audit.md` with findings, evidence, and limitations.
+- No compiler, test runner, build, migration, runtime, deployment, or production command was executed; compile and test evidence is reserved for Phase 6C.
+
 ## Next phase
 
-Phase 6B — Static integration audit and compile-safety repair.
+Phase 6C — Focused security test execution and defect repair.
 
 ## Safety constraints
 
