@@ -1,4 +1,5 @@
 import { queryClient, apiRequest } from "./queryClient";
+import { purgeUnsafeFactoryLoadingScans } from "./factoryOfflineQueueSafety";
 
 export type AppMode = "erp" | "factory" | "properties";
 
@@ -43,6 +44,10 @@ const ALLOWED_SHARED_PREFIXES = [
   "/api/my-erp-pages",
 ];
 
+// Remove stale loading-scan POSTs before factory screens mount and the offline
+// banner has a chance to replay them. These mutations are not safe to defer.
+purgeUnsafeFactoryLoadingScans();
+
 function isAllowedFactoryPath(url: string): boolean {
   if (url.startsWith(FACTORY_PREFIX)) return true;
   return ALLOWED_SHARED_PREFIXES.some((p) => url.startsWith(p));
@@ -57,7 +62,14 @@ export async function factoryApiRequest(method: string, url: string, data?: unkn
     }
   }
 
-  return apiRequest(method, url, data);
+  purgeUnsafeFactoryLoadingScans();
+  try {
+    return await apiRequest(method, url, data);
+  } finally {
+    // apiRequest may have just queued a network-failed loading scan. Remove it
+    // immediately so reconnecting cannot allocate a stale or different bale.
+    purgeUnsafeFactoryLoadingScans();
+  }
 }
 
 export const factoryQueryClient = queryClient;
