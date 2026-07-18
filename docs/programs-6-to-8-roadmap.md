@@ -19,9 +19,13 @@ Safety rules:
   - Implemented request-scoped database attribution with AsyncLocalStorage and no database timing overhead outside an active profiled request.
   - Implemented periodic configurable top-N ranking events and focused regression coverage.
   - Operational procedure documented in `docs/program-6a-endpoint-ranking.md`.
-- [ ] 6B — Daybook, accounts, and reports
+- [~] 6B — Daybook, accounts, and reports
   - Paginate or summarize the heaviest accounting and reporting endpoints.
   - Preserve totals and reconciliation semantics independently of page size.
+  - Confirmed the factory Daybook already has bounded opt-in pagination with full-filter counts and stable ordering.
+  - Confirmed ledger account type/search filters are already pushed into SQL.
+  - Identified the remaining unbounded no-filter ledger-account path and documented the compatibility-safe migration approach.
+  - Audit and acceptance criteria documented in `docs/program-6b-daybook-accounts-reports-audit.md`.
 - [ ] 6C — Stock and inventory APIs
   - Return only required fields, add bounded server-side filtering, and eliminate duplicate requests.
   - Preserve stock quantities, values, precision, and company isolation.
@@ -53,4 +57,4 @@ Existing performance work found:
 - HTML and dynamic API responses avoid stale caching.
 - Earlier heavy-API pagination and memory-stabilization scripts exist.
 
-Program 6A is implementation-complete. The profiler remains opt-in and does not alter API response shapes, route behavior, accounting logic, stock logic, or database writes. Program 6B is next.
+Program 6A is implementation-complete. Program 6B is in progress with the Daybook pagination path retained and the remaining Accounts/reporting migration scoped to preserve legacy selector callers and full-filter financial totals.
