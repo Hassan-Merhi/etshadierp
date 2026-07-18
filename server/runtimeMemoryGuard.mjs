@@ -89,7 +89,7 @@ function sampleMemory(trigger = "interval") {
 }
 
 const pathLimits = [
-  { test: (path) => path === "/api/factory/net-position", max: 1, name: "factory-net-position" },
+  { test: (path) => path === "/api/factory/net-position", max: 2, name: "factory-net-position" },
   { test: (path) => path === "/api/factory/raw-stock", max: 2, name: "factory-raw-stock" },
   { test: (path) => path === "/api/factory/bale-ledger", max: 2, name: "factory-bale-ledger" },
   { test: (path) => path.includes("/export"), max: 1, name: "exports" },

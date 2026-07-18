@@ -557,10 +557,21 @@ export default function FactoryNetPositionDetails() {
     queryKey: ["/api/factory/net-position", asOf],
     queryFn: async () => {
       const res = await fetch(`/api/factory/net-position?asOf=${asOf}`, { credentials: "include" });
-      if (!res.ok) throw new Error(await res.text());
+      if (!res.ok) {
+        const text = await res.text();
+        // Attach the parsed code so the retry handler can inspect it
+        const err: any = new Error(text);
+        try { err.code = JSON.parse(text)?.code; } catch {}
+        throw err;
+      }
       return res.json();
     },
     staleTime: isToday ? 60_000 : Infinity,
+    refetchOnWindowFocus: false,
+    // Auto-retry when the concurrency guard fires (max 3 attempts, 6 s apart)
+    retry: (failureCount, err: any) =>
+      err?.code === "ENDPOINT_BUSY" ? failureCount < 3 : false,
+    retryDelay: (_, err: any) => (err?.code === "ENDPOINT_BUSY" ? 6_000 : 0),
   });
 
   if (isLoading) {
@@ -575,14 +586,35 @@ export default function FactoryNetPositionDetails() {
   }
 
   if (error) {
+    const errAny = error as any;
+    const isEndpointBusy = errAny?.code === "ENDPOINT_BUSY";
+    const friendlyMessage = isEndpointBusy
+      ? "The report is already being generated. It will retry automatically in a few seconds…"
+      : (() => {
+          try {
+            const parsed = JSON.parse((error as Error).message);
+            return parsed?.message ?? (error as Error).message;
+          } catch {
+            return (error as Error).message;
+          }
+        })();
+
     return (
       <div className="p-6">
         <Card className="border-destructive">
           <CardContent className="pt-6">
             <div className="flex items-center gap-2 text-destructive">
               <AlertCircle className="h-5 w-5" />
-              <span>Failed to load data: {(error as Error).message}</span>
+              <span>{friendlyMessage}</span>
             </div>
+            {!isEndpointBusy && (
+              <button
+                className="mt-3 text-sm underline text-muted-foreground"
+                onClick={() => refetch()}
+              >
+                Try again
+              </button>
+            )}
           </CardContent>
         </Card>
       </div>
