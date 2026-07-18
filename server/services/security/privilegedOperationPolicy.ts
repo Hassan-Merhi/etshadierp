@@ -107,14 +107,25 @@ export function authorizePrivilegedOperation(
     });
   }
 
+  const requiredPermission = required(request.requiredPermission);
+  if (!requiredPermission) {
+    throw new AuthorizationDeniedError({ effect: "deny", code: "POLICY_NOT_DEFINED" });
+  }
+
   assertAuthorized({
     actor: request.actor,
     domain: request.domain,
     action: request.action,
     resource: { companyId: request.companyId },
-    requiredPermissions: [request.requiredPermission],
     allowedRoles: ["Admin", "Developer"],
   });
+
+  // Privileged roles bypass ordinary permission checks in the general policy,
+  // but privileged operations intentionally require the exact named permission.
+  const grantedPermissions = new Set(request.actor?.permissions ?? []);
+  if (!grantedPermissions.has(requiredPermission)) {
+    throw new AuthorizationDeniedError({ effect: "deny", code: "PERMISSION_REQUIRED" });
+  }
 
   const expectedToken = required(request.expectedConfirmationToken);
   if (expectedToken) {
