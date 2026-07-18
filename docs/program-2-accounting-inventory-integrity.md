@@ -5,7 +5,7 @@ Status: in progress. This branch must remain unmerged until the owner approves t
 ## Phase sequence
 
 - [x] 2A — Posting inventory audit
-- [ ] 2B — Central posting engine
+- [x] 2B — Central posting engine
 - [ ] 2C — Voucher lifecycle integrity
 - [ ] 2D — Cash, bank, customer, and supplier reconciliation
 - [ ] 2E — Stock movement integrity
@@ -34,9 +34,31 @@ Status: complete.
 - Confirmed the phase changed documentation only and did not alter balances, stock, routes, migrations, or production data.
 - No Replit checks or credits were used.
 
+## Phase 2B — Central posting engine
+
+Status: complete.
+
+### Completed work
+
+- Added `centralPostingEngine.ts` as the strict transaction-owned posting boundary for new and migrated voucher flows.
+- Added Decimal-based debit/credit validation, non-negative finite amount checks, exactly-one accounting-target validation, balanced total enforcement, and declared voucher-total matching.
+- Required deterministic source identity and idempotency contracts before any insert can occur.
+- Required company ownership validation and audit recording as explicit dependencies of the posting boundary.
+- Preserved `insertVoucherWithEntriesTx` as a low-level compatibility primitive so route migration can proceed safely and incrementally in Phase 2C.
+- Exported the new posting contract through the accounting service index.
+- Added focused tests for balanced postings, imbalance rejection, invalid multi-target entries, total mismatch, and repeat-safe idempotent return behavior.
+
+### Verification
+
+- Performed focused static inspection of the new engine, exports, and tests on the Program 2 branch.
+- Confirmed validation runs before ownership checks and database writes.
+- Confirmed an existing idempotent posting returns without duplicate insert, ownership work, idempotency recording, or audit duplication.
+- Confirmed the phase does not migrate or change existing accounting routes; that work belongs to Phase 2C.
+- No Replit checks or credits were used.
+
 ## Next phase
 
-- Phase 2B — Central posting engine
+- Phase 2C — Voucher lifecycle integrity
 
 ## Safety constraints
 
