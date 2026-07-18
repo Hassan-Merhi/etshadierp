@@ -75,7 +75,13 @@ Safety rules:
   - Defined a safe adoption boundary: workflow-heavy screens migrate during their owning UI phases instead of through a risky mechanical rewrite.
   - Added `scripts/verify-program7a-design-system.mjs` to protect tokens, shared controls, page states, and baseline accessibility semantics.
   - Final audit documented in `docs/program-7a-design-system.md`.
-- [ ] 7B — Financial screens
+- [x] 7B — Financial screens
+  - Added shared `FinancialScreenHeader`, `FinancialSummaryCard`, `FinancialSummaryGrid`, and `FinancialTableShell` primitives.
+  - Standardized responsive page headings, descriptions, action placement, filter surfaces, KPI grids, semantic financial tones, tabular numerals, and table containment.
+  - Reused the Program 7A loading, empty, and error-state contract instead of creating financial-only duplicates.
+  - Defined incremental adoption for mature accounting screens to avoid risky broad cosmetic rewrites.
+  - Added `scripts/verify-program7b-financial-screens.mjs` to protect the shared financial UI contract.
+  - Final audit documented in `docs/program-7b-financial-screens.md`.
 - [ ] 7C — Factory and inventory screens
 - [ ] 7D — Accessibility and responsive behavior
 
@@ -93,4 +99,4 @@ Existing performance work found:
 - HTML and dynamic API responses avoid stale caching.
 - Earlier heavy-API pagination and memory-stabilization scripts exist.
 
-Programs 6A, 6B, 6C, 6E, 6F, and 7A are implementation-complete. Program 6D still requires real-checkout findings and database reconciliation evidence before behavior-changing query or index work can be marked complete. Programs 7B–7D and 8A–8C remain unfinished.
+Programs 6A, 6B, 6C, 6E, 6F, 7A, and 7B are implementation-complete. Program 6D still requires real-checkout findings and database reconciliation evidence before behavior-changing query or index work can be marked complete. Programs 7C–7D and 8A–8C remain unfinished.
