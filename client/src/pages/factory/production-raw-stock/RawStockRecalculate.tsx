@@ -269,14 +269,20 @@ export default function RawStockRecalculate() {
     fingerprint?: string;
     expiresInMs: number;
     algorithmVersion: string;
-    /** DEFECT 3 FIX: Structured scope counts from the dry-run response. */
+    /**
+     * FIX 6: Richer scope object from buildHistoricalReplayScope — contains exact
+     * row counts for the confirmation dialog. Confirmation dialog must read from this,
+     * NOT from replayPreview.summary (which is not scoped to the selected suppliers).
+     */
     scope?: {
-      suppliersSelected: number;
-      containersInScope: number;
-      sourceMismatches: number;
-      batchesInScope: number;
-      balesToUpdate: number;
-      finalizedBalesToUpdate: number;
+      suppliers: number;
+      containers: number;
+      rawStockRows: number;
+      supplierSources: number;
+      batches: number;
+      availableBales: number;
+      finalizedBales: number;
+      blockedBatches: number;
     };
   }
   const [preparedReplayToken, setPreparedReplayToken] = useState<PreparedReplayData | null>(null);
@@ -2071,22 +2077,31 @@ export default function RawStockRecalculate() {
               Confirm Historical Cost Replay
             </DialogTitle>
             <DialogDescription className="text-xs space-y-2 pt-1">
-              {replayPreview && (
+              {/* FIX 6: Read scope counts from preparedReplayToken.scope (exact write scope),
+                  NOT from replayPreview.summary (which is global, not scoped to selection). */}
+              {preparedReplayToken?.scope ? (
                 <span className="block">
                   This will update{" "}
-                  <strong>{replayPreview.summary.safeSuppliers}</strong> supplier(s),{" "}
-                  <strong>{replayPreview.summary.sourceMismatches}</strong> source row(s),{" "}
-                  <strong>{replayPreview.summary.batchesToUpdate}</strong> batch(es), and{" "}
-                  <strong>{replayPreview.summary.balesToUpdate}</strong> bale(s)
-                  {(replayPreview.summary.completedBatchesToUpdate ?? 0) > 0 && includeCompletedBatches && (
-                    <span> (including {replayPreview.summary.completedBatchesToUpdate} completed batch(es))</span>
+                  <strong>{preparedReplayToken.scope.suppliers}</strong> supplier(s),{" "}
+                  <strong>{preparedReplayToken.scope.containers}</strong> container(s),{" "}
+                  <strong>{preparedReplayToken.scope.supplierSources}</strong> source row(s),{" "}
+                  <strong>{preparedReplayToken.scope.batches}</strong> batch(es), and{" "}
+                  <strong>{preparedReplayToken.scope.availableBales}</strong> bale(s)
+                  {preparedReplayToken.scope.finalizedBales > 0 && (
+                    <span> (including {preparedReplayToken.scope.finalizedBales} finalized bale(s))</span>
                   )}
-                  {(replayPreview.summary.finalizedBalesToUpdate ?? 0) > 0 && includeFinalizedBales && (
-                    <span> (including {replayPreview.summary.finalizedBalesToUpdate} finalized bale(s))</span>
+                  {preparedReplayToken.scope.blockedBatches > 0 && (
+                    <span className="text-amber-600"> — {preparedReplayToken.scope.blockedBatches} batch(es) blocked from correction</span>
                   )}.
                   <br />This operation <strong>corrects historical cost data</strong> and cannot be trivially reversed — an undo snapshot will be saved.
                 </span>
-              )}
+              ) : replayPreview ? (
+                <span className="block">
+                  This will apply the historical cost replay for{" "}
+                  <strong>{preparedReplayToken?.safeSupplierIds?.length ?? 0}</strong> supplier(s).
+                  <br />This operation <strong>corrects historical cost data</strong> and cannot be trivially reversed — an undo snapshot will be saved.
+                </span>
+              ) : null}
             </DialogDescription>
           </DialogHeader>
 

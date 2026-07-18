@@ -169,6 +169,26 @@ export interface HistoricalReplayScope {
   blockedBatchIds: number[];
 }
 
+/**
+ * FIX 1: Exact write scope returned by buildHistoricalReplayScope.
+ * Includes separate available/finalized bale sets and full blocked-batch details.
+ */
+export interface ReplayWriteScope {
+  supplierIds: number[];
+  containerIdsToUpdate: number[];
+  rawStockIdsToUpdate: number[];
+  sourceIdsToUpdate: number[];
+  batchIdsToUpdate: number[];
+  availableBaleIdsToUpdate: number[];
+  finalizedBaleIdsToUpdate: number[];
+  blockedBatches: Array<{ batchId: number; batchCode: string; reasons: string[] }>;
+}
+
+/** Generic DB executor — accepts pool client or pool itself for read-only calls. */
+export type QueryExecutor = {
+  query: (text: string, params?: any[]) => Promise<{ rows: any[]; rowCount?: number | null }>;
+};
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Internal event types
 // ─────────────────────────────────────────────────────────────────────────────
@@ -946,7 +966,7 @@ interface BatchCorrection {
 }
 
 /** DEFECT 12 FIX: Batches excluded from corrections (cycle or missing upstream). */
-interface BlockedBatch {
+export interface BlockedBatch {
   batchId: number;
   batchCode: string;
   reasons: string[];
@@ -1021,9 +1041,12 @@ function computeBatchCorrections(
   // Also detect missing upstream batches: a BATCH-type source whose sourceBatchId is not
   // in allBatchIds means the upstream was deleted or belongs to a different company.
   const missingUpstreamBatchIds = new Set<number>();
+  // FIX 2: Track named reason codes per blocked batch for diagnostic output.
+  const blockReasonByBatchId = new Map<number, string>();
   for (const src of sourceInfos) {
     if (src.sourceBatchId != null && !allBatchIds.has(src.sourceBatchId)) {
       missingUpstreamBatchIds.add(src.batchId); // the consumer is blocked
+      if (!blockReasonByBatchId.has(src.batchId)) blockReasonByBatchId.set(src.batchId, "UPSTREAM_BATCH_MISSING");
     }
   }
 
@@ -1068,6 +1091,15 @@ function computeBatchCorrections(
       const dWeight = new Decimal(src.weightKg);
       let correctedCostPerKg: number;
 
+      // FIX 2: Zero or negative weight source blocks the entire batch — a zero-weight
+      // term produces a degenerate weighted average. Named reason: ZERO_WEIGHT_SOURCE.
+      if (dWeight.lte(0)) {
+        missingUpstreamBatchIds.add(batchId);
+        blockReasonByBatchId.set(batchId, "ZERO_WEIGHT_SOURCE");
+        batchBlockedMidLoop = true;
+        break;
+      }
+
       if (src.pricingBasis === "BATCH" && src.sourceBatchId != null) {
         // DEFECT 9 FIX: No ?? fallback — upstream MUST have a corrected cost by now
         // because the pre-loop blocked-upstream check already skipped any batch whose
@@ -1081,14 +1113,33 @@ function computeBatchCorrections(
         }
         correctedCostPerKg = correctedBatchCost.get(src.sourceBatchId)!;
       } else if (src.pricingBasis === "SUPPLIER_LOCKED_RATE" && src.supplierId != null) {
-        // Use expected historical supplier rate at this batch; skip if unavailable.
+        // FIX 2: Missing supplier rate blocks the ENTIRE batch — a partial total would
+        // produce a wrong expected cost. Add named reason code MISSING_SUPPLIER_RATE.
         const key = `${src.supplierId}:${src.batchId}`;
-        if (!expectedRateAtBatch.has(key)) continue;
+        if (!expectedRateAtBatch.has(key)) {
+          missingUpstreamBatchIds.add(batchId);
+          blockReasonByBatchId.set(batchId, "MISSING_SUPPLIER_RATE");
+          batchBlockedMidLoop = true;
+          break;
+        }
         correctedCostPerKg = expectedRateAtBatch.get(key)!;
       } else if (src.pricingBasis === "CONTAINER_DIRECT" && src.containerId != null) {
-        // Use canonical container rate; skip if FX unresolved.
-        if (!canonicalRateByContainer.has(src.containerId)) continue;
+        // FIX 2: Unresolved FX blocks the ENTIRE batch — cannot compute canonical cost.
+        // Add named reason code UNRESOLVED_FX.
+        if (!canonicalRateByContainer.has(src.containerId)) {
+          missingUpstreamBatchIds.add(batchId);
+          blockReasonByBatchId.set(batchId, "UNRESOLVED_FX");
+          batchBlockedMidLoop = true;
+          break;
+        }
         correctedCostPerKg = canonicalRateByContainer.get(src.containerId)!;
+      } else if (src.pricingBasis === "MANUAL_REVIEW") {
+        // FIX 2: MANUAL_REVIEW sources block the entire batch — the pricing basis is
+        // ambiguous and cannot be automatically resolved. Named reason: MANUAL_REVIEW_SOURCE.
+        missingUpstreamBatchIds.add(batchId);
+        blockReasonByBatchId.set(batchId, "MANUAL_REVIEW_SOURCE");
+        batchBlockedMidLoop = true;
+        break;
       } else {
         correctedCostPerKg = src.storedCostPerKg;
       }
@@ -1123,18 +1174,23 @@ function computeBatchCorrections(
     });
   }
 
-  // DEFECT 12 FIX: Collect blocked batches and return alongside filtered corrections.
+  // FIX 2: Collect blocked batches with named reason codes.
   const blockedBatches: BlockedBatch[] = [];
   for (const batchId of cycleBatchIds) {
     const batch = batchInfoMap.get(batchId);
+    // FIX 2: Renamed reason code DEPENDENCY_CYCLE → BATCH_DEPENDENCY_CYCLE.
     if (batch) {
-      blockedBatches.push({ batchId, batchCode: batch.batchCode, reasons: ["DEPENDENCY_CYCLE"], dependencyPath: [] });
+      blockedBatches.push({ batchId, batchCode: batch.batchCode, reasons: ["BATCH_DEPENDENCY_CYCLE"], dependencyPath: [] });
     }
   }
   for (const batchId of missingUpstreamBatchIds) {
+    if (cycleBatchIds.has(batchId)) continue; // already added above
     const batch = batchInfoMap.get(batchId);
     if (batch) {
-      blockedBatches.push({ batchId, batchCode: batch.batchCode, reasons: ["UPSTREAM_BATCH_MISSING"], dependencyPath: [] });
+      // FIX 2: Use per-batch reason code (MISSING_SUPPLIER_RATE, UNRESOLVED_FX,
+      // MANUAL_REVIEW_SOURCE, ZERO_WEIGHT_SOURCE) when set; fall back to UPSTREAM_BATCH_MISSING.
+      const reason = blockReasonByBatchId.get(batchId) || "UPSTREAM_BATCH_MISSING";
+      blockedBatches.push({ batchId, batchCode: batch.batchCode, reasons: [reason], dependencyPath: [] });
     }
   }
 
@@ -1586,6 +1642,15 @@ export function computeReplayFingerprint(
       finalizedBalesToUpdate: preview.summary.finalizedBalesToUpdate,
       unresolvedFx: preview.summary.unresolvedFx,
     },
+    // FIX 4: Include write-scope IDs so any scope change (new batch discovered,
+    // source added, container linked) invalidates the token.
+    scopeIds: {
+      sortedSupplierIds,
+      // These are derived from preview; the fingerprint covers the union of all safe sources.
+      safeSourceIds: preview.sourceRows.filter(s => s.safeToRepair).map(s => s.sourceId).sort((a, b) => a - b),
+      batchIds: preview.batchRows.map(b => b.batchId).sort((a, b) => a - b),
+      containerIds: preview.containerRows.filter(c => !c.fxUnresolved && sortedSupplierIds.includes(c.supplierId ?? -1)).map(c => c.containerId).sort((a, b) => a - b),
+    },
   };
   return crypto.createHash("sha256").update(JSON.stringify(payload)).digest("hex");
 }
@@ -1613,7 +1678,12 @@ export interface ReplayApplyParams {
    * Set true only when the admin has explicitly authorized updating sold/dispatched/invoiced bales.
    */
   includeFinalizedBales: boolean;
-  preview: HistoricalReplayPreviewResult;
+  /**
+   * FIX 3: preview is no longer used by applyHistoricalCostReplay — all computation is
+   * rebuilt inside the advisory lock via _buildHistoricalReplayScopeInternal. Made optional
+   * so callers can omit it without a type error; any value passed is ignored internally.
+   */
+  preview?: HistoricalReplayPreviewResult;
   /** Re-derived fingerprint from the verified token — must match preview fingerprint */
   expectedFingerprint: string;
   /** Replay algorithm/version identifier — verified at apply to reject tokens from old versions */
@@ -1673,7 +1743,10 @@ export async function captureReplaySnapshot(
     client.query(
       `SELECT frs.id,
               frs.cost_per_kg        AS "costPerKg",
-              frs.cost_per_kg_usd    AS "costPerKgUsd"
+              frs.cost_per_kg_usd    AS "costPerKgUsd",
+              frs.received_kg        AS "receivedKg",
+              frs.used_kg            AS "usedKg",
+              frs.container_id       AS "containerId"
        FROM factory_raw_stock frs
        JOIN factory_containers fc ON fc.id = frs.container_id
        WHERE frs.company_id = $1
@@ -1683,8 +1756,14 @@ export async function captureReplaySnapshot(
     ),
     client.query(
       `SELECT id,
-              cost_per_kg  AS "costPerKg",
-              total_cost   AS "totalCost"
+              cost_per_kg       AS "costPerKg",
+              total_cost        AS "totalCost",
+              supplier_id       AS "supplierId",
+              container_id      AS "containerId",
+              source_batch_id   AS "sourceBatchId",
+              weight_kg         AS "weightKg",
+              quantity_kg       AS "quantityKg",
+              mix_batch_id      AS "mixBatchId"
        FROM factory_mix_batch_sources
        WHERE id = ANY($1)`,
       [safeSourceIds]
@@ -1694,18 +1773,22 @@ export async function captureReplaySnapshot(
               cost_per_kg     AS "costPerKg",
               total_cost      AS "totalCost",
               total_weight_kg AS "totalWeightKg",
-              status          AS "status"
+              status          AS "status",
+              used_kg         AS "usedKg",
+              company_id      AS "companyId"
        FROM factory_mix_batches
        WHERE id = ANY($1)`,
       [safeBatchIds]
     ),
     client.query(
       `SELECT id,
-              cost_per_kg  AS "costPerKg",
-              total_cost   AS "totalCost",
-              weight_kg    AS "weightKg",
-              status       AS "status",
-              mix_batch_id AS "mixBatchId"
+              cost_per_kg   AS "costPerKg",
+              total_cost    AS "totalCost",
+              weight_kg     AS "weightKg",
+              status        AS "status",
+              mix_batch_id  AS "mixBatchId",
+              location_id   AS "locationId",
+              company_id    AS "companyId"
        FROM factory_bales
        WHERE id = ANY($1) AND company_id = $2`,
       [safeBaleIds, companyId]
@@ -1717,13 +1800,17 @@ export async function captureReplaySnapshot(
        WHERE id = ANY($1) AND company_id = $2`,
       [safeSupplierIds, companyId]
     ),
-    // DEFECT 6 FIX: capture container cost fields so the undo log can restore them
-    // after DEFECT 7 writes update rate_per_kg_usd / final_payable_amount_usd.
+    // FIX 10: Capture non-cost fields on containers so the extended invariant check
+    // can verify they did not change during the transaction.
     client.query(
       `SELECT id,
               rate_per_kg_usd          AS "ratePerKgUsd",
               final_payable_amount     AS "finalPayableAmount",
-              final_payable_amount_usd AS "finalPayableAmountUsd"
+              final_payable_amount_usd AS "finalPayableAmountUsd",
+              supplier_id              AS "supplierId",
+              status                   AS "status",
+              actual_received_kg       AS "actualReceivedKg",
+              total_kg                 AS "totalKg"
        FROM factory_containers
        WHERE supplier_id = ANY($1) AND company_id = $2`,
       [safeSupplierIds, companyId]
@@ -1732,8 +1819,11 @@ export async function captureReplaySnapshot(
   return { rawStockRows, mixBatchSources, mixBatches, bales, suppliers: supplierRates, containers: containerRows };
 }
 
-/** Canonical algorithm version — increment whenever the replay formula changes. */
-export const REPLAY_ALGORITHM_VERSION = "v2-signed-quantity-max0-receipt";
+/** Canonical algorithm version — increment whenever the replay formula changes.
+ *  FIX 3: Bumped to v3 because apply now rebuilds all computation inside the advisory lock.
+ *  Any token issued under v2 is invalid (scope/fingerprint were computed pre-lock).
+ */
+export const REPLAY_ALGORITHM_VERSION = "v3-locked-rebuild-fix13";
 
 /**
  * DEFECT 3 FIX: Compute the exact write scope for a Historical Replay dry-run.
@@ -1843,19 +1933,273 @@ export async function computeReplayWriteScope(
   return { safeSupplierIds, containerIds, batchIdsToApply, sourceIds, baleCount };
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// FIX 1: buildHistoricalReplayScope — exact write scope with row-level locking
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Internal extended scope with intermediate computation results. Not exported. */
+interface _ReplayScopeInternal extends ReplayWriteScope {
+  _safeSupplierRows: ReplaySupplierRow[];
+  _sourceInfos: SourceInfo[];
+  _batchCorrections: BatchCorrection[];
+  _canonicalRateByContainer: Map<number, number>;
+  _canonicalTotalUsdByContainer: Map<number, number>;
+  _rawStockIdToContainer: Map<number, number>;
+  _fullPreview: HistoricalReplayPreviewResult;
+}
+
+/**
+ * FIX 1: Build exact write scope starting from selected supplier SUPPLIER_LOCKED_RATE
+ * sources, walking downstream batches recursively. Runs SELECT FOR UPDATE on all scope
+ * rows using `executor` so the write loops see a stable, locked DB state.
+ *
+ * Safe to call in the dry-run handler (pass pool as executor — locks auto-release).
+ * Must be called inside an advisory-locked transaction in applyHistoricalCostReplay (FIX 3).
+ */
+export async function buildHistoricalReplayScope(params: {
+  companyId: number;
+  selectedSupplierIds: Set<number>;
+  includeCompletedBatches: boolean;
+  includeFinalizedBales: boolean;
+  executor: QueryExecutor;
+}): Promise<ReplayWriteScope> {
+  const { _safeSupplierRows, _sourceInfos, _batchCorrections, _canonicalRateByContainer, _canonicalTotalUsdByContainer, _rawStockIdToContainer, _fullPreview, ...publicScope } = await _buildHistoricalReplayScopeInternal(params);
+  return publicScope;
+}
+
+async function _buildHistoricalReplayScopeInternal(params: {
+  companyId: number;
+  selectedSupplierIds: Set<number>;
+  includeCompletedBatches: boolean;
+  includeFinalizedBales: boolean;
+  executor: QueryExecutor;
+}): Promise<_ReplayScopeInternal> {
+  const { companyId, selectedSupplierIds, includeCompletedBatches, includeFinalizedBales, executor } = params;
+  const supplierIdArr = [...selectedSupplierIds];
+
+  const emptySummary: ReplaySummary = {
+    totalReceivedContainers: 0, containersScanned: 0, omittedContainers: 0,
+    canonicalContainerMismatches: 0, suppliersScanned: 0, safeSuppliers: 0,
+    manualReviewSuppliers: 0, supplierPricedSourcesScanned: 0, sourceMismatches: 0,
+    batchesToUpdate: 0, completedBatchesToUpdate: 0, balesToUpdate: 0,
+    finalizedBalesToUpdate: 0, unresolvedFx: 0, missingDates: 0,
+    quantityTimelineMismatches: 0, ambiguousEventOrdering: 0, scanCoverageError: false,
+  };
+  const emptyResult: _ReplayScopeInternal = {
+    supplierIds: [], containerIdsToUpdate: [], rawStockIdsToUpdate: [],
+    sourceIdsToUpdate: [], batchIdsToUpdate: [], availableBaleIdsToUpdate: [],
+    finalizedBaleIdsToUpdate: [], blockedBatches: [],
+    _safeSupplierRows: [], _sourceInfos: [], _batchCorrections: [],
+    _canonicalRateByContainer: new Map(), _canonicalTotalUsdByContainer: new Map(),
+    _rawStockIdToContainer: new Map(),
+    _fullPreview: { supplierRows: [], sourceRows: [], batchRows: [], containerRows: [], summary: emptySummary },
+  };
+
+  if (supplierIdArr.length === 0) return emptyResult;
+
+  // 1. SELECT FOR UPDATE on all rows that will be written.
+  await executor.query(
+    `SELECT id FROM factory_suppliers WHERE id = ANY($1) AND company_id = $2 FOR UPDATE`,
+    [supplierIdArr, companyId]
+  );
+  await executor.query(
+    `SELECT id FROM factory_containers WHERE supplier_id = ANY($1) AND company_id = $2 AND deleted_at IS NULL FOR UPDATE`,
+    [supplierIdArr, companyId]
+  );
+  await executor.query(
+    `SELECT frs.id FROM factory_raw_stock frs
+     JOIN factory_containers fc ON fc.id = frs.container_id
+     WHERE frs.company_id = $1 AND fc.supplier_id = ANY($2) AND frs.deleted_at IS NULL FOR UPDATE`,
+    [companyId, supplierIdArr]
+  );
+  await executor.query(
+    `SELECT DISTINCT mb.id FROM factory_mix_batches mb
+     JOIN factory_mix_batch_sources mbs ON mbs.mix_batch_id = mb.id
+     WHERE mb.company_id = $1 AND mbs.supplier_id = ANY($2) AND mb.deleted_at IS NULL FOR UPDATE`,
+    [companyId, supplierIdArr]
+  );
+  await executor.query(
+    `SELECT mbs.id FROM factory_mix_batch_sources mbs
+     JOIN factory_mix_batches mb ON mb.id = mbs.mix_batch_id
+     WHERE mb.company_id = $1 AND mbs.supplier_id = ANY($2) FOR UPDATE`,
+    [companyId, supplierIdArr]
+  );
+
+  // 2. Run full preview (uses global pool — reads are consistent after advisory lock + FOR UPDATE).
+  const fullPreview = await previewHistoricalCostReplay(companyId);
+
+  const safeSupplierRows = fullPreview.supplierRows.filter(
+    s => s.safeToRepair && selectedSupplierIds.has(s.supplierId)
+  );
+  const safeSupplierIds = new Set(safeSupplierRows.map(s => s.supplierId));
+
+  if (safeSupplierIds.size === 0) return { ...emptyResult, _fullPreview: fullPreview };
+
+  // Build expected rates from preview source rows.
+  const allExpectedRatesAtBatch = new Map<string, number>();
+  for (const srcRow of fullPreview.sourceRows) {
+    if (srcRow.pricingBasis === "SUPPLIER_LOCKED_RATE" && srcRow.supplierId != null && safeSupplierIds.has(srcRow.supplierId)) {
+      const key = `${srcRow.supplierId}:${srcRow.batchId}`;
+      if (!allExpectedRatesAtBatch.has(key)) allExpectedRatesAtBatch.set(key, srcRow.expectedHistoricalCostPerKg);
+    }
+  }
+
+  // 3. Load batch/source data scoped to selected suppliers.
+  const { sourceInfos, batchInfoMap } = await buildBatchConsumptionEvents(companyId, safeSupplierIds);
+  const universe = await loadContainerUniverse(companyId);
+  const canonicals = await computeCanonicalCosts(companyId, universe);
+  const canonicalRateByContainer = new Map<number, number>();
+  const canonicalTotalUsdByContainer = new Map<number, number>();
+  for (const c of canonicals) {
+    if (!c.fxUnresolved) {
+      canonicalRateByContainer.set(c.universe.container.id, c.canonicalCostPerKgUsd);
+      canonicalTotalUsdByContainer.set(c.universe.container.id, c.canonicalTotalUsd);
+    }
+  }
+
+  // 4. Compute batch corrections.
+  const { corrections: batchCorrections, blockedBatches } = computeBatchCorrections(
+    batchInfoMap, sourceInfos, allExpectedRatesAtBatch, canonicalRateByContainer
+  );
+
+  // 5. Build exact scope ID sets.
+  const COMPLETED_STATUSES = new Set(["COMPLETED", "CLOSED"]);
+  const batchIdsToUpdate = new Set<number>(
+    batchCorrections
+      .filter(c => !(COMPLETED_STATUSES.has(c.status) && !includeCompletedBatches))
+      .map(c => c.batchId)
+  );
+
+  const sourceIdsToUpdate = sourceInfos
+    .filter(s => {
+      if (!batchIdsToUpdate.has(s.batchId)) return false;
+      if (s.pricingBasis === "SUPPLIER_LOCKED_RATE" && s.supplierId != null) return safeSupplierIds.has(s.supplierId);
+      if (s.pricingBasis === "CONTAINER_DIRECT" && s.containerId != null) return canonicalRateByContainer.has(s.containerId);
+      return false;
+    })
+    .map(s => s.sourceId);
+
+  const containerIdsToUpdate = canonicals
+    .filter(c => !c.fxUnresolved && c.universe.container.supplierId != null && safeSupplierIds.has(c.universe.container.supplierId))
+    .map(c => c.universe.container.id);
+
+  // 6. FIX 8: Build exact raw stock ID set.
+  const rawStockIdToContainer = new Map<number, number>();
+  const rawStockIdsToUpdate: number[] = [];
+  if (containerIdsToUpdate.length > 0) {
+    const { rows: rsRows } = await pool.query<{ id: number; container_id: number }>(
+      `SELECT id, container_id FROM factory_raw_stock WHERE company_id = $1 AND container_id = ANY($2) AND deleted_at IS NULL`,
+      [companyId, containerIdsToUpdate]
+    );
+    for (const rs of rsRows) {
+      rawStockIdToContainer.set(rs.id, rs.container_id);
+      rawStockIdsToUpdate.push(rs.id);
+    }
+    if (rawStockIdsToUpdate.length > 0) {
+      await executor.query(`SELECT id FROM factory_raw_stock WHERE id = ANY($1) FOR UPDATE`, [rawStockIdsToUpdate]);
+    }
+  }
+
+  // 7. FIX 5: Classify bales by finalization status.
+  const batchIdArr = [...batchIdsToUpdate];
+  let availableBaleIdsToUpdate: number[] = [];
+  let finalizedBaleIdsToUpdate: number[] = [];
+
+  if (batchIdArr.length > 0) {
+    const finalizedIn = FINALIZED_BALE_STATUSES.map(s => `'${s}'`).join(',');
+    const { rows: baleRows } = await pool.query<{ id: number; is_finalized: boolean }>(
+      `SELECT fb.id,
+              (fb.status IN (${finalizedIn})
+                OR fb.dispatch_batch_id IS NOT NULL
+                OR EXISTS (SELECT 1 FROM customer_order_bales cob WHERE cob.bale_id = fb.id)
+                OR EXISTS (SELECT 1 FROM factory_invoice_loading_bales filb WHERE filb.bale_id = fb.id)
+              ) AS is_finalized
+       FROM factory_bales fb
+       WHERE fb.mix_batch_id = ANY($1) AND fb.company_id = $2 AND fb.status NOT IN ('DELETED','REMOVED')`,
+      [batchIdArr, companyId]
+    );
+    for (const bale of baleRows) {
+      if (bale.is_finalized) finalizedBaleIdsToUpdate.push(bale.id);
+      else availableBaleIdsToUpdate.push(bale.id);
+    }
+    const baleIdsToLock = includeFinalizedBales
+      ? [...availableBaleIdsToUpdate, ...finalizedBaleIdsToUpdate]
+      : availableBaleIdsToUpdate;
+    if (baleIdsToLock.length > 0) {
+      await executor.query(`SELECT id FROM factory_bales WHERE id = ANY($1) AND company_id = $2 FOR UPDATE`, [baleIdsToLock, companyId]);
+    }
+    await executor.query(`SELECT id FROM factory_mix_batches WHERE id = ANY($1) FOR UPDATE`, [batchIdArr]);
+    if (sourceIdsToUpdate.length > 0) {
+      await executor.query(`SELECT id FROM factory_mix_batch_sources WHERE id = ANY($1) FOR UPDATE`, [sourceIdsToUpdate]);
+    }
+  }
+
+  return {
+    supplierIds: [...safeSupplierIds],
+    containerIdsToUpdate,
+    rawStockIdsToUpdate,
+    sourceIdsToUpdate,
+    batchIdsToUpdate: batchIdArr,
+    availableBaleIdsToUpdate,
+    finalizedBaleIdsToUpdate,
+    blockedBatches,
+    _safeSupplierRows: safeSupplierRows,
+    _sourceInfos: sourceInfos,
+    _batchCorrections: batchCorrections,
+    _canonicalRateByContainer: canonicalRateByContainer,
+    _canonicalTotalUsdByContainer: canonicalTotalUsdByContainer,
+    _rawStockIdToContainer: rawStockIdToContainer,
+    _fullPreview: fullPreview,
+  };
+}
+
+/**
+ * FIX 5: Classify bale IDs into available vs. finalized sets using the same
+ * relationship-based logic as applyHistoricalCostReplay. Higher-level wrapper
+ * over buildNotFinalizedClause for use in preview / prepare / fingerprint flows.
+ */
+export async function classifyBalesByFinalization(
+  baleIds: number[],
+  includeFinalizedBales: boolean,
+  executor: QueryExecutor
+): Promise<{ availableIds: number[]; finalizedIds: number[] }> {
+  if (baleIds.length === 0) return { availableIds: [], finalizedIds: [] };
+  const finalizedIn = FINALIZED_BALE_STATUSES.map(s => `'${s}'`).join(',');
+  const { rows } = await executor.query(
+    `SELECT fb.id,
+            (fb.status IN (${finalizedIn})
+              OR fb.dispatch_batch_id IS NOT NULL
+              OR EXISTS (SELECT 1 FROM customer_order_bales cob WHERE cob.bale_id = fb.id)
+              OR EXISTS (SELECT 1 FROM factory_invoice_loading_bales filb WHERE filb.bale_id = fb.id)
+            ) AS is_finalized
+     FROM factory_bales fb WHERE fb.id = ANY($1)`,
+    [baleIds]
+  );
+  const availableIds: number[] = [];
+  const finalizedIds: number[] = [];
+  for (const row of rows) {
+    if (row.is_finalized) {
+      finalizedIds.push(row.id);
+      if (includeFinalizedBales) availableIds.push(row.id);
+    } else {
+      availableIds.push(row.id);
+    }
+  }
+  return { availableIds, finalizedIds };
+}
+
 export async function applyHistoricalCostReplay(
   params: ReplayApplyParams & {
     /**
-     * FIX 16: SHA-256 hex hash of the signed token being consumed. Stored in
+     * SHA-256 hex hash of the signed token being consumed. Stored in
      * factory_replay_consumed_tokens inside the apply transaction so the same
      * token cannot apply twice even if the caller retries concurrently.
      */
     tokenHash?: string;
     /**
-     * FIX 2: Called inside the transaction after all cost writes succeed but before
-     * COMMIT. The route uses this to insert the undo-log row and audit-log row in the
-     * same atomic unit as the cost writes. The callback receives the snapshot so the
-     * route can store it without an extra DB round-trip.
+     * Called inside the transaction after all cost writes succeed but before COMMIT.
+     * The route uses this to insert the undo-log row and audit-log row in the same
+     * atomic unit as the cost writes.
      */
     onCommit?: (
       client: any,
@@ -1869,7 +2213,6 @@ export async function applyHistoricalCostReplay(
     supplierIds,
     includeCompletedBatches,
     includeFinalizedBales,
-    preview,
     expectedFingerprint,
     algorithmVersion,
     issuedByUserId,
@@ -1877,20 +2220,12 @@ export async function applyHistoricalCostReplay(
     onCommit,
   } = params;
 
+  // Algorithm version check is the only thing that happens before pool.connect().
   if (algorithmVersion !== REPLAY_ALGORITHM_VERSION) {
     throw new Error(
       `Token algorithm version "${algorithmVersion}" does not match current engine "${REPLAY_ALGORITHM_VERSION}". Re-run the dry-run preview to get a fresh token.`
     );
   }
-
-  // DEFECT 2 FIX: Fingerprint check moved inside the advisory lock (see below).
-
-  // Filter to requested, safe suppliers
-  const safeTimelines = preview.supplierRows.filter(
-    (s) => s.safeToRepair && (supplierIds.length === 0 || supplierIds.includes(s.supplierId))
-  );
-
-  const safeSupplierIds = new Set(safeTimelines.map((s) => s.supplierId));
 
   const result: ReplayApplyResult = {
     suppliersApplied: 0,
@@ -1899,207 +2234,61 @@ export async function applyHistoricalCostReplay(
     batchesUpdated: 0,
     balesUpdated: 0,
     supplierRatesUpdated: 0,
-    skippedSupplierIds: preview.supplierRows
-      .filter((s) => !safeSupplierIds.has(s.supplierId))
-      .map((s) => s.supplierId),
+    skippedSupplierIds: [],
   };
 
-  if (safeTimelines.length === 0) return result;
+  if (supplierIds.length === 0) return result;
 
-  // Re-compute corrections from preview data. sourceInfos is already scoped to safeSupplierIds,
-  // so batchInfoMap only contains batches with sources from the selected suppliers (FIX 3).
-  const { sourceInfos, batchInfoMap } = await buildBatchConsumptionEvents(companyId, safeSupplierIds);
-  const canonicals = await computeCanonicalCosts(
-    companyId,
-    await loadContainerUniverse(companyId)
-  );
-  const canonicalRateByContainer = new Map<number, number>();
-  // DEFECT 8 FIX: Also track canonical total USD per container for accurate container UPDATE.
-  const canonicalTotalUsdByContainer = new Map<number, number>();
-  for (const c of canonicals) {
-    if (!c.fxUnresolved) {
-      canonicalRateByContainer.set(c.universe.container.id, c.canonicalCostPerKgUsd);
-      canonicalTotalUsdByContainer.set(c.universe.container.id, c.canonicalTotalUsd);
-    }
-  }
-
-  // Rebuild expected rates from preview
-  const allExpectedRatesAtBatch = new Map<string, number>();
-  for (const srcRow of preview.sourceRows) {
-    if (srcRow.pricingBasis === "SUPPLIER_LOCKED_RATE" && srcRow.supplierId != null) {
-      const key = `${srcRow.supplierId}:${srcRow.batchId}`;
-      if (!allExpectedRatesAtBatch.has(key)) {
-        allExpectedRatesAtBatch.set(key, srcRow.expectedHistoricalCostPerKg);
-      }
-    }
-  }
-
-  // DEFECT 12 FIX (apply caller): destructure named return.
-  const { corrections: batchCorrections } = computeBatchCorrections(
-    batchInfoMap,
-    sourceInfos,
-    allExpectedRatesAtBatch,
-    canonicalRateByContainer
-  );
-
-  // FIX 3: Build exact batch scope — only batches in batchCorrections are in the supplier
-  // closure for the selected suppliers. preview.batchRows is not filtered by supplier so
-  // using it directly would include batches from unselected suppliers.
-  const COMPLETED_STATUSES = ["COMPLETED", "CLOSED"];
-  const batchCorrectionIds = new Set(batchCorrections.map((c) => c.batchId));
-  const batchIdsToApply = new Set(
-    preview.batchRows
-      .filter((b) => {
-        if (!batchCorrectionIds.has(b.batchId)) return false; // not in supplier closure
-        if (COMPLETED_STATUSES.includes(b.status) && !includeCompletedBatches) return false;
-        return true;
-      })
-      .map((b) => b.batchId)
-  );
-
-  // Collect the exact IDs of every record that will be touched (FIX 14 — exact snapshot scope).
-  // DEFECT 1 FIX (complete): A source is in-scope ONLY when:
-  //   1. It is safeToRepair, AND
-  //   2. Its batch is in batchIdsToApply (supplier-closure + completed-gate), AND
-  //   3. Its supplier/container satisfies the pricing-basis membership check.
-  // Without gate 2, CONTAINER_DIRECT sources in batches outside the selected-supplier
-  // closure (e.g., a shared batch that also uses a different supplier's material) could
-  // be written when the user only approved a subset of suppliers.
-  const sourceIdsToUpdate = preview.sourceRows
-    .filter((s) => {
-      if (!s.safeToRepair) return false;
-      // Gate 2: batch must be in the approved write scope.
-      if (!batchIdsToApply.has(s.batchId)) return false;
-      // Gate 3: pricing-basis-specific supplier/container membership.
-      if (s.pricingBasis === "SUPPLIER_LOCKED_RATE" && s.supplierId != null) {
-        return safeSupplierIds.has(s.supplierId);
-      }
-      if (s.pricingBasis === "CONTAINER_DIRECT" && s.containerId != null) {
-        return canonicalRateByContainer.has(s.containerId);
-      }
-      return false;
-    })
-    .map((s) => s.sourceId);
-
-  // Pre-compute bale IDs that will be updated so snapshot is exact.
-  // We query them before the transaction to scope the snapshot correctly.
-  const baleIdsToUpdate: number[] = [];
-  if (batchIdsToApply.size > 0) {
-    // Finalised bales are excluded unless opted in (FIX 10: use real relationship check,
-    // not hardcoded status list)
-    // DEFECT 8 FIX: Use shared helper — eliminates duplicated inline clause.
-    const notFinalizedClause = buildNotFinalizedClause(includeFinalizedBales);
-    const { rows: baleIdRows } = await pool.query<{ id: number }>(
-      `SELECT fb.id FROM factory_bales fb
-       WHERE fb.mix_batch_id = ANY($1) AND fb.company_id = $2 AND ${notFinalizedClause}`,
-      [[...batchIdsToApply], companyId]
-    );
-    for (const r of baleIdRows) baleIdsToUpdate.push(r.id);
-  }
-
-  // Acquire company-level advisory lock and apply ALL writes in one transaction (FIX 2)
+  // FIX 3: All heavy computation (timeline rebuild, scope building, row locking) happens
+  // INSIDE the advisory lock — no stale pre-lock data is ever used.
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
-    // Advisory lock: namespace 9003 = historical replay
+    // Advisory lock: namespace 9003 = historical replay.
     await client.query(`SELECT pg_advisory_xact_lock(9003, $1)`, [companyId]);
 
-    // DEFECT 2 FIX (complete): Lock-consistent fingerprint verification.
-    //
-    // After acquiring the advisory lock we SELECT FOR UPDATE ALL rows that will be
-    // written (both SUPPLIER_LOCKED_RATE and CONTAINER_DIRECT source rows + all batch
-    // rows). This blocks concurrent writers on those rows for the lifetime of this
-    // transaction, then we rebuild a fresh preview clone with the live DB stored costs
-    // and recompute the fingerprint. Comparing the fresh fingerprint against
-    // expectedFingerprint (from the signed token) detects:
-    //   - data that changed between dry-run and apply (stale token), AND
-    //   - any tampered token payload (fingerprint mismatch).
-    {
-      // All safe source rows — includes CONTAINER_DIRECT (supplierId=null)
-      const allSafeSourceIds = preview.sourceRows
-        .filter((s) => s.safeToRepair)
-        .map((s) => s.sourceId);
+    // FIX 3: Build exact write scope inside the lock.
+    // _buildHistoricalReplayScopeInternal:
+    //   1. SELECT FOR UPDATE all rows that will be written (prevents concurrent modification).
+    //   2. Calls previewHistoricalCostReplay for a fresh, lock-consistent computation.
+    //   3. Returns exact write scope IDs + intermediate results for write loops.
+    const scopeInternal = await _buildHistoricalReplayScopeInternal({
+      companyId,
+      selectedSupplierIds: new Set(supplierIds),
+      includeCompletedBatches,
+      includeFinalizedBales,
+      executor: client,
+    });
 
-      const batchIdArr = [...batchIdsToApply];
+    result.skippedSupplierIds = supplierIds.filter(id => !scopeInternal.supplierIds.includes(id));
 
-      // Sequential queries: pg client connections are single-connection serial.
-      let freshSrcRows: { id: number; cost_per_kg: string }[] = [];
-      let freshBatchRows: { id: number; cost_per_kg: string; total_cost: string }[] = [];
-
-      if (allSafeSourceIds.length > 0) {
-        const { rows } = await client.query<{ id: number; cost_per_kg: string }>(
-          `SELECT id, cost_per_kg FROM factory_mix_batch_sources WHERE id = ANY($1) FOR UPDATE`,
-          [allSafeSourceIds]
-        );
-        freshSrcRows = rows;
-      }
-      if (batchIdArr.length > 0) {
-        const { rows } = await client.query<{ id: number; cost_per_kg: string; total_cost: string }>(
-          `SELECT id, cost_per_kg, total_cost FROM factory_mix_batches WHERE id = ANY($1) FOR UPDATE`,
-          [batchIdArr]
-        );
-        freshBatchRows = rows;
-      }
-
-      // DEFECT 2 FIX (complete): Lock container rows for approved suppliers too.
-      const supplierIdArr = [...safeSupplierIds];
-      let freshContainerRows: { id: number; rate_per_kg_usd: string; final_payable_amount_usd: string }[] = [];
-      if (supplierIdArr.length > 0) {
-        const { rows } = await client.query<{ id: number; rate_per_kg_usd: string; final_payable_amount_usd: string }>(
-          `SELECT id, rate_per_kg_usd, final_payable_amount_usd
-           FROM factory_containers
-           WHERE supplier_id = ANY($1) AND company_id = $2 AND deleted_at IS NULL
-           FOR UPDATE`,
-          [supplierIdArr, companyId]
-        );
-        freshContainerRows = rows;
-      }
-
-      const freshSrcCost = new Map(freshSrcRows.map((r) => [r.id, r.cost_per_kg]));
-      const freshBatchCost = new Map(
-        freshBatchRows.map((r) => [r.id, { cost: r.cost_per_kg, total: r.total_cost }])
-      );
-      const freshContainerCost = new Map(
-        freshContainerRows.map((r) => [r.id, { rate: r.rate_per_kg_usd, totalUsd: r.final_payable_amount_usd }])
-      );
-
-      // Build fresh preview clone: replace stored costs with live DB values.
-      const freshPreview: HistoricalReplayPreviewResult = {
-        ...preview,
-        sourceRows: preview.sourceRows.map((s) => {
-          const live = freshSrcCost.get(s.sourceId);
-          return live !== undefined ? { ...s, storedCostPerKg: parseFloat(live) } : s;
-        }),
-        batchRows: preview.batchRows.map((b) => {
-          const live = freshBatchCost.get(b.batchId);
-          return live !== undefined
-            ? { ...b, storedCostPerKg: parseFloat(live.cost), storedTotalCost: parseFloat(live.total) }
-            : b;
-        }),
-        // DEFECT 2 FIX: Include live container costs in freshPreview so the
-        // recomputed fingerprint reflects any changes to containers since dry-run.
-        containerRows: preview.containerRows.map((c) => {
-          const live = freshContainerCost.get(c.containerId);
-          return live !== undefined
-            ? { ...c, storedCostPerKgUsd: parseFloat(live.rate), storedTotalUsd: parseFloat(live.totalUsd) }
-            : c;
-        }),
-      };
-
-      // Recompute fingerprint from live DB state and validate against signed token value.
-      const freshFingerprint = computeReplayFingerprint(companyId, supplierIds, freshPreview, {
-        includeCompletedBatches,
-        includeFinalizedBales,
-      });
-      if (freshFingerprint !== expectedFingerprint) {
-        throw new StaleTokenError(
-          "Stale token — DB state changed since the dry-run was issued. Re-run the preview to obtain a fresh token."
-        );
-      }
+    const safeSupplierRows = scopeInternal._safeSupplierRows;
+    if (safeSupplierRows.length === 0) {
+      await client.query("COMMIT");
+      return result;
     }
 
-    // FIX 16 / DEFECT 17: Token table is created by migration; consume the token and
-    // record algorithm version + scope fingerprint (DEFECT 11 FIX).
+    const safeSupplierIds = new Set(scopeInternal.supplierIds);
+    const batchIdsToApply = new Set(scopeInternal.batchIdsToUpdate);
+    const sourceIdsToUpdateSet = new Set(scopeInternal.sourceIdsToUpdate);
+    const baleIdsToUpdate: number[] = includeFinalizedBales
+      ? [...scopeInternal.availableBaleIdsToUpdate, ...scopeInternal.finalizedBaleIdsToUpdate]
+      : [...scopeInternal.availableBaleIdsToUpdate];
+
+    // FIX 3+4: Fingerprint verification using freshly built data from inside the lock.
+    // _fullPreview was computed by previewHistoricalCostReplay AFTER the advisory lock
+    // and FOR UPDATE row locks, so it reflects the true current DB state.
+    const freshFingerprint = computeReplayFingerprint(companyId, supplierIds, scopeInternal._fullPreview, {
+      includeCompletedBatches,
+      includeFinalizedBales,
+    });
+    if (freshFingerprint !== expectedFingerprint) {
+      throw new StaleTokenError(
+        "Stale token — DB state changed since the dry-run was issued. Re-run the preview to obtain a fresh token."
+      );
+    }
+
+    // Consume token atomically with writes (replay-protection).
     if (tokenHash) {
       const { rowCount } = await client.query(
         `INSERT INTO factory_replay_consumed_tokens
@@ -2113,49 +2302,36 @@ export async function applyHistoricalCostReplay(
       }
     }
 
-    // FIX 14: Capture snapshot of exact records inside the same transaction so the
-    // pre-image is consistent with the writes that follow (reads see the locked rows).
+    // FIX 10: Capture snapshot of exact records inside the transaction (extended fields).
     const snapshot = await captureReplaySnapshot(
       client,
       companyId,
       [...safeSupplierIds],
       [...batchIdsToApply],
-      sourceIdsToUpdate,
+      scopeInternal.sourceIdsToUpdate,
       baleIdsToUpdate
     );
 
-    // 1. Update raw-stock costs for each supplier's containers.
-    //    Only cost_per_kg_usd is updated — cost_per_kg is the native-currency landed
-    //    cost and must never be overwritten with a USD value.
-    for (const timeline of safeTimelines) {
-      const { rows: rsRows } = await client.query<{ id: number; container_id: number }>(
-        `SELECT frs.id, frs.container_id
-         FROM factory_raw_stock frs
-         JOIN factory_containers fc ON fc.id = frs.container_id
-         WHERE frs.company_id = $1 AND fc.supplier_id = $2 AND frs.deleted_at IS NULL`,
-        [companyId, timeline.supplierId]
-      );
+    const canonicalRateByContainer = scopeInternal._canonicalRateByContainer;
+    const canonicalTotalUsdByContainer = scopeInternal._canonicalTotalUsdByContainer;
 
-      for (const rs of rsRows) {
-        const canonRate = canonicalRateByContainer.get(rs.container_id);
-        if (canonRate == null) continue;
-        // DEFECT 1 FIX: company_id guard prevents cross-company write.
-        await client.query(
-          `UPDATE factory_raw_stock SET cost_per_kg_usd = $1 WHERE id = $2 AND company_id = $3`,
-          [new Decimal(canonRate).toDecimalPlaces(6).toFixed(6), rs.id, companyId]
-        );
-        result.rawStockRowsUpdated++;
-      }
+    // 1. FIX 8: Update raw-stock using exact rawStockIdToContainer map — not a per-supplier
+    // JOIN query. This uses the scope computed inside the lock, so every RS row is already
+    // covered by the FOR UPDATE acquired in _buildHistoricalReplayScopeInternal.
+    for (const [rsId, containerId] of scopeInternal._rawStockIdToContainer) {
+      const canonRate = canonicalRateByContainer.get(containerId);
+      if (canonRate == null) continue;
+      await client.query(
+        `UPDATE factory_raw_stock SET cost_per_kg_usd = $1 WHERE id = $2 AND company_id = $3`,
+        [new Decimal(canonRate).toDecimalPlaces(6).toFixed(6), rsId, companyId]
+      );
+      result.rawStockRowsUpdated++;
     }
 
-    // DEFECT 8 FIX: Update factory_containers using the canonicalTotalUsd from
-    // the landed-cost computation, NOT `kg * rate`. This is the authoritative total
-    // that accounts for all invoice adjustments and cannot be reconstructed from the
-    // rate alone (e.g. when actual_received_kg differs from total_kg or charges are split).
-    // DEFECT 1 FIX: Only update containers whose supplier is in the approved safe set.
+    // 2. Update container costs using canonicalTotalUsd (authoritative total; not kg × rate).
     for (const [containerId, canonRate] of canonicalRateByContainer) {
       const canonTotalUsd = canonicalTotalUsdByContainer.get(containerId);
-      if (canonTotalUsd == null) continue; // no canonical total computed — skip
+      if (canonTotalUsd == null) continue;
       await client.query(
         `UPDATE factory_containers
          SET rate_per_kg_usd          = $1,
@@ -2173,16 +2349,9 @@ export async function applyHistoricalCostReplay(
       );
     }
 
-    // DEFECT 1 FIX: Pre-build an approved sourceId Set from the scoped filter computed
-    // above. Write loop uses set membership — this is the authoritative gate; no inline
-    // re-evaluation of supplier/container membership inside the hot path.
-    const sourceIdsToUpdateSet = new Set(sourceIdsToUpdate);
-
-    // 2. Update mix-batch source costs
-    for (const srcRow of preview.sourceRows) {
+    // 3. Update mix-batch source costs.
+    for (const srcRow of scopeInternal._fullPreview.sourceRows) {
       if (!srcRow.safeToRepair) continue;
-      // DEFECT 1 FIX: Use pre-computed approved set (covers both SUPPLIER_LOCKED_RATE
-      // and CONTAINER_DIRECT; any source not in the set is outside the approved scope).
       if (!sourceIdsToUpdateSet.has(srcRow.sourceId)) continue;
 
       const newCostPerKg = new Decimal(srcRow.expectedHistoricalCostPerKg).toDecimalPlaces(6).toFixed(6);
@@ -2191,7 +2360,6 @@ export async function applyHistoricalCostReplay(
         .toDecimalPlaces(6)
         .toFixed(6);
 
-      // DEFECT 1 FIX: scoped via mix_batch_id subquery to guard against cross-company write.
       await client.query(
         `UPDATE factory_mix_batch_sources SET cost_per_kg = $1, total_cost = $2
          WHERE id = $3
@@ -2201,11 +2369,10 @@ export async function applyHistoricalCostReplay(
       result.sourcesUpdated++;
     }
 
-    // 3. Update batch costs and cascade to bales (FIX 10: relationship-based finalized check)
-    for (const correction of batchCorrections) {
+    // 4. Update batch costs and cascade to bales.
+    for (const correction of scopeInternal._batchCorrections) {
       if (!batchIdsToApply.has(correction.batchId)) continue;
 
-      // DEFECT 1 FIX: company_id guard.
       await client.query(
         `UPDATE factory_mix_batches SET cost_per_kg = $1, total_cost = $2, updated_at = NOW() WHERE id = $3 AND company_id = $4`,
         [
@@ -2217,7 +2384,6 @@ export async function applyHistoricalCostReplay(
       );
       result.batchesUpdated++;
 
-      // DEFECT 8 FIX + FIX 10: Use shared helper for finalized-bale detection.
       const notFinalizedClause = buildNotFinalizedClause(includeFinalizedBales);
       const { rows: baleRows } = await client.query<{ id: number; weight_kg: string }>(
         `SELECT fb.id, fb.weight_kg FROM factory_bales fb
@@ -2225,9 +2391,10 @@ export async function applyHistoricalCostReplay(
         [correction.batchId, companyId]
       );
       for (const bale of baleRows) {
+        // FIX 5: Only write bales in the signed approved baleIdsToUpdate set.
+        if (!baleIdsToUpdate.includes(bale.id)) continue;
         const dWeight = new Decimal(bale.weight_kg || "0");
         const dCost = new Decimal(correction.expectedCostPerKg);
-        // DEFECT 1 FIX: company_id guard.
         await client.query(
           `UPDATE factory_bales SET cost_per_kg = $1, total_cost = $2, updated_at = NOW() WHERE id = $3 AND company_id = $4`,
           [
@@ -2241,15 +2408,15 @@ export async function applyHistoricalCostReplay(
       }
     }
 
-    // 4. Update supplier locked rates
-    for (const timeline of safeTimelines) {
-      if (timeline.endingExpectedRate > 0) {
+    // 5. Update supplier locked rates.
+    for (const supplier of safeSupplierRows) {
+      if (supplier.endingExpectedRate > 0) {
         await client.query(
           `UPDATE factory_suppliers SET current_raw_material_cost_per_kg_usd = $1, updated_at = NOW()
            WHERE id = $2 AND company_id = $3`,
           [
-            new Decimal(timeline.endingExpectedRate).toDecimalPlaces(8).toFixed(8),
-            timeline.supplierId,
+            new Decimal(supplier.endingExpectedRate).toDecimalPlaces(8).toFixed(8),
+            supplier.supplierId,
             companyId,
           ]
         );
@@ -2258,116 +2425,85 @@ export async function applyHistoricalCostReplay(
       result.suppliersApplied++;
     }
 
-    // DEFECT 10 FIX: Pre-commit cost-only invariant check.
-    // Historical replay only writes cost fields. If any non-cost field (weight, status,
-    // mix_batch_id, location) changed during our transaction, something is seriously wrong.
-    // Throw HISTORICAL_REPLAY_INVARIANT_VIOLATION so callers know to investigate.
+    // FIX 10: Extended pre-commit invariant check — non-cost fields captured by the
+    // extended snapshot must not have changed during the transaction.
     {
       const batchIdArr = [...batchIdsToApply];
       if (batchIdArr.length > 0) {
-        const { rows: postBatches } = await client.query<{ id: number; total_weight_kg: string; status: string }>(
-          `SELECT id, total_weight_kg, status FROM factory_mix_batches WHERE id = ANY($1)`,
-          [batchIdArr]
-        );
-        const preByBatch = new Map<number, { totalWeightKg: string; status: string }>(
-          (snapshot.mixBatches as Array<{ id: number; totalWeightKg: string; status: string }>).map((b) => [b.id, { totalWeightKg: b.totalWeightKg, status: b.status }])
+        const { rows: postBatches } = await client.query<{
+          id: number; total_weight_kg: string; status: string; used_kg: string; company_id: number;
+        }>(`SELECT id, total_weight_kg, status, used_kg, company_id FROM factory_mix_batches WHERE id = ANY($1)`, [batchIdArr]);
+        const preByBatch = new Map(
+          (snapshot.mixBatches as Array<{ id: number; totalWeightKg: string; status: string; usedKg?: string; companyId?: number }>).map(b => [b.id, b])
         );
         for (const post of postBatches) {
           const pre = preByBatch.get(post.id);
           if (!pre) continue;
           if (Math.abs(parseFloat(pre.totalWeightKg) - parseFloat(post.total_weight_kg)) > 0.001) {
-            throw Object.assign(
-              new Error(
-                `HISTORICAL_REPLAY_INVARIANT_VIOLATION: batch ${post.id} weight changed from ${pre.totalWeightKg} to ${post.total_weight_kg}. Rolling back.`
-              ),
-              { code: "HISTORICAL_REPLAY_INVARIANT_VIOLATION" }
-            );
+            throw Object.assign(new Error(`HISTORICAL_REPLAY_INVARIANT_VIOLATION: batch ${post.id} weight changed from ${pre.totalWeightKg} to ${post.total_weight_kg}. Rolling back.`), { code: "HISTORICAL_REPLAY_INVARIANT_VIOLATION" });
           }
           if (pre.status !== post.status) {
-            throw Object.assign(
-              new Error(
-                `HISTORICAL_REPLAY_INVARIANT_VIOLATION: batch ${post.id} status changed from ${pre.status} to ${post.status}. Rolling back.`
-              ),
-              { code: "HISTORICAL_REPLAY_INVARIANT_VIOLATION" }
-            );
+            throw Object.assign(new Error(`HISTORICAL_REPLAY_INVARIANT_VIOLATION: batch ${post.id} status changed from ${pre.status} to ${post.status}. Rolling back.`), { code: "HISTORICAL_REPLAY_INVARIANT_VIOLATION" });
+          }
+          // FIX 10: Extended — companyId must not change.
+          if (pre.companyId != null && pre.companyId !== post.company_id) {
+            throw Object.assign(new Error(`HISTORICAL_REPLAY_INVARIANT_VIOLATION: batch ${post.id} companyId changed from ${pre.companyId} to ${post.company_id}. Rolling back.`), { code: "HISTORICAL_REPLAY_INVARIANT_VIOLATION" });
           }
         }
       }
 
-      // Also verify bale non-cost fields didn't change.
       if (baleIdsToUpdate.length > 0) {
         const { rows: postBales } = await client.query<{
-          id: number; weight_kg: string; status: string; mix_batch_id: number | null;
-        }>(
-          `SELECT id, weight_kg, status, mix_batch_id FROM factory_bales WHERE id = ANY($1)`,
-          [baleIdsToUpdate]
-        );
-        const preByBale = new Map<number, { weightKg: string; status: string; mixBatchId: number | null }>(
-          (snapshot.bales as Array<{ id: number; weightKg: string; status: string; mixBatchId: number | null }>).map(
-            (b) => [b.id, { weightKg: b.weightKg, status: b.status, mixBatchId: b.mixBatchId }]
-          )
+          id: number; weight_kg: string; status: string; mix_batch_id: number | null; location_id: number | null; company_id: number;
+        }>(`SELECT id, weight_kg, status, mix_batch_id, location_id, company_id FROM factory_bales WHERE id = ANY($1)`, [baleIdsToUpdate]);
+        const preByBale = new Map(
+          (snapshot.bales as Array<{ id: number; weightKg: string; status: string; mixBatchId: number | null; locationId?: number | null; companyId?: number }>).map(b => [b.id, b])
         );
         for (const post of postBales) {
           const pre = preByBale.get(post.id);
           if (!pre) continue;
           if (Math.abs(parseFloat(pre.weightKg) - parseFloat(post.weight_kg)) > 0.001) {
-            throw Object.assign(
-              new Error(
-                `HISTORICAL_REPLAY_INVARIANT_VIOLATION: bale ${post.id} weight changed from ${pre.weightKg} to ${post.weight_kg}. Rolling back.`
-              ),
-              { code: "HISTORICAL_REPLAY_INVARIANT_VIOLATION" }
-            );
+            throw Object.assign(new Error(`HISTORICAL_REPLAY_INVARIANT_VIOLATION: bale ${post.id} weight changed from ${pre.weightKg} to ${post.weight_kg}. Rolling back.`), { code: "HISTORICAL_REPLAY_INVARIANT_VIOLATION" });
           }
           if (pre.status !== post.status) {
-            throw Object.assign(
-              new Error(
-                `HISTORICAL_REPLAY_INVARIANT_VIOLATION: bale ${post.id} status changed from ${pre.status} to ${post.status}. Rolling back.`
-              ),
-              { code: "HISTORICAL_REPLAY_INVARIANT_VIOLATION" }
-            );
+            throw Object.assign(new Error(`HISTORICAL_REPLAY_INVARIANT_VIOLATION: bale ${post.id} status changed from ${pre.status} to ${post.status}. Rolling back.`), { code: "HISTORICAL_REPLAY_INVARIANT_VIOLATION" });
           }
           if (pre.mixBatchId !== post.mix_batch_id) {
-            throw Object.assign(
-              new Error(
-                `HISTORICAL_REPLAY_INVARIANT_VIOLATION: bale ${post.id} mix_batch_id changed from ${pre.mixBatchId} to ${post.mix_batch_id}. Rolling back.`
-              ),
-              { code: "HISTORICAL_REPLAY_INVARIANT_VIOLATION" }
-            );
+            throw Object.assign(new Error(`HISTORICAL_REPLAY_INVARIANT_VIOLATION: bale ${post.id} mix_batch_id changed from ${pre.mixBatchId} to ${post.mix_batch_id}. Rolling back.`), { code: "HISTORICAL_REPLAY_INVARIANT_VIOLATION" });
+          }
+          // FIX 10: Extended — locationId and companyId must not change.
+          if (pre.locationId != null && pre.locationId !== post.location_id) {
+            throw Object.assign(new Error(`HISTORICAL_REPLAY_INVARIANT_VIOLATION: bale ${post.id} locationId changed from ${pre.locationId} to ${post.location_id}. Rolling back.`), { code: "HISTORICAL_REPLAY_INVARIANT_VIOLATION" });
+          }
+          if (pre.companyId != null && pre.companyId !== post.company_id) {
+            throw Object.assign(new Error(`HISTORICAL_REPLAY_INVARIANT_VIOLATION: bale ${post.id} companyId changed from ${pre.companyId} to ${post.company_id}. Rolling back.`), { code: "HISTORICAL_REPLAY_INVARIANT_VIOLATION" });
           }
         }
       }
     }
 
-    // DEFECT 9+11 FIX: Source-cost sum invariant — verify each updated batch's source cost
-    // sum matches the expected total cost before committing.
-    // DEFECT 9 FIX: Skip sources that are NOT safeToRepair (no ?? storedCostPerKg fallback).
-    for (const correction of batchCorrections) {
+    // Source-cost sum invariant — verify each updated batch's source cost sum matches
+    // the expected total cost before committing.
+    for (const correction of scopeInternal._batchCorrections) {
       if (!batchIdsToApply.has(correction.batchId)) continue;
-      const sourcesForBatch = sourceInfos.filter((s) => s.batchId === correction.batchId);
+      const sourcesForBatch = scopeInternal._sourceInfos.filter(s => s.batchId === correction.batchId);
       if (sourcesForBatch.length === 0) continue;
       let dSumCost = new Decimal(0);
       for (const src of sourcesForBatch) {
-        const previewSrc = preview.sourceRows.find((ps) => ps.sourceId === src.sourceId);
-        // DEFECT 9 FIX: Skip this source from the invariant sum if it is not safeToRepair.
-        // Using a storedCostPerKg fallback would mask genuine invariant violations.
+        const previewSrc = scopeInternal._fullPreview.sourceRows.find(ps => ps.sourceId === src.sourceId);
         if (!previewSrc || !previewSrc.safeToRepair) continue;
-        const correctedCost = previewSrc.expectedHistoricalCostPerKg;
-        dSumCost = dSumCost.plus(new Decimal(src.weightKg).times(correctedCost));
+        dSumCost = dSumCost.plus(new Decimal(src.weightKg).times(previewSrc.expectedHistoricalCostPerKg));
       }
       const expectedTotal = new Decimal(correction.expectedTotalCost);
       if (dSumCost.minus(expectedTotal).abs().gt(new Decimal("0.02"))) {
         throw new Error(
           `Source-cost sum invariant violated for batch ${correction.batchId} (${correction.batchCode}): ` +
-            `source sum ${dSumCost.toFixed(6)} diverges from expected total ${expectedTotal.toFixed(6)} by > 0.02. Rolling back.`
+          `source sum ${dSumCost.toFixed(6)} diverges from expected total ${expectedTotal.toFixed(6)} by > 0.02. Rolling back.`
         );
       }
     }
 
-    // FIX 2: Run the route-injected callback (undo log + audit log) inside the same
-    // transaction so they are committed or rolled back atomically with the cost writes.
-    if (onCommit) {
-      await onCommit(client, result, snapshot);
-    }
+    if (onCommit) await onCommit(client, result, snapshot);
 
     await client.query("COMMIT");
   } catch (err) {

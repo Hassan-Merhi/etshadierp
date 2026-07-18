@@ -710,17 +710,19 @@ export function registerRawStockBalanceRoutes(app: Express) {
       if (!containerRow) return res.status(404).json({ message: "Container not found, deleted, or belongs to another company" });
       const containerSupplierId = containerRow?.supplierId ?? null;
 
-      let costPerKgUsd: number;
-      if (containerSupplierId) {
-        costPerKgUsd = await getLockedSupplierRate(db, companyId, containerSupplierId, { forUpdate: false });
-      } else {
-        costPerKgUsd = parseFloat(rs.costPerKgUsd as string) || parseFloat(rs.costPerKg as string) || 0;
-      }
-      const totalCost = new Decimal(totalKg).times(costPerKgUsd).toDecimalPlaces(6).toNumber();
       const now = new Date();
 
       const result = await db.transaction(async (tx) => {
-        // 1. Create a completed mix batch to represent this OB assignment
+        // FIX 7: Read getLockedSupplierRate inside the transaction with forUpdate: true
+        // so the supplier rate cannot change between the read and the batch/source INSERTs.
+        let costPerKgUsd: number;
+        if (containerSupplierId) {
+          costPerKgUsd = await getLockedSupplierRate(tx, companyId, containerSupplierId, { forUpdate: true });
+        } else {
+          costPerKgUsd = parseFloat(rs.costPerKgUsd as string) || parseFloat(rs.costPerKg as string) || 0;
+        }
+        const totalCost = new Decimal(totalKg).times(costPerKgUsd).toDecimalPlaces(6).toNumber();
+        // 1. Create a completed mix batch to represent this OB assignment.
         const obBatchCode = `OB-ASSIGN-${rawStockId}-${Date.now()}`;
         const [newBatch] = await tx
           .insert(factoryMixBatches)
