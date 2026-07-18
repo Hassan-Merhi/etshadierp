@@ -24,12 +24,18 @@ function actorFromRequest(req: Request, permissions: string[]): AuthorizationAct
   return { userId, role, companyId, permissions };
 }
 
-async function audit(req: Request, outcome: "allowed" | "denied", reasonCode: string, assetId: string) {
+async function audit(
+  req: Request,
+  action: "read" | "download",
+  outcome: "allowed" | "denied",
+  reasonCode: string,
+  assetId: string
+) {
   await persistSecurityEvent(
     db,
     {
       kind: "protected-asset",
-      action: req.path.endsWith("/preview") ? "asset.uploaded-file.read" : "asset.uploaded-file.download",
+      action: action === "read" ? "asset.uploaded-file.read" : "asset.uploaded-file.download",
       outcome,
       companyId: req.session.currentCompanyId ?? null,
       actorUserId: req.session.userId ?? null,
@@ -38,7 +44,7 @@ async function audit(req: Request, outcome: "allowed" | "denied", reasonCode: st
       reasonCode,
       ipAddress: req.ip,
       userAgent: req.get("user-agent"),
-      metadata: { method: req.method, path: req.path },
+      metadata: { method: req.method, path: req.originalUrl || req.url },
     },
     req.session.username || req.session.userId || "anonymous"
   );
@@ -101,7 +107,7 @@ export function requireStoredFileAccess(action: "read" | "download") {
         allowedRoles: [],
         allowOwnerAccess: true,
       });
-      await audit(req, "allowed", "AUTHORIZED", assetId);
+      await audit(req, action, "allowed", "AUTHORIZED", assetId);
       res.setHeader("X-Content-Type-Options", "nosniff");
       res.setHeader("Cache-Control", "private, no-store");
       return next();
@@ -109,7 +115,7 @@ export function requireStoredFileAccess(action: "read" | "download") {
       const denied = error instanceof AuthorizationDeniedError || error instanceof ProtectedAssetAccessError;
       if (!denied) return next(error);
       try {
-        await audit(req, "denied", error.code || error.name || "DENIED", assetId);
+        await audit(req, action, "denied", error.code || error.name || "DENIED", assetId);
       } catch (auditError) {
         console.error("Security audit persistence failed:", auditError);
       }
