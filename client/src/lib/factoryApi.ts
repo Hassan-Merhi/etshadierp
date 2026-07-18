@@ -1,5 +1,8 @@
 import { queryClient, apiRequest } from "./queryClient";
-import { purgeUnsafeFactoryLoadingScans } from "./factoryOfflineQueueSafety";
+import {
+  isUnsafeFactoryLoadingScanRequest,
+  purgeUnsafeFactoryLoadingScans,
+} from "./factoryOfflineQueueSafety";
 
 export type AppMode = "erp" | "factory" | "properties";
 
@@ -62,9 +65,21 @@ export async function factoryApiRequest(method: string, url: string, data?: unkn
     }
   }
 
+  const unsafeLoadingScan = isUnsafeFactoryLoadingScanRequest(method, url);
   purgeUnsafeFactoryLoadingScans();
+
   try {
     return await apiRequest(method, url, data);
+  } catch (error: any) {
+    if (unsafeLoadingScan && error?.name === "OfflineQueued") {
+      purgeUnsafeFactoryLoadingScans();
+      const onlineOnlyError: any = new Error(
+        "Loading scans require an internet connection. Reconnect and scan this bale again; it was not queued."
+      );
+      onlineOnlyError.name = "OnlineRequired";
+      throw onlineOnlyError;
+    }
+    throw error;
   } finally {
     // apiRequest may have just queued a network-failed loading scan. Remove it
     // immediately so reconnecting cannot allocate a stale or different bale.
