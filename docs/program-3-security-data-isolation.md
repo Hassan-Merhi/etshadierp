@@ -9,7 +9,7 @@ Status: in progress. This branch is stacked on the completed, unmerged Program 2
 - [x] 3C — Company and tenant isolation enforcement
 - [x] 3D — Privileged action and admin-operation controls
 - [x] 3E — Session, authentication, and credential hardening
-- [ ] 3F — Input validation and unsafe-operation protection
+- [x] 3F — Input validation and unsafe-operation protection
 - [ ] 3G — File, export, and attachment access controls
 - [ ] 3H — Security audit logging and anomaly reporting
 - [ ] 3I — Security regression suite and remediation report
@@ -50,33 +50,43 @@ Status: complete.
 
 Status: complete.
 
+- Added canonical fail-closed session validation.
+- Added absolute and idle expiry, credential-version revocation, company context, and recent password confirmation controls.
+- Preserved login throttling, session regeneration, CSRF issuance, and persisted session save.
+
+## Phase 3F — Input validation and unsafe-operation protection
+
+Status: complete.
+
 ### Completed work
 
-- Added `server/services/security/sessionSecurityPolicy.ts` as the canonical fail-closed session validation boundary.
-- Added absolute session lifetime and idle-timeout enforcement with invalid/future timestamp rejection.
-- Added credential-version validation so password resets and explicit security revocations invalidate every older session independently of cookie expiration.
-- Required a valid company context for company-scoped application sessions.
-- Added optional recent-password-confirmation enforcement for sensitive actions.
-- Added safe credential-version incrementing with invalid and overflow protection.
-- Preserved the existing login protections already present in `authRoutes.ts`, including login throttling, session-ID regeneration, CSRF-token issuance, and persisted session save before response.
-- Kept the new policy pure so route and session-store adapters can migrate incrementally without weakening existing protections.
+- Added `server/services/security/unsafeOperationValidation.ts` as the canonical fail-closed validation boundary for security-sensitive mutations.
+- Required plain-object payloads and rejected arrays, primitives, class instances, and polluted object prototypes at the request boundary.
+- Added strict unknown-field denial by default so hidden or misspelled control fields cannot silently reach mutation logic.
+- Added reusable rules for strings, safe integers, positive identifiers, finite numbers, six-decimal strings, booleans, dates, enums, objects, and arrays.
+- Rejected non-finite numeric values, invalid identifiers, impossible calendar dates, and decimal values beyond six fractional digits.
+- Added recursive denial of `__proto__`, `prototype`, and `constructor` keys to block prototype-pollution payloads.
+- Added configurable limits for nesting depth, array size, and string size to constrain abusive payloads before service execution.
+- Added mandatory mutation-provenance validation for actor reason, idempotency key, source type, and source ID.
+- Returned a frozen shallow copy of accepted payloads so downstream adapters cannot mutate the validated top-level request object accidentally.
+- Kept the policy pure and additive; existing route schemas remain in place and can migrate incrementally without losing current validation.
 
 ### Verification
 
-- Added focused tests for valid sessions, missing sessions, idle expiry, absolute expiry, credential revocation, missing company context, stale password confirmation, and credential-version increments.
-- Confirmed errors expose only `Unauthorized` or `Forbidden` while retaining machine-readable security codes.
-- Confirmed no accounting balances, stock quantities, costing, or historical business records were modified.
+- Added focused tests for valid strict payloads, unknown fields, invalid and non-finite identifiers, decimal precision, impossible dates, oversized arrays, prototype-pollution keys, and missing provenance.
+- Confirmed invalid requests expose only `Invalid request` while retaining machine-readable issue codes and paths.
+- Confirmed no accounting balances, stock quantities, costing, sessions, or historical business records were modified.
 - Verification was limited to focused static inspection and test-contract review; no Replit checks or credits were used.
 
 ## Next phase
 
-- Phase 3F — Input validation and unsafe-operation protection
+- Phase 3G — File, export, and attachment access controls
 
 ## Safety constraints
 
 - Do not merge automatically.
 - Do not push directly to `main`.
-- Preserve every phase as separate commits.
+- Preserve every phase as a separate commit.
 - Do not use Replit-hosted checks or consume Replit credits.
 - Do not weaken an existing authorization check while centralizing policy.
 - Do not modify accounting balances, stock values, or historical transactions as part of Program 3.
