@@ -1,12 +1,9 @@
-/**
- * Opt-in endpoint performance and bandwidth profiler.
- *
- * Active only when BANDWIDTH_DEBUG=true. It records aggregate route metadata and
- * periodically emits a ranked list without logging response bodies, request
- * bodies, cookies, authorization headers, tokens, or query-string values.
- */
 import type { Request, Response, NextFunction } from "express";
 import { recordOperationalEvent } from "../lib/operationalEvents";
+import {
+  getRequestPerformanceMetrics,
+  runWithRequestPerformanceContext,
+} from "../lib/requestPerformanceContext";
 
 const DEFAULT_THRESHOLD_BYTES = 500 * 1024;
 const DEFAULT_REPORT_INTERVAL_MS = 5 * 60 * 1000;
@@ -27,11 +24,6 @@ type EndpointAggregate = {
   dbDurationMs: number;
 };
 
-type DatabaseMetrics = {
-  queryCount?: number;
-  durationMs?: number;
-};
-
 const aggregates = new Map<string, EndpointAggregate>();
 let reportTimer: NodeJS.Timeout | undefined;
 
@@ -46,10 +38,7 @@ function getThresholdBytes(): number {
 
 function normalizePath(req: Request): string {
   const routePath = req.route?.path;
-  if (typeof routePath === "string") {
-    const baseUrl = req.baseUrl || "";
-    return `${baseUrl}${routePath}` || "/";
-  }
+  if (typeof routePath === "string") return `${req.baseUrl || ""}${routePath}` || "/";
 
   return req.path
     .split("/")
@@ -61,17 +50,8 @@ function normalizePath(req: Request): string {
     .join("/");
 }
 
-function getDatabaseMetrics(res: Response): DatabaseMetrics {
-  const value = res.locals?.databaseMetrics as DatabaseMetrics | undefined;
-  return {
-    queryCount: Number.isFinite(value?.queryCount) ? Math.max(0, Number(value?.queryCount)) : 0,
-    durationMs: Number.isFinite(value?.durationMs) ? Math.max(0, Number(value?.durationMs)) : 0,
-  };
-}
-
 function calculateRankScore(aggregate: EndpointAggregate): number {
   const count = Math.max(aggregate.requestCount, 1);
-  const averageBytes = aggregate.totalResponseBytes / count;
   const averageDuration = aggregate.totalDurationMs / count;
   const averageHeapDelta = aggregate.totalHeapDeltaBytes / count;
   const averageDbDuration = aggregate.dbDurationMs / count;
@@ -108,6 +88,7 @@ function emitRanking(): void {
         averageHeapDeltaBytes: Math.round(aggregate.totalHeapDeltaBytes / count),
         maxHeapDeltaBytes: aggregate.maxHeapDeltaBytes,
         dbQueryCount: aggregate.dbQueryCount,
+        averageDbQueries: Number((aggregate.dbQueryCount / count).toFixed(2)),
         averageDbDurationMs: Math.round(aggregate.dbDurationMs / count),
       };
     })
@@ -129,7 +110,6 @@ function emitRanking(): void {
 
 function ensureReportTimer(): void {
   if (reportTimer) return;
-
   const intervalMs = positiveNumber(
     process.env.BANDWIDTH_DEBUG_REPORT_INTERVAL_MS,
     DEFAULT_REPORT_INTERVAL_MS,
@@ -142,85 +122,82 @@ export function bandwidthDebugMiddleware(req: Request, res: Response, next: Next
   if (process.env.BANDWIDTH_DEBUG !== "true") return next();
 
   ensureReportTimer();
+  runWithRequestPerformanceContext(() => {
+    const start = Date.now();
+    const startHeapBytes = process.memoryUsage().heapUsed;
+    const thresholdBytes = getThresholdBytes();
+    let totalBytes = 0;
+    let finalized = false;
 
-  const start = Date.now();
-  const startHeapBytes = process.memoryUsage().heapUsed;
-  const thresholdBytes = getThresholdBytes();
-  let totalBytes = 0;
-  let finalized = false;
+    const originalWrite = res.write.bind(res);
+    (res as typeof res & { write: typeof res.write }).write = function (chunk: unknown, ...args: unknown[]): boolean {
+      if (chunk != null) totalBytes += Buffer.isBuffer(chunk) ? chunk.length : Buffer.byteLength(String(chunk));
+      return originalWrite(chunk as never, ...(args as never[]));
+    };
 
-  const originalWrite = res.write.bind(res);
-  (res as typeof res & { write: typeof res.write }).write = function (chunk: unknown, ...args: unknown[]): boolean {
-    if (chunk != null) {
-      totalBytes += Buffer.isBuffer(chunk) ? chunk.length : Buffer.byteLength(String(chunk));
-    }
-    return originalWrite(chunk as never, ...(args as never[]));
-  };
+    const originalEnd = res.end.bind(res);
+    (res as typeof res & { end: typeof res.end }).end = function (chunk?: unknown, ...args: unknown[]): Response {
+      if (chunk != null && typeof chunk !== "function") {
+        totalBytes += Buffer.isBuffer(chunk) ? chunk.length : Buffer.byteLength(String(chunk));
+      }
+      originalEnd(chunk as never, ...(args as never[]));
 
-  const originalEnd = res.end.bind(res);
-  (res as typeof res & { end: typeof res.end }).end = function (chunk?: unknown, ...args: unknown[]): Response {
-    if (chunk != null && typeof chunk !== "function") {
-      totalBytes += Buffer.isBuffer(chunk) ? chunk.length : Buffer.byteLength(String(chunk));
-    }
-
-    originalEnd(chunk as never, ...(args as never[]));
-
-    if (!finalized) {
-      finalized = true;
-      const durationMs = Date.now() - start;
-      const heapDeltaBytes = process.memoryUsage().heapUsed - startHeapBytes;
-      const path = normalizePath(req);
-      const key = `${req.method} ${path}`;
-      const databaseMetrics = getDatabaseMetrics(res);
-      const aggregate = aggregates.get(key) ?? {
-        method: req.method,
-        path,
-        requestCount: 0,
-        errorCount: 0,
-        totalResponseBytes: 0,
-        maxResponseBytes: 0,
-        totalDurationMs: 0,
-        maxDurationMs: 0,
-        totalHeapDeltaBytes: 0,
-        maxHeapDeltaBytes: 0,
-        dbQueryCount: 0,
-        dbDurationMs: 0,
-      };
-
-      aggregate.requestCount += 1;
-      if (res.statusCode >= 500) aggregate.errorCount += 1;
-      aggregate.totalResponseBytes += totalBytes;
-      aggregate.maxResponseBytes = Math.max(aggregate.maxResponseBytes, totalBytes);
-      aggregate.totalDurationMs += durationMs;
-      aggregate.maxDurationMs = Math.max(aggregate.maxDurationMs, durationMs);
-      aggregate.totalHeapDeltaBytes += heapDeltaBytes;
-      aggregate.maxHeapDeltaBytes = Math.max(aggregate.maxHeapDeltaBytes, heapDeltaBytes);
-      aggregate.dbQueryCount += databaseMetrics.queryCount ?? 0;
-      aggregate.dbDurationMs += databaseMetrics.durationMs ?? 0;
-      aggregates.set(key, aggregate);
-
-      if (totalBytes >= thresholdBytes) {
-        recordOperationalEvent({
-          category: "bandwidth",
-          code: "large_http_response",
-          severity: "warning",
-          message: "Large HTTP response detected",
+      if (!finalized) {
+        finalized = true;
+        const durationMs = Date.now() - start;
+        const heapDeltaBytes = process.memoryUsage().heapUsed - startHeapBytes;
+        const path = normalizePath(req);
+        const key = `${req.method} ${path}`;
+        const databaseMetrics = getRequestPerformanceMetrics();
+        const aggregate = aggregates.get(key) ?? {
           method: req.method,
           path,
-          status: res.statusCode,
-          responseBytes: totalBytes,
-          durationMs,
-          heapDeltaBytes,
-          dbQueryCount: databaseMetrics.queryCount ?? 0,
-          dbDurationMs: databaseMetrics.durationMs ?? 0,
-        });
+          requestCount: 0,
+          errorCount: 0,
+          totalResponseBytes: 0,
+          maxResponseBytes: 0,
+          totalDurationMs: 0,
+          maxDurationMs: 0,
+          totalHeapDeltaBytes: 0,
+          maxHeapDeltaBytes: 0,
+          dbQueryCount: 0,
+          dbDurationMs: 0,
+        };
+
+        aggregate.requestCount += 1;
+        if (res.statusCode >= 500) aggregate.errorCount += 1;
+        aggregate.totalResponseBytes += totalBytes;
+        aggregate.maxResponseBytes = Math.max(aggregate.maxResponseBytes, totalBytes);
+        aggregate.totalDurationMs += durationMs;
+        aggregate.maxDurationMs = Math.max(aggregate.maxDurationMs, durationMs);
+        aggregate.totalHeapDeltaBytes += heapDeltaBytes;
+        aggregate.maxHeapDeltaBytes = Math.max(aggregate.maxHeapDeltaBytes, heapDeltaBytes);
+        aggregate.dbQueryCount += databaseMetrics.dbQueryCount;
+        aggregate.dbDurationMs += databaseMetrics.dbDurationMs;
+        aggregates.set(key, aggregate);
+
+        if (totalBytes >= thresholdBytes) {
+          recordOperationalEvent({
+            category: "bandwidth",
+            code: "large_http_response",
+            severity: "warning",
+            message: "Large HTTP response detected",
+            method: req.method,
+            path,
+            status: res.statusCode,
+            responseBytes: totalBytes,
+            durationMs,
+            heapDeltaBytes,
+            dbQueryCount: databaseMetrics.dbQueryCount,
+            dbDurationMs: databaseMetrics.dbDurationMs,
+          });
+        }
       }
-    }
+      return res;
+    };
 
-    return res;
-  };
-
-  next();
+    next();
+  });
 }
 
 export const __bandwidthDebugTesting = {
