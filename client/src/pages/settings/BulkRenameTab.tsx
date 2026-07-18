@@ -108,7 +108,6 @@ const userFormSchema = insertUserSchema;
 const companyFormSchema = insertCompanySchema;
 const roleAssignmentSchema = insertUserCompanyRoleSchema.refine(
   (data) => {
-    // If role is POS, assignedLocationId must be present
     if (data.role === "POS" && !data.assignedLocationId) {
       return false;
     }
@@ -152,7 +151,7 @@ export function BulkRenameTab() {
     }
     setIsSearching(true);
     try {
-      const res = await fetch("/api/stock-items", { credentials: "include" });
+      const res = await fetch("/api/stock-items/light", { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch stock items");
       const allItems = await res.json();
       const regex = buildRegex();
@@ -359,29 +358,14 @@ export function BulkRenameTab() {
               </Table>
             </div>
             <div className="flex justify-end">
-              <AlertDialog>
-                <AlertDialogTrigger asChild>
-                  <Button disabled={selectedIds.size === 0 || isApplying} data-testid="button-apply-rename">
-                    {isApplying ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
-                    Apply Changes
-                  </Button>
-                </AlertDialogTrigger>
-                <AlertDialogContent>
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>Rename {selectedIds.size} items?</AlertDialogTitle>
-                    <AlertDialogDescription>
-                      This will replace "{findText}" with "{replaceWith}" in {selectedIds.size} selected item name(s).
-                      This action cannot be easily undone.
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel data-testid="button-cancel-rename">Cancel</AlertDialogCancel>
-                    <AlertDialogAction onClick={handleApply} data-testid="button-confirm-rename">
-                      Confirm Rename
-                    </AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
+              <Button
+                onClick={handleApply}
+                disabled={isApplying || selectedIds.size === 0 || !replaceWith.trim()}
+                data-testid="button-bulk-apply"
+              >
+                {isApplying ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Check className="h-4 w-4 mr-2" />}
+                Rename Selected ({selectedIds.size})
+              </Button>
             </div>
           </div>
         )}
@@ -389,52 +373,3 @@ export function BulkRenameTab() {
     </Card>
   );
 }
-
-// Single source of truth: derived from FactorySidebar nav — new pages appear automatically
-const ALL_FACTORY_PAGES_SETTINGS = FACTORY_NAV_PAGES;
-const FACTORY_PAGE_GROUPS_SETTINGS = Array.from(new Set(ALL_FACTORY_PAGES_SETTINGS.map((p) => p.group)));
-
-// Single source of truth: derived from FEATURE_KEYS + FEATURE_PAGE_INFO in shared/schema
-const ALL_ERP_PAGES: { key: string; label: string; group: string }[] = FEATURE_KEYS.map((key) => ({
-  key,
-  label: FEATURE_PAGE_INFO[key].label,
-  group: FEATURE_PAGE_INFO[key].group,
-}));
-
-const ERP_PAGE_GROUPS = Array.from(new Set(ALL_ERP_PAGES.map((p) => p.group)));
-
-const ERP_COST_FIELDS = [
-  { key: "daybook_amounts", label: "Transaction Amounts" },
-  { key: "accounts_balances", label: "Account Balances" },
-  { key: "container_costs", label: "Cost & Fee Columns" },
-  { key: "stock_rates", label: "Rate / Price Columns" },
-  { key: "analytics_financials", label: "Revenue & Profit" },
-  { key: "voucher_amounts", label: "Amount Columns" },
-];
-
-const FACTORY_COST_FIELDS = [
-  { key: "inventory_avg_rate", label: "Avg Rate Column" },
-  { key: "inventory_total_value", label: "Total Value Column" },
-  { key: "inventory_sell_price", label: "Sell Price Column" },
-  { key: "inventory_sell_value", label: "Sell Value Column" },
-  { key: "bale_history_cost_per_kg", label: "Cost/KG Column" },
-  { key: "bale_history_total_cost", label: "Total Cost Column" },
-  { key: "bales_list_cost_per_kg", label: "Cost/kg Column" },
-];
-
-const PAGE_COST_FIELD_MAP: Record<string, { key: string; label: string }[]> = {
-  daybook: [ERP_COST_FIELDS[0]],
-  accounts: [ERP_COST_FIELDS[1]],
-  containers: [ERP_COST_FIELDS[2]],
-  stock_items: [ERP_COST_FIELDS[3]],
-  analytics: [ERP_COST_FIELDS[4]],
-  vouchers: [ERP_COST_FIELDS[5]],
-  "factory/location-inventory": [
-    FACTORY_COST_FIELDS[0],
-    FACTORY_COST_FIELDS[1],
-    FACTORY_COST_FIELDS[2],
-    FACTORY_COST_FIELDS[3],
-  ],
-  "factory/bales-history": [FACTORY_COST_FIELDS[4], FACTORY_COST_FIELDS[5]],
-  "factory/stock-entry": [FACTORY_COST_FIELDS[6]],
-};
