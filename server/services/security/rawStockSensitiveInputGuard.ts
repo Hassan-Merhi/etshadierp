@@ -57,6 +57,11 @@ const ROUTE_SCHEMAS: Readonly<Record<string, UnsafeOperationSchema>> = Object.fr
   }),
 });
 
+function canonicalRoutePath(req: Request): string {
+  const originalPath = String(req.originalUrl || req.url || req.path).split("?", 1)[0];
+  return originalPath.length > 1 ? originalPath.replace(/\/+$/, "") : originalPath;
+}
+
 function positiveIntegerArray(value: unknown, field: string): number[] {
   if (!Array.isArray(value) || value.length === 0 || value.length > 500) {
     throw new UnsafeInputError([{ code: "INVALID_FIELD_VALUE", path: field }]);
@@ -91,7 +96,12 @@ function validateManualRates(value: unknown, sourceIds: readonly number[]): void
   }
 }
 
-async function auditInputDecision(req: Request, outcome: "allowed" | "denied", reasonCode: string): Promise<void> {
+async function auditInputDecision(
+  req: Request,
+  routePath: string,
+  outcome: "allowed" | "denied",
+  reasonCode: string
+): Promise<void> {
   await persistSecurityEvent(
     db,
     {
@@ -101,7 +111,7 @@ async function auditInputDecision(req: Request, outcome: "allowed" | "denied", r
       companyId: req.session?.currentCompanyId ?? null,
       actorUserId: req.session?.userId ?? null,
       targetType: "route",
-      targetId: req.path,
+      targetId: routePath,
       reasonCode,
       ipAddress: req.ip,
       userAgent: req.get("user-agent"),
@@ -117,14 +127,15 @@ async function auditInputDecision(req: Request, outcome: "allowed" | "denied", r
  */
 export async function requireRawStockSensitiveInput(req: Request, res: Response, next: NextFunction) {
   if (req.method.toUpperCase() !== "POST") return next();
-  const routeSchema = ROUTE_SCHEMAS[req.path];
+  const routePath = canonicalRoutePath(req);
+  const routeSchema = ROUTE_SCHEMAS[routePath];
   if (!routeSchema) return next();
 
   try {
     const validated = validateUnsafeOperationInput({
       payload: req.body,
       schema: routeSchema,
-      operation: req.path,
+      operation: routePath,
     });
 
     if ("containerIds" in validated) positiveIntegerArray(validated.containerIds, "containerIds");
@@ -134,12 +145,12 @@ export async function requireRawStockSensitiveInput(req: Request, res: Response,
     }
 
     req.body = validated;
-    await auditInputDecision(req, "allowed", "INPUT_VALIDATED");
+    await auditInputDecision(req, routePath, "allowed", "INPUT_VALIDATED");
     return next();
   } catch (error) {
     if (error instanceof UnsafeInputError) {
       try {
-        await auditInputDecision(req, "denied", error.issues[0]?.code || error.code);
+        await auditInputDecision(req, routePath, "denied", error.issues[0]?.code || error.code);
       } catch (auditError) {
         console.error("Security audit persistence failed:", auditError);
         return res.status(500).json({ message: "Security audit unavailable" });
