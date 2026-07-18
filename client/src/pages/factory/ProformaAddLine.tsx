@@ -10,6 +10,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 import { useAppMode } from "@/contexts/AppModeContext";
+import { useCompany } from "@/contexts/CompanyContext";
 import { getApiRequest } from "@/lib/factoryApi";
 import { formatNumber } from "@/lib/formatNumber";
 import { PageHeader } from "@/components/PageHeader";
@@ -49,6 +50,7 @@ export default function ProformaAddLine() {
   const { proformaId } = useParams<{ proformaId: string }>();
   const [, navigate] = useLocation();
   const { toast } = useToast();
+  const { selectedCompany } = useCompany();
   const appMode = useAppMode();
   const modeApiRequest = getApiRequest(appMode);
 
@@ -80,7 +82,8 @@ export default function ProformaAddLine() {
   const numericProformaId = parseInt(proformaId);
 
   const { data: allItems = [], isLoading: itemsLoading } = useQuery<StockItem[]>({
-    queryKey: ["/api/stock-items/light"],
+    queryKey: ["/api/stock-items/light", selectedCompany?.id],
+    enabled: !!selectedCompany,
     staleTime: 10 * 60 * 1000,
     refetchOnWindowFocus: false,
     refetchOnMount: false,
