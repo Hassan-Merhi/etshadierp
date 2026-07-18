@@ -3,19 +3,20 @@ import path from "path";
 import { afterEach, describe, expect, it } from "vitest";
 import { purgeUnsafeFactoryLoadingScans } from "../client/src/lib/factoryOfflineQueueSafety";
 
-const repoRoot = path.resolve(import.meta.dirname, "..");
+const repoRoot = process.cwd();
 
 function readSource(relativePath: string): string {
   return fs.readFileSync(path.join(repoRoot, relativePath), "utf8");
 }
 
-describe("factory container document/freight access regression", () => {
-  it("checks ownership against factory_containers and keeps company scoping", () => {
+describe("ERP container document/freight access regression", () => {
+  it("uses the selected ERP company before a stale factory company", () => {
     const source = readSource("server/routes/factory/factoryContainerReadAccessRoutes.ts");
 
-    expect(source).toContain(".from(factoryContainers)");
-    expect(source).toContain("eq(factoryContainers.id, containerId)");
-    expect(source).toContain("eq(factoryContainers.companyId, companyId)");
+    expect(source).toContain("req.session?.currentCompanyId || req.session?.factoryCompanyId");
+    expect(source).toContain(".from(containers)");
+    expect(source).toContain("eq(containers.id, containerId)");
+    expect(source).toContain("eq(containers.companyId, companyId)");
     expect(source).toContain("eq(containerDocuments.companyId, companyId)");
     expect(source).toContain("eq(containerFreight.companyId, companyId)");
   });
