@@ -6,8 +6,22 @@ import { registerImportExportRoutes } from "./admin/importExportRoutes";
 import { registerAdminPoFixRoutes } from "./admin/adminPoFixRoutes";
 import { registerAdminRepairRoutes } from "./admin/adminRepairRoutes";
 import { registerDeletedItemsRoutes } from "./admin/deletedItemsRoutes";
+import { requirePrivilegedOperation } from "../services/security/privilegedOperationEnforcementAdapter";
 
 export function registerAdminRoutes(app: Express) {
+  app.use(
+    "/api/admin/rebuild-inventory",
+    requirePrivilegedOperation({
+      domain: "inventory",
+      action: "inventory.rebuild",
+      kind: "recalculate",
+      requiredPermission: "administration.repair",
+      sourceType: "inventory-rebuild-request",
+      expectedConfirmationToken: (companyId) => `REBUILD-INVENTORY:${companyId}`,
+      allowDryRun: true,
+    })
+  );
+
   registerDataToolsRoutes(app);
   registerUserManagementRoutes(app);
   registerCompanySettingsRoutes(app);
