@@ -163,6 +163,9 @@ export async function cascadeContainerCostChange(
      *  Only the post-offload-charge route should set this; all other callers leave it unset
      *  so the default moving-average derivation is unchanged. */
     supplierInventoryValueDeltaUsdOverride?: Decimal;
+    /** When true, skip the supplier locked-rate update. Use in legacy-undo mode where
+     *  the caller sets the supplier rate directly to the legacy baseline value. */
+    skipSupplierRateUpdate?: boolean;
   },
   opts: {
     /** When true, also rewrites COMPLETED/CLOSED mix batches (and their bales)
@@ -220,7 +223,7 @@ export async function cascadeContainerCostChange(
     .select({ supplierId: factoryContainers.supplierId })
     .from(factoryContainers)
     .where(and(eq(factoryContainers.id, containerId), eq(factoryContainers.companyId, companyId)));
-  if (container?.supplierId) {
+  if (container?.supplierId && !params.skipSupplierRateUpdate) {
     const oldLockedRate = await getLockedSupplierRate(tx, companyId, container.supplierId, { forUpdate: true });
     const supplierTotalRemainingKg = await getAuthoritativeSupplierRemainingKg(tx, companyId, container.supplierId);
     const dSupplierTotal = new Decimal(supplierTotalRemainingKg);

@@ -74,21 +74,25 @@ export async function writeDaybookEntry(
   const fxRate = opts.fxRateToUsd || 1;
   const amtUsd =
     opts.amountUsd !== undefined ? opts.amountUsd : currency === "USD" ? amtCurrency : amtCurrency * fxRate;
-  await dbOrTx.insert(factoryDaybookEntries).values({
-    companyId: opts.companyId,
-    txDate: opts.txDate,
-    txType: opts.txType,
-    referenceId: opts.referenceId || null,
-    referenceTable: opts.referenceTable || null,
-    description: opts.description,
-    metaJson: opts.metaJson || null,
-    currencyCode: currency,
-    amountCurrency: String(amtCurrency),
-    fxRateToUsd: String(fxRate),
-    amountUsd: String(amtUsd),
-    createdBy: opts.createdBy || null,
-    effectiveDate: opts.effectiveDate || null,
-  });
+  const [inserted] = await dbOrTx
+    .insert(factoryDaybookEntries)
+    .values({
+      companyId: opts.companyId,
+      txDate: opts.txDate,
+      txType: opts.txType,
+      referenceId: opts.referenceId || null,
+      referenceTable: opts.referenceTable || null,
+      description: opts.description,
+      metaJson: opts.metaJson || null,
+      currencyCode: currency,
+      amountCurrency: String(amtCurrency),
+      fxRateToUsd: String(fxRate),
+      amountUsd: String(amtUsd),
+      createdBy: opts.createdBy || null,
+      effectiveDate: opts.effectiveDate || null,
+    })
+    .returning({ id: factoryDaybookEntries.id });
+  return inserted; // { id: number } — callers that ignore the return value continue to work
 }
 
 export async function getOrFetchFxRateToUsd(companyId: number, currencyCode: string, dateISO: string): Promise<string> {

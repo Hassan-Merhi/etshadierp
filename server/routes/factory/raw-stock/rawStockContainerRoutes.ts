@@ -2,7 +2,11 @@ import { parseId, parseOptionalId } from "../../../lib/parseId";
 import { getClientDate } from "../../../lib/dateUtils";
 import type { Express } from "express";
 import { db } from "../../../db";
-import { requireAuth } from "../../../auth";
+import { requireAuth, requireRole } from "../../../auth";
+import {
+  applyPostOffloadChargeMutation,
+  type AccountingContext,
+} from "../../../services/factory/postOffloadChargeMutation";
 import { classifyNetPositionAccounts } from "../../../netPositionHelper";
 import { adjustInventory } from "../../../inventoryHelper";
 import Decimal from "decimal.js";
@@ -122,6 +126,46 @@ import CryptoJS from "crypto-js";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
+
+const ADMIN_ROLES = ["Admin", "Developer"] as const;
+
+/**
+ * Resolve FX rate for a post-offload charge (create or edit).
+ * Always returns fxRateConfirmed: true.
+ * Rules:
+ *  A) USD charge                   → fxRateToUsd = 1,   fxRateDate = txDate
+ *  B) Same CCY as container        → use confirmed container offload FX
+ *  C) Third currency               → fetch via getOrFetchFxRateToUsd, must be > 0
+ */
+async function resolvePostOffloadChargeFx(opts: {
+  chargeCcy: string;
+  containerCcy: string;
+  containerFxRate: number;
+  containerFxRateDateOffload: string | null;
+  containerFxConfirmed: boolean;
+  txDate: string;
+  companyId: number;
+}): Promise<{ fxRateToUsd: number; fxRateConfirmed: boolean; fxRateDate: string }> {
+  const { chargeCcy, containerCcy, containerFxRate, containerFxRateDateOffload, containerFxConfirmed, txDate, companyId } = opts;
+  if (chargeCcy === "USD") {
+    return { fxRateToUsd: 1, fxRateConfirmed: true, fxRateDate: txDate };
+  }
+  if (chargeCcy === containerCcy) {
+    if (!containerFxConfirmed) {
+      throw new Error(`Container FX rate for ${containerCcy} is not confirmed. Confirm the container FX rate first.`);
+    }
+    return { fxRateToUsd: containerFxRate, fxRateConfirmed: true, fxRateDate: containerFxRateDateOffload || txDate };
+  }
+  // Third currency — fetch independently
+  const fetched = await getOrFetchFxRateToUsd(companyId, chargeCcy, txDate);
+  const rate = parseFloat(fetched as any);
+  if (!rate || rate <= 0) {
+    throw new Error(
+      `Cannot resolve FX rate for charge currency ${chargeCcy} on ${txDate}. Add an FX rate for this currency first.`
+    );
+  }
+  return { fxRateToUsd: rate, fxRateConfirmed: true, fxRateDate: txDate };
+}
 
 export function registerRawStockContainerRoutes(app: Express) {
   app.patch("/api/factory/containers/:id/confirm-duty", requireAuth, async (req: any, res: any) => {
@@ -307,8 +351,7 @@ export function registerRawStockContainerRoutes(app: Express) {
 
       const txDate = reqTxDate || getClientDate(req);
       const containerCcy = container.currencyCode || "USD";
-      // Use offload-time FX rate — same source as computeCorrectContainerCost uses.
-      const { fxRate, looksSet: pocFxLooksSet } = resolveStoredFxRate(
+      const { fxRate: containerFxRate, looksSet: pocFxLooksSet } = resolveStoredFxRate(
         containerCcy,
         (container as any).fxRateToUsdOffload || container.fxRateToUsd,
         (container as any).fxRateConfirmed
@@ -316,26 +359,49 @@ export function registerRawStockContainerRoutes(app: Express) {
       if (!pocFxLooksSet) {
         return res.status(400).json({ message: new UnresolvedExchangeRateError(containerCcy).message });
       }
-      const actualKg = parseFloat(container.actualReceivedKg || "0");
-      if (actualKg <= 0) return res.status(400).json({ message: "Container has no received weight" });
+      if (parseFloat(container.actualReceivedKg || "0") <= 0) {
+        return res.status(400).json({ message: "Container has no received weight" });
+      }
 
-      // Guard: raw-stock row must exist — the cascade needs it to compute value deltas.
+      // Guard: raw-stock row must exist
       const rawStockCheck = await db
         .select({ id: factoryRawStock.id })
         .from(factoryRawStock)
         .where(and(eq(factoryRawStock.companyId, companyId), eq(factoryRawStock.containerId, containerId)));
       if (rawStockCheck.length === 0) {
         return res.status(400).json({
-          message:
-            "Cannot add post-offload charge because this offloaded container has no linked raw-stock record.",
+          message: "Cannot add post-offload charge because this offloaded container has no linked raw-stock record.",
         });
       }
 
-      // Pre-compute per-charge voucher context — getOrCreateLedgerAccount uses the
-      // raw db connection and MUST NOT run inside a transaction.
-      type ChargeCtx = { voucherCompanyId: number; chargesPayableAcctId: number };
-      const chargeCtxs: ChargeCtx[] = [];
+      const userId = String((req.session as any).userId || (req.user as any)?.id || "system");
+
+      // Resolve FX and accounting context BEFORE transaction (may call external APIs)
+      const resolvedChargeInputs: Array<{
+        fxRateToUsd: number;
+        fxRateConfirmed: boolean;
+        fxRateDate: string;
+        accountingCtx: AccountingContext;
+      }> = [];
+
       for (const charge of validCharges) {
+        const chargeCcy = charge.currencyCode || "USD";
+        let fxResolved: { fxRateToUsd: number; fxRateConfirmed: boolean; fxRateDate: string };
+        try {
+          fxResolved = await resolvePostOffloadChargeFx({
+            chargeCcy,
+            containerCcy,
+            containerFxRate,
+            containerFxRateDateOffload: (container as any).fxRateDateOffload || null,
+            containerFxConfirmed: !!(container as any).fxRateConfirmed,
+            txDate,
+            companyId,
+          });
+        } catch (e: any) {
+          return res.status(400).json({ message: e.message });
+        }
+
+        let acctCtx: AccountingContext = { voucherCompanyId: companyId, chargesPayableAcctId: 0 };
         if (charge.ledgerAccountId) {
           const lid = parseInt(charge.ledgerAccountId);
           const [acctRow] = await db
@@ -348,336 +414,80 @@ export function registerRawStockContainerRoutes(app: Express) {
             "FACTORY_CHARGES_PAYABLE",
             "Factory Charges Payable"
           );
-          console.log(
-            `[POC diag] chargeDesc="${charge.description}" ledgerAccountId=${lid} acctCompanyId=${acctRow?.companyId ?? "NOT FOUND"} voucherCompanyId=${voucherCompanyId} chargesPayableAcctId=${cpAcctId} container=${container.containerNumber}`
-          );
-          chargeCtxs.push({ voucherCompanyId, chargesPayableAcctId: cpAcctId });
+          acctCtx = { voucherCompanyId, chargesPayableAcctId: cpAcctId };
         } else if (charge.supplierId) {
-          const cpAcctId = await getOrCreateLedgerAccount(
-            companyId,
-            "FACTORY_CHARGES_PAYABLE",
-            "Factory Charges Payable"
-          );
-          chargeCtxs.push({ voucherCompanyId: companyId, chargesPayableAcctId: cpAcctId });
-        } else {
-          chargeCtxs.push({ voucherCompanyId: companyId, chargesPayableAcctId: 0 });
+          const cpAcctId = await getOrCreateLedgerAccount(companyId, "FACTORY_CHARGES_PAYABLE", "Factory Charges Payable");
+          acctCtx = { voucherCompanyId: companyId, chargesPayableAcctId: cpAcctId };
         }
-      }
 
-      // Fetch existing additional charges for inclusion in cost recalculation
-      const existingCharges = await db
-        .select()
-        .from(factoryOffloadAdditionalCharges)
-        .where(
-          and(
-            eq(factoryOffloadAdditionalCharges.containerId, containerId),
-            eq(factoryOffloadAdditionalCharges.companyId, companyId)
-          )
-        );
-
-      // Resolve FX for each new charge BEFORE the transaction (may hit external API).
-      // Rules: USD → 1, same CCY as container → container offload rate, other → fetch.
-      const resolvedChargeFxRates: number[] = [];
-      for (const charge of validCharges) {
-        const chargeCcy = charge.currencyCode || "USD";
-        let chargeFx: number;
-        if (chargeCcy === "USD") {
-          chargeFx = 1;
-        } else if (chargeCcy === containerCcy) {
-          chargeFx = fxRate;
-        } else {
-          const fetched = await getOrFetchFxRateToUsd(companyId, chargeCcy, txDate);
-          const fetchedNum = parseFloat(fetched as any);
-          if (!fetchedNum || fetchedNum <= 0) {
-            return res.status(400).json({
-              message: `Cannot resolve FX rate for charge currency ${chargeCcy} on ${txDate}. Add an FX rate for this currency first.`,
-            });
-          }
-          chargeFx = fetchedNum;
-        }
-        resolvedChargeFxRates.push(chargeFx);
+        resolvedChargeInputs.push({ ...fxResolved, accountingCtx: acctCtx });
       }
 
       const oldContainerCostPerKgUsd = parseFloat((container as any).ratePerKgUsd || "0");
       const oldContainerTotalUsd = parseFloat((container as any).finalPayableAmountUsd || "0");
-      let newContainerCostPerKgUsd = 0;
-      let newContainerTotalUsd = 0;
-      let newRawStock: any;
-      let cascadeResult: any;
-      let supplierLockedRateOld: number | null = null;
-      let supplierLockedRateNew: number | null = null;
-      // Breakdown fields for the post-offload response
-      let containerReceivedKg = 0;
-      let containerRemainingKg = 0;
-      let remainingFractionNum = 0;
-      let fullContainerValueDeltaUsdStr = "0";
-      let supplierInventoryValueDeltaUsdStr = "0";
-      let supplierRemainingKgNum = 0;
-      let supplierValueBeforeUsdStr: string | null = null;
-      let supplierValueAfterUsdStr: string | null = null;
-      let supplierLockedRateOldStr: string | null = null;
-      let supplierLockedRateNewStr: string | null = null;
-      let oldRawStockCostPerKgUsd: number | null = null;
-      let rawStockRateWasStale = false;
+
+      let lastResult: any = null;
+      let allCascadeResults: any[] = [];
 
       await db.transaction(async (tx) => {
-        // 1. Load commission record first — needed for both old and new canonical cost.
-        const commissionRecords = await tx
-          .select()
-          .from(factoryContainerCommissions)
-          .where(
-            and(
-              eq(factoryContainerCommissions.containerId, containerId),
-              eq(factoryContainerCommissions.companyId, companyId)
-            )
-          );
-        const commissionRecord = commissionRecords.sort((a: any, b: any) => b.id - a.id)[0] || null;
-
-        // 2. Compute OLD canonical container cost BEFORE inserting new charges.
-        //    This is the exact baseline; the delta from it equals the new charges' value only.
-        const oldCanonicalCost = computeCorrectContainerCost(container, existingCharges, commissionRecord);
-        if (oldCanonicalCost.fxUnresolved) {
-          throw new Error(`FX rate is unresolved for container ${container.containerNumber}`);
-        }
-
-        // 3. Insert new charge rows with correctly resolved FX rates
-        const insertedCharges: any[] = [];
         for (let i = 0; i < validCharges.length; i++) {
           const charge = validCharges[i];
-          const chargeCcy = charge.currencyCode || "USD";
-          const chargeFx = resolvedChargeFxRates[i];
-          const [inserted] = await tx
-            .insert(factoryOffloadAdditionalCharges)
-            .values({
-              companyId,
-              containerId,
-              description: charge.description || "Post-offload charge",
-              amount: String(parseFloat(charge.amount)),
-              currencyCode: chargeCcy,
-              fxRateToUsd: String(chargeFx),
-              ledgerAccountId: charge.ledgerAccountId ? parseInt(charge.ledgerAccountId) : null,
-              supplierId: charge.supplierId ? parseInt(charge.supplierId) : null,
-            })
-            .returning();
-          insertedCharges.push(inserted);
-        }
+          const { fxRateToUsd, fxRateConfirmed, fxRateDate, accountingCtx } = resolvedChargeInputs[i];
 
-        // 4. Load raw-stock rows to determine what fraction of this container remains in
-        //    inventory. Only that fraction of the new charge value belongs to the supplier
-        //    locked-rate adjustment; consumed material's cost is already a sunk cost.
-        const rawStockForFraction = await tx
-          .select()
-          .from(factoryRawStock)
-          .where(and(eq(factoryRawStock.companyId, companyId), eq(factoryRawStock.containerId, containerId)));
-        let dContainerReceivedKg = new Decimal(0);
-        let dContainerUsedKg = new Decimal(0);
-        for (const row of rawStockForFraction) {
-          dContainerReceivedKg = dContainerReceivedKg.plus(new Decimal(String(row.receivedKg || "0")));
-          dContainerUsedKg = dContainerUsedKg.plus(new Decimal(String(row.usedKg || "0")));
-        }
-        const dContainerRemainingKg = Decimal.max(0, dContainerReceivedKg.minus(dContainerUsedKg));
-        const dRemainingFraction = dContainerReceivedKg.gt(0)
-          ? Decimal.min(new Decimal(1), dContainerRemainingKg.div(dContainerReceivedKg))
-          : new Decimal(0);
-
-        if (rawStockForFraction.length > 0) {
-          oldRawStockCostPerKgUsd = parseFloat(
-            String(rawStockForFraction[0].costPerKgUsd || rawStockForFraction[0].costPerKg || "0")
-          );
-        }
-
-        // 5. Compute NEW canonical container cost with all charges (existing + new).
-        const allCharges = [...existingCharges, ...insertedCharges];
-        const next = computeCorrectContainerCost(container, allCharges, commissionRecord);
-        if (next.fxUnresolved) {
-          throw new Error(`FX rate is unresolved for container ${container.containerNumber}`);
-        }
-        newContainerCostPerKgUsd = next.costPerKgUsd;
-        newContainerTotalUsd = next.totalUsd;
-
-        // 6. Exact value-delta using Decimal.js — no parseFloat arithmetic.
-        //    fullContainerValueDeltaUsd      = total cost increase for this container.
-        //    supplierInventoryValueDeltaUsd  = portion belonging to still-in-inventory kg.
-        const dOldTotalUsd = new Decimal(String(oldCanonicalCost.totalUsd));
-        const dNewTotalUsd = new Decimal(String(next.totalUsd));
-        const dFullContainerValueDeltaUsd = dNewTotalUsd.minus(dOldTotalUsd);
-        const dSupplierInventoryValueDeltaUsd = dFullContainerValueDeltaUsd.times(dRemainingFraction);
-
-        containerReceivedKg = dContainerReceivedKg.toNumber();
-        containerRemainingKg = dContainerRemainingKg.toNumber();
-        remainingFractionNum = dRemainingFraction.toDecimalPlaces(6).toNumber();
-        fullContainerValueDeltaUsdStr = dFullContainerValueDeltaUsd.toFixed(6);
-        supplierInventoryValueDeltaUsdStr = dSupplierInventoryValueDeltaUsd.toFixed(6);
-
-        // 7. Update container landed totals (never touches ratePerKg — the purchase rate)
-        await tx
-          .update(factoryContainers)
-          .set({
-            finalPayableAmount: String(next.totalCost),
-            ratePerKgUsd: String(next.costPerKgUsd),
-            finalPayableAmountUsd: String(next.totalUsd),
-            updatedAt: new Date(),
-          })
-          .where(eq(factoryContainers.id, containerId));
-
-        // Capture supplier locked rate BEFORE cascade so we can report old vs. new.
-        // Also fetch authoritative supplier remaining kg for the breakdown calculation.
-        if (container.supplierId) {
-          const [supBefore] = await tx
-            .select({ rate: factorySuppliers.currentRawMaterialCostPerKgUsd })
-            .from(factorySuppliers)
-            .where(and(eq(factorySuppliers.id, container.supplierId), eq(factorySuppliers.companyId, companyId)));
-          supplierLockedRateOld = supBefore ? parseFloat(supBefore.rate || "0") : null;
-          supplierLockedRateOldStr = supBefore?.rate ?? null;
-
-          const authKg = await getAuthoritativeSupplierRemainingKg(tx, companyId, container.supplierId);
-          supplierRemainingKgNum = authKg;
-
-          if (supplierLockedRateOldStr !== null) {
-            const dOldRate = new Decimal(supplierLockedRateOldStr);
-            const dAuthKg = new Decimal(String(authKg));
-            const dValBefore = dOldRate.times(dAuthKg);
-            supplierValueBeforeUsdStr = dValBefore.toFixed(6);
-            supplierValueAfterUsdStr = dValBefore.plus(dSupplierInventoryValueDeltaUsd).toFixed(6);
-          }
-
-          // Detect pre-existing divergence between container rate and raw-stock rate.
-          if (oldRawStockCostPerKgUsd !== null) {
-            rawStockRateWasStale = new Decimal(String(oldContainerCostPerKgUsd))
-              .minus(new Decimal(String(oldRawStockCostPerKgUsd)))
-              .abs()
-              .gte(new Decimal("0.000001"));
-          }
-        }
-
-        // 8. Cascade: raw-stock update → supplier locked-rate adjustment →
-        //    mix-batch source corrections → batch weighted-average recompute → bale updates.
-        //    IMPORTANT: do NOT update raw-stock before calling this — the cascade reads
-        //    the current (old) cost first to compute the supplier-rate value delta.
-        //    includeCompletedBatches: true because post-offload charges are explicitly retroactive.
-        //    supplierInventoryValueDeltaUsdOverride: exact Decimal prevents the cascade from
-        //    re-deriving the delta from the old raw-stock rate (which may be stale vs. container).
-        cascadeResult = await cascadeContainerCostChange(
-          tx,
-          {
+          const mutResult = await applyPostOffloadChargeMutation(tx, {
+            action: "CREATE",
             companyId,
             containerId,
-            newCostPerKg: next.costPerKg,
-            newCostPerKgUsd: next.costPerKgUsd,
-            supplierInventoryValueDeltaUsdOverride: dSupplierInventoryValueDeltaUsd,
-          },
-          { includeCompletedBatches: true }
-        );
-
-        // Capture supplier locked rate AFTER cascade
-        if (container.supplierId) {
-          const [supAfter] = await tx
-            .select({ rate: factorySuppliers.currentRawMaterialCostPerKgUsd })
-            .from(factorySuppliers)
-            .where(and(eq(factorySuppliers.id, container.supplierId), eq(factorySuppliers.companyId, companyId)));
-          supplierLockedRateNew = supAfter ? parseFloat(supAfter.rate || "0") : null;
-          supplierLockedRateNewStr = supAfter?.rate ?? null;
-        }
-
-        // Expose updated raw-stock row for response
-        const freshRawStockRows = await tx
-          .select()
-          .from(factoryRawStock)
-          .where(and(eq(factoryRawStock.companyId, companyId), eq(factoryRawStock.containerId, containerId)));
-        if (freshRawStockRows.length > 0) {
-          newRawStock = freshRawStockRows[0];
-        }
-
-        // 9. Daybook entries + vouchers for each new charge (accounting is unchanged)
-        for (let ci = 0; ci < insertedCharges.length; ci++) {
-          const charge = insertedCharges[ci];
-          const chargeAmt = parseFloat(charge.amount || "0");
-          if (chargeAmt <= 0) continue;
-          const chargeCcy = charge.currencyCode || "USD";
-          const chargeFx = resolveStoredFxRateOrThrow(chargeCcy, charge.fxRateToUsd, (charge as any).fxRateConfirmed);
-          await writeDaybookEntry(tx, {
-            companyId,
             txDate,
-            txType: "OTHER_CHARGE",
-            referenceId: containerId,
-            description: `${charge.description} (post-offload) — container ${container.containerNumber}`,
-            currencyCode: chargeCcy,
-            amountCurrency: chargeAmt,
-            fxRateToUsd: chargeFx,
-            metaJson: JSON.stringify({ containerId, sourceType: "POST_OFFLOAD_ADDITIONAL", chargeId: charge.id }),
+            userId,
+            chargeData: {
+              description: charge.description || "Post-offload charge",
+              amount: parseFloat(charge.amount),
+              currencyCode: charge.currencyCode || "USD",
+              fxRateToUsd,
+              fxRateConfirmed,
+              fxRateDate,
+              ledgerAccountId: charge.ledgerAccountId ? parseInt(charge.ledgerAccountId) : null,
+              supplierId: charge.supplierId ? parseInt(charge.supplierId) : null,
+            },
+            accountingCtx,
           });
-          if (charge.ledgerAccountId || charge.supplierId) {
-            const { voucherCompanyId, chargesPayableAcctId: voucherChargesPayableAcctId } = chargeCtxs[ci];
-            const voucherNum = `FACTORY-POC-${containerId}-${charge.id}-${Date.now()}`;
-            console.log(
-              `[POC diag] inserting voucher chargeId=${charge.id} voucherCompanyId=${voucherCompanyId} chargesPayableAcctId=${voucherChargesPayableAcctId} container=${container.containerNumber}`
-            );
-            const [voucher] = await tx
-              .insert(vouchers)
-              .values({
-                companyId: voucherCompanyId,
-                voucherType: "Journal",
-                voucherNumber: voucherNum,
-                voucherDate: txDate,
-                description: `${charge.description} (post-offload) — container ${container.containerNumber}`,
-                totalAmount: String(chargeAmt),
-                currency: chargeCcy,
-                exchangeRate: String(chargeFx),
-                sourceModule: "FACTORY",
-              })
-              .returning();
-            console.log(`[POC diag] voucherId=${voucher.id} inserted`);
-            await tx.insert(voucherEntries).values({
-              voucherId: voucher.id,
-              ledgerAccountId: voucherChargesPayableAcctId,
-              debitAmount: String(chargeAmt),
-              creditAmount: "0",
-              narration: `${charge.description} payable — container ${container.containerNumber}`,
-            });
-            if (charge.ledgerAccountId) {
-              await tx.insert(voucherEntries).values({
-                voucherId: voucher.id,
-                ledgerAccountId: charge.ledgerAccountId,
-                debitAmount: "0",
-                creditAmount: String(chargeAmt),
-                narration: `${charge.description} — container ${container.containerNumber}`,
-              });
-            } else if (charge.supplierId) {
-              await tx.insert(voucherEntries).values({
-                voucherId: voucher.id,
-                factorySupplierId: charge.supplierId,
-                debitAmount: "0",
-                creditAmount: String(chargeAmt),
-                narration: `${charge.description} — container ${container.containerNumber}`,
-              });
-            }
-          }
+
+          lastResult = mutResult;
+          if (mutResult.cascadeResult) allCascadeResults.push(mutResult.cascadeResult);
         }
       });
+
+      const cascadeResult = allCascadeResults[allCascadeResults.length - 1] || null;
+      const r = lastResult!;
+
+      // Fetch updated raw-stock row for response
+      const [newRawStock] = await db
+        .select()
+        .from(factoryRawStock)
+        .where(and(eq(factoryRawStock.companyId, companyId), eq(factoryRawStock.containerId, containerId)));
 
       res.json({
         message: "Post-offload charges added and costs recalculated",
         containerId,
         oldContainerCostPerKgUsd,
-        newContainerCostPerKgUsd,
+        newContainerCostPerKgUsd: r.newContainerCostPerKgUsd,
         oldContainerTotalUsd,
-        newContainerTotalUsd,
+        newContainerTotalUsd: parseFloat(String((await db.select({ v: factoryContainers.finalPayableAmountUsd }).from(factoryContainers).where(eq(factoryContainers.id, containerId)))[0]?.v || "0")),
         rawStockRowsUpdated: cascadeResult?.rawStockRowsUpdated ?? 0,
-        supplierLockedRateOld,
-        supplierLockedRateNew,
-        // Exact-precision breakdown (string to avoid JS float precision loss)
-        supplierRemainingKg: supplierRemainingKgNum,
-        containerReceivedKg,
-        containerRemainingKg,
-        remainingFraction: remainingFractionNum,
-        fullContainerValueDeltaUsd: fullContainerValueDeltaUsdStr,
-        supplierInventoryValueDeltaUsd: supplierInventoryValueDeltaUsdStr,
-        supplierValueBeforeUsd: supplierValueBeforeUsdStr,
-        supplierValueAfterUsd: supplierValueAfterUsdStr,
-        supplierLockedRateOldExact: supplierLockedRateOldStr,
-        supplierLockedRateNewExact: supplierLockedRateNewStr,
-        oldRawStockCostPerKgUsd,
-        rawStockRateWasStale,
+        supplierLockedRateOld: r.supplierLockedRateBefore ? parseFloat(r.supplierLockedRateBefore) : null,
+        supplierLockedRateNew: r.supplierLockedRateAfter ? parseFloat(r.supplierLockedRateAfter) : null,
+        supplierRemainingKg: r.supplierRemainingKg,
+        containerReceivedKg: r.containerReceivedKg,
+        containerRemainingKg: r.containerRemainingKg,
+        remainingFraction: parseFloat(r.remainingFraction),
+        fullContainerValueDeltaUsd: r.fullContainerValueDeltaUsd,
+        supplierInventoryValueDeltaUsd: r.supplierInventoryValueDeltaUsd,
+        supplierValueBeforeUsd: r.supplierValueBeforeUsd,
+        supplierValueAfterUsd: r.supplierValueAfterUsd,
+        supplierLockedRateOldExact: r.supplierLockedRateBefore,
+        supplierLockedRateNewExact: r.supplierLockedRateAfter,
+        rawStockRateWasStale: false,
         affectedBatches: (cascadeResult?.affectedBatches ?? []).map((b: any) => ({
           batchId: b.batchId,
           batchCode: b.batchCode,
@@ -695,6 +505,302 @@ export function registerRawStockContainerRoutes(app: Express) {
       res.status(500).json({ message: error.message });
     }
   });
+
+  // ── GET /api/factory/containers/:id/post-offload-charges ─────────────────────
+  // Returns charge history (active + undone) for a container, newest first.
+  app.get("/api/factory/containers/:id/post-offload-charges", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      const containerId = parseId(req.params.id);
+      if (containerId === null) return res.status(400).json({ message: "Invalid id" });
+
+      const rows = await db
+        .select()
+        .from(factoryOffloadAdditionalCharges)
+        .where(
+          and(
+            eq(factoryOffloadAdditionalCharges.containerId, containerId),
+            eq(factoryOffloadAdditionalCharges.companyId, companyId)
+          )
+        )
+        .orderBy(desc(factoryOffloadAdditionalCharges.createdAt));
+
+      res.json(rows);
+    } catch (error: any) {
+      console.error("Error fetching post-offload charge history:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // ── PATCH /api/factory/containers/:id/post-offload-charges/:chargeId ─────────
+  // Edit an existing charge in-place. Admin only.
+  app.patch(
+    "/api/factory/containers/:id/post-offload-charges/:chargeId",
+    requireAuth,
+    requireRole(...ADMIN_ROLES),
+    async (req: any, res: any) => {
+      try {
+        const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+        if (!companyId) return res.status(400).json({ message: "No company selected" });
+        const containerId = parseId(req.params.id);
+        const chargeId = parseId(req.params.chargeId);
+        if (containerId === null || chargeId === null) return res.status(400).json({ message: "Invalid id" });
+
+        const {
+          description,
+          amount,
+          currencyCode,
+          ledgerAccountId,
+          supplierId,
+          txDate: reqTxDate,
+          expectedVersion,
+          legacyBaselineRate,
+        } = req.body;
+
+        if (!amount || parseFloat(amount) <= 0) {
+          return res.status(400).json({ message: "amount must be > 0" });
+        }
+
+        const [container] = await db
+          .select()
+          .from(factoryContainers)
+          .where(and(eq(factoryContainers.id, containerId), eq(factoryContainers.companyId, companyId)));
+        if (!container) return res.status(404).json({ message: "Container not found" });
+
+        const txDate = reqTxDate || getClientDate(req);
+        const containerCcy = container.currencyCode || "USD";
+        const chargeCcy = currencyCode || "USD";
+        const { fxRate: containerFxRate, looksSet: pocFxLooksSet } = resolveStoredFxRate(
+          containerCcy,
+          (container as any).fxRateToUsdOffload || container.fxRateToUsd,
+          (container as any).fxRateConfirmed
+        );
+        if (!pocFxLooksSet) {
+          return res.status(400).json({ message: new UnresolvedExchangeRateError(containerCcy).message });
+        }
+
+        // Resolve FX + accounting context before transaction
+        let fxResolved: { fxRateToUsd: number; fxRateConfirmed: boolean; fxRateDate: string };
+        try {
+          fxResolved = await resolvePostOffloadChargeFx({
+            chargeCcy,
+            containerCcy,
+            containerFxRate,
+            containerFxRateDateOffload: (container as any).fxRateDateOffload || null,
+            containerFxConfirmed: !!(container as any).fxRateConfirmed,
+            txDate,
+            companyId,
+          });
+        } catch (e: any) {
+          return res.status(400).json({ message: e.message });
+        }
+
+        let acctCtx: AccountingContext = { voucherCompanyId: companyId, chargesPayableAcctId: 0 };
+        if (ledgerAccountId) {
+          const lid = parseInt(ledgerAccountId);
+          const [acctRow] = await db
+            .select({ companyId: ledgerAccounts.companyId })
+            .from(ledgerAccounts)
+            .where(eq(ledgerAccounts.id, lid));
+          const voucherCompanyId = acctRow?.companyId ?? companyId;
+          const cpAcctId = await getOrCreateLedgerAccount(
+            voucherCompanyId,
+            "FACTORY_CHARGES_PAYABLE",
+            "Factory Charges Payable"
+          );
+          acctCtx = { voucherCompanyId, chargesPayableAcctId: cpAcctId };
+        } else if (supplierId) {
+          const cpAcctId = await getOrCreateLedgerAccount(companyId, "FACTORY_CHARGES_PAYABLE", "Factory Charges Payable");
+          acctCtx = { voucherCompanyId: companyId, chargesPayableAcctId: cpAcctId };
+        }
+
+        const userId = String((req.session as any).userId || (req.user as any)?.id || "system");
+        let mutResult: any;
+
+        try {
+          await db.transaction(async (tx) => {
+            mutResult = await applyPostOffloadChargeMutation(tx, {
+              action: "EDIT",
+              companyId,
+              containerId,
+              chargeId,
+              txDate,
+              userId,
+              expectedVersion: expectedVersion !== undefined ? parseInt(expectedVersion) : undefined,
+              legacyBaselineRate: legacyBaselineRate !== undefined ? parseFloat(legacyBaselineRate) : undefined,
+              chargeData: {
+                description: description || "Post-offload charge",
+                amount: parseFloat(amount),
+                currencyCode: chargeCcy,
+                fxRateToUsd: fxResolved.fxRateToUsd,
+                fxRateConfirmed: fxResolved.fxRateConfirmed,
+                fxRateDate: fxResolved.fxRateDate,
+                ledgerAccountId: ledgerAccountId ? parseInt(ledgerAccountId) : null,
+                supplierId: supplierId ? parseInt(supplierId) : null,
+              },
+              accountingCtx: acctCtx,
+            });
+          });
+        } catch (err: any) {
+          if (err.status === 409) return res.status(409).json({ message: err.message });
+          throw err;
+        }
+
+        res.json({
+          message: "Post-offload charge updated",
+          ...mutResult,
+          supplierLockedRateOldExact: mutResult.supplierLockedRateBefore,
+          supplierLockedRateNewExact: mutResult.supplierLockedRateAfter,
+          affectedBatches: (mutResult.cascadeResult?.affectedBatches ?? []).map((b: any) => ({
+            batchId: b.batchId,
+            batchCode: b.batchCode,
+            status: b.status ?? null,
+            wasCompleted: b.wasCompleted,
+            weightKgFromContainer: b.weightKgFromContainer,
+            oldCostPerKg: b.oldCostPerKg,
+            newCostPerKg: b.newCostPerKg,
+          })),
+          affectedBalesCount: mutResult.cascadeResult?.affectedBales?.length ?? 0,
+          rawStockRowsUpdated: mutResult.cascadeResult?.rawStockRowsUpdated ?? 0,
+        });
+      } catch (error: any) {
+        console.error("Error editing post-offload charge:", error);
+        res.status(500).json({ message: error.message });
+      }
+    }
+  );
+
+  // ── DELETE /api/factory/containers/:id/post-offload-charges/:chargeId ────────
+  // Undo (soft-delete) a charge and reverse accounting. Admin only.
+  app.delete(
+    "/api/factory/containers/:id/post-offload-charges/:chargeId",
+    requireAuth,
+    requireRole(...ADMIN_ROLES),
+    async (req: any, res: any) => {
+      try {
+        const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+        if (!companyId) return res.status(400).json({ message: "No company selected" });
+        const containerId = parseId(req.params.id);
+        const chargeId = parseId(req.params.chargeId);
+        if (containerId === null || chargeId === null) return res.status(400).json({ message: "Invalid id" });
+
+        const { expectedVersion, undoDate, legacyBaselineRate } = req.body || {};
+
+        const [container] = await db
+          .select()
+          .from(factoryContainers)
+          .where(and(eq(factoryContainers.id, containerId), eq(factoryContainers.companyId, companyId)));
+        if (!container) return res.status(404).json({ message: "Container not found" });
+
+        const txDate = undoDate || getClientDate(req);
+        const userId = String((req.session as any).userId || (req.user as any)?.id || "system");
+        let mutResult: any;
+
+        try {
+          await db.transaction(async (tx) => {
+            mutResult = await applyPostOffloadChargeMutation(tx, {
+              action: "UNDO",
+              companyId,
+              containerId,
+              chargeId,
+              txDate,
+              userId,
+              expectedVersion: expectedVersion !== undefined ? parseInt(expectedVersion) : undefined,
+              legacyBaselineRate: legacyBaselineRate !== undefined ? parseFloat(legacyBaselineRate) : undefined,
+            });
+          });
+        } catch (err: any) {
+          if (err.status === 409) return res.status(409).json({ message: err.message });
+          throw err;
+        }
+
+        if (mutResult.alreadyUndone) {
+          return res.json({ message: "Charge was already undone", alreadyUndone: true, chargeId });
+        }
+
+        res.json({
+          message: "Post-offload charge undone and accounting reversed",
+          ...mutResult,
+          supplierLockedRateOldExact: mutResult.supplierLockedRateBefore,
+          supplierLockedRateNewExact: mutResult.supplierLockedRateAfter,
+          affectedBatches: (mutResult.cascadeResult?.affectedBatches ?? []).map((b: any) => ({
+            batchId: b.batchId,
+            batchCode: b.batchCode,
+            status: b.status ?? null,
+            wasCompleted: b.wasCompleted,
+            weightKgFromContainer: b.weightKgFromContainer,
+            oldCostPerKg: b.oldCostPerKg,
+            newCostPerKg: b.newCostPerKg,
+          })),
+          affectedBalesCount: mutResult.cascadeResult?.affectedBales?.length ?? 0,
+          rawStockRowsUpdated: mutResult.cascadeResult?.rawStockRowsUpdated ?? 0,
+        });
+      } catch (error: any) {
+        console.error("Error undoing post-offload charge:", error);
+        res.status(500).json({ message: error.message });
+      }
+    }
+  );
+
+  // ── PATCH /api/factory/containers/:id/post-offload-charges/:chargeId/legacy-rebuild
+  // Rebuild supplier rate for a legacy charge (supplierLockedRateBefore IS NULL). Admin only.
+  app.patch(
+    "/api/factory/containers/:id/post-offload-charges/:chargeId/legacy-rebuild",
+    requireAuth,
+    requireRole(...ADMIN_ROLES),
+    async (req: any, res: any) => {
+      try {
+        const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+        if (!companyId) return res.status(400).json({ message: "No company selected" });
+        const containerId = parseId(req.params.id);
+        const chargeId = parseId(req.params.chargeId);
+        if (containerId === null || chargeId === null) return res.status(400).json({ message: "Invalid id" });
+
+        const { legacyBaselineRate, expectedVersion } = req.body || {};
+        if (!legacyBaselineRate || parseFloat(legacyBaselineRate) <= 0) {
+          return res.status(400).json({ message: "legacyBaselineRate is required and must be > 0" });
+        }
+
+        const [container] = await db
+          .select()
+          .from(factoryContainers)
+          .where(and(eq(factoryContainers.id, containerId), eq(factoryContainers.companyId, companyId)));
+        if (!container) return res.status(404).json({ message: "Container not found" });
+
+        const userId = String((req.session as any).userId || (req.user as any)?.id || "system");
+        let mutResult: any;
+
+        try {
+          await db.transaction(async (tx) => {
+            mutResult = await applyPostOffloadChargeMutation(tx, {
+              action: "LEGACY_REBUILD",
+              companyId,
+              containerId,
+              chargeId,
+              txDate: getClientDate(req),
+              userId,
+              legacyBaselineRate: parseFloat(legacyBaselineRate),
+              expectedVersion: expectedVersion !== undefined ? parseInt(expectedVersion) : undefined,
+            });
+          });
+        } catch (err: any) {
+          if (err.status === 409) return res.status(409).json({ message: err.message });
+          throw err;
+        }
+
+        res.json({
+          message: "Legacy charge supplier rate rebuilt successfully",
+          ...mutResult,
+          supplierLockedRateOldExact: mutResult.supplierLockedRateBefore,
+          supplierLockedRateNewExact: mutResult.supplierLockedRateAfter,
+        });
+      } catch (error: any) {
+        console.error("Error rebuilding legacy post-offload charge:", error);
+        res.status(500).json({ message: error.message });
+      }
+    }
+  );
 
   app.get("/api/factory/containers/:id/duty-audit-log", requireAuth, async (req: any, res: any) => {
     try {

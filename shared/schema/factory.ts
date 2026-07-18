@@ -845,13 +845,36 @@ export const factoryOffloadAdditionalCharges = pgTable(
     currencyCode: text("currency_code").default("USD"),
     fxRateToUsd: decimal("fx_rate_to_usd", { precision: 20, scale: 6 }).default("1"),
     fxRateConfirmed: boolean("fx_rate_confirmed").notNull().default(false),
+    fxRateDate: date("fx_rate_date"),
     ledgerAccountId: integer("ledger_account_id"),
     supplierId: integer("supplier_id").references(() => factorySuppliers.id, { onDelete: "restrict" }),
+    // Accounting links — set on creation, used for edit/undo
+    voucherId: integer("voucher_id").references(() => vouchers.id, { onDelete: "set null" }),
+    daybookEntryId: integer("daybook_entry_id"),
+    reversalDaybookEntryId: integer("reversal_daybook_entry_id"),
+    // Supplier-rate snapshots — saved on each create/edit so edit/undo can reason exactly
+    supplierLockedRateBefore: decimal("supplier_locked_rate_before", { precision: 20, scale: 8 }),
+    supplierLockedRateAfter: decimal("supplier_locked_rate_after", { precision: 20, scale: 8 }),
+    supplierRemainingKgAtApply: decimal("supplier_remaining_kg_at_apply", { precision: 20, scale: 3 }),
+    fullContainerValueDeltaUsd: decimal("full_container_value_delta_usd", { precision: 20, scale: 6 }),
+    supplierInventoryValueDeltaUsd: decimal("supplier_inventory_value_delta_usd", { precision: 20, scale: 6 }),
+    remainingFractionAtApply: decimal("remaining_fraction_at_apply", { precision: 20, scale: 8 }),
+    // Audit / lifecycle
+    createdByUserId: text("created_by_user_id"),
+    updatedByUserId: text("updated_by_user_id"),
     createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+    deletedAt: timestamp("deleted_at"),
+    version: integer("version").notNull().default(1),
   },
   (t) => ({
     companyIdx: index("factory_offload_additional_charges_company_idx").on(t.companyId),
     containerIdx: index("factory_offload_addl_charges_container_idx").on(t.containerId),
+    companyContainerDelIdx: index("factory_offload_addl_charges_co_ctr_del_idx").on(
+      t.companyId,
+      t.containerId,
+      t.deletedAt
+    ),
   })
 );
 

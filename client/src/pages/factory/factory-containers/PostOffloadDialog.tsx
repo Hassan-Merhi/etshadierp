@@ -1,6 +1,18 @@
 import { useState, Fragment } from "react";
-import { useMutation } from "@tanstack/react-query";
-import { PlusCircle, Plus, X, CheckCircle2, Info } from "lucide-react";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import {
+  PlusCircle,
+  Plus,
+  X,
+  CheckCircle2,
+  Info,
+  Pencil,
+  Trash2,
+  AlertTriangle,
+  RotateCcw,
+  ChevronDown,
+  ChevronUp,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -19,6 +31,8 @@ import { formatNumber } from "@/lib/formatNumber";
 import { useAdminOverride } from "@/hooks/use-admin-override";
 import type { ContainerWithSupplier } from "./otwHelpers";
 
+// ─── Types ────────────────────────────────────────────────────────────────────
+
 type PostOffloadCharge = {
   id: string;
   description: string;
@@ -28,28 +42,49 @@ type PostOffloadCharge = {
   supplierId: string;
 };
 
-type PostOffloadResult = {
+type HistoryRow = {
+  id: number;
+  description: string;
+  amount: string;
+  currencyCode: string;
+  fxRateToUsd: string;
+  fxRateConfirmed: boolean;
+  fxRateDate: string | null;
+  ledgerAccountId: number | null;
+  supplierId: number | null;
+  voucherId: number | null;
+  daybookEntryId: number | null;
+  supplierLockedRateBefore: string | null;
+  supplierLockedRateAfter: string | null;
+  supplierRemainingKgAtApply: string | null;
+  fullContainerValueDeltaUsd: string | null;
+  supplierInventoryValueDeltaUsd: string | null;
+  remainingFractionAtApply: string | null;
+  createdAt: string;
+  updatedAt: string;
+  deletedAt: string | null;
+  version: number;
+};
+
+type MutationResult = {
   message: string;
-  containerId: number;
+  containerId?: number;
+  chargeId?: number;
+  action?: string;
   oldContainerCostPerKgUsd: number;
   newContainerCostPerKgUsd: number;
-  oldContainerTotalUsd: number;
-  newContainerTotalUsd: number;
-  rawStockRowsUpdated: number;
-  supplierLockedRateOld: number | null;
-  supplierLockedRateNew: number | null;
-  // Exact-precision breakdown
+  supplierLockedRateBefore?: string | null;
+  supplierLockedRateAfter?: string | null;
+  supplierLockedRateOldExact?: string | null;
+  supplierLockedRateNewExact?: string | null;
   supplierRemainingKg?: number;
   containerReceivedKg?: number;
   containerRemainingKg?: number;
-  remainingFraction?: number;
+  remainingFraction?: number | string;
   fullContainerValueDeltaUsd?: string;
   supplierInventoryValueDeltaUsd?: string;
   supplierValueBeforeUsd?: string | null;
   supplierValueAfterUsd?: string | null;
-  supplierLockedRateOldExact?: string | null;
-  supplierLockedRateNewExact?: string | null;
-  oldRawStockCostPerKgUsd?: number | null;
   rawStockRateWasStale?: boolean;
   affectedBatches: {
     batchId: number;
@@ -61,6 +96,7 @@ type PostOffloadResult = {
     newCostPerKg: number;
   }[];
   affectedBalesCount: number;
+  rawStockRowsUpdated?: number;
 };
 
 interface PostOffloadDialogProps {
@@ -69,29 +105,173 @@ interface PostOffloadDialogProps {
   onClose: () => void;
 }
 
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function invalidateChargeQueries(containerId: number) {
+  queryClient.invalidateQueries({ queryKey: ["/api/factory/containers"] });
+  queryClient.invalidateQueries({ queryKey: ["/api/factory/raw-stock"] });
+  queryClient.invalidateQueries({ queryKey: ["/api/factory/raw-stock/by-container"] });
+  queryClient.invalidateQueries({ queryKey: ["/api/factory/mix-batches"] });
+  queryClient.invalidateQueries({ queryKey: ["/api/factory/bales"], refetchType: "active" });
+  queryClient.invalidateQueries({ queryKey: ["/api/factory/suppliers"] });
+  queryClient.invalidateQueries({ queryKey: ["/api/factory/suppliers/with-balances"] });
+  queryClient.invalidateQueries({ queryKey: ["/api/factory/production-value-report"] });
+  queryClient.invalidateQueries({ queryKey: [`/api/factory/containers/${containerId}/post-offload-charges`] });
+  queryClient.invalidateQueries({ queryKey: ["/api/factory/daybook"] });
+}
+
+function RateCell({ label, value }: { label: string; value: string | null }) {
+  if (!value) return null;
+  return (
+    <div className="flex justify-between text-xs">
+      <span className="text-muted-foreground">{label}</span>
+      <span className="font-mono">${parseFloat(value).toFixed(8)}</span>
+    </div>
+  );
+}
+
+function MutationResultPanel({ result }: { result: MutationResult }) {
+  const oldRate = result.supplierLockedRateBefore || result.supplierLockedRateOldExact;
+  const newRate = result.supplierLockedRateAfter || result.supplierLockedRateNewExact;
+  const supDelta = result.supplierInventoryValueDeltaUsd;
+  const fraction =
+    typeof result.remainingFraction === "number"
+      ? result.remainingFraction
+      : result.remainingFraction
+      ? parseFloat(result.remainingFraction)
+      : null;
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-start gap-3 p-3 rounded-md bg-green-50 dark:bg-green-950/20 text-green-800 dark:text-green-300 text-sm">
+        <CheckCircle2 className="h-4 w-4 mt-0.5 shrink-0" />
+        <p className="font-semibold">{result.message}</p>
+      </div>
+
+      <div className="rounded-md border text-sm divide-y">
+        <div className="grid grid-cols-3 gap-2 px-3 py-1.5 text-xs text-muted-foreground font-medium bg-muted/30">
+          <span>Metric</span>
+          <span className="text-right">Previous</span>
+          <span className="text-right">New</span>
+        </div>
+        <div className="grid grid-cols-3 gap-2 px-3 py-2">
+          <span className="text-muted-foreground">Container cost/kg (USD)</span>
+          <span className="text-right font-mono">${result.oldContainerCostPerKgUsd.toFixed(6)}</span>
+          <span className="text-right font-mono font-semibold text-green-700 dark:text-green-400">
+            ${result.newContainerCostPerKgUsd.toFixed(6)}
+          </span>
+        </div>
+        {oldRate && (
+          <div className="grid grid-cols-3 gap-2 px-3 py-2">
+            <span className="text-muted-foreground">Supplier locked rate</span>
+            <span className="text-right font-mono">${parseFloat(oldRate).toFixed(8)}</span>
+            <span className="text-right font-mono font-semibold">{newRate ? `$${parseFloat(newRate).toFixed(8)}` : "—"}</span>
+          </div>
+        )}
+        {supDelta && result.supplierRemainingKg != null && (
+          <div className="px-3 py-2 bg-muted/30 text-xs text-muted-foreground space-y-0.5">
+            <div className="flex justify-between">
+              <span>Supplier remaining</span>
+              <span className="font-mono">{formatNumber(result.supplierRemainingKg)} kg</span>
+            </div>
+            <div className="flex justify-between">
+              <span>Inventory value applied</span>
+              <span className="font-mono">${parseFloat(supDelta).toLocaleString("en", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+            </div>
+            {fraction != null && fraction < 0.9999 && result.fullContainerValueDeltaUsd && (
+              <div className="mt-1 text-amber-700 dark:text-amber-400">
+                Only {(fraction * 100).toFixed(0)}% of this container remains in inventory.
+              </div>
+            )}
+          </div>
+        )}
+        <div className="grid grid-cols-3 gap-2 px-3 py-2 text-muted-foreground">
+          <span>Raw-stock rows updated</span>
+          <span className="text-right">—</span>
+          <span className="text-right font-mono">{result.rawStockRowsUpdated ?? 0}</span>
+        </div>
+        <div className="grid grid-cols-3 gap-2 px-3 py-2 text-muted-foreground">
+          <span>Bales updated</span>
+          <span className="text-right">—</span>
+          <span className="text-right font-mono">{result.affectedBalesCount}</span>
+        </div>
+      </div>
+
+      {result.affectedBatches.length > 0 && (
+        <div className="space-y-2">
+          <p className="text-sm font-semibold">Affected Mix Batches</p>
+          <div className="border rounded-md divide-y text-sm">
+            <div className="grid grid-cols-[2fr_1fr_1fr_1fr] gap-2 px-3 py-1.5 text-xs text-muted-foreground font-medium bg-muted/30">
+              <span>Batch</span>
+              <span className="text-right">Old Cost/kg</span>
+              <span className="text-right">New Cost/kg</span>
+              <span className="text-right">Wt from container</span>
+            </div>
+            {result.affectedBatches.map((b) => (
+              <div key={b.batchId} className="grid grid-cols-[2fr_1fr_1fr_1fr] gap-2 px-3 py-2 items-center">
+                <span className="font-mono font-medium flex items-center gap-1.5 flex-wrap">
+                  {b.batchCode}
+                  {b.wasCompleted && (
+                    <span className="text-xs bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 px-1.5 py-0.5 rounded whitespace-nowrap">
+                      Completed
+                    </span>
+                  )}
+                </span>
+                <span className="text-right font-mono text-muted-foreground">${b.oldCostPerKg.toFixed(4)}</span>
+                <span className="text-right font-mono font-semibold">${b.newCostPerKg.toFixed(4)}</span>
+                <span className="text-right font-mono text-muted-foreground">{formatNumber(b.weightKgFromContainer)} kg</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Main component ───────────────────────────────────────────────────────────
+
 export function PostOffloadDialog({ container, ledgerAccounts, onClose }: PostOffloadDialogProps) {
   const { toast } = useToast();
   const { wrapAdminAction, AdminDialog } = useAdminOverride();
-  const [charges, setCharges] = useState<PostOffloadCharge[]>([]);
+
+  // New-charge form state
+  const [newCharges, setNewCharges] = useState<PostOffloadCharge[]>([]);
   const [txDate, setTxDate] = useState<string>(() => new Date().toLocaleDateString("en-CA"));
-  const [result, setResult] = useState<PostOffloadResult | null>(null);
+  const [createResult, setCreateResult] = useState<MutationResult | null>(null);
 
-  const handleClose = () => {
-    setCharges([]);
-    setResult(null);
-    onClose();
-  };
+  // Edit mode state
+  const [editingCharge, setEditingCharge] = useState<HistoryRow | null>(null);
+  const [editDesc, setEditDesc] = useState("");
+  const [editAmount, setEditAmount] = useState("");
+  const [editCcy, setEditCcy] = useState("USD");
+  const [editLedgerId, setEditLedgerId] = useState("");
+  const [editTxDate, setEditTxDate] = useState<string>(() => new Date().toLocaleDateString("en-CA"));
+  const [editResult, setEditResult] = useState<MutationResult | null>(null);
+  const [editLegacyRate, setEditLegacyRate] = useState("");
 
+  // Undo state
+  const [undoCharge, setUndoCharge] = useState<HistoryRow | null>(null);
+  const [undoLegacyRate, setUndoLegacyRate] = useState("");
+  const [undoResult, setUndoResult] = useState<MutationResult | null>(null);
+  const [undoDate, setUndoDate] = useState<string>(() => new Date().toLocaleDateString("en-CA"));
+
+  // History visibility
+  const [historyExpanded, setHistoryExpanded] = useState(true);
+
+  // ── Charge history query ─────────────────────────────────────────────────
+  const { data: chargeHistory = [] } = useQuery<HistoryRow[]>({
+    queryKey: [`/api/factory/containers/${container?.id}/post-offload-charges`],
+    enabled: !!container?.id,
+    select: (rows: HistoryRow[]) => rows,
+  });
+
+  const activeCharges = chargeHistory.filter((r) => !r.deletedAt);
+  const undoneCharges = chargeHistory.filter((r) => !!r.deletedAt);
+
+  // ── Create mutation ──────────────────────────────────────────────────────
   const postOffloadMutation = useMutation({
-    mutationFn: async ({
-      containerId,
-      charges: c,
-      txDate: d,
-    }: {
-      containerId: number;
-      charges: any[];
-      txDate: string;
-    }) => {
+    mutationFn: async ({ containerId, charges: c, txDate: d }: { containerId: number; charges: any[]; txDate: string }) => {
       const res = await factoryApiRequest("POST", `/api/factory/containers/${containerId}/post-offload-charges`, {
         charges: c,
         txDate: d,
@@ -103,15 +283,9 @@ export function PostOffloadDialog({ container, ledgerAccounts, onClose }: PostOf
       return res.json();
     },
     onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/factory/containers"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/factory/raw-stock"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/factory/raw-stock/by-container"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/factory/mix-batches"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/factory/bales"], refetchType: "active" });
-      queryClient.invalidateQueries({ queryKey: ["/api/factory/suppliers"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/factory/suppliers/with-balances"] });
-      setResult(data);
-      setCharges([]);
+      if (container) invalidateChargeQueries(container.id);
+      setCreateResult(data);
+      setNewCharges([]);
     },
     onError: (err: Error) => {
       if ((err as any)?._handledGlobally) return;
@@ -119,308 +293,632 @@ export function PostOffloadDialog({ container, ledgerAccounts, onClose }: PostOf
     },
   });
 
+  // ── Edit mutation ────────────────────────────────────────────────────────
+  const editMutation = useMutation({
+    mutationFn: async ({ containerId, chargeId, body }: { containerId: number; chargeId: number; body: any }) => {
+      const res = await factoryApiRequest("PATCH", `/api/factory/containers/${containerId}/post-offload-charges/${chargeId}`, body);
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.message || "Failed to update charge");
+      }
+      return res.json();
+    },
+    onSuccess: (data) => {
+      if (container) invalidateChargeQueries(container.id);
+      setEditResult(data);
+    },
+    onError: (err: Error) => {
+      if ((err as any)?._handledGlobally) return;
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    },
+  });
+
+  // ── Legacy rebuild mutation ──────────────────────────────────────────────
+  const rebuildMutation = useMutation({
+    mutationFn: async ({ containerId, chargeId, legacyBaselineRate, expectedVersion }: {
+      containerId: number; chargeId: number; legacyBaselineRate: number; expectedVersion: number;
+    }) => {
+      const res = await factoryApiRequest(
+        "PATCH",
+        `/api/factory/containers/${containerId}/post-offload-charges/${chargeId}/legacy-rebuild`,
+        { legacyBaselineRate, expectedVersion }
+      );
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.message || "Failed to rebuild charge");
+      }
+      return res.json();
+    },
+    onSuccess: (data) => {
+      if (container) invalidateChargeQueries(container.id);
+      setEditResult(data);
+    },
+    onError: (err: Error) => {
+      if ((err as any)?._handledGlobally) return;
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    },
+  });
+
+  // ── Undo mutation ────────────────────────────────────────────────────────
+  const undoMutation = useMutation({
+    mutationFn: async ({ containerId, chargeId, body }: { containerId: number; chargeId: number; body: any }) => {
+      const res = await factoryApiRequest("DELETE", `/api/factory/containers/${containerId}/post-offload-charges/${chargeId}`, body);
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.message || "Failed to undo charge");
+      }
+      return res.json();
+    },
+    onSuccess: (data) => {
+      if (container) invalidateChargeQueries(container.id);
+      if (data.alreadyUndone) {
+        toast({ title: "Already undone", description: "This charge was already reversed." });
+        setUndoCharge(null);
+      } else {
+        setUndoResult(data);
+        setUndoCharge(null);
+      }
+    },
+    onError: (err: Error) => {
+      if ((err as any)?._handledGlobally) return;
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    },
+  });
+
+  // ── Handlers ──────────────────────────────────────────────────────────────
+  const handleClose = () => {
+    setNewCharges([]);
+    setCreateResult(null);
+    setEditingCharge(null);
+    setEditResult(null);
+    setUndoCharge(null);
+    setUndoResult(null);
+    onClose();
+  };
+
+  const startEdit = (charge: HistoryRow) => {
+    setEditingCharge(charge);
+    setEditDesc(charge.description);
+    setEditAmount(charge.amount);
+    setEditCcy(charge.currencyCode || "USD");
+    setEditLedgerId(charge.ledgerAccountId ? String(charge.ledgerAccountId) : "");
+    setEditTxDate(new Date().toLocaleDateString("en-CA"));
+    setEditLegacyRate("");
+    setEditResult(null);
+  };
+
+  const handleSaveEdit = () => {
+    if (!container || !editingCharge) return;
+    const isLegacy = editingCharge.supplierLockedRateBefore === null;
+    const body: any = {
+      description: editDesc || "Post-offload charge",
+      amount: editAmount,
+      currencyCode: editCcy,
+      ledgerAccountId: editLedgerId ? parseInt(editLedgerId) : null,
+      txDate: editTxDate,
+      expectedVersion: editingCharge.version,
+    };
+    if (isLegacy && editLegacyRate) body.legacyBaselineRate = parseFloat(editLegacyRate);
+
+    wrapAdminAction(
+      () => editMutation.mutate({ containerId: container.id, chargeId: editingCharge.id, body }),
+      "Edit Post-Offload Charge"
+    );
+  };
+
+  const handleLegacyRebuild = () => {
+    if (!container || !editingCharge) return;
+    const rate = parseFloat(editLegacyRate);
+    if (!rate || rate <= 0) {
+      toast({ title: "Enter supplier rate", description: "Provide the supplier locked rate immediately before this charge.", variant: "destructive" });
+      return;
+    }
+    wrapAdminAction(
+      () => rebuildMutation.mutate({
+        containerId: container.id,
+        chargeId: editingCharge.id,
+        legacyBaselineRate: rate,
+        expectedVersion: editingCharge.version,
+      }),
+      "Legacy Rebuild — Supplier Rate"
+    );
+  };
+
+  const handleConfirmUndo = () => {
+    if (!container || !undoCharge) return;
+    const isLegacy = undoCharge.supplierLockedRateBefore === null;
+    if (isLegacy && !undoLegacyRate) {
+      toast({ title: "Enter baseline rate", description: "Provide the supplier locked rate before this charge to undo it.", variant: "destructive" });
+      return;
+    }
+    const body: any = {
+      undoDate,
+      expectedVersion: undoCharge.version,
+    };
+    if (isLegacy && undoLegacyRate) body.legacyBaselineRate = parseFloat(undoLegacyRate);
+
+    wrapAdminAction(
+      () => undoMutation.mutate({ containerId: container.id, chargeId: undoCharge.id, body }),
+      "Undo Post-Offload Charge"
+    );
+  };
+
+  // ─── Undo confirmation panel ──────────────────────────────────────────────
+  if (undoCharge && !undoResult) {
+    const isLegacy = undoCharge.supplierLockedRateBefore === null;
+    return (
+      <>
+        <Dialog open={!!container} onOpenChange={(v) => { if (!v) handleClose(); }}>
+          <DialogContent className="max-w-lg">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 text-red-600 dark:text-red-400">
+                <AlertTriangle className="h-5 w-5" /> Undo Post-Offload Charge
+              </DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 py-2 text-sm">
+              <p>This will reverse the following charge and all its downstream effects:</p>
+              <div className="rounded-md border px-3 py-2 space-y-1">
+                <p><strong>{undoCharge.description}</strong></p>
+                <p className="text-muted-foreground">{undoCharge.currencyCode} {parseFloat(undoCharge.amount).toFixed(2)}{undoCharge.fxRateToUsd && undoCharge.currencyCode !== "USD" ? ` × ${parseFloat(undoCharge.fxRateToUsd).toFixed(6)}` : ""}</p>
+              </div>
+              <ul className="text-sm text-muted-foreground list-disc pl-4 space-y-0.5">
+                <li>Container landed cost reverted</li>
+                <li>Raw-stock cost per kg reverted</li>
+                <li>Supplier locked rate reverted</li>
+                <li>All linked mix-batch and bale costs reverted</li>
+                <li>Linked voucher soft-deleted</li>
+                <li>Reversing daybook entry created</li>
+              </ul>
+              {isLegacy && (
+                <div className="rounded-md border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950/20 p-3 space-y-2">
+                  <p className="text-amber-800 dark:text-amber-300 font-medium flex items-center gap-1.5">
+                    <AlertTriangle className="h-4 w-4" /> Legacy charge — original supplier rate required
+                  </p>
+                  <p className="text-xs text-muted-foreground">Enter the supplier locked rate that was in effect immediately before this charge was applied.</p>
+                  <Input
+                    type="number"
+                    step="0.000001"
+                    value={undoLegacyRate}
+                    onChange={(e) => setUndoLegacyRate(e.target.value)}
+                    placeholder="e.g. 0.607861"
+                  />
+                </div>
+              )}
+              <div className="space-y-1">
+                <label className="text-sm font-medium">Reversal date</label>
+                <Input type="date" value={undoDate} onChange={(e) => setUndoDate(e.target.value)} className="w-48" />
+              </div>
+            </div>
+            <DialogFooter className="gap-2">
+              <Button variant="outline" onClick={() => { setUndoCharge(null); setUndoLegacyRate(""); }}>Cancel</Button>
+              <Button
+                variant="destructive"
+                onClick={handleConfirmUndo}
+                disabled={undoMutation.isPending || (isLegacy && !undoLegacyRate)}
+              >
+                {undoMutation.isPending ? "Undoing..." : "Confirm Undo"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+        {AdminDialog}
+      </>
+    );
+  }
+
+  // ─── Show undo result ────────────────────────────────────────────────────
+  if (undoResult) {
+    return (
+      <>
+        <Dialog open={!!container} onOpenChange={(v) => { if (!v) handleClose(); }}>
+          <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col">
+            <DialogHeader>
+              <DialogTitle>Charge Undone</DialogTitle>
+            </DialogHeader>
+            <div className="flex-1 overflow-y-auto py-2">
+              <MutationResultPanel result={undoResult} />
+            </div>
+            <DialogFooter className="pt-2 border-t">
+              <Button variant="outline" onClick={() => { setUndoResult(null); }}>Back</Button>
+              <Button onClick={handleClose}>Close</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+        {AdminDialog}
+      </>
+    );
+  }
+
+  // ─── Edit panel ───────────────────────────────────────────────────────────
+  if (editingCharge) {
+    const isLegacy = editingCharge.supplierLockedRateBefore === null;
+    const isBusy = editMutation.isPending || rebuildMutation.isPending;
+
+    return (
+      <>
+        <Dialog open={!!container} onOpenChange={(v) => { if (!v) handleClose(); }}>
+          <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Pencil className="h-5 w-5 text-blue-500" /> Edit Post-Offload Charge
+              </DialogTitle>
+              <DialogDescription>
+                Container <strong>{container?.containerNumber}</strong> — editing charge #{editingCharge.id}
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="flex-1 overflow-y-auto space-y-4 py-2">
+              {editResult ? (
+                <MutationResultPanel result={editResult} />
+              ) : (
+                <>
+                  {isLegacy && (
+                    <div className="rounded-md border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950/20 p-3 space-y-2">
+                      <p className="text-amber-800 dark:text-amber-300 font-medium flex items-center gap-1.5 text-sm">
+                        <AlertTriangle className="h-4 w-4" /> Legacy charge — original supplier rate required
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        This charge was created before supplier-rate snapshots were stored. Enter the supplier locked rate
+                        that was in effect immediately before this charge. For CYPRUS MODA, enter 0.607861.
+                      </p>
+                      <Input
+                        type="number"
+                        step="0.000001"
+                        value={editLegacyRate}
+                        onChange={(e) => setEditLegacyRate(e.target.value)}
+                        placeholder="e.g. 0.607861"
+                      />
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="col-span-2 space-y-1">
+                      <label className="text-sm font-medium">Description</label>
+                      <Input value={editDesc} onChange={(e) => setEditDesc(e.target.value)} placeholder="e.g. Port duty" />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-sm font-medium">Amount</label>
+                      <Input type="number" value={editAmount} onChange={(e) => setEditAmount(e.target.value)} step="0.01" placeholder="0.00" />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-sm font-medium">Currency</label>
+                      <Select value={editCcy} onValueChange={setEditCcy}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          {["USD", "EUR", "GBP", "AUD", "LBP"].map((c) => (
+                            <SelectItem key={c} value={c}>{c}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="col-span-2 space-y-1">
+                      <label className="text-sm font-medium">Account (optional)</label>
+                      <Select value={editLedgerId} onValueChange={setEditLedgerId}>
+                        <SelectTrigger><SelectValue placeholder="Select account (optional)" /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="">None</SelectItem>
+                          {ledgerAccounts.map((a: any) => (
+                            <SelectItem key={a.id} value={String(a.id)}>
+                              {a.code ? `${a.code} - ${a.name}` : a.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="col-span-2 space-y-1">
+                      <label className="text-sm font-medium">Date</label>
+                      <Input type="date" value={editTxDate} onChange={(e) => setEditTxDate(e.target.value)} className="w-48" />
+                    </div>
+                  </div>
+
+                  {/* Snapshot info */}
+                  {(editingCharge.supplierLockedRateBefore || editingCharge.supplierInventoryValueDeltaUsd) && (
+                    <div className="rounded-md border px-3 py-2 text-xs text-muted-foreground space-y-1">
+                      <p className="font-medium text-foreground text-sm">Stored snapshots</p>
+                      <RateCell label="Rate before" value={editingCharge.supplierLockedRateBefore} />
+                      <RateCell label="Rate after" value={editingCharge.supplierLockedRateAfter} />
+                      {editingCharge.supplierRemainingKgAtApply && (
+                        <div className="flex justify-between">
+                          <span>Supplier remaining at apply</span>
+                          <span className="font-mono">{formatNumber(parseFloat(editingCharge.supplierRemainingKgAtApply))} kg</span>
+                        </div>
+                      )}
+                      {editingCharge.supplierInventoryValueDeltaUsd && (
+                        <div className="flex justify-between">
+                          <span>Inventory value applied</span>
+                          <span className="font-mono">${parseFloat(editingCharge.supplierInventoryValueDeltaUsd).toFixed(6)}</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+
+            <DialogFooter className="gap-2 pt-2 border-t flex-wrap">
+              <Button variant="outline" onClick={() => { setEditingCharge(null); setEditResult(null); }}>
+                {editResult ? "Back" : "Cancel"}
+              </Button>
+              {!editResult && (
+                <>
+                  {isLegacy && editLegacyRate && (
+                    <Button
+                      variant="outline"
+                      onClick={handleLegacyRebuild}
+                      disabled={isBusy}
+                      title="Fix supplier rate using the legacy baseline without changing the charge amount or accounting"
+                    >
+                      {rebuildMutation.isPending ? "Rebuilding..." : "Rebuild Rate Only"}
+                    </Button>
+                  )}
+                  <Button onClick={handleSaveEdit} disabled={isBusy || !editAmount || parseFloat(editAmount) <= 0}>
+                    {editMutation.isPending ? "Saving..." : "Save Edit"}
+                  </Button>
+                </>
+              )}
+              {editResult && <Button onClick={handleClose}>Close</Button>}
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+        {AdminDialog}
+      </>
+    );
+  }
+
+  // ─── Main dialog ──────────────────────────────────────────────────────────
   return (
     <>
-      <Dialog
-        open={!!container}
-        onOpenChange={(v) => {
-          if (!v) handleClose();
-        }}
-      >
+      <Dialog open={!!container} onOpenChange={(v) => { if (!v) handleClose(); }}>
         <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <PlusCircle className="h-5 w-5 text-blue-500" />
-              Add Post-Offload Charges
+              Post-Offload Charges
             </DialogTitle>
             <DialogDescription>
-              Container <strong>{container?.containerNumber}</strong> — charges added here will update the cost per kg
-              and retroactively adjust all mix batches made from this container.
+              Container <strong>{container?.containerNumber}</strong> — charges here update cost per kg and cascade into mix batches.
             </DialogDescription>
           </DialogHeader>
 
           <div className="flex-1 overflow-y-auto space-y-5 py-2">
-            {result ? (
-              <div className="space-y-4">
-                <div className="flex items-start gap-3 p-3 rounded-md bg-green-50 dark:bg-green-950/20 text-green-800 dark:text-green-300 text-sm">
-                  <CheckCircle2 className="h-4 w-4 mt-0.5 shrink-0" />
-                  <div>
-                    <p className="font-semibold">Charges saved successfully</p>
-                    {result.rawStockRowsUpdated > 0 && (
-                      <p className="text-xs mt-0.5 opacity-80">
-                        The container cost per kg and all related mix batch costs have been updated.
+            {createResult ? (
+              <MutationResultPanel result={createResult} />
+            ) : (
+              <>
+                {/* ── Charge history section ─────────────────────────────── */}
+                {chargeHistory.length > 0 && (
+                  <div className="space-y-2">
+                    <button
+                      type="button"
+                      onClick={() => setHistoryExpanded((v) => !v)}
+                      className="flex items-center gap-1 text-sm font-semibold w-full text-left"
+                    >
+                      Post-Offload Charge History
+                      {historyExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                    </button>
+
+                    {historyExpanded && (
+                      <div className="border rounded-md divide-y text-sm">
+                        {/* Active charges */}
+                        {activeCharges.map((charge) => {
+                          const isLegacy = charge.supplierLockedRateBefore === null;
+                          return (
+                            <div key={charge.id} className="px-3 py-2.5 space-y-1">
+                              <div className="flex items-start justify-between gap-2">
+                                <div className="flex-1 min-w-0">
+                                  <p className="font-medium truncate">{charge.description}</p>
+                                  <p className="text-muted-foreground text-xs">
+                                    {charge.currencyCode} {parseFloat(charge.amount).toFixed(2)}
+                                    {charge.fxRateToUsd && charge.currencyCode !== "USD"
+                                      ? ` × ${parseFloat(charge.fxRateToUsd).toFixed(6)} = $${(parseFloat(charge.amount) * parseFloat(charge.fxRateToUsd)).toFixed(4)}`
+                                      : ""}
+                                    {" · "}
+                                    {charge.fxRateConfirmed ? (
+                                      <span className="text-green-600 dark:text-green-400">FX ✓</span>
+                                    ) : (
+                                      <span className="text-amber-600 dark:text-amber-400">FX unconfirmed</span>
+                                    )}
+                                    {charge.fxRateDate ? ` · ${charge.fxRateDate}` : ""}
+                                  </p>
+                                  {charge.supplierInventoryValueDeltaUsd && (
+                                    <p className="text-xs text-muted-foreground">
+                                      Inventory impact: ${parseFloat(charge.supplierInventoryValueDeltaUsd).toFixed(4)}
+                                    </p>
+                                  )}
+                                  {isLegacy && (
+                                    <p className="text-xs text-amber-600 dark:text-amber-400 flex items-center gap-1">
+                                      <AlertTriangle className="h-3 w-3" /> Legacy — rate input required for edit/undo
+                                    </p>
+                                  )}
+                                </div>
+                                <div className="flex gap-1 shrink-0">
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-7 w-7"
+                                    onClick={() => startEdit(charge)}
+                                    title="Edit charge"
+                                  >
+                                    <Pencil className="h-3.5 w-3.5" />
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-7 w-7 text-red-500 hover:text-red-700"
+                                    onClick={() => {
+                                      setUndoCharge(charge);
+                                      setUndoLegacyRate("");
+                                      setUndoDate(new Date().toLocaleDateString("en-CA"));
+                                    }}
+                                    title="Undo charge"
+                                  >
+                                    <RotateCcw className="h-3.5 w-3.5" />
+                                  </Button>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+
+                        {/* Undone charges */}
+                        {undoneCharges.map((charge) => (
+                          <div key={charge.id} className="px-3 py-2 opacity-50">
+                            <div className="flex items-center gap-2">
+                              <Trash2 className="h-3.5 w-3.5 text-red-500 shrink-0" />
+                              <span className="text-muted-foreground text-xs line-through">{charge.description}</span>
+                              <span className="text-muted-foreground text-xs ml-auto shrink-0">
+                                {charge.currencyCode} {parseFloat(charge.amount).toFixed(2)} · Undone {charge.deletedAt ? new Date(charge.deletedAt).toLocaleDateString() : ""}
+                              </span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* ── Add new charge form ────────────────────────────────── */}
+                <div className="space-y-5">
+                  <div className="flex items-start gap-3 p-3 rounded-md bg-blue-50 dark:bg-blue-950/20 text-blue-800 dark:text-blue-300 text-sm">
+                    <Info className="h-4 w-4 mt-0.5 shrink-0" />
+                    <p>Enter charges that arrived after the original offload — port fees, duties, handling, etc.</p>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-sm font-medium">Date</label>
+                    <Input
+                      type="date"
+                      value={txDate}
+                      onChange={(e) => setTxDate(e.target.value)}
+                      className="w-48"
+                      data-testid="input-post-offload-date"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between flex-wrap gap-1">
+                      <label className="text-sm font-medium">New Charges</label>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() =>
+                          setNewCharges((prev) => [
+                            ...prev,
+                            {
+                              id: Date.now().toString(),
+                              description: "",
+                              amount: "",
+                              currencyCode: (container as any)?.currencyCode || "USD",
+                              ledgerAccountId: "",
+                              supplierId: "",
+                            },
+                          ])
+                        }
+                        data-testid="button-add-post-offload-charge-row"
+                      >
+                        <Plus className="h-3 w-3 mr-1" /> Add Row
+                      </Button>
+                    </div>
+                    {newCharges.length === 0 ? (
+                      <p className="text-sm text-muted-foreground py-4 text-center border rounded-md">
+                        No charges added yet — click "Add Row" to begin.
                       </p>
+                    ) : (
+                      <div className="space-y-1">
+                        <div className="grid grid-cols-[2fr_1fr_auto_2fr_auto] gap-x-2 gap-y-1 items-center">
+                          <div className="text-xs text-muted-foreground font-medium">Description</div>
+                          <div className="text-xs text-muted-foreground font-medium">Amount</div>
+                          <div className="text-xs text-muted-foreground font-medium">CCY</div>
+                          <div className="text-xs text-muted-foreground font-medium">Account / Broker</div>
+                          <div />
+                          {newCharges.map((charge, idx) => (
+                            <Fragment key={charge.id}>
+                              <Input
+                                value={charge.description}
+                                onChange={(e) =>
+                                  setNewCharges((prev) =>
+                                    prev.map((c) => (c.id === charge.id ? { ...c, description: e.target.value } : c))
+                                  )
+                                }
+                                placeholder="e.g. Port duty"
+                                data-testid={`input-poc-description-${idx}`}
+                              />
+                              <Input
+                                type="number"
+                                value={charge.amount}
+                                onChange={(e) =>
+                                  setNewCharges((prev) =>
+                                    prev.map((c) => (c.id === charge.id ? { ...c, amount: e.target.value } : c))
+                                  )
+                                }
+                                placeholder="0.00"
+                                step="0.01"
+                                data-testid={`input-poc-amount-${idx}`}
+                              />
+                              <Select
+                                value={charge.currencyCode || "USD"}
+                                onValueChange={(v) =>
+                                  setNewCharges((prev) =>
+                                    prev.map((c) => (c.id === charge.id ? { ...c, currencyCode: v } : c))
+                                  )
+                                }
+                              >
+                                <SelectTrigger className="w-20" data-testid={`select-poc-currency-${idx}`}>
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {["USD", "EUR", "GBP", "AUD", "LBP"].map((ccy) => (
+                                    <SelectItem key={ccy} value={ccy}>{ccy}</SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                              <Select
+                                value={charge.ledgerAccountId || ""}
+                                onValueChange={(v) =>
+                                  setNewCharges((prev) =>
+                                    prev.map((c) =>
+                                      c.id === charge.id ? { ...c, ledgerAccountId: v, supplierId: "" } : c
+                                    )
+                                  )
+                                }
+                              >
+                                <SelectTrigger data-testid={`select-poc-account-${idx}`}>
+                                  <SelectValue placeholder="Select account (optional)" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {ledgerAccounts.map((a: any) => (
+                                    <SelectItem key={a.id} value={String(a.id)}>
+                                      {a.code ? `${a.code} - ${a.name}` : a.name}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => setNewCharges((prev) => prev.filter((c) => c.id !== charge.id))}
+                                data-testid={`button-remove-poc-${idx}`}
+                              >
+                                <X className="h-4 w-4" />
+                              </Button>
+                            </Fragment>
+                          ))}
+                        </div>
+                      </div>
                     )}
                   </div>
                 </div>
-
-                {/* Cost summary table */}
-                <div className="rounded-md border text-sm divide-y">
-                  <div className="grid grid-cols-3 gap-2 px-3 py-1.5 text-xs text-muted-foreground font-medium bg-muted/30">
-                    <span>Metric</span>
-                    <span className="text-right">Previous</span>
-                    <span className="text-right">New</span>
-                  </div>
-                  <div className="grid grid-cols-3 gap-2 px-3 py-2">
-                    <span className="text-muted-foreground">Container cost/kg (USD)</span>
-                    <span className="text-right font-mono">${result.oldContainerCostPerKgUsd.toFixed(6)}</span>
-                    <span className="text-right font-mono font-semibold text-green-700 dark:text-green-400">
-                      ${result.newContainerCostPerKgUsd.toFixed(6)}
-                    </span>
-                  </div>
-                  {result.supplierLockedRateOld !== null && (
-                    <>
-                      <div className="grid grid-cols-3 gap-2 px-3 py-2">
-                        <span className="text-muted-foreground">Supplier locked rate (USD/kg)</span>
-                        <span className="text-right font-mono">
-                          ${(result.supplierLockedRateOldExact
-                            ? parseFloat(result.supplierLockedRateOldExact)
-                            : (result.supplierLockedRateOld ?? 0)
-                          ).toFixed(6)}
-                        </span>
-                        <span className="text-right font-mono font-semibold">
-                          ${(result.supplierLockedRateNewExact
-                            ? parseFloat(result.supplierLockedRateNewExact)
-                            : (result.supplierLockedRateNew ?? 0)
-                          ).toFixed(6)}
-                        </span>
-                      </div>
-                      {/* Calculation breakdown */}
-                      {result.supplierValueBeforeUsd != null && result.supplierInventoryValueDeltaUsd != null && result.supplierRemainingKg != null && (
-                        <div className="px-3 py-2 bg-muted/30 text-xs text-muted-foreground space-y-0.5">
-                          <div className="flex justify-between">
-                            <span>Supplier remaining</span>
-                            <span className="font-mono">{formatNumber(result.supplierRemainingKg)} kg</span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span>Inventory value added</span>
-                            <span className="font-mono">${parseFloat(result.supplierInventoryValueDeltaUsd).toLocaleString("en", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span>Formula</span>
-                            <span className="font-mono">
-                              (${parseFloat(result.supplierValueBeforeUsd).toLocaleString("en", { minimumFractionDigits: 6, maximumFractionDigits: 6 })} + ${parseFloat(result.supplierInventoryValueDeltaUsd).toLocaleString("en", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}) ÷ {formatNumber(result.supplierRemainingKg)} kg
-                            </span>
-                          </div>
-                          {result.remainingFraction != null && result.remainingFraction < 0.9999 && result.fullContainerValueDeltaUsd != null && (
-                            <div className="mt-1 text-amber-700 dark:text-amber-400">
-                              Only {(result.remainingFraction * 100).toFixed(0)}% of this container remains in inventory, so ${parseFloat(result.supplierInventoryValueDeltaUsd).toLocaleString("en", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} of the ${parseFloat(result.fullContainerValueDeltaUsd).toLocaleString("en", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} charge was applied to the current supplier locked rate.
-                            </div>
-                          )}
-                          {result.rawStockRateWasStale && (
-                            <div className="mt-1 text-blue-700 dark:text-blue-400">
-                              Note: the container rate and raw-stock rate differed before this charge. Only the new charge value was applied to the supplier rate — the pre-existing divergence was not included.
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </>
-                  )}
-                  <div className="grid grid-cols-3 gap-2 px-3 py-2 text-muted-foreground">
-                    <span>Raw-stock rows updated</span>
-                    <span className="text-right">—</span>
-                    <span className="text-right font-mono">{result.rawStockRowsUpdated}</span>
-                  </div>
-                  <div className="grid grid-cols-3 gap-2 px-3 py-2 text-muted-foreground">
-                    <span>Bales updated</span>
-                    <span className="text-right">—</span>
-                    <span className="text-right font-mono">{result.affectedBalesCount}</span>
-                  </div>
-                </div>
-
-                {result.affectedBatches.length > 0 ? (
-                  <div className="space-y-2">
-                    <p className="text-sm font-semibold">Affected Mix Batches</p>
-                    <div className="border rounded-md divide-y text-sm">
-                      <div className="grid grid-cols-[2fr_1fr_1fr_1fr] gap-2 px-3 py-1.5 text-xs text-muted-foreground font-medium bg-muted/30">
-                        <span>Batch</span>
-                        <span className="text-right">Old Cost/kg</span>
-                        <span className="text-right">New Cost/kg</span>
-                        <span className="text-right">Wt from container</span>
-                      </div>
-                      {result.affectedBatches.map((b) => (
-                        <div key={b.batchId} className="grid grid-cols-[2fr_1fr_1fr_1fr] gap-2 px-3 py-2 items-center">
-                          <span className="font-mono font-medium flex items-center gap-1.5 flex-wrap">
-                            {b.batchCode}
-                            {b.wasCompleted && (
-                              <span className="text-xs bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 px-1.5 py-0.5 rounded whitespace-nowrap">
-                                Completed
-                              </span>
-                            )}
-                          </span>
-                          <span className="text-right font-mono text-muted-foreground">
-                            ${b.oldCostPerKg.toFixed(4)}
-                          </span>
-                          <span className="text-right font-mono font-semibold">${b.newCostPerKg.toFixed(4)}</span>
-                          <span className="text-right font-mono text-muted-foreground">
-                            {formatNumber(b.weightKgFromContainer)} kg
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                ) : (
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground p-3 bg-muted/40 rounded-md">
-                    <Info className="h-4 w-4 shrink-0" />
-                    No mix batches were linked to this container — only the container and raw stock costs were updated.
-                  </div>
-                )}
-              </div>
-            ) : (
-              <div className="space-y-5">
-                <div className="flex items-start gap-3 p-3 rounded-md bg-blue-50 dark:bg-blue-950/20 text-blue-800 dark:text-blue-300 text-sm">
-                  <Info className="h-4 w-4 mt-0.5 shrink-0" />
-                  <p>
-                    Enter any charges that arrived after the original offload — port fees, duties, handling, etc. Each
-                    charge will be added to the container's cost and will cascade into any mix batches already made from
-                    it.
-                  </p>
-                </div>
-                <div className="space-y-1">
-                  <label className="text-sm font-medium">Date</label>
-                  <Input
-                    type="date"
-                    value={txDate}
-                    onChange={(e) => setTxDate(e.target.value)}
-                    className="w-48"
-                    data-testid="input-post-offload-date"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between flex-wrap gap-1">
-                    <label className="text-sm font-medium">Charges</label>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() =>
-                        setCharges((prev) => [
-                          ...prev,
-                          {
-                            id: Date.now().toString(),
-                            description: "",
-                            amount: "",
-                            currencyCode: (container as any)?.currencyCode || "USD",
-                            ledgerAccountId: "",
-                            supplierId: "",
-                          },
-                        ])
-                      }
-                      data-testid="button-add-post-offload-charge-row"
-                    >
-                      <Plus className="h-3 w-3 mr-1" /> Add Row
-                    </Button>
-                  </div>
-                  {charges.length === 0 ? (
-                    <p className="text-sm text-muted-foreground py-4 text-center border rounded-md">
-                      No charges added yet — click "Add Row" to begin.
-                    </p>
-                  ) : (
-                    <div className="space-y-1">
-                      <div className="grid grid-cols-[2fr_1fr_auto_2fr_auto] gap-x-2 gap-y-1 items-center">
-                        <div className="text-xs text-muted-foreground font-medium">Description</div>
-                        <div className="text-xs text-muted-foreground font-medium">Amount</div>
-                        <div className="text-xs text-muted-foreground font-medium">CCY</div>
-                        <div className="text-xs text-muted-foreground font-medium">Account / Broker</div>
-                        <div />
-                        {charges.map((charge, idx) => (
-                          <Fragment key={charge.id}>
-                            <Input
-                              value={charge.description}
-                              onChange={(e) =>
-                                setCharges((prev) =>
-                                  prev.map((c) => (c.id === charge.id ? { ...c, description: e.target.value } : c))
-                                )
-                              }
-                              placeholder="e.g. Port duty"
-                              data-testid={`input-poc-description-${idx}`}
-                            />
-                            <Input
-                              type="number"
-                              value={charge.amount}
-                              onChange={(e) =>
-                                setCharges((prev) =>
-                                  prev.map((c) => (c.id === charge.id ? { ...c, amount: e.target.value } : c))
-                                )
-                              }
-                              placeholder="0.00"
-                              step="0.01"
-                              data-testid={`input-poc-amount-${idx}`}
-                            />
-                            <Select
-                              value={charge.currencyCode || "USD"}
-                              onValueChange={(v) =>
-                                setCharges((prev) =>
-                                  prev.map((c) => (c.id === charge.id ? { ...c, currencyCode: v } : c))
-                                )
-                              }
-                            >
-                              <SelectTrigger className="w-20" data-testid={`select-poc-currency-${idx}`}>
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {["USD", "EUR", "GBP", "AUD", "LBP"].map((ccy) => (
-                                  <SelectItem key={ccy} value={ccy}>
-                                    {ccy}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                            <Select
-                              value={charge.ledgerAccountId || ""}
-                              onValueChange={(v) =>
-                                setCharges((prev) =>
-                                  prev.map((c) =>
-                                    c.id === charge.id ? { ...c, ledgerAccountId: v, supplierId: "" } : c
-                                  )
-                                )
-                              }
-                            >
-                              <SelectTrigger data-testid={`select-poc-account-${idx}`}>
-                                <SelectValue placeholder="Select account (optional)" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {ledgerAccounts.map((a: any) => (
-                                  <SelectItem key={a.id} value={String(a.id)}>
-                                    {a.code ? `${a.code} - ${a.name}` : a.name}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => setCharges((prev) => prev.filter((c) => c.id !== charge.id))}
-                              data-testid={`button-remove-poc-${idx}`}
-                            >
-                              <X className="h-4 w-4" />
-                            </Button>
-                          </Fragment>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
+              </>
             )}
           </div>
 
           <DialogFooter className="gap-2 pt-2 border-t">
             <Button variant="outline" onClick={handleClose}>
-              {result ? "Close" : "Cancel"}
+              {createResult ? "Close" : "Cancel"}
             </Button>
-            {!result && (
+            {!createResult && newCharges.some((c) => parseFloat(c.amount || "0") > 0) && (
               <Button
                 onClick={() => {
                   if (!container) return;
-                  const valid = charges.filter((c) => parseFloat(c.amount || "0") > 0);
-                  if (valid.length === 0) {
-                    toast({
-                      title: "No charges",
-                      description: "Add at least one charge with an amount.",
-                      variant: "destructive",
-                    });
-                    return;
-                  }
+                  const valid = newCharges.filter((c) => parseFloat(c.amount || "0") > 0);
                   wrapAdminAction(
                     () =>
                       postOffloadMutation.mutate({
@@ -437,10 +935,15 @@ export function PostOffloadDialog({ container, ledgerAccounts, onClose }: PostOf
                     "Add Post-Offload Charges"
                   );
                 }}
-                disabled={postOffloadMutation.isPending || charges.every((c) => parseFloat(c.amount || "0") <= 0)}
+                disabled={postOffloadMutation.isPending}
                 data-testid="button-confirm-post-offload-charges"
               >
                 {postOffloadMutation.isPending ? "Saving..." : "Save Charges"}
+              </Button>
+            )}
+            {createResult && (
+              <Button variant="outline" onClick={() => setCreateResult(null)}>
+                Add More
               </Button>
             )}
           </DialogFooter>
