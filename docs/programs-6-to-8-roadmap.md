@@ -26,6 +26,7 @@ Safety rules:
   - Confirmed ledger account type/search filters are already pushed into SQL.
   - Identified the remaining unbounded no-filter ledger-account path and documented the compatibility-safe migration approach.
   - Added `server/lib/boundedPagination.ts`, a shared opt-in pagination parser that preserves legacy response shapes while enforcing conservative page-size limits for migrated callers.
+  - Added focused Program 6B unit coverage for legacy opt-in compatibility, endpoint-specific bounds, `pageSize` aliasing, oversized limits, and invalid/negative inputs.
   - Confirmed the net-profit statement already has a 30-second company/date keyed cache and parallel independent reads, but still materializes full period and all-time voucher-entry sets; SQL summary migration remains.
   - Added `scripts/verify-program6b-financial-pagination.mjs` to protect full-filter counts, deterministic ordering, brought-forward balances, and server-side account filtering.
   - Confirmed the main Accounts screen uses the balance-aware `/api/accounts/all` contract; the unbounded `/api/ledger-accounts` call on that screen is limited to parent-group options and should be narrowed rather than replacing the primary balance source.
@@ -61,4 +62,4 @@ Existing performance work found:
 - HTML and dynamic API responses avoid stale caching.
 - Earlier heavy-API pagination and memory-stabilization scripts exist.
 
-Program 6A is implementation-complete. Program 6B is in progress. The shared bounded-pagination primitive and financial-pagination guard are committed; next work is wiring opt-in pagination into selected ledger/report routes, adding full-filter count/summary queries, and narrowing the Accounts parent-group lookup without changing legacy selectors or financial totals.
+Program 6A is implementation-complete. Program 6B is in progress. The shared bounded-pagination primitive, focused compatibility tests, and financial-pagination guard are committed; next work is wiring opt-in pagination into selected ledger/report routes, adding full-filter count/summary queries, and narrowing the Accounts parent-group lookup without changing legacy selectors or financial totals.
