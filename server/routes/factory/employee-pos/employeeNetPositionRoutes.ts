@@ -1,4 +1,6 @@
 import { getClientDate } from "../../../lib/dateUtils";
+import { getRentalBillingDay, getRentalPeriodDueDate } from "../../../services/rental/rentalPeriodService";
+import { pool } from "../../../db";
 import type { Express } from "express";
 import { db } from "../../../db";
 import { requireAuth } from "../../../auth";
@@ -114,6 +116,7 @@ import {
   propertyContracts,
   propertyMonthlyLedger,
   propertyPayments,
+  propertyUnits,
 } from "@shared/schema";
 import { eq, and, or, asc, desc, sql, inArray, ilike, ne, isNull, not, gte, lte, lt, gt } from "drizzle-orm";
 import bcrypt from "bcryptjs";
@@ -1397,55 +1400,95 @@ export function registerEmployeeNetPositionRoutes(app: Express) {
       const totalCustomerDr = round2(customerDrItems.reduce((s, c) => s + c.balanceUsd, 0));
       const totalCustomerCr = round2(customerCrItems.reduce((s, c) => s + Math.abs(c.balanceUsd), 0));
 
-      // ── Rental (company is the TENANT paying rent) ───────────────────────────
-      // paid > expected → we overpaid our landlord → prepaid rent asset → For Us
-      // expected > paid → we still owe the landlord → rent payable → On Us
+      // ── Rental (company is the LANDLORD collecting rent from shop tenants) ──────
+      // Uses the same billing-day-aware logic as the Shop Rentals dashboard so
+      // the value here always matches what the user sees on that page.
+      //
+      // CREDIT  = tenants paid MORE than expected → advance money we hold (asset)
+      // OUTSTANDING = tenants still OWE us → receivable (asset)
+      // Prepaid Rent = CREDIT + OUTSTANDING  (both are "What We Have")
       let prepaidRent = 0;
       let rentPayable = 0;
       {
-        const activeContracts = await db
-          .select({ id: propertyContracts.id })
-          .from(propertyContracts)
-          .where(and(eq(propertyContracts.companyId, companyId), eq(propertyContracts.status, "ACTIVE")));
-        if (activeContracts.length > 0) {
-          const contractIds = activeContracts.map((c) => c.id);
-          // Expected: months on or before the asOf date
-          const expectedRows = await db
-            .select({
-              contractId: propertyMonthlyLedger.contractId,
-              expected: sql<string>`COALESCE(SUM(
-              CASE WHEN (
-                ${propertyMonthlyLedger.year} < EXTRACT(YEAR FROM ${asOf}::date)
-                OR (
-                  ${propertyMonthlyLedger.year} = EXTRACT(YEAR FROM ${asOf}::date)
-                  AND ${propertyMonthlyLedger.month} <= EXTRACT(MONTH FROM ${asOf}::date)
-                )
-              ) THEN CAST(${propertyMonthlyLedger.expectedAmount} AS numeric) ELSE 0 END
-            ), 0)`,
-            })
-            .from(propertyMonthlyLedger)
-            .where(inArray(propertyMonthlyLedger.contractId, contractIds))
-            .groupBy(propertyMonthlyLedger.contractId);
-          // Paid: only payments made on or before asOf
-          const paidRows = await db
-            .select({
-              contractId: propertyPayments.contractId,
-              paid: sql<string>`COALESCE(SUM(CAST(${propertyPayments.amount} AS numeric)), 0)`,
-            })
-            .from(propertyPayments)
-            .where(and(inArray(propertyPayments.contractId, contractIds), lte(propertyPayments.paymentDate, asOf)))
-            .groupBy(propertyPayments.contractId);
-          const paidMap = new Map(paidRows.map((r) => [r.contractId, parseFloat(r.paid)]));
-          for (const row of expectedRows) {
-            const expected = parseFloat(row.expected);
-            const paid = paidMap.get(row.contractId) ?? 0;
-            const net = paid - expected; // positive = overpaid
-            if (net > 0)
-              prepaidRent += net; // we overpaid → asset
-            else if (net < 0) rentPayable += -net; // we underpaid → liability
+        // All FACTORY units owned by this company
+        const rentalUnitsRows = await db
+          .select({ id: propertyUnits.id })
+          .from(propertyUnits)
+          .where(
+            and(
+              eq(propertyUnits.companyId, companyId),
+              eq(propertyUnits.module, "FACTORY"),
+              eq(propertyUnits.active, true)
+            )
+          );
+
+        if (rentalUnitsRows.length > 0) {
+          const unitIds = rentalUnitsRows.map((u) => u.id);
+          const activeContracts = await db
+            .select()
+            .from(propertyContracts)
+            .where(
+              and(
+                eq(propertyContracts.companyId, companyId),
+                eq(propertyContracts.module, "FACTORY"),
+                inArray(propertyContracts.unitId, unitIds),
+                eq(propertyContracts.status, "ACTIVE")
+              )
+            );
+
+          if (activeContracts.length > 0) {
+            const contractIds = activeContracts.map((c) => c.id);
+
+            // Billing-day-aware expected (same logic as rentalUnitsContractsRoutes)
+            const ledgerRows = await db
+              .select({
+                contractId: propertyMonthlyLedger.contractId,
+                year: propertyMonthlyLedger.year,
+                month: propertyMonthlyLedger.month,
+                expectedAmount: propertyMonthlyLedger.expectedAmount,
+              })
+              .from(propertyMonthlyLedger)
+              .where(inArray(propertyMonthlyLedger.contractId, contractIds));
+
+            const ledgerByContract = new Map<number, typeof ledgerRows>();
+            for (const row of ledgerRows) {
+              const arr = ledgerByContract.get(row.contractId) ?? [];
+              arr.push(row);
+              ledgerByContract.set(row.contractId, arr);
+            }
+
+            const expectedAsOfByContract = new Map<number, number>();
+            for (const c of activeContracts) {
+              const billingDay = getRentalBillingDay(c.startDate as string);
+              const rows = ledgerByContract.get(c.id) ?? [];
+              let expected = 0;
+              for (const row of rows) {
+                const billingDate = getRentalPeriodDueDate(row.year, row.month, billingDay);
+                if (billingDate <= asOf) expected += parseFloat(row.expectedAmount as string) || 0;
+              }
+              expectedAsOfByContract.set(c.id, expected);
+            }
+
+            // POSTED payments only — same authoritative source as the dashboard
+            const { rows: postedRows } = await pool.query<{ contract_id: string; paid: string }>(
+              `SELECT contract_id, COALESCE(SUM(amount::numeric), 0) AS paid
+               FROM property_payments
+               WHERE contract_id = ANY($1) AND posting_status = 'POSTED' AND payment_date <= $2
+               GROUP BY contract_id`,
+              [contractIds, asOf]
+            );
+            const paidAsOfByContract = new Map<number, number>();
+            postedRows.forEach((r) => paidAsOfByContract.set(parseInt(r.contract_id), parseFloat(r.paid)));
+
+            for (const c of activeContracts) {
+              const expected = expectedAsOfByContract.get(c.id) ?? 0;
+              const paid = paidAsOfByContract.get(c.id) ?? 0;
+              const raw = expected - paid; // positive = tenant still owes; negative = tenant overpaid
+              if (raw > 0) prepaidRent += raw;        // outstanding receivable
+              else if (raw < 0) prepaidRent += -raw;  // advance credit we hold
+            }
+            prepaidRent = round2(prepaidRent);
           }
-          prepaidRent = round2(prepaidRent);
-          rentPayable = round2(rentPayable);
         }
       }
 
