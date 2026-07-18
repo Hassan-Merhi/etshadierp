@@ -2,12 +2,11 @@
  * Central Accounting Service
  *
  * Re-exports the low-level compatibility helpers and the strict Program 2
- * posting, lifecycle, and reconciliation boundaries. New or migrated posting
- * flows should use postBalancedVoucherTx inside the transaction that owns the
- * source document and any mandatory inventory or secondary-ledger effects.
- * Voucher edits and deletes must use reverseVoucherTx or replaceVoucherTx rather
- * than deleting committed accounting rows. Balance checks should compare
- * operational projections against voucher-entry truth through reconcileTargetTx.
+ * posting, lifecycle, reconciliation, and period-lock boundaries. New or
+ * migrated posting flows should use postBalancedVoucherTx inside the transaction
+ * that owns the source document and mandatory inventory or secondary-ledger
+ * effects. Every dated business write must call assertPeriodOpenTx before its
+ * first write in that same transaction.
  */
 
 export type { VoucherInsertFields, VoucherEntryInsertFields, VoucherWithEntries } from "./accountingTypes";
@@ -58,3 +57,17 @@ export type {
   ReconciliationResult,
   ReconciliationTarget,
 } from "./partyReconciliationService";
+
+export {
+  assertPeriodOpenTx,
+  lockThroughTx,
+  PeriodLockError,
+} from "./periodLockService";
+export type {
+  ClosedPeriodOverride,
+  PeriodLockActor,
+  PeriodLockAdapter,
+  PeriodLockRecord,
+  PeriodLockScope,
+  ProtectedDomain,
+} from "./periodLockService";

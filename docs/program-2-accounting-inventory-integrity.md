@@ -11,7 +11,7 @@ Status: in progress. This branch must remain unmerged until the owner approves t
 - [x] 2E — Stock movement integrity
 - [x] 2F — Factory raw-stock costing integrity
 - [x] 2G — Mix-batch costing integrity
-- [ ] 2H — Period locking and closed-period protection
+- [x] 2H — Period locking and closed-period protection
 - [ ] 2I — Automated reconciliation and repair reporting
 
 Each phase must be completed and committed separately. Do not begin Program 3 on this branch.
@@ -69,31 +69,37 @@ Status: complete.
 
 Status: complete.
 
+- Added `mixBatchCostingIntegrityService.ts` as the transaction-owned mix-batch costing boundary.
+- Required deterministic supplier locks, locked-rate component valuation, stale form/version checks, sufficient stock, append-only events, idempotency, and audit recording.
+- Confirmed mix-batch deductions preserve each supplier's remaining cost/kg exactly.
+
+## Phase 2H — Period locking and closed-period protection
+
+Status: complete.
+
 ### Completed work
 
-- Added `mixBatchCostingIntegrityService.ts` as the transaction-owned mix-batch costing boundary.
-- Required company, batch, supplier, currency, source identity, and idempotency validation before any lock or write.
-- Required supplier raw-stock states to be locked in deterministic supplier order.
-- Derived every component value from the supplier's locked current cost/kg; callers cannot inject or average a replacement supplier rate.
-- Added displayed-rate and raw-stock-version conflict checks so stale mix-batch forms fail safely instead of silently changing cost.
-- Enforced sufficient stock, internally consistent supplier quantity/cost/rate state, and exact zero-cost depletion.
-- Made each component deduction proportional to its locked rate, preserving every supplier's remaining cost/kg exactly.
-- Calculated the mix-batch weighted cost/kg only from the sum of component historical values divided by total batch weight.
-- Required append-only supplier deduction events, versioned supplier-state persistence, batch-cost persistence, idempotency, and audit recording inside one caller-owned transaction.
-- Added focused tests for weighted batch cost, supplier-rate stability, stale rates, stale versions, insufficient stock, duplicate suppliers, write order, and repeat-safe retries.
+- Added `periodLockService.ts` as the shared transaction-owned boundary for accounting, inventory, and factory effective dates.
+- Added strict company, domain, and calendar-date validation.
+- Added `assertPeriodOpenTx` so all dated business writes can reject dates on or before the applicable locked-through date before their first write.
+- Added `lockThroughTx` with deterministic state locking, optimistic version checks, append-only audit requirements, and no-op handling for repeated identical closes.
+- Prevented normal workflows from shortening or reopening an already closed period.
+- Added exceptional closed-period overrides that require an explicit source identity, idempotency key, actor reason, override record, and audit record; overrides do not silently reopen the period.
+- Exported the period-lock boundary from the central accounting service for gradual route/service adoption.
+- Added focused invariant tests for open dates, blocked dates, reasoned overrides, repeat-safe overrides, stale lock versions, forbidden reopening, and lock-before-write ordering.
 
 ### Verification
 
-- Confirmed mix-batch deductions cannot re-average or mutate any supplier's cost/kg.
-- Confirmed new offloads remain the only quantity-addition path that can change weighted supplier cost/kg; mix-batch creation only removes quantity and its proportional historical value.
-- Confirmed stale UI rates and stale raw-stock versions fail before supplier deduction events or state writes.
-- Confirmed idempotency is checked before ownership validation, locks, writes, and audit recording.
-- Confirmed no production route or historical balance was switched without a complete database adapter and shared transaction boundary.
+- Confirmed the closed date itself is protected, not only dates before it.
+- Confirmed normal reversal, repair, import, back-date, accounting, inventory, and factory paths are expected to invoke the same guard within their owning transaction.
+- Confirmed period extension cannot race silently because the adapter must lock state and enforce the expected version.
+- Confirmed an administrative override is idempotent and independently auditable without modifying the period lock.
+- Confirmed no production route was switched without a complete database adapter and caller-owned transaction integration.
 - No production data or Replit checks/credits were used.
 
 ## Next phase
 
-- Phase 2H — Period locking and closed-period protection
+- Phase 2I — Automated reconciliation and repair reporting
 
 ## Safety constraints
 
