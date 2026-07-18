@@ -192,11 +192,14 @@ export function registerRentalUnitsContractsRoutes(
           expectedAsOfByContract.set(c.id, expected);
         }
 
-        // POSTED payments as of asOf date (authoritative — not the paidAmount cache)
+        // POSTED rent payments as of asOf date (authoritative — not the paidAmount cache).
+        // Exclude ledger_row_id IS NULL rows: those are guarantee deposits/releases which
+        // do not represent rent paid and would double-count vs. the per-month paidAmount.
         const { rows: postedRows } = await pool.query<{ contract_id: string; paid: string }>(
           `SELECT contract_id, COALESCE(SUM(amount::numeric), 0) AS paid
            FROM property_payments
            WHERE contract_id = ANY($1) AND posting_status = 'POSTED' AND payment_date <= $2
+             AND ledger_row_id IS NOT NULL
            GROUP BY contract_id`,
           [contractIds, asOf]
         );
@@ -326,11 +329,12 @@ export function registerRentalUnitsContractsRoutes(
               sharedOutstanding.set(c.id, expected);
             }
 
-            // POSTED payments for shared contracts
+            // POSTED rent payments for shared contracts — exclude guarantee deposits/releases.
             const { rows: sharedPostedRows } = await pool.query<{ contract_id: string; paid: string }>(
               `SELECT contract_id, COALESCE(SUM(amount::numeric), 0) AS paid
                FROM property_payments
                WHERE contract_id = ANY($1) AND posting_status = 'POSTED' AND payment_date <= $2
+                 AND ledger_row_id IS NOT NULL
                GROUP BY contract_id`,
               [sharedContractIds, asOf]
             );
