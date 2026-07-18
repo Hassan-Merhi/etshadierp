@@ -48,6 +48,7 @@ import {
 import { DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
+import { useCompany } from "@/contexts/CompanyContext";
 import { DeleteConfirmDialog } from "@/components/ConfirmationDialog";
 import { read as readExcel, utils as excelUtils, writeFile as writeExcel } from "@/lib/excelHelper";
 import { PageHeader } from "@/components/PageHeader";
@@ -92,6 +93,7 @@ interface Customer {
 }
 
 export default function FactoryProformas() {
+  const { selectedCompany } = useCompany();
   const { toast } = useToast();
   const { formatAmount } = useCurrencyContext();
   const appMode = useAppMode();

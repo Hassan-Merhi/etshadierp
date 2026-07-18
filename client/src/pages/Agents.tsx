@@ -111,8 +111,15 @@ export default function Agents() {
 
   useEscapeBack(selectedAccount ? () => setSelectedAccount(null) : null);
 
+  // /api/accounts/all returns { accounts: [...], asOfDate } — extract the array.
   const { data: allAccounts = [], isLoading: accountsLoading } = useQuery<Account[]>({
     queryKey: ["/api/accounts/all", selectedCompany?.id],
+    queryFn: async () => {
+      const response = await fetch("/api/accounts/all");
+      if (!response.ok) throw new Error("Failed to fetch accounts");
+      const data = await response.json();
+      return Array.isArray(data) ? data : (data.accounts ?? []);
+    },
     enabled: !!selectedCompany,
   });
 
