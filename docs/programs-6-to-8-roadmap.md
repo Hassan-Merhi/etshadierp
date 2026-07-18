@@ -38,9 +38,15 @@ Safety rules:
   - Confirmed movement summaries are year/month bounded and drills require one explicit month while retaining full-period totals and historical opening-state calculations.
   - Added strict caller classification and completion guards in `scripts/audit-program6c-stock-item-callers.mjs` and `scripts/verify-program6c-stock-inventory-contracts.mjs`.
   - Final audit documented in `docs/program-6c-stock-inventory-api-audit.md`.
-- [ ] 6D — Database-query optimization
-  - Review query plans, add evidence-backed indexes, remove N+1 queries, parallelize independent reads, and bound searches.
-  - Includes the net-profit voucher-entry SQL aggregation rewrite deferred from 6B, with migrated-account reconciliation evidence required before replacement.
+- [~] 6D — Database-query optimization
+  - Added a deterministic static scanner for possible N+1 reads, broad selects, unbounded reads, and sequential-query candidates.
+  - Added a reproducible JSON report runner and strict manual-classification validator.
+  - Added `scripts/verify-program6d-query-safety.mjs` to preserve accounting attribution, supplier pure-side filtering, full-dataset totals, and the query-plan evidence rule.
+  - Reviewed existing bounded/parallel implementations across Daybook, Accounts, Inventory, stock items, stock movement, and net-profit metadata reads.
+  - Confirmed the net-profit materialized entry arrays are aggregation candidates, but preserving migrated-account versus voucher-company attribution requires before/after database reconciliation.
+  - No speculative index was added because production-like `EXPLAIN (ANALYZE, BUFFERS)` evidence is not available.
+  - Remaining completion gate: run the scanner in a real checkout, classify its exact high-severity findings, compare grouped net-profit SQL against current totals, and collect query plans before index changes.
+  - Current review boundary documented in `docs/program-6d-database-query-optimization.md`.
 - [ ] 6E — Frontend bundle and caching
   - Lazy-load Excel/PDF dependencies, stabilize React Query keys, and constrain invalidation/refetch behavior.
 - [ ] 6F — Exports and resource limits
@@ -67,4 +73,4 @@ Existing performance work found:
 - HTML and dynamic API responses avoid stale caching.
 - Earlier heavy-API pagination and memory-stabilization scripts exist.
 
-Programs 6A, 6B, and 6C are implementation-complete. Programs 6D–6F, 7A–7D, and 8A–8C remain unfinished.
+Programs 6A, 6B, and 6C are implementation-complete. Program 6D has its audit, review, validation, and safety infrastructure complete but still requires real-checkout findings and database reconciliation evidence before behavior-changing query or index work can be marked complete. Programs 6E–6F, 7A–7D, and 8A–8C remain unfinished.
