@@ -67,74 +67,78 @@ import {
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe("sortEvents", () => {
-  const makeReceipt = (overrides: Partial<ReturnType<typeof makeReceipt>> = {}) => ({
-    type: "RECEIPT" as const,
-    date: "2024-01-15",
-    createdAt: new Date("2024-01-15T08:00:00Z"),
-    stableId: "r1",
+  // DEFECT 16 FIX: Use correct SupplierEvent field names:
+  //   kind (not type), effectiveDate (not date), createdAt as epoch-ms number (not Date),
+  //   stableId as number (not string). sortEvents() returns {sorted, ambiguous}, not an array.
+  const makeReceipt = (overrides: any = {}) => ({
+    kind: "RECEIPT" as const,
+    effectiveDate: "2024-01-15",
+    createdAt: new Date("2024-01-15T08:00:00Z").getTime(),
+    stableId: 1,
     receivedKg: 1000,
-    costPerKgUsd: 2.5,
+    canonicalRateUsd: 2.5,
     containerId: 1,
     ...overrides,
   });
 
   const makeBatch = (overrides: any = {}) => ({
-    type: "BATCH_CONSUMPTION" as const,
-    date: "2024-01-15",
-    createdAt: new Date("2024-01-15T12:00:00Z"),
-    stableId: "b1",
-    usedKg: 500,
+    kind: "BATCH_CONSUMPTION" as const,
+    effectiveDate: "2024-01-15",
+    createdAt: new Date("2024-01-15T12:00:00Z").getTime(),
+    stableId: 2,
+    consumptionKg: 500,
     batchId: 101,
+    sourceIds: [],
+    batchCode: "B-001",
     ...overrides,
   });
 
   const makeAdj = (overrides: any = {}) => ({
-    type: "ADD_ADJUSTMENT" as const,
-    date: "2024-01-15",
-    createdAt: new Date("2024-01-15T06:00:00Z"),
-    stableId: "a1",
+    kind: "ADD_ADJUSTMENT" as const,
+    effectiveDate: "2024-01-15",
+    createdAt: new Date("2024-01-15T06:00:00Z").getTime(),
+    stableId: 3,
     adjustKg: 50,
     ...overrides,
   });
 
   it("A1: receipt before batch_consumption on same date when receipt createdAt is earlier", () => {
-    const receipt = makeReceipt({ createdAt: new Date("2024-01-15T08:00:00Z") });
-    const batch = makeBatch({ createdAt: new Date("2024-01-15T12:00:00Z") });
-    const sorted = sortEvents([batch, receipt]);
+    const receipt = makeReceipt({ createdAt: new Date("2024-01-15T08:00:00Z").getTime() });
+    const batch = makeBatch({ createdAt: new Date("2024-01-15T12:00:00Z").getTime() });
+    // sortEvents returns { sorted: SupplierEvent[], ambiguous: boolean }
+    const result = sortEvents([batch, receipt]);
     // Receipt must come before batch when receipt.createdAt < batch.createdAt
-    expect(sorted[0].stableId).toBe("r1");
-    expect(sorted[1].stableId).toBe("b1");
+    expect(result.sorted[0].stableId).toBe(1);
+    expect(result.sorted[1].stableId).toBe(2);
     // Not ambiguous — timestamps resolve order
-    const ambiguous = sorted.some((e) => (e as any).ambiguous);
-    expect(ambiguous).toBe(false);
+    expect(result.ambiguous).toBe(false);
   });
 
   it("A2: same createdAt triggers AMBIGUOUS_EVENT_ORDER — safeToRepair should be false in preview", () => {
-    const ts = new Date("2024-01-15T08:00:00Z");
+    const ts = new Date("2024-01-15T08:00:00Z").getTime();
     const receipt = makeReceipt({ createdAt: ts });
     const batch = makeBatch({ createdAt: ts });
-    const sorted = sortEvents([receipt, batch]);
-    // When createdAt is identical, ambiguity must be flagged on both events
-    const ambiguousCount = sorted.filter((e) => (e as any).ambiguous).length;
-    expect(ambiguousCount).toBeGreaterThan(0);
+    // When createdAt is identical, ambiguity is flagged at the result level
+    const result = sortEvents([receipt, batch]);
+    expect(result.ambiguous).toBe(true);
   });
 
   it("A3: events on distinct dates are ordered by date, ignoring createdAt", () => {
-    const e1 = makeReceipt({ date: "2024-01-10", createdAt: new Date("2024-01-20T00:00:00Z"), stableId: "r_early" });
-    const e2 = makeBatch({ date: "2024-01-20", createdAt: new Date("2024-01-11T00:00:00Z"), stableId: "b_late" });
-    const sorted = sortEvents([e2, e1]);
-    expect(sorted[0].stableId).toBe("r_early");
-    expect(sorted[1].stableId).toBe("b_late");
+    // e1 has an earlier effectiveDate but a later createdAt — date wins
+    const e1 = makeReceipt({ effectiveDate: "2024-01-10", createdAt: new Date("2024-01-20T00:00:00Z").getTime(), stableId: 10 });
+    const e2 = makeBatch({ effectiveDate: "2024-01-20", createdAt: new Date("2024-01-11T00:00:00Z").getTime(), stableId: 20 });
+    const result = sortEvents([e2, e1]);
+    expect(result.sorted[0].stableId).toBe(10);
+    expect(result.sorted[1].stableId).toBe(20);
   });
 
   it("A4: ADD_ADJUSTMENT on same date as RECEIPT does not trigger AMBIGUOUS_EVENT_ORDER", () => {
-    const ts = new Date("2024-01-15T08:00:00Z");
-    const receipt = makeReceipt({ createdAt: ts, stableId: "r1" });
-    const adj = makeAdj({ createdAt: ts, stableId: "a1" });
-    const sorted = sortEvents([adj, receipt]);
+    const ts = new Date("2024-01-15T08:00:00Z").getTime();
+    const receipt = makeReceipt({ createdAt: ts, stableId: 1 });
+    const adj = makeAdj({ createdAt: ts, stableId: 3 });
     // Ambiguity is only between RECEIPT and BATCH_CONSUMPTION pairs
-    const ambiguousCount = sorted.filter((e) => (e as any).ambiguous).length;
-    expect(ambiguousCount).toBe(0);
+    const result = sortEvents([adj, receipt]);
+    expect(result.ambiguous).toBe(false);
   });
 });
 

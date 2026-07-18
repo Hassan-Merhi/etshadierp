@@ -339,8 +339,9 @@ export function registerFactoryMixBatchRoutes(app: Express) {
         await tx.delete(factoryMixBatchSources).where(eq(factoryMixBatchSources.mixBatchId, id));
 
         // ── 3. Apply new sources ──
-        let totalWeightKg = 0;
-        let totalCost = 0;
+        // DEFECT 15 FIX: use Decimal.js for cost accumulation (edit route).
+        let dTotalWeightKg = new Decimal(0);
+        let dTotalCost = new Decimal(0);
         const sourceRecords: any[] = [];
 
         for (const source of supplierSources || []) {
@@ -383,8 +384,10 @@ export function registerFactoryMixBatchRoutes(app: Express) {
             else perRsDeductions.push({ containerId: lastRs.containerId, deduct: remaining });
           }
 
-          totalWeightKg += weight;
-          totalCost += weight * costPerKg;
+          const dW = new Decimal(weight);
+          const dCpk = new Decimal(costPerKg);
+          dTotalWeightKg = dTotalWeightKg.plus(dW);
+          dTotalCost = dTotalCost.plus(dW.times(dCpk));
           if (supplierRawStocks.length === 0) {
             if (costPerKg <= 0) {
               throw new Error(
@@ -395,7 +398,7 @@ export function registerFactoryMixBatchRoutes(app: Express) {
               supplierId,
               weightKg: String(weight),
               costPerKg: String(costPerKg),
-              totalCost: String(weight * costPerKg),
+              totalCost: dW.times(dCpk).toDecimalPlaces(6).toFixed(6),
             });
           }
           for (const d of perRsDeductions) {
@@ -404,7 +407,7 @@ export function registerFactoryMixBatchRoutes(app: Express) {
               containerId: d.containerId,
               weightKg: String(d.deduct),
               costPerKg: String(costPerKg),
-              totalCost: String(d.deduct * costPerKg),
+              totalCost: new Decimal(d.deduct).times(dCpk).toDecimalPlaces(6).toFixed(6),
             });
           }
         }
@@ -426,23 +429,25 @@ export function registerFactoryMixBatchRoutes(app: Express) {
             .update(factoryMixBatches)
             .set({ usedKg: sql`${factoryMixBatches.usedKg} + ${weight}`, updatedAt: new Date() })
             .where(eq(factoryMixBatches.id, srcBatch.id));
-          totalWeightKg += weight;
-          totalCost += weight * cost;
+          const dWb = new Decimal(weight);
+          const dCostB = new Decimal(cost);
+          dTotalWeightKg = dTotalWeightKg.plus(dWb);
+          dTotalCost = dTotalCost.plus(dWb.times(dCostB));
           sourceRecords.push({
             sourceBatchId,
             weightKg: String(weight),
             costPerKg: String(cost),
-            totalCost: String(weight * cost),
+            totalCost: dWb.times(dCostB).toDecimalPlaces(6).toFixed(6),
           });
         }
 
-        const blendedCostPerKg = totalWeightKg > 0 ? totalCost / totalWeightKg : 0;
+        const blendedCostPerKg = dTotalWeightKg.gt(0) ? dTotalCost.div(dTotalWeightKg).toDecimalPlaces(6).toNumber() : 0;
 
         // ── 5. Update batch totals ──
         const batchUpdates: any = {
-          totalWeightKg: String(totalWeightKg),
-          costPerKg: String(blendedCostPerKg),
-          totalCost: String(totalCost),
+          totalWeightKg: dTotalWeightKg.toDecimalPlaces(6).toFixed(6),
+          costPerKg: new Decimal(blendedCostPerKg).toFixed(6),
+          totalCost: dTotalCost.toDecimalPlaces(6).toFixed(6),
           updatedAt: new Date(),
         };
         if (name !== undefined) batchUpdates.name = name?.trim() || null;
@@ -658,8 +663,9 @@ export function registerFactoryMixBatchRoutes(app: Express) {
         }
         const batchCode = `FMB-${year}-${String(nextNum).padStart(4, "0")}`;
 
-        let totalWeightKg = 0;
-        let totalCost = 0;
+        // DEFECT 15 FIX: use Decimal.js for cost accumulation (create route).
+        let dTotalWeightKg = new Decimal(0);
+        let dTotalCost = new Decimal(0);
         const sourceRecords: any[] = [];
 
         if (hasOpeningBatch) {
@@ -685,13 +691,15 @@ export function registerFactoryMixBatchRoutes(app: Express) {
             })
             .where(eq(factoryMixBatches.id, srcBatch.id));
 
-          totalWeightKg += remaining;
-          totalCost += remaining * cost;
+          const dR = new Decimal(remaining);
+          const dC = new Decimal(cost);
+          dTotalWeightKg = dTotalWeightKg.plus(dR);
+          dTotalCost = dTotalCost.plus(dR.times(dC));
           sourceRecords.push({
             sourceBatchId: srcBatch.id,
             weightKg: String(remaining),
             costPerKg: String(cost),
-            totalCost: String(remaining * cost),
+            totalCost: dR.times(dC).toDecimalPlaces(6).toFixed(6),
           });
         }
 
@@ -741,8 +749,10 @@ export function registerFactoryMixBatchRoutes(app: Express) {
             else perRsDeductions.push({ containerId: lastRs.containerId, deduct: remaining });
           }
 
-          totalWeightKg += weight;
-          totalCost += weight * costPerKg;
+          const dWs = new Decimal(weight);
+          const dCpks = new Decimal(costPerKg);
+          dTotalWeightKg = dTotalWeightKg.plus(dWs);
+          dTotalCost = dTotalCost.plus(dWs.times(dCpks));
 
           if (supplierRawStocks.length === 0) {
             // MANUAL supplier — no container raw-stock rows to deduct from. Still
@@ -757,7 +767,7 @@ export function registerFactoryMixBatchRoutes(app: Express) {
               supplierId,
               weightKg: String(weight),
               costPerKg: String(costPerKg),
-              totalCost: String(weight * costPerKg),
+              totalCost: dWs.times(dCpks).toDecimalPlaces(6).toFixed(6),
             });
           } else {
             // Push one source record per raw stock container so deletion can correctly reverse each one
@@ -767,7 +777,7 @@ export function registerFactoryMixBatchRoutes(app: Express) {
                 containerId: d.containerId,
                 weightKg: String(d.deduct),
                 costPerKg: String(costPerKg),
-                totalCost: String(d.deduct * costPerKg),
+                totalCost: new Decimal(d.deduct).times(dCpks).toDecimalPlaces(6).toFixed(6),
               });
             }
           }
@@ -808,14 +818,16 @@ export function registerFactoryMixBatchRoutes(app: Express) {
             .set({ usedKg: sql`${factoryRawStock.usedKg} + ${weight}` })
             .where(eq(factoryRawStock.id, rawStock.id));
 
-          totalWeightKg += weight;
-          totalCost += weight * costUsd;
+          const dWc = new Decimal(weight);
+          const dCusd = new Decimal(costUsd);
+          dTotalWeightKg = dTotalWeightKg.plus(dWc);
+          dTotalCost = dTotalCost.plus(dWc.times(dCusd));
           sourceRecords.push({
             supplierId: ctnSupplierId ?? undefined,
             containerId,
             weightKg: String(weight),
             costPerKg: String(costUsd),
-            totalCost: String(weight * costUsd),
+            totalCost: dWc.times(dCusd).toDecimalPlaces(6).toFixed(6),
           });
         }
 
@@ -842,17 +854,19 @@ export function registerFactoryMixBatchRoutes(app: Express) {
             .set({ usedKg: sql`${factoryMixBatches.usedKg} + ${weight}`, updatedAt: new Date() })
             .where(eq(factoryMixBatches.id, srcBatch.id));
 
-          totalWeightKg += weight;
-          totalCost += weight * cost;
+          const dWbs = new Decimal(weight);
+          const dCbs = new Decimal(cost);
+          dTotalWeightKg = dTotalWeightKg.plus(dWbs);
+          dTotalCost = dTotalCost.plus(dWbs.times(dCbs));
           sourceRecords.push({
             sourceBatchId,
             weightKg: String(weight),
             costPerKg: String(cost),
-            totalCost: String(weight * cost),
+            totalCost: dWbs.times(dCbs).toDecimalPlaces(6).toFixed(6),
           });
         }
 
-        const blendedCostPerKg = totalWeightKg > 0 ? totalCost / totalWeightKg : 0;
+        const blendedCostPerKg = dTotalWeightKg.gt(0) ? dTotalCost.div(dTotalWeightKg).toDecimalPlaces(6).toNumber() : 0;
 
         const [mixBatch] = await tx
           .insert(factoryMixBatches)
@@ -861,10 +875,10 @@ export function registerFactoryMixBatchRoutes(app: Express) {
             batchCode,
             batchNumber: batchCode,
             name: name || null,
-            totalWeightKg: String(totalWeightKg),
-            usedKg: String(totalWeightKg),
-            costPerKg: String(blendedCostPerKg),
-            totalCost: String(totalCost),
+            totalWeightKg: dTotalWeightKg.toDecimalPlaces(6).toFixed(6),
+            usedKg: dTotalWeightKg.toDecimalPlaces(6).toFixed(6),
+            costPerKg: new Decimal(blendedCostPerKg).toFixed(6),
+            totalCost: dTotalCost.toDecimalPlaces(6).toFixed(6),
             notes: notes || null,
             operatorUser: operatorUser || null,
             batchDate: batchDate || null,
@@ -935,8 +949,9 @@ export function registerFactoryMixBatchRoutes(app: Express) {
 
         const existingTotalKg = parseFloat(batch.totalWeightKg);
         const existingTotalCost = parseFloat(batch.totalCost);
-        let addedWeightKg = 0;
-        let addedCost = 0;
+        // DEFECT 15 FIX: use Decimal.js for cost accumulation (top-up route).
+        let dAddedWeightKg = new Decimal(0);
+        let dAddedCost = new Decimal(0);
         const sourceRecords: any[] = [];
 
         for (const source of supplierSources) {
@@ -962,13 +977,15 @@ export function registerFactoryMixBatchRoutes(app: Express) {
                 `Supplier has no established raw-material rate yet. Record a container offload or opening-balance/ADD adjustment before using it as a mix-batch source.`
               );
             }
-            addedWeightKg += weight;
-            addedCost += weight * stableCostPerKg;
+            const dWman = new Decimal(weight);
+            const dCman = new Decimal(stableCostPerKg);
+            dAddedWeightKg = dAddedWeightKg.plus(dWman);
+            dAddedCost = dAddedCost.plus(dWman.times(dCman));
             sourceRecords.push({
               supplierId,
               weightKg: String(weight),
               costPerKg: String(stableCostPerKg),
-              totalCost: String(weight * stableCostPerKg),
+              totalCost: dWman.times(dCman).toDecimalPlaces(6).toFixed(6),
             });
           } else {
             // FIFO deduction of usedKg only — this determines WHICH container rows get
@@ -998,13 +1015,15 @@ export function registerFactoryMixBatchRoutes(app: Express) {
 
             // Cost is always the supplier's locked rate — client-supplied cost is
             // never trusted, regardless of which raw-stock rows FIFO happened to hit.
-            addedWeightKg += weight;
-            addedCost += weight * stableCostPerKg;
+            const dWfifo = new Decimal(weight);
+            const dCfifo = new Decimal(stableCostPerKg);
+            dAddedWeightKg = dAddedWeightKg.plus(dWfifo);
+            dAddedCost = dAddedCost.plus(dWfifo.times(dCfifo));
             sourceRecords.push({
               supplierId,
               weightKg: String(weight),
               costPerKg: String(stableCostPerKg),
-              totalCost: String(weight * stableCostPerKg),
+              totalCost: dWfifo.times(dCfifo).toDecimalPlaces(6).toFixed(6),
             });
           }
         }
@@ -1043,14 +1062,16 @@ export function registerFactoryMixBatchRoutes(app: Express) {
             .set({ usedKg: sql`${factoryRawStock.usedKg} + ${weight}` })
             .where(eq(factoryRawStock.id, rawStockRow.id));
 
-          addedWeightKg += weight;
-          addedCost += weight * costUsd;
+          const dWctn = new Decimal(weight);
+          const dCctn = new Decimal(costUsd);
+          dAddedWeightKg = dAddedWeightKg.plus(dWctn);
+          dAddedCost = dAddedCost.plus(dWctn.times(dCctn));
           sourceRecords.push({
             supplierId: ctnSupplierId2 ?? undefined,
             containerId,
             weightKg: String(weight),
             costPerKg: String(costUsd),
-            totalCost: String(weight * costUsd),
+            totalCost: dWctn.times(dCctn).toDecimalPlaces(6).toFixed(6),
           });
         }
 
@@ -1076,26 +1097,30 @@ export function registerFactoryMixBatchRoutes(app: Express) {
             .set({ usedKg: sql`${factoryMixBatches.usedKg} + ${weight}`, updatedAt: new Date() })
             .where(eq(factoryMixBatches.id, srcBatch.id));
 
-          addedWeightKg += weight;
-          addedCost += weight * cost;
+          const dWtb = new Decimal(weight);
+          const dCtb = new Decimal(cost);
+          dAddedWeightKg = dAddedWeightKg.plus(dWtb);
+          dAddedCost = dAddedCost.plus(dWtb.times(dCtb));
           sourceRecords.push({
             sourceBatchId,
             weightKg: String(weight),
             costPerKg: String(cost),
-            totalCost: String(weight * cost),
+            totalCost: dWtb.times(dCtb).toDecimalPlaces(6).toFixed(6),
           });
         }
 
-        const newTotalKg = existingTotalKg + addedWeightKg;
-        const newTotalCost = existingTotalCost + addedCost;
-        const newCostPerKg = newTotalKg > 0 ? newTotalCost / newTotalKg : 0;
+        const dExistingKg = new Decimal(existingTotalKg);
+        const dExistingCost = new Decimal(existingTotalCost);
+        const newTotalKg = dExistingKg.plus(dAddedWeightKg);
+        const newTotalCost = dExistingCost.plus(dAddedCost);
+        const newCostPerKg = newTotalKg.gt(0) ? newTotalCost.div(newTotalKg).toDecimalPlaces(6).toNumber() : 0;
 
         const [updated] = await tx
           .update(factoryMixBatches)
           .set({
-            totalWeightKg: String(newTotalKg),
-            totalCost: String(newTotalCost),
-            costPerKg: String(newCostPerKg),
+            totalWeightKg: newTotalKg.toDecimalPlaces(6).toFixed(6),
+            totalCost: newTotalCost.toDecimalPlaces(6).toFixed(6),
+            costPerKg: new Decimal(newCostPerKg).toFixed(6),
             status: "ACTIVE",
             updatedAt: new Date(),
           })

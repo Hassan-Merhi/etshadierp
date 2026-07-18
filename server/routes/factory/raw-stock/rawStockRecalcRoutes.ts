@@ -19,6 +19,7 @@ import {
   captureReplaySnapshot,
   computeReplayFingerprint,
   REPLAY_ALGORITHM_VERSION,
+  StaleTokenError,
 } from "../../../services/factory/historicalCostReplay";
 import { logAudit } from "../../helpers/auditHelpers";
 import { getStableSupplierCost } from "../../../services/factory/rawStockStableCost";
@@ -694,6 +695,18 @@ export function registerRawStockRecalcRoutes(app: Express) {
       const { supplierId, dryRun } = req.body;
       const isDryRun = dryRun === true;
 
+      // DEFECT 13 FIX: The non-dryRun apply path is deprecated. Use Historical Replay.
+      if (!isDryRun) {
+        res.setHeader(
+          "X-Deprecated",
+          "This endpoint computes the all-time receipt-weighted stable average, not the timeline moving average. Prefer Historical Replay."
+        );
+        return res.status(410).json({
+          message: "Applying supplier rate recompute is deprecated. Use the Historical Cost Replay tool instead. It uses the timeline moving-average rather than the all-time receipt-weighted average.",
+          code: "USE_HISTORICAL_REPLAY",
+        });
+      }
+
       // FIX 6: Deprecation warning — this endpoint uses the all-time receipt-weighted
       // average, NOT the timeline moving-average. It can overwrite a correctly-computed
       // rate with a different value, making Historical Replay inconsistent. Prefer
@@ -954,44 +967,12 @@ export function registerRawStockRecalcRoutes(app: Express) {
     async (req: any, res: any) => {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
-      try {
-        const mismatches = await getMixBatchSourceCostMismatchPreview(companyId);
-        // FIX 6: Supplier-priced source rows (supplierId set) must not be auto-fixed
-        // here — their correct rate depends on the Historical Replay timeline, not the
-        // current container rate or today's stable average. Silently auto-correcting
-        // them would freeze the wrong historical rate. Route the admin to Historical Replay.
-        const fixableIds = mismatches
-          .filter((r) => r.fixable && !r.supplierId)
-          .map((r) => r.sourceId);
-        if (fixableIds.length === 0) {
-          return res.json({ applied: 0, skipped: 0, results: [] });
-        }
-        const results = await applyZeroCostMixBatchSourcesFix(companyId, fixableIds, {
-          onAudit: async (tx, result) => {
-            await logAudit(
-              {
-                userId: req.session.userId,
-                username: req.session.username || req.session.userId,
-                companyId,
-                action: "update",
-                tableName: "factory_mix_batch_sources",
-                recordId: result.sourceId,
-                recordIdentifier: `fix-source-mismatches — batch ${result.batchCode}`,
-                changes: { result: { new: result } },
-              },
-              tx
-            );
-          },
-        });
-        res.json({
-          applied: results.filter((r) => r.applied).length,
-          skipped: results.filter((r) => !r.applied).length,
-          results,
-        });
-      } catch (err: any) {
-        console.error("[recalc fix-source-mismatches] error:", err);
-        res.status(500).json({ message: err.message || "Failed to fix source mismatches" });
-      }
+      // DEFECT 13 FIX: Supplier-priced source rows must be corrected through Historical
+      // Replay (timeline-based rates), not this endpoint (container rate). Route 410.
+      return res.status(410).json({
+        message: "This endpoint is deprecated. Use the Historical Cost Replay tool to fix all source cost mismatches.",
+        code: "USE_HISTORICAL_REPLAY",
+      });
     }
   );
 
@@ -1197,12 +1178,33 @@ export function registerRawStockRecalcRoutes(app: Express) {
           suppliers: Array<{ id: number; currentRawMaterialCostPerKgUsd: string }>;
         };
 
-        // Apply the undo in a single DB transaction using a pool client
+        // DEFECT 5 FIX: Apply the undo in a single atomic transaction with
+        // advisory lock + row-level FOR UPDATE to prevent concurrent double-undo.
+        // The mark-as-undone is now inside the same transaction as the restore writes.
         const client = await pool.connect();
         try {
           await client.query("BEGIN");
+          await client.query(`SELECT pg_advisory_xact_lock(9003, $1)`, [companyId]);
 
-          for (const c of snapshot.containers) {
+          // Re-verify inside the lock to prevent TOCTOU double-undo.
+          const { rows: lockedRows } = await client.query(
+            `SELECT id, undone_at, snapshot FROM factory_recalc_undo_log
+             WHERE id = $1 AND company_id = $2 FOR UPDATE`,
+            [parseInt(undoLogId), companyId]
+          );
+          if (!lockedRows[0]) throw Object.assign(new Error("Undo log entry not found"), { undoStatus: 404 });
+          if (lockedRows[0].undone_at) throw Object.assign(new Error("This recalculation has already been undone."), { undoStatus: 400 });
+
+          const lockedSnapshot = lockedRows[0].snapshot as {
+            containers: Array<{ id: number; finalPayableAmount: string; ratePerKgUsd: string; finalPayableAmountUsd: string }>;
+            rawStockRows: Array<{ id: number; costPerKg: string; costPerKgUsd: string }>;
+            mixBatchSources: Array<{ id: number; costPerKg: string; totalCost: string }>;
+            mixBatches: Array<{ id: number; costPerKg: string; totalCost: string }>;
+            bales: Array<{ id: number; costPerKg: string; totalCost: string }>;
+            suppliers: Array<{ id: number; currentRawMaterialCostPerKgUsd: string }>;
+          };
+
+          for (const c of lockedSnapshot.containers) {
             await client.query(
               `UPDATE factory_containers
                SET final_payable_amount = $1, rate_per_kg_usd = $2, final_payable_amount_usd = $3, updated_at = NOW()
@@ -1210,52 +1212,54 @@ export function registerRawStockRecalcRoutes(app: Express) {
               [c.finalPayableAmount, c.ratePerKgUsd, c.finalPayableAmountUsd, c.id]
             );
           }
-          for (const rs of snapshot.rawStockRows) {
+          for (const rs of lockedSnapshot.rawStockRows) {
             await client.query(
               `UPDATE factory_raw_stock SET cost_per_kg = $1, cost_per_kg_usd = $2 WHERE id = $3`,
               [rs.costPerKg, rs.costPerKgUsd, rs.id]
             );
           }
-          for (const src of snapshot.mixBatchSources) {
+          for (const src of lockedSnapshot.mixBatchSources) {
             await client.query(
               `UPDATE factory_mix_batch_sources SET cost_per_kg = $1, total_cost = $2 WHERE id = $3`,
               [src.costPerKg, src.totalCost, src.id]
             );
           }
-          for (const b of snapshot.mixBatches) {
+          for (const b of lockedSnapshot.mixBatches) {
             await client.query(
               `UPDATE factory_mix_batches SET cost_per_kg = $1, total_cost = $2, updated_at = NOW() WHERE id = $3`,
               [b.costPerKg, b.totalCost, b.id]
             );
           }
-          for (const bale of snapshot.bales) {
+          for (const bale of lockedSnapshot.bales) {
             await client.query(
               `UPDATE factory_bales SET cost_per_kg = $1, total_cost = $2, updated_at = NOW() WHERE id = $3`,
               [bale.costPerKg, bale.totalCost, bale.id]
             );
           }
-          for (const sup of snapshot.suppliers) {
+          for (const sup of lockedSnapshot.suppliers) {
             await client.query(
               `UPDATE factory_suppliers SET current_raw_material_cost_per_kg_usd = $1, updated_at = NOW() WHERE id = $2`,
               [sup.currentRawMaterialCostPerKgUsd, sup.id]
             );
           }
 
+          // Mark as undone atomically with the restore writes (DEFECT 5 FIX).
+          await client.query(
+            `UPDATE factory_recalc_undo_log
+             SET undone_at = NOW(), undone_by_user_id = $1, undone_by_username = $2
+             WHERE id = $3 AND company_id = $4`,
+            [req.session.userId ?? null, req.session.username ?? null, parseInt(undoLogId), companyId]
+          );
+
           await client.query("COMMIT");
-        } catch (txErr) {
+        } catch (txErr: any) {
           await client.query("ROLLBACK");
+          if (txErr.undoStatus === 404) return res.status(404).json({ message: txErr.message });
+          if (txErr.undoStatus === 400) return res.status(400).json({ message: txErr.message });
           throw txErr;
         } finally {
           client.release();
         }
-
-        // Mark the log entry as undone
-        await pool.query(
-          `UPDATE factory_recalc_undo_log
-           SET undone_at = NOW(), undone_by_user_id = $1, undone_by_username = $2
-           WHERE id = $3`,
-          [req.session.userId ?? null, req.session.username ?? null, parseInt(undoLogId)]
-        );
 
         res.json({
           success: true,
@@ -1342,12 +1346,14 @@ export function registerRawStockRecalcRoutes(app: Express) {
           };
           const confirmationToken = signRepairToken(tokenPayload);
 
+          // DEFECT 9 (route) FIX: include fingerprint so the UI can display/log it.
           return res.json({
             dryRun: true,
             summary: preview.summary,
             safeSupplierIds,
             suppliersToApply: preview.supplierRows.filter((s) => safeSupplierIds.includes(s.supplierId)),
             confirmationToken,
+            fingerprint,
             expiresInMs: REPAIR_TOKEN_TTL_MS,
             algorithmVersion: REPLAY_ALGORITHM_VERSION,
           });
@@ -1422,14 +1428,35 @@ export function registerRawStockRecalcRoutes(app: Express) {
                 JSON.stringify(snapshot),
               ]
             );
+            // DEFECT 4 FIX: audit log inside the same transaction — atomic with cost writes.
+            // No try/catch: audit INSERT failure must abort the whole transaction (fail closed).
+            await client.query(
+              `INSERT INTO audit_log
+                 (user_id, username, company_id, action, table_name, record_id, record_identifier, changes)
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+              [
+                String(userId || ""),
+                username || null,
+                companyId,
+                "historical_cost_replay_applied",
+                "factory_suppliers",
+                companyId,
+                `historical_cost_replay — ${safeSupplierIds.length} supplier(s): ${supplierNames}`,
+                JSON.stringify({ applied: applyResult, safeSupplierIds }),
+              ]
+            );
           },
         });
 
-        // Audit log is best-effort (separate operation — logAudit opens its own connection)
-        try { await logAudit(req, "historical_cost_replay_applied", { result, safeSupplierIds }); } catch {}
-
         res.json({ success: true, ...result });
       } catch (err: any) {
+        // Structured non-500 for stale/concurrent-apply token violations.
+        if (err instanceof StaleTokenError || err?.code === "STALE_TOKEN") {
+          return res.status(409).json({
+            message: err.message,
+            code: "STALE_TOKEN",
+          });
+        }
         console.error("[historical-replay apply] error:", err);
         res.status(500).json({ message: err.message || "Failed to apply historical replay" });
       }

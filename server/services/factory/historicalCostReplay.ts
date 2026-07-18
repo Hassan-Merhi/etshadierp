@@ -37,6 +37,19 @@ import { eq, and, isNull, sql, inArray } from "drizzle-orm";
 // Public result types
 // ─────────────────────────────────────────────────────────────────────────────
 
+/**
+ * Thrown inside applyHistoricalCostReplay when the live DB fingerprint no longer
+ * matches the signed token fingerprint — meaning data changed between the dry-run
+ * and the apply call. Callers should catch this and return HTTP 409 (Conflict).
+ */
+export class StaleTokenError extends Error {
+  readonly code = "STALE_TOKEN" as const;
+  constructor(message: string) {
+    super(message);
+    this.name = "StaleTokenError";
+  }
+}
+
 export type ScanReason =
   | "ACTIVE_RAW_STOCK"
   | "DELETED_RAW_STOCK"
@@ -912,13 +925,21 @@ interface BatchCorrection {
   correctedSourceCosts: Map<number, number>; // sourceId → corrected costPerKg
 }
 
+/** DEFECT 12 FIX: Batches excluded from corrections (cycle or missing upstream). */
+interface BlockedBatch {
+  batchId: number;
+  batchCode: string;
+  reasons: string[];
+  dependencyPath: number[];
+}
+
 function computeBatchCorrections(
   batchInfoMap: Map<number, BatchInfo>,
   sourceInfos: SourceInfo[],
   /** supplierTimeline.expectedRateAtBatch for all suppliers combined */
   expectedRateAtBatch: Map<string, number>, // `${supplierId}:${batchId}` → rate
   canonicalRateByContainer: Map<number, number>
-): BatchCorrection[] {
+): { corrections: BatchCorrection[]; blockedBatches: BlockedBatch[] } {
   // Build corrected cost per source
   const correctedCostBySource = new Map<number, number>();
   const sourcesGroupedByBatch = new Map<number, SourceInfo[]>();
@@ -1046,12 +1067,29 @@ function computeBatchCorrections(
     });
   }
 
-  return corrections.filter((c) => {
+  // DEFECT 12 FIX: Collect blocked batches and return alongside filtered corrections.
+  const blockedBatches: BlockedBatch[] = [];
+  for (const batchId of cycleBatchIds) {
+    const batch = batchInfoMap.get(batchId);
+    if (batch) {
+      blockedBatches.push({ batchId, batchCode: batch.batchCode, reasons: ["DEPENDENCY_CYCLE"], dependencyPath: [] });
+    }
+  }
+  for (const batchId of missingUpstreamBatchIds) {
+    const batch = batchInfoMap.get(batchId);
+    if (batch) {
+      blockedBatches.push({ batchId, batchCode: batch.batchCode, reasons: ["UPSTREAM_BATCH_MISSING"], dependencyPath: [] });
+    }
+  }
+
+  const filteredCorrections = corrections.filter((c) => {
     // Only include batches that actually need updating
     const diffCpk = Math.abs(c.expectedCostPerKg - c.storedCostPerKg);
     const diffTot = Math.abs(c.expectedTotalCost - c.storedTotalCost);
     return diffCpk > 0.000001 || diffTot > 0.01;
   });
+
+  return { corrections: filteredCorrections, blockedBatches };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1230,8 +1268,8 @@ export async function previewHistoricalCostReplay(
     }
   }
 
-  // 8. Compute batch corrections
-  const batchCorrections = computeBatchCorrections(
+  // 8. Compute batch corrections (DEFECT 12 FIX: returns {corrections, blockedBatches})
+  const { corrections: batchCorrections, blockedBatches: batchBlockedBatches } = computeBatchCorrections(
     batchInfoMap,
     sourceInfos,
     allExpectedRatesAtBatch,
@@ -1444,15 +1482,32 @@ export function computeReplayFingerprint(
         currentStoredRate: s.currentStoredRate,
         safeToRepair: s.safeToRepair,
       })),
-    // Exact IDs of records that would be written — any DB change after the dry-run
-    // changes these arrays and the fingerprint, causing STALE_TOKEN on apply.
-    sourceIds: preview.sourceRows
-      .filter((s) => s.safeToRepair && sortedSupplierIds.includes(s.supplierId ?? -1))
-      .map((s) => s.sourceId)
-      .sort((a, b) => a - b),
-    batchIds: preview.batchRows
-      .map((b) => b.batchId)
-      .sort((a, b) => a - b),
+    // DEFECT 3 FIX: Include ALL safeToRepair source rows (SUPPLIER_LOCKED_RATE and
+    // CONTAINER_DIRECT) so any cost change on any row invalidates the fingerprint.
+    // Previous filter excluded CONTAINER_DIRECT rows (supplierId=null) — now they are covered.
+    sourceData: preview.sourceRows
+      .filter((s) => s.safeToRepair)
+      .sort((a, b) => a.sourceId - b.sourceId)
+      .map((s) => ({
+        id: s.sourceId,
+        supplierId: s.supplierId ?? null,
+        containerId: s.containerId ?? null,
+        batchId: s.batchId,
+        pricingBasis: s.pricingBasis,
+        weightKg: s.weightKg,
+        storedCostPerKg: s.storedCostPerKg,
+        expectedHistoricalCostPerKg: s.expectedHistoricalCostPerKg,
+      })),
+    batchData: preview.batchRows
+      .sort((a, b) => a.batchId - b.batchId)
+      .map((b) => ({
+        batchId: b.batchId,
+        status: b.status,
+        storedCostPerKg: b.storedCostPerKg,
+        expectedCostPerKg: b.expectedCostPerKg,
+        storedTotalCost: b.storedTotalCost,
+        expectedTotalCost: b.expectedTotalCost,
+      })),
     summary: {
       sourceMismatches: preview.summary.sourceMismatches,
       batchesToUpdate: preview.summary.batchesToUpdate,
@@ -1507,20 +1562,15 @@ export interface ReplayApplyResult {
   skippedSupplierIds: number[];
 }
 
-/**
- * Ensure the token-consumption table exists (idempotent — FIX 16).
- * Called inside the apply transaction so the table is guaranteed present before
- * the INSERT that marks the token as consumed.
- */
-async function ensureReplayConsumedTokensTable(client: { query: Function }): Promise<void> {
-  await client.query(`
-    CREATE TABLE IF NOT EXISTS factory_replay_consumed_tokens (
-      token_hash   TEXT        PRIMARY KEY,
-      company_id   INTEGER     NOT NULL,
-      user_id      TEXT        NOT NULL,
-      consumed_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    )
-  `);
+/** DEFECT 8 FIX: Single source of truth for the finalized-bale exclusion SQL fragment. */
+function buildNotFinalizedClause(includeFinalizedBales: boolean): string {
+  if (includeFinalizedBales) {
+    return `status NOT IN ('DELETED','REMOVED')`;
+  }
+  return `status NOT IN ('DELETED','REMOVED','${FINALIZED_BALE_STATUSES.join("','")}')
+         AND dispatch_batch_id IS NULL
+         AND NOT EXISTS (SELECT 1 FROM customer_order_bales WHERE bale_id = fb.id)
+         AND NOT EXISTS (SELECT 1 FROM factory_invoice_loading_bales WHERE bale_id = fb.id)`;
 }
 
 /**
@@ -1548,6 +1598,7 @@ export async function captureReplaySnapshot(
     { rows: mixBatches },
     { rows: bales },
     { rows: supplierRates },
+    { rows: containerRows },
   ] = await Promise.all([
     client.query(
       `SELECT frs.id,
@@ -1593,8 +1644,19 @@ export async function captureReplaySnapshot(
        WHERE id = ANY($1) AND company_id = $2`,
       [safeSupplierIds, companyId]
     ),
+    // DEFECT 6 FIX: capture container cost fields so the undo log can restore them
+    // after DEFECT 7 writes update rate_per_kg_usd / final_payable_amount_usd.
+    client.query(
+      `SELECT id,
+              rate_per_kg_usd          AS "ratePerKgUsd",
+              final_payable_amount     AS "finalPayableAmount",
+              final_payable_amount_usd AS "finalPayableAmountUsd"
+       FROM factory_containers
+       WHERE supplier_id = ANY($1) AND company_id = $2`,
+      [safeSupplierIds, companyId]
+    ),
   ]);
-  return { rawStockRows, mixBatchSources, mixBatches, bales, suppliers: supplierRates, containers: [] };
+  return { rawStockRows, mixBatchSources, mixBatches, bales, suppliers: supplierRates, containers: containerRows };
 }
 
 /** Canonical algorithm version — increment whenever the replay formula changes. */
@@ -1640,14 +1702,7 @@ export async function applyHistoricalCostReplay(
     );
   }
 
-  // Verify fingerprint (FIX 1: opts included so the hash matches what was signed)
-  const actualFingerprint = computeReplayFingerprint(companyId, supplierIds, preview, {
-    includeCompletedBatches,
-    includeFinalizedBales,
-  });
-  if (actualFingerprint !== expectedFingerprint) {
-    throw new Error("Fingerprint mismatch — replay data changed since dry-run was issued. Re-run the preview.");
-  }
+  // DEFECT 2 FIX: Fingerprint check moved inside the advisory lock (see below).
 
   // Filter to requested, safe suppliers
   const safeTimelines = preview.supplierRows.filter(
@@ -1693,7 +1748,8 @@ export async function applyHistoricalCostReplay(
     }
   }
 
-  const batchCorrections = computeBatchCorrections(
+  // DEFECT 12 FIX (apply caller): destructure named return.
+  const { corrections: batchCorrections } = computeBatchCorrections(
     batchInfoMap,
     sourceInfos,
     allExpectedRatesAtBatch,
@@ -1735,12 +1791,8 @@ export async function applyHistoricalCostReplay(
   if (batchIdsToApply.size > 0) {
     // Finalised bales are excluded unless opted in (FIX 10: use real relationship check,
     // not hardcoded status list)
-    const notFinalizedClause = includeFinalizedBales
-      ? `status NOT IN ('DELETED','REMOVED')`
-      : `status NOT IN ('DELETED','REMOVED','${FINALIZED_BALE_STATUSES.join("','")}')
-         AND dispatch_batch_id IS NULL
-         AND NOT EXISTS (SELECT 1 FROM customer_order_bales WHERE bale_id = fb.id)
-         AND NOT EXISTS (SELECT 1 FROM factory_invoice_loading_bales WHERE bale_id = fb.id)`;
+    // DEFECT 8 FIX: Use shared helper — eliminates duplicated inline clause.
+    const notFinalizedClause = buildNotFinalizedClause(includeFinalizedBales);
     const { rows: baleIdRows } = await pool.query<{ id: number }>(
       `SELECT fb.id FROM factory_bales fb
        WHERE fb.mix_batch_id = ANY($1) AND fb.company_id = $2 AND ${notFinalizedClause}`,
@@ -1756,10 +1808,77 @@ export async function applyHistoricalCostReplay(
     // Advisory lock: namespace 9003 = historical replay
     await client.query(`SELECT pg_advisory_xact_lock(9003, $1)`, [companyId]);
 
-    // FIX 16: Ensure token table exists and consume the token atomically.
-    // A duplicate token hash causes an immediate rollback with a clear message.
+    // DEFECT 2 FIX (complete): Lock-consistent fingerprint verification.
+    //
+    // After acquiring the advisory lock we SELECT FOR UPDATE ALL rows that will be
+    // written (both SUPPLIER_LOCKED_RATE and CONTAINER_DIRECT source rows + all batch
+    // rows). This blocks concurrent writers on those rows for the lifetime of this
+    // transaction, then we rebuild a fresh preview clone with the live DB stored costs
+    // and recompute the fingerprint. Comparing the fresh fingerprint against
+    // expectedFingerprint (from the signed token) detects:
+    //   - data that changed between dry-run and apply (stale token), AND
+    //   - any tampered token payload (fingerprint mismatch).
+    {
+      // All safe source rows — includes CONTAINER_DIRECT (supplierId=null)
+      const allSafeSourceIds = preview.sourceRows
+        .filter((s) => s.safeToRepair)
+        .map((s) => s.sourceId);
+
+      const batchIdArr = [...batchIdsToApply];
+
+      // Sequential queries: pg client connections are single-connection serial.
+      let freshSrcRows: { id: number; cost_per_kg: string }[] = [];
+      let freshBatchRows: { id: number; cost_per_kg: string; total_cost: string }[] = [];
+
+      if (allSafeSourceIds.length > 0) {
+        const { rows } = await client.query<{ id: number; cost_per_kg: string }>(
+          `SELECT id, cost_per_kg FROM factory_mix_batch_sources WHERE id = ANY($1) FOR UPDATE`,
+          [allSafeSourceIds]
+        );
+        freshSrcRows = rows;
+      }
+      if (batchIdArr.length > 0) {
+        const { rows } = await client.query<{ id: number; cost_per_kg: string; total_cost: string }>(
+          `SELECT id, cost_per_kg, total_cost FROM factory_mix_batches WHERE id = ANY($1) FOR UPDATE`,
+          [batchIdArr]
+        );
+        freshBatchRows = rows;
+      }
+
+      const freshSrcCost = new Map(freshSrcRows.map((r) => [r.id, r.cost_per_kg]));
+      const freshBatchCost = new Map(
+        freshBatchRows.map((r) => [r.id, { cost: r.cost_per_kg, total: r.total_cost }])
+      );
+
+      // Build fresh preview clone: replace storedCostPerKg/storedTotalCost with live values.
+      const freshPreview: HistoricalReplayPreviewResult = {
+        ...preview,
+        sourceRows: preview.sourceRows.map((s) => {
+          const live = freshSrcCost.get(s.sourceId);
+          return live !== undefined ? { ...s, storedCostPerKg: parseFloat(live) } : s;
+        }),
+        batchRows: preview.batchRows.map((b) => {
+          const live = freshBatchCost.get(b.batchId);
+          return live !== undefined
+            ? { ...b, storedCostPerKg: parseFloat(live.cost), storedTotalCost: parseFloat(live.total) }
+            : b;
+        }),
+      };
+
+      // Recompute fingerprint from live DB state and validate against signed token value.
+      const freshFingerprint = computeReplayFingerprint(companyId, supplierIds, freshPreview, {
+        includeCompletedBatches,
+        includeFinalizedBales,
+      });
+      if (freshFingerprint !== expectedFingerprint) {
+        throw new StaleTokenError(
+          "Stale token — DB state changed since the dry-run was issued. Re-run the preview to obtain a fresh token."
+        );
+      }
+    }
+
+    // FIX 16 / DEFECT 17: Token table is created by migration; just consume the token.
     if (tokenHash) {
-      await ensureReplayConsumedTokensTable(client);
       const { rowCount } = await client.query(
         `INSERT INTO factory_replay_consumed_tokens (token_hash, company_id, user_id)
          VALUES ($1, $2, $3)
@@ -1797,12 +1916,31 @@ export async function applyHistoricalCostReplay(
       for (const rs of rsRows) {
         const canonRate = canonicalRateByContainer.get(rs.container_id);
         if (canonRate == null) continue;
+        // DEFECT 1 FIX: company_id guard prevents cross-company write.
         await client.query(
-          `UPDATE factory_raw_stock SET cost_per_kg_usd = $1 WHERE id = $2`,
-          [new Decimal(canonRate).toDecimalPlaces(6).toFixed(6), rs.id]
+          `UPDATE factory_raw_stock SET cost_per_kg_usd = $1 WHERE id = $2 AND company_id = $3`,
+          [new Decimal(canonRate).toDecimalPlaces(6).toFixed(6), rs.id, companyId]
         );
         result.rawStockRowsUpdated++;
       }
+    }
+
+    // DEFECT 7 FIX: update factory_containers so rate_per_kg_usd stays in sync.
+    for (const [containerId, canonRate] of canonicalRateByContainer) {
+      await client.query(
+        `UPDATE factory_containers
+         SET rate_per_kg_usd          = $1,
+             final_payable_amount_usd = COALESCE(actual_received_kg, total_kg)::numeric * $1
+         WHERE id = $2
+           AND company_id = $3
+           AND supplier_id = ANY($4)`,
+        [
+          new Decimal(canonRate).toDecimalPlaces(6).toFixed(6),
+          containerId,
+          companyId,
+          [...safeSupplierIds],
+        ]
+      );
     }
 
     // 2. Update mix-batch source costs
@@ -1822,9 +1960,12 @@ export async function applyHistoricalCostReplay(
         .toDecimalPlaces(6)
         .toFixed(6);
 
+      // DEFECT 1 FIX: scoped via mix_batch_id subquery to guard against cross-company write.
       await client.query(
-        `UPDATE factory_mix_batch_sources SET cost_per_kg = $1, total_cost = $2 WHERE id = $3`,
-        [newCostPerKg, newTotalCost, srcRow.sourceId]
+        `UPDATE factory_mix_batch_sources SET cost_per_kg = $1, total_cost = $2
+         WHERE id = $3
+           AND mix_batch_id IN (SELECT id FROM factory_mix_batches WHERE company_id = $4)`,
+        [newCostPerKg, newTotalCost, srcRow.sourceId, companyId]
       );
       result.sourcesUpdated++;
     }
@@ -1833,24 +1974,20 @@ export async function applyHistoricalCostReplay(
     for (const correction of batchCorrections) {
       if (!batchIdsToApply.has(correction.batchId)) continue;
 
+      // DEFECT 1 FIX: company_id guard.
       await client.query(
-        `UPDATE factory_mix_batches SET cost_per_kg = $1, total_cost = $2, updated_at = NOW() WHERE id = $3`,
+        `UPDATE factory_mix_batches SET cost_per_kg = $1, total_cost = $2, updated_at = NOW() WHERE id = $3 AND company_id = $4`,
         [
           new Decimal(correction.expectedCostPerKg).toDecimalPlaces(6).toFixed(6),
           new Decimal(correction.expectedTotalCost).toDecimalPlaces(6).toFixed(6),
           correction.batchId,
+          companyId,
         ]
       );
       result.batchesUpdated++;
 
-      // FIX 10: Use real relationship query for finalized-bale detection instead of
-      // the hardcoded status list. Finalized = dispatched, customer-ordered, or invoiced.
-      const notFinalizedClause = includeFinalizedBales
-        ? `status NOT IN ('DELETED','REMOVED')`
-        : `status NOT IN ('DELETED','REMOVED','${FINALIZED_BALE_STATUSES.join("','")}')
-           AND dispatch_batch_id IS NULL
-           AND NOT EXISTS (SELECT 1 FROM customer_order_bales WHERE bale_id = fb.id)
-           AND NOT EXISTS (SELECT 1 FROM factory_invoice_loading_bales WHERE bale_id = fb.id)`;
+      // DEFECT 8 FIX + FIX 10: Use shared helper for finalized-bale detection.
+      const notFinalizedClause = buildNotFinalizedClause(includeFinalizedBales);
       const { rows: baleRows } = await client.query<{ id: number; weight_kg: string }>(
         `SELECT fb.id, fb.weight_kg FROM factory_bales fb
          WHERE fb.mix_batch_id = $1 AND fb.company_id = $2 AND ${notFinalizedClause}`,
@@ -1859,12 +1996,14 @@ export async function applyHistoricalCostReplay(
       for (const bale of baleRows) {
         const dWeight = new Decimal(bale.weight_kg || "0");
         const dCost = new Decimal(correction.expectedCostPerKg);
+        // DEFECT 1 FIX: company_id guard.
         await client.query(
-          `UPDATE factory_bales SET cost_per_kg = $1, total_cost = $2, updated_at = NOW() WHERE id = $3`,
+          `UPDATE factory_bales SET cost_per_kg = $1, total_cost = $2, updated_at = NOW() WHERE id = $3 AND company_id = $4`,
           [
             dCost.toDecimalPlaces(6).toFixed(6),
             dWeight.times(dCost).toDecimalPlaces(6).toFixed(6),
             bale.id,
+            companyId,
           ]
         );
         result.balesUpdated++;
@@ -1908,6 +2047,30 @@ export async function applyHistoricalCostReplay(
             );
           }
         }
+      }
+    }
+
+    // DEFECT 11 FIX: Source-cost sum invariant — verify each updated batch's source cost
+    // sum matches the expected total cost before committing.
+    for (const correction of batchCorrections) {
+      if (!batchIdsToApply.has(correction.batchId)) continue;
+      const sourcesForBatch = sourceInfos.filter((s) => s.batchId === correction.batchId);
+      if (sourcesForBatch.length === 0) continue;
+      let dSumCost = new Decimal(0);
+      for (const src of sourcesForBatch) {
+        const previewSrc = preview.sourceRows.find((ps) => ps.sourceId === src.sourceId);
+        const correctedCost =
+          previewSrc && previewSrc.safeToRepair
+            ? previewSrc.expectedHistoricalCostPerKg
+            : src.storedCostPerKg;
+        dSumCost = dSumCost.plus(new Decimal(src.weightKg).times(correctedCost));
+      }
+      const expectedTotal = new Decimal(correction.expectedTotalCost);
+      if (dSumCost.minus(expectedTotal).abs().gt(new Decimal("0.02"))) {
+        throw new Error(
+          `Source-cost sum invariant violated for batch ${correction.batchId} (${correction.batchCode}): ` +
+            `source sum ${dSumCost.toFixed(6)} diverges from expected total ${expectedTotal.toFixed(6)} by > 0.02. Rolling back.`
+        );
       }
     }
 

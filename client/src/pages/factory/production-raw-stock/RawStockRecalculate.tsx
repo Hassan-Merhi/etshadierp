@@ -258,9 +258,19 @@ export default function RawStockRecalculate() {
   // are selected will be included in the Prepare call.
   const [selectedSupplierIds, setSelectedSupplierIds] = useState<Set<number>>(new Set());
 
-  // FIX 12: Prepared token received from the dry-run (Prepare) call. The confirm
-  // dialog uses this token for the Apply call so the two steps are atomically linked.
-  const [preparedReplayToken, setPreparedReplayToken] = useState<string | null>(null);
+  // DEFECT 9 FIX: Store the full dry-run response (not just the token string) so the
+  // confirm dialog can surface summary data and pass the complete token on apply.
+  interface PreparedReplayData {
+    confirmationToken: string;
+    summary: Record<string, any>;
+    safeSupplierIds: number[];
+    suppliersToApply: any[];
+    // DEFECT 9 (route) FIX: fingerprint is now included in the dry-run response.
+    fingerprint?: string;
+    expiresInMs: number;
+    algorithmVersion: string;
+  }
+  const [preparedReplayToken, setPreparedReplayToken] = useState<PreparedReplayData | null>(null);
 
   // ── Recompute dry-run / confirmation dialog ────────────────────────────────
   const [recomputePreviewRows, setRecomputePreviewRows] = useState<SupplierRatePreviewRow[] | null>(null);
@@ -433,10 +443,12 @@ export default function RawStockRecalculate() {
         includeFinalizedBales: opts.includeFinalizedBales,
       });
       if (!res.ok) throw new Error((await res.json().catch(() => ({}))).message || "Dry-run failed");
-      return res.json() as Promise<{ confirmationToken: string; summary: Record<string, any> }>;
+      // DEFECT 9 FIX: return the full dry-run response, not just the token string.
+      return res.json() as Promise<PreparedReplayData>;
     },
     onSuccess: (data) => {
-      setPreparedReplayToken(data.confirmationToken);
+      // DEFECT 9 FIX: store the full prepared-replay object, not just the token.
+      setPreparedReplayToken(data);
       setReplayConfirmText("");
       setShowReplayConfirmDialog(true);
     },
@@ -2123,16 +2135,16 @@ export default function RawStockRecalculate() {
               disabled={
                 replayConfirmText !== REPLAY_CONFIRM_PHRASE ||
                 replayApplyMutation.isPending ||
-                !preparedReplayToken
+                !preparedReplayToken?.confirmationToken
               }
               onClick={() => {
-                if (!preparedReplayToken) return;
+                if (!preparedReplayToken?.confirmationToken) return;
                 replayApplyMutation.mutate(
                   {
                     supplierIds: Array.from(selectedSupplierIds),
                     includeCompletedBatches,
                     includeFinalizedBales,
-                    confirmationToken: preparedReplayToken,
+                    confirmationToken: preparedReplayToken.confirmationToken,
                   },
                   {
                     onSettled: () => {
@@ -2216,22 +2228,17 @@ export default function RawStockRecalculate() {
                 </p>
               )}
 
+              {/* DEFECT 13 FIX: Apply button removed — deprecated, use Historical Replay. */}
               <div className="flex justify-end gap-2 pt-2">
+                <p className="text-xs text-amber-700 dark:text-amber-400 mr-auto mt-1 font-medium">
+                  Applying is deprecated — use <strong>Historical Cost Replay</strong> instead.
+                </p>
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={() => { setShowRecomputeDialog(false); setRecomputePreviewRows(null); }}
                 >
-                  Cancel
-                </Button>
-                <Button
-                  size="sm"
-                  className="gap-1.5 bg-amber-600 hover:bg-amber-700 text-white"
-                  disabled={recomputeApplyMutation.isPending}
-                  onClick={handleRecomputeConfirm}
-                >
-                  <RefreshCw className="h-3.5 w-3.5" />
-                  {recomputeApplyMutation.isPending ? "Applying..." : "Apply — Overwrite Rates"}
+                  Close
                 </Button>
               </div>
             </div>
