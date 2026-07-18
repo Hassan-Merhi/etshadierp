@@ -132,8 +132,8 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
   registerFactoryContainersRoutes(app);
   registerFactoryBalesRoutes(app);
   registerFactoryCustomersRoutes(app);
-  // Correct factory-container document/freight GET ownership before the legacy
-  // docs module, whose helper still targets the ERP containers table.
+  // ContainerDetail is an ERP screen but its historical document/freight URLs
+  // live below /api/factory. Register the ERP-company-aware GET handlers first.
   registerFactoryContainerReadAccessRoutes(app);
   registerFactoryDocsUsersRoutes(app);
   registerFactoryEmployeesPosRoutes(app);
