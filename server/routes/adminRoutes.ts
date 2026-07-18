@@ -7,6 +7,7 @@ import { registerAdminPoFixRoutes } from "./admin/adminPoFixRoutes";
 import { registerAdminRepairRoutes } from "./admin/adminRepairRoutes";
 import { registerDeletedItemsRoutes } from "./admin/deletedItemsRoutes";
 import { registerSecurityAnomalyRoutes } from "./admin/securityAnomalyRoutes";
+import { registerSecurityPermissionRoutes } from "./admin/securityPermissionRoutes";
 import { requirePrivilegedOperation } from "../services/security/privilegedOperationEnforcementAdapter";
 import {
   inventoryRebuildInputSchema,
@@ -39,4 +40,5 @@ export function registerAdminRoutes(app: Express) {
   registerAdminRepairRoutes(app);
   registerDeletedItemsRoutes(app);
   registerSecurityAnomalyRoutes(app);
+  registerSecurityPermissionRoutes(app);
 }
