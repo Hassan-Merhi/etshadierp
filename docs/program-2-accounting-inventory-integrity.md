@@ -10,7 +10,7 @@ Status: in progress. This branch must remain unmerged until the owner approves t
 - [x] 2D — Cash, bank, customer, and supplier reconciliation
 - [x] 2E — Stock movement integrity
 - [x] 2F — Factory raw-stock costing integrity
-- [ ] 2G — Mix-batch costing integrity
+- [x] 2G — Mix-batch costing integrity
 - [ ] 2H — Period locking and closed-period protection
 - [ ] 2I — Automated reconciliation and repair reporting
 
@@ -20,141 +20,80 @@ Each phase must be completed and committed separately. Do not begin Program 3 on
 
 Status: complete.
 
-### Completed work
-
-- Reclassified the existing detailed accounting flow inventory by business domain and integrity risk.
-- Defined canonical sources of truth for general-ledger balances, inventory movements, source documents, and secondary projections.
-- Identified the highest-risk gaps: multiple posting engines, inconsistent reversals, secondary-ledger drift, non-uniform accounting/stock transactions, powerful factory repair paths, fragmented period controls, and fragmented reconciliation.
-- Mapped each finding to its remediation owner in Phases 2B–2I.
-- Added `docs/program-2-posting-inventory-audit.md` as the Program 2 implementation contract.
-
-### Verification
-
-- Cross-checked the audit against the repository's existing 31-flow `docs/accounting-engine-audit.md`.
-- Confirmed the phase changed documentation only and did not alter balances, stock, routes, migrations, or production data.
-- No Replit checks or credits were used.
+- Classified accounting and inventory posting flows by integrity risk.
+- Defined canonical truth for vouchers, stock movements, source documents, and secondary projections.
+- Mapped the identified gaps into Phases 2B–2I in `docs/program-2-posting-inventory-audit.md`.
 
 ## Phase 2B — Central posting engine
 
 Status: complete.
 
-### Completed work
-
-- Added `centralPostingEngine.ts` as the strict transaction-owned posting boundary for new and migrated voucher flows.
-- Added Decimal-based debit/credit validation, non-negative finite amount checks, exactly-one accounting-target validation, balanced total enforcement, and declared voucher-total matching.
-- Required deterministic source identity and idempotency contracts before any insert can occur.
-- Required company ownership validation and audit recording as explicit dependencies of the posting boundary.
-- Preserved `insertVoucherWithEntriesTx` as a low-level compatibility primitive so route migration can proceed safely and incrementally in Phase 2C.
-- Exported the new posting contract through the accounting service index.
-- Added focused tests for balanced postings, imbalance rejection, invalid multi-target entries, total mismatch, and repeat-safe idempotent return behavior.
-
-### Verification
-
-- Performed focused static inspection of the new engine, exports, and tests on the Program 2 branch.
-- Confirmed validation runs before ownership checks and database writes.
-- Confirmed an existing idempotent posting returns without duplicate insert, ownership work, idempotency recording, or audit duplication.
-- No Replit checks or credits were used.
+- Added a strict transaction-owned, Decimal-based balanced voucher posting boundary.
+- Required company ownership, deterministic source identity, idempotency, and audit recording.
+- Added focused posting invariant tests and safe incremental migration contracts.
 
 ## Phase 2C — Voucher lifecycle integrity
 
 Status: complete.
 
-### Completed work
-
-- Added `voucherLifecycleService.ts` as the transaction-owned boundary for reversal and replacement of committed vouchers.
-- Reversals are created from the original committed entry rows by swapping debit and credit amounts; current balances, prices, or reconstructed assumptions are never used.
-- Added immutable lifecycle states and explicit original, reversal, and replacement linkage contracts.
-- Required company-scoped row locking before lifecycle changes.
-- Required deterministic operation idempotency before any reversal or replacement work begins.
-- Required linked accounting, inventory, party-ledger, and source-document effects to reverse inside the caller-owned transaction through the lifecycle adapter.
-- Added repeat-safe behavior so retried delete/edit requests return the prior lifecycle result rather than duplicating reversals.
-- Required actor, reason, source identity, and operation audit recording.
-- Exported the lifecycle boundary through the accounting service index.
-
-### Verification
-
-- Confirmed invalid, missing, cross-company, already-reversed, and unsupported-replacement targets fail before linked effects are changed.
-- Confirmed the original voucher remains immutable and is marked through linkage instead of deleting committed voucher entries.
-- Confirmed replacement performs reversal, linked-effect reversal, replacement creation, lifecycle linkage, and audit recording in deterministic order.
-- Confirmed no existing production route was silently switched without an adapter for all of its secondary effects.
-- No Replit checks or credits were used.
+- Added transaction-owned reversal and replacement boundaries.
+- Kept committed vouchers immutable and required linked reversal of accounting, inventory, party-ledger, and source effects.
+- Added deterministic lifecycle idempotency, locking, linkage, actor/reason, and audit contracts.
 
 ## Phase 2D — Cash, bank, customer, and supplier reconciliation
 
 Status: complete.
 
-### Completed work
-
-- Added `partyReconciliationService.ts` as a read-only, transaction-owned reconciliation boundary for cash, bank, customer, and supplier balances.
-- Defined voucher-entry balances as canonical accounting truth and operational account, bank, customer, and supplier balances as projections.
-- Required company, domain, target, and optional as-of-date identity for every comparison.
-- Added Decimal-based exact comparison and explicit projection-minus-canonical difference reporting.
-- Added currency compatibility validation so unlike currencies cannot be silently compared.
-- Added deterministic duplicate-target rejection for batch reconciliation.
-- Added batch matched/mismatched summaries without mutating balances or attempting repairs.
-- Exported the reconciliation contract through the accounting service index.
-- Added focused tests for exact matches, positive and negative drift, currency mismatch, batch summaries, and duplicate targets.
-
-### Verification
-
-- Confirmed canonical and projected balances are loaded from one caller-owned transaction/snapshot.
-- Confirmed the service is read-only and cannot repair, overwrite, or delete accounting data.
-- Confirmed no tolerance or floating-point rounding can hide a non-zero accounting difference.
-- Confirmed repair planning remains isolated to Phase 2I.
-- No production data or Replit checks/credits were used.
+- Added read-only Decimal reconciliation against voucher-entry truth.
+- Added company/domain/currency isolation, exact drift reporting, and duplicate-target protection.
+- Kept all repair behavior isolated from the comparison service.
 
 ## Phase 2E — Stock movement integrity
 
 Status: complete.
 
-### Completed work
-
-- Added `stockMovementIntegrityService.ts` as the canonical transaction-owned boundary for receipts, issues, transfers, adjustments, and reversals.
-- Required deterministic source identity and idempotency before any stock write.
-- Required company ownership validation for the stock item and every participating location.
-- Added deterministic balance locking in sorted location order before quantity validation or writes.
-- Added Decimal-based positive quantity, non-negative unit-cost, and movement-value calculation.
-- Enforced movement-specific location rules, including equal-and-opposite transfer rows at one unit cost.
-- Rejected insufficient stock before append unless an explicitly authorized caller enables negative stock.
-- Made stock history append-only: corrections require new movement rows and reversals require explicit original-movement linkage.
-- Required exact append counts, idempotency recording, and audit recording inside the caller-owned transaction.
-- Added focused tests for transfer symmetry, invalid locations, reversal linkage, negative-stock prevention, append ordering, and repeat-safe retries.
-
-### Verification
-
-- Confirmed validation and idempotency checks run before ownership, balance locks, and writes.
-- Confirmed stock source documents, accounting effects, movement rows, and audit records can share one transaction and rollback boundary.
-- Confirmed transfers cannot silently change quantity or cost between source and destination.
-- Confirmed existing production routes were not switched without complete adapters for their source-document and accounting effects.
-- No production data or Replit checks/credits were used.
+- Added the canonical transaction-owned receipt, issue, transfer, adjustment, and reversal boundary.
+- Enforced deterministic locks, equal-and-opposite transfers, negative-stock protection, append-only history, idempotency, and audit recording.
+- Added focused movement invariant tests.
 
 ## Phase 2F — Factory raw-stock costing integrity
 
 Status: complete.
 
+- Added a locked, versioned, Decimal-only supplier raw-stock costing boundary.
+- New offloads and cost-only charges recalculate deterministically; deductions preserve the locked supplier cost/kg.
+- Added protection against stale versions, negative stock/cost, stranded depletion cost, currency mismatch, and cost drift.
+- Added append-only cost events, idempotency, audit contracts, and focused tests.
+
+## Phase 2G — Mix-batch costing integrity
+
+Status: complete.
+
 ### Completed work
 
-- Added `rawStockCostingIntegrityService.ts` as the transaction-owned boundary for supplier raw-stock quantity and costing changes.
-- Added Decimal-only quantity, total-cost, and unit-cost calculations with strict state consistency validation.
-- Required one company/supplier/currency identity, deterministic source idempotency, ownership validation, and a locked versioned state before any mutation.
-- Added optimistic version checks so stale recalculation or charge requests cannot overwrite newer supplier costing.
-- Enforced event-specific rules: offloads must add quantity, post-offload charges/commission/freight cannot alter quantity, and empty events are rejected.
-- Added preserve-unit-cost deduction behavior that derives the cost reduction from the locked supplier rate instead of accepting a caller-supplied average.
-- Added protection against negative quantity, negative total cost, stranded cost after full depletion, currency mismatch, and unit-cost drift.
-- Required append-only cost-event history, state persistence, idempotency recording, and audit recording inside the caller-owned transaction.
-- Added focused tests for weighted offloads, stable-cost deductions, post-offload charges, depletion integrity, stale versions, idempotent retries, and currency isolation.
+- Added `mixBatchCostingIntegrityService.ts` as the transaction-owned mix-batch costing boundary.
+- Required company, batch, supplier, currency, source identity, and idempotency validation before any lock or write.
+- Required supplier raw-stock states to be locked in deterministic supplier order.
+- Derived every component value from the supplier's locked current cost/kg; callers cannot inject or average a replacement supplier rate.
+- Added displayed-rate and raw-stock-version conflict checks so stale mix-batch forms fail safely instead of silently changing cost.
+- Enforced sufficient stock, internally consistent supplier quantity/cost/rate state, and exact zero-cost depletion.
+- Made each component deduction proportional to its locked rate, preserving every supplier's remaining cost/kg exactly.
+- Calculated the mix-batch weighted cost/kg only from the sum of component historical values divided by total batch weight.
+- Required append-only supplier deduction events, versioned supplier-state persistence, batch-cost persistence, idempotency, and audit recording inside one caller-owned transaction.
+- Added focused tests for weighted batch cost, supplier-rate stability, stale rates, stale versions, insufficient stock, duplicate suppliers, write order, and repeat-safe retries.
 
 ### Verification
 
-- Confirmed idempotency is checked before ownership, locks, and writes.
-- Confirmed raw-stock quantity, total cost, and unit cost are derived from one locked supplier state and cannot be updated independently.
-- Confirmed deductions preserve the existing supplier cost/kg exactly while new offloads or cost-only charges recalculate it deterministically.
-- Confirmed no production route or historical balance was mutated without a complete adapter and transaction boundary.
+- Confirmed mix-batch deductions cannot re-average or mutate any supplier's cost/kg.
+- Confirmed new offloads remain the only quantity-addition path that can change weighted supplier cost/kg; mix-batch creation only removes quantity and its proportional historical value.
+- Confirmed stale UI rates and stale raw-stock versions fail before supplier deduction events or state writes.
+- Confirmed idempotency is checked before ownership validation, locks, writes, and audit recording.
+- Confirmed no production route or historical balance was switched without a complete database adapter and shared transaction boundary.
 - No production data or Replit checks/credits were used.
 
 ## Next phase
 
-- Phase 2G — Mix-batch costing integrity
+- Phase 2H — Period locking and closed-period protection
 
 ## Safety constraints
 
