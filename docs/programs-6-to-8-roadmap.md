@@ -25,6 +25,8 @@ Safety rules:
   - Confirmed the factory Daybook already has bounded opt-in pagination with full-filter counts and stable ordering.
   - Confirmed ledger account type/search filters are already pushed into SQL.
   - Identified the remaining unbounded no-filter ledger-account path and documented the compatibility-safe migration approach.
+  - Added `server/lib/boundedPagination.ts`, a shared opt-in pagination parser that preserves legacy response shapes while enforcing conservative page-size limits for migrated callers.
+  - Confirmed the net-profit statement already has a 30-second company/date keyed cache and parallel independent reads, but still materializes full period and all-time voucher-entry sets; SQL summary migration remains.
   - Audit and acceptance criteria documented in `docs/program-6b-daybook-accounts-reports-audit.md`.
 - [ ] 6C — Stock and inventory APIs
   - Return only required fields, add bounded server-side filtering, and eliminate duplicate requests.
@@ -57,4 +59,4 @@ Existing performance work found:
 - HTML and dynamic API responses avoid stale caching.
 - Earlier heavy-API pagination and memory-stabilization scripts exist.
 
-Program 6A is implementation-complete. Program 6B is in progress with the Daybook pagination path retained and the remaining Accounts/reporting migration scoped to preserve legacy selector callers and full-filter financial totals.
+Program 6A is implementation-complete. Program 6B is in progress. The shared bounded-pagination primitive is now committed; next work is wiring it into ledger-account and report routes behind explicit opt-in parameters, adding full-filter count/summary queries, and migrating selected frontend callers without changing legacy selectors or financial totals.
