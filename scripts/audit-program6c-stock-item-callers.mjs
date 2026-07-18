@@ -6,7 +6,8 @@
  * The legacy /api/stock-items array contract must remain available until each
  * frontend caller is explicitly classified. This script distinguishes
  * lightweight selectors, paginated management lists, full-data management
- * callers, offline/prefetch flows, and unresolved legacy callers.
+ * callers, offline/prefetch flows, cache-only references, and unresolved
+ * legacy callers.
  *
  * Run with --strict to fail when selector-only callers still use the full
  * endpoint or when an unclassified legacy caller remains.
@@ -78,7 +79,26 @@ async function applySafeMigrations() {
   return results;
 }
 
+function isCacheOnlyReference(source, index) {
+  const prefix = source.slice(Math.max(0, index - 320), index);
+  const lastStatementBoundary = Math.max(prefix.lastIndexOf(";"), prefix.lastIndexOf("\n"));
+  const currentExpression = prefix.slice(lastStatementBoundary + 1);
+
+  return (
+    currentExpression.includes("invalidateQueries") ||
+    currentExpression.includes("removeQueries") ||
+    currentExpression.includes("resetQueries") ||
+    currentExpression.includes("cancelQueries") ||
+    currentExpression.includes("setQueryData") ||
+    currentExpression.includes("getQueryData")
+  );
+}
+
 function classifyFullCaller(source, index, relativePath) {
+  if (isCacheOnlyReference(source, index)) {
+    return "cache-key-reference";
+  }
+
   const context = source.slice(Math.max(0, index - 650), index + 1400);
   const lower = context.toLowerCase();
 
@@ -130,6 +150,10 @@ function classifyFullCaller(source, index, relativePath) {
   return "legacy-full-unclassified";
 }
 
+function classifyLightCaller(source, index) {
+  return isCacheOnlyReference(source, index) ? "cache-key-reference" : "lightweight-selector";
+}
+
 function findOccurrences(source, endpoint) {
   const occurrences = [];
   let index = source.indexOf(endpoint);
@@ -153,7 +177,7 @@ for (const file of files) {
       file: relativePath,
       line: source.slice(0, index).split("\n").length,
       endpoint: "light",
-      classification: "lightweight-selector",
+      classification: classifyLightCaller(source, index),
     });
   }
 
@@ -199,7 +223,8 @@ const report = {
   strict: STRICT,
   fixSafe: FIX_SAFE,
   safeMigrationResults,
-  callSiteCount: callers.length,
+  callSiteCount: callers.filter((caller) => caller.classification !== "cache-key-reference").length,
+  referenceCount: callers.length,
   counts,
   callers,
   migrationCandidates,
@@ -211,7 +236,8 @@ if (JSON_OUTPUT) {
   console.log(JSON.stringify(report, null, 2));
 } else {
   console.log("Program 6C stock-item caller audit");
-  console.log(`Call sites: ${callers.length}`);
+  console.log(`Call sites: ${report.callSiteCount}`);
+  console.log(`Endpoint references: ${report.referenceCount}`);
 
   if (FIX_SAFE) {
     console.log("\nSafe migration results:");
