@@ -7,7 +7,7 @@ Status: in progress. This branch is stacked on the completed, unmerged Program 2
 - [x] 3A — Security and authorization surface audit
 - [x] 3B — Central authorization policy boundary
 - [x] 3C — Company and tenant isolation enforcement
-- [ ] 3D — Privileged action and admin-operation controls
+- [x] 3D — Privileged action and admin-operation controls
 - [ ] 3E — Session, authentication, and credential hardening
 - [ ] 3F — Input validation and unsafe-operation protection
 - [ ] 3G — File, export, and attachment access controls
@@ -37,29 +37,37 @@ Status: complete.
 
 Status: complete.
 
+- Added the canonical object-level company-isolation boundary.
+- Required company ownership to be loaded from canonical storage.
+- Prevented privileged roles from bypassing cross-company isolation.
+- Added company-filter validation for lists, reports, and exports.
+
+## Phase 3D — Privileged action and admin-operation controls
+
+Status: complete.
+
 ### Completed work
 
-- Added `server/services/security/companyIsolationPolicy.ts` as the canonical object-level company-isolation boundary.
-- Required company ownership to be loaded from canonical storage rather than trusted from request parameters or payloads.
-- Added supported resource identities for vouchers, accounts, banks, customers, suppliers, inventory, factory records, reports, exports, and attachments.
-- Required resource IDs and adapter-returned company IDs to be valid before authorization.
-- Delegated role and permission evaluation to the Phase 3B authorization policy only after canonical company ownership is known.
-- Prevented Admin and Developer roles from bypassing cross-company isolation.
-- Added non-leaking `Not found` handling for missing resources and `Forbidden` handling for cross-company access.
-- Added `assertRequestCompanyMatchesSession` for list, report, and export filters that accept a company parameter.
-- Kept existing route middleware unchanged; route adapters can migrate incrementally without weakening current controls.
+- Added `server/services/security/privilegedOperationPolicy.ts` as the canonical fail-closed gate for repair, recalculation, migration, destructive, credential-reset, permission-change, company-configuration, and diagnostic-write operations.
+- Required same-company authorization before any privileged role or permission evaluation.
+- Required Admin or Developer role plus the exact declared privileged permission.
+- Required a non-empty actor reason, deterministic idempotency key, and source identity for every privileged operation.
+- Added exact confirmation-token validation for operations that require an explicit confirmation challenge.
+- Required recent password confirmation and rejected missing, expired, or future confirmation timestamps.
+- Returned normalized operation metadata so adapters can bind audit and idempotency records to the exact approved operation.
+- Kept the boundary pure: callers must execute the operation and append its audit record inside one transaction after authorization succeeds.
 
 ### Verification
 
-- Added focused tests for same-company access, storage-backed ownership lookup, Admin cross-company denial, missing resources, invalid IDs, invalid stored ownership, role/permission preservation, and company-filter validation.
-- Confirmed caller-supplied company IDs are never accepted as proof of object ownership.
-- Confirmed cross-company checks occur before privileged-role authorization.
-- Confirmed no accounting balances, inventory quantities, costing, sessions, or historical data were changed.
+- Added focused tests for authorized execution, Admin cross-company denial, missing reason, missing idempotency/source identity, wrong confirmation tokens, expired password confirmation, and future confirmation timestamps.
+- Confirmed privileged roles cannot bypass company isolation.
+- Confirmed destructive and repair-style operations fail closed when confirmation or provenance is incomplete.
+- Confirmed no accounting balances, stock quantities, costing, sessions, or historical records were modified.
 - Verification was limited to focused static inspection and test-contract review; no Replit checks or credits were used.
 
 ## Next phase
 
-- Phase 3D — Privileged action and admin-operation controls
+- Phase 3E — Session, authentication, and credential hardening
 
 ## Safety constraints
 
