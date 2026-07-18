@@ -68,7 +68,13 @@ Safety rules:
 
 ## Program 7 — User interface consistency
 
-- [ ] 7A — Design system
+- [x] 7A — Design system
+  - Confirmed centralized light/dark semantic tokens for colors, status, typography, radius, shadows, borders, module identity, and navigation identity.
+  - Confirmed shared Radix/shadcn-style controls and one shared button variant, sizing, disabled, hover, active, and keyboard-focus contract.
+  - Added shared `PageState`, `LoadingState`, `EmptyState`, and `ErrorState` primitives with semantic styling and accessible status behavior.
+  - Defined a safe adoption boundary: workflow-heavy screens migrate during their owning UI phases instead of through a risky mechanical rewrite.
+  - Added `scripts/verify-program7a-design-system.mjs` to protect tokens, shared controls, page states, and baseline accessibility semantics.
+  - Final audit documented in `docs/program-7a-design-system.md`.
 - [ ] 7B — Financial screens
 - [ ] 7C — Factory and inventory screens
 - [ ] 7D — Accessibility and responsive behavior
@@ -87,4 +93,4 @@ Existing performance work found:
 - HTML and dynamic API responses avoid stale caching.
 - Earlier heavy-API pagination and memory-stabilization scripts exist.
 
-Programs 6A, 6B, 6C, 6E, and 6F are implementation-complete. Program 6D still requires real-checkout findings and database reconciliation evidence before behavior-changing query or index work can be marked complete. Programs 7–8 remain unfinished.
+Programs 6A, 6B, 6C, 6E, 6F, and 7A are implementation-complete. Program 6D still requires real-checkout findings and database reconciliation evidence before behavior-changing query or index work can be marked complete. Programs 7B–7D and 8A–8C remain unfinished.
