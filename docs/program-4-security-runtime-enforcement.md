@@ -6,32 +6,35 @@ Status: in progress. This branch is stacked on the completed, unmerged Program 3
 
 - [x] 4A — Route and service adoption audit
 - [x] 4B — Authentication and session enforcement adapters
-- [ ] 4C — Company isolation enforcement on high-risk reads and writes
+- [x] 4C — Company isolation enforcement on high-risk reads and writes
 - [ ] 4D — Privileged operation enforcement on repair and administrative endpoints
 - [ ] 4E — Unsafe input validation on sensitive mutations
 - [ ] 4F — Protected file, attachment, report, and export enforcement
 - [ ] 4G — Security audit persistence and anomaly surfacing
 - [ ] 4H — End-to-end enforcement tests and integration report
 
-## Phase 4B — Authentication and session enforcement adapters
+## Phase 4B
 
 Status: complete.
 
-- Added `server/services/security/sessionEnforcementAdapter.ts`.
-- Wired it into production `requireLogin`, `requireAuth`, and `requirePasswordConfirmation` middleware in `server/auth.ts`.
-- Preserved the zero-database-call authentication path.
-- Enforced idle timeout, absolute lifetime, company context, recent password confirmation, and credential version checks.
-- Invalid, expired, or revoked sessions are denied and destroyed when appropriate.
-- Existing authenticated sessions receive a one-time bounded timestamp upgrade to avoid a forced mass logout.
-- Credential version zero remains the compatibility baseline until persistent per-user credential versions are integrated.
-- Existing role, location, delete, date, POS, and View Only controls remain in place.
-- Added focused tests for valid, legacy, expired, company-free, company-required, revoked, and password-confirmation cases.
+Authentication and session enforcement is connected to production middleware through `sessionEnforcementAdapter.ts`.
+
+## Phase 4C
+
+Status: complete for the first production slice.
+
+- Adopted the Program 3 company-isolation boundary in `server/routes/factory/factoryInsuranceRoutes.ts`.
+- The operating company comes from authenticated session state.
+- Request body or query `companyId` values are assertions only and must match the session company.
+- Applied the boundary to member lists, member ledger reads, creation, updates, toggles, deletion, and monthly journal generation.
+- Retained company predicates on insurance members, vouchers, and linked ledger cleanup.
+- Cross-company attempts receive a non-leaking response.
+- Added focused regression coverage showing privileged roles cannot bypass company isolation.
 - Tests were added but not executed through Replit or GitHub Actions.
-- No Replit credits were used.
 
 ## Next phase
 
-Phase 4C — Company isolation enforcement on high-risk reads and writes.
+Phase 4D — Privileged operation enforcement on repair and administrative endpoints.
 
 ## Safety constraints
 
