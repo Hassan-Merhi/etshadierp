@@ -107,9 +107,28 @@ export function useLocationInventoryQueries({
   const { data: allInventoryRaw, isLoading: allInventoryLoading } = useQuery<any>({
     queryKey: companyId ? ["/api/inventory", companyId] : [],
     queryFn: async () => {
-      const res = await fetch("/api/inventory?page=1&pageSize=100", { credentials: "include" });
+      // Fetch the first page at the maximum allowed page size.
+      const PAGE_SIZE = 5000;
+      const res = await fetch(`/api/inventory?page=1&pageSize=${PAGE_SIZE}`, { credentials: "include" });
       if (!res.ok) throw new Error(await res.text());
-      return res.json();
+      const first = await res.json();
+
+      // Legacy non-paginated response — return as-is.
+      if (Array.isArray(first)) return first;
+
+      const { data, totalPages } = first;
+      if (!totalPages || totalPages <= 1) return data;
+
+      // Fetch any remaining pages in parallel so large inventories are not truncated.
+      const remaining = await Promise.all(
+        Array.from({ length: totalPages - 1 }, (_, i) => i + 2).map(async (page) => {
+          const r = await fetch(`/api/inventory?page=${page}&pageSize=${PAGE_SIZE}`, { credentials: "include" });
+          if (!r.ok) throw new Error(await r.text());
+          const d = await r.json();
+          return Array.isArray(d) ? d : (d.data ?? []);
+        })
+      );
+      return [...data, ...remaining.flat()];
     },
     enabled: showAllStock && !!companyId,
     // Extended stale time: the full inventory list is expensive; avoid re-downloading
@@ -121,10 +140,8 @@ export function useLocationInventoryQueries({
     refetchOnMount: false,
     retry: false,
   });
-  // Backend returns paginated { data, page, pageSize, total, totalPages }; extract array.
-  const allInventoryData: any[] = Array.isArray(allInventoryRaw)
-    ? allInventoryRaw
-    : (allInventoryRaw?.data ?? []);
+  // queryFn always resolves to a flat array of inventory rows.
+  const allInventoryData: any[] = Array.isArray(allInventoryRaw) ? allInventoryRaw : [];
 
   const { data: allNegativeStock = [], isLoading: negativeStockLoading } = useQuery<any[]>({
     queryKey: companyId ? ["/api/inventory/negative", companyId] : [],

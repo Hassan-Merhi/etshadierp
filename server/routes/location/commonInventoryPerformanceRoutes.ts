@@ -12,6 +12,13 @@ function parsePageSize(value: unknown): number {
   return Math.min(250, Math.max(1, Number.parseInt(String(value), 10) || 100));
 }
 
+/** Higher cap used only by the combined all-locations inventory view, which must
+ *  return every (stockItem × location) row in a single shot so the client-side
+ *  pivot table is never truncated. */
+function parseInventoryPageSize(value: unknown): number {
+  return Math.min(5000, Math.max(1, Number.parseInt(String(value), 10) || 250));
+}
+
 export function registerCommonInventoryPerformanceRoutes(app: Express): void {
   app.get("/api/stock-items", requireAuth, async (req: Request, res: Response, next: NextFunction) => {
     if (!req.query.page) return next();
@@ -69,7 +76,7 @@ export function registerCommonInventoryPerformanceRoutes(app: Express): void {
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const page = parsePage(req.query.page);
-      const pageSize = parsePageSize(req.query.pageSize);
+      const pageSize = parseInventoryPageSize(req.query.pageSize);
       const offset = (page - 1) * pageSize;
       const conditions: any[] = [
         eq(inventory.companyId, companyId),
