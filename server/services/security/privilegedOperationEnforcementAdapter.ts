@@ -10,6 +10,7 @@ import {
   type PrivilegedOperationKind,
 } from "./privilegedOperationPolicy";
 import { persistSecurityEvent } from "./securityAuditRuntime";
+import { hydrateSessionNamedPermissions } from "./namedPermissionService";
 
 export interface PrivilegedRouteOptions {
   domain: "administration" | "accounting" | "inventory" | "factory" | "reporting";
@@ -23,6 +24,7 @@ export interface PrivilegedRouteOptions {
 
 type SecuritySession = Request["session"] & {
   securityPermissions?: string[];
+  securityPermissionsCompanyId?: number | null;
   passwordConfirmedAt?: number;
   username?: string;
   currentUsername?: string;
@@ -32,33 +34,16 @@ function normalizedText(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
 }
 
-function actorFromRequest(req: Request, permission: string): AuthorizationActor | null {
+function actorFromRequest(req: Request): AuthorizationActor | null {
   const session = req.session as SecuritySession;
   const companyId = session.currentCompanyId;
   const role = session.currentRole;
   const userId = session.userId;
   if (!companyId || !role || !userId) return null;
-
-  const explicit = Array.isArray(session.securityPermissions)
+  const permissions = Array.isArray(session.securityPermissions)
     ? session.securityPermissions.filter((item): item is string => typeof item === "string")
     : [];
-
-  // Compatibility bridge: existing Admin/Developer sessions do not yet persist
-  // named security permissions. Preserve their current route access while still
-  // presenting the exact route permission to the fail-closed Program 3 policy.
-  const permissions =
-    explicit.length > 0
-      ? explicit
-      : ["Admin", "Developer"].includes(role)
-        ? [permission]
-        : [];
-
-  return {
-    userId,
-    role,
-    companyId,
-    permissions,
-  };
+  return { userId, role, companyId, permissions };
 }
 
 function auditUsername(req: Request): string {
@@ -98,13 +83,6 @@ async function recordPrivilegedDecision(
   );
 }
 
-/**
- * Express adapter for destructive repair/recalculation/admin mutations.
- * Dry-runs may pass through when explicitly allowed; applying changes requires
- * a reason, deterministic idempotency key, exact confirmation token, source
- * identity, same-company context, exact permission, and recent password proof.
- * Applied attempts are persisted before route logic can mutate data.
- */
 export function requirePrivilegedOperation(options: PrivilegedRouteOptions) {
   return async (req: Request, res: Response, next: NextFunction) => {
     const body = req.body && typeof req.body === "object" ? req.body : {};
@@ -121,8 +99,9 @@ export function requirePrivilegedOperation(options: PrivilegedRouteOptions) {
     }
 
     try {
+      await hydrateSessionNamedPermissions(db, req.session as SecuritySession);
       authorizePrivilegedOperation({
-        actor: actorFromRequest(req, options.requiredPermission),
+        actor: actorFromRequest(req),
         companyId,
         domain: options.domain,
         action: options.action,
