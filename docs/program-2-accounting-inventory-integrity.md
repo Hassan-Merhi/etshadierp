@@ -6,7 +6,7 @@ Status: in progress. This branch must remain unmerged until the owner approves t
 
 - [x] 2A — Posting inventory audit
 - [x] 2B — Central posting engine
-- [ ] 2C — Voucher lifecycle integrity
+- [x] 2C — Voucher lifecycle integrity
 - [ ] 2D — Cash, bank, customer, and supplier reconciliation
 - [ ] 2E — Stock movement integrity
 - [ ] 2F — Factory raw-stock costing integrity
@@ -53,12 +53,35 @@ Status: complete.
 - Performed focused static inspection of the new engine, exports, and tests on the Program 2 branch.
 - Confirmed validation runs before ownership checks and database writes.
 - Confirmed an existing idempotent posting returns without duplicate insert, ownership work, idempotency recording, or audit duplication.
-- Confirmed the phase does not migrate or change existing accounting routes; that work belongs to Phase 2C.
+- No Replit checks or credits were used.
+
+## Phase 2C — Voucher lifecycle integrity
+
+Status: complete.
+
+### Completed work
+
+- Added `voucherLifecycleService.ts` as the transaction-owned boundary for reversal and replacement of committed vouchers.
+- Reversals are created from the original committed entry rows by swapping debit and credit amounts; current balances, prices, or reconstructed assumptions are never used.
+- Added immutable lifecycle states and explicit original, reversal, and replacement linkage contracts.
+- Required company-scoped row locking before lifecycle changes.
+- Required deterministic operation idempotency before any reversal or replacement work begins.
+- Required linked accounting, inventory, party-ledger, and source-document effects to reverse inside the caller-owned transaction through the lifecycle adapter.
+- Added repeat-safe behavior so retried delete/edit requests return the prior lifecycle result rather than duplicating reversals.
+- Required actor, reason, source identity, and operation audit recording.
+- Exported the lifecycle boundary through the accounting service index.
+
+### Verification
+
+- Confirmed invalid, missing, cross-company, already-reversed, and unsupported-replacement targets fail before linked effects are changed.
+- Confirmed the original voucher remains immutable and is marked through linkage instead of deleting committed voucher entries.
+- Confirmed replacement performs reversal, linked-effect reversal, replacement creation, lifecycle linkage, and audit recording in deterministic order.
+- Confirmed no existing production route was silently switched without an adapter for all of its secondary effects.
 - No Replit checks or credits were used.
 
 ## Next phase
 
-- Phase 2C — Voucher lifecycle integrity
+- Phase 2D — Cash, bank, customer, and supplier reconciliation
 
 ## Safety constraints
 
