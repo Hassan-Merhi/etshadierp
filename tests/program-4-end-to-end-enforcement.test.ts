@@ -116,7 +116,7 @@ describe("Program 4 end-to-end enforcement", () => {
     expect(inserted.changes.metadata).not.toHaveProperty("confirmationToken");
   });
 
-  it("rejects unsafe input before authorization or audit persistence", async () => {
+  it("rejects unsafe and cross-company assertion fields before authorization", async () => {
     const req = requestDouble({
       body: {
         dryRun: false,
@@ -134,9 +134,23 @@ describe("Program 4 end-to-end enforcement", () => {
     expect(auditInsert).not.toHaveBeenCalled();
   });
 
+  it("rejects an invalid idempotency key before privileged authorization", async () => {
+    const req = requestDouble();
+    req.body.idempotencyKey = "short";
+    const result = await executeChain(req);
+
+    expect(result.res.statusCode).toBe(400);
+    expect(result.routeReached).toBe(false);
+    expect(auditInsert).not.toHaveBeenCalled();
+  });
+
   it.each([
     ["missing permission", { securityPermissions: ["reports.read"] }, "PERMISSION_REQUIRED"],
-    ["stale password proof", { passwordConfirmedAt: Date.now() - 10 * 60 * 1000 }, "PASSWORD_CONFIRMATION_REQUIRED"],
+    [
+      "stale password proof",
+      { passwordConfirmedAt: Date.now() - 10 * 60 * 1000 },
+      "PRIVILEGED_PASSWORD_CONFIRMATION_REQUIRED",
+    ],
   ])("denies and audits %s", async (_label, sessionPatch, expectedReason) => {
     const base = requestDouble();
     base.session = { ...base.session, ...sessionPatch };
@@ -157,7 +171,7 @@ describe("Program 4 end-to-end enforcement", () => {
 
     expect(result.res.statusCode).toBe(403);
     expect(result.routeReached).toBe(false);
-    expect(auditValues.mock.calls[0][0].changes.reasonCode).toBe("CONFIRMATION_REQUIRED");
+    expect(auditValues.mock.calls[0][0].changes.reasonCode).toBe("PRIVILEGED_CONFIRMATION_REQUIRED");
   });
 
   it("fails closed when an allowed decision cannot be persisted", async () => {
