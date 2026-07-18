@@ -14,6 +14,7 @@
  *   node scripts/audit-program6d-database-query-risks.mjs --strict
  */
 
+import { createHash } from "node:crypto";
 import { readFile, readdir } from "node:fs/promises";
 import { join, relative } from "node:path";
 import process from "node:process";
@@ -52,14 +53,28 @@ function compactSnippet(source, start, end) {
     .slice(0, 220);
 }
 
+function findingId(file, category, snippet) {
+  const normalizedSnippet = snippet
+    .replace(/\b\d+(?:\.\d+)?\b/g, "#")
+    .replace(/\s+/g, " ")
+    .trim();
+  const digest = createHash("sha256")
+    .update(`${file}\n${category}\n${normalizedSnippet}`)
+    .digest("hex")
+    .slice(0, 12);
+  return `P6D-${digest}`;
+}
+
 function addFinding(findings, file, source, index, category, severity, message, snippetEnd = index + 300) {
+  const snippet = compactSnippet(source, index, snippetEnd);
   findings.push({
+    id: findingId(file, category, snippet),
     file,
     line: lineNumberAt(source, index),
     category,
     severity,
     message,
-    snippet: compactSnippet(source, index, snippetEnd),
+    snippet,
   });
 }
 
@@ -189,14 +204,25 @@ const totals = deduplicated.reduce(
   { byCategory: {}, bySeverity: {} },
 );
 
+const highSeverityCount = totals.bySeverity.high || 0;
+const failureReasons = [];
+if (STRICT && highSeverityCount > 0) {
+  failureReasons.push(`${highSeverityCount} high-severity query-risk candidate(s) require review.`);
+}
+
 const report = {
   program: "6D",
   scope: relative(ROOT, SERVER_ROOT).replaceAll("\\", "/"),
   filesScanned: files.length,
   findingCount: deduplicated.length,
+  highSeverityCount,
+  strict: STRICT,
+  passed: failureReasons.length === 0,
+  failureReasons,
   totals,
   findings: deduplicated,
   notes: [
+    "Finding IDs are deterministic from file, category, and normalized snippet so classifications can survive unrelated line movement.",
     "This is a static heuristic audit; every finding requires manual review.",
     "Do not add indexes without query-plan evidence.",
     "Do not parallelize queries that depend on transaction ordering or shared mutable state.",
@@ -210,10 +236,11 @@ if (JSON_OUTPUT) {
   console.log("Program 6D database query risk audit");
   console.log(`Files scanned: ${report.filesScanned}`);
   console.log(`Findings: ${report.findingCount}`);
+  console.log(`High severity: ${report.highSeverityCount}`);
   console.log("");
 
   for (const finding of deduplicated) {
-    console.log(`${finding.severity.padEnd(6)} ${finding.category.padEnd(30)} ${finding.file}:${finding.line}`);
+    console.log(`${finding.severity.padEnd(6)} ${finding.category.padEnd(30)} ${finding.file}:${finding.line} [${finding.id}]`);
     console.log(`       ${finding.message}`);
   }
 
@@ -223,7 +250,9 @@ if (JSON_OUTPUT) {
   }
 }
 
-if (STRICT && deduplicated.some((finding) => finding.severity === "high")) {
-  console.error("\nFAIL (--strict): high-severity query-risk candidates require review.");
+if (!report.passed) {
+  for (const reason of failureReasons) {
+    console.error(`\nFAIL (--strict): ${reason}`);
+  }
   process.exitCode = 1;
 }
