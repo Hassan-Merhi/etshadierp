@@ -4,7 +4,7 @@
  * Program 6C static audit for stock-item API consumers.
  *
  * The legacy /api/stock-items array contract must remain available until each
- * frontend caller is explicitly classified. This read-only script distinguishes
+ * frontend caller is explicitly classified. This script distinguishes
  * lightweight selectors, paginated management lists, full-data management
  * callers, offline/prefetch flows, and unresolved legacy callers.
  *
@@ -12,9 +12,11 @@
  * endpoint or when an unclassified legacy caller remains.
  * Run with --json to emit a stable machine-readable report for CI or follow-up
  * migration tooling.
+ * Run with --fix-safe to apply only explicitly allow-listed, exact-match
+ * migrations that do not alter mutations, accounting, inventory, or costing.
  */
 
-import { readFile, readdir } from "node:fs/promises";
+import { readFile, readdir, writeFile } from "node:fs/promises";
 import { join, relative } from "node:path";
 import process from "node:process";
 
@@ -24,6 +26,16 @@ const FULL_ENDPOINT = "/api/stock-items";
 const LIGHT_ENDPOINT = "/api/stock-items/light";
 const STRICT = process.argv.includes("--strict");
 const JSON_OUTPUT = process.argv.includes("--json");
+const FIX_SAFE = process.argv.includes("--fix-safe");
+
+const SAFE_MIGRATIONS = [
+  {
+    file: "client/src/pages/settings/BulkRenameTab.tsx",
+    description: "Bulk Rename read-only stock-item search",
+    from: 'fetch("/api/stock-items", { credentials: "include" })',
+    to: 'fetch("/api/stock-items/light", { credentials: "include" })',
+  },
+];
 
 async function walk(dir) {
   const entries = await readdir(dir, { withFileTypes: true });
@@ -34,6 +46,36 @@ async function walk(dir) {
     else if (/\.(ts|tsx|js|jsx)$/.test(entry.name)) files.push(path);
   }
   return files;
+}
+
+async function applySafeMigrations() {
+  const results = [];
+
+  for (const migration of SAFE_MIGRATIONS) {
+    const absolutePath = join(ROOT, migration.file);
+    const source = await readFile(absolutePath, "utf8");
+    const exactMatches = source.split(migration.from).length - 1;
+
+    if (exactMatches === 0 && source.includes(migration.to)) {
+      results.push({ ...migration, status: "already-migrated" });
+      continue;
+    }
+
+    if (exactMatches !== 1) {
+      results.push({
+        ...migration,
+        status: "skipped",
+        reason: `expected exactly one safe source match, found ${exactMatches}`,
+      });
+      continue;
+    }
+
+    const updated = source.replace(migration.from, migration.to);
+    await writeFile(absolutePath, updated, "utf8");
+    results.push({ ...migration, status: "migrated" });
+  }
+
+  return results;
 }
 
 function classifyFullCaller(source, index, relativePath) {
@@ -98,6 +140,7 @@ function findOccurrences(source, endpoint) {
   return occurrences;
 }
 
+const safeMigrationResults = FIX_SAFE ? await applySafeMigrations() : [];
 const files = await walk(CLIENT_ROOT);
 const callers = [];
 
@@ -146,11 +189,16 @@ if (lightCallers.length === 0) {
 if (STRICT && migrationCandidates.length > 0) {
   failures.push("strict mode requires every selector-only or unresolved full-endpoint caller to be migrated or classified");
 }
+if (FIX_SAFE && safeMigrationResults.some((result) => result.status === "skipped")) {
+  failures.push("one or more allow-listed safe migrations were skipped because the source no longer matched exactly");
+}
 
 const report = {
   program: "6C",
   audit: "stock-item-api-callers",
   strict: STRICT,
+  fixSafe: FIX_SAFE,
+  safeMigrationResults,
   callSiteCount: callers.length,
   counts,
   callers,
@@ -164,6 +212,15 @@ if (JSON_OUTPUT) {
 } else {
   console.log("Program 6C stock-item caller audit");
   console.log(`Call sites: ${callers.length}`);
+
+  if (FIX_SAFE) {
+    console.log("\nSafe migration results:");
+    for (const result of safeMigrationResults) {
+      const suffix = result.reason ? ` (${result.reason})` : "";
+      console.log(`  ${result.status.padEnd(18)} ${result.file}${suffix}`);
+    }
+  }
+
   console.log("");
   for (const caller of callers) {
     console.log(`${caller.classification.padEnd(35)} ${caller.file}:${caller.line}`);
