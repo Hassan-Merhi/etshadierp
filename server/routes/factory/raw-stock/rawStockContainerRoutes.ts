@@ -5,8 +5,10 @@ import { db } from "../../../db";
 import { requireAuth } from "../../../auth";
 import { classifyNetPositionAccounts } from "../../../netPositionHelper";
 import { adjustInventory } from "../../../inventoryHelper";
+import Decimal from "decimal.js";
 import { cascadeContainerCostChange } from "../../../services/factory/rawStockCostCascade";
 import { computeCorrectContainerCost } from "../../../services/factory/rawStockRecalc";
+import { getAuthoritativeSupplierRemainingKg } from "../../../services/factory/rawStockLockedRate";
 import { resolveStoredFxRate, resolveStoredFxRateOrThrow, UnresolvedExchangeRateError } from "../../../services/factory/currencyConversion";
 import {
   writeDaybookEntry,
@@ -404,9 +406,41 @@ export function registerRawStockContainerRoutes(app: Express) {
       let cascadeResult: any;
       let supplierLockedRateOld: number | null = null;
       let supplierLockedRateNew: number | null = null;
+      // Breakdown fields for the post-offload response
+      let containerReceivedKg = 0;
+      let containerRemainingKg = 0;
+      let remainingFractionNum = 0;
+      let fullContainerValueDeltaUsdStr = "0";
+      let supplierInventoryValueDeltaUsdStr = "0";
+      let supplierRemainingKgNum = 0;
+      let supplierValueBeforeUsdStr: string | null = null;
+      let supplierValueAfterUsdStr: string | null = null;
+      let supplierLockedRateOldStr: string | null = null;
+      let supplierLockedRateNewStr: string | null = null;
+      let oldRawStockCostPerKgUsd: number | null = null;
+      let rawStockRateWasStale = false;
 
       await db.transaction(async (tx) => {
-        // 1. Insert new charge rows with correctly resolved FX rates
+        // 1. Load commission record first — needed for both old and new canonical cost.
+        const commissionRecords = await tx
+          .select()
+          .from(factoryContainerCommissions)
+          .where(
+            and(
+              eq(factoryContainerCommissions.containerId, containerId),
+              eq(factoryContainerCommissions.companyId, companyId)
+            )
+          );
+        const commissionRecord = commissionRecords.sort((a: any, b: any) => b.id - a.id)[0] || null;
+
+        // 2. Compute OLD canonical container cost BEFORE inserting new charges.
+        //    This is the exact baseline; the delta from it equals the new charges' value only.
+        const oldCanonicalCost = computeCorrectContainerCost(container, existingCharges, commissionRecord);
+        if (oldCanonicalCost.fxUnresolved) {
+          throw new Error(`FX rate is unresolved for container ${container.containerNumber}`);
+        }
+
+        // 3. Insert new charge rows with correctly resolved FX rates
         const insertedCharges: any[] = [];
         for (let i = 0; i < validCharges.length; i++) {
           const charge = validCharges[i];
@@ -428,20 +462,31 @@ export function registerRawStockContainerRoutes(app: Express) {
           insertedCharges.push(inserted);
         }
 
-        // 2. Load commission record (authoritative source for commission cost/currency)
-        const commissionRecords = await tx
+        // 4. Load raw-stock rows to determine what fraction of this container remains in
+        //    inventory. Only that fraction of the new charge value belongs to the supplier
+        //    locked-rate adjustment; consumed material's cost is already a sunk cost.
+        const rawStockForFraction = await tx
           .select()
-          .from(factoryContainerCommissions)
-          .where(
-            and(
-              eq(factoryContainerCommissions.containerId, containerId),
-              eq(factoryContainerCommissions.companyId, companyId)
-            )
-          );
-        const commissionRecord = commissionRecords.sort((a: any, b: any) => b.id - a.id)[0] || null;
+          .from(factoryRawStock)
+          .where(and(eq(factoryRawStock.companyId, companyId), eq(factoryRawStock.containerId, containerId)));
+        let dContainerReceivedKg = new Decimal(0);
+        let dContainerUsedKg = new Decimal(0);
+        for (const row of rawStockForFraction) {
+          dContainerReceivedKg = dContainerReceivedKg.plus(new Decimal(String(row.receivedKg || "0")));
+          dContainerUsedKg = dContainerUsedKg.plus(new Decimal(String(row.usedKg || "0")));
+        }
+        const dContainerRemainingKg = Decimal.max(0, dContainerReceivedKg.minus(dContainerUsedKg));
+        const dRemainingFraction = dContainerReceivedKg.gt(0)
+          ? Decimal.min(new Decimal(1), dContainerRemainingKg.div(dContainerReceivedKg))
+          : new Decimal(0);
 
-        // 3. Use the single authoritative landed-cost calculator — avoids duplicating
-        //    the formula and ensures identical results with the recalc tool.
+        if (rawStockForFraction.length > 0) {
+          oldRawStockCostPerKgUsd = parseFloat(
+            String(rawStockForFraction[0].costPerKgUsd || rawStockForFraction[0].costPerKg || "0")
+          );
+        }
+
+        // 5. Compute NEW canonical container cost with all charges (existing + new).
         const allCharges = [...existingCharges, ...insertedCharges];
         const next = computeCorrectContainerCost(container, allCharges, commissionRecord);
         if (next.fxUnresolved) {
@@ -450,7 +495,21 @@ export function registerRawStockContainerRoutes(app: Express) {
         newContainerCostPerKgUsd = next.costPerKgUsd;
         newContainerTotalUsd = next.totalUsd;
 
-        // 4. Update container landed totals (never touches ratePerKg — the purchase rate)
+        // 6. Exact value-delta using Decimal.js — no parseFloat arithmetic.
+        //    fullContainerValueDeltaUsd      = total cost increase for this container.
+        //    supplierInventoryValueDeltaUsd  = portion belonging to still-in-inventory kg.
+        const dOldTotalUsd = new Decimal(String(oldCanonicalCost.totalUsd));
+        const dNewTotalUsd = new Decimal(String(next.totalUsd));
+        const dFullContainerValueDeltaUsd = dNewTotalUsd.minus(dOldTotalUsd);
+        const dSupplierInventoryValueDeltaUsd = dFullContainerValueDeltaUsd.times(dRemainingFraction);
+
+        containerReceivedKg = dContainerReceivedKg.toNumber();
+        containerRemainingKg = dContainerRemainingKg.toNumber();
+        remainingFractionNum = dRemainingFraction.toDecimalPlaces(6).toNumber();
+        fullContainerValueDeltaUsdStr = dFullContainerValueDeltaUsd.toFixed(6);
+        supplierInventoryValueDeltaUsdStr = dSupplierInventoryValueDeltaUsd.toFixed(6);
+
+        // 7. Update container landed totals (never touches ratePerKg — the purchase rate)
         await tx
           .update(factoryContainers)
           .set({
@@ -461,20 +520,43 @@ export function registerRawStockContainerRoutes(app: Express) {
           })
           .where(eq(factoryContainers.id, containerId));
 
-        // Capture supplier locked rate BEFORE cascade so we can report old vs. new
+        // Capture supplier locked rate BEFORE cascade so we can report old vs. new.
+        // Also fetch authoritative supplier remaining kg for the breakdown calculation.
         if (container.supplierId) {
           const [supBefore] = await tx
             .select({ rate: factorySuppliers.currentRawMaterialCostPerKgUsd })
             .from(factorySuppliers)
             .where(and(eq(factorySuppliers.id, container.supplierId), eq(factorySuppliers.companyId, companyId)));
           supplierLockedRateOld = supBefore ? parseFloat(supBefore.rate || "0") : null;
+          supplierLockedRateOldStr = supBefore?.rate ?? null;
+
+          const authKg = await getAuthoritativeSupplierRemainingKg(tx, companyId, container.supplierId);
+          supplierRemainingKgNum = authKg;
+
+          if (supplierLockedRateOldStr !== null) {
+            const dOldRate = new Decimal(supplierLockedRateOldStr);
+            const dAuthKg = new Decimal(String(authKg));
+            const dValBefore = dOldRate.times(dAuthKg);
+            supplierValueBeforeUsdStr = dValBefore.toFixed(6);
+            supplierValueAfterUsdStr = dValBefore.plus(dSupplierInventoryValueDeltaUsd).toFixed(6);
+          }
+
+          // Detect pre-existing divergence between container rate and raw-stock rate.
+          if (oldRawStockCostPerKgUsd !== null) {
+            rawStockRateWasStale = new Decimal(String(oldContainerCostPerKgUsd))
+              .minus(new Decimal(String(oldRawStockCostPerKgUsd)))
+              .abs()
+              .gte(new Decimal("0.000001"));
+          }
         }
 
-        // 5. Cascade: raw-stock update → supplier locked-rate adjustment →
+        // 8. Cascade: raw-stock update → supplier locked-rate adjustment →
         //    mix-batch source corrections → batch weighted-average recompute → bale updates.
         //    IMPORTANT: do NOT update raw-stock before calling this — the cascade reads
         //    the current (old) cost first to compute the supplier-rate value delta.
         //    includeCompletedBatches: true because post-offload charges are explicitly retroactive.
+        //    supplierInventoryValueDeltaUsdOverride: exact Decimal prevents the cascade from
+        //    re-deriving the delta from the old raw-stock rate (which may be stale vs. container).
         cascadeResult = await cascadeContainerCostChange(
           tx,
           {
@@ -482,6 +564,7 @@ export function registerRawStockContainerRoutes(app: Express) {
             containerId,
             newCostPerKg: next.costPerKg,
             newCostPerKgUsd: next.costPerKgUsd,
+            supplierInventoryValueDeltaUsdOverride: dSupplierInventoryValueDeltaUsd,
           },
           { includeCompletedBatches: true }
         );
@@ -493,6 +576,7 @@ export function registerRawStockContainerRoutes(app: Express) {
             .from(factorySuppliers)
             .where(and(eq(factorySuppliers.id, container.supplierId), eq(factorySuppliers.companyId, companyId)));
           supplierLockedRateNew = supAfter ? parseFloat(supAfter.rate || "0") : null;
+          supplierLockedRateNewStr = supAfter?.rate ?? null;
         }
 
         // Expose updated raw-stock row for response
@@ -504,7 +588,7 @@ export function registerRawStockContainerRoutes(app: Express) {
           newRawStock = freshRawStockRows[0];
         }
 
-        // 6. Daybook entries + vouchers for each new charge (accounting is unchanged)
+        // 9. Daybook entries + vouchers for each new charge (accounting is unchanged)
         for (let ci = 0; ci < insertedCharges.length; ci++) {
           const charge = insertedCharges[ci];
           const chargeAmt = parseFloat(charge.amount || "0");
@@ -581,6 +665,19 @@ export function registerRawStockContainerRoutes(app: Express) {
         rawStockRowsUpdated: cascadeResult?.rawStockRowsUpdated ?? 0,
         supplierLockedRateOld,
         supplierLockedRateNew,
+        // Exact-precision breakdown (string to avoid JS float precision loss)
+        supplierRemainingKg: supplierRemainingKgNum,
+        containerReceivedKg,
+        containerRemainingKg,
+        remainingFraction: remainingFractionNum,
+        fullContainerValueDeltaUsd: fullContainerValueDeltaUsdStr,
+        supplierInventoryValueDeltaUsd: supplierInventoryValueDeltaUsdStr,
+        supplierValueBeforeUsd: supplierValueBeforeUsdStr,
+        supplierValueAfterUsd: supplierValueAfterUsdStr,
+        supplierLockedRateOldExact: supplierLockedRateOldStr,
+        supplierLockedRateNewExact: supplierLockedRateNewStr,
+        oldRawStockCostPerKgUsd,
+        rawStockRateWasStale,
         affectedBatches: (cascadeResult?.affectedBatches ?? []).map((b: any) => ({
           batchId: b.batchId,
           batchCode: b.batchCode,

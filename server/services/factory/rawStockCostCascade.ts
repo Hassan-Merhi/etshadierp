@@ -158,6 +158,11 @@ export async function cascadeContainerCostChange(
     containerId: number;
     newCostPerKg: number; // native currency, inclusive landed cost per kg
     newCostPerKgUsd: number; // USD equivalent
+    /** When provided, use this exact Decimal value as the supplier inventory value delta
+     *  instead of deriving it from (containerRemainingKg × (newRate − oldRawStockRate)).
+     *  Only the post-offload-charge route should set this; all other callers leave it unset
+     *  so the default moving-average derivation is unchanged. */
+    supplierInventoryValueDeltaUsdOverride?: Decimal;
   },
   opts: {
     /** When true, also rewrites COMPLETED/CLOSED mix batches (and their bales)
@@ -219,7 +224,21 @@ export async function cascadeContainerCostChange(
     const oldLockedRate = await getLockedSupplierRate(tx, companyId, container.supplierId, { forUpdate: true });
     const supplierTotalRemainingKg = await getAuthoritativeSupplierRemainingKg(tx, companyId, container.supplierId);
     const dSupplierTotal = new Decimal(supplierTotalRemainingKg);
-    if (dCorrectedContainerRemainingKg.gt(0)) {
+
+    if (params.supplierInventoryValueDeltaUsdOverride !== undefined) {
+      // Override path: caller (post-offload-charges) supplies the exact value delta,
+      // computed from the difference in canonical container cost before/after the new
+      // charges × the fraction of the container still in inventory. This avoids
+      // including any pre-existing stale raw-stock/container rate divergence.
+      const dValueDelta = params.supplierInventoryValueDeltaUsdOverride;
+      const dNewLockedRate = dSupplierTotal.gt(0)
+        ? new Decimal(oldLockedRate).plus(dValueDelta.div(dSupplierTotal))
+        : dNewCostPerKgUsd;
+      await tx
+        .update(factorySuppliers)
+        .set({ currentRawMaterialCostPerKgUsd: Decimal.max(0, dNewLockedRate).toFixed(8), updatedAt: new Date() })
+        .where(and(eq(factorySuppliers.id, container.supplierId), eq(factorySuppliers.companyId, companyId)));
+    } else if (dCorrectedContainerRemainingKg.gt(0)) {
       // Normal path: delta-weighted moving-average correction.
       const dOldCostWeightedAvg = dOldValueOfRemaining.div(dCorrectedContainerRemainingKg);
       const dValueDelta = dCorrectedContainerRemainingKg.times(dNewCostPerKgUsd.minus(dOldCostWeightedAvg));

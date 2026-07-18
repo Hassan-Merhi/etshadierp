@@ -38,6 +38,19 @@ type PostOffloadResult = {
   rawStockRowsUpdated: number;
   supplierLockedRateOld: number | null;
   supplierLockedRateNew: number | null;
+  // Exact-precision breakdown
+  supplierRemainingKg?: number;
+  containerReceivedKg?: number;
+  containerRemainingKg?: number;
+  remainingFraction?: number;
+  fullContainerValueDeltaUsd?: string;
+  supplierInventoryValueDeltaUsd?: string;
+  supplierValueBeforeUsd?: string | null;
+  supplierValueAfterUsd?: string | null;
+  supplierLockedRateOldExact?: string | null;
+  supplierLockedRateNewExact?: string | null;
+  oldRawStockCostPerKgUsd?: number | null;
+  rawStockRateWasStale?: boolean;
   affectedBatches: {
     batchId: number;
     batchCode: string;
@@ -150,19 +163,58 @@ export function PostOffloadDialog({ container, ledgerAccounts, onClose }: PostOf
                   </div>
                   <div className="grid grid-cols-3 gap-2 px-3 py-2">
                     <span className="text-muted-foreground">Container cost/kg (USD)</span>
-                    <span className="text-right font-mono">${result.oldContainerCostPerKgUsd.toFixed(4)}</span>
+                    <span className="text-right font-mono">${result.oldContainerCostPerKgUsd.toFixed(6)}</span>
                     <span className="text-right font-mono font-semibold text-green-700 dark:text-green-400">
-                      ${result.newContainerCostPerKgUsd.toFixed(4)}
+                      ${result.newContainerCostPerKgUsd.toFixed(6)}
                     </span>
                   </div>
                   {result.supplierLockedRateOld !== null && (
-                    <div className="grid grid-cols-3 gap-2 px-3 py-2">
-                      <span className="text-muted-foreground">Supplier locked rate (USD/kg)</span>
-                      <span className="text-right font-mono">${(result.supplierLockedRateOld ?? 0).toFixed(4)}</span>
-                      <span className="text-right font-mono font-semibold">
-                        ${(result.supplierLockedRateNew ?? 0).toFixed(4)}
-                      </span>
-                    </div>
+                    <>
+                      <div className="grid grid-cols-3 gap-2 px-3 py-2">
+                        <span className="text-muted-foreground">Supplier locked rate (USD/kg)</span>
+                        <span className="text-right font-mono">
+                          ${(result.supplierLockedRateOldExact
+                            ? parseFloat(result.supplierLockedRateOldExact)
+                            : (result.supplierLockedRateOld ?? 0)
+                          ).toFixed(6)}
+                        </span>
+                        <span className="text-right font-mono font-semibold">
+                          ${(result.supplierLockedRateNewExact
+                            ? parseFloat(result.supplierLockedRateNewExact)
+                            : (result.supplierLockedRateNew ?? 0)
+                          ).toFixed(6)}
+                        </span>
+                      </div>
+                      {/* Calculation breakdown */}
+                      {result.supplierValueBeforeUsd != null && result.supplierInventoryValueDeltaUsd != null && result.supplierRemainingKg != null && (
+                        <div className="px-3 py-2 bg-muted/30 text-xs text-muted-foreground space-y-0.5">
+                          <div className="flex justify-between">
+                            <span>Supplier remaining</span>
+                            <span className="font-mono">{formatNumber(result.supplierRemainingKg)} kg</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span>Inventory value added</span>
+                            <span className="font-mono">${parseFloat(result.supplierInventoryValueDeltaUsd).toLocaleString("en", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span>Formula</span>
+                            <span className="font-mono">
+                              (${parseFloat(result.supplierValueBeforeUsd).toLocaleString("en", { minimumFractionDigits: 6, maximumFractionDigits: 6 })} + ${parseFloat(result.supplierInventoryValueDeltaUsd).toLocaleString("en", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}) ÷ {formatNumber(result.supplierRemainingKg)} kg
+                            </span>
+                          </div>
+                          {result.remainingFraction != null && result.remainingFraction < 0.9999 && result.fullContainerValueDeltaUsd != null && (
+                            <div className="mt-1 text-amber-700 dark:text-amber-400">
+                              Only {(result.remainingFraction * 100).toFixed(0)}% of this container remains in inventory, so ${parseFloat(result.supplierInventoryValueDeltaUsd).toLocaleString("en", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} of the ${parseFloat(result.fullContainerValueDeltaUsd).toLocaleString("en", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} charge was applied to the current supplier locked rate.
+                            </div>
+                          )}
+                          {result.rawStockRateWasStale && (
+                            <div className="mt-1 text-blue-700 dark:text-blue-400">
+                              Note: the container rate and raw-stock rate differed before this charge. Only the new charge value was applied to the supplier rate — the pre-existing divergence was not included.
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </>
                   )}
                   <div className="grid grid-cols-3 gap-2 px-3 py-2 text-muted-foreground">
                     <span>Raw-stock rows updated</span>
