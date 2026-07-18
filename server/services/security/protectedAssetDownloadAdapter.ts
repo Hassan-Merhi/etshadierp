@@ -9,7 +9,7 @@ import {
   type ProtectedAssetLookup,
   type ProtectedAssetRecord,
 } from "./protectedAssetAccessPolicy";
-import type { AuthorizationActor } from "./authorizationPolicy";
+import { AuthorizationDeniedError, type AuthorizationActor } from "./authorizationPolicy";
 
 interface ContainerDocumentAsset extends ProtectedAssetRecord {
   fileData: string | null;
@@ -117,10 +117,12 @@ export function createContainerDocumentDownloadHandler(db: any) {
       if (!asset.fileData) return res.status(404).json({ message: "Not found" });
       return res.send(Buffer.from(asset.fileData, "base64"));
     } catch (error) {
-      if (error instanceof ProtectedAssetAccessError || error?.constructor?.name === "AuthorizationDeniedError") {
-        return res.status(error instanceof ProtectedAssetAccessError && error.message === "Forbidden" ? 403 : 404).json({
-          message: error instanceof ProtectedAssetAccessError && error.message === "Forbidden" ? "Forbidden" : "Not found",
-        });
+      if (error instanceof AuthorizationDeniedError) {
+        return res.status(404).json({ message: "Not found" });
+      }
+      if (error instanceof ProtectedAssetAccessError) {
+        const forbidden = error.message === "Forbidden";
+        return res.status(forbidden ? 403 : 404).json({ message: forbidden ? "Forbidden" : "Not found" });
       }
       return next(error);
     }
