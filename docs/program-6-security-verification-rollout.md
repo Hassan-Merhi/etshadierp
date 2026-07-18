@@ -8,7 +8,7 @@ This program verifies and operationalizes the completed Program 5 security imple
 
 - [x] 6A — Verification inventory, rollout gates, and evidence model
 - [x] 6B — Static integration audit and compile-safety repair
-- [ ] 6C — Focused security test execution and defect repair
+- [ ] 6C — Focused security test execution and defect repair (execution blocked)
 - [ ] 6D — Migration dry-run and rollback validation
 - [ ] 6E — Session, credential, permission, and company-context runtime verification
 - [ ] 6F — Privileged repair and sensitive-input runtime verification
@@ -87,9 +87,20 @@ Status: source-level audit complete; command-based compile verification remains 
 - Added `docs/program-6-static-integration-audit.md` with findings, evidence, and limitations.
 - No compiler, test runner, build, migration, runtime, deployment, or production command was executed; compile and test evidence is reserved for Phase 6C.
 
+## Phase 6C — Focused security test execution and defect repair
+
+Status: execution blocked; not complete.
+
+- Local shell inspection confirmed `git` is available but `gh` is not installed.
+- Repository checkout failed because the execution container could not resolve `github.com`.
+- GitHub Actions lookup for the Phase 6B head returned no pull-request workflow runs.
+- Added `scripts/run-program-6-focused-security-checks.mjs` as the canonical one-command TypeScript and focused Vitest runner.
+- Added `docs/program-6-focused-security-test-evidence.md` with the exact attempts, environment failures, command scope, and unverified gates.
+- No tests or compiler command passed or failed against the application because no runnable checkout/dependency environment was available.
+
 ## Next phase
 
-Phase 6C — Focused security test execution and defect repair.
+Phase 6C remains open until the canonical command executes successfully and any resulting defects are repaired. Program 6 must not advance to migration or runtime verification on the assumption that tests pass.
 
 ## Safety constraints
 
