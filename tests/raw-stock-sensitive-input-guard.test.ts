@@ -1,8 +1,31 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+const auditValues = vi.fn(async () => undefined);
+const auditInsert = vi.fn(() => ({ values: auditValues }));
+
+vi.mock("../server/db", () => ({
+  db: { insert: auditInsert },
+}));
+
 import { requireRawStockSensitiveInput } from "../server/services/security/rawStockSensitiveInputGuard";
 
-function run(path: string, body: unknown) {
-  const req: any = { method: "POST", path, body };
+async function run(path: string, body: unknown, options: { mountedPath?: string } = {}) {
+  const originalUrl = options.mountedPath ?? path;
+  const req: any = {
+    method: "POST",
+    path,
+    url: path,
+    originalUrl,
+    body,
+    ip: "127.0.0.1",
+    session: {
+      userId: "user-1",
+      username: "admin",
+      currentCompanyId: 1,
+      currentRole: "Admin",
+    },
+    get: (header: string) => (header.toLowerCase() === "user-agent" ? "vitest" : undefined),
+  };
   const response: any = {
     statusCode: 200,
     payload: undefined,
@@ -16,13 +39,19 @@ function run(path: string, body: unknown) {
     },
   };
   const next = vi.fn();
-  requireRawStockSensitiveInput(req, response, next);
+  await requireRawStockSensitiveInput(req, response, next);
   return { req, response, next };
 }
 
 describe("raw-stock sensitive input guard", () => {
-  it("accepts and freezes an exact recalc apply payload", () => {
-    const result = run("/api/factory/raw-stock/recalc/apply", {
+  beforeEach(() => {
+    auditInsert.mockClear();
+    auditValues.mockClear();
+    auditValues.mockResolvedValue(undefined);
+  });
+
+  it("accepts and freezes an exact recalc apply payload", async () => {
+    const result = await run("/api/factory/raw-stock/recalc/apply", {
       containerIds: [3, 7],
       confirm: true,
       confirmationToken: "signed-token",
@@ -35,10 +64,24 @@ describe("raw-stock sensitive input guard", () => {
     expect(result.next).toHaveBeenCalledOnce();
     expect(result.response.statusCode).toBe(200);
     expect(Object.isFrozen(result.req.body)).toBe(true);
+    expect(auditValues).toHaveBeenCalledOnce();
   });
 
-  it("rejects unknown fields before route logic", () => {
-    const result = run("/api/factory/raw-stock/recalc/auto-apply-fx", {
+  it("uses originalUrl when Express has rewritten the mounted req.path", async () => {
+    const result = await run("/", {
+      containerIds: [4],
+      reason: "Apply approved FX rate",
+      idempotencyKey: "fx:company:1:container:4",
+      unexpected: true,
+    }, { mountedPath: "/api/factory/raw-stock/recalc/auto-apply-fx?source=admin" });
+
+    expect(result.response.statusCode).toBe(400);
+    expect(result.next).not.toHaveBeenCalled();
+    expect(auditValues.mock.calls[0][0].changes.targetId).toBe("/api/factory/raw-stock/recalc/auto-apply-fx");
+  });
+
+  it("rejects unknown fields before route logic", async () => {
+    const result = await run("/api/factory/raw-stock/recalc/auto-apply-fx", {
       containerIds: [1],
       reason: "Apply approved FX rate",
       idempotencyKey: "fx:company:1:container:1",
@@ -50,9 +93,9 @@ describe("raw-stock sensitive input guard", () => {
     expect(result.response.payload).toEqual({ message: "Invalid request" });
   });
 
-  it("rejects duplicate, non-integer, and non-positive identifiers", () => {
+  it("rejects duplicate, non-integer, and non-positive identifiers", async () => {
     for (const ids of [[1, 1], [1.5], [0], [-1], ["1"]]) {
-      const result = run("/api/factory/raw-stock/recalc/auto-apply-fx", {
+      const result = await run("/api/factory/raw-stock/recalc/auto-apply-fx", {
         containerIds: ids,
         reason: "Apply approved FX rate",
         idempotencyKey: "fx:company:1:batch:1",
@@ -62,8 +105,8 @@ describe("raw-stock sensitive input guard", () => {
     }
   });
 
-  it("rejects oversized identifier arrays", () => {
-    const result = run("/api/factory/raw-stock/recalc/apply", {
+  it("rejects oversized identifier arrays", async () => {
+    const result = await run("/api/factory/raw-stock/recalc/apply", {
       containerIds: Array.from({ length: 501 }, (_, index) => index + 1),
       reason: "Correct audited landed cost",
       idempotencyKey: "recalc:company:1:batch:large",
@@ -73,8 +116,8 @@ describe("raw-stock sensitive input guard", () => {
     expect(result.next).not.toHaveBeenCalled();
   });
 
-  it("rejects manual rates outside the selected source set", () => {
-    const result = run("/api/factory/raw-stock/recalc/zero-cost-sources/apply", {
+  it("rejects manual rates outside the selected source set", async () => {
+    const result = await run("/api/factory/raw-stock/recalc/zero-cost-sources/apply", {
       sourceIds: [10],
       manualRates: { "11": 0.55 },
       reason: "Repair approved source rate",
@@ -85,7 +128,7 @@ describe("raw-stock sensitive input guard", () => {
     expect(result.next).not.toHaveBeenCalled();
   });
 
-  it("rejects unsafe object structure", () => {
+  it("rejects unsafe object structure", async () => {
     const polluted = Object.create(null);
     polluted.sourceIds = [10];
     polluted.manualRates = Object.create(null);
@@ -93,18 +136,18 @@ describe("raw-stock sensitive input guard", () => {
     polluted.reason = "Repair approved source rate";
     polluted.idempotencyKey = "source:company:1:repair:unsafe";
 
-    const result = run("/api/factory/raw-stock/recalc/zero-cost-sources/apply", polluted);
+    const result = await run("/api/factory/raw-stock/recalc/zero-cost-sources/apply", polluted);
     expect(result.response.statusCode).toBe(400);
     expect(result.next).not.toHaveBeenCalled();
   });
 
-  it("requires strict positive integer identifiers for direct repairs", () => {
-    const supplier = run("/api/factory/raw-stock/supplier-rate/recompute", {
+  it("requires strict positive integer identifiers for direct repairs", async () => {
+    const supplier = await run("/api/factory/raw-stock/supplier-rate/recompute", {
       supplierId: "12",
       reason: "Recompute approved supplier rate",
       idempotencyKey: "supplier:company:1:rate:12",
     });
-    const undo = run("/api/factory/raw-stock/recalc/undo", {
+    const undo = await run("/api/factory/raw-stock/recalc/undo", {
       undoLogId: 0,
       reason: "Undo incorrect recalculation",
       idempotencyKey: "undo:company:1:log:0",
