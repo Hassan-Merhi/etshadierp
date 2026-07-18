@@ -1367,7 +1367,13 @@ export function registerEmployeeNetPositionRoutes(app: Express) {
             .replace(/\s+/g, " ") !== "factory worker advances" &&
           // Exclude per-worker insurance liability accounts (e.g. "Insurance - أحمد علي رمضان")
           // — these are tracked separately via the Insurance section, not Net Position assets
-          !/^Insurance\s*[-–]/i.test(a.name || "")
+          !/^Insurance\s*[-–]/i.test(a.name || "") &&
+          // Exclude ledger-based "Prepaid Rent" accounts — the property-contract
+          // calculation below (paid − expected per contract) is the authoritative source.
+          // Keeping both would show Prepaid Rent twice: once from the ledger account
+          // and once from the rental calculation. statsNetProfitRoutes.ts applies the
+          // same exclusion for the same reason.
+          !(a.name || "").toLowerCase().includes("prepaid rent")
       );
       const cleanLedgerForUsTotal = round2(cleanLedgerForUs.reduce((s, a) => s + a.value, 0));
 
