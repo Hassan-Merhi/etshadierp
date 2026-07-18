@@ -82,7 +82,13 @@ Safety rules:
   - Defined incremental adoption for mature accounting screens to avoid risky broad cosmetic rewrites.
   - Added `scripts/verify-program7b-financial-screens.mjs` to protect the shared financial UI contract.
   - Final audit documented in `docs/program-7b-financial-screens.md`.
-- [ ] 7C — Factory and inventory screens
+- [x] 7C — Factory and inventory screens
+  - Added shared `OperationsScreenHeader`, `OperationsMetricCard`, `OperationsMetricGrid`, `OperationsTableShell`, and `OperationsTableScroll` primitives.
+  - Standardized module identity, responsive actions and filters, operational KPI presentation, tabular numerals, dense-table containment, and horizontal overflow behavior.
+  - Reused Program 7A loading, empty, and error states instead of creating Factory/Inventory-specific duplicates.
+  - Preserved all stock, valuation, costing, offload, mix-batch, allocation, relabeling, and transfer behavior through a presentation-only adoption boundary.
+  - Added `scripts/verify-program7c-factory-inventory-screens.mjs` to protect the shared operational UI contract and business-logic boundary.
+  - Final audit documented in `docs/program-7c-factory-inventory-screens.md`.
 - [ ] 7D — Accessibility and responsive behavior
 
 ## Program 8 — Business functionality refinement
@@ -99,4 +105,4 @@ Existing performance work found:
 - HTML and dynamic API responses avoid stale caching.
 - Earlier heavy-API pagination and memory-stabilization scripts exist.
 
-Programs 6A, 6B, 6C, 6E, 6F, 7A, and 7B are implementation-complete. Program 6D still requires real-checkout findings and database reconciliation evidence before behavior-changing query or index work can be marked complete. Programs 7C–7D and 8A–8C remain unfinished.
+Programs 6A, 6B, 6C, 6E, 6F, 7A, 7B, and 7C are implementation-complete. Program 6D still requires real-checkout findings and database reconciliation evidence before behavior-changing query or index work can be marked complete. Program 7D and Programs 8A–8C remain unfinished.
