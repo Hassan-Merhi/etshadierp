@@ -297,19 +297,21 @@ export default function Dashboard() {
     refetchInterval: 5 * 60 * 1000,
   });
 
+  // /api/accounts/all returns { accounts: [...], asOfDate: "..." } — extract the array.
   const { data: allAccounts = [] } = useQuery<Account[]>({
     queryKey: ["/api/accounts/all", selectedCompany?.id],
-    enabled: !!selectedCompany,
-  });
-
-  const { data: allPayableAccounts = [] } = useQuery<PayableAccount[]>({
-    queryKey: ["/api/accounts/all-ledger", selectedCompany?.id],
     queryFn: async () => {
       const response = await modeApiRequest("GET", "/api/accounts/all");
       if (!response.ok) throw new Error("Failed to fetch accounts");
-      const allAccounts = await response.json();
-      return allAccounts.filter((acc: any) => acc.type && acc.type.toLowerCase() === "ledger");
+      const data = await response.json();
+      return Array.isArray(data) ? data : (data.accounts ?? []);
     },
+    enabled: !!selectedCompany,
+  });
+
+  // Use the dedicated ledger-only endpoint — returns a plain array, no extraction needed.
+  const { data: allPayableAccounts = [] } = useQuery<PayableAccount[]>({
+    queryKey: ["/api/accounts/all-ledger", selectedCompany?.id],
     enabled: !!selectedCompany,
   });
 
