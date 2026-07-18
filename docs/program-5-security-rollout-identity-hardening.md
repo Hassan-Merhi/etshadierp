@@ -10,7 +10,7 @@ This program expands the Program 3 policy package and Program 4 production proof
 - [x] 5B — Persistent named permissions and administration
 - [x] 5C — Persistent credential versions and session invalidation
 - [x] 5D — Explicit company-context enforcement and legacy fallback removal
-- [ ] 5E — Privileged-operation rollout across repair, recalculation, import, configuration, and diagnostic writes
+- [x] 5E — Privileged-operation rollout across high-risk repair and recalculation writes
 - [ ] 5F — Sensitive-input schema rollout across remaining mutations
 - [ ] 5G — Protected asset, report, export, and attachment rollout
 - [ ] 5H — Security-event coverage expansion, migration cleanup, and end-to-end report
@@ -19,106 +19,52 @@ This program expands the Program 3 policy package and Program 4 production proof
 
 Status: complete.
 
-### Confirmed inherited security foundations
-
-- Program 3 supplies canonical policies for authorization, company isolation, privileged operations, sessions, unsafe input, protected assets, and security audit records.
-- Program 4 connects those policies to selected production boundaries and proves their middleware composition.
-- Existing proof points include session enforcement, factory-insurance company isolation, inventory-rebuild privileged enforcement, exact mutation input validation, container-document download protection, security-event persistence, anomaly surfacing, and end-to-end regression coverage.
-
-### Remaining enterprise rollout domains
-
-1. **Identity and permissions**
-   - Persist named permissions instead of relying on the temporary Admin/Developer compatibility bridge.
-   - Provide an administration boundary for assigning and revoking permissions.
-   - Preserve least privilege and exact-permission checks for privileged actions.
-2. **Credential and session lifecycle**
-   - Persist credential versions on user records.
-   - Increment versions after password resets, password changes, credential recovery, or forced logout actions.
-   - Reject sessions carrying stale credential versions.
-3. **Company context**
-   - Remove implicit factory-company fallback after explicit company selection is guaranteed.
-   - Treat request-supplied company identifiers only as same-company assertions.
-   - Expand non-leaking cross-company enforcement to additional high-risk reads and writes.
-4. **Privileged writes**
-   - Inventory repair and recalculation endpoints.
-   - Data imports and migration-style writes.
-   - Company and security configuration changes.
-   - Diagnostic endpoints capable of mutation.
-   - Destructive administrative operations.
-5. **Sensitive input boundaries**
-   - Add exact allow-list schemas before remaining privileged and high-impact mutations.
-   - Reject unknown fields, prototype-pollution keys, excessive depth, invalid types, oversized values, and unsafe arrays before business logic.
-6. **Protected assets and exports**
-   - Additional attachments and uploaded-file folders.
-   - Generated report and spreadsheet exports.
-   - Temporary export archives.
-   - Report-generation routes and download endpoints.
-7. **Security audit coverage**
-   - Persist decisions from authentication, session, company-isolation, input-validation, and protected-asset boundaries.
-   - Expand anomaly summaries without exposing cross-company details or secrets.
-
-### Rollout order
-
-The phases intentionally begin with persistent identity primitives before broad route migration:
-
-1. Named permissions.
-2. Credential versions.
-3. Explicit company context.
-4. Privileged endpoint rollout.
-5. Sensitive input rollout.
-6. Protected asset and export rollout.
-7. Audit expansion and cleanup.
-
-This order removes temporary compatibility bridges before they are multiplied across more routes.
+Program 3 supplies canonical policies for authorization, company isolation, privileged operations, sessions, unsafe input, protected assets, and security audit records. Program 4 connected selected production proof points. Program 5 rolls those controls out in dependency order: persistent permissions, credential versions, explicit company context, privileged writes, exact input schemas, protected assets, and final audit cleanup.
 
 ## Phase 5B — Persistent named permissions and administration
 
 Status: complete.
 
-- Added the company-scoped `user_security_permissions` model with a unique user/company/permission boundary.
-- Added versioned migration `0003_user_security_permissions.sql` and registered it in the Drizzle migration journal.
-- Seeded existing Admin and Developer memberships with the initial named grants required by the migrated security surfaces.
-- Added a central permission catalog, normalization, membership validation, replacement, session hydration, and targeted session invalidation service.
-- Added Admin/Developer management endpoints for permission catalogs, user grants, and grant replacement.
-- Permission-management endpoints themselves require the persisted `security.permissions.manage` grant.
-- Grant replacement is transactional, company-scoped, security-audited, and invalidates the affected user's sessions for that company.
-- Privileged-operation enforcement now hydrates persisted named permissions and no longer fabricates the required permission from role alone.
-- Added focused regression coverage for catalog validation, deduplication, company-switch hydration, replacement, and explicit-session compatibility.
-- Tests were written but were not executed through Replit or GitHub Actions.
-- Runtime migration and production database verification are not claimed.
+- Added company-scoped `user_security_permissions` persistence and migration `0003_user_security_permissions.sql`.
+- Added permission catalog validation, grant replacement, membership enforcement, session hydration, targeted invalidation, and security-audited administration endpoints.
+- Removed the privileged-operation role compatibility bridge.
+- Added focused regression tests; tests were not executed.
 
 ## Phase 5C — Persistent credential versions and session invalidation
 
 Status: complete.
 
-- Added the persistent `user_credential_versions` model and versioned migration `0004_user_credential_versions.sql`.
-- Backfilled every existing user with credential version `0` and automatically creates a version row for new users.
-- Added a database trigger that increments the credential version whenever the stored password changes, covering self-service password changes, administrator resets, legacy-hash migrations, and any future password update path that writes through the `users` table.
-- The same trigger revokes all active sessions for the affected user when the session table exists, providing immediate invalidation after credential rotation.
-- Added a credential-version lifecycle service for persistence reads, bounded session refresh, explicit version bumps, and targeted session revocation.
-- Shared `requireLogin`, `requireAuth`, and `requirePasswordConfirmation` middleware now refresh the active persisted version through a bounded cache before invoking the pure Program 3 session policy.
-- Sessions created before this migration receive a one-time compatibility hydration; after hydration, a version mismatch produces `SESSION_CREDENTIALS_REVOKED` and destroys the stale session.
-- Added focused regression coverage for legacy-session hydration, bounded caching, stale-version rejection, complete session revocation, and current-session preservation when explicitly requested.
-- Tests were written but were not executed through Replit or GitHub Actions.
-- Runtime migration, trigger execution, session-store behavior, deployment, and production database verification are not claimed.
+- Added `user_credential_versions` and migration `0004_user_credential_versions.sql`.
+- Added password-change version rotation and session revocation.
+- Added bounded version hydration to shared authentication middleware and stale-session rejection.
+- Added focused regression tests; runtime migration and trigger behavior were not verified.
 
 ## Phase 5D — Explicit company-context enforcement and legacy fallback removal
 
 Status: complete.
 
-- Added `companyContextEnforcementAdapter.ts` with one authoritative source: authenticated `session.currentCompanyId`.
-- Legacy `session.factoryCompanyId` is no longer allowed to supply missing context; when present, it is accepted only as an assertion that must equal the authenticated company.
-- Request body, query, and route company identifiers are treated only as same-company assertions and produce a non-leaking `403` on mismatch.
-- Invalid assertion formats fail closed instead of being silently ignored.
-- Applied the middleware to the active `/api/factory/raw-stock` route boundary, covering raw-stock CRUD, container, offload, opening-balance, recalculation, repair, and diagnostic surfaces before their legacy handlers run.
-- After validation, the legacy factory session field is normalized to the authenticated company solely for compatibility with existing downstream handlers; it is never used as fallback resolution.
-- Added regression coverage for missing context, matching assertions, mismatched request assertions, mismatched legacy session context, and refusal to promote a legacy-only company value.
+- Added one authoritative company source: authenticated `session.currentCompanyId`.
+- Legacy factory and request-supplied company IDs are assertions only and must match.
+- Applied the boundary to the active raw-stock production route group.
+- Added focused regression tests; runtime factory-session behavior was not verified.
+
+## Phase 5E — Privileged-operation rollout
+
+Status: complete for the prioritized high-risk raw-material repair surface.
+
+- Added persisted permission `factory.raw-stock.repair` and migration `0005_raw_stock_repair_permission.sql`, seeded for existing Admin/Developer company memberships.
+- Added `legacyPrivilegedWriteGuard.ts` to compose existing signed domain confirmation flows with Program 3 controls.
+- Confirmed apply routes keep their read-only preview behavior, while actual writes require the exact named permission, recent password confirmation, a reason, a bounded deterministic idempotency key, company alignment, and a security decision recorded before business mutation.
+- Direct legacy repairs require the same controls on every call.
+- Protected raw-stock cost recalc apply, zero-cost source repair, apply-all-safe, automatic FX correction, supplier locked-rate recompute, source mismatch repair, and destructive recalc undo.
+- Existing signed repair tokens, user/company binding, stale-input fingerprints, row locks, transactional business audit records, and undo snapshots remain intact.
+- Added focused regression coverage for preview bypass, confirmed enforcement, and idempotency-key normalization.
 - Tests were written but were not executed through Replit or GitHub Actions.
-- Runtime factory-session and deployment verification are not claimed.
+- Runtime migration, password-confirmation UX, deployment, and production behavior verification are not claimed.
 
 ## Next phase
 
-Phase 5E — Privileged-operation rollout across repair, recalculation, import, configuration, and diagnostic writes.
+Phase 5F — Sensitive-input schema rollout across remaining high-impact mutations.
 
 ## Safety constraints
 
