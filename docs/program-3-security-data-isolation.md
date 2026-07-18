@@ -5,7 +5,7 @@ Status: in progress. This branch is stacked on the completed, unmerged Program 2
 ## Phase sequence
 
 - [x] 3A — Security and authorization surface audit
-- [ ] 3B — Central authorization policy boundary
+- [x] 3B — Central authorization policy boundary
 - [ ] 3C — Company and tenant isolation enforcement
 - [ ] 3D — Privileged action and admin-operation controls
 - [ ] 3E — Session, authentication, and credential hardening
@@ -20,55 +20,43 @@ Each phase must be completed and committed separately. Do not begin Program 4 on
 
 Status: complete.
 
-### Scope established
+- Classified authentication, route authorization, company isolation, privileged operations, validation, file access, and security-audit risks.
+- Assigned remediation ownership across Phases 3B–3I.
+- Changed documentation only; no production behavior or data was modified.
 
-Program 3 hardens who may perform sensitive operations and which company or tenant data each request may access. It builds on Program 2's accounting and inventory integrity boundaries without changing their balances or costing behavior.
+## Phase 3B — Central authorization policy boundary
 
-### Audit categories
+Status: complete.
 
-- Authentication and session establishment, renewal, revocation, and logout.
-- Route-level role and permission enforcement.
-- Company and tenant scoping for reads, writes, exports, reports, and repair endpoints.
-- Administrative, diagnostic, recalculation, migration, and destructive operations.
-- Object-level ownership checks for vouchers, accounts, suppliers, customers, stock, factory data, files, and attachments.
-- Input validation at security-sensitive boundaries.
-- Auditability of denied and privileged actions.
+### Completed work
 
-### Risk priorities
-
-1. Cross-company or cross-tenant object access caused by trusting caller-supplied IDs.
-2. Privileged routes protected only by UI visibility or inconsistent route middleware.
-3. Repair, recalculation, migration, and destructive endpoints without uniform authorization, confirmation, and audit controls.
-4. Session or credential behavior that permits stale, replayed, or insufficiently scoped access.
-5. Exports, files, and attachments returned without object-level ownership verification.
-6. Fragmented authorization logic that can drift between modules.
-
-### Phase ownership
-
-- 3B defines the canonical authorization decision contract.
-- 3C migrates company and tenant isolation to that boundary.
-- 3D hardens privileged and administrative operations.
-- 3E covers sessions, authentication, and credentials.
-- 3F standardizes validation for unsafe operations.
-- 3G protects exports, files, and attachments.
-- 3H adds security audit and anomaly visibility.
-- 3I verifies the program and produces the remediation report.
+- Added `server/services/security/authorizationPolicy.ts` as the canonical, pure authorization decision boundary.
+- Added explicit accounting, inventory, factory, administration, reporting, and configuration domains.
+- Added authenticated actor, role, company, permission, action, and resource contracts.
+- Enforced company isolation before role or permission evaluation, including for Admin and Developer roles.
+- Added default-deny behavior when no explicit role or permission policy is supplied.
+- Added exact required-permission evaluation and explicit allowed-role evaluation.
+- Added a non-leaking `AuthorizationDeniedError` whose public message remains `Forbidden` while retaining a machine-readable denial code.
+- Added `assertAuthorized` for service and route adapters that require exception-based enforcement.
+- Preserved all existing route middleware; migration to this boundary will occur incrementally without weakening current checks.
 
 ### Verification
 
-- Documentation-only phase; no production routes, balances, stock, sessions, or data were changed.
-- Program 3 is isolated on its own branch.
+- Added focused tests for authorized access, unauthenticated requests, invalid company context, cross-company denial, default deny, missing permissions, privileged-role behavior, and non-leaking errors.
+- Confirmed privileged roles cannot bypass company isolation.
+- Confirmed undefined policies fail closed.
+- Confirmed this phase does not change accounting balances, inventory quantities, costing, sessions, or historical data.
 - No Replit checks or credits were used.
 
 ## Next phase
 
-- Phase 3B — Central authorization policy boundary
+- Phase 3C — Company and tenant isolation enforcement
 
 ## Safety constraints
 
 - Do not merge automatically.
 - Do not push directly to `main`.
-- Preserve every phase as a separate commit.
+- Preserve every phase as separate commits.
 - Do not use Replit-hosted checks or consume Replit credits.
 - Do not weaken an existing authorization check while centralizing policy.
 - Do not modify accounting balances, stock values, or historical transactions as part of Program 3.
