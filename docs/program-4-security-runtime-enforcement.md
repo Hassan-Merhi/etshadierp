@@ -10,7 +10,7 @@ Status: in progress. This branch is stacked on the completed, unmerged Program 3
 - [x] 4D — Privileged operation enforcement on repair and administrative endpoints
 - [x] 4E — Unsafe input validation on sensitive mutations
 - [x] 4F — Protected file, attachment, report, and export enforcement
-- [ ] 4G — Security audit persistence and anomaly surfacing
+- [x] 4G — Security audit persistence and anomaly surfacing
 - [ ] 4H — End-to-end enforcement tests and integration report
 
 ## Phase 4B
@@ -70,9 +70,23 @@ Status: complete for the first protected production asset surface.
 - Added focused regression coverage for same-company access, cross-company denial, unsafe storage keys, invalid sizes, and header injection resistance.
 - Tests were added but not executed through Replit or GitHub Actions.
 
+## Phase 4G
+
+Status: complete for the first production security-event slice.
+
+- Added `server/services/security/securityAuditRuntime.ts` using the existing append-only `audit_log` table; no schema migration was introduced.
+- Applied inventory-rebuild authorization attempts are persisted before mutation logic can run.
+- Allowed and denied privileged-operation events include company, actor, action, target identity, reason code, IP address, user agent, and non-secret metadata.
+- Program 3 metadata redaction prevents passwords, confirmation tokens, credentials, cookies, and authorization values from being persisted.
+- Added `GET /api/admin/security-anomalies` for Admin/Developer users.
+- The endpoint is strictly scoped to the active session company and the most recent 15-minute window.
+- It surfaces repeated denials and privileged-operation failures through the Program 3 anomaly detector.
+- Added focused regression coverage for append-only mapping, redaction, target identifiers, and anomaly classification.
+- Tests were added but not executed through Replit or GitHub Actions.
+
 ## Next phase
 
-Phase 4G — Security audit persistence and anomaly surfacing.
+Phase 4H — End-to-end enforcement tests and integration report.
 
 ## Safety constraints
 
