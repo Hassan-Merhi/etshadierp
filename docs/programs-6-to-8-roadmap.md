@@ -19,19 +19,16 @@ Safety rules:
   - Implemented request-scoped database attribution with AsyncLocalStorage and no database timing overhead outside an active profiled request.
   - Implemented periodic configurable top-N ranking events and focused regression coverage.
   - Operational procedure documented in `docs/program-6a-endpoint-ranking.md`.
-- [~] 6B — Daybook, accounts, and reports
-  - Paginate or summarize the heaviest accounting and reporting endpoints.
-  - Preserve totals and reconciliation semantics independently of page size.
-  - Confirmed the factory Daybook already has bounded opt-in pagination with full-filter counts and stable ordering.
-  - Confirmed ledger account type/search filters are already pushed into SQL.
-  - Identified the remaining unbounded no-filter ledger-account path and documented the compatibility-safe migration approach.
-  - Added `server/lib/boundedPagination.ts`, a shared opt-in pagination parser that preserves legacy response shapes while enforcing conservative page-size limits for migrated callers.
-  - Added focused Program 6B unit coverage for legacy opt-in compatibility, endpoint-specific bounds, `pageSize` aliasing, oversized limits, and invalid/negative inputs.
-  - Confirmed the net-profit statement already has a 30-second company/date keyed cache and parallel independent reads, but still materializes full period and all-time voucher-entry sets; SQL summary migration remains.
-  - Added `scripts/verify-program6b-financial-pagination.mjs` to protect full-filter counts, deterministic ordering, brought-forward balances, and server-side account filtering.
-  - Confirmed the main Accounts screen uses the balance-aware `/api/accounts/all` contract; its unbounded `/api/ledger-accounts` call is only for parent-group options.
-  - Added `scripts/audit-program6b-ledger-account-callers.mjs` to classify every frontend ledger caller and fail when a management list still uses the legacy unbounded contract or the Accounts parent-group assumption changes.
-  - Audit and acceptance criteria documented in `docs/program-6b-daybook-accounts-reports-audit.md`.
+- [x] 6B — Daybook, accounts, and reports
+  - Factory Daybook retains bounded opt-in pagination, full-filter counts, and stable ordering.
+  - Legacy ledger selectors retain their complete array contract and server-side type/search filters.
+  - Added the field-limited `/api/ledger-accounts/parent-groups` contract for explicit and legacy parent groups.
+  - Migrated the Accounts Parent Group request while preserving the original balance-aware Accounts implementation.
+  - Preserved opening-balance side, pre-period net, brought-forward, running, and closing-balance semantics.
+  - Confirmed net profit is a summary-only contract and must remain independent of pagination.
+  - Transferred the evidence-backed voucher-entry SQL aggregation rewrite to Program 6D because migrated-account attribution requires query-plan and reconciliation validation.
+  - Added static guards for page limits, full-filter counts, deterministic ordering, parent-group field limits, legacy compatibility, and report page-independence.
+  - Final audit documented in `docs/program-6b-daybook-accounts-reports-audit.md`.
 - [~] 6C — Stock and inventory APIs
   - Return only required fields, add bounded server-side filtering, and eliminate duplicate requests.
   - Preserve stock quantities, values, precision, and company isolation.
@@ -44,6 +41,7 @@ Safety rules:
   - Audit and remaining caller migration work documented in `docs/program-6c-stock-inventory-api-audit.md`.
 - [ ] 6D — Database-query optimization
   - Review query plans, add evidence-backed indexes, remove N+1 queries, parallelize independent reads, and bound searches.
+  - Includes the net-profit voucher-entry SQL aggregation rewrite deferred from 6B, with migrated-account reconciliation evidence required before replacement.
 - [ ] 6E — Frontend bundle and caching
   - Lazy-load Excel/PDF dependencies, stabilize React Query keys, and constrain invalidation/refetch behavior.
 - [ ] 6F — Exports and resource limits
@@ -70,4 +68,4 @@ Existing performance work found:
 - HTML and dynamic API responses avoid stale caching.
 - Earlier heavy-API pagination and memory-stabilization scripts exist.
 
-Program 6A is implementation-complete. Programs 6B and 6C are in progress. Program 6B still requires the field-limited parent-group selector contract, selected report pagination, and SQL summary migration. Program 6C now has both the working lightweight stock-item backend contract and a repository-wide caller-classification guard; the next step is running that audit in a checkout, migrating confirmed selector-only callers, and reviewing location-inventory history payloads. Programs 6D–6F, 7A–7D, and 8A–8C remain unstarted.
+Programs 6A and 6B are implementation-complete. Program 6C is in progress. Programs 6D–6F, 7A–7D, and 8A–8C remain unfinished.
