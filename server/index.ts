@@ -4607,6 +4607,15 @@ END $$`,
     `CREATE INDEX IF NOT EXISTS factory_container_receipts_container_idx ON factory_container_receipts(company_id, container_id)`,
     `CREATE INDEX IF NOT EXISTS factory_container_receipts_date_idx ON factory_container_receipts(company_id, receipt_date)`,
 
+    // -- factory_container_receipts: backfill columns that may be absent on tables created
+    // before these fields were added.  ADD COLUMN IF NOT EXISTS is safe to re-run; it is
+    // a no-op when the column already exists (the CREATE TABLE IF NOT EXISTS above only
+    // adds the full column set when the table is brand-new).
+    `ALTER TABLE factory_container_receipts ADD COLUMN IF NOT EXISTS receipt_value numeric(20,6)`,
+    `ALTER TABLE factory_container_receipts ADD COLUMN IF NOT EXISTS receipt_value_usd numeric(20,6)`,
+    `ALTER TABLE factory_container_receipts ADD COLUMN IF NOT EXISTS currency_code varchar(3)`,
+    `ALTER TABLE factory_container_receipts ADD COLUMN IF NOT EXISTS fx_rate_to_usd numeric(20,8)`,
+
     // -- factory_container_receipts: integrity constraints + idempotency key (July 2026) --
     // Each migration statement is individually caught by the runner; duplicate-constraint
     // errors on re-deploy are non-fatal (logged but do not block startup).
