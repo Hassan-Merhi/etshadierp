@@ -12,7 +12,7 @@ This program expands the Program 3 policy package and Program 4 production proof
 - [x] 5D — Explicit company-context enforcement and legacy fallback removal
 - [x] 5E — Privileged-operation rollout across high-risk repair and recalculation writes
 - [x] 5F — Sensitive-input schema rollout across prioritized high-impact mutations
-- [ ] 5G — Protected asset, report, export, and attachment rollout
+- [x] 5G — Protected asset, report, export, and attachment rollout
 - [ ] 5H — Security-event coverage expansion, migration cleanup, and end-to-end report
 
 ## Phase 5A — Enterprise security adoption inventory and rollout map
@@ -70,13 +70,26 @@ Status: complete for the prioritized high-impact raw-material repair surface.
 - Required container and source identifier arrays to contain unique positive safe integers with a maximum of 500 entries.
 - Restricted manual-rate maps to selected source IDs and bounded positive finite numeric values.
 - Replaced `req.body` with the validated frozen payload before downstream middleware runs.
-- Added focused regression coverage for valid frozen payloads, unknown fields, malformed and duplicate IDs, oversized arrays, unsafe object structure, invalid rate maps, and strict direct-repair identifiers.
+- Added focused regression coverage; tests were not executed.
+
+## Phase 5G — Protected asset, report, export, and attachment rollout
+
+Status: complete for the prioritized stored-file and inherited container-document surfaces.
+
+- Preserved the Program 4 container-document protected download boundary.
+- Added `storedFileAccessAdapter.ts` for `/api/files/:id/download` and `/api/files/:id/preview` before the legacy byte-stream handlers.
+- Added persisted named permission `files.download` and migration `0006_stored_file_download_permission.sql`, seeded for existing Admin/Developer company memberships.
+- Stored-file access now loads the canonical asset record, validates asset identifiers and metadata, enforces authenticated same-company scope, requires the exact permission unless the requester is the recorded owner, and returns non-leaking not-found responses on denial.
+- Persisted allowed and denied protected-asset security decisions without exposing file contents or secrets.
+- Added `X-Content-Type-Options: nosniff` and `Cache-Control: private, no-store` before legacy download and preview handlers respond.
+- Reused canonical filename sanitization for traversal, control-character, and header-injection resistance.
+- Added focused regression coverage for exact-permission access, role-only denial, cross-company denial, invalid assets, and filename sanitization.
 - Tests were written but were not executed through Replit or GitHub Actions.
-- Runtime client compatibility, deployment, and production behavior verification are not claimed.
+- Runtime migration, legacy client access, response streaming, deployment, and production behavior verification are not claimed.
 
 ## Next phase
 
-Phase 5G — Protected asset, report, export, and attachment rollout.
+Phase 5H — Security-event coverage expansion, migration cleanup, and end-to-end report.
 
 ## Safety constraints
 
