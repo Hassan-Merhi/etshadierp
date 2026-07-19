@@ -12,6 +12,7 @@ import { OfflineBanner } from "@/components/OfflineBanner";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { CommandPalette } from "@/components/CommandPalette";
 import { KeyboardShortcutsButton } from "@/components/KeyboardShortcuts";
+import { ModuleIdentity } from "@/components/navigation/module-identity";
 import { LoadingState } from "@/components/ui/page-state";
 import { Factory } from "lucide-react";
 import type { MyAccess } from "./factoryAccessGuard";
@@ -54,26 +55,26 @@ export function FactoryShell({
   return (
     <AppModeProvider mode="factory">
       <SidebarProvider style={style as React.CSSProperties}>
-        <div ref={factoryContainerRef} className="flex h-full w-full">
+        <div ref={factoryContainerRef} className="flex h-full w-full min-w-0 overflow-hidden">
           {selectedCompany?.id && <DailyRateModal companyId={selectedCompany.id} />}
           <FactorySidebar user={user} />
           <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
             <AppTopBar
-              accentColor="#f97316"
+              accentColor="hsl(var(--module-factory))"
               user={user}
               onLogout={handleLogout}
               onSearchOpen={() => setPaletteOpen(true)}
               showSearch={user?.role === "Admin" || user?.role === "Owner" || user?.role === "Developer"}
               leftContent={
-                <div className="flex items-center gap-2 rounded-md border border-orange-600/20 bg-orange-600/10 px-2 py-1">
-                  <Factory className="h-4 w-4 text-orange-600" aria-hidden="true" />
-                  <span className="text-xs font-semibold uppercase tracking-wider text-orange-600">Factory Mode</span>
-                  {myAccess?.companyName && (
-                    <span className="hidden border-l border-orange-600/20 pl-2 text-xs font-normal normal-case tracking-normal text-orange-600/70 sm:inline">
-                      {myAccess.companyName}
-                    </span>
-                  )}
-                </div>
+                <ModuleIdentity
+                  compact
+                  moduleName="Factory"
+                  description="Production, raw materials, inventory, and costing"
+                  companyName={myAccess?.companyName || selectedCompany?.name}
+                  icon={Factory}
+                  tone="factory"
+                  className="hidden max-w-md border-0 bg-transparent p-0 shadow-none sm:block"
+                />
               }
               extraActions={<KeyboardShortcutsButton />}
             />
