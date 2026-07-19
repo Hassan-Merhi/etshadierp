@@ -11,14 +11,14 @@ interface EmptyStateProps extends React.HTMLAttributes<HTMLDivElement> {
 
 export function EmptyState({ icon: Icon, title, description, action, className, ...props }: EmptyStateProps) {
   return (
-    <div className={cn("empty-state", className)} {...props}>
+    <div className={cn("empty-state", className)} role="status" {...props}>
       {Icon && (
-        <div className="empty-state-icon">
+        <div className="empty-state-icon" aria-hidden="true">
           <Icon className="h-5 w-5" />
         </div>
       )}
-      <div className="empty-state-title">{title}</div>
-      {description && <div className="empty-state-desc">{description}</div>}
+      <h3 className="empty-state-title">{title}</h3>
+      {description && <p className="empty-state-desc">{description}</p>}
       {action && <div className="mt-2">{action}</div>}
     </div>
   );
