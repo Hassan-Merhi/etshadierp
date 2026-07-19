@@ -7,6 +7,8 @@ const ROOT = process.cwd();
 const read = (file) => fs.readFile(path.join(ROOT, file), "utf8");
 
 const workflowDialog = await read("client/src/components/ui/workflow-dialog.tsx");
+const confirmDialog = await read("client/src/components/ConfirmDialog.tsx");
+const confirmationShim = await read("client/src/components/ConfirmationDialog.tsx");
 const dialog = await read("client/src/components/ui/dialog.tsx");
 const form = await read("client/src/components/ui/form.tsx");
 const failures = [];
@@ -30,25 +32,49 @@ for (const token of [
   if (!workflowDialog.includes(token)) failures.push(`Workflow dialog contract missing: ${token}`);
 }
 
-for (const token of ["DialogContent", "focus-visible", "sm:max-w-lg"]) {
-  if (!dialog.includes(token) && token !== "sm:max-w-lg") failures.push(`Base dialog contract missing: ${token}`);
+for (const token of [
+  "ConfirmDialog",
+  "doubleConfirm",
+  "requirePhrase",
+  "confirmDisabled",
+  "max-h-[calc(100dvh-1rem)]",
+  "overflow-y-auto",
+  "break-words",
+  'aria-busy={isLoading ? "true"',
+  "motion-reduce:animate-none",
+  "w-full sm:w-auto",
+  "bg-destructive",
+  "bg-warning",
+  "disabled={isLoading}",
+]) {
+  if (!confirmDialog.includes(token)) failures.push(`Canonical confirmation contract missing: ${token}`);
+}
+
+for (const token of ["ConfirmDialog", "DeleteConfirmDialog", 'tone="destructive"']) {
+  if (!confirmationShim.includes(token)) failures.push(`Confirmation compatibility contract missing: ${token}`);
+}
+
+for (const token of ["DialogContent", "focus-visible"]) {
+  if (!dialog.includes(token)) failures.push(`Base dialog contract missing: ${token}`);
 }
 
 for (const token of ["FormField", "FormLabel", "FormControl", "FormMessage"]) {
   if (!form.includes(token)) failures.push(`Form consistency contract missing: ${token}`);
 }
 
-for (const forbidden of [
-  "/api/",
-  "useMutation(",
-  "useQuery(",
-  "queryClient",
-  "stockQuantity",
-  "saleTotal",
-  "costPerKg",
-  "ledgerAccount",
-]) {
-  if (workflowDialog.includes(forbidden)) failures.push(`Workflow dialog contains business logic: ${forbidden}`);
+for (const source of [workflowDialog, confirmDialog]) {
+  for (const forbidden of [
+    "/api/",
+    "useMutation(",
+    "useQuery(",
+    "queryClient",
+    "stockQuantity",
+    "saleTotal",
+    "costPerKg",
+    "ledgerAccount",
+  ]) {
+    if (source.includes(forbidden)) failures.push(`Dialog primitive contains business logic: ${forbidden}`);
+  }
 }
 
 if (failures.length) {
@@ -57,4 +83,4 @@ if (failures.length) {
   process.exit(1);
 }
 
-console.log(JSON.stringify({ phase: 10, status: "started", protectedContracts: 22 }, null, 2));
+console.log(JSON.stringify({ phase: 10, status: "complete", protectedContracts: 39 }, null, 2));
