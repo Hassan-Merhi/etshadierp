@@ -2,13 +2,16 @@ import * as React from "react";
 import { ArrowDownRight, ArrowUpRight, Minus } from "lucide-react";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { ResponsiveActions, ResponsiveToolbar } from "@/components/ui/responsive-accessibility";
 import { cn } from "@/lib/utils";
 
-type FinancialScreenHeaderProps = React.HTMLAttributes<HTMLDivElement> & {
+type FinancialScreenHeaderProps = React.HTMLAttributes<HTMLElement> & {
   title: string;
   description?: string;
   actions?: React.ReactNode;
   filters?: React.ReactNode;
+  actionsLabel?: string;
+  filtersLabel?: string;
 };
 
 export function FinancialScreenHeader({
@@ -16,24 +19,26 @@ export function FinancialScreenHeader({
   description,
   actions,
   filters,
+  actionsLabel = "Financial page actions",
+  filtersLabel = "Financial page filters",
   className,
   ...props
 }: FinancialScreenHeaderProps) {
+  const titleId = React.useId();
+
   return (
-    <div className={cn("space-y-4", className)} {...props}>
+    <header aria-labelledby={titleId} className={cn("space-y-4", className)} {...props}>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div className="min-w-0">
-          <h1 className="text-2xl font-semibold tracking-tight text-foreground">{title}</h1>
-          {description ? <p className="mt-1 text-sm text-muted-foreground">{description}</p> : null}
+        <div className="min-w-0 flex-1">
+          <h1 id={titleId} className="break-words text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
+            {title}
+          </h1>
+          {description ? <p className="mt-1 max-w-3xl text-sm leading-6 text-muted-foreground">{description}</p> : null}
         </div>
-        {actions ? <div className="flex shrink-0 flex-wrap items-center gap-2">{actions}</div> : null}
+        {actions ? <ResponsiveActions label={actionsLabel}>{actions}</ResponsiveActions> : null}
       </div>
-      {filters ? (
-        <div className="flex flex-col gap-2 rounded-lg border bg-card p-3 sm:flex-row sm:flex-wrap sm:items-end">
-          {filters}
-        </div>
-      ) : null}
-    </div>
+      {filters ? <ResponsiveToolbar label={filtersLabel}>{filters}</ResponsiveToolbar> : null}
+    </header>
   );
 }
 
