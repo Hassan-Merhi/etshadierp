@@ -105,7 +105,13 @@ Safety rules:
   - Added `scripts/verify-program8a-incomplete-workflows.mjs` to prevent new placeholders or mock workflows from entering without explicit classification.
   - Preserved all current behavior; implementation/removal decisions move to Program 8B where approval and exception semantics can be reviewed safely.
   - Final audit documented in `docs/program-8a-incomplete-workflow-audit.md`.
-- [ ] 8B — Approval and exception workflows
+- [x] 8B — Approval and exception workflows
+  - Documented the repository's distributed control model instead of introducing a speculative universal approval engine.
+  - Added seven control classes covering authorization, validation, preview/dry-run, explicit confirmation, transactional writes, audit trail, and replay protection.
+  - Classified seven critical/high-risk workflow families including vouchers, stock movements, factory repairs, container offloads, data imports, payroll adjustments, and locked-record exceptions.
+  - Added `scripts/program8b-approval-exception-baseline.json` and `scripts/verify-program8b-approval-exceptions.mjs` to protect the governance contract.
+  - Preserved all runtime permissions, posting, stock, costing, offload, payroll, and exception behavior.
+  - Final audit documented in `docs/program-8b-approval-exception-workflows.md`.
 - [ ] 8C — Reporting and traceability
 
 ## Current audit checkpoint
@@ -116,4 +122,4 @@ Existing performance work found:
 - HTML and dynamic API responses avoid stale caching.
 - Earlier heavy-API pagination and memory-stabilization scripts exist.
 
-Programs 6A, 6B, 6C, 6E, 6F, all Program 7 phases, and Program 8A are implementation-complete. Program 6D still requires real-checkout findings and database reconciliation evidence before behavior-changing query or index work can be marked complete. Programs 8B–8C remain unfinished.
+Programs 6A, 6B, 6C, 6E, 6F, all Program 7 phases, and Programs 8A–8B are implementation-complete. Program 6D still requires real-checkout findings and database reconciliation evidence before behavior-changing query or index work can be marked complete. Program 8C remains unfinished.
