@@ -1,11 +1,15 @@
+import { LoadingState } from "@/components/ui/page-state";
+
 interface AppLoadingStateProps {
   message?: string;
 }
 
-export function AppLoadingState({ message = "Loading..." }: AppLoadingStateProps) {
+export function AppLoadingState({ message = "Loading application" }: AppLoadingStateProps) {
   return (
-    <div className="flex items-center justify-center h-full">
-      <p className="text-muted-foreground">{message}</p>
-    </div>
+    <LoadingState
+      className="h-full min-h-64 border-0 bg-transparent"
+      title={message}
+      description="Preparing your workspace and latest company information."
+    />
   );
 }
