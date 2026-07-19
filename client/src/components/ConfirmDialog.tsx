@@ -13,15 +13,13 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
-import { AlertTriangle, type LucideIcon } from "lucide-react";
+import { AlertTriangle, Loader2, type LucideIcon } from "lucide-react";
 
 export type ConfirmDialogTone = "default" | "destructive" | "warning";
 
 export interface ConfirmDialogProps {
-  /** Controlled open state. If omitted you must pass `trigger`. */
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
-  /** If omitted you must use controlled `open`. */
   trigger?: React.ReactNode;
   title: string;
   description?: React.ReactNode;
@@ -29,26 +27,16 @@ export interface ConfirmDialogProps {
   cancelText?: string;
   tone?: ConfirmDialogTone;
   icon?: LucideIcon;
-  /** Optional confirmation phrase the user must type before Confirm enables. */
   requirePhrase?: string;
-  /** Optional second-step confirmation, e.g. for destructive actions. */
   doubleConfirm?: { title: string; description?: React.ReactNode; confirmText?: string };
   loading?: boolean;
-  /** When true, the primary confirm button is disabled (e.g. invalid form). */
   confirmDisabled?: boolean;
-  /** Children render below description (e.g. extra inputs). */
   children?: React.ReactNode;
   onConfirm: () => void | Promise<void>;
   onCancel?: () => void;
   "data-testid"?: string;
 }
 
-/**
- * ConfirmDialog — single canonical confirmation primitive. Replaces the
- * hand-rolled confirm/auth/override/draft dialogs scattered across the app.
- * Supports controlled or trigger-based use, optional double-confirm, and
- * optional "type-to-confirm" phrase for destructive flows.
- */
 export function ConfirmDialog({
   open: controlledOpen,
   onOpenChange,
@@ -71,9 +59,9 @@ export function ConfirmDialog({
   const isControlled = controlledOpen !== undefined;
   const [uncontrolledOpen, setUncontrolledOpen] = useState(false);
   const open = isControlled ? !!controlledOpen : uncontrolledOpen;
-  const setOpen = (v: boolean) => {
-    if (!isControlled) setUncontrolledOpen(v);
-    onOpenChange?.(v);
+  const setOpen = (value: boolean) => {
+    if (!isControlled) setUncontrolledOpen(value);
+    onOpenChange?.(value);
   };
 
   const [stage, setStage] = useState<1 | 2>(1);
@@ -91,10 +79,8 @@ export function ConfirmDialog({
   const isLoading = busy || !!externalLoading;
   const phraseMatches = !requirePhrase || phrase.trim() === requirePhrase.trim();
 
-  const handlePrimary = async (e: React.MouseEvent | React.SyntheticEvent) => {
-    // Radix's AlertDialogAction closes the dialog by default. Prevent that
-    // so we only close after async work / second-stage logic completes.
-    e.preventDefault();
+  const handlePrimary = async (event: React.MouseEvent | React.SyntheticEvent) => {
+    event.preventDefault();
     if (!phraseMatches || isLoading || confirmDisabled) return;
     if (doubleConfirm && stage === 1) {
       setStage(2);
@@ -110,18 +96,18 @@ export function ConfirmDialog({
   };
 
   const handleCancel = () => {
+    if (isLoading) return;
     onCancel?.();
     setOpen(false);
   };
 
   const ResolvedIcon = Icon ?? (tone === "destructive" || tone === "warning" ? AlertTriangle : null);
-
   const showSecond = doubleConfirm && stage === 2;
   const headerTitle = showSecond ? doubleConfirm!.title : title;
-  const headerDesc = showSecond ? doubleConfirm!.description : description;
+  const headerDescription = showSecond ? doubleConfirm!.description : description;
   const primaryLabel = showSecond ? (doubleConfirm!.confirmText ?? confirmText) : confirmText;
 
-  const destructiveBtn =
+  const primaryClassName =
     tone === "destructive" || showSecond
       ? "bg-destructive text-destructive-foreground hover:bg-destructive/90"
       : tone === "warning"
@@ -129,58 +115,81 @@ export function ConfirmDialog({
         : "";
 
   return (
-    <AlertDialog open={open} onOpenChange={setOpen}>
+    <AlertDialog open={open} onOpenChange={(nextOpen) => !isLoading && setOpen(nextOpen)}>
       {trigger && <AlertDialogTrigger asChild>{trigger}</AlertDialogTrigger>}
-      <AlertDialogContent data-testid={testId ?? "dialog-confirm"}>
-        <AlertDialogHeader>
-          <div className="flex items-start gap-3">
-            {ResolvedIcon && (
-              <div
-                className={cn(
-                  "flex h-9 w-9 items-center justify-center rounded-md shrink-0",
-                  tone === "destructive" && "bg-destructive-soft text-destructive",
-                  tone === "warning" && "bg-warning-soft text-warning-soft-foreground",
-                  tone === "default" && "bg-primary/10 text-primary"
+      <AlertDialogContent
+        data-testid={testId ?? "dialog-confirm"}
+        aria-busy={isLoading ? "true" : undefined}
+        className="max-h-[calc(100dvh-1rem)] w-[calc(100vw-1rem)] max-w-lg overflow-hidden p-0"
+      >
+        <div className="overflow-y-auto p-5 sm:p-6">
+          <AlertDialogHeader>
+            <div className="flex min-w-0 items-start gap-3">
+              {ResolvedIcon && (
+                <div
+                  className={cn(
+                    "flex h-9 w-9 shrink-0 items-center justify-center rounded-md",
+                    tone === "destructive" && "bg-destructive-soft text-destructive",
+                    tone === "warning" && "bg-warning-soft text-warning-soft-foreground",
+                    tone === "default" && "bg-primary/10 text-primary",
+                  )}
+                >
+                  <ResolvedIcon className="h-5 w-5" aria-hidden="true" />
+                </div>
+              )}
+              <div className="min-w-0 flex-1 text-left">
+                <AlertDialogTitle className="break-words">{headerTitle}</AlertDialogTitle>
+                {headerDescription && (
+                  <AlertDialogDescription className="mt-1 break-words leading-5">
+                    {headerDescription}
+                  </AlertDialogDescription>
                 )}
-              >
-                <ResolvedIcon className="h-5 w-5" />
               </div>
-            )}
-            <div className="min-w-0 flex-1">
-              <AlertDialogTitle>{headerTitle}</AlertDialogTitle>
-              {headerDesc && <AlertDialogDescription className="mt-1">{headerDesc}</AlertDialogDescription>}
             </div>
-          </div>
-        </AlertDialogHeader>
+          </AlertDialogHeader>
 
-        {!showSecond && children && <div className="space-y-3">{children}</div>}
+          {!showSecond && children && <div className="mt-4 min-w-0 space-y-3">{children}</div>}
 
-        {!showSecond && requirePhrase && (
-          <div className="space-y-2">
-            <Label htmlFor="confirm-phrase" className="text-xs">
-              Type <span className="font-mono font-semibold">{requirePhrase}</span> to confirm
-            </Label>
-            <Input
-              id="confirm-phrase"
-              value={phrase}
-              onChange={(e) => setPhrase(e.target.value)}
-              autoComplete="off"
-              data-testid="input-confirm-phrase"
-            />
-          </div>
-        )}
+          {!showSecond && requirePhrase && (
+            <div className="mt-4 space-y-2">
+              <Label htmlFor="confirm-phrase" className="text-xs">
+                Type <span className="font-mono font-semibold">{requirePhrase}</span> to confirm
+              </Label>
+              <Input
+                id="confirm-phrase"
+                value={phrase}
+                onChange={(event) => setPhrase(event.target.value)}
+                autoComplete="off"
+                disabled={isLoading}
+                data-testid="input-confirm-phrase"
+              />
+            </div>
+          )}
+        </div>
 
-        <AlertDialogFooter>
-          <AlertDialogCancel onClick={handleCancel} data-testid="button-confirm-cancel">
+        <AlertDialogFooter className="border-t bg-muted/20 p-4 sm:flex-row sm:justify-end sm:px-6">
+          <AlertDialogCancel
+            onClick={handleCancel}
+            disabled={isLoading}
+            className="w-full sm:w-auto"
+            data-testid="button-confirm-cancel"
+          >
             {cancelText}
           </AlertDialogCancel>
           <AlertDialogAction
             onClick={handlePrimary}
             disabled={isLoading || !phraseMatches || !!confirmDisabled}
             data-testid="button-confirm-confirm"
-            className={destructiveBtn}
+            className={cn("w-full sm:w-auto", primaryClassName)}
           >
-            {isLoading ? "Working..." : primaryLabel}
+            {isLoading ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin motion-reduce:animate-none" aria-hidden="true" />
+                Working...
+              </>
+            ) : (
+              primaryLabel
+            )}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
