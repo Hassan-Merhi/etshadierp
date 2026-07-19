@@ -5,6 +5,7 @@ const files = {
   responsive: "client/src/components/ui/responsive-accessibility.tsx",
   financial: "client/src/components/financial/financial-screen.tsx",
   operations: "client/src/components/operations/operations-screen.tsx",
+  dialog: "client/src/components/ui/dialog.tsx",
 };
 
 const sources = Object.fromEntries(
@@ -39,9 +40,31 @@ for (const [name, source] of [
   ["financial", sources.financial],
   ["operations", sources.operations],
 ]) {
-  for (const token of ["ResponsiveActions", "ResponsiveToolbar", "aria-labelledby", "React.useId()", "break-words"]) {
-    if (!source.includes(token)) failures.push(`${name} page header contract missing: ${token}`);
+  for (const token of [
+    "ResponsiveActions",
+    "ResponsiveToolbar",
+    "aria-labelledby",
+    "React.useId()",
+    "break-words",
+    "grid-cols-1",
+    "max-w-full",
+    "overflow-x-auto",
+    "overscroll-x-contain",
+  ]) {
+    if (!source.includes(token)) failures.push(`${name} responsive screen contract missing: ${token}`);
   }
+}
+
+for (const token of [
+  "100dvh",
+  "overflow-y-auto",
+  "overscroll-contain",
+  "min-h-10",
+  "min-w-10",
+  "motion-reduce:animate-none",
+  "[&>*]:w-full",
+]) {
+  if (!sources.dialog.includes(token)) failures.push(`Responsive dialog contract missing: ${token}`);
 }
 
 if (failures.length) {
