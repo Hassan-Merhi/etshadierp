@@ -2,15 +2,18 @@ import * as React from "react";
 import { PackageSearch, Warehouse, type LucideIcon } from "lucide-react";
 
 import { Card, CardContent } from "@/components/ui/card";
+import { ResponsiveActions, ResponsiveToolbar } from "@/components/ui/responsive-accessibility";
 import { cn } from "@/lib/utils";
 
-type OperationsScreenHeaderProps = React.HTMLAttributes<HTMLDivElement> & {
+type OperationsScreenHeaderProps = React.HTMLAttributes<HTMLElement> & {
   eyebrow?: string;
   title: string;
   description?: string;
   actions?: React.ReactNode;
   filters?: React.ReactNode;
   icon?: LucideIcon;
+  actionsLabel?: string;
+  filtersLabel?: string;
 };
 
 export function OperationsScreenHeader({
@@ -20,26 +23,32 @@ export function OperationsScreenHeader({
   actions,
   filters,
   icon: Icon = Warehouse,
+  actionsLabel = "Operations page actions",
+  filtersLabel = "Operations page filters",
   className,
   ...props
 }: OperationsScreenHeaderProps) {
+  const titleId = React.useId();
+
   return (
-    <section className={cn("space-y-4", className)} {...props}>
+    <header aria-labelledby={titleId} className={cn("space-y-4", className)} {...props}>
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-        <div className="flex min-w-0 gap-3">
-          <div className="mt-0.5 rounded-lg bg-[hsl(var(--module-factory)/0.12)] p-2 text-[hsl(var(--module-factory))]">
+        <div className="flex min-w-0 flex-1 gap-3">
+          <div className="mt-0.5 shrink-0 rounded-lg bg-[hsl(var(--module-factory)/0.12)] p-2 text-[hsl(var(--module-factory))]">
             <Icon className="h-5 w-5" aria-hidden="true" />
           </div>
-          <div className="min-w-0">
+          <div className="min-w-0 flex-1">
             {eyebrow ? <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{eyebrow}</p> : null}
-            <h1 className="text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">{title}</h1>
-            {description ? <p className="mt-1 max-w-3xl text-sm text-muted-foreground">{description}</p> : null}
+            <h1 id={titleId} className="break-words text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
+              {title}
+            </h1>
+            {description ? <p className="mt-1 max-w-3xl text-sm leading-6 text-muted-foreground">{description}</p> : null}
           </div>
         </div>
-        {actions ? <div className="flex flex-wrap items-center gap-2 lg:justify-end">{actions}</div> : null}
+        {actions ? <ResponsiveActions label={actionsLabel}>{actions}</ResponsiveActions> : null}
       </div>
-      {filters ? <div className="flex flex-col gap-3 rounded-lg border bg-card p-3 sm:flex-row sm:flex-wrap sm:items-end">{filters}</div> : null}
-    </section>
+      {filters ? <ResponsiveToolbar label={filtersLabel}>{filters}</ResponsiveToolbar> : null}
+    </header>
   );
 }
 
@@ -68,7 +77,7 @@ export function OperationsMetricCard({
           <div className="mt-1 break-words text-2xl font-semibold tabular-nums text-foreground">{value}</div>
           {detail ? <div className="mt-1 text-xs text-muted-foreground">{detail}</div> : null}
         </div>
-        <div className="rounded-md bg-muted p-2 text-muted-foreground">
+        <div className="shrink-0 rounded-md bg-muted p-2 text-muted-foreground">
           <Icon className="h-4 w-4" aria-hidden="true" />
         </div>
       </CardContent>
