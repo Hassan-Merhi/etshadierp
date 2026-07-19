@@ -98,7 +98,13 @@ Safety rules:
 
 ## Program 8 — Business functionality refinement
 
-- [ ] 8A — Incomplete workflow audit
+- [x] 8A — Incomplete workflow audit
+  - Reconciled the earlier no-op audit with current incomplete, dead, unreachable, structured-stub, and deterministic-mock workflow paths.
+  - Added `scripts/program8a-incomplete-workflow-baseline.json` with stable IDs, classifications, source markers, user impact, and follow-on ownership.
+  - Classified opening raw-stock manual import, supplier payment-edit dead prop, Accounts legacy dialogs, unsupported AI validation types, and Factory status mock-source values.
+  - Added `scripts/verify-program8a-incomplete-workflows.mjs` to prevent new placeholders or mock workflows from entering without explicit classification.
+  - Preserved all current behavior; implementation/removal decisions move to Program 8B where approval and exception semantics can be reviewed safely.
+  - Final audit documented in `docs/program-8a-incomplete-workflow-audit.md`.
 - [ ] 8B — Approval and exception workflows
 - [ ] 8C — Reporting and traceability
 
@@ -110,4 +116,4 @@ Existing performance work found:
 - HTML and dynamic API responses avoid stale caching.
 - Earlier heavy-API pagination and memory-stabilization scripts exist.
 
-Programs 6A, 6B, 6C, 6E, 6F, and all Program 7 phases are implementation-complete. Program 6D still requires real-checkout findings and database reconciliation evidence before behavior-changing query or index work can be marked complete. Programs 8A–8C remain unfinished.
+Programs 6A, 6B, 6C, 6E, 6F, all Program 7 phases, and Program 8A are implementation-complete. Program 6D still requires real-checkout findings and database reconciliation evidence before behavior-changing query or index work can be marked complete. Programs 8B–8C remain unfinished.
