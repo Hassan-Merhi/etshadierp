@@ -89,7 +89,12 @@ Safety rules:
   - Preserved all stock, valuation, costing, offload, mix-batch, allocation, relabeling, and transfer behavior through a presentation-only adoption boundary.
   - Added `scripts/verify-program7c-factory-inventory-screens.mjs` to protect the shared operational UI contract and business-logic boundary.
   - Final audit documented in `docs/program-7c-factory-inventory-screens.md`.
-- [ ] 7D — Accessibility and responsive behavior
+- [x] 7D — Accessibility and responsive behavior
+  - Added shared `SkipLink`, `ResponsiveActions`, `ResponsiveGrid`, `AccessibleRegion`, and `HorizontalScrollRegion` primitives.
+  - Standardized visible keyboard focus, labelled landmarks, keyboard-accessible wide-table scrolling, narrow-screen action stacking, and content-driven responsive grids.
+  - Preserved incremental adoption for workflow-heavy screens rather than performing a risky mechanical rewrite.
+  - Added `scripts/verify-program7d-accessibility-responsive.mjs` to protect accessibility and responsive contracts.
+  - Final audit documented in `docs/program-7d-accessibility-responsive.md`.
 
 ## Program 8 — Business functionality refinement
 
@@ -105,4 +110,4 @@ Existing performance work found:
 - HTML and dynamic API responses avoid stale caching.
 - Earlier heavy-API pagination and memory-stabilization scripts exist.
 
-Programs 6A, 6B, 6C, 6E, 6F, 7A, 7B, and 7C are implementation-complete. Program 6D still requires real-checkout findings and database reconciliation evidence before behavior-changing query or index work can be marked complete. Program 7D and Programs 8A–8C remain unfinished.
+Programs 6A, 6B, 6C, 6E, 6F, and all Program 7 phases are implementation-complete. Program 6D still requires real-checkout findings and database reconciliation evidence before behavior-changing query or index work can be marked complete. Programs 8A–8C remain unfinished.
