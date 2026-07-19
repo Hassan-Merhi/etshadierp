@@ -12,6 +12,7 @@ import { OfflineBanner } from "@/components/OfflineBanner";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { CommandPalette } from "@/components/CommandPalette";
 import { KeyboardShortcutsButton } from "@/components/KeyboardShortcuts";
+import { LoadingState } from "@/components/ui/page-state";
 import { Factory } from "lucide-react";
 import type { MyAccess } from "./factoryAccessGuard";
 
@@ -44,7 +45,7 @@ export function FactoryShell({
         <div ref={factoryContainerRef} className="flex h-full w-full">
           {selectedCompany?.id && <DailyRateModal companyId={selectedCompany.id} />}
           <FactorySidebar user={user} />
-          <div className="flex flex-col flex-1 overflow-hidden">
+          <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
             <AppTopBar
               accentColor="#f97316"
               user={user}
@@ -52,11 +53,11 @@ export function FactoryShell({
               onSearchOpen={() => setPaletteOpen(true)}
               showSearch={user?.role === "Admin" || user?.role === "Owner" || user?.role === "Developer"}
               leftContent={
-                <div className="flex items-center gap-2 px-2 py-1 rounded-md bg-orange-600/10 border border-orange-600/20">
-                  <Factory className="h-4 w-4 text-orange-600" />
-                  <span className="text-xs font-semibold text-orange-600 uppercase tracking-wider">Factory Mode</span>
+                <div className="flex items-center gap-2 rounded-md border border-orange-600/20 bg-orange-600/10 px-2 py-1">
+                  <Factory className="h-4 w-4 text-orange-600" aria-hidden="true" />
+                  <span className="text-xs font-semibold uppercase tracking-wider text-orange-600">Factory Mode</span>
                   {myAccess?.companyName && (
-                    <span className="hidden sm:inline text-xs text-orange-600/70 font-normal normal-case tracking-normal border-l border-orange-600/20 pl-2">
+                    <span className="hidden border-l border-orange-600/20 pl-2 text-xs font-normal normal-case tracking-normal text-orange-600/70 sm:inline">
                       {myAccess.companyName}
                     </span>
                   )}
@@ -65,14 +66,20 @@ export function FactoryShell({
               extraActions={<KeyboardShortcutsButton />}
             />
             <OfflineBanner />
-            <main className="flex-1 overflow-y-auto p-3 sm:p-6">
-              <div className="w-full">
+            <main
+              id="main-content"
+              tabIndex={-1}
+              aria-label="Factory and inventory workspace"
+              className="flex-1 overflow-y-auto overscroll-y-contain p-3 outline-none sm:p-6"
+            >
+              <div className="w-full min-w-0 max-w-full [&_form]:min-w-0 [&_table]:w-full [&_[role=table]]:w-full [&_.overflow-x-auto]:overscroll-x-contain">
                 <ErrorBoundary resetKey={currentLocation}>
                   <Suspense
                     fallback={
-                      <div className="flex items-center justify-center h-48 text-muted-foreground text-sm">
-                        Loading...
-                      </div>
+                      <LoadingState
+                        title="Loading factory workspace"
+                        description="Preparing the latest factory and inventory information."
+                      />
                     }
                   >
                     <FactoryRoutes
