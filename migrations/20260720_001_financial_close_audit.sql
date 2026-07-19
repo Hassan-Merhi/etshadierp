@@ -1,5 +1,3 @@
-BEGIN;
-
 CREATE TABLE IF NOT EXISTS financial_periods (
   id BIGSERIAL PRIMARY KEY,
   company_id INTEGER NOT NULL REFERENCES companies(id),
@@ -50,5 +48,3 @@ DROP TRIGGER IF EXISTS immutable_financial_audit_no_update ON immutable_financia
 CREATE TRIGGER immutable_financial_audit_no_update
 BEFORE UPDATE OR DELETE ON immutable_financial_audit_events
 FOR EACH ROW EXECUTE FUNCTION prevent_immutable_financial_audit_mutation();
-
-COMMIT;
