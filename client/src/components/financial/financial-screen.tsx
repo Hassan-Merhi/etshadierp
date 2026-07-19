@@ -1,0 +1,99 @@
+import * as React from "react";
+import { ArrowDownRight, ArrowUpRight, Minus } from "lucide-react";
+
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { cn } from "@/lib/utils";
+
+type FinancialScreenHeaderProps = React.HTMLAttributes<HTMLDivElement> & {
+  title: string;
+  description?: string;
+  actions?: React.ReactNode;
+  filters?: React.ReactNode;
+};
+
+export function FinancialScreenHeader({
+  title,
+  description,
+  actions,
+  filters,
+  className,
+  ...props
+}: FinancialScreenHeaderProps) {
+  return (
+    <div className={cn("space-y-4", className)} {...props}>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0">
+          <h1 className="text-2xl font-semibold tracking-tight text-foreground">{title}</h1>
+          {description ? <p className="mt-1 text-sm text-muted-foreground">{description}</p> : null}
+        </div>
+        {actions ? <div className="flex shrink-0 flex-wrap items-center gap-2">{actions}</div> : null}
+      </div>
+      {filters ? (
+        <div className="flex flex-col gap-2 rounded-lg border bg-card p-3 sm:flex-row sm:flex-wrap sm:items-end">
+          {filters}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+type FinancialSummaryCardProps = React.HTMLAttributes<HTMLDivElement> & {
+  label: string;
+  value: React.ReactNode;
+  description?: string;
+  trend?: "up" | "down" | "flat";
+  trendLabel?: string;
+  tone?: "default" | "success" | "warning" | "destructive" | "info";
+};
+
+const toneClasses = {
+  default: "text-foreground",
+  success: "text-success",
+  warning: "text-warning",
+  destructive: "text-destructive",
+  info: "text-info",
+} as const;
+
+export function FinancialSummaryCard({
+  label,
+  value,
+  description,
+  trend,
+  trendLabel,
+  tone = "default",
+  className,
+  ...props
+}: FinancialSummaryCardProps) {
+  const TrendIcon = trend === "up" ? ArrowUpRight : trend === "down" ? ArrowDownRight : Minus;
+  return (
+    <Card className={cn("min-w-0", className)} {...props}>
+      <CardHeader className="space-y-1 pb-2">
+        <CardDescription>{label}</CardDescription>
+        <CardTitle className={cn("break-words text-2xl font-semibold tabular-nums", toneClasses[tone])}>
+          {value}
+        </CardTitle>
+      </CardHeader>
+      {(description || trendLabel) ? (
+        <CardContent className="pt-0">
+          {trendLabel ? (
+            <div className="flex items-center gap-1 text-xs text-muted-foreground">
+              <TrendIcon className="h-3.5 w-3.5" aria-hidden="true" />
+              <span>{trendLabel}</span>
+            </div>
+          ) : null}
+          {description ? <p className="mt-1 text-xs text-muted-foreground">{description}</p> : null}
+        </CardContent>
+      ) : null}
+    </Card>
+  );
+}
+
+export function FinancialSummaryGrid({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
+  return <div className={cn("grid gap-3 sm:grid-cols-2 xl:grid-cols-4", className)} {...props} />;
+}
+
+export function FinancialTableShell({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
+  return <div className={cn("overflow-hidden rounded-lg border bg-card", className)} {...props} />;
+}
+
+export type { FinancialScreenHeaderProps, FinancialSummaryCardProps };

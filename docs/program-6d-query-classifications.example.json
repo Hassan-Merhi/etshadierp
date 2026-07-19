@@ -1,0 +1,39 @@
+{
+  "program": "6D",
+  "classifications": [
+    {
+      "id": "P6D-replace-with-finding-id",
+      "status": "deferred",
+      "rationale": "Explain why this finding cannot yet be safely classified or optimized.",
+      "blocker": "State the missing runtime evidence, query plan, data-volume evidence, or test coverage.",
+      "owner": "unassigned",
+      "reviewedAt": "YYYY-MM-DD"
+    }
+  ],
+  "statusValues": [
+    "verified-optimization",
+    "intentional-full-read",
+    "transaction-order-dependency",
+    "false-positive",
+    "deferred"
+  ],
+  "requiredEvidenceByStatus": {
+    "verified-optimization": [
+      "change",
+      "verification"
+    ],
+    "intentional-full-read": [
+      "maximumRows",
+      "boundingEvidence"
+    ],
+    "transaction-order-dependency": [
+      "orderingDependency"
+    ],
+    "false-positive": [
+      "falsePositiveReason"
+    ],
+    "deferred": [
+      "blocker"
+    ]
+  }
+}
