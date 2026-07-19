@@ -56,7 +56,7 @@ export function ResponsiveActions({ className, label = "Page actions", ...props 
       role="group"
       aria-label={label}
       className={cn(
-        "flex w-full flex-col-reverse gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:items-center sm:justify-end [&>*]:w-full sm:[&>*]:w-auto",
+        "flex w-full flex-col-reverse gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:items-center sm:justify-end [&>*]:min-h-10 [&>*]:w-full sm:[&>*]:w-auto",
         className,
       )}
       {...props}
@@ -74,7 +74,7 @@ export function ResponsiveToolbar({ className, label = "Page filters and tools",
       role="search"
       aria-label={label}
       className={cn(
-        "flex w-full flex-col gap-3 rounded-lg border bg-card p-3 sm:flex-row sm:flex-wrap sm:items-end [&>*]:min-w-0",
+        "flex w-full flex-col gap-3 rounded-lg border bg-card p-3 sm:flex-row sm:flex-wrap sm:items-end [&>*]:min-w-0 [&_button]:touch-manipulation",
         className,
       )}
       {...props}
@@ -89,7 +89,7 @@ type ResponsiveGridProps = React.HTMLAttributes<HTMLDivElement> & {
 export function ResponsiveGrid({ className, minColumnWidth = "16rem", style, ...props }: ResponsiveGridProps) {
   return (
     <div
-      className={cn("grid gap-4", className)}
+      className={cn("grid min-w-0 gap-4", className)}
       style={{ gridTemplateColumns: `repeat(auto-fit, minmax(min(100%, ${minColumnWidth}), 1fr))`, ...style }}
       {...props}
     />
@@ -127,7 +127,7 @@ export function HorizontalScrollRegion({
       aria-describedby={descriptionId}
       tabIndex={tabIndex}
       className={cn(
-        "max-w-full overflow-x-auto rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+        "max-w-full touch-pan-x overflow-x-auto overscroll-x-contain rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
         className,
       )}
       {...props}
