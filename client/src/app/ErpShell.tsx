@@ -14,9 +14,10 @@ import { ModuleIdentity } from "@/components/navigation/module-identity";
 import { LoadingState } from "@/components/ui/page-state";
 import { Router } from "@/routes/AppRoutes";
 import { BriefcaseBusiness } from "lucide-react";
+import { canUseAdminSearch, type ShellUser } from "./shellUser";
 
 interface ErpShellProps {
-  user: any;
+  user: ShellUser;
   hasErpAccess: boolean;
   handleLogout: () => void;
   leaveConfirmDialog: React.ReactNode;
@@ -27,6 +28,7 @@ export function ErpShell({ user, hasErpAccess, handleLogout, leaveConfirmDialog 
   const [currentLocation] = useLocation();
   const { selectedCompany } = useCompany();
   const style = { "--sidebar-width": "16rem", "--sidebar-width-icon": "3rem" };
+  const hasAdminSearch = canUseAdminSearch(user);
 
   return (
     <AppModeProvider mode="erp">
@@ -40,7 +42,7 @@ export function ErpShell({ user, hasErpAccess, handleLogout, leaveConfirmDialog 
               user={user}
               onLogout={handleLogout}
               onSearchOpen={() => setPaletteOpen(true)}
-              showSearch={user?.role === "Admin" || user?.role === "Owner" || user?.role === "Developer"}
+              showSearch={hasAdminSearch}
               leftContent={
                 <ModuleIdentity
                   compact
@@ -84,7 +86,7 @@ export function ErpShell({ user, hasErpAccess, handleLogout, leaveConfirmDialog 
         onOpenChange={setPaletteOpen}
         hasErpAccess={hasErpAccess}
         hasFactoryAccess={false}
-        isAdminOwner={user?.role === "Admin" || user?.role === "Owner" || user?.role === "Developer"}
+        isAdminOwner={hasAdminSearch}
         user={user}
       />
       {leaveConfirmDialog}
