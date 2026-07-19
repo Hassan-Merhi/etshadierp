@@ -8,17 +8,27 @@ const target = path.join(ROOT, "client/src/components/operations/operations-scre
 const source = await fs.readFile(target, "utf8");
 
 const required = [
+  "OperationsScreen",
   "OperationsScreenHeader",
+  "OperationsSectionHeading",
   "OperationsMetricCard",
   "OperationsMetricGrid",
+  "OperationsStatusStrip",
   "OperationsTableShell",
   "OperationsTableScroll",
+  "HorizontalScrollRegion",
+  "SkipLink",
+  'id="main-content"',
+  'role="status"',
+  'aria-atomic="true"',
   "--module-factory",
   "tabular-nums",
-  "overflow-x-auto",
   "sm:grid-cols-2",
   "xl:grid-cols-4",
   "sm:flex-row",
+  "text-success",
+  "text-warning",
+  "text-info",
 ];
 
 const missing = required.filter((token) => !source.includes(token));
