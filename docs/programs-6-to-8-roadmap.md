@@ -112,7 +112,13 @@ Safety rules:
   - Added `scripts/program8b-approval-exception-baseline.json` and `scripts/verify-program8b-approval-exceptions.mjs` to protect the governance contract.
   - Preserved all runtime permissions, posting, stock, costing, offload, payroll, and exception behavior.
   - Final audit documented in `docs/program-8b-approval-exception-workflows.md`.
-- [ ] 8C — Reporting and traceability
+- [x] 8C — Reporting and traceability
+  - Defined minimum stable identity, company scope, business-date, actor/source, lifecycle, and reference evidence for high-risk ERP records.
+  - Defined deterministic ordering, explicit date boundaries, company isolation, full-filter totals independent of pagination, server filtering for large datasets, and export parity.
+  - Classified accounting, inventory, factory costing, container, payroll, and administrative repair/import reporting families with explicit preservation contracts.
+  - Added `scripts/program8c-reporting-traceability-baseline.json` and `scripts/verify-program8c-reporting-traceability.mjs` to protect reporting scope and trace evidence.
+  - Preserved all accounting, inventory, costing, posting, export, and historical transaction behavior.
+  - Final audit documented in `docs/program-8c-reporting-traceability.md`.
 
 ## Current audit checkpoint
 
@@ -122,4 +128,4 @@ Existing performance work found:
 - HTML and dynamic API responses avoid stale caching.
 - Earlier heavy-API pagination and memory-stabilization scripts exist.
 
-Programs 6A, 6B, 6C, 6E, 6F, all Program 7 phases, and Programs 8A–8B are implementation-complete. Program 6D still requires real-checkout findings and database reconciliation evidence before behavior-changing query or index work can be marked complete. Program 8C remains unfinished.
+Programs 7A–7D and Programs 8A–8C are implementation-complete. Programs 6A, 6B, 6C, 6E, and 6F are also complete. Program 6D remains the only blocker: it requires real-checkout scanner classification, database reconciliation evidence, and production-like query plans before behavior-changing query or index work can be marked complete.
