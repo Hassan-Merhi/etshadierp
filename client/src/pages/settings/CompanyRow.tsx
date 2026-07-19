@@ -45,7 +45,7 @@ export function CompanyRow({
     <div className="rounded-md border p-3 space-y-3">
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <div className="flex items-center gap-2">
-          <Building2 className="h-3.5 w-3.5 text-muted-foreground" />
+          <Building2 aria-hidden="true" className="h-3.5 w-3.5 text-muted-foreground" />
           <span className="text-sm font-medium">{company.companyName}</span>
         </div>
         {groupChatId ? (
@@ -86,16 +86,17 @@ export function CompanyRow({
               setShowGroupPicker(true);
             }}
             disabled={chatsLoading || !hasCredentials}
+            aria-busy={chatsLoading}
             data-testid={`button-load-transfer-wa-chats-${company.companyId}`}
           >
             {chatsLoading ? (
               <>
-                <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />
+                <Loader2 aria-hidden="true" className="h-3.5 w-3.5 animate-spin mr-1.5" />
                 Loading groups…
               </>
             ) : (
               <>
-                <Users className="h-3.5 w-3.5 mr-1.5" />
+                <Users aria-hidden="true" className="h-3.5 w-3.5 mr-1.5" />
                 {groupChatId ? "Change Group" : "Select Group"}
               </>
             )}
@@ -136,9 +137,10 @@ export function CompanyRow({
           size="sm"
           onClick={() => onSave(company.companyId, groupChatId)}
           disabled={isSaving}
+          aria-busy={isSaving}
           data-testid={`button-save-transfer-wa-${company.companyId}`}
         >
-          {isSaving && <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />}
+          {isSaving && <Loader2 aria-hidden="true" className="h-3.5 w-3.5 animate-spin mr-1.5" />}
           Save
         </Button>
       )}
@@ -149,9 +151,10 @@ export function CompanyRow({
           variant="outline"
           onClick={() => onSave(company.companyId, groupChatId)}
           disabled={isSaving}
+          aria-busy={isSaving}
           data-testid={`button-save-transfer-wa-${company.companyId}`}
         >
-          {isSaving && <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />}
+          {isSaving && <Loader2 aria-hidden="true" className="h-3.5 w-3.5 animate-spin mr-1.5" />}
           Save
         </Button>
       )}
