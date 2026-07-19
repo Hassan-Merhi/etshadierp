@@ -39,6 +39,19 @@ interface PosShellProps {
   leaveConfirmDialog: React.ReactNode;
 }
 
+const posWorkspaceClasses = [
+  "[&_button]:touch-manipulation",
+  "[&_input]:min-h-10",
+  "[&_select]:min-h-10",
+  "[&_textarea]:min-h-20",
+  "[&_table]:min-w-max",
+  "[&_th]:whitespace-nowrap",
+  "[&_td]:align-middle",
+  "[&_[role=dialog]]:max-w-[calc(100vw-1rem)]",
+  "[&_[role=listbox]]:max-h-[min(24rem,70dvh)]",
+  "[&_.tabular-nums]:font-variant-numeric-tabular-nums",
+].join(" ");
+
 export function PosShell({
   user,
   posImportEnabled,
@@ -157,10 +170,13 @@ export function PosShell({
             <main
               id="main-content"
               aria-label="Point of sale workspace"
+              data-pos-workspace="true"
               className={
-                isFullHeightRoute
-                  ? "flex-1 min-w-0 overflow-hidden overscroll-contain"
-                  : "flex-1 min-w-0 overflow-x-hidden overflow-y-auto overscroll-contain p-3 sm:p-6"
+                `${posWorkspaceClasses} ${
+                  isFullHeightRoute
+                    ? "flex-1 min-w-0 overflow-hidden overscroll-contain"
+                    : "flex-1 min-w-0 overflow-x-hidden overflow-y-auto overscroll-contain p-3 sm:p-6"
+                }`
               }
             >
               <div className={isFullHeightRoute ? "h-full min-w-0" : "w-full min-w-0"}>
