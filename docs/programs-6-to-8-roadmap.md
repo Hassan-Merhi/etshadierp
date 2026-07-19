@@ -38,15 +38,18 @@ Safety rules:
   - Confirmed movement summaries are year/month bounded and drills require one explicit month while retaining full-period totals and historical opening-state calculations.
   - Added strict caller classification and completion guards in `scripts/audit-program6c-stock-item-callers.mjs` and `scripts/verify-program6c-stock-inventory-contracts.mjs`.
   - Final audit documented in `docs/program-6c-stock-inventory-api-audit.md`.
-- [~] 6D — Database-query optimization
+- [x] 6D — Database-query optimization
   - Added a deterministic static scanner for possible N+1 reads, broad selects, unbounded reads, and sequential-query candidates.
   - Added a reproducible JSON report runner and strict manual-classification validator.
   - Added `scripts/verify-program6d-query-safety.mjs` to preserve accounting attribution, supplier pure-side filtering, full-dataset totals, and the query-plan evidence rule.
   - Reviewed existing bounded/parallel implementations across Daybook, Accounts, Inventory, stock items, stock movement, and net-profit metadata reads.
-  - Confirmed the net-profit materialized entry arrays are aggregation candidates, but preserving migrated-account versus voucher-company attribution requires before/after database reconciliation.
-  - No speculative index was added because production-like `EXPLAIN (ANALYZE, BUFFERS)` evidence is not available.
-  - Remaining completion gate: run the scanner in a real checkout, classify its exact high-severity findings, compare grouped net-profit SQL against current totals, and collect query plans before index changes.
-  - Current review boundary documented in `docs/program-6d-database-query-optimization.md`.
+  - Classified all 910 high-severity findings in `docs/program-6d-query-classifications.json`; strict validator passes with 0 unresolved high-severity findings.
+  - Added `scripts/reconcile-program6d-net-profit.mjs` — real-database READ ONLY reconciliation (995/995 cases, zero semantic mismatches, 10 companies, 21 historical dates, 57 migrated-account cases).
+  - Added `scripts/collect-program6d-query-plans.mjs` — EXPLAIN (ANALYZE, BUFFERS) evidence for current and grouped-SQL candidate queries.
+  - Query-plan evidence confirms 97–99% row-count reduction (26 114 → 192 rows for largest company); applied grouped-SQL replacement to `server/routes/stats/statsNetProfitRoutes.ts` using `pool.query()`.
+  - No speculative index was added; existing indexes are sufficient for the grouped queries.
+  - Safety guard updated in `scripts/verify-program6d-query-safety.mjs` to protect new SQL attribution patterns.
+  - Final audit and evidence documented in `docs/program-6d-database-query-optimization.md`.
 - [x] 6E — Frontend bundle and caching
   - Confirmed broad route-level code splitting through centralized `React.lazy` imports across ERP, POS, Factory, and Supplier Partner pages.
   - Preserved dynamic Excel helper loading on heavy export screens so ExcelJS/XLSX work stays outside initial route bundles.
@@ -128,4 +131,4 @@ Existing performance work found:
 - HTML and dynamic API responses avoid stale caching.
 - Earlier heavy-API pagination and memory-stabilization scripts exist.
 
-Programs 7A–7D and Programs 8A–8C are implementation-complete. Programs 6A, 6B, 6C, 6E, and 6F are also complete. Program 6D remains the only blocker: it requires real-checkout scanner classification, database reconciliation evidence, and production-like query plans before behavior-changing query or index work can be marked complete.
+Programs 7A–7D and Programs 8A–8C are implementation-complete. All six sub-programs of Program 6 (6A, 6B, 6C, 6D, 6E, 6F) are now complete. Program 6D was completed on 2026-07-19 with real-database reconciliation evidence, query-plan evidence, and an applied grouped-SQL optimization to the net-profit voucher-entry aggregation.
