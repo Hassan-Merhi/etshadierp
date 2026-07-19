@@ -1,5 +1,5 @@
 import * as React from "react";
-import { AlertTriangle, CheckCircle2, Info, Loader2, XCircle, type LucideIcon } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Info, Loader2, RotateCcw, ShieldAlert, XCircle, type LucideIcon } from "lucide-react";
 
 import { Button, type ButtonProps } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -14,6 +14,7 @@ type ActionFeedbackProps = React.HTMLAttributes<HTMLDivElement> & {
   onAction?: () => void;
   actionVariant?: ButtonProps["variant"];
   compact?: boolean;
+  icon?: LucideIcon;
 };
 
 const toneConfig: Record<ActionFeedbackTone, { icon: LucideIcon; className: string; role: "status" | "alert"; live: "polite" | "assertive" }> = {
@@ -32,11 +33,12 @@ export function ActionFeedback({
   onAction,
   actionVariant = "outline",
   compact = false,
+  icon,
   className,
   ...props
 }: ActionFeedbackProps) {
   const config = toneConfig[tone];
-  const Icon = config.icon;
+  const Icon = icon ?? config.icon;
 
   return (
     <div
@@ -45,23 +47,25 @@ export function ActionFeedback({
       aria-atomic="true"
       aria-busy={tone === "progress" ? "true" : undefined}
       className={cn(
-        "flex min-w-0 items-start gap-3 rounded-lg border",
+        "flex min-w-0 flex-col gap-3 rounded-lg border sm:flex-row sm:items-start",
         compact ? "px-3 py-2" : "p-4",
         config.className,
         className,
       )}
       {...props}
     >
-      <Icon
-        className={cn("mt-0.5 h-5 w-5 shrink-0", tone === "progress" && "animate-spin motion-reduce:animate-none")}
-        aria-hidden="true"
-      />
-      <div className="min-w-0 flex-1 text-foreground">
-        <p className="break-words text-sm font-semibold">{title}</p>
-        {description ? <p className="mt-0.5 break-words text-sm leading-5 text-muted-foreground">{description}</p> : null}
+      <div className="flex min-w-0 flex-1 items-start gap-3">
+        <Icon
+          className={cn("mt-0.5 h-5 w-5 shrink-0", tone === "progress" && "animate-spin motion-reduce:animate-none")}
+          aria-hidden="true"
+        />
+        <div className="min-w-0 flex-1 text-foreground">
+          <p className="break-words text-sm font-semibold">{title}</p>
+          {description ? <p className="mt-0.5 break-words text-sm leading-5 text-muted-foreground">{description}</p> : null}
+        </div>
       </div>
       {actionLabel && onAction ? (
-        <Button className="shrink-0" size={compact ? "sm" : "default"} variant={actionVariant} onClick={onAction}>
+        <Button className="w-full shrink-0 sm:w-auto" size={compact ? "sm" : "default"} variant={actionVariant} onClick={onAction}>
           {actionLabel}
         </Button>
       ) : null}
@@ -83,6 +87,14 @@ export function WarningFeedback(props: Omit<ActionFeedbackProps, "tone">) {
 
 export function ErrorFeedback(props: Omit<ActionFeedbackProps, "tone">) {
   return <ActionFeedback tone="error" {...props} />;
+}
+
+export function RecoveryFeedback(props: Omit<ActionFeedbackProps, "tone" | "icon">) {
+  return <ActionFeedback tone="warning" icon={RotateCcw} actionVariant="outline" {...props} />;
+}
+
+export function ConfirmationFeedback(props: Omit<ActionFeedbackProps, "tone" | "icon">) {
+  return <ActionFeedback tone="warning" icon={ShieldAlert} actionVariant="destructive" {...props} />;
 }
 
 export type { ActionFeedbackProps, ActionFeedbackTone };
