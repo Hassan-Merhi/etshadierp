@@ -24,7 +24,6 @@ export function registerStockLightRoutes(app: Express) {
           id: stockItems.id,
           code: stockItems.code,
           name: stockItems.name,
-          barcode: stockItems.barcode,
           uom: stockItems.uom,
           active: stockItems.active,
           stockGroupId: stockItems.stockGroupId,
@@ -37,7 +36,11 @@ export function registerStockLightRoutes(app: Express) {
 
       return res.json(rows);
     } catch (error: any) {
-      return res.status(500).json({ message: error.message });
+      console.error("[stock-items/light] Failed to load lightweight stock items", {
+        companyId: req.session?.currentCompanyId || req.session?.factoryCompanyId || null,
+        error: error?.message || String(error),
+      });
+      return res.status(500).json({ message: "Failed to load stock items" });
     }
   });
 }
