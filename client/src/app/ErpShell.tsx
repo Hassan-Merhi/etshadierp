@@ -10,8 +10,10 @@ import { OfflineBanner } from "@/components/OfflineBanner";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { CommandPalette } from "@/components/CommandPalette";
 import { KeyboardShortcutsButton } from "@/components/KeyboardShortcuts";
+import { ModuleIdentity } from "@/components/navigation/module-identity";
 import { LoadingState } from "@/components/ui/page-state";
 import { Router } from "@/routes/AppRoutes";
+import { BriefcaseBusiness } from "lucide-react";
 
 interface ErpShellProps {
   user: any;
@@ -29,16 +31,27 @@ export function ErpShell({ user, hasErpAccess, handleLogout, leaveConfirmDialog 
   return (
     <AppModeProvider mode="erp">
       <SidebarProvider style={style as React.CSSProperties}>
-        <div className="flex h-full w-full">
+        <div className="flex h-full w-full min-w-0 overflow-hidden">
           {selectedCompany?.id && <DailyRateModal companyId={selectedCompany.id} />}
           <AppSidebar user={user} />
           <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
             <AppTopBar
-              accentColor="#3b82f6"
+              accentColor="hsl(var(--primary))"
               user={user}
               onLogout={handleLogout}
               onSearchOpen={() => setPaletteOpen(true)}
               showSearch={user?.role === "Admin" || user?.role === "Owner" || user?.role === "Developer"}
+              leftContent={
+                <ModuleIdentity
+                  compact
+                  moduleName="ERP"
+                  description="Finance, inventory, sales, and operations"
+                  companyName={selectedCompany?.name}
+                  icon={BriefcaseBusiness}
+                  tone="erp"
+                  className="hidden max-w-sm border-0 bg-transparent p-0 shadow-none sm:block"
+                />
+              }
               extraActions={<KeyboardShortcutsButton />}
             />
             <OfflineBanner />
