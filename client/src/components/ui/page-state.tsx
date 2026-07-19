@@ -1,5 +1,5 @@
 import * as React from "react";
-import { AlertCircle, Inbox, Loader2, type LucideIcon } from "lucide-react";
+import { AlertCircle, CheckCircle2, Inbox, Loader2, type LucideIcon } from "lucide-react";
 
 import { Button, type ButtonProps } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -45,7 +45,7 @@ const PageState = React.forwardRef<HTMLDivElement, PageStateProps>(
       <h3 className="text-base font-semibold text-foreground">{title}</h3>
       {description ? <p className="mt-1 max-w-md text-sm text-muted-foreground">{description}</p> : null}
       {actionLabel && onAction ? (
-        <Button className="mt-4" variant={actionVariant} onClick={onAction}>
+        <Button type="button" className="mt-4" variant={actionVariant} onClick={onAction}>
           {actionLabel}
         </Button>
       ) : null}
@@ -88,6 +88,22 @@ export function ErrorState({
       description={description}
       role="alert"
       aria-live="assertive"
+      {...props}
+    />
+  );
+}
+
+export function SuccessState({
+  title = "Completed successfully",
+  description = "Your changes have been saved.",
+  ...props
+}: Omit<PageStateProps, "icon" | "title"> & { title?: string }) {
+  return (
+    <PageState
+      icon={CheckCircle2}
+      title={title}
+      description={description}
+      aria-live="polite"
       {...props}
     />
   );

@@ -1,36 +1,49 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { assertRequestCompanyMatchesSession } from "../server/services/security/companyIsolationPolicy";
+import { resolveRequestCompanyId } from "../server/services/security/requestCompanyScope";
 
 const routeSource = readFileSync(
   new URL("../server/routes/factory/factoryInsuranceRoutes.ts", import.meta.url),
-  "utf8"
+  "utf8",
 );
 
 describe("factory insurance company isolation", () => {
-  const actor = { userId: 1, role: "Admin", companyId: 10 };
+  const request = {
+    session: { userId: 1, currentRole: "Admin", factoryCompanyId: 10 },
+    body: {},
+    query: {},
+  };
 
   it("accepts the active session company", () => {
-    expect(() => assertRequestCompanyMatchesSession(actor, 10)).not.toThrow();
+    expect(resolveRequestCompanyId(request)).toBe(10);
   });
 
   it("denies a request-supplied cross-company id even for Admin", () => {
-    expect(() => assertRequestCompanyMatchesSession(actor, 11)).toThrowError(/Not found|Forbidden/);
+    expect(() => resolveRequestCompanyId({ ...request, body: { companyId: 11 } })).toThrowError();
   });
 
-  it("uses the canonical company-isolation policy in the production route", () => {
-    expect(routeSource).toContain("assertRequestCompanyMatchesSession");
+  it("uses the shared request company scope in the production route", () => {
+    expect(routeSource).toContain('from "../../services/security/requestCompanyScope"');
     expect(routeSource).toContain("resolveRequestCompanyId(req)");
+    expect(routeSource).not.toContain("function getFactoryCompanyId");
+    expect(routeSource).not.toContain("function resolveRequestCompanyId");
   });
 
   it("does not select the operating company directly from request data", () => {
-    expect(routeSource).not.toContain("req.body.companyId || getFactoryCompanyId(req)");
-    expect(routeSource).not.toContain("req.query.companyId\n        ? parseInt");
+    expect(routeSource).not.toContain("req.body.companyId ||");
+    expect(routeSource).not.toContain("req.query.companyId ?");
   });
 
   it("keeps reads, writes, toggles, deletion, and generation scoped", () => {
     expect(routeSource.match(/resolveRequestCompanyId\(req\)/g)?.length ?? 0).toBeGreaterThanOrEqual(6);
     expect(routeSource).toContain("eq(insuranceMembers.companyId, companyId)");
     expect(routeSource).toContain("eq(vouchers.companyId, companyId)");
+  });
+
+  it("routes insurance voucher creation through the central posting service", () => {
+    expect(routeSource).toContain("insertVoucherWithEntriesTx");
+    expect(routeSource).toContain('sourceModule: "ERP"');
+    expect(routeSource).not.toContain("tx.insert(vouchers)");
+    expect(routeSource).not.toContain("tx.insert(voucherEntries)");
   });
 });

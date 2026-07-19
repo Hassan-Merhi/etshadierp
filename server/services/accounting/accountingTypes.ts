@@ -18,6 +18,7 @@ export interface VoucherInsertFields {
   optional?: boolean;
   currency?: string | null;
   exchangeRate?: string | null;
+  sourceModule?: string | null;
 }
 
 /** Minimal shape needed to insert a voucher entry row. */
@@ -35,7 +36,7 @@ export interface VoucherEntryInsertFields {
 }
 
 /** Shape returned by insertVoucherWithEntriesTx. */
-export interface VoucherWithEntries<V = any, E = any> {
+export interface VoucherWithEntries<V = unknown, E = unknown> {
   voucher: V;
   entries: E[];
 }
