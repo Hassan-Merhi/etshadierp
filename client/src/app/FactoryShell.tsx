@@ -16,9 +16,10 @@ import { ModuleIdentity } from "@/components/navigation/module-identity";
 import { LoadingState } from "@/components/ui/page-state";
 import { Factory } from "lucide-react";
 import type { MyAccess } from "./factoryAccessGuard";
+import { canUseAdminSearch, type ShellUser } from "./shellUser";
 
 interface FactoryShellProps {
-  user: any;
+  user: ShellUser;
   myAccess: MyAccess | undefined;
   factoryDefaultPage: string;
   handleLogout: () => void;
@@ -51,6 +52,7 @@ export function FactoryShell({
 
   const style = { "--sidebar-width": "16rem", "--sidebar-width-icon": "3rem" };
   const isFactoryPosRoute = currentLocation === "/factory/pos" || currentLocation.startsWith("/factory/pos?");
+  const hasAdminSearch = canUseAdminSearch(user);
 
   return (
     <AppModeProvider mode="factory">
@@ -64,7 +66,7 @@ export function FactoryShell({
               user={user}
               onLogout={handleLogout}
               onSearchOpen={() => setPaletteOpen(true)}
-              showSearch={user?.role === "Admin" || user?.role === "Owner" || user?.role === "Developer"}
+              showSearch={hasAdminSearch}
               leftContent={
                 <ModuleIdentity
                   compact
@@ -119,7 +121,7 @@ export function FactoryShell({
         onOpenChange={setPaletteOpen}
         hasErpAccess={false}
         hasFactoryAccess={true}
-        isAdminOwner={user?.role === "Admin" || user?.role === "Owner" || user?.role === "Developer"}
+        isAdminOwner={hasAdminSearch}
         user={user}
       />
       {leaveConfirmDialog}
