@@ -18,6 +18,34 @@ export function SkipLink({ className, children = "Skip to main content", href = 
   );
 }
 
+type VisuallyHiddenProps = React.HTMLAttributes<HTMLSpanElement>;
+
+export function VisuallyHidden({ className, ...props }: VisuallyHiddenProps) {
+  return <span className={cn("sr-only", className)} {...props} />;
+}
+
+type LiveRegionProps = React.HTMLAttributes<HTMLDivElement> & {
+  politeness?: "polite" | "assertive";
+  atomic?: boolean;
+};
+
+export function LiveRegion({
+  className,
+  politeness = "polite",
+  atomic = true,
+  ...props
+}: LiveRegionProps) {
+  return (
+    <div
+      role={politeness === "assertive" ? "alert" : "status"}
+      aria-live={politeness}
+      aria-atomic={atomic}
+      className={cn("sr-only", className)}
+      {...props}
+    />
+  );
+}
+
 type ResponsiveActionsProps = React.HTMLAttributes<HTMLDivElement> & {
   label?: string;
 };
@@ -79,19 +107,33 @@ export function AccessibleRegion({ label, as: Comp = "section", className, ...pr
 
 type HorizontalScrollRegionProps = React.HTMLAttributes<HTMLDivElement> & {
   label: string;
+  description?: string;
 };
 
-export function HorizontalScrollRegion({ label, className, tabIndex = 0, ...props }: HorizontalScrollRegionProps) {
+export function HorizontalScrollRegion({
+  label,
+  description = "Scroll horizontally to view additional columns.",
+  className,
+  tabIndex = 0,
+  children,
+  ...props
+}: HorizontalScrollRegionProps) {
+  const descriptionId = React.useId();
+
   return (
     <div
       role="region"
       aria-label={label}
+      aria-describedby={descriptionId}
       tabIndex={tabIndex}
       className={cn(
         "max-w-full overflow-x-auto rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
         className,
       )}
       {...props}
-    />
+    >
+      <VisuallyHidden id={descriptionId}>{description}</VisuallyHidden>
+      {children}
+    </div>
   );
 }
