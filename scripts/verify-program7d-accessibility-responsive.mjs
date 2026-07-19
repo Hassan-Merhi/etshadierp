@@ -16,6 +16,8 @@ const failures = [];
 
 for (const token of [
   "SkipLink",
+  "VisuallyHidden",
+  "LiveRegion",
   "ResponsiveActions",
   "ResponsiveToolbar",
   "ResponsiveGrid",
@@ -24,6 +26,9 @@ for (const token of [
   "focus-visible:ring-2",
   "focus:ring-offset-2",
   "aria-label",
+  "aria-live",
+  "aria-atomic",
+  "aria-describedby",
   'role="region"',
   'role="search"',
   'role="group"',
@@ -62,9 +67,12 @@ for (const token of [
   "min-h-10",
   "min-w-10",
   "motion-reduce:animate-none",
+  "motion-reduce:transition-none",
+  "aria-label=\"Close dialog\"",
+  "VisuallyHidden",
   "[&>*]:w-full",
 ]) {
-  if (!sources.dialog.includes(token)) failures.push(`Responsive dialog contract missing: ${token}`);
+  if (!sources.dialog.includes(token)) failures.push(`Accessible dialog contract missing: ${token}`);
 }
 
 if (failures.length) {
