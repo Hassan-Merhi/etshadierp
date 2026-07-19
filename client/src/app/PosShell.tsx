@@ -22,12 +22,13 @@ import { OfflineBanner } from "@/components/OfflineBanner";
 import { PendingSyncIndicator } from "@/components/PendingSyncIndicator";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { CommandPalette } from "@/components/CommandPalette";
+import { ModuleIdentity } from "@/components/navigation/module-identity";
 import { Router } from "@/routes/AppRoutes";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { LoadingState } from "@/components/ui/page-state";
 import { SkipLink } from "@/components/ui/responsive-accessibility";
-import { ArrowLeft, LogOut, Search } from "lucide-react";
+import { ArrowLeft, LogOut, Search, ShoppingCart } from "lucide-react";
 import { usePosNavigationItems } from "./usePosNavigationItems";
 
 interface PosShellProps {
@@ -76,7 +77,7 @@ export function PosShell({
         <div className="flex h-full w-full min-w-0 overflow-hidden">
           {selectedCompany?.id && <DailyRateModal companyId={selectedCompany.id} />}
           <Sidebar>
-            <SidebarHeader className="border-b p-3">
+            <SidebarHeader className="space-y-2 border-b p-3">
               <div className="flex items-center gap-2">
                 <Button
                   variant="ghost"
@@ -87,7 +88,14 @@ export function PosShell({
                 >
                   <ArrowLeft className="h-4 w-4" aria-hidden="true" />
                 </Button>
-                <span className="truncate text-sm font-semibold">POS {user.posStation || ""}</span>
+                <ModuleIdentity
+                  compact
+                  moduleName={user.posStation ? `POS ${user.posStation}` : "POS"}
+                  companyName={selectedCompany?.name}
+                  icon={ShoppingCart}
+                  tone="pos"
+                  className="min-w-0 flex-1 border-0 bg-transparent p-0 shadow-none"
+                />
               </div>
             </SidebarHeader>
             <SidebarContent>
@@ -171,13 +179,11 @@ export function PosShell({
               id="main-content"
               aria-label="Point of sale workspace"
               data-pos-workspace="true"
-              className={
-                `${posWorkspaceClasses} ${
-                  isFullHeightRoute
-                    ? "flex-1 min-w-0 overflow-hidden overscroll-contain"
-                    : "flex-1 min-w-0 overflow-x-hidden overflow-y-auto overscroll-contain p-3 sm:p-6"
-                }`
-              }
+              className={`${posWorkspaceClasses} ${
+                isFullHeightRoute
+                  ? "flex-1 min-w-0 overflow-hidden overscroll-contain"
+                  : "flex-1 min-w-0 overflow-x-hidden overflow-y-auto overscroll-contain p-3 sm:p-6"
+              }`}
             >
               <div className={isFullHeightRoute ? "h-full min-w-0" : "w-full min-w-0"}>
                 <ErrorBoundary resetKey={currentLocation}>
