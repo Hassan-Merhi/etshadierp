@@ -30,9 +30,10 @@ import { LoadingState } from "@/components/ui/page-state";
 import { SkipLink } from "@/components/ui/responsive-accessibility";
 import { ArrowLeft, LogOut, Search, ShoppingCart } from "lucide-react";
 import { usePosNavigationItems } from "./usePosNavigationItems";
+import { canUseAdminSearch, type ShellUser } from "./shellUser";
 
 interface PosShellProps {
-  user: any;
+  user: ShellUser;
   posImportEnabled: boolean;
   chatUnread: { count: number } | undefined;
   handleGoBack: () => void;
@@ -69,6 +70,7 @@ export function PosShell({
   const posStyle = { "--sidebar-width": "11rem", "--sidebar-width-icon": "3rem" };
   const isPosRoute = currentLocation === "/pos" || currentLocation.startsWith("/pos/");
   const isFullHeightRoute = isPosRoute || currentLocation === "/tracking" || currentLocation === "/";
+  const hasAdminSearch = canUseAdminSearch(user);
 
   return (
     <>
@@ -146,7 +148,7 @@ export function PosShell({
               <SidebarTrigger aria-label="Toggle point of sale navigation" data-testid="button-sidebar-toggle" />
               <div className="ml-auto flex min-w-0 items-center gap-2">
                 <PendingSyncIndicator />
-                {(user?.role === "Admin" || user?.role === "Owner" || user?.role === "Developer") && (
+                {hasAdminSearch && (
                   <Button
                     variant="ghost"
                     size="sm"
