@@ -10,6 +10,7 @@ import { OfflineBanner } from "@/components/OfflineBanner";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { CommandPalette } from "@/components/CommandPalette";
 import { KeyboardShortcutsButton } from "@/components/KeyboardShortcuts";
+import { LoadingState } from "@/components/ui/page-state";
 import { Router } from "@/routes/AppRoutes";
 
 interface ErpShellProps {
@@ -31,7 +32,7 @@ export function ErpShell({ user, hasErpAccess, handleLogout, leaveConfirmDialog 
         <div className="flex h-full w-full">
           {selectedCompany?.id && <DailyRateModal companyId={selectedCompany.id} />}
           <AppSidebar user={user} />
-          <div className="flex flex-col flex-1 overflow-hidden">
+          <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
             <AppTopBar
               accentColor="#3b82f6"
               user={user}
@@ -41,14 +42,20 @@ export function ErpShell({ user, hasErpAccess, handleLogout, leaveConfirmDialog 
               extraActions={<KeyboardShortcutsButton />}
             />
             <OfflineBanner />
-            <main className="flex-1 overflow-y-auto p-3 sm:p-6">
-              <div className="w-full">
+            <main
+              id="main-content"
+              tabIndex={-1}
+              aria-label="ERP workspace"
+              className="flex-1 overflow-y-auto overscroll-y-contain p-3 outline-none sm:p-6"
+            >
+              <div className="w-full min-w-0 max-w-full [&_form]:min-w-0 [&_table]:w-full [&_[role=table]]:w-full [&_.overflow-x-auto]:overscroll-x-contain">
                 <ErrorBoundary resetKey={currentLocation}>
                   <Suspense
                     fallback={
-                      <div className="flex items-center justify-center h-48 text-muted-foreground text-sm">
-                        Loading...
-                      </div>
+                      <LoadingState
+                        title="Loading workspace"
+                        description="Preparing the latest ERP information."
+                      />
                     }
                   >
                     <Router user={user} />
