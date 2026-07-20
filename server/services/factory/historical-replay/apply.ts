@@ -12,10 +12,13 @@ import {
   buildHistoricalReplayScopeInternal,
   buildNotFinalizedClause,
   captureReplaySnapshot,
-  computeReplayFingerprint,
   normalizeReplayWriteScope,
   replayWriteScopesEqual,
 } from "./selectedScope";
+import {
+  computeReplayFingerprint,
+  loadReplayAuthoritativeInputDigest,
+} from "./fingerprint";
 
 export async function applyHistoricalCostReplay(
   params: ReplayApplyParams & {
@@ -61,6 +64,7 @@ export async function applyHistoricalCostReplay(
   const executor = client as unknown as ReplayQueryExecutor;
   try {
     await client.query("BEGIN");
+    await client.query("SET TRANSACTION ISOLATION LEVEL SERIALIZABLE");
     await client.query(`SELECT pg_advisory_xact_lock(9003, $1)`, [companyId]);
 
     const scope = await buildHistoricalReplayScopeInternal({
@@ -86,6 +90,12 @@ export async function applyHistoricalCostReplay(
       );
     }
 
+    const authoritative = await loadReplayAuthoritativeInputDigest(executor, companyId);
+    Object.assign(scope._fullPreview, {
+      authoritativeInputDigest: authoritative.digest,
+      authoritativeInputCounts: authoritative.counts,
+    });
+
     const safeSupplierIds = new Set(scope.supplierIds);
     const batchIdsToApply = new Set(scope.batchIdsToUpdate);
     const baleIdsToUpdate = includeFinalizedBales
@@ -102,7 +112,7 @@ export async function applyHistoricalCostReplay(
     );
     if (freshFingerprint !== expectedFingerprint) {
       throw new StaleTokenError(
-        "Stale token — DB state changed since the dry-run was issued. Re-run the preview to obtain a fresh token."
+        "Stale token — DB state or the exact replay scope changed since dry-run. Re-run the preview to obtain a fresh token."
       );
     }
 
