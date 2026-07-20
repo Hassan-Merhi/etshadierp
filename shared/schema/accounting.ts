@@ -26,6 +26,11 @@ export const ledgerAccounts = pgTable(
     parentId: integer("parent_id"),
     openingBalance: decimal("opening_balance", { precision: 20, scale: 2 }).default("0"),
     openingBalanceSide: text("opening_balance_side"),
+    // Phase 4 — opening-balance currency metadata.
+    // NULL means "unresolved" — revaluation endpoint flags these as openingBalanceCurrencyUnresolved.
+    openingBalanceCurrency: varchar("opening_balance_currency", { length: 10 }),
+    openingBalanceHistoricalRate: decimal("opening_balance_historical_rate", { precision: 20, scale: 10 }),
+    openingBalanceBaseAmount: decimal("opening_balance_base_amount", { precision: 20, scale: 6 }),
     active: boolean("active").notNull().default(true),
     isHidden: boolean("is_hidden").notNull().default(false),
     deletedAt: timestamp("deleted_at"),

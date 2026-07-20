@@ -159,6 +159,19 @@ export function usePosQueries({
     enabled: !!editVoucherId,
   });
 
+  // Fallback: if the voucher loaded but has no salesItems (e.g. items were stored separately),
+  // fetch from view-entries which always includes stock items for Sales type.
+  const editVoucherHasSalesItems =
+    editVoucher && Array.isArray(editVoucher.salesItems) && editVoucher.salesItems.length > 0;
+  const { data: editVoucherViewEntries = [] } = useQuery<any[]>({
+    queryKey:
+      editVoucherId && editVoucher && !editVoucherHasSalesItems
+        ? [`/api/vouchers/${editVoucherId}/view-entries`]
+        : [],
+    enabled: !!editVoucherId && !!editVoucher && !editVoucherHasSalesItems,
+    staleTime: 60_000,
+  });
+
   // Stock inventory — prefetch when invoice or stock dialog is open
   const printLocationId = activeLocation?.id ?? (editVoucher as any)?.locationId ?? null;
   const { data: stockInventory = [], isLoading: stockInventoryLoading } = useQuery<any[]>({
@@ -187,6 +200,7 @@ export function usePosQueries({
     posCustomers,
     editVoucher,
     editVoucherLoading,
+    editVoucherViewEntries,
     stockInventory,
     stockInventoryLoading,
   };

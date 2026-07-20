@@ -1,5 +1,6 @@
 import type { Express } from "express";
 import { createHash } from "crypto";
+import Decimal from "decimal.js";
 import { db, pool } from "../db";
 import { storage } from "../storage";
 import { requireAuth, requireRole, canDelete, requireNonPOS, checkPOSLocation } from "../auth";
@@ -242,17 +243,23 @@ export function registerBankAssetRoutes(app: Express) {
   });
 
   // Cash/bank account revaluation — live translation at current rate vs. historical base.
+  //
   // For each Bank/Cash ledger account the response includes:
-  //   nativeCurrency, nativeBalance (sum of tx debits - tx credits in the transaction currency),
-  //   historicalBaseBalance (sum of COALESCE(base_debit, debit) - COALESCE(base_credit, credit) in USD),
-  //   currentRate, currentTranslatedBaseBalance (nativeBalance / currentRate),
-  //   translationDifference (currentTranslated - historical).
+  //   nativeBalancesByCurrency: Record<currency, string> — net native balance per currency
+  //   historicalBaseBalance:    sum of historical USD base amounts + opening balance
+  //   currentRate:              CFA per USD (or "1.0000000000" for USD-only accounts)
+  //   currentTranslatedBaseBalance: native balances translated at current rate
+  //   translationDifference:    currentTranslated - historical (unrealised FX gain/loss)
+  //   openingBalanceCurrencyUnresolved: true when opening-balance currency metadata is absent
+  //
+  // Phases 2+3: groups SQL by (ledger_account_id, currency) instead of MAX(currency),
+  // and uses Decimal.js throughout — no parseFloat/native-JS arithmetic.
   app.get("/api/bank-accounts/revaluation", requireAuth, requireNonPOS, async (req, res) => {
     try {
       const companyId = req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      // Fetch all Bank/Cash ledger accounts for this company
+      // Fetch all Bank/Cash ledger accounts, including Phase-4 opening-balance metadata.
       const cashBankAccts = await db
         .select({
           id: ledgerAccounts.id,
@@ -261,6 +268,9 @@ export function registerBankAssetRoutes(app: Express) {
           accountType: ledgerAccounts.accountType,
           openingBalance: ledgerAccounts.openingBalance,
           openingBalanceSide: ledgerAccounts.openingBalanceSide,
+          openingBalanceCurrency: ledgerAccounts.openingBalanceCurrency,
+          openingBalanceHistoricalRate: ledgerAccounts.openingBalanceHistoricalRate,
+          openingBalanceBaseAmount: ledgerAccounts.openingBalanceBaseAmount,
         })
         .from(ledgerAccounts)
         .where(
@@ -278,7 +288,7 @@ export function registerBankAssetRoutes(app: Express) {
 
       const accountIds = cashBankAccts.map((a) => a.id);
 
-      // Get the latest CFA/USD exchange rate (CFA per 1 USD)
+      // Get the latest CFA/USD exchange rate (CFA per 1 USD).
       const rateRows = await db
         .select({ rate: exchangeRates.rate })
         .from(exchangeRates)
@@ -294,67 +304,152 @@ export function registerBankAssetRoutes(app: Express) {
         .orderBy(desc(exchangeRates.effectiveDate))
         .limit(1)
         .execute();
-      const currentCfaPerUsd = rateRows.length > 0 ? parseFloat(rateRows[0].rate) : null;
+      const currentCfaPerUsd =
+        rateRows.length > 0 && rateRows[0].rate ? new Decimal(rateRows[0].rate) : null;
 
-      // Aggregate native amounts and historical base amounts per ledger account
+      // Phase 2: aggregate per (ledger_account_id, currency) so that mixed-currency accounts
+      // (e.g. an account with both USD and CFA deposits) are handled correctly.
+      // Legacy rows with NULL transaction_currency are treated as 'USD'.
       const aggRaw = await pool.query<{
         ledger_account_id: string;
+        entry_currency: string;
         native_debit: string;
         native_credit: string;
         hist_base_debit: string;
         hist_base_credit: string;
-        transaction_currency: string | null;
       }>(
         `SELECT ve.ledger_account_id,
+                COALESCE(ve.transaction_currency, 'USD') AS entry_currency,
                 COALESCE(SUM(ve.transaction_debit_amount::numeric),  0) AS native_debit,
                 COALESCE(SUM(ve.transaction_credit_amount::numeric), 0) AS native_credit,
                 COALESCE(SUM(COALESCE(ve.base_debit_amount,  ve.debit_amount)::numeric),  0) AS hist_base_debit,
-                COALESCE(SUM(COALESCE(ve.base_credit_amount, ve.credit_amount)::numeric), 0) AS hist_base_credit,
-                MAX(ve.transaction_currency) AS transaction_currency
+                COALESCE(SUM(COALESCE(ve.base_credit_amount, ve.credit_amount)::numeric), 0) AS hist_base_credit
          FROM voucher_entries ve
          JOIN vouchers v ON ve.voucher_id = v.id
          WHERE v.company_id = $1
            AND v.optional   = false
            AND v.deleted_at IS NULL
            AND ve.ledger_account_id = ANY($2::int[])
-         GROUP BY ve.ledger_account_id`,
+         GROUP BY ve.ledger_account_id, COALESCE(ve.transaction_currency, 'USD')`,
         [companyId, accountIds],
       );
 
-      const entryMap = new Map<number, (typeof aggRaw.rows)[0]>();
-      for (const row of aggRaw.rows) entryMap.set(parseInt(row.ledger_account_id), row);
+      // Build per-account currency buckets.
+      type CurrencyBucket = {
+        nativeDebit: Decimal;
+        nativeCredit: Decimal;
+        histBaseDebit: Decimal;
+        histBaseCredit: Decimal;
+      };
+      const bucketMap = new Map<number, Map<string, CurrencyBucket>>();
+      for (const row of aggRaw.rows) {
+        const accId = parseInt(row.ledger_account_id);
+        const ccy = row.entry_currency;
+        if (!bucketMap.has(accId)) bucketMap.set(accId, new Map());
+        bucketMap.get(accId)!.set(ccy, {
+          nativeDebit: new Decimal(row.native_debit),
+          nativeCredit: new Decimal(row.native_credit),
+          histBaseDebit: new Decimal(row.hist_base_debit),
+          histBaseCredit: new Decimal(row.hist_base_credit),
+        });
+      }
 
       const accounts = cashBankAccts.map((acc) => {
-        const row = entryMap.get(acc.id);
-        const openingRaw = parseFloat(acc.openingBalance || "0");
-        const openingSigned = (acc.openingBalanceSide as string) === "Cr" ? -openingRaw : openingRaw;
+        const buckets = bucketMap.get(acc.id) || new Map<string, CurrencyBucket>();
 
-        // Native balance (transaction currency, i.e. CFA for CFA accounts)
-        const nativeDebit = parseFloat(row?.native_debit || "0");
-        const nativeCredit = parseFloat(row?.native_credit || "0");
-        const nativeBalance = nativeDebit - nativeCredit;
+        // ── Opening balance ─────────────────────────────────────────────────────
+        // Phase 4: when openingBalanceCurrency + openingBalanceBaseAmount are set,
+        // use them for accurate historical-base contribution and native bucketing.
+        // Legacy rows (both NULL) fall back to treating the opening balance as USD
+        // and flag openingBalanceCurrencyUnresolved so the UI can warn the operator.
+        const openingRaw = new Decimal(acc.openingBalance || "0");
+        const openingSide = acc.openingBalanceSide === "Cr" ? -1 : 1;
+        const openingSignedRaw = openingRaw.times(openingSide);
 
-        // Historical base balance (USD): opening + voucher entries in base currency
-        const histBaseDebit = parseFloat(row?.hist_base_debit || "0");
-        const histBaseCredit = parseFloat(row?.hist_base_credit || "0");
-        const historicalBaseBalance = openingSigned + histBaseDebit - histBaseCredit;
+        let openingBaseContrib: Decimal;
+        let openingNativeCurrency: string;
+        let openingNativeAmount: Decimal;
+        let openingBalanceCurrencyUnresolved = false;
 
-        const nativeCurrency = row?.transaction_currency || "USD";
-
-        let currentRate: number | null = null;
-        let currentTranslatedBaseBalance: number | null = null;
-        let translationDifference: number | null = null;
-
-        if (nativeCurrency !== "USD" && currentCfaPerUsd && currentCfaPerUsd > 0) {
-          // nativeBalance is in CFA; divide by CFA/USD rate to get USD
-          currentRate = currentCfaPerUsd;
-          currentTranslatedBaseBalance = nativeBalance / currentCfaPerUsd;
-          translationDifference = currentTranslatedBaseBalance - historicalBaseBalance;
+        if (acc.openingBalanceCurrency && acc.openingBalanceBaseAmount != null) {
+          // Phase 4 path: explicit currency + base amount recorded.
+          const obBase = new Decimal(acc.openingBalanceBaseAmount);
+          openingBaseContrib = acc.openingBalanceSide === "Cr" ? obBase.neg() : obBase;
+          openingNativeCurrency = acc.openingBalanceCurrency;
+          openingNativeAmount = openingSignedRaw;
+        } else if (openingRaw.isZero()) {
+          openingBaseContrib = new Decimal(0);
+          openingNativeCurrency = "USD";
+          openingNativeAmount = new Decimal(0);
         } else {
-          // USD account: 1:1, no translation gain/loss
-          currentRate = 1;
-          currentTranslatedBaseBalance = nativeBalance;
-          translationDifference = 0;
+          // Legacy: currency unknown → treat as USD, flag as unresolved.
+          openingBalanceCurrencyUnresolved = true;
+          openingBaseContrib = openingSignedRaw;
+          openingNativeCurrency = "USD";
+          openingNativeAmount = openingSignedRaw;
+        }
+
+        // ── Native balances per currency ────────────────────────────────────────
+        // Merge opening-balance native amount + transaction-entry native amounts.
+        const nativeBalancesByCurrency: Record<string, string> = {};
+
+        if (!openingNativeAmount.isZero()) {
+          nativeBalancesByCurrency[openingNativeCurrency] = openingNativeAmount
+            .toDecimalPlaces(6)
+            .toFixed(6);
+        }
+        for (const [ccy, bucket] of buckets) {
+          const nativeNet = bucket.nativeDebit.minus(bucket.nativeCredit);
+          const prev = nativeBalancesByCurrency[ccy]
+            ? new Decimal(nativeBalancesByCurrency[ccy])
+            : new Decimal(0);
+          const total = prev.plus(nativeNet);
+          if (!total.isZero()) {
+            nativeBalancesByCurrency[ccy] = total.toDecimalPlaces(6).toFixed(6);
+          }
+        }
+        // Remove zero-balance entries.
+        for (const k of Object.keys(nativeBalancesByCurrency)) {
+          if (new Decimal(nativeBalancesByCurrency[k]).isZero()) {
+            delete nativeBalancesByCurrency[k];
+          }
+        }
+
+        // ── Historical base balance (USD) ───────────────────────────────────────
+        let historicalBaseBalance = openingBaseContrib;
+        for (const [, bucket] of buckets) {
+          historicalBaseBalance = historicalBaseBalance
+            .plus(bucket.histBaseDebit)
+            .minus(bucket.histBaseCredit);
+        }
+
+        // ── Current translated base balance ─────────────────────────────────────
+        // Translate each native-currency bucket at the current rate:
+        //   USD / other base-currency  → 1:1
+        //   CFA                        → native / currentCfaPerUsd
+        // This is the mark-to-market value — for display only, never for historical accounting.
+        let currentTranslatedBaseBalance: Decimal;
+        let translationDifference: Decimal;
+        let currentRate: Decimal;
+
+        if (currentCfaPerUsd && currentCfaPerUsd.gt(0)) {
+          let translatedSum = new Decimal(0);
+          for (const [ccy, nativeStr] of Object.entries(nativeBalancesByCurrency)) {
+            const native = new Decimal(nativeStr);
+            if (ccy === "CFA" || ccy === "XOF") {
+              translatedSum = translatedSum.plus(native.div(currentCfaPerUsd));
+            } else {
+              translatedSum = translatedSum.plus(native);
+            }
+          }
+          currentTranslatedBaseBalance = translatedSum;
+          currentRate = currentCfaPerUsd;
+          translationDifference = currentTranslatedBaseBalance.minus(historicalBaseBalance);
+        } else {
+          // No CFA rate — everything is USD-equivalent, no translation effect.
+          currentRate = new Decimal(1);
+          currentTranslatedBaseBalance = historicalBaseBalance;
+          translationDifference = new Decimal(0);
         }
 
         return {
@@ -362,16 +457,23 @@ export function registerBankAssetRoutes(app: Express) {
           name: acc.name,
           code: acc.code,
           accountType: acc.accountType,
-          nativeCurrency,
-          nativeBalance: parseFloat(nativeBalance.toFixed(6)),
-          historicalBaseBalance: parseFloat(historicalBaseBalance.toFixed(6)),
-          currentRate,
-          currentTranslatedBaseBalance: parseFloat(currentTranslatedBaseBalance.toFixed(6)),
-          translationDifference: parseFloat(translationDifference.toFixed(6)),
+          nativeBalancesByCurrency,
+          historicalBaseBalance: historicalBaseBalance.toDecimalPlaces(6).toFixed(6),
+          currentRate: currentRate.toDecimalPlaces(10).toFixed(10),
+          currentTranslatedBaseBalance: currentTranslatedBaseBalance
+            .toDecimalPlaces(6)
+            .toFixed(6),
+          translationDifference: translationDifference.toDecimalPlaces(6).toFixed(6),
+          openingBalanceCurrencyUnresolved,
         };
       });
 
-      res.json({ accounts, currentCfaPerUsd });
+      res.json({
+        accounts,
+        currentCfaPerUsd: currentCfaPerUsd
+          ? currentCfaPerUsd.toDecimalPlaces(10).toFixed(10)
+          : null,
+      });
     } catch (error: any) {
       console.error("Bank revaluation error:", error);
       res.status(500).json({ message: error.message });

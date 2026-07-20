@@ -392,7 +392,8 @@ async function applyRepairs(client, companyId, report) {
          historical_exchange_rate  = $7,
          rate_convention           = $8
        WHERE id = $1
-         AND transaction_currency IS NULL`,  // idempotency guard
+         AND transaction_currency IS NULL   -- idempotency guard: never overwrite a row
+         AND base_debit_amount    IS NULL`, // that has already been fully migrated
       [
         id,
         repair.transaction_currency,

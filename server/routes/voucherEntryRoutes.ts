@@ -467,7 +467,7 @@ export function registerVoucherEntryRoutes(app: Express) {
               creditAmount: isPOSUser ? "0" : item.totalAmount,
               narration: isPOSUser
                 ? `Transfer of ${item.quantity} x ${item.stockItemName || "Unknown Item"}`
-                : `Transfer of ${item.quantity} x ${item.stockItemName || "Unknown Item"} @ $${item.rate}`,
+                : `Transfer of ${item.quantity} x ${item.stockItemName || "Unknown Item"} @ ${item.rate}`,
               accountName: item.stockItemName || "Unknown Item",
               accountCode: item.stockItemCode || "-",
               isStockItem: true,
@@ -475,7 +475,12 @@ export function registerVoucherEntryRoutes(app: Express) {
             }));
             return res.json(itemsWithDetails);
           }
+          // stockTransferVouchers record exists but no items — return empty array
+          // (do NOT fall through to generic financial entries which show as 0-qty rows)
+          return res.json([]);
         }
+        // No stockTransferVouchers record found for this voucher — return empty array
+        return res.json([]);
       }
 
       // SECURITY: Final fallback redaction for POS users - ensure no cost data leaks
