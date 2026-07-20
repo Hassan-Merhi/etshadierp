@@ -19,8 +19,19 @@ const OPENING_FIELDS = [
   "openingBalanceBaseAmount",
 ] as const;
 
+const EXPLICIT_CURRENCY_FIELDS = [
+  "openingBalanceNativeAmount",
+  "openingBalanceCurrency",
+  "openingBalanceHistoricalRate",
+  "openingBalanceBaseAmount",
+] as const;
+
+function hasOwn(body: Record<string, unknown>, field: string): boolean {
+  return Object.prototype.hasOwnProperty.call(body, field);
+}
+
 function hasOpeningPayload(body: Record<string, unknown>): boolean {
-  return OPENING_FIELDS.some((field) => Object.prototype.hasOwnProperty.call(body, field));
+  return OPENING_FIELDS.some((field) => hasOwn(body, field));
 }
 
 async function getBaseCurrency(companyId: number): Promise<string> {
@@ -32,11 +43,55 @@ async function getBaseCurrency(companyId: number): Promise<string> {
   return company?.baseCurrency || "USD";
 }
 
+function unresolvedOpeningPayload(body: Record<string, any>, rawAmount: Decimal): Record<string, any> {
+  return {
+    ...body,
+    openingBalance: rawAmount.toFixed(),
+    openingBalanceNativeAmount: null,
+    openingBalanceCurrency: null,
+    openingBalanceHistoricalRate: null,
+    openingBalanceBaseAmount: null,
+  };
+}
+
 function normalizedOpeningPayload(
   body: Record<string, any>,
   existing: Record<string, any> | null,
   baseCurrency: string,
 ): Record<string, any> {
+  const hasExplicitCurrencyPayload = EXPLICIT_CURRENCY_FIELDS.some((field) => hasOwn(body, field));
+  const existingIsResolved = Boolean(
+    existing?.openingBalanceNativeAmount != null &&
+      existing?.openingBalanceCurrency &&
+      existing?.openingBalanceBaseAmount != null,
+  );
+
+  // Old edit forms submit only openingBalance, which is historical base after a
+  // record has been resolved. Preserve the locked native/rate metadata when that
+  // base value is unchanged. If an old form changes it without currency details,
+  // make it unresolved rather than pretending the edited number is USD or CFA.
+  if (existing && existingIsResolved && !hasExplicitCurrencyPayload) {
+    const submittedLegacyAmount = hasOwn(body, "openingBalance")
+      ? new Decimal(body.openingBalance || 0)
+      : new Decimal(existing.openingBalanceBaseAmount || existing.openingBalance || 0);
+    const existingBase = new Decimal(existing.openingBalanceBaseAmount || existing.openingBalance || 0);
+
+    if (!submittedLegacyAmount.isFinite() || submittedLegacyAmount.lt(0)) {
+      throw new Error("Opening balance must be a finite non-negative amount.");
+    }
+    if (submittedLegacyAmount.eq(existingBase)) {
+      return {
+        ...body,
+        openingBalance: existingBase.toFixed(),
+        openingBalanceNativeAmount: existing.openingBalanceNativeAmount,
+        openingBalanceCurrency: existing.openingBalanceCurrency,
+        openingBalanceHistoricalRate: existing.openingBalanceHistoricalRate,
+        openingBalanceBaseAmount: existing.openingBalanceBaseAmount,
+      };
+    }
+    return unresolvedOpeningPayload(body, submittedLegacyAmount);
+  }
+
   const nativeOpeningBalance =
     body.openingBalanceNativeAmount ??
     body.openingBalance ??
@@ -44,8 +99,7 @@ function normalizedOpeningPayload(
     existing?.openingBalance ??
     "0";
   const amount = new Decimal(nativeOpeningBalance || 0);
-  const rawCurrency =
-    body.openingBalanceCurrency ?? existing?.openingBalanceCurrency ?? null;
+  const rawCurrency = body.openingBalanceCurrency ?? existing?.openingBalanceCurrency ?? null;
 
   if (!amount.isFinite() || amount.lt(0)) {
     throw new Error("Opening balance must be a finite non-negative amount.");
@@ -55,14 +109,7 @@ function normalizedOpeningPayload(
   // amount visible and explicitly unresolved until an operator reviews it in
   // Accounts → Resolve Historical Opening & Asset Values.
   if (!amount.isZero() && !rawCurrency) {
-    return {
-      ...body,
-      openingBalance: amount.toFixed(),
-      openingBalanceNativeAmount: null,
-      openingBalanceCurrency: null,
-      openingBalanceHistoricalRate: null,
-      openingBalanceBaseAmount: null,
-    };
+    return unresolvedOpeningPayload(body, amount);
   }
 
   const normalized = normalizeOpeningBalanceCurrency({
