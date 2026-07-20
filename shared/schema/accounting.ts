@@ -14,6 +14,9 @@ import {
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
+const openingBalanceCurrencySchema = z.enum(["USD", "CFA"]).nullable().optional();
+const nullableDecimalString = z.string().nullable().optional();
+
 export const ledgerAccounts = pgTable(
   "ledger_accounts",
   {
@@ -26,8 +29,8 @@ export const ledgerAccounts = pgTable(
     parentId: integer("parent_id"),
     openingBalance: decimal("opening_balance", { precision: 20, scale: 2 }).default("0"),
     openingBalanceSide: text("opening_balance_side"),
-    // Phase 4 — opening-balance currency metadata.
-    // NULL means "unresolved" — revaluation endpoint flags these as openingBalanceCurrencyUnresolved.
+    // Native and historical base values are stored separately so current FX changes
+    // never rewrite an opening balance. NULL means unresolved legacy data.
     openingBalanceCurrency: varchar("opening_balance_currency", { length: 10 }),
     openingBalanceHistoricalRate: decimal("opening_balance_historical_rate", { precision: 20, scale: 10 }),
     openingBalanceBaseAmount: decimal("opening_balance_base_amount", { precision: 20, scale: 6 }),
@@ -75,6 +78,9 @@ export const insertLedgerAccountSchema = createInsertSchema(ledgerAccounts)
     subType: z.string().nullable().optional(),
     openingBalance: z.string().optional(),
     openingBalanceSide: z.enum(["Dr", "Cr"]).optional().or(z.literal("")),
+    openingBalanceCurrency: openingBalanceCurrencySchema,
+    openingBalanceHistoricalRate: nullableDecimalString,
+    openingBalanceBaseAmount: nullableDecimalString,
     parentId: z.number().nullable().optional(),
   });
 
@@ -102,6 +108,9 @@ export const bankAccounts = pgTable(
     linkedLedgerId: integer("linked_ledger_id"),
     openingBalance: decimal("opening_balance", { precision: 15, scale: 2 }).default("0"),
     openingBalanceSide: text("opening_balance_side"),
+    openingBalanceCurrency: varchar("opening_balance_currency", { length: 10 }),
+    openingBalanceHistoricalRate: decimal("opening_balance_historical_rate", { precision: 20, scale: 10 }),
+    openingBalanceBaseAmount: decimal("opening_balance_base_amount", { precision: 20, scale: 6 }),
     active: boolean("active").notNull().default(true),
     deletedAt: timestamp("deleted_at"),
     createdAt: timestamp("created_at").notNull().defaultNow(),
@@ -123,6 +132,9 @@ export const insertBankAccountSchema = createInsertSchema(bankAccounts)
     bankName: z.string().min(1, "Bank name is required"),
     accountNumber: z.string().min(1, "Account number is required"),
     openingBalanceSide: z.enum(["Dr", "Cr"]).optional().or(z.literal("")),
+    openingBalanceCurrency: openingBalanceCurrencySchema,
+    openingBalanceHistoricalRate: nullableDecimalString,
+    openingBalanceBaseAmount: nullableDecimalString,
   });
 
 export type InsertBankAccount = z.infer<typeof insertBankAccountSchema>;
