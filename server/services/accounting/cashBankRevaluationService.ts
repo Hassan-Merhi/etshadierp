@@ -42,6 +42,7 @@ interface AccountRow {
   accountType: string;
   openingBalance: string | null;
   openingBalanceSide: string | null;
+  openingBalanceNativeAmount: string | null;
   openingBalanceCurrency: string | null;
   openingBalanceHistoricalRate: string | null;
   openingBalanceBaseAmount: string | null;
@@ -68,7 +69,9 @@ function amount(value: string | number | null | undefined): Decimal {
 }
 
 function signedOpeningBalance(account: AccountRow): Decimal {
-  const raw = amount(account.openingBalance);
+  // Resolved rows preserve the native amount separately. Legacy unresolved rows
+  // have only openingBalance, whose denomination is deliberately unknown.
+  const raw = amount(account.openingBalanceNativeAmount ?? account.openingBalance);
   return account.openingBalanceSide === "Cr" ? raw.neg() : raw;
 }
 
@@ -112,6 +115,7 @@ async function loadAccounts(companyId: number): Promise<AccountRow[]> {
         accountType: ledgerAccounts.accountType,
         openingBalance: ledgerAccounts.openingBalance,
         openingBalanceSide: ledgerAccounts.openingBalanceSide,
+        openingBalanceNativeAmount: ledgerAccounts.openingBalanceNativeAmount,
         openingBalanceCurrency: ledgerAccounts.openingBalanceCurrency,
         openingBalanceHistoricalRate: ledgerAccounts.openingBalanceHistoricalRate,
         openingBalanceBaseAmount: ledgerAccounts.openingBalanceBaseAmount,
@@ -132,6 +136,7 @@ async function loadAccounts(companyId: number): Promise<AccountRow[]> {
         code: bankAccounts.code,
         openingBalance: bankAccounts.openingBalance,
         openingBalanceSide: bankAccounts.openingBalanceSide,
+        openingBalanceNativeAmount: bankAccounts.openingBalanceNativeAmount,
         openingBalanceCurrency: bankAccounts.openingBalanceCurrency,
         openingBalanceHistoricalRate: bankAccounts.openingBalanceHistoricalRate,
         openingBalanceBaseAmount: bankAccounts.openingBalanceBaseAmount,
@@ -149,6 +154,7 @@ async function loadAccounts(companyId: number): Promise<AccountRow[]> {
     accountType: row.accountType,
     openingBalance: row.openingBalance,
     openingBalanceSide: row.openingBalanceSide,
+    openingBalanceNativeAmount: row.openingBalanceNativeAmount,
     openingBalanceCurrency: row.openingBalanceCurrency,
     openingBalanceHistoricalRate: row.openingBalanceHistoricalRate,
     openingBalanceBaseAmount: row.openingBalanceBaseAmount,
@@ -167,6 +173,7 @@ async function loadAccounts(companyId: number): Promise<AccountRow[]> {
       accountType: "Bank",
       openingBalance: row.openingBalance,
       openingBalanceSide: row.openingBalanceSide,
+      openingBalanceNativeAmount: row.openingBalanceNativeAmount,
       openingBalanceCurrency: row.openingBalanceCurrency,
       openingBalanceHistoricalRate: row.openingBalanceHistoricalRate,
       openingBalanceBaseAmount: row.openingBalanceBaseAmount,
@@ -317,7 +324,11 @@ export async function getCashBankRevaluation(companyId: number): Promise<{
     let unresolvedOpeningBalanceRaw: string | null = null;
 
     if (!openingRaw.isZero()) {
-      if (openingCurrency && account.openingBalanceBaseAmount != null) {
+      if (
+        openingCurrency &&
+        account.openingBalanceNativeAmount != null &&
+        account.openingBalanceBaseAmount != null
+      ) {
         native.set(openingCurrency, (native.get(openingCurrency) || new Decimal(0)).plus(openingRaw));
         const openingBase = amount(account.openingBalanceBaseAmount);
         historicalBase = historicalBase.plus(account.openingBalanceSide === "Cr" ? openingBase.neg() : openingBase);
