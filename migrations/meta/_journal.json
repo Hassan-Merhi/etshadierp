@@ -50,6 +50,13 @@
       "when": 1784372000000,
       "tag": "0006_stored_file_download_permission",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1753020000000,
+      "tag": "20260720_002_voucher_entry_currency_fields",
+      "breakpoints": true
     }
   ]
 }

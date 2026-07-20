@@ -7,6 +7,29 @@
 import { db as globalDb } from "../../db";
 import { eq, and, sql, inArray, ne, isNull } from "drizzle-orm";
 import { ledgerAccounts, vouchers, voucherEntries, factoryPayrolls, factoryWorkers } from "@shared/schema";
+import { normalizeVoucherEntryAmounts } from "../../services/accounting/currencyAmounts";
+
+/** Normalize a USD voucher entry (IDENTITY convention). */
+function normUsd(debit: string | number, credit: string | number) {
+  const norm = normalizeVoucherEntryAmounts({
+    transactionCurrency: "USD",
+    baseCurrency: "USD",
+    transactionDebitAmount: String(debit),
+    transactionCreditAmount: String(credit),
+    historicalRate: "1",
+  });
+  return {
+    transactionCurrency: norm.transactionCurrency,
+    transactionDebitAmount: norm.transactionDebitAmount,
+    transactionCreditAmount: norm.transactionCreditAmount,
+    baseDebitAmount: norm.baseDebitAmount,
+    baseCreditAmount: norm.baseCreditAmount,
+    historicalExchangeRate: norm.historicalExchangeRate,
+    rateConvention: norm.rateConvention,
+    debitAmount: norm.debitAmount,
+    creditAmount: norm.creditAmount,
+  };
+}
 
 /**
  * Find or create a ledger account by name for a company.
@@ -219,8 +242,7 @@ export async function rebuildPayrollGenVoucher(
       journalEntries.push({
         voucherId: genVoucher.id,
         ledgerAccountId: accs.salaryId,
-        debitAmount: salAmt.toFixed(2),
-        creditAmount: "0",
+        ...normUsd(salAmt.toFixed(2), "0"),
         narration: `Salary - ${workerName} (${periodStart} – ${periodEnd})`,
       });
     }
@@ -228,8 +250,7 @@ export async function rebuildPayrollGenVoucher(
       journalEntries.push({
         voucherId: genVoucher.id,
         ledgerAccountId: accs.bonusId,
-        debitAmount: bonAmt.toFixed(2),
-        creditAmount: "0",
+        ...normUsd(bonAmt.toFixed(2), "0"),
         narration: `Bonus - ${workerName} (${periodStart} – ${periodEnd})`,
       });
     }
@@ -239,8 +260,7 @@ export async function rebuildPayrollGenVoucher(
     journalEntries.push({
       voucherId: genVoucher.id,
       ledgerAccountId: payableAcc.id,
-      debitAmount: "0",
-      creditAmount: totalNet.toFixed(2),
+      ...normUsd("0", totalNet.toFixed(2)),
       narration: desc,
     });
   }
@@ -249,8 +269,7 @@ export async function rebuildPayrollGenVoucher(
     journalEntries.push({
       voucherId: genVoucher.id,
       ledgerAccountId: advancesAcc.id,
-      debitAmount: "0",
-      creditAmount: totalAdvances.toFixed(2),
+      ...normUsd("0", totalAdvances.toFixed(2)),
       narration: `Advance deductions settled - ${count} worker${count !== 1 ? "s" : ""} (${periodStart} – ${periodEnd})`,
     });
   }

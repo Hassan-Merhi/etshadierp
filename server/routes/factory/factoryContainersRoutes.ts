@@ -7,6 +7,7 @@ import { requireAuth } from "../../auth";
 import { classifyNetPositionAccounts } from "../../netPositionHelper";
 import { adjustInventory } from "../../inventoryHelper";
 import { resolveStoredFxRate, resolveStoredFxRateOrThrow, applyFxRate, UnresolvedExchangeRateError } from "../../services/factory/currencyConversion";
+import { normalizeVoucherEntryAmounts } from "../../services/accounting/currencyAmounts";
 import {
   writeDaybookEntry,
   getOrFetchFxRateToUsd,
@@ -121,6 +122,45 @@ import path from "path";
 import fs from "fs";
 
 import { registerFactoryRawStockRoutes } from "./factoryRawStockRoutes";
+
+/**
+ * Normalize a factory voucher entry.
+ * Factory stores fxRateToUsd in BASE_PER_TRANSACTION convention (USD per foreign unit).
+ * ERP voucher entries need TRANSACTION_PER_BASE (foreign per USD), so we invert the rate.
+ */
+function normFactoryEntry(
+  transactionCurrency: string | null | undefined,
+  debit: string | number,
+  credit: string | number,
+  fxRateToUsdFactory: number | string | null | undefined
+) {
+  const ccy = transactionCurrency || "USD";
+  let historicalRate = "1";
+  if (ccy !== "USD" && fxRateToUsdFactory != null) {
+    const factoryRate = parseFloat(String(fxRateToUsdFactory));
+    if (factoryRate > 0) {
+      historicalRate = new Decimal(1).div(factoryRate).toDecimalPlaces(10).toFixed(10);
+    }
+  }
+  const norm = normalizeVoucherEntryAmounts({
+    transactionCurrency: ccy,
+    baseCurrency: "USD",
+    transactionDebitAmount: String(debit),
+    transactionCreditAmount: String(credit),
+    historicalRate,
+  });
+  return {
+    transactionCurrency: norm.transactionCurrency,
+    transactionDebitAmount: norm.transactionDebitAmount,
+    transactionCreditAmount: norm.transactionCreditAmount,
+    baseDebitAmount: norm.baseDebitAmount,
+    baseCreditAmount: norm.baseCreditAmount,
+    historicalExchangeRate: norm.historicalExchangeRate,
+    rateConvention: norm.rateConvention,
+    debitAmount: norm.debitAmount,
+    creditAmount: norm.creditAmount,
+  };
+}
 
 export function registerFactoryContainersRoutes(app: Express) {
   app.get("/api/factory/containers", requireAuth, async (req: any, res: any) => {
@@ -481,18 +521,17 @@ export function registerFactoryContainersRoutes(app: Express) {
             sourceModule: "FACTORY",
           })
           .returning();
+        const importFactoryFxRate = resolveStoredFxRateOrThrow(container.currencyCode, container.fxRateToUsd, (container as any).fxRateConfirmed);
         await db.insert(voucherEntries).values({
           voucherId: importVoucher.id,
           ledgerAccountId: importCostAccId,
-          debitAmount: String(goodsValue),
-          creditAmount: "0",
+          ...normFactoryEntry(container.currencyCode || "USD", String(goodsValue), "0", importFactoryFxRate),
           narration: `Goods import cost - container ${container.containerNumber}`,
         });
         await db.insert(voucherEntries).values({
           voucherId: importVoucher.id,
           factorySupplierId: container.supplierId,
-          debitAmount: "0",
-          creditAmount: String(goodsValue),
+          ...normFactoryEntry(container.currencyCode || "USD", "0", String(goodsValue), importFactoryFxRate),
           narration: `Goods payable to supplier - container ${container.containerNumber}`,
         });
       }
@@ -527,12 +566,15 @@ export function registerFactoryContainersRoutes(app: Express) {
             sourceModule: "FACTORY",
           })
           .returning();
+        // Compute factory freight FX rate (BASE_PER_TRANSACTION: USD per foreign)
+        const freightFactoryFxRate = freightCcy === (container.currencyCode || "USD")
+          ? resolveStoredFxRateOrThrow(container.currencyCode, container.fxRateToUsd, (container as any).fxRateConfirmed)
+          : 1; // USD-denominated freight — treat as USD-equivalent
         // Dr Freight Expense
         await db.insert(voucherEntries).values({
           voucherId: freightVoucher.id,
           ledgerAccountId: container.freightAccountId,
-          debitAmount: String(freightAmt),
-          creditAmount: "0",
+          ...normFactoryEntry(freightCcy, String(freightAmt), "0", freightFactoryFxRate),
           narration: `Freight expense - container ${container.containerNumber}`,
         });
         if (freightPaidBy === "own" && freightOwnAcctId) {
@@ -540,8 +582,7 @@ export function registerFactoryContainersRoutes(app: Express) {
           await db.insert(voucherEntries).values({
             voucherId: freightVoucher.id,
             ledgerAccountId: freightOwnAcctId,
-            debitAmount: "0",
-            creditAmount: String(freightAmt),
+            ...normFactoryEntry(freightCcy, "0", String(freightAmt), freightFactoryFxRate),
             narration: `Freight paid via own account - container ${container.containerNumber}`,
           });
         } else if (freightPaidBy === "supplier" && container.supplierId) {
@@ -549,8 +590,7 @@ export function registerFactoryContainersRoutes(app: Express) {
           await db.insert(voucherEntries).values({
             voucherId: freightVoucher.id,
             factorySupplierId: container.supplierId,
-            debitAmount: "0",
-            creditAmount: String(freightAmt),
+            ...normFactoryEntry(freightCcy, "0", String(freightAmt), freightFactoryFxRate),
             narration: `Freight payable to supplier - container ${container.containerNumber}`,
           });
         }
@@ -835,6 +875,12 @@ export function registerFactoryContainersRoutes(app: Express) {
               voucherType: newFreightPaidBy === "own" ? "Payment" : "Journal",
             })
             .where(eq(vouchers.id, existingFV.id));
+          // Compute normalized amounts for the updated freight entries
+          const updateFreightFactoryFxRate = freightCcy === (updated.currencyCode || "USD")
+            ? resolveStoredFxRateOrThrow(updated.currencyCode, (updated as any).fxRateToUsd, (updated as any).fxRateConfirmed)
+            : 1;
+          const normFreightDr = normFactoryEntry(freightCcy, String(newFreightAmt), "0", updateFreightFactoryFxRate);
+          const normFreightCr = normFactoryEntry(freightCcy, "0", String(newFreightAmt), updateFreightFactoryFxRate);
           // Update entries
           const fEntries = await db.select().from(voucherEntries).where(eq(voucherEntries.voucherId, existingFV.id));
           for (const fe of fEntries) {
@@ -842,16 +888,16 @@ export function registerFactoryContainersRoutes(app: Express) {
               // Dr Freight Expense — update amount and account
               await db
                 .update(voucherEntries)
-                .set({ debitAmount: String(newFreightAmt), ledgerAccountId: newFreightAcctId })
+                .set({ ledgerAccountId: newFreightAcctId, ...normFreightDr })
                 .where(eq(voucherEntries.id, fe.id));
             } else if (newFreightPaidBy === "own" && newFreightOwnAcctId) {
               // Cr Own account
               await db
                 .update(voucherEntries)
                 .set({
-                  creditAmount: String(newFreightAmt),
                   ledgerAccountId: newFreightOwnAcctId,
                   factorySupplierId: null,
+                  ...normFreightCr,
                 })
                 .where(eq(voucherEntries.id, fe.id));
             } else if (newFreightPaidBy === "supplier" && updated.supplierId) {
@@ -859,9 +905,9 @@ export function registerFactoryContainersRoutes(app: Express) {
               await db
                 .update(voucherEntries)
                 .set({
-                  creditAmount: String(newFreightAmt),
                   factorySupplierId: updated.supplierId,
                   ledgerAccountId: null,
+                  ...normFreightCr,
                 })
                 .where(eq(voucherEntries.id, fe.id));
             }
@@ -887,27 +933,27 @@ export function registerFactoryContainersRoutes(app: Express) {
               sourceModule: "FACTORY",
             })
             .returning();
+          const newFreightFactoryFxRate = freightCcy === (updated.currencyCode || "USD")
+            ? resolveStoredFxRateOrThrow(updated.currencyCode, (updated as any).fxRateToUsd, (updated as any).fxRateConfirmed)
+            : 1;
           await db.insert(voucherEntries).values({
             voucherId: newFV.id,
             ledgerAccountId: newFreightAcctId,
-            debitAmount: String(newFreightAmt),
-            creditAmount: "0",
+            ...normFactoryEntry(freightCcy, String(newFreightAmt), "0", newFreightFactoryFxRate),
             narration: `Freight expense - container ${updated.containerNumber}`,
           });
           if (newFreightPaidBy === "own" && newFreightOwnAcctId) {
             await db.insert(voucherEntries).values({
               voucherId: newFV.id,
               ledgerAccountId: newFreightOwnAcctId,
-              debitAmount: "0",
-              creditAmount: String(newFreightAmt),
+              ...normFactoryEntry(freightCcy, "0", String(newFreightAmt), newFreightFactoryFxRate),
               narration: `Freight paid via own account - container ${updated.containerNumber}`,
             });
           } else if (newFreightPaidBy === "supplier" && updated.supplierId) {
             await db.insert(voucherEntries).values({
               voucherId: newFV.id,
               factorySupplierId: updated.supplierId,
-              debitAmount: "0",
-              creditAmount: String(newFreightAmt),
+              ...normFactoryEntry(freightCcy, "0", String(newFreightAmt), newFreightFactoryFxRate),
               narration: `Freight payable to supplier - container ${updated.containerNumber}`,
             });
           }
@@ -1302,15 +1348,13 @@ export function registerFactoryContainersRoutes(app: Express) {
         await db.insert(voucherEntries).values({
           voucherId: importVoucher.id,
           ledgerAccountId: importCostAccId,
-          debitAmount: String(goodsValue),
-          creditAmount: "0",
+          ...normFactoryEntry(container.currencyCode || "USD", String(goodsValue), "0", backfillFxRate),
           narration: `Goods import cost - container ${container.containerNumber}`,
         });
         await db.insert(voucherEntries).values({
           voucherId: importVoucher.id,
           factorySupplierId: container.supplierId,
-          debitAmount: "0",
-          creditAmount: String(goodsValue),
+          ...normFactoryEntry(container.currencyCode || "USD", "0", String(goodsValue), backfillFxRate),
           narration: `Goods payable to supplier - container ${container.containerNumber}`,
         });
         created++;
@@ -1479,16 +1523,14 @@ export function registerFactoryContainersRoutes(app: Express) {
             await db.insert(voucherEntries).values({
               voucherId: ocVoucher.id,
               ledgerAccountId: payableAccId,
-              debitAmount: String(chargeAmt),
-              creditAmount: "0",
+              ...normFactoryEntry(chargeCcy, String(chargeAmt), "0", chargeFxRate),
               narration: `${charge.description} payable - container ${container.containerNumber}`,
             });
             // Cr chosen account (credit = I owe this person)
             await db.insert(voucherEntries).values({
               voucherId: ocVoucher.id,
               ledgerAccountId: charge.ledgerAccountId,
-              debitAmount: "0",
-              creditAmount: String(chargeAmt),
+              ...normFactoryEntry(chargeCcy, "0", String(chargeAmt), chargeFxRate),
               narration: `${charge.description} - container ${container.containerNumber}`,
             });
           }
@@ -1709,18 +1751,17 @@ export function registerFactoryContainersRoutes(app: Express) {
                   sourceModule: "FACTORY",
                 })
                 .returning();
+              // This admin-fix endpoint re-creates in USD (currency: "USD", exchangeRate: "1")
               await db.insert(voucherEntries).values({
                 voucherId: ocVoucher.id,
                 ledgerAccountId: payableAccId,
-                debitAmount: String(chargeAmt),
-                creditAmount: "0",
+                ...normFactoryEntry("USD", String(chargeAmt), "0", null),
                 narration: `${charge.description} payable`,
               });
               await db.insert(voucherEntries).values({
                 voucherId: ocVoucher.id,
                 ledgerAccountId: charge.ledgerAccountId,
-                debitAmount: "0",
-                creditAmount: String(chargeAmt),
+                ...normFactoryEntry("USD", "0", String(chargeAmt), null),
                 narration: `${charge.description}`,
               });
             }

@@ -121,6 +121,11 @@ export function registerCustomerRoutes(app: Express) {
                 ledgerAccountId: voucherEntries.ledgerAccountId,
                 debitAmount: voucherEntries.debitAmount,
                 creditAmount: voucherEntries.creditAmount,
+                transactionCurrency: (voucherEntries as any).transactionCurrency,
+                transactionDebitAmount: (voucherEntries as any).transactionDebitAmount,
+                transactionCreditAmount: (voucherEntries as any).transactionCreditAmount,
+                baseDebitAmount: (voucherEntries as any).baseDebitAmount,
+                baseCreditAmount: (voucherEntries as any).baseCreditAmount,
               })
               .from(voucherEntries)
               .innerJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
@@ -133,15 +138,18 @@ export function registerCustomerRoutes(app: Express) {
                 )
               )
               .execute()
-          : Promise.resolve(
-              [] as { ledgerAccountId: number | null; debitAmount: string | null; creditAmount: string | null }[]
-            ),
+          : Promise.resolve([] as any[]),
         customerOnlyIds.length > 0
           ? db
               .select({
                 customerId: (voucherEntries as any).customerId,
                 debitAmount: voucherEntries.debitAmount,
                 creditAmount: voucherEntries.creditAmount,
+                transactionCurrency: (voucherEntries as any).transactionCurrency,
+                transactionDebitAmount: (voucherEntries as any).transactionDebitAmount,
+                transactionCreditAmount: (voucherEntries as any).transactionCreditAmount,
+                baseDebitAmount: (voucherEntries as any).baseDebitAmount,
+                baseCreditAmount: (voucherEntries as any).baseCreditAmount,
               })
               .from(voucherEntries)
               .innerJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
@@ -154,13 +162,13 @@ export function registerCustomerRoutes(app: Express) {
                 )
               )
               .execute()
-          : Promise.resolve(
-              [] as { customerId: number | null; debitAmount: string | null; creditAmount: string | null }[]
-            ),
+          : Promise.resolve([] as any[]),
       ]);
 
-      // Build net-transaction maps (only pure debit or pure credit entries, matching original logic)
+      // Build net-transaction maps (legacy balance) + currency breakdown + historical-base balance
       const ledgerTxnMap = new Map<number, number>();
+      const ledgerCcyMap = new Map<number, Record<string, { debit: number; credit: number; net: number }>>();
+      const ledgerBaseMap = new Map<number, number>();
       for (const e of ledgerEntries) {
         if (!e.ledgerAccountId) continue;
         const d = parseFloat(e.debitAmount || "0"),
@@ -168,8 +176,29 @@ export function registerCustomerRoutes(app: Express) {
         const cur = ledgerTxnMap.get(e.ledgerAccountId) ?? 0;
         if (d > 0 && c === 0) ledgerTxnMap.set(e.ledgerAccountId, cur + d);
         else if (c > 0 && d === 0) ledgerTxnMap.set(e.ledgerAccountId, cur - c);
+
+        // Currency breakdown — Dr-positive convention (debits increase receivable balance)
+        const ccy: string = (e as any).transactionCurrency || "USD";
+        const txDr = parseFloat((e as any).transactionDebitAmount ?? e.debitAmount ?? "0");
+        const txCr = parseFloat((e as any).transactionCreditAmount ?? e.creditAmount ?? "0");
+        const ccyMap = ledgerCcyMap.get(e.ledgerAccountId) ?? {};
+        if (!ccyMap[ccy]) ccyMap[ccy] = { debit: 0, credit: 0, net: 0 };
+        ccyMap[ccy].debit += txDr;
+        ccyMap[ccy].credit += txCr;
+        ccyMap[ccy].net = ccyMap[ccy].debit - ccyMap[ccy].credit; // Dr-positive: net = debit − credit
+        ledgerCcyMap.set(e.ledgerAccountId, ccyMap);
+
+        // Historical base balance — Dr-positive: debits increase, credits decrease
+        const baseDr = parseFloat((e as any).baseDebitAmount ?? e.debitAmount ?? "0");
+        const baseCr = parseFloat((e as any).baseCreditAmount ?? e.creditAmount ?? "0");
+        const baseNet = ledgerBaseMap.get(e.ledgerAccountId) ?? 0;
+        if (baseDr > 0 && baseCr === 0) ledgerBaseMap.set(e.ledgerAccountId, baseNet + baseDr);
+        else if (baseCr > 0 && baseDr === 0) ledgerBaseMap.set(e.ledgerAccountId, baseNet - baseCr);
       }
+
       const customerTxnMap = new Map<number, number>();
+      const customerCcyMap = new Map<number, Record<string, { debit: number; credit: number; net: number }>>();
+      const customerBaseMap = new Map<number, number>();
       for (const e of customerEntries) {
         const cid = (e as any).customerId;
         if (!cid) continue;
@@ -178,6 +207,22 @@ export function registerCustomerRoutes(app: Express) {
         const cur = customerTxnMap.get(cid) ?? 0;
         if (d > 0 && c === 0) customerTxnMap.set(cid, cur + d);
         else if (c > 0 && d === 0) customerTxnMap.set(cid, cur - c);
+
+        const ccy: string = (e as any).transactionCurrency || "USD";
+        const txDr = parseFloat((e as any).transactionDebitAmount ?? e.debitAmount ?? "0");
+        const txCr = parseFloat((e as any).transactionCreditAmount ?? e.creditAmount ?? "0");
+        const ccyMap = customerCcyMap.get(cid) ?? {};
+        if (!ccyMap[ccy]) ccyMap[ccy] = { debit: 0, credit: 0, net: 0 };
+        ccyMap[ccy].debit += txDr;
+        ccyMap[ccy].credit += txCr;
+        ccyMap[ccy].net = ccyMap[ccy].debit - ccyMap[ccy].credit; // Dr-positive: net = debit − credit
+        customerCcyMap.set(cid, ccyMap);
+
+        const baseDr = parseFloat((e as any).baseDebitAmount ?? e.debitAmount ?? "0");
+        const baseCr = parseFloat((e as any).baseCreditAmount ?? e.creditAmount ?? "0");
+        const baseNet = customerBaseMap.get(cid) ?? 0;
+        if (baseDr > 0 && baseCr === 0) customerBaseMap.set(cid, baseNet + baseDr);
+        else if (baseCr > 0 && baseDr === 0) customerBaseMap.set(cid, baseNet - baseCr);
       }
 
       const customersWithBalances = customers.map((customer) => {
@@ -188,10 +233,18 @@ export function registerCustomerRoutes(app: Express) {
           ? (ledgerTxnMap.get(customer.ledgerAccountId) ?? 0)
           : (customerTxnMap.get(customer.id) ?? 0);
         const balance = openingNet + txnNet;
+        const balancesByCurrency = customer.ledgerAccountId
+          ? (ledgerCcyMap.get(customer.ledgerAccountId) ?? {})
+          : (customerCcyMap.get(customer.id) ?? {});
+        const historicalBaseBalance = openingNet + (customer.ledgerAccountId
+          ? (ledgerBaseMap.get(customer.ledgerAccountId) ?? 0)
+          : (customerBaseMap.get(customer.id) ?? 0));
         return {
           ...customer,
           balance: Math.abs(balance),
           balanceSide: balance >= 0 ? "Dr" : "Cr",
+          balancesByCurrency,
+          historicalBaseBalance,
         };
       });
 

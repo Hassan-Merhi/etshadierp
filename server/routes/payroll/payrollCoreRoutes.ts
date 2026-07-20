@@ -27,6 +27,29 @@ import {
   companies,
   companySettings,
 } from "@shared/schema";
+import { normalizeVoucherEntryAmounts } from "../../services/accounting/currencyAmounts";
+
+/** Normalize a USD voucher entry (IDENTITY convention). Returns dual-currency fields spread-ready. */
+function normUsd(debit: string | number, credit: string | number) {
+  const norm = normalizeVoucherEntryAmounts({
+    transactionCurrency: "USD",
+    baseCurrency: "USD",
+    transactionDebitAmount: String(debit),
+    transactionCreditAmount: String(credit),
+    historicalRate: "1",
+  });
+  return {
+    transactionCurrency: norm.transactionCurrency,
+    transactionDebitAmount: norm.transactionDebitAmount,
+    transactionCreditAmount: norm.transactionCreditAmount,
+    baseDebitAmount: norm.baseDebitAmount,
+    baseCreditAmount: norm.baseCreditAmount,
+    historicalExchangeRate: norm.historicalExchangeRate,
+    rateConvention: norm.rateConvention,
+    debitAmount: norm.debitAmount,
+    creditAmount: norm.creditAmount,
+  };
+}
 
 /** Prefer the factory-pinned company ID so cross-tab ERP company switches don't corrupt factory writes. */
 function getFactoryCompanyId(req: any): number | undefined {
@@ -908,8 +931,7 @@ export function registerPayrollCoreRoutes(app: Express) {
               journalEntries.push({
                 voucherId: genVoucher.id,
                 ledgerAccountId: accs.salaryId,
-                debitAmount: salAmt.toFixed(2),
-                creditAmount: "0",
+                ...normUsd(salAmt.toFixed(2), "0"),
                 narration: `Salary - ${workerName} (${periodStart} – ${periodEnd})`,
               });
             }
@@ -917,8 +939,7 @@ export function registerPayrollCoreRoutes(app: Express) {
               journalEntries.push({
                 voucherId: genVoucher.id,
                 ledgerAccountId: accs.bonusId,
-                debitAmount: bonAmt.toFixed(2),
-                creditAmount: "0",
+                ...normUsd(bonAmt.toFixed(2), "0"),
                 narration: `Bonus - ${workerName} (${periodStart} – ${periodEnd})`,
               });
             }
@@ -927,8 +948,7 @@ export function registerPayrollCoreRoutes(app: Express) {
             journalEntries.push({
               voucherId: genVoucher.id,
               ledgerAccountId: payableAccGen.id,
-              debitAmount: "0",
-              creditAmount: totalNet.toFixed(2),
+              ...normUsd("0", totalNet.toFixed(2)),
               narration: desc,
             });
           }
@@ -937,8 +957,7 @@ export function registerPayrollCoreRoutes(app: Express) {
             journalEntries.push({
               voucherId: genVoucher.id,
               ledgerAccountId: advancesAccGen.id,
-              debitAmount: "0",
-              creditAmount: totalAdvanceDeductions.toFixed(2),
+              ...normUsd("0", totalAdvanceDeductions.toFixed(2)),
               narration: `Advance deductions settled - ${count} worker${count !== 1 ? "s" : ""} (${periodStart} – ${periodEnd})`,
             });
           }
@@ -1044,22 +1063,22 @@ export function registerPayrollCoreRoutes(app: Express) {
             })
             .returning();
 
-          await tx.insert(voucherEntries).values([
-            {
-              voucherId: pVoucher.id,
-              ledgerAccountId: payableAcc.id,
-              debitAmount: netAmt.toFixed(2),
-              creditAmount: "0",
-              narration,
-            },
-            {
-              voucherId: pVoucher.id,
-              ledgerAccountId: cashAccountId,
-              debitAmount: "0",
-              creditAmount: netAmt.toFixed(2),
-              narration,
-            },
-          ]);
+          if (netAmt > 0) {
+            await tx.insert(voucherEntries).values([
+              {
+                voucherId: pVoucher.id,
+                ledgerAccountId: payableAcc.id,
+                ...normUsd(netAmt.toFixed(2), "0"),
+                narration,
+              },
+              {
+                voucherId: pVoucher.id,
+                ledgerAccountId: cashAccountId,
+                ...normUsd("0", netAmt.toFixed(2)),
+                narration,
+              },
+            ]);
+          }
         }
 
         await writeDaybookEntry(tx, {
@@ -1134,22 +1153,22 @@ export function registerPayrollCoreRoutes(app: Express) {
         })
         .returning();
 
-      await db.insert(voucherEntries).values([
-        {
-          voucherId: pVoucher.id,
-          ledgerAccountId: payableAcc.id,
-          debitAmount: netAmt.toFixed(2),
-          creditAmount: "0",
-          narration,
-        },
-        {
-          voucherId: pVoucher.id,
-          ledgerAccountId: cashAccountId,
-          debitAmount: "0",
-          creditAmount: netAmt.toFixed(2),
-          narration,
-        },
-      ]);
+      if (netAmt > 0) {
+        await db.insert(voucherEntries).values([
+          {
+            voucherId: pVoucher.id,
+            ledgerAccountId: payableAcc.id,
+            ...normUsd(netAmt.toFixed(2), "0"),
+            narration,
+          },
+          {
+            voucherId: pVoucher.id,
+            ledgerAccountId: cashAccountId,
+            ...normUsd("0", netAmt.toFixed(2)),
+            narration,
+          },
+        ]);
+      }
 
       // Update payroll to record which account was used
       await db
@@ -1248,22 +1267,22 @@ export function registerPayrollCoreRoutes(app: Express) {
               })
               .returning();
 
-            await tx.insert(voucherEntries).values([
-              {
-                voucherId: pVoucher.id,
-                ledgerAccountId: payableAcc.id,
-                debitAmount: netAmt.toFixed(2),
-                creditAmount: "0",
-                narration,
-              },
-              {
-                voucherId: pVoucher.id,
-                ledgerAccountId: cashId,
-                debitAmount: "0",
-                creditAmount: netAmt.toFixed(2),
-                narration,
-              },
-            ]);
+            if (netAmt > 0) {
+              await tx.insert(voucherEntries).values([
+                {
+                  voucherId: pVoucher.id,
+                  ledgerAccountId: payableAcc.id,
+                  ...normUsd(netAmt.toFixed(2), "0"),
+                  narration,
+                },
+                {
+                  voucherId: pVoucher.id,
+                  ledgerAccountId: cashId,
+                  ...normUsd("0", netAmt.toFixed(2)),
+                  narration,
+                },
+              ]);
+            }
           }
         }
 
@@ -1550,8 +1569,7 @@ export function registerPayrollCoreRoutes(app: Express) {
               newEntries.push({
                 voucherId: row.id,
                 ledgerAccountId: salAccId,
-                debitAmount: salAmt.toFixed(2),
-                creditAmount: "0",
+                ...normUsd(salAmt.toFixed(2), "0"),
                 narration: `Salary expense - ${capCity} (${periodStart} – ${periodEnd})`,
               });
             }
@@ -1560,8 +1578,7 @@ export function registerPayrollCoreRoutes(app: Express) {
               newEntries.push({
                 voucherId: row.id,
                 ledgerAccountId: bonAccId,
-                debitAmount: bonAmt.toFixed(2),
-                creditAmount: "0",
+                ...normUsd(bonAmt.toFixed(2), "0"),
                 narration: `Bonus expense - ${capCity} (${periodStart} – ${periodEnd})`,
               });
             }
@@ -1571,8 +1588,7 @@ export function registerPayrollCoreRoutes(app: Express) {
               newEntries.push({
                 voucherId: row.id,
                 ledgerAccountId: legacyAcc.id,
-                debitAmount: total.toFixed(2),
-                creditAmount: "0",
+                ...normUsd(total.toFixed(2), "0"),
                 narration: `Payroll expense (no city) (${periodStart} – ${periodEnd})`,
               });
             }
@@ -1629,15 +1645,13 @@ export function registerPayrollCoreRoutes(app: Express) {
           {
             voucherId: bVoucher.id,
             ledgerAccountId: expAccId,
-            debitAmount: amt.toFixed(2),
-            creditAmount: "0",
+            ...normUsd(amt.toFixed(2), "0"),
             narration: city ? `Bonus expense - ${capCity}: ${narration}` : narration,
           },
           {
             voucherId: bVoucher.id,
             ledgerAccountId: parseInt(wb.cash_account_id),
-            debitAmount: "0",
-            creditAmount: amt.toFixed(2),
+            ...normUsd("0", amt.toFixed(2)),
             narration,
           },
         ]);
@@ -1739,8 +1753,7 @@ export function registerPayrollCoreRoutes(app: Express) {
             newEntries.push({
               voucherId: row.id,
               ledgerAccountId: accs.salaryId,
-              debitAmount: salAmt.toFixed(2),
-              creditAmount: "0",
+              ...normUsd(salAmt.toFixed(2), "0"),
               narration: `Salary - ${workerName} (${periodStart} – ${periodEnd})`,
             });
           }
@@ -1748,8 +1761,7 @@ export function registerPayrollCoreRoutes(app: Express) {
             newEntries.push({
               voucherId: row.id,
               ledgerAccountId: accs.bonusId,
-              debitAmount: bonAmt.toFixed(2),
-              creditAmount: "0",
+              ...normUsd(bonAmt.toFixed(2), "0"),
               narration: `Bonus - ${workerName} (${periodStart} – ${periodEnd})`,
             });
           }
