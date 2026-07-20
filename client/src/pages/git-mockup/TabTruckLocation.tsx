@@ -67,7 +67,7 @@ export function TabTruckLocation() {
       };
       // Target ≤ 1.5 MB decoded so the JSON body stays comfortably under the
       // global 2 MB Express limit after base64 and JSON overhead.
-      const SIZE_LIMIT = 1.5 * 1024 * 1024;
+      const SIZE_LIMIT = 1.35 * 1024 * 1024;
 
       const qualities = [0.82, 0.68, 0.55, 0.42];
       let imageBase64 = "";

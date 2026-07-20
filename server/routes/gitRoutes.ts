@@ -1,4 +1,3 @@
-import express from "express";
 import type { Express, Request, Response, NextFunction } from "express";
 import multer from "multer";
 import path from "path";

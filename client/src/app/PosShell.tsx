@@ -183,9 +183,10 @@ export function PosShell({
             <OfflineBanner />
             <main
               id="main-content"
+              tabIndex={-1}
               aria-label="Point of sale workspace"
               data-pos-workspace="true"
-              className={`${posWorkspaceClasses} ${
+              className={`${posWorkspaceClasses} outline-none ${
                 isFullHeightRoute
                   ? "flex-1 min-w-0 overflow-hidden overscroll-contain"
                   : "flex-1 min-w-0 overflow-x-hidden overflow-y-auto overscroll-contain p-3 sm:p-6"
