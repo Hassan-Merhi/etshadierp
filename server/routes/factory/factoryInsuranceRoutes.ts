@@ -1,9 +1,10 @@
 import type { Express } from "express";
 import { z } from "zod";
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, or } from "drizzle-orm";
 import { db, pool } from "../../db";
 import { requireAuth } from "../../auth";
 import {
+  companies,
   insuranceMembers,
   insertInsuranceMemberSchema,
   ledgerAccounts,
@@ -56,6 +57,52 @@ async function findOrCreateLedger(
 }
 
 export function registerFactoryInsuranceRoutes(app: Express) {
+  // ── Factory company resolution ──────────────────────────────────────────────
+  // /api/insurance/* is registered outside /api/factory/* so the factory
+  // middleware that sets session.factoryCompanyId never runs automatically.
+  // This guard mirrors that middleware exactly: if factoryCompanyId is not yet
+  // in the session it resolves it from currentCompanyId (checking it is a
+  // factory company) or falls back to the first active factory company.
+  app.use("/api/insurance", async (req: any, _res: any, next: any) => {
+    try {
+      const session = req.session as any;
+      if (!session?.userId || session.factoryCompanyId) return next();
+
+      const currentCompanyId = session.currentCompanyId;
+      if (currentCompanyId) {
+        const [co] = await db
+          .select({ id: companies.id, companyType: companies.companyType })
+          .from(companies)
+          .where(eq(companies.id, currentCompanyId));
+        if (co?.companyType === "factory" || co?.companyType === "factory_v2") {
+          session.factoryCompanyId = co.id;
+          return next();
+        }
+      }
+
+      // currentCompanyId is ERP/other — fall back to any active factory company
+      const [factoryComp] = await db
+        .select({ id: companies.id })
+        .from(companies)
+        .where(
+          and(
+            or(eq(companies.companyType, "factory"), eq(companies.companyType, "factory_v2")),
+            eq(companies.active, true),
+          ),
+        )
+        .orderBy(companies.id)
+        .limit(1);
+      if (factoryComp) {
+        session.factoryCompanyId = factoryComp.id;
+      } else if (currentCompanyId) {
+        session.factoryCompanyId = currentCompanyId;
+      }
+      next();
+    } catch {
+      next();
+    }
+  });
+
   app.get("/api/insurance/members", requireAuth, async (req: any, res: any) => {
     try {
       const companyId = resolveRequestCompanyId(req);
