@@ -111,6 +111,8 @@ interface WorkerMatrix {
 interface StockEntryHistoryPage {
   items: GroupRow[];
   total: number;
+  totalBales: number;
+  totalWeight: number;
   page: number;
   limit: number;
   totalPages: number;
@@ -1211,22 +1213,24 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
         </div>
       </div>
 
-      {/* ── Summary pill-cards ── */}
+      {/* ── Summary pill-cards ── show dataset-level totals (all pages, full filter) ── */}
       <div className="flex items-center gap-2 flex-wrap">
         <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg border bg-slate-500/10 border-slate-500/20">
           <span className="text-xs font-semibold text-slate-500">Groups</span>
           <span className="text-sm font-bold tabular-nums text-slate-600 dark:text-slate-300">
-            {filteredGroups.length}
+            {(pagedGroups?.total ?? filteredGroups.length).toLocaleString()}
           </span>
         </div>
         <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg border bg-emerald-500/10 border-emerald-500/20">
           <span className="text-xs font-semibold text-emerald-500">Bales</span>
-          <span className="text-sm font-bold tabular-nums text-emerald-600 dark:text-emerald-400">{totalBales}</span>
+          <span className="text-sm font-bold tabular-nums text-emerald-600 dark:text-emerald-400">
+            {(pagedGroups?.totalBales ?? totalBales).toLocaleString()}
+          </span>
         </div>
         <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg border bg-sky-500/10 border-sky-500/20">
           <span className="text-xs font-semibold text-sky-500">Weight</span>
           <span className="text-sm font-bold tabular-nums text-sky-600 dark:text-sky-400">
-            {totalWeight.toFixed(2)}
+            {(pagedGroups?.totalWeight ?? totalWeight).toFixed(2)}
           </span>
           <span className="text-xs text-sky-600/70 dark:text-sky-400/70">kg</span>
         </div>

@@ -2196,21 +2196,27 @@ export function registerFactoryBalesRoutes(app: Express) {
         LEFT JOIN factory_bale_products fbp ON fb.product_id = fbp.id AND fbp.company_id = ${companyId}
         LEFT JOIN locations l ON fb.erp_location_id = l.id AND l.company_id = ${companyId}`;
 
-      // COUNT query: counts distinct groups matching the filter. Runs in parallel with the data query.
+      // COUNT query: counts distinct groups + total bales + total weight across all matching groups.
+      // Runs in parallel with the data query.
       const countQuery = sql`
-        SELECT COUNT(*) AS total
+        SELECT
+          COUNT(*) AS total,
+          COALESCE(SUM(grp_bale_count), 0) AS total_bales,
+          COALESCE(SUM(grp_weight), 0) AS total_weight
         FROM (
-          SELECT 1
+          SELECT COUNT(fb.id) AS grp_bale_count, COALESCE(SUM(CAST(fb.weight_kg AS numeric)), 0) AS grp_weight
           ${joinClause}
           ${whereClause}
           ${groupByClause}
         ) AS grp`;
 
-      function buildPaginatedResponse(items: any[], total: number) {
+      function buildPaginatedResponse(items: any[], total: number, totalBales = 0, totalWeight = 0) {
         const totalPages = total === 0 ? 0 : Math.ceil(total / limit);
         return {
           items,
           total,
+          totalBales,
+          totalWeight,
           page,
           limit,
           totalPages,
@@ -2247,8 +2253,10 @@ export function registerFactoryBalesRoutes(app: Express) {
           db.execute(countQuery),
         ]);
         const total = parseInt(String((countResult.rows[0] as any)?.total ?? "0"), 10);
+        const totalBales = parseInt(String((countResult.rows[0] as any)?.total_bales ?? "0"), 10);
+        const totalWeight = parseFloat(String((countResult.rows[0] as any)?.total_weight ?? "0"));
         const items = liteResult.rows.map((r: any) => ({ ...r, bales: [] }));
-        return res.json(buildPaginatedResponse(items, total));
+        return res.json(buildPaginatedResponse(items, total, totalBales, totalWeight));
       }
 
       const [dataResult, countResult] = await Promise.all([
@@ -2289,7 +2297,9 @@ export function registerFactoryBalesRoutes(app: Express) {
       ]);
 
       const total = parseInt(String((countResult.rows[0] as any)?.total ?? "0"), 10);
-      res.json(buildPaginatedResponse(dataResult.rows, total));
+      const totalBales = parseInt(String((countResult.rows[0] as any)?.total_bales ?? "0"), 10);
+      const totalWeight = parseFloat(String((countResult.rows[0] as any)?.total_weight ?? "0"));
+      res.json(buildPaginatedResponse(dataResult.rows, total, totalBales, totalWeight));
     } catch (error: any) {
       console.error("Error fetching stock entry history:", error);
       res.status(500).json({ message: error.message });
