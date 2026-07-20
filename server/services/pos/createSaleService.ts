@@ -189,6 +189,9 @@ export async function createPosSale(
       isSpCompany,
       salesAccount,
       spCtx,
+      // Thread through the voucher's currency/rate so entries carry dual-currency fields
+      currency: currency || "USD",
+      exchangeRate: exchangeRate ? String(exchangeRate) : null,
     });
 
     const txSaleItems: any[] = [];

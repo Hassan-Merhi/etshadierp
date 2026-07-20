@@ -54,7 +54,7 @@ const _normalizedBrand = Symbol("normalizedEntryAmounts");
 
 export interface NormalizedEntryAmounts {
   readonly [_normalizedBrand]: true;
-  /** ISO-4217 currency code of the original transaction (e.g. "XOF", "USD"). */
+  /** Currency code of the original transaction (e.g. "CFA", "USD"). Uses the project alias "CFA", not ISO "XOF". */
   readonly transactionCurrency: string;
   /** Original transaction-currency debit (≥0). String for decimal precision. */
   readonly transactionDebitAmount: string;
@@ -91,15 +91,23 @@ const KNOWN_CURRENCIES = new Set([
 // ─── Public helpers ──────────────────────────────────────────────────────────
 
 /**
- * Normalise a currency code: upper-cases it and accepts "CFA" as an alias for "XOF".
- * Throws if the code is not in the supported set.
+ * Normalise a currency code: upper-cases it and keeps "CFA" as the project identifier.
+ *
+ * This project uses "CFA" (not ISO-4217 "XOF") everywhere: in the database,
+ * in APIs, in screen labels, and in exchange-rate records.  Incoming "XOF"
+ * (from external feeds or user input) is normalised to "CFA" at this boundary.
+ * The other direction ("CFA" → "XOF") is deliberately NOT performed.
+ *
+ * Throws for unsupported or empty codes.
  */
 export function normalizeCurrencyCode(code: string | null | undefined): string {
   if (!code || typeof code !== "string") {
     throw new Error("Currency code must be a non-empty string.");
   }
   const upper = code.trim().toUpperCase();
-  if (upper === "CFA") return "XOF"; // project alias
+  // Normalize ISO 4217 XOF → project alias CFA.
+  // Never convert the other direction: the DB and APIs use "CFA", not "XOF".
+  if (upper === "XOF") return "CFA";
   if (!KNOWN_CURRENCIES.has(upper)) {
     throw new Error(`Unsupported currency code: "${upper}". Add it to currencyAmounts.ts if needed.`);
   }
@@ -209,9 +217,9 @@ export function convertBaseToTransaction(
 }
 
 export interface NormalizeVoucherEntryAmountsInput {
-  /** ISO-4217 code of the voucher's transaction currency (e.g. "XOF", "USD"). */
+  /** Transaction currency code. Pass "CFA" (project alias) or "USD". ISO "XOF" is accepted and normalised to "CFA". */
   transactionCurrency: string;
-  /** ISO-4217 code of the company's base/functional currency (typically "USD"). */
+  /** Base/functional currency of the company (typically "USD"). */
   baseCurrency: string;
   /**
    * Transaction-currency debit amount as typed/submitted.

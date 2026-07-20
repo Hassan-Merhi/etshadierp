@@ -5,6 +5,10 @@
  *   - Sales revenue account resolution
  *   - Supplier-partner accounting context precompute
  *   - Debit/credit voucher entries (normal ERP and supplier-partner split accounting)
+ *
+ * Phase 15 update: voucher entries now carry all 7 dual-currency fields via
+ * normalizeVoucherEntryAmounts(). The backward-compatible debitAmount / creditAmount
+ * columns always store the historical base (USD) value so legacy queries keep working.
  */
 import { db } from "../../db";
 import { storage } from "../../storage";
@@ -12,6 +16,7 @@ import { ledgerAccounts, voucherEntries } from "@shared/schema";
 import { eq, and, isNull } from "drizzle-orm";
 import type { HandlerErrorResult, SupplierPartnerAccountingContext, ValidatedInventoryItem } from "./posSaleTypes";
 import { findLinkedCustomerId } from "./updateCustomerBalance";
+import { normalizeVoucherEntryAmounts } from "../../services/accounting/currencyAmounts";
 
 /**
  * Get or create SALES revenue account (outside transaction for simplicity).
@@ -120,6 +125,70 @@ export async function fetchSupplierPartnerAccountingContext(
   };
 }
 
+/**
+ * Normalize a single entry amount and return the dual-currency fields ready for insert.
+ *
+ * Uses the voucher's stored currency and historical exchange rate so that:
+ *   - CFA entries store the original CFA amount in transactionDebitAmount / transactionCreditAmount
+ *   - The historical USD base is stored in baseDebitAmount / baseCreditAmount
+ *   - The backward-compatible debitAmount / creditAmount always equal the base USD amounts
+ *
+ * Amounts must be >= 0 with exactly one side > 0 (the function enforces this).
+ */
+function normalizePosEntry(
+  debitAmt: number,
+  creditAmt: number,
+  currency: string,
+  exchangeRate: string | null | undefined
+): {
+  debitAmount: string;
+  creditAmount: string;
+  transactionCurrency: string;
+  transactionDebitAmount: string;
+  transactionCreditAmount: string;
+  baseDebitAmount: string;
+  baseCreditAmount: string;
+  historicalExchangeRate: string;
+  rateConvention: string;
+} {
+  try {
+    const norm = normalizeVoucherEntryAmounts({
+      transactionCurrency: currency || "USD",
+      baseCurrency: "USD",
+      transactionDebitAmount: String(Math.abs(debitAmt)),
+      transactionCreditAmount: String(Math.abs(creditAmt)),
+      historicalRate: exchangeRate,
+    });
+    return {
+      debitAmount: norm.debitAmount,
+      creditAmount: norm.creditAmount,
+      transactionCurrency: norm.transactionCurrency,
+      transactionDebitAmount: norm.transactionDebitAmount,
+      transactionCreditAmount: norm.transactionCreditAmount,
+      baseDebitAmount: norm.baseDebitAmount,
+      baseCreditAmount: norm.baseCreditAmount,
+      historicalExchangeRate: norm.historicalExchangeRate,
+      rateConvention: norm.rateConvention,
+    };
+  } catch (e) {
+    // Fallback for legacy paths: if normalization fails (missing rate etc.) store as-is
+    console.warn("[POS] normalizeVoucherEntryAmounts failed, using legacy storage:", (e as any)?.message);
+    const dStr = Math.abs(debitAmt).toFixed(2);
+    const cStr = Math.abs(creditAmt).toFixed(2);
+    return {
+      debitAmount: dStr,
+      creditAmount: cStr,
+      transactionCurrency: currency || "USD",
+      transactionDebitAmount: dStr,
+      transactionCreditAmount: cStr,
+      baseDebitAmount: dStr,
+      baseCreditAmount: cStr,
+      historicalExchangeRate: "1.0000000000",
+      rateConvention: "IDENTITY",
+    };
+  }
+}
+
 /** Insert the Dr (payment) + Cr (Sales revenue, or SP-split) voucher entries for a POS sale. */
 export async function insertSaleAccountingEntries(
   tx: any,
@@ -136,6 +205,10 @@ export async function insertSaleAccountingEntries(
     isSpCompany: boolean;
     salesAccount: any;
     spCtx: SupplierPartnerAccountingContext;
+    /** Voucher transaction currency (e.g. "CFA", "USD"). Defaults to "USD". */
+    currency?: string | null;
+    /** Historical exchange rate at time of sale (CFA per USD for TRANSACTION_PER_BASE). */
+    exchangeRate?: string | null;
   }
 ): Promise<void> {
   const {
@@ -151,25 +224,32 @@ export async function insertSaleAccountingEntries(
     isSpCompany,
     salesAccount,
     spCtx,
+    currency,
+    exchangeRate,
   } = params;
 
   const creditSaleNarration = isCreditSale
     ? `Credit Invoice Sale at ${location.name} - ${(customerAccount as any).name}`
     : `POS Sale - ${voucherNumber}`;
 
+  // Debit entry (cash / bank / receivable account)
+  const normDR = normalizePosEntry(Math.abs(grandTotal), 0, currency || "USD", exchangeRate);
   const debitEntry: any = {
     voucherId: txVoucherId,
-    debitAmount: grandTotal.toFixed(2),
-    creditAmount: "0",
+    debitAmount: grandTotal >= 0 ? normDR.debitAmount : "0",
+    creditAmount: grandTotal < 0 ? normDR.debitAmount : "0", // reversals have opposite sign
+    transactionCurrency: normDR.transactionCurrency,
+    transactionDebitAmount: grandTotal >= 0 ? normDR.transactionDebitAmount : "0",
+    transactionCreditAmount: grandTotal < 0 ? normDR.transactionDebitAmount : "0",
+    baseDebitAmount: grandTotal >= 0 ? normDR.baseDebitAmount : "0",
+    baseCreditAmount: grandTotal < 0 ? normDR.baseDebitAmount : "0",
+    historicalExchangeRate: normDR.historicalExchangeRate,
+    rateConvention: normDR.rateConvention,
     narration: creditSaleNarration,
   };
 
   if (isCreditSale || accountType === "cash" || accountType === "credit") {
     debitEntry.ledgerAccountId = accountId;
-    // For credit sales, also stamp the customerId on the receivable
-    // entry whenever the receivable ledger is linked to a customer.
-    // Without this, the customer ledger / statement views can't
-    // attribute the entry to the customer.
     if (isCreditSale && accountType === "credit") {
       const linkedCustId = await findLinkedCustomerId(tx, companyId, accountId);
       if (linkedCustId !== undefined) {
@@ -187,11 +267,19 @@ export async function insertSaleAccountingEntries(
 
   if (!isSpCompany) {
     // Normal ERP: credit the full sale amount to the Sales Revenue account
+    const normCR = normalizePosEntry(0, Math.abs(grandTotal), currency || "USD", exchangeRate);
     await tx.insert(voucherEntries).values({
       voucherId: txVoucherId,
       ledgerAccountId: salesAccount.id,
-      debitAmount: "0",
-      creditAmount: grandTotal.toFixed(2),
+      debitAmount: grandTotal < 0 ? normCR.creditAmount : "0",
+      creditAmount: grandTotal >= 0 ? normCR.creditAmount : "0",
+      transactionCurrency: normCR.transactionCurrency,
+      transactionDebitAmount: grandTotal < 0 ? normCR.transactionCreditAmount : "0",
+      transactionCreditAmount: grandTotal >= 0 ? normCR.transactionCreditAmount : "0",
+      baseDebitAmount: grandTotal < 0 ? normCR.baseCreditAmount : "0",
+      baseCreditAmount: grandTotal >= 0 ? normCR.baseCreditAmount : "0",
+      historicalExchangeRate: normCR.historicalExchangeRate,
+      rateConvention: normCR.rateConvention,
       narration: creditSaleNarration,
     });
     return;
@@ -201,13 +289,8 @@ export async function insertSaleAccountingEntries(
   //   Dr Cash                           = grandTotal  (debit entry already written above)
   //   Cr Supplier Cash Payable          = grandTotal − deductionAmount
   //   Cr Deduction Clearing (hidden)    = deductionAmount          (if deduction > 0)
-  //
-  // The deduction is a silent per-qty reduction to what is owed to the supplier
-  // (e.g. a warehouse loss charge). It is NOT income, profit, or an expense —
-  // it flows into a hidden clearing liability that is excluded from all reports.
   const grandTotalRounded = Number(grandTotal.toFixed(2));
   const spDeductionAmount = Number((spCtx.spPosTotalQtySold * spCtx.spPosDeductionPerQty).toFixed(2));
-  // Guard: deduction cannot exceed the sale total
   if (spDeductionAmount > Math.abs(grandTotalRounded)) {
     throw new Error(
       `Supplier payable deduction (${spDeductionAmount}) exceeds the sale total (${grandTotalRounded}). ` +
@@ -217,43 +300,73 @@ export async function insertSaleAccountingEntries(
   const spPayableAmount = Number((grandTotalRounded - spDeductionAmount).toFixed(2));
 
   if (grandTotalRounded > 0) {
-    // Cr Supplier Cash Payable = reduced payable
     if (spPayableAmount > 0) {
+      const normSP = normalizePosEntry(0, spPayableAmount, currency || "USD", exchangeRate);
       await tx.insert(voucherEntries).values({
         voucherId: txVoucherId,
         ledgerAccountId: spCtx.spPosPayableAccountId!,
         debitAmount: "0",
-        creditAmount: spPayableAmount.toFixed(2),
+        creditAmount: normSP.creditAmount,
+        transactionCurrency: normSP.transactionCurrency,
+        transactionDebitAmount: "0",
+        transactionCreditAmount: normSP.transactionCreditAmount,
+        baseDebitAmount: "0",
+        baseCreditAmount: normSP.baseCreditAmount,
+        historicalExchangeRate: normSP.historicalExchangeRate,
+        rateConvention: normSP.rateConvention,
         narration: `Supplier Cash Payable — ${voucherNumber}`,
       });
     }
-    // Cr Deduction Clearing = deduction (keeps voucher balanced)
     if (spDeductionAmount > 0 && spCtx.spPosDeductionClrAccountId) {
+      const normDD = normalizePosEntry(0, spDeductionAmount, currency || "USD", exchangeRate);
       await tx.insert(voucherEntries).values({
         voucherId: txVoucherId,
         ledgerAccountId: spCtx.spPosDeductionClrAccountId,
         debitAmount: "0",
-        creditAmount: spDeductionAmount.toFixed(2),
+        creditAmount: normDD.creditAmount,
+        transactionCurrency: normDD.transactionCurrency,
+        transactionDebitAmount: "0",
+        transactionCreditAmount: normDD.transactionCreditAmount,
+        baseDebitAmount: "0",
+        baseCreditAmount: normDD.baseCreditAmount,
+        historicalExchangeRate: normDD.historicalExchangeRate,
+        rateConvention: normDD.rateConvention,
         narration: `Supplier Payable Deduction (${spCtx.spPosTotalQtySold} qty × ${spCtx.spPosDeductionPerQty}) — ${voucherNumber}`,
       });
     }
   } else if (grandTotalRounded < 0) {
     // Reversal: Dr Supplier Cash Payable
     if (spPayableAmount < 0) {
+      const normSPR = normalizePosEntry(Math.abs(spPayableAmount), 0, currency || "USD", exchangeRate);
       await tx.insert(voucherEntries).values({
         voucherId: txVoucherId,
         ledgerAccountId: spCtx.spPosPayableAccountId!,
-        debitAmount: Math.abs(spPayableAmount).toFixed(2),
+        debitAmount: normSPR.debitAmount,
         creditAmount: "0",
+        transactionCurrency: normSPR.transactionCurrency,
+        transactionDebitAmount: normSPR.transactionDebitAmount,
+        transactionCreditAmount: "0",
+        baseDebitAmount: normSPR.baseDebitAmount,
+        baseCreditAmount: "0",
+        historicalExchangeRate: normSPR.historicalExchangeRate,
+        rateConvention: normSPR.rateConvention,
         narration: `Supplier Cash Payable reversal — ${voucherNumber}`,
       });
     }
     if (spDeductionAmount > 0 && spCtx.spPosDeductionClrAccountId) {
+      const normDDR = normalizePosEntry(spDeductionAmount, 0, currency || "USD", exchangeRate);
       await tx.insert(voucherEntries).values({
         voucherId: txVoucherId,
         ledgerAccountId: spCtx.spPosDeductionClrAccountId,
-        debitAmount: spDeductionAmount.toFixed(2),
+        debitAmount: normDDR.debitAmount,
         creditAmount: "0",
+        transactionCurrency: normDDR.transactionCurrency,
+        transactionDebitAmount: normDDR.transactionDebitAmount,
+        transactionCreditAmount: "0",
+        baseDebitAmount: normDDR.baseDebitAmount,
+        baseCreditAmount: "0",
+        historicalExchangeRate: normDDR.historicalExchangeRate,
+        rateConvention: normDDR.rateConvention,
         narration: `Supplier Payable Deduction reversal — ${voucherNumber}`,
       });
     }

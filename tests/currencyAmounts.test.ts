@@ -40,9 +40,14 @@ describe("normalizeCurrencyCode", () => {
     expect(normalizeCurrencyCode("EUR")).toBe("EUR");
   });
 
-  it("maps CFA alias to XOF", () => {
-    expect(normalizeCurrencyCode("CFA")).toBe("XOF");
-    expect(normalizeCurrencyCode("cfa")).toBe("XOF");
+  it("keeps CFA as the project identifier (does NOT map to XOF)", () => {
+    expect(normalizeCurrencyCode("CFA")).toBe("CFA");
+    expect(normalizeCurrencyCode("cfa")).toBe("CFA");
+  });
+
+  it("normalizes ISO XOF input to project alias CFA", () => {
+    expect(normalizeCurrencyCode("XOF")).toBe("CFA");
+    expect(normalizeCurrencyCode("xof")).toBe("CFA");
   });
 
   it("throws for unknown codes", () => {
@@ -126,15 +131,16 @@ describe("convertBaseToTransaction", () => {
 
 describe("normalizeVoucherEntryAmounts", () => {
   // Test case 1: CFA customer receipt
+  // Note: passing "XOF" or "CFA" as transactionCurrency both normalise to "CFA" (project identifier).
   it("TC1 — CFA customer receipt: 1,000,000 CFA @ 600 = 1,666.666667 USD", () => {
     const norm = normalizeVoucherEntryAmounts({
-      transactionCurrency: "XOF",
+      transactionCurrency: "XOF",   // normalised to "CFA" on output
       baseCurrency: "USD",
       transactionDebitAmount: "1000000",
       transactionCreditAmount: "0",
       historicalRate: "600",
     });
-    expect(norm.transactionCurrency).toBe("XOF");
+    expect(norm.transactionCurrency).toBe("CFA");   // XOF input → CFA stored
     expect(norm.transactionDebitAmount).toBe("1000000.000000");
     expect(norm.transactionCreditAmount).toBe("0.000000");
     // base = 1,000,000 / 600 = 1666.666666...
@@ -380,6 +386,7 @@ describe("Mixed USD+CFA customer transactions — TC7", () => {
 
 describe("erpRateToDaybookFxRateToUsd", () => {
   it("CFA per USD 600 → USD per CFA = 0.0016666...", () => {
+    // "XOF" input is normalised to "CFA" inside the function — result unchanged
     const result = erpRateToDaybookFxRateToUsd("XOF", "USD", "600");
     expect(new Decimal(result).toDecimalPlaces(10).toFixed(10)).toBe("0.0016666667");
   });
@@ -389,9 +396,12 @@ describe("erpRateToDaybookFxRateToUsd", () => {
     expect(result).toBe("1.0000000000");
   });
 
-  it("CFA alias works", () => {
-    const result = erpRateToDaybookFxRateToUsd("CFA", "USD", "600");
-    expect(new Decimal(result).toDecimalPlaces(10).toFixed(10)).toBe("0.0016666667");
+  it("CFA alias is the canonical input (not XOF)", () => {
+    // The project uses "CFA" everywhere — this must produce the same result as "XOF"
+    const resultCfa = erpRateToDaybookFxRateToUsd("CFA", "USD", "600");
+    const resultXof = erpRateToDaybookFxRateToUsd("XOF", "USD", "600");
+    expect(resultCfa).toBe(resultXof);
+    expect(new Decimal(resultCfa).toDecimalPlaces(10).toFixed(10)).toBe("0.0016666667");
   });
 });
 
@@ -400,7 +410,7 @@ describe("erpRateToDaybookFxRateToUsd", () => {
 describe("resolveLegacyTransactionAmounts", () => {
   it("already-repaired rows return null", () => {
     const result = resolveLegacyTransactionAmounts({
-      existingTransactionCurrency: "XOF",
+      existingTransactionCurrency: "CFA",  // project identifier, not "XOF"
       voucherCurrency: "XOF",
       baseCurrency: "USD",
       storedDebitAmount: "1666.67",
@@ -428,7 +438,7 @@ describe("resolveLegacyTransactionAmounts", () => {
   it("CFA voucher: transaction = base × rate", () => {
     const result = resolveLegacyTransactionAmounts({
       existingTransactionCurrency: null,
-      voucherCurrency: "XOF",
+      voucherCurrency: "CFA",  // project alias
       baseCurrency: "USD",
       storedDebitAmount: "1666.666667",
       storedCreditAmount: "0",
@@ -438,17 +448,147 @@ describe("resolveLegacyTransactionAmounts", () => {
     expect(result!.rateConvention).toBe(RateConvention.TRANSACTION_PER_BASE);
     // txDebit = 1666.666667 * 600 = 1,000,000
     expect(new Decimal(result!.transactionDebitAmount).toDecimalPlaces(0).toFixed(0)).toBe("1000000");
+    // transactionCurrency stored as CFA (project alias, not XOF)
+    expect(result!.transactionCurrency).toBe("CFA");
   });
 
   it("missing rate returns null (cannot auto-repair)", () => {
     const result = resolveLegacyTransactionAmounts({
       existingTransactionCurrency: null,
-      voucherCurrency: "XOF",
+      voucherCurrency: "CFA",
       baseCurrency: "USD",
       storedDebitAmount: "1000000",
       storedCreditAmount: "0",
       voucherExchangeRate: null,
     });
     expect(result).toBeNull();
+  });
+});
+
+// ─── 11. CFA identifier consistency ─────────────────────────────────────────
+
+describe("CFA identifier consistency — CFA is the canonical code, not XOF", () => {
+  it("normalizeVoucherEntryAmounts stores CFA for both 'CFA' and 'XOF' inputs", () => {
+    const viaCfa = normalizeVoucherEntryAmounts({
+      transactionCurrency: "CFA",
+      baseCurrency: "USD",
+      transactionDebitAmount: "1200000",
+      transactionCreditAmount: "0",
+      historicalRate: "600",
+    });
+    const viaXof = normalizeVoucherEntryAmounts({
+      transactionCurrency: "XOF",
+      baseCurrency: "USD",
+      transactionDebitAmount: "1200000",
+      transactionCreditAmount: "0",
+      historicalRate: "600",
+    });
+    // Both normalise to "CFA" — the project identifier
+    expect(viaCfa.transactionCurrency).toBe("CFA");
+    expect(viaXof.transactionCurrency).toBe("CFA");
+    // Math is identical
+    expect(viaCfa.baseDebitAmount).toBe(viaXof.baseDebitAmount);
+  });
+
+  it("normalizeCurrencyCode never outputs XOF", () => {
+    // "XOF" in → "CFA" out (normalization direction)
+    expect(normalizeCurrencyCode("XOF")).toBe("CFA");
+    // "CFA" in → "CFA" out (kept as project code)
+    expect(normalizeCurrencyCode("CFA")).toBe("CFA");
+    // No call to normalizeCurrencyCode should ever return "XOF"
+    // (only use currencies actually in KNOWN_CURRENCIES)
+    const allInputs = ["USD", "EUR", "GBP", "CFA", "XOF", "NGN", "GHS", "CDF", "CNY", "JPY"];
+    const allOutputs = allInputs.map((c) => normalizeCurrencyCode(c));
+    expect(allOutputs).not.toContain("XOF");
+  });
+});
+
+// ─── 12. Payment entry dual-currency round-trip ──────────────────────────────
+
+describe("Payment entry — dual-currency fields round-trip", () => {
+  it("CFA receipt payment: DR Cash 600,000 CFA @ 600 = 1,000 USD base", () => {
+    // Simulate a payment/receipt voucher: Dr Cash (600k CFA), Cr Customer Receivable (600k CFA)
+    const drNorm = normalizeVoucherEntryAmounts({
+      transactionCurrency: "CFA",
+      baseCurrency: "USD",
+      transactionDebitAmount: "600000",
+      transactionCreditAmount: "0",
+      historicalRate: "600",
+    });
+    const crNorm = normalizeVoucherEntryAmounts({
+      transactionCurrency: "CFA",
+      baseCurrency: "USD",
+      transactionDebitAmount: "0",
+      transactionCreditAmount: "600000",
+      historicalRate: "600",
+    });
+    // Both entries share the same historical rate
+    expect(drNorm.historicalExchangeRate).toBe(crNorm.historicalExchangeRate);
+    // Base debit = base credit (balanced)
+    expect(drNorm.baseDebitAmount).toBe(crNorm.baseCreditAmount);
+    // Base = 600,000 / 600 = 1,000 USD
+    expect(new Decimal(drNorm.baseDebitAmount).toFixed(2)).toBe("1000.00");
+    // Transaction amounts preserved
+    expect(new Decimal(drNorm.transactionDebitAmount).toFixed(0)).toBe("600000");
+    // Backward-compat debitAmount = base (USD)
+    expect(drNorm.debitAmount).toBe(drNorm.baseDebitAmount);
+    // rateConvention distinguishes from IDENTITY
+    expect(drNorm.rateConvention).toBe(RateConvention.TRANSACTION_PER_BASE);
+  });
+
+  it("Editing a CFA voucher preserves rate — changing amount recalculates base", () => {
+    // Original: 600,000 CFA @ 600 = 1,000 USD
+    const original = normalizeVoucherEntryAmounts({
+      transactionCurrency: "CFA",
+      baseCurrency: "USD",
+      transactionDebitAmount: "600000",
+      transactionCreditAmount: "0",
+      historicalRate: "600",
+    });
+    // Edit: amount changed to 720,000 CFA — SAME historical rate (600)
+    const edited = normalizeVoucherEntryAmounts({
+      transactionCurrency: "CFA",
+      baseCurrency: "USD",
+      transactionDebitAmount: "720000",
+      transactionCreditAmount: "0",
+      historicalRate: "600",  // preserved from the original posting
+    });
+    expect(edited.historicalExchangeRate).toBe(original.historicalExchangeRate);
+    expect(new Decimal(edited.baseDebitAmount).toFixed(2)).toBe("1200.00");
+    expect(new Decimal(original.baseDebitAmount).toFixed(2)).toBe("1000.00");
+  });
+});
+
+// ─── 13. POS CFA entry normalization ────────────────────────────────────────
+
+describe("POS CFA entry normalization — simulates normalizePosEntry logic", () => {
+  it("1,500,000 CFA sale @ 600 debit entry: base = 2,500 USD", () => {
+    const norm = normalizeVoucherEntryAmounts({
+      transactionCurrency: "CFA",
+      baseCurrency: "USD",
+      transactionDebitAmount: "1500000",
+      transactionCreditAmount: "0",
+      historicalRate: "600",
+    });
+    expect(norm.transactionCurrency).toBe("CFA");
+    expect(new Decimal(norm.baseDebitAmount).toFixed(2)).toBe("2500.00");
+    expect(new Decimal(norm.transactionDebitAmount).toFixed(0)).toBe("1500000");
+  });
+
+  it("SP sale split: payable 1,350,000 CFA + deduction 150,000 CFA = total 1,500,000 CFA", () => {
+    // Verify the credits sum back to the total
+    const payable = normalizeVoucherEntryAmounts({
+      transactionCurrency: "CFA", baseCurrency: "USD",
+      transactionDebitAmount: "0", transactionCreditAmount: "1350000",
+      historicalRate: "600",
+    });
+    const deduction = normalizeVoucherEntryAmounts({
+      transactionCurrency: "CFA", baseCurrency: "USD",
+      transactionDebitAmount: "0", transactionCreditAmount: "150000",
+      historicalRate: "600",
+    });
+    const totalBaseCr = new Decimal(payable.baseCreditAmount).plus(deduction.baseCreditAmount);
+    // Matches the debit base of 2,500 USD
+    expect(totalBaseCr.toFixed(2)).toBe("2500.00");
   });
 });

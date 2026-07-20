@@ -143,7 +143,9 @@ export async function updatePosSale(params: UpdatePosSaleParams): Promise<{ stat
       voucherDate,
     });
 
-    // Recreate voucher entries with new total
+    // Recreate voucher entries with new total.
+    // Use the ORIGINAL voucher's stored currency and exchange rate — never the current
+    // company rate — so the historical accounting remains correct.
     await rebuildSaleAccountingEntries(tx, {
       voucherId,
       oldEntries,
@@ -155,6 +157,8 @@ export async function updatePosSale(params: UpdatePosSaleParams): Promise<{ stat
       editSpDeductionClrAccountId,
       totalQtySoldEdit,
       editSpDeductionPerQty,
+      currency: existingVoucher.currency || "USD",
+      exchangeRate: existingVoucher.exchangeRate ? String(existingVoucher.exchangeRate) : null,
     });
   });
 

@@ -127,6 +127,7 @@ import path from "path";
 import fs from "fs";
 
 import { registerVoucherEntryRoutes } from "../voucherEntryRoutes";
+import { normalizeVoucherEntryAmounts } from "../../services/accounting/currencyAmounts";
 import { recalculateOrderTotals } from "../factory/_helpers";
 import {
   customerOrderCharges,
@@ -192,6 +193,14 @@ export function registerVoucherCreateRoutes(app: Express) {
       // Get current exchange rate before starting the transaction
       const exchangeRate = await getCurrentExchangeRate(req.session.currentCompanyId!);
 
+      // Use the caller-supplied currency/rate if present (multi-currency create path).
+      // Fall back to the current company rate (legacy USD-only path).
+      const voucherCurrency: string = (voucher.currency as string | undefined) || "USD";
+      const voucherHistoricalRate: string | null =
+        voucher.exchangeRate != null ? String(voucher.exchangeRate)
+        : exchangeRate != null ? String(exchangeRate)
+        : null;
+
       // Create voucher + all entries atomically inside a single transaction.
       // Any thrown error automatically rolls back both the voucher row and
       // all entry rows — no manual cleanup required.
@@ -207,6 +216,8 @@ export function registerVoucherCreateRoutes(app: Express) {
             description: voucher.description || null,
             totalAmount: Math.max(totalDebits, totalCredits).toFixed(2),
             optional: voucher.optional ?? false,
+            currency: voucherCurrency,
+            exchangeRate: voucherHistoricalRate,
           })
           .returning();
 
@@ -245,6 +256,50 @@ export function registerVoucherCreateRoutes(app: Express) {
             }
           }
 
+          // Normalize dual-currency fields.
+          // If the caller already provides transactionCurrency (new multi-currency frontend),
+          // use those fields as-is. Otherwise derive from the voucher's currency/rate.
+          let dualCurrencyFields: Record<string, any> = {};
+          if (!entry.transactionCurrency) {
+            try {
+              const debitAmt = String(entry.debitAmount || "0");
+              const creditAmt = String(entry.creditAmount || "0");
+              const totalAmt = parseFloat(debitAmt) + parseFloat(creditAmt);
+              if (totalAmt > 0) {
+                const norm = normalizeVoucherEntryAmounts({
+                  transactionCurrency: voucherCurrency,
+                  baseCurrency: "USD",
+                  transactionDebitAmount: debitAmt,
+                  transactionCreditAmount: creditAmt,
+                  historicalRate: voucherHistoricalRate,
+                });
+                dualCurrencyFields = {
+                  transactionCurrency: norm.transactionCurrency,
+                  transactionDebitAmount: norm.transactionDebitAmount,
+                  transactionCreditAmount: norm.transactionCreditAmount,
+                  baseDebitAmount: norm.baseDebitAmount,
+                  baseCreditAmount: norm.baseCreditAmount,
+                  historicalExchangeRate: norm.historicalExchangeRate,
+                  rateConvention: norm.rateConvention,
+                };
+              }
+            } catch (normErr) {
+              // Non-fatal: normalization can fail for entries without a rate (USD-only companies).
+              // Entry is still inserted with legacy debitAmount/creditAmount only.
+            }
+          } else {
+            // Caller provided full dual-currency data (new frontend)
+            dualCurrencyFields = {
+              transactionCurrency: entry.transactionCurrency,
+              transactionDebitAmount: entry.transactionDebitAmount ?? null,
+              transactionCreditAmount: entry.transactionCreditAmount ?? null,
+              baseDebitAmount: entry.baseDebitAmount ?? null,
+              baseCreditAmount: entry.baseCreditAmount ?? null,
+              historicalExchangeRate: entry.historicalExchangeRate ?? null,
+              rateConvention: entry.rateConvention ?? null,
+            };
+          }
+
           const [txEntry] = await tx
             .insert(voucherEntries)
             .values({
@@ -259,6 +314,7 @@ export function registerVoucherCreateRoutes(app: Express) {
               debitAmount: entry.debitAmount || "0",
               creditAmount: entry.creditAmount || "0",
               narration: entry.narration || null,
+              ...dualCurrencyFields,
             })
             .returning();
           txEntries.push(txEntry);
