@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useMainContentFocus } from "@/hooks/use-main-content-focus";
+import { useWorkspaceWheelScroll } from "@/hooks/use-workspace-wheel-scroll";
 import { AppModeProvider } from "@/contexts/AppModeContext";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { PropertiesSidebar } from "@/components/PropertiesSidebar";
@@ -19,14 +20,16 @@ interface PropertiesShellProps {
 export function PropertiesShell({ user, currentLocation, handleLogout, leaveConfirmDialog }: PropertiesShellProps) {
   const [paletteOpen, setPaletteOpen] = useState(false);
   const style = { "--sidebar-width": "16rem", "--sidebar-width-icon": "3rem" };
+  const propertiesContainerRef = useRef<HTMLDivElement>(null);
   useMainContentFocus(currentLocation);
+  useWorkspaceWheelScroll(propertiesContainerRef);
   const hasAdminSearch = canUseAdminSearch(user);
 
   return (
     <AppModeProvider mode="properties">
       <SkipLink />
       <SidebarProvider style={style as React.CSSProperties}>
-        <div className="flex h-full w-full min-w-0 overflow-hidden">
+        <div ref={propertiesContainerRef} className="flex h-full w-full min-w-0 overflow-hidden">
           <PropertiesSidebar user={user} />
           <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
             <OfflineBanner />

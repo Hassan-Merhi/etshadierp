@@ -1,6 +1,7 @@
-import { useState, Suspense } from "react";
+import { useState, useRef, Suspense } from "react";
 import { useLocation } from "wouter";
 import { useMainContentFocus } from "@/hooks/use-main-content-focus";
+import { useWorkspaceWheelScroll } from "@/hooks/use-workspace-wheel-scroll";
 import { useCompany } from "@/contexts/CompanyContext";
 import { AppModeProvider } from "@/contexts/AppModeContext";
 import { SidebarProvider } from "@/components/ui/sidebar";
@@ -28,12 +29,14 @@ export function ErpShell({ user, hasErpAccess, handleLogout, leaveConfirmDialog 
   const { selectedCompany } = useCompany();
   const style = { "--sidebar-width": "16rem", "--sidebar-width-icon": "3rem" };
   const hasAdminSearch = canUseAdminSearch(user);
+  const erpContainerRef = useRef<HTMLDivElement>(null);
   useMainContentFocus(currentLocation);
+  useWorkspaceWheelScroll(erpContainerRef);
 
   return (
     <AppModeProvider mode="erp">
       <SidebarProvider style={style as React.CSSProperties}>
-        <div className="flex h-full w-full min-w-0 overflow-hidden">
+        <div ref={erpContainerRef} className="flex h-full w-full min-w-0 overflow-hidden">
           {selectedCompany?.id && <DailyRateModal companyId={selectedCompany.id} />}
           <AppSidebar user={user} />
           <div className="flex min-w-0 flex-1 flex-col overflow-hidden">

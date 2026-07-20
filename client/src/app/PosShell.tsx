@@ -1,6 +1,7 @@
-import { useState, Suspense } from "react";
+import { useState, useRef, Suspense } from "react";
 import { useLocation } from "wouter";
 import { useMainContentFocus } from "@/hooks/use-main-content-focus";
+import { useWorkspaceWheelScroll } from "@/hooks/use-workspace-wheel-scroll";
 import { useCompany } from "@/contexts/CompanyContext";
 import {
   SidebarProvider,
@@ -74,13 +75,15 @@ export function PosShell({
   // All other routes — including /tracking — are scrollable and must receive focus.
   const isFullHeightRoute = isPosRoute;
   const hasAdminSearch = canUseAdminSearch(user);
+  const posContainerRef = useRef<HTMLDivElement>(null);
   useMainContentFocus(currentLocation, isFullHeightRoute);
+  useWorkspaceWheelScroll(posContainerRef);
 
   return (
     <>
       <SkipLink />
       <SidebarProvider style={posStyle as React.CSSProperties}>
-        <div className="flex h-full w-full min-w-0 overflow-hidden">
+        <div ref={posContainerRef} className="flex h-full w-full min-w-0 overflow-hidden">
           {selectedCompany?.id && <DailyRateModal companyId={selectedCompany.id} />}
           <Sidebar>
             <SidebarHeader className="space-y-2 border-b p-3">
