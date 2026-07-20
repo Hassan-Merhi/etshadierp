@@ -104,7 +104,10 @@ export function registerStatsMultiCurrencyRoutes(app: Express) {
       const revaluation = await getCashBankRevaluation(companyId);
       const originalJson = res.json.bind(res);
       res.json = ((payload: any) => {
-        const adjusted = applyCurrentCashTranslation(payload, revaluation.accounts);
+        // The existing report engine caches its object. Clone before adjusting so
+        // repeated requests never reapply translation to the cached reference.
+        const copy = payload == null ? payload : JSON.parse(JSON.stringify(payload));
+        const adjusted = applyCurrentCashTranslation(copy, revaluation.accounts);
         adjusted.currencyRevaluation = {
           currentCfaPerUsd: revaluation.currentCfaPerUsd,
           unresolvedAccountCount: revaluation.unresolvedAccountCount,
