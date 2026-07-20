@@ -4,11 +4,13 @@ import { useWorkspaceWheelScroll } from "@/hooks/use-workspace-wheel-scroll";
 import { AppModeProvider } from "@/contexts/AppModeContext";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { PropertiesSidebar } from "@/components/PropertiesSidebar";
+import { AppTopBar } from "@/components/AppTopBar";
 import { OfflineBanner } from "@/components/OfflineBanner";
 import { CommandPalette } from "@/components/CommandPalette";
 import { SkipLink } from "@/components/ui/responsive-accessibility";
 import { PropertiesRoutes } from "@/app/PropertiesRoutes";
 import { canUseAdminSearch, type ShellUser } from "./shellUser";
+import { MODULE_ACCENT } from "@/components/sidebar/sidebarPrimitives";
 
 interface PropertiesShellProps {
   user: ShellUser;
@@ -33,6 +35,12 @@ export function PropertiesShell({ user, currentLocation, handleLogout, leaveConf
           <PropertiesSidebar user={user} />
           <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
             <OfflineBanner />
+            <AppTopBar
+              accentColor={MODULE_ACCENT.properties}
+              user={{ username: user.username, role: user.role ?? "" }}
+              onLogout={handleLogout}
+              onSearchOpen={() => setPaletteOpen(true)}
+            />
             <main
               id="main-content"
               tabIndex={-1}

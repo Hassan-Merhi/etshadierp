@@ -300,6 +300,33 @@ export const voucherEntries = pgTable(
     debitAmount: decimal("debit_amount", { precision: 20, scale: 2 }).default("0"),
     creditAmount: decimal("credit_amount", { precision: 20, scale: 2 }).default("0"),
     narration: text("narration"),
+    // ── Dual-currency fields (Phase 1 multi-currency accounting) ─────────────
+    // Added as nullable so all existing rows remain valid without a data migration.
+    // New writes fill all 7 fields via normalizeVoucherEntryAmounts().
+    // Existing rows are backfilled via scripts/backfill-voucher-entry-currency-amounts.mjs.
+    //
+    // debitAmount / creditAmount (above) are redefined as backward-compatible
+    // historical BASE-CURRENCY (USD) amounts for all newly posted vouchers.
+    // Legacy rows that stored CFA directly must be repaired by the backfill script.
+    /** ISO-4217 code of the original transaction currency (e.g. "XOF", "USD"). */
+    transactionCurrency: varchar("transaction_currency", { length: 3 }),
+    /** Transaction-currency debit amount at time of posting (6 dp). */
+    transactionDebitAmount: decimal("transaction_debit_amount", { precision: 20, scale: 6 }),
+    /** Transaction-currency credit amount at time of posting (6 dp). */
+    transactionCreditAmount: decimal("transaction_credit_amount", { precision: 20, scale: 6 }),
+    /** Historical base-currency (USD) debit amount (6 dp). Equals debitAmount for new rows. */
+    baseDebitAmount: decimal("base_debit_amount", { precision: 20, scale: 6 }),
+    /** Historical base-currency (USD) credit amount (6 dp). Equals creditAmount for new rows. */
+    baseCreditAmount: decimal("base_credit_amount", { precision: 20, scale: 6 }),
+    /** Exchange rate used at posting time (10 dp). Semantics depend on rateConvention. */
+    historicalExchangeRate: decimal("historical_exchange_rate", { precision: 20, scale: 10 }),
+    /**
+     * Rate convention:
+     *  IDENTITY             – transaction currency IS the base currency
+     *  TRANSACTION_PER_BASE – rate = transaction-currency units per 1 base unit (CFA per USD)
+     *  BASE_PER_TRANSACTION – rate = base units per 1 transaction unit (reserved)
+     */
+    rateConvention: varchar("rate_convention", { length: 30 }),
     createdAt: timestamp("created_at").notNull().defaultNow(),
   },
   (t) => ({

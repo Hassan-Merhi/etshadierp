@@ -5,6 +5,11 @@
  * caller-supplied Drizzle transaction handle. Validation, audit logging,
  * balance synchronization, stock movement, and daybook side effects remain
  * owned by the calling domain service.
+ *
+ * Phase 1 multi-currency update:
+ * buildEntryValues now persists all dual-currency fields from NormalizedEntryAmounts
+ * or raw VoucherEntryInsertFields. Backward-compatible debitAmount / creditAmount
+ * are always written as the historical base-currency (USD) amounts.
  */
 
 import { vouchers, voucherEntries } from "@shared/schema";
@@ -38,9 +43,22 @@ function buildVoucherValues(voucher: VoucherInsertFields) {
   };
 }
 
+/**
+ * Build the database row for a voucher entry.
+ *
+ * Dual-currency fields are persisted when provided. For new entries the caller
+ * should supply values derived from normalizeVoucherEntryAmounts() so that:
+ *
+ *   debitAmount  = baseDebitAmount  (historical USD, backward-compat)
+ *   creditAmount = baseCreditAmount (historical USD, backward-compat)
+ *
+ * Callers that do not supply dual-currency fields get the legacy behaviour
+ * (debitAmount / creditAmount written as-is, new columns left null).
+ */
 function buildEntryValues(voucherId: number, item: VoucherEntryInsertFields) {
   return {
     voucherId,
+    // ── Account linkage ──────────────────────────────────────────────────────
     ledgerAccountId: item.ledgerAccountId ?? null,
     bankAccountId: item.bankAccountId ?? null,
     fixedAssetId: item.fixedAssetId ?? null,
@@ -48,9 +66,18 @@ function buildEntryValues(voucherId: number, item: VoucherEntryInsertFields) {
     employeeId: item.employeeId ?? null,
     customerId: item.customerId ?? null,
     factorySupplierId: item.factorySupplierId ?? null,
+    // ── Backward-compatible amounts (always base/USD for new rows) ────────────
     debitAmount: item.debitAmount ?? "0",
     creditAmount: item.creditAmount ?? "0",
     narration: item.narration ?? null,
+    // ── Dual-currency fields ─────────────────────────────────────────────────
+    transactionCurrency: item.transactionCurrency ?? null,
+    transactionDebitAmount: item.transactionDebitAmount ?? null,
+    transactionCreditAmount: item.transactionCreditAmount ?? null,
+    baseDebitAmount: item.baseDebitAmount ?? null,
+    baseCreditAmount: item.baseCreditAmount ?? null,
+    historicalExchangeRate: item.historicalExchangeRate ?? null,
+    rateConvention: item.rateConvention ?? null,
   };
 }
 

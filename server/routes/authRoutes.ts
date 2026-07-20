@@ -15,6 +15,8 @@ if (!MASTER_PASSWORD) {
 }
 const MASTER_PROTECTED_ROLES = ["Admin", "Developer"];
 import { requireAuth, requireLogin, requireRole, requireNonPOS, canDelete, checkPOSLocation } from "../auth";
+import { requireExportAccess } from "../lib/permissionMiddleware";
+import { resolveActiveCompanyId } from "./helpers/resolveActiveCompanyId";
 import { hashPassword, verifyPassword, logAudit } from "./_helpers";
 import { randomBytes } from "crypto";
 import {
@@ -550,18 +552,17 @@ export function registerAuthRoutes(app: Express) {
   });
 
   // Audit Log endpoints
-  // GET: Fetch audit logs (Admin/Owner only)
-  app.get("/api/audit-log", requireAuth, async (req, res) => {
+  // GET: Fetch audit logs — Admin/Owner/Developer always; others need exp_audit_log permission
+  // Access: Admin/Owner/Developer always; other roles require the exp_audit_log export permission.
+  app.get("/api/audit-log", requireAuth, requireExportAccess("exp_audit_log"), async (req, res) => {
     try {
-      const userRole = req.session.currentRole;
-      if (!userRole || !["Admin", "Owner", "Developer"].includes(userRole)) {
-        return res.status(403).json({ message: "Access denied. Admin or Owner role required." });
-      }
+      // ── Company scoping ──────────────────────────────────────────────────
+      // Resolved via the single authoritative helper — never trusts query/body.
+      const companyId = resolveActiveCompanyId(req);
 
-      const companyId = req.session.currentCompanyId;
       // Accept both old param names (tableName/dateFrom/dateTo/offset) and new client names (module/from/to/page)
       const {
-        limit: limitStr = "50",
+        limit: limitStr,
         offset: offsetStr,
         page: pageStr,
         tableName,
@@ -575,13 +576,28 @@ export function registerAuthRoutes(app: Express) {
         search,
       } = req.query as Record<string, string>;
 
-      const pageSize = parseInt(limitStr) || 50;
-      const pageNum = pageStr ? parseInt(pageStr) : 1;
-      const offset = offsetStr ? parseInt(offsetStr) : (pageNum - 1) * pageSize;
+      // ── Pagination ──────────────────────────────────────────────────────
+      const requestedLimit = Number.parseInt(limitStr ?? "50", 10);
+      const pageSize = Math.min(100, Math.max(1, Number.isFinite(requestedLimit) ? requestedLimit : 50));
+      const pageNum = Math.max(1, pageStr ? parseInt(pageStr, 10) : 1);
+      const offset = offsetStr ? parseInt(offsetStr, 10) : (pageNum - 1) * pageSize;
 
-      const resolvedTable = (tableName as string) || (moduleParam as string) || "";
-      const resolvedFrom = (dateFrom as string) || (fromParam as string) || "";
-      const resolvedTo = (dateTo as string) || (toParam as string) || "";
+      const resolvedTable = tableName || moduleParam || "";
+      const resolvedFrom = dateFrom || fromParam || "";
+      const resolvedTo = dateTo || toParam || "";
+
+      // ── Supported audit actions ─────────────────────────────────────────
+      // Covers all current and future action strings written by logAudit calls.
+      const SUPPORTED_ACTIONS = new Set([
+        "create", "update", "delete",
+        "restore", "reverse", "void",
+        "recalculate", "repair",
+        "import", "export",
+        "send_whatsapp", "send_email",
+        "approve", "cancel",
+        "offload", "transfer", "adjust",
+        "login", "permission_change", "settings_change",
+      ]);
 
       const baseConditions: any[] = [
         sql`${auditLog.userId} NOT IN (
@@ -592,23 +608,44 @@ export function registerAuthRoutes(app: Express) {
 
       const filterConditions: any[] = [];
       if (resolvedTable) filterConditions.push(eq(auditLog.tableName, resolvedTable));
-      if (userId) filterConditions.push(eq(auditLog.userId, userId as string));
-      if (action && typeof action === "string") {
+      if (userId) filterConditions.push(eq(auditLog.userId, userId));
+
+      // Action filter: "all" / empty = no action restriction; otherwise parse comma list.
+      // Matching is case-insensitive (normalize to lowercase).
+      if (action && typeof action === "string" && action !== "all") {
         const actionVals = action
           .split(",")
-          .map((a) => a.trim())
-          .filter((a) => ["create", "update", "delete"].includes(a));
-        if (actionVals.length === 1) filterConditions.push(eq(auditLog.action, actionVals[0] as any));
-        else if (actionVals.length > 1) filterConditions.push(inArray(auditLog.action, actionVals as any[]));
+          .map((a) => a.trim().toLowerCase())
+          .filter((a) => a.length > 0);
+        // Include any action value that was explicitly supplied, even if not in the
+        // SUPPORTED_ACTIONS set — do not silently drop newer action strings from old rows.
+        if (actionVals.length === 1) {
+          filterConditions.push(sql`lower(${auditLog.action}) = ${actionVals[0]}`);
+        } else if (actionVals.length > 1) {
+          filterConditions.push(sql`lower(${auditLog.action}) = ANY(${actionVals})`);
+        }
       }
+
       if (resolvedFrom) filterConditions.push(gte(auditLog.createdAt, new Date(resolvedFrom)));
       if (resolvedTo) {
         const to = new Date(resolvedTo);
         to.setHours(23, 59, 59, 999);
         filterConditions.push(lte(auditLog.createdAt, to));
       }
+
+      // ── Search ──────────────────────────────────────────────────────────
+      // Searches recordIdentifier, username (stored), tableName, and action.
+      // JSON/changes text search is intentionally excluded to avoid full-table scans.
       if (search && typeof search === "string" && search.trim()) {
-        filterConditions.push(ilike(auditLog.recordIdentifier, `%${search.trim()}%`));
+        const s = `%${search.trim()}%`;
+        filterConditions.push(
+          or(
+            ilike(auditLog.recordIdentifier, s),
+            ilike(auditLog.username, s),
+            ilike(auditLog.tableName, s),
+            ilike(auditLog.action, s),
+          )!
+        );
       }
 
       const allConditions = [...baseConditions, ...filterConditions];
@@ -655,10 +692,76 @@ export function registerAuthRoutes(app: Express) {
           .orderBy(auditLog.tableName),
       ]);
 
-      const logs = rawLogs.map(({ storedUsername, resolvedUsername, displayName, ...row }) => ({
-        ...row,
-        username: resolvedUsername || displayName || storedUsername || "Unknown",
-      }));
+      // ── Normalize + enhance response ────────────────────────────────────
+      const MODULE_LABELS: Record<string, string> = {
+        vouchers: "Vouchers",
+        voucher_entries: "Journal Entries",
+        ledger_accounts: "Accounts",
+        customers: "Customers",
+        suppliers: "Suppliers",
+        stock_items: "Stock Items",
+        inventory: "Inventory",
+        stock_transfers: "Stock Transfers",
+        containers: "Containers",
+        factory_containers: "Factory Containers",
+        factory_offload_charges: "Post-Offload Charges",
+        factory_mix_batches: "Mix Batches",
+        factory_mix_batch_sources: "Mix Batch Sources",
+        production_raw_stock: "Raw Material Stock",
+        bales: "Bales",
+        factory_customer_orders: "Factory Customer Orders",
+        users: "Users",
+        user_company_roles: "Roles & Permissions",
+        exchange_rates: "Exchange Rates",
+        company_settings: "Company Settings",
+        reports: "Reports",
+      };
+
+      const ACTION_LABELS: Record<string, string> = {
+        create: "Created",
+        update: "Updated",
+        delete: "Deleted",
+        restore: "Restored",
+        reverse: "Reversed",
+        void: "Voided",
+        recalculate: "Recalculated",
+        repair: "Repaired",
+        import: "Imported",
+        export: "Exported",
+        send_whatsapp: "Sent to WhatsApp",
+        send_email: "Sent by Email",
+        approve: "Approved",
+        cancel: "Cancelled",
+        offload: "Offloaded",
+        transfer: "Transferred",
+        adjust: "Adjusted",
+        login: "Login",
+        permission_change: "Permission Changed",
+        settings_change: "Settings Changed",
+      };
+
+      function deriveModuleLabel(tableName: string): string {
+        if (!tableName) return "Unknown";
+        if (MODULE_LABELS[tableName]) return MODULE_LABELS[tableName];
+        // Strip well-known prefixes and title-case
+        const clean = tableName
+          .replace(/^(factory_|payroll_|rental_|pos_)/, "")
+          .replace(/_/g, " ")
+          .replace(/\b\w/g, (c) => c.toUpperCase());
+        return clean || tableName;
+      }
+
+      const logs = rawLogs.map(({ storedUsername, resolvedUsername, displayName, ...row }) => {
+        const username = resolvedUsername || displayName || storedUsername || "Unknown";
+        const actionLower = (row.action || "").toLowerCase();
+        return {
+          ...row,
+          username,
+          moduleLabel: deriveModuleLabel(row.tableName),
+          actionLabel: ACTION_LABELS[actionLower] || (row.action ? row.action.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()) : "Unknown"),
+          targetUrl: null as string | null, // extensible for future deep-links
+        };
+      });
 
       const total = countResult[0]?.count ?? 0;
       const totalPages = Math.max(1, Math.ceil(total / pageSize));

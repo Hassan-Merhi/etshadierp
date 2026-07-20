@@ -7,15 +7,80 @@
  *   - normal-ERP single revenue credit
  *   - supplier-partner split accounting (payable / deduction clearing) for edits
  *
- * Every message, status code, and query is byte-identical to the original —
- * only the code location changed.
+ * Phase 15 update: entries now carry all 7 dual-currency fields via
+ * normalizeVoucherEntryAmounts(). The voucher's stored currency and historical
+ * exchange rate are loaded before calling this function so that the repair
+ * uses the rate that was in effect at the time of the original sale, never
+ * the current company rate.
  */
 import { voucherEntries } from "@shared/schema";
+import { normalizeVoucherEntryAmounts } from "../../../services/accounting/currencyAmounts";
+
+/**
+ * Normalize a single entry amount with the voucher's historical currency and rate.
+ * Soft-fails to legacy storage when normalization is not possible (missing rate etc.).
+ */
+function normalizePosEntry(
+  debitAmt: number,
+  creditAmt: number,
+  currency: string,
+  exchangeRate: string | null | undefined
+): {
+  debitAmount: string;
+  creditAmount: string;
+  transactionCurrency: string;
+  transactionDebitAmount: string;
+  transactionCreditAmount: string;
+  baseDebitAmount: string;
+  baseCreditAmount: string;
+  historicalExchangeRate: string;
+  rateConvention: string;
+} {
+  try {
+    const norm = normalizeVoucherEntryAmounts({
+      transactionCurrency: currency || "USD",
+      baseCurrency: "USD",
+      transactionDebitAmount: String(Math.abs(debitAmt)),
+      transactionCreditAmount: String(Math.abs(creditAmt)),
+      historicalRate: exchangeRate,
+    });
+    return {
+      debitAmount: norm.debitAmount,
+      creditAmount: norm.creditAmount,
+      transactionCurrency: norm.transactionCurrency,
+      transactionDebitAmount: norm.transactionDebitAmount,
+      transactionCreditAmount: norm.transactionCreditAmount,
+      baseDebitAmount: norm.baseDebitAmount,
+      baseCreditAmount: norm.baseCreditAmount,
+      historicalExchangeRate: norm.historicalExchangeRate,
+      rateConvention: norm.rateConvention,
+    };
+  } catch (e) {
+    console.warn("[POS Edit] normalizeVoucherEntryAmounts failed, using legacy storage:", (e as any)?.message);
+    const dStr = Math.abs(debitAmt).toFixed(2);
+    const cStr = Math.abs(creditAmt).toFixed(2);
+    return {
+      debitAmount: dStr,
+      creditAmount: cStr,
+      transactionCurrency: currency || "USD",
+      transactionDebitAmount: dStr,
+      transactionCreditAmount: cStr,
+      baseDebitAmount: dStr,
+      baseCreditAmount: cStr,
+      historicalExchangeRate: "1.0000000000",
+      rateConvention: "IDENTITY",
+    };
+  }
+}
 
 /**
  * Recreates voucher entries with the new total. Throws "Original voucher
  * entries not found" (matching the original) if the old debit/credit entries
  * cannot be located.
+ *
+ * `currency` and `exchangeRate` must be the values stored on the ORIGINAL voucher —
+ * never substitute the current company rate. The caller loads them from the existing
+ * voucher row (existingVoucher.currency / existingVoucher.exchangeRate).
  */
 export async function rebuildSaleAccountingEntries(
   tx: any,
@@ -30,6 +95,10 @@ export async function rebuildSaleAccountingEntries(
     editSpDeductionClrAccountId: number | null;
     totalQtySoldEdit: number;
     editSpDeductionPerQty: number;
+    /** Voucher's stored transaction currency — loaded from the original voucher, NOT substituted. */
+    currency?: string | null;
+    /** Voucher's stored historical exchange rate — loaded from original voucher row. */
+    exchangeRate?: string | null;
   }
 ): Promise<void> {
   const {
@@ -43,6 +112,8 @@ export async function rebuildSaleAccountingEntries(
     editSpDeductionClrAccountId,
     totalQtySoldEdit,
     editSpDeductionPerQty,
+    currency,
+    exchangeRate,
   } = params;
 
   // Get original entries for reference
@@ -53,11 +124,22 @@ export async function rebuildSaleAccountingEntries(
     throw new Error("Original voucher entries not found");
   }
 
-  // Determine payment account - use new values if provided, otherwise preserve original
+  const voucherCurrency = currency || "USD";
+  const voucherRate = exchangeRate || null;
+
+  // Debit entry (payment account) with dual-currency fields
+  const normDR = normalizePosEntry(Math.abs(grandTotal), 0, voucherCurrency, voucherRate);
   const newDebitEntry: any = {
     voucherId,
-    debitAmount: grandTotal.toString(),
-    creditAmount: "0",
+    debitAmount: grandTotal >= 0 ? normDR.debitAmount : "0",
+    creditAmount: grandTotal < 0 ? normDR.debitAmount : "0",
+    transactionCurrency: normDR.transactionCurrency,
+    transactionDebitAmount: grandTotal >= 0 ? normDR.transactionDebitAmount : "0",
+    transactionCreditAmount: grandTotal < 0 ? normDR.transactionDebitAmount : "0",
+    baseDebitAmount: grandTotal >= 0 ? normDR.baseDebitAmount : "0",
+    baseCreditAmount: grandTotal < 0 ? normDR.baseDebitAmount : "0",
+    historicalExchangeRate: normDR.historicalExchangeRate,
+    rateConvention: normDR.rateConvention,
     narration: paymentEntry.narration || "",
   };
 
@@ -87,6 +169,7 @@ export async function rebuildSaleAccountingEntries(
 
   if (!isSpCompanyEdit) {
     // Normal ERP: single credit to Sales Revenue account
+    const normCR = normalizePosEntry(0, Math.abs(grandTotal), voucherCurrency, voucherRate);
     await tx.insert(voucherEntries).values({
       voucherId,
       ledgerAccountId: revenueEntry.ledgerAccountId,
@@ -94,8 +177,15 @@ export async function rebuildSaleAccountingEntries(
       supplierId: revenueEntry.supplierId,
       employeeId: revenueEntry.employeeId,
       fixedAssetId: revenueEntry.fixedAssetId,
-      debitAmount: "0",
-      creditAmount: grandTotal.toString(),
+      debitAmount: grandTotal < 0 ? normCR.creditAmount : "0",
+      creditAmount: grandTotal >= 0 ? normCR.creditAmount : "0",
+      transactionCurrency: normCR.transactionCurrency,
+      transactionDebitAmount: grandTotal < 0 ? normCR.transactionCreditAmount : "0",
+      transactionCreditAmount: grandTotal >= 0 ? normCR.transactionCreditAmount : "0",
+      baseDebitAmount: grandTotal < 0 ? normCR.baseCreditAmount : "0",
+      baseCreditAmount: grandTotal >= 0 ? normCR.baseCreditAmount : "0",
+      historicalExchangeRate: normCR.historicalExchangeRate,
+      rateConvention: normCR.rateConvention,
       narration: revenueEntry.narration || "",
     });
   } else {
@@ -115,39 +205,71 @@ export async function rebuildSaleAccountingEntries(
 
     if (grandTotalRounded > 0) {
       if (editSpPayableAmount > 0) {
+        const normSP = normalizePosEntry(0, editSpPayableAmount, voucherCurrency, voucherRate);
         await tx.insert(voucherEntries).values({
           voucherId,
           ledgerAccountId: editSpPayableAccountId!,
           debitAmount: "0",
-          creditAmount: editSpPayableAmount.toFixed(2),
+          creditAmount: normSP.creditAmount,
+          transactionCurrency: normSP.transactionCurrency,
+          transactionDebitAmount: "0",
+          transactionCreditAmount: normSP.transactionCreditAmount,
+          baseDebitAmount: "0",
+          baseCreditAmount: normSP.baseCreditAmount,
+          historicalExchangeRate: normSP.historicalExchangeRate,
+          rateConvention: normSP.rateConvention,
           narration: `Supplier Cash Payable`,
         });
       }
       if (editDeductionAmount > 0 && editSpDeductionClrAccountId) {
+        const normDD = normalizePosEntry(0, editDeductionAmount, voucherCurrency, voucherRate);
         await tx.insert(voucherEntries).values({
           voucherId,
           ledgerAccountId: editSpDeductionClrAccountId,
           debitAmount: "0",
-          creditAmount: editDeductionAmount.toFixed(2),
+          creditAmount: normDD.creditAmount,
+          transactionCurrency: normDD.transactionCurrency,
+          transactionDebitAmount: "0",
+          transactionCreditAmount: normDD.transactionCreditAmount,
+          baseDebitAmount: "0",
+          baseCreditAmount: normDD.baseCreditAmount,
+          historicalExchangeRate: normDD.historicalExchangeRate,
+          rateConvention: normDD.rateConvention,
           narration: `Supplier Payable Deduction (${totalQtySoldEdit} qty × ${editSpDeductionPerQty})`,
         });
       }
     } else if (grandTotalRounded < 0) {
       if (editSpPayableAmount < 0) {
+        const normSPR = normalizePosEntry(Math.abs(editSpPayableAmount), 0, voucherCurrency, voucherRate);
         await tx.insert(voucherEntries).values({
           voucherId,
           ledgerAccountId: editSpPayableAccountId!,
-          debitAmount: Math.abs(editSpPayableAmount).toFixed(2),
+          debitAmount: normSPR.debitAmount,
           creditAmount: "0",
+          transactionCurrency: normSPR.transactionCurrency,
+          transactionDebitAmount: normSPR.transactionDebitAmount,
+          transactionCreditAmount: "0",
+          baseDebitAmount: normSPR.baseDebitAmount,
+          baseCreditAmount: "0",
+          historicalExchangeRate: normSPR.historicalExchangeRate,
+          rateConvention: normSPR.rateConvention,
           narration: `Supplier Cash Payable reversal`,
         });
       }
       if (editDeductionAmount > 0 && editSpDeductionClrAccountId) {
+        const normDDR = normalizePosEntry(editDeductionAmount, 0, voucherCurrency, voucherRate);
         await tx.insert(voucherEntries).values({
           voucherId,
           ledgerAccountId: editSpDeductionClrAccountId,
-          debitAmount: editDeductionAmount.toFixed(2),
+          debitAmount: normDDR.debitAmount,
           creditAmount: "0",
+          transactionCurrency: normDDR.transactionCurrency,
+          transactionDebitAmount: normDDR.transactionDebitAmount,
+          transactionCreditAmount: "0",
+          baseDebitAmount: normDDR.baseDebitAmount,
+          baseCreditAmount: "0",
+          historicalExchangeRate: normDDR.historicalExchangeRate,
+          rateConvention: normDDR.rateConvention,
           narration: `Supplier Payable Deduction reversal`,
         });
       }

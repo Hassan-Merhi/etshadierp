@@ -1,5 +1,5 @@
 import type { Express } from "express";
-import { db } from "../db";
+import { db, pool } from "../db";
 import { storage } from "../storage";
 import { requireAuth, requireRole, canDelete, requireNonPOS, checkPOSLocation } from "../auth";
 import {
@@ -190,12 +190,14 @@ export function registerReportsRoutes(app: Express) {
       }
 
       // Phase 2: period entries + all-time entries via JOINs (eliminates 2 intermediate ID round-trips)
+      // COALESCE(base_debit_amount, debit_amount): uses historical USD base when available
+      // (i.e. after backfill), falls back to debit_amount for legacy rows.
       const [periodEntries, allTimeEntries] = await Promise.all([
         db
           .select({
             ledgerAccountId: voucherEntries.ledgerAccountId,
-            debitAmount: voucherEntries.debitAmount,
-            creditAmount: voucherEntries.creditAmount,
+            debitAmount: sql<string>`COALESCE("voucher_entries"."base_debit_amount", "voucher_entries"."debit_amount")`,
+            creditAmount: sql<string>`COALESCE("voucher_entries"."base_credit_amount", "voucher_entries"."credit_amount")`,
             voucherId: voucherEntries.voucherId,
           })
           .from(voucherEntries)
@@ -205,8 +207,8 @@ export function registerReportsRoutes(app: Express) {
         db
           .select({
             ledgerAccountId: voucherEntries.ledgerAccountId,
-            debitAmount: voucherEntries.debitAmount,
-            creditAmount: voucherEntries.creditAmount,
+            debitAmount: sql<string>`COALESCE("voucher_entries"."base_debit_amount", "voucher_entries"."debit_amount")`,
+            creditAmount: sql<string>`COALESCE("voucher_entries"."base_credit_amount", "voucher_entries"."credit_amount")`,
             supplierId: voucherEntries.supplierId,
           })
           .from(voucherEntries)
@@ -465,8 +467,8 @@ export function registerReportsRoutes(app: Express) {
         const erpSalesEntries = await db
           .select({
             ledgerAccountId: voucherEntries.ledgerAccountId,
-            debitAmount: voucherEntries.debitAmount,
-            creditAmount: voucherEntries.creditAmount,
+            debitAmount: sql<string>`COALESCE("voucher_entries"."base_debit_amount", "voucher_entries"."debit_amount")`,
+            creditAmount: sql<string>`COALESCE("voucher_entries"."base_credit_amount", "voucher_entries"."credit_amount")`,
           })
           .from(voucherEntries)
           .innerJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
@@ -1457,8 +1459,8 @@ export function registerReportsRoutes(app: Express) {
           ? await db
               .select({
                 ledgerAccountId: voucherEntries.ledgerAccountId,
-                debitAmount: voucherEntries.debitAmount,
-                creditAmount: voucherEntries.creditAmount,
+                debitAmount: sql<string>`COALESCE("voucher_entries"."base_debit_amount", "voucher_entries"."debit_amount")`,
+                creditAmount: sql<string>`COALESCE("voucher_entries"."base_credit_amount", "voucher_entries"."credit_amount")`,
               })
               .from(voucherEntries)
               .innerJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
@@ -1529,8 +1531,8 @@ export function registerReportsRoutes(app: Express) {
           ? await db
               .select({
                 ledgerAccountId: voucherEntries.ledgerAccountId,
-                debitAmount: voucherEntries.debitAmount,
-                creditAmount: voucherEntries.creditAmount,
+                debitAmount: sql<string>`COALESCE("voucher_entries"."base_debit_amount", "voucher_entries"."debit_amount")`,
+                creditAmount: sql<string>`COALESCE("voucher_entries"."base_credit_amount", "voucher_entries"."credit_amount")`,
               })
               .from(voucherEntries)
               .innerJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
@@ -1620,8 +1622,8 @@ export function registerReportsRoutes(app: Express) {
           ? await db
               .select({
                 ledgerAccountId: voucherEntries.ledgerAccountId,
-                debitAmount: voucherEntries.debitAmount,
-                creditAmount: voucherEntries.creditAmount,
+                debitAmount: sql<string>`COALESCE("voucher_entries"."base_debit_amount", "voucher_entries"."debit_amount")`,
+                creditAmount: sql<string>`COALESCE("voucher_entries"."base_credit_amount", "voucher_entries"."credit_amount")`,
               })
               .from(voucherEntries)
               .innerJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
@@ -1697,8 +1699,8 @@ export function registerReportsRoutes(app: Express) {
           ? await db
               .select({
                 ledgerAccountId: voucherEntries.ledgerAccountId,
-                debitAmount: voucherEntries.debitAmount,
-                creditAmount: voucherEntries.creditAmount,
+                debitAmount: sql<string>`COALESCE("voucher_entries"."base_debit_amount", "voucher_entries"."debit_amount")`,
+                creditAmount: sql<string>`COALESCE("voucher_entries"."base_credit_amount", "voucher_entries"."credit_amount")`,
               })
               .from(voucherEntries)
               .innerJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
@@ -1777,8 +1779,8 @@ export function registerReportsRoutes(app: Express) {
       // Get opening balance (entries before start date)
       const openingEntries = await db
         .select({
-          debit: voucherEntries.debitAmount,
-          credit: voucherEntries.creditAmount,
+          debit: sql<string>`COALESCE("voucher_entries"."base_debit_amount", "voucher_entries"."debit_amount")`,
+          credit: sql<string>`COALESCE("voucher_entries"."base_credit_amount", "voucher_entries"."credit_amount")`,
         })
         .from(voucherEntries)
         .innerJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
@@ -1802,12 +1804,13 @@ export function registerReportsRoutes(app: Express) {
       }
 
       // Get all voucher entries in date range grouped by month
+      // COALESCE(base_debit_amount, debit_amount): uses historical USD base when available
       const entries = await db
         .select({
           voucherId: vouchers.id,
           date: vouchers.voucherDate,
-          debit: voucherEntries.debitAmount,
-          credit: voucherEntries.creditAmount,
+          debit: sql<string>`COALESCE("voucher_entries"."base_debit_amount", "voucher_entries"."debit_amount")`,
+          credit: sql<string>`COALESCE("voucher_entries"."base_credit_amount", "voucher_entries"."credit_amount")`,
         })
         .from(voucherEntries)
         .innerJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))

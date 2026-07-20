@@ -1,3 +1,4 @@
+import { logAudit } from "../../helpers/auditHelpers";
 import { contentDisposition } from "../../../lib/contentDisposition";
 import { trackOneContainerById } from "../../../services/containerTrackingService";
 import { parseId, parseOptionalId } from "../../../lib/parseId";
@@ -613,6 +614,20 @@ export function registerOrderExcelExportRoutes(app: Express) {
         hideSelling: hideSellingXls1,
         noCharges: false,
       });
+      try {
+        await logAudit({
+          userId: req.session.userId!,
+          username: (req.session as any).username || req.session.userId!,
+          companyId,
+          action: "export",
+          tableName: "factory_customer_orders",
+          recordId: orderId,
+          recordIdentifier: `Customer Order #${(order as any).invoiceNumber || (order as any).orderNumber || orderId} Excel`,
+          changes: { format: { old: null, new: "xlsx" }, orderId: { old: null, new: orderId } },
+        });
+      } catch (auditErr) {
+        console.error("[ExcelExport] audit write failed:", auditErr);
+      }
       res.status(200);
       res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
       res.setHeader("Content-Disposition", contentDisposition(fileName));
@@ -737,6 +752,20 @@ export function registerOrderExcelExportRoutes(app: Express) {
         noCharges: noChargesXls,
       });
       res.status(200);
+      try {
+        await logAudit({
+          userId: req.session.userId!,
+          username: (req.session as any).username || req.session.userId!,
+          companyId,
+          action: "export",
+          tableName: "factory_customer_orders",
+          recordId: orderId,
+          recordIdentifier: `Customer Order #${(order as any).invoiceNumber || orderId} Excel`,
+          changes: { format: { old: null, new: "xlsx" }, orderId: { old: null, new: orderId } },
+        });
+      } catch (auditErr) {
+        console.error("[ExcelExport] audit write failed:", auditErr);
+      }
       res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
       res.setHeader("Content-Disposition", contentDisposition(fileName));
       res.setHeader("Content-Length", String(xlsBuffer.length));

@@ -59,7 +59,11 @@ export interface SupplierBalanceContextResult {
   balance: number;
   openingBalance: number;
   hasActivity: boolean;
-  entries: Array<{ creditAmount?: string | null; debitAmount?: string | null }>;
+  entries: Array<{ creditAmount?: string | null; debitAmount?: string | null; transactionCurrency?: string | null; transactionDebitAmount?: string | null; transactionCreditAmount?: string | null; baseDebitAmount?: string | null; baseCreditAmount?: string | null }>;
+  /** Net balance in each transaction currency: { currency: { debit, credit, net } }. */
+  balancesByCurrency: Record<string, { debit: number; credit: number; net: number }>;
+  /** Sum of COALESCE(base_debit_amount, debit_amount) − COALESCE(base_credit_amount, credit_amount) across all entries. */
+  historicalBaseBalance: number;
 }
 
 /**
@@ -88,10 +92,31 @@ export async function getSupplierBalanceForContext(
   }, openingBalanceD);
   const balance = balanceD.toNumber();
 
+  // Build balancesByCurrency: group by transactionCurrency (fall back to "USD" when null)
+  const balancesByCurrency: Record<string, { debit: number; credit: number; net: number }> = {};
+  for (const entry of entries as any[]) {
+    const ccy: string = (entry.transactionCurrency as string | null) || "USD";
+    const txDr = parseFloat((entry.transactionDebitAmount as string | null) ?? (entry.debitAmount as string | null) ?? "0");
+    const txCr = parseFloat((entry.transactionCreditAmount as string | null) ?? (entry.creditAmount as string | null) ?? "0");
+    if (!balancesByCurrency[ccy]) balancesByCurrency[ccy] = { debit: 0, credit: 0, net: 0 };
+    balancesByCurrency[ccy].debit += txDr;
+    balancesByCurrency[ccy].credit += txCr;
+    balancesByCurrency[ccy].net = balancesByCurrency[ccy].credit - balancesByCurrency[ccy].debit;
+  }
+
+  // historicalBaseBalance: sum of COALESCE(base_debit_amount, debit_amount) − COALESCE(base_credit_amount, credit_amount)
+  let historicalBaseBalance = openingBalanceD.toNumber();
+  for (const entry of entries as any[]) {
+    const baseDr = parseFloat((entry.baseDebitAmount as string | null) ?? (entry.debitAmount as string | null) ?? "0");
+    const baseCr = parseFloat((entry.baseCreditAmount as string | null) ?? (entry.creditAmount as string | null) ?? "0");
+    if (baseCr > 0 && baseDr === 0) historicalBaseBalance += baseCr;
+    if (baseDr > 0 && baseCr === 0) historicalBaseBalance -= baseDr;
+  }
+
   // A nonzero opening balance (only ever present in the parent's own context)
   // counts as activity too — otherwise the parent company itself would
   // wrongly have its own suppliers filtered out of activity-gated lists.
-  return { balance, openingBalance, hasActivity: entries.length > 0 || openingBalance !== 0, entries };
+  return { balance, openingBalance, hasActivity: entries.length > 0 || openingBalance !== 0, entries, balancesByCurrency, historicalBaseBalance };
 }
 
 /**

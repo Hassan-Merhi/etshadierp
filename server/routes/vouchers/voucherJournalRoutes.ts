@@ -137,6 +137,10 @@ import {
   factorySettings as fSettings,
   factoryDaybookEntries as fde,
 } from "@shared/schema";
+import {
+  normalizeVoucherEntryAmounts,
+  erpRateToDaybookFxRateToUsd,
+} from "../../services/accounting/currencyAmounts";
 
 /**
  * After saving a journal voucher, if it has a customer entry + a ledger account entry,
@@ -294,7 +298,13 @@ export function registerVoucherJournalRoutes(app: Express) {
         return res.status(400).json({ message: "Missing required fields" });
       }
 
-      // Calculate total debits and credits
+      // Determine voucher currency and rate (CFA per USD convention for non-USD).
+      // totalDebits/totalCredits below are in the voucher's transaction currency (e.g. CFA).
+      const vCurrency = (currency as string | undefined) || "USD";
+      const vRateRaw = (exchangeRate as string | number | undefined) || null;
+      const cfaPerUsd = (vCurrency !== "USD" && vRateRaw) ? parseFloat(String(vRateRaw)) : 1;
+
+      // Calculate total debits and credits in transaction currency
       let totalDebits = 0;
       let totalCredits = 0;
       entries.forEach((entry: any) => {
@@ -311,6 +321,12 @@ export function registerVoucherJournalRoutes(app: Express) {
         return res.status(400).json({ message: "Total debits must equal total credits" });
       }
 
+      // vouchers.totalAmount stores the historical base (USD) amount.
+      // For CFA: baseTotalMax = max(totalDebits, totalCredits) / cfaPerUsd
+      const baseTxMax = Math.max(totalDebits, totalCredits);
+      const baseTotalMax =
+        vCurrency !== "USD" && cfaPerUsd > 0 ? baseTxMax / cfaPerUsd : baseTxMax;
+
       // Generate voucher number
       const voucherNumber = `JOURNAL-${Date.now()}`;
 
@@ -325,19 +341,23 @@ export function registerVoucherJournalRoutes(app: Express) {
             voucherType: "Journal",
             voucherDate,
             description: notes || null,
-            totalAmount: Math.max(totalDebits, totalCredits).toFixed(2),
+            // Store historical base-currency (USD) total.
+            totalAmount: baseTotalMax.toFixed(6),
             optional: optional ?? false,
-            currency: currency || "USD",
-            exchangeRate: exchangeRate || null,
+            currency: vCurrency,
+            exchangeRate: vRateRaw ? String(vRateRaw) : null,
             effectiveDate: effectiveDate || null,
           })
           .returning();
 
-        const voucherEntriesToCreate = [];
+        const voucherEntriesToCreate: any[] = [];
 
-        // Create entries
+        // Create entries.
+        // Each entry.amount is the original transaction-currency (CFA) value.
+        // normalizeVoucherEntryAmounts() produces the historical base (USD) amounts
+        // for debitAmount / creditAmount (backward compat) and fills all new fields.
         for (const entry of entries) {
-          const amount = entry.amount;
+          const amount: string = entry.amount;
           const narration = entry.narration || null;
 
           // Determine account field
@@ -358,11 +378,26 @@ export function registerVoucherJournalRoutes(app: Express) {
             accountField.customerId = entry.accountId;
           }
 
+          const norm = normalizeVoucherEntryAmounts({
+            transactionCurrency: vCurrency,
+            baseCurrency: "USD",
+            transactionDebitAmount: entry.type === "DR" ? amount : "0",
+            transactionCreditAmount: entry.type === "CR" ? amount : "0",
+            historicalRate: vRateRaw,
+          });
+
           voucherEntriesToCreate.push({
             voucherId: createdVoucher.id,
             ...accountField,
-            debitAmount: entry.type === "DR" ? amount : "0",
-            creditAmount: entry.type === "CR" ? amount : "0",
+            debitAmount: norm.debitAmount,
+            creditAmount: norm.creditAmount,
+            transactionCurrency: norm.transactionCurrency,
+            transactionDebitAmount: norm.transactionDebitAmount,
+            transactionCreditAmount: norm.transactionCreditAmount,
+            baseDebitAmount: norm.baseDebitAmount,
+            baseCreditAmount: norm.baseCreditAmount,
+            historicalExchangeRate: norm.historicalExchangeRate,
+            rateConvention: norm.rateConvention,
             narration,
           });
         }
@@ -394,10 +429,18 @@ export function registerVoucherJournalRoutes(app: Express) {
         const cid = req.session.currentCompanyId!;
         const [fSetting] = await db.select().from(fSettings).where(eq(fSettings.companyId, cid));
         if (fSetting) {
-          const currency = result.voucher.currency || "USD";
-          const fxRate = parseFloat(result.voucher.exchangeRate || "1") || 1;
-          const amtCurrency = parseFloat(result.voucher.totalAmount || "0");
-          const amtUsd = currency === "USD" ? amtCurrency : amtCurrency * fxRate;
+          const daybookCurrencyJ = result.voucher.currency || "USD";
+          // vouchers.totalAmount now stores the historical base (USD) amount.
+          const daybookBaseTotalJ = parseFloat(result.voucher.totalAmount || "0");
+          const daybookRateJ = result.voucher.exchangeRate ? parseFloat(result.voucher.exchangeRate) : 1;
+          // Reconstruct the original CFA total: base × rate (TRANSACTION_PER_BASE).
+          const daybookAmtCurrencyJ =
+            daybookCurrencyJ !== "USD" && daybookRateJ > 0
+              ? daybookBaseTotalJ * daybookRateJ
+              : daybookBaseTotalJ;
+          // factory_daybook_entries.fx_rate_to_usd expects USD-per-foreign-unit.
+          // The ERP voucher stores CFA-per-USD, so we store the inverse.
+          const daybookFxRateToUsdJ = erpRateToDaybookFxRateToUsd(daybookCurrencyJ, "USD", result.voucher.exchangeRate);
           await db.insert(fde).values({
             companyId: cid,
             txDate: result.voucher.voucherDate,
@@ -405,10 +448,10 @@ export function registerVoucherJournalRoutes(app: Express) {
             referenceId: result.voucher.id,
             referenceTable: "vouchers",
             description: result.voucher.description || `Journal voucher #${result.voucher.voucherNumber}`,
-            currencyCode: currency,
-            amountCurrency: String(amtCurrency),
-            fxRateToUsd: String(fxRate),
-            amountUsd: String(amtUsd),
+            currencyCode: daybookCurrencyJ,
+            amountCurrency: String(daybookAmtCurrencyJ),
+            fxRateToUsd: daybookFxRateToUsdJ,
+            amountUsd: String(daybookBaseTotalJ),
             createdBy: null,
           });
         }
@@ -504,7 +547,14 @@ export function registerVoucherJournalRoutes(app: Express) {
         return res.status(400).json({ message: "Missing required fields" });
       }
 
-      // Calculate total debits and credits
+      // Determine voucher currency and rate for the PATCH handler.
+      // currency/exchangeRate may not be sent on a PATCH (preserve existing values).
+      const vCurrencyPatch = (currency as string | undefined) || "USD";
+      const vRateRawPatch = (exchangeRate as string | number | undefined) || null;
+      const cfaPerUsdPatch =
+        (vCurrencyPatch !== "USD" && vRateRawPatch) ? parseFloat(String(vRateRawPatch)) : 1;
+
+      // Calculate total debits and credits in transaction currency
       let totalDebits = 0;
       let totalCredits = 0;
       entries.forEach((entry: any) => {
@@ -520,6 +570,13 @@ export function registerVoucherJournalRoutes(app: Express) {
       if (!optional && Math.abs(totalDebits - totalCredits) >= 0.01) {
         return res.status(400).json({ message: "Total debits must equal total credits" });
       }
+
+      // vouchers.totalAmount stores the historical base (USD) amount.
+      const baseTxMaxPatch = Math.max(totalDebits, totalCredits);
+      const baseTotalMaxPatch =
+        vCurrencyPatch !== "USD" && cfaPerUsdPatch > 0
+          ? baseTxMaxPatch / cfaPerUsdPatch
+          : baseTxMaxPatch;
 
       // Use database transaction for atomic operation
       const result = await db.transaction(async (tx) => {
@@ -547,7 +604,8 @@ export function registerVoucherJournalRoutes(app: Express) {
           .set({
             voucherDate,
             description: notes || null,
-            totalAmount: Math.max(totalDebits, totalCredits).toFixed(2),
+            // Store historical base (USD) total.
+            totalAmount: baseTotalMaxPatch.toFixed(6),
             optional: optional ?? false,
             effectiveDate: effectiveDate || null,
           })
@@ -557,11 +615,11 @@ export function registerVoucherJournalRoutes(app: Express) {
         // Delete existing voucher entries
         await tx.delete(voucherEntries).where(eq(voucherEntries.voucherId, voucherId));
 
-        const voucherEntriesToCreate = [];
+        const voucherEntriesToCreate: any[] = [];
 
-        // Create new entries
+        // Create new entries with dual-currency normalization.
         for (const entry of entries) {
-          const amount = entry.amount;
+          const amount: string = entry.amount;
           const narration = entry.narration || null;
 
           // Determine account field
@@ -582,11 +640,26 @@ export function registerVoucherJournalRoutes(app: Express) {
             accountField.customerId = entry.accountId;
           }
 
+          const norm = normalizeVoucherEntryAmounts({
+            transactionCurrency: vCurrencyPatch,
+            baseCurrency: "USD",
+            transactionDebitAmount: entry.type === "DR" ? amount : "0",
+            transactionCreditAmount: entry.type === "CR" ? amount : "0",
+            historicalRate: vRateRawPatch,
+          });
+
           voucherEntriesToCreate.push({
             voucherId: updatedVoucher.id,
             ...accountField,
-            debitAmount: entry.type === "DR" ? amount : "0",
-            creditAmount: entry.type === "CR" ? amount : "0",
+            debitAmount: norm.debitAmount,
+            creditAmount: norm.creditAmount,
+            transactionCurrency: norm.transactionCurrency,
+            transactionDebitAmount: norm.transactionDebitAmount,
+            transactionCreditAmount: norm.transactionCreditAmount,
+            baseDebitAmount: norm.baseDebitAmount,
+            baseCreditAmount: norm.baseCreditAmount,
+            historicalExchangeRate: norm.historicalExchangeRate,
+            rateConvention: norm.rateConvention,
             narration,
           });
         }

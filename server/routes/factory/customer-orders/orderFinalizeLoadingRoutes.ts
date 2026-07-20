@@ -17,6 +17,7 @@ import {
   verifySupervisorPassword,
   recalculateOrderTotals,
 } from "../_helpers";
+import { logAudit } from "../../helpers/auditHelpers";
 import {
   factorySuppliers,
   factoryCategories,
@@ -701,6 +702,20 @@ export function registerOrderFinalizeLoadingRoutes(app: Express) {
             referenceId: orderId,
             description: `V5 container cancelled: ${cancelCustomer?.legalName || "Customer"}, ${orderBales.length} bale link${orderBales.length !== 1 ? "s" : ""} removed. Cancelled by: ${cancelledBy}.`,
           });
+          try {
+            await logAudit({
+              userId: req.session.userId!,
+              username: (req.session as any).username || req.session.userId!,
+              companyId,
+              action: "update",
+              tableName: "factory_customer_orders",
+              recordId: orderId,
+              recordIdentifier: (order as any).orderNumber || `Order #${orderId}`,
+              changes: { status: { old: order.status, new: "CANCELLED" } },
+            });
+          } catch (auditErr) {
+            console.error("[order cancel V5 audit] non-fatal:", auditErr);
+          }
           return res.json(updated);
         }
 
@@ -747,6 +762,21 @@ export function registerOrderFinalizeLoadingRoutes(app: Express) {
         referenceId: orderId,
         description: `Order cancelled: ${cancelCustomer?.legalName || "Customer"}, ${orderBales.length} bale${orderBales.length !== 1 ? "s" : ""} released`,
       });
+
+      try {
+        await logAudit({
+          userId: req.session.userId!,
+          username: (req.session as any).username || req.session.userId!,
+          companyId,
+          action: "update",
+          tableName: "factory_customer_orders",
+          recordId: orderId,
+          recordIdentifier: (order as any).orderNumber || `Order #${orderId}`,
+          changes: { status: { old: order.status, new: "CANCELLED" } },
+        });
+      } catch (auditErr) {
+        console.error("[order cancel audit] non-fatal:", auditErr);
+      }
 
       res.json(updated);
     } catch (error: any) {
@@ -802,6 +832,21 @@ export function registerOrderFinalizeLoadingRoutes(app: Express) {
             eq(factoryDaybookEntries.referenceId, orderId)
           )
         );
+
+      try {
+        await logAudit({
+          userId: req.session.userId!,
+          username: (req.session as any).username || req.session.userId!,
+          companyId,
+          action: "update",
+          tableName: "factory_customer_orders",
+          recordId: orderId,
+          recordIdentifier: (order as any).orderNumber || `Order #${orderId}`,
+          changes: { status: { old: "CANCELLED", new: "LOADING" } },
+        });
+      } catch (auditErr) {
+        console.error("[order restore-loading audit] non-fatal:", auditErr);
+      }
 
       res.json(restored);
     } catch (error: any) {

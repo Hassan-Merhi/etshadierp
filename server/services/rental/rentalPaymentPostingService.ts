@@ -34,6 +34,7 @@ import {
 import { eq, and, sql, inArray, isNull } from "drizzle-orm";
 import Decimal from "decimal.js";
 import type { RentalModule } from "../../routes/rental/_rentalShared";
+import { normalizeVoucherEntryAmounts } from "../accounting/currencyAmounts";
 import { findOrCreateLedgerAccount, maybeRunAutoTransfer } from "../../routes/rental/_rentalShared";
 import {
   isRentalPeriodDue,
@@ -243,6 +244,8 @@ async function postGroupCore(
     paymentDate: string;
     asOfDate: string;
     currency: string;
+    /** ERP TRANSACTION_PER_BASE rate (foreign-per-USD). "1" for USD contracts. */
+    exchangeRate: string;
     narration: string;
     shopExpenseAccountName: string;
     incomeAccountName: string;
@@ -252,9 +255,31 @@ async function postGroupCore(
 ): Promise<number | null> {
   const {
     companyId, module: mod, contract, unit, cashAccountId, allocs,
-    totalAmountStr, paymentDate, asOfDate, currency, narration,
+    totalAmountStr, paymentDate, asOfDate, currency, exchangeRate, narration,
     shopExpenseAccountName, incomeAccountName, isSharedPayment, groupId,
   } = opts;
+
+  /** Normalize an entry for this payment's currency and rate. */
+  function normEntry(debit: string | number, credit: string | number) {
+    const norm = normalizeVoucherEntryAmounts({
+      transactionCurrency: currency,
+      baseCurrency: "USD",
+      transactionDebitAmount: String(debit),
+      transactionCreditAmount: String(credit),
+      historicalRate: exchangeRate,
+    });
+    return {
+      transactionCurrency: norm.transactionCurrency,
+      transactionDebitAmount: norm.transactionDebitAmount,
+      transactionCreditAmount: norm.transactionCreditAmount,
+      baseDebitAmount: norm.baseDebitAmount,
+      baseCreditAmount: norm.baseCreditAmount,
+      historicalExchangeRate: norm.historicalExchangeRate,
+      rateConvention: norm.rateConvention,
+      debitAmount: norm.debitAmount,
+      creditAmount: norm.creditAmount,
+    };
+  }
 
   if (!cashAccountId) return null;
 
@@ -325,7 +350,7 @@ async function postGroupCore(
       .returning();
 
     const payEntries: any[] = [
-      { voucherId: v.id, ledgerAccountId: cashAccountId, debitAmount: "0", creditAmount: totalAmountStr, narration },
+      { voucherId: v.id, ledgerAccountId: cashAccountId, ...normEntry("0", totalAmountStr), narration },
     ];
 
     if (accrualAmt.gt(0.005)) {
@@ -334,7 +359,7 @@ async function postGroupCore(
       );
       payEntries.push({
         voucherId: v.id, ledgerAccountId: accPayId,
-        debitAmount: accrualAmt.toFixed(2), creditAmount: "0", narration,
+        ...normEntry(accrualAmt.toFixed(2), "0"), narration,
       });
     }
 
@@ -344,7 +369,7 @@ async function postGroupCore(
       );
       payEntries.push({
         voucherId: v.id, ledgerAccountId: advId,
-        debitAmount: advanceAmt.toFixed(2), creditAmount: "0", narration,
+        ...normEntry(advanceAmt.toFixed(2), "0"), narration,
       });
     }
 
@@ -354,7 +379,7 @@ async function postGroupCore(
       );
       payEntries.push({
         voucherId: v.id, ledgerAccountId: prepId,
-        debitAmount: prepaidAmt.toFixed(2), creditAmount: "0", narration,
+        ...normEntry(prepaidAmt.toFixed(2), "0"), narration,
       });
     }
 
@@ -388,11 +413,11 @@ async function postGroupCore(
       await tx.insert(voucherEntries).values([
         {
           voucherId: rv.id, ledgerAccountId: expId,
-          debitAmount: advanceAmt.toFixed(2), creditAmount: "0", narration: recNarr,
+          ...normEntry(advanceAmt.toFixed(2), "0"), narration: recNarr,
         },
         {
           voucherId: rv.id, ledgerAccountId: advId,
-          debitAmount: "0", creditAmount: advanceAmt.toFixed(2), narration: recNarr,
+          ...normEntry("0", advanceAmt.toFixed(2)), narration: recNarr,
         },
       ]);
     }
@@ -454,12 +479,12 @@ async function postGroupCore(
       .returning();
 
     const lEntries: any[] = [
-      { voucherId: v.id, ledgerAccountId: cashAccountId, debitAmount: totalAmountStr, creditAmount: "0", narration },
+      { voucherId: v.id, ledgerAccountId: cashAccountId, ...normEntry(totalAmountStr, "0"), narration },
     ];
     if (earnedChunk > 0.005) {
       lEntries.push({
         voucherId: v.id, ledgerAccountId: incomeAccountId,
-        debitAmount: "0", creditAmount: earnedChunk.toFixed(2), narration,
+        ...normEntry("0", earnedChunk.toFixed(2)), narration,
       });
     }
     if (deferredChunk > 0.005) {
@@ -468,7 +493,7 @@ async function postGroupCore(
       );
       lEntries.push({
         voucherId: v.id, ledgerAccountId: deferredId,
-        debitAmount: "0", creditAmount: deferredChunk.toFixed(2), narration,
+        ...normEntry("0", deferredChunk.toFixed(2)), narration,
       });
       // Mark prepaid rows
       const futureIds = futureAllocs.map((a) => a.ledgerRowId).filter(Boolean) as number[];
@@ -603,7 +628,7 @@ export async function createRentalPaymentGroup(
     await postScheduledGroup(
       companyId, contractCompanyId, mod, contract, unit,
       paymentGroupId, paymentDate, clientDate,
-      cashAccountId, currency, notes, shopExpenseAccountName, incomeAccountName,
+      cashAccountId, currency, exchangeRate || "1", notes, shopExpenseAccountName, incomeAccountName,
       isSharedPayment ?? false
     );
 
@@ -638,8 +663,11 @@ export async function postDueScheduledRentalPayments(
     payment_date: string;
     cash_account_id: number | null;
     currency: string;
+    exchange_rate: string | null;
   }>(
-    `SELECT DISTINCT payment_group_id, payment_date, cash_account_id, COALESCE(currency, 'USD') AS currency
+    `SELECT DISTINCT payment_group_id, payment_date, cash_account_id,
+            COALESCE(currency, 'USD') AS currency,
+            COALESCE(exchange_rate::text, '1') AS exchange_rate
      FROM property_payments
      WHERE company_id = $1
        AND module = $2
@@ -681,7 +709,9 @@ export async function postDueScheduledRentalPayments(
       const didPost = await postScheduledGroup(
         companyId, contract.companyId, module, contract, unit,
         row.payment_group_id, row.payment_date, asOfDate,
-        row.cash_account_id, row.currency, firstRow.notes as string | null,
+        row.cash_account_id, row.currency,
+        String((firstRow as any)?.exchangeRate || row.exchange_rate || "1"),
+        firstRow.notes as string | null,
         shopExpenseAccountName, incomeAccountName, isShared
       );
       if (didPost) posted++;
@@ -710,6 +740,7 @@ async function postScheduledGroup(
   asOfDate: string,
   cashAccountId: number | null,
   currency: string,
+  exchangeRate: string,
   notes: string | null,
   shopExpenseAccountName: string,
   incomeAccountName: string,
@@ -753,6 +784,9 @@ async function postScheduledGroup(
         : `${String(allocs[0].forMonth).padStart(2, "0")}/${allocs[0].forYear}`;
     const narration = `Rent paid - ${unitLabel} - ${monthSpan}`;
 
+    // Derive the exchange rate from the first scheduled row — all rows in a group share the same rate
+    const groupExchangeRate = String((groupRows[0] as any)?.exchangeRate || exchangeRate || "1");
+
     const voucherId = await postGroupCore(tx, {
       companyId,
       module,
@@ -764,6 +798,7 @@ async function postScheduledGroup(
       paymentDate,
       asOfDate,
       currency: currency || "USD",
+      exchangeRate: groupExchangeRate,
       narration,
       shopExpenseAccountName,
       incomeAccountName,

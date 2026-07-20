@@ -2,6 +2,7 @@ import { type Express } from "express";
 import { logger } from "../../lib/logger";
 import { requireAuth, canModifyDate } from "../../auth";
 import { updatePosSale } from "../../services/pos/edit/updateSaleService";
+import { logAudit } from "../helpers/auditHelpers";
 
 export function registerPosEditSaleRoutes(app: Express): void {
   // Update existing sales voucher
@@ -39,6 +40,20 @@ export function registerPosEditSaleRoutes(app: Express): void {
           voucherId: result.body?.voucher?.id,
           durationMs: Date.now() - _t,
         });
+        try {
+          await logAudit({
+            userId: req.session.userId!,
+            username: (req.session as any).username || "unknown",
+            companyId: req.session.currentCompanyId!,
+            action: "update",
+            tableName: "vouchers",
+            recordId: voucherId,
+            recordIdentifier: result.body?.voucher?.voucherNumber ?? null,
+            changes: null,
+          });
+        } catch (auditErr) {
+          console.error("[POS edit audit] non-fatal:", auditErr);
+        }
       }
       res.status(result.status).json(result.body);
     } catch (error: any) {

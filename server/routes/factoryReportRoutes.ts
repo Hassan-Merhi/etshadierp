@@ -944,6 +944,25 @@ export function registerFactoryReportRoutes(app: Express, requireAuth: any, db: 
       if (!result.success) {
         return res.status(500).json({ message: result.error || "Failed to send" });
       }
+      // Non-fatal: audit write must not block the WhatsApp confirmation response
+      try {
+        const waCompanyId =
+          (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+        if (waCompanyId) {
+          await logAudit({
+            userId: req.session.userId!,
+            username: (req.session as any).username || req.session.userId!,
+            companyId: waCompanyId,
+            action: "send_whatsapp",
+            tableName: "reports",
+            recordId: null,
+            recordIdentifier: `Mix Batch Details — ${today}`,
+            changes: { format: { old: null, new: "image/png" } },
+          });
+        }
+      } catch (auditErr) {
+        console.error("[mix-batch-wa] audit write failed:", auditErr);
+      }
       res.json({ ok: true, message: "Mix batch image sent to WhatsApp group." });
     } catch (err: any) {
       console.error("[mix-batch-wa] send error:", err);

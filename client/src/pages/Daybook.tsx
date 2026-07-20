@@ -1,4 +1,6 @@
 import { useState, useMemo, useEffect, useRef } from "react";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { AuditLog } from "@/pages/settings/AuditLog";
 import { hasAnyOpenDialog } from "@/hooks/use-escape-back";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm, useFieldArray } from "react-hook-form";
@@ -79,6 +81,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
   const { data: myErpPages } = useQuery<{ hiddenErpCostFields?: string[] }>({ queryKey: ["/api/my-erp-pages"] });
   const hiddenErpCosts = myErpPages?.hiddenErpCostFields ?? [];
   const hideAmounts = hiddenErpCosts.includes("daybook_amounts");
+  const [activeDaybookTab, setActiveDaybookTab] = useState<"transactions" | "activity">("transactions");
   const [periodFilter, setPeriodFilter] = useState(getDefaultPeriodValue("today"));
   useDateJump((date) => setPeriodFilter({ fromDate: date, toDate: date, preset: "custom" }));
 
@@ -584,6 +587,14 @@ export default function Daybook({ user }: { user?: any } = {}) {
         </Button>
       </PageHeader>
 
+      {/* Tab selector: Transactions / Edits & Activity */}
+      <Tabs value={activeDaybookTab} onValueChange={(value) => setActiveDaybookTab(value as "transactions" | "activity")}>
+        <TabsList className="w-fit">
+          <TabsTrigger value="transactions">Transactions</TabsTrigger>
+          <TabsTrigger value="activity">Edits &amp; Activity</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="transactions" className="space-y-4 mt-0">
       <DaybookFilters
         periodFilter={periodFilter}
         setPeriodFilter={setPeriodFilter}
@@ -717,6 +728,15 @@ export default function Daybook({ user }: { user?: any } = {}) {
         fixedAssets={fixedAssets}
         formatAmount={formatAmount}
       />
+
+        </TabsContent>
+
+        <TabsContent value="activity" className="mt-2">
+          {activeDaybookTab === "activity" && (
+            <AuditLog context="daybook" defaultActions="all" />
+          )}
+        </TabsContent>
+      </Tabs>
 
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>

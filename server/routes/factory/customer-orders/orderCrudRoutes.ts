@@ -1,3 +1,4 @@
+import { logAudit } from "../../helpers/auditHelpers";
 import { trackOneContainerById } from "../../../services/containerTrackingService";
 import { parseId, parseOptionalId } from "../../../lib/parseId";
 import { dispatchNotification } from "../../../lib/notificationService";
@@ -422,6 +423,16 @@ export function registerOrderCrudRoutes(app: Express) {
 
       const parsed = insertCustomerOrderSchema.parse({ ...req.body, companyId, status: "DRAFT" });
       const [order] = await db.insert(customerOrders).values(parsed).returning();
+      await logAudit({
+        userId: req.session.userId!,
+        username: (req.session as any).username || req.session.userId!,
+        companyId,
+        action: "create",
+        tableName: "factory_customer_orders",
+        recordId: order.id,
+        recordIdentifier: (order as any).orderNumber || `Order #${order.id}`,
+        changes: null,
+      });
       res.json(order);
     } catch (error: any) {
       console.error("Error creating customer order:", error);
@@ -539,6 +550,16 @@ export function registerOrderCrudRoutes(app: Express) {
         .where(eq(customerOrders.id, orderId))
         .returning();
 
+      await logAudit({
+        userId: req.session.userId!,
+        username: (req.session as any).username || req.session.userId!,
+        companyId,
+        action: "update",
+        tableName: "factory_customer_orders",
+        recordId: orderId,
+        recordIdentifier: (order as any).orderNumber || `Order #${orderId}`,
+        changes: { loadingNote: { old: order.containerNotes ?? null, new: note?.trim() || null } },
+      });
       res.json({ success: true, order: updated });
     } catch (error: any) {
       console.error("Error updating loading note:", error);
@@ -590,6 +611,16 @@ export function registerOrderCrudRoutes(app: Express) {
           .where(eq(customerOrders.id, orderId));
       });
 
+      await logAudit({
+        userId: req.session.userId!,
+        username: (req.session as any).username || req.session.userId!,
+        companyId,
+        action: "delete",
+        tableName: "factory_customer_orders",
+        recordId: orderId,
+        recordIdentifier: `Order #${orderId}`,
+        changes: null,
+      });
       res.json({ success: true, message: "Invoice moved to Deleted Items" });
     } catch (error: any) {
       console.error("Error deleting customer order:", error);
@@ -622,6 +653,16 @@ export function registerOrderCrudRoutes(app: Express) {
         .where(eq(customerOrders.id, orderId))
         .returning();
 
+      await logAudit({
+        userId: req.session.userId!,
+        username: (req.session as any).username || req.session.userId!,
+        companyId,
+        action: "update",
+        tableName: "factory_customer_orders",
+        recordId: orderId,
+        recordIdentifier: (order as any).orderNumber || `Order #${orderId}`,
+        changes: { orderDate: { old: order.orderDate ?? null, new: orderDate } },
+      });
       res.json(updated);
     } catch (error: any) {
       console.error("Error updating order date:", error);
@@ -660,6 +701,20 @@ export function registerOrderCrudRoutes(app: Express) {
       // Shipping company is order-specific. The customers table has no
       // defaultShippingCompany field, so do not perform a swallowed invalid update.
 
+      await logAudit({
+        userId: req.session.userId!,
+        username: (req.session as any).username || req.session.userId!,
+        companyId,
+        action: "update",
+        tableName: "factory_customer_orders",
+        recordId: orderId,
+        recordIdentifier: (order as any).orderNumber || `Order #${orderId}`,
+        changes: {
+          ...(containerNumber !== undefined ? { containerNumber: { old: order.containerNumber ?? null, new: containerNumber } } : {}),
+          ...(destination !== undefined ? { destination: { old: (order as any).destination ?? null, new: destination || null } } : {}),
+          ...(shippingCompany !== undefined ? { shippingCompany: { old: (order as any).shippingCompany ?? null, new: shippingCompany } } : {}),
+        },
+      });
       res.json(updated);
     } catch (error: any) {
       console.error("Error assigning container:", error);

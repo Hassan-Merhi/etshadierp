@@ -6,6 +6,7 @@ import { requireAuth, canModifyDate } from "../../auth";
 import { companies } from "@shared/schema";
 import { eq } from "drizzle-orm";
 import { createPosSale } from "../../services/pos/createSaleService";
+import { logAudit } from "../helpers/auditHelpers";
 
 export function registerPosSalesRoutes(app: Express): void {
   app.post("/api/pos/sales", requireAuth, canModifyDate("voucherDate"), async (req, res) => {
@@ -48,6 +49,20 @@ export function registerPosSalesRoutes(app: Express): void {
           voucherId: result.body?.voucher?.id,
           durationMs: Date.now() - _t,
         });
+        try {
+          await logAudit({
+            userId: req.session.userId!,
+            username: (req.session as any).username || "unknown",
+            companyId: req.session.currentCompanyId!,
+            action: "create",
+            tableName: "vouchers",
+            recordId: result.body?.voucher?.id ?? null,
+            recordIdentifier: result.body?.voucher?.voucherNumber ?? null,
+            changes: null,
+          });
+        } catch (auditErr) {
+          console.error("[POS create audit] non-fatal:", auditErr);
+        }
       }
       res.status(result.status).json(result.body);
     } catch (error: any) {

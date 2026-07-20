@@ -1,3 +1,4 @@
+import { logAudit } from "../../helpers/auditHelpers";
 import { contentDisposition } from "../../../lib/contentDisposition";
 import { trackOneContainerById } from "../../../services/containerTrackingService";
 import { parseId, parseOptionalId } from "../../../lib/parseId";
@@ -514,6 +515,21 @@ export function registerOrderPdfExportRoutes(app: Express) {
         }
       }
 
+      // Non-fatal: audit write must not break PDF delivery
+      try {
+        await logAudit({
+          userId: req.session.userId!,
+          username: (req.session as any).username || req.session.userId!,
+          companyId,
+          action: "export",
+          tableName: "factory_customer_orders",
+          recordId: orderId,
+          recordIdentifier: `Customer Order #${(order as any).invoiceNumber || orderId} PDF`,
+          changes: { format: { old: null, new: "pdf" }, orderId: { old: null, new: orderId } },
+        });
+      } catch (auditErr) {
+        console.error("[PdfExport] audit write failed:", auditErr);
+      }
       doc.end();
     } catch (error: any) {
       console.error("Error exporting order to PDF:", error);
