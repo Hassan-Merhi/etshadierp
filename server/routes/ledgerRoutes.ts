@@ -6,12 +6,14 @@ import {
   normalizeAccountOpeningBalance,
   registerAccountCurrencyRoutes,
 } from "./accountCurrencyRoutes";
+import { registerHistoricalCurrencyGuardRoutes } from "./historicalCurrencyGuardRoutes";
 
 export function registerLedgerRoutes(app: Express) {
-  // This module registers before the legacy bank/account route modules. Install
-  // normalization and safe read handlers here so all existing callers use the
-  // corrected currency model without changing their URLs.
+  // This module registers before the legacy bank/account/report route modules.
+  // Install write normalization, safe reads, and historical-report readiness
+  // guards here so every existing caller receives the corrected currency model.
   app.use(normalizeAccountOpeningBalance);
+  registerHistoricalCurrencyGuardRoutes(app);
   registerAccountCurrencyRoutes(app);
 
   app.get("/api/ledger-accounts/parent-groups", requireAuth, async (req, res) => {
