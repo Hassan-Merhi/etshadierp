@@ -61,8 +61,8 @@
     {
       "idx": 8,
       "version": "7",
-      "when": 1753106400000,
-      "tag": "20260720_003_ledger_account_opening_balance_currency",
+      "when": 1784544000000,
+      "tag": "0007_factory_historical_replay_safety",
       "breakpoints": true
     }
   ]
