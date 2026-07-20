@@ -13,6 +13,7 @@ import {
 const OPENING_FIELDS = [
   "openingBalance",
   "openingBalanceSide",
+  "openingBalanceNativeAmount",
   "openingBalanceCurrency",
   "openingBalanceHistoricalRate",
   "openingBalanceBaseAmount",
@@ -36,11 +37,16 @@ function normalizedOpeningPayload(
   existing: Record<string, any> | null,
   baseCurrency: string,
 ): Record<string, any> {
-  const openingBalance = body.openingBalance ?? existing?.openingBalance ?? "0";
+  const nativeOpeningBalance =
+    body.openingBalanceNativeAmount ??
+    body.openingBalance ??
+    existing?.openingBalanceNativeAmount ??
+    existing?.openingBalance ??
+    "0";
   const rawCurrency =
     body.openingBalanceCurrency ?? existing?.openingBalanceCurrency ?? baseCurrency;
   const normalized = normalizeOpeningBalanceCurrency({
-    openingBalance,
+    openingBalance: nativeOpeningBalance,
     openingBalanceCurrency: rawCurrency,
     openingBalanceHistoricalRate:
       body.openingBalanceHistoricalRate ?? existing?.openingBalanceHistoricalRate,
@@ -48,7 +54,14 @@ function normalizedOpeningPayload(
       body.openingBalanceBaseAmount ?? existing?.openingBalanceBaseAmount,
     baseCurrency,
   });
-  return { ...body, ...normalized };
+
+  return {
+    ...body,
+    ...normalized,
+    // Existing reports read openingBalance. Keep it in historical base currency;
+    // the original amount is preserved in openingBalanceNativeAmount.
+    openingBalance: normalized.openingBalanceBaseAmount,
+  };
 }
 
 export const normalizeAccountOpeningBalance: RequestHandler = async (req, res, next) => {
@@ -134,10 +147,13 @@ async function getHistoricalLedgerBalance(companyId: number, ledgerAccountId: nu
   );
 
   let historicalBalance = new Decimal(result.rows[0]?.historical_net || 0);
-  const openingRaw = new Decimal(account.openingBalance || 0);
-  const openingBalanceCurrencyUnresolved = !openingRaw.isZero() && !account.openingBalanceBaseAmount;
-  if (!openingBalanceCurrencyUnresolved && !openingRaw.isZero()) {
-    const openingBase = new Decimal(account.openingBalanceBaseAmount || 0);
+  const openingBase = new Decimal(account.openingBalanceBaseAmount || account.openingBalance || 0);
+  const openingNative = new Decimal(account.openingBalanceNativeAmount || 0);
+  const hasNonZeroOpening = !openingBase.isZero() || !openingNative.isZero();
+  const openingBalanceCurrencyUnresolved =
+    hasNonZeroOpening &&
+    (!account.openingBalanceCurrency || !account.openingBalanceBaseAmount || !account.openingBalanceNativeAmount);
+  if (!openingBalanceCurrencyUnresolved && !openingBase.isZero()) {
     historicalBalance = historicalBalance.plus(account.openingBalanceSide === "Cr" ? openingBase.neg() : openingBase);
   }
 
@@ -148,14 +164,15 @@ async function getHistoricalLedgerBalance(companyId: number, ledgerAccountId: nu
     unresolvedLegacyNetRaw: new Decimal(result.rows[0]?.unresolved_raw_net || 0).toDecimalPlaces(6).toFixed(6),
     openingBalanceCurrencyUnresolved,
     unresolvedOpeningBalanceRaw: openingBalanceCurrencyUnresolved
-      ? (account.openingBalanceSide === "Cr" ? openingRaw.neg() : openingRaw).toDecimalPlaces(6).toFixed(6)
+      ? new Decimal(account.openingBalance || 0)
+          .times(account.openingBalanceSide === "Cr" ? -1 : 1)
+          .toDecimalPlaces(6)
+          .toFixed(6)
       : null,
   };
 }
 
 export function registerAccountCurrencyRoutes(app: Express) {
-  // Must register before the legacy account/bank routes. These handlers intentionally
-  // use the existing URLs so old clients receive safe results without a migration.
   app.get("/api/bank-accounts/revaluation", requireAuth, requireNonPOS, async (req, res) => {
     try {
       const companyId = req.session.currentCompanyId;
@@ -176,10 +193,7 @@ export function registerAccountCurrencyRoutes(app: Express) {
       const cashSummary = await getCashBankAccountSummary(companyId, "ledger", id);
       if (cashSummary) {
         const displayBalance = cashSummary.currentTranslatedBaseBalance ?? cashSummary.historicalBaseBalance;
-        return res.json({
-          balance: Number(displayBalance),
-          ...cashSummary,
-        });
+        return res.json({ balance: Number(displayBalance), ...cashSummary });
       }
 
       const historical = await getHistoricalLedgerBalance(companyId, id);
