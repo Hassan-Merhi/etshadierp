@@ -8,14 +8,16 @@ import {
 } from "./accountCurrencyRoutes";
 import { registerHistoricalCurrencyGuardRoutes } from "./historicalCurrencyGuardRoutes";
 import { registerVoucherEntryCurrencyEditRoutes } from "./voucherEntryCurrencyEditRoutes";
+import { registerOpeningBalanceResolutionRoutes } from "./openingBalanceResolutionRoutes";
 
 export function registerLedgerRoutes(app: Express) {
   // This module registers before the legacy bank/account/report/voucher-entry routes.
   // Install write normalization, safe reads, historical-report readiness guards,
-  // and the dual-currency entry editor here so existing URLs remain compatible.
+  // explicit legacy resolution, and the dual-currency editor here so existing URLs remain compatible.
   app.use(normalizeAccountOpeningBalance);
   registerHistoricalCurrencyGuardRoutes(app);
   registerAccountCurrencyRoutes(app);
+  registerOpeningBalanceResolutionRoutes(app);
   registerVoucherEntryCurrencyEditRoutes(app);
 
   app.get("/api/ledger-accounts/parent-groups", requireAuth, async (req, res) => {
