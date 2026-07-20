@@ -79,6 +79,12 @@ interface VoucherEntry {
   debitAmount: string;
   creditAmount: string;
   narration: string;
+  // Multi-currency fields (read-only during edit — preserved from stored entry)
+  transactionCurrency?: string | null;
+  transactionDebitAmount?: string | null;
+  transactionCreditAmount?: string | null;
+  historicalExchangeRate?: string | null;
+  rateConvention?: string | null;
 }
 
 const voucherEntrySchema = z.object({
@@ -90,6 +96,14 @@ const voucherEntrySchema = z.object({
   debitAmount: z.string(),
   creditAmount: z.string(),
   narration: z.string(),
+  // ── Multi-currency fields (read-only — preserved from stored entry) ────────
+  // These are carried through the form state and re-submitted on save so the
+  // server can keep them consistent when the user edits USD amounts.
+  transactionCurrency: z.string().nullable().optional(),
+  transactionDebitAmount: z.string().nullable().optional(),
+  transactionCreditAmount: z.string().nullable().optional(),
+  historicalExchangeRate: z.string().nullable().optional(),
+  rateConvention: z.string().nullable().optional(),
 });
 
 const voucherSchema = z.object({
@@ -187,6 +201,12 @@ export function VoucherEditDialog({ voucherId, open, onOpenChange }: VoucherEdit
                 debitAmount: entry.debitAmount || "0",
                 creditAmount: entry.creditAmount || "0",
                 narration: entry.narration || "",
+                // Preserve historical multi-currency fields so they survive the round-trip
+                transactionCurrency: entry.transactionCurrency ?? null,
+                transactionDebitAmount: entry.transactionDebitAmount ?? null,
+                transactionCreditAmount: entry.transactionCreditAmount ?? null,
+                historicalExchangeRate: entry.historicalExchangeRate ?? null,
+                rateConvention: entry.rateConvention ?? null,
               }))
             : [
                 {
@@ -224,6 +244,11 @@ export function VoucherEditDialog({ voucherId, open, onOpenChange }: VoucherEdit
         debitAmount: entry.debitAmount,
         creditAmount: entry.creditAmount,
         narration: entry.narration,
+        // Preserve historical multi-currency fields so the server can keep
+        // baseDebitAmount / baseCreditAmount consistent after an edit.
+        transactionCurrency: entry.transactionCurrency ?? undefined,
+        historicalExchangeRate: entry.historicalExchangeRate ?? undefined,
+        rateConvention: entry.rateConvention ?? undefined,
       }));
 
       return await apiRequest("PUT", `/api/vouchers/${voucherId}/with-entries`, {
@@ -527,6 +552,30 @@ export function VoucherEditDialog({ voucherId, open, onOpenChange }: VoucherEdit
                             ) : (
                               <>
                                 <td className="py-2 px-2">
+                                  {/* Historical-rate info badge — shown for non-USD entries */}
+                                  {(() => {
+                                    const txCcy = form.watch(`entries.${index}.transactionCurrency`);
+                                    const rate = form.watch(`entries.${index}.historicalExchangeRate`);
+                                    if (!txCcy || txCcy === "USD" || !rate) return null;
+                                    const txDebit = parseFloat(form.watch(`entries.${index}.transactionDebitAmount`) || "0");
+                                    const txCredit = parseFloat(form.watch(`entries.${index}.transactionCreditAmount`) || "0");
+                                    const txAmt = Math.max(txDebit, txCredit);
+                                    const rateNum = parseFloat(rate);
+                                    return (
+                                      <div className="mb-1 flex items-center gap-1.5 text-xs text-muted-foreground bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded px-2 py-0.5">
+                                        <span className="font-medium text-amber-700 dark:text-amber-400">
+                                          {txCcy}
+                                        </span>
+                                        {txAmt > 0 && (
+                                          <span>{txCcy === "CFA" ? Math.round(txAmt).toLocaleString() : txAmt.toFixed(2)}</span>
+                                        )}
+                                        {rateNum > 0 && (
+                                          <span className="text-muted-foreground">@ {rateNum.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 })}</span>
+                                        )}
+                                        <span className="text-xs opacity-60">(historical)</span>
+                                      </div>
+                                    );
+                                  })()}
                                   <div className="space-y-1">
                                     <Select
                                       value={

@@ -14,6 +14,23 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { getVoucherTypeBadge } from "@/lib/voucherTypeBadge";
 import { Voucher, ViewVoucherEntry, Employee, LedgerAccount, BankAccount } from "./types";
 
+/**
+ * Returns a formatted string of the original transaction-currency amount
+ * when it differs from USD (i.e. for CFA vouchers).  Returns null for USD
+ * or when multi-currency fields are not populated yet (pre-backfill rows).
+ */
+function txCurrencyLabel(entry: ViewVoucherEntry): string | null {
+  if (!entry.transactionCurrency || entry.transactionCurrency === "USD") return null;
+  const debit = parseFloat(entry.transactionDebitAmount || "0");
+  const credit = parseFloat(entry.transactionCreditAmount || "0");
+  const amt = Math.max(debit, credit);
+  if (!amt) return null;
+  if (entry.transactionCurrency === "CFA") {
+    return `CFA ${Math.round(amt).toLocaleString()}`;
+  }
+  return `${entry.transactionCurrency} ${amt.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
 interface VoucherDetailsDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -616,14 +633,42 @@ export function VoucherDetailsDialog({
                                       parseFloat(entry.creditAmount || "0")
                                     )
                                   )}
+                                  {txCurrencyLabel(entry) && (
+                                    <div className="text-xs text-muted-foreground mt-0.5">
+                                      {txCurrencyLabel(entry)}
+                                    </div>
+                                  )}
                                 </TableCell>
                               ) : (
                                 <>
                                   <TableCell className="text-right font-mono">
-                                    {parseFloat(entry.debitAmount) > 0 ? formatAmount(entry.debitAmount) : "-"}
+                                    {parseFloat(entry.debitAmount) > 0 ? (
+                                      <div>
+                                        {formatAmount(entry.debitAmount)}
+                                        {txCurrencyLabel(entry) && parseFloat(entry.transactionDebitAmount || "0") > 0 && (
+                                          <div className="text-xs text-muted-foreground mt-0.5">
+                                            {txCurrencyLabel(entry)}
+                                          </div>
+                                        )}
+                                      </div>
+                                    ) : "-"}
                                   </TableCell>
                                   <TableCell className="text-right font-mono">
-                                    {parseFloat(entry.creditAmount) > 0 ? formatAmount(entry.creditAmount) : "-"}
+                                    {parseFloat(entry.creditAmount) > 0 ? (
+                                      <div>
+                                        {formatAmount(entry.creditAmount)}
+                                        {txCurrencyLabel(entry) && parseFloat(entry.transactionCreditAmount || "0") > 0 && (
+                                          <div className="text-xs text-muted-foreground mt-0.5">
+                                            {(() => {
+                                              const credit = parseFloat(entry.transactionCreditAmount || "0");
+                                              if (!credit || !entry.transactionCurrency || entry.transactionCurrency === "USD") return null;
+                                              if (entry.transactionCurrency === "CFA") return `CFA ${Math.round(credit).toLocaleString()}`;
+                                              return `${entry.transactionCurrency} ${credit.toFixed(2)}`;
+                                            })()}
+                                          </div>
+                                        )}
+                                      </div>
+                                    ) : "-"}
                                   </TableCell>
                                   <TableCell className="text-sm text-muted-foreground">
                                     {entry.narration || "-"}

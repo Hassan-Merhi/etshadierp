@@ -15,6 +15,7 @@ import {
   buildVoucherChangesForUpdate,
   buildItemLevelChanges,
 } from "../_helpers";
+import { normalizeVoucherEntryAmounts } from "../../services/accounting/currencyAmounts";
 import { triggerIntercompanyNotifications } from "../intercompanyNotificationRoutes";
 import { autoReallocateLoansAccounts } from "../../lib/transporterAllocation";
 import {
@@ -568,8 +569,82 @@ export function registerVoucherTransferRoutes(app: Express) {
         // Delete all existing entries
         await db.delete(voucherEntries).where(eq(voucherEntries.voucherId, id));
 
+        // Resolve voucher currency and historical rate for dual-currency normalization.
+        // Prefer the stored voucher's currency/rate (historical invariant); fall back to
+        // the client-supplied values or the current company rate for newly-added entries.
+        const editVoucherCurrency: string =
+          String(existingVoucher.currency || "USD");
+        const editVoucherRate: string | null =
+          existingVoucher.exchangeRate
+            ? String(existingVoucher.exchangeRate)
+            : null;
+
         // Create new entries
         for (const entry of entries) {
+          // ── Dual-currency normalization ────────────────────────────────────
+          // Three cases:
+          //  A) Caller supplied full dual-currency data (new frontend with preserved rate)
+          //     → use as-is.
+          //  B) Caller supplied transactionCurrency without amounts
+          //     → derive base amounts from debitAmount/creditAmount + rate.
+          //  C) Legacy call (no transactionCurrency at all)
+          //     → derive from the voucher's stored currency/rate.
+          let dualCurrencyFields: Record<string, any> = {};
+          if (entry.transactionCurrency) {
+            // Case A/B: caller-supplied transaction currency
+            try {
+              const debitAmt = String(entry.debitAmount || "0");
+              const creditAmt = String(entry.creditAmount || "0");
+              const norm = normalizeVoucherEntryAmounts({
+                transactionCurrency: entry.transactionCurrency,
+                baseCurrency: "USD",
+                transactionDebitAmount: debitAmt,
+                transactionCreditAmount: creditAmt,
+                historicalRate: entry.historicalExchangeRate
+                  ? String(entry.historicalExchangeRate)
+                  : editVoucherRate,
+              });
+              dualCurrencyFields = {
+                transactionCurrency: norm.transactionCurrency,
+                transactionDebitAmount: norm.transactionDebitAmount,
+                transactionCreditAmount: norm.transactionCreditAmount,
+                baseDebitAmount: norm.baseDebitAmount,
+                baseCreditAmount: norm.baseCreditAmount,
+                historicalExchangeRate: norm.historicalExchangeRate,
+                rateConvention: norm.rateConvention,
+              };
+            } catch {
+              // Non-fatal: entry will be stored with legacy columns only.
+            }
+          } else if (editVoucherCurrency !== "USD" && editVoucherRate) {
+            // Case C: derive from voucher-level currency/rate
+            try {
+              const debitAmt = String(entry.debitAmount || "0");
+              const creditAmt = String(entry.creditAmount || "0");
+              const totalAmt = parseFloat(debitAmt) + parseFloat(creditAmt);
+              if (totalAmt > 0) {
+                const norm = normalizeVoucherEntryAmounts({
+                  transactionCurrency: editVoucherCurrency,
+                  baseCurrency: "USD",
+                  transactionDebitAmount: debitAmt,
+                  transactionCreditAmount: creditAmt,
+                  historicalRate: editVoucherRate,
+                });
+                dualCurrencyFields = {
+                  transactionCurrency: norm.transactionCurrency,
+                  transactionDebitAmount: norm.transactionDebitAmount,
+                  transactionCreditAmount: norm.transactionCreditAmount,
+                  baseDebitAmount: norm.baseDebitAmount,
+                  baseCreditAmount: norm.baseCreditAmount,
+                  historicalExchangeRate: norm.historicalExchangeRate,
+                  rateConvention: norm.rateConvention,
+                };
+              }
+            } catch {
+              // Non-fatal.
+            }
+          }
+
           const [createdEntry] = await db
             .insert(voucherEntries)
             .values({
@@ -583,6 +658,7 @@ export function registerVoucherTransferRoutes(app: Express) {
               debitAmount: entry.debitAmount || "0",
               creditAmount: entry.creditAmount || "0",
               narration: entry.narration || null,
+              ...dualCurrencyFields,
             })
             .returning();
           createdEntries.push(createdEntry);
@@ -610,6 +686,14 @@ export function registerVoucherTransferRoutes(app: Express) {
                 debitAmount: oldEntry.debitAmount,
                 creditAmount: oldEntry.creditAmount,
                 narration: oldEntry.narration,
+                // Restore dual-currency fields too
+                transactionCurrency: oldEntry.transactionCurrency,
+                transactionDebitAmount: oldEntry.transactionDebitAmount,
+                transactionCreditAmount: oldEntry.transactionCreditAmount,
+                baseDebitAmount: oldEntry.baseDebitAmount,
+                baseCreditAmount: oldEntry.baseCreditAmount,
+                historicalExchangeRate: oldEntry.historicalExchangeRate,
+                rateConvention: oldEntry.rateConvention,
               })
               .catch(() => {});
           }

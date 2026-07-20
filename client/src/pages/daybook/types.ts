@@ -125,6 +125,14 @@ export interface VoucherEntry {
   debitAmount: string;
   creditAmount: string;
   narration: string | null;
+  // ── Multi-currency fields (Phase 1) ──────────────────────────────────────
+  transactionCurrency?: string | null;
+  transactionDebitAmount?: string | null;
+  transactionCreditAmount?: string | null;
+  baseDebitAmount?: string | null;
+  baseCreditAmount?: string | null;
+  historicalExchangeRate?: string | null;
+  rateConvention?: string | null;
 }
 
 export interface ViewVoucherEntry {
@@ -155,4 +163,19 @@ export interface ViewVoucherEntry {
   hassansProfit?: string | null;
   hassansPercentage?: string | null;
   adjustmentType?: string;
+  // ── Multi-currency fields (Phase 1) ──────────────────────────────────────
+  /** ISO currency code of the original transaction (e.g. "CFA", "USD"). */
+  transactionCurrency?: string | null;
+  /** Original transaction-currency debit amount (6 dp). */
+  transactionDebitAmount?: string | null;
+  /** Original transaction-currency credit amount (6 dp). */
+  transactionCreditAmount?: string | null;
+  /** Historical base-currency (USD) debit amount (6 dp). */
+  baseDebitAmount?: string | null;
+  /** Historical base-currency (USD) credit amount (6 dp). */
+  baseCreditAmount?: string | null;
+  /** Exchange rate at time of posting. */
+  historicalExchangeRate?: string | null;
+  /** Rate convention (IDENTITY | TRANSACTION_PER_BASE). */
+  rateConvention?: string | null;
 }
