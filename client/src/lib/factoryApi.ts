@@ -3,6 +3,13 @@ import {
   isUnsafeFactoryLoadingScanRequest,
   purgeUnsafeFactoryLoadingScans,
 } from "./factoryOfflineQueueSafety";
+import {
+  forgetHistoricalReplayPreparation,
+  freezeHistoricalReplayApplyRequest,
+  historicalReplayTokenFromRequest,
+  isHistoricalReplayPrepareRequest,
+  rememberHistoricalReplayPreparation,
+} from "./historicalReplayPreparedRequest";
 
 export type AppMode = "erp" | "factory" | "properties";
 
@@ -56,7 +63,38 @@ function isAllowedFactoryPath(url: string): boolean {
   return ALLOWED_SHARED_PREFIXES.some((p) => url.startsWith(p));
 }
 
-export async function factoryApiRequest(method: string, url: string, data?: unknown): Promise<Response> {
+type RequestDelegate = (method: string, url: string, data?: unknown) => Promise<Response>;
+
+/**
+ * Shared replay guard for both ERP and Factory app modes. The UI may pass current
+ * checkbox state, but a token-backed apply is rebuilt from the server-prepared
+ * frozen state before it reaches apiRequest.
+ */
+async function requestWithPreparedReplayState(
+  delegate: RequestDelegate,
+  method: string,
+  url: string,
+  data?: unknown
+): Promise<Response> {
+  const prepareRequest = isHistoricalReplayPrepareRequest(method, url, data);
+  const token = historicalReplayTokenFromRequest(method, url, data);
+  const outboundData = freezeHistoricalReplayApplyRequest(method, url, data);
+  try {
+    const response = await delegate(method, url, outboundData);
+    if (prepareRequest && response.ok) {
+      const payload = await response.clone().json().catch(() => null);
+      rememberHistoricalReplayPreparation(payload);
+    }
+    return response;
+  } finally {
+    // A token apply is intentionally one-shot in the client. On any response or
+    // network error, force a fresh Prepare rather than reusing potentially stale
+    // review state. The server independently enforces one-time use transactionally.
+    if (token) forgetHistoricalReplayPreparation(token);
+  }
+}
+
+async function factoryApiRequestBase(method: string, url: string, data?: unknown): Promise<Response> {
   if (!isAllowedFactoryPath(url)) {
     const msg = `[factoryApi] BLOCKED: Factory mode attempted non-factory endpoint: ${method} ${url}`;
     console.error(msg);
@@ -87,12 +125,17 @@ export async function factoryApiRequest(method: string, url: string, data?: unkn
   }
 }
 
+export function factoryApiRequest(method: string, url: string, data?: unknown): Promise<Response> {
+  return requestWithPreparedReplayState(factoryApiRequestBase, method, url, data);
+}
+
 export const factoryQueryClient = queryClient;
 
 export function resolveApiPath(erpPath: string, factoryPath: string, mode: AppMode): string {
   return mode === "factory" ? factoryPath : erpPath;
 }
 
-export function getApiRequest(mode: AppMode) {
-  return mode === "factory" ? factoryApiRequest : apiRequest;
+export function getApiRequest(mode: AppMode): RequestDelegate {
+  if (mode === "factory") return factoryApiRequest;
+  return (method, url, data) => requestWithPreparedReplayState(apiRequest, method, url, data);
 }
