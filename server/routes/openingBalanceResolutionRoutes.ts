@@ -93,12 +93,12 @@ async function getBaseCurrency(companyId: number): Promise<string> {
   return result.rows[0]?.base_currency || "USD";
 }
 
-function supplierScopeSql(): string {
+function supplierScopeSql(alias = "target"): string {
   return `EXISTS (
     SELECT 1
       FROM voucher_entries ve
       JOIN vouchers v ON v.id = ve.voucher_id
-     WHERE ve.supplier_id = target.id
+     WHERE ve.supplier_id = ${alias}.id
        AND v.company_id = $2
        AND v.deleted_at IS NULL
   )`;
@@ -108,7 +108,7 @@ async function entityExists(entityType: EntityType, entityId: number, companyId:
   const config = CONFIG[entityType];
   const clauses = ["target.id = $1"];
   if (config.companyColumn) clauses.push(`target.${config.companyColumn} = $2`);
-  else clauses.push(supplierScopeSql());
+  else clauses.push(supplierScopeSql("target"));
   if (config.deletedColumn) clauses.push(`target.${config.deletedColumn} IS NULL`);
   const result = await pool.query(
     `SELECT 1 FROM ${config.table} target WHERE ${clauses.join(" AND ")} LIMIT 1`,
@@ -157,7 +157,7 @@ export function registerOpeningBalanceResolutionRoutes(app: Express) {
               WHERE s.deleted_at IS NULL
                 AND COALESCE(s.opening_balance, 0)::numeric <> 0
                 AND (s.opening_balance_native_amount IS NULL OR s.opening_balance_currency IS NULL OR s.opening_balance_base_amount IS NULL)
-                AND ${supplierScopeSql()}
+                AND ${supplierScopeSql("s")}
              UNION ALL
              SELECT 'employee', e.id, CONCAT_WS(' ', e.first_name, e.last_name), e.code,
                     e.opening_balance::text, COALESCE(e.opening_balance_side, 'Cr')
@@ -215,7 +215,12 @@ export function registerOpeningBalanceResolutionRoutes(app: Express) {
           openingBalanceBaseAmount: req.body.baseAmount,
           baseCurrency,
         });
-        const side = req.body.side || (entityType === "supplier" || entityType === "employee" ? "Cr" : "Dr");
+        // Supplier and employee opening balances retain their established credit
+        // orientation; ledger/bank/customer sides may be explicitly reviewed.
+        const side =
+          entityType === "supplier" || entityType === "employee"
+            ? "Cr"
+            : req.body.side || "Dr";
         if (side !== "Dr" && side !== "Cr") {
           return res.status(400).json({ message: "Side must be Dr or Cr" });
         }
