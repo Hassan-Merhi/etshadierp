@@ -1,3 +1,4 @@
+import "./deploymentPreflight.mjs";
 import "./runtimeHealthGuard.mjs";
 import "./runtimeObservability.mjs";
 import "./runtimeLifecycleGuard.mjs";
