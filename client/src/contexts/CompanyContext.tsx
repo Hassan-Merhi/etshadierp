@@ -125,7 +125,10 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
     switchCompanyOnServer(companyToSelect.id)
       .then((ok) => {
         if (!ok) {
-          initialSyncStarted.current = false;
+          // Keep the attempt latched so a failed request cannot create an
+          // immediate render/retry loop. The user can retry by selecting a
+          // company explicitly from the company switcher.
+          console.error("[Company] Failed to synchronize the initial company selection.");
           return;
         }
 
