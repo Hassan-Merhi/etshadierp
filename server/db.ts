@@ -5,6 +5,10 @@ import * as schema from "@shared/schema";
 import { logger } from "./lib/logger";
 import { readDatabaseRuntimeConfig } from "./lib/databaseConfig";
 import {
+  logDatabasePoolSnapshot,
+  logSlowDatabaseQuery,
+} from "./lib/databaseTelemetry";
+import {
   isRequestPerformanceContextActive,
   recordDatabaseQuery,
 } from "./lib/requestPerformanceContext";
@@ -84,14 +88,7 @@ const originalPoolQuery = pool.query.bind(pool);
       recordDatabaseQuery(durationMillis);
     }
 
-    if (durationMillis >= databaseRuntimeConfig.slowQueryThresholdMillis) {
-      logger.warn("Slow database query", {
-        module: "database",
-        action: "slow-query",
-        durationMillis: Math.round(durationMillis),
-        thresholdMillis: databaseRuntimeConfig.slowQueryThresholdMillis,
-      });
-    }
+    logSlowDatabaseQuery(durationMillis, databaseRuntimeConfig.slowQueryThresholdMillis);
   };
 
   if (result && typeof (result as Promise<unknown>).finally === "function") {
@@ -130,20 +127,7 @@ pool.on("acquire", () => {
 });
 
 export function logPoolStats(trigger: string) {
-  const context = {
-    module: "database",
-    action: "pool-stats",
-    trigger,
-    total: pool.totalCount,
-    idle: pool.idleCount,
-    waiting: pool.waitingCount,
-  };
-
-  if (trigger === "on-error" || pool.waitingCount > 0) {
-    logger.warn("Database pool pressure", context);
-  } else {
-    logger.debug("Database pool stats", context);
-  }
+  logDatabasePoolSnapshot(pool, trigger);
 }
 
 export const db = drizzle(pool, { schema });
