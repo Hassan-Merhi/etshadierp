@@ -8,7 +8,7 @@ import { BaleWeightEditDialog, type WeightEditBale } from "@/components/BaleWeig
 import { useEscapeBack } from "@/hooks/use-escape-back";
 import { cn } from "@/lib/utils";
 import { EmptyState, LoadingRows } from "@/components/ui/display-state";
-import { PageShell, PageActions, financialNumberClass } from "@/components/ui/page-shell";
+import { PageShell, PageActions, financialNumberClassName as financialNumberClass } from "@/components/ui/page-shell";
 
 interface StockBale {
   id: number;
