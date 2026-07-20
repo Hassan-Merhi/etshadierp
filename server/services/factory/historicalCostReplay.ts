@@ -7,5 +7,6 @@
  */
 export * from "./historical-replay/types";
 export * from "./historical-replay/readModel";
-export * from "./historical-replay/scope";
+export * from "./historical-replay/closure";
+export * from "./historical-replay/selectedScope";
 export * from "./historical-replay/apply";

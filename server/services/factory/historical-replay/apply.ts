@@ -13,7 +13,9 @@ import {
   buildNotFinalizedClause,
   captureReplaySnapshot,
   computeReplayFingerprint,
-} from "./scope";
+  normalizeReplayWriteScope,
+  replayWriteScopesEqual,
+} from "./selectedScope";
 
 export async function applyHistoricalCostReplay(
   params: ReplayApplyParams & {
@@ -31,6 +33,7 @@ export async function applyHistoricalCostReplay(
     includeCompletedBatches,
     includeFinalizedBales,
     expectedFingerprint,
+    expectedScope,
     algorithmVersion,
     issuedByUserId,
     tokenHash,
@@ -68,6 +71,8 @@ export async function applyHistoricalCostReplay(
       executor,
       lockRows: true,
     });
+    const publicScope = normalizeReplayWriteScope(scope);
+    const sourceCorrections = scope._sourceCorrections ?? new Map();
 
     result.skippedSupplierIds = supplierIds.filter((id) => !scope.supplierIds.includes(id));
     if (scope._safeSupplierRows.length === 0) {
@@ -75,18 +80,26 @@ export async function applyHistoricalCostReplay(
       return result;
     }
 
+    if (expectedScope && !replayWriteScopesEqual(expectedScope, publicScope)) {
+      throw new StaleTokenError(
+        "Stale token — the selected-supplier replay scope changed since dry-run. Re-run the preview."
+      );
+    }
+
     const safeSupplierIds = new Set(scope.supplierIds);
     const batchIdsToApply = new Set(scope.batchIdsToUpdate);
-    const sourceIdsToUpdate = new Set(scope.sourceIdsToUpdate);
     const baleIdsToUpdate = includeFinalizedBales
       ? [...scope.availableBaleIdsToUpdate, ...scope.finalizedBaleIdsToUpdate]
       : [...scope.availableBaleIdsToUpdate];
     const baleIdSet = new Set(baleIdsToUpdate);
 
-    const freshFingerprint = computeReplayFingerprint(companyId, supplierIds, scope._fullPreview, {
-      includeCompletedBatches,
-      includeFinalizedBales,
-    });
+    const freshFingerprint = computeReplayFingerprint(
+      companyId,
+      supplierIds,
+      scope._fullPreview,
+      { includeCompletedBatches, includeFinalizedBales },
+      expectedScope ? publicScope : undefined
+    );
     if (freshFingerprint !== expectedFingerprint) {
       throw new StaleTokenError(
         "Stale token — DB state changed since the dry-run was issued. Re-run the preview to obtain a fresh token."
@@ -148,13 +161,7 @@ export async function applyHistoricalCostReplay(
       );
     }
 
-    for (const sourceRow of scope._fullPreview.sourceRows) {
-      if (!sourceRow.safeToRepair || !sourceIdsToUpdate.has(sourceRow.sourceId)) continue;
-      const costPerKg = new Decimal(sourceRow.expectedHistoricalCostPerKg).toDecimalPlaces(6).toFixed(6);
-      const totalCost = new Decimal(sourceRow.weightKg)
-        .times(sourceRow.expectedHistoricalCostPerKg)
-        .toDecimalPlaces(6)
-        .toFixed(6);
+    for (const sourceCorrection of sourceCorrections.values()) {
       const update = await client.query(
         `UPDATE factory_mix_batch_sources
          SET cost_per_kg = $1, total_cost = $2
@@ -162,7 +169,12 @@ export async function applyHistoricalCostReplay(
            AND mix_batch_id IN (
              SELECT id FROM factory_mix_batches WHERE company_id = $4
            )`,
-        [costPerKg, totalCost, sourceRow.sourceId, companyId]
+        [
+          new Decimal(sourceCorrection.expectedCostPerKg).toDecimalPlaces(6).toFixed(6),
+          new Decimal(sourceCorrection.expectedTotalCost).toDecimalPlaces(6).toFixed(6),
+          sourceCorrection.sourceId,
+          companyId,
+        ]
       );
       if (update.rowCount) result.sourcesUpdated += update.rowCount;
     }
@@ -308,14 +320,11 @@ export async function applyHistoricalCostReplay(
     for (const correction of scope._batchCorrections) {
       if (!batchIdsToApply.has(correction.batchId)) continue;
       const sources = scope._sourceInfos.filter((source) => source.batchId === correction.batchId);
-      if (sources.length === 0) continue;
       let sourceTotal = new Decimal(0);
       for (const source of sources) {
-        const previewSource = scope._fullPreview.sourceRows.find((row) => row.sourceId === source.sourceId);
-        if (!previewSource?.safeToRepair) continue;
-        sourceTotal = sourceTotal.plus(
-          new Decimal(source.weightKg).times(previewSource.expectedHistoricalCostPerKg)
-        );
+        const expected = sourceCorrections.get(source.sourceId)?.expectedCostPerKg
+          ?? source.storedCostPerKg;
+        sourceTotal = sourceTotal.plus(new Decimal(source.weightKg).times(expected));
       }
       if (sourceTotal.minus(correction.expectedTotalCost).abs().gt("0.02")) {
         throw new Error(

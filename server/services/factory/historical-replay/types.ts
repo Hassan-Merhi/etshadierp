@@ -145,6 +145,7 @@ export interface ReplayApplyParams {
   includeFinalizedBales: boolean;
   preview?: HistoricalReplayPreviewResult;
   expectedFingerprint: string;
+  expectedScope?: ReplayWriteScope;
   algorithmVersion: string;
   issuedByUserId: string;
 }
@@ -229,6 +230,15 @@ export interface SourceInfo {
   pricingBasis: string;
 }
 
+export interface SourceCorrection {
+  sourceId: number;
+  batchId: number;
+  pricingBasis: string;
+  weightKg: number;
+  expectedCostPerKg: number;
+  expectedTotalCost: number;
+}
+
 export interface BatchCorrection {
   batchId: number;
   batchCode: string;
@@ -251,6 +261,7 @@ export interface BlockedBatch {
 export interface ReplayScopeInternal extends ReplayWriteScope {
   _safeSupplierRows: ReplaySupplierRow[];
   _sourceInfos: SourceInfo[];
+  _sourceCorrections?: Map<number, SourceCorrection>;
   _batchCorrections: BatchCorrection[];
   _canonicalRateByContainer: Map<number, number>;
   _canonicalTotalUsdByContainer: Map<number, number>;
@@ -266,7 +277,7 @@ export const FINALIZED_BALE_STATUSES = [
   "FINALIZED",
 ] as const;
 
-export const REPLAY_ALGORITHM_VERSION = "v3-locked-rebuild-fix13";
+export const REPLAY_ALGORITHM_VERSION = "v4-selected-supplier-closure";
 
 export function rowToCamel<T>(row: Record<string, unknown>): T {
   const out: Record<string, unknown> = {};
