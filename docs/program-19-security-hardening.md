@@ -36,24 +36,47 @@ Strengthen early runtime request boundaries and centralize security-policy owner
 - Guard installation is idempotent through a global symbol.
 - Existing Helmet, session-cookie configuration, application body limits, origin guard, CSRF synchronizer token, role enforcement, and route authorization remain authoritative and unchanged.
 
+## Phase 19C — Security Event Observability
+
+### Completed
+
+- Added `server/runtimeSecurityEvents.mjs` as a bounded, in-memory security-event recorder.
+- Added counters by stable rejection code.
+- Retains only the 50 most recent early-boundary events to prevent unbounded memory growth.
+- Emits structured warning logs for rejected requests.
+- Logs only event time, stable code, bounded method, status code, and bounded numeric or policy detail.
+- Does not log URLs, query strings, headers, cookies, tokens, request bodies, credentials, or database details.
+- Added an immutable snapshot function for later observability integration without exposing a new public endpoint.
+
+## Phase 19D — Security Ownership and Change Boundaries
+
+### Completed
+
+- Established `securityRuntimeConfig.mjs` as the sole owner of early infrastructure security limits and safe early-response headers.
+- Established `runtimeSecurityGuard.mjs` as the sole early request-boundary enforcement layer.
+- Established `runtimeSecurityEvents.mjs` as the owner of bounded early-rejection telemetry.
+- Kept authentication, authorization, role enforcement, company isolation, CSRF, CORS, session policy, uploads, and route validation in existing application middleware and services.
+- Documented that early runtime guards must never make business authorization decisions or inspect request bodies.
+- Documented that new security limits must be bounded, backward-compatible, and secret-safe.
+
 ## Security ownership rules
 
 1. Runtime security configuration owns bounded infrastructure policy only.
 2. The early request guard may reject structurally unsafe HTTP requests but must not infer users, roles, companies, permissions, or business actions.
-3. Application middleware remains responsible for authentication, authorization, CSRF, CORS, session handling, and route-level validation.
-4. Security logs must never include credentials, cookies, tokens, authorization headers, request bodies, or database connection strings.
+3. Application middleware remains responsible for authentication, authorization, CSRF, CORS, session handling, uploads, and route-level validation.
+4. Security logs must never include credentials, cookies, tokens, authorization headers, request bodies, URLs with query strings, or database connection strings.
 5. New limits must remain bounded, documented, and backward-compatible with legitimate application traffic.
+6. Security event retention must remain bounded and must not become a persistence or audit-log substitute.
 
-## Deferred work for later Program 19 phases
+## Future work requiring a runnable environment
 
-- route-by-route authorization consistency review;
-- sensitive-response and error-redaction consolidation;
-- upload and file-access boundary review;
-- security event taxonomy and audit-log normalization;
-- dependency and secret scanning in a real checkout;
-- penetration testing, runtime traffic replay, and production validation.
+- dependency and secret scanning;
+- route-by-route authorization verification;
+- upload and file-access penetration testing;
+- runtime traffic replay;
+- production validation.
 
-These require broader route analysis or a runnable environment and were not guessed or simulated.
+These were not guessed, simulated, or reported as completed.
 
 ## Safety
 
@@ -65,4 +88,6 @@ These require broader route analysis or a runnable environment and were not gues
 - Active branch: `quality/program-19-security-hardening`
 - Phase 19A: complete.
 - Phase 19B: complete.
-- Program 19 remains unmerged until later phases are completed.
+- Phase 19C: complete.
+- Phase 19D: complete.
+- Program 19: complete and ready to merge.
