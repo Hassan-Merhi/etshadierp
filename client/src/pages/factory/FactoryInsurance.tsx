@@ -33,6 +33,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { useDateFormat } from "@/contexts/DateFormatContext";
+import { useCompany } from "@/contexts/CompanyContext";
 
 
 interface InsuranceMember {
@@ -361,6 +362,7 @@ function MemberStatementDrawer({
 export default function FactoryInsurance() {
   const { toast } = useToast();
   const { formatDisplayDate } = useDateFormat();
+  const { selectedCompany } = useCompany();
   const [, navigate] = useLocation();
 
   const [includeInactive, setIncludeInactive] = useState(false);
@@ -445,8 +447,8 @@ export default function FactoryInsurance() {
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
-  const { data: members = [], isLoading } = useQuery<InsuranceMember[]>({
-    queryKey: ["/api/insurance/members", includeInactive],
+  const { data: members = [], isLoading, isError, error: membersError } = useQuery<InsuranceMember[]>({
+    queryKey: ["/api/insurance/members", selectedCompany?.id, includeInactive],
     queryFn: async () => {
       const params = new URLSearchParams({ includeInactive: String(includeInactive) });
       const res = await fetch(`/api/insurance/members?${params}`, { credentials: "include" });
@@ -456,6 +458,8 @@ export default function FactoryInsurance() {
       }
       return res.json();
     },
+    staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
   });
 
   const toggleMutation = useMutation({
@@ -654,6 +658,17 @@ export default function FactoryInsurance() {
           {isLoading ? (
             <div className="flex items-center justify-center py-12">
               <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            </div>
+          ) : isError ? (
+            <div className="flex flex-col items-center justify-center py-12 text-destructive gap-2">
+              <Shield className="h-10 w-10 mb-2 opacity-30" />
+              <p className="text-sm font-medium">Failed to load insurance members</p>
+              <p className="text-xs text-muted-foreground max-w-xs text-center">
+                {(membersError as Error)?.message || "Unknown error"}
+              </p>
+              <Button size="sm" variant="outline" className="mt-1" onClick={() => queryClient.invalidateQueries({ queryKey: ["/api/insurance/members"] })}>
+                Retry
+              </Button>
             </div>
           ) : filteredMembers.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">

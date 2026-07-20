@@ -1,26 +1,32 @@
 import type { Express } from "express";
 import { z } from "zod";
-import { and, desc, eq, or } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import { db, pool } from "../../db";
 import { requireAuth } from "../../auth";
 import {
-  companies,
   insuranceMembers,
   insertInsuranceMemberSchema,
   ledgerAccounts,
   voucherEntries,
   vouchers,
 } from "@shared/schema";
-import {
-  isCompanyIsolationError,
-  resolveRequestCompanyId,
-} from "../../services/security/requestCompanyScope";
 import { insertVoucherWithEntriesTx } from "../../services/accounting/voucherPostingService";
 
-function handleCompanyIsolationError(res: any, error: unknown): boolean {
-  if (!isCompanyIsolationError(error)) return false;
-  res.status(error.code === "RESOURCE_COMPANY_INVALID" ? 400 : 404).json({ message: "Not found" });
-  return true;
+/**
+ * Resolve the company ID for insurance routes.
+ * Uses the same pattern as all other factory routes:
+ *   factoryCompanyId  (set by the /api/factory middleware or previous factory request)
+ *   || currentCompanyId (set at login / company-switch)
+ *
+ * NOTE: We intentionally do NOT rely on session.factoryCompanyId being "pre-resolved"
+ * by a separate middleware, because that cached value can be stale when the user switches
+ * companies.  Reading both fields here and preferring factoryCompanyId mirrors every other
+ * factory route handler in the codebase.
+ */
+function resolveInsuranceCompanyId(req: any): number | null {
+  const session = req.session as any;
+  const id = session?.factoryCompanyId || session?.currentCompanyId;
+  return Number.isInteger(Number(id)) && Number(id) > 0 ? Number(id) : null;
 }
 
 function errorMessage(error: unknown, fallback: string): string {
@@ -57,55 +63,10 @@ async function findOrCreateLedger(
 }
 
 export function registerFactoryInsuranceRoutes(app: Express) {
-  // ── Factory company resolution ──────────────────────────────────────────────
-  // /api/insurance/* is registered outside /api/factory/* so the factory
-  // middleware that sets session.factoryCompanyId never runs automatically.
-  // This guard mirrors that middleware exactly: if factoryCompanyId is not yet
-  // in the session it resolves it from currentCompanyId (checking it is a
-  // factory company) or falls back to the first active factory company.
-  app.use("/api/insurance", async (req: any, _res: any, next: any) => {
-    try {
-      const session = req.session as any;
-      if (!session?.userId || session.factoryCompanyId) return next();
-
-      const currentCompanyId = session.currentCompanyId;
-      if (currentCompanyId) {
-        const [co] = await db
-          .select({ id: companies.id, companyType: companies.companyType })
-          .from(companies)
-          .where(eq(companies.id, currentCompanyId));
-        if (co?.companyType === "factory" || co?.companyType === "factory_v2") {
-          session.factoryCompanyId = co.id;
-          return next();
-        }
-      }
-
-      // currentCompanyId is ERP/other — fall back to any active factory company
-      const [factoryComp] = await db
-        .select({ id: companies.id })
-        .from(companies)
-        .where(
-          and(
-            or(eq(companies.companyType, "factory"), eq(companies.companyType, "factory_v2")),
-            eq(companies.active, true),
-          ),
-        )
-        .orderBy(companies.id)
-        .limit(1);
-      if (factoryComp) {
-        session.factoryCompanyId = factoryComp.id;
-      } else if (currentCompanyId) {
-        session.factoryCompanyId = currentCompanyId;
-      }
-      next();
-    } catch {
-      next();
-    }
-  });
-
   app.get("/api/insurance/members", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = resolveRequestCompanyId(req);
+      const companyId = resolveInsuranceCompanyId(req);
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
       const includeInactive = req.query.includeInactive === "true";
       const where = includeInactive
         ? eq(insuranceMembers.companyId, companyId)
@@ -113,7 +74,6 @@ export function registerFactoryInsuranceRoutes(app: Express) {
       const rows = await db.select().from(insuranceMembers).where(where).orderBy(insuranceMembers.name);
       res.json(rows);
     } catch (error: unknown) {
-      if (handleCompanyIsolationError(res, error)) return;
       console.error("GET /api/insurance/members error:", error);
       res.status(500).json({ message: errorMessage(error, "Failed to fetch insurance members") });
     }
@@ -122,8 +82,9 @@ export function registerFactoryInsuranceRoutes(app: Express) {
   app.get("/api/insurance/members/:id/entries", requireAuth, async (req: any, res: any) => {
     try {
       const id = Number(req.params.id);
-      const companyId = resolveRequestCompanyId(req);
       if (!Number.isInteger(id) || id <= 0) return res.status(400).json({ message: "Invalid id" });
+      const companyId = resolveInsuranceCompanyId(req);
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const [member] = await db
         .select({ ledgerAccountId: insuranceMembers.ledgerAccountId })
@@ -150,7 +111,6 @@ export function registerFactoryInsuranceRoutes(app: Express) {
         .orderBy(desc(vouchers.voucherDate), desc(vouchers.id));
       res.json(entries);
     } catch (error: unknown) {
-      if (handleCompanyIsolationError(res, error)) return;
       console.error("GET /api/insurance/members/:id/entries error:", error);
       res.status(500).json({ message: errorMessage(error, "Failed to fetch entries") });
     }
@@ -158,7 +118,8 @@ export function registerFactoryInsuranceRoutes(app: Express) {
 
   app.post("/api/insurance/members", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = resolveRequestCompanyId(req);
+      const companyId = resolveInsuranceCompanyId(req);
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
       const parsed = insertInsuranceMemberSchema.safeParse({ ...req.body, companyId });
       if (!parsed.success) return res.status(400).json({ message: "Validation failed", errors: parsed.error.errors });
       const data = parsed.data;
@@ -185,7 +146,6 @@ export function registerFactoryInsuranceRoutes(app: Express) {
       );
       res.status(201).json(inserted.rows[0]);
     } catch (error: unknown) {
-      if (handleCompanyIsolationError(res, error)) return;
       console.error("POST /api/insurance/members error:", error);
       res.status(500).json({ message: errorMessage(error, "Failed to create insurance member") });
     }
@@ -195,7 +155,8 @@ export function registerFactoryInsuranceRoutes(app: Express) {
     try {
       const id = Number(req.params.id);
       if (!Number.isInteger(id) || id <= 0) return res.status(400).json({ message: "Invalid id" });
-      const companyId = resolveRequestCompanyId(req);
+      const companyId = resolveInsuranceCompanyId(req);
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
       const [existing] = await db
         .select({ name: insuranceMembers.name, ledgerAccountId: insuranceMembers.ledgerAccountId })
         .from(insuranceMembers)
@@ -219,7 +180,6 @@ export function registerFactoryInsuranceRoutes(app: Express) {
         .returning();
       res.json(updated);
     } catch (error: unknown) {
-      if (handleCompanyIsolationError(res, error)) return;
       console.error("PATCH /api/insurance/members/:id error:", error);
       res.status(500).json({ message: errorMessage(error, "Failed to update insurance member") });
     }
@@ -229,7 +189,8 @@ export function registerFactoryInsuranceRoutes(app: Express) {
     try {
       const id = Number(req.params.id);
       if (!Number.isInteger(id) || id <= 0) return res.status(400).json({ message: "Invalid id" });
-      const companyId = resolveRequestCompanyId(req);
+      const companyId = resolveInsuranceCompanyId(req);
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
       const [existing] = await db
         .select({ active: insuranceMembers.active })
         .from(insuranceMembers)
@@ -243,7 +204,6 @@ export function registerFactoryInsuranceRoutes(app: Express) {
         .returning();
       res.json(updated);
     } catch (error: unknown) {
-      if (handleCompanyIsolationError(res, error)) return;
       console.error("PATCH /api/insurance/members/:id/toggle error:", error);
       res.status(500).json({ message: errorMessage(error, "Failed to toggle member status") });
     }
@@ -253,7 +213,8 @@ export function registerFactoryInsuranceRoutes(app: Express) {
     try {
       const id = Number(req.params.id);
       if (!Number.isInteger(id) || id <= 0) return res.status(400).json({ message: "Invalid id" });
-      const companyId = resolveRequestCompanyId(req);
+      const companyId = resolveInsuranceCompanyId(req);
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
       const [existing] = await db
         .select({ ledgerAccountId: insuranceMembers.ledgerAccountId })
         .from(insuranceMembers)
@@ -266,7 +227,6 @@ export function registerFactoryInsuranceRoutes(app: Express) {
       }
       res.json({ success: true });
     } catch (error: unknown) {
-      if (handleCompanyIsolationError(res, error)) return;
       console.error("DELETE /api/insurance/members/:id error:", error);
       res.status(500).json({ message: errorMessage(error, "Failed to delete insurance member") });
     }
@@ -277,7 +237,8 @@ export function registerFactoryInsuranceRoutes(app: Express) {
       const parsed = z.object({ month: z.number().min(1).max(12), year: z.number().min(2000).max(2100) }).safeParse(req.body);
       if (!parsed.success) return res.status(400).json({ message: "Validation failed", errors: parsed.error.errors });
       const { month, year } = parsed.data;
-      const companyId = resolveRequestCompanyId(req);
+      const companyId = resolveInsuranceCompanyId(req);
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
       const periodStart = `${year}-${String(month).padStart(2, "0")}-01`;
       const lastDay = new Date(year, month, 0).getDate();
       const periodEnd = `${year}-${String(month).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
@@ -355,7 +316,6 @@ export function registerFactoryInsuranceRoutes(app: Express) {
         period: monthLabel,
       });
     } catch (error: unknown) {
-      if (handleCompanyIsolationError(res, error)) return;
       console.error("POST /api/insurance/generate error:", error);
       res.status(500).json({ message: errorMessage(error, "Failed to generate insurance entries") });
     }
