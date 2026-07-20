@@ -1,6 +1,10 @@
 import type { Express } from "express";
 import { requireAuth, requireLogin } from "../auth";
 import { screenFeedStore, watcherPollStore } from "../screenFeedStore";
+import {
+  isValidScreenFeedDataUrl,
+  sanitizeScreenFeedClicks,
+} from "../services/screenFeedService";
 
 // How long (ms) after a watcher's last GET we still consider the user "being watched".
 // Must be comfortably larger than the watcher's poll interval (~3–5 s) to avoid
@@ -29,7 +33,7 @@ export function registerScreenFeedRoutes(app: Express) {
 
     if (isDev) {
       console.log(
-        `[ScreenFeed] being-watched userId=${userId} watched=${watched} lastPollAgeMs=${lastPoll > 0 ? ageMs : "never"}`
+        `[ScreenFeed] being-watched userId=${userId} watched=${watched} lastPollAgeMs=${lastPoll > 0 ? ageMs : "never"}`,
       );
     }
 
@@ -54,17 +58,18 @@ export function registerScreenFeedRoutes(app: Express) {
 
     if (isDev) {
       console.log(
-        `[ScreenFeed] POST /api/screen-feed received from userId=${String(req.session.userId!)} body_keys=${Object.keys(req.body ?? {}).join(",")}`
+        `[ScreenFeed] POST /api/screen-feed received from userId=${String(req.session.userId!)} body_keys=${Object.keys(req.body ?? {}).join(",")}`,
       );
     }
 
     const { dataUrl, clicks } = req.body ?? {};
 
-    if (!dataUrl || typeof dataUrl !== "string" || !dataUrl.startsWith("data:image/")) {
-      if (isDev)
+    if (!isValidScreenFeedDataUrl(dataUrl)) {
+      if (isDev) {
         console.warn(
-          `[ScreenFeed] POST rejected: missing or invalid dataUrl (type=${typeof dataUrl} starts=${typeof dataUrl === "string" ? dataUrl.slice(0, 30) : "N/A"})`
+          `[ScreenFeed] POST rejected: missing or invalid dataUrl (type=${typeof dataUrl} starts=${typeof dataUrl === "string" ? dataUrl.slice(0, 30) : "N/A"})`,
         );
+      }
       return res.status(400).end();
     }
     if (dataUrl.length > MAX_FRAME_SIZE) {
@@ -73,18 +78,14 @@ export function registerScreenFeedRoutes(app: Express) {
     }
 
     const userId = String(req.session.userId!);
-    const username = ((req.session as any).username as string) || userId;
-    const now = Date.now();
-    const safeClicks = Array.isArray(clicks)
-      ? clicks
-          .filter((c: any) => c && typeof c.x === "number" && typeof c.y === "number" && now - c.ts < 8000)
-          .slice(-50)
-      : [];
+    const sessionWithUsername = req.session as typeof req.session & { username?: string };
+    const username = sessionWithUsername.username || userId;
+    const safeClicks = sanitizeScreenFeedClicks(clicks);
     screenFeedStore.set(userId, { dataUrl, capturedAt: new Date(), userId, username, clicks: safeClicks });
 
     if (isDev) {
       console.log(
-        `[ScreenFeed] POST frame stored userId=${userId} frameLen=${dataUrl.length} clicks=${safeClicks.length}`
+        `[ScreenFeed] POST frame stored userId=${userId} frameLen=${dataUrl.length} clicks=${safeClicks.length}`,
       );
     }
 
@@ -107,7 +108,7 @@ export function registerScreenFeedRoutes(app: Express) {
     if (isDev) {
       const frameAgeMs = frame ? Date.now() - frame.capturedAt.getTime() : null;
       console.log(
-        `[ScreenFeed] GET /:userId watchedUserId=${watchedUserId} hasFrame=${hasFrame} frameAgeMs=${frameAgeMs}`
+        `[ScreenFeed] GET /:userId watchedUserId=${watchedUserId} hasFrame=${hasFrame} frameAgeMs=${frameAgeMs}`,
       );
     }
 
