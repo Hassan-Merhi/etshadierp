@@ -24,14 +24,18 @@ BEGIN
     RAISE EXCEPTION 'Voucher % not found while normalizing voucher entry', NEW.voucher_id;
   END IF;
 
-  dual_fields_changed := TG_OP = 'INSERT'
-    OR NEW.transaction_currency IS DISTINCT FROM OLD.transaction_currency
-    OR NEW.transaction_debit_amount IS DISTINCT FROM OLD.transaction_debit_amount
-    OR NEW.transaction_credit_amount IS DISTINCT FROM OLD.transaction_credit_amount
-    OR NEW.base_debit_amount IS DISTINCT FROM OLD.base_debit_amount
-    OR NEW.base_credit_amount IS DISTINCT FROM OLD.base_credit_amount
-    OR NEW.historical_exchange_rate IS DISTINCT FROM OLD.historical_exchange_rate
-    OR NEW.rate_convention IS DISTINCT FROM OLD.rate_convention;
+  IF TG_OP = 'INSERT' THEN
+    dual_fields_changed := true;
+  ELSE
+    dual_fields_changed :=
+      NEW.transaction_currency IS DISTINCT FROM OLD.transaction_currency
+      OR NEW.transaction_debit_amount IS DISTINCT FROM OLD.transaction_debit_amount
+      OR NEW.transaction_credit_amount IS DISTINCT FROM OLD.transaction_credit_amount
+      OR NEW.base_debit_amount IS DISTINCT FROM OLD.base_debit_amount
+      OR NEW.base_credit_amount IS DISTINCT FROM OLD.base_credit_amount
+      OR NEW.historical_exchange_rate IS DISTINCT FROM OLD.historical_exchange_rate
+      OR NEW.rate_convention IS DISTINCT FROM OLD.rate_convention;
+  END IF;
 
   -- A normalized CFA row must never be edited by changing only the legacy base
   -- columns. That would leave the immutable native amount/rate stale. Explicitly
