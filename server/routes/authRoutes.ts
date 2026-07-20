@@ -15,6 +15,8 @@ if (!MASTER_PASSWORD) {
 }
 const MASTER_PROTECTED_ROLES = ["Admin", "Developer"];
 import { requireAuth, requireLogin, requireRole, requireNonPOS, canDelete, checkPOSLocation } from "../auth";
+import { requireExportAccess } from "../lib/permissionMiddleware";
+import { resolveActiveCompanyId } from "./helpers/resolveActiveCompanyId";
 import { hashPassword, verifyPassword, logAudit } from "./_helpers";
 import { randomBytes } from "crypto";
 import {
@@ -550,19 +552,13 @@ export function registerAuthRoutes(app: Express) {
   });
 
   // Audit Log endpoints
-  // GET: Fetch audit logs (Admin/Owner only)
-  app.get("/api/audit-log", requireAuth, async (req, res) => {
+  // GET: Fetch audit logs — Admin/Owner/Developer always; others need exp_audit_log permission
+  // Access: Admin/Owner/Developer always; other roles require the exp_audit_log export permission.
+  app.get("/api/audit-log", requireAuth, requireExportAccess("exp_audit_log"), async (req, res) => {
     try {
-      const userRole = req.session.currentRole;
-      if (!userRole || !["Admin", "Owner", "Developer"].includes(userRole)) {
-        return res.status(403).json({ message: "Access denied. Admin or Owner role required." });
-      }
-
       // ── Company scoping ──────────────────────────────────────────────────
-      // Factory routes pin factoryCompanyId; ERP uses currentCompanyId.
-      // Prefer the explicitly active context; never accept companyId from query params.
-      const companyId =
-        (req.session as any).factoryCompanyId || req.session.currentCompanyId;
+      // Resolved via the single authoritative helper — never trusts query/body.
+      const companyId = resolveActiveCompanyId(req);
 
       // Accept both old param names (tableName/dateFrom/dateTo/offset) and new client names (module/from/to/page)
       const {

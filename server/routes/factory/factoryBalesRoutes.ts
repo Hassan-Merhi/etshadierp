@@ -1827,6 +1827,16 @@ export function registerFactoryBalesRoutes(app: Express) {
         .returning({ id: factoryBales.id, status: factoryBales.status });
 
       if (!updated) return res.status(404).json({ message: "Bale not found" });
+      await logAudit({
+        userId: req.session.userId!,
+        username: (req.session as any).username || req.session.userId!,
+        companyId,
+        action: "update",
+        tableName: "factory_bales",
+        recordId: id,
+        recordIdentifier: `Bale #${id}`,
+        changes: { status: { old: null, new: status } },
+      });
       res.json(updated);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
@@ -2040,6 +2050,16 @@ export function registerFactoryBalesRoutes(app: Express) {
         };
       });
 
+      await logAudit({
+        userId: req.session.userId!,
+        username: (req.session as any).username || req.session.userId!,
+        companyId,
+        action: "update",
+        tableName: "factory_bales",
+        recordId: id,
+        recordIdentifier: result.bale.referenceNumber || `Bale #${id}`,
+        changes: { weightKg: { old: result.oldWeight, new: result.newWeight } },
+      });
       res.json({
         success: true,
         baleId: id,
@@ -2125,6 +2145,19 @@ export function registerFactoryBalesRoutes(app: Express) {
         return { originalBale, newBale, newRefNum };
       });
 
+      await logAudit({
+        userId: req.session.userId!,
+        username: (req.session as any).username || req.session.userId!,
+        companyId,
+        action: "update",
+        tableName: "factory_bales",
+        recordId: id,
+        recordIdentifier: result.originalBale.referenceNumber || `Bale #${id}`,
+        changes: {
+          status: { old: result.originalBale.status, new: "REPACKED" },
+          newBaleRef: { old: null, new: result.newRefNum },
+        },
+      });
       res.json(result);
     } catch (error: any) {
       console.error("Error repacking bale:", error);

@@ -2454,7 +2454,7 @@ export default function FactoryDaybook() {
       </div>
 
       {/* Tab selector: Transactions / Edits & Activity */}
-      <Tabs value={activeDaybookTab} onValueChange={(v: any) => setActiveDaybookTab(v)}>
+      <Tabs value={activeDaybookTab} onValueChange={(value) => setActiveDaybookTab(value as "transactions" | "activity")}>
         <TabsList className="w-fit">
           <TabsTrigger value="transactions">Transactions</TabsTrigger>
           <TabsTrigger value="activity">Edits &amp; Activity</TabsTrigger>

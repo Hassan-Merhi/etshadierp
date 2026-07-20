@@ -631,6 +631,21 @@ export function registerStatsNetPositionRoutes(app: Express) {
       // ── Send file ─────────────────────────────────────────────────────────
       const dateTag = getClientDate(req);
       const xlsBuffer = Buffer.from(await wb.xlsx.writeBuffer());
+      // Non-fatal: audit write must not block the Excel download
+      try {
+        await logAudit({
+          userId: req.session.userId!,
+          username: (req.session as any).username || req.session.userId!,
+          companyId: companyId!,
+          action: "export",
+          tableName: "reports",
+          recordId: null,
+          recordIdentifier: `Net Position Excel — ${dateTag}`,
+          changes: { format: { old: null, new: "xlsx" } },
+        });
+      } catch (auditErr) {
+        console.error("[NetPositionExcel] audit write failed:", auditErr);
+      }
       res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
       res.setHeader("Content-Disposition", `attachment; filename="Net_Position_${dateTag}.xlsx"`);
       res.setHeader("Content-Length", xlsBuffer.byteLength);

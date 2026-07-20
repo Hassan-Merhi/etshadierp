@@ -1080,6 +1080,21 @@ export function registerNetProfitExcelRoute(app: Express) {
       const safeCompanyName = companyName.replace(/[^a-z0-9]/gi, "_");
       const safePeriod = periodLabel.replace(/[^a-z0-9]/gi, "_");
       const xlsBuffer = Buffer.from(await workbook.xlsx.writeBuffer());
+      // Non-fatal audit write: must not corrupt the export response if it fails
+      try {
+        await logAudit({
+          userId: req.session.userId!,
+          username: (req.session as any).username || req.session.userId!,
+          companyId: companyId!,
+          action: "export",
+          tableName: "reports",
+          recordId: null,
+          recordIdentifier: `Net Profit Excel — ${periodLabel}`,
+          changes: { format: { old: null, new: "xlsx" } },
+        });
+      } catch (auditErr) {
+        console.error("[NetProfitExcel] audit write failed:", auditErr);
+      }
       res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
       res.setHeader("Content-Disposition", `attachment; filename="NetProfit_${safeCompanyName}_${safePeriod}.xlsx"`);
       res.setHeader("Content-Length", xlsBuffer.byteLength);

@@ -238,12 +238,26 @@ export function AuditLog({ defaultActions = "update,delete", context = "settings
           ))}
         </div>
       ) : error ? (
-        <div className="flex flex-col items-center gap-3 p-6 text-destructive bg-destructive/10 rounded-md">
-          <p className="text-sm font-medium">Error loading activity log.</p>
-          <Button variant="outline" size="sm" onClick={() => refetch()}>
-            Try again
-          </Button>
-        </div>
+        (() => {
+          const isPermissionError =
+            (error as any)?.status === 403 ||
+            String((error as any)?.message || "").toLowerCase().includes("access denied") ||
+            String((error as any)?.message || "").toLowerCase().includes("permission") ||
+            String((error as any)?.message || "").includes("403");
+          return isPermissionError ? (
+            <div className="flex flex-col items-center gap-3 p-8 text-muted-foreground border rounded-md bg-muted/20">
+              <p className="text-sm font-medium">You do not have permission to view activity history.</p>
+              <p className="text-xs">Contact your administrator to request access.</p>
+            </div>
+          ) : (
+            <div className="flex flex-col items-center gap-3 p-6 text-destructive bg-destructive/10 rounded-md">
+              <p className="text-sm font-medium">Error loading activity log.</p>
+              <Button variant="outline" size="sm" onClick={() => refetch()}>
+                Try again
+              </Button>
+            </div>
+          );
+        })()
       ) : auditLogs.length === 0 ? (
         <div className="text-center py-12 text-muted-foreground border rounded-md bg-muted/20">
           <p className="text-sm font-medium">No activity found</p>

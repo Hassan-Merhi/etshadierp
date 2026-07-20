@@ -1,3 +1,4 @@
+import { logAudit } from "../helpers/auditHelpers";
 import { parseId, parseOptionalId } from "../../lib/parseId";
 import { getClientDate } from "../../lib/dateUtils";
 import type { Express } from "express";
@@ -500,6 +501,20 @@ export function registerFactoryMixBatchRoutes(app: Express) {
         amountUsd: parseFloat(result.totalCost || "0"),
       });
 
+      await logAudit({
+        userId: req.session.userId!,
+        username: (req.session as any).username || req.session.userId!,
+        companyId,
+        action: "update",
+        tableName: "factory_mix_batches",
+        recordId: result.id,
+        recordIdentifier: result.batchCode + (result.name ? ` – ${result.name}` : ""),
+        changes: {
+          ...(name !== undefined ? { name: { old: null, new: name?.trim() || null } } : {}),
+          ...(notes !== undefined ? { notes: { old: null, new: notes?.trim() || null } } : {}),
+          totalWeightKg: { old: null, new: parseFloat(result.totalWeightKg || "0").toFixed(3) },
+        },
+      });
       res.json(result);
     } catch (error: any) {
       console.error("Error updating mix batch:", error);
@@ -612,6 +627,16 @@ export function registerFactoryMixBatchRoutes(app: Express) {
       });
 
       if (!result) return res.status(404).json({ message: "Mix batch not found" });
+      await logAudit({
+        userId: req.session.userId!,
+        username: (req.session as any).username || req.session.userId!,
+        companyId,
+        action: "delete",
+        tableName: "factory_mix_batches",
+        recordId: id,
+        recordIdentifier: `Mix Batch #${id}`,
+        changes: null,
+      });
       res.json({ id: result.id, message: "Mix batch moved to Deleted Items" });
     } catch (error: any) {
       console.error("Error deleting mix batch:", error);
@@ -918,6 +943,19 @@ export function registerFactoryMixBatchRoutes(app: Express) {
         amountUsd: parseFloat(result.totalCost || "0"),
       });
 
+      await logAudit({
+        userId: req.session.userId!,
+        username: (req.session as any).username || req.session.userId!,
+        companyId,
+        action: "create",
+        tableName: "factory_mix_batches",
+        recordId: result.id,
+        recordIdentifier: result.batchCode + (result.name ? ` – ${result.name}` : ""),
+        changes: {
+          totalWeightKg: { old: null, new: parseFloat(result.totalWeightKg || "0").toFixed(3) },
+          totalCost: { old: null, new: parseFloat(result.totalCost || "0").toFixed(2) },
+        },
+      });
       res.json(result);
     } catch (error: any) {
       console.error("Error creating mix batch:", error);
