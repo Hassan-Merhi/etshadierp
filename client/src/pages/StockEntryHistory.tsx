@@ -216,7 +216,7 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
   if (!includeUnassigned) params.set("includeUnassigned", "false");
   if (useLite) params.set("lite", "1");
 
-  const { data: rawGroups, isLoading } = useQuery<GroupRow[]>({
+  const { data: pagedGroups, isLoading } = useQuery<{ items: GroupRow[]; total: number; totalPages: number; hasNextPage: boolean; hasPreviousPage: boolean }>({
     queryKey: ["/api/factory/bales/stock-entry-history", params.toString()],
     queryFn: () =>
       fetch(`/api/factory/bales/stock-entry-history?${params.toString()}`, { credentials: "include" }).then((r) =>
@@ -227,9 +227,9 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
     refetchOnReconnect: false,
     placeholderData: (prev) => prev,
   });
-  const groups: GroupRow[] = Array.isArray(rawGroups) ? rawGroups : [];
+  const groups: GroupRow[] = pagedGroups?.items ?? [];
 
-  const { data: workers = [] } = useQuery<any[]>({ queryKey: ["/api/factory/workers"] });
+  const { data: workers = [] } = useQuery<any[]>({ queryKey: ["/api/factory/workers"], staleTime: 60_000, refetchOnWindowFocus: false });
   const { data: products = [] } = useQuery<any[]>({ queryKey: ["/api/factory/bale-products"] });
   const { data: locations = [] } = useQuery<Location[]>({ queryKey: ["/api/locations"] });
   const { data: categories = [] } = useQuery<any[]>({
@@ -270,7 +270,10 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
         queryFn: (): Promise<BaleDetail[]> =>
           fetch(`/api/factory/bales/stock-entry-history?${gp.toString()}`, { credentials: "include" })
             .then((r) => r.json())
-            .then((rows: GroupRow[]) => (Array.isArray(rows) ? rows.flatMap((g) => g.bales ?? []) : [])),
+            .then((res: any) => {
+          const rows: GroupRow[] = Array.isArray(res) ? res : (res?.items ?? []);
+          return rows.flatMap((g: GroupRow) => g.bales ?? []);
+        }),
         staleTime: 5 * 60 * 1000,
         refetchOnWindowFocus: false,
         enabled: useLite && !!group,
@@ -425,15 +428,16 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
     if (g.productId) gp.set("productId", String(g.productId));
     if (g.erpLocationId) gp.set("locationId", String(g.erpLocationId));
 
-    const rows: GroupRow[] = await qc.fetchQuery({
+    const res = await qc.fetchQuery({
       queryKey: ["/api/factory/bales/stock-entry-history/group", gp.toString()],
       queryFn: () =>
         fetch(`/api/factory/bales/stock-entry-history?${gp.toString()}`, { credentials: "include" }).then((r) =>
           r.json()
         ),
       staleTime: 5 * 60 * 1000,
-    });
-    const bales = Array.isArray(rows) ? rows.flatMap((row) => row.bales ?? []) : [];
+    }) as any;
+    const rows: GroupRow[] = Array.isArray(res) ? res : (res?.items ?? []);
+    const bales = rows.flatMap((row: GroupRow) => row.bales ?? []);
     return bales.map((b) => b.id);
   }
 
@@ -454,7 +458,7 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
     const raw = await fetch(`/api/factory/bales/stock-entry-history?${fullParams.toString()}`, {
       credentials: "include",
     }).then((r) => r.json());
-    return Array.isArray(raw) ? raw : filteredGroups;
+    return Array.isArray(raw) ? raw : Array.isArray(raw?.items) ? raw.items : filteredGroups;
   }
 
   function resetFilters() {

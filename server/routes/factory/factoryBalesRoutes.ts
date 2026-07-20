@@ -2154,6 +2154,13 @@ export function registerFactoryBalesRoutes(app: Express) {
       const effectiveStart = startDate || today;
       const effectiveEnd = endDate || today;
 
+      // Pagination — page ≥ 1, limit 1–250 (default 100)
+      const rawPage = parseInt(String(req.query.page ?? ""), 10);
+      const rawLimit = parseInt(String(req.query.limit ?? ""), 10);
+      const page = Number.isFinite(rawPage) && rawPage > 0 ? rawPage : 1;
+      const limit = Math.min(Number.isFinite(rawLimit) && rawLimit > 0 ? rawLimit : 100, 250);
+      const offset = (page - 1) * limit;
+
       const workerFilter = workerId ? sql`AND fb.finalized_by = ${parseInt(workerId)}` : sql``;
       const productFilter = productId ? sql`AND fb.product_id = ${parseInt(productId)}` : sql``;
       const locationFilter = locationId ? sql`AND fb.erp_location_id = ${parseInt(locationId)}` : sql``;
@@ -2166,10 +2173,86 @@ export function registerFactoryBalesRoutes(app: Express) {
       // otherwise exclude deleted/removed bales (consistent with daily-summary)
       const deletedFilter = isPrivileged && search ? sql`` : sql`AND fb.status NOT IN ('DELETED', 'REMOVED')`;
 
+      // Shared WHERE base reused by both the data query and the COUNT subquery.
+      const whereClause = sql`
+        WHERE fb.company_id = ${companyId}
+          ${deletedFilter}
+          AND fb.stock_entry_date IS NOT NULL
+          AND fb.stock_entry_date >= ${effectiveStart}
+          AND fb.stock_entry_date <= ${effectiveEnd}
+          ${workerFilter}
+          ${productFilter}
+          ${locationFilter}
+          ${statusFilter}
+          ${searchFilter}
+          ${unassignedFilter}`;
+
+      const groupByClause = sql`GROUP BY fb.stock_entry_date, fb.erp_location_id, l.name, fb.finalized_by, fw.full_name, fb.product_id, fbp.name, fbp.article_code`;
+      const orderByClause = sql`ORDER BY fb.stock_entry_date DESC, l.name NULLS LAST, fw.full_name NULLS LAST, fbp.name NULLS LAST`;
+
+      const joinClause = sql`
+        FROM factory_bales fb
+        LEFT JOIN factory_workers fw ON fb.finalized_by = fw.id AND fw.company_id = ${companyId}
+        LEFT JOIN factory_bale_products fbp ON fb.product_id = fbp.id AND fbp.company_id = ${companyId}
+        LEFT JOIN locations l ON fb.erp_location_id = l.id AND l.company_id = ${companyId}`;
+
+      // COUNT query: counts distinct groups matching the filter. Runs in parallel with the data query.
+      const countQuery = sql`
+        SELECT COUNT(*) AS total
+        FROM (
+          SELECT 1
+          ${joinClause}
+          ${whereClause}
+          ${groupByClause}
+        ) AS grp`;
+
+      function buildPaginatedResponse(items: any[], total: number) {
+        const totalPages = total === 0 ? 0 : Math.ceil(total / limit);
+        return {
+          items,
+          total,
+          page,
+          limit,
+          totalPages,
+          hasNextPage: page < totalPages,
+          hasPreviousPage: page > 1 && totalPages > 0,
+        };
+      }
+
       // Lite mode: omit per-bale JSON_AGG — returns a summary-only payload (~95% smaller).
       // The condensed view uses this for the initial page load; bale details are fetched on demand.
       if (lite === "1") {
-        const liteRows = await db.execute(sql`
+        const [liteResult, countResult] = await Promise.all([
+          db.execute(sql`
+            SELECT
+              fb.stock_entry_date::text AS "stockEntryDate",
+              fb.erp_location_id AS "erpLocationId",
+              COALESCE(l.name, 'Unknown') AS "locationName",
+              fb.finalized_by AS "workerId",
+              fw.full_name AS "workerName",
+              fb.product_id AS "productId",
+              fbp.name AS "productName",
+              fbp.article_code AS "articleCode",
+              COUNT(*)::int AS "baleCount",
+              ROUND(SUM(CAST(fb.weight_kg AS numeric)), 3) AS "totalWeight",
+              ROUND(AVG(CAST(fb.weight_kg AS numeric)), 3) AS "avgWeight",
+              MIN(fb.finalized_at) AS "firstFinalizedAt",
+              MAX(fb.finalized_at) AS "lastFinalizedAt"
+            ${joinClause}
+            ${whereClause}
+            ${groupByClause}
+            ${orderByClause}
+            LIMIT ${limit} OFFSET ${offset}
+          `),
+          db.execute(countQuery),
+        ]);
+        const total = parseInt(String((countResult.rows[0] as any)?.total ?? "0"), 10);
+        const items = liteResult.rows.map((r: any) => ({ ...r, bales: [] }));
+        return res.json(buildPaginatedResponse(items, total));
+      }
+
+      const [dataResult, countResult] = await Promise.all([
+        db.execute(sql`
           SELECT
             fb.stock_entry_date::text AS "stockEntryDate",
             fb.erp_location_id AS "erpLocationId",
@@ -2183,75 +2266,30 @@ export function registerFactoryBalesRoutes(app: Express) {
             ROUND(SUM(CAST(fb.weight_kg AS numeric)), 3) AS "totalWeight",
             ROUND(AVG(CAST(fb.weight_kg AS numeric)), 3) AS "avgWeight",
             MIN(fb.finalized_at) AS "firstFinalizedAt",
-            MAX(fb.finalized_at) AS "lastFinalizedAt"
-          FROM factory_bales fb
-          LEFT JOIN factory_workers fw ON fb.finalized_by = fw.id AND fw.company_id = ${companyId}
-          LEFT JOIN factory_bale_products fbp ON fb.product_id = fbp.id AND fbp.company_id = ${companyId}
-          LEFT JOIN locations l ON fb.erp_location_id = l.id AND l.company_id = ${companyId}
-          WHERE fb.company_id = ${companyId}
-            ${deletedFilter}
-            AND fb.stock_entry_date IS NOT NULL
-            AND fb.stock_entry_date >= ${effectiveStart}
-            AND fb.stock_entry_date <= ${effectiveEnd}
-            ${workerFilter}
-            ${productFilter}
-            ${locationFilter}
-            ${statusFilter}
-            ${searchFilter}
-            ${unassignedFilter}
-          GROUP BY fb.stock_entry_date, fb.erp_location_id, l.name, fb.finalized_by, fw.full_name, fb.product_id, fbp.name, fbp.article_code
-          ORDER BY fb.stock_entry_date DESC, l.name NULLS LAST, fw.full_name NULLS LAST, fbp.name NULLS LAST
-        `);
-        return res.json(liteRows.rows.map((r: any) => ({ ...r, bales: [] })));
-      }
+            MAX(fb.finalized_at) AS "lastFinalizedAt",
+            JSON_AGG(JSON_BUILD_OBJECT(
+              'id', fb.id,
+              'referenceNumber', fb.reference_number,
+              'weightKg', fb.weight_kg,
+              'status', fb.status,
+              'finalizedAt', fb.finalized_at,
+              'stockEntryDate', fb.stock_entry_date::text,
+              'locationName', COALESCE(l.name, 'Unknown'),
+              'workerName', fw.full_name,
+              'productName', fbp.name,
+              'articleCode', fbp.article_code
+            ) ORDER BY fb.finalized_at ASC) AS "bales"
+          ${joinClause}
+          ${whereClause}
+          ${groupByClause}
+          ${orderByClause}
+          LIMIT ${limit} OFFSET ${offset}
+        `),
+        db.execute(countQuery),
+      ]);
 
-      const rows = await db.execute(sql`
-        SELECT
-          fb.stock_entry_date::text AS "stockEntryDate",
-          fb.erp_location_id AS "erpLocationId",
-          COALESCE(l.name, 'Unknown') AS "locationName",
-          fb.finalized_by AS "workerId",
-          fw.full_name AS "workerName",
-          fb.product_id AS "productId",
-          fbp.name AS "productName",
-          fbp.article_code AS "articleCode",
-          COUNT(*)::int AS "baleCount",
-          ROUND(SUM(CAST(fb.weight_kg AS numeric)), 3) AS "totalWeight",
-          ROUND(AVG(CAST(fb.weight_kg AS numeric)), 3) AS "avgWeight",
-          MIN(fb.finalized_at) AS "firstFinalizedAt",
-          MAX(fb.finalized_at) AS "lastFinalizedAt",
-          JSON_AGG(JSON_BUILD_OBJECT(
-            'id', fb.id,
-            'referenceNumber', fb.reference_number,
-            'weightKg', fb.weight_kg,
-            'status', fb.status,
-            'finalizedAt', fb.finalized_at,
-            'stockEntryDate', fb.stock_entry_date::text,
-            'locationName', COALESCE(l.name, 'Unknown'),
-            'workerName', fw.full_name,
-            'productName', fbp.name,
-            'articleCode', fbp.article_code
-          ) ORDER BY fb.finalized_at ASC) AS "bales"
-        FROM factory_bales fb
-        LEFT JOIN factory_workers fw ON fb.finalized_by = fw.id AND fw.company_id = ${companyId}
-        LEFT JOIN factory_bale_products fbp ON fb.product_id = fbp.id AND fbp.company_id = ${companyId}
-        LEFT JOIN locations l ON fb.erp_location_id = l.id AND l.company_id = ${companyId}
-        WHERE fb.company_id = ${companyId}
-          ${deletedFilter}
-          AND fb.stock_entry_date IS NOT NULL
-          AND fb.stock_entry_date >= ${effectiveStart}
-          AND fb.stock_entry_date <= ${effectiveEnd}
-          ${workerFilter}
-          ${productFilter}
-          ${locationFilter}
-          ${statusFilter}
-          ${searchFilter}
-          ${unassignedFilter}
-        GROUP BY fb.stock_entry_date, fb.erp_location_id, l.name, fb.finalized_by, fw.full_name, fb.product_id, fbp.name, fbp.article_code
-        ORDER BY fb.stock_entry_date DESC, l.name NULLS LAST, fw.full_name NULLS LAST, fbp.name NULLS LAST
-      `);
-
-      res.json(rows.rows);
+      const total = parseInt(String((countResult.rows[0] as any)?.total ?? "0"), 10);
+      res.json(buildPaginatedResponse(dataResult.rows, total));
     } catch (error: any) {
       console.error("Error fetching stock entry history:", error);
       res.status(500).json({ message: error.message });

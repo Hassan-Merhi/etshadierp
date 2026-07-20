@@ -22,38 +22,76 @@ if (!globalThis[FLAG]) {
     return originalClose.apply(this, args);
   };
 
+  // ── Runtime snapshot (no secrets, no SQL, no headers) ────────────────────
+  function buildRuntimeSnapshot(reason, exitCode, signal) {
+    const mem = process.memoryUsage();
+    const mb = (b) => Math.round(b / 1024 / 1024);
+    const pressure = globalThis.__erpMemoryPressure ?? {};
+    const poolSnap =
+      typeof globalThis.__erpDatabasePoolSnapshot === "function"
+        ? globalThis.__erpDatabasePoolSnapshot()
+        : { totalCount: 0, idleCount: 0, waitingCount: 0 };
+    const counters = globalThis.__erpConcurrencyCounters;
+    const activeHeavyRequests =
+      counters instanceof Map ? Object.fromEntries(counters) : {};
+    return {
+      reason,
+      exitCode,
+      signal: signal ?? null,
+      buildVersion: deploymentRuntimeConfig.buildVersion ?? "unknown",
+      rssMb: mb(mem.rss),
+      heapUsedMb: mb(mem.heapUsed),
+      heapTotalMb: mb(mem.heapTotal),
+      externalMb: mb(mem.external),
+      arrayBuffersMb: mb(mem.arrayBuffers ?? 0),
+      pressureLevel: pressure.level ?? "unknown",
+      hardSamples: pressure.hardSamples ?? 0,
+      dbTotalCount: poolSnap.totalCount ?? 0,
+      dbIdleCount: poolSnap.idleCount ?? 0,
+      dbWaitingCount: poolSnap.waitingCount ?? 0,
+      activeHeavyRequests,
+      trackedServers: servers.size,
+    };
+  }
+
+  // ── Shared graceful shutdown ──────────────────────────────────────────────
   let shuttingDown = false;
-  const closeServers = async (signal) => {
+
+  async function gracefulShutdown(reason, exitCode = 0, signal = null) {
     if (shuttingDown) return;
     shuttingDown = true;
     globalThis.__erpRuntimeShuttingDown = true;
 
-    console.log(JSON.stringify({
-      timestamp: new Date().toISOString(),
-      level: "INFO",
-      module: "runtime-lifecycle",
-      action: "shutdown-start",
-      signal,
-      trackedServers: servers.size,
-      timeoutMs: deploymentRuntimeConfig.shutdownGraceMs,
-      buildVersion: deploymentRuntimeConfig.buildVersion,
-    }));
-
-    const timeoutMs = deploymentRuntimeConfig.shutdownGraceMs;
-    const timeout = setTimeout(() => {
-      console.error(JSON.stringify({
+    const snapshot = buildRuntimeSnapshot(reason, exitCode, signal);
+    console.log(
+      JSON.stringify({
         timestamp: new Date().toISOString(),
-        level: "ERROR",
+        level: "INFO",
         module: "runtime-lifecycle",
-        action: "shutdown-timeout",
-        signal,
-        timeoutMs,
-        buildVersion: deploymentRuntimeConfig.buildVersion,
-      }));
-      process.exitCode = 1;
+        action: "shutdown-start",
+        ...snapshot,
+      })
+    );
+
+    const timeoutMs = deploymentRuntimeConfig.shutdownGraceMs ?? 25_000;
+    const timeout = setTimeout(() => {
+      console.error(
+        JSON.stringify({
+          timestamp: new Date().toISOString(),
+          level: "ERROR",
+          module: "runtime-lifecycle",
+          action: "shutdown-timeout",
+          reason,
+          signal,
+          timeoutMs,
+          buildVersion: deploymentRuntimeConfig.buildVersion ?? "unknown",
+        })
+      );
+      process.exitCode = exitCode || 1;
     }, timeoutMs);
     timeout.unref();
 
+    // Close tracked HTTP servers (drains in-flight requests up to the grace period).
     await Promise.allSettled(
       [...servers].map(
         (server) =>
@@ -65,18 +103,73 @@ if (!globalThis[FLAG]) {
     );
 
     clearTimeout(timeout);
-    console.log(JSON.stringify({
-      timestamp: new Date().toISOString(),
-      level: "INFO",
-      module: "runtime-lifecycle",
-      action: "http-closed",
-      signal,
-      buildVersion: deploymentRuntimeConfig.buildVersion,
-    }));
-  };
+    console.log(
+      JSON.stringify({
+        timestamp: new Date().toISOString(),
+        level: "INFO",
+        module: "runtime-lifecycle",
+        action: "shutdown-complete",
+        reason,
+        exitCode,
+        buildVersion: deploymentRuntimeConfig.buildVersion ?? "unknown",
+      })
+    );
 
-  process.prependListener("SIGTERM", () => void closeServers("SIGTERM"));
-  process.prependListener("SIGINT", () => void closeServers("SIGINT"));
+    process.exitCode = exitCode;
+    // Allow Node to exit naturally once all async resources close.
+  }
+
+  // Exposed for runtimeMemoryGuard.mjs and any other module that needs a
+  // controlled shutdown.  Signature: (reason: string, exitCode?: number, signal?: string|null)
+  globalThis.__erpRequestGracefulShutdown = gracefulShutdown;
+
+  // ── Signal handlers ───────────────────────────────────────────────────────
+  process.prependListener("SIGTERM", () => void gracefulShutdown("SIGTERM", 0, "SIGTERM"));
+  process.prependListener("SIGINT",  () => void gracefulShutdown("SIGINT",  0, "SIGINT"));
+
+  // ── Process-level error handlers ──────────────────────────────────────────
+  // Log + request graceful shutdown; never continue after an uncaught error.
+
+  process.on("uncaughtException", (err) => {
+    const safe = {
+      name:    err?.name    ?? "UnknownError",
+      message: err?.message ?? String(err),
+      stack:   (err?.stack  ?? "").slice(0, 2000),
+    };
+    const snapshot = buildRuntimeSnapshot("uncaughtException", 1, null);
+    console.error(
+      JSON.stringify({
+        timestamp: new Date().toISOString(),
+        level: "FATAL",
+        module: "runtime-lifecycle",
+        action: "uncaught-exception",
+        error: safe,
+        ...snapshot,
+      })
+    );
+    void gracefulShutdown("uncaughtException", 1, null);
+  });
+
+  process.on("unhandledRejection", (reason) => {
+    const err = reason instanceof Error ? reason : new Error(String(reason));
+    const safe = {
+      name:    err?.name    ?? "UnhandledRejection",
+      message: err?.message ?? String(reason),
+      stack:   (err?.stack  ?? "").slice(0, 2000),
+    };
+    const snapshot = buildRuntimeSnapshot("unhandledRejection", 1, null);
+    console.error(
+      JSON.stringify({
+        timestamp: new Date().toISOString(),
+        level: "FATAL",
+        module: "runtime-lifecycle",
+        action: "unhandled-rejection",
+        error: safe,
+        ...snapshot,
+      })
+    );
+    void gracefulShutdown("unhandledRejection", 1, null);
+  });
 
   process.on("beforeExit", () => {
     for (const server of servers) server.closeIdleConnections?.();

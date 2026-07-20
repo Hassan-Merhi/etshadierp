@@ -90,6 +90,18 @@ export function isScraperAvailable(): boolean {
 export async function ensureChromiumInstalled(): Promise<void> {
   if (isScraperAvailable()) return;
 
+  // Never auto-download Chrome in production. Render's ephemeral filesystem
+  // means the download is lost on every restart, wasting startup time and
+  // blocking the server from accepting requests. If Chrome is not pre-installed
+  // via the build or PUPPETEER_EXECUTABLE_PATH, the scraper is simply disabled.
+  if (process.env.NODE_ENV === "production") {
+    console.log(
+      "[Puppeteer] Production environment — skipping Chrome download. " +
+      "Scraper will be disabled. Set PUPPETEER_EXECUTABLE_PATH to enable it."
+    );
+    return;
+  }
+
   try {
     _require.resolve("puppeteer");
   } catch {

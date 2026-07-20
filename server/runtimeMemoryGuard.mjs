@@ -59,7 +59,13 @@ function sampleMemory(trigger = "interval") {
 
   if (pressureState.hardSamples >= HARD_SAMPLES_BEFORE_EXIT) {
     console.error(JSON.stringify({ timestamp: new Date().toISOString(), level: "FATAL", message: "Memory stayed above the hard RSS limit; exiting before an OOM kill", module: "memory-guard", action: "controlled-restart", rssMb: pressureState.rssMb, hardLimitMb: HARD_RSS_MB, samples: pressureState.hardSamples }));
-    process.exit(1);
+    const shutdown = globalThis.__erpRequestGracefulShutdown;
+    if (typeof shutdown === "function") {
+      shutdown("memory-hard-limit", 1, null);
+    } else {
+      console.error(JSON.stringify({ timestamp: new Date().toISOString(), level: "FATAL", module: "memory-guard", action: "shutdown-fallback", message: "Graceful shutdown unavailable — calling process.exit directly" }));
+      process.exit(1);
+    }
   }
 }
 
@@ -68,9 +74,17 @@ const pathLimits = [
   { test: (path) => path === "/api/factory/raw-stock", max: 2, name: "factory-raw-stock" },
   { test: (path) => path === "/api/factory/bale-ledger", max: 2, name: "factory-bale-ledger" },
   { test: (path) => path.includes("/export"), max: 1, name: "exports" },
+  // Proven heavy routes from the latest incident:
+  { test: (path) => path === "/api/factory/bales/stock-entry-history", max: 2, name: "factory-stock-entry-history" },
+  { test: (path) => path === "/api/factory/monthly-salary-summary", max: 2, name: "factory-monthly-salary-summary" },
+  { test: (path) => path === "/api/factory/workers", max: 2, name: "factory-workers" },
+  { test: (path) => path === "/api/factory/cash-accounts", max: 2, name: "factory-cash-accounts" },
+  { test: (path) => path === "/api/ledger-accounts", max: 2, name: "ledger-accounts" },
 ];
 
 const activeByName = new Map();
+// Exposed for the lifecycle guard's runtime snapshot.
+globalThis.__erpConcurrencyCounters = activeByName;
 function pathnameOf(req) {
   try { return new URL(req.url || "/", "http://localhost").pathname; } catch { return req.url || "/"; }
 }

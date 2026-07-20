@@ -367,82 +367,101 @@ export function registerEmployeeAttendanceRoutes(app: Express) {
       const year = now.getFullYear();
       const month = String(now.getMonth() + 1).padStart(2, "0");
       const monthStart = `${year}-${month}-01`;
-      const today = dateParam ?? now.toISOString().slice(0, 10);
 
       const daysInMonth = new Date(year, now.getMonth() + 1, 0).getDate();
       const currentDay = now.getDate();
       const ratio = currentDay / daysInMonth;
       const monthEnd = `${year}-${month}-${String(daysInMonth).padStart(2, "0")}`;
 
-      // ── Workers (Monthly salary type only) ──
-      const workers = await db
-        .select({
-          id: factoryWorkers.id,
-          fullName: factoryWorkers.fullName,
-          baseSalary: factoryWorkers.baseSalary,
-          transportAllowance: factoryWorkers.transportAllowance,
-          salaryType: factoryWorkers.salaryType,
-        })
-        .from(factoryWorkers)
-        .where(
-          and(
-            eq(factoryWorkers.companyId, companyId),
-            eq(factoryWorkers.active, true),
-            eq(factoryWorkers.salaryType, "Monthly")
-          )
-        );
+      const includeBreakdown = req.query.includeBreakdown === "true";
 
-      let totalWorkerBaseSalary = 0;
-      let totalWorkerTransport = 0;
-      for (const w of workers) {
-        totalWorkerBaseSalary += parseFloat(w.baseSalary ?? "0");
-        totalWorkerTransport += parseFloat(w.transportAllowance ?? "0");
+      // ── Aggregate totals via SQL SUM — three independent queries run concurrently ──
+      const [workerAgg, payrollAgg, employeeAgg] = await Promise.all([
+        db.execute(sql`
+          SELECT
+            COALESCE(SUM(CAST(base_salary AS numeric)), 0) AS "totalWorkerBaseSalary",
+            COALESCE(SUM(CAST(transport_allowance AS numeric)), 0) AS "totalWorkerTransport"
+          FROM factory_workers
+          WHERE company_id = ${companyId}
+            AND active = true
+            AND salary_type = 'Monthly'
+        `),
+        // Use overlap logic: any PAID payroll whose period overlaps the current month counts.
+        db.execute(sql`
+          SELECT COALESCE(SUM(net_salary), 0) AS "totalWorkerPaid"
+          FROM factory_payrolls
+          WHERE company_id = ${companyId}
+            AND status = 'PAID'
+            AND period_start <= ${monthEnd}::date
+            AND period_end   >= ${monthStart}::date
+        `),
+        db.execute(sql`
+          SELECT
+            COALESCE(SUM(CAST(monthly_salary AS numeric)), 0) AS "totalEmployeeMonthlySalary",
+            COALESCE(SUM(CAST(current_balance AS numeric)), 0) AS "totalEmployeeBalance"
+          FROM employees
+          WHERE company_id = ${companyId}
+            AND employee_type = 'Employee'
+            AND deleted_at IS NULL
+        `),
+      ]);
+
+      const totalWorkerBaseSalary = parseFloat(String((workerAgg.rows[0] as any)?.totalWorkerBaseSalary ?? "0"));
+      const totalWorkerTransport = parseFloat(String((workerAgg.rows[0] as any)?.totalWorkerTransport ?? "0"));
+      const totalWorkerPaid = parseFloat(String((payrollAgg.rows[0] as any)?.totalWorkerPaid ?? "0"));
+      const totalEmployeeMonthlySalary = parseFloat(String((employeeAgg.rows[0] as any)?.totalEmployeeMonthlySalary ?? "0"));
+      const totalEmployeeBalance = parseFloat(String((employeeAgg.rows[0] as any)?.totalEmployeeBalance ?? "0"));
+
+      // When breakdown is not requested, return lightweight summary only (no row-level data).
+      if (!includeBreakdown) {
+        return res.json({
+          currentDay,
+          daysInMonth,
+          totalWorkerBaseSalary,
+          totalWorkerTransport,
+          totalWorkerPaid,
+          totalEmployeeMonthlySalary,
+          totalEmployeeBalance,
+          workerBreakdown: [],
+          employeeBreakdown: [],
+        });
       }
 
-      // ── Worker payrolls paid this month ──
-      // Use overlap logic (same as attendance-report): any PAID payroll whose
-      // period overlaps the current month counts — handles advance-paid payrolls.
-      const payrollRows = await db.execute(
-        sql`SELECT net_salary AS "netSalary"
-            FROM factory_payrolls
-            WHERE company_id = ${companyId}
-              AND status = 'PAID'
-              AND period_start <= ${monthEnd}::date
-              AND period_end   >= ${monthStart}::date`
-      );
-      const payrollList: { netSalary: string }[] = (
-        (payrollRows as any).rows ?? (payrollRows as unknown as any[])
-      ).map((r: any) => ({ netSalary: r.netSalary ?? "0" }));
-
-      let totalWorkerPaid = 0;
-      for (const p of payrollList) {
-        totalWorkerPaid += parseFloat(p.netSalary ?? "0");
-      }
-
-      // ── Employees (type = "Employee") ──
-      const empRows = await db
-        .select({
-          id: employees.id,
-          firstName: employees.firstName,
-          lastName: employees.lastName,
-          monthlySalary: employees.monthlySalary,
-          currentBalance: employees.currentBalance,
-        })
-        .from(employees)
-        .where(
-          and(
-            eq(employees.companyId, companyId),
-            eq(employees.employeeType, "Employee"),
-            sql`${employees.deletedAt} IS NULL`
-          )
-        );
-
-      let totalEmployeeMonthlySalary = 0;
-      let totalEmployeeBalance = 0;
-      for (const e of empRows) {
-        totalEmployeeMonthlySalary += parseFloat(e.monthlySalary ?? "0");
-        totalEmployeeBalance += parseFloat(e.currentBalance ?? "0");
-      }
+      // includeBreakdown=true: fetch individual worker and employee rows concurrently.
+      const [workers, empRows] = await Promise.all([
+        db
+          .select({
+            id: factoryWorkers.id,
+            fullName: factoryWorkers.fullName,
+            baseSalary: factoryWorkers.baseSalary,
+            transportAllowance: factoryWorkers.transportAllowance,
+            salaryType: factoryWorkers.salaryType,
+          })
+          .from(factoryWorkers)
+          .where(
+            and(
+              eq(factoryWorkers.companyId, companyId),
+              eq(factoryWorkers.active, true),
+              eq(factoryWorkers.salaryType, "Monthly")
+            )
+          ),
+        db
+          .select({
+            id: employees.id,
+            firstName: employees.firstName,
+            lastName: employees.lastName,
+            monthlySalary: employees.monthlySalary,
+            currentBalance: employees.currentBalance,
+          })
+          .from(employees)
+          .where(
+            and(
+              eq(employees.companyId, companyId),
+              eq(employees.employeeType, "Employee"),
+              sql`${employees.deletedAt} IS NULL`
+            )
+          ),
+      ]);
 
       res.json({
         currentDay,

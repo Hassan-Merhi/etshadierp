@@ -1222,7 +1222,7 @@ export default function DailyProductionReport() {
   }>({
     queryKey: ["/api/factory/monthly-salary-summary", payrollDateParam, payrollStartParam],
     queryFn: async () => {
-      const params = new URLSearchParams({ date: payrollDateParam });
+      const params = new URLSearchParams({ date: payrollDateParam, includeBreakdown: "true" });
       if (payrollStartParam) params.set("startDate", payrollStartParam);
       const res = await fetch(`/api/factory/monthly-salary-summary?${params}`, { credentials: "include" });
       if (!res.ok) throw new Error(await res.text());
