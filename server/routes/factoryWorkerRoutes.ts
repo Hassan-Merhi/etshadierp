@@ -466,12 +466,14 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
       headers.forEach((_, i) => {
         sheet.getColumn(i + 1).width = 22;
       });
+      const xlsBuffer = Buffer.from(await wb.xlsx.writeBuffer());
       res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
       res.setHeader("Content-Disposition", 'attachment; filename="worker_import_template.xlsx"');
-            res.end(await wb.xlsx.writeBuffer());
+      res.setHeader("Content-Length", xlsBuffer.byteLength);
+      res.end(xlsBuffer);
     } catch (error: any) {
       console.error("Error generating template:", error);
-      res.status(500).json({ message: error.message });
+      if (!res.headersSent) res.status(500).json({ message: error.message });
     }
   });
 

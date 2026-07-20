@@ -611,9 +611,11 @@ export function registerFactoryBaleExportRoutes(app: Express) {
           cell.font = { bold: true };
         });
 
+        const xlsBuffer1 = Buffer.from(await workbook.xlsx.writeBuffer());
         res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
         res.setHeader("Content-Disposition", `attachment; filename="raw-production-report-${filenameDate}.xlsx"`);
-                return res.end(await workbook.xlsx.writeBuffer());
+        res.setHeader("Content-Length", xlsBuffer1.byteLength);
+        return res.end(xlsBuffer1);
       }
 
       if (format === "pdf") {
@@ -941,9 +943,11 @@ export function registerFactoryBaleExportRoutes(app: Express) {
           const wb = new ExcelJS.Workbook();
           const sh = wb.addWorksheet("Weekly Report");
           sh.addRow(["No data found"]);
+          const xlsBuffer2 = Buffer.from(await wb.xlsx.writeBuffer());
           res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
           res.setHeader("Content-Disposition", `attachment; filename="weekly-production-report.xlsx"`);
-                    return res.end(await wb.xlsx.writeBuffer());
+          res.setHeader("Content-Length", xlsBuffer2.byteLength);
+          return res.end(xlsBuffer2);
         }
         return res.json({ message: "No data" });
       }
@@ -1194,9 +1198,11 @@ export function registerFactoryBaleExportRoutes(app: Express) {
           row++; // blank gap between weeks
         }
 
+        const xlsBuffer3 = Buffer.from(await wb.xlsx.writeBuffer());
         res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
         res.setHeader("Content-Disposition", `attachment; filename="weekly-production-report.xlsx"`);
-                return res.end(await wb.xlsx.writeBuffer());
+        res.setHeader("Content-Length", xlsBuffer3.byteLength);
+        return res.end(xlsBuffer3);
       }
 
       // PDF format

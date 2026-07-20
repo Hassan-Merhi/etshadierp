@@ -929,12 +929,14 @@ export function registerRentalUnitsContractsRoutes(
       addPaymentSection("GUARANTEE / DEPOSIT ACTIVITY", guaranteePaymentsExport);
 
       const filename = buildSafeFilename(["Rental", unit.unitNumber, contract.tenantName], "xlsx");
+      const xlsBuffer = Buffer.from(await wb.xlsx.writeBuffer());
       res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
       res.setHeader("Content-Disposition", contentDisposition(filename));
-            res.end(await wb.xlsx.writeBuffer());
+      res.setHeader("Content-Length", xlsBuffer.byteLength);
+      res.end(xlsBuffer);
     } catch (e: any) {
       console.error(`${tag} statement export:`, e);
-      res.status(500).json({ message: e.message });
+      if (!res.headersSent) res.status(500).json({ message: e.message });
     }
   });
 

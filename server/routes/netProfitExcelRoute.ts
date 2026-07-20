@@ -1079,12 +1079,14 @@ export function registerNetProfitExcelRoute(app: Express) {
 
       const safeCompanyName = companyName.replace(/[^a-z0-9]/gi, "_");
       const safePeriod = periodLabel.replace(/[^a-z0-9]/gi, "_");
+      const xlsBuffer = Buffer.from(await workbook.xlsx.writeBuffer());
       res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
       res.setHeader("Content-Disposition", `attachment; filename="NetProfit_${safeCompanyName}_${safePeriod}.xlsx"`);
-            res.end(await workbook.xlsx.writeBuffer());
+      res.setHeader("Content-Length", xlsBuffer.byteLength);
+      res.end(xlsBuffer);
     } catch (error: any) {
       console.error("Net profit Excel export error:", error);
-      res.status(500).json({ message: error.message });
+      if (!res.headersSent) res.status(500).json({ message: error.message });
     }
   });
 

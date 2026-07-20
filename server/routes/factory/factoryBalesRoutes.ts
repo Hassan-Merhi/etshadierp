@@ -979,12 +979,14 @@ export function registerFactoryBalesRoutes(app: Express) {
         sheet.addRow(baleRowData);
       }
 
+      const xlsBuffer = Buffer.from(await workbook.xlsx.writeBuffer());
       res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
       res.setHeader("Content-Disposition", `attachment; filename="bales_export_${date}.xlsx"`);
-      res.end(await workbook.xlsx.writeBuffer());
+      res.setHeader("Content-Length", xlsBuffer.byteLength);
+      res.end(xlsBuffer);
     } catch (error: any) {
       console.error("Error exporting full bales:", error);
-      res.status(500).json({ message: error.message });
+      if (!res.headersSent) res.status(500).json({ message: error.message });
     }
   });
 
@@ -1130,12 +1132,14 @@ export function registerFactoryBalesRoutes(app: Express) {
       summarySheet.getColumn("weight").numFmt = "#,##0.000";
 
       const dateSuffix = from && to ? `_${from}_to_${to}` : `_all`;
+      const xlsBuffer = Buffer.from(await workbook.xlsx.writeBuffer());
       res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
       res.setHeader("Content-Disposition", `attachment; filename="stock_register${dateSuffix}.xlsx"`);
-      res.end(await workbook.xlsx.writeBuffer());
+      res.setHeader("Content-Length", xlsBuffer.byteLength);
+      res.end(xlsBuffer);
     } catch (error: any) {
       console.error("Error exporting stock register:", error);
-      res.status(500).json({ message: error.message });
+      if (!res.headersSent) res.status(500).json({ message: error.message });
     }
   });
 
@@ -1506,12 +1510,14 @@ export function registerFactoryBalesRoutes(app: Express) {
 
       sheet.protect("", { selectLockedCells: true, selectUnlockedCells: true });
 
+      const xlsBuffer = Buffer.from(await workbook.xlsx.writeBuffer());
       res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
       res.setHeader("Content-Disposition", `attachment; filename="bale_names_${companyId}.xlsx"`);
-      res.end(await workbook.xlsx.writeBuffer());
+      res.setHeader("Content-Length", xlsBuffer.byteLength);
+      res.end(xlsBuffer);
     } catch (error: any) {
       console.error("Error exporting bale names:", error);
-      res.status(500).json({ message: error.message });
+      if (!res.headersSent) res.status(500).json({ message: error.message });
     }
   });
 

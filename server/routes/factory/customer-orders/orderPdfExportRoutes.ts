@@ -225,12 +225,14 @@ export function registerOrderPdfExportRoutes(app: Express) {
       totalRow.getCell("totalWeight").numFmt = "#,##0.00";
 
       const safeName = buildExportFilename([String(orderId), customerName], "xlsx");
+      const xlsBuffer = Buffer.from(await workbook.xlsx.writeBuffer());
       res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
       res.setHeader("Content-Disposition", contentDisposition(`loading_${safeName}`));
-            res.end(await workbook.xlsx.writeBuffer());
+      res.setHeader("Content-Length", xlsBuffer.byteLength);
+      res.end(xlsBuffer);
     } catch (error: any) {
       console.error("Error exporting pending loading:", error);
-      res.status(500).json({ message: error.message });
+      if (!res.headersSent) res.status(500).json({ message: error.message });
     }
   });
 
@@ -895,15 +897,17 @@ export function registerOrderPdfExportRoutes(app: Express) {
       });
 
       const fileDateStr = getClientDate(req);
+      const xlsBuffer = Buffer.from(await workbook.xlsx.writeBuffer());
       res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
       res.setHeader(
         "Content-Disposition",
         contentDisposition(buildExportFilename([order.containerNumber, order.customerName, order.destination], "xlsx"))
       );
-            res.end(await workbook.xlsx.writeBuffer());
+      res.setHeader("Content-Length", xlsBuffer.byteLength);
+      res.end(xlsBuffer);
     } catch (error: any) {
       console.error("Error exporting loading status:", error);
-      res.status(500).json({ message: error.message });
+      if (!res.headersSent) res.status(500).json({ message: error.message });
     }
   });
 

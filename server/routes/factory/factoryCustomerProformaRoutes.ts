@@ -1678,12 +1678,15 @@ export function registerFactoryCustomerProformaRoutes(app: Express) {
       totRow.getCell(hideSellingExcel ? 6 : 7).alignment = { horizontal: "right" };
       if (!hideSellingExcel) totRow.getCell(8).alignment = { horizontal: "right" };
 
+      // Build buffer BEFORE setting headers so ExcelJS errors can still return a clean JSON 500.
+      const xlsBuffer = Buffer.from(await workbook.xlsx.writeBuffer());
       res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
       res.setHeader("Content-Disposition", contentDisposition(buildSafeFilename(["proforma", proforma.name], "xlsx")));
-            res.end(await workbook.xlsx.writeBuffer());
+      res.setHeader("Content-Length", xlsBuffer.byteLength);
+      res.end(xlsBuffer);
     } catch (error: any) {
       console.error("Error exporting proforma to Excel:", error);
-      res.status(500).json({ message: error.message });
+      if (!res.headersSent) res.status(500).json({ message: error.message });
     }
   });
 

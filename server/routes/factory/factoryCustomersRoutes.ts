@@ -1566,15 +1566,18 @@ export function registerFactoryCustomersRoutes(app: Express) {
         noteRow.height = Math.max(18, Math.ceil(customer.statementNote.length / 60) * 15);
       }
 
+      // Build buffer BEFORE setting headers so ExcelJS errors can still return a clean JSON 500.
+      const xlsBuffer = Buffer.from(await workbook.xlsx.writeBuffer());
       res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
       res.setHeader(
         "Content-Disposition",
         contentDisposition(buildSafeFilename([customer.legalName || "customer"], "") + "_Statement.xlsx")
       );
-            res.end(await workbook.xlsx.writeBuffer());
+      res.setHeader("Content-Length", xlsBuffer.byteLength);
+      res.end(xlsBuffer);
     } catch (error: any) {
       console.error("Error exporting customer statement Excel:", error);
-      res.status(500).json({ message: error.message });
+      if (!res.headersSent) res.status(500).json({ message: error.message });
     }
   });
 

@@ -1161,15 +1161,17 @@ export function registerSupplierProformaRoutes(app: Express, requireAuth: any) {
           if (idx > 0) return;
         });
 
-        res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
         const safeSupplier = (supplier?.legalName || "").replace(/[^a-zA-Z0-9 ]/g, "").trim();
         const safeContainer = (container?.containerNumber || String(containerId)).replace(/[^a-zA-Z0-9]/g, "");
         const fileName = `Verification ${safeSupplier} ${safeContainer}.xlsx`;
+        const xlsBuffer = Buffer.from(await workbook.xlsx.writeBuffer());
+        res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
         res.setHeader("Content-Disposition", `attachment; filename="${fileName}"`);
-                res.end(await workbook.xlsx.writeBuffer());
+        res.setHeader("Content-Length", xlsBuffer.byteLength);
+        res.end(xlsBuffer);
       } catch (error: any) {
         console.error("Export error:", error);
-        res.status(500).json({ message: error.message });
+        if (!res.headersSent) res.status(500).json({ message: error.message });
       }
     }
   );
@@ -1492,15 +1494,17 @@ export function registerSupplierProformaRoutes(app: Express, requireAuth: any) {
             ];
         addBlock("Price Diff", sc.priceDiffBorder, priceDiffCols, priceDiffs);
 
-        res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
         const safeSupplierS = (supplier?.legalName || "").replace(/[^a-zA-Z0-9 ]/g, "").trim();
         const safeContainerS = (container?.containerNumber || String(containerId)).replace(/[^a-zA-Z0-9]/g, "");
         const summaryFileName = `Verification Summary ${safeSupplierS} ${safeContainerS}.xlsx`;
+        const xlsBuffer2 = Buffer.from(await wb.xlsx.writeBuffer());
+        res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
         res.setHeader("Content-Disposition", `attachment; filename="${summaryFileName}"`);
-                res.end(await wb.xlsx.writeBuffer());
+        res.setHeader("Content-Length", xlsBuffer2.byteLength);
+        res.end(xlsBuffer2);
       } catch (error: any) {
         console.error("Summary export error:", error);
-        res.status(500).json({ message: error.message });
+        if (!res.headersSent) res.status(500).json({ message: error.message });
       }
     }
   );

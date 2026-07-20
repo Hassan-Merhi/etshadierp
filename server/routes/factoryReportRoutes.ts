@@ -379,9 +379,11 @@ export function registerFactoryReportRoutes(app: Express, requireAuth: any, db: 
     sheet.addRow([]);
     sheet.addRow(["No data found for the selected period and filters."]);
 
+    const xlsBuffer = Buffer.from(await workbook.xlsx.writeBuffer());
     res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
     res.setHeader("Content-Disposition", `attachment; filename="supplier_usage_report_${startDate}_${endDate}.xlsx"`);
-        res.end(await workbook.xlsx.writeBuffer());
+    res.setHeader("Content-Length", xlsBuffer.byteLength);
+    res.end(xlsBuffer);
   }
 
   async function generatePdf(
@@ -757,9 +759,11 @@ export function registerFactoryReportRoutes(app: Express, requireAuth: any, db: 
       col.width = Math.min(maxLen + 4, 40);
     });
 
+    const xlsBuffer2 = Buffer.from(await workbook.xlsx.writeBuffer());
     res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
     res.setHeader("Content-Disposition", `attachment; filename="supplier_usage_report_${startDate}_${endDate}.xlsx"`);
-        res.end(await workbook.xlsx.writeBuffer());
+    res.setHeader("Content-Length", xlsBuffer2.byteLength);
+    res.end(xlsBuffer2);
   }
 
   // ── Mix batches by date ───────────────────────────────────────────────────

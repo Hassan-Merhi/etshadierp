@@ -630,12 +630,14 @@ export function registerStatsNetPositionRoutes(app: Express) {
 
       // ── Send file ─────────────────────────────────────────────────────────
       const dateTag = getClientDate(req);
+      const xlsBuffer = Buffer.from(await wb.xlsx.writeBuffer());
       res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
       res.setHeader("Content-Disposition", `attachment; filename="Net_Position_${dateTag}.xlsx"`);
-            res.end(await wb.xlsx.writeBuffer());
+      res.setHeader("Content-Length", xlsBuffer.byteLength);
+      res.end(xlsBuffer);
     } catch (error: any) {
       console.error("Net position Excel error:", error);
-      res.status(500).json({ message: error.message });
+      if (!res.headersSent) res.status(500).json({ message: error.message });
     }
   });
 

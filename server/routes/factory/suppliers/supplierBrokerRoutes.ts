@@ -820,15 +820,17 @@ export function registerSupplierBrokerRoutes(app: Express) {
         { width: 18 },
       ];
 
+      const xlsBuffer = Buffer.from(await wb.xlsx.writeBuffer());
       res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
       res.setHeader(
         "Content-Disposition",
         contentDisposition(buildSafeFilename(["broker-statement", (data.supplier as any).name || String(brokerId), getClientDate(req)], "xlsx"))
       );
-            res.end(await wb.xlsx.writeBuffer());
+      res.setHeader("Content-Length", xlsBuffer.byteLength);
+      res.end(xlsBuffer);
     } catch (err: any) {
       console.error("Broker statement export error:", err);
-      res.status(500).json({ message: err.message });
+      if (!res.headersSent) res.status(500).json({ message: err.message });
     }
   });
 

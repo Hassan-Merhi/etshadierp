@@ -1529,12 +1529,15 @@ export function registerFactoryStockRoutes(app: Express) {
       garbageDetailSheet.views = [{ state: "frozen", ySplit: 1 }];
 
       const dateStr = getClientDate(req);
+      // Build buffer BEFORE setting headers so ExcelJS errors can still return a clean JSON 500.
+      const xlsBuffer = Buffer.from(await workbook.xlsx.writeBuffer());
       res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
       res.setHeader("Content-Disposition", `attachment; filename="inventory_location_${locationId}_${dateStr}.xlsx"`);
-            res.end(await workbook.xlsx.writeBuffer());
+      res.setHeader("Content-Length", xlsBuffer.byteLength);
+      res.end(xlsBuffer);
     } catch (error: any) {
       console.error("Error exporting inventory Excel:", error);
-      res.status(500).json({ message: error.message });
+      if (!res.headersSent) res.status(500).json({ message: error.message });
     }
   });
 
@@ -1936,12 +1939,15 @@ export function registerFactoryStockRoutes(app: Express) {
       garbageDetailSheetAll.views = [{ state: "frozen", ySplit: 1 }];
 
       const dateStr = getClientDate(req);
+      // Build buffer BEFORE setting headers so ExcelJS errors can still return a clean JSON 500.
+      const xlsBuffer = Buffer.from(await workbook.xlsx.writeBuffer());
       res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
       res.setHeader("Content-Disposition", `attachment; filename="inventory_all_locations_${dateStr}.xlsx"`);
-            res.end(await workbook.xlsx.writeBuffer());
+      res.setHeader("Content-Length", xlsBuffer.byteLength);
+      res.end(xlsBuffer);
     } catch (error: any) {
       console.error("Error exporting all-locations inventory Excel:", error);
-      res.status(500).json({ message: error.message });
+      if (!res.headersSent) res.status(500).json({ message: error.message });
     }
   });
 
