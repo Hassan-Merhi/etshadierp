@@ -5,9 +5,14 @@ import {
   getCashBankRevaluation,
 } from "../../services/accounting/cashBankRevaluationService";
 
+/**
+ * Registered from statsRoutes only to keep the top-level route registry small.
+ * The URLs deliberately live under /api/accounts so accounting users do not
+ * need the separate Analytics-module permission to view cash/bank balances.
+ */
 export function registerStatsMultiCurrencyRoutes(app: Express) {
   app.get(
-    "/api/stats/multi-currency/cash-bank-revaluation",
+    "/api/accounts/multi-currency/cash-bank-revaluation",
     requireAuth,
     requireNonPOS,
     async (req, res) => {
@@ -23,7 +28,7 @@ export function registerStatsMultiCurrencyRoutes(app: Express) {
   );
 
   app.get(
-    "/api/stats/multi-currency/accounts/:kind/:id",
+    "/api/accounts/multi-currency/:kind/:id",
     requireAuth,
     requireNonPOS,
     async (req, res) => {
