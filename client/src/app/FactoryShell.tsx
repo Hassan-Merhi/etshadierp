@@ -7,7 +7,9 @@ import { SidebarProvider } from "@/components/ui/sidebar";
 import { DailyRateModal } from "@/components/DailyRateModal";
 import { FactorySidebar } from "@/components/FactorySidebar";
 import { FactoryRoutes } from "@/components/FactoryRoutes";
+import { AppTopBar } from "@/components/AppTopBar";
 import { OfflineBanner } from "@/components/OfflineBanner";
+import { MODULE_ACCENT } from "@/components/sidebar/sidebarPrimitives";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { CommandPalette } from "@/components/CommandPalette";
 import { LoadingState } from "@/components/ui/page-state";
@@ -58,6 +60,12 @@ export function FactoryShell({
           <FactorySidebar user={user} />
           <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
             <OfflineBanner />
+            <AppTopBar
+              accentColor={MODULE_ACCENT.factory}
+              user={{ username: user.username, role: user.role ?? "" }}
+              onLogout={handleLogout}
+              onSearchOpen={() => setPaletteOpen(true)}
+            />
             <main
               id="main-content"
               tabIndex={-1}
