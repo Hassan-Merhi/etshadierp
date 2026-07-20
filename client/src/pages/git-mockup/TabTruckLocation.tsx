@@ -47,7 +47,7 @@ export function TabTruckLocation() {
       const html2canvas = (await import("html2canvas")).default;
       const el = printRef.current;
       const canvas = await html2canvas(el, {
-        scale: 2,
+        scale: 1.25,
         useCORS: true,
         allowTaint: true,
         backgroundColor: "#f8fafc",
@@ -57,12 +57,42 @@ export function TabTruckLocation() {
         windowWidth: el.scrollWidth,
         windowHeight: el.scrollHeight,
       });
-      const imageBase64 = canvas.toDataURL("image/png");
+
+      // Approximate decoded byte size from base64 string length
+      const approxBytes = (b64: string) => Math.ceil((b64.length - (b64.indexOf(",") + 1)) * 0.75);
+      const SIZE_LIMIT = 1.8 * 1024 * 1024; // 1.8 MB
+
+      let imageBase64 = canvas.toDataURL("image/jpeg", 0.82);
+      if (approxBytes(imageBase64) > SIZE_LIMIT) {
+        // Retry with lower quality — reuse the same canvas
+        imageBase64 = canvas.toDataURL("image/jpeg", 0.65);
+        if (approxBytes(imageBase64) > SIZE_LIMIT) {
+          toast({
+            title: "Failed to send",
+            description:
+              "The tracking report is still too large to send. Reduce the number of displayed containers or use All Companies separately.",
+            variant: "destructive",
+          });
+          return;
+        }
+      }
+
       const today = new Date().toISOString().substring(0, 10);
-      await apiRequest("POST", "/api/git/send-containers-whatsapp", {
-        imageBase64,
-        fileName: `TruckLocation_${today}.png`,
-      });
+      try {
+        await apiRequest("POST", "/api/git/send-containers-whatsapp", {
+          imageBase64,
+          fileName: `TruckLocation_${today}.jpg`,
+        });
+      } catch (apiErr: any) {
+        // Surface a clear message for HTTP 413
+        const msg =
+          apiErr?.status === 413 || String(apiErr?.message).includes("too large")
+            ? "Tracking report is too large to send to WhatsApp."
+            : apiErr?.message ?? "Failed to send";
+        toast({ title: "Failed to send", description: msg, variant: "destructive" });
+        return;
+      }
+
       toast({ title: "Sent", description: "Truck / Location report sent to WhatsApp group." });
     } catch (err: any) {
       toast({ title: "Failed to send", description: err.message, variant: "destructive" });

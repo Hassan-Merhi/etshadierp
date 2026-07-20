@@ -1639,10 +1639,29 @@ export function registerGitRoutes(app: Express) {
         const today = new Date().toISOString().substring(0, 10);
 
         if (imageBase64) {
-          const base64Data = String(imageBase64).replace(/^data:image\/\w+;base64,/, "");
+          // Detect MIME type from the data URL prefix
+          const dataUrlStr = String(imageBase64);
+          const mimeMatch = dataUrlStr.match(/^data:(image\/[a-zA-Z+]+);base64,/);
+          const detectedMime = mimeMatch ? mimeMatch[1].toLowerCase() : "image/png";
+          const isJpeg = detectedMime === "image/jpeg" || detectedMime === "image/jpg";
+          mimeType = isJpeg ? "image/jpeg" : "image/png";
+          const ext = isJpeg ? "jpg" : "png";
+
+          const base64Data = dataUrlStr.replace(/^data:image\/[a-zA-Z+]+;base64,/, "");
           buffer = Buffer.from(base64Data, "base64");
-          finalFileName = String(fileName || `Containers_${today}.png`);
-          mimeType = "image/png";
+
+          // Server-side size guard — reject decoded images above 5 MB
+          if (buffer.length > 5 * 1024 * 1024) {
+            return res.status(413).json({ message: "WhatsApp image is too large. Maximum allowed size is 5 MB." });
+          }
+
+          // Use caller-supplied filename if provided, otherwise build one with correct extension
+          const supplied = String(fileName || "");
+          finalFileName = supplied || `Containers_${today}.${ext}`;
+          // Ensure the extension matches the actual content type
+          if (!finalFileName.toLowerCase().endsWith(`.${ext}`)) {
+            finalFileName = finalFileName.replace(/\.[^.]+$/, "") + `.${ext}`;
+          }
         } else {
           const { generateContainersPdf } = await import("../helpers/generateContainersPdf");
           const pdf = await generateContainersPdf();
