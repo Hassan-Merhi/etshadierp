@@ -667,6 +667,8 @@ export function registerAuthRoutes(app: Express) {
             createdAt: auditLog.createdAt,
             resolvedUsername: users.username,
             displayName: factoryUserProfiles.displayName,
+            companyName: companies.name,
+            companyCode: companies.code,
           })
           .from(auditLog)
           .leftJoin(users, eq(users.id, auditLog.userId))
@@ -677,6 +679,7 @@ export function registerAuthRoutes(app: Express) {
               companyId ? eq(factoryUserProfiles.companyId, companyId) : sql`1 = 0`
             )
           )
+          .leftJoin(companies, eq(companies.id, auditLog.companyId))
           .where(whereClause)
           .orderBy(desc(auditLog.createdAt))
           .limit(pageSize)
@@ -751,15 +754,17 @@ export function registerAuthRoutes(app: Express) {
         return clean || tableName;
       }
 
-      const logs = rawLogs.map(({ storedUsername, resolvedUsername, displayName, ...row }) => {
+      const logs = rawLogs.map(({ storedUsername, resolvedUsername, displayName, companyName, companyCode, ...row }) => {
         const username = resolvedUsername || displayName || storedUsername || "Unknown";
         const actionLower = (row.action || "").toLowerCase();
         return {
           ...row,
           username,
+          companyName: companyName || null,
+          companyCode: companyCode || null,
           moduleLabel: deriveModuleLabel(row.tableName),
           actionLabel: ACTION_LABELS[actionLower] || (row.action ? row.action.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()) : "Unknown"),
-          targetUrl: null as string | null, // extensible for future deep-links
+          targetUrl: null as string | null,
         };
       });
 

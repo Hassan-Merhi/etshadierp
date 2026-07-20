@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo, Fragment } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -8,7 +8,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
-import { Search, RefreshCw, ChevronLeft, ChevronRight, X, ExternalLink } from "lucide-react";
+import { Search, RefreshCw, ChevronLeft, ChevronRight, X, ExternalLink, Building2, CalendarDays } from "lucide-react";
 import {
   fmtDate,
   tableShortName,
@@ -39,6 +39,65 @@ const ACTION_FILTER_OPTIONS: { label: string; value: string }[] = [
   { label: "Settings / Permissions", value: "settings_change,permission_change" },
   { label: "Updates & Deletes", value: "update,delete" },
 ];
+
+// ── Grouping helpers ──────────────────────────────────────────────────────────
+
+type CompanyGroup = {
+  companyId: number | null;
+  companyName: string;
+  companyCode: string | null;
+  logs: any[];
+};
+
+type DayGroup = {
+  dateKey: string;   // "2026-07-20" — used as React key
+  dateLabel: string; // "Sunday, July 20, 2026"
+  companies: CompanyGroup[];
+};
+
+function groupLogsByDayAndCompany(logs: any[]): DayGroup[] {
+  // Build an ordered map: dateKey → (companyKey → CompanyGroup)
+  // Ordered maps preserve insertion order which follows the DESC sort from the API.
+  const dayMap = new Map<string, Map<string, CompanyGroup>>();
+
+  for (const log of logs) {
+    // Extract local calendar date from the ISO timestamp so "Jul 20 02:16" and
+    // "Jul 20 04:07" both land in the same Jul 20 bucket regardless of timezone.
+    const d = new Date(log.createdAt);
+    const dateKey = d.toLocaleDateString("en-CA"); // "2026-07-20" (ISO-format locale)
+
+    if (!dayMap.has(dateKey)) dayMap.set(dateKey, new Map());
+    const companyMap = dayMap.get(dateKey)!;
+
+    const companyKey = log.companyId != null ? String(log.companyId) : "none";
+    if (!companyMap.has(companyKey)) {
+      companyMap.set(companyKey, {
+        companyId: log.companyId ?? null,
+        companyName: log.companyName || (log.companyId ? `Company #${log.companyId}` : "Unknown Company"),
+        companyCode: log.companyCode || null,
+        logs: [],
+      });
+    }
+    companyMap.get(companyKey)!.logs.push(log);
+  }
+
+  return [...dayMap.entries()].map(([dateKey, companyMap]) => {
+    // Build a human-readable date label from the date key itself (avoids timezone shift).
+    const [year, month, day] = dateKey.split("-").map(Number);
+    const d = new Date(year, month - 1, day);
+    const dateLabel = d.toLocaleDateString("en-US", {
+      weekday: "long",
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    });
+    return {
+      dateKey,
+      dateLabel,
+      companies: [...companyMap.values()],
+    };
+  });
+}
 
 // ── Props ─────────────────────────────────────────────────────────────────────
 
@@ -115,10 +174,20 @@ export function AuditLog({ defaultActions = "update,delete", context = "settings
     },
   });
 
-  const auditLogs = data?.logs || [];
+  const auditLogs: any[] = data?.logs || [];
   const totalPages = data?.totalPages || 1;
   const total = data?.total ?? null;
   const knownModules = data?.knownModules || [];
+
+  // Whether this page contains entries from more than one company.
+  // When true, company sub-headers are shown inside each day group.
+  const hasMultipleCompanies = useMemo(() => {
+    const ids = new Set(auditLogs.map((l: any) => l.companyId));
+    return ids.size > 1;
+  }, [auditLogs]);
+
+  // Grouped view — always used; gives us date separators even for single-company.
+  const groupedDays = useMemo(() => groupLogsByDayAndCompany(auditLogs), [auditLogs]);
 
   const isDirty =
     filterAction !== defaultActions ||
@@ -277,39 +346,83 @@ export function AuditLog({ defaultActions = "update,delete", context = "settings
               </TableRow>
             </TableHeader>
             <TableBody>
-              {auditLogs.map((log: any) => (
-                <TableRow
-                  key={log.id}
-                  className="group cursor-pointer hover:bg-muted/50 transition-colors"
-                  onClick={() => setSelectedLog(log)}
-                >
-                  <TableCell className="text-xs font-mono text-muted-foreground whitespace-nowrap">
-                    {fmtDate(log.createdAt)}
-                  </TableCell>
-                  <TableCell className="text-sm font-medium truncate max-w-[130px]">
-                    {log.username || `User #${String(log.userId).slice(0, 8)}` || "Unknown"}
-                  </TableCell>
-                  <TableCell>
-                    <Badge
-                      variant={actionBadgeVariant(log.action)}
-                      className="capitalize text-[10px] h-5 whitespace-nowrap"
+              {groupedDays.map(({ dateKey, dateLabel, companies }) => (
+                <Fragment key={`day-${dateKey}`}>
+                  {/* ── Day separator ─────────────────────────────────────── */}
+                  <TableRow
+                    className="bg-muted/60 hover:bg-muted/60 pointer-events-none select-none"
+                  >
+                    <TableCell
+                      colSpan={6}
+                      className="py-2 px-4 font-semibold text-sm text-foreground"
                     >
-                      {log.actionLabel || actionLabel(log.action)}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
-                    {log.moduleLabel || tableShortName(log.tableName)}
-                  </TableCell>
-                  <TableCell className="text-xs text-muted-foreground max-w-[160px]">
-                    <span className="truncate block">{getRecordLabel(log)}</span>
-                  </TableCell>
-                  <TableCell className="text-xs text-muted-foreground">
-                    <div className="flex items-center gap-2">
-                      <span className="truncate max-w-[380px]">{getDetailsSentence(log)}</span>
-                      <ExternalLink className="h-3 w-3 shrink-0 opacity-0 group-hover:opacity-50" />
-                    </div>
-                  </TableCell>
-                </TableRow>
+                      <span className="flex items-center gap-2">
+                        <CalendarDays className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                        {dateLabel}
+                      </span>
+                    </TableCell>
+                  </TableRow>
+
+                  {companies.map(({ companyId, companyName, companyCode, logs }) => (
+                    <Fragment key={`cg-${dateKey}-${companyId}`}>
+                      {/* ── Company sub-header (only when mixed companies) ── */}
+                      {hasMultipleCompanies && (
+                        <TableRow
+                          className="bg-muted/25 hover:bg-muted/25 pointer-events-none select-none"
+                        >
+                          <TableCell
+                            colSpan={6}
+                            className="py-1.5 pl-10 pr-4 text-xs font-medium text-muted-foreground"
+                          >
+                            <span className="flex items-center gap-1.5">
+                              <Building2 className="h-3 w-3 shrink-0" />
+                              {companyName}
+                              {companyCode && (
+                                <span className="font-normal opacity-60">({companyCode})</span>
+                              )}
+                            </span>
+                          </TableCell>
+                        </TableRow>
+                      )}
+
+                      {/* ── Log rows for this company on this day ─────────── */}
+                      {logs.map((log: any) => (
+                        <TableRow
+                          key={log.id}
+                          className="group cursor-pointer hover:bg-muted/50 transition-colors"
+                          onClick={() => setSelectedLog(log)}
+                        >
+                          <TableCell className="text-xs font-mono text-muted-foreground whitespace-nowrap">
+                            {fmtDate(log.createdAt)}
+                          </TableCell>
+                          <TableCell className="text-sm font-medium truncate max-w-[130px]">
+                            {log.username || `User #${String(log.userId).slice(0, 8)}` || "Unknown"}
+                          </TableCell>
+                          <TableCell>
+                            <Badge
+                              variant={actionBadgeVariant(log.action)}
+                              className="capitalize text-[10px] h-5 whitespace-nowrap"
+                            >
+                              {log.actionLabel || actionLabel(log.action)}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
+                            {log.moduleLabel || tableShortName(log.tableName)}
+                          </TableCell>
+                          <TableCell className="text-xs text-muted-foreground max-w-[160px]">
+                            <span className="truncate block">{getRecordLabel(log)}</span>
+                          </TableCell>
+                          <TableCell className="text-xs text-muted-foreground">
+                            <div className="flex items-center gap-2">
+                              <span className="truncate max-w-[380px]">{getDetailsSentence(log)}</span>
+                              <ExternalLink className="h-3 w-3 shrink-0 opacity-0 group-hover:opacity-50" />
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </Fragment>
+                  ))}
+                </Fragment>
               ))}
             </TableBody>
           </Table>
