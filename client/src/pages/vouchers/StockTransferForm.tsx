@@ -118,9 +118,10 @@ export function StockTransferForm({ voucherIdToEdit, isPOS, posUser }: StockTran
   const lastKnownTransferIdRef = useRef<number | null>(null);
 
   const { data: stockItems = [] } = useQuery<StockItem[]>({
-    queryKey: ["/api/stock-items", selectedCompany?.id],
+    queryKey: ["/api/stock-items/light", selectedCompany?.id],
     staleTime: 5 * 60 * 1000,
     refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
   });
   const { data: locations = [] } = useQuery<Location[]>({
     queryKey: ["/api/locations", selectedCompany?.id],

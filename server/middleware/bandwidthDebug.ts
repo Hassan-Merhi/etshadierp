@@ -50,59 +50,66 @@ function normalizePath(req: Request): string {
     .join("/");
 }
 
-function calculateRankScore(aggregate: EndpointAggregate): number {
-  const count = Math.max(aggregate.requestCount, 1);
-  const averageDuration = aggregate.totalDurationMs / count;
-  const averageHeapDelta = aggregate.totalHeapDeltaBytes / count;
-  const averageDbDuration = aggregate.dbDurationMs / count;
+/**
+ * Returns true for Vite/webpack hashed static assets such as
+ * /assets/index-DdXDEvCM.js or /assets/main-B4tkL4ok.css.
+ * These are CDN-cached on the first visit and not meaningful API bandwidth.
+ */
+function isStaticAsset(path: string): boolean {
+  return /^\/assets\/[^/]+-[A-Za-z0-9_-]{6,}\.(js|css|woff2?|ttf|png|jpg|svg|ico)$/.test(path);
+}
 
-  return (
-    aggregate.totalResponseBytes / (1024 * 1024) +
-    aggregate.requestCount * 0.25 +
-    averageDuration / 100 +
-    Math.max(0, averageHeapDelta) / (1024 * 1024) +
-    averageDbDuration / 100 +
-    aggregate.errorCount * 2 +
-    aggregate.maxResponseBytes / (10 * 1024 * 1024)
-  );
+function formatRow(aggregate: EndpointAggregate) {
+  const count = Math.max(aggregate.requestCount, 1);
+  return {
+    method: aggregate.method,
+    path: aggregate.path,
+    requests: aggregate.requestCount,
+    errors: aggregate.errorCount,
+    totalResponseBytes: aggregate.totalResponseBytes,
+    averageResponseBytes: Math.round(aggregate.totalResponseBytes / count),
+    maxResponseBytes: aggregate.maxResponseBytes,
+    averageDurationMs: Math.round(aggregate.totalDurationMs / count),
+    maxDurationMs: aggregate.maxDurationMs,
+    dbQueryCount: aggregate.dbQueryCount,
+    averageDbDurationMs: Math.round(aggregate.dbDurationMs / count),
+  };
 }
 
 function emitRanking(): void {
   if (aggregates.size === 0) return;
 
   const topN = Math.round(positiveNumber(process.env.BANDWIDTH_DEBUG_TOP_N, DEFAULT_TOP_N));
-  const ranked = [...aggregates.values()]
-    .map((aggregate) => {
-      const count = Math.max(aggregate.requestCount, 1);
-      return {
-        method: aggregate.method,
-        path: aggregate.path,
-        score: Number(calculateRankScore(aggregate).toFixed(3)),
-        requests: aggregate.requestCount,
-        errors: aggregate.errorCount,
-        totalResponseBytes: aggregate.totalResponseBytes,
-        averageResponseBytes: Math.round(aggregate.totalResponseBytes / count),
-        maxResponseBytes: aggregate.maxResponseBytes,
-        averageDurationMs: Math.round(aggregate.totalDurationMs / count),
-        maxDurationMs: aggregate.maxDurationMs,
-        averageHeapDeltaBytes: Math.round(aggregate.totalHeapDeltaBytes / count),
-        maxHeapDeltaBytes: aggregate.maxHeapDeltaBytes,
-        dbQueryCount: aggregate.dbQueryCount,
-        averageDbQueries: Number((aggregate.dbQueryCount / count).toFixed(2)),
-        averageDbDurationMs: Math.round(aggregate.dbDurationMs / count),
-      };
-    })
-    .sort((left, right) => right.score - left.score)
+  const all = [...aggregates.values()];
+
+  // Separate API routes from hashed static assets so API bandwidth is easy to read.
+  const apiRows = all
+    .filter((a) => !isStaticAsset(a.path))
+    .map(formatRow)
+    .sort((l, r) =>
+      r.totalResponseBytes !== l.totalResponseBytes
+        ? r.totalResponseBytes - l.totalResponseBytes
+        : r.requests - l.requests,
+    )
     .slice(0, topN);
+
+  const staticRows = all
+    .filter((a) => isStaticAsset(a.path))
+    .map(formatRow)
+    .sort((l, r) => r.totalResponseBytes - l.totalResponseBytes)
+    .slice(0, 10);
 
   recordOperationalEvent({
     category: "bandwidth",
     code: "endpoint_performance_ranking",
     severity: "info",
     message: "Ranked endpoint performance and bandwidth snapshot",
-    endpointCount: aggregates.size,
+    endpointCount: all.length,
+    apiEndpointCount: apiRows.length,
+    staticAssetCount: staticRows.length,
     windowMs: positiveNumber(process.env.BANDWIDTH_DEBUG_REPORT_INTERVAL_MS, DEFAULT_REPORT_INTERVAL_MS),
-    ranked,
+    ranked: apiRows,
+    staticAssets: staticRows,
   });
 
   aggregates.clear();
@@ -203,7 +210,7 @@ export function bandwidthDebugMiddleware(req: Request, res: Response, next: Next
 export const __bandwidthDebugTesting = {
   emitRanking,
   normalizePath,
-  calculateRankScore,
+  isStaticAsset,
   clear(): void {
     aggregates.clear();
   },
