@@ -1,0 +1,65 @@
+import type { Express, RequestHandler } from "express";
+import { requireAuth, requireNonPOS } from "../auth";
+import { getHistoricalCurrencyReadiness } from "../services/accounting/historicalCurrencyReadiness";
+
+function isGuardedFinancialPath(pathname: string): boolean {
+  return (
+    pathname === "/api/stats/net-profit" ||
+    pathname.startsWith("/api/stats/net-position") ||
+    pathname.startsWith("/api/reports/net-position") ||
+    pathname.startsWith("/api/reports/net-profit") ||
+    pathname.includes("/statement-pdf") ||
+    pathname.includes("/statement-excel")
+  );
+}
+
+export const guardUnresolvedHistoricalCurrency: RequestHandler = async (req, res, next) => {
+  if (req.method !== "GET" || !isGuardedFinancialPath(req.path)) return next();
+  const companyId = req.session.currentCompanyId;
+  if (!companyId) return next();
+
+  try {
+    const asOfDate = typeof req.query.toDate === "string"
+      ? req.query.toDate
+      : typeof req.query.endDate === "string"
+        ? req.query.endDate
+        : null;
+    const readiness = await getHistoricalCurrencyReadiness(companyId, asOfDate);
+    if (readiness.ready) return next();
+
+    return res.status(409).json({
+      code: "HISTORICAL_CURRENCY_DATA_UNRESOLVED",
+      message:
+        "This financial report is blocked because legacy foreign-currency entries or opening balances are unresolved. " +
+        "Run the multi-currency backfill in dry-run mode, review ambiguous rows, then apply only approved repairs.",
+      readiness,
+      backfillWasRun: false,
+    });
+  } catch (error: any) {
+    console.error("Historical currency readiness check failed:", error);
+    return res.status(500).json({
+      code: "HISTORICAL_CURRENCY_READINESS_FAILED",
+      message: error.message,
+    });
+  }
+};
+
+export function registerHistoricalCurrencyGuardRoutes(app: Express) {
+  app.use(guardUnresolvedHistoricalCurrency);
+
+  app.get(
+    "/api/accounts/multi-currency/readiness",
+    requireAuth,
+    requireNonPOS,
+    async (req, res) => {
+      try {
+        const companyId = req.session.currentCompanyId;
+        if (!companyId) return res.status(400).json({ message: "No company selected" });
+        const asOfDate = typeof req.query.toDate === "string" ? req.query.toDate : null;
+        return res.json(await getHistoricalCurrencyReadiness(companyId, asOfDate));
+      } catch (error: any) {
+        return res.status(500).json({ message: error.message });
+      }
+    },
+  );
+}

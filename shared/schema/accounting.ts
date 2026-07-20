@@ -14,6 +14,9 @@ import {
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
+const openingBalanceCurrencySchema = z.enum(["USD", "CFA"]).nullable().optional();
+const nullableDecimalString = z.string().nullable().optional();
+
 export const ledgerAccounts = pgTable(
   "ledger_accounts",
   {
@@ -24,10 +27,10 @@ export const ledgerAccounts = pgTable(
     accountType: text("account_type").notNull(),
     subType: text("sub_type"),
     parentId: integer("parent_id"),
+    // Backward-compatible historical company-base amount.
     openingBalance: decimal("opening_balance", { precision: 20, scale: 2 }).default("0"),
     openingBalanceSide: text("opening_balance_side"),
-    // Phase 4 — opening-balance currency metadata.
-    // NULL means "unresolved" — revaluation endpoint flags these as openingBalanceCurrencyUnresolved.
+    openingBalanceNativeAmount: decimal("opening_balance_native_amount", { precision: 20, scale: 6 }),
     openingBalanceCurrency: varchar("opening_balance_currency", { length: 10 }),
     openingBalanceHistoricalRate: decimal("opening_balance_historical_rate", { precision: 20, scale: 10 }),
     openingBalanceBaseAmount: decimal("opening_balance_base_amount", { precision: 20, scale: 6 }),
@@ -75,6 +78,10 @@ export const insertLedgerAccountSchema = createInsertSchema(ledgerAccounts)
     subType: z.string().nullable().optional(),
     openingBalance: z.string().optional(),
     openingBalanceSide: z.enum(["Dr", "Cr"]).optional().or(z.literal("")),
+    openingBalanceNativeAmount: nullableDecimalString,
+    openingBalanceCurrency: openingBalanceCurrencySchema,
+    openingBalanceHistoricalRate: nullableDecimalString,
+    openingBalanceBaseAmount: nullableDecimalString,
     parentId: z.number().nullable().optional(),
   });
 
@@ -100,8 +107,13 @@ export const bankAccounts = pgTable(
     accountNumber: text("account_number").notNull(),
     routingCode: text("routing_code"),
     linkedLedgerId: integer("linked_ledger_id"),
+    // Backward-compatible historical company-base amount.
     openingBalance: decimal("opening_balance", { precision: 15, scale: 2 }).default("0"),
     openingBalanceSide: text("opening_balance_side"),
+    openingBalanceNativeAmount: decimal("opening_balance_native_amount", { precision: 20, scale: 6 }),
+    openingBalanceCurrency: varchar("opening_balance_currency", { length: 10 }),
+    openingBalanceHistoricalRate: decimal("opening_balance_historical_rate", { precision: 20, scale: 10 }),
+    openingBalanceBaseAmount: decimal("opening_balance_base_amount", { precision: 20, scale: 6 }),
     active: boolean("active").notNull().default(true),
     deletedAt: timestamp("deleted_at"),
     createdAt: timestamp("created_at").notNull().defaultNow(),
@@ -123,6 +135,10 @@ export const insertBankAccountSchema = createInsertSchema(bankAccounts)
     bankName: z.string().min(1, "Bank name is required"),
     accountNumber: z.string().min(1, "Account number is required"),
     openingBalanceSide: z.enum(["Dr", "Cr"]).optional().or(z.literal("")),
+    openingBalanceNativeAmount: nullableDecimalString,
+    openingBalanceCurrency: openingBalanceCurrencySchema,
+    openingBalanceHistoricalRate: nullableDecimalString,
+    openingBalanceBaseAmount: nullableDecimalString,
   });
 
 export type InsertBankAccount = z.infer<typeof insertBankAccountSchema>;
@@ -137,7 +153,12 @@ export const fixedAssets = pgTable(
     name: text("name").notNull(),
     category: text("category").notNull(),
     purchaseDate: date("purchase_date").notNull(),
+    // Backward-compatible historical company-base acquisition amount.
     purchaseAmount: decimal("purchase_amount", { precision: 15, scale: 2 }).notNull(),
+    purchaseNativeAmount: decimal("purchase_native_amount", { precision: 20, scale: 6 }),
+    purchaseCurrency: varchar("purchase_currency", { length: 10 }),
+    purchaseHistoricalRate: decimal("purchase_historical_rate", { precision: 20, scale: 10 }),
+    purchaseBaseAmount: decimal("purchase_base_amount", { precision: 20, scale: 6 }),
     depreciationMethod: text("depreciation_method").notNull().default("None"),
     usefulLife: integer("useful_life"),
     openingBalance: decimal("opening_balance", { precision: 15, scale: 2 }),
@@ -161,6 +182,10 @@ export const insertFixedAssetSchema = createInsertSchema(fixedAssets)
     category: z.string().min(1, "Category is required"),
     purchaseDate: z.string().min(1, "Purchase date is required"),
     purchaseAmount: z.string().min(1, "Purchase amount is required"),
+    purchaseNativeAmount: nullableDecimalString,
+    purchaseCurrency: openingBalanceCurrencySchema,
+    purchaseHistoricalRate: nullableDecimalString,
+    purchaseBaseAmount: nullableDecimalString,
     depreciationMethod: z.enum(["None", "StraightLine", "Declining"]),
   });
 

@@ -1,127 +1,104 @@
 ---
 name: Multi-currency implementation status
-description: Phase 15 multi-currency — what is done, what remains, and key design invariants.
+description: Final implementation state on fix/complete-multi-currency. Code is committed but unmerged; migrations and repair tools have not been run.
 ---
 
-## Core design invariants (never break these)
-- **Rate convention**: ERP = `TRANSACTION_PER_BASE` (CFA per USD). `baseUsd = cfaAmount / rate`. Factory uses the opposite (multiply). Never mix.
-- **CFA identifier**: Store `"CFA"` everywhere — DB, APIs, responses. `"XOF"` is only ever accepted as *input* at the `normalizeCurrencyCode` boundary and immediately mapped to `"CFA"`. No code should produce `"XOF"` as output.
-- **Historical immutability**: `historicalExchangeRate` on a `voucher_entries` row never changes after posting. Reports must read `base_debit_amount`/`base_credit_amount` columns, not recompute from the current company rate.
-- **Backward compat**: `debitAmount`/`creditAmount` always store the historical base (USD) value. Legacy queries that SUM these get the correct historical USD total.
-- **No backfill during migration**: Migration SQL adds columns only. Backfill is manual via the script with dry-run + HMAC token.
+## Core invariants
+- ERP CFA convention is `TRANSACTION_PER_BASE`: CFA per 1 USD, so `baseUsd = cfaAmount / historicalRate`.
+- Factory `fxRateToUsd` fields may use `BASE_PER_TRANSACTION`; never mix the conventions without explicit inversion.
+- Store `CFA`; accept `XOF` only as an input alias and normalize it immediately.
+- Historical transaction currency, original amount, historical rate, and historical base amount are immutable accounting facts.
+- `voucher_entries.debit_amount` / `credit_amount` remain backward-compatible historical base values for new and repaired rows.
+- Only current translated cash/bank value changes with the latest rate. Native cash/bank amounts and all historical sales, expenses, customers, suppliers, assets, inventory, and profit remain fixed.
+- Ambiguous legacy foreign-currency data is never guessed or converted using the current rate.
 
-## DB migration status — voucher_entries
-The 7 multi-currency columns (`transaction_currency`, `transaction_debit_amount`, `transaction_credit_amount`, `base_debit_amount`, `base_credit_amount`, `historical_exchange_rate`, `rate_convention`) exist in BOTH:
-- Drizzle schema (`shared/schema/erp.ts`, lines 312–329)
-- Live database (applied via idempotent `ADD COLUMN IF NOT EXISTS`)
+## Completed code
 
-Pre-existing rows have NULL for all 7 columns. New posts fill them via `normalizeVoucherEntryAmounts`. Backfill script fills legacy rows.
+### Voucher storage and write enforcement
+- `shared/schema/erp.ts` contains the seven dual-currency voucher-entry fields.
+- `server/services/accounting/currencyAmounts.ts` is the canonical Decimal.js normalization service.
+- Journal, Payment/Receipt, POS create/edit, transfers, credit notes, payroll, rental, and multiple factory posting paths use historical normalization.
+- `migrations/20260720_005_voucher_entry_currency_normalization_trigger.sql` protects remaining direct USD/CFA inserts and synchronized updates at the database boundary.
+- Unsupported third-currency rows are left explicitly unresolved unless their caller supplies a known convention.
+- Generic voucher-entry PATCH is overridden by `voucherEntryCurrencyEditRoutes.ts` so CFA amount edits preserve the native amount and historical rate.
 
-## What is done (Task #1 — migration + normalization)
+### Structural migrations
+The branch contains real, structural-only SQL migrations:
+- `20260720_002_voucher_entry_currency_fields.sql`
+- `20260720_003_ledger_account_opening_balance_currency.sql`
+- `20260720_004_bank_account_opening_balance_currency.sql`
+- `20260720_005_voucher_entry_currency_normalization_trigger.sql`
+- `20260720_006_entity_opening_and_asset_currency.sql`
 
-### Fixed bugs
-- `normalizeCurrencyCode("CFA")` → was "XOF" (wrong), now "CFA". `normalizeCurrencyCode("XOF")` → "CFA" (correct boundary normalization).
-- Backfill script (`scripts/backfill-voucher-entry-currency-amounts.mjs`) fully rewritten:
-  - Token validation: re-scans DB in apply mode, uses `crypto.timingSafeEqual` for constant-time comparison.
-  - All monetary math uses `Decimal.js` (no `parseFloat * number` or `.toFixed()` on floats).
-  - Outputs "CFA" never "XOF".
-  - New classifications: `confirmed-base-stored` (was "likely-base-stored"), `confirmed-transaction-stored` (new — stored amounts are CFA, derive USD base by dividing).
+The migrations add:
+- voucher-entry transaction/base/rate fields
+- native/historical opening metadata for ledger, bank, customer, supplier, and employee values
+- native/historical fixed-asset acquisition metadata
 
-### POS accounting
-- `postSaleAccounting.ts`: `insertSaleAccountingEntries` now accepts `currency`/`exchangeRate`, uses `normalizeVoucherEntryAmounts` via local `normalizePosEntry` helper for all entry inserts. Soft-fails to legacy if normalization impossible.
-- `createSaleService.ts`: threads `currency`/`exchangeRate` through to `insertSaleAccountingEntries`.
-- `rebuildSaleAccounting.ts`: `rebuildSaleAccountingEntries` now accepts `currency`/`exchangeRate` and uses `normalizeVoucherEntryAmounts`.
-- `updateSaleService.ts`: passes `existingVoucher.currency`/`existingVoucher.exchangeRate` (the ORIGINAL stored rate) to rebuild. Never uses current company rate.
+No migration performs a historical data backfill.
 
-### Voucher reads
-- `server/storage/accounting.ts` `getVoucherEntriesByVoucher`: all 7 dual-currency fields now included in SELECT and returned to callers.
+### Opening balances and fixed assets
+- Native opening/acquisition amounts are stored separately from historical base amounts.
+- Legacy amount columns remain historical base values after explicit resolution so existing reports remain compatible.
+- New non-zero ledger/bank openings without a currency remain unresolved instead of being silently treated as USD.
+- Resolved CFA openings survive edits from legacy account forms without losing their locked native amount/rate.
+- `openingBalanceResolutionRoutes.ts` provides an Admin/Owner/Developer-only explicit resolver for ledger, bank, customer, supplier, employee, and fixed-asset values.
+- `HistoricalOpeningResolver.tsx` exposes that workflow in Accounts.
 
-### Generic voucher create ("with-entries")
-- `voucherCreateRoutes.ts` POST `/api/vouchers/with-entries`: accepts `voucher.currency`/`voucher.exchangeRate` from request body, stores them on the voucher row, and runs `normalizeVoucherEntryAmounts` on each entry. Falls back gracefully if normalization fails (e.g. non-rate companies). Caller-supplied `transactionCurrency` on individual entries is respected as-is (new frontend path).
+### Cash/bank current translation
+- `cashBankRevaluationService.ts` uses Decimal.js throughout.
+- Native balances are grouped by account and currency; USD and CFA are never added as one native number.
+- Resolved CFA is translated using the latest CFA-per-USD rate only for current cash/bank display.
+- Missing current rate, unsupported currencies, unresolved openings, and unresolved legacy rows return provisional/null current values rather than fake zero differences.
+- Linked standalone bank accounts are not double-counted with their ledger account.
+- Existing account/bank balance URLs are safely overridden before legacy handlers register.
+- Accounts UI shows native balances, historical base, current translated value, translation difference, and unresolved warnings.
 
-### Frontend formatters (CurrencyContext.tsx + use-currency.ts)
-Four new formatters added (additive, no breakage):
-- `formatTransactionAmount(amount, currency)` — format in the specific transaction currency, no conversion.
-- `formatHistoricalBaseAmount(amount)` — always USD, never re-translated (historical).
-- `formatCurrentCashTranslation(nativeAmount, nativeCurrency)` — live translation of native (CFA) balance to selected display currency at current rate (display-only).
-- `formatNewTransactionPreview(amount)` — shows both currencies for a new transaction using the current rate.
+### Net Position and financial reports
+- Live Net Position response replaces only resolved cash/bank rows with current translated values.
+- Income, expenses, customers, suppliers, assets, inventory, equity, and historical profit are not current-revalued.
+- Date-filtered snapshots remain historical.
+- Cached report payloads are cloned before cash-only adjustment, preventing repeated revaluation.
+- `historicalCurrencyReadiness.ts` identifies unresolved foreign voucher rows and unresolved ledger, bank, customer, supplier, employee, and fixed-asset values.
+- Protected Net Position, Net Profit, and statement export endpoints return HTTP 409 while ambiguous historical currency data remains unresolved instead of returning convincing but wrong totals.
 
-### Tests
-- `tests/currencyAmounts.test.ts` updated: 41 tests all passing.
-  - Fixed assertions that expected "XOF" output (now "CFA").
-  - Added: CFA identifier consistency tests, Payment round-trip, POS CFA entry normalization, extended normalizeCurrencyCode tests.
+### Historical repair
+- `scripts/backfill-voucher-entry-currency-amounts.mjs` remains explicit and dry-run by default.
+- Apply mode requires a regenerated timing-safe confirmation token.
+- It uses stored historical rates only and never uses the latest rate.
+- Ambiguous and missing-rate rows are skipped for manual review.
+- The branch does not run this script automatically.
 
-## What is done (Task #2 — reporting layer, fixed-asset, cash/bank revaluation, exports)
+### Targeted regression coverage
+- `tests/currencyAmounts.test.ts` covers the central normalization helper.
+- `tests/multi-currency-integration.test.ts` covers:
+  - CFA/USD historical normalization
+  - separate native/base opening values
+  - all required migration files and journal entries
+  - database trigger behavior
+  - mixed-currency cash/bank safety
+  - unresolved legacy handling
+  - cash-only live Net Position translation
+  - protected report readiness
+  - generic entry edit normalization
+  - explicit opening/asset resolution
+  - backfill dry-run/token safeguards
 
-### COALESCE substitution strategy
-All report/export SQL now reads `COALESCE(base_debit_amount, debit_amount)` / `COALESCE(base_credit_amount, credit_amount)`.
-- Pre-backfill: `base_debit_amount IS NULL` → COALESCE falls back to `debit_amount` (same as before).
-- Post-backfill: COALESCE picks up historical USD base amounts → correct historical figures without re-translating.
+## Deployment and execution status
+- Branch: `fix/complete-multi-currency`
+- Base: `a80704e500178bfa5fb29ec1f49fc6c4b41f37f6`
+- The branch is not merged.
+- SQL migrations have not been applied by this work session.
+- The historical backfill has not been run.
+- Production data has not been modified.
+- CI and the full test suite were not run.
+- The focused tests were added/updated but were not executed in this environment.
 
-### Files changed
-- `server/routes/stats/statsNetProfitRoutes.ts`: COALESCE in all 3 pool.query calls (ledger, supplier, employee balance queries). CFA revaluation block RETAINED for backward compat (will be removed after backfill).
-- `server/routes/stats/statsNetPositionRoutes.ts`: Two Drizzle entry queries converted to pool.query with COALESCE. Added `pool` import.
-- `server/routes/reportsRoutes.ts`: COALESCE via `sql<string>` template in periodEntries, allTimeEntries, erpSalesEntries, drill-down endpoints (purchases, direct-incomes, direct-expenses, indirect-expenses), and account-statement (opening + monthly entries). Added `pool` import.
-- `server/routes/netProfitExcelRoute.ts`: COALESCE in allPeriodEntries, erpIncEntries, allTimeEntriesXlsx (all switched from `db.select()` to explicit column selects with sql template). Added `pool` import.
-- `server/routes/bankAssetRoutes.ts`:
-  - New `GET /api/bank-accounts/revaluation` endpoint: returns per-account `nativeCurrency`, `nativeBalance`, `historicalBaseBalance`, `currentRate`, `currentTranslatedBaseBalance`, `translationDifference`.
-  - `GET /api/fixed-assets` now returns `historicalCostBase` and `historicalDepreciationBase` computed from voucher_entries via COALESCE pool.query.
-  - Added `ledgerAccounts`, `exchangeRates` schema imports, `pool` import.
-- Factory daybook and POS daybook routes: no changes needed (no entry-summing queries found).
-
-## What is done (Task #3 — frontend, voucher editing, backfill review, tests)
-
-### DB columns applied
-- Applied idempotent `ALTER TABLE voucher_entries ADD COLUMN IF NOT EXISTS ...` for all 7 dual-currency columns in the live DB.
-- Key lesson: voucher_entries schema had the columns defined in Drizzle (erp.ts) but they weren't in the DB yet; always verify with `information_schema.columns` before assuming Drizzle schema == DB state.
-
-### Frontend types
-- `client/src/pages/daybook/types.ts`: `ViewVoucherEntry` and `VoucherEntry` interfaces now include all 7 optional multi-currency fields (`transactionCurrency`, `transactionDebitAmount`, `transactionCreditAmount`, `baseDebitAmount`, `baseCreditAmount`, `historicalExchangeRate`, `rateConvention`).
-
-### VoucherDetailsDialog (read-only view)
-- `client/src/pages/daybook/VoucherDetailsDialog.tsx`: Added `txCurrencyLabel(entry)` helper. Payment/Receipt/Journal entry amounts now show the original CFA amount as a secondary line (e.g. "CFA 60,000") when `transactionCurrency !== "USD"`. Debit and credit cells in Journal view each show their native side's amount.
-
-### VoucherEditDialog (shared edit component)
-- `client/src/components/VoucherEditDialog.tsx`:
-  - `VoucherEntry` interface extended with 5 optional multi-currency fields.
-  - `voucherEntrySchema` (Zod) extended with matching nullable optional fields.
-  - Form `reset()` now maps `transactionCurrency`, `transactionDebitAmount`, `transactionCreditAmount`, `historicalExchangeRate`, `rateConvention` from loaded entry data.
-  - Per-entry row shows an amber info badge ("CFA 60,000 @ 600 (historical)") for non-USD entries.
-  - `entriesPayload` on save includes `transactionCurrency`, `historicalExchangeRate`, `rateConvention` so the server can recompute base amounts consistently.
-
-### Targeted tests
-- `tests/multi-currency-integration.test.ts` (NEW, 22 tests, all passing):
-  - CFA voucher creation → entries have `transactionCurrency=CFA`, `historicalExchangeRate=600`, `baseDebitAmount=100` (60000 ÷ 600)
-  - USD voucher creation → `transactionCurrency=USD`
-  - `GET /api/vouchers/:id/entries` returns `historicalExchangeRate` for CFA vouchers
-  - `GET /api/vouchers/:id/view-entries` returns `transactionDebitAmount` and `baseDebitAmount`
-  - `GET /api/bank-accounts/revaluation` returns 200 with correct response shape
-  - `GET /api/fixed-assets` returns `historicalCostBase`
-  - Backfill token constant-time comparison unit tests (5 tests)
-  - Backfill classification logic unit tests (8 tests)
-  - Voucher edit GET /entries returns historical rate info
-
-## What still remains (not in scope of Tasks 1–3)
-
-### Issue 7 — Purchase/expense posting routes
-Many routes still insert voucher entries without `normalizeVoucherEntryAmounts`:
-- Purchase order vouchers, expense accounts, income accounts, supplier bills, credit/debit notes, payroll, rental income/expense, container expenses, freight, commissions, post-offload charges.
-- These all write `debitAmount`/`creditAmount` as raw strings from the request body.
-- Fix: add `normalizeVoucherEntryAmounts` to each route's entry insert, threading the voucher's currency/rate.
-
-### Issue 8 — Customer/supplier balance reads
-- `GET /api/customers/stats` and `GET /api/customers/:id/transactions` sum `debit_amount`/`credit_amount` — should also return `historicalBaseBalance` (sum of `base_debit_amount`/`base_credit_amount`) and per-currency native balances.
-- Same for `GET /api/suppliers/:id/balance` and `GET /api/suppliers/stats`.
-
-### Issue 10 — Cash/bank current translation in account balance endpoints
-- `GET /api/accounts/ledger/:id/balance` does not yet return `nativeBalance`, `historicalBaseBalance`, `currentTranslatedBaseBalance`, `translationDifference` fields. Frontend formatters are ready; the API endpoint needs updating.
-
-### Issue 12 — Backfill execution + CFA revaluation block removal
-- Run backfill script in dry-run on production data, verify, then apply.
-- After backfill confirmed, remove the CFA revaluation block from `statsNetProfitRoutes.ts` (~lines 333–370 and related lines ~553, 555, 602, 607, 620, 621, 733). This block divides all balance-sheet account values by `currentCfaRate` to compensate for pre-backfill CFA amounts. Once backfill runs, COALESCE handles this correctly and the block is wrong.
-- **Removal is only safe after backfill runs** — removing it before will break Net Position for CFA companies.
-
-### Issue 14 — Frontend display hooks for new formatters
-- Hook up `formatHistoricalBaseAmount` / `formatCurrentCashTranslation` formatters in voucher detail pages, account statement, and the net-position table.
-- Show `translationDifference` in the cash/bank revaluation UI (endpoint exists, UI not yet built).
-- Build a "Bank/Cash Revaluation" report page that surfaces the `/api/bank-accounts/revaluation` endpoint data.
+## Required deployment order after approval
+1. Review and merge the branch.
+2. Apply migrations `002` through `006` before starting code that queries the new columns.
+3. Open Accounts and review the historical readiness/resolution panels.
+4. Run the voucher-entry backfill in dry-run mode for one company.
+5. Review every ambiguous/missing-rate row; resolve opening/acquisition values explicitly.
+6. Apply only the approved repair token.
+7. Recheck readiness; protected financial reports unlock only when historical data is fully resolved.
