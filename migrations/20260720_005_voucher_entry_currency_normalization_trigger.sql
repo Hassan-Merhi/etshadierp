@@ -114,7 +114,7 @@ BEGIN
   END IF;
 
   -- Unnormalized legacy insertion/update: the legacy debit/credit values are
-  -- interpreted as the original transaction-currency values.
+  -- interpreted as the original transaction-currency values for USD/CFA only.
   raw_debit := COALESCE(NEW.debit_amount, 0)::numeric;
   raw_credit := COALESCE(NEW.credit_amount, 0)::numeric;
 
@@ -157,11 +157,10 @@ BEGIN
     RETURN NEW;
   END IF;
 
-  -- Do not guess conventions for other currencies. The caller must submit a
-  -- fully normalized entry with an explicit convention.
-  RAISE EXCEPTION
-    'Voucher currency % requires explicit transaction/base amounts and rate convention',
-    voucher_currency;
+  -- Other currencies use several established factory/supplier rate conventions.
+  -- Do not guess or block those flows. Leave the dual-currency fields NULL so the
+  -- row remains explicitly unresolved until its caller supplies a full convention.
+  RETURN NEW;
 END;
 $$;
 
