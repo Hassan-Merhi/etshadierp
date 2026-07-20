@@ -1613,7 +1613,7 @@ export function registerGitRoutes(app: Express) {
 
   // Route-level body parser: allow up to 10 MB for this endpoint only.
   // The global limit in server/index.ts stays at 2 MB for all other routes.
-  const largeJsonParser = (await import("express")).default.json({ limit: "10mb" });
+  const largeJsonParser = (require("express") as typeof import("express")).json({ limit: "10mb" });
 
   app.post(
     "/api/git/send-containers-whatsapp",
