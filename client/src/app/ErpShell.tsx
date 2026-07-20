@@ -5,12 +5,14 @@ import { AppModeProvider } from "@/contexts/AppModeContext";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { DailyRateModal } from "@/components/DailyRateModal";
 import { AppSidebar } from "@/components/AppSidebar";
+import { AppTopBar } from "@/components/AppTopBar";
 import { OfflineBanner } from "@/components/OfflineBanner";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { CommandPalette } from "@/components/CommandPalette";
 import { LoadingState } from "@/components/ui/page-state";
 import { Router } from "@/routes/AppRoutes";
 import { canUseAdminSearch, type ShellUser } from "./shellUser";
+import { MODULE_ACCENT } from "@/components/sidebar/sidebarPrimitives";
 
 interface ErpShellProps {
   user: ShellUser;
@@ -34,6 +36,12 @@ export function ErpShell({ user, hasErpAccess, handleLogout, leaveConfirmDialog 
           <AppSidebar user={user} />
           <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
             <OfflineBanner />
+            <AppTopBar
+              accentColor={MODULE_ACCENT.erp}
+              user={{ username: user.username, role: user.role ?? "" }}
+              onLogout={handleLogout}
+              onSearchOpen={() => setPaletteOpen(true)}
+            />
             <main
               id="main-content"
               tabIndex={-1}
