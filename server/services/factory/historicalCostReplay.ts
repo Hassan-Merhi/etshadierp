@@ -1,9 +1,8 @@
 /**
  * Historical Raw-Material Cost Replay facade.
  *
- * Read-only preview supplies the PostgreSQL pool as an executor. Apply acquires
- * one client, begins a serializable transaction, takes the company advisory
- * lock, and passes that same executor through the complete calculation chain.
+ * Prepare uses the read-only executor-aware preview. Apply uses the exact signed
+ * scope implementation inside one serializable, advisory-locked transaction.
  */
 export * from "./historical-replay/types";
 export {
@@ -23,14 +22,20 @@ export {
   buildNotFinalizedClause,
   normalizeReplayWriteScope,
   replayWriteScopesEqual,
-  buildHistoricalReplayScope,
-  buildHistoricalReplayScopeInternal,
   computeReplayWriteScope,
-  classifyBalesByFinalization,
-  captureReplaySnapshot,
 } from "./historical-replay/selectedScope";
+export {
+  buildExactHistoricalReplayScope as buildHistoricalReplayScope,
+  buildExactHistoricalReplayScopeInternal as buildHistoricalReplayScopeInternal,
+} from "./historical-replay/exactScope";
+export {
+  classifyReplayBalesForBatches,
+  classifyReplayBalesByIds,
+} from "./historical-replay/baleClassification";
 export {
   computeReplayFingerprint,
   loadReplayAuthoritativeInputDigest,
 } from "./historical-replay/fingerprint";
-export * from "./historical-replay/apply";
+export { captureReplaySnapshot } from "./historical-replay/scope";
+export { captureExactReplaySnapshot } from "./historical-replay/exactSnapshot";
+export { applyExactHistoricalCostReplay as applyHistoricalCostReplay } from "./historical-replay/exactApply";
