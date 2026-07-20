@@ -1,3 +1,4 @@
+import { logAudit } from "../helpers/auditHelpers";
 import { parseId, parseOptionalId } from "../../lib/parseId";
 import { getClientDate } from "../../lib/dateUtils";
 import type { Express } from "express";
@@ -1849,6 +1850,16 @@ export function registerFactoryBalesRoutes(app: Express) {
         .returning({ id: factoryBales.id });
 
       if (!updated) return res.status(404).json({ message: "Bale not found" });
+      await logAudit({
+        userId: req.session.userId!,
+        username: (req.session as any).username || req.session.userId!,
+        companyId,
+        action: "delete",
+        tableName: "bales",
+        recordId: id,
+        recordIdentifier: `Bale #${id}`,
+        changes: null,
+      });
       res.json({ message: "Bale deleted" });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
@@ -1887,6 +1898,16 @@ export function registerFactoryBalesRoutes(app: Express) {
         .set({ productName: name.trim(), updatedAt: new Date() })
         .where(eq(factoryBales.id, id));
 
+      await logAudit({
+        userId: req.session.userId!,
+        username: (req.session as any).username || req.session.userId!,
+        companyId,
+        action: "update",
+        tableName: "bales",
+        recordId: id,
+        recordIdentifier: `Bale #${id}`,
+        changes: { productName: { old: bale.productName, new: name.trim() } },
+      });
       res.json({ success: true });
     } catch (error: any) {
       console.error("Error updating bale product name:", error);

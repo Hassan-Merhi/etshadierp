@@ -1,4 +1,5 @@
 import Decimal from "decimal.js";
+import { logAudit } from "../../helpers/auditHelpers";
 import { parseId, parseOptionalId } from "../../../lib/parseId";
 import { getClientDate } from "../../../lib/dateUtils";
 import type { Express } from "express";
@@ -1055,6 +1056,16 @@ export function registerRawStockOffloadRoutes(app: Express) {
         // (First-receipt event was recorded at step 3 above, inside this same transaction.)
       }); // ── end transaction ────────────────────────────────────────────────────
 
+      await logAudit({
+        userId: req.session.userId!,
+        username: (req.session as any).username || req.session.userId!,
+        companyId,
+        action: "offload",
+        tableName: "production_raw_stock",
+        recordId: containerId,
+        recordIdentifier: `Container #${containerId} — ${receivedKg} kg`,
+        changes: null,
+      });
       res.json({ rawStock, commission: commissionRecord });
     } catch (error: any) {
       console.error("Error offloading container:", error);
@@ -1425,6 +1436,16 @@ export function registerRawStockOffloadRoutes(app: Express) {
           .where(eq(factoryContainers.id, containerId));
       });
 
+      await logAudit({
+        userId: req.session.userId!,
+        username: (req.session as any).username || req.session.userId!,
+        companyId,
+        action: "reverse",
+        tableName: "production_raw_stock",
+        recordId: containerId,
+        recordIdentifier: `Container #${containerId} offload reversed`,
+        changes: null,
+      });
       res.json({ message: "Offload reversed successfully. Container is back to its previous status." });
     } catch (error: any) {
       console.error("Error reversing offload:", error);

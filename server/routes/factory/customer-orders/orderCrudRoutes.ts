@@ -1,3 +1,4 @@
+import { logAudit } from "../../helpers/auditHelpers";
 import { trackOneContainerById } from "../../../services/containerTrackingService";
 import { parseId, parseOptionalId } from "../../../lib/parseId";
 import { dispatchNotification } from "../../../lib/notificationService";
@@ -422,6 +423,16 @@ export function registerOrderCrudRoutes(app: Express) {
 
       const parsed = insertCustomerOrderSchema.parse({ ...req.body, companyId, status: "DRAFT" });
       const [order] = await db.insert(customerOrders).values(parsed).returning();
+      await logAudit({
+        userId: req.session.userId!,
+        username: (req.session as any).username || req.session.userId!,
+        companyId,
+        action: "create",
+        tableName: "factory_customer_orders",
+        recordId: order.id,
+        recordIdentifier: (order as any).orderNumber || `Order #${order.id}`,
+        changes: null,
+      });
       res.json(order);
     } catch (error: any) {
       console.error("Error creating customer order:", error);
@@ -590,6 +601,16 @@ export function registerOrderCrudRoutes(app: Express) {
           .where(eq(customerOrders.id, orderId));
       });
 
+      await logAudit({
+        userId: req.session.userId!,
+        username: (req.session as any).username || req.session.userId!,
+        companyId,
+        action: "delete",
+        tableName: "factory_customer_orders",
+        recordId: orderId,
+        recordIdentifier: `Order #${orderId}`,
+        changes: null,
+      });
       res.json({ success: true, message: "Invoice moved to Deleted Items" });
     } catch (error: any) {
       console.error("Error deleting customer order:", error);

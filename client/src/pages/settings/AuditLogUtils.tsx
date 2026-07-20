@@ -1,3 +1,5 @@
+// ── Date formatting ──────────────────────────────────────────────────────────
+
 export function fmtDate(d: string) {
   const dt = new Date(d);
   return (
@@ -6,6 +8,8 @@ export function fmtDate(d: string) {
     dt.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })
   );
 }
+
+// ── Field label helpers ──────────────────────────────────────────────────────
 
 export function fieldLabel(key: string) {
   return key
@@ -89,9 +93,109 @@ export function fmtBusinessValue(field: string, value: any): string {
   return String(value);
 }
 
-export function tableShortName(t: string) {
-  return t.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+// ── Module/table name mapping ────────────────────────────────────────────────
+
+const MODULE_LABEL_MAP: Record<string, string> = {
+  vouchers: "Vouchers",
+  voucher_entries: "Journal Entries",
+  ledger_accounts: "Accounts",
+  customers: "Customers",
+  suppliers: "Suppliers",
+  stock_items: "Stock Items",
+  inventory: "Inventory",
+  stock_transfers: "Stock Transfers",
+  containers: "Containers",
+  factory_containers: "Factory Containers",
+  factory_offload_charges: "Post-Offload Charges",
+  factory_mix_batches: "Mix Batches",
+  factory_mix_batch_sources: "Mix Batch Sources",
+  production_raw_stock: "Raw Material Stock",
+  bales: "Bales",
+  factory_customer_orders: "Factory Customer Orders",
+  users: "Users",
+  user_company_roles: "Roles & Permissions",
+  exchange_rates: "Exchange Rates",
+  company_settings: "Company Settings",
+  reports: "Reports",
+  // payroll
+  payroll_workers: "Payroll Workers",
+  payroll_salaries: "Payroll Salaries",
+  // rental
+  rental_properties: "Rental Properties",
+  rental_payments: "Rental Payments",
+  // pos
+  pos_shifts: "POS Shifts",
+  pos_sales: "POS Sales",
+  pos_locations: "POS Locations",
+};
+
+/** Returns a human-readable title for a database table name. */
+export function tableShortName(t: string): string {
+  if (!t) return "Unknown";
+  if (MODULE_LABEL_MAP[t]) return MODULE_LABEL_MAP[t];
+  // Strip well-known prefixes, then title-case
+  return t
+    .replace(/^(factory_|payroll_|rental_|pos_)/, "")
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (c) => c.toUpperCase());
 }
+
+// ── Action labels and badge variants ─────────────────────────────────────────
+
+const ACTION_LABEL_MAP: Record<string, string> = {
+  create: "Created",
+  update: "Updated",
+  delete: "Deleted",
+  restore: "Restored",
+  reverse: "Reversed",
+  void: "Voided",
+  recalculate: "Recalculated",
+  repair: "Repaired",
+  import: "Imported",
+  export: "Exported",
+  send_whatsapp: "WhatsApp",
+  send_email: "Email",
+  approve: "Approved",
+  cancel: "Cancelled",
+  offload: "Offloaded",
+  transfer: "Transferred",
+  adjust: "Adjusted",
+  login: "Login",
+  permission_change: "Permissions",
+  settings_change: "Settings",
+};
+
+/** Returns a readable label for an audit action string. */
+export function actionLabel(action: string): string {
+  if (!action) return "—";
+  const key = action.toLowerCase();
+  if (ACTION_LABEL_MAP[key]) return ACTION_LABEL_MAP[key];
+  return action.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+type BadgeVariant = "default" | "secondary" | "destructive" | "outline";
+
+/** Maps an audit action to a shadcn Badge variant for color-coding. */
+export function actionBadgeVariant(action: string): BadgeVariant {
+  const key = (action || "").toLowerCase();
+  if (key === "delete" || key === "void" || key === "reverse") return "destructive";
+  if (key === "create" || key === "approve" || key === "restore") return "default";
+  return "secondary";
+}
+
+/** All action values accepted by the /api/audit-log endpoint. */
+export const ALL_SUPPORTED_ACTIONS = [
+  "create", "update", "delete",
+  "restore", "reverse", "void",
+  "recalculate", "repair",
+  "import", "export",
+  "send_whatsapp", "send_email",
+  "approve", "cancel",
+  "offload", "transfer", "adjust",
+  "login", "permission_change", "settings_change",
+] as const;
+
+// ── Record / diff helpers ────────────────────────────────────────────────────
 
 export function isItemDiffKey(field: string): boolean {
   return /^item_(added|removed|changed)_/.test(field);

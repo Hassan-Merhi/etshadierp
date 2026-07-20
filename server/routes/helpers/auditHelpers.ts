@@ -11,12 +11,22 @@ import {
 import { inArray } from "drizzle-orm";
 
 // ─── Audit log ────────────────────────────────────────────────────────────────
+export type AuditAction =
+  | "create" | "update" | "delete"
+  | "restore" | "reverse" | "void"
+  | "recalculate" | "repair"
+  | "import" | "export"
+  | "send_whatsapp" | "send_email"
+  | "approve" | "cancel"
+  | "offload" | "transfer" | "adjust"
+  | "login" | "permission_change" | "settings_change";
+
 export async function logAudit(
   params: {
     userId: string;
     username: string;
     companyId?: number | null;
-    action: "create" | "update" | "delete";
+    action: AuditAction;
     tableName: string;
     recordId?: number | null;
     recordIdentifier?: string | null;

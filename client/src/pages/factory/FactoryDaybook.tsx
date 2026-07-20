@@ -1,4 +1,6 @@
 import { useState, useMemo, useEffect, useRef, useCallback } from "react";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { AuditLog } from "@/pages/settings/AuditLog";
 import { useAdminOverride } from "@/hooks/use-admin-override";
 import { addDays, format } from "date-fns";
 import { useDateFormat } from "@/contexts/DateFormatContext";
@@ -1834,6 +1836,7 @@ export default function FactoryDaybook() {
   // post-mount useEffect) so the very first query fires once, with the right
   // dates/filters — never "today" followed immediately by a second, wider fetch.
   const initialDaybookStateRef = useRef<FactoryDaybookUIState | null>(loadFactoryDaybookState());
+  const [activeDaybookTab, setActiveDaybookTab] = useState<"transactions" | "activity">("transactions");
   const [periodFilter, setPeriodFilter] = useState<PeriodFilterValue>(
     () => initialDaybookStateRef.current?.periodFilter || getDefaultPeriodValue("today")
   );
@@ -2450,7 +2453,15 @@ export default function FactoryDaybook() {
         </DropdownMenu>
       </div>
 
-      {/* Filters */}
+      {/* Tab selector: Transactions / Edits & Activity */}
+      <Tabs value={activeDaybookTab} onValueChange={(v: any) => setActiveDaybookTab(v)}>
+        <TabsList className="w-fit">
+          <TabsTrigger value="transactions">Transactions</TabsTrigger>
+          <TabsTrigger value="activity">Edits &amp; Activity</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="transactions" className="space-y-4 mt-2">
+        {/* Filters */}
       <Card>
         <CardContent className="pt-4 pb-3">
           <div className="flex flex-wrap items-center gap-3">
@@ -3180,6 +3191,15 @@ export default function FactoryDaybook() {
             })()}
         </DialogContent>
       </Dialog>
+
+        </TabsContent>
+
+        <TabsContent value="activity" className="mt-2">
+          {activeDaybookTab === "activity" && (
+            <AuditLog context="daybook" defaultActions="all" />
+          )}
+        </TabsContent>
+      </Tabs>
 
       {AdminDialog}
     </div>
