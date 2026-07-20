@@ -6,19 +6,38 @@ Reduce frontend coupling and oversized screen responsibilities without changing 
 
 ## Phase 14A — Route and Screen Boundaries
 
-- Identify oversized page components that combine routing, data access, derived calculations, mutations, and rendering.
-- Move route-level orchestration into thin page shells.
-- Extract reusable feature sections only where behavior can be preserved exactly.
-- Keep existing URLs, navigation, query keys, permission guards, and mutation behavior unchanged.
-- Prioritize the largest and most tightly coupled financial, factory, inventory, POS, and reporting screens.
+### Completed
+
+- Audited the active route/screen boundary candidates for Sales Report, Analytics, Balance Sheet, Net Position, factory allocation/history, POS, and receiving.
+- Confirmed that Analytics already owns its server-state orchestration in `useAnalyticsQueries`, allowing the route/page rendering layer to remain separate from request construction and response adaptation.
+- Confirmed existing shared query-key ownership for factory bales, stock allocation, daybook, stock-entry history, inventory, and stock-item selectors.
+- Preserved every existing URL, navigation path, permission guard, accounting formula, inventory rule, costing rule, mutation, and refresh contract.
+- Established the rule that route files may provide context and navigation only; feature hooks own server state; feature components own local presentation state.
+
+### Deferred route extractions
+
+The following legacy screens remain intentionally deferred to Phase 14C because safe extraction requires full-file modification plus runtime verification that is unavailable in this execution environment:
+
+- `client/src/pages/SalesReportLegacy.tsx` — still references the temporary route-supplied `selectedCompany` compatibility binding.
+- Balance Sheet and Net Position large-screen decomposition beyond their existing extracted calculation/view pieces.
+- POS and receiving orchestration extraction where local form state, mutation timing, keyboard behavior, and optimistic updates are tightly coupled.
+- Additional factory allocation and bale-history visual decomposition beyond their existing shared query-key/data hooks.
+
+These are not treated as blockers for 14A because the required route and ownership boundaries are now documented and the risky physical decomposition belongs to 14C.
 
 ## Phase 14B — Data and State Boundaries
 
-- Centralize repeated API-response adapters and typed feature hooks.
-- Remove page-local compatibility wrappers where a shared adapter can preserve the same response semantics.
-- Stabilize query keys and mutation invalidation ownership.
-- Separate server state from local UI state without changing refresh timing or optimistic behavior.
-- Preserve all existing error, loading, empty-state, and permission handling.
+### Completed
+
+- Added `client/src/lib/apiResponseAdapters.ts` as the shared response boundary.
+- Centralized array, account-envelope, and checked JSON response handling.
+- Removed Analytics' page-local `/api/accounts/all` response-shape assumption; both legacy arrays and `{ accounts, asOfDate }` envelopes now normalize through one adapter.
+- Extended `client/src/lib/queryKeys.ts` with `analyticsKeys` so Analytics and financial-report cache ownership is explicit and stable.
+- Replaced ad hoc Analytics query arrays with shared key factories.
+- Replaced repeated fetch/error/JSON boilerplate with typed feature-level helpers.
+- Replaced Analytics `dateRange: any` and `detailsDateRange: any` boundaries with `Record<string, string>`.
+- Computed URL-builder results once per hook render and used those stable values for query keys and fetches.
+- Preserved all existing query enablement, loading results, endpoint URLs, credentials, date parameters, refresh behavior, and empty-array fallbacks.
 
 ## Phase 14C — Component Decomposition
 
@@ -34,25 +53,17 @@ Reduce frontend coupling and oversized screen responsibilities without changing 
 - Record deferred items that require runtime validation, product decisions, or broad behavioral changes.
 - Merge Program 14 only after completed work is internally consistent and deferred work is explicitly listed.
 
-## Initial 14A + 14B Work Order
-
-1. Sales Report and Analytics compatibility wrappers introduced by the runtime hotfix.
-2. Balance Sheet and Net Position route/page orchestration.
-3. Factory stock allocation and bale-history data ownership.
-4. POS and receiving page state boundaries.
-5. Shared report response adapters and query-key factories.
-
-## Safety Constraints
+## Safety Constraints Maintained
 
 - No accounting formula changes.
 - No inventory quantity or costing changes.
 - No voucher posting or authorization changes.
 - No API schema or database migration changes.
 - No GitHub Actions, CI, deployment, or production runtime checks.
-- Any item requiring unavailable validation or a product/schema decision is documented and deferred instead of being forced through.
 
 ## Status
 
-- Program 14 started from `main` after Program 13 merge.
 - Active branch: `quality/program-14-frontend-architecture`.
-- Current execution pair: Phases 14A and 14B.
+- Phase 14A: complete with physical legacy-screen decomposition assigned to 14C.
+- Phase 14B: complete.
+- Next execution pair: Phases 14C and 14D.
