@@ -37,19 +37,18 @@ export function registerOpeningBalanceAssignmentRoutesV5(app: Express): void {
       try {
         await client.query("BEGIN");
         await client.query("SET TRANSACTION ISOLATION LEVEL SERIALIZABLE");
+        await client.query(`SELECT pg_advisory_xact_lock(9003, $1)`, [companyId]);
         await client.query(`SELECT pg_advisory_xact_lock(9004, $1)`, [companyId]);
 
         const rawStockResult = await client.query<{
           id: number;
           container_id: number;
-          cost_per_kg: string;
           cost_per_kg_usd: string | null;
           used_kg: string;
           supplier_id: number | null;
         }>(
           `SELECT frs.id,
                   frs.container_id,
-                  frs.cost_per_kg,
                   frs.cost_per_kg_usd,
                   frs.used_kg,
                   fc.supplier_id
@@ -125,8 +124,15 @@ export function registerOpeningBalanceAssignmentRoutesV5(app: Express): void {
           }
           costPerKgUsd = new Decimal(storedRate);
         } else {
-          const directRate = rawStock.cost_per_kg_usd ?? rawStock.cost_per_kg;
-          costPerKgUsd = new Decimal(directRate || 0);
+          if (rawStock.cost_per_kg_usd == null) {
+            throw Object.assign(
+              new Error(
+                "Opening-balance direct source has no stored USD cost. Resolve its FX/cost before assigning bales."
+              ),
+              { statusCode: 409 }
+            );
+          }
+          costPerKgUsd = new Decimal(rawStock.cost_per_kg_usd);
           if (costPerKgUsd.lt(0)) {
             throw Object.assign(new Error("Opening-balance source has an invalid direct USD cost"), { statusCode: 409 });
           }

@@ -9,6 +9,22 @@ function canonicalScalar(value: unknown): string {
   return String(value);
 }
 
+function canonicalize(value: unknown): unknown {
+  if (value instanceof Date) return value.toISOString();
+  if (Array.isArray(value)) return value.map(canonicalize);
+  if (value && typeof value === "object") {
+    const record = value as Record<string, unknown>;
+    const out: Record<string, unknown> = {};
+    for (const key of Object.keys(record).sort()) out[key] = canonicalize(record[key]);
+    return out;
+  }
+  return value;
+}
+
+function stableJson(value: unknown): string {
+  return JSON.stringify(canonicalize(value));
+}
+
 function decimalEquals(left: unknown, right: unknown, tolerance = "0.0000001"): boolean {
   if (left == null || right == null) return left == null && right == null;
   try {
@@ -44,102 +60,41 @@ function assertSameIds(
   }
 }
 
-function assertFieldsUnchanged(
-  beforeRows: Array<{ id: number }>,
-  afterRows: Array<{ id: number }>,
-  label: string,
-  fields: string[],
-  decimalFields: string[] = []
+function assertCompleteNonCostStateUnchanged(
+  beforeRows: Array<{ id: number; nonCostState: Record<string, unknown> }>,
+  afterRows: Array<{ id: number; nonCostState: Record<string, unknown> }>,
+  label: string
 ): void {
   assertSameIds(beforeRows, afterRows, label);
   const afterById = rowsById(afterRows);
-  for (const before of beforeRows as any[]) {
+  for (const before of beforeRows) {
     const after = afterById.get(Number(before.id));
-    for (const field of fields) {
-      const same = decimalFields.includes(field)
-        ? decimalEquals(before[field], after[field])
-        : canonicalScalar(before[field]) === canonicalScalar(after[field]);
-      if (!same) {
-        throw invariantError(`${label} ${before.id} changed non-cost field ${field}`);
-      }
+    if (stableJson(before.nonCostState) !== stableJson(after.nonCostState)) {
+      throw invariantError(`${label} ${before.id} changed a non-cost column`);
     }
   }
 }
 
 /**
- * Proves the historical replay changed costs only. This intentionally checks
- * signed quantities, ownership, lifecycle state and dependency relationships;
- * negative inventory remains valid and is compared exactly rather than clamped.
+ * Proves the replay changed only its explicitly authorized cost columns. The
+ * JSONB nonCostState image contains every other persisted column, including
+ * signed quantities, ownership, lifecycle state and dependency relationships.
  */
 export function assertExactReplayNonCostInvariants(
   before: ExactReplaySnapshot,
   after: ExactReplaySnapshot
 ): void {
-  assertFieldsUnchanged(
-    before.containers,
-    after.containers,
-    "container",
-    ["supplierId", "status", "companyId", "actualReceivedKg", "totalKg", "declaredKg"],
-    ["actualReceivedKg", "totalKg", "declaredKg"]
-  );
-  assertFieldsUnchanged(
-    before.rawStockRows,
-    after.rawStockRows,
-    "raw-stock",
-    ["receivedKg", "usedKg", "containerId", "companyId", "deletedAt"],
-    ["receivedKg", "usedKg"]
-  );
-  assertFieldsUnchanged(
-    before.mixBatchSources,
-    after.mixBatchSources,
-    "source",
-    [
-      "supplierId",
-      "containerId",
-      "sourceBatchId",
-      "sourceType",
-      "sourceId",
-      "weightKg",
-      "quantityKg",
-      "mixBatchId",
-    ],
-    ["weightKg", "quantityKg"]
-  );
-  assertFieldsUnchanged(
-    before.mixBatches,
-    after.mixBatches,
-    "batch",
-    ["totalWeightKg", "usedKg", "status", "companyId", "deletedAt"],
-    ["totalWeightKg", "usedKg"]
-  );
-  assertFieldsUnchanged(
-    before.bales,
-    after.bales,
-    "bale",
-    [
-      "weightKg",
-      "quantity",
-      "status",
-      "mixBatchId",
-      "erpLocationId",
-      "pressingBatchId",
-      "finalizedAt",
-      "companyId",
-      "deletedAt",
-    ],
-    ["weightKg"]
-  );
-  assertFieldsUnchanged(
-    before.suppliers,
-    after.suppliers,
-    "supplier",
-    ["companyId"]
-  );
+  assertCompleteNonCostStateUnchanged(before.containers, after.containers, "container");
+  assertCompleteNonCostStateUnchanged(before.rawStockRows, after.rawStockRows, "raw-stock");
+  assertCompleteNonCostStateUnchanged(before.mixBatchSources, after.mixBatchSources, "source");
+  assertCompleteNonCostStateUnchanged(before.mixBatches, after.mixBatches, "batch");
+  assertCompleteNonCostStateUnchanged(before.bales, after.bales, "bale");
+  assertCompleteNonCostStateUnchanged(before.suppliers, after.suppliers, "supplier");
 }
 
 /**
  * Before undo, prove every cost field still equals the exact value written by
- * the replay. This prevents an old undo snapshot from overwriting later edits.
+ * replay. This prevents an old undo snapshot from overwriting later edits.
  */
 export function assertExactReplayCurrentCostsMatchApplied(
   applied: ExactReplaySnapshot,
@@ -210,8 +165,9 @@ export function assertExactReplayCurrentCostsMatchApplied(
 }
 
 /**
- * Validate persisted source totals, not in-memory preview objects. Every updated
- * batch must equal the sum of its persisted source weight × persisted cost.
+ * Validate persisted source totals rather than preview objects. Batch total_cost
+ * must equal SUM(persisted source total_cost), and every persisted source total
+ * must still agree with its own weight × cost within the approved rounding bound.
  */
 export async function assertPersistedReplaySourceTotals(
   executor: ReplayQueryExecutor,
@@ -223,10 +179,13 @@ export async function assertPersistedReplaySourceTotals(
     batch_id: number;
     batch_total: string;
     persisted_source_total: string;
+    max_source_row_difference: string;
   }>(
     `SELECT mb.id AS batch_id,
             mb.total_cost AS batch_total,
-            COALESCE(SUM(mbs.weight_kg * mbs.cost_per_kg), 0) AS persisted_source_total
+            COALESCE(SUM(mbs.total_cost), 0) AS persisted_source_total,
+            COALESCE(MAX(ABS(mbs.total_cost - (mbs.weight_kg * mbs.cost_per_kg))), 0)
+              AS max_source_row_difference
      FROM factory_mix_batches mb
      LEFT JOIN factory_mix_batch_sources mbs ON mbs.mix_batch_id = mb.id
      WHERE mb.company_id = $1
@@ -236,9 +195,12 @@ export async function assertPersistedReplaySourceTotals(
     [companyId, scope.batchIdsToUpdate]
   );
 
-  if (result.rows.length !== scope.batchIdsToUpdate.length) {
+  const expectedIds = [...new Set(scope.batchIdsToUpdate)].sort((a, b) => a - b);
+  const actualIds = result.rows.map((row) => Number(row.batch_id)).sort((a, b) => a - b);
+  if (JSON.stringify(expectedIds) !== JSON.stringify(actualIds)) {
     throw invariantError("persisted batch/source scope changed");
   }
+
   for (const row of result.rows) {
     if (
       new Decimal(row.batch_total || 0)
@@ -246,7 +208,10 @@ export async function assertPersistedReplaySourceTotals(
         .abs()
         .gt("0.02")
     ) {
-      throw invariantError(`batch ${row.batch_id} persisted source total does not equal batch total`);
+      throw invariantError(`batch ${row.batch_id} persisted source totals do not equal batch total`);
+    }
+    if (new Decimal(row.max_source_row_difference || 0).abs().gt("0.02")) {
+      throw invariantError(`batch ${row.batch_id} contains a persisted source total inconsistent with weight × cost`);
     }
   }
 }

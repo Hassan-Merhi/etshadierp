@@ -277,7 +277,7 @@ export const FINALIZED_BALE_STATUSES = [
   "FINALIZED",
 ] as const;
 
-export const REPLAY_ALGORITHM_VERSION = "v5-exact-scope-invariants";
+export const REPLAY_ALGORITHM_VERSION = "v6-final-static-safety";
 
 export function rowToCamel<T>(row: Record<string, unknown>): T {
   const out: Record<string, unknown> = {};

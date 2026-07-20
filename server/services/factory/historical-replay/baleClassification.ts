@@ -25,10 +25,10 @@ function finalizedStatusSql(): string {
 
 /**
  * One authoritative, company-scoped finalized-bale classifier for Historical
- * Replay. A bale is finalized when its status/finalized timestamp says so, when
- * it belongs to a live customer order, or when it has been placed on invoice
- * loading. Factory POS sale items are product-level and have no bale_id in the
- * current schema, so SOLD status is the schema-supported POS signal.
+ * Replay. The current factory_bales schema has no dispatch_batch_id relation, so
+ * dispatch is represented by lifecycle status. A live customer-order relation
+ * or invoice-loading relation also makes the bale finalized. Factory POS rows
+ * expose no bale_id; SOLD status is therefore the schema-supported POS signal.
  */
 async function classifyReplayBales(
   executor: ReplayQueryExecutor,

@@ -49,7 +49,6 @@ export function enqueueRequest(
       (i) => i.url === url && i.method.toUpperCase() === upperMethod && i.status === "pending"
     );
     if (existingIdx !== -1) {
-      // Replace body of existing item with latest payload
       queue[existingIdx] = {
         ...queue[existingIdx],
         body,
@@ -61,14 +60,11 @@ export function enqueueRequest(
     }
   }
 
-  // Dedup: for DELETE, remove any pending POST/PATCH for the same URL
   if (upperMethod === "DELETE") {
     const filtered = queue.filter(
       (i) => !(i.url === url && i.status === "pending" && i.method.toUpperCase() !== "DELETE")
     );
-    if (filtered.length !== queue.length) {
-      writeQueue(filtered);
-    }
+    if (filtered.length !== queue.length) writeQueue(filtered);
   }
 
   const id = `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
@@ -117,32 +113,35 @@ export function setLastSynced(): void {
   localStorage.setItem(LAST_SYNCED_KEY, String(Date.now()));
 }
 
+/**
+ * Financial repair, replay, undo and row-allocation requests are online-only.
+ * Keep this deny-list ahead of the allow-list so a future broad SAFE_PATTERNS
+ * entry cannot accidentally make a signed, expiring or lock-sensitive action
+ * replay later from localStorage.
+ */
+const NEVER_QUEUE_PATTERNS: RegExp[] = [
+  /^\/api\/factory\/raw-stock\/recalc(?:\/|$)/,
+  /^\/api\/factory\/raw-stock\/\d+\/assign-to-bales$/,
+];
+
 const SAFE_PATTERNS: Array<{ method: string; pattern: RegExp }> = [
-  // Session
   { method: "POST", pattern: /^\/api\/auth\/set-company$/ },
-  // ERP — customers
   { method: "POST", pattern: /^\/api\/customers$/ },
   { method: "PUT", pattern: /^\/api\/customers\/\d+$/ },
-  // ERP — suppliers
   { method: "PATCH", pattern: /^\/api\/suppliers\/\d+$/ },
   { method: "DELETE", pattern: /^\/api\/suppliers\/\d+$/ },
-  // ERP — purchase orders
   { method: "PATCH", pattern: /^\/api\/purchase-orders\/\d+$/ },
   { method: "DELETE", pattern: /^\/api\/purchase-orders\/\d+$/ },
-  // ERP — voucher extras
   { method: "PUT", pattern: /^\/api\/vouchers\/\d+\/with-entries$/ },
   { method: "PATCH", pattern: /^\/api\/vouchers\/\d+$/ },
   { method: "DELETE", pattern: /^\/api\/vouchers\/\d+$/ },
   { method: "POST", pattern: /^\/api\/vouchers\/\d+\/finalize$/ },
-  // ERP — inventory
   { method: "POST", pattern: /^\/api\/inventory\/quick-adjust$/ },
-  // POS
   { method: "POST", pattern: /^\/api\/pos\/sales$/ },
   { method: "POST", pattern: /^\/api\/pos\/drafts$/ },
   { method: "PATCH", pattern: /^\/api\/pos\/drafts\/\d+$/ },
   { method: "DELETE", pattern: /^\/api\/pos\/drafts\/\d+$/ },
   { method: "POST", pattern: /^\/api\/pos\/customers$/ },
-  // ERP Vouchers
   { method: "POST", pattern: /^\/api\/vouchers$/ },
   { method: "POST", pattern: /^\/api\/vouchers\/payment-receipt$/ },
   { method: "POST", pattern: /^\/api\/vouchers\/journal$/ },
@@ -150,7 +149,6 @@ const SAFE_PATTERNS: Array<{ method: string; pattern: RegExp }> = [
   { method: "PATCH", pattern: /^\/api\/vouchers\/\d+\/journal$/ },
   { method: "PATCH", pattern: /^\/api\/vouchers\/\d+\/sales$/ },
   { method: "PUT", pattern: /^\/api\/vouchers\/\d+\/sales$/ },
-  // Factory — stock & bales
   { method: "POST", pattern: /^\/api\/factory\/stock-entry$/ },
   { method: "POST", pattern: /^\/api\/factory\/stock-entry\/remove$/ },
   { method: "POST", pattern: /^\/api\/factory\/stock-entry\/remove-by-product$/ },
@@ -159,18 +157,15 @@ const SAFE_PATTERNS: Array<{ method: string; pattern: RegExp }> = [
   { method: "DELETE", pattern: /^\/api\/factory\/bale-products\/\d+$/ },
   { method: "POST", pattern: /^\/api\/factory\/bale-products\/\d+\/cascade-update$/ },
   { method: "PATCH", pattern: /^\/api\/factory\/bales\/\d+\/assign-worker$/ },
-  // Factory — containers / loading scans
   { method: "POST", pattern: /^\/api\/factory\/customer-orders-loading$/ },
   { method: "POST", pattern: /^\/api\/factory\/customer-orders\/\d+\/bales$/ },
   { method: "DELETE", pattern: /^\/api\/factory\/customer-orders\/\d+\/bales\/\d+$/ },
   { method: "POST", pattern: /^\/api\/factory\/customer-orders\/\d+\/finalize-loading$/ },
-  // Factory — vouchers
   { method: "POST", pattern: /^\/api\/factory\/vouchers$/ },
   { method: "POST", pattern: /^\/api\/factory\/vouchers\/payment-receipt$/ },
   { method: "POST", pattern: /^\/api\/factory\/vouchers\/journal$/ },
   { method: "PATCH", pattern: /^\/api\/factory\/vouchers\/\d+\/payment-receipt$/ },
   { method: "PATCH", pattern: /^\/api\/factory\/vouchers\/\d+\/journal$/ },
-  // Factory — daybook / mix batches
   { method: "POST", pattern: /^\/api\/factory\/mix-batches$/ },
   { method: "POST", pattern: /^\/api\/factory\/mix-batches\/\d+\/assign-bales$/ },
   { method: "PATCH", pattern: /^\/api\/factory\/mix-batches\/\d+$/ },
@@ -178,11 +173,9 @@ const SAFE_PATTERNS: Array<{ method: string; pattern: RegExp }> = [
   { method: "POST", pattern: /^\/api\/factory\/daybook$/ },
   { method: "PUT", pattern: /^\/api\/factory\/daybook\/\d+$/ },
   { method: "DELETE", pattern: /^\/api\/factory\/daybook\/entry\/\d+\/void$/ },
-  // Factory — categories
   { method: "POST", pattern: /^\/api\/factory\/categories$/ },
   { method: "PATCH", pattern: /^\/api\/factory\/categories\/\d+$/ },
   { method: "DELETE", pattern: /^\/api\/factory\/categories\/\d+$/ },
-  // Factory — suppliers & financials
   { method: "POST", pattern: /^\/api\/factory\/suppliers$/ },
   { method: "PATCH", pattern: /^\/api\/factory\/suppliers\/\d+$/ },
   { method: "DELETE", pattern: /^\/api\/factory\/suppliers\/\d+$/ },
@@ -192,23 +185,18 @@ const SAFE_PATTERNS: Array<{ method: string; pattern: RegExp }> = [
   { method: "DELETE", pattern: /^\/api\/factory\/supplier-payments\/\d+$/ },
   { method: "POST", pattern: /^\/api\/factory\/supplier-fx-transfers$/ },
   { method: "DELETE", pattern: /^\/api\/factory\/supplier-fx-transfers\/\d+$/ },
-  // Factory — raw stock opening balances
   { method: "POST", pattern: /^\/api\/factory\/raw-stock\/opening-balance$/ },
   { method: "PATCH", pattern: /^\/api\/factory\/raw-stock\/opening-balance\/\d+$/ },
   { method: "DELETE", pattern: /^\/api\/factory\/raw-stock\/opening-balance\/\d+$/ },
-  // Factory — containers
   { method: "POST", pattern: /^\/api\/factory\/containers$/ },
   { method: "PATCH", pattern: /^\/api\/factory\/containers\/\d+$/ },
   { method: "DELETE", pattern: /^\/api\/factory\/containers\/\d+$/ },
   { method: "POST", pattern: /^\/api\/factory\/containers\/\d+\/other-charges\/sync$/ },
   { method: "POST", pattern: /^\/api\/factory\/containers\/\d+\/reverse-offload$/ },
   { method: "POST", pattern: /^\/api\/factory\/containers\/import-excel$/ },
-  // Factory — attendance
   { method: "POST", pattern: /^\/api\/factory\/attendance\/bulk$/ },
-  // Factory — waste
   { method: "POST", pattern: /^\/api\/factory\/waste$/ },
   { method: "DELETE", pattern: /^\/api\/factory\/waste\/\d+$/ },
-  // Factory — workers & advances
   { method: "POST", pattern: /^\/api\/factory\/workers$/ },
   { method: "PATCH", pattern: /^\/api\/factory\/workers\/\d+$/ },
   { method: "POST", pattern: /^\/api\/factory\/workers\/\d+\/advances$/ },
@@ -216,17 +204,14 @@ const SAFE_PATTERNS: Array<{ method: string; pattern: RegExp }> = [
   { method: "POST", pattern: /^\/api\/factory\/advances\/bulk$/ },
   { method: "DELETE", pattern: /^\/api\/factory\/advances\/\d+$/ },
   { method: "DELETE", pattern: /^\/api\/factory\/workers\/\d+\/documents\/\d+$/ },
-  // Factory — employees
   { method: "POST", pattern: /^\/api\/factory\/employees$/ },
   { method: "PATCH", pattern: /^\/api\/factory\/employees\/\d+$/ },
   { method: "POST", pattern: /^\/api\/factory\/employees\/\d+\/deposit$/ },
   { method: "POST", pattern: /^\/api\/factory\/employees\/\d+\/withdraw$/ },
-  // Factory — customers
   { method: "POST", pattern: /^\/api\/factory\/customers$/ },
   { method: "PATCH", pattern: /^\/api\/factory\/customers\/\d+$/ },
   { method: "PUT", pattern: /^\/api\/factory\/customers\/\d+$/ },
   { method: "DELETE", pattern: /^\/api\/factory\/customers\/\d+$/ },
-  // Factory — proformas
   { method: "POST", pattern: /^\/api\/factory\/customer-proformas$/ },
   { method: "POST", pattern: /^\/api\/factory\/customer-proformas\/bulk$/ },
   { method: "PUT", pattern: /^\/api\/factory\/customer-proformas\/\d+$/ },
@@ -236,24 +221,19 @@ const SAFE_PATTERNS: Array<{ method: string; pattern: RegExp }> = [
   { method: "POST", pattern: /^\/api\/factory\/customer-proforma-lines$/ },
   { method: "PUT", pattern: /^\/api\/factory\/customer-proforma-lines\/\d+$/ },
   { method: "DELETE", pattern: /^\/api\/factory\/customer-proforma-lines\/\d+$/ },
-  // Factory — alerts / settings
   { method: "POST", pattern: /^\/api\/factory\/alerts$/ },
   { method: "PATCH", pattern: /^\/api\/factory\/alerts\/\d+$/ },
   { method: "DELETE", pattern: /^\/api\/factory\/alerts\/\d+$/ },
-  // Factory — payroll
   { method: "PATCH", pattern: /^\/api\/factory\/payroll\/\d+$/ },
   { method: "POST", pattern: /^\/api\/factory\/payroll\/\d+\/undo$/ },
   { method: "PATCH", pattern: /^\/api\/factory\/payrolls\/\d+\/mark-paid$/ },
   { method: "POST", pattern: /^\/api\/factory\/payrolls\/mark-paid-bulk$/ },
-  // Stock adjustments & transfers
   { method: "POST", pattern: /^\/api\/stock-adjustments$/ },
   { method: "PUT", pattern: /^\/api\/stock-adjustments\/\d+$/ },
   { method: "POST", pattern: /^\/api\/stock-transfers$/ },
   { method: "PUT", pattern: /^\/api\/stock-transfers\/\d+$/ },
   { method: "POST", pattern: /^\/api\/bale-label-prints$/ },
-  // Bale transfers
   { method: "POST", pattern: /^\/api\/bale-transfers$/ },
-  // ERP — containers
   { method: "PATCH", pattern: /^\/api\/containers\/\d+\/number$/ },
   { method: "PATCH", pattern: /^\/api\/containers\/\d+\/tracking$/ },
   { method: "DELETE", pattern: /^\/api\/containers\/\d+$/ },
@@ -263,46 +243,40 @@ const SAFE_PATTERNS: Array<{ method: string; pattern: RegExp }> = [
   { method: "DELETE", pattern: /^\/api\/container-loaded-items\/\d+$/ },
   { method: "POST", pattern: /^\/api\/containers\/\d+\/import-loaded-items$/ },
   { method: "POST", pattern: /^\/api\/container-sales$/ },
-  // ERP — container freight (routes under factory API)
   { method: "DELETE", pattern: /^\/api\/factory\/containers\/\d+\/documents\/\d+$/ },
   { method: "POST", pattern: /^\/api\/factory\/containers\/\d+\/freight$/ },
   { method: "DELETE", pattern: /^\/api\/factory\/containers\/\d+\/freight\/\d+$/ },
   { method: "POST", pattern: /^\/api\/factory\/freight\/\d+\/payments$/ },
   { method: "DELETE", pattern: /^\/api\/factory\/freight\/\d+\/payments\/\d+$/ },
-  // ERP — supplier proformas
   { method: "POST", pattern: /^\/api\/suppliers\/\d+\/proformas$/ },
   { method: "DELETE", pattern: /^\/api\/suppliers\/\d+\/proformas\/\d+$/ },
   { method: "POST", pattern: /^\/api\/suppliers\/\d+\/proformas\/\d+\/lines$/ },
   { method: "PATCH", pattern: /^\/api\/supplier-proforma-lines\/\d+$/ },
   { method: "DELETE", pattern: /^\/api\/supplier-proforma-lines\/\d+$/ },
   { method: "POST", pattern: /^\/api\/suppliers\/\d+\/proformas\/\d+\/import-lines$/ },
-  // ERP — barcodes
   { method: "POST", pattern: /^\/api\/pending-barcodes$/ },
   { method: "DELETE", pattern: /^\/api\/pending-barcodes\/\d+$/ },
   { method: "PATCH", pattern: /^\/api\/pending-barcodes\/mark-printed$/ },
-  // ERP — stock items bulk ops
   { method: "POST", pattern: /^\/api\/stock-items\/bulk-delete$/ },
   { method: "POST", pattern: /^\/api\/stock-items\/bulk-update-uom$/ },
-  // ERP — locations & archives
   { method: "DELETE", pattern: /^\/api\/locations\/\d+$/ },
   { method: "POST", pattern: /^\/api\/stock-group-archives$/ },
-  // Factory — waste dispatch & pressing
   { method: "POST", pattern: /^\/api\/factory\/waste-dispatch\/submit$/ },
   { method: "POST", pattern: /^\/api\/factory\/pressing\/create-multi$/ },
-  // Spreadsheets
   { method: "POST", pattern: /^\/api\/spreadsheets$/ },
   { method: "PATCH", pattern: /^\/api\/spreadsheets\/\d+$/ },
   { method: "DELETE", pattern: /^\/api\/spreadsheets\/\d+$/ },
   { method: "POST", pattern: /^\/api\/live-spreadsheets$/ },
   { method: "PATCH", pattern: /^\/api\/live-spreadsheets\/\d+$/ },
   { method: "DELETE", pattern: /^\/api\/live-spreadsheets\/\d+$/ },
-  // Deleted items
   { method: "POST", pattern: /^\/api\/deleted-items\/\w+\/\d+\/restore$/ },
   { method: "DELETE", pattern: /^\/api\/deleted-items\/\w+\/\d+\/permanent$/ },
 ];
 
 export function isSafeToQueue(method: string, url: string): boolean {
-  return SAFE_PATTERNS.some((p) => p.method === method.toUpperCase() && p.pattern.test(url));
+  const path = url.split("?", 1)[0];
+  if (NEVER_QUEUE_PATTERNS.some((pattern) => pattern.test(path))) return false;
+  return SAFE_PATTERNS.some((p) => p.method === method.toUpperCase() && p.pattern.test(path));
 }
 
 export function getDescriptionForRequest(url: string): string {
