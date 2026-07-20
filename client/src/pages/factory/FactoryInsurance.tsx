@@ -450,7 +450,10 @@ export default function FactoryInsurance() {
     queryFn: async () => {
       const params = new URLSearchParams({ includeInactive: String(includeInactive) });
       const res = await fetch(`/api/insurance/members?${params}`, { credentials: "include" });
-      if (!res.ok) return [];
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body?.message || `Failed to load members (${res.status})`);
+      }
       return res.json();
     },
   });

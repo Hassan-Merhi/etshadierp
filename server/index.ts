@@ -5504,11 +5504,13 @@ END $mig$`;
       // the account.  Must run BEFORE the orphan-cleanup below.
       try {
         const memberBackfill = await migrationClient.query(`
-          INSERT INTO insurance_members (company_id, name, active, ledger_account_id)
+          INSERT INTO insurance_members (company_id, name, active, ledger_account_id, start_date, amount)
           SELECT la.company_id,
                  SUBSTRING(la.name FROM 13),
                  true,
-                 la.id
+                 la.id,
+                 CURRENT_DATE,
+                 0
           FROM ledger_accounts la
           JOIN companies c ON c.id = la.company_id
           WHERE la.name LIKE 'Insurance - %'
