@@ -136,6 +136,10 @@ import {
   factorySettings as fSettings,
   factoryDaybookEntries as fde,
 } from "@shared/schema";
+import {
+  normalizeVoucherEntryAmounts,
+  erpRateToDaybookFxRateToUsd,
+} from "../../services/accounting/currencyAmounts";
 
 /**
  * After saving a journal voucher, if it has a customer entry + a ledger account entry,
@@ -180,8 +184,16 @@ export function registerVoucherPaymentRoutes(app: Express) {
         return res.status(400).json({ message: "voucherType must be 'Payment' or 'Receipt'" });
       }
 
-      // Calculate total amount
-      const total = entries.reduce((sum, entry) => sum + parseFloat(entry.amount || "0"), 0);
+      // Determine voucher currency and rate (CFA per USD convention for non-USD).
+      // transactionTotal is in the voucher's transaction currency (e.g. CFA).
+      // baseTotal is the historical base-currency (USD) equivalent stored on the voucher.
+      const vCurrency = (currency as string | undefined) || "USD";
+      const vRateRaw = (exchangeRate as string | number | undefined) || null;
+      const cfaPerUsd = (vCurrency !== "USD" && vRateRaw) ? parseFloat(String(vRateRaw)) : 1;
+      const transactionTotal = entries.reduce((sum: number, entry: any) => sum + parseFloat(entry.amount || "0"), 0);
+      // For CFA vouchers: baseTotal = transactionTotal / cfaPerUsd (CFA ÷ rate = USD)
+      // For USD vouchers: baseTotal = transactionTotal (no conversion)
+      const baseTotal = vCurrency !== "USD" && cfaPerUsd > 0 ? transactionTotal / cfaPerUsd : transactionTotal;
 
       // Generate voucher number
       const voucherNumber = `${voucherType.toUpperCase()}-${Date.now()}`;
@@ -254,22 +266,26 @@ export function registerVoucherPaymentRoutes(app: Express) {
             voucherType,
             voucherDate,
             description: notes || null,
-            totalAmount: total.toFixed(2),
+            // Store historical base-currency (USD) total (baseTotal = transactionTotal for USD vouchers).
+            totalAmount: baseTotal.toFixed(6),
             optional: optional ?? false,
-            currency: currency || "USD",
-            exchangeRate: exchangeRate || null,
+            currency: vCurrency,
+            exchangeRate: vRateRaw ? String(vRateRaw) : null,
             effectiveDate: effectiveDate || null,
           })
           .returning();
 
-        const voucherEntriesToCreate = [];
+        const voucherEntriesToCreate: any[] = [];
 
         // Pre-compute the payment-account field once (same for every entry)
         const paymentAccountField = await buildAccountField(paymentAccountType, paymentAccountId);
 
-        // Create entries based on voucher type
+        // Create entries based on voucher type.
+        // Each entry amount is the original transaction-currency (CFA) value as typed.
+        // normalizeVoucherEntryAmounts() converts it to historical base (USD) for
+        // debitAmount / creditAmount (backward-compat columns) and fills all new fields.
         for (const entry of entries) {
-          const amount = entry.amount;
+          const amount: string = entry.amount;
           const narration = notes || null;
 
           const entryAccountField = await buildAccountField(entry.accountType, entry.accountId);
@@ -279,23 +295,54 @@ export function registerVoucherPaymentRoutes(app: Express) {
             paymentAccountType === "factorySupplier" ||
             paymentAccountType === "employee";
 
+          // Normalize the transaction amount once per entry (DR side and CR side).
+          // normDR: this entry carries the debit leg; normCR: the credit leg.
+          const normDR = normalizeVoucherEntryAmounts({
+            transactionCurrency: vCurrency,
+            baseCurrency: "USD",
+            transactionDebitAmount: amount,
+            transactionCreditAmount: "0",
+            historicalRate: vRateRaw,
+          });
+          const normCR = normalizeVoucherEntryAmounts({
+            transactionCurrency: vCurrency,
+            baseCurrency: "USD",
+            transactionDebitAmount: "0",
+            transactionCreditAmount: amount,
+            historicalRate: vRateRaw,
+          });
+
           if (voucherType === "Payment") {
             if (isLiabilityPaymentAccount) {
               // Payment from liability account (supplier/employee):
-              // DR payment account (reduce liability - we paid from what they owe/advanced)
+              // DR payment account (reduce liability)
               // CR contra account
               voucherEntriesToCreate.push({
                 voucherId: createdVoucher.id,
                 ...paymentAccountField,
-                debitAmount: amount,
-                creditAmount: "0",
+                debitAmount: normDR.debitAmount,
+                creditAmount: normDR.creditAmount,
+                transactionCurrency: normDR.transactionCurrency,
+                transactionDebitAmount: normDR.transactionDebitAmount,
+                transactionCreditAmount: normDR.transactionCreditAmount,
+                baseDebitAmount: normDR.baseDebitAmount,
+                baseCreditAmount: normDR.baseCreditAmount,
+                historicalExchangeRate: normDR.historicalExchangeRate,
+                rateConvention: normDR.rateConvention,
                 narration,
               });
               voucherEntriesToCreate.push({
                 voucherId: createdVoucher.id,
                 ...entryAccountField,
-                debitAmount: "0",
-                creditAmount: amount,
+                debitAmount: normCR.debitAmount,
+                creditAmount: normCR.creditAmount,
+                transactionCurrency: normCR.transactionCurrency,
+                transactionDebitAmount: normCR.transactionDebitAmount,
+                transactionCreditAmount: normCR.transactionCreditAmount,
+                baseDebitAmount: normCR.baseDebitAmount,
+                baseCreditAmount: normCR.baseCreditAmount,
+                historicalExchangeRate: normCR.historicalExchangeRate,
+                rateConvention: normCR.rateConvention,
                 narration,
               });
             } else {
@@ -305,35 +352,63 @@ export function registerVoucherPaymentRoutes(app: Express) {
               voucherEntriesToCreate.push({
                 voucherId: createdVoucher.id,
                 ...entryAccountField,
-                debitAmount: amount,
-                creditAmount: "0",
+                debitAmount: normDR.debitAmount,
+                creditAmount: normDR.creditAmount,
+                transactionCurrency: normDR.transactionCurrency,
+                transactionDebitAmount: normDR.transactionDebitAmount,
+                transactionCreditAmount: normDR.transactionCreditAmount,
+                baseDebitAmount: normDR.baseDebitAmount,
+                baseCreditAmount: normDR.baseCreditAmount,
+                historicalExchangeRate: normDR.historicalExchangeRate,
+                rateConvention: normDR.rateConvention,
                 narration,
               });
               voucherEntriesToCreate.push({
                 voucherId: createdVoucher.id,
                 ...paymentAccountField,
-                debitAmount: "0",
-                creditAmount: amount,
+                debitAmount: normCR.debitAmount,
+                creditAmount: normCR.creditAmount,
+                transactionCurrency: normCR.transactionCurrency,
+                transactionDebitAmount: normCR.transactionDebitAmount,
+                transactionCreditAmount: normCR.transactionCreditAmount,
+                baseDebitAmount: normCR.baseDebitAmount,
+                baseCreditAmount: normCR.baseCreditAmount,
+                historicalExchangeRate: normCR.historicalExchangeRate,
+                rateConvention: normCR.rateConvention,
                 narration,
               });
             }
           } else {
             if (isLiabilityPaymentAccount) {
               // Receipt into liability account (supplier/employee):
-              // CR payment account (increase liability - we owe them more)
-              // DR contra account (the source, e.g. loans)
+              // DR contra account (source, e.g. loans)
+              // CR payment account (increase liability)
               voucherEntriesToCreate.push({
                 voucherId: createdVoucher.id,
                 ...entryAccountField,
-                debitAmount: amount,
-                creditAmount: "0",
+                debitAmount: normDR.debitAmount,
+                creditAmount: normDR.creditAmount,
+                transactionCurrency: normDR.transactionCurrency,
+                transactionDebitAmount: normDR.transactionDebitAmount,
+                transactionCreditAmount: normDR.transactionCreditAmount,
+                baseDebitAmount: normDR.baseDebitAmount,
+                baseCreditAmount: normDR.baseCreditAmount,
+                historicalExchangeRate: normDR.historicalExchangeRate,
+                rateConvention: normDR.rateConvention,
                 narration,
               });
               voucherEntriesToCreate.push({
                 voucherId: createdVoucher.id,
                 ...paymentAccountField,
-                debitAmount: "0",
-                creditAmount: amount,
+                debitAmount: normCR.debitAmount,
+                creditAmount: normCR.creditAmount,
+                transactionCurrency: normCR.transactionCurrency,
+                transactionDebitAmount: normCR.transactionDebitAmount,
+                transactionCreditAmount: normCR.transactionCreditAmount,
+                baseDebitAmount: normCR.baseDebitAmount,
+                baseCreditAmount: normCR.baseCreditAmount,
+                historicalExchangeRate: normCR.historicalExchangeRate,
+                rateConvention: normCR.rateConvention,
                 narration,
               });
             } else {
@@ -343,15 +418,29 @@ export function registerVoucherPaymentRoutes(app: Express) {
               voucherEntriesToCreate.push({
                 voucherId: createdVoucher.id,
                 ...paymentAccountField,
-                debitAmount: amount,
-                creditAmount: "0",
+                debitAmount: normDR.debitAmount,
+                creditAmount: normDR.creditAmount,
+                transactionCurrency: normDR.transactionCurrency,
+                transactionDebitAmount: normDR.transactionDebitAmount,
+                transactionCreditAmount: normDR.transactionCreditAmount,
+                baseDebitAmount: normDR.baseDebitAmount,
+                baseCreditAmount: normDR.baseCreditAmount,
+                historicalExchangeRate: normDR.historicalExchangeRate,
+                rateConvention: normDR.rateConvention,
                 narration,
               });
               voucherEntriesToCreate.push({
                 voucherId: createdVoucher.id,
                 ...entryAccountField,
-                debitAmount: "0",
-                creditAmount: amount,
+                debitAmount: normCR.debitAmount,
+                creditAmount: normCR.creditAmount,
+                transactionCurrency: normCR.transactionCurrency,
+                transactionDebitAmount: normCR.transactionDebitAmount,
+                transactionCreditAmount: normCR.transactionCreditAmount,
+                baseDebitAmount: normCR.baseDebitAmount,
+                baseCreditAmount: normCR.baseCreditAmount,
+                historicalExchangeRate: normCR.historicalExchangeRate,
+                rateConvention: normCR.rateConvention,
                 narration,
               });
             }
@@ -384,10 +473,19 @@ export function registerVoucherPaymentRoutes(app: Express) {
         if (fSetting) {
           const vType = result.voucher.voucherType;
           const txType = vType === "Payment" ? "PAYMENT" : vType === "Receipt" ? "RECEIPT" : "JOURNAL";
-          const currency = result.voucher.currency || "USD";
-          const fxRate = parseFloat(result.voucher.exchangeRate || "1") || 1;
-          const amtCurrency = parseFloat(result.voucher.totalAmount || "0");
-          const amtUsd = currency === "USD" ? amtCurrency : amtCurrency * fxRate;
+          const daybookCurrency = result.voucher.currency || "USD";
+          // vouchers.totalAmount now stores the historical base (USD) amount.
+          // transactionTotal (CFA) = baseTotal * cfaPerUsd for non-USD vouchers.
+          const daybookBaseTotal = parseFloat(result.voucher.totalAmount || "0");
+          const daybookRate = result.voucher.exchangeRate ? parseFloat(result.voucher.exchangeRate) : 1;
+          // Reconstruct the original CFA total: base × rate (TRANSACTION_PER_BASE).
+          const daybookAmtCurrency =
+            daybookCurrency !== "USD" && daybookRate > 0
+              ? daybookBaseTotal * daybookRate
+              : daybookBaseTotal;
+          // factory_daybook_entries.fx_rate_to_usd expects USD-per-foreign-unit.
+          // The ERP voucher stores CFA-per-USD (TRANSACTION_PER_BASE), so we invert.
+          const daybookFxRateToUsd = erpRateToDaybookFxRateToUsd(daybookCurrency, "USD", result.voucher.exchangeRate);
           await db.insert(fde).values({
             companyId: cid,
             txDate: result.voucher.voucherDate,
@@ -395,10 +493,10 @@ export function registerVoucherPaymentRoutes(app: Express) {
             referenceId: result.voucher.id,
             referenceTable: "vouchers",
             description: result.voucher.description || `${vType} voucher #${result.voucher.voucherNumber}`,
-            currencyCode: currency,
-            amountCurrency: String(amtCurrency),
-            fxRateToUsd: String(fxRate),
-            amountUsd: String(amtUsd),
+            currencyCode: daybookCurrency,
+            amountCurrency: String(daybookAmtCurrency),
+            fxRateToUsd: daybookFxRateToUsd,
+            amountUsd: String(daybookBaseTotal),
             createdBy: null,
             effectiveDate: result.voucher.effectiveDate || null,
           });
@@ -505,8 +603,14 @@ export function registerVoucherPaymentRoutes(app: Express) {
         return res.status(400).json({ message: "voucherType must be 'Payment' or 'Receipt'" });
       }
 
-      // Calculate total amount
-      const total = entries.reduce((sum, entry) => sum + parseFloat(entry.amount || "0"), 0);
+      // Determine currency/rate for the PATCH (may preserve existing if not re-sent).
+      const pCurrency = (currency as string | undefined) || "USD";
+      const pRateRaw = (exchangeRate as string | number | undefined) || null;
+      const pCfaPerUsd = pCurrency !== "USD" && pRateRaw ? parseFloat(String(pRateRaw)) : 1;
+      // Transaction total (voucher currency, e.g. CFA)
+      const pTransactionTotal = entries.reduce((sum: number, e: any) => sum + parseFloat(e.amount || "0"), 0);
+      // Base total (historical USD) — stored in vouchers.totalAmount
+      const pBaseTotal = pCurrency !== "USD" && pCfaPerUsd > 0 ? pTransactionTotal / pCfaPerUsd : pTransactionTotal;
 
       // Use database transaction for atomic operation
       const result = await db.transaction(async (tx) => {
@@ -528,14 +632,14 @@ export function registerVoucherPaymentRoutes(app: Express) {
         // Get existing entries before deleting (for balance sync)
         const oldEntries = await tx.select().from(voucherEntries).where(eq(voucherEntries.voucherId, voucherId));
 
-        // Update voucher
+        // Update voucher — store historical base (USD) total
         const [updatedVoucher] = await tx
           .update(vouchers)
           .set({
             voucherType,
             voucherDate,
             description: notes || null,
-            totalAmount: total.toFixed(2),
+            totalAmount: pBaseTotal.toFixed(6),
             optional: optional ?? false,
             effectiveDate: effectiveDate || null,
           })
@@ -545,11 +649,11 @@ export function registerVoucherPaymentRoutes(app: Express) {
         // Delete existing voucher entries
         await tx.delete(voucherEntries).where(eq(voucherEntries.voucherId, voucherId));
 
-        const voucherEntriesToCreate = [];
+        const voucherEntriesToCreate: any[] = [];
 
-        // Create new entries based on voucher type
+        // Create new entries with dual-currency normalization.
         for (const entry of entries) {
-          const amount = entry.amount;
+          const amount: string = entry.amount;
           const narration = notes || null;
 
           // Determine account field for entry account
@@ -593,69 +697,58 @@ export function registerVoucherPaymentRoutes(app: Express) {
             paymentAccountType === "factorySupplier" ||
             paymentAccountType === "employee";
 
+          // Normalize once; debit/credit fields determined by voucher type below
+          const normDR = normalizeVoucherEntryAmounts({
+            transactionCurrency: pCurrency,
+            baseCurrency: "USD",
+            transactionDebitAmount: amount,
+            transactionCreditAmount: "0",
+            historicalRate: pRateRaw,
+          });
+          const normCR = normalizeVoucherEntryAmounts({
+            transactionCurrency: pCurrency,
+            baseCurrency: "USD",
+            transactionDebitAmount: "0",
+            transactionCreditAmount: amount,
+            historicalRate: pRateRaw,
+          });
+
+          const mkDR = (acctField: any) => ({
+            voucherId: updatedVoucher.id, ...acctField,
+            debitAmount: normDR.debitAmount, creditAmount: normDR.creditAmount,
+            transactionCurrency: normDR.transactionCurrency,
+            transactionDebitAmount: normDR.transactionDebitAmount,
+            transactionCreditAmount: normDR.transactionCreditAmount,
+            baseDebitAmount: normDR.baseDebitAmount, baseCreditAmount: normDR.baseCreditAmount,
+            historicalExchangeRate: normDR.historicalExchangeRate, rateConvention: normDR.rateConvention,
+            narration,
+          });
+          const mkCR = (acctField: any) => ({
+            voucherId: updatedVoucher.id, ...acctField,
+            debitAmount: normCR.debitAmount, creditAmount: normCR.creditAmount,
+            transactionCurrency: normCR.transactionCurrency,
+            transactionDebitAmount: normCR.transactionDebitAmount,
+            transactionCreditAmount: normCR.transactionCreditAmount,
+            baseDebitAmount: normCR.baseDebitAmount, baseCreditAmount: normCR.baseCreditAmount,
+            historicalExchangeRate: normCR.historicalExchangeRate, rateConvention: normCR.rateConvention,
+            narration,
+          });
+
           if (voucherType === "Payment") {
             if (isLiabilityPaymentAccount) {
-              voucherEntriesToCreate.push({
-                voucherId: updatedVoucher.id,
-                ...paymentAccountField,
-                debitAmount: amount,
-                creditAmount: "0",
-                narration,
-              });
-              voucherEntriesToCreate.push({
-                voucherId: updatedVoucher.id,
-                ...entryAccountField,
-                debitAmount: "0",
-                creditAmount: amount,
-                narration,
-              });
+              voucherEntriesToCreate.push(mkDR(paymentAccountField));
+              voucherEntriesToCreate.push(mkCR(entryAccountField));
             } else {
-              voucherEntriesToCreate.push({
-                voucherId: updatedVoucher.id,
-                ...entryAccountField,
-                debitAmount: amount,
-                creditAmount: "0",
-                narration,
-              });
-              voucherEntriesToCreate.push({
-                voucherId: updatedVoucher.id,
-                ...paymentAccountField,
-                debitAmount: "0",
-                creditAmount: amount,
-                narration,
-              });
+              voucherEntriesToCreate.push(mkDR(entryAccountField));
+              voucherEntriesToCreate.push(mkCR(paymentAccountField));
             }
           } else {
             if (isLiabilityPaymentAccount) {
-              voucherEntriesToCreate.push({
-                voucherId: updatedVoucher.id,
-                ...entryAccountField,
-                debitAmount: amount,
-                creditAmount: "0",
-                narration,
-              });
-              voucherEntriesToCreate.push({
-                voucherId: updatedVoucher.id,
-                ...paymentAccountField,
-                debitAmount: "0",
-                creditAmount: amount,
-                narration,
-              });
+              voucherEntriesToCreate.push(mkDR(entryAccountField));
+              voucherEntriesToCreate.push(mkCR(paymentAccountField));
             } else {
-              voucherEntriesToCreate.push({
-                voucherId: updatedVoucher.id,
-                ...paymentAccountField,
-                debitAmount: amount,
-                creditAmount: "0",
-                narration,
-              });
-              voucherEntriesToCreate.push({
-                voucherId: updatedVoucher.id,
-                ...entryAccountField,
-                debitAmount: "0",
-                creditAmount: amount,
-                narration,
-              });
+              voucherEntriesToCreate.push(mkDR(paymentAccountField));
+              voucherEntriesToCreate.push(mkCR(entryAccountField));
             }
           }
         }
