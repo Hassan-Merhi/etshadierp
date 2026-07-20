@@ -1,29 +1,30 @@
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
-import { useBackToParent } from "@/hooks/use-back-to-parent";
 import { useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
-import { ArrowLeft, Package, ChevronRight, RefreshCw, Calendar } from "lucide-react";
+import { Package, ChevronRight, RefreshCw, Calendar } from "lucide-react";
 import { useCompany } from "@/contexts/CompanyContext";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
 import {
   Dialog,
   DialogContent,
-  DialogHeader,
-  DialogTitle,
   DialogDescription,
   DialogFooter,
+  DialogHeader,
+  DialogTitle,
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { format } from "date-fns";
-import { PeriodFilter, PeriodFilterValue, getDefaultPeriodValue } from "@/components/ui/period-filter";
+import { PeriodFilter, type PeriodFilterValue, getDefaultPeriodValue } from "@/components/ui/period-filter";
 import { useDateJump } from "@/hooks/use-date-jump";
 import { PageHeader } from "@/components/PageHeader";
+import { EmptyState, LoadingRows } from "@/components/ui/display-state";
+import { PageActions, PageShell, financialNumberClassName } from "@/components/ui/page-shell";
+import { cn } from "@/lib/utils";
 
 interface StockGroupSummary {
   id: number;
@@ -46,6 +47,10 @@ interface ClosingStockData {
   };
 }
 
+interface MutationError extends Error {
+  _handledGlobally?: boolean;
+}
+
 function formatNumber(value: number, decimals: number = 2): string {
   return value.toLocaleString("en-US", {
     minimumFractionDigits: decimals,
@@ -58,14 +63,8 @@ function formatQty(value: number): string {
   return `${formatNumber(value)} BL`;
 }
 
-function formatValue(value: number): string {
-  if (value === 0) return "";
-  return formatNumber(value);
-}
-
 export default function ClosingStockSummary() {
   const [, navigate] = useLocation();
-  const handleBack = useBackToParent();
   const { selectedCompany } = useCompany();
   const { formatAmount } = useCurrencyContext();
   const [periodFilter, setPeriodFilter] = useState<PeriodFilterValue>(getDefaultPeriodValue("today"));
@@ -93,17 +92,14 @@ export default function ClosingStockSummary() {
       const response = await apiRequest("POST", "/api/reports/carryforward-closing-stock", { asOfDate: date });
       return response.json();
     },
-    onSuccess: (data) => {
-      toast({
-        title: "Success",
-        description: data.message,
-      });
+    onSuccess: (result) => {
+      toast({ title: "Success", description: result.message });
       setShowCarryForwardDialog(false);
       queryClient.invalidateQueries({ queryKey: ["/api/reports/closing-stock-summary"] });
       queryClient.invalidateQueries({ queryKey: ["/api/reports/opening-stock-summary"] });
     },
-    onError: (error: any) => {
-      if ((error as any)?._handledGlobally) return;
+    onError: (error: MutationError) => {
+      if (error._handledGlobally) return;
       toast({
         title: "Failed",
         description: error.message || "Failed to carry forward closing stock",
@@ -112,38 +108,28 @@ export default function ClosingStockSummary() {
     },
   });
 
-  const handleCarryForward = () => {
-    carryForwardMutation.mutate(asOfDate);
-  };
-
   const handleGroupClick = (groupId: number, groupName: string) => {
     navigate(`/closing-stock/${groupId}?name=${encodeURIComponent(groupName)}`);
   };
 
   return (
-    <div className="p-3 sm:p-6 space-y-6">
-      <div className="flex items-center justify-between flex-wrap gap-4">
-        <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={handleBack} data-testid="button-back">
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
-          <div>
-            <PageHeader title="Closing Stock Summary" icon={<Package className="h-5 w-5" />} />
-            <p className="text-muted-foreground text-sm">Current inventory values - {selectedCompany?.name}</p>
-          </div>
-        </div>
-        <div className="flex items-center gap-2 flex-wrap">
+    <PageShell>
+      <PageHeader
+        title="Closing Stock Summary"
+        subtitle={`Current inventory values${selectedCompany?.name ? ` — ${selectedCompany.name}` : ""}`}
+        icon={<Package className="h-5 w-5" />}
+      >
+        <PageActions>
           <PeriodFilter value={periodFilter} onChange={setPeriodFilter} data-testid="period-filter-closing-stock" />
-          {data?.grandTotal && data.grandTotal.value > 0 && (
+          {data?.grandTotal && data.grandTotal.value > 0 ? (
             <Button onClick={() => setShowCarryForwardDialog(true)} data-testid="button-carryforward-stock">
-              <RefreshCw className="h-4 w-4 mr-2" />
+              <RefreshCw className="mr-2 h-4 w-4" />
               Set as Opening Stock
             </Button>
-          )}
-        </div>
-      </div>
+          ) : null}
+        </PageActions>
+      </PageHeader>
 
-      {/* Carry Forward Confirmation Dialog */}
       <Dialog open={showCarryForwardDialog} onOpenChange={setShowCarryForwardDialog}>
         <DialogContent>
           <DialogHeader>
@@ -152,7 +138,7 @@ export default function ClosingStockSummary() {
               Select a date to calculate inventory as of that date. This will replace the current opening stock values.
             </DialogDescription>
           </DialogHeader>
-          <div className="py-4 space-y-4">
+          <div className="space-y-4 py-4">
             <div className="space-y-2">
               <Label htmlFor="as-of-date" className="flex items-center gap-2">
                 <Calendar className="h-4 w-4" />
@@ -162,22 +148,22 @@ export default function ClosingStockSummary() {
                 id="as-of-date"
                 type="date"
                 value={asOfDate}
-                onChange={(e) => setAsOfDate(e.target.value)}
+                onChange={(event) => setAsOfDate(event.target.value)}
                 data-testid="input-as-of-date"
               />
               <p className="text-xs text-muted-foreground">
                 The system will calculate what inventory was on this date by reversing transactions after it.
               </p>
             </div>
-            <div className="border-t pt-4 space-y-2">
+            <div className="space-y-2 border-t pt-4">
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Company:</span>
                 <span className="font-medium">{selectedCompany?.name}</span>
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Current Inventory Value:</span>
-                <span className="font-mono font-medium">
-                  {formatAmount(data?.grandTotal ? data.grandTotal.value : 0)}
+                <span className="font-mono font-medium tabular-nums">
+                  {formatAmount(data?.grandTotal?.value ?? 0)}
                 </span>
               </div>
             </div>
@@ -187,7 +173,7 @@ export default function ClosingStockSummary() {
               Cancel
             </Button>
             <Button
-              onClick={handleCarryForward}
+              onClick={() => carryForwardMutation.mutate(asOfDate)}
               disabled={carryForwardMutation.isPending}
               data-testid="button-confirm-carryforward"
             >
@@ -199,67 +185,66 @@ export default function ClosingStockSummary() {
 
       <Card className="overflow-hidden">
         <div className="bg-primary text-primary-foreground">
-          <div className="grid grid-cols-2 sm:grid-cols-4 p-2 sm:p-3 font-semibold text-xs sm:text-sm">
-            <div className="col-span-1">Particulars</div>
-            <div className="hidden sm:block col-span-3 text-center border-l border-primary-foreground/30">
+          <div className="grid grid-cols-2 p-2 text-xs font-semibold sm:grid-cols-4 sm:p-3 sm:text-sm">
+            <div>Particulars</div>
+            <div className="hidden border-l border-primary-foreground/30 text-center sm:col-span-3 sm:block">
               Closing Balance
             </div>
-            <div className="sm:hidden text-right border-l border-primary-foreground/30 pl-2">Quantity</div>
+            <div className="border-l border-primary-foreground/30 pl-2 text-right sm:hidden">Quantity</div>
           </div>
-          <div className="grid grid-cols-2 sm:grid-cols-4 px-2 sm:px-3 pb-2 text-xs">
-            <div></div>
-            <div className="hidden sm:block text-right border-l border-primary-foreground/30 pl-2">Quantity</div>
-            <div className="hidden sm:block text-right">Rate</div>
-            <div className="hidden sm:block text-right">Value</div>
+          <div className="grid grid-cols-2 px-2 pb-2 text-xs sm:grid-cols-4 sm:px-3">
+            <div />
+            <div className="hidden border-l border-primary-foreground/30 pl-2 text-right sm:block">Quantity</div>
+            <div className="hidden text-right sm:block">Rate</div>
+            <div className="hidden text-right sm:block">Value</div>
           </div>
         </div>
 
         <div className="divide-y">
           {isLoading ? (
-            <div className="p-4 space-y-3">
-              {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
-                <Skeleton key={i} className="h-10 w-full" />
-              ))}
-            </div>
-          ) : data?.stockGroups && data.stockGroups.length > 0 ? (
-            <>
-              {data.stockGroups.map((group) => (
-                <div
-                  key={group.id}
-                  className="grid grid-cols-2 sm:grid-cols-4 p-2 sm:p-3 cursor-pointer hover-elevate"
-                  onClick={() => handleGroupClick(group.id, group.name)}
-                  data-testid={`row-stock-group-${group.id}`}
-                >
-                  <div className="font-medium flex items-center gap-1 truncate text-xs sm:text-sm">
-                    <ChevronRight className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                    <span className="truncate">{group.name}</span>
-                  </div>
-                  <div className="text-right font-mono text-sm">{formatQty(group.closing.quantity)}</div>
-                  <div className="hidden sm:block text-right font-mono text-sm">
-                    {group.closing.rate > 0 ? formatAmount(group.closing.rate) : ""}
-                  </div>
-                  <div className="hidden sm:block text-right font-mono text-sm">
-                    {group.closing.value > 0 ? formatAmount(group.closing.value) : ""}
-                  </div>
-                </div>
-              ))}
-            </>
+            <LoadingRows />
+          ) : data?.stockGroups?.length ? (
+            data.stockGroups.map((group) => (
+              <button
+                type="button"
+                key={group.id}
+                className="grid w-full grid-cols-2 p-2 text-left hover-elevate focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset sm:grid-cols-4 sm:p-3"
+                onClick={() => handleGroupClick(group.id, group.name)}
+                data-testid={`row-stock-group-${group.id}`}
+              >
+                <span className="flex min-w-0 items-center gap-1 truncate text-xs font-medium sm:text-sm">
+                  <ChevronRight className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
+                  <span className="truncate">{group.name}</span>
+                </span>
+                <span className={cn(financialNumberClassName, "text-sm")}>{formatQty(group.closing.quantity)}</span>
+                <span className={cn(financialNumberClassName, "hidden text-sm sm:block")}>
+                  {group.closing.rate > 0 ? formatAmount(group.closing.rate) : ""}
+                </span>
+                <span className={cn(financialNumberClassName, "hidden text-sm sm:block")}>
+                  {group.closing.value > 0 ? formatAmount(group.closing.value) : ""}
+                </span>
+              </button>
+            ))
           ) : (
-            <div className="p-8 text-center text-muted-foreground">No closing stock data available.</div>
+            <EmptyState
+              title="No closing stock data"
+              description="Closing stock balances will appear here for the selected period once inventory values are available."
+              icon={<Package className="h-5 w-5" />}
+            />
           )}
         </div>
 
-        {data?.grandTotal && (
-          <div className="bg-muted/50 border-t-2 border-primary">
-            <div className="grid grid-cols-2 sm:grid-cols-4 p-2 sm:p-3 font-bold">
+        {data?.grandTotal ? (
+          <div className="border-t-2 border-primary bg-muted/50">
+            <div className="grid grid-cols-2 p-2 font-bold sm:grid-cols-4 sm:p-3">
               <div className="text-xs sm:text-sm">Grand Total</div>
-              <div className="text-right font-mono">{formatNumber(data.grandTotal.quantity)} BL</div>
-              <div className="hidden sm:block text-right font-mono">{formatAmount(data.grandTotal.rate)}</div>
-              <div className="hidden sm:block text-right font-mono">{formatAmount(data.grandTotal.value)}</div>
+              <div className={financialNumberClassName}>{formatNumber(data.grandTotal.quantity)} BL</div>
+              <div className={cn(financialNumberClassName, "hidden sm:block")}>{formatAmount(data.grandTotal.rate)}</div>
+              <div className={cn(financialNumberClassName, "hidden sm:block")}>{formatAmount(data.grandTotal.value)}</div>
             </div>
           </div>
-        )}
+        ) : null}
       </Card>
-    </div>
+    </PageShell>
   );
 }

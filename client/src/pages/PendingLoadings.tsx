@@ -2,10 +2,11 @@ import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Skeleton } from "@/components/ui/skeleton";
 import { useLocation } from "wouter";
 import { Clock, Package, Play, StickyNote } from "lucide-react";
 import { PageHeader } from "@/components/PageHeader";
+import { EmptyState, LoadingRows } from "@/components/ui/display-state";
+import { PageActions, PageShell } from "@/components/ui/page-shell";
 
 interface PendingLoad {
   id: number;
@@ -40,34 +41,37 @@ export default function PendingLoadings() {
   };
 
   return (
-    <div className="flex flex-col h-full p-4 lg:p-6">
-      <div className="mb-6">
-        <PageHeader title="Pending Loadings" subtitle="In-progress container loads saved for later" />
-      </div>
-
-      {isLoading ? (
-        <div className="space-y-3">
-          {[1, 2, 3].map((i) => (
-            <Skeleton key={i} className="h-20 w-full" />
-          ))}
-        </div>
-      ) : loads.length === 0 ? (
-        <div
-          className="flex flex-col items-center justify-center py-20 text-muted-foreground"
-          data-testid="text-no-loads"
-        >
-          <Clock className="h-16 w-16 mb-4 opacity-30" />
-          <p className="text-lg font-medium">No pending loads</p>
-          <p className="text-sm mt-1">All container loadings are either complete or not yet started.</p>
+    <PageShell className="flex min-h-full flex-col">
+      <PageHeader title="Pending Loadings" subtitle="In-progress container loads saved for later">
+        <PageActions>
           <Button
-            className="mt-6"
             onClick={() => navigate("/factory/sales/loading/new")}
             data-testid="button-start-new"
           >
             <Play className="h-4 w-4 mr-2" />
             Start New Loading
           </Button>
-        </div>
+        </PageActions>
+      </PageHeader>
+
+      {isLoading ? (
+        <LoadingRows count={3} rowClassName="h-20" />
+      ) : loads.length === 0 ? (
+        <EmptyState
+          icon={Clock}
+          title="No pending loads"
+          description="All container loadings are either complete or not yet started."
+          action={
+            <Button
+              onClick={() => navigate("/factory/sales/loading/new")}
+              data-testid="button-start-new-empty"
+            >
+              <Play className="h-4 w-4 mr-2" />
+              Start New Loading
+            </Button>
+          }
+          data-testid="text-no-loads"
+        />
       ) : (
         <div className="space-y-3">
           {loads.map((load) => (
@@ -88,11 +92,11 @@ export default function PendingLoadings() {
                     )}
                   </div>
                   <div className="flex items-center gap-4 text-sm text-muted-foreground flex-wrap">
-                    <span>
+                    <span className="tabular-nums">
                       <Clock className="inline h-3 w-3 mr-1" />
                       Started: {formatDate(load.loadingStartedAt)}
                     </span>
-                    <span>
+                    <span className="tabular-nums">
                       <Package className="inline h-3 w-3 mr-1" />
                       {load.totalQtyBales} bales scanned
                     </span>
@@ -119,6 +123,6 @@ export default function PendingLoadings() {
           ))}
         </div>
       )}
-    </div>
+    </PageShell>
   );
 }
