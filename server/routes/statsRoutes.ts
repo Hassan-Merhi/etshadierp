@@ -5,6 +5,7 @@ import { registerStatsDataRoutes } from "./stats/statsDataRoutes";
 import { registerStatsSalesRoutes } from "./stats/statsSalesRoutes";
 import { registerStatsReportsRoutes } from "./stats/statsReportsRoutes";
 import { registerStatsCountryActivityRoutes } from "./stats/statsCountryActivityRoutes";
+import { registerStatsMultiCurrencyRoutes } from "./stats/statsMultiCurrencyRoutes";
 
 export function registerStatsRoutes(app: Express) {
   registerStatsNetProfitRoutes(app);
@@ -13,4 +14,5 @@ export function registerStatsRoutes(app: Express) {
   registerStatsSalesRoutes(app);
   registerStatsReportsRoutes(app);
   registerStatsCountryActivityRoutes(app);
+  registerStatsMultiCurrencyRoutes(app);
 }
