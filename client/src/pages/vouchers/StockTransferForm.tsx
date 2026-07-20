@@ -144,6 +144,17 @@ export function StockTransferForm({ voucherIdToEdit, isPOS, posUser }: StockTran
     },
   });
 
+  // If a "Stock Transfer Order" voucher (voucherType="Stock Transfer") lands on this tab
+  // by mistake (old bookmark / old Daybook routing), redirect to the correct tab.
+  useEffect(() => {
+    if (!voucherIdToEdit || !voucherToEdit) return;
+    if (voucherToEdit.voucherType === "Stock Transfer" || voucherToEdit.voucherType === "StockTransfer") {
+      const params = new URLSearchParams(window.location.search);
+      params.set("tab", "transferorder");
+      setLocation(`/vouchers?${params.toString()}`);
+    }
+  }, [voucherToEdit, voucherIdToEdit]); // eslint-disable-line
+
   const { data: stockTransferToEdit } = useQuery({
     queryKey: ["/api/stock-transfers", voucherIdToEdit],
     enabled: !!voucherIdToEdit,
