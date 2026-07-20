@@ -1,3 +1,4 @@
+import express from "express";
 import type { Express, Request, Response, NextFunction } from "express";
 import multer from "multer";
 import path from "path";
@@ -1613,7 +1614,7 @@ export function registerGitRoutes(app: Express) {
 
   // Route-level body parser: allow up to 10 MB for this endpoint only.
   // The global limit in server/index.ts stays at 2 MB for all other routes.
-  const largeJsonParser = (require("express") as typeof import("express")).json({ limit: "10mb" });
+  const largeJsonParser = express.json({ limit: "10mb" });
 
   app.post(
     "/api/git/send-containers-whatsapp",
