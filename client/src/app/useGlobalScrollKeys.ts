@@ -25,12 +25,15 @@ export function useGlobalScrollKeys(handleGoBack: () => void): void {
       if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return true;
       if (el.isContentEditable) return true;
       const role = el.getAttribute("role");
+      // Note: "row", "gridcell", "columnheader" are intentionally excluded —
+      // the app's tables are passive (no interactive grid navigation), so
+      // clicking a table row must not block global page scroll.
       if (
         role &&
         [
           "listbox", "option", "combobox", "menu", "menuitem",
           "menuitemcheckbox", "menuitemradio", "slider", "spinbutton",
-          "treeitem", "tree", "gridcell", "row", "columnheader",
+          "treeitem", "tree",
         ].includes(role)
       )
         return true;
@@ -90,8 +93,11 @@ export function useGlobalScrollKeys(handleGoBack: () => void): void {
         if (fromActive) return fromActive;
       }
 
-      // 3. Try <main> directly (standard non-full-height pages)
-      const main = document.querySelector("main");
+      // 3. Try #main-content directly (the primary scroll container in all
+      //    shells). Falls back to the first <main> for non-shell pages.
+      const main =
+        document.getElementById("main-content") ??
+        document.querySelector<HTMLElement>("main");
       if (main && canScroll(main, axis, direction)) return main;
 
       // 4. Scan inside <main> (or body) for Tailwind overflow class elements

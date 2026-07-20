@@ -30,10 +30,15 @@ export function AuthenticatedApp() {
   const { user, isLoading, error, loadingTimedOut, handleLogout } = useAuthenticatedUser();
   const { showLeaveConfirm, setShowLeaveConfirm, handleGoBack, handleConfirmLeave } = useAppNavigation();
 
-  // Reset scroll position on every route change so the new page always starts at top
+  // Reset scroll position on every route change and focus the main scroll
+  // container so that native browser arrow-key and two-finger scroll work
+  // immediately without requiring a click first.
   useEffect(() => {
-    const main = document.querySelector("main");
-    if (main) main.scrollTop = 0;
+    const main = document.getElementById("main-content");
+    if (main) {
+      main.scrollTop = 0;
+      main.focus({ preventScroll: true });
+    }
   }, [currentLocation]);
 
   const isPOS = user?.role === "POS";

@@ -7,7 +7,7 @@ interface PageShellProps {
 }
 
 export function PageShell({ children, className }: PageShellProps) {
-  return <main className={cn("space-y-6 p-3 sm:p-6", className)}>{children}</main>;
+  return <div className={cn("space-y-6 p-3 sm:p-6", className)}>{children}</div>;
 }
 
 interface PageActionsProps {
