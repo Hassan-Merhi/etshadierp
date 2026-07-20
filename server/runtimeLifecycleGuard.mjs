@@ -1,5 +1,6 @@
 import { Server } from "node:http";
 import process from "node:process";
+import { deploymentRuntimeConfig } from "./deploymentPreflight.mjs";
 
 const FLAG = Symbol.for("erp.runtime-lifecycle-guard");
 
@@ -34,9 +35,11 @@ if (!globalThis[FLAG]) {
       action: "shutdown-start",
       signal,
       trackedServers: servers.size,
+      timeoutMs: deploymentRuntimeConfig.shutdownGraceMs,
+      buildVersion: deploymentRuntimeConfig.buildVersion,
     }));
 
-    const timeoutMs = Number.parseInt(process.env.GRACEFUL_SHUTDOWN_TIMEOUT_MS || "25000", 10);
+    const timeoutMs = deploymentRuntimeConfig.shutdownGraceMs;
     const timeout = setTimeout(() => {
       console.error(JSON.stringify({
         timestamp: new Date().toISOString(),
@@ -45,6 +48,7 @@ if (!globalThis[FLAG]) {
         action: "shutdown-timeout",
         signal,
         timeoutMs,
+        buildVersion: deploymentRuntimeConfig.buildVersion,
       }));
       process.exitCode = 1;
     }, timeoutMs);
@@ -67,11 +71,10 @@ if (!globalThis[FLAG]) {
       module: "runtime-lifecycle",
       action: "http-closed",
       signal,
+      buildVersion: deploymentRuntimeConfig.buildVersion,
     }));
   };
 
-  // Register before the application entrypoint so new requests stop before its
-  // existing database-pool shutdown handler runs. Repeated signals are idempotent.
   process.prependListener("SIGTERM", () => void closeServers("SIGTERM"));
   process.prependListener("SIGINT", () => void closeServers("SIGINT"));
 
