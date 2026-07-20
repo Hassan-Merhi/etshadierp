@@ -1,8 +1,8 @@
 /**
  * Historical Raw-Material Cost Replay facade.
  *
- * Prepare uses the read-only executor-aware preview. Apply uses the exact signed
- * scope implementation inside one serializable, advisory-locked transaction.
+ * Prepare uses one read-only snapshot. Apply uses the exact signed scope inside
+ * one serializable, advisory-locked transaction with post-write invariants.
  */
 export * from "./historical-replay/types";
 export {
@@ -37,5 +37,18 @@ export {
   loadReplayAuthoritativeInputDigest,
 } from "./historical-replay/fingerprint";
 export { captureReplaySnapshot } from "./historical-replay/scope";
-export { captureExactReplaySnapshot } from "./historical-replay/exactSnapshot";
-export { applyExactHistoricalCostReplay as applyHistoricalCostReplay } from "./historical-replay/exactApply";
+export {
+  captureExactReplaySnapshot,
+  lockExactReplayScopeRows,
+  replayBaleIdsForScope,
+  type ExactReplaySnapshot,
+} from "./historical-replay/exactSnapshot";
+export {
+  assertExactReplayNonCostInvariants,
+  assertExactReplayCurrentCostsMatchApplied,
+  assertPersistedReplaySourceTotals,
+} from "./historical-replay/exactInvariants";
+export {
+  applyExactHistoricalCostReplayV5 as applyHistoricalCostReplay,
+  type ExactReplayCommitContext,
+} from "./historical-replay/exactApplyV5";

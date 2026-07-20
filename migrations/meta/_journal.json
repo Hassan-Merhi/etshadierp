@@ -50,6 +50,13 @@
       "when": 1784372000000,
       "tag": "0006_stored_file_download_permission",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1784544000000,
+      "tag": "0007_factory_historical_replay_safety",
+      "breakpoints": true
     }
   ]
 }
