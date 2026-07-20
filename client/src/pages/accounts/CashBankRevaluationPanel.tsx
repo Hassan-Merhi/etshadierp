@@ -37,6 +37,10 @@ interface HistoricalCurrencyReadiness {
   unresolvedVoucherCount: number;
   unresolvedLedgerOpeningCount: number;
   unresolvedBankOpeningCount: number;
+  unresolvedCustomerOpeningCount: number;
+  unresolvedSupplierOpeningCount: number;
+  unresolvedEmployeeOpeningCount: number;
+  unresolvedFixedAssetCount: number;
   sampleVoucherIds: number[];
 }
 
@@ -79,6 +83,14 @@ export function CashBankRevaluationPanel() {
   if (!data?.accounts?.length && readiness?.ready) return null;
 
   const needsReview = (data?.unresolvedAccountCount || 0) > 0 || readiness?.ready === false;
+  const unresolvedEntityValues = readiness
+    ? readiness.unresolvedLedgerOpeningCount +
+      readiness.unresolvedBankOpeningCount +
+      readiness.unresolvedCustomerOpeningCount +
+      readiness.unresolvedSupplierOpeningCount +
+      readiness.unresolvedEmployeeOpeningCount +
+      readiness.unresolvedFixedAssetCount
+    : 0;
 
   return (
     <Card data-testid="cash-bank-revaluation-panel">
@@ -105,7 +117,7 @@ export function CashBankRevaluationPanel() {
             <AlertTriangle className="h-4 w-4" />
             <AlertTitle>Historical financial reports are protected</AlertTitle>
             <AlertDescription>
-              {readiness.unresolvedEntryCount} foreign-currency entr{readiness.unresolvedEntryCount === 1 ? "y is" : "ies are"} unresolved across {readiness.unresolvedVoucherCount} voucher{readiness.unresolvedVoucherCount === 1 ? "" : "s"}. {readiness.unresolvedLedgerOpeningCount + readiness.unresolvedBankOpeningCount} opening balance{readiness.unresolvedLedgerOpeningCount + readiness.unresolvedBankOpeningCount === 1 ? " is" : "s are"} also unresolved. Net Position, Net Profit, and protected exports will not guess these values; review the backfill dry-run first.
+              {readiness.unresolvedEntryCount} foreign-currency entr{readiness.unresolvedEntryCount === 1 ? "y is" : "ies are"} unresolved across {readiness.unresolvedVoucherCount} voucher{readiness.unresolvedVoucherCount === 1 ? "" : "s"}. {unresolvedEntityValues} opening or acquisition value{unresolvedEntityValues === 1 ? " is" : "s are"} also unresolved across ledger, bank, customer, supplier, employee, and fixed-asset records. Net Position, Net Profit, and protected exports will not guess these values; review the backfill dry-run and the resolver below.
             </AlertDescription>
           </Alert>
         )}
