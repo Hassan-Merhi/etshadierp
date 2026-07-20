@@ -885,7 +885,7 @@ export async function replaySupplierTimeline(
   const replayRemainingKg = state.remaining.toDecimalPlaces(3).toNumber();
 
   // Check quantity reconciliation against the authoritative remaining
-  const authoritativeRemainingKg = await getAuthoritativeSupplierRemainingKg(db, companyId, supplierId);
+  // (authoritativeRemainingKg is already passed in as a parameter — do not re-declare)
   const diff = Math.abs(replayRemainingKg - authoritativeRemainingKg);
   const quantityMismatch = diff > 0.001;
 
