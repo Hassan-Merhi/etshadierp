@@ -43,8 +43,28 @@ function normalizedOpeningPayload(
     existing?.openingBalanceNativeAmount ??
     existing?.openingBalance ??
     "0";
+  const amount = new Decimal(nativeOpeningBalance || 0);
   const rawCurrency =
-    body.openingBalanceCurrency ?? existing?.openingBalanceCurrency ?? baseCurrency;
+    body.openingBalanceCurrency ?? existing?.openingBalanceCurrency ?? null;
+
+  if (!amount.isFinite() || amount.lt(0)) {
+    throw new Error("Opening balance must be a finite non-negative amount.");
+  }
+
+  // Never guess a non-zero opening balance's currency. Keep the legacy raw
+  // amount visible and explicitly unresolved until an operator reviews it in
+  // Accounts → Resolve Historical Opening & Asset Values.
+  if (!amount.isZero() && !rawCurrency) {
+    return {
+      ...body,
+      openingBalance: amount.toFixed(),
+      openingBalanceNativeAmount: null,
+      openingBalanceCurrency: null,
+      openingBalanceHistoricalRate: null,
+      openingBalanceBaseAmount: null,
+    };
+  }
+
   const normalized = normalizeOpeningBalanceCurrency({
     openingBalance: nativeOpeningBalance,
     openingBalanceCurrency: rawCurrency,
