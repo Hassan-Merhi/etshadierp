@@ -152,12 +152,12 @@ describe("required database migrations", () => {
     }
   });
 
-  it("normalizes new USD/CFA writes and protects CFA updates", () => {
+  it("normalizes new USD/CFA writes and synchronizes legacy updates", () => {
     const sql = read("migrations/20260720_005_voucher_entry_currency_normalization_trigger.sql");
     expect(sql).toMatch(/BEFORE INSERT OR UPDATE/i);
     expect(sql).toContain("ROUND(raw_debit / voucher_rate, 6)");
     expect(sql).toContain("NEW.debit_amount := NEW.base_debit_amount");
-    expect(sql).toMatch(/must be edited through transaction\/base currency fields/i);
+    expect(sql).toMatch(/already locked rate\/convention/i);
     expect(sql).toMatch(/Other currencies[\s\S]*remain explicitly unresolved/i);
   });
 
@@ -200,6 +200,24 @@ describe("cash/bank revaluation safety source checks", () => {
     expect(source).toContain("req.query.toDate");
     expect(source).not.toMatch(/incomeTotal\s*=/);
     expect(source).not.toMatch(/expensesTotal\s*=/);
+  });
+});
+
+describe("legacy history safety", () => {
+  it("blocks protected financial reports instead of guessing unresolved base values", () => {
+    const guard = read("server/routes/historicalCurrencyGuardRoutes.ts");
+    const readiness = read("server/services/accounting/historicalCurrencyReadiness.ts");
+    expect(guard).toContain("HISTORICAL_CURRENCY_DATA_UNRESOLVED");
+    expect(guard).toContain("/api/stats/net-profit");
+    expect(readiness).toMatch(/base_debit_amount IS NULL/);
+    expect(readiness).toMatch(/COALESCE\(UPPER\(v\.currency\), 'USD'\) <> 'USD'/);
+  });
+
+  it("normalizes generic voucher-entry amount edits", () => {
+    const source = read("server/routes/voucherEntryCurrencyEditRoutes.ts");
+    expect(source).toContain("normalizeVoucherEntryAmounts");
+    expect(source).toContain("historicalExchangeRate");
+    expect(source).toContain("HISTORICAL_CURRENCY_DATA_UNRESOLVED");
   });
 });
 
