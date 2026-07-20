@@ -127,6 +127,343 @@ import fs from "fs";
 
 import { buildExportFilename, buildOrderExcelBuffer } from "./orderHelpers";
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Shared invoice workbook builder
+// Both /export/excel and /export-excel routes call this so that hardening,
+// logging, and bug fixes are never applied to just one of them.
+// ─────────────────────────────────────────────────────────────────────────────
+
+interface InvoiceLineData {
+  articleCode: string;
+  productName: string;
+  qty: number;
+  wtPerBale: number;
+  totalWt: number;
+  pricePerBale: number;
+  total: number;
+  pricingMode: string;
+  pricePerKg: number;
+}
+
+interface InvoiceChargeData {
+  name: string | null;
+  amount: string | null;
+  chargeType: string;
+}
+
+interface InvoiceWorkbookParams {
+  orderId: number;
+  companyId: number;
+  invoiceNumber: string;
+  orderDate: string | null;
+  containerNumber: string | null;
+  customerName: string | null;
+  baseCurrency: string;
+  lines: InvoiceLineData[];
+  charges: InvoiceChargeData[];
+  subtotalBales: string | null;
+  freightAmount: string | null;
+  otherChargesTotal: string | null;
+  grandTotal: string | null;
+  hideSelling: boolean;
+  noCharges: boolean;
+}
+
+async function buildInvoiceWorkbookBuffer(params: InvoiceWorkbookParams): Promise<Buffer> {
+  const { orderId, companyId, hideSelling, noCharges } = params;
+
+  // Sanitize helpers — used throughout to prevent NaN/null/undefined reaching ExcelJS cells.
+  const safeStr = (v: any): string => (v == null ? "" : String(v));
+  const safeNum = (v: any): number => { const n = Number(v); return isFinite(n) ? n : 0; };
+
+  console.log(`[ExcelExport] orderId=${orderId} companyId=${companyId} stage=started`);
+
+  // Production-safe ExcelJS import — handles both default and named export shapes.
+  const excelModule = await import("exceljs");
+  const ExcelJS = (excelModule as any).default ?? excelModule;
+  if (!ExcelJS?.Workbook) {
+    throw new Error("ExcelJS.Workbook not available after import");
+  }
+  console.log(`[ExcelExport] orderId=${orderId} stage=exceljs-imported`);
+
+  const workbook = new ExcelJS.Workbook();
+  const sheet = workbook.addWorksheet("Commercial Invoice");
+  const COL = 8;
+
+  sheet.columns = [
+    { key: "c1", width: 6 },
+    { key: "c2", width: 16 },
+    { key: "c3", width: 30 },
+    { key: "c4", width: 8 },
+    { key: "c5", width: 11 },
+    { key: "c6", width: 13 },
+    { key: "c7", width: 13 },
+    { key: "c8", width: 14 },
+  ];
+
+  const DARK_BLUE = "FF1F3864";
+  const LIGHT_GRAY = "FFF5F5F5";
+  const WHITE = "FFFFFFFF";
+
+  const merge = (r: number, c1: number, c2: number) => { try { sheet.mergeCells(r, c1, r, c2); } catch {} };
+  const setFill = (cell: any, argb: string) => {
+    try { cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb } }; } catch {}
+  };
+  const setBorder = (row: any) => {
+    try {
+      row.eachCell((cell: any) => {
+        cell.border = {
+          top: { style: "thin", color: { argb: "FFDDDDDD" } },
+          bottom: { style: "thin", color: { argb: "FFDDDDDD" } },
+          left: { style: "thin", color: { argb: "FFDDDDDD" } },
+          right: { style: "thin", color: { argb: "FFDDDDDD" } },
+        };
+      });
+    } catch {}
+  };
+
+  // Currency formatting
+  const currencySymbolMap: Record<string, string> = {
+    USD: "$", GBP: "£", EUR: "€", CFA: "CFA", XOF: "CFA", XAF: "CFA",
+  };
+  const currSym = currencySymbolMap[(params.baseCurrency || "USD").toUpperCase()] ?? params.baseCurrency;
+  const fmtMoney = (n: number) => {
+    const v = safeNum(n);
+    return `${currSym}${v % 1 === 0 ? v.toLocaleString() : v.toFixed(2)}`;
+  };
+  const fmtNum = (n: number) => {
+    const v = safeNum(n);
+    return v % 1 === 0 ? v.toLocaleString() : v.toFixed(2);
+  };
+
+  // ── Logo row (failure here must not abort the export) ──
+  const logoRow = sheet.addRow([]);
+  logoRow.height = 110;
+  try {
+    const logoPath = path.join(process.cwd(), "server", "hmd-logo.png");
+    if (fs.existsSync(logoPath)) {
+      const logoBuf = fs.readFileSync(logoPath);
+      // The file is JPEG content stored with a .png extension — declare the real content type.
+      const logoId = workbook.addImage({ buffer: logoBuf as Buffer, extension: "jpeg" });
+      sheet.addImage(logoId, { tl: { col: 0, row: 0 }, ext: { width: 180, height: 110 } });
+      console.log(`[ExcelExport] orderId=${orderId} stage=logo-added`);
+    } else {
+      console.log(`[ExcelExport] orderId=${orderId} stage=logo-skipped reason=file-not-found`);
+    }
+  } catch (logoErr: any) {
+    console.warn(`[ExcelExport] orderId=${orderId} stage=logo-skipped reason=${logoErr.message}`);
+  }
+
+  // ── Company name ──
+  const r1 = sheet.addRow(["HMD INTERNATIONAL GROUP"]);
+  r1.height = 26;
+  try {
+    r1.getCell(1).font = { bold: true, size: 16, color: { argb: DARK_BLUE } };
+    r1.getCell(1).alignment = { horizontal: "center", vertical: "middle" };
+    merge(r1.number, 1, COL);
+  } catch {}
+
+  // ── "Commercial Invoice" title ──
+  const r2 = sheet.addRow(["Commercial Invoice"]);
+  r2.height = 22;
+  try {
+    r2.getCell(1).font = { bold: true, size: 14, color: { argb: DARK_BLUE } };
+    r2.getCell(1).alignment = { horizontal: "center", vertical: "middle" };
+    merge(r2.number, 1, COL);
+  } catch {}
+  sheet.addRow([]);
+
+  // ── Invoice details block ──
+  const invoiceNum = safeStr(params.invoiceNumber) || `INV-${String(orderId).padStart(6, "0")}`;
+  const orderDateFmt = params.orderDate
+    ? new Date(params.orderDate).toLocaleDateString("en-US", { month: "2-digit", day: "2-digit", year: "2-digit" })
+    : "-";
+
+  const details: [string, string][] = [
+    ["Invoice No.", invoiceNum],
+    ["Customer", safeStr(params.customerName) || "-"],
+    ["Date", orderDateFmt],
+    ["Container", safeStr(params.containerNumber) || "-"],
+  ];
+  try {
+    for (const [label, value] of details) {
+      const dr = sheet.addRow(["", "", "", "", "", label, "", value]);
+      dr.height = 20;
+      dr.getCell(6).font = { bold: true, size: 11 };
+      dr.getCell(6).alignment = { horizontal: "right" };
+      dr.getCell(8).font = { size: 11 };
+      dr.getCell(8).alignment = { horizontal: "left" };
+      merge(dr.number, 6, 7);
+    }
+  } catch {}
+  sheet.addRow([]);
+
+  // ── Table header ──
+  const anyPerKg = params.lines.some((l) => l.pricingMode === "per_kg");
+  const unitPriceLabel = anyPerKg ? "Price/KG" : "Price/Bale";
+  const hdrRow = sheet.addRow([
+    "#", "Article Code", "Product", "Qty", "Wt/Bale", "Total Wt",
+    ...(hideSelling ? [] : [unitPriceLabel, "Total"]),
+  ]);
+  hdrRow.height = 24;
+  try {
+    hdrRow.eachCell((cell: any) => {
+      cell.font = { bold: true, color: { argb: WHITE }, size: 11 };
+      setFill(cell, DARK_BLUE);
+      cell.alignment = { horizontal: "center", vertical: "middle" };
+      cell.border = {
+        top: { style: "thin", color: { argb: WHITE } },
+        bottom: { style: "thin", color: { argb: WHITE } },
+        left: { style: "thin", color: { argb: WHITE } },
+        right: { style: "thin", color: { argb: WHITE } },
+      };
+    });
+  } catch {}
+
+  // ── Data rows ──
+  console.log(`[ExcelExport] orderId=${orderId} stage=writing-rows count=${params.lines.length}`);
+  let totalQty = 0, totalWtAll = 0, totalAll = 0;
+  params.lines.forEach((g, idx) => {
+    const qty   = safeNum(g.qty);
+    const wt    = safeNum(g.totalWt);
+    const tot   = safeNum(g.total);
+    totalQty    += qty;
+    totalWtAll  += wt;
+    totalAll    += tot;
+    const unitPrice =
+      g.pricingMode === "per_kg"
+        ? (safeNum(g.totalWt) > 0 ? tot / safeNum(g.totalWt) : safeNum(g.pricePerKg))
+        : safeNum(g.pricePerBale);
+    const rowCells: any[] = [
+      idx + 1,
+      safeStr(g.articleCode),
+      safeStr(g.productName),
+      qty,
+      fmtNum(g.wtPerBale),
+      fmtNum(g.totalWt),
+    ];
+    if (!hideSelling) {
+      rowCells.push(fmtMoney(unitPrice));
+      rowCells.push(fmtMoney(tot));
+    }
+    const dr = sheet.addRow(rowCells);
+    dr.height = 20;
+    try {
+      dr.eachCell((cell: any) => { cell.font = { size: 11 }; });
+      if (idx % 2 === 1) {
+        dr.eachCell((cell: any) => setFill(cell, LIGHT_GRAY));
+      }
+      dr.getCell(1).alignment = { horizontal: "center" };
+      dr.getCell(4).alignment = { horizontal: "right" };
+      dr.getCell(5).alignment = { horizontal: "right" };
+      dr.getCell(6).alignment = { horizontal: "right" };
+      if (!hideSelling) {
+        dr.getCell(7).alignment = { horizontal: "right" };
+        dr.getCell(8).alignment = { horizontal: "right" };
+      }
+      setBorder(dr);
+    } catch {}
+  });
+
+  // ── Totals row ──
+  const totRowCells: any[] = ["", "", "Totals", totalQty, "", fmtNum(totalWtAll)];
+  if (!hideSelling) {
+    totRowCells.push("");
+    totRowCells.push(fmtMoney(totalAll));
+  }
+  const totRow = sheet.addRow(totRowCells);
+  totRow.height = 22;
+  try {
+    totRow.eachCell((cell: any) => {
+      cell.font = { bold: true, size: 11, color: { argb: WHITE } };
+      setFill(cell, DARK_BLUE);
+      cell.alignment = { horizontal: "right" };
+    });
+    totRow.getCell(3).alignment = { horizontal: "center" };
+    totRow.getCell(4).alignment = { horizontal: "right" };
+    totRow.getCell(6).alignment = { horizontal: "right" };
+    if (!hideSelling) totRow.getCell(8).alignment = { horizontal: "right" };
+  } catch {}
+
+  sheet.addRow([]);
+
+  // ── Financial summary (optional — failure here must NOT abort the export) ──
+  if (!hideSelling && !noCharges) {
+    try {
+      const subtotal         = safeNum(parseFloat(params.subtotalBales     || "0"));
+      const freight          = safeNum(parseFloat(params.freightAmount      || "0"));
+      const otherChargesTotal = safeNum(parseFloat(params.otherChargesTotal || "0"));
+      const grandTotal       = safeNum(parseFloat(params.grandTotal         || "0"));
+
+      const otherChargeLines = params.charges.filter((ch) => ch.chargeType !== "FREIGHT");
+      const chargeRows: [string, number][] =
+        otherChargeLines.length > 0
+          ? otherChargeLines.map((ch) => [safeStr(ch.name) || "Charge", safeNum(parseFloat(ch.amount || "0"))] as [string, number])
+          : otherChargesTotal > 0
+            ? [["Other Charges", otherChargesTotal]]
+            : [];
+
+      const summaryData: [string, number][] = [
+        ["Subtotal (Bales)", subtotal],
+        ...(freight > 0 ? [["Freight", freight] as [string, number]] : []),
+        ...chargeRows,
+        ["Grand Total", grandTotal],
+      ];
+
+      const sumHdr = sheet.addRow(["", "", "", "", "", "", "Name", "Amount"]);
+      sumHdr.height = 22;
+      sumHdr.getCell(7).font = { bold: true, color: { argb: WHITE }, size: 11 };
+      sumHdr.getCell(8).font = { bold: true, color: { argb: WHITE }, size: 11 };
+      setFill(sumHdr.getCell(7), DARK_BLUE);
+      setFill(sumHdr.getCell(8), DARK_BLUE);
+      sumHdr.getCell(7).alignment = { horizontal: "center" };
+      sumHdr.getCell(8).alignment = { horizontal: "center" };
+
+      summaryData.forEach(([label, amount], idx) => {
+        const sr = sheet.addRow(["", "", "", "", "", "", safeStr(label), fmtMoney(amount)]);
+        sr.height = 20;
+        const isGrandTotal = idx === summaryData.length - 1;
+        const bg = isGrandTotal ? DARK_BLUE : idx % 2 === 0 ? WHITE : LIGHT_GRAY;
+        const fg = isGrandTotal ? WHITE : "FF000000";
+        setFill(sr.getCell(7), bg);
+        setFill(sr.getCell(8), bg);
+        sr.getCell(7).font = { bold: isGrandTotal, size: 11, color: { argb: fg } };
+        sr.getCell(8).font = { bold: isGrandTotal, size: 11, color: { argb: fg } };
+        sr.getCell(7).alignment = { horizontal: "left" };
+        sr.getCell(8).alignment = { horizontal: "right" };
+        const thinBorder = {
+          top: { style: "thin", color: { argb: "FFDDDDDD" } },
+          bottom: { style: "thin", color: { argb: "FFDDDDDD" } },
+          left: { style: "thin", color: { argb: "FFDDDDDD" } },
+          right: { style: "thin", color: { argb: "FFDDDDDD" } },
+        };
+        sr.getCell(7).border = thinBorder;
+        sr.getCell(8).border = thinBorder;
+      });
+    } catch (summaryErr: any) {
+      console.warn(`[ExcelExport] orderId=${orderId} stage=summary-skipped reason=${summaryErr.message}`);
+    }
+  }
+
+  // ── Write buffer and verify ──
+  console.log(`[ExcelExport] orderId=${orderId} stage=writebuffer-started`);
+  const xlsBuffer = Buffer.from(await workbook.xlsx.writeBuffer());
+  console.log(`[ExcelExport] orderId=${orderId} stage=writebuffer-complete bytes=${xlsBuffer.length}`);
+
+  if (xlsBuffer.length === 0) {
+    throw new Error("Generated workbook buffer is empty");
+  }
+  // Verify ZIP/XLSX magic bytes: first two bytes must be PK (0x50 0x4B)
+  if (xlsBuffer[0] !== 0x50 || xlsBuffer[1] !== 0x4B) {
+    throw new Error(
+      `Generated buffer has invalid XLSX signature: 0x${xlsBuffer[0].toString(16)} 0x${xlsBuffer[1].toString(16)}`
+    );
+  }
+
+  console.log(`[ExcelExport] orderId=${orderId} stage=response-sent bytes=${xlsBuffer.length}`);
+  return xlsBuffer;
+}
+
 export function registerOrderExcelExportRoutes(app: Express) {
   app.get("/api/factory/customer-orders/:id/export/excel", requireAuth, async (req: any, res: any) => {
     try {
@@ -227,248 +564,39 @@ export function registerOrderExcelExportRoutes(app: Express) {
       }
 
       const lines = Array.from(grouped.values()).sort((a, b) => a.articleCode.localeCompare(b.articleCode));
-      const anyPerKgXls1 = lines.some((l) => l.pricingMode === "per_kg");
-
-      // Currency
-      const baseCurrency = (company as any)?.baseCurrency || "USD";
-      const currencySymbolMap: Record<string, string> = {
-        USD: "$",
-        GBP: "£",
-        EUR: "€",
-        CFA: "CFA",
-        XOF: "CFA",
-        XAF: "CFA",
-      };
-      const currSym = currencySymbolMap[baseCurrency.toUpperCase()] ?? baseCurrency;
-      const fmtMoney = (n: number) => `${currSym}${n % 1 === 0 ? n.toLocaleString() : n.toFixed(2)}`;
-      const fmtNum = (n: number) => (n % 1 === 0 ? n.toLocaleString() : n.toFixed(2));
-
-      const ExcelJS = (await import("exceljs")).default;
-      const workbook = new ExcelJS.Workbook();
-      const sheet = workbook.addWorksheet("Commercial Invoice");
-      const COL = 8;
-
-      sheet.columns = [
-        { key: "c1", width: 6 },
-        { key: "c2", width: 16 },
-        { key: "c3", width: 30 },
-        { key: "c4", width: 8 },
-        { key: "c5", width: 11 },
-        { key: "c6", width: 13 },
-        { key: "c7", width: 13 },
-        { key: "c8", width: 14 },
-      ];
-
-      const DARK_BLUE = "FF1F3864";
-      const LIGHT_GRAY = "FFF5F5F5";
-      const WHITE = "FFFFFFFF";
-      const GOLD = "FFD4AF37";
-
-      const merge = (r: number, c1: number, c2: number) => sheet.mergeCells(r, c1, r, c2);
-      const setFill = (cell: any, argb: string) => {
-        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb } };
-      };
-      const setBorder = (row: any) => {
-        row.eachCell((cell: any) => {
-          cell.border = {
-            top: { style: "thin", color: { argb: "FFDDDDDD" } },
-            bottom: { style: "thin", color: { argb: "FFDDDDDD" } },
-            left: { style: "thin", color: { argb: "FFDDDDDD" } },
-            right: { style: "thin", color: { argb: "FFDDDDDD" } },
-          };
-        });
-      };
-
-      // ── Logo row ──
-      const logoRow = sheet.addRow([]);
-      logoRow.height = 110;
-      try {
-        const logoPath = path.join(process.cwd(), "server", "hmd-logo.png");
-        if (fs.existsSync(logoPath)) {
-          const logoBuf = fs.readFileSync(logoPath);
-          const logoId = workbook.addImage({ buffer: logoBuf as Buffer, extension: "jpeg" });
-          sheet.addImage(logoId, { tl: { col: 0, row: 0 }, ext: { width: 180, height: 110 } });
-        }
-      } catch {}
-
-      // ── Company name ──
-      const r1 = sheet.addRow(["HMD INTERNATIONAL GROUP"]);
-      r1.height = 26;
-      r1.getCell(1).font = { bold: true, size: 16, color: { argb: DARK_BLUE } };
-      r1.getCell(1).alignment = { horizontal: "center", vertical: "middle" };
-      merge(r1.number, 1, COL);
-
-      // ── "Commercial Invoice" title ──
-      const r2 = sheet.addRow(["Commercial Invoice"]);
-      r2.height = 22;
-      r2.getCell(1).font = { bold: true, size: 14, color: { argb: DARK_BLUE } };
-      r2.getCell(1).alignment = { horizontal: "center", vertical: "middle" };
-      merge(r2.number, 1, COL);
-      sheet.addRow([]);
-
-      // ── Invoice details (right-aligned block) ──
-      const invoiceNum = order.invoiceNumber || `INV-${String(orderId).padStart(6, "0")}`;
-      const orderDateFmt = order.orderDate
-        ? new Date(order.orderDate).toLocaleDateString("en-US", { month: "2-digit", day: "2-digit", year: "2-digit" })
-        : "-";
-
-      const details = [
-        ["Invoice No.", invoiceNum],
-        ["Customer", customer?.legalName || "-"],
-        ["Date", orderDateFmt],
-        ["Container", order.containerNumber || "-"],
-      ];
-      for (const [label, value] of details) {
-        const dr = sheet.addRow(["", "", "", "", "", label, "", value]);
-        dr.height = 20;
-        dr.getCell(6).font = { bold: true, size: 11 };
-        dr.getCell(6).alignment = { horizontal: "right" };
-        dr.getCell(8).font = { size: 11 };
-        dr.getCell(8).alignment = { horizontal: "left" };
-        merge(dr.number, 6, 7);
-      }
-      sheet.addRow([]);
-
-      // ── Table header ──
-      const unitPriceLabelXls1 = anyPerKgXls1 ? "Price/KG" : "Price/Bale";
-      const hdrRow = sheet.addRow([
-        "#",
-        "Article Code",
-        "Product",
-        "Qty",
-        "Wt/Bale",
-        "Total Wt",
-        ...(hideSellingXls1 ? [] : [unitPriceLabelXls1, "Total"]),
-      ]);
-      hdrRow.height = 24;
-      hdrRow.eachCell((cell: any) => {
-        cell.font = { bold: true, color: { argb: WHITE }, size: 11 };
-        setFill(cell, DARK_BLUE);
-        cell.alignment = { horizontal: "center", vertical: "middle" };
-        cell.border = {
-          top: { style: "thin", color: { argb: WHITE } },
-          bottom: { style: "thin", color: { argb: WHITE } },
-          left: { style: "thin", color: { argb: WHITE } },
-          right: { style: "thin", color: { argb: WHITE } },
-        };
-      });
-
-      // ── Data rows ──
-      let totalQty = 0,
-        totalWtAll = 0,
-        totalAll = 0;
-      lines.forEach((g, idx) => {
-        totalQty += g.qty;
-        totalWtAll += g.totalWt;
-        totalAll += g.total;
-        const unitPriceXls1 =
-          g.pricingMode === "per_kg" ? (g.totalWt > 0 ? g.total / g.totalWt : g.pricePerKg) : g.pricePerBale;
-        const rowCells: any[] = [idx + 1, g.articleCode, g.productName, g.qty, fmtNum(g.wtPerBale), fmtNum(g.totalWt)];
-        if (!hideSellingXls1) {
-          rowCells.push(fmtMoney(unitPriceXls1));
-          rowCells.push(fmtMoney(g.total));
-        }
-        const dr = sheet.addRow(rowCells);
-        dr.height = 20;
-        dr.eachCell((cell: any) => {
-          cell.font = { size: 11 };
-        });
-        if (idx % 2 === 1) {
-          dr.eachCell((cell: any) => setFill(cell, LIGHT_GRAY));
-        }
-        dr.getCell(1).alignment = { horizontal: "center" };
-        dr.getCell(4).alignment = { horizontal: "right" };
-        dr.getCell(5).alignment = { horizontal: "right" };
-        dr.getCell(6).alignment = { horizontal: "right" };
-        if (!hideSellingXls1) {
-          dr.getCell(7).alignment = { horizontal: "right" };
-          dr.getCell(8).alignment = { horizontal: "right" };
-        }
-        setBorder(dr);
-      });
-
-      // ── Totals row ──
-      const totRowCells: any[] = ["", "", "Totals", totalQty, "", fmtNum(totalWtAll)];
-      if (!hideSellingXls1) {
-        totRowCells.push("");
-        totRowCells.push(fmtMoney(totalAll));
-      }
-      const totRow = sheet.addRow(totRowCells);
-      totRow.height = 22;
-      totRow.eachCell((cell: any) => {
-        cell.font = { bold: true, size: 11, color: { argb: WHITE } };
-        setFill(cell, DARK_BLUE);
-        cell.alignment = { horizontal: "right" };
-      });
-      totRow.getCell(3).alignment = { horizontal: "center" };
-      totRow.getCell(4).alignment = { horizontal: "right" };
-      totRow.getCell(6).alignment = { horizontal: "right" };
-      if (!hideSellingXls1) totRow.getCell(8).alignment = { horizontal: "right" };
-
-      sheet.addRow([]);
-
-      // ── Financial summary block (omit when selling prices are hidden) ──
-      if (!hideSellingXls1) {
-        const subtotal = parseFloat(order.subtotalBales || "0");
-        const freight = parseFloat(order.freightAmount || "0");
-        const otherChargesTotal = parseFloat(order.otherChargesTotal || "0");
-        const grandTotal = parseFloat(order.grandTotal || "0");
-
-        const otherChargeLines = orderCharges.filter((ch: any) => ch.chargeType !== "FREIGHT");
-        const chargeRows: [string, number][] =
-          otherChargeLines.length > 0
-            ? otherChargeLines.map((ch: any) => [ch.name, parseFloat(ch.amount || "0")] as [string, number])
-            : otherChargesTotal > 0
-              ? [["Other Charges", otherChargesTotal]]
-              : [];
-
-        const summaryData: [string, number][] = [
-          ["Subtotal (Bales)", subtotal],
-          ...(freight > 0 ? [["Freight", freight] as [string, number]] : []),
-          ...chargeRows,
-          ["Grand Total", grandTotal],
-        ];
-
-        const sumHdr = sheet.addRow(["", "", "", "", "", "", "Name", "Amount"]);
-        sumHdr.height = 22;
-        sumHdr.getCell(7).font = { bold: true, color: { argb: WHITE }, size: 11 };
-        sumHdr.getCell(8).font = { bold: true, color: { argb: WHITE }, size: 11 };
-        setFill(sumHdr.getCell(7), DARK_BLUE);
-        setFill(sumHdr.getCell(8), DARK_BLUE);
-        sumHdr.getCell(7).alignment = { horizontal: "center" };
-        sumHdr.getCell(8).alignment = { horizontal: "center" };
-
-        summaryData.forEach(([label, amount], idx) => {
-          const sr = sheet.addRow(["", "", "", "", "", "", label as string, fmtMoney(amount as number)]);
-          sr.height = 20;
-          const isGrandTotal = idx === summaryData.length - 1;
-          const bg = isGrandTotal ? DARK_BLUE : idx % 2 === 0 ? WHITE : LIGHT_GRAY;
-          const fg = isGrandTotal ? WHITE : "FF000000";
-          setFill(sr.getCell(7), bg);
-          setFill(sr.getCell(8), bg);
-          sr.getCell(7).font = { bold: isGrandTotal, size: 11, color: { argb: fg } };
-          sr.getCell(8).font = { bold: isGrandTotal, size: 11, color: { argb: fg } };
-          sr.getCell(7).alignment = { horizontal: "left" };
-          sr.getCell(8).alignment = { horizontal: "right" };
-          sr.getCell(7).border = {
-            top: { style: "thin", color: { argb: "FFDDDDDD" } },
-            bottom: { style: "thin", color: { argb: "FFDDDDDD" } },
-            left: { style: "thin", color: { argb: "FFDDDDDD" } },
-            right: { style: "thin", color: { argb: "FFDDDDDD" } },
-          };
-          sr.getCell(8).border = {
-            top: { style: "thin", color: { argb: "FFDDDDDD" } },
-            bottom: { style: "thin", color: { argb: "FFDDDDDD" } },
-            left: { style: "thin", color: { argb: "FFDDDDDD" } },
-            right: { style: "thin", color: { argb: "FFDDDDDD" } },
-          };
-        });
-      }
 
       const fileName = buildExportFilename([order.containerNumber, customer?.legalName, order.destination], "xlsx");
-      // Build buffer BEFORE setting headers — if ExcelJS throws, catch can still send a clean JSON 500.
-      const xlsBuffer = Buffer.from(await workbook.xlsx.writeBuffer());
-      if (xlsBuffer.length === 0) throw new Error("Generated workbook buffer is empty");
+      const xlsBuffer = await buildInvoiceWorkbookBuffer({
+        orderId: orderId!,
+        companyId,
+        invoiceNumber: order.invoiceNumber || "",
+        orderDate: order.orderDate ?? null,
+        containerNumber: order.containerNumber ?? null,
+        customerName: customer?.legalName ?? null,
+        baseCurrency: (company as any)?.baseCurrency || "USD",
+        lines: lines.map((g) => ({
+          articleCode: g.articleCode,
+          productName: g.productName,
+          qty: g.qty,
+          wtPerBale: g.wtPerBale,
+          totalWt: g.totalWt,
+          pricePerBale: g.pricePerBale,
+          total: g.total,
+          pricingMode: g.pricingMode,
+          pricePerKg: g.pricePerKg,
+        })),
+        charges: orderCharges.map((ch: any) => ({
+          name: ch.name ?? null,
+          amount: ch.amount ?? null,
+          chargeType: ch.chargeType || "",
+        })),
+        subtotalBales: order.subtotalBales ?? null,
+        freightAmount: order.freightAmount ?? null,
+        otherChargesTotal: order.otherChargesTotal ?? null,
+        grandTotal: order.grandTotal ?? null,
+        hideSelling: hideSellingXls1,
+        noCharges: false,
+      });
       res.status(200);
       res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
       res.setHeader("Content-Disposition", contentDisposition(fileName));
@@ -478,7 +606,7 @@ export function registerOrderExcelExportRoutes(app: Express) {
       res.setHeader("X-Content-Type-Options", "nosniff");
       res.end(xlsBuffer);
     } catch (error: any) {
-      console.error("Error exporting order to Excel:", error);
+      console.error(`[ExcelExport] /export/excel failed:`, error.message, error.stack);
       if (!res.headersSent) res.status(500).json({ message: error.message });
     }
   });
@@ -558,246 +686,39 @@ export function registerOrderExcelExportRoutes(app: Express) {
           pricePerKg: parseFloat(l.pricePerKg || "0"),
         }))
         .sort((a: any, b: any) => a.articleCode.localeCompare(b.articleCode));
-      const anyPerKgXls2 = lines.some((l: any) => l.pricingMode === "per_kg");
-
-      // Currency
-      const baseCurrency = (company as any)?.baseCurrency || "USD";
-      const currencySymbolMap: Record<string, string> = {
-        USD: "$",
-        GBP: "£",
-        EUR: "€",
-        CFA: "CFA",
-        XOF: "CFA",
-        XAF: "CFA",
-      };
-      const currSym = currencySymbolMap[baseCurrency.toUpperCase()] ?? baseCurrency;
-      const fmtMoney = (n: number) => `${currSym}${n % 1 === 0 ? n.toLocaleString() : n.toFixed(2)}`;
-      const fmtNum = (n: number) => (n % 1 === 0 ? n.toLocaleString() : n.toFixed(2));
-
-      const ExcelJS = (await import("exceljs")).default;
-      const workbook = new ExcelJS.Workbook();
-      const sheet = workbook.addWorksheet("Commercial Invoice");
-      const COL = 8;
-
-      sheet.columns = [
-        { key: "c1", width: 6 },
-        { key: "c2", width: 16 },
-        { key: "c3", width: 30 },
-        { key: "c4", width: 8 },
-        { key: "c5", width: 11 },
-        { key: "c6", width: 13 },
-        { key: "c7", width: 13 },
-        { key: "c8", width: 14 },
-      ];
-
-      const DARK_BLUE = "FF1F3864";
-      const LIGHT_GRAY = "FFF5F5F5";
-      const WHITE = "FFFFFFFF";
-
-      const merge = (r: number, c1: number, c2: number) => sheet.mergeCells(r, c1, r, c2);
-      const setFill = (cell: any, argb: string) => {
-        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb } };
-      };
-      const setBorder = (row: any) => {
-        row.eachCell((cell: any) => {
-          cell.border = {
-            top: { style: "thin", color: { argb: "FFDDDDDD" } },
-            bottom: { style: "thin", color: { argb: "FFDDDDDD" } },
-            left: { style: "thin", color: { argb: "FFDDDDDD" } },
-            right: { style: "thin", color: { argb: "FFDDDDDD" } },
-          };
-        });
-      };
-
-      // ── Logo row ──
-      const logoRow = sheet.addRow([]);
-      logoRow.height = 110;
-      try {
-        const logoPath = path.join(process.cwd(), "server", "hmd-logo.png");
-        if (fs.existsSync(logoPath)) {
-          const logoBuf = fs.readFileSync(logoPath);
-          const logoId = workbook.addImage({ buffer: logoBuf as Buffer, extension: "jpeg" });
-          sheet.addImage(logoId, { tl: { col: 0, row: 0 }, ext: { width: 180, height: 110 } });
-        }
-      } catch {}
-
-      // ── Company name ──
-      const r1 = sheet.addRow(["HMD INTERNATIONAL GROUP"]);
-      r1.height = 26;
-      r1.getCell(1).font = { bold: true, size: 16, color: { argb: DARK_BLUE } };
-      r1.getCell(1).alignment = { horizontal: "center", vertical: "middle" };
-      merge(r1.number, 1, COL);
-
-      // ── "Commercial Invoice" title ──
-      const r2 = sheet.addRow(["Commercial Invoice"]);
-      r2.height = 22;
-      r2.getCell(1).font = { bold: true, size: 14, color: { argb: DARK_BLUE } };
-      r2.getCell(1).alignment = { horizontal: "center", vertical: "middle" };
-      merge(r2.number, 1, COL);
-      sheet.addRow([]);
-
-      // ── Invoice details ──
-      const invoiceNum = order.invoiceNumber || `INV-${String(orderId).padStart(6, "0")}`;
-      const orderDateFmt = order.orderDate
-        ? new Date(order.orderDate).toLocaleDateString("en-US", { month: "2-digit", day: "2-digit", year: "2-digit" })
-        : "-";
-
-      const details = [
-        ["Invoice No.", invoiceNum],
-        ["Customer", `${order.customerName || "-"}`],
-        ["Date", orderDateFmt],
-        ["Container", (order as any).containerNumber || "-"],
-      ];
-      for (const [label, value] of details) {
-        const dr = sheet.addRow(["", "", "", "", "", label, "", value]);
-        dr.height = 20;
-        dr.getCell(6).font = { bold: true, size: 11 };
-        dr.getCell(6).alignment = { horizontal: "right" };
-        dr.getCell(8).font = { size: 11 };
-        dr.getCell(8).alignment = { horizontal: "left" };
-        merge(dr.number, 6, 7);
-      }
-      sheet.addRow([]);
-
-      // ── Table header ──
-      const unitPriceLabelXls2 = anyPerKgXls2 ? "Price/KG" : "Price/Bale";
-      const hdrRow = sheet.addRow([
-        "#",
-        "Article Code",
-        "Product",
-        "Qty",
-        "Wt/Bale",
-        "Total Wt",
-        ...(hideSellingXls2 ? [] : [unitPriceLabelXls2, "Total"]),
-      ]);
-      hdrRow.height = 24;
-      hdrRow.eachCell((cell: any) => {
-        cell.font = { bold: true, color: { argb: WHITE }, size: 11 };
-        setFill(cell, DARK_BLUE);
-        cell.alignment = { horizontal: "center", vertical: "middle" };
-        cell.border = {
-          top: { style: "thin", color: { argb: WHITE } },
-          bottom: { style: "thin", color: { argb: WHITE } },
-          left: { style: "thin", color: { argb: WHITE } },
-          right: { style: "thin", color: { argb: WHITE } },
-        };
-      });
-
-      // ── Data rows ──
-      let totalQty = 0,
-        totalWtAll = 0,
-        totalAll = 0;
-      lines.forEach((g: any, idx: number) => {
-        totalQty += g.qty;
-        totalWtAll += g.totalWt;
-        totalAll += g.total;
-        const unitPriceXls2 =
-          g.pricingMode === "per_kg" ? (g.totalWt > 0 ? g.total / g.totalWt : g.pricePerKg) : g.pricePerBale;
-        const rowCells2: any[] = [idx + 1, g.articleCode, g.productName, g.qty, fmtNum(g.wtPerBale), fmtNum(g.totalWt)];
-        if (!hideSellingXls2) {
-          rowCells2.push(fmtMoney(unitPriceXls2));
-          rowCells2.push(fmtMoney(g.total));
-        }
-        const dr = sheet.addRow(rowCells2);
-        dr.height = 20;
-        dr.eachCell((cell: any) => {
-          cell.font = { size: 11 };
-        });
-        if (idx % 2 === 1) {
-          dr.eachCell((cell: any) => setFill(cell, LIGHT_GRAY));
-        }
-        dr.getCell(1).alignment = { horizontal: "center" };
-        dr.getCell(4).alignment = { horizontal: "right" };
-        dr.getCell(5).alignment = { horizontal: "right" };
-        dr.getCell(6).alignment = { horizontal: "right" };
-        if (!hideSellingXls2) {
-          dr.getCell(7).alignment = { horizontal: "right" };
-          dr.getCell(8).alignment = { horizontal: "right" };
-        }
-        setBorder(dr);
-      });
-
-      // ── Totals row ──
-      const totRowCells2: any[] = ["", "", "Totals", totalQty, "", fmtNum(totalWtAll)];
-      if (!hideSellingXls2) {
-        totRowCells2.push("");
-        totRowCells2.push(fmtMoney(totalAll));
-      }
-      const totRow = sheet.addRow(totRowCells2);
-      totRow.height = 22;
-      totRow.eachCell((cell: any) => {
-        cell.font = { bold: true, size: 11, color: { argb: WHITE } };
-        setFill(cell, DARK_BLUE);
-        cell.alignment = { horizontal: "right" };
-      });
-      totRow.getCell(3).alignment = { horizontal: "center" };
-
-      sheet.addRow([]);
-
-      // ── Financial summary block (omit when selling prices are hidden or noCharges) ──
-      if (!hideSellingXls2 && !noChargesXls) {
-        const subtotal = parseFloat(order.subtotalBales || "0");
-        const freight = parseFloat(order.freightAmount || "0");
-        const otherChargesTotal2 = parseFloat(order.otherChargesTotal || "0");
-        const grandTotal = parseFloat(order.grandTotal || "0");
-
-        const otherChargeLines2 = orderCharges2.filter((ch: any) => ch.chargeType !== "FREIGHT");
-        const chargeRows2: [string, number][] =
-          otherChargeLines2.length > 0
-            ? otherChargeLines2.map((ch: any) => [ch.name, parseFloat(ch.amount || "0")] as [string, number])
-            : otherChargesTotal2 > 0
-              ? [["Other Charges", otherChargesTotal2]]
-              : [];
-
-        const summaryData: [string, number][] = [
-          ["Subtotal (Bales)", subtotal],
-          ...(freight > 0 ? [["Freight", freight] as [string, number]] : []),
-          ...chargeRows2,
-          ["Grand Total", grandTotal],
-        ];
-
-        const sumHdr = sheet.addRow(["", "", "", "", "", "", "Name", "Amount"]);
-        sumHdr.height = 22;
-        sumHdr.getCell(7).font = { bold: true, color: { argb: WHITE }, size: 11 };
-        sumHdr.getCell(8).font = { bold: true, color: { argb: WHITE }, size: 11 };
-        setFill(sumHdr.getCell(7), DARK_BLUE);
-        setFill(sumHdr.getCell(8), DARK_BLUE);
-        sumHdr.getCell(7).alignment = { horizontal: "center" };
-        sumHdr.getCell(8).alignment = { horizontal: "center" };
-
-        summaryData.forEach(([label, amount], idx) => {
-          const sr = sheet.addRow(["", "", "", "", "", "", label, fmtMoney(amount)]);
-          sr.height = 20;
-          const isGrandTotal = idx === summaryData.length - 1;
-          const bg = isGrandTotal ? DARK_BLUE : idx % 2 === 0 ? WHITE : LIGHT_GRAY;
-          const fg = isGrandTotal ? WHITE : "FF000000";
-          setFill(sr.getCell(7), bg);
-          setFill(sr.getCell(8), bg);
-          sr.getCell(7).font = { bold: isGrandTotal, size: 11, color: { argb: fg } };
-          sr.getCell(8).font = { bold: isGrandTotal, size: 11, color: { argb: fg } };
-          sr.getCell(7).alignment = { horizontal: "left" };
-          sr.getCell(8).alignment = { horizontal: "right" };
-          sr.getCell(7).border = {
-            top: { style: "thin", color: { argb: "FFDDDDDD" } },
-            bottom: { style: "thin", color: { argb: "FFDDDDDD" } },
-            left: { style: "thin", color: { argb: "FFDDDDDD" } },
-            right: { style: "thin", color: { argb: "FFDDDDDD" } },
-          };
-          sr.getCell(8).border = {
-            top: { style: "thin", color: { argb: "FFDDDDDD" } },
-            bottom: { style: "thin", color: { argb: "FFDDDDDD" } },
-            left: { style: "thin", color: { argb: "FFDDDDDD" } },
-            right: { style: "thin", color: { argb: "FFDDDDDD" } },
-          };
-        });
-      } // end if (!hideSellingXls2)
 
       const fileName = buildExportFilename([order.containerNumber, order.customerName, order.destination], "xlsx");
-      // Build the buffer BEFORE setting any headers so that if ExcelJS fails the
-      // catch block can still send a clean 500 JSON response instead of leaving
-      // the browser with a stalled 0-byte download.
-      const xlsBuffer = Buffer.from(await workbook.xlsx.writeBuffer());
-      if (xlsBuffer.length === 0) throw new Error("Generated workbook buffer is empty");
+      const xlsBuffer = await buildInvoiceWorkbookBuffer({
+        orderId: orderId!,
+        companyId,
+        invoiceNumber: order.invoiceNumber || "",
+        orderDate: order.orderDate ?? null,
+        containerNumber: order.containerNumber ?? null,
+        customerName: order.customerName ?? null,
+        baseCurrency: (company as any)?.baseCurrency || "USD",
+        lines: lines.map((l: any) => ({
+          articleCode: l.articleCode,
+          productName: l.productName,
+          qty: l.qty,
+          wtPerBale: l.wtPerBale,
+          totalWt: l.totalWt,
+          pricePerBale: l.pricePerBale,
+          total: l.total,
+          pricingMode: l.pricingMode,
+          pricePerKg: l.pricePerKg,
+        })),
+        charges: orderCharges2.map((ch: any) => ({
+          name: ch.name ?? null,
+          amount: ch.amount ?? null,
+          chargeType: ch.chargeType || "",
+        })),
+        subtotalBales: order.subtotalBales ?? null,
+        freightAmount: order.freightAmount ?? null,
+        otherChargesTotal: order.otherChargesTotal ?? null,
+        grandTotal: order.grandTotal ?? null,
+        hideSelling: hideSellingXls2,
+        noCharges: noChargesXls,
+      });
       res.status(200);
       res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
       res.setHeader("Content-Disposition", contentDisposition(fileName));
@@ -807,7 +728,7 @@ export function registerOrderExcelExportRoutes(app: Express) {
       res.setHeader("X-Content-Type-Options", "nosniff");
       res.end(xlsBuffer);
     } catch (error: any) {
-      console.error("Error exporting order to Excel:", error);
+      console.error(`[ExcelExport] /export-excel failed:`, error.message, error.stack);
       if (!res.headersSent) {
         res.status(500).json({ message: error.message });
       }
