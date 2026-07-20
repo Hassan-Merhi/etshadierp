@@ -1579,6 +1579,21 @@ export function registerFactoryBalesRoutes(app: Express) {
           updated++;
         }
 
+        try {
+          await logAudit({
+            userId: req.session.userId!,
+            username: (req.session as any).username || req.session.userId!,
+            companyId,
+            action: "update",
+            tableName: "factory_bales",
+            recordId: null,
+            recordIdentifier: `bulk-rename: ${updated} bale(s) updated, ${skipped} skipped`,
+            changes: null,
+          });
+        } catch (auditErr) {
+          console.error("[bulk-update-names audit] non-fatal:", auditErr);
+        }
+
         res.json({ updated, skipped, errors });
       } catch (error: any) {
         console.error("Error bulk-updating bale names:", error);
@@ -1819,6 +1834,13 @@ export function registerFactoryBalesRoutes(app: Express) {
         }
       }
 
+      // Read old status before updating so the audit has a real before/after diff.
+      const [baleBeforeStatusChange] = await db
+        .select({ status: factoryBales.status, referenceNumber: factoryBales.referenceNumber })
+        .from(factoryBales)
+        .where(and(eq(factoryBales.id, id), eq(factoryBales.companyId, companyId)));
+      if (!baleBeforeStatusChange) return res.status(404).json({ message: "Bale not found" });
+
       const now = new Date();
       const [updated] = await db
         .update(factoryBales)
@@ -1834,8 +1856,8 @@ export function registerFactoryBalesRoutes(app: Express) {
         action: "update",
         tableName: "factory_bales",
         recordId: id,
-        recordIdentifier: `Bale #${id}`,
-        changes: { status: { old: null, new: status } },
+        recordIdentifier: baleBeforeStatusChange.referenceNumber || `Bale #${id}`,
+        changes: { status: { old: baleBeforeStatusChange.status, new: status } },
       });
       res.json(updated);
     } catch (error: any) {

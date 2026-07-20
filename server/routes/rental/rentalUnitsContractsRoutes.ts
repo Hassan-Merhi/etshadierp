@@ -467,11 +467,38 @@ export function registerRentalUnitsContractsRoutes(
       const allowed = ["unitNumber", "size", "dimensions", "locationGroup", "notes", "sortOrder", "active"];
       const updates: any = {};
       for (const k of allowed) if (k in req.body) updates[k] = req.body[k];
+
+      const [existing] = await db
+        .select()
+        .from(propertyUnits)
+        .where(and(eq(propertyUnits.id, id), eq(propertyUnits.companyId, companyId), eq(propertyUnits.module, module)));
+      if (!existing) return res.status(404).json({ message: "Unit not found" });
+
       const [updated] = await db
         .update(propertyUnits)
         .set(updates)
         .where(and(eq(propertyUnits.id, id), eq(propertyUnits.companyId, companyId), eq(propertyUnits.module, module)))
         .returning();
+
+      try {
+        const changes: Record<string, { old: any; new: any }> = {};
+        for (const k of Object.keys(updates)) {
+          changes[k] = { old: (existing as any)[k] ?? null, new: updates[k] };
+        }
+        await logAudit({
+          userId: req.session.userId!,
+          username: (req.session as any).username || "unknown",
+          companyId,
+          action: "update",
+          tableName: "property_units",
+          recordId: id,
+          recordIdentifier: existing.unitNumber || String(id),
+          changes,
+        });
+      } catch (auditErr) {
+        console.error("[unit update audit] non-fatal:", auditErr);
+      }
+
       res.json(updated);
     } catch (e: any) {
       res.status(500).json({ message: e.message });
@@ -498,10 +525,32 @@ export function registerRentalUnitsContractsRoutes(
         );
       if (active)
         return res.status(400).json({ message: "Cannot delete: unit has active contract. End contract first." });
+
+      const [unitToDelete] = await db
+        .select({ unitNumber: propertyUnits.unitNumber })
+        .from(propertyUnits)
+        .where(and(eq(propertyUnits.id, id), eq(propertyUnits.companyId, companyId), eq(propertyUnits.module, module)));
+
       await db
         .update(propertyUnits)
         .set({ active: false })
         .where(and(eq(propertyUnits.id, id), eq(propertyUnits.companyId, companyId), eq(propertyUnits.module, module)));
+
+      try {
+        await logAudit({
+          userId: req.session.userId!,
+          username: (req.session as any).username || "unknown",
+          companyId,
+          action: "delete",
+          tableName: "property_units",
+          recordId: id,
+          recordIdentifier: unitToDelete?.unitNumber || String(id),
+          changes: { active: { old: true, new: false } },
+        });
+      } catch (auditErr) {
+        console.error("[unit delete audit] non-fatal:", auditErr);
+      }
+
       res.json({ ok: true });
     } catch (e: any) {
       res.status(500).json({ message: e.message });
@@ -613,6 +662,25 @@ export function registerRentalUnitsContractsRoutes(
         WHERE contract_id = ${id} AND paid_amount = 0
           AND ((year > ${y}) OR (year = ${y} AND month >= ${m}))
       `);
+
+      try {
+        await logAudit({
+          userId: req.session.userId!,
+          username: (req.session as any).username || "unknown",
+          companyId,
+          action: "update",
+          tableName: "property_contracts",
+          recordId: id,
+          recordIdentifier: `Contract#${id} Unit#${contract.unitId}`,
+          changes: {
+            rentalAmount: { old: contract.rentalAmount ?? null, new: newAmount },
+            rentEffectiveFrom: { old: null, new: effectiveFrom },
+          },
+        });
+      } catch (auditErr) {
+        console.error("[contract rent-update audit] non-fatal:", auditErr);
+      }
+
       res.json({ ok: true });
     } catch (e: any) {
       if (e instanceof z.ZodError)
@@ -691,6 +759,25 @@ export function registerRentalUnitsContractsRoutes(
           AND expected_amount::numeric = 0
           AND paid_amount::numeric > 0
       `);
+
+      try {
+        await logAudit({
+          userId: req.session.userId!,
+          username: (req.session as any).username || "unknown",
+          companyId,
+          action: "update",
+          tableName: "property_contracts",
+          recordId: id,
+          recordIdentifier: `Contract#${id} Unit#${contract.unitId}`,
+          changes: {
+            ...(tenantName !== contract.tenantName ? { tenantName: { old: contract.tenantName ?? null, new: tenantName } } : {}),
+            ...(startDate !== (contract.startDate as any) ? { startDate: { old: (contract.startDate as any) ?? null, new: startDate } } : {}),
+            ...(guaranteeAmount !== undefined ? { guaranteeAmount: { old: contract.guaranteeAmount ?? null, new: guaranteeAmount } } : {}),
+          },
+        });
+      } catch (auditErr) {
+        console.error("[contract info-update audit] non-fatal:", auditErr);
+      }
 
       res.json({ ok: true });
     } catch (e: any) {

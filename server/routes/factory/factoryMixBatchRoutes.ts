@@ -265,8 +265,33 @@ export function registerFactoryMixBatchRoutes(app: Express) {
           .set(updates)
           .where(eq(factoryMixBatches.id, id))
           .returning();
+        try {
+          await logAudit({
+            userId: req.session.userId!,
+            username: (req.session as any).username || req.session.userId!,
+            companyId,
+            action: "update",
+            tableName: "factory_mix_batches",
+            recordId: id,
+            recordIdentifier: batch.batchCode + (updated.name ? ` – ${updated.name}` : ""),
+            changes: {
+              ...(name !== undefined ? { name: { old: batch.name ?? null, new: updated.name ?? null } } : {}),
+              ...(notes !== undefined ? { notes: { old: batch.notes ?? null, new: updated.notes ?? null } } : {}),
+              ...(batchDate !== undefined ? { batchDate: { old: batch.batchDate ?? null, new: updated.batchDate ?? null } } : {}),
+            },
+          });
+        } catch (auditErr) {
+          console.error("[mix-batch simple-patch audit] non-fatal:", auditErr);
+        }
         return res.json(updated);
       }
+
+      // Capture old values before the transaction so the audit log has real before/after diffs.
+      const [batchBefore] = await db
+        .select()
+        .from(factoryMixBatches)
+        .where(and(eq(factoryMixBatches.id, id), eq(factoryMixBatches.companyId, companyId)));
+      if (!batchBefore) return res.status(404).json({ message: "Mix batch not found" });
 
       // Full source edit: reverse old consumption, apply new
       const result = await db.transaction(async (tx: any) => {
@@ -510,9 +535,9 @@ export function registerFactoryMixBatchRoutes(app: Express) {
         recordId: result.id,
         recordIdentifier: result.batchCode + (result.name ? ` – ${result.name}` : ""),
         changes: {
-          ...(name !== undefined ? { name: { old: null, new: name?.trim() || null } } : {}),
-          ...(notes !== undefined ? { notes: { old: null, new: notes?.trim() || null } } : {}),
-          totalWeightKg: { old: null, new: parseFloat(result.totalWeightKg || "0").toFixed(3) },
+          ...(name !== undefined ? { name: { old: batchBefore.name ?? null, new: name?.trim() || null } } : {}),
+          ...(notes !== undefined ? { notes: { old: batchBefore.notes ?? null, new: notes?.trim() || null } } : {}),
+          totalWeightKg: { old: parseFloat(batchBefore.totalWeightKg || "0").toFixed(3), new: parseFloat(result.totalWeightKg || "0").toFixed(3) },
         },
       });
       res.json(result);
@@ -978,6 +1003,12 @@ export function registerFactoryMixBatchRoutes(app: Express) {
       const hasAnySources = supplierSources.length > 0 || sources.length > 0 || batchSources.length > 0;
       if (!hasAnySources) return res.status(400).json({ message: "At least one source is required" });
 
+      // Capture old values before the transaction for the audit log.
+      const [batchBeforeTopup] = await db
+        .select({ batchCode: factoryMixBatches.batchCode, name: factoryMixBatches.name, totalWeightKg: factoryMixBatches.totalWeightKg, totalCost: factoryMixBatches.totalCost })
+        .from(factoryMixBatches)
+        .where(and(eq(factoryMixBatches.id, id), eq(factoryMixBatches.companyId, companyId)));
+
       const result = await db.transaction(async (tx: any) => {
         const [batch] = await tx
           .select()
@@ -1197,6 +1228,24 @@ export function registerFactoryMixBatchRoutes(app: Express) {
         amountCurrency: parseFloat(result.totalCost || "0"),
         amountUsd: parseFloat(result.totalCost || "0"),
       });
+
+      try {
+        await logAudit({
+          userId: req.session.userId!,
+          username: (req.session as any).username || req.session.userId!,
+          companyId,
+          action: "update",
+          tableName: "factory_mix_batches",
+          recordId: result.id,
+          recordIdentifier: result.batchCode + (result.name ? ` – ${result.name}` : ""),
+          changes: {
+            totalWeightKg: { old: parseFloat(batchBeforeTopup?.totalWeightKg || "0").toFixed(3), new: parseFloat(result.totalWeightKg || "0").toFixed(3) },
+            totalCost: { old: parseFloat(batchBeforeTopup?.totalCost || "0").toFixed(2), new: parseFloat(result.totalCost || "0").toFixed(2) },
+          },
+        });
+      } catch (auditErr) {
+        console.error("[mix-batch top-up audit] non-fatal:", auditErr);
+      }
 
       res.json(result);
     } catch (error: any) {

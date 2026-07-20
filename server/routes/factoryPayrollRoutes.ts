@@ -1,3 +1,4 @@
+import { logAudit } from "./helpers/auditHelpers";
 import { parseId, parseOptionalId } from "../lib/parseId";
 import { getClientDate } from "../lib/dateUtils";
 import type { Express } from "express";
@@ -347,6 +348,21 @@ export function registerFactoryPayrollRoutes(app: Express, requireAuth: any, db:
         payrollRecords.push(record);
       }
 
+      try {
+        await logAudit({
+          userId: req.session.userId!,
+          username: (req.session as any).username || req.session.userId!,
+          companyId: parseInt(companyId),
+          action: "create",
+          tableName: "factory_payrolls",
+          recordId: null,
+          recordIdentifier: `Payroll generated — ${payrollRecords.length} worker(s), ${startDate} to ${endDate}`,
+          changes: null,
+        });
+      } catch (auditErr) {
+        console.error("[payroll generate audit] non-fatal:", auditErr);
+      }
+
       res.json(payrollRecords);
     } catch (error: any) {
       console.error("Error generating payroll:", error);
@@ -535,6 +551,26 @@ export function registerFactoryPayrollRoutes(app: Express, requireAuth: any, db:
             amountUsd: netSalary,
           });
         }
+      }
+
+      try {
+        await logAudit({
+          userId: req.session.userId!,
+          username: (req.session as any).username || req.session.userId!,
+          companyId: existing.companyId,
+          action: "update",
+          tableName: "factory_payrolls",
+          recordId: id,
+          recordIdentifier: `Payroll #${id} (Worker #${existing.workerId})`,
+          changes: {
+            ...(bonuses !== undefined ? { bonuses: { old: existing.bonuses ?? null, new: String(updatedBonuses.toFixed(2)) } } : {}),
+            ...(deductions !== undefined ? { deductions: { old: existing.deductions ?? null, new: String(updatedDeductions.toFixed(2)) } } : {}),
+            ...(status !== undefined && status !== existing.status ? { status: { old: existing.status, new: status } } : {}),
+            ...(notes !== undefined ? { notes: { old: existing.notes ?? null, new: notes } } : {}),
+          },
+        });
+      } catch (auditErr) {
+        console.error("[payroll update audit] non-fatal:", auditErr);
       }
 
       res.json(updated);
@@ -735,6 +771,21 @@ export function registerFactoryPayrollRoutes(app: Express, requireAuth: any, db:
         createdBy: (req.session as any).userId ? parseInt((req.session as any).userId) : undefined,
       });
 
+      try {
+        await logAudit({
+          userId: req.session.userId!,
+          username: (req.session as any).username || req.session.userId!,
+          companyId,
+          action: "delete",
+          tableName: "factory_payrolls",
+          recordId: id,
+          recordIdentifier: `Payroll #${id} (Worker #${existing.workerId}, period ${existing.periodStart}–${existing.periodEnd})`,
+          changes: { status: { old: existing.status, new: "DELETED" } },
+        });
+      } catch (auditErr) {
+        console.error("[payroll delete audit] non-fatal:", auditErr);
+      }
+
       res.json({ message: "Payroll record deleted" });
     } catch (error: any) {
       console.error("Error deleting payroll:", error);
@@ -774,6 +825,20 @@ export function registerFactoryPayrollRoutes(app: Express, requireAuth: any, db:
 
       res.setHeader("Content-Type", "application/pdf");
       res.setHeader("Content-Disposition", `attachment; filename=payroll_${startDate}_${endDate}.pdf`);
+      try {
+        await logAudit({
+          userId: req.session.userId!,
+          username: (req.session as any).username || req.session.userId!,
+          companyId: parseInt(companyId),
+          action: "export",
+          tableName: "factory_payrolls",
+          recordId: null,
+          recordIdentifier: `PDF export — period ${startDate} to ${endDate}`,
+          changes: null,
+        });
+      } catch (auditErr) {
+        console.error("[payroll export-pdf audit] non-fatal:", auditErr);
+      }
       doc.pipe(res);
 
       const hmdLogoPath = path.join(process.cwd(), "server", "hmd-logo.png");
@@ -1108,6 +1173,20 @@ export function registerFactoryPayrollRoutes(app: Express, requireAuth: any, db:
       });
 
       const xlsBuffer = Buffer.from(await workbook.xlsx.writeBuffer());
+      try {
+        await logAudit({
+          userId: req.session.userId!,
+          username: (req.session as any).username || req.session.userId!,
+          companyId: parseInt(companyId),
+          action: "export",
+          tableName: "factory_payrolls",
+          recordId: null,
+          recordIdentifier: `Excel export — period ${startDate} to ${endDate}`,
+          changes: null,
+        });
+      } catch (auditErr) {
+        console.error("[payroll export-excel audit] non-fatal:", auditErr);
+      }
       res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
       res.setHeader("Content-Disposition", `attachment; filename=payroll_${startDate}_${endDate}.xlsx`);
       res.setHeader("Content-Length", xlsBuffer.byteLength);
