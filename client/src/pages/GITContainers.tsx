@@ -208,28 +208,11 @@ export default function GITContainers({ embedded = false }: { embedded?: boolean
   }
 
   async function sendToWhatsApp() {
-    if (!printRef.current) return;
     setWaSending(true);
     try {
-      const html2canvas = (await import("html2canvas")).default;
-      const el = printRef.current;
-      const canvas = await html2canvas(el, {
-        scale: 2,
-        useCORS: true,
-        allowTaint: true,
-        backgroundColor: "#0f172a",
-        logging: false,
-        width: el.scrollWidth,
-        height: el.scrollHeight,
-        windowWidth: el.scrollWidth,
-        windowHeight: el.scrollHeight,
-      });
-      const imageBase64 = canvas.toDataURL("image/png");
-      const today = new Date().toISOString().substring(0, 10);
-      await apiRequest("POST", "/api/git/send-containers-whatsapp", {
-        imageBase64,
-        fileName: `ContainersOTW_${today}.png`,
-      });
+      // Send no image payload — the server generates the PDF report itself,
+      // avoiding the 2 MB Express JSON body limit that a base64 screenshot would exceed.
+      await apiRequest("POST", "/api/git/send-containers-whatsapp", {});
       toast({ title: "Sent", description: "Container report sent to WhatsApp group." });
     } catch (err: any) {
       toast({ title: "Failed to send", description: err.message, variant: "destructive" });
