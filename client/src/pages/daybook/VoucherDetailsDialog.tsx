@@ -397,6 +397,16 @@ export function VoucherDetailsDialog({
                             </TableRow>
                           </TableHeader>
                           <TableBody>
+                            {filteredItems.length === 0 && (
+                              <TableRow>
+                                <TableCell
+                                  colSpan={9}
+                                  className="text-center text-muted-foreground py-8 text-sm"
+                                >
+                                  No items found for this voucher
+                                </TableCell>
+                              </TableRow>
+                            )}
                             {filteredItems.map((entry, idx) => {
                               const isSelected = selectedDialogRow === idx;
                               const profit = parseFloat(entry.profit || "0");
@@ -560,6 +570,18 @@ export function VoucherDetailsDialog({
                             selectedVoucher.voucherType === "StockTransfer" ||
                             selectedVoucher.voucherType === "Transfer"
                           ) {
+                            if (viewVoucherEntries.length === 0) {
+                              return (
+                                <TableRow key="empty-state">
+                                  <TableCell
+                                    colSpan={5}
+                                    className="text-center text-muted-foreground py-8 text-sm"
+                                  >
+                                    No items found for this voucher
+                                  </TableCell>
+                                </TableRow>
+                              );
+                            }
                             return viewVoucherEntries.map((entry) => {
                               const qty = parseFloat(entry.quantity || "0");
                               const rate = entry.rate != null ? parseFloat(entry.rate) : 0;

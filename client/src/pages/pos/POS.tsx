@@ -104,6 +104,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
     posCustomers,
     editVoucher,
     editVoucherLoading,
+    editVoucherViewEntries,
     stockInventory,
     stockInventoryLoading,
   } = usePosQueries({
@@ -180,9 +181,27 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
 
   // Populate form when editing an existing voucher (ISSUE 10)
   useEffect(() => {
-    if (!editVoucher || !Array.isArray(editVoucher.salesItems) || editVoucher.salesItems.length === 0) return;
+    // Primary source: salesItems attached to the voucher object.
+    // Fallback: view-entries endpoint (populated when salesItems is missing from the voucher).
+    const resolvedItems: any[] = Array.isArray(editVoucher?.salesItems) && editVoucher.salesItems.length > 0
+      ? editVoucher.salesItems
+      : (editVoucherViewEntries ?? [])
+          .filter((e: any) => e.isStockItem || e.stockItemId)
+          .map((e: any) => ({
+            id: e.id,
+            stockItemId: e.stockItemId,
+            stockItemName: e.stockItemName || e.accountName || "",
+            stockItemCode: e.stockItemCode || e.accountCode || "",
+            quantity: e.quantity,
+            sellingPrice: e.rate ?? e.sellingPrice ?? "0",
+            totalSales: e.totalAmount ?? e.totalSales ?? e.creditAmount ?? "0",
+            costPrice: e.costPrice,
+            configuredPrice: e.configuredPrice,
+          }));
 
-    const newRows = editVoucher.salesItems.map((item: any, index: number) => ({
+    if (!editVoucher || resolvedItems.length === 0) return;
+
+    const newRows = resolvedItems.map((item: any, index: number) => ({
       id: String(index + 1),
       itemName: item.stockItemName || "",
       stockItemCode: item.stockItemCode || "",
@@ -235,7 +254,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
         }
       }
     }
-  }, [editVoucher, allLedgerAccounts]);
+  }, [editVoucher, editVoucherViewEntries, allLedgerAccounts]);
 
   // ── WhatsApp / mutations / autosave ───────────────────────────────────────
   const { handleSendInvoiceWhatsApp, handleSendWhatsAppReport } = usePosWhatsApp({

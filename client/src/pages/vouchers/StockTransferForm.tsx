@@ -454,6 +454,20 @@ export function StockTransferForm({ voucherIdToEdit, isPOS, posUser }: StockTran
               rate: e.rate,
             })),
           });
+        } else {
+          // Orphaned voucher: stockTransferVouchers record is missing — create it now so the
+          // transfer is fully linked and the user can view/edit it going forward.
+          await modeApiRequest("POST", "/api/stock-transfers", {
+            voucherId: voucherIdToEdit,
+            destinationLocationId: data.destinationLocationId,
+            notes: data.notes || "",
+            items: validEntries.map((e) => ({
+              stockItemId: e.stockItemId,
+              sourceLocationId: e.sourceLocationId,
+              quantity: e.quantity,
+              rate: e.rate,
+            })),
+          });
         }
         return { id: voucherIdToEdit };
       } else {
