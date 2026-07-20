@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import AccountsLegacy from "./AccountsLegacy";
+import { CashBankRevaluationPanel } from "./accounts/CashBankRevaluationPanel";
 
 const PATCH_KEY = "__program6bAccountsParentGroupFetchPatch";
 
@@ -61,5 +62,10 @@ export default function Accounts() {
     cleanupRef.current = null;
   }, []);
 
-  return <AccountsLegacy />;
+  return (
+    <div className="space-y-4">
+      <CashBankRevaluationPanel />
+      <AccountsLegacy />
+    </div>
+  );
 }
