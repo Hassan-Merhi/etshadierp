@@ -10,6 +10,9 @@ import { db } from "../../../db";
 import { requireAuth } from "../../../auth";
 import { classifyNetPositionAccounts } from "../../../netPositionHelper";
 import { adjustInventory } from "../../../inventoryHelper";
+import ExcelJS from "exceljs";
+import os from "os";
+import crypto from "crypto";
 import {
   writeDaybookEntry,
   getOrFetchFxRateToUsd,
@@ -178,14 +181,6 @@ async function buildInvoiceWorkbookBuffer(params: InvoiceWorkbookParams): Promis
 
   console.log(`[ExcelExport] orderId=${orderId} companyId=${companyId} stage=started`);
 
-  // Production-safe ExcelJS import — handles both default and named export shapes.
-  const excelModule = await import("exceljs");
-  const ExcelJS = (excelModule as any).default ?? excelModule;
-  if (!ExcelJS?.Workbook) {
-    throw new Error("ExcelJS.Workbook not available after import");
-  }
-  console.log(`[ExcelExport] orderId=${orderId} stage=exceljs-imported`);
-
   const workbook = new ExcelJS.Workbook();
   const sheet = workbook.addWorksheet("Commercial Invoice");
   const COL = 8;
@@ -236,23 +231,9 @@ async function buildInvoiceWorkbookBuffer(params: InvoiceWorkbookParams): Promis
     return v % 1 === 0 ? v.toLocaleString() : v.toFixed(2);
   };
 
-  // ── Logo row (failure here must not abort the export) ──
+  // ── Spacer row (logo removed — image serialization caused empty buffers in production) ──
   const logoRow = sheet.addRow([]);
-  logoRow.height = 110;
-  try {
-    const logoPath = path.join(process.cwd(), "server", "hmd-logo.png");
-    if (fs.existsSync(logoPath)) {
-      const logoBuf = fs.readFileSync(logoPath);
-      // The file is JPEG content stored with a .png extension — declare the real content type.
-      const logoId = workbook.addImage({ buffer: logoBuf as Buffer, extension: "jpeg" });
-      sheet.addImage(logoId, { tl: { col: 0, row: 0 }, ext: { width: 180, height: 110 } });
-      console.log(`[ExcelExport] orderId=${orderId} stage=logo-added`);
-    } else {
-      console.log(`[ExcelExport] orderId=${orderId} stage=logo-skipped reason=file-not-found`);
-    }
-  } catch (logoErr: any) {
-    console.warn(`[ExcelExport] orderId=${orderId} stage=logo-skipped reason=${logoErr.message}`);
-  }
+  logoRow.height = 20;
 
   // ── Company name ──
   const r1 = sheet.addRow(["HMD INTERNATIONAL GROUP"]);
@@ -445,10 +426,24 @@ async function buildInvoiceWorkbookBuffer(params: InvoiceWorkbookParams): Promis
     }
   }
 
-  // ── Write buffer and verify ──
+  // ── Write buffer (with temp-file fallback if writeBuffer produces empty output) ──
   console.log(`[ExcelExport] orderId=${orderId} stage=writebuffer-started`);
-  const xlsBuffer = Buffer.from(await workbook.xlsx.writeBuffer());
+  const generated = await workbook.xlsx.writeBuffer();
+  let xlsBuffer = Buffer.isBuffer(generated) ? generated : Buffer.from(generated as ArrayBuffer);
   console.log(`[ExcelExport] orderId=${orderId} stage=writebuffer-complete bytes=${xlsBuffer.length}`);
+
+  if (xlsBuffer.length === 0) {
+    // Primary serialization produced an empty buffer. Retry via a temp file.
+    console.warn(`[ExcelExport] orderId=${orderId} stage=writebuffer-empty-retrying-file`);
+    const tempPath = path.join(os.tmpdir(), `invoice-${crypto.randomUUID()}.xlsx`);
+    try {
+      await workbook.xlsx.writeFile(tempPath);
+      xlsBuffer = await fs.promises.readFile(tempPath);
+      console.log(`[ExcelExport] orderId=${orderId} stage=writefile-complete bytes=${xlsBuffer.length}`);
+    } finally {
+      fs.promises.unlink(tempPath).catch(() => {});
+    }
+  }
 
   if (xlsBuffer.length === 0) {
     throw new Error("Generated workbook buffer is empty");
