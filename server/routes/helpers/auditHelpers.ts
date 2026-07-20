@@ -21,6 +21,25 @@ export type AuditAction =
   | "offload" | "transfer" | "adjust"
   | "login" | "permission_change" | "settings_change";
 
+function normalizeAuditAction(params: {
+  action: AuditAction;
+  tableName: string;
+  changes?: Record<string, { old?: any; new?: any }> | null;
+}): AuditAction {
+  if (params.action !== "update" || params.tableName !== "factory_customer_orders") {
+    return params.action;
+  }
+
+  const statusChange = params.changes?.status;
+  const oldStatus = String(statusChange?.old ?? "").toUpperCase();
+  const newStatus = String(statusChange?.new ?? "").toUpperCase();
+
+  if (newStatus === "CANCELLED") return "cancel";
+  if (oldStatus === "CANCELLED" && newStatus === "LOADING") return "restore";
+
+  return params.action;
+}
+
 export async function logAudit(
   params: {
     userId: string;
@@ -44,7 +63,7 @@ export async function logAudit(
       userId: params.userId,
       username: params.username,
       companyId: params.companyId,
-      action: params.action,
+      action: normalizeAuditAction(params),
       tableName: params.tableName,
       recordId: params.recordId,
       recordIdentifier: params.recordIdentifier,
