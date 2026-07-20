@@ -1,23 +1,9 @@
 import { Server } from "node:http";
 import { Client } from "pg";
+import { deploymentRuntimeConfig } from "./deploymentPreflight.mjs";
+import { runtimeReleaseState } from "./runtimeReleaseState.mjs";
 
-const isProduction = process.env.NODE_ENV === "production";
-const requiredProductionEnv = ["SESSION_SECRET"];
-const missingEnv = requiredProductionEnv.filter((name) => !process.env[name]);
-const hasDatabaseConfig = Boolean(process.env.DATABASE_URL || process.env.PGHOST);
-
-if (isProduction && missingEnv.length > 0) {
-  console.error(JSON.stringify({
-    timestamp: new Date().toISOString(),
-    level: "FATAL",
-    module: "runtime-health",
-    action: "startup-validation",
-    message: "Required production environment variables are missing",
-    missing: missingEnv,
-  }));
-  process.exit(1);
-}
-
+const hasDatabaseConfig = deploymentRuntimeConfig.databaseSource !== "missing-development-database";
 const startedAt = Date.now();
 let listening = false;
 let shuttingDown = false;
@@ -71,19 +57,24 @@ Server.prototype.emit = function healthAwareEmit(event, ...args) {
   try { pathname = new URL(req.url || "/", "http://localhost").pathname; } catch {}
 
   if (pathname === "/api/health/live") {
-    sendJson(res, 200, { status: "live", uptimeSeconds: Math.floor((Date.now() - startedAt) / 1000) });
+    sendJson(res, 200, {
+      status: "live",
+      uptimeSeconds: Math.floor((Date.now() - startedAt) / 1000),
+      release: runtimeReleaseState,
+    });
     return true;
   }
 
   if (pathname === "/api/health/ready") {
     void probeDatabase().then((database) => {
-      const ready = listening && !shuttingDown && missingEnv.length === 0 && database.ok;
+      const ready = listening && !shuttingDown && database.ok;
       sendJson(res, ready ? 200 : 503, {
         status: ready ? "ready" : "not_ready",
         listening,
         shuttingDown,
-        environmentValid: missingEnv.length === 0,
+        environmentValid: true,
         database,
+        release: runtimeReleaseState,
       });
     });
     return true;
