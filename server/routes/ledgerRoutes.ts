@@ -2,8 +2,18 @@ import type { Express } from "express";
 import { requireAuth } from "../auth";
 import { getLedgerParentGroupOptions } from "../services/ledgerAccountOptionsService";
 import { registerLedgerRoutes as registerLegacyLedgerRoutes } from "./ledgerRoutesLegacy";
+import {
+  normalizeAccountOpeningBalance,
+  registerAccountCurrencyRoutes,
+} from "./accountCurrencyRoutes";
 
 export function registerLedgerRoutes(app: Express) {
+  // This module registers before the legacy bank/account route modules. Install
+  // normalization and safe read handlers here so all existing callers use the
+  // corrected currency model without changing their URLs.
+  app.use(normalizeAccountOpeningBalance);
+  registerAccountCurrencyRoutes(app);
+
   app.get("/api/ledger-accounts/parent-groups", requireAuth, async (req, res) => {
     try {
       const requestedCompanyId =
