@@ -10,14 +10,19 @@ export interface OpeningBalanceCurrencyInput {
 }
 
 export interface NormalizedOpeningBalanceCurrency {
+  openingBalanceNativeAmount: string;
   openingBalanceCurrency: string | null;
   openingBalanceHistoricalRate: string | null;
-  openingBalanceBaseAmount: string | null;
+  openingBalanceBaseAmount: string;
 }
 
 /**
  * Normalizes an unsigned opening-balance magnitude. Debit/credit direction is
  * stored separately in openingBalanceSide and must not be applied here.
+ *
+ * openingBalanceNativeAmount preserves what the user entered. Legacy
+ * openingBalance columns should store openingBalanceBaseAmount so older reports
+ * continue reading historical company-base values.
  */
 export function normalizeOpeningBalanceCurrency(
   input: OpeningBalanceCurrencyInput,
@@ -31,6 +36,7 @@ export function normalizeOpeningBalanceCurrency(
 
   if (amount.isZero()) {
     return {
+      openingBalanceNativeAmount: "0.000000",
       openingBalanceCurrency: null,
       openingBalanceHistoricalRate: null,
       openingBalanceBaseAmount: "0.000000",
@@ -61,7 +67,11 @@ export function normalizeOpeningBalanceCurrency(
     );
   }
 
-  if (input.openingBalanceBaseAmount !== null && input.openingBalanceBaseAmount !== undefined && input.openingBalanceBaseAmount !== "") {
+  if (
+    input.openingBalanceBaseAmount !== null &&
+    input.openingBalanceBaseAmount !== undefined &&
+    input.openingBalanceBaseAmount !== ""
+  ) {
     const suppliedBase = new Decimal(input.openingBalanceBaseAmount);
     if (!suppliedBase.isFinite() || suppliedBase.lt(0)) {
       throw new Error("Opening-balance base amount must be a finite non-negative amount.");
@@ -75,6 +85,7 @@ export function normalizeOpeningBalanceCurrency(
   }
 
   return {
+    openingBalanceNativeAmount: amount.toDecimalPlaces(6).toFixed(6),
     openingBalanceCurrency: currency,
     openingBalanceHistoricalRate: historicalRate.toDecimalPlaces(10).toFixed(10),
     openingBalanceBaseAmount: computedBase.toDecimalPlaces(6).toFixed(6),
