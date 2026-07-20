@@ -38,9 +38,42 @@ Improve database observability, pool safety, and query-execution guardrails with
 - Preserved promise resolution, rejection, return values, query arguments, transaction behavior, statement timeout behavior, and Drizzle's shared pool integration.
 - Preserved sustained pool-pressure detection and idle-client error reporting.
 
+## Phase 15C — Database Telemetry Boundaries
+
+### Completed
+
+- Added `server/lib/databaseTelemetry.ts` as the single owner of pool snapshots and slow-query logging.
+- Added a typed pool snapshot containing total, idle, active, waiting, and utilization ratio values.
+- Added utilization percentage to pool diagnostics while preserving existing warning conditions.
+- Kept SQL text, parameters, credentials, and business payloads outside telemetry.
+- Reduced `server/db.ts` to configuration, pool construction, event wiring, and request-performance integration.
+- Preserved the exported `logPoolStats()` compatibility boundary for existing callers.
+
+## Phase 15D — Optimization Completion and Governance
+
+### Completed
+
+- Defined ownership boundaries: runtime settings belong to `databaseConfig.ts`; telemetry belongs to `databaseTelemetry.ts`; pool lifecycle belongs to `db.ts`; SQL semantics remain in repositories/routes/services.
+- Confirmed that Program 6D already completed the evidence-backed query review, classification, reconciliation, and grouped-SQL optimization work.
+- Explicitly prohibited speculative indexes and SQL rewrites without current plan evidence.
+- Documented the evidence required before any future index, pagination, batching, or aggregate rewrite is accepted.
+- Closed Program 15 with no schema, data, accounting, inventory, costing, authorization, or company-isolation changes.
+
+## Deferred evidence-dependent work
+
+The following items are deliberately kept aside because they require a live production-like database and cannot be safely inferred from static code:
+
+- new or modified indexes;
+- `EXPLAIN (ANALYZE, BUFFERS)` comparisons;
+- production cardinality and cache-hit measurements;
+- accounting or inventory reconciliation after SQL rewrites;
+- workload-specific pool sizing beyond the bounded configuration defaults.
+
+These deferrals do not block Program 15 because the code now provides safe configuration and telemetry needed to collect that evidence later.
+
 ## Index and SQL Rewrite Decision
 
-No index or SQL rewrite was added in 15A/15B. Program 6D already established that indexes must be supported by production-like `EXPLAIN (ANALYZE, BUFFERS)` evidence and reconciliation. Adding speculative indexes without current plan evidence would increase write and storage cost and is explicitly outside these phases.
+No index or SQL rewrite was added. Program 6D established that indexes must be supported by production-like `EXPLAIN (ANALYZE, BUFFERS)` evidence and reconciliation. Adding speculative indexes without current plan evidence would increase write and storage cost.
 
 Any future index candidate must record:
 
@@ -62,7 +95,9 @@ Any future index candidate must record:
 
 ## Status
 
-- Active branch: `quality/program-15-database-optimization`
+- Branch: `quality/program-15-database-optimization`
 - Phase 15A: complete.
 - Phase 15B: complete.
-- Program 15 remains unmerged until its later phases are completed.
+- Phase 15C: complete.
+- Phase 15D: complete with evidence-dependent work explicitly deferred.
+- Program 15: complete and ready to merge.
