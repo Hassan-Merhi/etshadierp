@@ -47,7 +47,7 @@ export function TabTruckLocation() {
       const html2canvas = (await import("html2canvas")).default;
       const el = printRef.current;
       const canvas = await html2canvas(el, {
-        scale: 1.25,
+        scale: 1.0,
         useCORS: true,
         allowTaint: true,
         backgroundColor: "#f8fafc",
@@ -58,23 +58,26 @@ export function TabTruckLocation() {
         windowHeight: el.scrollHeight,
       });
 
-      // Approximate decoded byte size from base64 string length
+      // Approximate decoded byte size from base64 string length.
+      // Route-level body parser on the server allows 10 MB for this endpoint,
+      // so we target ≤ 8 MB and try progressively lower quality until it fits.
       const approxBytes = (b64: string) => Math.ceil((b64.length - (b64.indexOf(",") + 1)) * 0.75);
-      const SIZE_LIMIT = 1.8 * 1024 * 1024; // 1.8 MB
+      const SIZE_LIMIT = 8 * 1024 * 1024; // 8 MB
 
-      let imageBase64 = canvas.toDataURL("image/jpeg", 0.82);
-      if (approxBytes(imageBase64) > SIZE_LIMIT) {
-        // Retry with lower quality — reuse the same canvas
-        imageBase64 = canvas.toDataURL("image/jpeg", 0.65);
-        if (approxBytes(imageBase64) > SIZE_LIMIT) {
-          toast({
-            title: "Failed to send",
-            description:
-              "The tracking report is still too large to send. Reduce the number of displayed containers or use All Companies separately.",
-            variant: "destructive",
-          });
-          return;
-        }
+      const qualities = [0.82, 0.65, 0.5, 0.35];
+      let imageBase64 = "";
+      for (const q of qualities) {
+        imageBase64 = canvas.toDataURL("image/jpeg", q);
+        if (approxBytes(imageBase64) <= SIZE_LIMIT) break;
+      }
+
+      if (!imageBase64 || approxBytes(imageBase64) > SIZE_LIMIT) {
+        toast({
+          title: "Failed to send",
+          description: "The tracking report is too large to send even at minimum quality.",
+          variant: "destructive",
+        });
+        return;
       }
 
       const today = new Date().toISOString().substring(0, 10);
@@ -84,7 +87,6 @@ export function TabTruckLocation() {
           fileName: `TruckLocation_${today}.jpg`,
         });
       } catch (apiErr: any) {
-        // Surface a clear message for HTTP 413
         const msg =
           apiErr?.status === 413 || String(apiErr?.message).includes("too large")
             ? "Tracking report is too large to send to WhatsApp."
