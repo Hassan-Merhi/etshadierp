@@ -5496,9 +5496,42 @@ END $mig$`;
         console.error("[BaleOrphanFix] Error:", e.message);
       }
 
+      // ── Back-fill insurance_members from existing "Insurance - …" accounts ───
+      // When ledger accounts named "Insurance - <name>" exist under a factory
+      // company but have no corresponding insurance_members row (e.g. after a
+      // DB restore or a bulk import), create the member rows so the Insurance
+      // page shows them.  Idempotent: skipped if a member already points to
+      // the account.  Must run BEFORE the orphan-cleanup below.
+      try {
+        const memberBackfill = await migrationClient.query(`
+          INSERT INTO insurance_members (company_id, name, active, ledger_account_id)
+          SELECT la.company_id,
+                 SUBSTRING(la.name FROM 13),
+                 true,
+                 la.id
+          FROM ledger_accounts la
+          JOIN companies c ON c.id = la.company_id
+          WHERE la.name LIKE 'Insurance - %'
+            AND la.deleted_at IS NULL
+            AND c.company_type IN ('factory', 'factory_v2')
+            AND NOT EXISTS (
+              SELECT 1 FROM insurance_members im
+              WHERE im.ledger_account_id = la.id
+            )
+          ON CONFLICT DO NOTHING
+          RETURNING id
+        `);
+        if (memberBackfill.rowCount && memberBackfill.rowCount > 0) {
+          console.log(`[InsuranceMemberBackfill] Created ${memberBackfill.rowCount} missing insurance_members row(s) from ledger accounts`);
+        }
+      } catch (e: any) {
+        console.error("[InsuranceMemberBackfill] Error:", e.message);
+      }
+
       // ── Soft-delete orphaned Insurance ledger accounts ───────────────────────
       // Insurance member deletion previously left the linked "Insurance - Name"
       // ledger account alive. Clean up any that no longer have a member row.
+      // (Runs after the back-fill above so legitimate accounts are not removed.)
       try {
         const insuranceFix = await migrationClient.query(`
           UPDATE ledger_accounts la
