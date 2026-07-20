@@ -1,5 +1,5 @@
 import type { Express } from "express";
-import { db } from "../db";
+import { db, pool } from "../db";
 import { storage } from "../storage";
 import { requireAuth, requireRole, canDelete, requireNonPOS, checkPOSLocation } from "../auth";
 import {
@@ -162,12 +162,18 @@ export function registerNetProfitExcelRoute(app: Express) {
       }
       const sortedMonths = Array.from(vouchersByMonth.keys()).sort();
 
-      // Fetch ALL entries for ALL period vouchers at once
+      // Fetch ALL entries for ALL period vouchers at once.
+      // COALESCE(base_debit_amount, debit_amount): uses historical USD base when available.
       const allPeriodVoucherIds = allPeriodVouchers.map((v) => v.id);
       const allPeriodEntries =
         allPeriodVoucherIds.length > 0
           ? await db
-              .select()
+              .select({
+                ledgerAccountId: voucherEntries.ledgerAccountId,
+                voucherId: voucherEntries.voucherId,
+                debitAmount: sql<string>`COALESCE("voucher_entries"."base_debit_amount", "voucher_entries"."debit_amount")`,
+                creditAmount: sql<string>`COALESCE("voucher_entries"."base_credit_amount", "voucher_entries"."credit_amount")`,
+              })
               .from(voucherEntries)
               .where(inArray(voucherEntries.voucherId, allPeriodVoucherIds))
               .execute()
@@ -239,7 +245,12 @@ export function registerNetProfitExcelRoute(app: Express) {
       if (xlsxMissedIncomeAccounts.length > 0 && nonPosVIdsXlsx.length > 0) {
         const missedAccIdsXlsx = xlsxMissedIncomeAccounts.map((a: any) => a.id);
         const erpIncEntries = await db
-          .select()
+          .select({
+            ledgerAccountId: voucherEntries.ledgerAccountId,
+            voucherId: voucherEntries.voucherId,
+            debitAmount: sql<string>`COALESCE("voucher_entries"."base_debit_amount", "voucher_entries"."debit_amount")`,
+            creditAmount: sql<string>`COALESCE("voucher_entries"."base_credit_amount", "voucher_entries"."credit_amount")`,
+          })
           .from(voucherEntries)
           .where(
             and(
@@ -277,7 +288,15 @@ export function registerNetProfitExcelRoute(app: Express) {
       const allTimeIdsXlsx = allTimeVsXlsx.map((v) => v.id);
       const allTimeEntriesXlsx =
         allTimeIdsXlsx.length > 0
-          ? await db.select().from(voucherEntries).where(inArray(voucherEntries.voucherId, allTimeIdsXlsx)).execute()
+          ? await db
+              .select({
+                ledgerAccountId: voucherEntries.ledgerAccountId,
+                debitAmount: sql<string>`COALESCE("voucher_entries"."base_debit_amount", "voucher_entries"."debit_amount")`,
+                creditAmount: sql<string>`COALESCE("voucher_entries"."base_credit_amount", "voucher_entries"."credit_amount")`,
+              })
+              .from(voucherEntries)
+              .where(inArray(voucherEntries.voucherId, allTimeIdsXlsx))
+              .execute()
           : [];
       const allTimeBalsXlsx = new Map<number, { debit: number; credit: number }>();
       for (const e of allTimeEntriesXlsx) {

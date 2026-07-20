@@ -1,6 +1,6 @@
 import type { Express } from "express";
 import { createHash } from "crypto";
-import { db } from "../db";
+import { db, pool } from "../db";
 import { storage } from "../storage";
 import { requireAuth, requireRole, canDelete, requireNonPOS, checkPOSLocation } from "../auth";
 import { upload, logAudit, getCurrentExchangeRate } from "./_helpers";
@@ -44,6 +44,8 @@ import {
   auditLog,
   interCompanyTransfers,
   insertInterCompanyTransferSchema,
+  ledgerAccounts,
+  exchangeRates,
   FEATURE_KEYS,
 } from "@shared/schema";
 import {
@@ -239,19 +241,193 @@ export function registerBankAssetRoutes(app: Express) {
     }
   });
 
+  // Cash/bank account revaluation — live translation at current rate vs. historical base.
+  // For each Bank/Cash ledger account the response includes:
+  //   nativeCurrency, nativeBalance (sum of tx debits - tx credits in the transaction currency),
+  //   historicalBaseBalance (sum of COALESCE(base_debit, debit) - COALESCE(base_credit, credit) in USD),
+  //   currentRate, currentTranslatedBaseBalance (nativeBalance / currentRate),
+  //   translationDifference (currentTranslated - historical).
+  app.get("/api/bank-accounts/revaluation", requireAuth, requireNonPOS, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      // Fetch all Bank/Cash ledger accounts for this company
+      const cashBankAccts = await db
+        .select({
+          id: ledgerAccounts.id,
+          name: ledgerAccounts.name,
+          code: ledgerAccounts.code,
+          accountType: ledgerAccounts.accountType,
+          openingBalance: ledgerAccounts.openingBalance,
+          openingBalanceSide: ledgerAccounts.openingBalanceSide,
+        })
+        .from(ledgerAccounts)
+        .where(
+          and(
+            eq(ledgerAccounts.companyId, companyId),
+            isNull(ledgerAccounts.deletedAt),
+            or(eq(ledgerAccounts.accountType, "Bank"), eq(ledgerAccounts.accountType, "Cash")),
+          ),
+        )
+        .execute();
+
+      if (cashBankAccts.length === 0) {
+        return res.json({ accounts: [], currentCfaPerUsd: null });
+      }
+
+      const accountIds = cashBankAccts.map((a) => a.id);
+
+      // Get the latest CFA/USD exchange rate (CFA per 1 USD)
+      const rateRows = await db
+        .select({ rate: exchangeRates.rate })
+        .from(exchangeRates)
+        .where(
+          and(
+            eq(exchangeRates.companyId, companyId),
+            or(
+              and(eq(exchangeRates.fromCurrency, "USD"), eq(exchangeRates.toCurrency, "CFA")),
+              and(eq(exchangeRates.fromCurrency, "USD"), eq(exchangeRates.toCurrency, "XOF")),
+            ),
+          ),
+        )
+        .orderBy(desc(exchangeRates.effectiveDate))
+        .limit(1)
+        .execute();
+      const currentCfaPerUsd = rateRows.length > 0 ? parseFloat(rateRows[0].rate) : null;
+
+      // Aggregate native amounts and historical base amounts per ledger account
+      const aggRaw = await pool.query<{
+        ledger_account_id: string;
+        native_debit: string;
+        native_credit: string;
+        hist_base_debit: string;
+        hist_base_credit: string;
+        transaction_currency: string | null;
+      }>(
+        `SELECT ve.ledger_account_id,
+                COALESCE(SUM(ve.transaction_debit_amount::numeric),  0) AS native_debit,
+                COALESCE(SUM(ve.transaction_credit_amount::numeric), 0) AS native_credit,
+                COALESCE(SUM(COALESCE(ve.base_debit_amount,  ve.debit_amount)::numeric),  0) AS hist_base_debit,
+                COALESCE(SUM(COALESCE(ve.base_credit_amount, ve.credit_amount)::numeric), 0) AS hist_base_credit,
+                MAX(ve.transaction_currency) AS transaction_currency
+         FROM voucher_entries ve
+         JOIN vouchers v ON ve.voucher_id = v.id
+         WHERE v.company_id = $1
+           AND v.optional   = false
+           AND v.deleted_at IS NULL
+           AND ve.ledger_account_id = ANY($2::int[])
+         GROUP BY ve.ledger_account_id`,
+        [companyId, accountIds],
+      );
+
+      const entryMap = new Map<number, (typeof aggRaw.rows)[0]>();
+      for (const row of aggRaw.rows) entryMap.set(parseInt(row.ledger_account_id), row);
+
+      const accounts = cashBankAccts.map((acc) => {
+        const row = entryMap.get(acc.id);
+        const openingRaw = parseFloat(acc.openingBalance || "0");
+        const openingSigned = (acc.openingBalanceSide as string) === "Cr" ? -openingRaw : openingRaw;
+
+        // Native balance (transaction currency, i.e. CFA for CFA accounts)
+        const nativeDebit = parseFloat(row?.native_debit || "0");
+        const nativeCredit = parseFloat(row?.native_credit || "0");
+        const nativeBalance = nativeDebit - nativeCredit;
+
+        // Historical base balance (USD): opening + voucher entries in base currency
+        const histBaseDebit = parseFloat(row?.hist_base_debit || "0");
+        const histBaseCredit = parseFloat(row?.hist_base_credit || "0");
+        const historicalBaseBalance = openingSigned + histBaseDebit - histBaseCredit;
+
+        const nativeCurrency = row?.transaction_currency || "USD";
+
+        let currentRate: number | null = null;
+        let currentTranslatedBaseBalance: number | null = null;
+        let translationDifference: number | null = null;
+
+        if (nativeCurrency !== "USD" && currentCfaPerUsd && currentCfaPerUsd > 0) {
+          // nativeBalance is in CFA; divide by CFA/USD rate to get USD
+          currentRate = currentCfaPerUsd;
+          currentTranslatedBaseBalance = nativeBalance / currentCfaPerUsd;
+          translationDifference = currentTranslatedBaseBalance - historicalBaseBalance;
+        } else {
+          // USD account: 1:1, no translation gain/loss
+          currentRate = 1;
+          currentTranslatedBaseBalance = nativeBalance;
+          translationDifference = 0;
+        }
+
+        return {
+          id: acc.id,
+          name: acc.name,
+          code: acc.code,
+          accountType: acc.accountType,
+          nativeCurrency,
+          nativeBalance: parseFloat(nativeBalance.toFixed(6)),
+          historicalBaseBalance: parseFloat(historicalBaseBalance.toFixed(6)),
+          currentRate,
+          currentTranslatedBaseBalance: parseFloat(currentTranslatedBaseBalance.toFixed(6)),
+          translationDifference: parseFloat(translationDifference.toFixed(6)),
+        };
+      });
+
+      res.json({ accounts, currentCfaPerUsd });
+    } catch (error: any) {
+      console.error("Bank revaluation error:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Fixed Assets
   app.get("/api/fixed-assets", requireAuth, async (req, res) => {
     try {
-      if (!req.session.currentCompanyId) {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) {
         return res.status(400).json({ message: "No company selected" });
       }
-      const assets = await storage.getAllFixedAssets(req.session.currentCompanyId);
-      // Transform to match frontend expectations (assetCode, assetName)
-      const transformedAssets = assets.map((asset) => ({
-        ...asset,
-        assetCode: asset.code,
-        assetName: asset.name,
-      }));
+      const assets = await storage.getAllFixedAssets(companyId);
+
+      // Compute historical cost/depreciation from voucher entries using base currency amounts.
+      // COALESCE(base_debit_amount, debit_amount): historical USD cost (post-backfill); falls
+      // back to debit_amount for legacy rows.
+      const assetIds = assets.map((a) => a.id);
+      const assetHistMap = new Map<number, { historicalCostBase: number; historicalDepreciationBase: number }>();
+      if (assetIds.length > 0) {
+        const histRows = await pool.query<{
+          fixed_asset_id: string;
+          hist_debit: string;
+          hist_credit: string;
+        }>(
+          `SELECT ve.fixed_asset_id,
+                  COALESCE(SUM(COALESCE(ve.base_debit_amount,  ve.debit_amount)::numeric),  0) AS hist_debit,
+                  COALESCE(SUM(COALESCE(ve.base_credit_amount, ve.credit_amount)::numeric), 0) AS hist_credit
+           FROM voucher_entries ve
+           JOIN vouchers v ON ve.voucher_id = v.id
+           WHERE ve.fixed_asset_id = ANY($1::int[])
+             AND v.deleted_at IS NULL
+             AND v.optional = false
+           GROUP BY ve.fixed_asset_id`,
+          [assetIds],
+        );
+        for (const row of histRows.rows) {
+          assetHistMap.set(parseInt(row.fixed_asset_id), {
+            historicalCostBase: parseFloat(row.hist_debit),
+            historicalDepreciationBase: parseFloat(row.hist_credit),
+          });
+        }
+      }
+
+      // Transform to match frontend expectations (assetCode, assetName) and add historical fields
+      const transformedAssets = assets.map((asset) => {
+        const hist = assetHistMap.get(asset.id) || { historicalCostBase: 0, historicalDepreciationBase: 0 };
+        return {
+          ...asset,
+          assetCode: asset.code,
+          assetName: asset.name,
+          historicalCostBase: hist.historicalCostBase,
+          historicalDepreciationBase: hist.historicalDepreciationBase,
+        };
+      });
       res.json(transformedAssets);
     } catch (error: any) {
       res.status(500).json({ message: error.message });

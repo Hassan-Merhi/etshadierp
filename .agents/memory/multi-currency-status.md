@@ -10,7 +10,7 @@ description: Phase 15 multi-currency — what is done, what remains, and key des
 - **Backward compat**: `debitAmount`/`creditAmount` always store the historical base (USD) value. Legacy queries that SUM these get the correct historical USD total.
 - **No backfill during migration**: Migration SQL adds columns only. Backfill is manual via the script with dry-run + HMAC token.
 
-## What is done (Phase 15 session)
+## What is done (Task #1 — migration + normalization)
 
 ### Fixed bugs
 - `normalizeCurrencyCode("CFA")` → was "XOF" (wrong), now "CFA". `normalizeCurrencyCode("XOF")` → "CFA" (correct boundary normalization).
@@ -44,7 +44,25 @@ Four new formatters added (additive, no breakage):
   - Fixed assertions that expected "XOF" output (now "CFA").
   - Added: CFA identifier consistency tests, Payment round-trip, POS CFA entry normalization, extended normalizeCurrencyCode tests.
 
-## What still remains
+## What is done (Task #2 — reporting layer, fixed-asset, cash/bank revaluation, exports)
+
+### COALESCE substitution strategy
+All report/export SQL now reads `COALESCE(base_debit_amount, debit_amount)` / `COALESCE(base_credit_amount, credit_amount)`.
+- Pre-backfill: `base_debit_amount IS NULL` → COALESCE falls back to `debit_amount` (same as before).
+- Post-backfill: COALESCE picks up historical USD base amounts → correct historical figures without re-translating.
+
+### Files changed
+- `server/routes/stats/statsNetProfitRoutes.ts`: COALESCE in all 3 pool.query calls (ledger, supplier, employee balance queries). CFA revaluation block RETAINED for backward compat (it converts pre-backfill CFA amounts to USD; will be removed after backfill in Task #3).
+- `server/routes/stats/statsNetPositionRoutes.ts`: Two Drizzle entry queries converted to pool.query with COALESCE. Added `pool` import.
+- `server/routes/reportsRoutes.ts`: COALESCE via `sql<string>` template in periodEntries, allTimeEntries, erpSalesEntries, drill-down endpoints (purchases, direct-incomes, direct-expenses, indirect-expenses), and account-statement (opening + monthly entries). Added `pool` import.
+- `server/routes/netProfitExcelRoute.ts`: COALESCE in allPeriodEntries, erpIncEntries, allTimeEntriesXlsx (all switched from `db.select()` to explicit column selects with sql template). Added `pool` import.
+- `server/routes/bankAssetRoutes.ts`:
+  - New `GET /api/bank-accounts/revaluation` endpoint: returns per-account `nativeCurrency`, `nativeBalance`, `historicalBaseBalance`, `currentRate`, `currentTranslatedBaseBalance`, `translationDifference`.
+  - `GET /api/fixed-assets` now returns `historicalCostBase` and `historicalDepreciationBase` computed from voucher_entries via COALESCE pool.query.
+  - Added `ledgerAccounts`, `exchangeRates` schema imports, `pool` import.
+- Factory daybook and POS daybook routes: no changes needed (no entry-summing queries found).
+
+## What still remains (Task #3 scope)
 
 ### Issue 7 — Purchase/expense posting routes
 Many routes still insert voucher entries without `normalizeVoucherEntryAmounts`:
@@ -56,16 +74,15 @@ Many routes still insert voucher entries without `normalizeVoucherEntryAmounts`:
 - `GET /api/customers/stats` and `GET /api/customers/:id/transactions` sum `debit_amount`/`credit_amount` — should also return `historicalBaseBalance` (sum of `base_debit_amount`/`base_credit_amount`) and per-currency native balances.
 - Same for `GET /api/suppliers/:id/balance` and `GET /api/suppliers/stats`.
 
-### Issue 9 — Fixed assets / inventory
-- `bankAssetRoutes.ts`, depreciation, COGS, mix-batch costs — need to use stored historical amounts.
-
 ### Issue 10 — Cash/bank current translation in account balance endpoints
 - `GET /api/accounts/ledger/:id/balance` does not yet return `nativeBalance`, `historicalBaseBalance`, `currentTranslatedBaseBalance`, `translationDifference` fields. Frontend formatters are ready; the API endpoint needs updating.
 
-### Issue 12 — Reports/exports
-- Daybook exports, net-position, net-profit — sum `debit_amount`/`credit_amount` which for pre-backfill rows are CFA not USD. After backfill, `base_debit_amount` should be summed instead.
+### Issue 12 — Backfill review + CFA revaluation block removal
+- Run backfill script in dry-run, verify, then apply.
+- After backfill, remove the CFA revaluation block from `statsNetProfitRoutes.ts` (~lines 333–370).
 
-### Issue 14 — Journal/Payment review
-- `voucherJournalRoutes.ts` and `voucherPaymentRoutes.ts` already use `normalizeVoucherEntryAmounts` — verified correct.
+### Issue 14 — Frontend display
+- Hook up `formatHistoricalBaseAmount` / `formatCurrentCashTranslation` formatters in voucher detail pages, account statement, and the net-position table.
+- Show `translationDifference` in the cash/bank revaluation UI.
 
-**Why:** The multi-currency spec is large; addressing all 15 issues in one session risks introducing regressions. The above remaining items are safe to tackle incrementally once the core foundation (done above) is validated in production.
+**Why:** The multi-currency spec is large; addressing all issues in one session risks introducing regressions. The above remaining items are safe to tackle incrementally once the core foundation (done above) is validated in production.

@@ -161,10 +161,12 @@ export function registerStatsNetProfitRoutes(app: Express) {
         storage.getAllLedgerAccounts(companyId, true),
         storage.getParentCompanyId(),
         // 1. Ledger-account balances — account-company scoped (migrated-account rule)
+        // COALESCE(base_debit_amount, debit_amount): uses historical USD base when available
+        // (i.e. after backfill), falls back to debit_amount for legacy rows.
         pool.query<{ ledger_account_id: string; total_debit: string; total_credit: string }>(
           `SELECT ve.ledger_account_id,
-                  SUM(ve.debit_amount::numeric)  AS total_debit,
-                  SUM(ve.credit_amount::numeric) AS total_credit
+                  SUM(COALESCE(ve.base_debit_amount,  ve.debit_amount)::numeric)  AS total_debit,
+                  SUM(COALESCE(ve.base_credit_amount, ve.credit_amount)::numeric) AS total_credit
            FROM voucher_entries ve
            JOIN vouchers        v  ON ve.voucher_id        = v.id
            JOIN ledger_accounts la ON ve.ledger_account_id = la.id
@@ -178,12 +180,12 @@ export function registerStatsNetProfitRoutes(app: Express) {
         // 2. Supplier balances — voucher-company scoped, pure-side only (excludes mixed FX rows)
         pool.query<{ supplier_id: string; total_debit: string; total_credit: string }>(
           `SELECT ve.supplier_id,
-                  SUM(CASE WHEN ve.debit_amount::numeric  > 0
-                                AND ve.credit_amount::numeric = 0
-                           THEN ve.debit_amount::numeric ELSE 0 END) AS total_debit,
-                  SUM(CASE WHEN ve.credit_amount::numeric > 0
-                                AND ve.debit_amount::numeric  = 0
-                           THEN ve.credit_amount::numeric ELSE 0 END) AS total_credit
+                  SUM(CASE WHEN COALESCE(ve.base_debit_amount,  ve.debit_amount)::numeric  > 0
+                                AND COALESCE(ve.base_credit_amount, ve.credit_amount)::numeric = 0
+                           THEN COALESCE(ve.base_debit_amount, ve.debit_amount)::numeric ELSE 0 END) AS total_debit,
+                  SUM(CASE WHEN COALESCE(ve.base_credit_amount, ve.credit_amount)::numeric > 0
+                                AND COALESCE(ve.base_debit_amount,  ve.debit_amount)::numeric  = 0
+                           THEN COALESCE(ve.base_credit_amount, ve.credit_amount)::numeric ELSE 0 END) AS total_credit
            FROM voucher_entries ve
            JOIN vouchers v ON ve.voucher_id = v.id
            WHERE v.company_id    = $1
@@ -197,8 +199,8 @@ export function registerStatsNetProfitRoutes(app: Express) {
         // 3. Employee balances — voucher-company scoped
         pool.query<{ employee_id: string; total_debit: string; total_credit: string }>(
           `SELECT ve.employee_id,
-                  SUM(ve.debit_amount::numeric)  AS total_debit,
-                  SUM(ve.credit_amount::numeric) AS total_credit
+                  SUM(COALESCE(ve.base_debit_amount,  ve.debit_amount)::numeric)  AS total_debit,
+                  SUM(COALESCE(ve.base_credit_amount, ve.credit_amount)::numeric) AS total_credit
            FROM voucher_entries ve
            JOIN vouchers v ON ve.voucher_id = v.id
            WHERE v.company_id    = $1

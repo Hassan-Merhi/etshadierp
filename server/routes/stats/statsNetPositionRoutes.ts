@@ -1,5 +1,5 @@
 import type { Express } from "express";
-import { db } from "../../db";
+import { db, pool } from "../../db";
 import { storage } from "../../storage";
 import { requireAuth, requireRole, canDelete, requireNonPOS, checkPOSLocation } from "../../auth";
 import { upload, logAudit, getCurrentExchangeRate, calculateHistoricalLocationInventory } from "../_helpers";
@@ -136,49 +136,63 @@ export function registerStatsNetPositionRoutes(app: Express) {
       // companyEntries  → supplier/employee balances (scoped to voucher's company)
       // ledgerAccEntries → ledger account balances (scoped to account's company so
       //                    migrated accounts appear correctly in the destination)
-      const [companyEntries, ledgerAccEntries] = await Promise.all([
-        db
-          .select({
-            ledgerAccountId: voucherEntries.ledgerAccountId,
-            supplierId: voucherEntries.supplierId,
-            employeeId: voucherEntries.employeeId,
-            debitAmount: voucherEntries.debitAmount,
-            creditAmount: voucherEntries.creditAmount,
-          })
-          .from(voucherEntries)
-          .innerJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
-          .where(and(...voucherConds))
-          .execute(),
-        db
-          .select({
-            ledgerAccountId: voucherEntries.ledgerAccountId,
-            debitAmount: voucherEntries.debitAmount,
-            creditAmount: voucherEntries.creditAmount,
-          })
-          .from(voucherEntries)
-          .innerJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
-          .innerJoin(ledgerAccounts, eq(voucherEntries.ledgerAccountId, ledgerAccounts.id))
-          .where(and(eq(ledgerAccounts.companyId, companyId), ...voucherAcctConds))
-          .execute(),
+      //
+      // COALESCE(base_debit_amount, debit_amount): uses historical USD base when available
+      // (i.e. after backfill), falls back to debit_amount for legacy rows.
+      const _npExcelParams = toDate ? [companyId, toDate] : [companyId];
+      const _npExcelDateClause = toDate ? "AND v.voucher_date <= $2" : "";
+
+      const [companyEntriesRaw, ledgerAccEntriesRaw] = await Promise.all([
+        pool.query<{ ledger_account_id: string; supplier_id: string | null; debit_amount: string; credit_amount: string }>(
+          `SELECT ve.ledger_account_id,
+                  ve.supplier_id,
+                  COALESCE(ve.base_debit_amount,  ve.debit_amount)  AS debit_amount,
+                  COALESCE(ve.base_credit_amount, ve.credit_amount) AS credit_amount
+           FROM voucher_entries ve
+           JOIN vouchers v ON ve.voucher_id = v.id
+           WHERE v.company_id = $1
+             AND v.optional   = false
+             AND v.deleted_at IS NULL
+             ${_npExcelDateClause}`,
+          _npExcelParams,
+        ),
+        pool.query<{ ledger_account_id: string; debit_amount: string; credit_amount: string }>(
+          `SELECT ve.ledger_account_id,
+                  COALESCE(ve.base_debit_amount,  ve.debit_amount)  AS debit_amount,
+                  COALESCE(ve.base_credit_amount, ve.credit_amount) AS credit_amount
+           FROM voucher_entries ve
+           JOIN vouchers        v  ON ve.voucher_id        = v.id
+           JOIN ledger_accounts la ON ve.ledger_account_id = la.id
+           WHERE la.company_id = $1
+             AND v.optional    = false
+             AND v.deleted_at IS NULL
+             ${_npExcelDateClause}`,
+          _npExcelParams,
+        ),
       ]);
+
+      const companyEntries = companyEntriesRaw.rows;
+      const ledgerAccEntries = ledgerAccEntriesRaw.rows;
 
       const accountBalances = new Map<number, { debit: number; credit: number }>();
       const supplierBalances = new Map<number, { debit: number; credit: number }>();
       for (const e of ledgerAccEntries as any[]) {
-        if (e.ledgerAccountId) {
-          const cur = accountBalances.get(e.ledgerAccountId) || { debit: 0, credit: 0 };
-          accountBalances.set(e.ledgerAccountId, {
-            debit: cur.debit + parseFloat(e.debitAmount || "0"),
-            credit: cur.credit + parseFloat(e.creditAmount || "0"),
+        if (e.ledger_account_id) {
+          const id = parseInt(e.ledger_account_id);
+          const cur = accountBalances.get(id) || { debit: 0, credit: 0 };
+          accountBalances.set(id, {
+            debit: cur.debit + parseFloat(e.debit_amount || "0"),
+            credit: cur.credit + parseFloat(e.credit_amount || "0"),
           });
         }
       }
       for (const e of companyEntries as any[]) {
-        if (e.supplierId) {
-          const cur = supplierBalances.get(e.supplierId) || { debit: 0, credit: 0 };
-          supplierBalances.set(e.supplierId, {
-            debit: cur.debit + parseFloat(e.debitAmount || "0"),
-            credit: cur.credit + parseFloat(e.creditAmount || "0"),
+        if (e.supplier_id) {
+          const id = parseInt(e.supplier_id);
+          const cur = supplierBalances.get(id) || { debit: 0, credit: 0 };
+          supplierBalances.set(id, {
+            debit: cur.debit + parseFloat(e.debit_amount || "0"),
+            credit: cur.credit + parseFloat(e.credit_amount || "0"),
           });
         }
       }
