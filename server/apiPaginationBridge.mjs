@@ -12,7 +12,6 @@ if (!globalThis[INSTALL_KEY]) {
   const defaultLimit = Math.min(readPositiveInt(process.env.API_PAGINATION_DEFAULT_LIMIT, DEFAULT_LIMIT), maxLimit);
 
   const heavyArrayPaths = new Set([
-    "/api/factory/daybook",
     "/api/stock-items",
     "/api/inventory",
     "/api/factory/bales",
