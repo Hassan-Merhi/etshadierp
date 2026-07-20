@@ -1612,13 +1612,8 @@ export function registerGitRoutes(app: Express) {
 
   // ── Send containers table to WhatsApp ───────────────────────────────────────
 
-  // Route-level body parser: allow up to 10 MB for this endpoint only.
-  // The global limit in server/index.ts stays at 2 MB for all other routes.
-  const largeJsonParser = express.json({ limit: "10mb" });
-
   app.post(
     "/api/git/send-containers-whatsapp",
-    largeJsonParser,
     requireAuth,
     requireRole("Admin", "Developer", "Owner"),
     async (req: Request, res: Response) => {
@@ -1645,26 +1640,43 @@ export function registerGitRoutes(app: Express) {
         const today = new Date().toISOString().substring(0, 10);
 
         if (imageBase64) {
-          // Detect MIME type from the data URL prefix
           const dataUrlStr = String(imageBase64);
-          const mimeMatch = dataUrlStr.match(/^data:(image\/[a-zA-Z+]+);base64,/);
-          const detectedMime = mimeMatch ? mimeMatch[1].toLowerCase() : "image/png";
+
+          // Require a well-formed data URL with a supported image MIME type.
+          const mimeMatch = dataUrlStr.match(/^data:(image\/(?:jpeg|jpg|png));base64,([A-Za-z0-9+/=]+)$/);
+          if (!mimeMatch) {
+            return res.status(400).json({
+              message: "Invalid image payload. Only JPEG and PNG data URLs are accepted.",
+            });
+          }
+
+          const detectedMime = mimeMatch[1].toLowerCase();
+          const base64Data = mimeMatch[2];
+
+          if (!base64Data) {
+            return res.status(400).json({ message: "Image payload is empty." });
+          }
+
           const isJpeg = detectedMime === "image/jpeg" || detectedMime === "image/jpg";
           mimeType = isJpeg ? "image/jpeg" : "image/png";
           const ext = isJpeg ? "jpg" : "png";
 
-          const base64Data = dataUrlStr.replace(/^data:image\/[a-zA-Z+]+;base64,/, "");
           buffer = Buffer.from(base64Data, "base64");
 
-          // Server-side size guard — reject decoded images above 5 MB
-          if (buffer.length > 5 * 1024 * 1024) {
-            return res.status(413).json({ message: "WhatsApp image is too large. Maximum allowed size is 5 MB." });
+          if (buffer.length === 0) {
+            return res.status(400).json({ message: "Decoded image buffer is empty." });
           }
 
-          // Use caller-supplied filename if provided, otherwise build one with correct extension
-          const supplied = String(fileName || "");
+          // Server-side size guard: reject decoded images above 2 MB.
+          if (buffer.length > 2 * 1024 * 1024) {
+            return res.status(413).json({
+              message: "WhatsApp image is too large. Maximum allowed decoded image size is 2 MB.",
+            });
+          }
+
+          // Use caller-supplied filename if provided, normalised to the correct extension.
+          const supplied = String(fileName || "").trim();
           finalFileName = supplied || `Containers_${today}.${ext}`;
-          // Ensure the extension matches the actual content type
           if (!finalFileName.toLowerCase().endsWith(`.${ext}`)) {
             finalFileName = finalFileName.replace(/\.[^.]+$/, "") + `.${ext}`;
           }

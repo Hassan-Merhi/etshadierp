@@ -58,13 +58,18 @@ export function TabTruckLocation() {
         windowHeight: el.scrollHeight,
       });
 
-      // Approximate decoded byte size from base64 string length.
-      // Route-level body parser on the server allows 10 MB for this endpoint,
-      // so we target ≤ 8 MB and try progressively lower quality until it fits.
-      const approxBytes = (b64: string) => Math.ceil((b64.length - (b64.indexOf(",") + 1)) * 0.75);
-      const SIZE_LIMIT = 8 * 1024 * 1024; // 8 MB
+      // Estimate decoded byte size from the base64 payload (strip data URL prefix
+      // and account for base64 padding before calculating).
+      const approxBytes = (b64: string) => {
+        const payload = b64.slice(b64.indexOf(",") + 1);
+        const padding = (payload.match(/=+$/) ?? [""])[0].length;
+        return Math.ceil((payload.length * 3) / 4) - padding;
+      };
+      // Target ≤ 1.5 MB decoded so the JSON body stays comfortably under the
+      // global 2 MB Express limit after base64 and JSON overhead.
+      const SIZE_LIMIT = 1.5 * 1024 * 1024;
 
-      const qualities = [0.82, 0.65, 0.5, 0.35];
+      const qualities = [0.82, 0.68, 0.55, 0.42];
       let imageBase64 = "";
       for (const q of qualities) {
         imageBase64 = canvas.toDataURL("image/jpeg", q);
@@ -74,7 +79,8 @@ export function TabTruckLocation() {
       if (!imageBase64 || approxBytes(imageBase64) > SIZE_LIMIT) {
         toast({
           title: "Failed to send",
-          description: "The tracking report is too large to send even at minimum quality.",
+          description:
+            "The tracking report is too large to send in one image. Use My Company instead of All Accessible Companies, or reduce the displayed container rows.",
           variant: "destructive",
         });
         return;

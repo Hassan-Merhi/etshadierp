@@ -70,9 +70,10 @@ export function PosShell({
 
   const posStyle = { "--sidebar-width": "11rem", "--sidebar-width-icon": "3rem" };
   const isPosRoute = currentLocation === "/pos" || currentLocation.startsWith("/pos/");
-  const isFullHeightRoute = isPosRoute || currentLocation === "/tracking" || currentLocation === "/";
+  // Only the true full-screen POS canvas uses overflow-hidden on <main>.
+  // All other routes — including /tracking — are scrollable and must receive focus.
+  const isFullHeightRoute = isPosRoute;
   const hasAdminSearch = canUseAdminSearch(user);
-  // Skip focus on full-height routes where <main> has overflow-hidden (not scrollable).
   useMainContentFocus(currentLocation, isFullHeightRoute);
 
   return (
