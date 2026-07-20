@@ -85,7 +85,7 @@ describe("multi-currency historical amount rules", () => {
 });
 
 describe("opening balance currency rules", () => {
-  it("stores a CFA opening balance with its historical USD base", () => {
+  it("stores a CFA opening balance with separate native and historical USD values", () => {
     const opening = normalizeOpeningBalanceCurrency({
       openingBalance: "6000000",
       openingBalanceCurrency: "CFA",
@@ -94,6 +94,7 @@ describe("opening balance currency rules", () => {
     });
 
     expect(opening).toEqual({
+      openingBalanceNativeAmount: "6000000.000000",
       openingBalanceCurrency: "CFA",
       openingBalanceHistoricalRate: "600.0000000000",
       openingBalanceBaseAmount: "10000.000000",
@@ -108,6 +109,7 @@ describe("opening balance currency rules", () => {
     });
 
     expect(opening).toEqual({
+      openingBalanceNativeAmount: "1250.250000",
       openingBalanceCurrency: "USD",
       openingBalanceHistoricalRate: "1.0000000000",
       openingBalanceBaseAmount: "1250.250000",
@@ -152,6 +154,15 @@ describe("required database migrations", () => {
     }
   });
 
+  it("adds native opening and fixed-asset acquisition metadata", () => {
+    const sql = read("migrations/20260720_006_entity_opening_and_asset_currency.sql");
+    expect(sql).toContain("opening_balance_native_amount");
+    expect(sql).toContain("purchase_native_amount");
+    expect(sql).toContain("purchase_historical_rate");
+    expect(sql).toContain("purchase_base_amount");
+    expect(sql).not.toMatch(/UPDATE\s+(customers|suppliers|employees|fixed_assets)/i);
+  });
+
   it("normalizes new USD/CFA writes and synchronizes legacy updates", () => {
     const sql = read("migrations/20260720_005_voucher_entry_currency_normalization_trigger.sql");
     expect(sql).toMatch(/BEFORE INSERT OR UPDATE/i);
@@ -167,6 +178,7 @@ describe("required database migrations", () => {
     expect(journal).toContain("20260720_003_ledger_account_opening_balance_currency");
     expect(journal).toContain("20260720_004_bank_account_opening_balance_currency");
     expect(journal).toContain("20260720_005_voucher_entry_currency_normalization_trigger");
+    expect(journal).toContain("20260720_006_entity_opening_and_asset_currency");
   });
 });
 
@@ -174,6 +186,7 @@ describe("cash/bank revaluation safety source checks", () => {
   it("keeps native currencies separate and uses Decimal calculations", () => {
     const source = read("server/services/accounting/cashBankRevaluationService.ts");
     expect(source).toContain("nativeBalancesByCurrency");
+    expect(source).toContain("openingBalanceNativeAmount");
     expect(source).toContain("new Decimal");
     expect(source).toContain("GROUP BY account_id, entry_currency");
     expect(source).not.toContain("MAX(ve.transaction_currency)");
@@ -210,7 +223,10 @@ describe("legacy history safety", () => {
     expect(guard).toContain("HISTORICAL_CURRENCY_DATA_UNRESOLVED");
     expect(guard).toContain("/api/stats/net-profit");
     expect(readiness).toMatch(/base_debit_amount IS NULL/);
-    expect(readiness).toMatch(/COALESCE\(UPPER\(v\.currency\), 'USD'\) <> 'USD'/);
+    expect(readiness).toContain("unresolved_customer_openings");
+    expect(readiness).toContain("unresolved_supplier_openings");
+    expect(readiness).toContain("unresolved_employee_openings");
+    expect(readiness).toContain("unresolved_fixed_assets");
   });
 
   it("normalizes generic voucher-entry amount edits", () => {
@@ -218,6 +234,23 @@ describe("legacy history safety", () => {
     expect(source).toContain("normalizeVoucherEntryAmounts");
     expect(source).toContain("historicalExchangeRate");
     expect(source).toContain("HISTORICAL_CURRENCY_DATA_UNRESOLVED");
+  });
+
+  it("does not silently assign a missing opening-balance currency", () => {
+    const source = read("server/routes/accountCurrencyRoutes.ts");
+    expect(source).toContain("Never guess a non-zero opening balance's currency");
+    expect(source).toContain("openingBalanceCurrency: null");
+    expect(source).not.toContain("existing?.openingBalanceCurrency ?? baseCurrency");
+  });
+
+  it("provides an explicit admin resolution workflow", () => {
+    const route = read("server/routes/openingBalanceResolutionRoutes.ts");
+    const ui = read("client/src/pages/accounts/HistoricalOpeningResolver.tsx");
+    expect(route).toContain("/api/accounts/multi-currency/unresolved-openings");
+    expect(route).toContain("/api/accounts/multi-currency/opening-balance/:entityType/:id");
+    expect(route).toContain("normalizeOpeningBalanceCurrency");
+    expect(ui).toContain("Resolve Historical Opening & Asset Values");
+    expect(ui).toContain("historicalRate");
   });
 });
 
