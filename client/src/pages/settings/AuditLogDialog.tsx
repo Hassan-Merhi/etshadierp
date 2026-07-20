@@ -343,7 +343,7 @@ export function AuditLogDialog({ log, onClose }: { log: any; onClose: () => void
               variant={actionBadgeVariant(log.action)}
               className="text-xs max-w-full whitespace-normal break-words leading-snug"
             >
-              {log.actionLabel || actionLabel(log.action)}
+              {actionLabel(log.action)}
             </Badge>
           </div>
           <span className="text-muted-foreground">Module</span>
