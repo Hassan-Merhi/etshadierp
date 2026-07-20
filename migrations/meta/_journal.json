@@ -54,6 +54,13 @@
     {
       "idx": 7,
       "version": "7",
+      "when": 1753020000000,
+      "tag": "20260720_002_voucher_entry_currency_fields",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
       "when": 1784544000000,
       "tag": "0007_factory_historical_replay_safety",
       "breakpoints": true
