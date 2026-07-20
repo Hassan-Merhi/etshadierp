@@ -79,6 +79,50 @@ export async function getAuthoritativeSupplierRemainingKg(
 }
 
 /**
+ * Executor-aware variant of getAuthoritativeSupplierRemainingKg.
+ * Uses raw SQL via executor.query() so it works with both pool and a transaction
+ * client inside applyHistoricalCostReplay, without requiring Drizzle ORM access.
+ */
+type _RawSqlExecutor = { query(text: string, params?: unknown[]): Promise<{ rows: any[] }> };
+
+export async function getAuthoritativeSupplierRemainingKgWithExecutor(
+  executor: _RawSqlExecutor,
+  companyId: number,
+  supplierId: number
+): Promise<number> {
+  const [stockResult, adjResult] = await Promise.all([
+    executor.query(
+      `SELECT COALESCE(SUM(frs.received_kg - frs.used_kg), 0) AS remaining_kg
+       FROM factory_raw_stock frs
+       JOIN factory_containers fc ON fc.id = frs.container_id
+       WHERE frs.company_id = $1
+         AND fc.supplier_id = $2
+         AND fc.status != 'DELETED'
+         AND frs.deleted_at IS NULL
+         AND fc.deleted_at IS NULL`,
+      [companyId, supplierId]
+    ),
+    executor.query(
+      `SELECT COALESCE(SUM(
+               CASE WHEN type = 'ADD' THEN kg
+                    WHEN type = 'REMOVE' THEN -kg
+                    ELSE 0
+               END
+             ), 0) AS net_adjusted_kg
+       FROM factory_raw_material_adjustments
+       WHERE company_id = $1
+         AND supplier_id = $2
+         AND deleted_at IS NULL`,
+      [companyId, supplierId]
+    ),
+  ]);
+
+  const rk = new Decimal(stockResult.rows[0]?.remaining_kg ?? 0);
+  const nk = new Decimal(adjResult.rows[0]?.net_adjusted_kg ?? 0);
+  return rk.plus(nk).toNumber();
+}
+
+/**
  * Reads the supplier's locked rate. If it has never been established (NULL —
  * e.g. a supplier created before this field existed, or the backfill migration
  * hasn't run against this row yet), lazily derives it ONCE from the legacy

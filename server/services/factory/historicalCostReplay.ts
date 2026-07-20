@@ -16,8 +16,7 @@ import crypto from "crypto";
 import { pool } from "../../db";
 import { computeContainerLandedCost } from "./containerLandedCost";
 import { resolveMixSourcePricingBasis } from "./mixSourcePricingBasis";
-import { getAuthoritativeSupplierRemainingKg } from "./rawStockLockedRate";
-import { db } from "../../db";
+import { getAuthoritativeSupplierRemainingKgWithExecutor } from "./rawStockLockedRate";
 import {
   factoryContainers,
   factoryRawStock,
@@ -31,7 +30,6 @@ import {
   factoryRawMaterialAdjustments,
   factoryContainerReceipts,
 } from "@shared/schema";
-import { eq, and, isNull, sql, inArray } from "drizzle-orm";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Public result types
@@ -189,6 +187,21 @@ export type QueryExecutor = {
   query: (text: string, params?: any[]) => Promise<{ rows: any[]; rowCount?: number | null }>;
 };
 
+/**
+ * Alias used throughout the historical replay engine.
+ * Accepts pool directly or a transaction client — both expose .query().
+ */
+export type ReplayQueryExecutor = QueryExecutor;
+
+/** Convert a postgres snake_case row to camelCase, matching Drizzle ORM's output shape. */
+function rowToCamel<T>(row: Record<string, unknown>): T {
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(row)) {
+    out[k.replace(/_([a-z])/g, (_: string, c: string) => c.toUpperCase())] = v;
+  }
+  return out as T;
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Internal event types
 // ─────────────────────────────────────────────────────────────────────────────
@@ -238,20 +251,9 @@ interface ContainerUniverse {
   offloadDate: string | null;
 }
 
-async function loadContainerUniverse(companyId: number): Promise<ContainerUniverse[]> {
+async function loadContainerUniverse(executor: ReplayQueryExecutor, companyId: number): Promise<ContainerUniverse[]> {
   // One query to get all containers with any received/offload evidence
-  const { rows } = await pool.query<{
-    id: number;
-    supplier_name: string | null;
-    actual_received_kg: string | null;
-    has_active_rs: boolean;
-    has_deleted_rs: boolean;
-    has_receipt_history: boolean;
-    has_offload_daybook: boolean;
-    has_mix_source: boolean;
-    earliest_offload_date: string | null;
-    offloaded_at: string | null;
-  }>(
+  const { rows } = await executor.query(
     `SELECT
        fc.id,
        fs.name                             AS supplier_name,
@@ -296,32 +298,22 @@ async function loadContainerUniverse(companyId: number): Promise<ContainerUniver
 
   if (rows.length === 0) return [];
 
-  const containerIds = rows.map((r) => r.id);
+  const containerIds = rows.map((r: any) => r.id);
 
-  // Load full container rows, raw-stock, charges in one batch
-  const [containers, allRawStock, allAdditionalCharges, allCommissions, allOtherCharges] =
-    await Promise.all([
-      db
-        .select()
-        .from(factoryContainers)
-        .where(and(eq(factoryContainers.companyId, companyId), inArray(factoryContainers.id, containerIds))),
-      db
-        .select()
-        .from(factoryRawStock)
-        .where(and(eq(factoryRawStock.companyId, companyId), inArray(factoryRawStock.containerId, containerIds))),
-      db
-        .select()
-        .from(factoryOffloadAdditionalCharges)
-        .where(and(eq(factoryOffloadAdditionalCharges.companyId, companyId))),
-      db
-        .select()
-        .from(factoryContainerCommissions)
-        .where(and(eq(factoryContainerCommissions.companyId, companyId))),
-      db
-        .select()
-        .from(factoryContainerOtherCharges)
-        .where(and(eq(factoryContainerOtherCharges.companyId, companyId))),
-    ]);
+  // Load full container rows and raw-stock via executor
+  const [containerRawRows, rawStockRawRows] = await Promise.all([
+    executor.query(
+      `SELECT * FROM factory_containers WHERE company_id = $1 AND id = ANY($2)`,
+      [companyId, containerIds]
+    ),
+    executor.query(
+      `SELECT * FROM factory_raw_stock WHERE company_id = $1 AND container_id = ANY($2)`,
+      [companyId, containerIds]
+    ),
+  ]);
+
+  const containers = containerRawRows.rows.map((r) => rowToCamel<typeof factoryContainers.$inferSelect>(r));
+  const allRawStock = rawStockRawRows.rows.map((r) => rowToCamel<typeof factoryRawStock.$inferSelect>(r));
 
   const containerMap = new Map(containers.map((c) => [c.id, c]));
   const activeRsMap = new Map<number, typeof factoryRawStock.$inferSelect>();
@@ -335,25 +327,10 @@ async function loadContainerUniverse(companyId: number): Promise<ContainerUniver
       if (!ex || rs.id > ex.id) activeRsMap.set(cid, rs);
     }
   }
-  const chargesByContainer = new Map<number, (typeof factoryOffloadAdditionalCharges.$inferSelect)[]>();
-  for (const c of allAdditionalCharges) {
-    if (!chargesByContainer.has(c.containerId)) chargesByContainer.set(c.containerId, []);
-    chargesByContainer.get(c.containerId)!.push(c);
-  }
-  const commissionByContainer = new Map<number, typeof factoryContainerCommissions.$inferSelect>();
-  for (const c of allCommissions) {
-    const ex = commissionByContainer.get(c.containerId);
-    if (!ex || c.id > ex.id) commissionByContainer.set(c.containerId, c);
-  }
-  const otherChargesByContainer = new Map<number, (typeof factoryContainerOtherCharges.$inferSelect)[]>();
-  for (const oc of allOtherCharges) {
-    if (!otherChargesByContainer.has(oc.containerId)) otherChargesByContainer.set(oc.containerId, []);
-    otherChargesByContainer.get(oc.containerId)!.push(oc);
-  }
 
   const result: ContainerUniverse[] = [];
 
-  for (const row of rows) {
+  for (const row of rows as any[]) {
     const container = containerMap.get(row.id);
     if (!container) continue;
 
@@ -407,17 +384,21 @@ interface CanonicalContainer {
 }
 
 async function computeCanonicalCosts(
+  executor: ReplayQueryExecutor,
   companyId: number,
   universe: ContainerUniverse[]
 ): Promise<CanonicalContainer[]> {
   const containerIds = universe.map((u) => u.container.id);
   if (containerIds.length === 0) return [];
 
-  const [allAdditionalCharges, allCommissions, allOtherCharges] = await Promise.all([
-    db.select().from(factoryOffloadAdditionalCharges).where(eq(factoryOffloadAdditionalCharges.companyId, companyId)),
-    db.select().from(factoryContainerCommissions).where(eq(factoryContainerCommissions.companyId, companyId)),
-    db.select().from(factoryContainerOtherCharges).where(eq(factoryContainerOtherCharges.companyId, companyId)),
+  const [chargesRaw, commissionsRaw, otherChargesRaw] = await Promise.all([
+    executor.query(`SELECT * FROM factory_offload_additional_charges WHERE company_id = $1`, [companyId]),
+    executor.query(`SELECT * FROM factory_container_commissions WHERE company_id = $1`, [companyId]),
+    executor.query(`SELECT * FROM factory_container_other_charges WHERE company_id = $1`, [companyId]),
   ]);
+  const allAdditionalCharges = chargesRaw.rows.map((r) => rowToCamel<typeof factoryOffloadAdditionalCharges.$inferSelect>(r));
+  const allCommissions = commissionsRaw.rows.map((r) => rowToCamel<typeof factoryContainerCommissions.$inferSelect>(r));
+  const allOtherCharges = otherChargesRaw.rows.map((r) => rowToCamel<typeof factoryContainerOtherCharges.$inferSelect>(r));
 
   const chargesByContainer = new Map<number, (typeof factoryOffloadAdditionalCharges.$inferSelect)[]>();
   for (const c of allAdditionalCharges) {
@@ -483,6 +464,7 @@ interface ContainerReceiptEvent {
 }
 
 async function buildReceiptEvents(
+  executor: ReplayQueryExecutor,
   companyId: number,
   canonicals: CanonicalContainer[]
 ): Promise<ContainerReceiptEvent[]> {
@@ -490,16 +472,11 @@ async function buildReceiptEvents(
   if (containerIds.length === 0) return [];
 
   // Load all active receipt rows
-  const receiptRows = await db
-    .select()
-    .from(factoryContainerReceipts)
-    .where(
-      and(
-        eq(factoryContainerReceipts.companyId, companyId),
-        inArray(factoryContainerReceipts.containerId, containerIds),
-        isNull(factoryContainerReceipts.deletedAt)
-      )
-    );
+  const { rows: receiptRawRows } = await executor.query(
+    `SELECT * FROM factory_container_receipts WHERE company_id = $1 AND container_id = ANY($2) AND deleted_at IS NULL`,
+    [companyId, containerIds]
+  );
+  const receiptRows = receiptRawRows.map((r) => rowToCamel<typeof factoryContainerReceipts.$inferSelect>(r));
 
   const receiptsByContainer = new Map<number, (typeof factoryContainerReceipts.$inferSelect)[]>();
   for (const r of receiptRows) {
@@ -572,17 +549,12 @@ interface AdjustmentEvent {
   stableId: number;
 }
 
-async function buildAdjustmentEvents(companyId: number): Promise<AdjustmentEvent[]> {
-  const rows = await db
-    .select()
-    .from(factoryRawMaterialAdjustments)
-    .where(
-      and(
-        eq(factoryRawMaterialAdjustments.companyId, companyId),
-        isNull(factoryRawMaterialAdjustments.deletedAt),
-        sql`${factoryRawMaterialAdjustments.supplierId} IS NOT NULL`
-      )
-    );
+async function buildAdjustmentEvents(executor: ReplayQueryExecutor, companyId: number): Promise<AdjustmentEvent[]> {
+  const { rows: rawRows } = await executor.query(
+    `SELECT * FROM factory_raw_material_adjustments WHERE company_id = $1 AND deleted_at IS NULL AND supplier_id IS NOT NULL`,
+    [companyId]
+  );
+  const rows = rawRows.map((r) => rowToCamel<typeof factoryRawMaterialAdjustments.$inferSelect>(r));
 
   return rows.map((r) => {
     const kg = parseFloat(r.kg as string || "0");
@@ -651,24 +623,27 @@ interface SourceInfo {
 }
 
 async function buildBatchConsumptionEvents(
+  executor: ReplayQueryExecutor,
   companyId: number,
   supplierIds: Set<number>
 ): Promise<{ events: BatchConsumptionEvent[]; batchInfoMap: Map<number, BatchInfo>; sourceInfos: SourceInfo[] }> {
   // Load all non-deleted batches and their sources
-  const batchRows = await db
-    .select()
-    .from(factoryMixBatches)
-    .where(and(eq(factoryMixBatches.companyId, companyId), isNull(factoryMixBatches.deletedAt)));
+  const { rows: batchRawRows } = await executor.query(
+    `SELECT * FROM factory_mix_batches WHERE company_id = $1 AND deleted_at IS NULL`,
+    [companyId]
+  );
+  const batchRows = batchRawRows.map((r) => rowToCamel<typeof factoryMixBatches.$inferSelect>(r));
 
   const batchIds = batchRows.map((b) => b.id);
   if (batchIds.length === 0) {
     return { events: [], batchInfoMap: new Map(), sourceInfos: [] };
   }
 
-  const sourceRows = await db
-    .select()
-    .from(factoryMixBatchSources)
-    .where(inArray(factoryMixBatchSources.mixBatchId, batchIds));
+  const { rows: sourceRawRows } = await executor.query(
+    `SELECT * FROM factory_mix_batch_sources WHERE mix_batch_id = ANY($1)`,
+    [batchIds]
+  );
+  const sourceRows = sourceRawRows.map((r) => rowToCamel<typeof factoryMixBatchSources.$inferSelect>(r));
 
   const batchInfoMap = new Map<number, BatchInfo>();
   for (const b of batchRows) {
@@ -830,7 +805,9 @@ export async function replaySupplierTimeline(
   supplierId: number,
   supplierName: string,
   storedRate: number,
-  events: SupplierEvent[]
+  events: SupplierEvent[],
+  /** Pre-loaded by caller via executor — replaySupplierTimeline no longer queries the DB directly. */
+  authoritativeRemainingKg: number
 ): Promise<SupplierTimelineResult> {
   const { sorted, ambiguous } = sortEvents(events);
 
@@ -1214,6 +1191,7 @@ interface BaleCountResult {
 }
 
 async function loadBaleCountsByBatch(
+  executor: ReplayQueryExecutor,
   companyId: number,
   batchIds: number[]
 ): Promise<BaleCountResult> {
@@ -1222,14 +1200,14 @@ async function loadBaleCountsByBatch(
   const finalizedIn = FINALIZED_BALE_STATUSES.map((s) => `'${s}'`).join(",");
 
   const [{ rows: totalRows }, { rows: finalizedRows }] = await Promise.all([
-    pool.query<{ mix_batch_id: number; cnt: string }>(
+    executor.query(
       `SELECT mix_batch_id, COUNT(*)::int AS cnt
        FROM factory_bales
        WHERE mix_batch_id = ANY($1) AND company_id = $2 AND status NOT IN ('DELETED','REMOVED')
        GROUP BY mix_batch_id`,
       [batchIds, companyId]
     ),
-    pool.query<{ mix_batch_id: number; cnt: string }>(
+    executor.query(
       `SELECT mix_batch_id, COUNT(*)::int AS cnt
        FROM factory_bales
        WHERE mix_batch_id = ANY($1) AND company_id = $2 AND status IN (${finalizedIn})

@@ -557,22 +557,31 @@ export default function FactoryInvoiceDetail() {
   // errors surface as toast messages, and stalled 0-byte downloads are avoided.
   const downloadFromUrl = async (url: string, fallbackName: string) => {
     try {
-      const res = await fetch(url, { credentials: "include" });
+      const res = await fetch(url, { credentials: "include", cache: "no-store" });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
         throw new Error((err as any).message || `Server error ${res.status}`);
       }
       const blob = await res.blob();
+      if (blob.size === 0) {
+        throw new Error("Server returned an empty file.");
+      }
+      const cd = res.headers.get("content-disposition") || "";
+      // Handle both  filename*=UTF-8''encoded-name  and  filename="plain-name"
+      const starMatch = cd.match(/filename\*=UTF-8''([^;\s]+)/i);
+      const plainMatch = cd.match(/filename="([^"]+)"/i);
+      const rawName = starMatch ? starMatch[1] : plainMatch ? plainMatch[1] : null;
       const objectUrl = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = objectUrl;
-      const cd = res.headers.get("content-disposition");
-      const match = cd?.match(/filename\*?=(?:UTF-8'')?["']?([^;"'\r\n]+)/i);
-      a.download = match ? decodeURIComponent(match[1].replace(/"/g, "").trim()) : fallbackName;
+      a.download = rawName ? decodeURIComponent(rawName) : fallbackName;
       document.body.appendChild(a);
       a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(objectUrl);
+      // Delay cleanup so Chrome has time to consume the blob URL before it is revoked.
+      setTimeout(() => {
+        document.body.removeChild(a);
+        URL.revokeObjectURL(objectUrl);
+      }, 10000);
     } catch (err: any) {
       toast({ title: "Export failed", description: err.message, variant: "destructive" });
     }

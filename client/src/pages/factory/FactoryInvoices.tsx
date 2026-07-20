@@ -99,24 +99,34 @@ export default function FactoryInvoices() {
   // and surfaces server errors as a toast instead of leaving the browser with a 0-byte file.
   const downloadFromUrl = useCallback(async (url: string, fallbackName: string) => {
     try {
-      const res = await fetch(url, { credentials: "include" });
+      const res = await fetch(url, { credentials: "include", cache: "no-store" });
       if (!res.ok) {
         const err = await res.json().catch(() => ({ message: res.statusText }));
         toast({ title: "Download failed", description: err.message || res.statusText, variant: "destructive" });
         return;
       }
       const blob = await res.blob();
+      if (blob.size === 0) {
+        toast({ title: "Download failed", description: "Server returned an empty file.", variant: "destructive" });
+        return;
+      }
       const disposition = res.headers.get("Content-Disposition") || "";
-      const match = disposition.match(/filename\*?=(?:UTF-8''|")?([^";\n]+)/i);
-      const fileName = match ? decodeURIComponent(match[1].replace(/"/g, "")) : fallbackName;
+      // Handle both  filename*=UTF-8''encoded-name  and  filename="plain-name"
+      const starMatch = disposition.match(/filename\*=UTF-8''([^;\s]+)/i);
+      const plainMatch = disposition.match(/filename="([^"]+)"/i);
+      const rawName = starMatch ? starMatch[1] : plainMatch ? plainMatch[1] : null;
+      const fileName = rawName ? decodeURIComponent(rawName) : fallbackName;
       const blobUrl = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = blobUrl;
       a.download = fileName;
       document.body.appendChild(a);
       a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(blobUrl);
+      // Delay cleanup so Chrome has time to consume the blob URL before it is revoked.
+      setTimeout(() => {
+        document.body.removeChild(a);
+        URL.revokeObjectURL(blobUrl);
+      }, 10000);
     } catch (e: any) {
       toast({ title: "Download failed", description: e.message || "Network error", variant: "destructive" });
     }

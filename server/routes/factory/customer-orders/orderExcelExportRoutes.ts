@@ -468,9 +468,14 @@ export function registerOrderExcelExportRoutes(app: Express) {
       const fileName = buildExportFilename([order.containerNumber, customer?.legalName, order.destination], "xlsx");
       // Build buffer BEFORE setting headers — if ExcelJS throws, catch can still send a clean JSON 500.
       const xlsBuffer = Buffer.from(await workbook.xlsx.writeBuffer());
+      if (xlsBuffer.length === 0) throw new Error("Generated workbook buffer is empty");
+      res.status(200);
       res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
       res.setHeader("Content-Disposition", contentDisposition(fileName));
-      res.setHeader("Content-Length", xlsBuffer.byteLength);
+      res.setHeader("Content-Length", String(xlsBuffer.length));
+      res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
+      res.setHeader("Pragma", "no-cache");
+      res.setHeader("X-Content-Type-Options", "nosniff");
       res.end(xlsBuffer);
     } catch (error: any) {
       console.error("Error exporting order to Excel:", error);
@@ -792,9 +797,14 @@ export function registerOrderExcelExportRoutes(app: Express) {
       // catch block can still send a clean 500 JSON response instead of leaving
       // the browser with a stalled 0-byte download.
       const xlsBuffer = Buffer.from(await workbook.xlsx.writeBuffer());
+      if (xlsBuffer.length === 0) throw new Error("Generated workbook buffer is empty");
+      res.status(200);
       res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
       res.setHeader("Content-Disposition", contentDisposition(fileName));
-      res.setHeader("Content-Length", xlsBuffer.byteLength);
+      res.setHeader("Content-Length", String(xlsBuffer.length));
+      res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
+      res.setHeader("Pragma", "no-cache");
+      res.setHeader("X-Content-Type-Options", "nosniff");
       res.end(xlsBuffer);
     } catch (error: any) {
       console.error("Error exporting order to Excel:", error);
