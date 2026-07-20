@@ -172,6 +172,27 @@ interface InvoiceWorkbookParams {
   noCharges: boolean;
 }
 
+function normalizeExcelBuffer(value: unknown): Buffer {
+  if (Buffer.isBuffer(value)) {
+    return Buffer.from(value);
+  }
+  if (value instanceof Uint8Array) {
+    return Buffer.from(value.buffer, value.byteOffset, value.byteLength);
+  }
+  if (value instanceof ArrayBuffer) {
+    return Buffer.from(value);
+  }
+  const candidate = value as any;
+  if (
+    candidate?.buffer instanceof ArrayBuffer &&
+    typeof candidate.byteOffset === "number" &&
+    typeof candidate.byteLength === "number"
+  ) {
+    return Buffer.from(candidate.buffer, candidate.byteOffset, candidate.byteLength);
+  }
+  throw new Error(`Unsupported ExcelJS buffer result: ${Object.prototype.toString.call(value)}`);
+}
+
 async function buildInvoiceWorkbookBuffer(params: InvoiceWorkbookParams): Promise<Buffer> {
   const { orderId, companyId, hideSelling, noCharges } = params;
 
@@ -428,8 +449,7 @@ async function buildInvoiceWorkbookBuffer(params: InvoiceWorkbookParams): Promis
 
   // ── Write buffer (with temp-file fallback if writeBuffer produces empty output) ──
   console.log(`[ExcelExport] orderId=${orderId} stage=writebuffer-started`);
-  const generated = await workbook.xlsx.writeBuffer();
-  let xlsBuffer = Buffer.isBuffer(generated) ? generated : Buffer.from(generated as ArrayBuffer);
+  let xlsBuffer = normalizeExcelBuffer(await workbook.xlsx.writeBuffer());
   console.log(`[ExcelExport] orderId=${orderId} stage=writebuffer-complete bytes=${xlsBuffer.length}`);
 
   if (xlsBuffer.length === 0) {
@@ -438,24 +458,25 @@ async function buildInvoiceWorkbookBuffer(params: InvoiceWorkbookParams): Promis
     const tempPath = path.join(os.tmpdir(), `invoice-${crypto.randomUUID()}.xlsx`);
     try {
       await workbook.xlsx.writeFile(tempPath);
-      xlsBuffer = await fs.promises.readFile(tempPath);
+      xlsBuffer = normalizeExcelBuffer(await fs.promises.readFile(tempPath));
       console.log(`[ExcelExport] orderId=${orderId} stage=writefile-complete bytes=${xlsBuffer.length}`);
     } finally {
       fs.promises.unlink(tempPath).catch(() => {});
     }
   }
 
-  if (xlsBuffer.length === 0) {
-    throw new Error("Generated workbook buffer is empty");
-  }
-  // Verify ZIP/XLSX magic bytes: first two bytes must be PK (0x50 0x4B)
-  if (xlsBuffer[0] !== 0x50 || xlsBuffer[1] !== 0x4B) {
-    throw new Error(
-      `Generated buffer has invalid XLSX signature: 0x${xlsBuffer[0].toString(16)} 0x${xlsBuffer[1].toString(16)}`
-    );
+  if (xlsBuffer.length < 2) {
+    throw new Error("Generated workbook buffer is too small");
   }
 
-  console.log(`[ExcelExport] orderId=${orderId} stage=response-sent bytes=${xlsBuffer.length}`);
+  // Verify ZIP/XLSX magic bytes via Buffer methods — never index-access .toString()
+  const signature = xlsBuffer.subarray(0, 2).toString("ascii");
+  if (signature !== "PK") {
+    const signatureHex = xlsBuffer.subarray(0, 2).toString("hex");
+    throw new Error(`Generated buffer has invalid XLSX signature: ${signatureHex || "missing"}`);
+  }
+
+  console.log(`[ExcelExport] orderId=${orderId} stage=buffer-validated bytes=${xlsBuffer.length}`);
   return xlsBuffer;
 }
 
@@ -600,6 +621,7 @@ export function registerOrderExcelExportRoutes(app: Express) {
       res.setHeader("Pragma", "no-cache");
       res.setHeader("X-Content-Type-Options", "nosniff");
       res.end(xlsBuffer);
+      console.log(`[ExcelExport] orderId=${orderId} stage=response-sent bytes=${xlsBuffer.length}`);
     } catch (error: any) {
       console.error(`[ExcelExport] /export/excel failed:`, error.message, error.stack);
       if (!res.headersSent) res.status(500).json({ message: error.message });
@@ -722,6 +744,7 @@ export function registerOrderExcelExportRoutes(app: Express) {
       res.setHeader("Pragma", "no-cache");
       res.setHeader("X-Content-Type-Options", "nosniff");
       res.end(xlsBuffer);
+      console.log(`[ExcelExport] orderId=${orderId} stage=response-sent bytes=${xlsBuffer.length}`);
     } catch (error: any) {
       console.error(`[ExcelExport] /export-excel failed:`, error.message, error.stack);
       if (!res.headersSent) {
