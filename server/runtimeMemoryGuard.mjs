@@ -1,5 +1,6 @@
 import "./deploymentPreflight.mjs";
 import "./runtimeReleaseState.mjs";
+import "./runtimeSecurityGuard.mjs";
 import "./runtimeHealthGuard.mjs";
 import "./runtimeObservability.mjs";
 import "./runtimeLifecycleGuard.mjs";
