@@ -911,12 +911,15 @@ export function registerFactoryInvoiceLoadingRoutes(app: Express) {
       }
 
       const filename = buildSafeFilename([inv.containerNumber, inv.customerName, inv.destination], "xlsx");
+      // Build buffer BEFORE setting headers so a failed writeBuffer() can still return a JSON 500.
+      const xlsBuf1 = Buffer.from(await wb.xlsx.writeBuffer());
       res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
       res.setHeader("Content-Disposition", contentDisposition(filename));
-            res.end(await wb.xlsx.writeBuffer());
+      res.setHeader("Content-Length", xlsBuf1.byteLength);
+      res.end(xlsBuf1);
     } catch (error: any) {
       console.error("loading report excel error:", error);
-      res.status(500).json({ message: error.message });
+      if (!res.headersSent) res.status(500).json({ message: error.message });
     }
   });
 
@@ -1230,11 +1233,14 @@ ${
         [invoice?.containerNumber, invoice?.customerName, invoice?.destination],
         "xlsx"
       );
+      // Build buffer BEFORE setting headers so a failed writeBuffer() can still return a JSON 500.
+      const xlsBuf2 = Buffer.from(await wb.xlsx.writeBuffer());
       res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
       res.setHeader("Content-Disposition", contentDisposition(filename));
-            res.end(await wb.xlsx.writeBuffer());
+      res.setHeader("Content-Length", xlsBuf2.byteLength);
+      res.end(xlsBuf2);
     } catch (error: any) {
-      res.status(500).json({ message: error.message });
+      if (!res.headersSent) res.status(500).json({ message: error.message });
     }
   });
 

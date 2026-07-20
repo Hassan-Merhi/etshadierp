@@ -1,11 +1,11 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
+import { useState, useCallback } from "react";
 import { useAppMode } from "@/contexts/AppModeContext";
 import { getApiRequest } from "@/lib/factoryApi";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useState } from "react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useLocation } from "wouter";
@@ -94,6 +94,33 @@ export default function FactoryInvoices() {
       return next;
     });
   };
+
+  // Using fetch+blob instead of window.open() ensures auth cookies are always sent,
+  // and surfaces server errors as a toast instead of leaving the browser with a 0-byte file.
+  const downloadFromUrl = useCallback(async (url: string, fallbackName: string) => {
+    try {
+      const res = await fetch(url, { credentials: "include" });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ message: res.statusText }));
+        toast({ title: "Download failed", description: err.message || res.statusText, variant: "destructive" });
+        return;
+      }
+      const blob = await res.blob();
+      const disposition = res.headers.get("Content-Disposition") || "";
+      const match = disposition.match(/filename\*?=(?:UTF-8''|")?([^";\n]+)/i);
+      const fileName = match ? decodeURIComponent(match[1].replace(/"/g, "")) : fallbackName;
+      const blobUrl = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = blobUrl;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(blobUrl);
+    } catch (e: any) {
+      toast({ title: "Download failed", description: e.message || "Network error", variant: "destructive" });
+    }
+  }, [toast]);
 
   const { data: myAccess } = useQuery<any>({ queryKey: ["/api/factory/my-access"], staleTime: 5 * 60000 });
   const isAdmin = myAccess?.fullAccess === true;
@@ -573,7 +600,7 @@ export default function FactoryInvoices() {
                                 <DropdownMenuContent align="end">
                                   <DropdownMenuItem
                                     onClick={() =>
-                                      window.open(`/api/factory/customer-orders/${order.id}/export/excel`, "_blank")
+                                      downloadFromUrl(`/api/factory/customer-orders/${order.id}/export/excel`, "invoice.xlsx")
                                     }
                                     data-testid={`button-download-excel-${order.id}`}
                                   >
@@ -582,9 +609,9 @@ export default function FactoryInvoices() {
                                   </DropdownMenuItem>
                                   <DropdownMenuItem
                                     onClick={() =>
-                                      window.open(
+                                      downloadFromUrl(
                                         `/api/factory/customer-orders/${order.id}/export-excel?noCharges=1`,
-                                        "_blank"
+                                        "invoice-no-charges.xlsx"
                                       )
                                     }
                                     data-testid={`button-download-excel-no-charges-${order.id}`}
@@ -594,7 +621,7 @@ export default function FactoryInvoices() {
                                   </DropdownMenuItem>
                                   <DropdownMenuItem
                                     onClick={() =>
-                                      window.open(`/api/factory/customer-orders/${order.id}/export-pdf`, "_blank")
+                                      downloadFromUrl(`/api/factory/customer-orders/${order.id}/export-pdf`, "invoice.pdf")
                                     }
                                     data-testid={`button-download-pdf-${order.id}`}
                                   >
@@ -603,9 +630,9 @@ export default function FactoryInvoices() {
                                   </DropdownMenuItem>
                                   <DropdownMenuItem
                                     onClick={() =>
-                                      window.open(
+                                      downloadFromUrl(
                                         `/api/factory/customer-orders/${order.id}/export-pdf?noCharges=1`,
-                                        "_blank"
+                                        "invoice-no-charges.pdf"
                                       )
                                     }
                                     data-testid={`button-download-pdf-no-charges-${order.id}`}
@@ -616,9 +643,9 @@ export default function FactoryInvoices() {
                                   {isAdmin && (
                                     <DropdownMenuItem
                                       onClick={() =>
-                                        window.open(
+                                        downloadFromUrl(
                                           `/api/factory/customer-orders/${order.id}/loading-status-export`,
-                                          "_blank"
+                                          "loading-status.xlsx"
                                         )
                                       }
                                       data-testid={`button-download-loading-status-${order.id}`}

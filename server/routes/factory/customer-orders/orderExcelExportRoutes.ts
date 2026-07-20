@@ -466,12 +466,15 @@ export function registerOrderExcelExportRoutes(app: Express) {
       }
 
       const fileName = buildExportFilename([order.containerNumber, customer?.legalName, order.destination], "xlsx");
+      // Build buffer BEFORE setting headers — if ExcelJS throws, catch can still send a clean JSON 500.
+      const xlsBuffer = Buffer.from(await workbook.xlsx.writeBuffer());
       res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
       res.setHeader("Content-Disposition", contentDisposition(fileName));
-            res.end(await workbook.xlsx.writeBuffer());
+      res.setHeader("Content-Length", xlsBuffer.byteLength);
+      res.end(xlsBuffer);
     } catch (error: any) {
       console.error("Error exporting order to Excel:", error);
-      res.status(500).json({ message: error.message });
+      if (!res.headersSent) res.status(500).json({ message: error.message });
     }
   });
 
