@@ -37,27 +37,55 @@ BEGIN
       OR NEW.rate_convention IS DISTINCT FROM OLD.rate_convention;
   END IF;
 
-  -- A normalized CFA row must never be edited by changing only the legacy base
-  -- columns. That would leave the immutable native amount/rate stale. Explicitly
-  -- require the application to submit the transaction/base fields together.
+  -- Legacy update callers still submit debit_amount/credit_amount. Once a row is
+  -- normalized, interpret those changed values as NEW transaction-currency amounts
+  -- and recompute historical base using the row's already locked rate/convention.
   IF TG_OP = 'UPDATE'
      AND OLD.transaction_currency IS NOT NULL
      AND NOT dual_fields_changed
      AND (NEW.debit_amount IS DISTINCT FROM OLD.debit_amount
           OR NEW.credit_amount IS DISTINCT FROM OLD.credit_amount) THEN
-    IF UPPER(OLD.transaction_currency) IN ('CFA', 'XOF') THEN
-      RAISE EXCEPTION
-        'CFA voucher entry % must be edited through transaction/base currency fields, not debit_amount/credit_amount alone',
-        OLD.id;
+    raw_debit := COALESCE(NEW.debit_amount, 0)::numeric;
+    raw_credit := COALESCE(NEW.credit_amount, 0)::numeric;
+
+    IF raw_debit < 0 OR raw_credit < 0 THEN
+      RAISE EXCEPTION 'Voucher entry amounts cannot be negative';
     END IF;
-    -- USD identity entries can safely mirror a legacy-only update.
-    NEW.transaction_currency := 'USD';
-    NEW.transaction_debit_amount := COALESCE(NEW.debit_amount, 0)::numeric;
-    NEW.transaction_credit_amount := COALESCE(NEW.credit_amount, 0)::numeric;
-    NEW.base_debit_amount := NEW.transaction_debit_amount;
-    NEW.base_credit_amount := NEW.transaction_credit_amount;
-    NEW.historical_exchange_rate := 1.0000000000;
-    NEW.rate_convention := 'IDENTITY';
+    IF raw_debit > 0 AND raw_credit > 0 THEN
+      RAISE EXCEPTION 'Voucher entry cannot contain both a debit and a credit amount';
+    END IF;
+    IF raw_debit = 0 AND raw_credit = 0 THEN
+      RAISE EXCEPTION 'Voucher entry must contain a debit or credit amount';
+    END IF;
+
+    NEW.transaction_currency := CASE WHEN UPPER(OLD.transaction_currency) = 'XOF' THEN 'CFA' ELSE UPPER(OLD.transaction_currency) END;
+    NEW.transaction_debit_amount := raw_debit;
+    NEW.transaction_credit_amount := raw_credit;
+    NEW.historical_exchange_rate := OLD.historical_exchange_rate;
+    NEW.rate_convention := OLD.rate_convention;
+
+    IF NEW.rate_convention = 'IDENTITY' THEN
+      NEW.base_debit_amount := raw_debit;
+      NEW.base_credit_amount := raw_credit;
+    ELSIF NEW.rate_convention = 'TRANSACTION_PER_BASE' THEN
+      IF NEW.historical_exchange_rate IS NULL OR NEW.historical_exchange_rate <= 0 THEN
+        RAISE EXCEPTION 'TRANSACTION_PER_BASE requires a positive historical rate';
+      END IF;
+      NEW.base_debit_amount := ROUND(raw_debit / NEW.historical_exchange_rate, 6);
+      NEW.base_credit_amount := ROUND(raw_credit / NEW.historical_exchange_rate, 6);
+    ELSIF NEW.rate_convention = 'BASE_PER_TRANSACTION' THEN
+      IF NEW.historical_exchange_rate IS NULL OR NEW.historical_exchange_rate <= 0 THEN
+        RAISE EXCEPTION 'BASE_PER_TRANSACTION requires a positive historical rate';
+      END IF;
+      NEW.base_debit_amount := ROUND(raw_debit * NEW.historical_exchange_rate, 6);
+      NEW.base_credit_amount := ROUND(raw_credit * NEW.historical_exchange_rate, 6);
+    ELSE
+      RAISE EXCEPTION 'Unknown voucher-entry rate convention %', NEW.rate_convention;
+    END IF;
+
+    NEW.debit_amount := NEW.base_debit_amount;
+    NEW.credit_amount := NEW.base_credit_amount;
+    RETURN NEW;
   END IF;
 
   -- Fully normalized application paths remain authoritative, but their fields
