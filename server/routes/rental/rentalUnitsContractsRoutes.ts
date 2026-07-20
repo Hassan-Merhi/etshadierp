@@ -1,4 +1,5 @@
 import type { Express, Request, Response } from "express";
+import { buildSafeFilename, contentDisposition } from "../../lib/contentDisposition";
 import type ExcelJS from "exceljs";
 import {
   getCompanyId,
@@ -927,9 +928,9 @@ export function registerRentalUnitsContractsRoutes(
       addPaymentSection("RENT PAYMENT HISTORY", payments);
       addPaymentSection("GUARANTEE / DEPOSIT ACTIVITY", guaranteePaymentsExport);
 
-      const filename = `Rental_${unit.unitNumber.replace(/\s+/g, "_")}_${contract.tenantName.replace(/\s+/g, "_")}.xlsx`;
+      const filename = buildSafeFilename(["Rental", unit.unitNumber, contract.tenantName], "xlsx");
       res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
-      res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+      res.setHeader("Content-Disposition", contentDisposition(filename));
             res.end(await wb.xlsx.writeBuffer());
     } catch (e: any) {
       console.error(`${tag} statement export:`, e);

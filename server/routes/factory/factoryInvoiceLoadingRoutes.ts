@@ -1,4 +1,5 @@
 import { parseId, parseOptionalId } from "../../lib/parseId";
+import { buildSafeFilename, contentDisposition } from "../../lib/contentDisposition";
 import type { Express } from "express";
 import { db } from "../../db";
 import { requireAuth } from "../../auth";
@@ -21,20 +22,6 @@ import { eq, and, or, inArray, not, sql, ne } from "drizzle-orm";
 
 function getCompanyId(req: any): number | null {
   return (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId || null;
-}
-
-function buildExportFilename(parts: (string | null | undefined)[], ext: string): string {
-  const safe = parts
-    .filter((p): p is string => Boolean(p && p.trim()))
-    .map((p) =>
-      p
-        .replace(/[\\/*?:[\]<>|]/g, "")
-        .replace(/\s+/g, "_")
-        .trim()
-    )
-    .filter((p) => p.length > 0);
-  const base = safe.join("_") || "export";
-  return ext ? `${base}.${ext}` : base;
 }
 
 /**
@@ -923,9 +910,9 @@ export function registerFactoryInvoiceLoadingRoutes(app: Express) {
         tr.height = 16;
       }
 
-      const filename = buildExportFilename([inv.containerNumber, inv.customerName, inv.destination], "xlsx");
-      res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+      const filename = buildSafeFilename([inv.containerNumber, inv.customerName, inv.destination], "xlsx");
       res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+      res.setHeader("Content-Disposition", contentDisposition(filename));
             res.end(await wb.xlsx.writeBuffer());
     } catch (error: any) {
       console.error("loading report excel error:", error);
@@ -1239,12 +1226,12 @@ ${
         tr.height = 16;
       }
 
-      const filename = buildExportFilename(
+      const filename = buildSafeFilename(
         [invoice?.containerNumber, invoice?.customerName, invoice?.destination],
         "xlsx"
       );
-      res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
       res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+      res.setHeader("Content-Disposition", contentDisposition(filename));
             res.end(await wb.xlsx.writeBuffer());
     } catch (error: any) {
       res.status(500).json({ message: error.message });
@@ -1299,7 +1286,7 @@ ${
 
       const remainingBales = invoiceSummary?.invoiceBales.filter((b) => !b.loaded) ?? [];
 
-      const pdfTitle = buildExportFilename([invoice?.containerNumber, invoice?.customerName, invoice?.destination], "");
+      const pdfTitle = buildSafeFilename([invoice?.containerNumber, invoice?.customerName, invoice?.destination], "");
       const html = `<!DOCTYPE html><html><head><meta charset="utf-8">
 <title>${pdfTitle || `Loading Session #${session.id}`}</title>
 <style>

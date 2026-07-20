@@ -1,6 +1,7 @@
 import type { Express } from "express";
 import { db } from "../../db";
 import { storage } from "../../storage";
+import { buildSafeFilename, contentDisposition } from "../../lib/contentDisposition";
 import { requireAuth, checkPOSLocation } from "../../auth";
 import { calculateHistoricalLocationInventory } from "../_helpers";
 import { getClientDate } from "../../lib/dateUtils";
@@ -200,7 +201,7 @@ export function registerLocationInventoryRoutes(app: Express) {
       res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
       res.setHeader(
         "Content-Disposition",
-        `attachment; filename="${location.name}_inventory_${getClientDate(req)}.xlsx"`
+        contentDisposition(buildSafeFilename([location.name, "inventory", getClientDate(req)], "xlsx"))
       );
       res.send(excelBuffer);
     } catch (error: any) {

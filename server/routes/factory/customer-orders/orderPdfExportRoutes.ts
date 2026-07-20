@@ -1,3 +1,4 @@
+import { contentDisposition } from "../../../lib/contentDisposition";
 import { trackOneContainerById } from "../../../services/containerTrackingService";
 import { parseId, parseOptionalId } from "../../../lib/parseId";
 import { dispatchNotification } from "../../../lib/notificationService";
@@ -223,9 +224,9 @@ export function registerOrderPdfExportRoutes(app: Express) {
       totalRow.getCell("weight").numFmt = "#,##0.00";
       totalRow.getCell("totalWeight").numFmt = "#,##0.00";
 
-      const safeName = customerName.replace(/[^a-zA-Z0-9_\-]/g, "_");
+      const safeName = buildExportFilename([String(orderId), customerName], "xlsx");
       res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
-      res.setHeader("Content-Disposition", `attachment; filename="loading_${orderId}_${safeName}.xlsx"`);
+      res.setHeader("Content-Disposition", contentDisposition(`loading_${safeName}`));
             res.end(await workbook.xlsx.writeBuffer());
     } catch (error: any) {
       console.error("Error exporting pending loading:", error);
@@ -300,7 +301,7 @@ export function registerOrderPdfExportRoutes(app: Express) {
       res.setHeader("Content-Type", "application/pdf");
       res.setHeader(
         "Content-Disposition",
-        `attachment; filename="${buildExportFilename([order.containerNumber, order.customerName, order.destination], "pdf")}"`
+        contentDisposition(buildExportFilename([order.containerNumber, order.customerName, order.destination], "pdf"))
       );
       doc.pipe(res);
 
@@ -897,7 +898,7 @@ export function registerOrderPdfExportRoutes(app: Express) {
       res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
       res.setHeader(
         "Content-Disposition",
-        `attachment; filename="${buildExportFilename([order.containerNumber, order.customerName, order.destination], "xlsx")}"`
+        contentDisposition(buildExportFilename([order.containerNumber, order.customerName, order.destination], "xlsx"))
       );
             res.end(await workbook.xlsx.writeBuffer());
     } catch (error: any) {

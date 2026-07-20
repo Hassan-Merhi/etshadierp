@@ -1,6 +1,7 @@
 import { getClientDate } from "../../lib/dateUtils";
 import type { Express } from "express";
 import { db } from "../../db";
+import { sanitiseFilename, contentDisposition } from "../../lib/contentDisposition";
 import { broadcast } from "../../wsServer";
 import { requireAuth } from "../../auth";
 import { classifyNetPositionAccounts } from "../../netPositionHelper";
@@ -459,7 +460,7 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
         const ct = doc.mimeType || "application/octet-stream";
         res.setHeader("Content-Type", ct);
         const isInline = ct.startsWith("image/") || ct === "application/pdf";
-        res.setHeader("Content-Disposition", `${isInline ? "inline" : "attachment"}; filename="${doc.fileName}"`);
+        res.setHeader("Content-Disposition", contentDisposition(sanitiseFilename(doc.fileName || "download"), isInline ? "inline" : "attachment"));
         return res.send(buffer);
       }
 

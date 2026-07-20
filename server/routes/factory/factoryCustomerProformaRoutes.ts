@@ -1,6 +1,7 @@
 import { parseId, parseOptionalId } from "../../lib/parseId";
 import { getClientDate } from "../../lib/dateUtils";
 import { getExportPriceVisibility } from "../../helpers/exportVisibility";
+import { buildSafeFilename, contentDisposition } from "../../lib/contentDisposition";
 import { syncProformaReservations, isFactoryV2Company, computeFreeToPromise } from "./_stockReservationHelper";
 import { sqlArray } from "../../lib/sqlArray";
 import type { Express } from "express";
@@ -1678,7 +1679,7 @@ export function registerFactoryCustomerProformaRoutes(app: Express) {
       if (!hideSellingExcel) totRow.getCell(8).alignment = { horizontal: "right" };
 
       res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
-      res.setHeader("Content-Disposition", `attachment; filename=proforma_${proforma.name.replace(/\s+/g, "_")}.xlsx`);
+      res.setHeader("Content-Disposition", contentDisposition(buildSafeFilename(["proforma", proforma.name], "xlsx")));
             res.end(await workbook.xlsx.writeBuffer());
     } catch (error: any) {
       console.error("Error exporting proforma to Excel:", error);
@@ -1770,7 +1771,7 @@ export function registerFactoryCustomerProformaRoutes(app: Express) {
 
       const doc = new PDFDocument({ margin: 40, size: "A4" });
       res.setHeader("Content-Type", "application/pdf");
-      res.setHeader("Content-Disposition", `attachment; filename=proforma_${proforma.name.replace(/\s+/g, "_")}.pdf`);
+      res.setHeader("Content-Disposition", contentDisposition(buildSafeFilename(["proforma", proforma.name], "pdf")));
       doc.pipe(res);
 
       // ── Header ──

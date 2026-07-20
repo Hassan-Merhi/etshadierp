@@ -182,8 +182,8 @@ interface ZeroCostSourceTokenPayload {
 export function registerRawStockRecalcRoutes(app: Express) {
   // Ensure the undo log table exists (idempotent, runs once at startup).
   ensureUndoLogTable().catch((err) => console.error("[recalc] Failed to create undo log table:", err));
-  // DEFECT 11 FIX: ensure consumed-tokens table has all D11 columns (idempotent on existing DBs).
-  ensureTokenTable().catch((err) => console.error("[recalc] Failed to ensure token table schema:", err));
+  // FIX 11: ensureTokenTable removed — consumed-tokens table DDL lives in migration
+  // 20260718_factory_replay_consumed_tokens.sql; no startup DDL needed here.
 
   // Read-only diff preview — never writes anything. Admin/Developer-only: this
   // surfaces exact stored vs. corrected landed-cost figures for every container.

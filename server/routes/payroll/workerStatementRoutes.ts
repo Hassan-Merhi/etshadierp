@@ -1,6 +1,7 @@
 import { parseId, parseOptionalId } from "../../lib/parseId";
 import { getClientDate } from "../../lib/dateUtils";
 import type { Express } from "express";
+import { buildSafeFilename, contentDisposition } from "../../lib/contentDisposition";
 import { db } from "../../db";
 import { requireAuth } from "../../auth";
 import { eq, and, desc, sql, ilike, gte, lte, inArray, isNotNull, isNull } from "drizzle-orm";
@@ -601,7 +602,7 @@ export function registerWorkerStatementRoutes(app: Express) {
       const doc = new PDFDocument({ margin: 40, size: "A4" });
       if (hasArabicFont) doc.registerFont("Arabic", arabicFontPath);
       res.setHeader("Content-Type", "application/pdf");
-      res.setHeader("Content-Disposition", `attachment; filename=statement_${workerName.replace(/\s+/g, "_")}.pdf`);
+      res.setHeader("Content-Disposition", contentDisposition(buildSafeFilename(["statement", workerName], "pdf")));
       doc.pipe(res);
 
       // Arabic reshaping helpers — always loaded

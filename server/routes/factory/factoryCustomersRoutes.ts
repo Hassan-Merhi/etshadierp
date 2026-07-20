@@ -1,4 +1,5 @@
 import { getClientDate } from "../../lib/dateUtils";
+import { buildSafeFilename, contentDisposition } from "../../lib/contentDisposition";
 import type { Express } from "express";
 import { db } from "../../db";
 import { requireAuth } from "../../auth";
@@ -915,12 +916,7 @@ export function registerFactoryCustomersRoutes(app: Express) {
       res.setHeader("Content-Type", "application/pdf");
       res.setHeader(
         "Content-Disposition",
-        `attachment; filename="${(customer.legalName || customer.code || String(customerId))
-          .replace(/[^\x20-\x7E]/g, "")
-          .replace(/"/g, "")
-          .replace(/[^\w\s.()\-]/g, "_")
-          .replace(/\s+/g, "_")
-          .trim() || "customer"}_Statement.pdf"`
+        contentDisposition(buildSafeFilename([customer.legalName || customer.code || String(customerId)], "") + "_Statement.pdf")
       );
       doc.pipe(res);
 
@@ -1573,11 +1569,7 @@ export function registerFactoryCustomersRoutes(app: Express) {
       res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
       res.setHeader(
         "Content-Disposition",
-        `attachment; filename="${(customer.legalName || "customer")
-          .replace(/[^\x20-\x7E]/g, "")
-          .replace(/"/g, "")
-          .replace(/\s+/g, "_")
-          .trim() || "customer"}_Statement.xlsx"`
+        contentDisposition(buildSafeFilename([customer.legalName || "customer"], "") + "_Statement.xlsx")
       );
             res.end(await workbook.xlsx.writeBuffer());
     } catch (error: any) {

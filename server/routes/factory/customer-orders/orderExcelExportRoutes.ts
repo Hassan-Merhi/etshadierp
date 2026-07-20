@@ -1,3 +1,4 @@
+import { contentDisposition } from "../../../lib/contentDisposition";
 import { trackOneContainerById } from "../../../services/containerTrackingService";
 import { parseId, parseOptionalId } from "../../../lib/parseId";
 import { dispatchNotification } from "../../../lib/notificationService";
@@ -466,7 +467,7 @@ export function registerOrderExcelExportRoutes(app: Express) {
 
       const fileName = buildExportFilename([order.containerNumber, customer?.legalName, order.destination], "xlsx");
       res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
-      res.setHeader("Content-Disposition", `attachment; filename="${fileName}"`);
+      res.setHeader("Content-Disposition", contentDisposition(fileName));
             res.end(await workbook.xlsx.writeBuffer());
     } catch (error: any) {
       console.error("Error exporting order to Excel:", error);
@@ -785,7 +786,7 @@ export function registerOrderExcelExportRoutes(app: Express) {
 
       const fileName = buildExportFilename([order.containerNumber, order.customerName, order.destination], "xlsx");
       res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
-      res.setHeader("Content-Disposition", `attachment; filename="${fileName}"`);
+      res.setHeader("Content-Disposition", contentDisposition(fileName));
             res.end(await workbook.xlsx.writeBuffer());
     } catch (error: any) {
       console.error("Error exporting order to Excel:", error);

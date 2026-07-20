@@ -1,5 +1,6 @@
 import { parseId, parseOptionalId } from "../../../lib/parseId";
 import { getClientDate } from "../../../lib/dateUtils";
+import { buildSafeFilename, contentDisposition } from "../../../lib/contentDisposition";
 import type { Express } from "express";
 import { db } from "../../../db";
 import { requireAuth } from "../../../auth";
@@ -822,7 +823,7 @@ export function registerSupplierBrokerRoutes(app: Express) {
       res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
       res.setHeader(
         "Content-Disposition",
-        `attachment; filename="broker-statement-${(data.supplier as any).name?.replace(/\s+/g, "-") || brokerId}-${getClientDate(req)}.xlsx"`
+        contentDisposition(buildSafeFilename(["broker-statement", (data.supplier as any).name || String(brokerId), getClientDate(req)], "xlsx"))
       );
             res.end(await wb.xlsx.writeBuffer());
     } catch (err: any) {

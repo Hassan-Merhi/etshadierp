@@ -124,21 +124,7 @@ import multer from "multer";
 import path from "path";
 import fs from "fs";
 
-export function buildExportFilename(parts: (string | null | undefined)[], ext: string): string {
-  const safe = parts
-    .filter((p): p is string => Boolean(p && p.trim()))
-    .map((p) =>
-      p
-        .replace(/[^\x20-\x7E]/g, "")  // strip non-ASCII / non-printable (prevents ERR_INVALID_CHAR in headers)
-        .replace(/["]/g, "")            // strip double-quotes (would break the quoted header value)
-        .replace(/[\\/*?:[\]<>|]/g, "") // strip filesystem-unsafe chars
-        .replace(/\s+/g, "_")
-        .trim()
-    )
-    .filter((p) => p.length > 0);
-  const base = safe.join("_") || "export";
-  return ext ? `${base}.${ext}` : base;
-}
+export { buildSafeFilename as buildExportFilename } from "../../../lib/contentDisposition";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Shared helper: build the Commercial Invoice Excel workbook for an order and
