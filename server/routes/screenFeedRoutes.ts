@@ -5,6 +5,11 @@ import {
   isValidScreenFeedDataUrl,
   sanitizeScreenFeedClicks,
 } from "../services/screenFeedService";
+import {
+  getSessionRole,
+  getSessionUserId,
+  getSessionUsername,
+} from "../lib/requestContext";
 
 // How long (ms) after a watcher's last GET we still consider the user "being watched".
 // Must be comfortably larger than the watcher's poll interval (~3–5 s) to avoid
@@ -26,7 +31,7 @@ export function registerScreenFeedRoutes(app: Express) {
   app.get("/api/screen-feed/being-watched", requireLogin, (req, res) => {
     if (SCREEN_FEED_DISABLED) return res.json({ watched: false });
 
-    const userId = String(req.session.userId!);
+    const userId = String(getSessionUserId(req));
     const lastPoll = watcherPollStore.get(userId) ?? 0;
     const ageMs = Date.now() - lastPoll;
     const watched = lastPoll > 0 && ageMs < WATCHER_TIMEOUT_MS;
@@ -45,7 +50,7 @@ export function registerScreenFeedRoutes(app: Express) {
   // Registered BEFORE /:userId so "trace" is not mistaken for a userId.
   app.get("/api/screen-feed/trace/:event", requireLogin, (req, res) => {
     if (!isDev) return res.status(204).end();
-    const userId = String(req.session.userId!);
+    const userId = String(getSessionUserId(req));
     const event = req.params.event;
     const extra = req.query.d ? String(req.query.d) : "";
     console.log(`[ScreenFeed][TRACE] userId=${userId} event=${event}${extra ? " d=" + extra : ""}`);
@@ -56,9 +61,10 @@ export function registerScreenFeedRoutes(app: Express) {
   app.post("/api/screen-feed", requireLogin, (req, res) => {
     if (SCREEN_FEED_DISABLED) return res.status(200).end();
 
+    const userId = String(getSessionUserId(req));
     if (isDev) {
       console.log(
-        `[ScreenFeed] POST /api/screen-feed received from userId=${String(req.session.userId!)} body_keys=${Object.keys(req.body ?? {}).join(",")}`,
+        `[ScreenFeed] POST /api/screen-feed received from userId=${userId} body_keys=${Object.keys(req.body ?? {}).join(",")}`,
       );
     }
 
@@ -77,9 +83,7 @@ export function registerScreenFeedRoutes(app: Express) {
       return res.status(204).end();
     }
 
-    const userId = String(req.session.userId!);
-    const sessionWithUsername = req.session as typeof req.session & { username?: string };
-    const username = sessionWithUsername.username || userId;
+    const username = getSessionUsername(req) || userId;
     const safeClicks = sanitizeScreenFeedClicks(clicks);
     screenFeedStore.set(userId, { dataUrl, capturedAt: new Date(), userId, username, clicks: safeClicks });
 
@@ -94,8 +98,7 @@ export function registerScreenFeedRoutes(app: Express) {
 
   // GET: Developer polls the latest frame + clicks for a specific watched user.
   app.get("/api/screen-feed/:userId", requireAuth, (req, res) => {
-    const role = req.session.currentRole;
-    if (role !== "Developer") {
+    if (getSessionRole(req) !== "Developer") {
       return res.status(403).json({ message: "Access denied." });
     }
 
