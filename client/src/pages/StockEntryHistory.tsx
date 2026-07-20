@@ -175,14 +175,16 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
   const today = new Date().toLocaleDateString("en-CA");
   const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toLocaleDateString("en-CA");
 
-  const [useDateFilter, setUseDateFilter] = useState(true);
+  // fromActive: send startDate; toActive: send endDate (activating To deactivates From)
+  const [fromActive, setFromActive] = useState(true);
+  const [toActive, setToActive] = useState(true);
   const [fromDate, setFromDate] = useState(today);
   const [toDate, setToDate] = useState(today);
 
   useEffect(() => {
     if (!onActiveDateChange) return;
-    onActiveDateChange(useDateFilter ? fromDate : null);
-  }, [useDateFilter, fromDate]);
+    onActiveDateChange(fromActive ? fromDate : null);
+  }, [fromActive, fromDate]);
 
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [workerIdFilter, setWorkerIdFilter] = useState("all");
@@ -204,10 +206,8 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
   const useLite = viewMode === "condensed";
 
   const params = new URLSearchParams();
-  if (useDateFilter) {
-    params.set("startDate", fromDate);
-    params.set("endDate", toDate);
-  }
+  if (fromActive) params.set("startDate", fromDate);
+  if (toActive) params.set("endDate", toDate);
   if (workerIdFilter !== "all") params.set("workerId", workerIdFilter);
   if (productIdFilter !== "all") params.set("productId", productIdFilter);
   if (locationIdFilter !== "all") params.set("locationId", locationIdFilter);
@@ -238,7 +238,7 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
   });
 
   // Fetch production plan targets when viewing a single day
-  const planDate = useDateFilter && fromDate === toDate ? fromDate : null;
+  const planDate = fromActive && toActive && fromDate === toDate ? fromDate : null;
   const { data: workerTargets = {} } = useQuery<Record<number, { targetBales: number; workerCount: number }>>({
     queryKey: ["/api/factory/production-planner", planDate, "worker-targets"],
     queryFn: () =>
@@ -367,7 +367,7 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
   const sendWorkerPdfWaMutation = useMutation({
     mutationFn: async () => {
       const res = await apiRequest("POST", "/api/factory/bales/send-worker-pdf-whatsapp", {
-        date: useDateFilter ? fromDate : today,
+        date: fromActive ? fromDate : today,
       });
       if (!res.ok) {
         const e = await res.json();
@@ -458,7 +458,8 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
   }
 
   function resetFilters() {
-    setUseDateFilter(false);
+    setFromActive(false);
+    setToActive(false);
     setFromDate(today);
     setToDate(today);
     setCategoryFilter("all");
@@ -1068,33 +1069,48 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
       {/* ── Date + Search band ── */}
       <div className="flex items-center gap-2 px-3 py-2 rounded-xl border bg-muted/30 flex-wrap">
         <Button
-          variant={useDateFilter ? "default" : "ghost"}
+          variant={fromActive ? "default" : "ghost"}
           size="sm"
-          onClick={() => setUseDateFilter((v) => !v)}
-          data-testid="button-toggle-date-filter"
+          onClick={() => setFromActive((v) => !v)}
+          data-testid="button-toggle-from-date"
           className="toggle-elevate shrink-0 h-7 px-2.5 text-xs"
         >
           <CalendarRange className="w-3.5 h-3.5 mr-1.5" />
-          Date
+          From
         </Button>
-        {useDateFilter && (
-          <>
-            <Input
-              type="date"
-              value={fromDate}
-              onChange={(e) => setFromDate(e.target.value)}
-              data-testid="input-from-date"
-              className="w-34 h-7 text-xs shrink-0"
-            />
-            <span className="text-muted-foreground text-xs shrink-0">to</span>
-            <Input
-              type="date"
-              value={toDate}
-              onChange={(e) => setToDate(e.target.value)}
-              data-testid="input-to-date"
-              className="w-34 h-7 text-xs shrink-0"
-            />
-          </>
+        {fromActive && (
+          <Input
+            type="date"
+            value={fromDate}
+            onChange={(e) => setFromDate(e.target.value)}
+            data-testid="input-from-date"
+            className="w-34 h-7 text-xs shrink-0"
+          />
+        )}
+        <Button
+          variant={toActive ? "default" : "ghost"}
+          size="sm"
+          onClick={() => {
+            setToActive((prev) => {
+              const next = !prev;
+              // Activating "To" ignores "From" — deactivate it automatically
+              if (next) setFromActive(false);
+              return next;
+            });
+          }}
+          data-testid="button-toggle-to-date"
+          className="toggle-elevate shrink-0 h-7 px-2.5 text-xs"
+        >
+          To
+        </Button>
+        {toActive && (
+          <Input
+            type="date"
+            value={toDate}
+            onChange={(e) => setToDate(e.target.value)}
+            data-testid="input-to-date"
+            className="w-34 h-7 text-xs shrink-0"
+          />
         )}
         <div className="relative flex-1 min-w-[180px]">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
