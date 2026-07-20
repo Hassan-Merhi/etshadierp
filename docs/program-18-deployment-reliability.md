@@ -2,7 +2,7 @@
 
 ## Objective
 
-Make production startup deterministic and fail fast on invalid deployment configuration without changing application routes, database schema, migrations, accounting, inventory, costing, authorization, API contracts, or runtime business behavior.
+Make production startup, release identity, readiness, and shutdown behavior deterministic without changing application routes, database schema, migrations, accounting, inventory, costing, authorization, API contracts, or runtime business behavior.
 
 ## Phase 18A — Deployment Configuration Ownership
 
@@ -14,7 +14,43 @@ Make production startup deterministic and fail fast on invalid deployment config
 - Established one safe build-version fallback order: `BUILD_VERSION`, `RENDER_GIT_COMMIT`, `REPL_SLUG`, then `dev`.
 - Added startup logging for accepted deployment configuration without exposing credentials, connection strings, passwords, or session secrets.
 
-### Supported settings
+## Phase 18B — Production Startup Preflight
+
+### Completed
+
+- Wired deployment preflight into `server/runtimeMemoryGuard.mjs`, which loads before `dist/index.js` in production.
+- Production now fails before the application bundle loads when required deployment configuration is absent or invalid.
+- Development remains non-blocking: invalid bounded values warn and fall back to documented defaults.
+- Database validation accepts either `DATABASE_URL` or the complete PostgreSQL environment variable set.
+- Session-secret validation rejects missing or short production secrets before session middleware starts.
+- Preserved existing runtime memory, startup migration, readiness, and restart behavior.
+
+## Phase 18C — Release Identity and Readiness Ownership
+
+### Completed
+
+- Added `server/runtimeReleaseState.mjs` as the immutable runtime release record.
+- Captured only safe release metadata: build version, environment, database configuration source, and process start time.
+- Loaded release identity before health, observability, lifecycle, and application startup.
+- Removed duplicated production-environment validation from `runtimeHealthGuard.mjs`; the health guard now consumes validated preflight configuration.
+- Added release metadata to `/api/health/live` and `/api/health/ready` responses.
+- Kept liveness independent from database availability.
+- Kept readiness dependent on HTTP listening state, shutdown state, and a successful database probe.
+- Preserved existing health route paths and success/failure status semantics.
+
+## Phase 18D — Controlled Shutdown and Operational Handoff
+
+### Completed
+
+- Consolidated shutdown timeout ownership onto `deploymentRuntimeConfig.shutdownGraceMs`.
+- Removed the separate unvalidated `GRACEFUL_SHUTDOWN_TIMEOUT_MS` runtime path.
+- Preserved idempotent `SIGTERM` and `SIGINT` handling.
+- Preserved immediate rejection of new non-health API work once shutdown begins.
+- Preserved idle-connection closure and tracked HTTP server shutdown.
+- Added build identity and validated timeout metadata to shutdown logs.
+- Preserved the application entrypoint's existing downstream database-pool shutdown behavior.
+
+## Supported settings
 
 | Setting | Default | Accepted range / requirement |
 |---|---:|---|
@@ -27,37 +63,28 @@ Make production startup deterministic and fail fast on invalid deployment config
 | `SHUTDOWN_GRACE_MS` | 25000 | integer 1000–120000 |
 | `BUILD_VERSION` | provider-derived | non-secret release identifier |
 
-## Phase 18B — Production Startup Preflight
-
-### Completed
-
-- Wired deployment preflight into `server/runtimeMemoryGuard.mjs`, which is already imported before `dist/index.js` by the production `start` command.
-- Production now fails before the application bundle loads when required deployment configuration is absent or invalid.
-- Development remains non-blocking: invalid bounded values warn and fall back to documented defaults.
-- Database validation accepts either `DATABASE_URL` or the complete PostgreSQL environment variable set.
-- Session-secret validation rejects missing or short production secrets before session middleware starts.
-- Preflight logs only deployment metadata and bounded numeric settings; it never logs secret values or database connection details.
-- Preserved the existing runtime memory, health, observability, lifecycle, startup migration, readiness, and process-restart behavior.
-
 ## Release safety rules
 
 1. Production startup must pass deployment preflight before loading the server bundle.
-2. Secrets and connection strings must never be included in startup logs.
-3. Build identity must be stable across restarts of the same release.
-4. Readiness remains separate from liveness; startup migrations continue to control readiness in the existing server flow.
-5. Deployment validation must not execute migrations, mutate data, or contact external services.
-6. Provider-specific tuning must be bounded and documented before use.
+2. Secrets and connection strings must never be included in startup, health, or shutdown logs.
+3. Build identity must remain stable across restarts of the same release.
+4. Liveness must not depend on database connectivity.
+5. Readiness must return unavailable during shutdown or database failure.
+6. Shutdown must stop accepting new application work before closing tracked servers.
+7. Deployment validation must not execute migrations, mutate data, or contact external services.
 
-## Deferred work for later Program 18 phases
+## Explicitly not verified
 
-- graceful shutdown ownership consolidation;
-- release metadata exposure and deployment diagnostics;
-- build artifact and production dependency verification integration;
-- rollback and post-deploy verification documentation;
-- provider configuration files and health-check alignment where supported;
-- live deployment, migration, readiness, and rollback exercises.
+The following require a real deployment environment and were not claimed as completed:
 
-These require later phases or a real deployment environment and were not guessed or simulated here.
+- build artifact execution;
+- production dependency installation;
+- live database connectivity;
+- provider health-check configuration;
+- startup migration duration;
+- zero-downtime cutover;
+- rollback execution;
+- post-deploy business reconciliation.
 
 ## Safety
 
@@ -71,4 +98,6 @@ These require later phases or a real deployment environment and were not guessed
 - Active branch: `quality/program-18-deployment-reliability`
 - Phase 18A: complete.
 - Phase 18B: complete.
-- Program 18 remains unmerged until later phases are completed.
+- Phase 18C: complete.
+- Phase 18D: complete.
+- Program 18: complete and ready to merge.
