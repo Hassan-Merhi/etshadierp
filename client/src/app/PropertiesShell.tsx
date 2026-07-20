@@ -2,13 +2,10 @@ import { useState } from "react";
 import { AppModeProvider } from "@/contexts/AppModeContext";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { PropertiesSidebar } from "@/components/PropertiesSidebar";
-import { AppTopBar } from "@/components/AppTopBar";
 import { OfflineBanner } from "@/components/OfflineBanner";
 import { CommandPalette } from "@/components/CommandPalette";
-import { ModuleIdentity } from "@/components/navigation/module-identity";
 import { SkipLink } from "@/components/ui/responsive-accessibility";
 import { PropertiesRoutes } from "@/app/PropertiesRoutes";
-import { Building2 } from "lucide-react";
 import { canUseAdminSearch, type ShellUser } from "./shellUser";
 
 interface PropertiesShellProps {
@@ -30,23 +27,6 @@ export function PropertiesShell({ user, currentLocation, handleLogout, leaveConf
         <div className="flex h-full w-full min-w-0 overflow-hidden">
           <PropertiesSidebar user={user} />
           <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-            <AppTopBar
-              accentColor="hsl(var(--module-properties, var(--primary)))"
-              user={user}
-              onLogout={handleLogout}
-              onSearchOpen={() => setPaletteOpen(true)}
-              showSearch={hasAdminSearch}
-              leftContent={
-                <ModuleIdentity
-                  compact
-                  moduleName="Properties"
-                  description="Properties, tenants, billing, and collections"
-                  icon={Building2}
-                  tone="erp"
-                  className="hidden max-w-sm border-0 bg-transparent p-0 shadow-none sm:block"
-                />
-              }
-            />
             <OfflineBanner />
             <main
               id="main-content"

@@ -7,14 +7,10 @@ import { SidebarProvider } from "@/components/ui/sidebar";
 import { DailyRateModal } from "@/components/DailyRateModal";
 import { FactorySidebar } from "@/components/FactorySidebar";
 import { FactoryRoutes } from "@/components/FactoryRoutes";
-import { AppTopBar } from "@/components/AppTopBar";
 import { OfflineBanner } from "@/components/OfflineBanner";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { CommandPalette } from "@/components/CommandPalette";
-import { KeyboardShortcutsButton } from "@/components/KeyboardShortcuts";
-import { ModuleIdentity } from "@/components/navigation/module-identity";
 import { LoadingState } from "@/components/ui/page-state";
-import { Factory } from "lucide-react";
 import type { MyAccess } from "./factoryAccessGuard";
 import { canUseAdminSearch, type ShellUser } from "./shellUser";
 
@@ -61,25 +57,6 @@ export function FactoryShell({
           {selectedCompany?.id && <DailyRateModal companyId={selectedCompany.id} />}
           <FactorySidebar user={user} />
           <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-            <AppTopBar
-              accentColor="hsl(var(--module-factory))"
-              user={user}
-              onLogout={handleLogout}
-              onSearchOpen={() => setPaletteOpen(true)}
-              showSearch={hasAdminSearch}
-              leftContent={
-                <ModuleIdentity
-                  compact
-                  moduleName="Factory"
-                  description="Production, raw materials, inventory, and costing"
-                  companyName={myAccess?.companyName || selectedCompany?.name}
-                  icon={Factory}
-                  tone="factory"
-                  className="hidden max-w-md border-0 bg-transparent p-0 shadow-none sm:block"
-                />
-              }
-              extraActions={<KeyboardShortcutsButton />}
-            />
             <OfflineBanner />
             <main
               id="main-content"

@@ -5,15 +5,11 @@ import { AppModeProvider } from "@/contexts/AppModeContext";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { DailyRateModal } from "@/components/DailyRateModal";
 import { AppSidebar } from "@/components/AppSidebar";
-import { AppTopBar } from "@/components/AppTopBar";
 import { OfflineBanner } from "@/components/OfflineBanner";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { CommandPalette } from "@/components/CommandPalette";
-import { KeyboardShortcutsButton } from "@/components/KeyboardShortcuts";
-import { ModuleIdentity } from "@/components/navigation/module-identity";
 import { LoadingState } from "@/components/ui/page-state";
 import { Router } from "@/routes/AppRoutes";
-import { BriefcaseBusiness } from "lucide-react";
 import { canUseAdminSearch, type ShellUser } from "./shellUser";
 
 interface ErpShellProps {
@@ -37,25 +33,6 @@ export function ErpShell({ user, hasErpAccess, handleLogout, leaveConfirmDialog 
           {selectedCompany?.id && <DailyRateModal companyId={selectedCompany.id} />}
           <AppSidebar user={user} />
           <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-            <AppTopBar
-              accentColor="hsl(var(--primary))"
-              user={user}
-              onLogout={handleLogout}
-              onSearchOpen={() => setPaletteOpen(true)}
-              showSearch={hasAdminSearch}
-              leftContent={
-                <ModuleIdentity
-                  compact
-                  moduleName="ERP"
-                  description="Finance, inventory, sales, and operations"
-                  companyName={selectedCompany?.name}
-                  icon={BriefcaseBusiness}
-                  tone="erp"
-                  className="hidden max-w-sm border-0 bg-transparent p-0 shadow-none sm:block"
-                />
-              }
-              extraActions={<KeyboardShortcutsButton />}
-            />
             <OfflineBanner />
             <main
               id="main-content"
