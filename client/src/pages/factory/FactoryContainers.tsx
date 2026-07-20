@@ -85,7 +85,7 @@ export default function FactoryContainers() {
   const { data: currentUser } = useQuery<any>({ queryKey: ["/api/auth/me"] });
   const { data: containers, isLoading } = useQuery<ContainerWithSupplier[]>({ queryKey: ["/api/factory/containers"] });
   const { data: suppliers } = useQuery<FactorySupplier[]>({ queryKey: ["/api/factory/suppliers"] });
-  const { data: ledgerAccounts = [] } = useQuery<any[]>({ queryKey: ["/api/ledger-accounts"] });
+  const { data: ledgerAccounts = [] } = useQuery<any[]>({ queryKey: ["/api/ledger-accounts"], staleTime: 60_000, refetchOnWindowFocus: false });
 
   // ── OTW Summary computed values ──────────────────────────────────────────
   const otwContainers = useMemo(() => (containers || []).filter((c) => STATUS_ACTIVE.has(c.status)), [containers]);

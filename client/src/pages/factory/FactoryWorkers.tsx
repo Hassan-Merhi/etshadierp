@@ -195,6 +195,8 @@ export default function FactoryWorkers() {
       const res = await fetch("/api/factory/cash-accounts", { credentials: "include" });
       return res.json();
     },
+    staleTime: 60_000,
+    refetchOnWindowFocus: false,
   });
 
   const { data: workers, isLoading } = useQuery<FactoryWorker[]>({

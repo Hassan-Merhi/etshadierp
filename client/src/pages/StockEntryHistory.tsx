@@ -108,6 +108,51 @@ interface WorkerMatrix {
   grandTotal: number;
 }
 
+interface StockEntryHistoryPage {
+  items: GroupRow[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+  hasNextPage: boolean;
+  hasPreviousPage: boolean;
+}
+
+/** Fetches all pages of a stock-entry-history query using limit=250 per page.
+ *  Safety cap: 100 pages. Use only for actions requiring every matching row
+ *  (exports, bulk ops, print). Never use for the normal paginated screen list. */
+async function fetchAllStockEntryHistoryPages(baseParams: URLSearchParams): Promise<GroupRow[]> {
+  const p = new URLSearchParams(baseParams);
+  p.set("page", "1");
+  p.set("limit", "250");
+  const r = await fetch(`/api/factory/bales/stock-entry-history?${p.toString()}`, { credentials: "include" });
+  if (!r.ok) throw new Error(`Stock entry history request failed: ${r.status}`);
+  const firstData: StockEntryHistoryPage = await r.json();
+  if (!Array.isArray(firstData.items)) {
+    throw new Error("Invalid response from stock entry history endpoint");
+  }
+  const allItems: GroupRow[] = [...firstData.items];
+  const totalPages = Math.min(firstData.totalPages, 100); // hard safety cap: 100 pages max
+  // Fetch remaining pages with concurrency limit of 2
+  for (let batchStart = 2; batchStart <= totalPages; batchStart += 2) {
+    const pageNums = [batchStart, batchStart + 1].filter((n) => n <= totalPages);
+    const results = await Promise.all(
+      pageNums.map(async (pageNum) => {
+        const pp = new URLSearchParams(baseParams);
+        pp.set("page", String(pageNum));
+        pp.set("limit", "250");
+        const res = await fetch(`/api/factory/bales/stock-entry-history?${pp.toString()}`, { credentials: "include" });
+        if (!res.ok) throw new Error(`Stock entry history page ${pageNum} failed: ${res.status}`);
+        const data: StockEntryHistoryPage = await res.json();
+        if (!Array.isArray(data.items)) throw new Error(`Invalid response for page ${pageNum}`);
+        return data.items;
+      })
+    );
+    for (const pageItems of results) allItems.push(...pageItems);
+  }
+  return allItems;
+}
+
 function buildWorkerMatrix(filteredGroups: GroupRow[]): WorkerMatrix {
   const workerSet = new Set<string>();
   const productMap = new Map<string, Record<string, number>>();
@@ -205,6 +250,30 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
   // Detailed mode fetches the full response so the flat bale list is populated.
   const useLite = viewMode === "condensed";
 
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(100);
+
+  // Reset to page 1 whenever any filter changes (but not on page/pageSize changes themselves).
+  const filtersKey = useMemo(
+    () =>
+      [
+        fromActive ? fromDate : "",
+        toActive ? toDate : "",
+        workerIdFilter,
+        productIdFilter,
+        locationIdFilter,
+        categoryFilter,
+        statusFilter,
+        debouncedSearch,
+        String(includeUnassigned),
+        String(useLite),
+      ].join("|"),
+    [fromActive, fromDate, toActive, toDate, workerIdFilter, productIdFilter, locationIdFilter, categoryFilter, statusFilter, debouncedSearch, includeUnassigned, useLite]
+  );
+  useEffect(() => {
+    setPage(1);
+  }, [filtersKey]);
+
   const params = new URLSearchParams();
   if (fromActive) params.set("startDate", fromDate);
   if (toActive) params.set("endDate", toDate);
@@ -215,19 +284,31 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
   if (debouncedSearch.trim()) params.set("search", debouncedSearch.trim());
   if (!includeUnassigned) params.set("includeUnassigned", "false");
   if (useLite) params.set("lite", "1");
+  params.set("page", String(page));
+  params.set("limit", String(pageSize));
 
-  const { data: pagedGroups, isLoading } = useQuery<{ items: GroupRow[]; total: number; totalPages: number; hasNextPage: boolean; hasPreviousPage: boolean }>({
-    queryKey: ["/api/factory/bales/stock-entry-history", params.toString()],
-    queryFn: () =>
-      fetch(`/api/factory/bales/stock-entry-history?${params.toString()}`, { credentials: "include" }).then((r) =>
-        r.json()
-      ),
+  const { data: pagedGroups, isLoading } = useQuery<StockEntryHistoryPage>({
+    queryKey: ["/api/factory/bales/stock-entry-history", params.toString(), page, pageSize],
+    queryFn: async () => {
+      const r = await fetch(`/api/factory/bales/stock-entry-history?${params.toString()}`, { credentials: "include" });
+      if (!r.ok) throw new Error(`Stock entry history failed: ${r.status}`);
+      const data = await r.json();
+      if (!Array.isArray(data.items)) throw new Error("Invalid response: items is not an array");
+      return data as StockEntryHistoryPage;
+    },
     staleTime: 60_000,
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,
     placeholderData: (prev) => prev,
   });
   const groups: GroupRow[] = pagedGroups?.items ?? [];
+
+  // If the current page becomes invalid after filters narrow the result set, move to the last valid page.
+  useEffect(() => {
+    const tp = pagedGroups?.totalPages;
+    if (typeof tp === "number" && tp > 0 && page > tp) setPage(tp);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pagedGroups?.totalPages]);
 
   const { data: workers = [] } = useQuery<any[]>({ queryKey: ["/api/factory/workers"], staleTime: 60_000, refetchOnWindowFocus: false });
   const { data: products = [] } = useQuery<any[]>({ queryKey: ["/api/factory/bale-products"] });
@@ -268,12 +349,7 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
       return {
         queryKey: ["/api/factory/bales/stock-entry-history/group", gp.toString()],
         queryFn: (): Promise<BaleDetail[]> =>
-          fetch(`/api/factory/bales/stock-entry-history?${gp.toString()}`, { credentials: "include" })
-            .then((r) => r.json())
-            .then((res: any) => {
-          const rows: GroupRow[] = Array.isArray(res) ? res : (res?.items ?? []);
-          return rows.flatMap((g: GroupRow) => g.bales ?? []);
-        }),
+          fetchAllStockEntryHistoryPages(gp).then((rows) => rows.flatMap((g) => g.bales ?? [])),
         staleTime: 5 * 60 * 1000,
         refetchOnWindowFocus: false,
         enabled: useLite && !!group,
@@ -428,16 +504,12 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
     if (g.productId) gp.set("productId", String(g.productId));
     if (g.erpLocationId) gp.set("locationId", String(g.erpLocationId));
 
-    const res = await qc.fetchQuery({
+    const rows = await qc.fetchQuery<GroupRow[]>({
       queryKey: ["/api/factory/bales/stock-entry-history/group", gp.toString()],
-      queryFn: () =>
-        fetch(`/api/factory/bales/stock-entry-history?${gp.toString()}`, { credentials: "include" }).then((r) =>
-          r.json()
-        ),
+      queryFn: () => fetchAllStockEntryHistoryPages(gp),
       staleTime: 5 * 60 * 1000,
-    }) as any;
-    const rows: GroupRow[] = Array.isArray(res) ? res : (res?.items ?? []);
-    const bales = rows.flatMap((row: GroupRow) => row.bales ?? []);
+    });
+    const bales = rows.flatMap((row) => row.bales ?? []);
     return bales.map((b) => b.id);
   }
 
@@ -450,15 +522,13 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
     return groupBaleQueries[idx]?.isLoading ?? false;
   }
 
-  /** Fetches full group data (with bales) for exports. Skips re-fetch when already in detailed mode. */
+  /** Fetches all matching group data (with bales) across all pages for exports and print. */
   async function fetchGroupsWithBales(): Promise<GroupRow[]> {
-    if (!useLite) return filteredGroups;
     const fullParams = new URLSearchParams(params);
-    fullParams.delete("lite");
-    const raw = await fetch(`/api/factory/bales/stock-entry-history?${fullParams.toString()}`, {
-      credentials: "include",
-    }).then((r) => r.json());
-    return Array.isArray(raw) ? raw : Array.isArray(raw?.items) ? raw.items : filteredGroups;
+    fullParams.delete("lite"); // ensure we get bale data
+    fullParams.delete("page"); // fetchAllStockEntryHistoryPages manages its own pagination
+    fullParams.delete("limit");
+    return fetchAllStockEntryHistoryPages(fullParams);
   }
 
   function resetFilters() {
@@ -473,6 +543,8 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
     setStatusFilter("all");
     setSearch("");
     setIncludeUnassigned(true);
+    setPage(1);
+    setPageSize(100);
   }
 
   function fmtTime(iso: string | null) {
@@ -1159,6 +1231,56 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
           <span className="text-xs text-sky-600/70 dark:text-sky-400/70">kg</span>
         </div>
       </div>
+
+      {/* ── Pagination controls ── */}
+      {(pagedGroups?.total ?? 0) > 0 && (
+        <div className="flex items-center gap-3 flex-wrap" data-testid="pagination-controls">
+          <span className="text-xs text-muted-foreground tabular-nums">
+            Showing {((page - 1) * pageSize + 1).toLocaleString()}–{Math.min(page * pageSize, pagedGroups!.total).toLocaleString()} of {pagedGroups!.total.toLocaleString()}
+          </span>
+          <span className="text-xs text-muted-foreground/40">·</span>
+          <span className="text-xs text-muted-foreground tabular-nums">Page {page} of {pagedGroups!.totalPages}</span>
+          <div className="flex items-center gap-1.5 ml-auto">
+            <Select
+              value={String(pageSize)}
+              onValueChange={(v) => {
+                setPageSize(Number(v));
+                setPage(1);
+              }}
+            >
+              <SelectTrigger className="w-[72px] h-7 text-xs" data-testid="select-page-size">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="50">50</SelectItem>
+                <SelectItem value="100">100</SelectItem>
+                <SelectItem value="250">250</SelectItem>
+              </SelectContent>
+            </Select>
+            <span className="text-xs text-muted-foreground/60">/ page</span>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-7 px-2.5 text-xs"
+              disabled={!pagedGroups?.hasPreviousPage}
+              onClick={() => setPage((p) => p - 1)}
+              data-testid="button-prev-page"
+            >
+              Previous
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-7 px-2.5 text-xs"
+              disabled={!pagedGroups?.hasNextPage}
+              onClick={() => setPage((p) => p + 1)}
+              data-testid="button-next-page"
+            >
+              Next
+            </Button>
+          </div>
+        </div>
+      )}
 
       {/* ── CONDENSED VIEW: grouped by worker ── */}
       {viewMode === "condensed" && (

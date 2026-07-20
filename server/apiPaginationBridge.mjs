@@ -15,7 +15,6 @@ if (!globalThis[INSTALL_KEY]) {
     "/api/factory/daybook",
     "/api/stock-items",
     "/api/inventory",
-    // "/api/factory/bales/stock-entry-history" — removed: the route now paginates natively in SQL.
     "/api/factory/bales",
     "/api/factory/v5/stock-allocation",
   ]);

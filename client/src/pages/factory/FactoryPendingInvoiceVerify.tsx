@@ -216,7 +216,8 @@ export default function FactoryPendingInvoiceVerify() {
 
   const { data: ledgerAccounts = [] } = useQuery<{ id: number; name: string; code: string; accountType: string }[]>({
     queryKey: ["/api/ledger-accounts"],
-    enabled: true,
+    staleTime: 60_000,
+    refetchOnWindowFocus: false,
   });
 
   const { data: proformas = [] } = useQuery<

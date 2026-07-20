@@ -154,6 +154,8 @@ export default function FactoryInvoiceDetail() {
 
   const { data: ledgerAccounts = [] } = useQuery<{ id: number; name: string; code: string }[]>({
     queryKey: ["/api/ledger-accounts"],
+    staleTime: 60_000,
+    refetchOnWindowFocus: false,
   });
 
   const updateChargeLedgerMutation = useMutation({

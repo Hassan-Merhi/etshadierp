@@ -73,6 +73,8 @@ export default function FactoryWorkerBonusesTab() {
       if (!res.ok) throw new Error("Failed");
       return res.json();
     },
+    staleTime: 60_000,
+    refetchOnWindowFocus: false,
   });
 
   const { data: cashAccounts = [] } = useQuery<CashAccount[]>({
@@ -82,6 +84,8 @@ export default function FactoryWorkerBonusesTab() {
       if (!res.ok) return [];
       return res.json();
     },
+    staleTime: 60_000,
+    refetchOnWindowFocus: false,
   });
 
   const qKey = useMemo(() => ["/api/factory/worker-bonuses", workerFilter, statusFilter], [workerFilter, statusFilter]);

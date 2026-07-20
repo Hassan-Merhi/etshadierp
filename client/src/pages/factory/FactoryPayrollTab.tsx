@@ -450,6 +450,8 @@ export default function FactoryPayrollTab() {
       const res = await fetch("/api/factory/cash-accounts", { credentials: "include" });
       return res.json();
     },
+    staleTime: 60_000,
+    refetchOnWindowFocus: false,
   });
 
   const activeWorkers = useMemo(() => workers?.filter((w) => w.active) || [], [workers]);

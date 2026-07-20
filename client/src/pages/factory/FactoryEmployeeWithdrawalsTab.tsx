@@ -82,6 +82,8 @@ export default function FactoryEmployeeWithdrawalsTab() {
       if (!res.ok) return [];
       return res.json();
     },
+    staleTime: 60_000,
+    refetchOnWindowFocus: false,
   });
 
   const singleMutation = useMutation({

@@ -118,6 +118,8 @@ export default function FactoryContainerCreate() {
 
   const { data: ledgerAccounts = [] } = useQuery<any[]>({
     queryKey: ["/api/ledger-accounts"],
+    staleTime: 60_000,
+    refetchOnWindowFocus: false,
   });
 
   const activeSuppliers = suppliers?.filter((s) => s.isActive) ?? [];

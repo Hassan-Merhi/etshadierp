@@ -213,6 +213,8 @@ export default function FactorySuppliers() {
 
   const { data: ledgerAccounts } = useQuery<{ id: number; name: string; code: string }[]>({
     queryKey: ["/api/ledger-accounts"],
+    staleTime: 60_000,
+    refetchOnWindowFocus: false,
   });
 
   const [fxConversionOpen, setFxConversionOpen] = useState(false);

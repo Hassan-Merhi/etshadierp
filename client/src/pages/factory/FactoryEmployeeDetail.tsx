@@ -195,6 +195,8 @@ export default function FactoryEmployeeDetail() {
         (a: LedgerAccount) => a.accountType === "Cash" || a.accountType?.toLowerCase().includes("cash")
       );
     },
+    staleTime: 60_000,
+    refetchOnWindowFocus: false,
   });
 
   // Mutations

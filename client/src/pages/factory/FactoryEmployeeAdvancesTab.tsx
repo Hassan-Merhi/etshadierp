@@ -100,6 +100,8 @@ export default function FactoryEmployeeAdvancesTab() {
       if (!res.ok) return [];
       return res.json();
     },
+    staleTime: 60_000,
+    refetchOnWindowFocus: false,
   });
 
   const qKey = useMemo(() => ["/api/factory/employee-advances", statusFilter, empFilter], [statusFilter, empFilter]);

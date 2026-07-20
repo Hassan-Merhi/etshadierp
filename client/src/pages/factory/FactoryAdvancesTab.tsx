@@ -206,10 +206,14 @@ function AdvancesView() {
 
   const { data: workers } = useQuery<FactoryWorker[]>({
     queryKey: ["/api/factory/workers?active=true"],
+    staleTime: 60_000,
+    refetchOnWindowFocus: false,
   });
 
   const { data: cashAccounts } = useQuery<CashAccount[]>({
     queryKey: ["/api/factory/cash-accounts"],
+    staleTime: 60_000,
+    refetchOnWindowFocus: false,
   });
 
   const {
@@ -2280,6 +2284,8 @@ function RepaymentsView() {
       const res = await fetch("/api/factory/workers?active=true", { credentials: "include" });
       return res.json();
     },
+    staleTime: 60_000,
+    refetchOnWindowFocus: false,
   });
 
   const { data: repayments, isLoading } = useQuery<RepaymentRecord[]>({
@@ -2459,6 +2465,8 @@ function DeductionsView() {
       const res = await fetch("/api/factory/workers", { credentials: "include" });
       return res.json();
     },
+    staleTime: 60_000,
+    refetchOnWindowFocus: false,
   });
 
   const { data: deductions = [], isLoading } = useQuery<DeductionRecord[]>({

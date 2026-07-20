@@ -154,6 +154,8 @@ function AdvanceRow({ adv, isLoan, isExpanded, onToggleExpand, onRepay, formatDa
   const { data: cashAccounts } = useQuery<CashAccount[]>({
     queryKey: ["/api/factory/cash-accounts"],
     enabled: isLoan && isExpanded,
+    staleTime: 60_000,
+    refetchOnWindowFocus: false,
   });
 
   const { data: repayments } = useQuery<any[]>({
@@ -464,6 +466,8 @@ export default function FactoryWorkerDetail() {
 
   const { data: cashAccounts } = useQuery<CashAccount[]>({
     queryKey: ["/api/factory/cash-accounts"],
+    staleTime: 60_000,
+    refetchOnWindowFocus: false,
   });
 
   const createAdvanceMutation = useMutation({
