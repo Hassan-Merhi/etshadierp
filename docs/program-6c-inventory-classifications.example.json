@@ -1,0 +1,45 @@
+{
+  "program": "6C",
+  "generatedFrom": "tmp/program6c-report.json",
+  "reviewedAt": "YYYY-MM-DD",
+  "classifications": [
+    {
+      "findingId": "replace-with-stable-finding-id",
+      "status": "verified-unbounded-read",
+      "reviewer": "reviewer-name",
+      "evidence": "Describe the route, caller, representative row volume, and why the response is unbounded.",
+      "proposedBounding": "Describe the proposed limit, pagination, date range, location filter, item filter, or field projection.",
+      "behaviorPreservation": "Explain how company isolation, ordering, totals, running balances, reversals, source traceability, and historical records remain unchanged."
+    },
+    {
+      "findingId": "replace-with-stable-finding-id",
+      "status": "bounded-by-design",
+      "reviewer": "reviewer-name",
+      "evidence": "Describe the verified request path and why it cannot grow without a bound.",
+      "boundingMechanism": "Name the enforced server-side limit, required filter, fixed parent scope, or bounded source collection.",
+      "maximumRowsOrScope": "State the maximum rows or the precise bounded scope."
+    },
+    {
+      "findingId": "replace-with-stable-finding-id",
+      "status": "mutation-or-cache-only",
+      "reviewer": "reviewer-name",
+      "evidence": "Show that this reference is not a list read and does not materialize an inventory payload.",
+      "referencePurpose": "Describe the mutation, invalidation, cache read, cache write, or other non-fetch purpose."
+    },
+    {
+      "findingId": "replace-with-stable-finding-id",
+      "status": "false-positive",
+      "reviewer": "reviewer-name",
+      "evidence": "Describe what the scanner matched and the real code path.",
+      "falsePositiveReason": "Explain why the reference is not an inventory payload risk."
+    },
+    {
+      "findingId": "replace-with-stable-finding-id",
+      "status": "deferred",
+      "reviewer": "reviewer-name",
+      "evidence": "Record the evidence collected so far.",
+      "blocker": "State the exact missing runtime, representative-data, database, or ownership dependency.",
+      "nextEvidenceNeeded": "State the concrete evidence required to resolve the finding."
+    }
+  ]
+}

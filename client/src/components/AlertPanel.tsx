@@ -12,6 +12,7 @@ export interface AlertPanelProps {
   icon?: LucideIcon;
   actions?: React.ReactNode;
   onDismiss?: () => void;
+  dismissLabel?: string;
   className?: string;
   children?: React.ReactNode;
   "data-testid"?: string;
@@ -28,9 +29,8 @@ const TONE: Record<AlertTone, { wrap: string; icon: LucideIcon }> = {
 };
 
 /**
- * AlertPanel — inline informational/warning panel. Replaces ad-hoc colored
- * divs ("draft restored", "needs approval", "offline mode") with one
- * consistent component.
+ * Consistent inline feedback panel with tone-appropriate screen-reader
+ * announcements and a keyboard-accessible dismiss action.
  */
 export function AlertPanel({
   tone = "info",
@@ -39,19 +39,24 @@ export function AlertPanel({
   icon,
   actions,
   onDismiss,
+  dismissLabel = "Dismiss notification",
   className,
   children,
   "data-testid": testId,
 }: AlertPanelProps) {
-  const t = TONE[tone];
-  const Icon = icon ?? t.icon;
+  const presentation = TONE[tone];
+  const Icon = icon ?? presentation.icon;
+  const isUrgent = tone === "destructive";
+
   return (
     <div
-      role="alert"
-      className={cn("rounded-md border p-3 flex items-start gap-3", t.wrap, className)}
+      role={isUrgent ? "alert" : "status"}
+      aria-live={isUrgent ? "assertive" : "polite"}
+      aria-atomic="true"
+      className={cn("flex items-start gap-3 rounded-md border p-3", presentation.wrap, className)}
       data-testid={testId ?? `alert-${tone}`}
     >
-      <Icon className="h-4 w-4 shrink-0 mt-0.5" aria-hidden />
+      <Icon className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
       <div className="min-w-0 flex-1 space-y-1">
         {title && <div className="text-sm font-semibold leading-tight">{title}</div>}
         {description && <div className="text-xs leading-relaxed opacity-90">{description}</div>}
@@ -60,14 +65,15 @@ export function AlertPanel({
       </div>
       {onDismiss && (
         <Button
+          type="button"
           size="icon"
           variant="ghost"
           onClick={onDismiss}
-          className="h-6 w-6 -mt-1 -mr-1 shrink-0"
-          aria-label="Dismiss"
+          className="-mr-1 -mt-1 h-8 w-8 shrink-0 touch-manipulation"
+          aria-label={dismissLabel}
           data-testid="button-alert-dismiss"
         >
-          <X className="h-3.5 w-3.5" />
+          <X className="h-3.5 w-3.5" aria-hidden="true" />
         </Button>
       )}
     </div>

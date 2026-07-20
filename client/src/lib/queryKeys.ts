@@ -75,3 +75,28 @@ export const stockItemKeys = {
   full: (companyId: number | string | undefined) =>
     ["/api/stock-items", companyId] as const,
 };
+
+// ── Analytics and financial-report keys ──────────────────────────────────────
+export const analyticsKeys = {
+  locations: (companyId: number | undefined) => ["/api/locations", companyId] as const,
+  stockGroups: (companyId: number | undefined) => ["/api/stock-groups", companyId] as const,
+  suppliers: () => ["/api/suppliers"] as const,
+  accounts: (companyId: number | undefined, startDate: string, endDate: string) =>
+    ["/api/accounts/all", companyId, startDate, endDate] as const,
+  financialSales: (companyId: number | undefined, dateRange: Record<string, string>) =>
+    ["/api/financial/sales", companyId, normalizeFilters(dateRange)] as const,
+  financialTransactions: (
+    locationId: number | null,
+    dateRange: Record<string, string>,
+  ) => ["/api/financial/sales", locationId, "transactions", normalizeFilters(dateRange)] as const,
+  userCompanies: () => ["/api/user/companies"] as const,
+  urlScoped: (url: string, companyId?: number) => [url, companyId] as const,
+  factorySalesByCustomer: (companyId: number | undefined, url: string) =>
+    ["/api/factory/analytics/sales-by-customer", companyId, url] as const,
+  factoryPosSummary: (companyId: number | undefined, url: string) =>
+    ["/api/factory/analytics/pos-summary", companyId, url] as const,
+  netProfitStatement: (companyId: number | undefined, startDate: string, endDate: string) =>
+    ["/api/reports/net-profit-statement", companyId, startDate, endDate] as const,
+  openingStockSummary: (companyId: number | undefined, locationId: string) =>
+    ["/api/reports/opening-stock-summary", companyId, locationId] as const,
+};
