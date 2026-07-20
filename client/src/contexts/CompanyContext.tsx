@@ -47,7 +47,9 @@ async function switchCompanyOnServer(companyId: number): Promise<boolean> {
 
 export function CompanyProvider({ children }: { children: ReactNode }) {
   const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
+  const [isSyncingCompany, setIsSyncingCompany] = useState(false);
   const lastSyncedCompanyId = useRef<number | null>(null);
+  const initialSyncStarted = useRef(false);
 
   const { data: userCompanies = [], isLoading } = useQuery<any[]>({
     queryKey: ["/api/user/companies"],
@@ -75,47 +77,71 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
     });
   };
 
-  const selectCompany = async (company: Company) => {
-    setSelectedCompany(company);
-    localStorage.setItem("selectedCompanyId", company.id.toString());
+  const clearActivityCache = () => {
+    // Audit history is strictly company-scoped. Remove the previous company's
+    // page immediately so it can never remain visible while a new company is
+    // becoming active on the server.
+    queryClient.removeQueries({ queryKey: ["/api/audit-log"] });
+  };
 
+  const selectCompany = async (company: Company) => {
+    if (lastSyncedCompanyId.current === company.id && selectedCompany?.id === company.id) return;
+
+    setIsSyncingCompany(true);
     const ok = await switchCompanyOnServer(company.id);
+
     if (ok) {
+      clearActivityCache();
       lastSyncedCompanyId.current = company.id;
+      setSelectedCompany(company);
+      localStorage.setItem("selectedCompanyId", company.id.toString());
       invalidateCompanyQueries();
-    } else {
-      invalidateCompanyQueries();
+      prefetchReferenceData(company.id);
     }
-    prefetchReferenceData(company.id);
+
+    setIsSyncingCompany(false);
   };
 
   useEffect(() => {
-    if (companies.length > 0 && !selectedCompany) {
-      const savedCompanyId = localStorage.getItem("selectedCompanyId");
-      let companyToSelect: Company | undefined;
+    if (companies.length === 0 || selectedCompany || initialSyncStarted.current) return;
 
-      if (savedCompanyId) {
-        companyToSelect = companies.find((c) => c.id === parseInt(savedCompanyId));
-      }
-      if (!companyToSelect) {
-        companyToSelect = companies[0];
-      }
+    const savedCompanyId = localStorage.getItem("selectedCompanyId");
+    let companyToSelect: Company | undefined;
 
-      setSelectedCompany(companyToSelect);
-      prefetchReferenceData(companyToSelect.id);
-
-      if (companyToSelect && lastSyncedCompanyId.current !== companyToSelect.id) {
-        switchCompanyOnServer(companyToSelect.id).then((ok) => {
-          if (ok) {
-            lastSyncedCompanyId.current = companyToSelect!.id;
-          }
-          // Do NOT invalidate queries here — this is the initial auto-select on page load.
-          // The server session already persists currentCompanyId, so all data queries
-          // return correct data without needing a full invalidation. Invalidating here
-          // resets in-flight queries to isLoading:true, causing blank white screens.
-        });
-      }
+    if (savedCompanyId) {
+      companyToSelect = companies.find((c) => c.id === parseInt(savedCompanyId, 10));
     }
+    if (!companyToSelect) {
+      companyToSelect = companies[0];
+    }
+    if (!companyToSelect) return;
+
+    initialSyncStarted.current = true;
+    setIsSyncingCompany(true);
+
+    // Do not expose a selected company to company-scoped screens until the
+    // server session confirms the same company. This prevents an initial
+    // request from running with no company and receiving cross-company data.
+    switchCompanyOnServer(companyToSelect.id)
+      .then((ok) => {
+        if (!ok) {
+          initialSyncStarted.current = false;
+          return;
+        }
+
+        clearActivityCache();
+        lastSyncedCompanyId.current = companyToSelect!.id;
+        setSelectedCompany(companyToSelect!);
+        localStorage.setItem("selectedCompanyId", companyToSelect!.id.toString());
+        prefetchReferenceData(companyToSelect!.id);
+
+        // Only reset the activity query here. A broad initial invalidation can
+        // reset unrelated in-flight pages and cause blank-screen flashes.
+        queryClient.invalidateQueries({ queryKey: ["/api/audit-log"] });
+      })
+      .finally(() => {
+        setIsSyncingCompany(false);
+      });
   }, [companies, selectedCompany]);
 
   return (
@@ -123,7 +149,7 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
       value={{
         selectedCompany,
         companies,
-        isLoading,
+        isLoading: isLoading || isSyncingCompany || (companies.length > 0 && !selectedCompany),
         selectCompany,
       }}
     >
