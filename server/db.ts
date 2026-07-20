@@ -3,6 +3,11 @@ import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
 import * as schema from "@shared/schema";
 import { logger } from "./lib/logger";
+import { readDatabaseRuntimeConfig } from "./lib/databaseConfig";
+import {
+  logDatabasePoolSnapshot,
+  logSlowDatabaseQuery,
+} from "./lib/databaseTelemetry";
 import {
   isRequestPerformanceContextActive,
   recordDatabaseQuery,
@@ -31,6 +36,7 @@ if (process.env.DATABASE_URL) {
 const isLocalReplitDB = process.env.PGHOST === "helium" || connectionString.includes("@helium:");
 const sslExplicitlyDisabled = process.env.PGSSLMODE === "disable";
 const requiresSSL = !isLocalReplitDB && !sslExplicitlyDisabled;
+const databaseRuntimeConfig = readDatabaseRuntimeConfig();
 
 logger.info("Database configuration selected", {
   module: "database",
@@ -47,41 +53,49 @@ if (sslExplicitlyDisabled && !isLocalReplitDB) {
   });
 }
 
-const poolMax = Number(process.env.PG_POOL_MAX || 10);
 logger.info("Database pool configured", {
   module: "database",
   action: "pool-configure",
-  max: poolMax,
-  configuredValue: process.env.PG_POOL_MAX ?? "unset",
+  max: databaseRuntimeConfig.poolMax,
+  min: databaseRuntimeConfig.poolMin,
+  connectionTimeoutMillis: databaseRuntimeConfig.connectionTimeoutMillis,
+  idleTimeoutMillis: databaseRuntimeConfig.idleTimeoutMillis,
+  statementTimeoutMillis: databaseRuntimeConfig.statementTimeoutMillis,
+  slowQueryThresholdMillis: databaseRuntimeConfig.slowQueryThresholdMillis,
 });
 
 export const pool = new Pool({
   connectionString,
   ssl: requiresSSL ? { rejectUnauthorized: false } : false,
-  max: poolMax,
-  min: 2,
-  connectionTimeoutMillis: 8000,
-  idleTimeoutMillis: 120_000,
+  max: databaseRuntimeConfig.poolMax,
+  min: databaseRuntimeConfig.poolMin,
+  connectionTimeoutMillis: databaseRuntimeConfig.connectionTimeoutMillis,
+  idleTimeoutMillis: databaseRuntimeConfig.idleTimeoutMillis,
   allowExitOnIdle: false,
-  options: "-c statement_timeout=30000",
+  options: `-c statement_timeout=${databaseRuntimeConfig.statementTimeoutMillis}`,
 });
 
 const originalPoolQuery = pool.query.bind(pool);
 (pool as typeof pool & { query: typeof pool.query }).query = ((...args: Parameters<typeof pool.query>) => {
-  if (!isRequestPerformanceContextActive()) {
-    return originalPoolQuery(...args);
-  }
-
+  const shouldRecordRequestQuery = isRequestPerformanceContextActive();
   const startedAt = performance.now();
   const result = originalPoolQuery(...args);
 
+  const recordQueryCompletion = () => {
+    const durationMillis = performance.now() - startedAt;
+
+    if (shouldRecordRequestQuery) {
+      recordDatabaseQuery(durationMillis);
+    }
+
+    logSlowDatabaseQuery(durationMillis, databaseRuntimeConfig.slowQueryThresholdMillis);
+  };
+
   if (result && typeof (result as Promise<unknown>).finally === "function") {
-    return (result as Promise<unknown>).finally(() => {
-      recordDatabaseQuery(performance.now() - startedAt);
-    });
+    return (result as Promise<unknown>).finally(recordQueryCompletion);
   }
 
-  recordDatabaseQuery(performance.now() - startedAt);
+  recordQueryCompletion();
   return result;
 }) as typeof pool.query;
 
@@ -113,20 +127,7 @@ pool.on("acquire", () => {
 });
 
 export function logPoolStats(trigger: string) {
-  const context = {
-    module: "database",
-    action: "pool-stats",
-    trigger,
-    total: pool.totalCount,
-    idle: pool.idleCount,
-    waiting: pool.waitingCount,
-  };
-
-  if (trigger === "on-error" || pool.waitingCount > 0) {
-    logger.warn("Database pool pressure", context);
-  } else {
-    logger.debug("Database pool stats", context);
-  }
+  logDatabasePoolSnapshot(pool, trigger);
 }
 
 export const db = drizzle(pool, { schema });
