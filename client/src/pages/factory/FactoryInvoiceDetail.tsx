@@ -552,29 +552,55 @@ export default function FactoryInvoiceDetail() {
     setEditValue("");
   };
 
+  // Shared helper: fetch a binary file from the server and trigger a browser download.
+  // Using fetch+blob instead of window.open() ensures auth cookies are always sent,
+  // errors surface as toast messages, and stalled 0-byte downloads are avoided.
+  const downloadFromUrl = async (url: string, fallbackName: string) => {
+    try {
+      const res = await fetch(url, { credentials: "include" });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error((err as any).message || `Server error ${res.status}`);
+      }
+      const blob = await res.blob();
+      const objectUrl = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = objectUrl;
+      const cd = res.headers.get("content-disposition");
+      const match = cd?.match(/filename\*?=(?:UTF-8'')?["']?([^;"'\r\n]+)/i);
+      a.download = match ? decodeURIComponent(match[1].replace(/"/g, "").trim()) : fallbackName;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(objectUrl);
+    } catch (err: any) {
+      toast({ title: "Export failed", description: err.message, variant: "destructive" });
+    }
+  };
+
   const handleExportExcel = () => {
     if (!orderId) return;
-    window.open(`/api/factory/customer-orders/${orderId}/export-excel`, "_blank");
+    downloadFromUrl(`/api/factory/customer-orders/${orderId}/export-excel`, "invoice.xlsx");
   };
 
   const handleExportExcelNoCharges = () => {
     if (!orderId) return;
-    window.open(`/api/factory/customer-orders/${orderId}/export-excel?noCharges=1`, "_blank");
+    downloadFromUrl(`/api/factory/customer-orders/${orderId}/export-excel?noCharges=1`, "invoice-no-charges.xlsx");
   };
 
   const handleExportPdf = () => {
     if (!orderId) return;
-    window.open(`/api/factory/customer-orders/${orderId}/export-pdf`, "_blank");
+    downloadFromUrl(`/api/factory/customer-orders/${orderId}/export-pdf`, "invoice.pdf");
   };
 
   const handleExportPdfNoCharges = () => {
     if (!orderId) return;
-    window.open(`/api/factory/customer-orders/${orderId}/export-pdf?noCharges=1`, "_blank");
+    downloadFromUrl(`/api/factory/customer-orders/${orderId}/export-pdf?noCharges=1`, "invoice-no-charges.pdf");
   };
 
   const handleExportLoadingStatus = () => {
     if (!orderId) return;
-    window.open(`/api/factory/customer-orders/${orderId}/loading-status-export`, "_blank");
+    downloadFromUrl(`/api/factory/customer-orders/${orderId}/loading-status-export`, "loading-status.xlsx");
   };
 
   if (isLoading) {
