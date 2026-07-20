@@ -1,5 +1,6 @@
 import { useState, Suspense } from "react";
 import { useLocation } from "wouter";
+import { useMainContentFocus } from "@/hooks/use-main-content-focus";
 import { useCompany } from "@/contexts/CompanyContext";
 import { AppModeProvider } from "@/contexts/AppModeContext";
 import { SidebarProvider } from "@/components/ui/sidebar";
@@ -27,6 +28,7 @@ export function ErpShell({ user, hasErpAccess, handleLogout, leaveConfirmDialog 
   const { selectedCompany } = useCompany();
   const style = { "--sidebar-width": "16rem", "--sidebar-width-icon": "3rem" };
   const hasAdminSearch = canUseAdminSearch(user);
+  useMainContentFocus(currentLocation);
 
   return (
     <AppModeProvider mode="erp">

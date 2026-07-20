@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useMainContentFocus } from "@/hooks/use-main-content-focus";
 import { AppModeProvider } from "@/contexts/AppModeContext";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { PropertiesSidebar } from "@/components/PropertiesSidebar";
@@ -18,6 +19,7 @@ interface PropertiesShellProps {
 export function PropertiesShell({ user, currentLocation, handleLogout, leaveConfirmDialog }: PropertiesShellProps) {
   const [paletteOpen, setPaletteOpen] = useState(false);
   const style = { "--sidebar-width": "16rem", "--sidebar-width-icon": "3rem" };
+  useMainContentFocus(currentLocation);
   const hasAdminSearch = canUseAdminSearch(user);
 
   return (

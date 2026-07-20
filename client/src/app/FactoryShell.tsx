@@ -1,5 +1,6 @@
 import { useState, useRef, Suspense } from "react";
 import { useLocation } from "wouter";
+import { useMainContentFocus } from "@/hooks/use-main-content-focus";
 import { useButtonClickFeedback } from "@/hooks/use-button-click-feedback";
 import { useCompany } from "@/contexts/CompanyContext";
 import { AppModeProvider } from "@/contexts/AppModeContext";
@@ -50,6 +51,7 @@ export function FactoryShell({
 
   const style = { "--sidebar-width": "16rem", "--sidebar-width-icon": "3rem" };
   const isFactoryPosRoute = currentLocation === "/factory/pos" || currentLocation.startsWith("/factory/pos?");
+  useMainContentFocus(currentLocation);
   const hasAdminSearch = canUseAdminSearch(user);
 
   return (

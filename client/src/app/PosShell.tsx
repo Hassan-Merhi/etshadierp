@@ -1,5 +1,6 @@
 import { useState, Suspense } from "react";
 import { useLocation } from "wouter";
+import { useMainContentFocus } from "@/hooks/use-main-content-focus";
 import { useCompany } from "@/contexts/CompanyContext";
 import {
   SidebarProvider,
@@ -71,6 +72,8 @@ export function PosShell({
   const isPosRoute = currentLocation === "/pos" || currentLocation.startsWith("/pos/");
   const isFullHeightRoute = isPosRoute || currentLocation === "/tracking" || currentLocation === "/";
   const hasAdminSearch = canUseAdminSearch(user);
+  // Skip focus on full-height routes where <main> has overflow-hidden (not scrollable).
+  useMainContentFocus(currentLocation, isFullHeightRoute);
 
   return (
     <>
