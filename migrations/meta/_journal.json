@@ -71,6 +71,13 @@
       "when": 1753108200000,
       "tag": "20260720_004_bank_account_opening_balance_currency",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1753110000000,
+      "tag": "20260720_005_voucher_entry_currency_normalization_trigger",
+      "breakpoints": true
     }
   ]
 }
