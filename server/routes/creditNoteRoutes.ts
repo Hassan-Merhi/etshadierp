@@ -1,5 +1,6 @@
 import type { Express } from "express";
 import { db } from "../db";
+import { normalizeVoucherEntryAmounts } from "../services/accounting/currencyAmounts";
 import { storage } from "../storage";
 import { requireAuth, requireRole, canDelete, requireNonPOS, checkPOSLocation } from "../auth";
 import {
@@ -161,6 +162,44 @@ async function getOrCreateSalesReturnsAccount(companyId: number, txOrDb: any = d
   return created?.id ?? null;
 }
 
+/**
+ * Phase 5 — Dual-currency normalization for credit/debit note entries.
+ *
+ * Credit/debit notes have no multi-currency metadata in the request body —
+ * they are always posted in the company base currency (USD). Using
+ * normalizeVoucherEntryAmounts with IDENTITY convention ensures all 7
+ * dual-currency columns are populated consistently with other voucher types.
+ *
+ * Falls back to raw amounts if normalization fails (zero-amount edge cases).
+ */
+function normEntryAmounts(debit: number, credit: number): Record<string, string> {
+  const dStr = debit.toFixed(6);
+  const cStr = credit.toFixed(6);
+  try {
+    const norm = normalizeVoucherEntryAmounts({
+      transactionCurrency: "USD",
+      baseCurrency: "USD",
+      transactionDebitAmount: dStr,
+      transactionCreditAmount: cStr,
+      historicalRate: "1",
+    });
+    return {
+      debitAmount: norm.debitAmount,
+      creditAmount: norm.creditAmount,
+      transactionCurrency: norm.transactionCurrency,
+      transactionDebitAmount: norm.transactionDebitAmount,
+      transactionCreditAmount: norm.transactionCreditAmount,
+      baseDebitAmount: norm.baseDebitAmount,
+      baseCreditAmount: norm.baseCreditAmount,
+      historicalExchangeRate: norm.historicalExchangeRate,
+      rateConvention: norm.rateConvention,
+    };
+  } catch {
+    // Fallback for zero-amount edge cases (zero-cost inventory items, etc.)
+    return { debitAmount: debit.toFixed(2), creditAmount: credit.toFixed(2) };
+  }
+}
+
 export function registerCreditNoteRoutes(app: Express) {
   app.post("/api/credit-notes", requireAuth, requireNonPOS, async (req, res) => {
     try {
@@ -247,20 +286,20 @@ export function registerCreditNoteRoutes(app: Express) {
           .returning();
 
         // Create voucher entries for the cash account using the REFUND amount
+        const cashDebit = noteType === "Debit Note" ? totalRefundAmount : 0;
+        const cashCredit = noteType === "Credit Note" ? totalRefundAmount : 0;
         if (cashAccountType === "bank") {
           await tx.insert(voucherEntries).values({
             voucherId: createdVoucher.id,
             bankAccountId: cashAccountId,
-            debitAmount: noteType === "Debit Note" ? totalRefundAmount.toFixed(2) : "0",
-            creditAmount: noteType === "Credit Note" ? totalRefundAmount.toFixed(2) : "0",
+            ...normEntryAmounts(cashDebit, cashCredit),
             narration: `${noteType} - cash ${noteType === "Credit Note" ? "refund" : "receipt"}`,
           });
         } else {
           await tx.insert(voucherEntries).values({
             voucherId: createdVoucher.id,
             ledgerAccountId: cashAccountId,
-            debitAmount: noteType === "Debit Note" ? totalRefundAmount.toFixed(2) : "0",
-            creditAmount: noteType === "Credit Note" ? totalRefundAmount.toFixed(2) : "0",
+            ...normEntryAmounts(cashDebit, cashCredit),
             narration: `${noteType} - cash ${noteType === "Credit Note" ? "refund" : "receipt"}`,
           });
         }
@@ -304,8 +343,7 @@ export function registerCreditNoteRoutes(app: Express) {
               await tx.insert(voucherEntries).values({
                 voucherId: createdVoucher.id,
                 ledgerAccountId: inventoryAccount[0].id,
-                debitAmount: inventoryValue.toFixed(2),
-                creditAmount: "0",
+                ...normEntryAmounts(inventoryValue, 0),
                 narration: `Inventory restored - ${noteType}`,
               });
             }
@@ -327,8 +365,7 @@ export function registerCreditNoteRoutes(app: Express) {
               await tx.insert(voucherEntries).values({
                 voucherId: createdVoucher.id,
                 ledgerAccountId: inventoryAccount[0].id,
-                debitAmount: "0",
-                creditAmount: inventoryValue.toFixed(2),
+                ...normEntryAmounts(0, inventoryValue),
                 narration: `Inventory reduced - ${noteType}`,
               });
             }
@@ -354,16 +391,14 @@ export function registerCreditNoteRoutes(app: Express) {
               await tx.insert(voucherEntries).values({
                 voucherId: createdVoucher.id,
                 ledgerAccountId: salesReturnsAccountId,
-                debitAmount: variance > 0 ? variance.toFixed(2) : "0",
-                creditAmount: variance < 0 ? Math.abs(variance).toFixed(2) : "0",
+                ...normEntryAmounts(variance > 0 ? variance : 0, variance < 0 ? Math.abs(variance) : 0),
                 narration: `Variance between refund and inventory cost`,
               });
             } else {
               await tx.insert(voucherEntries).values({
                 voucherId: createdVoucher.id,
                 ledgerAccountId: salesReturnsAccountId,
-                debitAmount: variance < 0 ? Math.abs(variance).toFixed(2) : "0",
-                creditAmount: variance > 0 ? variance.toFixed(2) : "0",
+                ...normEntryAmounts(variance < 0 ? Math.abs(variance) : 0, variance > 0 ? variance : 0),
                 narration: `Variance between debit note amount and inventory cost`,
               });
             }
@@ -640,21 +675,21 @@ export function registerCreditNoteRoutes(app: Express) {
           })
           .where(eq(vouchers.id, voucherId));
 
-        // Create new cash entry
+        // Create new cash entry (Phase 5 normalization: populate dual-currency columns)
+        const patchCashDebit = noteType === "Debit Note" ? totalRefundAmount : 0;
+        const patchCashCredit = noteType === "Credit Note" ? totalRefundAmount : 0;
         if (cashAccountType === "bank") {
           await tx.insert(voucherEntries).values({
             voucherId,
             bankAccountId: cashAccountId,
-            debitAmount: noteType === "Debit Note" ? totalRefundAmount.toFixed(2) : "0",
-            creditAmount: noteType === "Credit Note" ? totalRefundAmount.toFixed(2) : "0",
+            ...normEntryAmounts(patchCashDebit, patchCashCredit),
             narration: `${noteType} - cash ${noteType === "Credit Note" ? "refund" : "receipt"}`,
           });
         } else {
           await tx.insert(voucherEntries).values({
             voucherId,
             ledgerAccountId: cashAccountId,
-            debitAmount: noteType === "Debit Note" ? totalRefundAmount.toFixed(2) : "0",
-            creditAmount: noteType === "Credit Note" ? totalRefundAmount.toFixed(2) : "0",
+            ...normEntryAmounts(patchCashDebit, patchCashCredit),
             narration: `${noteType} - cash ${noteType === "Credit Note" ? "refund" : "receipt"}`,
           });
         }
@@ -698,8 +733,7 @@ export function registerCreditNoteRoutes(app: Express) {
               await tx.insert(voucherEntries).values({
                 voucherId,
                 ledgerAccountId: inventoryAccount[0].id,
-                debitAmount: inventoryValue.toFixed(2),
-                creditAmount: "0",
+                ...normEntryAmounts(inventoryValue, 0),
                 narration: `Inventory restored - ${noteType}`,
               });
             }
@@ -721,8 +755,7 @@ export function registerCreditNoteRoutes(app: Express) {
               await tx.insert(voucherEntries).values({
                 voucherId,
                 ledgerAccountId: inventoryAccount[0].id,
-                debitAmount: "0",
-                creditAmount: inventoryValue.toFixed(2),
+                ...normEntryAmounts(0, inventoryValue),
                 narration: `Inventory reduced - ${noteType}`,
               });
             }
@@ -748,16 +781,14 @@ export function registerCreditNoteRoutes(app: Express) {
               await tx.insert(voucherEntries).values({
                 voucherId,
                 ledgerAccountId: salesReturnsAccountId,
-                debitAmount: variance > 0 ? variance.toFixed(2) : "0",
-                creditAmount: variance < 0 ? Math.abs(variance).toFixed(2) : "0",
+                ...normEntryAmounts(variance > 0 ? variance : 0, variance < 0 ? Math.abs(variance) : 0),
                 narration: `Variance between refund and inventory cost`,
               });
             } else {
               await tx.insert(voucherEntries).values({
                 voucherId,
                 ledgerAccountId: salesReturnsAccountId,
-                debitAmount: variance < 0 ? Math.abs(variance).toFixed(2) : "0",
-                creditAmount: variance > 0 ? variance.toFixed(2) : "0",
+                ...normEntryAmounts(variance < 0 ? Math.abs(variance) : 0, variance > 0 ? variance : 0),
                 narration: `Variance between debit note amount and inventory cost`,
               });
             }

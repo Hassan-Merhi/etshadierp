@@ -156,7 +156,7 @@ export function registerStatsNetProfitRoutes(app: Express) {
       const _dateClause  = toDate ? "AND v.voucher_date <= $2" : "";
 
       const [companyRecord, companyAccounts, parentCompanyId,
-             groupedLedgerRows, groupedSupplierRows, groupedEmployeeRows] = await Promise.all([
+             groupedLedgerRows, groupedSupplierRows, groupedEmployeeRows, hasMigratedResult] = await Promise.all([
         storage.getCompanyById(companyId),
         storage.getAllLedgerAccounts(companyId, true),
         storage.getParentCompanyId(),
@@ -211,7 +211,22 @@ export function registerStatsNetProfitRoutes(app: Express) {
            GROUP BY ve.employee_id`,
           _entryParams,
         ),
+        // 7. Phase 6 guard: any entry with base_debit_amount set means COALESCE already
+        //    returns the correct historical USD base — legacy CFA revaluation must NOT run
+        //    or it will double-convert migrated amounts.
+        pool.query<{ has_migrated: boolean }>(
+          `SELECT EXISTS(
+             SELECT 1 FROM voucher_entries ve
+             JOIN vouchers v ON ve.voucher_id = v.id
+             WHERE v.company_id = $1
+               AND ve.base_debit_amount IS NOT NULL
+           ) AS has_migrated`,
+          [companyId],
+        ),
       ]);
+      // true  → some entries have base_debit_amount → COALESCE returns USD base → skip legacy revaluation
+      // false → all entries are pre-migration legacy → legacy CFA revaluation block applies
+      const hasMigratedEntries = (hasMigratedResult as any).rows[0]?.has_migrated === true;
       const companyBaseCurrency = companyRecord?.baseCurrency || "USD";
 
       // Build accountBalances from grouped SQL result.
@@ -349,9 +364,12 @@ export function registerStatsNetProfitRoutes(app: Express) {
           : [];
       const currentCfaRate = cfaRateRows.length > 0 ? parseFloat(cfaRateRows[0].rate) : 0;
 
-      if (currentCfaRate > 0) {
-        // Revalue ALL balance-sheet accounts (forUs = assets, onUs = liabilities).
-        // For a CFA company every ledger balance is stored in CFA — divide by rate to get USD.
+      if (currentCfaRate > 0 && !hasMigratedEntries) {
+        // Legacy CFA revaluation: only runs when ALL entries are pre-migration.
+        // After backfill (hasMigratedEntries=true) COALESCE already returns historical USD
+        // base amounts — dividing again would produce double-conversion errors.
+        // For a pre-migration CFA company every ledger balance is stored in CFA — divide by
+        // the current rate to get an approximate USD equivalent.
         for (const acc of forUsAccounts) {
           const oldVal = acc.value;
           const newVal = round2(oldVal / currentCfaRate);
@@ -549,10 +567,15 @@ export function registerStatsNetProfitRoutes(app: Express) {
         .from(salaryAdvances)
         .where(and(eq(salaryAdvances.companyId, companyId), eq(salaryAdvances.fullyPaid, false)));
       const rawSalaryAdvances = round2(parseFloat((saRow as any)?.total || "0"));
-      // For CFA companies, worker balances are stored in CFA → convert to USD
+      // For CFA companies, worker balances come from voucher entries.
+      // Guard: only convert if ALL entries are pre-migration (hasMigratedEntries=false).
+      // After migration COALESCE already returns USD-base values; re-dividing by CFA rate
+      // would produce incorrect double-conversion.
       const workerLiabilitiesDisplay =
-        currentCfaRate > 0 ? round2(workerLiabilities / currentCfaRate) : workerLiabilities;
-      const workerAdvancesDisplay = currentCfaRate > 0 ? round2(rawSalaryAdvances / currentCfaRate) : rawSalaryAdvances;
+        currentCfaRate > 0 && !hasMigratedEntries ? round2(workerLiabilities / currentCfaRate) : workerLiabilities;
+      // rawSalaryAdvances comes from the salary_advances table (not voucher entries).
+      // Its currency follows the company base currency for CFA companies.
+      const workerAdvancesDisplay = currentCfaRate > 0 && !hasMigratedEntries ? round2(rawSalaryAdvances / currentCfaRate) : rawSalaryAdvances;
       if (workerLiabilitiesDisplay > 0) {
         onUsTotal += workerLiabilitiesDisplay;
         categoryTotals["liability_Workers"] = (categoryTotals["liability_Workers"] || 0) + workerLiabilitiesDisplay;
@@ -599,12 +622,12 @@ export function registerStatsNetProfitRoutes(app: Express) {
             const netBalance = opening + balance.credit - balance.debit;
             if (netBalance > 0) {
               supplierLiabilities += netBalance;
-              const displayVal = currentCfaRate > 0 ? round2(netBalance / currentCfaRate) : netBalance;
+              const displayVal = currentCfaRate > 0 && !hasMigratedEntries ? round2(netBalance / currentCfaRate) : netBalance;
               onUsAccounts.push({ name: sup.legalName, code: sup.code || "", value: displayVal, category: "Supplier" });
             } else if (netBalance < 0) {
               supplierAssets += Math.abs(netBalance);
               const displayVal =
-                currentCfaRate > 0 ? round2(Math.abs(netBalance) / currentCfaRate) : Math.abs(netBalance);
+                currentCfaRate > 0 && !hasMigratedEntries ? round2(Math.abs(netBalance) / currentCfaRate) : Math.abs(netBalance);
               forUsAccounts.push({
                 name: sup.legalName,
                 code: sup.code || "",
@@ -616,9 +639,11 @@ export function registerStatsNetProfitRoutes(app: Express) {
         }
 
         // For CFA companies, supplier balances are in CFA → convert to USD
+        // Guard: supplier balances come from voucher entries via COALESCE.
+        // Only convert pre-migration amounts; after migration the COALESCE already returns USD.
         const supplierLiabilitiesDisplay =
-          currentCfaRate > 0 ? round2(supplierLiabilities / currentCfaRate) : supplierLiabilities;
-        const supplierAssetsDisplay = currentCfaRate > 0 ? round2(supplierAssets / currentCfaRate) : supplierAssets;
+          currentCfaRate > 0 && !hasMigratedEntries ? round2(supplierLiabilities / currentCfaRate) : supplierLiabilities;
+        const supplierAssetsDisplay = currentCfaRate > 0 && !hasMigratedEntries ? round2(supplierAssets / currentCfaRate) : supplierAssets;
         if (supplierLiabilitiesDisplay > 0) {
           onUsTotal += supplierLiabilitiesDisplay;
           categoryTotals["liability_Suppliers"] = supplierLiabilitiesDisplay;

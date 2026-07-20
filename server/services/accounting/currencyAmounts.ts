@@ -465,6 +465,74 @@ export function resolveLegacyTransactionAmounts(params: {
 }
 
 /**
+ * Classify a voucher_entry row for historical-fallback read paths.
+ *
+ * The `COALESCE(base_debit_amount, debit_amount)` SQL fallback used throughout
+ * reporting queries is safe only for certain row classifications:
+ *
+ *   "migrated"          — base_debit_amount IS NOT NULL → safe to use base_debit_amount
+ *   "identity-usd"      — txCurrency = baseCurrency → debit_amount stores correct base
+ *   "unresolved-legacy" — non-base currency, base_debit_amount IS NULL → unsafe;
+ *                         debit_amount may be a raw CFA transaction amount, not a USD base
+ *
+ * Callers that need to handle unresolved-legacy rows should flag them for backfill
+ * or display a "data unresolved" indicator in the UI.
+ *
+ * NOTE: This is a read-only classification helper. It never persists anything.
+ */
+export function classifyVoucherEntryFallback(params: {
+  baseDebitAmount: string | null | undefined;
+  baseCreditAmount: string | null | undefined;
+  transactionCurrency: string | null | undefined;
+  voucherCurrency: string | null | undefined;
+  baseCurrency: string;
+}): { safe: boolean; classification: "migrated" | "identity-usd" | "unresolved-legacy"; reason?: string } {
+  const { baseDebitAmount, baseCreditAmount, transactionCurrency, voucherCurrency, baseCurrency } = params;
+
+  // Already migrated → safe; caller should use base_debit_amount directly.
+  if (baseDebitAmount != null || baseCreditAmount != null) {
+    return { safe: true, classification: "migrated" };
+  }
+
+  let txCcy: string;
+  let baseCcy: string;
+
+  try {
+    txCcy = normalizeCurrencyCode(
+      transactionCurrency || voucherCurrency || baseCurrency
+    );
+  } catch {
+    return {
+      safe: false,
+      classification: "unresolved-legacy",
+      reason: `Cannot determine transaction currency from: transactionCurrency=${transactionCurrency}, voucherCurrency=${voucherCurrency}`,
+    };
+  }
+
+  try {
+    baseCcy = normalizeCurrencyCode(baseCurrency);
+  } catch {
+    return {
+      safe: false,
+      classification: "unresolved-legacy",
+      reason: `Unknown base currency: ${baseCurrency}`,
+    };
+  }
+
+  if (txCcy === baseCcy) {
+    // USD-in-USD: stored debit/credit are the historical base amounts → safe.
+    return { safe: true, classification: "identity-usd" };
+  }
+
+  // Non-base currency with no base_debit_amount → unknown denomination.
+  return {
+    safe: false,
+    classification: "unresolved-legacy",
+    reason: `${txCcy} entry with no base_debit_amount — COALESCE fallback returns raw amount in unknown denomination (could be CFA tx amount or legacy USD base). Run backfill to resolve.`,
+  };
+}
+
+/**
  * Compute the fxRateToUsd value for storage in factory_daybook_entries.
  *
  * factory_daybook_entries.fx_rate_to_usd stores USD per foreign-currency unit

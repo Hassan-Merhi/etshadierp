@@ -57,6 +57,13 @@
       "when": 1753020000000,
       "tag": "20260720_002_voucher_entry_currency_fields",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1753106400000,
+      "tag": "20260720_003_ledger_account_opening_balance_currency",
+      "breakpoints": true
     }
   ]
 }
