@@ -42,7 +42,9 @@ export type ReplayBlockReason =
   | "MANUAL_REVIEW_SOURCE"
   | "UPSTREAM_BATCH_BLOCKED"
   | "MISSING_SUPPLIER_RATE"
-  | "DIRECT_CONTAINER_MISSING";
+  | "DIRECT_CONTAINER_MISSING"
+  | "COMPLETED_BATCH_REQUIRES_INCLUDE_COMPLETED"
+  | "UPSTREAM_COMPLETED_BATCH_EXCLUDED";
 
 export interface ReplayContainerRow {
   containerId: number;
@@ -125,10 +127,35 @@ export interface ReplaySummary {
   quantityTimelineMismatches: number;
   ambiguousEventOrdering: number;
   scanCoverageError: boolean;
-  /** V7 gates */
+  /** V7 gates are optional at the low-level read-model boundary and finalized by securePreview. */
+  unresolvedInventorySupplierSources?: number;
+  unclassifiedValuedAdjustments?: number;
+  incompleteMixedBatchSupplierScopes?: number;
+  blockedBatches?: number;
+}
+
+export interface ReplayUnclassifiedAdjustmentRow {
+  adjustmentId: number;
+  supplierId: number;
+  supplierName: string;
+  date: string;
+  kg: number;
+  costPerKg: number;
+  currencyCode: string;
+  reference: string | null;
+  notes: string | null;
+}
+
+export interface ReplaySafetyGateDetails {
   unresolvedInventorySupplierSources: number;
   unclassifiedValuedAdjustments: number;
+  unresolvedFx: number;
+  missingDates: number;
+  quantityTimelineMismatches: number;
+  ambiguousEventOrdering: number;
   incompleteMixedBatchSupplierScopes: number;
+  blockedBatches: number;
+  scanCoverageError: boolean;
 }
 
 /** Per-supplier financial impact projected by the replay. */
@@ -157,17 +184,7 @@ export interface ReplayFinancialImpact {
   finalizedBalesExcluded: number;
   supplierImpacts: ReplaySupplierFinancialImpact[];
   allSafetyGatesPassed: boolean;
-  safetyGateDetails: {
-    unresolvedInventorySupplierSources: number;
-    unclassifiedValuedAdjustments: number;
-    unresolvedFx: number;
-    missingDates: number;
-    quantityTimelineMismatches: number;
-    ambiguousEventOrdering: number;
-    incompleteMixedBatchSupplierScopes: number;
-    blockedBatches: number;
-    scanCoverageError: boolean;
-  };
+  safetyGateDetails: ReplaySafetyGateDetails;
 }
 
 export interface HistoricalReplayPreviewResult {
@@ -177,6 +194,8 @@ export interface HistoricalReplayPreviewResult {
   sourceRows: ReplaySourceRow[];
   batchRows: ReplayBatchRow[];
   financialImpact?: ReplayFinancialImpact;
+  unclassifiedAdjustmentRows?: ReplayUnclassifiedAdjustmentRow[];
+  blockedBatches?: Array<{ batchId: number; batchCode: string; reasons: string[] }>;
 }
 
 export interface HistoricalReplayScope {
@@ -343,7 +362,8 @@ export const FINALIZED_BALE_STATUSES = [
   "FINALIZED",
 ] as const;
 
-export const REPLAY_ALGORITHM_VERSION = "HISTORICAL_COST_REPLAY_V7_INVENTORY_OWNERSHIP";
+// Final V7 bump invalidates tokens issued by the incomplete first V7 implementation.
+export const REPLAY_ALGORITHM_VERSION = "HISTORICAL_COST_REPLAY_V7_INVENTORY_OWNERSHIP_FINAL";
 
 export function rowToCamel<T>(row: Record<string, unknown>): T {
   const out: Record<string, unknown> = {};

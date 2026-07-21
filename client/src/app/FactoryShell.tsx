@@ -9,6 +9,7 @@ import { SidebarProvider } from "@/components/ui/sidebar";
 import { DailyRateModal } from "@/components/DailyRateModal";
 import { FactorySidebar } from "@/components/FactorySidebar";
 import { FactoryRoutes } from "@/components/FactoryRoutes";
+import { HistoricalReplaySafetyPanel } from "@/components/HistoricalReplaySafetyPanel";
 import { AppTopBar } from "@/components/AppTopBar";
 import { OfflineBanner } from "@/components/OfflineBanner";
 import { MODULE_ACCENT } from "@/components/sidebar/sidebarPrimitives";
@@ -52,6 +53,9 @@ export function FactoryShell({
 
   const style = { "--sidebar-width": "16rem", "--sidebar-width-icon": "3rem" };
   const isFactoryPosRoute = currentLocation === "/factory/pos" || currentLocation.startsWith("/factory/pos?");
+  const isRawStockRecalculateRoute =
+    currentLocation === "/factory/raw-stock/recalculate"
+    || currentLocation.startsWith("/factory/raw-stock/recalculate?");
   useMainContentFocus(currentLocation);
   useWorkspaceWheelScroll(factoryContainerRef);
   const hasAdminSearch = canUseAdminSearch(user);
@@ -80,6 +84,9 @@ export function FactoryShell({
               }`}
             >
               <div className="w-full min-w-0 max-w-full [&_form]:min-w-0 [&_table]:w-full [&_[role=table]]:w-full [&_.overflow-x-auto]:overscroll-x-contain">
+                <ErrorBoundary resetKey={`${currentLocation}:historical-replay-preview`}>
+                  {isRawStockRecalculateRoute && <HistoricalReplaySafetyPanel />}
+                </ErrorBoundary>
                 <ErrorBoundary resetKey={currentLocation}>
                   <Suspense
                     fallback={
