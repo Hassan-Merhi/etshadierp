@@ -228,12 +228,31 @@ export async function insertSaleAccountingEntries(
     exchangeRate,
   } = params;
 
+  /**
+   * The frontend always converts item rates to USD before sending them, so
+   * `grandTotal` (= sum of qty × rate) is always in USD — even when the
+   * voucher currency is "CFA".  `normalizeVoucherEntryAmounts` divides the
+   * transaction amount by the exchange rate to produce the USD base amount,
+   * so if we pass the already-USD grandTotal it gets divided again, yielding
+   * a fraction of the correct value (e.g. $430.75 / 49.34 ≈ $8.73).
+   *
+   * Fix: multiply grandTotal back into the transaction currency before handing
+   * it to normalizePosEntry.  The normalization then divides by the same rate
+   * and recovers the correct USD base.  For USD sales the factor is 1 (no-op).
+   */
+  const txRate = exchangeRate ? parseFloat(exchangeRate) : 1;
+  const needsTxConversion = !!(currency && currency !== "USD" && exchangeRate && txRate > 0);
+  /** Convert a USD amount → transaction-currency amount for normalizePosEntry. */
+  function toTxAmt(usdAmt: number): number {
+    return needsTxConversion ? usdAmt * txRate : usdAmt;
+  }
+
   const creditSaleNarration = isCreditSale
     ? `Credit Invoice Sale at ${location.name} - ${(customerAccount as any).name}`
     : `POS Sale - ${voucherNumber}`;
 
   // Debit entry (cash / bank / receivable account)
-  const normDR = normalizePosEntry(Math.abs(grandTotal), 0, currency || "USD", exchangeRate);
+  const normDR = normalizePosEntry(toTxAmt(Math.abs(grandTotal)), 0, currency || "USD", exchangeRate);
   const debitEntry: any = {
     voucherId: txVoucherId,
     debitAmount: grandTotal >= 0 ? normDR.debitAmount : "0",
@@ -267,7 +286,7 @@ export async function insertSaleAccountingEntries(
 
   if (!isSpCompany) {
     // Normal ERP: credit the full sale amount to the Sales Revenue account
-    const normCR = normalizePosEntry(0, Math.abs(grandTotal), currency || "USD", exchangeRate);
+    const normCR = normalizePosEntry(0, toTxAmt(Math.abs(grandTotal)), currency || "USD", exchangeRate);
     await tx.insert(voucherEntries).values({
       voucherId: txVoucherId,
       ledgerAccountId: salesAccount.id,
@@ -301,7 +320,7 @@ export async function insertSaleAccountingEntries(
 
   if (grandTotalRounded > 0) {
     if (spPayableAmount > 0) {
-      const normSP = normalizePosEntry(0, spPayableAmount, currency || "USD", exchangeRate);
+      const normSP = normalizePosEntry(0, toTxAmt(spPayableAmount), currency || "USD", exchangeRate);
       await tx.insert(voucherEntries).values({
         voucherId: txVoucherId,
         ledgerAccountId: spCtx.spPosPayableAccountId!,
@@ -318,7 +337,7 @@ export async function insertSaleAccountingEntries(
       });
     }
     if (spDeductionAmount > 0 && spCtx.spPosDeductionClrAccountId) {
-      const normDD = normalizePosEntry(0, spDeductionAmount, currency || "USD", exchangeRate);
+      const normDD = normalizePosEntry(0, toTxAmt(spDeductionAmount), currency || "USD", exchangeRate);
       await tx.insert(voucherEntries).values({
         voucherId: txVoucherId,
         ledgerAccountId: spCtx.spPosDeductionClrAccountId,
@@ -337,7 +356,7 @@ export async function insertSaleAccountingEntries(
   } else if (grandTotalRounded < 0) {
     // Reversal: Dr Supplier Cash Payable
     if (spPayableAmount < 0) {
-      const normSPR = normalizePosEntry(Math.abs(spPayableAmount), 0, currency || "USD", exchangeRate);
+      const normSPR = normalizePosEntry(toTxAmt(Math.abs(spPayableAmount)), 0, currency || "USD", exchangeRate);
       await tx.insert(voucherEntries).values({
         voucherId: txVoucherId,
         ledgerAccountId: spCtx.spPosPayableAccountId!,
@@ -354,7 +373,7 @@ export async function insertSaleAccountingEntries(
       });
     }
     if (spDeductionAmount > 0 && spCtx.spPosDeductionClrAccountId) {
-      const normDDR = normalizePosEntry(spDeductionAmount, 0, currency || "USD", exchangeRate);
+      const normDDR = normalizePosEntry(toTxAmt(spDeductionAmount), 0, currency || "USD", exchangeRate);
       await tx.insert(voucherEntries).values({
         voucherId: txVoucherId,
         ledgerAccountId: spCtx.spPosDeductionClrAccountId,
