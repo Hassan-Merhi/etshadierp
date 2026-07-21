@@ -187,6 +187,7 @@ export function registerSupplierRoutes(app: Express) {
   });
 
   app.get("/api/suppliers/:id/balance", requireAuth, async (req, res) => {
+    res.set("Cache-Control", "no-store");
     try {
       const supplierId = parseInt(req.params.id);
       if (isNaN(supplierId)) {

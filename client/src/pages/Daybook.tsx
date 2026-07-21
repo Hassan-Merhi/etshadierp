@@ -190,11 +190,11 @@ export default function Daybook({ user }: { user?: any } = {}) {
       setPoSupplierBalance(null);
       return;
     }
-    fetch(`/api/suppliers/${purchaseOrderData.supplierId}/balance`, { credentials: "include" })
+    fetch(`/api/suppliers/${purchaseOrderData.supplierId}/balance`, { credentials: "include", cache: "no-store" })
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => setPoSupplierBalance(d?.balance?.toString() ?? null))
       .catch(() => setPoSupplierBalance(null));
-  }, [purchaseOrderData?.supplierId]);
+  }, [purchaseOrderData?.supplierId, balanceRefreshKey]);
 
   const { data: viewVoucherEntriesRaw, isLoading: viewEntriesLoading } = useQuery<any>({
     queryKey: selectedVoucher ? [`/api/vouchers/${selectedVoucher.id}/view-entries`] : [],
@@ -269,14 +269,24 @@ export default function Daybook({ user }: { user?: any } = {}) {
 
   const [cashAccountBalance, setCashAccountBalance] = useState("0");
   const [entryBalances, setEntryBalances] = useState<Record<number, string>>({});
+  // Incremented after any mutation that changes account balances, forcing a re-fetch.
+  const [balanceRefreshKey, setBalanceRefreshKey] = useState(0);
+  const refreshBalances = () => setBalanceRefreshKey((k) => k + 1);
+
+  // Reset balance state immediately when the viewed voucher changes so stale
+  // values from the previous voucher don't flash while the new fetch is in flight.
+  useEffect(() => {
+    setCashAccountBalance("0");
+    setEntryBalances({});
+  }, [selectedVoucher?.id]);
 
   useEffect(() => {
     if (!cashAccountId || !viewDialogOpen) return;
-    fetch(`/api/accounts/ledger/${cashAccountId}/balance`, { credentials: "include" })
+    fetch(`/api/accounts/ledger/${cashAccountId}/balance`, { credentials: "include", cache: "no-store" })
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => setCashAccountBalance(data?.balance?.toString() || "0"))
       .catch(() => {});
-  }, [cashAccountId, viewDialogOpen]);
+  }, [cashAccountId, viewDialogOpen, balanceRefreshKey]);
 
   useEffect(() => {
     if (
@@ -310,7 +320,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
                     : null;
         if (!url) return;
         try {
-          const res = await fetch(url, { credentials: "include" });
+          const res = await fetch(url, { credentials: "include", cache: "no-store" });
           if (res.ok) {
             const d = await res.json();
             results[entry.id] = d.balance?.toString() || "0";
@@ -318,7 +328,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
         } catch {}
       })
     ).then(() => setEntryBalances(results));
-  }, [viewDialogOpen, selectedVoucher, viewVoucherEntries]);
+  }, [viewDialogOpen, selectedVoucher, viewVoucherEntries, balanceRefreshKey]);
 
   useEffect(() => {
     setSelectedDialogRow(null);
@@ -525,6 +535,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
     mutationFn: async (id: number) => apiRequest("DELETE", `/api/vouchers/${id}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] });
+      refreshBalances();
       toast({ title: "Success", description: "Voucher deleted" });
       setDeleteDialogOpen(false);
     },
@@ -535,6 +546,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
       apiRequest("PATCH", `/api/vouchers/${id}`, updates),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] });
+      refreshBalances();
       toast({ title: "Success", description: "Voucher updated" });
       setEditDialogOpen(false);
     },

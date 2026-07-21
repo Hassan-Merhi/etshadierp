@@ -641,6 +641,7 @@ export async function buildBrokerStatement(brokerId: number, companyId: number, 
 
 export function registerSupplierBalanceRoutes(app: Express) {
   app.get("/api/factory/suppliers/:id/balance", requireAuth, async (req: any, res: any) => {
+    res.set("Cache-Control", "no-store");
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });

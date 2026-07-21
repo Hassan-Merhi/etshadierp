@@ -2800,6 +2800,7 @@ export function registerBaleRoutes(app: Express) {
 
   // Customer Balance API Routes
   app.get("/api/customers/:id/balance", requireAuth, async (req, res) => {
+    res.set("Cache-Control", "no-store");
     try {
       const companyId = req.session.currentCompanyId;
       if (!companyId) {

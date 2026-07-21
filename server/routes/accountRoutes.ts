@@ -1104,6 +1104,7 @@ export function registerAccountRoutes(app: Express) {
 
   // Get balance for a specific ledger account
   app.get("/api/accounts/ledger/:id/balance", requireAuth, async (req, res) => {
+    res.set("Cache-Control", "no-store");
     try {
       const ledgerAccountId = parseInt(req.params.id);
 
