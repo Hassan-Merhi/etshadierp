@@ -28,11 +28,44 @@ interface DailyRateModalProps {
   companyId: number;
 }
 
+// ---------------------------------------------------------------------------
+// localStorage helpers — persist "rate was set today" across remounts / tabs.
+// Key format:  daily-rate-done-{companyId}-{YYYY-MM-DD}
+// The check is per-company and per-calendar-day so it expires automatically
+// when the date changes (no need for explicit cleanup of the current day's key).
+// ---------------------------------------------------------------------------
+const LS_PREFIX = "daily-rate-done";
+
+function lsKey(companyId: number, date: string) {
+  return `${LS_PREFIX}-${companyId}-${date}`;
+}
+
+function isDoneToday(companyId: number, date: string): boolean {
+  try {
+    return localStorage.getItem(lsKey(companyId, date)) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function markDoneToday(companyId: number, date: string): void {
+  try {
+    localStorage.setItem(lsKey(companyId, date), "1");
+    // Prune stale entries for this company (keep only today's).
+    for (const key of Object.keys(localStorage)) {
+      if (key.startsWith(`${LS_PREFIX}-${companyId}-`) && key !== lsKey(companyId, date)) {
+        localStorage.removeItem(key);
+      }
+    }
+  } catch {
+    // localStorage may be unavailable (private browsing, quota, etc.) — silent fallback.
+  }
+}
+
 export function DailyRateModal({ companyId }: DailyRateModalProps) {
   const { toast } = useToast();
   const { selectedCompany } = useCompany();
   const [isOpen, setIsOpen] = useState(false);
-  const [checkedCompanyId, setCheckedCompanyId] = useState<number | null>(null);
 
   const form = useForm<RateFormData>({
     resolver: zodResolver(rateFormSchema),
@@ -61,9 +94,7 @@ export function DailyRateModal({ companyId }: DailyRateModalProps) {
     },
     enabled: !!companyId && !!company?.displayCurrency && company.displayCurrency !== "none",
     // The backend is the single source of truth for whether today's rate has been set
-    // company-wide. Never let a stale cached "no rate yet" answer linger and reopen the
-    // popup after another user (or this one) has already saved it — always refetch when
-    // the page/tab regains focus or the query is invalidated.
+    // company-wide.  Always refetch on focus so multi-user saves propagate promptly.
     staleTime: 0,
     refetchOnWindowFocus: true,
   });
@@ -74,18 +105,44 @@ export function DailyRateModal({ companyId }: DailyRateModalProps) {
     ? new Date(previousRate.effectiveDate).toLocaleDateString()
     : null;
 
+  // -------------------------------------------------------------------------
+  // Decide whether to show the modal.
+  //
+  // Rules:
+  //  1. Backend says rate is already set → mark done in localStorage, close.
+  //  2. Rate was already set (or modal already shown) today in THIS browser →
+  //     skip (persists across tabs, page reloads, and component remounts).
+  //  3. Otherwise → show.
+  //
+  // We deliberately do NOT auto-open when the modal was manually dismissed
+  // without saving — that only suppresses for the remainder of the browser
+  // session via the `isOpen` state (the localStorage key is only written on
+  // successful save).
+  // -------------------------------------------------------------------------
   useEffect(() => {
-    if (!isCheckingRate && todayRateCheck && checkedCompanyId !== companyId) {
-      setCheckedCompanyId(companyId);
-      if (!todayRateCheck.hasRate && company?.displayCurrency && company.displayCurrency !== "none") {
-        // Pre-fill with previous rate if available
-        if (previousRateValue) {
-          form.setValue("rate", String(previousRateValue));
-        }
-        setIsOpen(true);
-      }
+    if (isCheckingRate || !todayRateCheck || !company) return;
+
+    const today = todayRateCheck.today;
+
+    if (todayRateCheck.hasRate) {
+      // Backend confirms rate exists — write the localStorage flag so we don't
+      // show the modal again for this (company, day) in any tab or after a reload.
+      markDoneToday(companyId, today);
+      setIsOpen(false);
+      return;
     }
-  }, [todayRateCheck, isCheckingRate, checkedCompanyId, companyId, company, previousRateValue]);
+
+    // Already handled in this browser today (rate was saved earlier).
+    if (isDoneToday(companyId, today)) return;
+
+    // No rate set yet and not previously dismissed → show.
+    if (company.displayCurrency && company.displayCurrency !== "none") {
+      if (previousRateValue) {
+        form.setValue("rate", String(previousRateValue));
+      }
+      setIsOpen(true);
+    }
+  }, [todayRateCheck, isCheckingRate, company, companyId, previousRateValue]);
 
   const createRateMutation = useMutation({
     mutationFn: async (data: RateFormData) => {
@@ -100,6 +157,11 @@ export function DailyRateModal({ companyId }: DailyRateModalProps) {
       });
     },
     onSuccess: async () => {
+      const today = todayRateCheck?.today || format(new Date(), "yyyy-MM-dd");
+      // Persist "rate set today" so the modal doesn't reappear in any tab or
+      // after remounting until tomorrow.
+      markDoneToday(companyId, today);
+
       toast({ title: "Today's exchange rate has been set" });
       queryClient.invalidateQueries({ queryKey: ["/api/exchange-rates"] });
       await queryClient.refetchQueries({ queryKey: ["/api/exchange-rates/latest"] });
