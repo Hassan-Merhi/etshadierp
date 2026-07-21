@@ -184,6 +184,9 @@ export default function Daybook({ user }: { user?: any } = {}) {
 
   const [purchaseOrderData, setPurchaseOrderData] = useState<any>(null);
   const [poSupplierBalance, setPoSupplierBalance] = useState<string | null>(null);
+  // Declared here — before any useEffect that references it — to avoid TDZ errors.
+  const [balanceRefreshKey, setBalanceRefreshKey] = useState(0);
+  const refreshBalances = () => setBalanceRefreshKey((k) => k + 1);
 
   useEffect(() => {
     if (!purchaseOrderData?.supplierId) {
@@ -270,9 +273,6 @@ export default function Daybook({ user }: { user?: any } = {}) {
   const [cashAccountBalance, setCashAccountBalance] = useState("0");
   const [entryBalances, setEntryBalances] = useState<Record<number, string>>({});
   // Incremented after any mutation that changes account balances, forcing a re-fetch.
-  const [balanceRefreshKey, setBalanceRefreshKey] = useState(0);
-  const refreshBalances = () => setBalanceRefreshKey((k) => k + 1);
-
   // Reset balance state immediately when the viewed voucher changes so stale
   // values from the previous voucher don't flash while the new fetch is in flight.
   useEffect(() => {
