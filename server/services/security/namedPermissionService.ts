@@ -12,6 +12,27 @@ export const KNOWN_SECURITY_PERMISSIONS = Object.freeze([
 
 export type KnownSecurityPermission = (typeof KNOWN_SECURITY_PERMISSIONS)[number];
 
+export class SecuritySchemaUnavailableError extends Error {
+  readonly status = 503;
+  readonly statusCode = 503;
+  readonly code = "SECURITY_SCHEMA_NOT_READY";
+
+  constructor(cause?: unknown) {
+    super("Critical security permissions schema is unavailable");
+    this.name = "SecuritySchemaUnavailableError";
+    (this as any).cause = cause;
+  }
+}
+
+function postgresErrorCode(error: any): string {
+  return String(error?.code || error?.cause?.code || "");
+}
+
+function isSecuritySchemaError(error: any): boolean {
+  const code = postgresErrorCode(error);
+  return code === "42P01" || code === "42703";
+}
+
 export function normalizePermissionList(value: unknown): string[] {
   if (!Array.isArray(value)) throw new Error("Invalid permissions");
   const known = new Set<string>(KNOWN_SECURITY_PERMISSIONS);
@@ -21,11 +42,16 @@ export function normalizePermissionList(value: unknown): string[] {
 }
 
 export async function loadNamedPermissions(db: any, userId: string, companyId: number): Promise<string[]> {
-  const rows = await db
-    .select({ permission: userSecurityPermissions.permission })
-    .from(userSecurityPermissions)
-    .where(and(eq(userSecurityPermissions.userId, userId), eq(userSecurityPermissions.companyId, companyId)));
-  return [...new Set(rows.map((row: any) => String(row.permission)))].sort();
+  try {
+    const rows = await db
+      .select({ permission: userSecurityPermissions.permission })
+      .from(userSecurityPermissions)
+      .where(and(eq(userSecurityPermissions.userId, userId), eq(userSecurityPermissions.companyId, companyId)));
+    return [...new Set(rows.map((row: any) => String(row.permission)))].sort();
+  } catch (error) {
+    if (isSecuritySchemaError(error)) throw new SecuritySchemaUnavailableError(error);
+    throw error;
+  }
 }
 
 export async function assertUserBelongsToCompany(db: any, userId: string, companyId: number): Promise<void> {
