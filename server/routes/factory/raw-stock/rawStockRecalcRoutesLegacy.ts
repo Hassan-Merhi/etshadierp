@@ -615,11 +615,19 @@ export function registerRawStockRecalcRoutes(app: Express) {
             [c.id, ...Object.values(updates)]
           );
 
-          await logAudit(req, {
-            action: "AUTO_APPLY_FX_RATE",
-            entityType: "factory_container",
-            entityId: c.id,
-            changes: { new: { rate, source: rateRow.rows[0].source, effectiveDate: rateRow.rows[0].effective_date } },
+          await logAudit({
+            userId: req.session.userId,
+            username: req.session.username || req.session.userId,
+            companyId,
+            action: "update",
+            tableName: "factory_containers",
+            recordId: c.id,
+            recordIdentifier: `auto-apply-fx-rate — container ${c.container_number}`,
+            changes: {
+              rate: { new: rate },
+              source: { new: rateRow.rows[0].source },
+              effectiveDate: { new: rateRow.rows[0].effective_date },
+            },
           });
 
           results.push({ containerNumber: c.container_number, rate, applied: true });
@@ -788,7 +796,7 @@ export function registerRawStockRecalcRoutes(app: Express) {
               tableName: "factory_suppliers",
               recordId: sid,
               recordIdentifier: `supplier-rate/recompute — stable avg from ${rows.length} rows, totalReceived ${totalReceivedKg}kg`,
-              changes: { old: { currentRawMaterialCostPerKgUsd: oldRate }, new: { currentRawMaterialCostPerKgUsd: costPerKgUsd } },
+              changes: { currentRawMaterialCostPerKgUsd: { old: oldRate, new: costPerKgUsd } },
             });
           }
           results.push({ supplierId: sid, supplierName, oldRate, newRate: costPerKgUsd, rowCount: rows.length, totalReceivedKg });
@@ -935,7 +943,7 @@ export function registerRawStockRecalcRoutes(app: Express) {
             tableName: "factory_suppliers",
             recordId: sid,
             recordIdentifier: `supplier-rate/restore-from-audit — reverted to pre-recompute moving-average rate`,
-            changes: { old: { currentRawMaterialCostPerKgUsd: oldRate }, new: { currentRawMaterialCostPerKgUsd: rateNum } },
+            changes: { currentRawMaterialCostPerKgUsd: { old: oldRate, new: rateNum } },
           });
 
           results.push({

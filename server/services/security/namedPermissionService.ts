@@ -47,7 +47,8 @@ export async function loadNamedPermissions(db: any, userId: string, companyId: n
       .select({ permission: userSecurityPermissions.permission })
       .from(userSecurityPermissions)
       .where(and(eq(userSecurityPermissions.userId, userId), eq(userSecurityPermissions.companyId, companyId)));
-    return [...new Set(rows.map((row: any) => String(row.permission)))].sort();
+    const permissions: string[] = rows.map((row: any) => String(row.permission));
+    return [...new Set(permissions)].sort();
   } catch (error) {
     if (isSecuritySchemaError(error)) throw new SecuritySchemaUnavailableError(error);
     throw error;

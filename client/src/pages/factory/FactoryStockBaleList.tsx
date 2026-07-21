@@ -83,10 +83,10 @@ export default function FactoryStockBaleList() {
       </PageHeader>
 
       {isLoading ? (
-        <LoadingRows count={6} rowClassName="h-9" />
+        <LoadingRows rows={6} rowClassName="h-9" />
       ) : bales.length === 0 ? (
         <EmptyState
-          icon={Package}
+          icon={<Package className="h-5 w-5" />}
           title="No in-stock bales"
           description={`No IN_STOCK bales found for ${articleCode}.`}
         />

@@ -1,7 +1,7 @@
 import { logger } from "./logger";
 
 export type OperationalEventCategory = "error" | "bandwidth" | "integrity";
-export type OperationalEventSeverity = "warning" | "critical";
+export type OperationalEventSeverity = "info" | "warning" | "critical";
 
 export interface OperationalEventInput {
   category: OperationalEventCategory;
@@ -16,6 +16,16 @@ export interface OperationalEventInput {
   responseBytes?: number;
   companyId?: number;
   userId?: number;
+  // Optional diagnostic metrics attached by bandwidth/performance events.
+  endpointCount?: number;
+  apiEndpointCount?: number;
+  staticAssetCount?: number;
+  windowMs?: number;
+  ranked?: unknown[];
+  staticAssets?: unknown[];
+  heapDeltaBytes?: number;
+  dbQueryCount?: number;
+  dbDurationMs?: number;
 }
 
 interface OperationalEventRecord extends OperationalEventInput {

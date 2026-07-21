@@ -62,6 +62,7 @@ interface ContainerDetailData {
   container: any;
   pos: any[];
   charges: any[];
+  offloadId?: number | null;
 }
 
 const saleFormSchema = z.object({

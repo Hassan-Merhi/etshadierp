@@ -30,3 +30,10 @@ android/keystore.properties
 *.backup*
 *.bak
 *~
+
+# Type-check / CI diagnostic dumps (regenerated on demand, never committed)
+ts-errors*.txt
+*-errors-ci.txt
+
+# User-uploaded content (runtime data, not source)
+uploads/

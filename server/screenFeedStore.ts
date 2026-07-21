@@ -1,7 +1,7 @@
 export interface ClickEvent {
   x: number;
   y: number;
-  label: string;
+  label?: string;
   ts: number;
 }
 

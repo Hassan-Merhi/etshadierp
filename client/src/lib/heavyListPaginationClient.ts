@@ -142,8 +142,13 @@ if (typeof window !== "undefined" && !window.__erpHeavyListPaginationClientInsta
   function renderControls(): void {
     const root = ensureControls();
     // Pagination UI intentionally hidden — all data loads in a single request.
-    root.style.display = "none";
-    return;
+    // Typed as boolean (not the literal `false`) so the disabled controls below
+    // stay reachable for type-checking until pagination is re-enabled.
+    const PAGINATION_UI_ENABLED = false as boolean;
+    if (!PAGINATION_UI_ENABLED) {
+      root.style.display = "none";
+      return;
+    }
     if (!activeMeta || !isVisibleRoute() || !condensedMode) {
       root.style.display = "none";
       return;

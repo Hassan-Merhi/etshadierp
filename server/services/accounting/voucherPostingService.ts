@@ -15,12 +15,14 @@
 import { vouchers, voucherEntries } from "@shared/schema";
 import type { VoucherInsertFields, VoucherEntryInsertFields, VoucherWithEntries } from "./accountingTypes";
 
+type VoucherRow = typeof vouchers.$inferSelect;
+type VoucherEntryRow = typeof voucherEntries.$inferSelect;
+
+// Method-syntax members (not property arrows) so parameters compare
+// bivariantly — this lets a concrete Drizzle PgTransaction satisfy the
+// structural contract without a cast at every call site.
 interface TransactionLike {
-  insert: (table: unknown) => {
-    values: (values: unknown) => {
-      returning: () => Promise<unknown[]>;
-    };
-  };
+  insert(table: any): any;
 }
 
 interface DatabaseLike {
@@ -85,8 +87,11 @@ export async function insertVoucherWithEntriesTx(
   tx: TransactionLike,
   voucherFields: VoucherInsertFields,
   items: VoucherEntryInsertFields[],
-): Promise<VoucherWithEntries> {
-  const [voucher] = await tx.insert(vouchers).values(buildVoucherValues(voucherFields)).returning();
+): Promise<VoucherWithEntries<VoucherRow, VoucherEntryRow>> {
+  const [voucher] = (await tx
+    .insert(vouchers)
+    .values(buildVoucherValues(voucherFields))
+    .returning()) as VoucherRow[];
   if (!voucher || typeof voucher !== "object" || !("id" in voucher)) {
     throw new Error("Voucher insert did not return a persisted voucher");
   }

@@ -7,7 +7,7 @@ export interface UserNotesSnapshot {
   updatedAt: Date | null;
 }
 
-export async function getUserNotes(userId: number): Promise<UserNotesSnapshot> {
+export async function getUserNotes(userId: string): Promise<UserNotesSnapshot> {
   const [row] = await db
     .select({ content: userNotes.content, updatedAt: userNotes.updatedAt })
     .from(userNotes)
@@ -20,7 +20,7 @@ export async function getUserNotes(userId: number): Promise<UserNotesSnapshot> {
   };
 }
 
-export async function saveUserNotes(userId: number, content: string): Promise<void> {
+export async function saveUserNotes(userId: string, content: string): Promise<void> {
   const updatedAt = new Date();
 
   await db

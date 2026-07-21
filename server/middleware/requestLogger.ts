@@ -9,7 +9,7 @@ import type { Request, Response, NextFunction } from "express";
 import { pool } from "../db";
 import { logger } from "../lib/logger";
 import { getOperationalEventSnapshot, recordOperationalEvent } from "../lib/operationalEvents";
-import { logAudit } from "../routes/helpers/auditHelpers";
+import { logAudit, type AuditAction } from "../routes/helpers/auditHelpers";
 
 const SLOW_REQUEST_MS = Number(process.env.SLOW_REQUEST_MS || 500);
 const SUCCESS_SAMPLE_RATE = Math.min(1, Math.max(0, Number(process.env.REQUEST_LOG_SAMPLE_RATE || 0)));
@@ -31,7 +31,7 @@ interface RequestMetrics {
 }
 
 interface ActivityAuditMatch {
-  action: string;
+  action: AuditAction;
   tableName: string;
   recordId: number | null;
   recordIdentifier: string;

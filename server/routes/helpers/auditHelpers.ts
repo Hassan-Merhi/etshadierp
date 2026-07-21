@@ -13,7 +13,7 @@ import { inArray } from "drizzle-orm";
 // ─── Audit log ────────────────────────────────────────────────────────────────
 export type AuditAction =
   | "create" | "update" | "delete"
-  | "restore" | "reverse" | "void"
+  | "restore" | "reverse" | "void" | "return"
   | "recalculate" | "repair"
   | "import" | "export"
   | "send_whatsapp" | "send_email"

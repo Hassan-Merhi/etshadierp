@@ -434,7 +434,7 @@ async function buildInvoiceWorkbookBuffer(params: InvoiceWorkbookParams): Promis
         sr.getCell(8).font = { bold: isGrandTotal, size: 11, color: { argb: fg } };
         sr.getCell(7).alignment = { horizontal: "left" };
         sr.getCell(8).alignment = { horizontal: "right" };
-        const thinBorder = {
+        const thinBorder: Partial<ExcelJS.Borders> = {
           top: { style: "thin", color: { argb: "FFDDDDDD" } },
           bottom: { style: "thin", color: { argb: "FFDDDDDD" } },
           left: { style: "thin", color: { argb: "FFDDDDDD" } },

@@ -1,5 +1,5 @@
 import { writeAuditEvent } from "../../services/audit";
-import type { AuditChanges } from "../../services/audit";
+import type { AuditAction, AuditChanges } from "../../services/audit";
 
 /**
  * Compatibility adapter for established server-side audit call sites.
@@ -13,7 +13,7 @@ export async function logAudit(params: {
   userId: string;
   username: string;
   companyId?: number | null;
-  action: "create" | "update" | "delete";
+  action: AuditAction;
   tableName: string;
   recordId?: number | null;
   recordIdentifier?: string | null;
