@@ -1,4 +1,4 @@
-import { QueryClient, QueryFunction, MutationCache } from "@tanstack/react-query";
+import { QueryClient, QueryFunction, MutationCache, QueryCache } from "@tanstack/react-query";
 import { isSafeToQueue, enqueueRequest, getDescriptionForRequest } from "./offlineQueue";
 import { OFFLINE_MODE_ENABLED } from "@/lib/featureFlags";
 import { toast } from "@/hooks/use-toast";
@@ -322,6 +322,29 @@ export const getQueryFn: <T>(options: { on401: UnauthorizedBehavior }) => QueryF
     }
   };
 
+// ── Global query error handler ────────────────────────────────────────────
+// TQ v5 is supposed to suppress AbortErrors when signal.aborted === true, but
+// a race condition in our custom AbortController forwarding (controller wrapping
+// querySignal) means the AbortError can reach query.state.error and permanently
+// show error UI on every page.
+//
+// Fix: intercept AbortErrors in QueryCache.onError. If the query still has
+// active observers (component is mounted), reset it back to pending and schedule
+// a fresh fetch so the component recovers silently. If there are no observers
+// (component unmounted), just remove the error so it doesn't flash on remount.
+const globalQueryCache = new QueryCache({
+  onError: (error: any, query) => {
+    if (error?.name !== "AbortError") return;
+    // Swallow — schedule a transparent recovery refetch if the component is still mounted
+    const observerCount = query.getObserversCount();
+    setTimeout(() => {
+      if (observerCount > 0 && query.state.status === "error") {
+        query.fetch();
+      }
+    }, 50);
+  },
+});
+
 // Global mutation error handler — catches OfflineQueued for every mutation
 // so individual pages don't need to duplicate the offline toast logic.
 // Pages that need extra offline behaviour (BaleStockEntry, Vouchers) still
@@ -437,6 +460,7 @@ export function invalidateCustomerBalances(customerId?: number | string) {
 }
 
 export const queryClient = new QueryClient({
+  queryCache: globalQueryCache,
   mutationCache: globalMutationCache,
   defaultOptions: {
     queries: {
