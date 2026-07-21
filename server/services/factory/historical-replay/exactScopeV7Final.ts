@@ -1,3 +1,4 @@
+import Decimal from "decimal.js";
 import type {
   ReplayQueryExecutor,
   ReplayScopeInternal,
@@ -25,6 +26,73 @@ function safetyError(message: string, details?: unknown): Error & { code: string
 
 function sorted(values: Iterable<number>): number[] {
   return [...new Set(values)].sort((left, right) => left - right);
+}
+
+function assertPlannedCostArithmetic(scope: ReplayScopeInternal): void {
+  const sourceCorrections = scope._sourceCorrections ?? new Map();
+  for (const correction of sourceCorrections.values()) {
+    const expectedTotal = new Decimal(correction.weightKg)
+      .times(correction.expectedCostPerKg)
+      .toDecimalPlaces(6);
+    if (expectedTotal.minus(correction.expectedTotalCost).abs().gt(0.01)) {
+      throw safetyError("Historical Replay source arithmetic does not reconcile.", {
+        sourceId: correction.sourceId,
+        batchId: correction.batchId,
+        expectedFromWeightAndRate: expectedTotal.toNumber(),
+        plannedTotal: correction.expectedTotalCost,
+      });
+    }
+  }
+
+  const sourcesByBatchId = new Map<number, typeof scope._sourceInfos>();
+  for (const source of scope._sourceInfos) {
+    const rows = sourcesByBatchId.get(source.batchId) ?? [];
+    rows.push(source);
+    sourcesByBatchId.set(source.batchId, rows);
+  }
+
+  for (const correction of scope._batchCorrections) {
+    const sources = sourcesByBatchId.get(correction.batchId) ?? [];
+    if (sources.length === 0) {
+      throw safetyError("Historical Replay batch has no complete source set.", {
+        batchId: correction.batchId,
+        batchCode: correction.batchCode,
+      });
+    }
+
+    let totalWeight = new Decimal(0);
+    let totalCost = new Decimal(0);
+    for (const source of sources) {
+      const costPerKg = sourceCorrections.get(source.sourceId)?.expectedCostPerKg
+        ?? correction.correctedSourceCosts.get(source.sourceId)
+        ?? source.storedCostPerKg;
+      totalWeight = totalWeight.plus(source.weightKg);
+      totalCost = totalCost.plus(new Decimal(source.weightKg).times(costPerKg));
+    }
+
+    if (totalWeight.lte(0)) {
+      throw safetyError("Historical Replay batch has no positive source weight.", {
+        batchId: correction.batchId,
+        batchCode: correction.batchCode,
+      });
+    }
+
+    const expectedTotal = totalCost.toDecimalPlaces(6);
+    const expectedRate = totalCost.div(totalWeight).toDecimalPlaces(6);
+    if (
+      expectedTotal.minus(correction.expectedTotalCost).abs().gt(0.01)
+      || expectedRate.minus(correction.expectedCostPerKg).abs().gt(0.000001)
+    ) {
+      throw safetyError("Historical Replay batch arithmetic does not reconcile.", {
+        batchId: correction.batchId,
+        batchCode: correction.batchCode,
+        expectedTotalFromSources: expectedTotal.toNumber(),
+        plannedTotal: correction.expectedTotalCost,
+        expectedRateFromSources: expectedRate.toNumber(),
+        plannedRate: correction.expectedCostPerKg,
+      });
+    }
+  }
 }
 
 export async function buildExactHistoricalReplayScopeV7Final(params: {
@@ -127,6 +195,8 @@ export async function buildExactHistoricalReplayScopeInternalV7Final(params: {
       { blockedBatches: scope.blockedBatches }
     );
   }
+
+  assertPlannedCostArithmetic(scope);
 
   // Freeze the final scoped preview into the signed fingerprint input. The low-level
   // preview is company-wide, while these fields describe the fully-expanded selection.
