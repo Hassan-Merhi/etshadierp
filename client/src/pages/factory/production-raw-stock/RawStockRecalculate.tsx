@@ -832,32 +832,16 @@ export default function RawStockRecalculate() {
     );
   };
 
-  // ── Fix ALL source mismatches in one shot (no dry-run) ────────────────────
-  const fixAllSourcesMutation = useMutation({
-    mutationFn: async () => {
-      const res = await modeApiRequest("POST", "/api/factory/raw-stock/recalc/fix-source-mismatches");
-      if (!res.ok) throw new Error((await res.json()).message || "Failed to fix source mismatches");
-      return res.json();
-    },
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/factory/raw-stock/recalc/source-cost-mismatches"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/factory/raw-stock"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/factory/raw-stock/history"] });
-      toast({
-        title: "Source costs updated",
-        description: `Applied ${data.applied} fix(es), skipped ${data.skipped} (already correct).`,
-      });
-    },
-    onError: (err: any) => {
-      toast({ title: "Error", description: err.message, variant: "destructive" });
-    },
-  });
+  // ── Fix ALL source mismatches — delegates to the working zero-cost-sources/apply path
+  const fixAllSourcesMutation = { isPending: false }; // kept so JSX references compile
 
   const handleFixAllSources = () => {
-    const fixable = (sourceMismatches || []).filter((r) => r.fixable).length;
+    const fixable = fixableSourceMismatches;
+    if (fixable.length === 0) return;
+    const sourceIds = fixable.map((r) => r.sourceId);
     wrapAdminAction(
-      () => fixAllSourcesMutation.mutate(),
-      `Fix all ${fixable} fixable source cost mismatch(es) — no dry-run`
+      () => sourceMismatchFixMutation.mutate({ sourceIds, rates: {} }),
+      `Fix all ${fixable.length} fixable source cost mismatch(es)`
     );
   };
 
@@ -1455,7 +1439,7 @@ export default function RawStockRecalculate() {
                     <Button
                       size="sm"
                       variant="outline"
-                      disabled={fixAllSourcesMutation.isPending || sourceMismatchFixMutation.isPending}
+                      disabled={sourceMismatchFixMutation.isPending}
                       onClick={handleFixAllSources}
                       title="Fix all fixable mismatches in one shot — no dry-run, admin-confirmed"
                     >
