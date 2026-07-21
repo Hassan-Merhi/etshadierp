@@ -31,6 +31,7 @@ export type ReplayBlockReason =
   | "INVENTORY_SUPPLIER_UNRESOLVED"
   | "ADJUSTMENT_VALUATION_UNCLASSIFIED"
   | "SUPPLIER_TIMELINE_UNAVAILABLE"
+  | "MISSING_SUPPLIER_TIMELINE"
   | "TIMELINE_QUANTITY_MISMATCH"
   | "MISSING_EVENT_DATES"
   | "TIMELINE_ORDER_AMBIGUOUS"
@@ -131,6 +132,7 @@ export interface ReplaySummary {
   unresolvedInventorySupplierSources?: number;
   unclassifiedValuedAdjustments?: number;
   incompleteMixedBatchSupplierScopes?: number;
+  missingSupplierTimelines?: number;
   blockedBatches?: number;
 }
 
@@ -146,6 +148,14 @@ export interface ReplayUnclassifiedAdjustmentRow {
   notes: string | null;
 }
 
+export interface ReplayMissingSupplierTimelineRow {
+  supplierId: number;
+  supplierName: string;
+  hasRawStock: boolean;
+  hasAdjustment: boolean;
+  hasOwnedSource: boolean;
+}
+
 export interface ReplaySafetyGateDetails {
   unresolvedInventorySupplierSources: number;
   unclassifiedValuedAdjustments: number;
@@ -154,6 +164,7 @@ export interface ReplaySafetyGateDetails {
   quantityTimelineMismatches: number;
   ambiguousEventOrdering: number;
   incompleteMixedBatchSupplierScopes: number;
+  missingSupplierTimelines: number;
   blockedBatches: number;
   scanCoverageError: boolean;
 }
@@ -171,6 +182,14 @@ export interface ReplaySupplierFinancialImpact {
   valueDifference: number;
 }
 
+export interface ReplayBatchFinancialImpact {
+  batchId: number;
+  batchCode: string;
+  currentTotalCost: number;
+  projectedTotalCost: number;
+  valueDifference: number;
+}
+
 /** Financial impact summary added to the preview in V7. */
 export interface ReplayFinancialImpact {
   currentRawMaterialAsset: number;
@@ -185,6 +204,12 @@ export interface ReplayFinancialImpact {
   supplierImpacts: ReplaySupplierFinancialImpact[];
   allSafetyGatesPassed: boolean;
   safetyGateDetails: ReplaySafetyGateDetails;
+  currentBalanceOnTableAsset?: number;
+  projectedBalanceOnTableAsset?: number;
+  balanceOnTableDifference?: number;
+  otherNetPositionEffect?: number;
+  totalNetPositionEffect?: number;
+  batchImpacts?: ReplayBatchFinancialImpact[];
 }
 
 export interface HistoricalReplayPreviewResult {
@@ -195,6 +220,7 @@ export interface HistoricalReplayPreviewResult {
   batchRows: ReplayBatchRow[];
   financialImpact?: ReplayFinancialImpact;
   unclassifiedAdjustmentRows?: ReplayUnclassifiedAdjustmentRow[];
+  missingSupplierTimelineRows?: ReplayMissingSupplierTimelineRow[];
   blockedBatches?: Array<{ batchId: number; batchCode: string; reasons: string[] }>;
 }
 
