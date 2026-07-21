@@ -25,8 +25,34 @@ describe("Historical Replay V7 final safety wiring", () => {
     );
     expect(exactScope).toContain("expandConnectedSupplierClosure");
     expect(exactScope).toContain("connectedScopeIsComplete");
+    expect(exactScope).toContain("allSafetyGatesPassed !== true");
     expect(exactScope).toContain("scope.blockedBatches.length > 0");
+    expect(exactScope).toContain("assertPlannedCostArithmetic");
     expect(exactScope).toContain("expectedSupplierIds");
+  });
+
+  it("prepares one full-company scope with completed batches and no finalized bales", () => {
+    const fullCompany = read(
+      "server/routes/factory/raw-stock/historicalReplayFullCompanyScopeRoutes.ts"
+    );
+    expect(fullCompany).toContain("fullCompanyScope: true");
+    expect(fullCompany).toContain("allSafeSupplierIds");
+    expect(fullCompany).toContain("includeCompletedBatches = true");
+    expect(fullCompany).toContain("includeFinalizedBales = false");
+
+    const registration = read(
+      "server/routes/factory/raw-stock/rawStockRecalcRoutes.ts"
+    );
+    const fullCompanyIndex = registration.indexOf(
+      "registerHistoricalReplayFullCompanyScopeRoutes(app)"
+    );
+    const guardIndex = registration.indexOf(
+      "registerHistoricalReplayPhase6GuardRoutes(app)"
+    );
+    const exactIndex = registration.indexOf("registerHistoricalReplayRoutesV4(app)");
+    expect(fullCompanyIndex).toBeGreaterThan(-1);
+    expect(fullCompanyIndex).toBeLessThan(guardIndex);
+    expect(guardIndex).toBeLessThan(exactIndex);
   });
 
   it("forbids force-apply and finalized-bale writes", () => {
@@ -36,6 +62,17 @@ describe("Historical Replay V7 final safety wiring", () => {
     expect(guard).toContain("HISTORICAL_REPLAY_FORCE_APPLY_FORBIDDEN");
     expect(guard).toContain("HISTORICAL_REPLAY_FINALIZED_BALES_FORBIDDEN");
     expect(guard).toContain("includeFinalizedBales = false");
+  });
+
+  it("projects raw material and Balance on Table before Net Position", () => {
+    const guard = read(
+      "server/routes/factory/raw-stock/historicalReplayPhase6GuardRoutes.ts"
+    );
+    expect(guard).toContain("loadBalanceProjectionBase");
+    expect(guard).toContain("projectBalanceOnTable");
+    expect(guard).toContain("balanceOnTableDifference");
+    expect(guard).toContain("totalNetPositionEffect");
+    expect(guard).toContain("verifyRepairToken");
   });
 
   it("provides explicit adjustment classification with an audit entry", () => {
