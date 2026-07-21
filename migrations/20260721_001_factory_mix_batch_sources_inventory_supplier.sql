@@ -39,6 +39,24 @@ WHERE mbs.mix_batch_id = mb.id
   AND fc.deleted_at IS NULL
   AND mbs.inventory_supplier_id IS NULL;
 
+-- Quarantine previously-backfilled container rows whose owner does not match the
+-- container supplier in the same company. These remain unresolved until reviewed.
+UPDATE factory_mix_batch_sources AS mbs
+SET inventory_supplier_id = NULL
+FROM factory_mix_batches AS mb
+WHERE mbs.mix_batch_id = mb.id
+  AND mbs.source_batch_id IS NULL
+  AND mbs.container_id IS NOT NULL
+  AND mbs.inventory_supplier_id IS NOT NULL
+  AND NOT EXISTS (
+    SELECT 1
+    FROM factory_containers AS fc
+    WHERE fc.id = mbs.container_id
+      AND fc.company_id = mb.company_id
+      AND fc.deleted_at IS NULL
+      AND fc.supplier_id = mbs.inventory_supplier_id
+  );
+
 UPDATE factory_mix_batch_sources
 SET inventory_supplier_id = NULL
 WHERE source_batch_id IS NOT NULL
@@ -52,9 +70,6 @@ WHERE UPPER(type) = 'ADD'
   AND COALESCE(cost_per_kg, 0) = 0
   AND valuation_basis IS NULL;
 
--- Drizzle push may already have created an automatically named FK from the canonical
--- schema. Detect any equivalent FK on this exact table/column instead of checking only
--- our preferred constraint name, so repeated deployments never create duplicates.
 DO $$
 BEGIN
   IF NOT EXISTS (
@@ -108,7 +123,6 @@ CREATE INDEX IF NOT EXISTS factory_raw_material_adjustments_unclassified_valuati
     AND COALESCE(cost_per_kg, 0) > 0
     AND valuation_basis IS NULL;
 
--- Resolve and validate ownership for every future source-writing path at the database boundary.
 CREATE OR REPLACE FUNCTION factory_resolve_mix_source_inventory_supplier()
 RETURNS TRIGGER
 LANGUAGE plpgsql
@@ -212,8 +226,6 @@ ON factory_mix_batch_sources
 FOR EACH ROW
 EXECUTE FUNCTION factory_resolve_mix_source_inventory_supplier();
 
--- New supplier-linked ADDs are quantity-only in the current write path: the route ignores
--- client cost and uses the existing locked rate. Historical positive-cost rows are not guessed.
 CREATE OR REPLACE FUNCTION factory_default_new_adjustment_valuation_basis()
 RETURNS TRIGGER
 LANGUAGE plpgsql
