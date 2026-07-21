@@ -2,8 +2,8 @@ import { queryClient } from "./queryClient";
 
 const STOCK_ENTRY_ENDPOINT = "/api/factory/bales/stock-entry-history";
 const STOCK_ENTRY_ROUTE = "/factory/stock-entry";
-const DEFAULT_LIMIT = 50;
-const ALLOWED_LIMITS = [25, 50, 100];
+const DEFAULT_LIMIT = 9999;   // load everything in one request — no pagination UI
+const ALLOWED_LIMITS = [9999];
 
 interface PaginationMeta {
   key: string;
@@ -141,6 +141,9 @@ if (typeof window !== "undefined" && !window.__erpHeavyListPaginationClientInsta
 
   function renderControls(): void {
     const root = ensureControls();
+    // Pagination UI intentionally hidden — all data loads in a single request.
+    root.style.display = "none";
+    return;
     if (!activeMeta || !isVisibleRoute() || !condensedMode) {
       root.style.display = "none";
       return;
