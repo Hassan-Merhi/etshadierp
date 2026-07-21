@@ -39,11 +39,24 @@ WHERE UPPER(type) = 'ADD'
   AND COALESCE(cost_per_kg, 0) = 0
   AND valuation_basis IS NULL;
 
+-- Drizzle push may already have created an automatically named FK from the canonical
+-- schema. Detect any equivalent FK on this exact table/column instead of checking only
+-- our preferred constraint name, so repeated deployments never create duplicates.
 DO $$
 BEGIN
   IF NOT EXISTS (
-    SELECT 1 FROM pg_constraint
-    WHERE conname = 'factory_mix_batch_sources_inventory_supplier_fk'
+    SELECT 1
+    FROM pg_constraint c
+    JOIN pg_class rel ON rel.oid = c.conrelid
+    JOIN pg_namespace nsp ON nsp.oid = rel.relnamespace
+    JOIN LATERAL unnest(c.conkey) AS key(attnum) ON TRUE
+    JOIN pg_attribute a
+      ON a.attrelid = rel.oid
+     AND a.attnum = key.attnum
+    WHERE c.contype = 'f'
+      AND nsp.nspname = current_schema()
+      AND rel.relname = 'factory_mix_batch_sources'
+      AND a.attname = 'inventory_supplier_id'
   ) THEN
     ALTER TABLE factory_mix_batch_sources
       ADD CONSTRAINT factory_mix_batch_sources_inventory_supplier_fk
@@ -59,6 +72,7 @@ BEGIN
   IF NOT EXISTS (
     SELECT 1 FROM pg_constraint
     WHERE conname = 'factory_raw_material_adjustments_valuation_basis_chk'
+      AND conrelid = 'factory_raw_material_adjustments'::regclass
   ) THEN
     ALTER TABLE factory_raw_material_adjustments
       ADD CONSTRAINT factory_raw_material_adjustments_valuation_basis_chk
