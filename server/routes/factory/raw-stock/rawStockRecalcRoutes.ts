@@ -1,5 +1,6 @@
 import type { Express } from "express";
 import { pool } from "../../../db";
+import { registerHistoricalReplayFullCompanyScopeRoutes } from "./historicalReplayFullCompanyScopeRoutes";
 import { registerHistoricalReplayPhase6GuardRoutes } from "./historicalReplayPhase6GuardRoutes";
 import { registerHistoricalReplayRoutesV4 } from "./historicalReplayRoutesV4";
 import { registerRawStockRecalcRoutes as registerPreservedRawStockRecalcRoutes } from "./rawStockRecalcRoutesLegacy";
@@ -32,11 +33,12 @@ function registerLegacyRawStockRecalcRoutes(app: Express): void {
 }
 
 /**
- * The fail-closed prepare guard and exact Historical Replay handlers are
- * registered before the preserved legacy module. Legacy routes remain available
- * for unrelated recalculation, audit, history, and non-replay undo operations.
+ * The full-company scope middleware runs first, then the fail-closed safety/impact
+ * guard, then the exact signed Prepare/Apply/Undo handlers. Legacy routes remain
+ * available only for unrelated recalculation, audit, history, and non-replay undo.
  */
 export function registerRawStockRecalcRoutes(app: Express): void {
+  registerHistoricalReplayFullCompanyScopeRoutes(app);
   registerHistoricalReplayPhase6GuardRoutes(app);
   registerHistoricalReplayRoutesV4(app);
   registerLegacyRawStockRecalcRoutes(app);

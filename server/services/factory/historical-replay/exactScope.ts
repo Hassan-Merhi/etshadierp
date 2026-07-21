@@ -1,11 +1,11 @@
 /**
  * Stable exact-scope entry point.
  *
- * The final scope compares persisted container totals, follows the selected
- * supplier dependency closure, and includes parent batches even when corrected
- * source rows offset and leave the aggregate batch cost numerically unchanged.
+ * V7 expands every selected supplier to the complete connected mixed-batch
+ * supplier closure, rejects unresolved ownership/unsafe timelines, and refuses
+ * to issue a scope containing blocked batches.
  */
 export {
-  buildExactHistoricalReplayScopeFinal as buildExactHistoricalReplayScope,
-  buildExactHistoricalReplayScopeInternalFinal as buildExactHistoricalReplayScopeInternal,
-} from "./exactScopeFinal";
+  buildExactHistoricalReplayScopeV7Final as buildExactHistoricalReplayScope,
+  buildExactHistoricalReplayScopeInternalV7Final as buildExactHistoricalReplayScopeInternal,
+} from "./exactScopeV7Final";
