@@ -1,7 +1,8 @@
 // ── Date formatting ──────────────────────────────────────────────────────────
 
-export function fmtDate(d: string) {
+export function fmtDate(d: string | number | Date) {
   const dt = new Date(d);
+  if (Number.isNaN(dt.getTime())) return "—";
   return (
     dt.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }) +
     " " +
@@ -14,15 +15,21 @@ export function fmtDate(d: string) {
 export function fieldLabel(key: string) {
   return key
     .replace(/([A-Z])/g, " $1")
+    .replace(/[._:-]+/g, " ")
     .replace(/_/g, " ")
     .replace(/\b\w/g, (c) => c.toUpperCase())
+    .replace(/\s+/g, " ")
     .trim();
 }
 
 export const BUSINESS_FIELD_LABELS: Record<string, string> = {
   voucherType: "Voucher Type",
+  voucherNumber: "Voucher Number",
   date: "Date",
+  chargeDate: "Charge Date",
+  occurredAt: "Occurred At",
   amount: "Amount",
+  totalAmount: "Total Amount",
   description: "Description",
   narration: "Narration",
   location: "Location",
@@ -35,14 +42,19 @@ export const BUSINESS_FIELD_LABELS: Record<string, string> = {
   supplier: "Supplier",
   paymentMethod: "Payment Method",
   currency: "Currency",
+  fxRate: "FX Rate",
   exchangeRate: "Exchange Rate",
   sourceLocation: "Source Location",
   destinationLocation: "Destination Location",
   company: "Company",
+  companyId: "Company ID",
   reference: "Reference",
+  referenceNumber: "Reference Number",
+  newReferenceNumber: "New Reference Number",
   name: "Name",
   status: "Status",
   type: "Type",
+  saleType: "Sale Type",
   balance: "Balance",
   phone: "Phone",
   email: "Email",
@@ -55,41 +67,172 @@ export const BUSINESS_FIELD_LABELS: Record<string, string> = {
   unit: "Unit",
   category: "Category",
   quantity: "Quantity",
+  weight: "Weight",
   unitPrice: "Unit Price",
   total: "Total",
+  itemCount: "Number of Items",
+  affectedRows: "Records Affected",
+  updated: "Records Updated",
+  skipped: "Records Skipped",
+  scope: "Scope",
+  mode: "Mode",
+  operation: "Operation",
+  delivery: "Delivery Method",
+  reason: "Reason",
+  reasonCode: "Reason Code",
+  kind: "Security Area",
+  action: "Security Check",
+  outcome: "Result",
+  eventKey: "Technical Reference",
+  severity: "Severity",
+  ipAddress: "IP Address",
+  userAgent: "Browser / Device",
+  targetType: "Affected Record Type",
+  targetId: "Affected Record ID",
+  actorUserId: "User ID",
+  metadata: "Additional Details",
 };
 
-export function fmtBusinessValue(field: string, value: any): string {
-  if (value === null || value === undefined) return "—";
-  if (field === "optional") return value ? "Optional" : "Active";
-  if (typeof value === "boolean") return value ? "Yes" : "No";
-  if (field === "amount" || field === "balance" || field === "total" || field === "unitPrice") {
-    const n = parseFloat(String(value));
-    if (!isNaN(n)) return n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  }
-  if (field === "exchangeRate" || field === "quantity") {
-    const n = parseFloat(String(value));
-    if (!isNaN(n)) return n.toLocaleString();
-  }
-  if (field === "date" || (typeof value === "string" && /^\d{4}-\d{2}-\d{2}/.test(String(value)))) {
-    try {
-      const d = new Date(String(value));
-      if (!isNaN(d.getTime()))
-        return d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
-    } catch {
-      /* fall through */
+export type AuditChangePair = { old?: any; new?: any };
+
+/**
+ * Audit rows come from two historical formats:
+ *  1. business mutations: { field: { old, new } }
+ *  2. security events:     { field: value }
+ * Normalize both so every screen can render actual values instead of blank rows.
+ */
+export function normalizeAuditChanges(source: any): Record<string, AuditChangePair> {
+  const raw = source?.changes ?? source?.diff ?? source;
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
+
+  const normalized: Record<string, AuditChangePair> = {};
+  for (const [key, value] of Object.entries(raw)) {
+    if (
+      value &&
+      typeof value === "object" &&
+      !Array.isArray(value) &&
+      (Object.prototype.hasOwnProperty.call(value, "old") || Object.prototype.hasOwnProperty.call(value, "new"))
+    ) {
+      normalized[key] = value as AuditChangePair;
+    } else {
+      normalized[key] = { new: value };
     }
   }
-  if (Array.isArray(value)) return `(${value.length} item${value.length !== 1 ? "s" : ""})`;
-  if (typeof value === "object") {
-    const keys = Object.keys(value);
-    if (keys.length === 0) return "—";
-    const preview = keys
-      .slice(0, 3)
-      .map((k) => `${fieldLabel(k)}: ${String((value as any)[k] ?? "—")}`)
-      .join(", ");
-    return keys.length > 3 ? `${preview}, +${keys.length - 3} more` : preview;
+  return normalized;
+}
+
+function changeValue(changes: Record<string, AuditChangePair>, key: string): any {
+  const pair = changes[key];
+  if (!pair) return undefined;
+  return pair.new !== undefined ? pair.new : pair.old;
+}
+
+function securityParts(logOrAction: any): {
+  category: string;
+  check: string;
+  outcome: string;
+  changes: Record<string, AuditChangePair>;
+} | null {
+  const action = typeof logOrAction === "string" ? logOrAction : String(logOrAction?.action || "");
+  if (!action.toUpperCase().startsWith("SECURITY:")) return null;
+
+  const changes = normalizeAuditChanges(typeof logOrAction === "string" ? {} : logOrAction);
+  const pieces = action.split(":");
+  return {
+    category: String(changeValue(changes, "kind") ?? pieces[1] ?? "Security"),
+    check: String(changeValue(changes, "action") ?? pieces.slice(2, -1).join(":") ?? "Check"),
+    outcome: String(changeValue(changes, "outcome") ?? pieces[pieces.length - 1] ?? "Recorded"),
+    changes,
+  };
+}
+
+export function securityActionSummary(logOrAction: any): string {
+  const parsed = securityParts(logOrAction);
+  if (!parsed) return "Security event recorded";
+
+  const combined = `${parsed.category} ${parsed.check}`.toLowerCase();
+  const outcome = parsed.outcome.toLowerCase();
+  const outcomeWord = outcome.includes("allow")
+    ? "allowed"
+    : outcome.includes("deny") || outcome.includes("reject") || outcome.includes("block")
+      ? "denied"
+      : fieldLabel(parsed.outcome).toLowerCase();
+
+  let subject = fieldLabel(parsed.check);
+  if (combined.includes("company") && combined.includes("context")) subject = "Company access";
+  else if (combined.includes("privileged")) subject = "Privileged action";
+  else if (combined.includes("sensitive") && combined.includes("input")) subject = "Sensitive input";
+  else if (combined.includes("protected") && (combined.includes("file") || combined.includes("asset"))) subject = "File access";
+  else if (combined.includes("permission")) subject = "Permission check";
+  else if (combined.includes("session")) subject = "Session check";
+
+  return `${subject} ${outcomeWord}`;
+}
+
+function formatPlainNumber(value: any, maximumFractionDigits = 6): string | null {
+  const n = typeof value === "number" ? value : Number(String(value));
+  if (!Number.isFinite(n)) return null;
+  return n.toLocaleString(undefined, { maximumFractionDigits });
+}
+
+export function fmtBusinessValue(field: string, value: any): string {
+  if (value === null || value === undefined || value === "") return "—";
+  if (field === "optional") return value ? "Optional" : "Active";
+  if (typeof value === "boolean") return value ? "Yes" : "No";
+
+  const lowerField = field.toLowerCase();
+
+  if (field === "occurredAt" && (typeof value === "number" || /^\d{11,}$/.test(String(value)))) {
+    return fmtDate(Number(value));
   }
+
+  if (
+    lowerField.includes("date") ||
+    lowerField.endsWith("at") ||
+    (typeof value === "string" && /^\d{4}-\d{2}-\d{2}(?:[T\s]|$)/.test(value))
+  ) {
+    const date = new Date(value);
+    if (!Number.isNaN(date.getTime())) {
+      return /[T\s]\d{2}:\d{2}/.test(String(value)) || lowerField.endsWith("at")
+        ? fmtDate(date)
+        : date.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+    }
+  }
+
+  if (/amount|balance|total|price|cost|debit|credit/.test(lowerField)) {
+    const n = Number(String(value));
+    if (Number.isFinite(n)) {
+      return n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+  }
+
+  if (/rate|quantity|weight|count|rows|updated|skipped/.test(lowerField)) {
+    const formatted = formatPlainNumber(value);
+    if (formatted !== null) return formatted;
+  }
+
+  if (field === "action" && typeof value === "string") {
+    return fieldLabel(value);
+  }
+
+  if (Array.isArray(value)) {
+    if (value.length === 0) return "None";
+    if (value.every((item) => item === null || ["string", "number", "boolean"].includes(typeof item))) {
+      return value.map((item) => String(item)).join(", ");
+    }
+    return `${value.length} item${value.length !== 1 ? "s" : ""}`;
+  }
+
+  if (typeof value === "object") {
+    const entries = Object.entries(value);
+    if (entries.length === 0) return "—";
+    const preview = entries
+      .slice(0, 4)
+      .map(([key, nested]) => `${BUSINESS_FIELD_LABELS[key] || fieldLabel(key)}: ${fmtBusinessValue(key, nested)}`)
+      .join("; ");
+    return entries.length > 4 ? `${preview}; +${entries.length - 4} more` : preview;
+  }
+
   return String(value);
 }
 
@@ -107,23 +250,30 @@ const MODULE_LABEL_MAP: Record<string, string> = {
   containers: "Containers",
   factory_containers: "Factory Containers",
   factory_offload_charges: "Post-Offload Charges",
+  factory_post_offload_charges: "Post-Offload Charges",
+  factory_container_commissions: "Container Commissions",
+  factory_container_freight: "Container Freight",
+  factory_container_extra_charges: "Container Extra Charges",
   factory_mix_batches: "Mix Batches",
   factory_mix_batch_sources: "Mix Batch Sources",
   production_raw_stock: "Raw Material Stock",
+  factory_raw_stock: "Raw Material Stock",
+  factory_repairs: "Factory Repairs",
+  factory_fx_repairs: "FX Repairs",
+  factory_landed_cost_repairs: "Landed Cost Repairs",
   bales: "Bales",
+  factory_bales: "Bales",
   factory_customer_orders: "Factory Customer Orders",
   users: "Users",
   user_company_roles: "Roles & Permissions",
   exchange_rates: "Exchange Rates",
   company_settings: "Company Settings",
   reports: "Reports",
-  // payroll
+  security_events: "Security Events",
   payroll_workers: "Payroll Workers",
   payroll_salaries: "Payroll Salaries",
-  // rental
   rental_properties: "Rental Properties",
   rental_payments: "Rental Payments",
-  // pos
   pos_shifts: "POS Shifts",
   pos_sales: "POS Sales",
   pos_locations: "POS Locations",
@@ -133,7 +283,6 @@ const MODULE_LABEL_MAP: Record<string, string> = {
 export function tableShortName(t: string): string {
   if (!t) return "Unknown";
   if (MODULE_LABEL_MAP[t]) return MODULE_LABEL_MAP[t];
-  // Strip well-known prefixes, then title-case
   return t
     .replace(/^(factory_|payroll_|rental_|pos_)/, "")
     .replace(/_/g, " ")
@@ -149,28 +298,36 @@ const ACTION_LABEL_MAP: Record<string, string> = {
   restore: "Restored",
   reverse: "Reversed",
   void: "Voided",
+  return: "Returned",
   recalculate: "Recalculated",
   repair: "Repaired",
   import: "Imported",
   export: "Exported",
-  send_whatsapp: "WhatsApp",
-  send_email: "Email",
+  send_whatsapp: "Sent to WhatsApp",
+  send_email: "Sent by Email",
   approve: "Approved",
   cancel: "Cancelled",
   offload: "Offloaded",
   transfer: "Transferred",
   adjust: "Adjusted",
   login: "Login",
-  permission_change: "Permissions",
-  settings_change: "Settings",
+  permission_change: "Permissions Changed",
+  settings_change: "Settings Changed",
 };
 
 /** Returns a readable label for an audit action string. */
 export function actionLabel(action: string): string {
   if (!action) return "—";
+  const security = securityParts(action);
+  if (security) {
+    const outcome = security.outcome.toLowerCase();
+    if (outcome.includes("allow")) return "Security Allowed";
+    if (outcome.includes("deny") || outcome.includes("reject") || outcome.includes("block")) return "Security Denied";
+    return "Security Event";
+  }
   const key = action.toLowerCase();
   if (ACTION_LABEL_MAP[key]) return ACTION_LABEL_MAP[key];
-  return action.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+  return fieldLabel(action);
 }
 
 type BadgeVariant = "default" | "secondary" | "destructive" | "outline";
@@ -178,7 +335,12 @@ type BadgeVariant = "default" | "secondary" | "destructive" | "outline";
 /** Maps an audit action to a shadcn Badge variant for color-coding. */
 export function actionBadgeVariant(action: string): BadgeVariant {
   const key = (action || "").toLowerCase();
-  if (key === "delete" || key === "void" || key === "reverse") return "destructive";
+  if (key.startsWith("security:")) {
+    return key.includes(":denied") || key.includes(":rejected") || key.includes(":blocked")
+      ? "destructive"
+      : "secondary";
+  }
+  if (key === "delete" || key === "void" || key === "reverse" || key === "cancel") return "destructive";
   if (key === "create" || key === "approve" || key === "restore") return "default";
   return "secondary";
 }
@@ -186,7 +348,7 @@ export function actionBadgeVariant(action: string): BadgeVariant {
 /** All action values accepted by the /api/audit-log endpoint. */
 export const ALL_SUPPORTED_ACTIONS = [
   "create", "update", "delete",
-  "restore", "reverse", "void",
+  "restore", "reverse", "void", "return",
   "recalculate", "repair",
   "import", "export",
   "send_whatsapp", "send_email",
@@ -202,41 +364,94 @@ export function isItemDiffKey(field: string): boolean {
 }
 
 export function getRecordLabel(log: any): string {
-  if (log.recordIdentifier) {
-    const id = log.recordIdentifier as string;
-    if (id.length <= 40) return id;
-    return id.slice(0, 38) + "…";
+  if (log?.tableName === "security_events" || String(log?.action || "").toUpperCase().startsWith("SECURITY:")) {
+    const changes = normalizeAuditChanges(log);
+    const targetType = changeValue(changes, "targetType");
+    const targetId = changeValue(changes, "targetId");
+    if (targetType) {
+      return `${fieldLabel(String(targetType))}${targetId ? ` #${targetId}` : ""}`;
+    }
+    return securityActionSummary(log);
   }
-  if (log.recordId) return `${log.tableName} #${log.recordId}`;
-  return log.tableName;
+
+  if (log?.recordIdentifier) {
+    const id = String(log.recordIdentifier);
+    if (id.length <= 60) return id;
+    return id.slice(0, 58) + "…";
+  }
+  if (log?.recordId) return `${tableShortName(log.tableName)} #${log.recordId}`;
+  return tableShortName(log?.tableName);
+}
+
+function fallbackDetails(action: string): string {
+  const key = String(action || "").toLowerCase();
+  const messages: Record<string, string> = {
+    create: "Record created",
+    update: "Record updated",
+    delete: "Record deleted",
+    restore: "Record restored",
+    reverse: "Transaction reversed",
+    void: "Transaction voided",
+    return: "Sale returned",
+    recalculate: "Values recalculated",
+    repair: "Historical data repaired",
+    import: "Data imported",
+    export: "Data exported",
+    send_whatsapp: "Sent to WhatsApp",
+    send_email: "Sent by email",
+    approve: "Record approved",
+    cancel: "Record cancelled",
+    offload: "Container offloaded",
+    transfer: "Stock transferred",
+    adjust: "Value adjusted",
+    login: "User logged in",
+    permission_change: "User permissions changed",
+    settings_change: "Company settings changed",
+  };
+  return messages[key] || `${actionLabel(action)} activity recorded`;
 }
 
 export function getDetailsSentence(log: any): string {
-  if (!log.diff || typeof log.diff !== "object") {
-    if (log.action === "create") return "Record created";
-    if (log.action === "delete") return "Record deleted";
-    return "Record updated";
+  if (log?.tableName === "security_events" || String(log?.action || "").toUpperCase().startsWith("SECURITY:")) {
+    const changes = normalizeAuditChanges(log);
+    const reason = changeValue(changes, "reasonCode") ?? changeValue(changes, "reason");
+    return reason ? `${securityActionSummary(log)} — ${fmtBusinessValue("reasonCode", reason)}` : securityActionSummary(log);
   }
-  const keys = Object.keys(log.diff).filter((k) => !isItemDiffKey(k));
-  const itemKeys = Object.keys(log.diff).filter((k) => isItemDiffKey(k));
-  if (keys.length === 0 && itemKeys.length === 0) {
-    if (log.action === "create") return "Record created";
-    if (log.action === "delete") return "Record deleted";
-    return "Record updated";
-  }
+
+  const changes = normalizeAuditChanges(log);
+  const allKeys = Object.keys(changes);
+  if (allKeys.length === 0) return fallbackDetails(log?.action);
+
+  const scalarKeys = allKeys.filter((key) => key !== "entries" && !isItemDiffKey(key));
+  const itemKeys = allKeys.filter((key) => isItemDiffKey(key));
   const parts: string[] = [];
-  if (keys.length > 0) {
-    const changed = keys.slice(0, 3).map((k) => {
-      const label = BUSINESS_FIELD_LABELS[k] || fieldLabel(k);
-      const val = log.diff[k];
-      const newVal = val && typeof val === "object" && "new" in val ? val.new : val;
-      return `${label}: ${fmtBusinessValue(k, newVal)}`;
+
+  if (scalarKeys.length > 0) {
+    const changed = scalarKeys.slice(0, 3).map((key) => {
+      const label = BUSINESS_FIELD_LABELS[key] || fieldLabel(key);
+      const pair = changes[key] || {};
+      const hasOld = pair.old !== undefined && pair.old !== null;
+      const hasNew = pair.new !== undefined && pair.new !== null;
+      if (hasOld && hasNew && JSON.stringify(pair.old) !== JSON.stringify(pair.new)) {
+        return `${label}: ${fmtBusinessValue(key, pair.old)} → ${fmtBusinessValue(key, pair.new)}`;
+      }
+      return `${label}: ${fmtBusinessValue(key, hasNew ? pair.new : pair.old)}`;
     });
     parts.push(changed.join("; "));
-    if (keys.length > 3) parts.push(`+${keys.length - 3} more`);
+    if (scalarKeys.length > 3) parts.push(`+${scalarKeys.length - 3} more`);
   }
+
   if (itemKeys.length > 0) {
     parts.push(`${itemKeys.length} item change${itemKeys.length !== 1 ? "s" : ""}`);
   }
-  return parts.join(" — ");
+
+  const entries = changes.entries;
+  const entryCount = Array.isArray(entries?.new)
+    ? entries.new.length
+    : Array.isArray(entries?.old)
+      ? entries.old.length
+      : 0;
+  if (entryCount > 0) parts.push(`${entryCount} accounting entr${entryCount === 1 ? "y" : "ies"}`);
+
+  return parts.length > 0 ? parts.join(" — ") : fallbackDetails(log?.action);
 }
