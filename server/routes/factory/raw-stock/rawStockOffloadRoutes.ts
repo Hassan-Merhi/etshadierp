@@ -518,6 +518,9 @@ export function registerRawStockOffloadRoutes(app: Express) {
               weightKg: String(allocKg),
               costPerKg: dAllocRate.toDecimalPlaces(6).toFixed(6),
               totalCost: dAllocKg.times(dAllocRate).toDecimalPlaces(6).toFixed(6),
+              // V7: container.supplierId is the inventory owner for both SUPPLIER_FIFO
+              // and CONTAINER_DIRECT source types. Null for containers without a supplier.
+              inventorySupplierId: lockedContainer.supplierId || null,
             });
           }
 
@@ -652,6 +655,7 @@ export function registerRawStockOffloadRoutes(app: Express) {
             weightKg: String(allocKg),
             costPerKg: dAllocRate.toDecimalPlaces(6).toFixed(6),
             totalCost: dAllocKg.times(dAllocRate).toDecimalPlaces(6).toFixed(6),
+            inventorySupplierId: container.supplierId || null,
           });
         }
 

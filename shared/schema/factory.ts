@@ -987,6 +987,12 @@ export const factoryRawMaterialAdjustments = pgTable(
     reference: varchar("reference", { length: 200 }),
     deletedAt: timestamp("deleted_at"),
     createdAt: timestamp("created_at").notNull().defaultNow(),
+    /** Explicit valuation basis for ADD adjustments used by Historical Replay.
+     *  QUANTITY_ONLY: adds kg without shifting rate.
+     *  VALUED_TRANSFER: adds both kg and USD value to moving average.
+     *  OPENING_BALANCE: establishes opening stock quantity and value.
+     *  NULL on historical rows with cost → surfaces as ADJUSTMENT_VALUATION_UNCLASSIFIED. */
+    valuationBasis: varchar("valuation_basis", { length: 30 }),
   },
   (t) => ({
     companyIdx: index("factory_raw_material_adjustments_company_idx").on(t.companyId),
@@ -1152,6 +1158,10 @@ export const factoryMixBatchSources = pgTable("factory_mix_batch_sources", {
   totalCost: decimal("total_cost", { precision: 20, scale: 7 }).notNull(),
   notes: text("notes"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
+  /** Explicit inventory ownership: which supplier's raw-material kg were consumed.
+   *  NULL for BATCH sources (upstream batch already deducted quantities).
+   *  NULL when no supplier can be resolved (reported as INVENTORY_SUPPLIER_UNRESOLVED). */
+  inventorySupplierId: integer("inventory_supplier_id").references(() => factorySuppliers.id, { onDelete: "restrict" }),
 });
 
 export const insertFactoryMixBatchSourceSchema = createInsertSchema(factoryMixBatchSources)

@@ -12,8 +12,8 @@ describe("Historical Replay manual review", () => {
       createdAt: 1, storedCostPerKg: 1, storedTotalCost: 100, totalWeightKg: 100,
     }]]);
     const sources: SourceInfo[] = [
-      { sourceId: 1, batchId: 1, batchCode: "B1", batchDate: "2026-01-01", supplierId: 1, containerId: 10, sourceBatchId: null, weightKg: 50, storedCostPerKg: 1, storedTotalCost: 50, pricingBasis: "SUPPLIER_LOCKED_RATE" },
-      { sourceId: 2, batchId: 1, batchCode: "B1", batchDate: "2026-01-01", supplierId: null, containerId: null, sourceBatchId: null, weightKg: 50, storedCostPerKg: 1, storedTotalCost: 50, pricingBasis: "MANUAL_REVIEW" },
+      { sourceId: 1, batchId: 1, batchCode: "B1", batchDate: "2026-01-01", supplierId: 1, containerId: 10, sourceBatchId: null, weightKg: 50, storedCostPerKg: 1, storedTotalCost: 50, pricingBasis: "SUPPLIER_LOCKED_RATE", inventorySupplierId: 1 },
+      { sourceId: 2, batchId: 1, batchCode: "B1", batchDate: "2026-01-01", supplierId: null, containerId: null, sourceBatchId: null, weightKg: 50, storedCostPerKg: 1, storedTotalCost: 50, pricingBasis: "MANUAL_REVIEW", inventorySupplierId: null },
     ];
     const plan = buildSelectedSupplierCorrectionPlan({
       batchInfoMap: batches,

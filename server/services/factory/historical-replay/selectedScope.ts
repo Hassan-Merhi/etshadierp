@@ -44,7 +44,7 @@ export function normalizeReplayWriteScope(scope: ReplayWriteScope): ReplayWriteS
       .map((batch) => ({
         batchId: batch.batchId,
         batchCode: batch.batchCode,
-        reasons: [...batch.reasons].sort(),
+        reasons: [...new Set(batch.reasons)].sort(),
       }))
       .sort((left, right) => left.batchId - right.batchId),
   };

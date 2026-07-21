@@ -753,6 +753,8 @@ export function registerRawStockBalanceRoutes(app: Express) {
           quantityKg: totalKg.toFixed(3),
           costPerKg: new Decimal(costPerKgUsd).toDecimalPlaces(6).toFixed(6),
           totalCost: new Decimal(totalCost).toDecimalPlaces(6).toFixed(6),
+          // V7: for OB stock assignment, containerSupplierId is the inventory owner.
+          inventorySupplierId: containerSupplierId ?? null,
         });
 
         // 3. Assign the mix batch to each bale with correct cost fields (DEFECT 5 FIX).

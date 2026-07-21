@@ -332,6 +332,9 @@ export async function applyExactHistoricalCostReplayV6(
         throw scopeViolation(`supplier ${supplierId} has no approved replay result`);
       }
 
+      // Always persist the exact replay result — even a zero ending rate is a valid
+      // approved outcome (supplier's stock is fully consumed). Only negative rates
+      // indicate a calculation error.
       const expectedRate = new Decimal(supplier.endingExpectedRate).toDecimalPlaces(8);
       if (expectedRate.lt(0)) {
         throw scopeViolation(`supplier ${supplierId} produced a negative replay rate`);

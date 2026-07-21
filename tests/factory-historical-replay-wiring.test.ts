@@ -15,7 +15,8 @@ describe("Historical Replay final wiring", () => {
 
   it("invalidates every token prepared before phase 6", () => {
     const types = read("server/services/factory/historical-replay/types.ts");
-    expect(types).toContain('REPLAY_ALGORITHM_VERSION = "v6-final-static-safety"');
+    // V7 bumped the version — old v6 tokens are rejected by exactApplyFinal.ts.
+    expect(types).toContain('REPLAY_ALGORITHM_VERSION = "HISTORICAL_COST_REPLAY_V7_INVENTORY_OWNERSHIP"');
   });
 
   it("registers fail-closed guard and exact handlers before legacy routes", () => {

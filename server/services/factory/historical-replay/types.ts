@@ -27,6 +27,23 @@ export type ScanReason =
   | "MIX_SOURCE_LINK"
   | "CONTAINER_RECEIVED_FIELD";
 
+export type ReplayBlockReason =
+  | "INVENTORY_SUPPLIER_UNRESOLVED"
+  | "ADJUSTMENT_VALUATION_UNCLASSIFIED"
+  | "SUPPLIER_TIMELINE_UNAVAILABLE"
+  | "TIMELINE_QUANTITY_MISMATCH"
+  | "MISSING_EVENT_DATES"
+  | "TIMELINE_ORDER_AMBIGUOUS"
+  | "UNRESOLVED_FX"
+  | "MIXED_BATCH_SUPPLIER_SCOPE_INCOMPLETE"
+  | "BATCH_DEPENDENCY_CYCLE"
+  | "UPSTREAM_BATCH_MISSING"
+  | "ZERO_WEIGHT_SOURCE"
+  | "MANUAL_REVIEW_SOURCE"
+  | "UPSTREAM_BATCH_BLOCKED"
+  | "MISSING_SUPPLIER_RATE"
+  | "DIRECT_CONTAINER_MISSING";
+
 export interface ReplayContainerRow {
   containerId: number;
   containerNumber: string;
@@ -108,6 +125,49 @@ export interface ReplaySummary {
   quantityTimelineMismatches: number;
   ambiguousEventOrdering: number;
   scanCoverageError: boolean;
+  /** V7 gates */
+  unresolvedInventorySupplierSources: number;
+  unclassifiedValuedAdjustments: number;
+  incompleteMixedBatchSupplierScopes: number;
+}
+
+/** Per-supplier financial impact projected by the replay. */
+export interface ReplaySupplierFinancialImpact {
+  supplierId: number;
+  supplierName: string;
+  authoritativeRemainingKg: number;
+  replayRemainingKg: number;
+  currentStoredRate: number;
+  endingExpectedRate: number;
+  currentValue: number;
+  projectedValue: number;
+  valueDifference: number;
+}
+
+/** Financial impact summary added to the preview in V7. */
+export interface ReplayFinancialImpact {
+  currentRawMaterialAsset: number;
+  projectedRawMaterialAsset: number;
+  rawMaterialDifference: number;
+  currentNetPosition: number | null;
+  projectedNetPosition: number | null;
+  otherLedgerEffect: number;
+  completedBatchesAffected: number;
+  availableBalesAffected: number;
+  finalizedBalesExcluded: number;
+  supplierImpacts: ReplaySupplierFinancialImpact[];
+  allSafetyGatesPassed: boolean;
+  safetyGateDetails: {
+    unresolvedInventorySupplierSources: number;
+    unclassifiedValuedAdjustments: number;
+    unresolvedFx: number;
+    missingDates: number;
+    quantityTimelineMismatches: number;
+    ambiguousEventOrdering: number;
+    incompleteMixedBatchSupplierScopes: number;
+    blockedBatches: number;
+    scanCoverageError: boolean;
+  };
 }
 
 export interface HistoricalReplayPreviewResult {
@@ -116,6 +176,7 @@ export interface HistoricalReplayPreviewResult {
   containerRows: ReplayContainerRow[];
   sourceRows: ReplaySourceRow[];
   batchRows: ReplayBatchRow[];
+  financialImpact?: ReplayFinancialImpact;
 }
 
 export interface HistoricalReplayScope {
@@ -175,6 +236,8 @@ export interface SupplierEvent {
   receiptKg?: number;
   adjustKg?: number;
   costPerKgUsd?: number | null;
+  /** Explicit valuation basis for ADD adjustments (Phase V7). */
+  valuationBasis?: string;
   removeKg?: number;
   batchId?: number;
   batchCode?: string;
@@ -228,6 +291,9 @@ export interface SourceInfo {
   storedCostPerKg: number;
   storedTotalCost: number;
   pricingBasis: string;
+  /** Explicit inventory ownership column from Phase V7 migration.
+   *  Null for BATCH sources (by design) and for unresolved historical rows. */
+  inventorySupplierId: number | null;
 }
 
 export interface SourceCorrection {
@@ -277,7 +343,7 @@ export const FINALIZED_BALE_STATUSES = [
   "FINALIZED",
 ] as const;
 
-export const REPLAY_ALGORITHM_VERSION = "v6-final-static-safety";
+export const REPLAY_ALGORITHM_VERSION = "HISTORICAL_COST_REPLAY_V7_INVENTORY_OWNERSHIP";
 
 export function rowToCamel<T>(row: Record<string, unknown>): T {
   const out: Record<string, unknown> = {};

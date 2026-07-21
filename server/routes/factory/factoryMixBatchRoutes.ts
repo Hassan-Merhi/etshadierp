@@ -499,6 +499,10 @@ export function registerFactoryMixBatchRoutes(app: Express) {
             quantityKg: sr.weightKg,
             costPerKg: sr.costPerKg,
             totalCost: sr.totalCost,
+            // V7: explicit inventory ownership. supplierId here is always the container's
+            // supplier (populated from ctnSupplierId2 for container sources), so this
+            // expression correctly identifies the inventory owner for all source types.
+            inventorySupplierId: (sr.sourceBatchId != null) ? null : (sr.supplierId ?? null),
           });
         }
 
@@ -950,6 +954,7 @@ export function registerFactoryMixBatchRoutes(app: Express) {
             quantityKg: sr.weightKg,
             costPerKg: sr.costPerKg,
             totalCost: sr.totalCost,
+            inventorySupplierId: (sr.sourceBatchId != null) ? null : (sr.supplierId ?? null),
           });
         }
 
@@ -1212,6 +1217,7 @@ export function registerFactoryMixBatchRoutes(app: Express) {
             quantityKg: sr.weightKg,
             costPerKg: sr.costPerKg,
             totalCost: sr.totalCost,
+            inventorySupplierId: (sr.sourceBatchId != null) ? null : (sr.supplierId ?? null),
           });
         }
 

@@ -33,6 +33,7 @@ describe("Historical Replay direct-container sources", () => {
         storedCostPerKg: 1,
         storedTotalCost: 100,
         pricingBasis: "SUPPLIER_LOCKED_RATE",
+        inventorySupplierId: 1,
       },
       {
         sourceId: 2,
@@ -46,6 +47,8 @@ describe("Historical Replay direct-container sources", () => {
         storedCostPerKg: 1,
         storedTotalCost: 50,
         pricingBasis: "CONTAINER_DIRECT",
+        // No inventorySupplierId — container has no supplier → CONTAINER_DIRECT unowned
+        inventorySupplierId: null,
       },
     ];
 
@@ -89,6 +92,7 @@ describe("Historical Replay direct-container sources", () => {
         storedCostPerKg: 1,
         storedTotalCost: 100,
         pricingBasis: "SUPPLIER_LOCKED_RATE",
+        inventorySupplierId: 1,
       },
       {
         sourceId: 2,
@@ -102,6 +106,7 @@ describe("Historical Replay direct-container sources", () => {
         storedCostPerKg: 1,
         storedTotalCost: 50,
         pricingBasis: "CONTAINER_DIRECT",
+        inventorySupplierId: null,
       },
     ];
 

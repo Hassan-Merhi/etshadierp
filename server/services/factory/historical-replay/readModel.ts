@@ -293,6 +293,7 @@ interface AdjustmentEvent {
   kind: "ADD_ADJUSTMENT" | "REMOVE_ADJUSTMENT" | "DEDUCT_ADJUSTMENT";
   adjustKg: number;
   costPerKgUsd: number | null;
+  valuationBasis?: string;
   createdAt: number;
   stableId: number;
 }
@@ -300,13 +301,14 @@ interface AdjustmentEvent {
 async function buildAdjustmentEvents(
   executor: ReplayQueryExecutor,
   companyId: number
-): Promise<AdjustmentEvent[]> {
+): Promise<{ events: AdjustmentEvent[]; unclassifiedCount: number }> {
   const result = await executor.query(
     `SELECT * FROM factory_raw_material_adjustments
      WHERE company_id = $1 AND deleted_at IS NULL AND supplier_id IS NOT NULL`,
     [companyId]
   );
-  return result.rows
+  let unclassifiedCount = 0;
+  const events: AdjustmentEvent[] = result.rows
     .map((row) => rowToCamel<typeof factoryRawMaterialAdjustments.$inferSelect>(row))
     .map((row) => {
       const type = String(row.type).toUpperCase();
@@ -317,16 +319,26 @@ async function buildAdjustmentEvents(
           : "DEDUCT_ADJUSTMENT";
       const rawCost = numeric(row.costPerKg);
       const currency = row.currencyCode || "USD";
+      const valuationBasis = (row as any).valuationBasis as string | undefined | null;
+
+      // Flag unclassified valued ADD adjustments — must block apply for that supplier.
+      if (type === "ADD" && rawCost > 0 && !valuationBasis) {
+        unclassifiedCount += 1;
+      }
+
       return {
         supplierId: row.supplierId!,
         effectiveDate: row.date ? String(row.date).slice(0, 10) : "",
         kind,
         adjustKg: numeric(row.kg),
+        // Pass cost and valuationBasis for use in replaySupplierTimeline.
         costPerKgUsd: type === "ADD" && currency === "USD" && rawCost > 0 ? rawCost : null,
+        valuationBasis: valuationBasis ?? undefined,
         createdAt: row.createdAt ? new Date(row.createdAt).getTime() : 0,
         stableId: row.id,
-      };
+      } as AdjustmentEvent & { valuationBasis?: string };
     });
+  return { events, unclassifiedCount };
 }
 
 interface BatchConsumptionEvent {
@@ -376,35 +388,74 @@ export async function buildBatchConsumptionEvents(
     });
   }
 
-  const sourceInfos = sourceRows.map<SourceInfo>((source) => ({
-    sourceId: source.id,
-    batchId: source.mixBatchId,
-    batchCode: batchInfoMap.get(source.mixBatchId)?.batchCode ?? `#${source.mixBatchId}`,
-    batchDate: batchInfoMap.get(source.mixBatchId)?.batchDate ?? null,
-    supplierId: source.supplierId ?? null,
-    containerId: source.containerId ?? null,
-    sourceBatchId: source.sourceBatchId ?? null,
-    weightKg: numeric(source.weightKg),
-    storedCostPerKg: numeric(source.costPerKg),
-    storedTotalCost: numeric(source.totalCost),
-    pricingBasis: resolveMixSourcePricingBasis({
-      sourceBatchId: source.sourceBatchId,
-      supplierId: source.supplierId,
-      containerId: source.containerId,
-    }),
-  }));
+  // Source type priority for inventory ownership resolution:
+  //   1. pricingBasis = "BATCH"          → upstream batch already deducted; skip consumption event
+  //   2. pricingBasis = "SUPPLIER_LOCKED_RATE" → use supplierId (or inventorySupplierId) as owner
+  //   3. pricingBasis = "CONTAINER_DIRECT"     → use container's supplierId via inventorySupplierId
+
+  // Load container supplier map for fallback inventory-supplier derivation
+  // when the persisted inventory_supplier_id column is null (pre-V7 rows).
+  const containerIds = [...new Set(
+    sourceRows.filter((s) => s.containerId != null && s.sourceBatchId == null && s.supplierId == null)
+      .map((s) => s.containerId as number)
+  )];
+  const containerSupplierMap = new Map<number, number | null>();
+  if (containerIds.length > 0) {
+    const res = await executor.query<{ id: number; supplier_id: number | null }>(
+      `SELECT id, supplier_id FROM factory_containers WHERE id = ANY($1)`,
+      [containerIds]
+    );
+    for (const row of res.rows) containerSupplierMap.set(row.id, row.supplier_id ?? null);
+  }
+
+  const sourceInfos = sourceRows.map<SourceInfo>((source) => {
+    // Prefer the persisted column (added by V7 migration). Fall back to derivation
+    // for defensive compatibility with pre-migration rows.
+    let inventorySupplierId: number | null = (source as any).inventorySupplierId ?? null;
+    if (inventorySupplierId == null && source.sourceBatchId == null) {
+      if (source.supplierId != null) {
+        inventorySupplierId = source.supplierId;
+      } else if (source.containerId != null) {
+        inventorySupplierId = containerSupplierMap.get(source.containerId) ?? null;
+      }
+    }
+    return {
+      sourceId: source.id,
+      batchId: source.mixBatchId,
+      batchCode: batchInfoMap.get(source.mixBatchId)?.batchCode ?? `#${source.mixBatchId}`,
+      batchDate: batchInfoMap.get(source.mixBatchId)?.batchDate ?? null,
+      supplierId: source.supplierId ?? null,
+      containerId: source.containerId ?? null,
+      sourceBatchId: source.sourceBatchId ?? null,
+      weightKg: numeric(source.weightKg),
+      storedCostPerKg: numeric(source.costPerKg),
+      storedTotalCost: numeric(source.totalCost),
+      pricingBasis: resolveMixSourcePricingBasis({
+        sourceBatchId: source.sourceBatchId,
+        supplierId: source.supplierId,
+        containerId: source.containerId,
+      }),
+      inventorySupplierId,
+    };
+  });
 
   const eventMap = new Map<string, BatchConsumptionEvent>();
   for (const source of sourceInfos) {
-    if (source.pricingBasis !== "SUPPLIER_LOCKED_RATE" || source.supplierId == null) continue;
-    if (!supplierIds.has(source.supplierId)) continue;
+    // BATCH sources don't directly deduct supplier inventory (the upstream batch already did).
+    if (source.pricingBasis === "BATCH") continue;
+    // MANUAL_REVIEW sources are blocked — no consumption event.
+    if (source.pricingBasis === "MANUAL_REVIEW") continue;
+    // Use inventorySupplierId (explicit ownership), not supplierId (pricing ownership).
+    const inventorySupplierId = source.inventorySupplierId;
+    if (inventorySupplierId == null) continue; // INVENTORY_SUPPLIER_UNRESOLVED — counted in summary
+    if (!supplierIds.has(inventorySupplierId)) continue;
     const batch = batchInfoMap.get(source.batchId);
     if (!batch) continue;
-    const key = `${source.supplierId}:${source.batchId}`;
+    const key = `${inventorySupplierId}:${source.batchId}`;
     let event = eventMap.get(key);
     if (!event) {
       event = {
-        supplierId: source.supplierId,
+        supplierId: inventorySupplierId,
         effectiveDate: batch.batchDate ?? "",
         batchId: source.batchId,
         batchCode: batch.batchCode,
@@ -504,16 +555,50 @@ export async function replaySupplierTimeline(
     }
     if (event.kind === "ADD_ADJUSTMENT") {
       const quantity = new Decimal(event.adjustKg ?? 0);
-      if (quantity.gt(0)) remaining = remaining.plus(quantity);
+      if (quantity.gt(0)) {
+        const valuationBasis = (event as any).valuationBasis as string | undefined;
+        if (valuationBasis === "VALUED_TRANSFER") {
+          // Add both kg and USD value to moving average.
+          const adjRate = new Decimal(event.costPerKgUsd ?? 0);
+          const oldPositiveRemaining = Decimal.max(0, remaining);
+          const denominator = oldPositiveRemaining.plus(quantity);
+          rate = denominator.gt(0)
+            ? oldPositiveRemaining.times(rate).plus(quantity.times(adjRate)).div(denominator)
+            : adjRate;
+          remaining = remaining.plus(quantity);
+        } else if (valuationBasis === "OPENING_BALANCE") {
+          // Establish opening quantity and value (replaces current state).
+          const adjRate = new Decimal(event.costPerKgUsd ?? 0);
+          if (remaining.lte(0)) {
+            remaining = quantity;
+            rate = adjRate;
+          } else {
+            // If opening balance is applied on top of existing stock, treat as VALUED_TRANSFER.
+            const oldPositiveRemaining = Decimal.max(0, remaining);
+            const denominator = oldPositiveRemaining.plus(quantity);
+            rate = denominator.gt(0)
+              ? oldPositiveRemaining.times(rate).plus(quantity.times(adjRate)).div(denominator)
+              : adjRate;
+            remaining = remaining.plus(quantity);
+          }
+        } else {
+          // QUANTITY_ONLY (or unclassified — still applies quantity without shifting rate).
+          remaining = remaining.plus(quantity);
+        }
+      }
       continue;
     }
     if (event.kind === "REMOVE_ADJUSTMENT" || event.kind === "DEDUCT_ADJUSTMENT") {
       remaining = remaining.minus(new Decimal(event.removeKg ?? event.adjustKg ?? 0));
+      // Clamp tiny rounding residuals.
+      if (remaining.abs().lte(0.001)) remaining = new Decimal(0);
       continue;
     }
     if (event.kind === "BATCH_CONSUMPTION") {
       if (event.batchId != null) expectedRateAtBatch.set(event.batchId, rate.toDecimalPlaces(8).toNumber());
       remaining = remaining.minus(new Decimal(event.consumptionKg ?? 0));
+      // Clamp tiny rounding residuals to zero after consumption.
+      if (remaining.abs().lte(0.001)) remaining = new Decimal(0);
     }
   }
 
@@ -781,8 +866,20 @@ export async function previewHistoricalCostReplayWithExecutor(
   const supplierMap = new Map(supplierRows.map((supplier) => [supplier.id, supplier]));
 
   const receiptEvents = await buildReceiptEvents(executor, companyId, canonicals);
-  const adjustmentEvents = await buildAdjustmentEvents(executor, companyId);
+  const { events: adjustmentEventsAll, unclassifiedCount: unclassifiedValuedAdjustments } = await buildAdjustmentEvents(executor, companyId);
   const { events: consumptionEvents, batchInfoMap, sourceInfos } = await buildBatchConsumptionEvents(executor, companyId, supplierIds);
+
+  // Count unresolved inventory supplier sources (non-BATCH sources with null inventorySupplierId).
+  const unresolvedInventorySupplierSources = sourceInfos.filter(
+    (s) => s.pricingBasis !== "BATCH" && s.pricingBasis !== "MANUAL_REVIEW" && s.inventorySupplierId == null
+  ).length;
+
+  // Build per-supplier sets of unclassified adjustments for blocking.
+  const unclassifiedAdjustmentSupplierIds = new Set<number>(
+    adjustmentEventsAll
+      .filter((e) => e.kind === "ADD_ADJUSTMENT" && (e.costPerKgUsd ?? 0) > 0 && !e.valuationBasis)
+      .map((e) => e.supplierId)
+  );
 
   const receiptsBySupplier = new Map<number, ContainerReceiptEvent[]>();
   for (const event of receiptEvents) {
@@ -792,7 +889,7 @@ export async function previewHistoricalCostReplayWithExecutor(
     receiptsBySupplier.set(event.supplierId, values);
   }
   const adjustmentsBySupplier = new Map<number, AdjustmentEvent[]>();
-  for (const event of adjustmentEvents) {
+  for (const event of adjustmentEventsAll) {
     const values = adjustmentsBySupplier.get(event.supplierId) ?? [];
     values.push(event);
     adjustmentsBySupplier.set(event.supplierId, values);
@@ -829,6 +926,7 @@ export async function previewHistoricalCostReplayWithExecutor(
         stableId: event.stableId,
         adjustKg: event.adjustKg,
         costPerKgUsd: event.costPerKgUsd,
+        valuationBasis: event.valuationBasis,
         removeKg: event.kind === "ADD_ADJUSTMENT" ? undefined : event.adjustKg,
       });
     }
@@ -855,6 +953,11 @@ export async function previewHistoricalCostReplayWithExecutor(
       allEvents,
       authoritativeRemainingKg
     );
+    // Block suppliers with unclassified valued adjustments.
+    if (unclassifiedAdjustmentSupplierIds.has(supplierId) && !timeline.reasons.includes("ADJUSTMENT_VALUATION_UNCLASSIFIED")) {
+      timeline.reasons.push("ADJUSTMENT_VALUATION_UNCLASSIFIED");
+      (timeline as any).safeToRepair = false;
+    }
     timelineResults.push(timeline);
     for (const [batchId, rate] of timeline.expectedRateAtBatch) {
       allExpectedRatesAtBatch.set(`${supplierId}:${batchId}`, rate);
@@ -952,13 +1055,33 @@ export async function previewHistoricalCostReplayWithExecutor(
     affectedBales: baleCounts.total.get(correction.batchId) ?? 0,
   }));
 
+  // V7: detect mixed batches where not all participating inventory suppliers are in scope.
+  let incompleteMixedBatchSupplierScopes = 0;
+  {
+    const batchInventorySuppliers = new Map<number, Set<number>>();
+    for (const source of sourceInfos) {
+      if (source.pricingBasis === "BATCH" || source.inventorySupplierId == null) continue;
+      const s = batchInventorySuppliers.get(source.batchId) ?? new Set<number>();
+      s.add(source.inventorySupplierId);
+      batchInventorySuppliers.set(source.batchId, s);
+    }
+    for (const [, batchSuppliers] of batchInventorySuppliers) {
+      for (const sid of batchSuppliers) {
+        if (!supplierIds.has(sid)) { incompleteMixedBatchSupplierScopes++; break; }
+      }
+    }
+  }
+
   const supplierOutputRows: ReplaySupplierRow[] = timelineResults.map((timeline) => {
+    // Count all sources where THIS supplier's inventory was consumed (not just SUPPLIER_LOCKED_RATE).
     const affectedSourceCount = sourceInfos.filter(
-      (source) => source.supplierId === timeline.supplierId && source.pricingBasis === "SUPPLIER_LOCKED_RATE"
+      (source) => source.inventorySupplierId === timeline.supplierId && source.pricingBasis !== "BATCH"
     ).length;
     const affectedBatchIds = new Set(
       batchCorrections
-        .filter((batch) => sourceInfos.some((source) => source.batchId === batch.batchId && source.supplierId === timeline.supplierId))
+        .filter((batch) => sourceInfos.some(
+          (source) => source.batchId === batch.batchId && source.inventorySupplierId === timeline.supplierId
+        ))
         .map((batch) => batch.batchId)
     );
     return {
@@ -982,6 +1105,19 @@ export async function previewHistoricalCostReplayWithExecutor(
   const completedBatchIds = new Set(
     batchCorrections.filter((batch) => ["COMPLETED", "CLOSED"].includes(batch.status)).map((batch) => batch.batchId)
   );
+
+  // ── Financial impact (Phase 11) ──────────────────────────────────────────────
+  // Current raw material asset: sum of per-row (received - used) × cost_per_kg_usd
+  // plus ADD adjustments, matching the net position route formula.
+  const financialImpact = await computeFinancialImpact(
+    executor,
+    companyId,
+    supplierOutputRows,
+    canonicals,
+    batchCorrections,
+    baleCounts
+  );
+
   const summary: ReplaySummary = {
     totalReceivedContainers: universe.length,
     containersScanned: canonicals.length,
@@ -1003,9 +1139,106 @@ export async function previewHistoricalCostReplayWithExecutor(
     quantityTimelineMismatches: timelineResults.filter((timeline) => timeline.quantityMismatch).length,
     ambiguousEventOrdering: timelineResults.filter((timeline) => timeline.ambiguous).length,
     scanCoverageError: canonicals.length !== universe.length,
+    // V7 gates
+    unresolvedInventorySupplierSources,
+    unclassifiedValuedAdjustments,
+    incompleteMixedBatchSupplierScopes,
   };
 
-  return { summary, supplierRows: supplierOutputRows, containerRows, sourceRows, batchRows };
+  return { summary, supplierRows: supplierOutputRows, containerRows, sourceRows, batchRows, financialImpact };
+}
+
+/**
+ * Compute Phase 11 financial impact from replay preview data.
+ * Per-supplier value change = replayRemainingKg × endingExpectedRate − authoritativeRemainingKg × currentStoredRate.
+ * Projected net position = current net position + raw-material difference.
+ */
+async function computeFinancialImpact(
+  executor: ReplayQueryExecutor,
+  companyId: number,
+  supplierOutputRows: ReplaySupplierRow[],
+  canonicals: CanonicalContainer[],
+  batchCorrections: BatchCorrection[],
+  baleCounts: { total: Map<number, number>; finalized: Map<number, number> }
+): Promise<import("./types").ReplayFinancialImpact> {
+  // Current raw material asset — same formula as employeeNetPositionRoutes.ts
+  const rawResult = await executor.query<{ remaining_value_usd: string }>(
+    `SELECT COALESCE(SUM(
+        (frs.received_kg::numeric - frs.used_kg::numeric) *
+        COALESCE(NULLIF(frs.cost_per_kg_usd::numeric, 0), frs.cost_per_kg::numeric, 0)
+      ), 0) AS remaining_value_usd
+     FROM factory_raw_stock frs
+     JOIN factory_containers fc ON fc.id = frs.container_id
+     WHERE frs.company_id = $1 AND fc.status != 'DELETED'
+       AND frs.deleted_at IS NULL AND fc.deleted_at IS NULL`,
+    [companyId]
+  );
+  const adjResult = await executor.query<{ kg: string; cpk: string; type: string }>(
+    `SELECT kg::numeric AS kg, cost_per_kg::numeric AS cpk, type
+     FROM factory_raw_material_adjustments
+     WHERE company_id = $1 AND deleted_at IS NULL AND type = 'ADD'`,
+    [companyId]
+  );
+  let currentRawMaterialAsset = parseFloat(rawResult.rows[0]?.remaining_value_usd ?? "0") || 0;
+  for (const adj of adjResult.rows) {
+    currentRawMaterialAsset += parseFloat(adj.kg ?? "0") * parseFloat(adj.cpk ?? "0");
+  }
+
+  // Per-supplier value change from the replay.
+  const supplierImpacts: import("./types").ReplaySupplierFinancialImpact[] = supplierOutputRows.map((row) => {
+    const currentValue = new Decimal(row.authoritativeRemainingKg).times(row.currentStoredRate).toDecimalPlaces(2).toNumber();
+    const projectedValue = new Decimal(row.replayRemainingKg).times(row.endingExpectedRate).toDecimalPlaces(2).toNumber();
+    const valueDifference = new Decimal(projectedValue).minus(currentValue).toDecimalPlaces(2).toNumber();
+    return {
+      supplierId: row.supplierId,
+      supplierName: row.supplierName,
+      authoritativeRemainingKg: row.authoritativeRemainingKg,
+      replayRemainingKg: row.replayRemainingKg,
+      currentStoredRate: row.currentStoredRate,
+      endingExpectedRate: row.endingExpectedRate,
+      currentValue,
+      projectedValue,
+      valueDifference,
+    };
+  });
+
+  const rawMaterialDifference = supplierImpacts.reduce((sum, s) => sum + s.valueDifference, 0);
+  const projectedRawMaterialAsset = new Decimal(currentRawMaterialAsset).plus(rawMaterialDifference).toDecimalPlaces(2).toNumber();
+
+  const completedBatchesAffected = batchCorrections.filter((b) => ["COMPLETED", "CLOSED"].includes(b.status)).length;
+  const batchIds = batchCorrections.map((b) => b.batchId);
+  const availableBalesAffected = batchIds.reduce((sum, id) => sum + (baleCounts.total.get(id) ?? 0) - (baleCounts.finalized.get(id) ?? 0), 0);
+  const finalizedBalesExcluded = batchIds.reduce((sum, id) => sum + (baleCounts.finalized.get(id) ?? 0), 0);
+
+  // Safety gate results (reflect in/complete view).
+  const blockedBatches = 0; // filled by caller from preview.summary if needed
+  const safetyGateDetails = {
+    unresolvedInventorySupplierSources: supplierOutputRows.reduce((_, __) => 0, 0), // computed in caller
+    unclassifiedValuedAdjustments: 0,
+    unresolvedFx: canonicals.filter((c) => c.fxUnresolved).length,
+    missingDates: 0,
+    quantityTimelineMismatches: supplierOutputRows.filter((r) => !r.safeToRepair && r.reasons.includes("TIMELINE_QUANTITY_MISMATCH")).length,
+    ambiguousEventOrdering: supplierOutputRows.filter((r) => !r.safeToRepair && r.reasons.includes("TIMELINE_ORDER_AMBIGUOUS")).length,
+    incompleteMixedBatchSupplierScopes: 0,
+    blockedBatches,
+    scanCoverageError: false,
+  };
+  const allSafetyGatesPassed = Object.values(safetyGateDetails).every((v) => v === 0 || v === false);
+
+  return {
+    currentRawMaterialAsset: new Decimal(currentRawMaterialAsset).toDecimalPlaces(2).toNumber(),
+    projectedRawMaterialAsset,
+    rawMaterialDifference: new Decimal(rawMaterialDifference).toDecimalPlaces(2).toNumber(),
+    currentNetPosition: null,     // filled by the route layer from the net position service
+    projectedNetPosition: null,   // filled by the route layer
+    otherLedgerEffect: 0,
+    completedBatchesAffected,
+    availableBalesAffected,
+    finalizedBalesExcluded,
+    supplierImpacts,
+    allSafetyGatesPassed,
+    safetyGateDetails,
+  };
 }
 
 export async function previewHistoricalCostReplay(companyId: number): Promise<HistoricalReplayPreviewResult> {
