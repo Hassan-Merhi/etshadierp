@@ -149,8 +149,15 @@ export async function buildExactHistoricalReplayScopeInternalV7Final(params: {
   }
 
   const preview = await previewHistoricalCostReplayWithExecutor(params.executor, params.companyId);
-  if (preview.summary.scanCoverageError) {
-    throw safetyError("Historical Replay scan coverage is incomplete. No token was issued.");
+  if (preview.financialImpact?.allSafetyGatesPassed !== true) {
+    throw safetyError(
+      "Historical Replay cannot prepare until every company-wide safety gate passes.",
+      {
+        safetyGateDetails: preview.financialImpact?.safetyGateDetails ?? null,
+        blockedBatches: preview.blockedBatches ?? [],
+        unclassifiedAdjustmentRows: preview.unclassifiedAdjustmentRows ?? [],
+      }
+    );
   }
 
   const previewBySupplierId = new Map(preview.supplierRows.map((row) => [row.supplierId, row]));
