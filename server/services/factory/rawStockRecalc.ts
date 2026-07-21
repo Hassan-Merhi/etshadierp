@@ -1444,6 +1444,20 @@ export interface FullAuditResult {
 
 /** Comprehensive read-only audit of every relevant container in the company. */
 export async function getFullAuditScan(companyId: number): Promise<FullAuditResult> {
+  // Pre-fetch supplier-linked container IDs using the same query as apply-all-safe's
+  // DEFECT 12 guard. These containers cannot be fixed by apply-all-safe (the cascade
+  // skips SUPPLIER_LOCKED_RATE sources), so they must NOT count as safeToRepair.
+  const supplierLinkedQuery = await pool.query<{ container_id: number }>(
+    `SELECT DISTINCT mbs.container_id
+     FROM factory_mix_batch_sources mbs
+     JOIN factory_mix_batches mb ON mb.id = mbs.mix_batch_id
+     WHERE mb.company_id = $1
+       AND mbs.supplier_id IS NOT NULL
+       AND mbs.source_batch_id IS NULL`,
+    [companyId]
+  );
+  const supplierLinkedIds = new Set(supplierLinkedQuery.rows.map((r) => r.container_id));
+
   const [previewRows, sourceMismatches] = await Promise.all([
     getRawStockRecalcPreview(companyId),
     getMixBatchSourceCostMismatchPreview(companyId),
@@ -1509,10 +1523,16 @@ export async function getFullAuditScan(companyId: number): Promise<FullAuditResu
     ]);
     const hasCostIssue = [...codes].some((c) => COST_ISSUE_CODES.has(c));
 
+    // Exclude supplier-linked containers — apply-all-safe's DEFECT 12 guard removes
+    // these because the cascade skips SUPPLIER_LOCKED_RATE sources. Marking them
+    // safeToRepair here would make the audit count disagree with what apply-all-safe
+    // actually applies, showing "Nothing to repair" after a non-zero safe-repair count.
+    const isSupplierLinked = supplierLinkedIds.has(row.containerId);
     const safeToRepair =
       !codes.has("UNRESOLVED_FX") &&
       !codes.has("MANUAL_REVIEW_REQUIRED") &&
       !codes.has("CORRECT") &&
+      !isSupplierLinked &&
       hasCostIssue &&
       (row.activeRawStockRowExists || row.rawStockDeleted || containerSourceMismatches.length > 0);
 
