@@ -1376,6 +1376,7 @@ export function registerRawStockRecalcRoutes(app: Express) {
         dryRun,
         confirmationToken: providedToken,
         supplierIds = [] as number[],
+        forceSupplierIds = [] as number[],
         includeCompletedBatches = false,
       } = req.body;
 
@@ -1396,13 +1397,29 @@ export function registerRawStockRecalcRoutes(app: Express) {
               )
             : preview.supplierRows.filter((s) => s.safeToRepair).map((s) => s.supplierId);
 
-          const fingerprint = computeReplayFingerprint(companyId, safeSupplierIds, preview, {
+          // Force-apply suppliers: only accept those whose SOLE blocking reason is
+          // TIMELINE_QUANTITY_MISMATCH (not missing dates or ambiguous ordering).
+          // These have a reliable enough rate computation to be worth applying.
+          const requestedForceIds: number[] = Array.isArray(forceSupplierIds) ? forceSupplierIds : [];
+          const forcedSupplierIds: number[] = requestedForceIds.filter((id: number) => {
+            const row = preview.supplierRows.find((s) => s.supplierId === id);
+            return (
+              row &&
+              !row.safeToRepair &&
+              row.reasons.length === 1 &&
+              row.reasons[0] === "TIMELINE_QUANTITY_MISMATCH"
+            );
+          });
+          // Merge forced IDs into the supplier list (deduplicated)
+          const allSupplierIds = Array.from(new Set([...safeSupplierIds, ...forcedSupplierIds]));
+
+          const fingerprint = computeReplayFingerprint(companyId, allSupplierIds, preview, {
             includeCompletedBatches: wantsCompletedBatches,
             includeFinalizedBales: wantsFinalizedBales,
           });
           const tokenPayload = {
             companyId,
-            supplierIds: safeSupplierIds,
+            supplierIds: allSupplierIds,
             includeCompletedBatches: wantsCompletedBatches,
             includeFinalizedBales: wantsFinalizedBales,
             fingerprint,
@@ -1416,7 +1433,7 @@ export function registerRawStockRecalcRoutes(app: Express) {
           // FOR UPDATE — safe to pass pool here, locks auto-release after single-statement tx).
           const writeScope = await buildHistoricalReplayScope({
             companyId,
-            selectedSupplierIds: new Set(safeSupplierIds),
+            selectedSupplierIds: new Set(allSupplierIds),
             includeCompletedBatches: wantsCompletedBatches,
             includeFinalizedBales: wantsFinalizedBales,
             executor: pool,
@@ -1424,7 +1441,8 @@ export function registerRawStockRecalcRoutes(app: Express) {
           return res.json({
             dryRun: true,
             summary: preview.summary,
-            safeSupplierIds,
+            safeSupplierIds: allSupplierIds,
+            forcedSupplierIds,
             suppliersToApply: preview.supplierRows.filter(s => writeScope.supplierIds.includes(s.supplierId)),
             confirmationToken,
             fingerprint,

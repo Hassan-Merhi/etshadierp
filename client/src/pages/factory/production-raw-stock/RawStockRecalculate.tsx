@@ -448,12 +448,14 @@ export default function RawStockRecalculate() {
   const replayPrepareMutation = useMutation({
     mutationFn: async (opts: {
       supplierIds: number[];
+      forceSupplierIds: number[];
       includeCompletedBatches: boolean;
       includeFinalizedBales: boolean;
     }) => {
       const res = await modeApiRequest("POST", "/api/factory/raw-stock/recalc/historical-replay/apply", {
         dryRun: true,
         supplierIds: opts.supplierIds,
+        forceSupplierIds: opts.forceSupplierIds,
         includeCompletedBatches: opts.includeCompletedBatches,
         includeFinalizedBales: opts.includeFinalizedBales,
       });
@@ -1928,8 +1930,9 @@ export default function RawStockRecalculate() {
               {replayPreview.summary.quantityTimelineMismatches > 0 && (
                 <div className="border border-amber-500/30 bg-amber-500/10 rounded-md p-3 text-xs text-amber-700 dark:text-amber-400">
                   <strong>{replayPreview.summary.quantityTimelineMismatches} supplier(s)</strong> have a quantity
-                  reconciliation mismatch — replay remaining kg differs from authoritative remaining kg. These
-                  suppliers require manual review and will be skipped.
+                  reconciliation mismatch — the event timeline's total kg doesn't match the raw stock remaining kg.
+                  This usually means a batch consumed slightly more or fewer kg than what's recorded in the raw stock row.
+                  {" "}Rows with <em>only</em> this issue can still be force-applied by checking them below.
                 </div>
               )}
 
@@ -1945,18 +1948,29 @@ export default function RawStockRecalculate() {
                   {/* FIX 11: Select All / Clear controls */}
                   {(() => {
                     const safeIds = replayPreview.supplierRows.filter((s) => s.safeToRepair).map((s) => s.supplierId);
-                    return safeIds.length > 0 ? (
+                    const forceableIds = replayPreview.supplierRows
+                      .filter((s) => !s.safeToRepair && s.reasons.length === 1 && s.reasons[0] === "TIMELINE_QUANTITY_MISMATCH")
+                      .map((s) => s.supplierId);
+                    const totalSelectable = safeIds.length + forceableIds.length;
+                    return totalSelectable > 0 ? (
                       <div className="flex items-center gap-2 px-3 py-1.5 border-b text-xs text-muted-foreground bg-muted/20">
                         <Button size="sm" variant="ghost" className="h-6 text-xs px-2"
+                          onClick={() => { setSelectedSupplierIds(new Set([...safeIds, ...forceableIds])); setPreparedReplayToken(null); }}>
+                          Select All
+                        </Button>
+                        <Button size="sm" variant="ghost" className="h-6 text-xs px-2"
                           onClick={() => { setSelectedSupplierIds(new Set(safeIds)); setPreparedReplayToken(null); }}>
-                          Select All Safe
+                          Safe Only
                         </Button>
                         <Button size="sm" variant="ghost" className="h-6 text-xs px-2"
                           onClick={() => { setSelectedSupplierIds(new Set()); setPreparedReplayToken(null); }}>
                           Clear
                         </Button>
                         <span className="ml-auto font-medium">
-                          {selectedSupplierIds.size}/{safeIds.length} selected
+                          {selectedSupplierIds.size}/{totalSelectable} selected
+                          {forceableIds.some((id) => selectedSupplierIds.has(id)) && (
+                            <span className="ml-1 text-amber-600">(includes quantity-mismatch override)</span>
+                          )}
                         </span>
                       </div>
                     ) : null;
@@ -1979,13 +1993,17 @@ export default function RawStockRecalculate() {
                       {replayPreview.supplierRows.map((s) => {
                         const delta = s.endingExpectedRate - s.currentStoredRate;
                         const isChecked = selectedSupplierIds.has(s.supplierId);
+                        // A quantity-mismatch-only row can be force-applied (user acknowledges the gap).
+                        const isForceAppliable = !s.safeToRepair && s.reasons.length === 1 && s.reasons[0] === "TIMELINE_QUANTITY_MISMATCH";
+                        const kgGap = Math.abs((s.replayRemainingKg ?? 0) - (s.authoritativeRemainingKg ?? 0));
                         return (
-                          <TableRow key={s.supplierId} className="text-xs">
-                            {/* FIX 11: per-row checkbox; disabled for manual-review suppliers */}
+                          <TableRow key={s.supplierId} className={`text-xs ${isForceAppliable && isChecked ? "bg-amber-500/5" : ""}`}>
+                            {/* Checkbox: enabled for safe rows; also enabled (amber) for force-appliable rows */}
                             <TableCell className="pl-3">
                               <Checkbox
                                 checked={isChecked}
-                                disabled={!s.safeToRepair}
+                                disabled={!s.safeToRepair && !isForceAppliable}
+                                className={isForceAppliable ? "border-amber-500 data-[state=checked]:bg-amber-500 data-[state=checked]:border-amber-500" : ""}
                                 onCheckedChange={(v) => {
                                   const next = new Set(selectedSupplierIds);
                                   if (v) next.add(s.supplierId); else next.delete(s.supplierId);
@@ -2010,8 +2028,17 @@ export default function RawStockRecalculate() {
                                 <Badge variant="outline" className="text-emerald-600 border-emerald-500/30 bg-emerald-500/10 text-[10px]">
                                   Safe
                                 </Badge>
+                              ) : isForceAppliable ? (
+                                <div className="flex flex-col gap-0.5">
+                                  <Badge variant="outline" className="text-amber-600 border-amber-500/30 bg-amber-500/10 text-[10px]">
+                                    {s.reasons[0]}
+                                  </Badge>
+                                  <span className="text-[10px] text-muted-foreground">
+                                    gap: {kgGap.toFixed(3)} kg
+                                  </span>
+                                </div>
                               ) : (
-                                <Badge variant="outline" className="text-amber-600 border-amber-500/30 bg-amber-500/10 text-[10px]">
+                                <Badge variant="outline" className="text-red-600 border-red-500/30 bg-red-500/10 text-[10px]">
                                   {s.reasons[0] || "Manual review"}
                                 </Badge>
                               )}
@@ -2024,8 +2051,10 @@ export default function RawStockRecalculate() {
                 </div>
               )}
 
-              {/* Options and apply — only show when there are safe suppliers */}
-              {replayPreview.summary.safeSuppliers > 0 && (
+              {/* Options and apply — show when there are safe suppliers OR force-appliable ones */}
+              {(replayPreview.summary.safeSuppliers > 0 || replayPreview.supplierRows.some(
+                (s) => !s.safeToRepair && s.reasons.length === 1 && s.reasons[0] === "TIMELINE_QUANTITY_MISMATCH"
+              )) && (
                 <div className="space-y-2 pt-2">
                   {/* includeFinalizedBales toggle */}
                   {(replayPreview.summary.finalizedBalesToUpdate ?? 0) > 0 && (
@@ -2045,11 +2074,21 @@ export default function RawStockRecalculate() {
                       after the token is stored in state — ensuring every apply uses
                       a freshly-signed token that was reviewed before clicking Apply. */}
                   <div className="flex items-center justify-between gap-2">
-                    {selectedSupplierIds.size === 0 && replayPreview.summary.safeSuppliers > 0 && (
+                    {selectedSupplierIds.size === 0 && (
                       <span className="text-xs text-amber-600">
-                        Select at least one safe supplier above to enable Prepare.
+                        Select at least one supplier above to enable Prepare.
                       </span>
                     )}
+                    {selectedSupplierIds.size > 0 && (() => {
+                      const forceableSelected = replayPreview.supplierRows.filter(
+                        (s) => !s.safeToRepair && s.reasons.length === 1 && s.reasons[0] === "TIMELINE_QUANTITY_MISMATCH" && selectedSupplierIds.has(s.supplierId)
+                      );
+                      return forceableSelected.length > 0 ? (
+                        <span className="text-xs text-amber-600">
+                          ⚠ {forceableSelected.length} quantity-mismatch supplier(s) will be force-applied — rates are computed from an incomplete timeline.
+                        </span>
+                      ) : null;
+                    })()}
                     <div className="ml-auto">
                       <Button
                         size="sm"
@@ -2058,18 +2097,29 @@ export default function RawStockRecalculate() {
                           replayApplyMutation.isPending ||
                           selectedSupplierIds.size === 0
                         }
-                        onClick={() =>
+                        onClick={() => {
+                          const allSelected = Array.from(selectedSupplierIds);
+                          const safeSelected = allSelected.filter((id) =>
+                            replayPreview.supplierRows.some((s) => s.supplierId === id && s.safeToRepair)
+                          );
+                          const forceSelected = allSelected.filter((id) =>
+                            replayPreview.supplierRows.some(
+                              (s) => s.supplierId === id && !s.safeToRepair &&
+                                     s.reasons.length === 1 && s.reasons[0] === "TIMELINE_QUANTITY_MISMATCH"
+                            )
+                          );
                           wrapAdminAction(
                             () => {
                               replayPrepareMutation.mutate({
-                                supplierIds: Array.from(selectedSupplierIds),
+                                supplierIds: safeSelected,
+                                forceSupplierIds: forceSelected,
                                 includeCompletedBatches,
                                 includeFinalizedBales,
                               });
                             },
                             `Prepare historical cost replay for ${selectedSupplierIds.size} selected supplier(s) — a signed review token will be issued before any data is written.`
-                          )
-                        }
+                          );
+                        }}
                         className="gap-2 bg-emerald-600 hover:bg-emerald-700 text-white"
                       >
                         <ShieldCheck className="h-3.5 w-3.5" />
@@ -2082,7 +2132,9 @@ export default function RawStockRecalculate() {
                 </div>
               )}
 
-              {replayPreview.summary.safeSuppliers === 0 && replayPreview.supplierRows.length > 0 && (
+              {replayPreview.summary.safeSuppliers === 0 && !replayPreview.supplierRows.some(
+                (s) => !s.safeToRepair && s.reasons.length === 1 && s.reasons[0] === "TIMELINE_QUANTITY_MISMATCH"
+              ) && replayPreview.supplierRows.length > 0 && (
                 <div className="text-sm text-muted-foreground py-8 text-center border rounded-md bg-card">
                   No suppliers are safe to repair automatically.
                   {replayPreview.summary.manualReviewSuppliers > 0 &&
