@@ -259,10 +259,22 @@ export function registerContainerCrudRoutes(app: Express) {
         items: allLineItems[index],
       }));
 
+      // Fetch offload ID so the frontend can link to the offload detail page
+      let offloadId: number | null = null;
+      if (container.status === "OFFLOADED") {
+        const [offloadRow] = await db
+          .select({ id: containerOffloads.id })
+          .from(containerOffloads)
+          .where(eq(containerOffloads.containerId, containerId))
+          .limit(1);
+        offloadId = offloadRow?.id ?? null;
+      }
+
       res.json({
         container,
         pos: posWithItems,
         charges,
+        offloadId,
       });
     } catch (error: any) {
       res.status(500).json({ message: error.message });

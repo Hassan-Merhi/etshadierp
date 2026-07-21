@@ -39,6 +39,7 @@ import {
   Ship,
   ChevronDown,
   RefreshCw,
+  ExternalLink,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -1082,6 +1083,18 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
           </div>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
+          {/* View Offload button — only shown on offloaded containers */}
+          {container.status === "OFFLOADED" && containerData?.offloadId && (
+            <Button
+              variant="outline"
+              className="gap-2"
+              onClick={() => setLocation(`/offloads/${containerData.offloadId}`)}
+              data-testid="button-view-offload"
+            >
+              <ExternalLink className="w-4 h-4" />
+              View Offload
+            </Button>
+          )}
           {/* Actions dropdown */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
