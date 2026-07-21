@@ -32,14 +32,6 @@ export function TabTruckLocation() {
   const noTruck = allContainers.filter((r) => !(r.numberPlate ?? "").trim());
   const shops = [...new Set(withTruck.map((r) => r.shopName ?? r.companyName ?? "Unknown"))].sort();
 
-  const companyGroups: { id: number; name: string; rows: EnrichedContainerApi[] }[] = [];
-  for (const r of withTruck) {
-    const existing = companyGroups.find((g) => g.id === r.companyId);
-    if (existing) existing.rows.push(r);
-    else companyGroups.push({ id: r.companyId, name: r.companyName, rows: [r] });
-  }
-  companyGroups.sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }));
-
   async function sendToWhatsApp() {
     if (!printRef.current) return;
     setWaSending(true);
@@ -193,18 +185,14 @@ export function TabTruckLocation() {
         <div className="py-10 text-center text-muted-foreground text-sm">No active containers found.</div>
       )}
 
-      {(companyMode === "all" ? companyGroups : [{ id: 0, name: "", rows: withTruck }]).map((cg) => {
+      {/* Always group by shop name across all companies — same merge logic as the WhatsApp print template */}
+      {[{ id: 0, rows: withTruck }].map((cg) => {
         const cgShops = [...new Set(cg.rows.map((r) => r.shopName ?? r.companyName ?? "Unknown"))].sort((a, b) =>
           a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" })
         );
         return (
           <div key={cg.id} className="space-y-1">
-            {companyMode === "all" && (
-              <div className="px-3 py-1.5 rounded-t-md bg-muted/60 border border-b-0 text-xs font-bold uppercase tracking-widest text-muted-foreground">
-                {cg.name} — {cg.rows.length} on the road
-              </div>
-            )}
-            <div className={cn("rounded-md border overflow-hidden", companyMode === "all" && "rounded-t-none")}>
+            <div className="rounded-md border overflow-hidden">
               <table className="w-full text-xs whitespace-nowrap border-collapse">
                 <thead>
                   <tr className="bg-yellow-400 text-yellow-950 font-bold border-b-2 border-yellow-600">
