@@ -2,9 +2,9 @@ import { queryClient } from "./queryClient";
 
 const ENDPOINT = "/api/factory/daybook";
 const ROUTES = new Set(["/factory/daybook", "/properties/daybook"]);
-const DEFAULT_LIMIT = 100;
-const MAX_ACTION_LIMIT = 250;
-const ALLOWED_LIMITS = [50, 100, 250];
+const DEFAULT_LIMIT = 9999;   // load everything in one request — no pagination UI
+const MAX_ACTION_LIMIT = 9999;
+const ALLOWED_LIMITS = [9999];
 
 export interface PaginatedDaybookEntry {
   id: number;
@@ -203,6 +203,9 @@ if (typeof window !== "undefined" && !window.__erpDaybookPaginationInstalled) {
 
   function renderControls(): void {
     const root = ensureControls();
+    // Pagination UI is intentionally hidden — all data loads in a single request.
+    root.style.display = "none";
+    return;
     if (!activeMeta || !ROUTES.has(window.location.pathname) || hasDeepLink()) {
       root.style.display = "none";
       return;
