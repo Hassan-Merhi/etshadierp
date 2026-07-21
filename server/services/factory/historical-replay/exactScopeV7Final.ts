@@ -16,7 +16,9 @@ import { previewHistoricalCostReplayWithExecutor } from "./securePreview";
 
 function safetyError(message: string, details?: unknown): Error & { code: string; details?: unknown } {
   return Object.assign(new Error(message), {
-    code: "HISTORICAL_REPLAY_SAFETY_GATE_FAILED",
+    // The existing protected route already maps this code to HTTP 409. Reusing it
+    // keeps all V7 fail-closed conditions out of the generic 500 path.
+    code: "HISTORICAL_REPLAY_SCOPE_VIOLATION",
     details,
   });
 }
