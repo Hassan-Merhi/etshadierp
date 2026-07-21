@@ -1837,6 +1837,13 @@ export function registerAuthRoutes(app: Express) {
     }
   });
   // Set current company in session
+  // Lightweight read — returns the company currently stored in the session.
+  // No DB query; used by the frontend to skip the set-company POST when the
+  // session already holds the correct company.
+  app.get("/api/auth/session-company", requireAuth, (req, res) => {
+    res.json({ companyId: (req.session as any).currentCompanyId ?? null });
+  });
+
   app.post("/api/auth/set-company", requireAuth, async (req, res) => {
     try {
       const { companyId } = req.body;

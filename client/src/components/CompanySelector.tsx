@@ -72,7 +72,9 @@ export function CompanySelector() {
 
     try {
       await apiRequest("POST", "/api/auth/set-company", { companyId: company.id });
-      selectCompany(company);
+      // Write localStorage before reload so the context initialises with the
+      // right company on the next page load without an extra set-company POST.
+      localStorage.setItem("selectedCompanyId", company.id.toString());
       window.location.reload();
     } catch (error: any) {
       toast({

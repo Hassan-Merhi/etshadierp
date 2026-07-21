@@ -88,13 +88,17 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
     if (lastSyncedCompanyId.current === company.id && selectedCompany?.id === company.id) return;
 
     setIsSyncingCompany(true);
+
+    // Write localStorage immediately so a page reload that follows will pick
+    // up the right company before the async POST resolves.
+    localStorage.setItem("selectedCompanyId", company.id.toString());
+
     const ok = await switchCompanyOnServer(company.id);
 
     if (ok) {
       clearActivityCache();
       lastSyncedCompanyId.current = company.id;
       setSelectedCompany(company);
-      localStorage.setItem("selectedCompanyId", company.id.toString());
       invalidateCompanyQueries();
       prefetchReferenceData(company.id);
     }
@@ -119,27 +123,38 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
     initialSyncStarted.current = true;
     setIsSyncingCompany(true);
 
-    // Do not expose a selected company to company-scoped screens until the
-    // server session confirms the same company. This prevents an initial
-    // request from running with no company and receiving cross-company data.
-    switchCompanyOnServer(companyToSelect.id)
-      .then((ok) => {
+    const target = companyToSelect;
+
+    // Fast path: if the server session already holds the target company we can
+    // skip the set-company POST entirely and unblock the UI immediately.
+    // Slow path (session differs or GET fails): fall back to the full POST.
+    fetch("/api/auth/session-company", { credentials: "include" })
+      .then((r) => (r.ok ? r.json() : Promise.resolve({ companyId: null })))
+      .catch(() => ({ companyId: null }))
+      .then(async ({ companyId: sessionCompanyId }) => {
+        if (sessionCompanyId === target.id) {
+          // Session is already correct — no write needed.
+          clearActivityCache();
+          lastSyncedCompanyId.current = target.id;
+          setSelectedCompany(target);
+          localStorage.setItem("selectedCompanyId", target.id.toString());
+          prefetchReferenceData(target.id);
+          queryClient.invalidateQueries({ queryKey: ["/api/audit-log"] });
+          return;
+        }
+
+        // Session has a different (or missing) company — must POST to sync.
+        const ok = await switchCompanyOnServer(target.id);
         if (!ok) {
-          // Keep the attempt latched so a failed request cannot create an
-          // immediate render/retry loop. The user can retry by selecting a
-          // company explicitly from the company switcher.
           console.error("[Company] Failed to synchronize the initial company selection.");
           return;
         }
 
         clearActivityCache();
-        lastSyncedCompanyId.current = companyToSelect!.id;
-        setSelectedCompany(companyToSelect!);
-        localStorage.setItem("selectedCompanyId", companyToSelect!.id.toString());
-        prefetchReferenceData(companyToSelect!.id);
-
-        // Only reset the activity query here. A broad initial invalidation can
-        // reset unrelated in-flight pages and cause blank-screen flashes.
+        lastSyncedCompanyId.current = target.id;
+        setSelectedCompany(target);
+        localStorage.setItem("selectedCompanyId", target.id.toString());
+        prefetchReferenceData(target.id);
         queryClient.invalidateQueries({ queryKey: ["/api/audit-log"] });
       })
       .finally(() => {
