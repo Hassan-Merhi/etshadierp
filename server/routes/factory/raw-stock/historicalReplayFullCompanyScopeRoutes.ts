@@ -59,6 +59,7 @@ export function registerHistoricalReplayFullCompanyScopeRoutes(app: Express): vo
             safetyGateDetails: impact?.safetyGateDetails ?? null,
             blockedBatches: preview.blockedBatches ?? [],
             unclassifiedAdjustmentRows: preview.unclassifiedAdjustmentRows ?? [],
+            missingSupplierTimelineRows: preview.missingSupplierTimelineRows ?? [],
           });
         }
 
@@ -104,8 +105,6 @@ export function registerHistoricalReplayFullCompanyScopeRoutes(app: Express): vo
           });
         };
 
-        // One atomic historical migration. Completed batch source/header corrections
-        // are required; finalized/sold bales and historical COGS remain excluded.
         req.body.supplierIds = allSafeSupplierIds;
         req.body.forceSupplierIds = [];
         req.body.includeCompletedBatches = true;
