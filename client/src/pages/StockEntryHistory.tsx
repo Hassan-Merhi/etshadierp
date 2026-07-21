@@ -252,10 +252,10 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
   // Detailed mode fetches the full response so the flat bale list is populated.
   const useLite = viewMode === "condensed";
 
-  const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(100);
+  const page = 1;
+  const pageSize = 9999;
 
-  // Reset to page 1 whenever any filter changes (but not on page/pageSize changes themselves).
+  // (no pagination state — all records load in a single request)
   const filtersKey = useMemo(
     () =>
       [
@@ -272,9 +272,7 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
       ].join("|"),
     [fromActive, fromDate, toActive, toDate, workerIdFilter, productIdFilter, locationIdFilter, categoryFilter, statusFilter, debouncedSearch, includeUnassigned, useLite]
   );
-  useEffect(() => {
-    setPage(1);
-  }, [filtersKey]);
+  // (page/pageSize reset removed — no pagination)
 
   const params = new URLSearchParams();
   if (fromActive) params.set("startDate", fromDate);
@@ -305,12 +303,7 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
   });
   const groups: GroupRow[] = pagedGroups?.items ?? [];
 
-  // If the current page becomes invalid after filters narrow the result set, move to the last valid page.
-  useEffect(() => {
-    const tp = pagedGroups?.totalPages;
-    if (typeof tp === "number" && tp > 0 && page > tp) setPage(tp);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pagedGroups?.totalPages]);
+  // (page validity effect removed — no pagination)
 
   const { data: workers = [] } = useQuery<any[]>({ queryKey: ["/api/factory/workers"], staleTime: 60_000, refetchOnWindowFocus: false });
   const { data: products = [] } = useQuery<any[]>({ queryKey: ["/api/factory/bale-products"] });
@@ -545,8 +538,6 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
     setStatusFilter("all");
     setSearch("");
     setIncludeUnassigned(true);
-    setPage(1);
-    setPageSize(100);
   }
 
   function fmtTime(iso: string | null) {
@@ -1236,55 +1227,6 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
         </div>
       </div>
 
-      {/* ── Pagination controls ── */}
-      {(pagedGroups?.total ?? 0) > 0 && (
-        <div className="flex items-center gap-3 flex-wrap" data-testid="pagination-controls">
-          <span className="text-xs text-muted-foreground tabular-nums">
-            Showing {((page - 1) * pageSize + 1).toLocaleString()}–{Math.min(page * pageSize, pagedGroups!.total).toLocaleString()} of {pagedGroups!.total.toLocaleString()}
-          </span>
-          <span className="text-xs text-muted-foreground/40">·</span>
-          <span className="text-xs text-muted-foreground tabular-nums">Page {page} of {pagedGroups!.totalPages}</span>
-          <div className="flex items-center gap-1.5 ml-auto">
-            <Select
-              value={String(pageSize)}
-              onValueChange={(v) => {
-                setPageSize(Number(v));
-                setPage(1);
-              }}
-            >
-              <SelectTrigger className="w-[72px] h-7 text-xs" data-testid="select-page-size">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="50">50</SelectItem>
-                <SelectItem value="100">100</SelectItem>
-                <SelectItem value="250">250</SelectItem>
-              </SelectContent>
-            </Select>
-            <span className="text-xs text-muted-foreground/60">/ page</span>
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-7 px-2.5 text-xs"
-              disabled={!pagedGroups?.hasPreviousPage}
-              onClick={() => setPage((p) => p - 1)}
-              data-testid="button-prev-page"
-            >
-              Previous
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-7 px-2.5 text-xs"
-              disabled={!pagedGroups?.hasNextPage}
-              onClick={() => setPage((p) => p + 1)}
-              data-testid="button-next-page"
-            >
-              Next
-            </Button>
-          </div>
-        </div>
-      )}
 
       {/* ── CONDENSED VIEW: grouped by worker ── */}
       {viewMode === "condensed" && (
