@@ -4572,6 +4572,13 @@ END $$`,
     `ALTER TABLE factory_container_other_charges ADD COLUMN IF NOT EXISTS fx_rate_confirmed BOOLEAN NOT NULL DEFAULT false`,
     `ALTER TABLE factory_container_other_charges ADD COLUMN IF NOT EXISTS fx_rate_date DATE`,
 
+    // ── Multi-currency base amounts on voucher_entries (never had a standalone migration) ──
+    // base_debit_amount / base_credit_amount store the historical USD-base value after
+    // multi-currency backfill.  The net-profit and bank-revaluation routes COALESCE these
+    // with the legacy debit_amount / credit_amount columns so they must exist in production.
+    `ALTER TABLE voucher_entries ADD COLUMN IF NOT EXISTS base_debit_amount NUMERIC(20,6)`,
+    `ALTER TABLE voucher_entries ADD COLUMN IF NOT EXISTS base_credit_amount NUMERIC(20,6)`,
+
     // -- fx_rate_to_usd / fx_rate_confirmed on offload charges and commissions (July 2026) --
     // factory_offload_additional_charges was created with fx_rate_to_usd in its CREATE TABLE body,
     // but IF NOT EXISTS means existing production tables that predate the column never got it.

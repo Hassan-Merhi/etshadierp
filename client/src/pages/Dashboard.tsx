@@ -499,13 +499,8 @@ export default function Dashboard() {
   );
   const netCashPosition = totalAvailable - totalPayable;
 
-  if (isError) {
-    return (
-      <div className="space-y-6">
-        <div className="text-destructive">Failed to load dashboard data. Please try again.</div>
-      </div>
-    );
-  }
+  // isError from net-profit: show the rest of the dashboard with an inline warning
+  // rather than a blank error screen.  Other queries are unaffected.
 
   const importCycleBalance = importCycleData?.netImportCycleBalance ?? null;
   const isImportCycleBalanced = importCycleBalance !== null && Math.abs(importCycleBalance) < 1;
@@ -518,6 +513,14 @@ export default function Dashboard() {
         subtitle={isFactoryMode ? "Today's factory floor overview" : "Business performance at a glance"}
         showHomeButton={false}
       />
+
+      {/* ── Net-profit error banner (non-fatal) ── */}
+      {isError && (
+        <div className="flex items-center gap-2 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+          <span className="font-medium">⚠</span>
+          <span>Some financial data could not be loaded. Figures may be incomplete — please refresh or contact support if the issue persists.</span>
+        </div>
+      )}
 
       {/* ── Greeting banner ── */}
       <div className="flex flex-wrap items-center justify-between gap-2 -mt-2 px-0.5">

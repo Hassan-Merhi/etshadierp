@@ -704,7 +704,11 @@ export function registerStatsNetProfitRoutes(app: Express) {
       // Company is the TENANT paying rent to landlords.
       // paid > expected → we overpaid → prepaid rent asset → forUs
       // expected > paid → we still owe → rent payable → onUs
-      {
+      //
+      // Wrapped in try-catch: if the property tables are missing schema columns
+      // (e.g. `currency` not yet in prod), the dashboard still loads — rent data
+      // is simply omitted rather than crashing the whole response.
+      try {
         const activeContracts = await db
           .select({ id: propertyContracts.id, currency: propertyContracts.currency })
           .from(propertyContracts)
@@ -772,6 +776,9 @@ export function registerStatsNetProfitRoutes(app: Express) {
             onUsAccounts.push({ name: "Rent Payable", code: "RENT_PAYABLE", value: val, category: "Rent Payable" });
           }
         }
+      } catch (rentalErr: any) {
+        console.warn("[/api/stats/net-profit] Rental section skipped (schema or data error):", rentalErr.message);
+        // Non-fatal: dashboard continues without rent figures
       }
 
       // Build breakdowns from category totals (with rounding)
