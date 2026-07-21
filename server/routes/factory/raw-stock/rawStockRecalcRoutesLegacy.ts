@@ -1009,26 +1009,21 @@ export function registerRawStockRecalcRoutes(app: Express) {
           const dryRun = await computeApplyAllDryRun(companyId, { includeHistoricalContainers: wantsHistorical });
 
           // DEFECT 12 FIX: Guard against applying to SUPPLIER_LOCKED_RATE sources via
-          // apply-all-safe.  These sources must be corrected via Historical Replay so the
-          // timeline-based expected rate is used (not the container canonical rate).
+          // apply-all-safe. Filter those containers OUT of the safe set rather than
+          // blocking the entire operation — the remaining containers can still be fixed.
           if (dryRun.safeContainerIds.length > 0) {
-            const { rows: supplierLinkedSources } = await pool.query<{ id: number }>(
-              `SELECT mbs.id
+            const { rows: supplierLinkedRows } = await pool.query<{ container_id: number }>(
+              `SELECT DISTINCT mbs.container_id
                FROM factory_mix_batch_sources mbs
                JOIN factory_mix_batches mb ON mb.id = mbs.mix_batch_id
                WHERE mbs.container_id = ANY($1)
                  AND mb.company_id = $2
-                 AND mbs.supplier_id IS NOT NULL AND mbs.source_batch_id IS NULL
-               LIMIT 1`,
+                 AND mbs.supplier_id IS NOT NULL AND mbs.source_batch_id IS NULL`,
               [dryRun.safeContainerIds, companyId]
             );
-            if (supplierLinkedSources.length > 0) {
-              return res.status(400).json({
-                code: "SUPPLIER_LOCKED_RATE_SOURCES_PRESENT",
-                message:
-                  "Some containers have SUPPLIER_LOCKED_RATE (SUPPLIER_FIFO) sources. " +
-                  "These must be fixed via Historical Cost Replay, not apply-all-safe.",
-              });
+            if (supplierLinkedRows.length > 0) {
+              const excludedIds = new Set(supplierLinkedRows.map((r) => r.container_id));
+              dryRun.safeContainerIds = dryRun.safeContainerIds.filter((id) => !excludedIds.has(id));
             }
           }
           if (dryRun.safeContainerIds.length === 0) {
