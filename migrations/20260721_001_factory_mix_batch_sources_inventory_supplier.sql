@@ -116,6 +116,7 @@ AS $$
 DECLARE
   resolved_supplier_id INTEGER;
   source_company_id INTEGER;
+  container_supplier_id INTEGER;
 BEGIN
   SELECT company_id
     INTO source_company_id
@@ -151,13 +152,27 @@ BEGIN
     resolved_supplier_id := NEW.supplier_id;
   END IF;
 
-  IF resolved_supplier_id IS NULL AND NEW.container_id IS NOT NULL THEN
+  IF NEW.container_id IS NOT NULL THEN
     SELECT supplier_id
-      INTO resolved_supplier_id
+      INTO container_supplier_id
       FROM factory_containers
      WHERE id = NEW.container_id
        AND company_id = source_company_id
        AND deleted_at IS NULL;
+
+    IF container_supplier_id IS NULL THEN
+      RAISE EXCEPTION USING
+        ERRCODE = '23514',
+        MESSAGE = 'CONTAINER_INVENTORY_SUPPLIER_UNRESOLVED: source container is missing, belongs to another company, or has no supplier';
+    END IF;
+
+    IF resolved_supplier_id IS NULL THEN
+      resolved_supplier_id := container_supplier_id;
+    ELSIF resolved_supplier_id <> container_supplier_id THEN
+      RAISE EXCEPTION USING
+        ERRCODE = '23514',
+        MESSAGE = 'CONTAINER_INVENTORY_SUPPLIER_CONFLICT: source owner does not match the container supplier';
+    END IF;
   END IF;
 
   IF resolved_supplier_id IS NULL THEN
