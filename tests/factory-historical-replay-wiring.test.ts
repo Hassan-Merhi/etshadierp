@@ -24,12 +24,16 @@ describe("Historical Replay final wiring", () => {
     );
   });
 
-  it("registers fail-closed guard and exact handlers before legacy routes", () => {
+  it("registers full-company scope, safety guard and exact handlers before legacy routes", () => {
     const routes = read("server/routes/factory/raw-stock/rawStockRecalcRoutes.ts");
+    const fullCompany = routes.indexOf(
+      "registerHistoricalReplayFullCompanyScopeRoutes(app)"
+    );
     const guard = routes.indexOf("registerHistoricalReplayPhase6GuardRoutes(app)");
     const exact = routes.indexOf("registerHistoricalReplayRoutesV4(app)");
     const legacy = routes.indexOf("registerLegacyRawStockRecalcRoutes(app)");
-    expect(guard).toBeGreaterThan(-1);
+    expect(fullCompany).toBeGreaterThan(-1);
+    expect(fullCompany).toBeLessThan(guard);
     expect(guard).toBeLessThan(exact);
     expect(exact).toBeLessThan(legacy);
   });
