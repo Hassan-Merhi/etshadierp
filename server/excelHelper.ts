@@ -88,8 +88,13 @@ export async function writeWorkbook(workbook: ExcelJS.Workbook): Promise<Buffer>
 }
 
 export async function writeWorkbookToStream(workbook: ExcelJS.Workbook, stream: Writable): Promise<void> {
+  // NOTE: ExcelJS 3.x wb.xlsx.write(stream) is broken — it throws "ea.results is not a Promise".
+  // Buffer the workbook and pipe it manually instead.
   await withHeavyExportSlot("excel-stream", async () => {
-    await workbook.xlsx.write(stream);
+    const buf = Buffer.from(await workbook.xlsx.writeBuffer());
+    await new Promise<void>((resolve, reject) => {
+      stream.write(buf, (err) => (err ? reject(err) : resolve()));
+    });
   });
 }
 
@@ -98,32 +103,21 @@ export async function writeWorkbookToResponse(
   res: ServerResponse,
   filename: string
 ): Promise<void> {
+  // NOTE: ExcelJS 3.x wb.xlsx.write(res) is broken — it throws "ea.results is not a Promise"
+  // and produces 0-byte files. Buffer the workbook and send with res.end() instead.
   const safeFilename = filename.replace(/[\r\n"]/g, "_");
   res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
   res.setHeader("Content-Disposition", `attachment; filename="${safeFilename}"`);
   res.setHeader("Cache-Control", "no-store, max-age=0");
   res.setHeader("Pragma", "no-cache");
-  res.setHeader("X-Accel-Buffering", "no");
-
-  let completed = false;
-  let disconnected = false;
-  const onClose = () => {
-    if (!completed) disconnected = true;
-  };
-  res.once("close", onClose);
 
   try {
-    await withHeavyExportSlot("excel-http", async () => {
-      if (disconnected || res.destroyed) throw new Error("Excel download client disconnected");
-      await workbook.xlsx.write(res);
-      if (disconnected || res.destroyed) throw new Error("Excel download client disconnected");
-    });
-    completed = true;
-    if (!res.writableEnded) res.end();
+    const buf = await withHeavyExportSlot("excel-http", async () =>
+      Buffer.from(await workbook.xlsx.writeBuffer())
+    );
+    if (!res.destroyed && !res.writableEnded) res.end(buf);
   } catch (error) {
     if (!res.destroyed && !res.writableEnded) res.destroy(error as Error);
     throw error;
-  } finally {
-    res.off("close", onClose);
   }
 }

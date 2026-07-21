@@ -646,7 +646,7 @@ export function registerSupplierProfitCheckRoutes(app: Express, requireAuth: any
 
         res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
         res.setHeader("Content-Disposition", `attachment; filename="proforma-${proforma.reference}.xlsx"`);
-        const buffer = await wb.xlsx.writeBuffer();
+        const buffer = Buffer.from(await wb.xlsx.writeBuffer());
         res.send(buffer);
       } catch (err: any) {
         console.error("[export-supplier]", err.message);
@@ -869,7 +869,7 @@ export function registerSupplierProfitCheckRoutes(app: Express, requireAuth: any
 
       res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
       res.setHeader("Content-Disposition", `attachment; filename="profit-analysis-${proformaRef || "export"}.xlsx"`);
-      const buffer = await wb.xlsx.writeBuffer();
+      const buffer = Buffer.from(await wb.xlsx.writeBuffer());
       res.send(buffer);
     } catch (err: any) {
       console.error("[export-internal]", err.message);

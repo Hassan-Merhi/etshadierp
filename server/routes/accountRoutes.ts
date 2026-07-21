@@ -2315,7 +2315,7 @@ export function registerAccountRoutes(app: Express) {
       cbRow.getCell(6).alignment = { horizontal: "right" };
 
       const safeAccName = accountName.replace(/[^\w\s.()\-]/g, "_").replace(/\s+/g, "_");
-      const buf = await workbook.xlsx.writeBuffer();
+      const buf = Buffer.from(await workbook.xlsx.writeBuffer());
       res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
       res.setHeader("Content-Disposition", `attachment; filename="${safeAccName}_Statement.xlsx"`);
       res.end(buf);

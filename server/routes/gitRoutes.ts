@@ -874,7 +874,7 @@ export function registerGitRoutes(app: Express) {
         const today = new Date().toISOString().slice(0, 10).replace(/-/g, "");
         res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
         res.setHeader("Content-Disposition", `attachment; filename="eta_update_${today}.xlsx"`);
-        const buf = await wb.xlsx.writeBuffer();
+        const buf = Buffer.from(await wb.xlsx.writeBuffer());
         res.send(buf);
       } catch (err: any) {
         console.error("[ETA template]", err);
@@ -1020,7 +1020,7 @@ export function registerGitRoutes(app: Express) {
 
         res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
         res.setHeader("Content-Disposition", 'attachment; filename="container_import_template.xlsx"');
-        const buf = await wb.xlsx.writeBuffer();
+        const buf = Buffer.from(await wb.xlsx.writeBuffer());
         res.send(buf);
       } catch (err: any) {
         console.error("[GIT import template]", err);

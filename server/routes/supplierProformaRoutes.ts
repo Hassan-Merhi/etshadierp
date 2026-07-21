@@ -1745,7 +1745,7 @@ export function registerSupplierProformaRoutes(app: Express, requireAuth: any) {
       const safeRef = (proforma.reference || "proforma").replace(/[^a-zA-Z0-9 \-_]/g, "").trim();
       res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
       res.setHeader("Content-Disposition", `attachment; filename="${safeRef}.xlsx"`);
-      const buf = await wb.xlsx.writeBuffer();
+      const buf = Buffer.from(await wb.xlsx.writeBuffer());
       res.end(buf);
     } catch (error: any) {
       console.error("Proforma export error:", error);

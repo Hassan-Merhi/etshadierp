@@ -523,8 +523,8 @@ export async function buildCompanyWorkbook(
   addSheet(wb, "Employee Txn Detail", data.employeeTxnDetail);
   addSheet(wb, "Location Stock Detail", data.locationStockDetail);
 
-  const buf1 = await wb.xlsx.writeBuffer();
-  outputStream.write(buf1 as Buffer);
+  const buf1 = Buffer.from(await wb.xlsx.writeBuffer());
+  outputStream.write(buf1);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
