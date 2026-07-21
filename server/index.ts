@@ -5790,6 +5790,20 @@ END $mig$`;
 
   warmupDb()
     .then(async () => {
+      // ── Always-running critical index: exchange_rates upsert constraint ───────
+      // This index is required for the exchange_rates upsert to work correctly.
+      // It runs unconditionally (even when RUN_STARTUP_MIGRATIONS=false) so that
+      // production environments that skipped the bulk migration still get it.
+      // CREATE UNIQUE INDEX IF NOT EXISTS is a no-op if the index already exists.
+      try {
+        await pool.query(
+          `CREATE UNIQUE INDEX IF NOT EXISTS exchange_rates_company_date_pair_unique
+           ON exchange_rates (company_id, effective_date, from_currency, to_currency)`
+        );
+      } catch (idxErr: any) {
+        // Non-fatal: upsertExchangeRate has a fallback that works without the index.
+        console.warn("[startup] Could not ensure exchange_rates unique index:", idxErr?.message);
+      }
       if (migrationsEnabled) {
         try {
           await runMigrations();
