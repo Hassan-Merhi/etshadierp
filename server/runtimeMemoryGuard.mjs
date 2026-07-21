@@ -80,6 +80,10 @@ const pathLimits = [
   { test: (path) => path === "/api/factory/monthly-salary-summary", max: 2, name: "factory-monthly-salary-summary" },
   { test: (path) => path === "/api/factory/workers", max: 2, name: "factory-workers" },
   { test: (path) => path === "/api/factory/cash-accounts", max: 2, name: "factory-cash-accounts" },
+  // This route issues several grouped financial queries in parallel. Keep only
+  // one cold-cache calculation active so a dashboard request cannot consume the
+  // entire PostgreSQL pool and starve authorization/session queries.
+  { test: (path) => path === "/api/stats/net-profit", max: 1, name: "stats-net-profit" },
   { test: (path) => path === "/api/ledger-accounts", max: 2, name: "ledger-accounts" },
 ];
 
