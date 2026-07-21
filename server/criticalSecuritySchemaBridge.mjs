@@ -6,7 +6,7 @@ const { Client } = pg;
 const connectionString =
   process.env.DATABASE_URL ||
   (process.env.PGHOST
-    ? `postgresql://${encodeURIComponent(process.env.PGUSER || "")}://${encodeURIComponent(process.env.PGPASSWORD || "")}@${process.env.PGHOST}:${process.env.PGPORT || "5432"}/${process.env.PGDATABASE || ""}`
+    ? `postgresql://${encodeURIComponent(process.env.PGUSER || "")}:${encodeURIComponent(process.env.PGPASSWORD || "")}@${process.env.PGHOST}:${process.env.PGPORT || "5432"}/${process.env.PGDATABASE || ""}`
     : "");
 
 function log(level, message, extra = {}) {
@@ -107,10 +107,10 @@ async function ensureCriticalSecuritySchema() {
         SELECT
           ucr.user_id,
           ucr.company_id,
-          permission_name,
+          permissions.permission_name,
           ucr.user_id
         FROM user_company_roles ucr
-        CROSS JOIN unnest($1::text[]) AS permission_name
+        CROSS JOIN unnest($1::text[]) AS permissions(permission_name)
         WHERE ucr.role IN ('Admin', 'Developer')
         ON CONFLICT (user_id, company_id, permission) DO NOTHING
       `,
