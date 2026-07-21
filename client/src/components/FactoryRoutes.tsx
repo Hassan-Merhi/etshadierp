@@ -55,14 +55,14 @@ export function FactoryRoutes({ user, myAccess, factoryDefaultPage }: FactoryRou
       <Route path="/factory/daybook" component={FactoryDaybook} />
       <Route path="/factory/transporters" component={FactoryTransporters} />
       <Route path="/factory/finance">
-        <Redirect to="/factory/workers" />
+        <Redirect replace to="/factory/workers" />
       </Route>
       <Route path="/factory/suppliers">
-        <Redirect to="/factory/parties?section=suppliers" />
+        <Redirect replace to="/factory/parties?section=suppliers" />
       </Route>
       <Route path="/factory/containers/new" component={FactoryContainerCreate} />
       <Route path="/factory/containers">
-        <Redirect to="/factory/containers-hub?section=containers" />
+        <Redirect replace to="/factory/containers-hub?section=containers" />
       </Route>
       <Route path="/factory/bale-products" component={BaleProducts} />
       <Route
@@ -73,10 +73,10 @@ export function FactoryRoutes({ user, myAccess, factoryDefaultPage }: FactoryRou
       <Route path="/factory/raw-stock" component={ProductionRawStock} />
       <Route path="/factory/raw-materials" component={FactoryRawMaterialsHub} />
       <Route path="/factory/pressing">
-        <Redirect to="/factory/stock-entry" />
+        <Redirect replace to="/factory/stock-entry" />
       </Route>
       <Route path="/factory/finalize">
-        <Redirect to="/factory/stock-entry" />
+        <Redirect replace to="/factory/stock-entry" />
       </Route>
       <Route path="/factory/stock-entry" component={BaleStockEntry} />
       <Route path="/factory/bales-history" component={BalesHistory} />
@@ -98,7 +98,7 @@ export function FactoryRoutes({ user, myAccess, factoryDefaultPage }: FactoryRou
       />
       <Route path="/factory/containers-hub" component={FactoryContainersHub} />
       <Route path="/factory/stock-otw">
-        <Redirect to="/factory/containers-hub" />
+        <Redirect replace to="/factory/containers-hub" />
       </Route>
       <Route path="/factory/stock-bale-list" component={FactoryStockBaleList} />
       <Route path="/factory/stock-query/:id" component={FactoryStockItemDetail} />
@@ -112,7 +112,7 @@ export function FactoryRoutes({ user, myAccess, factoryDefaultPage }: FactoryRou
       <Route path="/factory/payroll" component={Payroll} />
       <Route path="/factory/analytics" component={Analytics} />
       <Route path="/factory/production-summary">
-        <Redirect to="/factory/intelligence/production-hub?section=production-summary" />
+        <Redirect replace to="/factory/intelligence/production-hub?section=production-summary" />
       </Route>
       <Route path="/factory/sales/new" component={FactoryInvoiceCreate} />
       <Route path="/factory/sales/loading/pending" component={FactoryPendingLoadings} />
@@ -140,27 +140,27 @@ export function FactoryRoutes({ user, myAccess, factoryDefaultPage }: FactoryRou
       <Route path="/factory/parties" component={FactoryPartiesHub} />
       <Route path="/factory/customers/:id" component={FactoryCustomerStatement} />
       <Route path="/factory/customers">
-        <Redirect to="/factory/parties?section=customers" />
+        <Redirect replace to="/factory/parties?section=customers" />
       </Route>
       <Route path="/factory/payroll-hub" component={FactoryPayrollHub} />
       <Route path="/factory/insurance" component={FactoryInsurance} />
       <Route path="/factory/sheets-sacks" component={FactorySheetsAndSacks} />
       <Route path="/factory/employees/:id" component={FactoryEmployeeDetail} />
       <Route path="/factory/employees">
-        <Redirect to="/factory/payroll-hub?section=employees" />
+        <Redirect replace to="/factory/payroll-hub?section=employees" />
       </Route>
       <Route path="/factory/workers/:id" component={FactoryWorkerDetail} />
       <Route path="/factory/workers">
-        <Redirect to="/factory/payroll-hub?section=workers" />
+        <Redirect replace to="/factory/payroll-hub?section=workers" />
       </Route>
       <Route path="/factory/worker-payroll">
-        <Redirect to="/factory/workers?tab=payroll" />
+        <Redirect replace to="/factory/workers?tab=payroll" />
       </Route>
       <Route path="/factory/supplier-report">
-        <Redirect to="/factory/intelligence/supplier-hub?section=report" />
+        <Redirect replace to="/factory/intelligence/supplier-hub?section=report" />
       </Route>
       <Route path="/factory/supplier-statement">
-        <Redirect to="/factory/intelligence/supplier-hub?section=statement" />
+        <Redirect replace to="/factory/intelligence/supplier-hub?section=statement" />
       </Route>
       <Route path="/factory/broker-visual-statement" component={FactoryBrokerVisualStatement} />
       <Route path="/factory/barcode-lookup" component={BarcodeLookup} />
@@ -172,35 +172,35 @@ export function FactoryRoutes({ user, myAccess, factoryDefaultPage }: FactoryRou
       <Route path="/factory/label-banners" component={LabelBannersSettings} />
       <Route path="/factory/bale-relabeling/wipers-re-entry" component={WipersReEntry} />
       <Route path="/factory/users">
-        <Redirect to="/factory/settings" />
+        <Redirect replace to="/factory/settings" />
       </Route>
       <Route path="/factory/ledger-monthly/:accountId" component={LedgerMonthlySummary} />
       <Route path="/factory/ledger-vouchers/:accountId/:year/:month" component={LedgerVouchers} />
       <Route path="/factory/intelligence/dashboard" component={FactoryDashboardIntel} />
       <Route path="/factory/intelligence/kpis" component={FactoryKpis} />
       <Route path="/factory/intelligence/profitability">
-        <Redirect to="/factory/intelligence/financial-hub?section=profitability" />
+        <Redirect replace to="/factory/intelligence/financial-hub?section=profitability" />
       </Route>
       <Route path="/factory/intelligence/alerts" component={FactoryAlerts} />
       <Route path="/factory/intelligence/supplier-hub" component={FactorySupplierHub} />
       <Route path="/factory/intelligence/financial-hub" component={FactoryFinancialHub} />
       <Route path="/factory/intelligence/production-hub" component={FactoryProductionIntelHub} />
       <Route path="/factory/intelligence/supplier-scores">
-        <Redirect to="/factory/intelligence/supplier-hub?section=scores" />
+        <Redirect replace to="/factory/intelligence/supplier-hub?section=scores" />
       </Route>
       <Route path="/factory/intelligence/mix-optimizer">
-        <Redirect to="/factory/intelligence/production-hub?section=mix-optimizer" />
+        <Redirect replace to="/factory/intelligence/production-hub?section=mix-optimizer" />
       </Route>
       <Route path="/factory/intelligence/cashflow">
-        <Redirect to="/factory/intelligence/financial-hub?section=cashflow" />
+        <Redirect replace to="/factory/intelligence/financial-hub?section=cashflow" />
       </Route>
       <Route path="/factory/intelligence/waste">
-        <Redirect to="/factory/intelligence/production-hub?section=waste" />
+        <Redirect replace to="/factory/intelligence/production-hub?section=waste" />
       </Route>
       <Route path="/factory/waste-dispatch" component={WasteDispatchPage} />
       <Route path="/factory/pos" component={FactoryPOS} />
       <Route path="/factory/bale-ledger">
-        {() => <Redirect to="/factory/production-report?tab=ledger" />}
+        {() => <Redirect replace to="/factory/production-report?tab=ledger" />}
       </Route>
       <Route path="/factory/intelligence/settings" component={FactoryIntelSettings} />
       {(user?.role === "Admin" || user?.role === "Developer" || myAccess?.fullAccess) && (
@@ -222,10 +222,10 @@ export function FactoryRoutes({ user, myAccess, factoryDefaultPage }: FactoryRou
       {isAdminOrDev && <Route path="/factory/company-data-reset" component={CompanyDataReset} />}
       <Route path="/factory/net-position-details" component={FactoryNetPositionDetails} />
       <Route path="/factory/net-profit-analytics">
-        <Redirect to="/factory/intelligence/financial-hub?section=net-profit" />
+        <Redirect replace to="/factory/intelligence/financial-hub?section=net-profit" />
       </Route>
       <Route path="/factory/net-position">
-        <Redirect to="/factory/intelligence/financial-hub?section=net-position" />
+        <Redirect replace to="/factory/intelligence/financial-hub?section=net-position" />
       </Route>
       <Route path="/factory/financial-snapshot" component={FactoryFinancialSnapshot} />
       <Route path="/factory/production-report">
@@ -241,8 +241,13 @@ export function FactoryRoutes({ user, myAccess, factoryDefaultPage }: FactoryRou
       <Route path="/factory/rental/shops" component={FactoryRentalShops} />
       <Route path="/factory/rental/payments" component={FactoryRentalPayments} />
       {isAdminOrDev && <Route path="/balance-repair" component={BalanceRepair} />}
+      {/* Catch-all: only redirect once myAccess has loaded.
+          While myAccess is undefined the Switch will render null here
+          (no URL change) so the correct gated route has a chance to
+          appear once the access data arrives — preventing the "refresh
+          sends you to production-report" race condition. */}
       <Route>
-        <Redirect to={factoryDefaultPage} />
+        {myAccess !== undefined ? <Redirect replace to={factoryDefaultPage} /> : null}
       </Route>
     </Switch>
   );

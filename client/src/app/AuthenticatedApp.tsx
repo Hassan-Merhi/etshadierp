@@ -139,10 +139,10 @@ export function AuthenticatedApp() {
     // Wait for myAccess before redirecting so restricted users land on their real first page.
     if (myAccessLoading) return <AppLoadingState />;
     if (myAccess === undefined && !myAccessError) return null;
-    return <Redirect to={factoryDefaultPage} />;
+    return <Redirect replace to={factoryDefaultPage} />;
   }
 
-  if (isFactoryRoute && !hasFactoryAccess) return <Redirect to="/" />;
+  if (isFactoryRoute && !hasFactoryAccess) return <Redirect replace to="/" />;
 
   if (
     !isFactoryCompany &&
@@ -152,7 +152,7 @@ export function AuthenticatedApp() {
     currentLocation !== "/my-settings" &&
     currentLocation !== "/intercompany-requests"
   ) {
-    return <Redirect to={factoryDefaultPage} />;
+    return <Redirect replace to={factoryDefaultPage} />;
   }
 
   // ── Route-level access guard ────────────────────────────────────────────────
@@ -164,11 +164,11 @@ export function AuthenticatedApp() {
     factoryDefaultPage,
     currentLocation,
   });
-  if (factoryGuardRedirect) return <Redirect to={factoryGuardRedirect} />;
+  if (factoryGuardRedirect) return <Redirect replace to={factoryGuardRedirect} />;
   // ── End route-level access guard ────────────────────────────────────────────
 
   // Auto-redirect: factory URL but user has switched to an ERP company
-  if (isFactoryRoute && !isFactoryCompany && !myAccessLoading && hasErpAccess) return <Redirect to="/" />;
+  if (isFactoryRoute && !isFactoryCompany && !myAccessLoading && hasErpAccess) return <Redirect replace to="/" />;
 
   const leaveConfirmDialog = (
     <AppLeaveConfirmDialog
