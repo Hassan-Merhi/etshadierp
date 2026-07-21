@@ -33,6 +33,7 @@ interface GateDetails {
   quantityTimelineMismatches: number;
   ambiguousEventOrdering: number;
   incompleteMixedBatchSupplierScopes: number;
+  missingSupplierTimelines: number;
   blockedBatches: number;
   scanCoverageError: boolean;
 }
@@ -64,9 +65,18 @@ interface UnclassifiedAdjustment {
   notes: string | null;
 }
 
+interface MissingSupplierTimeline {
+  supplierId: number;
+  supplierName: string;
+  hasRawStock: boolean;
+  hasAdjustment: boolean;
+  hasOwnedSource: boolean;
+}
+
 interface HistoricalReplayPreview {
   financialImpact?: FinancialImpact;
   unclassifiedAdjustmentRows?: UnclassifiedAdjustment[];
+  missingSupplierTimelineRows?: MissingSupplierTimeline[];
   blockedBatches?: Array<{ batchId: number; batchCode: string; reasons: string[] }>;
 }
 
@@ -176,6 +186,7 @@ export function HistoricalReplaySafetyPanel() {
     ["Quantity mismatches", impact.safetyGateDetails.quantityTimelineMismatches],
     ["Ambiguous ordering", impact.safetyGateDetails.ambiguousEventOrdering],
     ["Incomplete mixed-batch scopes", impact.safetyGateDetails.incompleteMixedBatchSupplierScopes],
+    ["Missing supplier timelines", impact.safetyGateDetails.missingSupplierTimelines],
     ["Blocked batches", impact.safetyGateDetails.blockedBatches],
     ["Scan coverage error", impact.safetyGateDetails.scanCoverageError],
   ];
@@ -238,6 +249,28 @@ export function HistoricalReplaySafetyPanel() {
           );
         })}
       </div>
+
+      {(preview.missingSupplierTimelineRows?.length ?? 0) > 0 && (
+        <div className="rounded-lg border border-red-500/30 bg-red-500/5 p-3">
+          <div className="mb-2 text-sm font-semibold text-red-700 dark:text-red-400">
+            Suppliers with raw-material evidence but no replay timeline
+          </div>
+          <div className="space-y-1 text-xs">
+            {preview.missingSupplierTimelineRows?.map((row) => (
+              <div key={row.supplierId} className="flex flex-wrap justify-between gap-2 rounded border bg-card px-2 py-1.5">
+                <span className="font-medium">{row.supplierName}</span>
+                <span className="text-red-700 dark:text-red-400">
+                  {[
+                    row.hasRawStock ? "raw stock" : null,
+                    row.hasAdjustment ? "adjustment" : null,
+                    row.hasOwnedSource ? "owned source" : null,
+                  ].filter(Boolean).join(", ")}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {(preview.unclassifiedAdjustmentRows?.length ?? 0) > 0 && (
         <div className="space-y-2 rounded-lg border border-amber-500/30 bg-amber-500/5 p-3">
