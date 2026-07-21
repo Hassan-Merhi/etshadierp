@@ -1565,8 +1565,12 @@ export function registerRawStockRecalcRoutes(app: Express) {
         const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
         if (!companyId) return res.status(400).json({ message: "No company selected" });
         const rows = await getRawStockRecalcPreview(companyId);
-        const affected = rows.filter((r) => r.wasPartialReceipt && r.changed && !r.fxUnresolved);
-        const skippedFx  = rows.filter((r) => r.wasPartialReceipt && r.fxUnresolved);
+        // Include partial receipts (received < declared) AND fully-consumed containers
+        // (remaining = 0). Old records may have null totalKg/declaredKg so wasPartialReceipt
+        // can be false even when the container was a short delivery — fullyUsed catches those.
+        const isTarget = (r: any) => r.wasPartialReceipt || r.fullyUsed;
+        const affected = rows.filter((r) => isTarget(r) && r.changed && !r.fxUnresolved);
+        const skippedFx = rows.filter((r) => isTarget(r) && r.fxUnresolved);
         res.json({ affected, skippedFx, totalScanned: rows.length });
       } catch (err: any) {
         console.error("[partial-offload-scan] error:", err);
@@ -1588,7 +1592,8 @@ export function registerRawStockRecalcRoutes(app: Express) {
         if (!confirm) {
           // ── Dry-run: identify containers, build token ──────────────────────
           const rows = await getRawStockRecalcPreview(companyId);
-          const affected = rows.filter((r) => r.wasPartialReceipt && r.changed && !r.fxUnresolved);
+          const isTarget = (r: any) => r.wasPartialReceipt || r.fullyUsed;
+          const affected = rows.filter((r) => isTarget(r) && r.changed && !r.fxUnresolved);
           if (affected.length === 0) {
             return res.json({ dryRun: true, count: 0, confirmationToken: null, affected: [] });
           }
