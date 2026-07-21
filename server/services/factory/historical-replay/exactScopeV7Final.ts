@@ -14,11 +14,10 @@ import {
   expandConnectedSupplierClosure,
 } from "./supplierClosureV7Final";
 import { previewHistoricalCostReplayWithExecutor } from "./securePreview";
+import { loadMissingSupplierTimelineRows } from "./missingSupplierTimelineV7";
 
 function safetyError(message: string, details?: unknown): Error & { code: string; details?: unknown } {
   return Object.assign(new Error(message), {
-    // The existing protected route already maps this code to HTTP 409. Reusing it
-    // keeps all V7 fail-closed conditions out of the generic 500 path.
     code: "HISTORICAL_REPLAY_SCOPE_VIOLATION",
     details,
   });
@@ -109,12 +108,6 @@ export async function buildExactHistoricalReplayScopeV7Final(params: {
   return normalizeReplayWriteScope(internal);
 }
 
-/**
- * Final V7 scope builder. It expands the requested supplier selection to the full
- * connected mixed-batch supplier closure before the legacy exact-scope engine runs.
- * No supplier in a connected mixed batch can be silently left on a known-wrong
- * persisted rate, and no blocked batch can receive a confirmation token.
- */
 export async function buildExactHistoricalReplayScopeInternalV7Final(params: {
   companyId: number;
   selectedSupplierIds: Set<number>;
@@ -127,9 +120,6 @@ export async function buildExactHistoricalReplayScopeInternalV7Final(params: {
     throw safetyError("Historical Replay requires at least one selected supplier.");
   }
 
-  // buildBatchConsumptionEvents always returns the complete source read-model; the
-  // supplier filter controls only emitted timeline events. An empty filter is enough
-  // for closure discovery without doing a partial supplier replay.
   const { sourceInfos } = await buildBatchConsumptionEvents(
     params.executor,
     params.companyId,
@@ -149,6 +139,18 @@ export async function buildExactHistoricalReplayScopeInternalV7Final(params: {
   }
 
   const preview = await previewHistoricalCostReplayWithExecutor(params.executor, params.companyId);
+  const missingSupplierTimelineRows = await loadMissingSupplierTimelineRows(
+    params.executor,
+    params.companyId,
+    preview.supplierRows.map((row) => row.supplierId)
+  );
+  if (missingSupplierTimelineRows.length > 0) {
+    throw safetyError(
+      "Historical Replay found suppliers with raw-material evidence but no replay timeline.",
+      { missingSupplierTimelineRows }
+    );
+  }
+
   if (preview.financialImpact?.allSafetyGatesPassed !== true) {
     throw safetyError(
       "Historical Replay cannot prepare until every company-wide safety gate passes.",
@@ -205,9 +207,8 @@ export async function buildExactHistoricalReplayScopeInternalV7Final(params: {
 
   assertPlannedCostArithmetic(scope);
 
-  // Freeze the final scoped preview into the signed fingerprint input. The low-level
-  // preview is company-wide, while these fields describe the fully-expanded selection.
   scope._fullPreview.summary.incompleteMixedBatchSupplierScopes = 0;
+  scope._fullPreview.summary.missingSupplierTimelines = 0;
   scope._fullPreview.summary.blockedBatches = 0;
 
   return scope;
