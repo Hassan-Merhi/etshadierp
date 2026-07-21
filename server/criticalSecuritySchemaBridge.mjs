@@ -40,56 +40,95 @@ async function ensureCriticalSecuritySchema() {
     connectionTimeoutMillis: 8_000,
   });
 
+  let tableCreated = false;
+  const columnsAdded = [];
+  const indexesCreated = [];
+
   try {
     await client.connect();
     await client.query("BEGIN");
     await client.query("SET LOCAL lock_timeout = '15s'");
     await client.query("SET LOCAL statement_timeout = '60s'");
 
-    await client.query(`
-      CREATE TABLE IF NOT EXISTS user_security_permissions (
-        id serial PRIMARY KEY NOT NULL,
-        user_id varchar NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-        company_id integer NOT NULL,
-        permission text NOT NULL,
-        granted_by varchar REFERENCES users(id) ON DELETE SET NULL,
-        created_at timestamp DEFAULT now() NOT NULL,
-        updated_at timestamp DEFAULT now() NOT NULL
-      )
-    `);
+    const tableLookup = await client.query(
+      `SELECT to_regclass('public.user_security_permissions') AS table_name`
+    );
 
-    // CREATE TABLE IF NOT EXISTS does not repair a partially-created table.
-    // These additions are idempotent and protect deployments with schema drift.
-    await client.query(`ALTER TABLE user_security_permissions ADD COLUMN IF NOT EXISTS id serial`);
-    await client.query(`ALTER TABLE user_security_permissions ADD COLUMN IF NOT EXISTS user_id varchar`);
-    await client.query(`ALTER TABLE user_security_permissions ADD COLUMN IF NOT EXISTS company_id integer`);
-    await client.query(`ALTER TABLE user_security_permissions ADD COLUMN IF NOT EXISTS permission text`);
-    await client.query(`ALTER TABLE user_security_permissions ADD COLUMN IF NOT EXISTS granted_by varchar`);
-    await client.query(`ALTER TABLE user_security_permissions ADD COLUMN IF NOT EXISTS created_at timestamp DEFAULT now()`);
-    await client.query(`ALTER TABLE user_security_permissions ADD COLUMN IF NOT EXISTS updated_at timestamp DEFAULT now()`);
+    if (!tableLookup.rows[0]?.table_name) {
+      await client.query(`
+        CREATE TABLE user_security_permissions (
+          id serial PRIMARY KEY NOT NULL,
+          user_id varchar NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          company_id integer NOT NULL,
+          permission text NOT NULL,
+          granted_by varchar REFERENCES users(id) ON DELETE SET NULL,
+          created_at timestamp DEFAULT now() NOT NULL,
+          updated_at timestamp DEFAULT now() NOT NULL
+        )
+      `);
+      tableCreated = true;
+    } else {
+      const columnResult = await client.query(`
+        SELECT column_name
+        FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = 'user_security_permissions'
+      `);
+      const existingColumns = new Set(columnResult.rows.map((row) => row.column_name));
+      const requiredColumns = [
+        ["id", "serial"],
+        ["user_id", "varchar"],
+        ["company_id", "integer"],
+        ["permission", "text"],
+        ["granted_by", "varchar"],
+        ["created_at", "timestamp DEFAULT now()"],
+        ["updated_at", "timestamp DEFAULT now()"],
+      ];
 
-    await client.query(`
-      DELETE FROM user_security_permissions
-      WHERE user_id IS NULL OR company_id IS NULL OR permission IS NULL
-    `);
+      for (const [columnName, definition] of requiredColumns) {
+        if (existingColumns.has(columnName)) continue;
+        await client.query(
+          `ALTER TABLE user_security_permissions ADD COLUMN ${columnName} ${definition}`
+        );
+        columnsAdded.push(columnName);
+      }
+    }
 
-    await client.query(`
-      DELETE FROM user_security_permissions duplicate
-      USING user_security_permissions canonical
-      WHERE duplicate.id > canonical.id
-        AND duplicate.user_id = canonical.user_id
-        AND duplicate.company_id = canonical.company_id
-        AND duplicate.permission = canonical.permission
+    const indexResult = await client.query(`
+      SELECT indexname
+      FROM pg_indexes
+      WHERE schemaname = 'public'
+        AND tablename = 'user_security_permissions'
     `);
+    const existingIndexes = new Set(indexResult.rows.map((row) => row.indexname));
 
-    await client.query(`
-      CREATE UNIQUE INDEX IF NOT EXISTS user_security_permissions_unique
-      ON user_security_permissions (user_id, company_id, permission)
-    `);
-    await client.query(`
-      CREATE INDEX IF NOT EXISTS user_security_permissions_company_user_idx
-      ON user_security_permissions (company_id, user_id)
-    `);
+    if (!existingIndexes.has("user_security_permissions_unique")) {
+      await client.query(`
+        DELETE FROM user_security_permissions
+        WHERE user_id IS NULL OR company_id IS NULL OR permission IS NULL
+      `);
+      await client.query(`
+        DELETE FROM user_security_permissions duplicate
+        USING user_security_permissions canonical
+        WHERE duplicate.id > canonical.id
+          AND duplicate.user_id = canonical.user_id
+          AND duplicate.company_id = canonical.company_id
+          AND duplicate.permission = canonical.permission
+      `);
+      await client.query(`
+        CREATE UNIQUE INDEX user_security_permissions_unique
+        ON user_security_permissions (user_id, company_id, permission)
+      `);
+      indexesCreated.push("user_security_permissions_unique");
+    }
+
+    if (!existingIndexes.has("user_security_permissions_company_user_idx")) {
+      await client.query(`
+        CREATE INDEX user_security_permissions_company_user_idx
+        ON user_security_permissions (company_id, user_id)
+      `);
+      indexesCreated.push("user_security_permissions_company_user_idx");
+    }
 
     const permissions = [
       "administration.repair",
@@ -127,6 +166,9 @@ async function ensureCriticalSecuritySchema() {
     await client.query("COMMIT");
 
     log("INFO", "Critical security permissions schema verified", {
+      tableCreated,
+      columnsAdded,
+      indexesCreated,
       totalPermissions: verification.rows[0]?.total_permissions ?? 0,
       rawStockRepairPermissions: verification.rows[0]?.raw_stock_repair_permissions ?? 0,
       startupMigrationsEnabled: process.env.RUN_STARTUP_MIGRATIONS !== "false",
