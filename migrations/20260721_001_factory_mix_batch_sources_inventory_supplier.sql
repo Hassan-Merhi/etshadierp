@@ -9,21 +9,34 @@ ALTER TABLE factory_mix_batch_sources
 ALTER TABLE factory_raw_material_adjustments
   ADD COLUMN IF NOT EXISTS valuation_basis VARCHAR(30);
 
--- Backfill inventory ownership without changing pricing ownership.
+-- Backfill inventory ownership without changing pricing ownership. Company matching is
+-- mandatory: suspicious cross-company legacy links remain NULL and block the protected preview.
 -- BATCH sources intentionally remain NULL because the upstream batch already consumed raw material.
-UPDATE factory_mix_batch_sources
-SET inventory_supplier_id = supplier_id
-WHERE source_batch_id IS NULL
-  AND supplier_id IS NOT NULL
-  AND inventory_supplier_id IS NULL;
+UPDATE factory_mix_batch_sources AS mbs
+SET inventory_supplier_id = mbs.supplier_id
+FROM factory_mix_batches AS mb,
+     factory_suppliers AS fs
+WHERE mbs.mix_batch_id = mb.id
+  AND mbs.supplier_id = fs.id
+  AND fs.company_id = mb.company_id
+  AND mbs.source_batch_id IS NULL
+  AND mbs.supplier_id IS NOT NULL
+  AND mbs.inventory_supplier_id IS NULL;
 
 UPDATE factory_mix_batch_sources AS mbs
 SET inventory_supplier_id = fc.supplier_id
-FROM factory_containers AS fc
-WHERE mbs.source_batch_id IS NULL
+FROM factory_containers AS fc,
+     factory_mix_batches AS mb,
+     factory_suppliers AS fs
+WHERE mbs.mix_batch_id = mb.id
+  AND mbs.source_batch_id IS NULL
   AND mbs.supplier_id IS NULL
   AND mbs.container_id = fc.id
+  AND fc.company_id = mb.company_id
+  AND fc.supplier_id = fs.id
+  AND fs.company_id = mb.company_id
   AND fc.supplier_id IS NOT NULL
+  AND fc.deleted_at IS NULL
   AND mbs.inventory_supplier_id IS NULL;
 
 UPDATE factory_mix_batch_sources
@@ -54,6 +67,7 @@ BEGIN
       ON a.attrelid = rel.oid
      AND a.attnum = key.attnum
     WHERE c.contype = 'f'
+      AND c.confrelid = 'factory_suppliers'::regclass
       AND nsp.nspname = current_schema()
       AND rel.relname = 'factory_mix_batch_sources'
       AND a.attname = 'inventory_supplier_id'
@@ -101,8 +115,32 @@ LANGUAGE plpgsql
 AS $$
 DECLARE
   resolved_supplier_id INTEGER;
+  source_company_id INTEGER;
 BEGIN
+  SELECT company_id
+    INTO source_company_id
+    FROM factory_mix_batches
+   WHERE id = NEW.mix_batch_id
+     AND deleted_at IS NULL;
+
+  IF source_company_id IS NULL THEN
+    RAISE EXCEPTION USING
+      ERRCODE = '23514',
+      MESSAGE = 'MIX_BATCH_COMPANY_UNRESOLVED: source batch is missing or deleted';
+  END IF;
+
   IF NEW.source_batch_id IS NOT NULL THEN
+    IF NOT EXISTS (
+      SELECT 1
+      FROM factory_mix_batches upstream
+      WHERE upstream.id = NEW.source_batch_id
+        AND upstream.company_id = source_company_id
+        AND upstream.deleted_at IS NULL
+    ) THEN
+      RAISE EXCEPTION USING
+        ERRCODE = '23514',
+        MESSAGE = 'UPSTREAM_BATCH_COMPANY_MISMATCH: source batch belongs to another company or is missing';
+    END IF;
     NEW.inventory_supplier_id := NULL;
     RETURN NEW;
   END IF;
@@ -118,6 +156,7 @@ BEGIN
       INTO resolved_supplier_id
       FROM factory_containers
      WHERE id = NEW.container_id
+       AND company_id = source_company_id
        AND deleted_at IS NULL;
   END IF;
 
@@ -125,6 +164,23 @@ BEGIN
     RAISE EXCEPTION USING
       ERRCODE = '23514',
       MESSAGE = 'INVENTORY_SUPPLIER_UNRESOLVED: non-batch raw-material source has no supplier owner';
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1
+    FROM factory_suppliers
+    WHERE id = resolved_supplier_id
+      AND company_id = source_company_id
+  ) THEN
+    RAISE EXCEPTION USING
+      ERRCODE = '23514',
+      MESSAGE = 'INVENTORY_SUPPLIER_COMPANY_MISMATCH: supplier owner belongs to another company';
+  END IF;
+
+  IF NEW.supplier_id IS NOT NULL AND NEW.supplier_id <> resolved_supplier_id THEN
+    RAISE EXCEPTION USING
+      ERRCODE = '23514',
+      MESSAGE = 'INVENTORY_SUPPLIER_CONFLICT: pricing supplier and inventory owner disagree';
   END IF;
 
   NEW.inventory_supplier_id := resolved_supplier_id;
@@ -136,7 +192,7 @@ DROP TRIGGER IF EXISTS factory_mix_source_inventory_supplier_trg
   ON factory_mix_batch_sources;
 
 CREATE TRIGGER factory_mix_source_inventory_supplier_trg
-BEFORE INSERT OR UPDATE OF supplier_id, container_id, source_batch_id, inventory_supplier_id
+BEFORE INSERT OR UPDATE OF mix_batch_id, supplier_id, container_id, source_batch_id, inventory_supplier_id
 ON factory_mix_batch_sources
 FOR EACH ROW
 EXECUTE FUNCTION factory_resolve_mix_source_inventory_supplier();
