@@ -102,6 +102,10 @@ if (!globalThis[BRIDGE_FLAG]) {
   }
 
   function isExcludedDeliveryPath(pathname) {
+    // Paths that produce lightweight static template files — bridge overhead is
+    // unnecessary and the stream-based write used internally by the bridge fails
+    // on ExcelJS 3.x, producing a 0-byte download.
+    if (/import-template|export-template|blank-template/i.test(pathname)) return true;
     return /(?:send|email|mail|whatsapp|schedule|scheduled|notification)/i.test(pathname);
   }
 
