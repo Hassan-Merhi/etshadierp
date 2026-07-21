@@ -2,6 +2,7 @@ import Decimal from "decimal.js";
 import { pool } from "../../../db";
 import type {
   HistoricalReplayPreviewResult,
+  ReplayMissingSupplierTimelineRow,
   ReplayQueryExecutor,
   ReplaySafetyGateDetails,
   ReplayUnclassifiedAdjustmentRow,
@@ -18,6 +19,7 @@ import {
   applyReceiptAdjustmentAmbiguityBlocks,
   findReceiptAdjustmentAmbiguitySupplierIds,
 } from "./timelineAmbiguityV6";
+import { loadMissingSupplierTimelineRows } from "./missingSupplierTimelineV7";
 
 interface SourceSafetyRow {
   source_id: number;
@@ -85,8 +87,9 @@ async function loadV7SafetyState(
   gateDetails: ReplaySafetyGateDetails;
   blockedBatches: Array<{ batchId: number; batchCode: string; reasons: string[] }>;
   unclassifiedAdjustmentRows: ReplayUnclassifiedAdjustmentRow[];
+  missingSupplierTimelineRows: ReplayMissingSupplierTimelineRow[];
 }> {
-  const [sourceResult, adjustmentResult] = await Promise.all([
+  const [sourceResult, adjustmentResult, missingSupplierTimelineRows] = await Promise.all([
     executor.query<SourceSafetyRow>(
       `SELECT mbs.id AS source_id,
               mbs.mix_batch_id AS batch_id,
@@ -140,6 +143,11 @@ async function loadV7SafetyState(
          AND a.valuation_basis IS NULL
        ORDER BY a.date, a.id`,
       [companyId]
+    ),
+    loadMissingSupplierTimelineRows(
+      executor,
+      companyId,
+      preview.supplierRows.map((row) => row.supplierId)
     ),
   ]);
 
@@ -227,11 +235,17 @@ async function loadV7SafetyState(
     quantityTimelineMismatches: preview.summary.quantityTimelineMismatches,
     ambiguousEventOrdering: preview.summary.ambiguousEventOrdering,
     incompleteMixedBatchSupplierScopes: incompleteBatchIds.size,
+    missingSupplierTimelines: missingSupplierTimelineRows.length,
     blockedBatches: blockedBatches.length,
     scanCoverageError: preview.summary.scanCoverageError,
   };
 
-  return { gateDetails, blockedBatches, unclassifiedAdjustmentRows };
+  return {
+    gateDetails,
+    blockedBatches,
+    unclassifiedAdjustmentRows,
+    missingSupplierTimelineRows,
+  };
 }
 
 async function computeManualRawMaterialAsset(
@@ -305,6 +319,7 @@ function allSafetyGatesPassed(details: ReplaySafetyGateDetails): boolean {
     && details.quantityTimelineMismatches === 0
     && details.ambiguousEventOrdering === 0
     && details.incompleteMixedBatchSupplierScopes === 0
+    && details.missingSupplierTimelines === 0
     && details.blockedBatches === 0
     && details.scanCoverageError === false;
 }
@@ -338,9 +353,12 @@ export async function previewHistoricalCostReplayWithExecutor(
     safety.gateDetails.unclassifiedValuedAdjustments;
   preview.summary.incompleteMixedBatchSupplierScopes =
     safety.gateDetails.incompleteMixedBatchSupplierScopes;
+  preview.summary.missingSupplierTimelines =
+    safety.gateDetails.missingSupplierTimelines;
   preview.summary.blockedBatches = safety.gateDetails.blockedBatches;
   preview.blockedBatches = safety.blockedBatches;
   preview.unclassifiedAdjustmentRows = safety.unclassifiedAdjustmentRows;
+  preview.missingSupplierTimelineRows = safety.missingSupplierTimelineRows;
 
   if (preview.financialImpact) {
     const supplierImpacts = preview.supplierRows.map((row) => {
