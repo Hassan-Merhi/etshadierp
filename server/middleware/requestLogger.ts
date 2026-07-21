@@ -1,4 +1,4 @@
-﻿/**
+/**
  * HTTP request logging and lightweight internal monitoring middleware.
  *
  * Logs failures, slow requests and an optional sample of successful requests.
@@ -281,6 +281,21 @@ export function requestLogger(req: Request, res: Response, next: NextFunction): 
     }
     res.status(200).json(getRequestMetricsSnapshot());
     return;
+  }
+
+  // Activity history must never fall back to an unscoped query. The route's
+  // query builder supports legacy no-company sessions, which previously meant
+  // a request made before company selection returned every company's audit
+  // records. Fail closed until the ERP company is confirmed in the session.
+  if (req.method === "GET" && req.path === "/api/audit-log") {
+    const companyId = Number((req as any).session?.currentCompanyId);
+    if (!Number.isSafeInteger(companyId) || companyId <= 0) {
+      res.status(409).json({
+        message: "Select a company before viewing activity history.",
+        code: "AUDIT_COMPANY_REQUIRED",
+      });
+      return;
+    }
   }
 
   if (req.path.startsWith("/api/")) {
