@@ -27,9 +27,14 @@ function round2(value: number): number {
 
 async function readCurrentNetPosition(req: any): Promise<number | null> {
   try {
-    const host = req.get?.("host");
-    if (!host || typeof fetch !== "function") return null;
-    const response = await fetch(`${req.protocol || "http"}://${host}/api/factory/net-position`, {
+    const port = Number(process.env.PORT || 5000);
+    if (!Number.isInteger(port) || port <= 0 || port > 65535 || typeof fetch !== "function") {
+      return null;
+    }
+    // Use a fixed loopback origin rather than the request Host header. This keeps the
+    // read-only projection independent of proxy/Host input and preserves the user's
+    // authenticated session through the forwarded cookie.
+    const response = await fetch(`http://127.0.0.1:${port}/api/factory/net-position`, {
       method: "GET",
       headers: {
         cookie: String(req.headers?.cookie || ""),
@@ -42,7 +47,7 @@ async function readCurrentNetPosition(req: any): Promise<number | null> {
     return Number.isFinite(value) ? value : null;
   } catch {
     // Financial impact remains useful even when the independent Net Position route
-    // cannot be reached (for example during isolated tests).
+    // cannot be reached (for example during isolated tests or before HTTP startup).
     return null;
   }
 }
@@ -143,8 +148,10 @@ export function registerHistoricalReplayPhase6GuardRoutes(app: Express): void {
           type: string;
           supplier_id: number | null;
           valuation_basis: string | null;
+          currency_code: string | null;
+          cost_per_kg: string | null;
         }>(
-          `SELECT id, type, supplier_id, valuation_basis
+          `SELECT id, type, supplier_id, valuation_basis, currency_code, cost_per_kg
            FROM factory_raw_material_adjustments
            WHERE id = $1 AND company_id = $2 AND deleted_at IS NULL
            FOR UPDATE`,
@@ -159,6 +166,25 @@ export function registerHistoricalReplayPhase6GuardRoutes(app: Express): void {
           await client.query("ROLLBACK");
           return res.status(409).json({
             message: "Only supplier-linked ADD adjustments can be classified for replay.",
+          });
+        }
+        if (
+          valuationBasis !== "QUANTITY_ONLY"
+          && String(row.currency_code || "USD").toUpperCase() !== "USD"
+        ) {
+          await client.query("ROLLBACK");
+          return res.status(409).json({
+            message:
+              "Valued transfers and opening balances require an explicit stored USD cost. This adjustment is not denominated in USD.",
+          });
+        }
+        if (
+          valuationBasis !== "QUANTITY_ONLY"
+          && !(Number.parseFloat(row.cost_per_kg || "0") > 0)
+        ) {
+          await client.query("ROLLBACK");
+          return res.status(409).json({
+            message: "A valued transfer or opening balance must have a positive USD cost per kg.",
           });
         }
 
@@ -183,6 +209,8 @@ export function registerHistoricalReplayPhase6GuardRoutes(app: Express): void {
             JSON.stringify({
               before: row.valuation_basis,
               after: valuationBasis,
+              currencyCode: row.currency_code || "USD",
+              costPerKg: row.cost_per_kg,
             }),
           ]
         );
