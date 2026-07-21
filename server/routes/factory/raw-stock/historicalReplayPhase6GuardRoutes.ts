@@ -7,12 +7,35 @@ import {
   type ReplayFinancialImpact,
   type ReplayQueryExecutor,
 } from "../../../services/factory/historicalCostReplay";
+import { verifyRepairToken } from "../../../services/factory/repairToken";
 
 const APPLY_PATH = "/api/factory/raw-stock/recalc/historical-replay/apply";
 const PREVIEW_PATH = "/api/factory/raw-stock/recalc/historical-replay";
 const ADJUSTMENT_CLASSIFICATION_PATH =
   "/api/factory/raw-stock/recalc/historical-replay/adjustments/:id/valuation-basis";
 const ADMIN_ROLES = ["Admin", "Developer"] as const;
+
+interface BatchCostImpact {
+  batchId: number;
+  batchCode: string;
+  currentTotalCost: number;
+  projectedTotalCost: number;
+  valueDifference: number;
+}
+
+interface BalanceProjectionBase {
+  totalMixWeightKg: number;
+  balanceOnTableWeightKg: number;
+  currentTotalMixCost: number;
+  currentBalanceOnTableAsset: number;
+  batchImpacts: BatchCostImpact[];
+}
+
+interface SignedReplayScopeToken {
+  scope?: {
+    batchIdsToUpdate?: number[];
+  };
+}
 
 function parsePositiveIntegerIds(value: unknown): number[] | null {
   if (!Array.isArray(value)) return null;
@@ -52,10 +75,95 @@ async function readCurrentNetPosition(req: any): Promise<number | null> {
   }
 }
 
+async function loadBalanceProjectionBase(
+  companyId: number,
+  preview: HistoricalReplayPreviewResult
+): Promise<BalanceProjectionBase> {
+  const [mixResult, baleResult] = await Promise.all([
+    pool.query<{
+      total_mix_kg: string;
+      total_mix_cost: string;
+    }>(
+      `SELECT COALESCE(SUM(total_weight_kg::numeric), 0) AS total_mix_kg,
+              COALESCE(SUM(total_cost::numeric), 0) AS total_mix_cost
+       FROM factory_mix_batches
+       WHERE company_id = $1
+         AND carry_forward_from_id IS NULL
+         AND deleted_at IS NULL`,
+      [companyId]
+    ),
+    pool.query<{ total_bale_kg: string }>(
+      `SELECT COALESCE(SUM(weight_kg::numeric), 0) AS total_bale_kg
+       FROM factory_bales
+       WHERE company_id = $1
+         AND status NOT IN ('DELETED', 'REMOVED')`,
+      [companyId]
+    ),
+  ]);
+
+  const totalMixWeightKg = Number.parseFloat(mixResult.rows[0]?.total_mix_kg ?? "0") || 0;
+  const currentTotalMixCost = Number.parseFloat(mixResult.rows[0]?.total_mix_cost ?? "0") || 0;
+  const totalBaleWeightKg = Number.parseFloat(baleResult.rows[0]?.total_bale_kg ?? "0") || 0;
+  const balanceOnTableWeightKg = Math.max(totalMixWeightKg - totalBaleWeightKg, 0);
+  const currentRate = totalMixWeightKg > 0 ? currentTotalMixCost / totalMixWeightKg : 0;
+  const currentBalanceOnTableAsset = round2(balanceOnTableWeightKg * currentRate);
+
+  const batchImpacts: BatchCostImpact[] = preview.batchRows.map((row) => ({
+    batchId: row.batchId,
+    batchCode: row.batchCode,
+    currentTotalCost: row.storedTotalCost,
+    projectedTotalCost: row.expectedTotalCost,
+    valueDifference: round2(row.expectedTotalCost - row.storedTotalCost),
+  }));
+
+  return {
+    totalMixWeightKg,
+    balanceOnTableWeightKg,
+    currentTotalMixCost,
+    currentBalanceOnTableAsset,
+    batchImpacts,
+  };
+}
+
+function projectBalanceOnTable(
+  base: BalanceProjectionBase,
+  batchIds: number[]
+): {
+  currentBalanceOnTableAsset: number;
+  projectedBalanceOnTableAsset: number;
+  balanceOnTableDifference: number;
+  otherNetPositionEffect: number;
+  batchImpacts: BatchCostImpact[];
+} {
+  const selected = new Set(batchIds);
+  const batchImpacts = base.batchImpacts.filter((row) => selected.has(row.batchId));
+  const mixCostDifference = batchImpacts.reduce((sum, row) => sum + row.valueDifference, 0);
+  const projectedTotalMixCost = base.currentTotalMixCost + mixCostDifference;
+  const projectedRate = base.totalMixWeightKg > 0
+    ? projectedTotalMixCost / base.totalMixWeightKg
+    : 0;
+  const projectedBalanceOnTableAsset = round2(
+    base.balanceOnTableWeightKg * projectedRate
+  );
+  const balanceOnTableDifference = round2(
+    projectedBalanceOnTableAsset - base.currentBalanceOnTableAsset
+  );
+
+  return {
+    currentBalanceOnTableAsset: base.currentBalanceOnTableAsset,
+    projectedBalanceOnTableAsset,
+    balanceOnTableDifference,
+    otherNetPositionEffect: balanceOnTableDifference,
+    batchImpacts,
+  };
+}
+
 function scopeFinancialImpact(
   preview: HistoricalReplayPreviewResult,
   supplierIds: number[],
-  currentNetPosition: number | null
+  batchIds: number[],
+  currentNetPosition: number | null,
+  balanceBase: BalanceProjectionBase
 ): ReplayFinancialImpact | undefined {
   const base = preview.financialImpact;
   if (!base) return undefined;
@@ -66,6 +174,10 @@ function scopeFinancialImpact(
     supplierImpacts.reduce((sum, row) => sum + row.valueDifference, 0)
   );
   const projectedRawMaterialAsset = round2(base.currentRawMaterialAsset + rawMaterialDifference);
+  const balance = projectBalanceOnTable(balanceBase, batchIds);
+  const totalNetPositionEffect = round2(
+    rawMaterialDifference + balance.otherNetPositionEffect
+  );
 
   return {
     ...base,
@@ -74,9 +186,11 @@ function scopeFinancialImpact(
     projectedRawMaterialAsset,
     currentNetPosition,
     projectedNetPosition:
-      currentNetPosition == null ? null : round2(currentNetPosition + rawMaterialDifference),
+      currentNetPosition == null ? null : round2(currentNetPosition + totalNetPositionEffect),
     otherLedgerEffect: 0,
-  };
+    ...balance,
+    totalNetPositionEffect,
+  } as ReplayFinancialImpact;
 }
 
 /**
@@ -85,7 +199,7 @@ function scopeFinancialImpact(
  * - GET returns the real safety gates, blocked/unclassified rows and Net Position impact.
  * - Prepare rejects force-apply and finalized-bale writes.
  * - The successful dry-run response is augmented with the exact selected/expanded
- *   supplier financial impact returned by the signed-scope route.
+ *   supplier and batch financial impact returned by the signed-scope route.
  * - Historical adjustment valuation is explicitly classifiable with an audit row.
  */
 export function registerHistoricalReplayPhase6GuardRoutes(app: Express): void {
@@ -101,15 +215,18 @@ export function registerHistoricalReplayPhase6GuardRoutes(app: Express): void {
           pool as ReplayQueryExecutor,
           companyId
         );
-        const currentNetPosition = await readCurrentNetPosition(req);
-        if (preview.financialImpact) {
-          preview.financialImpact.currentNetPosition = currentNetPosition;
-          preview.financialImpact.projectedNetPosition =
-            currentNetPosition == null
-              ? null
-              : round2(currentNetPosition + preview.financialImpact.rawMaterialDifference);
-          preview.financialImpact.otherLedgerEffect = 0;
-        }
+        const [currentNetPosition, balanceBase] = await Promise.all([
+          readCurrentNetPosition(req),
+          loadBalanceProjectionBase(companyId, preview),
+        ]);
+        const financialImpact = scopeFinancialImpact(
+          preview,
+          preview.supplierRows.map((row) => row.supplierId),
+          preview.batchRows.map((row) => row.batchId),
+          currentNetPosition,
+          balanceBase
+        );
+        if (financialImpact) preview.financialImpact = financialImpact;
         return res.json(preview);
       } catch (error: any) {
         console.error("[historical-replay v7 preview] error:", error);
@@ -279,15 +396,33 @@ export function registerHistoricalReplayPhase6GuardRoutes(app: Express): void {
           pool as ReplayQueryExecutor,
           companyId
         );
-        const currentNetPosition = await readCurrentNetPosition(req);
+        const [currentNetPosition, balanceBase] = await Promise.all([
+          readCurrentNetPosition(req),
+          loadBalanceProjectionBase(companyId, preview),
+        ]);
         const originalJson = res.json.bind(res);
         res.json = (payload: any) => {
           if (!payload?.dryRun) return originalJson(payload);
           const expandedSupplierIds = parsePositiveIntegerIds(payload.safeSupplierIds) ?? supplierIds;
+          let batchIds: number[] = [];
+          try {
+            const signed = verifyRepairToken<SignedReplayScopeToken>(payload.confirmationToken);
+            batchIds = parsePositiveIntegerIds(signed.scope?.batchIdsToUpdate) ?? [];
+          } catch {
+            // The exact V4 handler will already have rejected an invalid token. If its
+            // response cannot be decoded here, fail closed rather than show a partial projection.
+            return originalJson({
+              ...payload,
+              financialImpact: undefined,
+              projectionError: "Signed batch scope could not be decoded. Re-run Prepare.",
+            });
+          }
           const financialImpact = scopeFinancialImpact(
             preview,
             expandedSupplierIds,
-            currentNetPosition
+            batchIds,
+            currentNetPosition,
+            balanceBase
           );
           return originalJson({
             ...payload,
