@@ -220,30 +220,56 @@ export function canModifyDate(dateField: string = "voucherDate") {
 }
 
 export async function checkPOSLocation(req: Request, res: Response, next: NextFunction) {
-  if (!req.user || !req.user.role) {
-    return res.status(401).json({ message: "Unauthorized" });
+  try {
+    if (!req.user?.role) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+
+    if (req.user.role !== "POS") {
+      return next();
+    }
+
+    const rawLocationId =
+      req.params.locationId ??
+      req.body?.locationId ??
+      req.query.locationId;
+    const locationId = Number.parseInt(String(rawLocationId ?? ""), 10);
+
+    if (!Number.isInteger(locationId) || locationId <= 0) {
+      return next();
+    }
+
+    const companyId = req.session.currentCompanyId;
+    if (!companyId) {
+      return res.status(403).json({ message: "No company selected" });
+    }
+
+    // Check the exact requested assignment instead of loading every location for
+    // the user. This uses the composite user/company/location index and keeps the
+    // authorization query bounded even when a POS user has many locations.
+    const [assignment] = await db
+      .select({ id: userLocations.id })
+      .from(userLocations)
+      .where(
+        and(
+          eq(userLocations.userId, req.user.id),
+          eq(userLocations.companyId, companyId),
+          eq(userLocations.locationId, locationId)
+        )
+      )
+      .limit(1);
+
+    if (!assignment) {
+      return res.status(403).json({ message: "You can only access data for your assigned locations" });
+    }
+
+    return next();
+  } catch (error) {
+    // Async Express middleware must pass database failures to the central error
+    // handler. Letting this promise reject creates a process-level
+    // unhandledRejection and forces a full Render restart.
+    return next(error);
   }
-
-  const isPOS = req.user.role === "POS";
-  if (!isPOS) return next();
-
-  const locationId = parseInt(req.params.locationId || req.body.locationId || req.query.locationId);
-  if (!locationId) return next();
-
-  const companyId = req.session.currentCompanyId;
-  if (!companyId) return res.status(403).json({ message: "No company selected" });
-
-  const assignedLocations = await db
-    .select({ locationId: userLocations.locationId })
-    .from(userLocations)
-    .where(and(eq(userLocations.userId, req.user.id), eq(userLocations.companyId, companyId)));
-
-  const allowedIds = assignedLocations.map((l) => l.locationId);
-  if (!allowedIds.includes(locationId)) {
-    return res.status(403).json({ message: "You can only access data for your assigned locations" });
-  }
-
-  next();
 }
 
 export async function requirePasswordConfirmation(req: Request, res: Response, next: NextFunction) {
