@@ -66,7 +66,7 @@ export default function Accounts() {
   return (
     <div className="space-y-4">
       {/* CashBankRevaluationPanel hidden */}
-      <HistoricalOpeningResolver />
+      {/* HistoricalOpeningResolver hidden */}
       <AccountsLegacy />
     </div>
   );
