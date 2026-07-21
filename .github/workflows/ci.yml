@@ -85,7 +85,7 @@ jobs:
 
       - name: Upload type-check failure log
         if: always() && steps.typecheck.outcome == 'failure'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: typecheck-errors
           path: ts-errors-ci.txt
@@ -101,7 +101,7 @@ jobs:
 
       - name: Upload build failure log
         if: always() && steps.build.outcome == 'failure'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: build-errors
           path: build-errors-ci.txt
@@ -117,7 +117,7 @@ jobs:
 
       - name: Upload lint failure log
         if: always() && steps.lint.outcome == 'failure'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: lint-errors
           path: lint-errors-ci.txt
@@ -157,7 +157,7 @@ jobs:
 
       - name: Upload format failure log
         if: always() && steps.format_check.outcome == 'failure'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: format-errors
           path: format-errors-ci.txt
@@ -173,7 +173,7 @@ jobs:
 
       - name: Upload database schema failure log
         if: always() && steps.db_schema.outcome == 'failure'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: database-schema-errors
           path: db-schema-ci.txt
@@ -212,7 +212,7 @@ jobs:
 
       - name: Upload startup migration failure log
         if: always() && steps.runtime_migrations.outcome == 'failure'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: startup-migration-errors
           path: |
@@ -230,7 +230,7 @@ jobs:
 
       - name: Upload backend test failure log
         if: always() && steps.backend_tests.outcome == 'failure'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: backend-test-errors
           path: backend-test-errors-ci.txt
@@ -246,7 +246,7 @@ jobs:
 
       - name: Upload backend coverage failure log
         if: always() && steps.backend_coverage.outcome == 'failure'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: backend-coverage-errors
           path: backend-coverage-errors-ci.txt
@@ -255,7 +255,7 @@ jobs:
 
       - name: Upload backend coverage summary
         if: always() && steps.backend_coverage.outcome == 'success'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: backend-coverage-summary
           path: coverage/backend/coverage-summary.json
@@ -271,7 +271,7 @@ jobs:
 
       - name: Upload frontend test failure log
         if: always() && steps.frontend_tests.outcome == 'failure'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: frontend-test-errors
           path: frontend-test-errors-ci.txt
@@ -287,7 +287,7 @@ jobs:
 
       - name: Upload frontend coverage failure log
         if: always() && steps.frontend_coverage.outcome == 'failure'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: frontend-coverage-errors
           path: frontend-coverage-errors-ci.txt
@@ -296,7 +296,7 @@ jobs:
 
       - name: Upload frontend coverage summary
         if: always() && steps.frontend_coverage.outcome == 'success'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: frontend-coverage-summary
           path: coverage/frontend/coverage-summary.json

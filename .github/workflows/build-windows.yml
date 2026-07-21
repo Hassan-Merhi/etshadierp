@@ -66,7 +66,7 @@ jobs:
         run: ls -lh dist/
 
       - name: Upload MSIX artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: erp-warehouse-msix-${{ steps.version.outputs.version }}
           path: |
@@ -77,7 +77,7 @@ jobs:
 
       - name: Upload installer artifact (NSIS exe — optional)
         if: false
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: erp-warehouse-installer-${{ steps.version.outputs.version }}
           path: desktop/dist/*.exe
