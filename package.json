@@ -42,7 +42,7 @@
   "dependencies": {
     "@aparajita/capacitor-biometric-auth": "^10.0.0",
     "@capacitor/android": "^8.3.4",
-    "@capacitor/cli": "^7.6.6",
+    "@capacitor/cli": "^8.4.1",
     "@capacitor/core": "^8.3.4",
     "@capacitor/ios": "^8.3.4",
     "@capacitor/preferences": "^8.0.1",
