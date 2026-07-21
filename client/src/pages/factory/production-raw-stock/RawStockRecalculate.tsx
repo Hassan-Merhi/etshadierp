@@ -246,7 +246,7 @@ export default function RawStockRecalculate() {
   const [selectedZeroCostSources, setSelectedZeroCostSources] = useState<Set<number>>(new Set());
   const [manualRates, setManualRates] = useState<Record<number, string>>({});
   const [expandedBatchSources, setExpandedBatchSources] = useState<Set<number>>(new Set());
-  const [activeTab, setActiveTab] = useState<"recalc" | "sources" | "audit" | "history" | "replay">("recalc");
+  const [activeTab, setActiveTab] = useState<"recalc" | "sources" | "audit" | "history" | "replay" | "partialfix">("recalc");
 
   // ── Historical Replay confirmation dialog (requires typing "APPLY HISTORICAL REPLAY") ──
   const [showReplayConfirmDialog, setShowReplayConfirmDialog] = useState(false);
@@ -896,6 +896,55 @@ export default function RawStockRecalculate() {
     }, `Repair source cost for ${selectedZeroCostSources.size} mix-batch source(s)`);
   };
 
+  // ── Partial-offload legacy fix scan ──────────────────────────────────────
+  const {
+    data: partialOffloadScan,
+    isLoading: partialOffloadLoading,
+    refetch: refetchPartialOffload,
+  } = useQuery<{ affected: RecalcRow[]; skippedFx: RecalcRow[]; totalScanned: number }>({
+    queryKey: ["/api/factory/raw-stock/recalc/partial-offload-scan"],
+    queryFn: async () => {
+      const res = await modeApiRequest("GET", "/api/factory/raw-stock/recalc/partial-offload-scan");
+      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).message || "Scan failed");
+      return res.json();
+    },
+    enabled: activeTab === "partialfix",
+  });
+
+  const partialOffloadApplyMutation = useMutation({
+    mutationFn: async () => {
+      const dryRun = await modeApiRequest("POST", "/api/factory/raw-stock/recalc/partial-offload-scan/apply", {});
+      if (!dryRun.ok) throw new Error((await dryRun.json()).message || "Dry-run failed");
+      const dryRunData = await dryRun.json();
+      if (!dryRunData.confirmationToken) {
+        return dryRunData; // nothing to fix
+      }
+      const res = await modeApiRequest("POST", "/api/factory/raw-stock/recalc/partial-offload-scan/apply", {
+        confirm: true,
+        confirmationToken: dryRunData.confirmationToken,
+      });
+      if (!res.ok) throw new Error((await res.json()).message || "Apply failed");
+      return res.json();
+    },
+    onSuccess: (data) => {
+      if (!data.applied) {
+        toast({ title: "Nothing to fix", description: "All partial-offload containers already have correct costs." });
+        return;
+      }
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/raw-stock/recalc/partial-offload-scan"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/raw-stock/recalc/preview"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/raw-stock/recalc/full-audit"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/raw-stock"] });
+      toast({
+        title: "Partial-offload costs corrected",
+        description: `Fixed ${data.applied} container(s). ${data.skipped} skipped.`,
+      });
+    },
+    onError: (err: any) => {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    },
+  });
+
   // ─── Helpers ──────────────────────────────────────────────────────────────
   const badgePct = (pct: number | null | undefined) => {
     const v = pct ?? 0;
@@ -947,6 +996,7 @@ export default function RawStockRecalculate() {
     { id: "audit" as const, label: "Full Audit" },
     { id: "history" as const, label: "History & Rates" },
     { id: "replay" as const, label: "Historical Replay" },
+    { id: "partialfix" as const, label: "Partial Offload Fix" },
   ];
 
   return (
@@ -1022,6 +1072,11 @@ export default function RawStockRecalculate() {
             {t.id === "audit" && (fullAudit?.summary.safeRepairsAvailable ?? 0) > 0 && (
               <span className="ml-1.5 rounded-full bg-amber-500/15 text-amber-600 text-[10px] px-1.5 py-0.5">
                 {fullAudit!.summary.safeRepairsAvailable}
+              </span>
+            )}
+            {t.id === "partialfix" && (partialOffloadScan?.affected.length ?? 0) > 0 && (
+              <span className="ml-1.5 rounded-full bg-blue-500/15 text-blue-600 text-[10px] px-1.5 py-0.5">
+                {partialOffloadScan!.affected.length}
               </span>
             )}
           </button>
@@ -2234,6 +2289,121 @@ export default function RawStockRecalculate() {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* ── Tab: Partial Offload Fix ──────────────────────────────────────── */}
+      {activeTab === "partialfix" && (
+        <div className="space-y-3">
+          <div>
+            <h2 className="text-sm font-semibold leading-tight">Partial Offload Legacy Cost Fix</h2>
+            <p className="text-xs text-muted-foreground leading-tight max-w-2xl">
+              Finds containers that were partially received and whose stored cost/kg was calculated
+              using the old wrong formula (supplier rate only, ignoring freight + commission + other charges).
+              Applies the correct formula: <span className="font-mono">total landed cost ÷ actual received kg</span>.
+            </p>
+          </div>
+
+          {partialOffloadLoading ? (
+            <Skeleton className="h-24 w-full" />
+          ) : !partialOffloadScan ? (
+            <div className="text-xs text-muted-foreground py-6 text-center border rounded-md bg-card">
+              Loading scan…
+            </div>
+          ) : partialOffloadScan.affected.length === 0 ? (
+            <div className="space-y-2">
+              <div className="text-xs text-emerald-600 py-6 text-center border border-emerald-500/30 rounded-md bg-emerald-500/5">
+                ✓ No partial-offload cost errors found across {partialOffloadScan.totalScanned} container(s).
+              </div>
+              {partialOffloadScan.skippedFx.length > 0 && (
+                <div className="text-xs text-amber-600 bg-amber-500/10 border border-amber-500/30 rounded-md px-3 py-2">
+                  {partialOffloadScan.skippedFx.length} container(s) skipped — unresolved FX rate.
+                  Set their FX rate then re-scan.
+                </div>
+              )}
+            </div>
+          ) : (
+            <>
+              <div className="text-xs text-amber-700 dark:text-amber-400 bg-amber-500/10 border border-amber-500/30 rounded-md px-3 py-2">
+                Found <strong>{partialOffloadScan.affected.length}</strong> container(s) with incorrect partial-offload
+                costs out of {partialOffloadScan.totalScanned} scanned.
+                {partialOffloadScan.skippedFx.length > 0 &&
+                  ` (${partialOffloadScan.skippedFx.length} additional skipped — unresolved FX rate)`}
+              </div>
+
+              <div className="border rounded-md overflow-hidden bg-card shadow-sm">
+                <Table>
+                  <TableHeader className="bg-muted/50">
+                    <TableRow>
+                      <TableHead>Container</TableHead>
+                      <TableHead>Supplier</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="text-right">Received kg</TableHead>
+                      <TableHead className="text-right">Old $/kg</TableHead>
+                      <TableHead className="text-right">Correct $/kg</TableHead>
+                      <TableHead className="text-right">Diff %</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {partialOffloadScan.affected.map((r) => (
+                      <TableRow key={r.containerId}>
+                        <TableCell className="font-mono text-xs">{r.containerNumber}</TableCell>
+                        <TableCell className="text-xs text-muted-foreground">{r.supplierName || "—"}</TableCell>
+                        <TableCell>
+                          <Badge variant="outline" className="text-[10px] text-muted-foreground">
+                            {r.containerStatus}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right font-mono text-xs">{formatNumber(r.receivedKg)}</TableCell>
+                        <TableCell className="text-right font-mono text-xs text-muted-foreground">
+                          ${r.old.costPerKgUsd.toFixed(6)}
+                        </TableCell>
+                        <TableCell className="text-right font-mono text-xs font-medium text-emerald-600">
+                          ${r.next.costPerKgUsd.toFixed(6)}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Badge
+                            variant="outline"
+                            className="text-red-500 border-red-500/30 bg-red-500/10 text-[10px]"
+                          >
+                            {r.diffPct > 0 ? "+" : ""}{r.diffPct.toFixed(1)}%
+                          </Badge>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+
+              <div className="flex items-center justify-between gap-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => refetchPartialOffload()}
+                  disabled={partialOffloadLoading}
+                  className="gap-2"
+                >
+                  <RefreshCw className="h-3.5 w-3.5" /> Re-scan
+                </Button>
+                <Button
+                  size="sm"
+                  disabled={partialOffloadApplyMutation.isPending}
+                  onClick={() =>
+                    wrapAdminAction(
+                      () => partialOffloadApplyMutation.mutate(),
+                      `Apply corrected landed cost to ${partialOffloadScan.affected.length} partial-offload container(s) — rewrites mix-batch sources and bale costs`
+                    )
+                  }
+                  className="gap-2 bg-emerald-600 hover:bg-emerald-700 text-white"
+                >
+                  <CheckCircle2 className="h-3.5 w-3.5" />
+                  {partialOffloadApplyMutation.isPending
+                    ? "Applying…"
+                    : `Fix All (${partialOffloadScan.affected.length})`}
+                </Button>
+              </div>
+            </>
+          )}
+        </div>
+      )}
 
       {/* Batch detail dialog */}
       <Dialog open={detailBatchId !== null} onOpenChange={(open) => !open && setDetailBatchId(null)}>
