@@ -1,10 +1,8 @@
 import { useState, useEffect, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { AlertTriangle, FileX, Building2, Layers } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { AlertTriangle, FileX, Building2 } from "lucide-react";
 import { queryClient } from "@/lib/queryClient";
 import { AgentCard } from "./AgentCard";
 import type {
@@ -17,7 +15,6 @@ import type {
 
 export function TabAgentDuty() {
   const [companyMode, setCompanyMode] = useState<CompanyViewMode>("session");
-  const [mergeAgents, setMergeAgents] = useState(true);
 
   const queryUrl =
     companyMode === "all" ? "/api/git/agent-duty-summary?allCompanies=true" : "/api/git/agent-duty-summary";
@@ -75,8 +72,9 @@ export function TabAgentDuty() {
   }, [data]);
 
   const CONF_RANK: Record<AgentDutySummary["matchConfidence"], number> = { exact: 0, fuzzy: 1, unmapped: 2 };
+  // In "all companies" mode always merge agents with the same name across companies.
   const displaySections: AgentDutyCompanySection[] = useMemo(() => {
-    if (!mergeAgents || companyMode !== "all" || sections.length <= 1) return sections;
+    if (companyMode !== "all" || sections.length <= 1) return sections;
     const agentMap = new Map<string, AgentDutySummary[]>();
     for (const section of sections) {
       for (const agent of section.agents) {
@@ -117,7 +115,7 @@ export function TabAgentDuty() {
     }
     merged.sort((a, b) => a.agentName.localeCompare(b.agentName));
     return [{ companyId: 0, companyName: "All Companies", agents: merged }];
-  }, [sections, mergeAgents, companyMode]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [sections, companyMode]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const totalAgents = displaySections.reduce((s, c) => s + c.agents.length, 0);
 
@@ -143,18 +141,6 @@ export function TabAgentDuty() {
       >
         All Accessible Companies
       </Button>
-      {companyMode === "all" && (
-        <Button
-          size="sm"
-          variant="outline"
-          className={cn("text-xs gap-1.5 toggle-elevate", mergeAgents && "toggle-elevated")}
-          onClick={() => setMergeAgents((v) => !v)}
-          data-testid="button-agent-duty-merge"
-        >
-          <Layers className="h-3 w-3" />
-          Merge same agents
-        </Button>
-      )}
     </div>
   );
 
@@ -221,16 +207,6 @@ export function TabAgentDuty() {
       {modeSelector}
       {displaySections.map((section) => (
         <div key={section.companyId} className="space-y-4" data-testid={`company-section-${section.companyId}`}>
-          {companyMode === "all" && !(mergeAgents && displaySections.length === 1) && (
-            <div className="flex items-center gap-2 pt-1">
-              <Building2 className="h-4 w-4 text-muted-foreground shrink-0" />
-              <span className="text-sm font-semibold tracking-wide">{section.companyName}</span>
-              <Badge variant="outline" className="text-xs no-default-active-elevate">
-                {section.agents.length} {section.agents.length === 1 ? "agent" : "agents"}
-              </Badge>
-              <div className="flex-1 border-t" />
-            </div>
-          )}
           {section.agents.filter(
             (a) => a.activePreviewRows.length > 0 && (a.openBalance === null || a.openBalance !== 0)
           ).length === 0 ? (
