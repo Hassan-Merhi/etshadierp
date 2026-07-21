@@ -484,7 +484,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
   const displayedRows = useMemo(() => visibleRows.slice(0, daybookRowLimit), [visibleRows, daybookRowLimit]);
 
   const canEdit = (v: Voucher) =>
-    !["Sales", "Purchase"].includes(v.voucherType) && user?.role !== "POS" && !isReadonlyMigratedVoucher(v);
+    v.voucherType !== "Purchase" && user?.role !== "POS" && !isReadonlyMigratedVoucher(v);
   const canDelete = () => !!(user?.role === "Developer" || user?.role === "Admin" || user?.canDeleteRecords);
   const handleView = (v: Voucher) => {
     setSelectedVoucher(v);

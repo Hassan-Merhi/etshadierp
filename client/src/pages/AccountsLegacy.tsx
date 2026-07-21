@@ -500,19 +500,51 @@ export default function Accounts() {
     else setSelectedVoucherIds(new Set(vouchersWithBalance.map((v) => v.voucherId)));
   };
 
-  const voucherTypeToTab = (type: string): string => {
-    const t = (type || "").toLowerCase().replace(/\s+/g, "");
-    if (t === "payment") return "payment";
-    if (t === "receipt") return "receipt";
-    if (t === "journal") return "journal";
-    if (t === "stocktransfer") return "transfer";
-    if (t === "creditnote") return "creditnote";
-    return "journal";
-  };
-
   const handleOpenVoucher = (v: any) => {
-    const tab = voucherTypeToTab(v.voucherType || "");
-    navigate(`${modePrefix}/vouchers?edit=${v.voucherId}&tab=${tab}`);
+    const id = v.voucherId;
+    const rawType = (v.voucherType || "").toLowerCase().replace(/\s+/g, "");
+
+    // POS / Sales → open in the POS edit page
+    if (rawType === "sales" || rawType === "pos") {
+      navigate(`${modePrefix.replace(/^\/erp/, "")}/pos/edit/${id}`);
+      return;
+    }
+
+    // Purchase → try to resolve the container; fall back to vouchers page
+    if (rawType === "purchase") {
+      fetch(`/api/vouchers/${id}/view-entries`, { credentials: "include" })
+        .then((r) => (r.ok ? r.json() : null))
+        .then((data) => {
+          const po = data && !Array.isArray(data) ? data.purchaseOrder : null;
+          if (po?.containerId) {
+            navigate(`${modePrefix}/containers/${po.containerId}`);
+          } else {
+            navigate(`${modePrefix}/vouchers?edit=${id}&tab=purchase`);
+          }
+        })
+        .catch(() => navigate(`${modePrefix}/vouchers?edit=${id}&tab=purchase`));
+      return;
+    }
+
+    // All other voucher types → map to the correct Vouchers tab
+    const tabMap: Record<string, string> = {
+      payment: "payment",
+      receipt: "receipt",
+      journal: "journal",
+      contra: "journal",
+      stocktransfer: "transferorder",
+      "stock transfer": "transferorder",
+      transfer: "transfer",
+      creditnote: "creditnote",
+      "credit note": "creditnote",
+      debitnote: "creditnote",
+      "debit note": "creditnote",
+      production: "adjustment",
+      consumption: "adjustment",
+      mixed: "adjustment",
+    };
+    const tab = tabMap[rawType] ?? "journal";
+    navigate(`${modePrefix}/vouchers?edit=${id}&tab=${tab}`);
   };
 
   const bankForm = useForm({
