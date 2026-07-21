@@ -164,7 +164,8 @@ export interface ReplaySafetyGateDetails {
   quantityTimelineMismatches: number;
   ambiguousEventOrdering: number;
   incompleteMixedBatchSupplierScopes: number;
-  missingSupplierTimelines: number;
+  /** Added by securePreview; optional only for legacy low-level preview constructors. */
+  missingSupplierTimelines?: number;
   blockedBatches: number;
   scanCoverageError: boolean;
 }
