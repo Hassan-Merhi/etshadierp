@@ -5804,6 +5804,84 @@ END $mig$`;
         // Non-fatal: upsertExchangeRate has a fallback that works without the index.
         console.warn("[startup] Could not ensure exchange_rates unique index:", idxErr?.message);
       }
+
+      // ── Always-running multi-currency schema columns ──────────────────────────
+      // These columns were added by migrations 0011, 0012, 20260720_002–006, but
+      // production uses RUN_STARTUP_MIGRATIONS=false so those migrations never ran.
+      // ALTER TABLE … ADD COLUMN IF NOT EXISTS is idempotent — safe to run every
+      // startup.  Without these columns, /api/stats/net-profit returns 500 and the
+      // dashboard shows the "Some financial data could not be loaded" error banner.
+      try {
+        await pool.query(`
+          -- vouchers: currency column (migration 0011)
+          ALTER TABLE vouchers
+            ADD COLUMN IF NOT EXISTS currency VARCHAR(3) NOT NULL DEFAULT 'USD';
+
+          -- user_preferences: preferred_currency (migration 0012)
+          ALTER TABLE user_preferences
+            ADD COLUMN IF NOT EXISTS preferred_currency VARCHAR(10);
+
+          -- voucher_entries: multi-currency audit columns (migration 20260720_002)
+          ALTER TABLE voucher_entries
+            ADD COLUMN IF NOT EXISTS transaction_currency        VARCHAR(3),
+            ADD COLUMN IF NOT EXISTS transaction_debit_amount    NUMERIC(20,6),
+            ADD COLUMN IF NOT EXISTS transaction_credit_amount   NUMERIC(20,6),
+            ADD COLUMN IF NOT EXISTS base_debit_amount           NUMERIC(20,6),
+            ADD COLUMN IF NOT EXISTS base_credit_amount          NUMERIC(20,6),
+            ADD COLUMN IF NOT EXISTS historical_exchange_rate    NUMERIC(20,10),
+            ADD COLUMN IF NOT EXISTS rate_convention             VARCHAR(30);
+
+          -- ledger_accounts: opening balance currency (migrations 20260720_003 + 006)
+          ALTER TABLE ledger_accounts
+            ADD COLUMN IF NOT EXISTS opening_balance_currency         VARCHAR(10),
+            ADD COLUMN IF NOT EXISTS opening_balance_historical_rate  NUMERIC(20,10),
+            ADD COLUMN IF NOT EXISTS opening_balance_base_amount      NUMERIC(20,6),
+            ADD COLUMN IF NOT EXISTS opening_balance_native_amount    NUMERIC(20,6);
+
+          -- bank_accounts: opening balance currency (migrations 20260720_004 + 006)
+          ALTER TABLE bank_accounts
+            ADD COLUMN IF NOT EXISTS opening_balance_currency         VARCHAR(10),
+            ADD COLUMN IF NOT EXISTS opening_balance_historical_rate  NUMERIC(20,10),
+            ADD COLUMN IF NOT EXISTS opening_balance_base_amount      NUMERIC(20,6),
+            ADD COLUMN IF NOT EXISTS opening_balance_native_amount    NUMERIC(20,6);
+
+          -- customers: opening balance currency (migration 20260720_006)
+          ALTER TABLE customers
+            ADD COLUMN IF NOT EXISTS opening_balance_native_amount    NUMERIC(20,6),
+            ADD COLUMN IF NOT EXISTS opening_balance_currency         VARCHAR(10),
+            ADD COLUMN IF NOT EXISTS opening_balance_historical_rate  NUMERIC(20,10),
+            ADD COLUMN IF NOT EXISTS opening_balance_base_amount      NUMERIC(20,6);
+
+          -- suppliers: opening balance currency + side (migration 20260720_006)
+          ALTER TABLE suppliers
+            ADD COLUMN IF NOT EXISTS opening_balance_side             VARCHAR(2) DEFAULT 'Cr',
+            ADD COLUMN IF NOT EXISTS opening_balance_native_amount    NUMERIC(20,6),
+            ADD COLUMN IF NOT EXISTS opening_balance_currency         VARCHAR(10),
+            ADD COLUMN IF NOT EXISTS opening_balance_historical_rate  NUMERIC(20,10),
+            ADD COLUMN IF NOT EXISTS opening_balance_base_amount      NUMERIC(20,6);
+
+          -- employees: opening balance currency + side (migration 20260720_006)
+          ALTER TABLE employees
+            ADD COLUMN IF NOT EXISTS opening_balance_side             VARCHAR(2) DEFAULT 'Cr',
+            ADD COLUMN IF NOT EXISTS opening_balance_native_amount    NUMERIC(20,6),
+            ADD COLUMN IF NOT EXISTS opening_balance_currency         VARCHAR(10),
+            ADD COLUMN IF NOT EXISTS opening_balance_historical_rate  NUMERIC(20,10),
+            ADD COLUMN IF NOT EXISTS opening_balance_base_amount      NUMERIC(20,6);
+
+          -- fixed_assets: purchase currency (migration 20260720_006)
+          ALTER TABLE fixed_assets
+            ADD COLUMN IF NOT EXISTS purchase_native_amount           NUMERIC(20,6),
+            ADD COLUMN IF NOT EXISTS purchase_currency                VARCHAR(10),
+            ADD COLUMN IF NOT EXISTS purchase_historical_rate         NUMERIC(20,10),
+            ADD COLUMN IF NOT EXISTS purchase_base_amount             NUMERIC(20,6);
+        `);
+        console.log("[startup] ✓ Multi-currency schema columns ensured");
+      } catch (colErr: any) {
+        console.error("[startup] ✗ Could not ensure multi-currency columns:", colErr?.message);
+        // Non-fatal: the app will start but the dashboard net-profit query may still fail
+        // if the columns are genuinely absent.
+      }
+
       if (migrationsEnabled) {
         try {
           await runMigrations();
