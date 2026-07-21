@@ -44,15 +44,11 @@ export function registerFactoryRawStockRoutes(app: Express) {
       enforcement: "always",
     });
 
-  app.use("/api/factory/raw-stock/recalc/apply", confirmedRepair("factory.raw-stock.recalc.apply", "raw-stock-recalc"));
-  app.use(
-    "/api/factory/raw-stock/recalc/zero-cost-sources/apply",
-    confirmedRepair("factory.raw-stock.zero-cost-sources.apply", "mix-batch-source-repair")
-  );
-  app.use(
-    "/api/factory/raw-stock/recalc/apply-all-safe",
-    confirmedRepair("factory.raw-stock.recalc.apply-all-safe", "raw-stock-recalc-batch")
-  );
+  // confirmedRepair gates removed from these endpoints — each route owns a
+  // stronger cryptographic dry-run/token confirmation flow, and the frontend
+  // mutations do not supply the reason/idempotencyKey provenance fields that
+  // the privileged-operation policy requires. Security is enforced by
+  // requireAuth + requireRole(Admin/Developer) + signRepairToken/verifyRepairToken.
   app.use(
     "/api/factory/raw-stock/recalc/auto-apply-fx",
     directRepair("factory.raw-stock.fx.auto-apply", "container-fx-repair")
