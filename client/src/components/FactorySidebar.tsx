@@ -93,7 +93,6 @@ export const FACTORY_NAV_SECTIONS: FactoryNavSection[] = [
       { title: "Raw Materials", url: "/factory/raw-materials", icon: Package },
       { title: "Waste Dispatch", url: "/factory/waste-dispatch", icon: Trash2 },
       { title: "Bale Explorer", url: "/factory/bales-hub", icon: History },
-      { title: "Production Comparison", url: "/factory/production-comparison", icon: Scale },
     ],
   },
   {

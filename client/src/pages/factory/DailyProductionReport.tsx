@@ -5,6 +5,7 @@ import FactoryShippingContainers from "@/pages/factory/FactoryShippingContainers
 import FactoryStatusBuilder from "@/pages/factory/FactoryStatusBuilder";
 import FactoryContainerTracking from "@/pages/factory/FactoryContainerTracking";
 import FactoryOtwTrackingTab from "@/pages/factory/FactoryOtwTrackingTab";
+import ProductionComparison from "@/pages/factory/ProductionComparison";
 import { addDays, format } from "date-fns";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -1284,6 +1285,9 @@ export default function DailyProductionReport() {
           <TabsTrigger value="production" data-testid="tab-production">
             Production
           </TabsTrigger>
+          <TabsTrigger value="comparison" data-testid="tab-comparison">
+            Comparison
+          </TabsTrigger>
           <TabsTrigger value="snapshot" data-testid="tab-snapshot" className="hidden">
             Financial Snapshot
           </TabsTrigger>
@@ -2352,6 +2356,11 @@ export default function DailyProductionReport() {
               )}
             </>
           )}
+        </TabsContent>
+
+        {/* ── Production Comparison tab ── */}
+        <TabsContent value="comparison" className="flex-1 overflow-y-auto p-4 mt-0 data-[state=inactive]:hidden">
+          <ProductionComparison />
         </TabsContent>
 
         {/* ── Shipping Containers tab ── */}
