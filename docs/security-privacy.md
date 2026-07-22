@@ -52,3 +52,12 @@
 - No analytics, telemetry, or usage tracking is sent to any external server.
 - No user data is shared with third parties.
 - The system does not use cookies beyond what is required for session management.
+
+---
+
+## Known Accepted Risks
+
+### `xlsx` (SheetJS) — prototype pollution / ReDoS
+- **Advisories:** GHSA-4r6h-8v6p-xvw6 (prototype pollution), GHSA-5pgg-2g8v-p4x9 (ReDoS). No npm fix is published — SheetJS ships fixes only via its own CDN.
+- **Exposure:** these are only reachable when *parsing* a malicious `.xlsx` file. In this app that requires an **authenticated user uploading a crafted spreadsheet** (factory/payroll/git import flows) — there is no unauthenticated or remote vector.
+- **Decision:** accepted for now. Removing the dependency means migrating Excel parse/export logic off `xlsx` (used across several import/export routes) to `exceljs`, which cannot be validated without exercising each export/import against real data. Tracked as a follow-up; all other production `npm audit` criticals/highs have been resolved.
