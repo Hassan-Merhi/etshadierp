@@ -904,6 +904,18 @@ export function registerSupplierFxRoutes(app: Express) {
         .delete(factorySupplierFxTransfers)
         .where(and(eq(factorySupplierFxTransfers.id, id), eq(factorySupplierFxTransfers.companyId, companyId)));
 
+      // Remove the original daybook entry that was written when this transfer was created.
+      // Without this, the SUPPLIER_FX_TRANSFER row lingers in the daybook even after deletion.
+      await db
+        .delete(factoryDaybookEntries)
+        .where(
+          and(
+            eq(factoryDaybookEntries.companyId, companyId),
+            eq(factoryDaybookEntries.txType, "SUPPLIER_FX_TRANSFER"),
+            eq(factoryDaybookEntries.referenceId, id),
+          )
+        );
+
       await writeDaybookEntry(db, {
         companyId,
         txDate: getClientDate(req),
