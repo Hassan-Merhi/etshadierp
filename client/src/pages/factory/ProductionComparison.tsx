@@ -111,7 +111,8 @@ interface MergedRow {
 // ── Formatting ────────────────────────────────────────────────────────────────
 
 function fmtKg(n: number) {
-  return n.toLocaleString("en-US", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+  // Show 1 decimal only when needed (strips ".0" for whole numbers)
+  return n.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 1 });
 }
 function fmtNum(n: number) {
   return n.toLocaleString("en-US");
@@ -444,7 +445,7 @@ export default function ProductionComparison() {
             r.productName.toLowerCase().includes(q)
           );
         })
-        .sort((a, b) => Math.abs(b.aQty - b.bQty) - Math.abs(a.aQty - a.bQty)),
+        .sort((a, b) => (a.productName || a.articleCode).localeCompare(b.productName || b.articleCode)),
     [mergedAll, filterCategories, filterGrades, filterProduct],
   );
 
@@ -696,7 +697,6 @@ export default function ProductionComparison() {
                   {filtered.map((row) => {
                     const qDiff = row.aQty - row.bQty;
                     const kDiff = row.aKg - row.bKg;
-                    const pct = pctChange(row.aQty, row.bQty);
                     return (
                       <TableRow key={row.articleCode}>
                         <TableCell>
@@ -716,28 +716,25 @@ export default function ProductionComparison() {
                             <span className="text-muted-foreground text-xs">—</span>
                           )}
                         </TableCell>
-                        <TableCell className="text-right tabular-nums font-medium">
+                        <TableCell className="text-center tabular-nums font-medium">
                           {fmtNum(row.aQty)}
                         </TableCell>
-                        <TableCell className="text-right tabular-nums text-muted-foreground">
+                        <TableCell className="text-center tabular-nums text-muted-foreground">
                           {fmtNum(row.bQty)}
                         </TableCell>
-                        <TableCell className="text-right">
+                        <TableCell className="text-center">
                           <DiffCell
                             value={qDiff}
                             fmt={(n) => (n > 0 ? "+" : "") + fmtNum(n)}
                           />
                         </TableCell>
-                        <TableCell className="text-right">
-                          <PctCell pct={pct} />
-                        </TableCell>
-                        <TableCell className="text-right tabular-nums text-sm">
+                        <TableCell className="text-center tabular-nums text-sm">
                           {fmtKg(row.aKg)}
                         </TableCell>
-                        <TableCell className="text-right tabular-nums text-sm text-muted-foreground">
+                        <TableCell className="text-center tabular-nums text-sm text-muted-foreground">
                           {fmtKg(row.bKg)}
                         </TableCell>
-                        <TableCell className="text-right">
+                        <TableCell className="text-center">
                           <DiffCell
                             value={kDiff}
                             fmt={(n) => (n > 0 ? "+" : "") + fmtKg(n)}
