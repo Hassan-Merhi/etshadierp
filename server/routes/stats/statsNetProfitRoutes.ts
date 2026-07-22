@@ -457,7 +457,7 @@ export function registerStatsNetProfitRoutes(app: Express) {
       const cfaRateRows =
         companyBaseCurrency === "CFA"
           ? await db
-              .select()
+              .select({ rate: exchangeRates.rate })
               .from(exchangeRates)
               .where(
                 and(
@@ -625,8 +625,14 @@ export function registerStatsNetProfitRoutes(app: Express) {
       }
 
       // Add Workers/Payroll - employee balances (salary payable only)
+      // Select only the columns we actually use to avoid schema-mismatch errors on production
+      // when new columns have been added to the Drizzle schema but not yet migrated.
       const companyEmployees = await db
-        .select()
+        .select({
+          id:             employees.id,
+          companyId:      employees.companyId,
+          openingBalance: employees.openingBalance,
+        })
         .from(employees)
         .where(and(eq(employees.companyId, companyId), eq(employees.active, true), isNull(employees.deletedAt)))
         .execute();
@@ -636,8 +642,8 @@ export function registerStatsNetProfitRoutes(app: Express) {
       let workerLiabilities = 0;
       for (const emp of companyEmployees) {
         const opening = parseFloat((emp as any).openingBalance || "0");
-        const openingSide = (emp as any).openingBalanceSide === "Dr" ? 1 : -1; // default Cr = we owe them
-        const signedOpening = opening * openingSide;
+        // employees table has no openingBalanceSide — convention is Cr (we owe them), so negate.
+        const signedOpening = opening * -1;
         const balance = employeeBalances.get(emp.id) || { debit: 0, credit: 0 };
         const netBalance = signedOpening + balance.debit - balance.credit;
         if (netBalance < 0) {
@@ -718,10 +724,17 @@ export function registerStatsNetProfitRoutes(app: Express) {
       if (shouldIncludeSuppliers) {
         // Only fetch suppliers that appear in this company's entries (avoids full-table scan)
         const supplierIdsWithBalance = [...supplierBalances.keys()];
+        // Select only the columns we actually use to avoid schema-mismatch 500s when new
+        // columns exist in the Drizzle schema but haven't been migrated to production yet.
         const allSuppliers =
           supplierIdsWithBalance.length > 0
             ? await db
-                .select()
+                .select({
+                  id:             suppliers.id,
+                  legalName:      suppliers.legalName,
+                  code:           suppliers.code,
+                  openingBalance: suppliers.openingBalance,
+                })
                 .from(suppliers)
                 .where(and(isNull(suppliers.deletedAt), inArray(suppliers.id, supplierIdsWithBalance)))
                 .execute()
@@ -791,7 +804,17 @@ export function registerStatsNetProfitRoutes(app: Express) {
               )
             )
           : and(eq(containers.companyId, companyId), eq(containers.status, "OTW"));
-        const otwContainers = await db.select().from(containers).where(otwContainersQuery).execute();
+        // Select only the columns needed for OTW value calculation — avoids schema-mismatch
+        // 500s when new columns (e.g. locked_rate, fx_rate_confirmed) are in the Drizzle
+        // schema but haven't been migrated to production yet.
+        const otwContainers = await db
+          .select({
+            grandTotal: containers.grandTotal,
+            itemsTotal: containers.itemsTotal,
+          })
+          .from(containers)
+          .where(otwContainersQuery)
+          .execute();
 
         let stockOtwValue = 0;
         for (const container of otwContainers) {
