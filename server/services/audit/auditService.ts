@@ -11,6 +11,15 @@ export type AuditAction =
   | "login"
   | "logout"
   | "import"
+  | "export"
+  | "send_whatsapp"
+  | "send_email"
+  | "cancel"
+  | "void"
+  | "return"
+  | "restore"
+  | "repair"
+  | "recalculate"
   | "migrate";
 
 export type AuditChange = { old?: unknown; new?: unknown };

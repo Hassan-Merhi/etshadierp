@@ -1,7 +1,7 @@
 import type { Request } from "express";
 import { HttpError } from "./httpHandlers";
 
-export function getSessionUserId(request: Request): number {
+export function getSessionUserId(request: Request): string {
   const userId = request.session.userId;
   if (!userId) {
     throw new HttpError(401, "Not authenticated");

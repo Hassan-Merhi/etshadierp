@@ -267,7 +267,6 @@ export function registerAccountCurrencyRoutes(app: Express) {
       if (historical) {
         return res.json({
           balance: Number(historical.historicalBaseBalance),
-          historicalBaseBalance: historical.historicalBaseBalance,
           currentTranslatedBaseBalance: null,
           translationDifference: null,
           nativeBalancesByCurrency: {},

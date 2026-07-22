@@ -204,8 +204,13 @@ if (typeof window !== "undefined" && !window.__erpDaybookPaginationInstalled) {
   function renderControls(): void {
     const root = ensureControls();
     // Pagination UI is intentionally hidden — all data loads in a single request.
-    root.style.display = "none";
-    return;
+    // Typed as boolean (not the literal `false`) so the disabled controls below
+    // stay reachable for type-checking until pagination is re-enabled.
+    const PAGINATION_UI_ENABLED = false as boolean;
+    if (!PAGINATION_UI_ENABLED) {
+      root.style.display = "none";
+      return;
+    }
     if (!activeMeta || !ROUTES.has(window.location.pathname) || hasDeepLink()) {
       root.style.display = "none";
       return;

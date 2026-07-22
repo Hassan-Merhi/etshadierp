@@ -1,8 +1,11 @@
 import type { NextFunction, Request, RequestHandler, Response } from "express";
 
+// Intersect with the globally-augmented `Request["user"]` shape (see the
+// Express namespace augmentation in server/index.ts) so this stays a valid
+// subtype of Request. User IDs are varchar in the schema, hence `string`.
 export interface AuthenticatedRequest extends Request {
-  user?: {
-    id?: number;
+  user?: NonNullable<Request["user"]> & {
+    id?: string;
     role?: string;
   };
 }
@@ -17,7 +20,7 @@ export class HttpError extends Error {
   }
 }
 
-export function getAuthenticatedUserId(request: AuthenticatedRequest): number {
+export function getAuthenticatedUserId(request: AuthenticatedRequest): string {
   const userId = request.user?.id;
   if (!userId) {
     throw new HttpError(401, "Not authenticated");

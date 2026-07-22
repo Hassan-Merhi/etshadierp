@@ -124,7 +124,8 @@ import multer from "multer";
 import path from "path";
 import fs from "fs";
 
-export { buildSafeFilename as buildExportFilename } from "../../../lib/contentDisposition";
+import { buildSafeFilename as buildExportFilename } from "../../../lib/contentDisposition";
+export { buildExportFilename };
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Shared helper: build the Commercial Invoice Excel workbook for an order and

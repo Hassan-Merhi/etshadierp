@@ -110,7 +110,7 @@ export function requireLegacyPrivilegedWrite(options: LegacyPrivilegedWriteOptio
       const denied = error instanceof PrivilegedOperationError || error instanceof AuthorizationDeniedError;
       if (!denied) return next(error);
       try {
-        await audit(req, options, "denied", error.code || error.name || "DENIED", sourceId);
+        await audit(req, options, "denied", error.code, sourceId);
       } catch (auditError) {
         console.error("Security audit persistence failed:", auditError);
       }

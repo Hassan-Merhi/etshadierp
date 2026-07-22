@@ -120,7 +120,7 @@ export function requirePrivilegedOperation(options: PrivilegedRouteOptions) {
     } catch (error: any) {
       if (error instanceof PrivilegedOperationError || error instanceof AuthorizationDeniedError) {
         try {
-          await recordPrivilegedDecision(req, options, "denied", error.code || error.name || "DENIED");
+          await recordPrivilegedDecision(req, options, "denied", error.code);
         } catch (auditError) {
           console.error("Security audit persistence failed:", auditError);
         }

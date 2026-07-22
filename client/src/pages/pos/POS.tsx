@@ -213,7 +213,18 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
       amount: parseFloat(item.totalSales),
       configuredPrice: parseFloat(item.configuredPrice || "0") || undefined,
     }));
-    newRows.push({ id: String(newRows.length + 1), itemName: "", quantity: 0, rate: 0, rateUSD: 0, amount: 0 });
+    newRows.push({
+      id: String(newRows.length + 1),
+      itemName: "",
+      stockItemCode: "",
+      stockItemId: undefined,
+      salesItemId: undefined,
+      quantity: 0,
+      rate: 0,
+      rateUSD: 0,
+      amount: 0,
+      configuredPrice: undefined,
+    });
     setRows(newRows);
 
     if (editVoucher.description) setNotes(editVoucher.description);

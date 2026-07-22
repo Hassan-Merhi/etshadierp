@@ -91,8 +91,9 @@ const originalPoolQuery = pool.query.bind(pool);
     logSlowDatabaseQuery(durationMillis, databaseRuntimeConfig.slowQueryThresholdMillis);
   };
 
-  if (result && typeof (result as Promise<unknown>).finally === "function") {
-    return (result as Promise<unknown>).finally(recordQueryCompletion);
+  const maybePromise = result as unknown as Promise<unknown> | undefined;
+  if (maybePromise && typeof maybePromise.finally === "function") {
+    return maybePromise.finally(recordQueryCompletion);
   }
 
   recordQueryCompletion();

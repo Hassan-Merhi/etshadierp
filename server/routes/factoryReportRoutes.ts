@@ -19,6 +19,7 @@ import {
   companies,
 } from "@shared/schema";
 import { getUserHideAllCosts } from "./factory/_helpers";
+import { logAudit } from "./_helpers";
 
 export function registerFactoryReportRoutes(app: Express, requireAuth: any, db: any) {
   async function writeDaybookEntry(

@@ -115,7 +115,7 @@ export function requireStoredFileAccess(action: "read" | "download") {
       const denied = error instanceof AuthorizationDeniedError || error instanceof ProtectedAssetAccessError;
       if (!denied) return next(error);
       try {
-        await audit(req, action, "denied", error.code || error.name || "DENIED", assetId);
+        await audit(req, action, "denied", error.code, assetId);
       } catch (auditError) {
         console.error("Security audit persistence failed:", auditError);
       }

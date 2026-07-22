@@ -57,7 +57,7 @@ export function DashboardMetric({ label, value, detail, icon: Icon, className, .
 }
 
 export function DashboardMetricGrid({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
-  return <ResponsiveGrid minItemWidth="15rem" className={cn("gap-3", className)} {...props} />;
+  return <ResponsiveGrid minColumnWidth="15rem" className={cn("gap-3", className)} {...props} />;
 }
 
 export function DashboardSection({ title, description, actions, className, children, ...props }: React.HTMLAttributes<HTMLElement> & {

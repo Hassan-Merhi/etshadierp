@@ -55,10 +55,10 @@ export default function PendingLoadings() {
       </PageHeader>
 
       {isLoading ? (
-        <LoadingRows count={3} rowClassName="h-20" />
+        <LoadingRows rows={3} rowClassName="h-20" />
       ) : loads.length === 0 ? (
         <EmptyState
-          icon={Clock}
+          icon={<Clock className="h-5 w-5" />}
           title="No pending loads"
           description="All container loadings are either complete or not yet started."
           action={
