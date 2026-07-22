@@ -1980,6 +1980,33 @@ export default function DailyProductionReport() {
                     <StatRow label="Weight" value={fmtKg(data?.balanceOnTable.weightKg ?? 0)} />
                     <StatRow label="Batch Rate" value={fmtRate(data?.balanceOnTable.costPerKg ?? 0)} sub="per kg" />
                     <StatRow label="Value" value={fmtMoney(data?.balanceOnTable.value ?? 0)} />
+                    {/* Production Profit = (bales produced kg × balance batch rate) − bales produced value */}
+                    {(() => {
+                      const producedKg = data?.production.totalWeightKg ?? 0;
+                      const batchRate  = data?.balanceOnTable.costPerKg ?? 0;
+                      const producedVal = data?.production.totalValue ?? 0;
+                      const profit = (producedKg * batchRate) - producedVal;
+                      const isPos = profit > 0;
+                      const isNeg = profit < 0;
+                      return (
+                        <div className="mt-2 pt-2 border-t border-violet-200 dark:border-violet-800/40 flex items-center justify-between">
+                          <span className="text-xs font-bold uppercase tracking-wide text-violet-700 dark:text-violet-400">
+                            Production Profit
+                          </span>
+                          <span
+                            className={`text-sm font-extrabold tabular-nums ${
+                              isPos
+                                ? "text-emerald-600 dark:text-emerald-400"
+                                : isNeg
+                                  ? "text-red-500 dark:text-red-400"
+                                  : "text-muted-foreground"
+                            }`}
+                          >
+                            {isPos ? "+" : ""}{fmtMoney(profit)}
+                          </span>
+                        </div>
+                      );
+                    })()}
                   </>
                 )}
               </CardContent>
