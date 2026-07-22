@@ -669,11 +669,20 @@ export function registerStatsNetProfitRoutes(app: Express) {
 
       // Authoritative ERP worker advances = SUM(salaryAdvances.remainingBalance)
       // WHERE fullyPaid = false AND companyId = X — exactly what Payroll → Advances shows.
-      const [saRow] = await db
-        .select({ total: sql<string>`COALESCE(SUM(CAST(${salaryAdvances.remainingBalance} AS numeric)), 0)` })
-        .from(salaryAdvances)
-        .where(and(eq(salaryAdvances.companyId, companyId), eq(salaryAdvances.fullyPaid, false)));
-      const rawSalaryAdvances = round2(parseFloat((saRow as any)?.total || "0"));
+      // Wrapped in try-catch: if salary_advances is missing remaining_balance / fully_paid
+      // (pre-migration production schema), fall back to 0 rather than crashing the whole
+      // net-profit response with a 500 / column-not-found error.
+      let rawSalaryAdvances = 0;
+      try {
+        const [saRow] = await db
+          .select({ total: sql<string>`COALESCE(SUM(CAST(${salaryAdvances.remainingBalance} AS numeric)), 0)` })
+          .from(salaryAdvances)
+          .where(and(eq(salaryAdvances.companyId, companyId), eq(salaryAdvances.fullyPaid, false)));
+        rawSalaryAdvances = round2(parseFloat((saRow as any)?.total || "0"));
+      } catch (saErr: any) {
+        // Fallback: column may be absent on old production schemas. Dashboard still loads.
+        console.warn("[/api/stats/net-profit] salary_advances query skipped (schema gap):", saErr?.message);
+      }
       // For CFA companies, worker balances come from voucher entries.
       // Guard: only convert if ALL entries are pre-migration (hasMigratedEntries=false).
       // After migration COALESCE already returns USD-base values; re-dividing by CFA rate

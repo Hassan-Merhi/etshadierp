@@ -5890,6 +5890,36 @@ END $mig$`;
             ADD COLUMN IF NOT EXISTS purchase_currency                VARCHAR(10),
             ADD COLUMN IF NOT EXISTS purchase_historical_rate         NUMERIC(20,10),
             ADD COLUMN IF NOT EXISTS purchase_base_amount             NUMERIC(20,6);
+
+          -- salary_advances: remaining_balance + fully_paid (added in a later drizzle migration
+          -- that never ran on production because RUN_STARTUP_MIGRATIONS=false).
+          -- Without these columns /api/stats/net-profit throws "column does not exist" and
+          -- the dashboard shows the financial-data error banner.
+          ALTER TABLE salary_advances
+            ADD COLUMN IF NOT EXISTS remaining_balance DECIMAL(15,2) NOT NULL DEFAULT 0,
+            ADD COLUMN IF NOT EXISTS fully_paid        BOOLEAN       NOT NULL DEFAULT false;
+
+          -- fiscal_period_closures: the startup migration at index 2673 only adds an FK
+          -- constraint but never creates the table itself. Add it here idempotently so the
+          -- table exists before the FK migration runs (it is a no-op if already present).
+          CREATE TABLE IF NOT EXISTS fiscal_period_closures (
+            id                          SERIAL PRIMARY KEY,
+            company_id                  INTEGER      NOT NULL,
+            period_start_date           DATE         NOT NULL,
+            period_end_date             DATE         NOT NULL,
+            closure_date                TIMESTAMP    NOT NULL DEFAULT NOW(),
+            closed_by_user_id           VARCHAR      NOT NULL,
+            closing_voucher_id          INTEGER      NOT NULL,
+            retained_earnings_account_id INTEGER     NOT NULL,
+            total_income                DECIMAL(15,2) NOT NULL,
+            total_expense               DECIMAL(15,2) NOT NULL,
+            net_income                  DECIMAL(15,2) NOT NULL,
+            status                      TEXT         NOT NULL DEFAULT 'CLOSED',
+            notes                       TEXT,
+            created_at                  TIMESTAMP    NOT NULL DEFAULT NOW()
+          );
+          CREATE UNIQUE INDEX IF NOT EXISTS fiscal_closures_company_period_unique
+            ON fiscal_period_closures (company_id, period_end_date);
         `);
         console.log("[startup] ✓ Multi-currency schema columns ensured");
       } catch (colErr: any) {
