@@ -2866,6 +2866,26 @@ export default function FactoryDaybook() {
                                               <Trash2 className="h-3 w-3" />
                                             </Button>
                                           )}
+                                        {/* Hard-delete button for non-voucher entries (admin/developer only).
+                                            SUPPLIER_FX_TRANSFER must be deleted from the supplier management
+                                            page so the underlying transfer record is also removed. */}
+                                        {isAdminOrOwner &&
+                                          entry.id > 0 &&
+                                          entry.txType !== "SUPPLIER_FX_TRANSFER" &&
+                                          !(isVoucherBacked && ["PAYMENT", "RECEIPT", "JOURNAL"].includes(entry.txType)) && (
+                                            <Button
+                                              size="icon"
+                                              variant="ghost"
+                                              title="Delete entry"
+                                              onClick={(e) => {
+                                                e.stopPropagation();
+                                                setDeleteEntry(de._source as DaybookEntry);
+                                              }}
+                                              data-testid={`button-delete-${entry.id}`}
+                                            >
+                                              <Trash2 className="h-3 w-3 text-destructive/70" />
+                                            </Button>
+                                          )}
                                       </div>
                                     ) : (
                                       <div className="flex items-center justify-end gap-1 pr-2 py-2">

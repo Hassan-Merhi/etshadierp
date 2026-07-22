@@ -965,6 +965,53 @@ export function registerFactoryContainersRoutes(app: Express) {
         await db.delete(vouchers).where(eq(vouchers.id, existingFV.id));
       }
 
+      // ── Sync CONTAINER_IMPORT daybook entry ────────────────────────────────
+      // If any description-relevant fields were changed (container number, supplier,
+      // quantity, rate, currency, arrival date), update the stored daybook entry so
+      // the daybook always shows current data without requiring a separate migration.
+      const descRelevantFields = ["containerNumber", "supplierId", "totalKg", "ratePerKg", "currencyCode", "arrivalDate"];
+      const touchedDescField = descRelevantFields.some((f) => f in updateData);
+      if (touchedDescField) {
+        let supplierNameForSync = "";
+        if (updated.supplierId) {
+          const [sup] = await db
+            .select({ name: factorySuppliers.name })
+            .from(factorySuppliers)
+            .where(eq(factorySuppliers.id, updated.supplierId));
+          supplierNameForSync = sup?.name || "";
+        }
+        const kgForSync = parseFloat(updated.totalKg || "0");
+        const rateForSync = parseFloat(updated.ratePerKg || "0");
+        const ccyForSync = updated.currencyCode || "USD";
+        const syncDescParts = [
+          updated.containerNumber,
+          supplierNameForSync,
+          kgForSync > 0 ? `${kgForSync.toLocaleString()} kg` : null,
+          rateForSync > 0 ? `${rateForSync} ${ccyForSync}/kg` : null,
+        ].filter(Boolean);
+        const syncDesc = syncDescParts.join(" · ");
+        const syncAmount = rateForSync * kgForSync;
+        const syncFxRate = parseFloat((updated as any).fxRateToUsd || "1") || 1;
+        const daybookUpdateSet: Record<string, any> = { description: syncDesc };
+        if (syncAmount > 0) {
+          daybookUpdateSet.amountCurrency = String(syncAmount);
+          daybookUpdateSet.amountUsd = String(syncAmount * syncFxRate);
+        }
+        if ("arrivalDate" in updateData && updated.arrivalDate) {
+          daybookUpdateSet.txDate = updated.arrivalDate;
+        }
+        await db
+          .update(factoryDaybookEntries)
+          .set(daybookUpdateSet)
+          .where(
+            and(
+              eq(factoryDaybookEntries.companyId, companyId),
+              eq(factoryDaybookEntries.txType, "CONTAINER_IMPORT"),
+              eq(factoryDaybookEntries.referenceId, id)
+            )
+          );
+      }
+
       logger.info("factory container update succeeded", { module: "factoryContainers", action: "update", userId: _uid, companyId: _cid, containerId: id, durationMs: Date.now() - _t });
       res.json(updated);
     } catch (error: any) {

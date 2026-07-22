@@ -299,6 +299,24 @@ export function registerFactoryDaybookRoutes(app: Express) {
         liveRepayments.forEach((a: any) => validRepaymentIds.add(a.id));
       }
 
+      // ── 1f. Safety-net: drop container-backed entries whose container was soft-deleted ─
+      // CONTAINER_IMPORT and PURCHASE entries reference a factory_containers row.
+      // If the container was soft-deleted (deletedAt IS NOT NULL) the daybook entry
+      // must be hidden — otherwise bulk-deleted containers leave ghost entries behind.
+      const CONTAINER_TX_TYPES = new Set(["CONTAINER_IMPORT", "PURCHASE"]);
+      const containerRefIds = daybookRows
+        .filter((r: any) => CONTAINER_TX_TYPES.has(r.txType) && r.referenceId != null)
+        .map((r: any) => r.referenceId as number);
+
+      const validContainerIds = new Set<number>();
+      if (containerRefIds.length > 0) {
+        const liveContainers = await db
+          .select({ id: factoryContainers.id })
+          .from(factoryContainers)
+          .where(and(inArray(factoryContainers.id, containerRefIds), isNull(factoryContainers.deletedAt)));
+        liveContainers.forEach((c: any) => validContainerIds.add(c.id));
+      }
+
       const filteredDaybookRows = daybookRows
         .filter((r: any) => {
           // Drop voucher-backed entries whose voucher was deleted
@@ -321,6 +339,10 @@ export function registerFactoryDaybookRoutes(app: Express) {
           if (r.referenceTable === "factory_advance_repayments" || REPAYMENT_TX_TYPES.has(r.txType)) {
             if (r.referenceId == null) return false;
             return validRepaymentIds.has(r.referenceId);
+          }
+          // Drop container-backed entries whose container was soft-deleted
+          if (CONTAINER_TX_TYPES.has(r.txType) && r.referenceId != null) {
+            return validContainerIds.has(r.referenceId);
           }
           return true;
         })
