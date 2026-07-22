@@ -260,23 +260,29 @@ export function registerAccountCurrencyRoutes(app: Express) {
       const cashSummary = await getCashBankAccountSummary(companyId, "ledger", id);
       if (cashSummary) {
         const displayBalance = cashSummary.currentTranslatedBaseBalance ?? cashSummary.historicalBaseBalance;
-        // When the opening balance currency is unresolved (openingBalanceBaseAmount is null),
-        // getCashBankRevaluation excludes it from historicalBaseBalance to avoid mixing
-        // denominations. Add it back here so the returned `balance` reflects the true
-        // running balance (OB + debits − credits) for display in voucher details.
+        // historicalBaseBalance only covers entries whose currency is fully resolved to a
+        // USD base amount. Add back the two missing pieces so the returned balance equals
+        // (OB + all_debits − all_credits) — the same formula used by the legacy route:
+        //   1. Unresolved opening balance (OB whose currency metadata was never backfilled)
+        //   2. Unresolved legacy entry raw net (non-USD entries without a base conversion)
         let balance = Number(displayBalance);
         if (cashSummary.openingBalanceCurrencyUnresolved && cashSummary.unresolvedOpeningBalanceRaw != null) {
           balance += Number(cashSummary.unresolvedOpeningBalanceRaw);
         }
+        balance += Number(cashSummary.unresolvedLegacyNetRaw || 0);
         return res.json({ balance, ...cashSummary });
       }
 
       const historical = await getHistoricalLedgerBalance(companyId, id);
       if (historical) {
+        // historicalBaseBalance = resolved-entry net (USD-denominated).
+        // Add back: (1) unresolved OB, (2) unresolved legacy entry raw net.
+        // Together these reproduce: OB_signed + total_debits − total_credits.
         let balance = Number(historical.historicalBaseBalance);
         if (historical.openingBalanceCurrencyUnresolved && historical.unresolvedOpeningBalanceRaw != null) {
           balance += Number(historical.unresolvedOpeningBalanceRaw);
         }
+        balance += Number(historical.unresolvedLegacyNetRaw || 0);
         return res.json({
           balance,
           currentTranslatedBaseBalance: null,
@@ -295,6 +301,7 @@ export function registerAccountCurrencyRoutes(app: Express) {
       if (bankSummary.openingBalanceCurrencyUnresolved && bankSummary.unresolvedOpeningBalanceRaw != null) {
         bankBalance += Number(bankSummary.unresolvedOpeningBalanceRaw);
       }
+      bankBalance += Number(bankSummary.unresolvedLegacyNetRaw || 0);
       return res.json({ balance: bankBalance, ...bankSummary });
     } catch (error: any) {
       return res.status(500).json({ message: error.message });
