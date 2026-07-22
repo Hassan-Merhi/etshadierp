@@ -358,12 +358,38 @@ if (!globalThis[BRIDGE_FLAG]) {
       }
 
       return withSharedExportSlot(label, async () => {
+        // Use writeBuffer() (not write(stream)) — ExcelJS 3.x write(stream) is broken
+        // (throws "ea.results is not a Promise" and produces 0-byte / corrupt output).
+        // writeBuffer() is the only reliable API; we then flush the in-memory buffer to
+        // a temp file so large exports don't block the event loop for too long.
+        const rawBuffer = await originalWriteBuffer.call(this, options);
+
+        // Normalise whatever ExcelJS actually returned (Buffer / Uint8Array / ArrayBuffer)
+        let buf;
+        if (Buffer.isBuffer(rawBuffer)) {
+          buf = rawBuffer;
+        } else if (rawBuffer instanceof Uint8Array) {
+          buf = Buffer.from(rawBuffer.buffer, rawBuffer.byteOffset, rawBuffer.byteLength);
+        } else if (rawBuffer instanceof ArrayBuffer) {
+          buf = Buffer.from(rawBuffer);
+        } else {
+          // Fallback — return as-is and let the route handle it
+          return rawBuffer;
+        }
+
+        // Only write to a temp file when the buffer is large enough to justify it;
+        // small workbooks are returned directly as an in-memory marker.
+        if (buf.byteLength < chunkBridgeThreshold) {
+          return buf;
+        }
+
         await mkdir(tempRoot, { recursive: true });
         const filePath = path.join(tempRoot, `${Date.now()}-${randomUUID()}.xlsx`);
         const output = createWriteStream(filePath, { flags: "wx" });
         try {
-          const writing = originalWrite.call(this, output, options);
-          await Promise.all([writing, finished(output)]);
+          output.write(buf);
+          output.end();
+          await finished(output);
           const info = await stat(filePath);
           return createMarker({
             kind: "file",
