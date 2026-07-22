@@ -38,6 +38,8 @@ import {
   vouchers,
   voucherEntries,
   salesItems,
+  stockGrades,
+  stockCategories,
   suppliers,
   customers,
   locations,
@@ -234,6 +236,54 @@ export function registerContainerCrudRoutes(app: Express) {
         });
       }
       return res.status(500).json({ message: error.message });
+    }
+  });
+
+  // ── Bulk OTW line-items (replaces N individual /api/containers/:id fan-out) ─
+  // MUST be registered BEFORE the /:id route to avoid being swallowed by it.
+  app.get("/api/containers/otw-items", requireAuth, requireNonPOS, async (req, res) => {
+    try {
+      if (!req.session.currentCompanyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+      const companyId = req.session.currentCompanyId;
+
+      const rows = await db
+        .select({
+          stockItemCode: stockItems.code,
+          stockItemName: sql<string>`COALESCE(
+            CASE WHEN ${stockItems.deletedAt} IS NULL THEN ${stockItems.name} ELSE NULL END,
+            ${poLineItems.itemName}
+          )`,
+          quantity:    poLineItems.quantity,
+          totalCost:   poLineItems.lineTotal,
+          rate:        poLineItems.rate,
+          containerNumber: containers.containerNumber,
+          supplierId:  containers.supplierId,
+          supplierName: sql<string>`COALESCE(${suppliers.legalName}, 'Unknown')`,
+          importDate:  containers.importDate,
+          gradeId:     stockItems.gradeId,
+          gradeName:   stockGrades.name,
+          categoryId:  stockItems.categoryId,
+          categoryName: stockCategories.name,
+        })
+        .from(containers)
+        .innerJoin(purchaseOrders, eq(purchaseOrders.containerId, containers.id))
+        .innerJoin(poLineItems,    eq(poLineItems.poId, purchaseOrders.id))
+        .leftJoin(stockItems,      eq(stockItems.id,    poLineItems.stockItemId))
+        .leftJoin(stockGrades,     eq(stockGrades.id,   stockItems.gradeId))
+        .leftJoin(stockCategories, eq(stockCategories.id, stockItems.categoryId))
+        .leftJoin(suppliers,       eq(suppliers.id,     containers.supplierId))
+        .where(
+          and(
+            eq(containers.companyId, companyId),
+            eq(containers.status,    "OTW"),
+          ),
+        );
+
+      res.json(rows);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
     }
   });
 

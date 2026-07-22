@@ -1,5 +1,5 @@
 import { useState, useMemo, Fragment } from "react";
-import { useQuery, useQueries } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { useAppMode } from "@/contexts/AppModeContext";
 import { getApiRequest } from "@/lib/factoryApi";
 import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -11,16 +11,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Package, Search, Ship, AlertCircle, ChevronRight, ChevronDown, X, Layers, FileDown } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
-import type { Container, Supplier } from "@shared/schema";
+import type { Container } from "@shared/schema";
 import { PageHeader } from "@/components/PageHeader";
 import CombinedInventory from "@/pages/CombinedInventory";
 import { ExcelJS, writeFile } from "@/lib/excelHelper";
-
-interface ContainerDetailData {
-  container: Container;
-  pos: any[];
-  charges: any[];
-}
 
 interface StockItem {
   stockItemCode: string;
@@ -72,54 +66,21 @@ function StockOTWContent({ showCombined, onToggleCombined }: { showCombined: boo
     queryKey: ["/api/containers"],
   });
 
-  const { data: suppliers = [], error: suppliersError } = useQuery<Supplier[]>({
-    queryKey: ["/api/suppliers"],
+  // Single bulk query replaces the N-per-container useQueries fan-out
+  const {
+    data: otwItemsRaw = [],
+    isLoading: loadingOtwItems,
+    error: otwItemsError,
+  } = useQuery<StockItem[]>({
+    queryKey: ["/api/containers/otw-items"],
   });
 
   const otwContainers = useMemo(() => containers.filter((c) => c.status === "OTW"), [containers]);
 
-  const containerDetailsQueries = useQueries({
-    queries: otwContainers.map((container) => ({
-      queryKey: [`/api/containers/${container.id}`],
-      enabled: !!container.id,
-    })),
-  });
+  const isLoading = loadingContainers || loadingOtwItems;
+  const hasErrors = containersError || otwItemsError;
 
-  const isLoadingDetails = containerDetailsQueries.some((q) => q.isLoading);
-  const isLoading = loadingContainers || isLoadingDetails;
-
-  const hasDetailsErrors = containerDetailsQueries.some((q) => q.error);
-  const hasErrors = containersError || suppliersError || hasDetailsErrors;
-
-  const stockItems: StockItem[] = useMemo(() => {
-    const items: StockItem[] = [];
-    containerDetailsQueries.forEach((query, index) => {
-      if (query.data) {
-        const containerData = query.data as ContainerDetailData;
-        const container = otwContainers[index];
-        const supplier = suppliers.find((s) => s.id === container.supplierId);
-        containerData.pos.forEach((po: any) => {
-          po.items.forEach((item: any) => {
-            items.push({
-              stockItemCode: item.stockItemCode,
-              stockItemName: item.stockItemName,
-              quantity: item.quantity,
-              totalCost: item.totalCost,
-              rate: item.rate,
-              containerNumber: container.containerNumber,
-              supplierName: supplier?.legalName || "Unknown",
-              importDate: container.importDate,
-              gradeId: item.gradeId ?? null,
-              gradeName: item.gradeName ?? null,
-              categoryId: item.categoryId ?? null,
-              categoryName: item.categoryName ?? null,
-            });
-          });
-        });
-      }
-    });
-    return items;
-  }, [containerDetailsQueries, otwContainers, suppliers]);
+  const stockItems: StockItem[] = otwItemsRaw;
 
   const groupedItems: GroupedStockItem[] = useMemo(() => {
     const grouped = new Map<string, GroupedStockItem>();
@@ -502,8 +463,7 @@ function StockOTWContent({ showCombined, onToggleCombined }: { showCombined: boo
           <AlertTitle>Error Loading Data</AlertTitle>
           <AlertDescription>
             {containersError ? "Failed to load containers. " : ""}
-            {suppliersError ? "Failed to load suppliers. " : ""}
-            {hasDetailsErrors ? "Some container details could not be loaded. " : ""}
+            {otwItemsError ? "Failed to load stock items. " : ""}
             Please try refreshing the page.
           </AlertDescription>
         </Alert>
