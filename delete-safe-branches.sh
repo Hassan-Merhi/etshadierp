@@ -1,92 +1,49 @@
-branches=(
-  "audit/finalize-daybook-activity"
-  "fix/historical-replay-phase-1-executor"
+#!/usr/bin/env bash
+# Deletes 33 stale branches from Hassan-Merhi/etshadierp.
+# 20 are already MERGED into main (zero risk); 13 are abandoned/scratch/backup.
+# All 29 branches with OPEN pull requests are intentionally left untouched.
+set -euo pipefail
 
-  "quality/program-19-security-hardening"
-  "quality/program-18-deployment-reliability"
-  "quality/program-17-ui-consistency"
-  "quality/program-16-backend-architecture"
-  "quality/program-15-database-optimization"
-  "quality/program-14-frontend-architecture"
-  "quality/program-13-finalization"
-  "quality/phases-1-2"
-
-  "ui/usability-100-rollout"
-  "hotfix/sales-report-analytics-runtime"
-  "integration/programs-1-to-6-validation"
-
-  "agent/program-1-deployment-reliability"
-  "agent/memory-phase-1-stabilization"
-  "agent/fix-tracking-startup-resilience"
-  "agent/reapply-factory-request-log-fixes"
-  "agent/temporarily-revert-pr-67"
-  "agent/fix-remaining-bandwidth-bursts"
-
-  "agent/phase-7a-performance-baseline"
-  "agent/phase-7b-common-inventory-performance"
-  "agent/phase-7c-read-performance"
-
-  "agent/phase-8a-audit-framework"
-  "agent/phase-8b-voucher-pos-auditing"
-  "agent/phase-8c-inventory-transfer-container-auditing"
-  "agent/phase-8d-payroll-accounts-users-roles-migration-auditing"
-
-  "agent/phase-5a-health-metrics-v2"
-  "agent/phase-5b-event-detection"
-  "agent/phase-5c-external-alerting-checklist"
-
-  "agent/phase-9a-ci-coverage-format"
-  "agent/phase-9b-security-scanning"
-  "agent/phase-9c-branch-protection-guidance"
-
-  "agent/stock-items-bandwidth-light-callers"
-  "agent/inventory-integrity-hardening"
-  "agent/startup-migration-hardening"
-  "agent/inventory-test-hardening"
-  "agent/logging-observability-hardening"
-
-  "agent/phase-5a-health-metrics"
-
-  "agent/combo-4g-validation-v2"
-  "agent/combo-4g-validation"
-  "agent/combo-4f-validation"
-  "agent/combo-4e-validation-v1"
-
-  "agent/combo-4d-validation-v6"
-  "agent/combo-4d-validation-v5"
-  "agent/combo-4d-validation-v4"
-  "agent/combo-4d-validation-v3"
-  "agent/combo-4d-validation-v2"
-
-  "agent/combo-4c-container-freight-typescript-v2"
-  "agent/combo-4b-baseline-669695d"
-  "agent/combo-4a-final-validation"
+BRANCHES=(
+  # --- Tier A: merged into main (safe) ---
+  agent/combo-4a-safe-typescript-ui-reports
+  agent/combo-4b-payroll-nonstock-typescript-v3
+  agent/combo-4c-container-freight-typescript
+  agent/combo-4d-stock-pos-vouchers-typescript
+  agent/combo-4e-accounting-reports-typescript
+  agent/combo-4f-fiscal-sp-typescript
+  agent/combo-4g-final-data-model-typescript
+  agent/fix-container-access-offline-scan-replay
+  agent/fix-factory-request-log-bursts
+  agent/fix-pos-location-pool-crash
+  agent/program-2-accounting-inventory-integrity
+  combo-1-ci-safe-types
+  combo-2-logging-skipped-tests
+  combo-3-frontend-tests-coverage
+  fix/aikido-security-update-packages-41113995-tubz
+  fix/complete-multi-currency
+  fix/daybook-activity-company-isolation
+  fix/factory-landed-cost-reconciliation
+  fix/historical-replay-v7-completion
+  fix/render-critical-security-schema
+  # --- Tier B: abandoned / scratch / backup (no merged PR) ---
+  agent/combo-4b-payroll-accounting-reports
+  agent/combo-4b-payroll-nonstock-typescript
+  agent/combo-4b-payroll-nonstock-typescript-v2
+  agent/combo-4f-fiscal-transfer-typescript
+  backup/combo-1-before-sync-89cf3e1e
+  backup/combo-1-before-sync-ba639466
+  agent/program6b-parent-group-selector
+  agent/program6e-proforma-drawer-refetch-policy
+  fix/historical-replay-phase-3-fingerprint
+  quality/program-13-types
+  quality/program-13-types-2
+  temp/program6b-finish
+  work
 )
 
-deleted=0
-missing=0
-failed=0
+# Delete all in one push:
+git push origin --delete "${BRANCHES[@]}"
 
-for branch in "${branches[@]}"; do
-  if git ls-remote --exit-code --heads origin "$branch" >/dev/null 2>&1; then
-    echo "Deleting: $branch"
-
-    if git push origin --delete "$branch"; then
-      deleted=$((deleted + 1))
-    else
-      echo "FAILED: $branch"
-      failed=$((failed + 1))
-    fi
-  else
-    echo "Already missing: $branch"
-    missing=$((missing + 1))
-  fi
-done
-
-git fetch --prune origin
-
-echo
-echo "Cleanup complete"
-echo "Deleted: $deleted"
-echo "Already missing: $missing"
-echo "Failed: $failed"
+# --- OR, if you prefer the gh CLI, run this instead of the line above: ---
+# for b in "${BRANCHES[@]}"; do gh api -X DELETE "repos/Hassan-Merhi/etshadierp/git/refs/heads/$b" && echo "deleted $b"; done
