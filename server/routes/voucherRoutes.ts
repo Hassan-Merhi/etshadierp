@@ -8,12 +8,14 @@ import { registerVoucherPurchaseUpdateRoutes } from "./vouchers/voucherPurchaseU
 import { registerVoucherTransferRoutes } from "./vouchers/voucherTransferRoutes";
 import { registerSmartTransferPreviewRoutes } from "./vouchers/smartTransferPreviewRoutes";
 import { registerStockTransferLifecycleRoutes } from "./vouchers/stockTransferLifecycleRoutes";
+import { registerStockTransferRevisionLifecycleRoutes } from "./vouchers/stockTransferRevisionLifecycleRoutes";
 import { registerVoucherEntryRoutes } from "./voucherEntryRoutes";
 
 export function registerVoucherRoutes(app: Express) {
   // Must be registered before generic/legacy voucher handlers so stock-transfer
-  // draft/post transitions are owned by one atomic lifecycle transaction.
+  // draft/post and revision transitions are owned by atomic lifecycle transactions.
   registerStockTransferLifecycleRoutes(app);
+  registerStockTransferRevisionLifecycleRoutes(app);
   registerVoucherQueryRoutes(app);
   registerVoucherCreateRoutes(app);
   registerVoucherPaymentRoutes(app);
