@@ -50,7 +50,7 @@ export const newEntryRowSchema = z.object({
 export const createVoucherSchema = z
   .object({
     voucherType: z.enum(["Journal", "Payment", "Receipt", "Stock Transfer", "Sales", "Purchase", "Contra"], {
-      required_error: "Voucher type is required",
+      error: "Voucher type is required",
     }),
     voucherDate: z.string().min(1, "Voucher date is required"),
     description: z.string().optional(),

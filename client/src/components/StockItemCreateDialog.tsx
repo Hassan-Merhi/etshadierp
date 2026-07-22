@@ -36,7 +36,7 @@ interface StockCategory {
 // Extend the schema to make companyId optional for the form
 // (companyId is added during submission); stockGroupId is required
 const formSchema = insertStockItemSchema.extend({
-  stockGroupId: z.number({ required_error: "Stock Group is required", invalid_type_error: "Stock Group is required" }),
+  stockGroupId: z.number({ error: "Stock Group is required" }),
   companyId: z.number().optional(),
   gradeId: z.number().nullable().optional(),
   categoryId: z.number().nullable().optional(),

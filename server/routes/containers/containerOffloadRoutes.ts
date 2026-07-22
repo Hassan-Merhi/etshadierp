@@ -91,7 +91,7 @@ export function registerContainerOffloadRoutes(app: Express) {
       if (!validation.success) {
         return res.status(400).json({
           message: "Validation failed",
-          errors: validation.error.errors,
+          errors: validation.error.issues,
         });
       }
 
@@ -830,7 +830,7 @@ export function registerContainerOffloadRoutes(app: Express) {
         .safeParse(req.body);
 
       if (!validation.success) {
-        return res.status(400).json({ errors: validation.error.errors });
+        return res.status(400).json({ errors: validation.error.issues });
       }
 
       const {
@@ -857,6 +857,10 @@ export function registerContainerOffloadRoutes(app: Express) {
       if (!currentOffload) {
         return res.status(404).json({ message: "Offload record not found" });
       }
+
+      // Captured inside the transaction so the post-commit inventory sync
+      // (fire-and-forget block below) can compute the per-bale cost delta.
+      let newAdditionalCostPerBale = 0;
 
       await db.transaction(async (tx) => {
         // If location changed, need to move inventory
@@ -899,6 +903,7 @@ export function registerContainerOffloadRoutes(app: Express) {
         const totalBales = parseFloat(currentOffload.totalBales);
         // Round to 2 decimal places to prevent floating-point accumulation errors
         const additionalCostPerBale = totalBales > 0 ? Math.round((totalCharges / totalBales) * 100) / 100 : 0;
+        newAdditionalCostPerBale = additionalCostPerBale;
 
         // Update offload record
         await tx
@@ -955,7 +960,7 @@ export function registerContainerOffloadRoutes(app: Express) {
         try {
           const companyId = req.session.currentCompanyId!;
           const oldAdditionalCostPerBale = parseFloat(currentOffload.additionalCostPerBale || "0");
-          const delta = additionalCostPerBale - oldAdditionalCostPerBale;
+          const delta = newAdditionalCostPerBale - oldAdditionalCostPerBale;
 
           // Get affected stock items from stored offload items (most accurate)
           const offloadItems = await db

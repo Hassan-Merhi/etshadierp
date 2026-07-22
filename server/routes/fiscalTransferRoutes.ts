@@ -1799,7 +1799,7 @@ export function registerFiscalTransferRoutes(app: Express) {
       if (!parseResult.success) {
         return res.status(400).json({
           message: "Invalid request data",
-          errors: parseResult.error.errors,
+          errors: parseResult.error.issues,
         });
       }
 
@@ -1937,7 +1937,7 @@ export function registerFiscalTransferRoutes(app: Express) {
       if (!parseResult.success) {
         return res.status(400).json({
           message: "Invalid request data",
-          errors: parseResult.error.errors,
+          errors: parseResult.error.issues,
         });
       }
 

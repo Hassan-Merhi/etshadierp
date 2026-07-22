@@ -979,7 +979,7 @@ export function registerFactoryShippingContainerRoutes(app: Express) {
       const companyId = getCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const parsed = insertFactoryShippingAvailabilitySchema.safeParse({ ...req.body, companyId });
-      if (!parsed.success) return res.status(400).json({ message: parsed.error.errors[0]?.message || "Invalid data" });
+      if (!parsed.success) return res.status(400).json({ message: parsed.error.issues[0]?.message || "Invalid data" });
       const [row] = await db.insert(factoryShippingAvailability).values(parsed.data).returning();
       res.json(row);
     } catch (e: any) {

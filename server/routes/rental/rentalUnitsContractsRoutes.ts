@@ -452,7 +452,7 @@ export function registerRentalUnitsContractsRoutes(
       res.json(created);
     } catch (e: any) {
       if (e instanceof z.ZodError)
-        return res.status(400).json({ message: e.errors.map((err: any) => err.message).join(", ") });
+        return res.status(400).json({ message: e.issues.map((err: any) => err.message).join(", ") });
       res.status(500).json({ message: e.message });
     }
   });
@@ -611,7 +611,7 @@ export function registerRentalUnitsContractsRoutes(
       res.json(created);
     } catch (e: any) {
       if (e instanceof z.ZodError)
-        return res.status(400).json({ message: e.errors.map((err: any) => err.message).join(", ") });
+        return res.status(400).json({ message: e.issues.map((err: any) => err.message).join(", ") });
       console.error(`${tag} contracts:`, e);
       res.status(500).json({ message: e.message });
     }
@@ -684,7 +684,7 @@ export function registerRentalUnitsContractsRoutes(
       res.json({ ok: true });
     } catch (e: any) {
       if (e instanceof z.ZodError)
-        return res.status(400).json({ message: e.errors.map((err: any) => err.message).join(", ") });
+        return res.status(400).json({ message: e.issues.map((err: any) => err.message).join(", ") });
       res.status(500).json({ message: e.message });
     }
   });
@@ -782,7 +782,7 @@ export function registerRentalUnitsContractsRoutes(
       res.json({ ok: true });
     } catch (e: any) {
       if (e instanceof z.ZodError)
-        return res.status(400).json({ message: e.errors.map((err: any) => err.message).join(", ") });
+        return res.status(400).json({ message: e.issues.map((err: any) => err.message).join(", ") });
       res.status(500).json({ message: e.message });
     }
   });
@@ -1053,7 +1053,7 @@ export function registerRentalUnitsContractsRoutes(
       res.json({ ok: true });
     } catch (e: any) {
       if (e instanceof z.ZodError)
-        return res.status(400).json({ message: e.errors.map((err: any) => err.message).join(", ") });
+        return res.status(400).json({ message: e.issues.map((err: any) => err.message).join(", ") });
       res.status(500).json({ message: e.message });
     }
   });
@@ -1084,7 +1084,7 @@ export function registerRentalUnitsContractsRoutes(
       res.json({ ok: true });
     } catch (e: any) {
       if (e instanceof z.ZodError)
-        return res.status(400).json({ message: e.errors.map((err: any) => err.message).join(", ") });
+        return res.status(400).json({ message: e.issues.map((err: any) => err.message).join(", ") });
       res.status(500).json({ message: e.message });
     }
   });
@@ -1254,7 +1254,7 @@ export function registerRentalUnitsContractsRoutes(
       res.json({ ok: true });
     } catch (e: any) {
       if (e instanceof z.ZodError)
-        return res.status(400).json({ message: e.errors.map((err: any) => err.message).join(", ") });
+        return res.status(400).json({ message: e.issues.map((err: any) => err.message).join(", ") });
       res.status(500).json({ message: e.message });
     }
   });
@@ -1381,7 +1381,7 @@ export function registerRentalUnitsContractsRoutes(
       res.json({ ok: true });
     } catch (e: any) {
       if (e instanceof z.ZodError)
-        return res.status(400).json({ message: e.errors.map((err: any) => err.message).join(", ") });
+        return res.status(400).json({ message: e.issues.map((err: any) => err.message).join(", ") });
       res.status(500).json({ message: e.message });
     }
   });
@@ -1527,7 +1527,7 @@ export function registerRentalUnitsContractsRoutes(
       res.json({ ok: true });
     } catch (e: any) {
       if (e instanceof z.ZodError)
-        return res.status(400).json({ message: e.errors.map((err: any) => err.message).join(", ") });
+        return res.status(400).json({ message: e.issues.map((err: any) => err.message).join(", ") });
       res.status(500).json({ message: e.message });
     }
   });
@@ -1757,7 +1757,7 @@ export function registerRentalUnitsContractsRoutes(
       res.json({ ok: true, allocations });
     } catch (e: any) {
       if (e instanceof z.ZodError)
-        return res.status(400).json({ message: e.errors.map((err: any) => err.message).join(", ") });
+        return res.status(400).json({ message: e.issues.map((err: any) => err.message).join(", ") });
       res.status(500).json({ message: e.message });
     }
   });
