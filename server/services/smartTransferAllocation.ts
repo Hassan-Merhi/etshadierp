@@ -313,9 +313,9 @@ export async function buildSmartTransferPreview(
   targetQuantity: number,
   options: SmartTransferPreviewOptions = {}
 ): Promise<SmartTransferPreviewResult> {
-  const requestedTarget = wholeNonNegative(targetQuantity);
+  const autoTarget = !targetQuantity || targetQuantity <= 0;
+  let requestedTarget = wholeNonNegative(targetQuantity);
   if (!Number.isInteger(companyId) || companyId <= 0) throw new Error("A valid company is required");
-  if (requestedTarget <= 0) throw new Error("Target quantity must be a positive whole number");
 
   const includeOtw = options.includeOtw !== false;
   const minimumSourceReserve = wholeNonNegative(options.minimumSourceReserve ?? 0);
@@ -539,6 +539,13 @@ export async function buildSmartTransferPreview(
       b.performance.overallSellThroughPercentage - a.performance.overallSellThroughPercentage ||
       a.stockItemName.localeCompare(b.stockItemName)
   );
+
+  // Auto-target: when no explicit target was supplied, use the sum of each
+  // candidate's calculated need so the order covers exactly what sales data
+  // says the destination requires.
+  if (autoTarget) {
+    requestedTarget = candidates.reduce((sum, c) => sum + c.calculatedNeed, 0);
+  }
 
   // Fair-share cap: no single item should take more than 1.5× its proportional
   // slice of the total target. This prevents a strong-seller with very high

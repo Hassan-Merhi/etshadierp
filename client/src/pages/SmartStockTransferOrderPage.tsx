@@ -65,7 +65,12 @@ export default function SmartStockTransferOrderPage() {
       })
     );
     sessionStorage.setItem(AUTO_RESTORE_KEY, "1");
-    window.location.reload();
+    // Preserve (or inject) tab=transferorder so that if the dialog was opened
+    // from the Vouchers page (/vouchers), reloading doesn't fall back to the
+    // default Payment tab.
+    const url = new URL(window.location.href);
+    url.searchParams.set("tab", "transferorder");
+    window.location.href = url.toString();
   };
 
   return (

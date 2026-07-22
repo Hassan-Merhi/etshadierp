@@ -246,7 +246,7 @@ export default function SmartTransferGeneratorDialog({
   const { toast } = useToast();
   const [destinationLocationId, setDestinationLocationId] = useState<number | null>(null);
   const [sourceLocationIds, setSourceLocationIds] = useState<number[]>([]);
-  const [targetQuantity, setTargetQuantity] = useState("410");
+  const [targetQuantity, setTargetQuantity] = useState(""); // empty = auto from sales data
   const [includeOtw, setIncludeOtw] = useState(true);
   const [minimumSourceReserve, setMinimumSourceReserve] = useState("0");
   const [targetCoverageDays, setTargetCoverageDays] = useState("21");
@@ -371,8 +371,8 @@ export default function SmartTransferGeneratorDialog({
     mutationFn: async () => {
       if (!destinationLocationId) throw new Error("Select a destination location");
       if (sourceLocationIds.length === 0) throw new Error("Select at least one source location");
+      // 0 = auto: server computes target from sum of calculated need per item
       const target = Math.floor(numberValue(targetQuantity, 0));
-      if (target <= 0) throw new Error("Enter a positive target quantity");
 
       const response = await apiRequest("POST", "/api/stock-transfers/smart-preview", {
         destinationLocationId,
@@ -397,7 +397,7 @@ export default function SmartTransferGeneratorDialog({
       setExpandedLineIds(new Set());
       toast({
         title: "Preview generated",
-        description: `${result.achievedQuantity} of ${result.targetQuantity} requested bales suggested.`,
+        description: `${result.achievedQuantity} of ${result.targetQuantity} bales suggested across ${result.lines.length} lines.`,
       });
     },
     onError: (error: any) => {
@@ -597,12 +597,16 @@ export default function SmartTransferGeneratorDialog({
 
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-2">
-                  <Label htmlFor="smart-target">Target bales</Label>
+                  <Label htmlFor="smart-target">
+                    Target bales{" "}
+                    <span className="text-xs font-normal text-muted-foreground">(blank = auto)</span>
+                  </Label>
                   <Input
                     id="smart-target"
                     type="number"
                     min="1"
                     step="1"
+                    placeholder="Auto from sales"
                     value={targetQuantity}
                     onChange={(event) => setTargetQuantity(event.target.value)}
                   />

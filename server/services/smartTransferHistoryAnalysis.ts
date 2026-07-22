@@ -308,7 +308,13 @@ export async function analyzeLastTwoMultiSourceTransfers(
           isNull(vouchers.deletedAt),
           eq(vouchers.locationId, destinationLocationId),
           inArray(salesItems.stockItemId, stockItemIds),
-          gte(vouchers.voucherDate, earliestTransferDate),
+          // Look back up to 365 days so sales rates reflect the full available
+          // history, not just the narrow window since the last two transfers.
+          gte(vouchers.voucherDate, (() => {
+            const d = new Date(asOfDate);
+            d.setFullYear(d.getFullYear() - 1);
+            return d.toISOString().slice(0, 10);
+          })()),
           lte(vouchers.voucherDate, asOfDate)
         )
       )

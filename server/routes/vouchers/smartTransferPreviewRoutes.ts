@@ -6,7 +6,8 @@ import { buildSmartTransferPreview } from "../../services/smartTransferAllocatio
 const smartTransferPreviewSchema = z.object({
   destinationLocationId: z.coerce.number().int().positive(),
   sourceLocationIds: z.array(z.coerce.number().int().positive()).min(1).max(30),
-  targetQuantity: z.coerce.number().int().positive().max(1_000_000),
+  // 0 = auto-compute from sales data (sum of calculatedNeed per item)
+  targetQuantity: z.coerce.number().int().nonnegative().max(1_000_000).optional().default(0),
   includeOtw: z.boolean().optional().default(true),
   stockGroupIds: z.array(z.coerce.number().int().positive()).max(100).optional().default([]),
   categoryIds: z.array(z.coerce.number().int().positive()).max(100).optional().default([]),
