@@ -113,14 +113,23 @@ function collectRuntimeImports(source) {
     }
 
     if (token.value === "import") {
-      if (tokens[index + 1]?.type === "string") {
-        imports.add(tokens[index + 1].value);
+      const next = tokens[index + 1];
+      // `import.meta` is not a module specifier — skip it so the static
+      // `from` scan below doesn't run away into later code.
+      if (next?.value === ".") continue;
+      // Dynamic `import(...)`: capture only string-literal arguments; a
+      // non-literal (e.g. `import(variable)`) has no static specifier, so
+      // skip it rather than scanning forward for an unrelated `from`.
+      if (next?.value === "(") {
+        if (tokens[index + 2]?.type === "string") imports.add(tokens[index + 2].value);
         continue;
       }
-      if (tokens[index + 1]?.value === "(" && tokens[index + 2]?.type === "string") {
-        imports.add(tokens[index + 2].value);
+      // Side-effect import: `import "x"`.
+      if (next?.type === "string") {
+        imports.add(next.value);
         continue;
       }
+      // Otherwise fall through to the static `import … from "x"` scan below.
     }
 
     if (token.value === "import" || token.value === "export") {
@@ -161,11 +170,22 @@ if (existsSync(bundlePath)) {
   const source = readFileSync(bundlePath, "utf8");
   const imports = collectRuntimeImports(source);
   const builtins = new Set([...builtinModules, ...builtinModules.map((name) => `node:${name}`)]);
-  const declared = new Set(Object.keys(packageJson.dependencies ?? {}));
+  // The production deploy (render.yaml) runs `npm ci` without --omit=dev, so
+  // devDependencies are installed and resolvable at runtime alongside deps.
+  // Accept both; still fail on packages declared in neither.
+  const declared = new Set([
+    ...Object.keys(packageJson.dependencies ?? {}),
+    ...Object.keys(packageJson.devDependencies ?? {}),
+  ]);
   const require = createRequire(import.meta.url);
 
   for (const specifier of imports) {
     if (isInternalSpecifier(specifier, builtins)) continue;
+    // Defend against tokenizer noise: the hand-rolled tokenizer can mis-read a
+    // regex literal (which may contain quote characters) as a string, yielding
+    // a bogus "specifier" made of surrounding code. A real bare module
+    // specifier never contains whitespace or JS punctuation, so skip those.
+    if (/[\s(){}=;`,]/.test(specifier)) continue;
     const packageName = specifier.startsWith("@") ? specifier.split("/").slice(0, 2).join("/") : specifier.split("/")[0];
     if (!declared.has(packageName)) {
       errors.push(`Runtime import ${specifier} is not declared in dependencies`);
