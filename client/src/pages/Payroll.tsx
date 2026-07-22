@@ -197,7 +197,8 @@ export default function Payroll() {
         credentials: "include",
       });
       if (!res.ok) throw new Error("Failed to fetch employee transactions");
-      const raw: any[] = await res.json();
+      const payload = await res.json();
+      const raw: any[] = Array.isArray(payload) ? payload : (payload.transactions ?? []);
       return raw.map((txn: any) => {
         const dr = parseFloat(txn.debitAmount ?? txn.debit ?? "0") || 0;
         const cr = parseFloat(txn.creditAmount ?? txn.credit ?? "0") || 0;
