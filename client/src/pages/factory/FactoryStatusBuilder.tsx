@@ -31,7 +31,6 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
   LayoutGrid,
@@ -43,13 +42,7 @@ import {
   X,
   Link2,
   Link2Off,
-  Pencil,
-  Trash2,
-  Search,
   History as HistoryIcon,
-  LayoutList,
-  TrendingUp,
-  TrendingDown,
 } from "lucide-react";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -161,7 +154,7 @@ function resolveCellValue(
   sheetId: string,
   rowId: string,
   colId: string,
-  visited: Set<string> = new Set()
+  visited: Set<string> = new Set(),
 ): { value: CellValue; broken: boolean; circular: boolean } {
   const key = `${sheetId}|${rowId}|${colId}`;
   if (visited.has(key)) return { value: null, broken: false, circular: true };
@@ -190,7 +183,7 @@ function resolveCellValue(
       cell.link.sourceSheetId,
       cell.link.sourceRowId,
       cell.link.sourceColumnId,
-      new Set(visited)
+      new Set(visited),
     );
   }
   return { value: cell.value, broken: false, circular: false };
@@ -198,7 +191,12 @@ function resolveCellValue(
 
 function getEffectiveValue(sheets: StatusBuilderSheet[], cell: Cell): CellValue {
   if (!cell.link) return cell.value;
-  const res = resolveCellValue(sheets, cell.link.sourceSheetId, cell.link.sourceRowId, cell.link.sourceColumnId);
+  const res = resolveCellValue(
+    sheets,
+    cell.link.sourceSheetId,
+    cell.link.sourceRowId,
+    cell.link.sourceColumnId,
+  );
   if (res.broken || res.circular) return null;
   return res.value;
 }
@@ -213,7 +211,11 @@ function isTotalColumn(label: string): boolean {
   return l === "TOTAL" || l === "TOTALE" || l === "ИТОГО" || l === "مجموع";
 }
 
-function computeDiffValue(colLabels: string[], resolvedVals: (number | null)[], ci: number): number | null {
+function computeDiffValue(
+  colLabels: string[],
+  resolvedVals: (number | null)[],
+  ci: number,
+): number | null {
   const leftNonDiff: number[] = [];
   for (let i = ci - 1; i >= 0 && leftNonDiff.length < 2; i--) {
     if (!isDiffColumn(colLabels[i])) leftNonDiff.unshift(i);
@@ -225,8 +227,10 @@ function computeDiffValue(colLabels: string[], resolvedVals: (number | null)[], 
   return a - b;
 }
 
-// Sum of all base (non-total, non-diff) columns in the same resolved-values array
-function computeTotalValue(colLabels: string[], resolvedVals: (number | null)[]): number | null {
+function computeTotalValue(
+  colLabels: string[],
+  resolvedVals: (number | null)[],
+): number | null {
   let sum: number | null = null;
   for (let i = 0; i < colLabels.length; i++) {
     if (isDiffColumn(colLabels[i]) || isTotalColumn(colLabels[i])) continue;
@@ -241,7 +245,6 @@ function calcDiff(sheets: StatusBuilderSheet[], sheet: StatusBuilderSheet): (num
   const colCount = sheet.columns.length;
   const totals: (number | null)[] = Array(colCount).fill(null);
 
-  // First pass: sum base columns
   for (const row of sheet.rows) {
     for (let c = 0; c < colCount; c++) {
       if (isDiffColumn(colLabels[c]) || isTotalColumn(colLabels[c])) continue;
@@ -250,7 +253,6 @@ function calcDiff(sheets: StatusBuilderSheet[], sheet: StatusBuilderSheet): (num
       if (typeof eff === "number") totals[c] = (totals[c] ?? 0) + eff;
     }
   }
-  // Second pass: compute derived columns
   for (let c = 0; c < colCount; c++) {
     if (isTotalColumn(colLabels[c])) {
       totals[c] = computeTotalValue(colLabels, totals);
@@ -273,7 +275,6 @@ function calcTotal(sheets: StatusBuilderSheet[], sheet: StatusBuilderSheet): (nu
       if (typeof eff === "number") totals[c] = (totals[c] ?? 0) + eff;
     }
   }
-  // Compute derived columns for the total row
   for (let c = 0; c < colCount; c++) {
     if (isTotalColumn(colLabels[c])) {
       totals[c] = computeTotalValue(colLabels, totals);
@@ -300,19 +301,10 @@ function parseCellValue(s: string): CellValue {
 // ── Tab component ─────────────────────────────────────────────────────────────
 
 function TabLabel({
-  name,
-  active,
-  onActivate,
-  onRename,
-  onDelete,
-  canDelete,
+  name, active, onActivate, onRename, onDelete, canDelete,
 }: {
-  name: string;
-  active: boolean;
-  onActivate: () => void;
-  onRename: (v: string) => void;
-  onDelete: () => void;
-  canDelete: boolean;
+  name: string; active: boolean; onActivate: () => void;
+  onRename: (v: string) => void; onDelete: () => void; canDelete: boolean;
 }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(name);
@@ -325,40 +317,31 @@ function TabLabel({
     setEditing(false);
   };
 
-  useEffect(() => {
-    if (editing) inputRef.current?.select();
-  }, [editing]);
+  useEffect(() => { if (editing) inputRef.current?.select(); }, [editing]);
 
   return (
     <div
       data-testid={`sb-tab-${name}`}
       onClick={onActivate}
-      onDoubleClick={() => {
-        setEditing(true);
-        setDraft(name);
-      }}
+      onDoubleClick={() => { setEditing(true); setDraft(name); }}
       className={`relative flex items-center gap-1.5 px-3 py-2 cursor-pointer border-b-2 select-none whitespace-nowrap transition-colors
-        ${
-          active
-            ? "border-primary text-foreground font-medium"
-            : "border-transparent text-muted-foreground hover:text-foreground hover:border-muted"
+        ${active
+          ? "border-primary text-foreground font-medium"
+          : "border-transparent text-muted-foreground hover:text-foreground hover:border-muted"
         }`}
     >
       {editing ? (
         <input
           ref={inputRef}
           value={draft}
-          onChange={(e) => setDraft(e.target.value)}
+          onChange={e => setDraft(e.target.value)}
           onBlur={commit}
-          onKeyDown={(e) => {
+          onKeyDown={e => {
             if (e.key === "Enter") commit();
-            if (e.key === "Escape") {
-              setDraft(name);
-              setEditing(false);
-            }
+            if (e.key === "Escape") { setDraft(name); setEditing(false); }
             e.stopPropagation();
           }}
-          onClick={(e) => e.stopPropagation()}
+          onClick={e => e.stopPropagation()}
           className="bg-transparent border-none outline-none w-24 text-sm font-medium"
           data-testid={`sb-tab-input-${name}`}
         />
@@ -368,10 +351,7 @@ function TabLabel({
       {active && canDelete && (
         <button
           data-testid={`sb-tab-delete-${name}`}
-          onClick={(e) => {
-            e.stopPropagation();
-            onDelete();
-          }}
+          onClick={e => { e.stopPropagation(); onDelete(); }}
           className="ml-1 rounded-sm opacity-60 hover:opacity-100 text-muted-foreground hover:text-destructive transition-opacity"
           style={{ visibility: "visible" }}
         >
@@ -385,10 +365,7 @@ function TabLabel({
 // ── Link Dialog ────────────────────────────────────────────────────────────────
 
 function LinkDialog({
-  state,
-  sheets,
-  onClose,
-  onSave,
+  state, sheets, onClose, onSave,
 }: {
   state: LinkDialogState;
   sheets: StatusBuilderSheet[];
@@ -405,7 +382,7 @@ function LinkDialog({
       setSelRowId(state.sourceRowId || "");
       setSelColId(state.sourceColId || "");
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.open]);
 
   const srcSheet = sheets.find((s) => s.stableId === selSheetId);
@@ -414,13 +391,9 @@ function LinkDialog({
   let previewVal = "—";
   if (selSheetId && selRowId && selColId) {
     const res = resolveCellValue(sheets, selSheetId, selRowId, selColId);
-    if (res.broken) {
-      previewVal = "#REF!";
-      previewLabel = "Missing source";
-    } else if (res.circular) {
-      previewVal = "#CYCLE!";
-      previewLabel = "Circular reference";
-    } else if (res.value !== null) previewVal = fmt(res.value);
+    if (res.broken) { previewVal = "#REF!"; previewLabel = "Missing source"; }
+    else if (res.circular) { previewVal = "#CYCLE!"; previewLabel = "Circular reference"; }
+    else if (res.value !== null) previewVal = fmt(res.value);
 
     const sCol = srcSheet?.columns.find((c) => c.id === selColId);
     if (selRowId === "__diff__") {
@@ -434,36 +407,27 @@ function LinkDialog({
   const canSave = !!selSheetId && !!selRowId && !!selColId;
 
   return (
-    <Dialog
-      open={state.open}
-      onOpenChange={(open) => {
-        if (!open) onClose();
-      }}
-    >
+    <Dialog open={state.open} onOpenChange={(open) => { if (!open) onClose(); }}>
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle>Link Cell</DialogTitle>
-          <DialogDescription>Choose the source page, row, and column to pull data from.</DialogDescription>
+          <DialogDescription>
+            Choose the source page, row, and column to pull data from.
+          </DialogDescription>
         </DialogHeader>
         <div className="space-y-4 py-1">
           <div className="space-y-1.5">
             <label className="text-sm font-medium">Source Page</label>
             <Select
               value={selSheetId}
-              onValueChange={(v) => {
-                setSelSheetId(v);
-                setSelRowId("");
-                setSelColId("");
-              }}
+              onValueChange={(v) => { setSelSheetId(v); setSelRowId(""); setSelColId(""); }}
             >
               <SelectTrigger data-testid="sb-select-link-sheet">
                 <SelectValue placeholder="Select page…" />
               </SelectTrigger>
               <SelectContent>
                 {sheets.map((s) => (
-                  <SelectItem key={s.stableId} value={s.stableId}>
-                    {s.name}
-                  </SelectItem>
+                  <SelectItem key={s.stableId} value={s.stableId}>{s.name}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -472,10 +436,7 @@ function LinkDialog({
             <label className="text-sm font-medium">Source Row</label>
             <Select
               value={selRowId}
-              onValueChange={(v) => {
-                setSelRowId(v);
-                setSelColId("");
-              }}
+              onValueChange={(v) => { setSelRowId(v); setSelColId(""); }}
               disabled={!srcSheet}
             >
               <SelectTrigger data-testid="sb-select-link-row">
@@ -484,24 +445,24 @@ function LinkDialog({
               <SelectContent>
                 <SelectItem value="__diff__">Difference (auto-calculated)</SelectItem>
                 {srcSheet?.rows.map((r) => (
-                  <SelectItem key={r.id} value={r.id}>
-                    {r.label || "(row)"}
-                  </SelectItem>
+                  <SelectItem key={r.id} value={r.id}>{r.label || "(row)"}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
           <div className="space-y-1.5">
             <label className="text-sm font-medium">Source Column</label>
-            <Select value={selColId} onValueChange={setSelColId} disabled={!selRowId}>
+            <Select
+              value={selColId}
+              onValueChange={setSelColId}
+              disabled={!selRowId}
+            >
               <SelectTrigger data-testid="sb-select-link-col">
                 <SelectValue placeholder={selRowId ? "Select column…" : "Select row first"} />
               </SelectTrigger>
               <SelectContent>
                 {srcSheet?.columns.map((c) => (
-                  <SelectItem key={c.id} value={c.id}>
-                    {c.label || "(col)"}
-                  </SelectItem>
+                  <SelectItem key={c.id} value={c.id}>{c.label || "(col)"}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -509,156 +470,16 @@ function LinkDialog({
           {selColId && (
             <div className="rounded-md border bg-muted/40 px-3 py-2">
               <p className="text-xs text-muted-foreground mb-1">{previewLabel}</p>
-              <p
-                className={`text-sm font-mono font-medium ${previewVal === "#REF!" || previewVal === "#CYCLE!" ? "text-red-500" : ""}`}
-              >
+              <p className={`text-sm font-mono font-medium ${previewVal === "#REF!" || previewVal === "#CYCLE!" ? "text-red-500" : ""}`}>
                 {previewVal}
               </p>
             </div>
           )}
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={onClose} data-testid="sb-button-link-cancel">
-            Cancel
-          </Button>
-          <Button
-            onClick={() => onSave(selSheetId, selRowId, selColId)}
-            disabled={!canSave}
-            data-testid="sb-button-link-save"
-          >
+          <Button variant="outline" onClick={onClose} data-testid="sb-button-link-cancel">Cancel</Button>
+          <Button onClick={() => onSave(selSheetId, selRowId, selColId)} disabled={!canSave} data-testid="sb-button-link-save">
             Save Link
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-// ── Row editor (replaces inline Excel-style cell typing) ────────────────────
-
-function RowEditDialog({
-  sheet,
-  sheets,
-  rowIdx,
-  onClose,
-  onLabelChange,
-  onCellChange,
-  onOpenLink,
-  onUnlink,
-  onDelete,
-  fmtLabel,
-}: {
-  sheet: StatusBuilderSheet | null;
-  sheets: StatusBuilderSheet[];
-  rowIdx: number | null;
-  onClose: () => void;
-  onLabelChange: (rowIdx: number, val: string) => void;
-  onCellChange: (rowIdx: number, colIdx: number, val: string) => void;
-  onOpenLink: (rowIdx: number, colIdx: number) => void;
-  onUnlink: (rowIdx: number, colIdx: number) => void;
-  onDelete: (rowIdx: number, label: string) => void;
-  fmtLabel: (v: string) => string;
-}) {
-  const row = rowIdx !== null ? sheet?.rows[rowIdx] : undefined;
-  const open = rowIdx !== null && !!row;
-
-  return (
-    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-w-lg">
-        <DialogHeader>
-          <DialogTitle>Edit row</DialogTitle>
-          <DialogDescription>Update the label and values, or link a value to another page.</DialogDescription>
-        </DialogHeader>
-        {row && sheet && (
-          <div className="space-y-4 py-1 max-h-[60vh] overflow-y-auto">
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium">Label</label>
-              <Input
-                value={fmtLabel(row.label)}
-                onChange={(e) => onLabelChange(rowIdx!, e.target.value)}
-                data-testid="sb-modal-input-row-label"
-                dir="auto"
-              />
-            </div>
-            {sheet.columns.map((col, ci) => {
-              const isDiff = isDiffColumn(col.label);
-              const isTotal = isTotalColumn(col.label);
-              if (isDiff || isTotal) return null;
-              const cell = row.cells[ci] ?? { value: null };
-              const isLinked = !!cell.link;
-              let linkInfo: string | null = null;
-              let broken = false;
-              if (isLinked) {
-                const res = resolveCellValue(
-                  sheets,
-                  cell.link!.sourceSheetId,
-                  cell.link!.sourceRowId,
-                  cell.link!.sourceColumnId
-                );
-                broken = res.broken || res.circular;
-                const srcSheet = sheets.find((s) => s.stableId === cell.link!.sourceSheetId);
-                const srcRow = srcSheet?.rows.find((r) => r.id === cell.link!.sourceRowId);
-                const srcCol = srcSheet?.columns.find((c) => c.id === cell.link!.sourceColumnId);
-                if (srcSheet && srcCol) {
-                  linkInfo = `${srcSheet.name} → ${cell.link!.sourceRowId === "__diff__" ? "Difference" : srcRow?.label || "(row)"} → ${srcCol.label}`;
-                }
-              }
-              return (
-                <div key={col.id} className="space-y-1.5">
-                  <div className="flex items-center justify-between">
-                    <label className="text-sm font-medium">{col.label || "(column)"}</label>
-                    <button
-                      type="button"
-                      onClick={() => (isLinked ? onUnlink(rowIdx!, ci) : onOpenLink(rowIdx!, ci))}
-                      className={`text-xs flex items-center gap-1 ${broken ? "text-red-500" : isLinked ? "text-blue-500" : "text-muted-foreground hover:text-foreground"}`}
-                      data-testid={`sb-modal-link-toggle-${ci}`}
-                    >
-                      {broken ? <Link2Off className="h-3 w-3" /> : <Link2 className="h-3 w-3" />}
-                      {isLinked ? "Unlink" : "Link to another page"}
-                    </button>
-                  </div>
-                  {isLinked ? (
-                    <div
-                      className={`h-9 flex items-center px-3 rounded-md border bg-muted/40 text-sm ${broken ? "text-red-500" : ""}`}
-                      title={linkInfo ?? ""}
-                    >
-                      {broken ? "#REF! — " : ""}
-                      {linkInfo ?? "Linked"}
-                    </div>
-                  ) : (
-                    <Input
-                      value={fmt(cell.value)}
-                      onChange={(e) => onCellChange(rowIdx!, ci, e.target.value)}
-                      data-testid={`sb-modal-input-cell-${ci}`}
-                      dir="auto"
-                    />
-                  )}
-                  {isLinked && (
-                    <button
-                      type="button"
-                      onClick={() => onOpenLink(rowIdx!, ci)}
-                      className="text-xs text-muted-foreground hover:text-foreground"
-                    >
-                      Change link…
-                    </button>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        )}
-        <DialogFooter className="flex items-center justify-between sm:justify-between">
-          <Button
-            variant="ghost"
-            className="text-destructive hover:text-destructive gap-1.5"
-            onClick={() => rowIdx !== null && row && onDelete(rowIdx, fmtLabel(row.label) || `Row ${rowIdx + 1}`)}
-            data-testid="sb-modal-button-delete-row"
-          >
-            <Trash2 className="h-3.5 w-3.5" />
-            Delete row
-          </Button>
-          <Button onClick={onClose} data-testid="sb-modal-button-done">
-            Done
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -680,12 +501,8 @@ export default function FactoryStatusBuilder() {
   const silentSaveRef = useRef(false);
 
   const [linkDialog, setLinkDialog] = useState<LinkDialogState>({
-    open: false,
-    targetRowIdx: 0,
-    targetColIdx: 0,
-    sourceSheetId: "",
-    sourceRowId: "",
-    sourceColId: "",
+    open: false, targetRowIdx: 0, targetColIdx: 0,
+    sourceSheetId: "", sourceRowId: "", sourceColId: "",
   });
 
   const [pendingDelete, setPendingDelete] = useState<{
@@ -694,20 +511,12 @@ export default function FactoryStatusBuilder() {
     label: string;
   } | null>(null);
 
-  // ── Card-UI state ──────────────────────────────────────────────────────────
-  const [viewMode, setViewMode] = useState<"cards" | "history">("cards");
-  const [search, setSearch] = useState("");
-  const [primaryColIdx, setPrimaryColIdx] = useState(0);
-  const [editRowIdx, setEditRowIdx] = useState<number | null>(null);
-  const [manageColumnsOpen, setManageColumnsOpen] = useState(false);
+  const [viewMode, setViewMode] = useState<"sheet" | "history">("sheet");
 
-  const fmtLabel = useCallback(
-    (label: string): string => {
-      if (/^\d{4}-\d{2}-\d{2}$/.test(label)) return formatDisplayDate(label);
-      return label;
-    },
-    [formatDisplayDate]
-  );
+  const fmtLabel = useCallback((label: string): string => {
+    if (/^\d{4}-\d{2}-\d{2}$/.test(label)) return formatDisplayDate(label);
+    return label;
+  }, [formatDisplayDate]);
 
   // ── Load ───────────────────────────────────────────────────────────────────
   const { data: apiSheets, isLoading } = useQuery<ApiSheet[]>({
@@ -724,7 +533,7 @@ export default function FactoryStatusBuilder() {
   const activeSheet = localSheets[activeIdx] ?? null;
   const isDirty = localSheets.some((s) => s.dirty);
 
-  // History log for the active page.
+  // ── History log ────────────────────────────────────────────────────────────
   const { data: historyLog, isLoading: historyLoading } = useQuery<
     Array<{
       id: number;
@@ -746,21 +555,6 @@ export default function FactoryStatusBuilder() {
     enabled: viewMode === "history" && !!activeSheet?.id,
   });
 
-  // Reset the "primary" (headline) column whenever the active page changes,
-  // and clamp it back in range whenever columns are added/removed so the
-  // segmented control never points at a column that no longer exists.
-  useEffect(() => {
-    setPrimaryColIdx(0);
-  }, [activeIdx]);
-
-  useEffect(() => {
-    const colCount = activeSheet?.columns.length ?? 0;
-    if (colCount === 0) return;
-    if (primaryColIdx >= colCount) {
-      setPrimaryColIdx(colCount - 1);
-    }
-  }, [activeSheet?.columns.length, primaryColIdx]);
-
   // ── Autosave ───────────────────────────────────────────────────────────────
   useEffect(() => {
     const hasSaveable = localSheets.some((s) => s.dirty && s.id !== null);
@@ -770,104 +564,79 @@ export default function FactoryStatusBuilder() {
       silentSaveRef.current = true;
       saveMutation.mutate(localSheets);
     }, 2000);
-    return () => {
-      if (autosaveTimerRef.current) clearTimeout(autosaveTimerRef.current);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    return () => { if (autosaveTimerRef.current) clearTimeout(autosaveTimerRef.current); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [localSheets]);
 
   // ── Helpers ────────────────────────────────────────────────────────────────
-  const updateSheet = useCallback(
-    (fn: (s: StatusBuilderSheet) => StatusBuilderSheet) => {
-      setLocalSheets((prev) => {
-        const next = [...prev];
-        next[activeIdx] = { ...fn(next[activeIdx]), dirty: true };
-        return next;
-      });
-    },
-    [activeIdx]
-  );
+  const updateSheet = useCallback((fn: (s: StatusBuilderSheet) => StatusBuilderSheet) => {
+    setLocalSheets((prev) => {
+      const next = [...prev];
+      next[activeIdx] = { ...fn(next[activeIdx]), dirty: true };
+      return next;
+    });
+  }, [activeIdx]);
 
   // ── Link operations ────────────────────────────────────────────────────────
-  const openLinkDialog = useCallback(
-    (rowIdx: number, colIdx: number) => {
-      const cell = activeSheet?.rows[rowIdx]?.cells[colIdx] ?? { value: null };
-      setLinkDialog({
-        open: true,
-        targetRowIdx: rowIdx,
-        targetColIdx: colIdx,
-        sourceSheetId: cell.link?.sourceSheetId ?? "",
-        sourceRowId: cell.link?.sourceRowId ?? "",
-        sourceColId: cell.link?.sourceColumnId ?? "",
-      });
-    },
-    [activeSheet]
-  );
+  const openLinkDialog = useCallback((rowIdx: number, colIdx: number) => {
+    const cell = activeSheet?.rows[rowIdx]?.cells[colIdx] ?? { value: null };
+    setLinkDialog({
+      open: true, targetRowIdx: rowIdx, targetColIdx: colIdx,
+      sourceSheetId: cell.link?.sourceSheetId ?? "",
+      sourceRowId: cell.link?.sourceRowId ?? "",
+      sourceColId: cell.link?.sourceColumnId ?? "",
+    });
+  }, [activeSheet]);
 
-  const handleSaveLink = useCallback(
-    (sourceSheetId: string, sourceRowId: string, sourceColId: string) => {
-      const { targetRowIdx, targetColIdx } = linkDialog;
-      updateSheet((s) => {
-        const rows = s.rows.map((r, ri) => {
-          if (ri !== targetRowIdx) return r;
-          const cells = [...r.cells];
-          const existing = cells[targetColIdx] ?? { value: null };
-          cells[targetColIdx] = {
-            ...existing,
-            link: { type: "status_builder_cell", sourceSheetId, sourceRowId, sourceColumnId: sourceColId },
-          };
-          return { ...r, cells };
-        });
-        return { ...s, rows };
+  const handleSaveLink = useCallback((sourceSheetId: string, sourceRowId: string, sourceColId: string) => {
+    const { targetRowIdx, targetColIdx } = linkDialog;
+    updateSheet((s) => {
+      const rows = s.rows.map((r, ri) => {
+        if (ri !== targetRowIdx) return r;
+        const cells = [...r.cells];
+        const existing = cells[targetColIdx] ?? { value: null };
+        cells[targetColIdx] = {
+          ...existing,
+          link: { type: "status_builder_cell", sourceSheetId, sourceRowId, sourceColumnId: sourceColId },
+        };
+        return { ...r, cells };
       });
-      setLinkDialog((prev) => ({ ...prev, open: false }));
-    },
-    [linkDialog, updateSheet]
-  );
+      return { ...s, rows };
+    });
+    setLinkDialog((prev) => ({ ...prev, open: false }));
+  }, [linkDialog, updateSheet]);
 
-  const unlinkCell = useCallback(
-    (rowIdx: number, colIdx: number) => {
-      updateSheet((s) => {
-        const rows = s.rows.map((r, ri) => {
-          if (ri !== rowIdx) return r;
-          const cells = [...r.cells];
-          const existing = cells[colIdx] ?? { value: null };
-          cells[colIdx] = { value: existing.value, link: null };
-          return { ...r, cells };
-        });
-        return { ...s, rows };
+  const unlinkCell = useCallback((rowIdx: number, colIdx: number) => {
+    updateSheet((s) => {
+      const rows = s.rows.map((r, ri) => {
+        if (ri !== rowIdx) return r;
+        const cells = [...r.cells];
+        const existing = cells[colIdx] ?? { value: null };
+        cells[colIdx] = { value: existing.value, link: null };
+        return { ...r, cells };
       });
-    },
-    [updateSheet]
-  );
+      return { ...s, rows };
+    });
+  }, [updateSheet]);
 
-  const copyLinkValueAsManual = useCallback(
-    (rowIdx: number, colIdx: number) => {
-      const sheet = localSheets[activeIdx];
-      if (!sheet) return;
-      const cell = sheet.rows[rowIdx]?.cells[colIdx];
-      if (!cell?.link) return;
-      const resolved = resolveCellValue(
-        localSheets,
-        cell.link.sourceSheetId,
-        cell.link.sourceRowId,
-        cell.link.sourceColumnId
-      );
-      updateSheet((s) => {
-        const rows = s.rows.map((r, ri) => {
-          if (ri !== rowIdx) return r;
-          const cells = [...r.cells];
-          cells[colIdx] = {
-            value: resolved.broken || resolved.circular ? null : (resolved.value as CellValue),
-            link: null,
-          };
-          return { ...r, cells };
-        });
-        return { ...s, rows };
+  const copyLinkValueAsManual = useCallback((rowIdx: number, colIdx: number) => {
+    const sheet = localSheets[activeIdx];
+    if (!sheet) return;
+    const cell = sheet.rows[rowIdx]?.cells[colIdx];
+    if (!cell?.link) return;
+    const resolved = resolveCellValue(
+      localSheets, cell.link.sourceSheetId, cell.link.sourceRowId, cell.link.sourceColumnId,
+    );
+    updateSheet((s) => {
+      const rows = s.rows.map((r, ri) => {
+        if (ri !== rowIdx) return r;
+        const cells = [...r.cells];
+        cells[colIdx] = { value: (resolved.broken || resolved.circular) ? null : resolved.value as CellValue, link: null };
+        return { ...r, cells };
       });
-    },
-    [localSheets, activeIdx, updateSheet]
-  );
+      return { ...s, rows };
+    });
+  }, [localSheets, activeIdx, updateSheet]);
 
   // ── Mutations ──────────────────────────────────────────────────────────────
   const createMutation = useMutation({
@@ -892,7 +661,9 @@ export default function FactoryStatusBuilder() {
             rows: s.rows.map((r) => ({
               id: r.id,
               label: r.label,
-              cells: r.cells.map((c) => (c.link ? { value: c.value, link: c.link } : c.value)),
+              cells: r.cells.map((c) =>
+                c.link ? { value: c.value, link: c.link } : c.value
+              ),
             })),
           })
         )
@@ -927,17 +698,11 @@ export default function FactoryStatusBuilder() {
       const fd = new FormData();
       fd.append("file", file);
       return fetch("/api/factory/status-builder/sheets/import", {
-        method: "POST",
-        credentials: "include",
-        body: fd,
+        method: "POST", credentials: "include", body: fd,
       }).then(async (r) => {
         if (!r.ok) {
           const t = await r.text();
-          try {
-            throw new Error(JSON.parse(t).message);
-          } catch {
-            throw new Error(t);
-          }
+          try { throw new Error(JSON.parse(t).message); } catch { throw new Error(t); }
         }
         return r.json() as Promise<ApiSheet[]>;
       });
@@ -1012,7 +777,7 @@ export default function FactoryStatusBuilder() {
   const setRowLabel = (rowIdx: number, val: string) => {
     updateSheet((s) => ({
       ...s,
-      rows: s.rows.map((r, i) => (i === rowIdx ? { ...r, label: val } : r)),
+      rows: s.rows.map((r, i) => i === rowIdx ? { ...r, label: val } : r),
     }));
   };
 
@@ -1028,29 +793,74 @@ export default function FactoryStatusBuilder() {
     }));
   };
 
+  // ── Keyboard navigation ────────────────────────────────────────────────────
+  const focusCell = useCallback((ri: number, ci: number) => {
+    const el = document.querySelector(`[data-testid="sb-input-cell-${ri}-${ci}"]`) as HTMLInputElement | null;
+    if (el) { el.focus(); el.select(); }
+  }, []);
+
+  const handleCellKeyDown = useCallback(
+    (e: React.KeyboardEvent<HTMLInputElement>, ri: number, ci: number) => {
+      const sheet = localSheets[activeIdx];
+      if (!sheet) return;
+      const rowCount = sheet.rows.length;
+      const colCount = sheet.columns.length;
+
+      if (e.key === "Enter") {
+        e.preventDefault();
+        if (ri >= rowCount - 1) {
+          updateSheet((s) => ({
+            ...s,
+            rows: [...s.rows, { id: `row_${makeId()}`, label: "", cells: Array(s.columns.length).fill({ value: null }) }],
+          }));
+          setTimeout(() => focusCell(rowCount, ci), 30);
+        } else focusCell(ri + 1, ci);
+      } else if (e.key === "Tab") {
+        e.preventDefault();
+        if (e.shiftKey) {
+          if (ci > 0) focusCell(ri, ci - 1);
+          else if (ri > 0) focusCell(ri - 1, colCount - 1);
+        } else {
+          if (ci < colCount - 1) focusCell(ri, ci + 1);
+          else if (ri < rowCount - 1) focusCell(ri + 1, 0);
+        }
+      } else if (e.key === "ArrowUp") { e.preventDefault(); if (ri > 0) focusCell(ri - 1, ci); }
+      else if (e.key === "ArrowDown") { e.preventDefault(); if (ri < rowCount - 1) focusCell(ri + 1, ci); }
+      else if (e.key === "ArrowLeft") {
+        const input = e.currentTarget;
+        if (input.selectionStart === 0 && input.selectionEnd === 0 && ci > 0) { e.preventDefault(); focusCell(ri, ci - 1); }
+      } else if (e.key === "ArrowRight") {
+        const input = e.currentTarget;
+        if (input.selectionStart === input.value.length && ci < colCount - 1) { e.preventDefault(); focusCell(ri, ci + 1); }
+      }
+    },
+    [localSheets, activeIdx, focusCell, updateSheet],
+  );
+
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key === "i") {
-        e.preventDefault();
-        addColumn();
-      }
+      if ((e.ctrlKey || e.metaKey) && e.key === "i") { e.preventDefault(); addColumn(); }
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeIdx, localSheets]);
 
   // ── Render ─────────────────────────────────────────────────────────────────
   if (isLoading) {
-    return <div className="flex items-center justify-center min-h-[200px] text-muted-foreground">Loading pages…</div>;
+    return (
+      <div className="flex items-center justify-center min-h-[200px] text-muted-foreground">
+        Loading pages…
+      </div>
+    );
   }
 
-  const diffRow = activeSheet ? calcDiff(localSheets, activeSheet) : [];
-  const totalRow = activeSheet ? calcTotal(localSheets, activeSheet) : [];
+  const diffRow  = activeSheet ? calcDiff(localSheets, activeSheet) : [];
 
   return (
     <>
       <div className="flex flex-col flex-1 min-h-0 bg-background">
+
         {/* Link dialog */}
         <LinkDialog
           state={linkDialog}
@@ -1076,32 +886,15 @@ export default function FactoryStatusBuilder() {
             }}
             data-testid="sb-input-import-file"
           />
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => window.open("/api/factory/status-builder/sheets/template", "_blank")}
-            data-testid="sb-button-download-template"
-          >
+          <Button size="sm" variant="outline" onClick={() => window.open("/api/factory/status-builder/sheets/template", "_blank")} data-testid="sb-button-download-template">
             <FileDown className="h-3.5 w-3.5 mr-1.5" />
             Template
           </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => fileInputRef.current?.click()}
-            disabled={importMutation.isPending}
-            data-testid="sb-button-import-excel"
-          >
+          <Button size="sm" variant="outline" onClick={() => fileInputRef.current?.click()} disabled={importMutation.isPending} data-testid="sb-button-import-excel">
             <Upload className="h-3.5 w-3.5 mr-1.5" />
             Import Excel
           </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={handleExport}
-            disabled={localSheets.length === 0}
-            data-testid="sb-button-export-excel"
-          >
+          <Button size="sm" variant="outline" onClick={handleExport} disabled={localSheets.length === 0} data-testid="sb-button-export-excel">
             <Download className="h-3.5 w-3.5 mr-1.5" />
             Export Excel
           </Button>
@@ -1112,10 +905,7 @@ export default function FactoryStatusBuilder() {
           )}
           <Button
             size="sm"
-            onClick={() => {
-              silentSaveRef.current = false;
-              saveMutation.mutate(localSheets);
-            }}
+            onClick={() => { silentSaveRef.current = false; saveMutation.mutate(localSheets); }}
             disabled={!isDirty || saveMutation.isPending}
             data-testid="sb-button-save"
           >
@@ -1124,18 +914,18 @@ export default function FactoryStatusBuilder() {
           </Button>
         </div>
 
-        {/* Cards / History toggle + search */}
-        <div className="flex items-center gap-2 px-4 py-2 border-b flex-wrap bg-muted/20">
+        {/* Sheet / History toggle */}
+        <div className="flex items-center gap-2 px-4 py-2 border-b bg-muted/20">
           <div className="flex items-center rounded-md border overflow-hidden shrink-0">
             <button
-              onClick={() => setViewMode("cards")}
-              data-testid="sb-button-view-cards"
+              onClick={() => setViewMode("sheet")}
+              data-testid="sb-button-view-sheet"
               className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium transition-colors ${
-                viewMode === "cards" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted"
+                viewMode === "sheet" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted"
               }`}
             >
-              <LayoutList className="h-3.5 w-3.5" />
-              Cards
+              <LayoutGrid className="h-3.5 w-3.5" />
+              Sheet
             </button>
             <button
               onClick={() => setViewMode("history")}
@@ -1148,55 +938,6 @@ export default function FactoryStatusBuilder() {
               History
             </button>
           </div>
-          {viewMode === "cards" && activeSheet && (
-            <>
-              <div className="relative flex-1 min-w-[160px] max-w-xs">
-                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-                <Input
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Search rows…"
-                  className="h-8 pl-8 text-sm"
-                  data-testid="sb-input-search"
-                />
-              </div>
-              <div className="flex items-center gap-1 overflow-x-auto">
-                {activeSheet.columns
-                  .filter((c) => !isDiffColumn(c.label) && !isTotalColumn(c.label))
-                  .map((col) => {
-                    const ci = activeSheet.columns.indexOf(col);
-                    return (
-                      <button
-                        key={col.id}
-                        onClick={() => setPrimaryColIdx(ci)}
-                        data-testid={`sb-pill-column-${ci}`}
-                        className={`px-2.5 py-1 rounded-full text-xs whitespace-nowrap transition-colors ${
-                          ci === primaryColIdx
-                            ? "bg-primary text-primary-foreground"
-                            : "bg-muted text-muted-foreground hover:text-foreground"
-                        }`}
-                      >
-                        {col.label || "(column)"}
-                      </button>
-                    );
-                  })}
-              </div>
-              <Button size="sm" variant="outline" onClick={() => setManageColumnsOpen(true)} data-testid="sb-button-manage-columns">
-                Columns
-              </Button>
-              <Button
-                size="sm"
-                onClick={() => {
-                  addRow();
-                  setTimeout(() => setEditRowIdx(activeSheet.rows.length), 0);
-                }}
-                data-testid="sb-button-add-row-card"
-              >
-                <Plus className="h-3.5 w-3.5 mr-1.5" />
-                Add row
-              </Button>
-            </>
-          )}
         </div>
 
         {/* Tabs */}
@@ -1231,6 +972,7 @@ export default function FactoryStatusBuilder() {
             </div>
           </div>
         ) : viewMode === "history" ? (
+          /* ── History tab ── */
           <div className="flex-1 overflow-auto p-4">
             {historyLoading ? (
               <div className="text-center text-sm text-muted-foreground py-8">Loading history…</div>
@@ -1272,244 +1014,265 @@ export default function FactoryStatusBuilder() {
             )}
           </div>
         ) : (
-          <div className="flex-1 overflow-auto p-4 space-y-4">
-            {/* Difference / Total status banners */}
-            {(diffRow.some((v) => v !== null) || totalRow.some((v) => v !== null)) && (
-              <div className="flex items-center gap-3 flex-wrap">
-                {activeSheet.columns.map((col, ci) => {
-                  if (isDiffColumn(col.label) && diffRow[ci] !== null) {
-                    const val = diffRow[ci] as number;
-                    const isNeg = val < 0;
-                    return (
-                      <div
-                        key={col.id}
-                        data-testid={`sb-banner-diff-${ci}`}
-                        className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium ${
-                          isNeg
-                            ? "bg-red-50 text-red-700 dark:bg-red-950/30 dark:text-red-400"
-                            : "bg-amber-50 text-amber-700 dark:bg-amber-950/30 dark:text-amber-400"
-                        }`}
+          /* ── Spreadsheet grid ── */
+          <div className="flex-1 overflow-auto p-4">
+            <div className="w-fit">
+              <table className="border-collapse text-sm" data-testid="sb-grid-table">
+                <thead className="sticky top-0 z-30">
+                  <tr>
+                    <th className="border border-border bg-muted px-2 py-1.5 text-left font-medium text-muted-foreground min-w-[180px]">
+                      Label
+                    </th>
+                    {activeSheet.columns.map((col, ci) => (
+                      <th key={col.id} className="border border-border bg-muted px-1 py-1 text-center font-medium min-w-[130px]">
+                        <div className="flex items-center gap-1">
+                          <Input
+                            value={col.label}
+                            onChange={(e) => setColumnHeader(ci, e.target.value)}
+                            className="h-7 text-xs text-center font-semibold border-0 bg-transparent focus-visible:ring-1 focus-visible:ring-primary px-1"
+                            data-testid={`sb-input-col-header-${ci}`}
+                          />
+                          <button
+                            data-testid={`sb-button-remove-col-${ci}`}
+                            onClick={() => setPendingDelete({ type: "col", idx: ci, label: col.label || `Column ${ci + 1}` })}
+                            className="text-muted-foreground hover:text-destructive shrink-0 transition-colors"
+                          >
+                            <X className="h-3 w-3" />
+                          </button>
+                        </div>
+                      </th>
+                    ))}
+                    <th className="border border-border bg-muted px-2 py-1.5 text-center">
+                      <button data-testid="sb-button-add-column" onClick={addColumn} className="text-muted-foreground hover:text-foreground transition-colors" title="Add column">
+                        <Plus className="h-4 w-4" />
+                      </button>
+                    </th>
+                  </tr>
+                </thead>
+
+                <tbody>
+                  {activeSheet.rows.map((row, ri) => (
+                    <tr key={row.id} className="group hover:bg-muted/30">
+                      {/* Row label */}
+                      <td className="border border-border px-1 py-0.5 bg-muted/20">
+                        <div className="flex items-center gap-1">
+                          <Input
+                            value={fmtLabel(row.label)}
+                            onChange={(e) => setRowLabel(ri, e.target.value)}
+                            className="h-7 text-xs border-0 bg-transparent focus-visible:ring-1 focus-visible:ring-primary px-1 flex-1"
+                            data-testid={`sb-input-row-label-${ri}`}
+                            dir="auto"
+                          />
+                          <button
+                            data-testid={`sb-button-remove-row-${ri}`}
+                            onClick={() => setPendingDelete({ type: "row", idx: ri, label: fmtLabel(row.label) || `Row ${ri + 1}` })}
+                            className="text-muted-foreground hover:text-destructive shrink-0 transition-colors opacity-0 group-hover:opacity-100"
+                            style={{ visibility: "visible" }}
+                          >
+                            <X className="h-3 w-3" />
+                          </button>
+                        </div>
+                      </td>
+
+                      {/* Data cells */}
+                      {activeSheet.columns.map((col, ci) => {
+                        const isDiff = isDiffColumn(col.label);
+                        const isTotal = isTotalColumn(col.label);
+                        const cell = row.cells[ci] ?? { value: null };
+                        const isLinked = !!cell.link;
+
+                        let displayValue: CellValue | "#REF!" | "#CYCLE!";
+                        let isBroken = false;
+                        let isCyclic = false;
+
+                        if (isDiff || isTotal) {
+                          const colLabels = activeSheet.columns.map((c) => c.label);
+                          const rowResolvedVals: (number | null)[] = activeSheet.columns.map((_, idx) => {
+                            const c = row.cells[idx] ?? { value: null };
+                            const eff = getEffectiveValue(localSheets, c);
+                            return typeof eff === "number" ? eff : null;
+                          });
+                          displayValue = isDiff
+                            ? computeDiffValue(colLabels, rowResolvedVals, ci)
+                            : computeTotalValue(colLabels, rowResolvedVals);
+                        } else if (isLinked) {
+                          const res = resolveCellValue(localSheets, cell.link!.sourceSheetId, cell.link!.sourceRowId, cell.link!.sourceColumnId);
+                          displayValue = res.value;
+                          isBroken = res.broken;
+                          isCyclic = res.circular;
+                        } else {
+                          displayValue = cell.value;
+                        }
+
+                        const isNeg = typeof displayValue === "number" && displayValue < 0;
+                        const isErrorVal = displayValue === "#REF!" || displayValue === "#CYCLE!";
+                        const isTextVal = !isDiff && !isLinked && typeof cell.value === "string" && cell.value !== "-";
+
+                        let linkInfo: string | null = null;
+                        if (isLinked && !isBroken && !isCyclic) {
+                          const srcSheet = localSheets.find((s) => s.stableId === cell.link!.sourceSheetId);
+                          const srcRow = srcSheet?.rows.find((r) => r.id === cell.link!.sourceRowId);
+                          const srcCol = srcSheet?.columns.find((c) => c.id === cell.link!.sourceColumnId);
+                          if (srcSheet && srcRow && srcCol) {
+                            linkInfo = `${srcSheet.name} → ${srcRow.label || "(row)"} → ${srcCol.label || "(col)"}`;
+                          }
+                        }
+
+                        const srcSheetIdxForJump = isLinked
+                          ? localSheets.findIndex((s) => s.stableId === cell.link!.sourceSheetId)
+                          : -1;
+
+                        return (
+                          <td key={col.id} className={`border border-border px-0 py-0 ${isDiff ? "bg-muted/20" : isTotal ? "bg-blue-50/60 dark:bg-blue-950/30" : ""}`}>
+                            <div className="relative group/cell">
+                              {isDiff || isTotal || isLinked ? (
+                                <div
+                                  data-testid={isLinked ? `sb-linked-cell-${ri}-${ci}` : isDiff ? `sb-diff-cell-${ri}-${ci}` : `sb-total-cell-${ri}-${ci}`}
+                                  className={`h-7 px-2 flex items-center gap-1 text-xs tabular-nums select-none cursor-default
+                                    ${isErrorVal ? "text-red-500 font-mono" : isNeg ? "text-red-500" : isDiff ? "text-foreground font-medium" : isTotal ? "text-blue-700 dark:text-blue-300 font-semibold" : "text-foreground"}
+                                    ${isTextVal ? "justify-start" : "justify-center"}`}
+                                  title={isDiff ? "Auto-calculated: DIFF" : isTotal ? "Auto-calculated: sum of all columns" : isLinked && linkInfo ? `Linked from: ${linkInfo}` : ""}
+                                >
+                                  {isLinked && !isBroken && !isCyclic && (
+                                    <Link2 className="h-2.5 w-2.5 text-blue-400 shrink-0" />
+                                  )}
+                                  {(isBroken || isCyclic) && (
+                                    <Link2Off className="h-2.5 w-2.5 text-red-400 shrink-0" />
+                                  )}
+                                  <span className="tabular-nums">{fmt(displayValue)}</span>
+                                </div>
+                              ) : (
+                                <Input
+                                  value={fmt(cell.value)}
+                                  onChange={(e) => setCellDirect(ri, ci, e.target.value)}
+                                  onKeyDown={(e) => handleCellKeyDown(e, ri, ci)}
+                                  className={`h-7 text-xs border-0 bg-transparent focus-visible:ring-1 focus-visible:ring-primary px-2 tabular-nums
+                                    ${isNeg ? "text-red-500" : ""}
+                                    ${isTextVal ? "text-left" : "text-center"}`}
+                                  data-testid={`sb-input-cell-${ri}-${ci}`}
+                                  dir="auto"
+                                />
+                              )}
+
+                              {/* Link menu */}
+                              {!isDiff && !isTotal && (
+                                <div className={`absolute top-0.5 right-0.5 z-10 transition-opacity ${isLinked ? "opacity-100" : "opacity-0 group-hover/cell:opacity-100"}`}>
+                                  <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                      <button
+                                        className="p-0.5 rounded hover:bg-muted/60"
+                                        onClick={(e) => e.stopPropagation()}
+                                        data-testid={`sb-button-cell-menu-${ri}-${ci}`}
+                                        title={isLinked ? `Linked from: ${linkInfo ?? "…"}` : "Link this cell"}
+                                      >
+                                        {isBroken || isCyclic ? (
+                                          <Link2Off className="h-2.5 w-2.5 text-red-400" />
+                                        ) : isLinked ? (
+                                          <Link2 className="h-2.5 w-2.5 text-blue-400" />
+                                        ) : (
+                                          <Link2 className="h-2.5 w-2.5 text-muted-foreground" />
+                                        )}
+                                      </button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent align="end" className="text-xs min-w-[160px]">
+                                      {isLinked && linkInfo && (
+                                        <>
+                                          <div className="px-2 py-1.5 text-xs text-muted-foreground max-w-[200px] leading-tight">
+                                            {linkInfo}
+                                          </div>
+                                          <DropdownMenuSeparator />
+                                        </>
+                                      )}
+                                      {!isLinked ? (
+                                        <DropdownMenuItem onClick={() => openLinkDialog(ri, ci)} className="text-xs gap-2">
+                                          <Link2 className="h-3 w-3" />
+                                          Link cell
+                                        </DropdownMenuItem>
+                                      ) : (
+                                        <>
+                                          <DropdownMenuItem onClick={() => openLinkDialog(ri, ci)} className="text-xs gap-2">
+                                            <Link2 className="h-3 w-3" />
+                                            Change link
+                                          </DropdownMenuItem>
+                                          <DropdownMenuItem onClick={() => unlinkCell(ri, ci)} className="text-xs gap-2">
+                                            <Link2Off className="h-3 w-3" />
+                                            Remove link
+                                          </DropdownMenuItem>
+                                          <DropdownMenuItem onClick={() => copyLinkValueAsManual(ri, ci)} className="text-xs gap-2">
+                                            Copy value as manual
+                                          </DropdownMenuItem>
+                                          {srcSheetIdxForJump !== -1 && (
+                                            <DropdownMenuItem onClick={() => setActiveIdx(srcSheetIdxForJump)} className="text-xs gap-2">
+                                              Jump to source page
+                                            </DropdownMenuItem>
+                                          )}
+                                        </>
+                                      )}
+                                    </DropdownMenuContent>
+                                  </DropdownMenu>
+                                </div>
+                              )}
+                            </div>
+                          </td>
+                        );
+                      })}
+                      {/* Add column placeholder */}
+                      <td className="border border-border" />
+                    </tr>
+                  ))}
+
+                  {/* Add row */}
+                  <tr>
+                    <td className="border border-border px-1 py-0.5 bg-muted/10">
+                      <button
+                        data-testid="sb-button-add-row"
+                        onClick={addRow}
+                        className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors w-full px-1"
                       >
-                        {isNeg ? <TrendingDown className="h-4 w-4" /> : <TrendingUp className="h-4 w-4" />}
-                        {col.label || "Difference"}: <span className="tabular-nums">{fmt(val)}</span>
-                      </div>
-                    );
-                  }
-                  if (isTotalColumn(col.label) && totalRow[ci] !== null) {
-                    return (
-                      <div
-                        key={col.id}
-                        data-testid={`sb-banner-total-${ci}`}
-                        className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium bg-blue-50 text-blue-700 dark:bg-blue-950/30 dark:text-blue-300"
-                      >
-                        {col.label || "Total"}: <span className="tabular-nums">{fmt(totalRow[ci])}</span>
-                      </div>
-                    );
-                  }
-                  return null;
-                })}
-              </div>
-            )}
+                        <Plus className="h-3 w-3" />
+                        Add row
+                      </button>
+                    </td>
+                    {activeSheet.columns.map((_, ci) => (
+                      <td key={ci} className="border border-border" />
+                    ))}
+                    <td className="border border-border" />
+                  </tr>
 
-            {/* Row cards */}
-            {(() => {
-              const filteredRows = activeSheet.rows
-                .map((row, ri) => ({ row, ri }))
-                .filter(({ row }) => fmtLabel(row.label).toLowerCase().includes(search.trim().toLowerCase()));
-
-              if (activeSheet.rows.length === 0) {
-                return (
-                  <div className="flex flex-col items-center justify-center text-muted-foreground text-sm py-12 gap-3">
-                    <LayoutList className="h-10 w-10 opacity-30" />
-                    <p>No rows yet.</p>
-                    <Button
-                      size="sm"
-                      onClick={() => {
-                        addRow();
-                        setTimeout(() => setEditRowIdx(0), 0);
-                      }}
-                    >
-                      <Plus className="h-3.5 w-3.5 mr-1.5" />
-                      Add first row
-                    </Button>
-                  </div>
-                );
-              }
-
-              if (filteredRows.length === 0) {
-                return (
-                  <div className="text-center text-sm text-muted-foreground py-8">
-                    No rows match "{search}".
-                  </div>
-                );
-              }
-
-              const primaryCol = activeSheet.columns[primaryColIdx];
-
-              return (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-                  {filteredRows.map(({ row, ri }) => {
-                    const otherCols = activeSheet.columns
-                      .map((c, ci) => ({ c, ci }))
-                      .filter(({ ci }) => ci !== primaryColIdx && !isDiffColumn(activeSheet.columns[ci].label) && !isTotalColumn(activeSheet.columns[ci].label));
-
-                    const primaryCell = primaryCol ? row.cells[primaryColIdx] ?? { value: null } : { value: null };
-                    const primaryLinked = !!primaryCell.link;
-                    let primaryDisplay: CellValue | "#REF!" | "#CYCLE!" = primaryCell.value;
-                    if (primaryLinked) {
-                      const res = resolveCellValue(
-                        localSheets,
-                        primaryCell.link!.sourceSheetId,
-                        primaryCell.link!.sourceRowId,
-                        primaryCell.link!.sourceColumnId
-                      );
-                      primaryDisplay = res.value;
-                    }
-                    const rowHasLink = row.cells.some((c) => !!c.link);
-
-                    return (
-                      <Card
-                        key={row.id}
-                        className="cursor-pointer hover-elevate transition-colors"
-                        onClick={() => setEditRowIdx(ri)}
-                        data-testid={`sb-card-row-${ri}`}
-                      >
-                        <CardContent className="p-3.5 space-y-2.5">
-                          <div className="flex items-start justify-between gap-2">
-                            <div className="font-medium text-sm leading-tight break-words" dir="auto">
-                              {fmtLabel(row.label) || <span className="text-muted-foreground italic">Untitled row</span>}
-                            </div>
-                            <div className="flex items-center gap-0.5 shrink-0">
-                              {rowHasLink && <Link2 className="h-3.5 w-3.5 text-blue-400" />}
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setEditRowIdx(ri);
-                                }}
-                                className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground"
-                                data-testid={`sb-button-edit-row-${ri}`}
-                              >
-                                <Pencil className="h-3.5 w-3.5" />
-                              </button>
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setPendingDelete({ type: "row", idx: ri, label: fmtLabel(row.label) || `Row ${ri + 1}` });
-                                }}
-                                className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-destructive"
-                                data-testid={`sb-button-remove-row-${ri}`}
-                              >
-                                <Trash2 className="h-3.5 w-3.5" />
-                              </button>
-                            </div>
-                          </div>
-
-                          {primaryCol && (
-                            <div>
-                              <div className="text-[11px] text-muted-foreground">{primaryCol.label || "Value"}</div>
-                              <div
-                                className={`text-lg font-semibold tabular-nums ${typeof primaryDisplay === "number" && primaryDisplay < 0 ? "text-red-500" : ""}`}
-                              >
-                                {fmt(primaryDisplay)}
-                              </div>
-                            </div>
-                          )}
-
-                          {otherCols.length > 0 && (
-                            <div className="flex flex-wrap gap-1.5 pt-1 border-t">
-                              {otherCols.map(({ c, ci }) => {
-                                const cell = row.cells[ci] ?? { value: null };
-                                let display: CellValue | "#REF!" | "#CYCLE!" = cell.value;
-                                if (cell.link) {
-                                  const res = resolveCellValue(
-                                    localSheets,
-                                    cell.link.sourceSheetId,
-                                    cell.link.sourceRowId,
-                                    cell.link.sourceColumnId
-                                  );
-                                  display = res.value;
-                                }
-                                return (
-                                  <Badge key={c.id} variant="secondary" className="text-[11px] font-normal gap-1">
-                                    <span className="text-muted-foreground">{c.label || "—"}:</span>
-                                    <span className="tabular-nums">{fmt(display)}</span>
-                                    {cell.link && <Link2 className="h-2.5 w-2.5 text-blue-400" />}
-                                  </Badge>
-                                );
-                              })}
-                            </div>
-                          )}
-                        </CardContent>
-                      </Card>
-                    );
-                  })}
-                </div>
-              );
-            })()}
+                  {/* Footer — DIFFERENCE row */}
+                  {activeSheet.rows.length > 0 && (
+                    <tr className="bg-amber-50/60 dark:bg-amber-950/20">
+                      <td className="border border-border px-2 py-1.5">
+                        <span className="text-xs font-semibold text-amber-700 dark:text-amber-400">DIFFERENCE</span>
+                      </td>
+                      {diffRow.map((val, ci) => {
+                        const isNeg = typeof val === "number" && val < 0;
+                        return (
+                          <td
+                            key={ci}
+                            className="border border-border px-2 py-1.5 text-xs font-semibold text-center tabular-nums"
+                            data-testid={`sb-footer-diff-${ci}`}
+                          >
+                            <span className={isNeg ? "text-red-500" : "text-amber-700 dark:text-amber-400"}>
+                              {fmt(val)}
+                            </span>
+                          </td>
+                        );
+                      })}
+                      <td className="border border-border" />
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
       </div>
 
-      <RowEditDialog
-        sheet={activeSheet}
-        sheets={localSheets}
-        rowIdx={editRowIdx}
-        onClose={() => setEditRowIdx(null)}
-        onLabelChange={setRowLabel}
-        onCellChange={setCellDirect}
-        onOpenLink={(ri, ci) => {
-          setEditRowIdx(null);
-          openLinkDialog(ri, ci);
-        }}
-        onUnlink={unlinkCell}
-        onDelete={(ri, label) => {
-          setEditRowIdx(null);
-          setPendingDelete({ type: "row", idx: ri, label });
-        }}
-        fmtLabel={fmtLabel}
-      />
-
-      {/* Manage columns dialog */}
-      <Dialog open={manageColumnsOpen} onOpenChange={setManageColumnsOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Manage columns</DialogTitle>
-            <DialogDescription>Rename, add, or remove the columns on this page.</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-2 max-h-[50vh] overflow-y-auto py-1">
-            {activeSheet?.columns.map((col, ci) => (
-              <div key={col.id} className="flex items-center gap-2">
-                <Input
-                  value={col.label}
-                  onChange={(e) => setColumnHeader(ci, e.target.value)}
-                  className="h-9 text-sm"
-                  data-testid={`sb-input-col-header-${ci}`}
-                />
-                <button
-                  data-testid={`sb-button-remove-col-${ci}`}
-                  onClick={() => setPendingDelete({ type: "col", idx: ci, label: col.label || `Column ${ci + 1}` })}
-                  className="p-2 rounded text-muted-foreground hover:text-destructive hover:bg-muted shrink-0"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </button>
-              </div>
-            ))}
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={addColumn} data-testid="sb-button-add-column">
-              <Plus className="h-3.5 w-3.5 mr-1.5" />
-              Add column
-            </Button>
-            <Button onClick={() => setManageColumnsOpen(false)}>Done</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
+      {/* Delete confirmation dialog */}
       <AlertDialog
         open={!!pendingDelete}
-        onOpenChange={(isOpen) => {
-          if (!isOpen) setPendingDelete(null);
-        }}
+        onOpenChange={(isOpen) => { if (!isOpen) setPendingDelete(null); }}
       >
         <AlertDialogContent>
           <AlertDialogHeader>
