@@ -6,13 +6,15 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
 import {
   Table,
   TableBody,
@@ -21,7 +23,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { TrendingUp, TrendingDown, Minus, AlertTriangle, GitCompare } from "lucide-react";
+import { TrendingUp, TrendingDown, Minus, AlertTriangle, Check, ChevronDown, X } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 // ── Date helpers ─────────────────────────────────────────────────────────────
 
@@ -115,13 +118,114 @@ function fmtNum(n: number) {
 }
 function pctChange(a: number, b: number): number | null {
   if (b === 0 && a === 0) return 0;
-  if (b === 0) return null; // infinite / N/A
+  if (b === 0) return null;
   return ((a - b) / b) * 100;
 }
 function fmtPct(p: number | null) {
   if (p === null) return "N/A";
   const sign = p > 0 ? "+" : "";
   return `${sign}${p.toFixed(1)}%`;
+}
+
+// ── MultiSelectFilter ─────────────────────────────────────────────────────────
+
+function MultiSelectFilter({
+  options,
+  selected,
+  onChange,
+  placeholder,
+  allLabel,
+  className,
+}: {
+  options: string[];
+  selected: string[];
+  onChange: (next: string[]) => void;
+  placeholder: string;
+  allLabel: string;
+  className?: string;
+}) {
+  const [open, setOpen] = useState(false);
+
+  const toggle = (value: string) => {
+    if (selected.includes(value)) {
+      onChange(selected.filter((v) => v !== value));
+    } else {
+      onChange([...selected, value]);
+    }
+  };
+
+  const label =
+    selected.length === 0
+      ? allLabel
+      : selected.length === 1
+        ? selected[0]
+        : `${selected.length} selected`;
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button
+          className={cn(
+            "inline-flex items-center justify-between gap-2 rounded-md border bg-background px-3 py-2 text-sm shadow-sm hover:bg-accent transition-colors min-w-[140px]",
+            selected.length > 0 && "border-primary/50",
+            className,
+          )}
+        >
+          <span className="truncate">{label}</span>
+          <div className="flex items-center gap-1 shrink-0">
+            {selected.length > 0 && (
+              <span
+                role="button"
+                tabIndex={0}
+                className="rounded-full hover:bg-muted p-0.5"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onChange([]);
+                }}
+                onKeyDown={(e) => e.key === "Enter" && (e.stopPropagation(), onChange([]))}
+              >
+                <X className="h-3 w-3 text-muted-foreground" />
+              </span>
+            )}
+            <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+          </div>
+        </button>
+      </PopoverTrigger>
+      <PopoverContent className="w-52 p-0" align="start">
+        <Command>
+          <CommandInput placeholder={`Search ${placeholder.toLowerCase()}…`} />
+          <CommandList>
+            <CommandEmpty>No results.</CommandEmpty>
+            <CommandGroup>
+              {options.map((opt) => {
+                const checked = selected.includes(opt);
+                return (
+                  <CommandItem
+                    key={opt}
+                    value={opt}
+                    onSelect={() => toggle(opt)}
+                    className="flex items-center gap-2 cursor-pointer"
+                  >
+                    <div
+                      className={cn(
+                        "flex h-4 w-4 items-center justify-center rounded border shrink-0",
+                        checked
+                          ? "border-primary bg-primary text-primary-foreground"
+                          : "border-muted-foreground/40",
+                      )}
+                    >
+                      {checked && <Check className="h-3 w-3" />}
+                    </div>
+                    <span className="truncate">{opt}</span>
+                  </CommandItem>
+                );
+              })}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
+  );
 }
 
 // ── Sub-components ────────────────────────────────────────────────────────────
@@ -213,16 +317,14 @@ function StatCard({
 export default function ProductionComparison() {
   const [preset, setPreset] = useState<Preset>("month");
 
-  // Custom dates
   const [customA, setCustomA] = useState<[string, string]>([todayStr(), todayStr()]);
   const [customB, setCustomB] = useState<[string, string]>([yesterdayStr(), yesterdayStr()]);
 
-  // Filters
-  const [filterCategory, setFilterCategory] = useState("__all__");
-  const [filterGrade, setFilterGrade] = useState("__all__");
+  // Filters — multi-select for category and grade
+  const [filterCategories, setFilterCategories] = useState<string[]>([]);
+  const [filterGrades, setFilterGrades] = useState<string[]>([]);
   const [filterProduct, setFilterProduct] = useState("");
 
-  // Compute date ranges from preset
   const [rangeA, rangeB] = useMemo<[[string, string], [string, string]]>(() => {
     if (preset === "today-yesterday")
       return [[todayStr(), todayStr()], [yesterdayStr(), yesterdayStr()]];
@@ -248,7 +350,6 @@ export default function ProductionComparison() {
           ? "Last Year"
           : "Period B";
 
-  // Fetch period A
   const qA = useQuery<ReportData>({
     queryKey: ["/api/factory/production-value-report", rangeA[0], rangeA[1]],
     queryFn: async () => {
@@ -261,7 +362,6 @@ export default function ProductionComparison() {
     },
   });
 
-  // Fetch period B
   const qB = useQuery<ReportData>({
     queryKey: ["/api/factory/production-value-report", rangeB[0], rangeB[1]],
     queryFn: async () => {
@@ -277,7 +377,6 @@ export default function ProductionComparison() {
   const isLoading = qA.isLoading || qB.isLoading;
   const fetchError = qA.error || qB.error;
 
-  // Build category + grade option lists from both period results
   const { categories, grades } = useMemo(() => {
     const catSet = new Set<string>();
     const gradeSet = new Set<string>();
@@ -292,7 +391,6 @@ export default function ProductionComparison() {
     return { categories: [...catSet].sort(), grades: [...gradeSet].sort() };
   }, [qA.data, qB.data]);
 
-  // Merge period A and B byProduct arrays on articleCode
   const mergedAll = useMemo<MergedRow[]>(() => {
     const map = new Map<string, MergedRow>();
     for (const row of qA.data?.production.byProduct ?? []) {
@@ -328,12 +426,16 @@ export default function ProductionComparison() {
     return [...map.values()];
   }, [qA.data, qB.data]);
 
-  // Apply filters + sort by |bale diff| desc
   const filtered = useMemo(
     () =>
       mergedAll
-        .filter((r) => filterCategory === "__all__" || r.categoryName === filterCategory)
-        .filter((r) => filterGrade === "__all__" || r.grade === filterGrade)
+        .filter(
+          (r) =>
+            filterCategories.length === 0 || filterCategories.includes(r.categoryName),
+        )
+        .filter(
+          (r) => filterGrades.length === 0 || filterGrades.includes(r.grade),
+        )
         .filter((r) => {
           if (!filterProduct) return true;
           const q = filterProduct.toLowerCase();
@@ -343,10 +445,9 @@ export default function ProductionComparison() {
           );
         })
         .sort((a, b) => Math.abs(b.aQty - b.bQty) - Math.abs(a.aQty - a.bQty)),
-    [mergedAll, filterCategory, filterGrade, filterProduct],
+    [mergedAll, filterCategories, filterGrades, filterProduct],
   );
 
-  // Compute totals from filtered set
   const totalABales = filtered.reduce((s, r) => s + r.aQty, 0);
   const totalBBales = filtered.reduce((s, r) => s + r.bQty, 0);
   const totalAKg = filtered.reduce((s, r) => s + r.aKg, 0);
@@ -357,9 +458,7 @@ export default function ProductionComparison() {
   const kgPct = pctChange(totalAKg, totalBKg);
 
   const hasActiveFilter =
-    filterCategory !== "__all__" || filterGrade !== "__all__" || filterProduct !== "";
-
-  // ── Render ──────────────────────────────────────────────────────────────────
+    filterCategories.length > 0 || filterGrades.length > 0 || filterProduct !== "";
 
   return (
     <div className="flex flex-col gap-4 p-4 md:p-6">
@@ -457,7 +556,6 @@ export default function ProductionComparison() {
       {/* Content */}
       {!isLoading && !fetchError && (
         <>
-          {/* ── Summary cards (7 cards, 2 rows) ── */}
           {/* Row 1: A bales, B bales, A kg, B kg */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             <StatCard
@@ -524,37 +622,27 @@ export default function ProductionComparison() {
 
           {/* ── Filters ── */}
           <div className="flex flex-wrap gap-3 items-center">
-            <Select value={filterCategory} onValueChange={setFilterCategory}>
-              <SelectTrigger className="w-48">
-                <SelectValue placeholder="All Categories" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__all__">All Categories</SelectItem>
-                {categories.map((c) => (
-                  <SelectItem key={c} value={c}>
-                    {c}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <MultiSelectFilter
+              options={categories}
+              selected={filterCategories}
+              onChange={setFilterCategories}
+              placeholder="Categories"
+              allLabel="All Categories"
+              className="w-48"
+            />
 
-            <Select value={filterGrade} onValueChange={setFilterGrade}>
-              <SelectTrigger className="w-36">
-                <SelectValue placeholder="All Grades" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__all__">All Grades</SelectItem>
-                {grades.map((g) => (
-                  <SelectItem key={g} value={g}>
-                    {g}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <MultiSelectFilter
+              options={grades}
+              selected={filterGrades}
+              onChange={setFilterGrades}
+              placeholder="Grades"
+              allLabel="All Grades"
+              className="w-36"
+            />
 
             <Input
-              placeholder="Search product / article…"
-              className="w-56"
+              placeholder="Search product…"
+              className="w-52"
               value={filterProduct}
               onChange={(e) => setFilterProduct(e.target.value)}
             />
@@ -564,8 +652,8 @@ export default function ProductionComparison() {
                 variant="ghost"
                 size="sm"
                 onClick={() => {
-                  setFilterCategory("__all__");
-                  setFilterGrade("__all__");
+                  setFilterCategories([]);
+                  setFilterGrades([]);
                   setFilterProduct("");
                 }}
               >
@@ -612,10 +700,9 @@ export default function ProductionComparison() {
                     return (
                       <TableRow key={row.articleCode}>
                         <TableCell>
-                          <div className="font-mono text-[11px] text-muted-foreground leading-none mb-0.5">
-                            {row.articleCode}
+                          <div className="text-sm font-medium leading-snug">
+                            {row.productName || row.articleCode}
                           </div>
-                          <div className="text-sm leading-snug">{row.productName}</div>
                         </TableCell>
                         <TableCell className="text-sm text-muted-foreground">
                           {row.categoryName || "—"}
