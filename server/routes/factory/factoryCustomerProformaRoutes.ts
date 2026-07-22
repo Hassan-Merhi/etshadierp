@@ -638,6 +638,7 @@ export function registerFactoryCustomerProformaRoutes(app: Express) {
         txDate: orderDate || getClientDate(req),
         txType: "LOADING_CREATED",
         referenceId: order.id,
+        referenceTable: "customer_orders",
         description: `Loading created from proforma "${proforma.name}" for ${loadingCustomer?.legalName || "customer"} — ${totalBalesAdded} bale(s) added${insufficientNote}`,
       });
 

@@ -322,6 +322,7 @@ export function registerRawStockBalanceRoutes(app: Express) {
           txDate: today,
           txType: "OPENING_BALANCE_RAW",
           referenceId: rawStock.id,
+          referenceTable: "factory_raw_stock",
           description: `Opening balance: ${containerNumber} - ${kgVal} kg at ${rateVal}/kg (${currencyCode})`,
           currencyCode,
           amountCurrency: totalPayable,

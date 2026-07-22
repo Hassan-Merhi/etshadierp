@@ -1086,6 +1086,7 @@ export function registerPayrollCoreRoutes(app: Express) {
           txDate: prToday,
           txType: "PAYROLL_PAYMENT",
           referenceId: payroll.id,
+          referenceTable: "factory_payrolls",
           description: `Payroll paid: ${workerName} – ${parseFloat(payroll.netSalary || "0").toFixed(2)} (${payroll.periodStart} – ${payroll.periodEnd})`,
           amountCurrency: parseFloat(payroll.netSalary || "0"),
           amountUsd: parseFloat(payroll.netSalary || "0"),

@@ -2,6 +2,7 @@ import { parseId, parseOptionalId } from "../../../lib/parseId";
 import { getClientDate } from "../../../lib/dateUtils";
 import type { Express } from "express";
 import { db } from "../../../db";
+import { removeDaybookEntriesForSource } from "../../../services/factory/daybookSourceIntegrity";
 import { requireAuth } from "../../../auth";
 import { classifyNetPositionAccounts } from "../../../netPositionHelper";
 import { adjustInventory } from "../../../inventoryHelper";
@@ -1046,6 +1047,7 @@ export function registerSupplierCrudRoutes(app: Express) {
         txDate: created.date,
         txType: "SUPPLIER_PAYMENT",
         referenceId: created.id,
+        referenceTable: "factory_supplier_payments",
         description: `Supplier payment: ${spSupplier?.name || "Unknown"} – ${parseFloat(created.amount).toFixed(2)} ${created.currencyCode}`,
         amountCurrency: parseFloat(created.amount),
         amountUsd: parseFloat(created.amountUsd),
@@ -1088,6 +1090,14 @@ export function registerSupplierCrudRoutes(app: Express) {
           await tx.delete(voucherEntries).where(inArray(voucherEntries.voucherId, vIds));
           await tx.delete(vouchers).where(inArray(vouchers.id, vIds));
         }
+        // Remove the original SUPPLIER_PAYMENT daybook entry (including legacy rows
+        // written before referenceTable was populated).
+        await removeDaybookEntriesForSource(tx, {
+          companyId,
+          referenceTable: "factory_supplier_payments",
+          referenceId: id,
+          txTypes: ["SUPPLIER_PAYMENT"],
+        });
         await tx
           .delete(factorySupplierPayments)
           .where(and(eq(factorySupplierPayments.id, id), eq(factorySupplierPayments.companyId, companyId)));

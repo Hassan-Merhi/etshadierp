@@ -1944,7 +1944,8 @@ export default function FactoryDaybook() {
     // Avoid the bandwidth spike from constant refetching: the daybook list doesn't
     // need to be second-by-second live, and refocusing/reconnecting shouldn't
     // trigger a fresh multi-MB fetch every time.
-    staleTime: 60 * 1000,
+    staleTime: 0,
+    refetchOnMount: "always",
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,
     placeholderData: (prev) => prev,

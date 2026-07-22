@@ -790,6 +790,7 @@ export function registerOrderVerifyRecoverRoutes(app: Express) {
           txDate: verifyToday,
           txType: "ORDER_VERIFIED",
           referenceId: orderId,
+          referenceTable: "customer_orders",
           description: `Order verified for customer: ${verifyCustomer?.legalName || "Customer"}${notes ? ` – ${notes}` : ""}`,
           amountCurrency: verifyTotalValue,
           amountUsd: verifyTotalValue,

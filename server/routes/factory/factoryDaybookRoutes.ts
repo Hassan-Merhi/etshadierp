@@ -1,5 +1,6 @@
 import type { Express } from "express";
 import { db } from "../../db";
+import { buildLegacyValidSourceIds, isRowIntegrityValid } from "../../services/factory/daybookSourceIntegrity";
 import { requireAuth } from "../../auth";
 import { classifyNetPositionAccounts } from "../../netPositionHelper";
 import { adjustInventory } from "../../inventoryHelper";
@@ -78,7 +79,6 @@ import {
   factoryWorkerCategories,
   insertFactoryWorkerCategorySchema,
   factoryRawMaterialAdjustments,
-  factoryPayrolls,
   factoryWorkerDocuments,
   factoryAlerts,
   employees,
@@ -101,8 +101,6 @@ import {
   factoryFxAllocations,
   baleRecodeSessions,
   baleRecodeItems,
-  factoryWorkerAdvances,
-  factoryAdvanceRepayments,
   factoryBaleWasteDispatches,
   factoryPosSales,
   factoryPosSaleItems,
@@ -238,113 +236,20 @@ export function registerFactoryDaybookRoutes(app: Express) {
         });
       }
 
-      // ── 1c. Safety-net: drop payroll-referenced daybook entries whose payroll was deleted ─
-      // Covers PAYROLL_PAYMENT and PAYROLL_GENERATED entries left behind after undo/delete.
-      // NOTE: older entries were written without referenceTable, so also match by txType.
-      const PAYROLL_TX_TYPES = new Set(["PAYROLL_PAYMENT", "PAYROLL_GENERATED"]);
-      const payrollRefIds = daybookRows
-        .filter(
-          (r: any) =>
-            (r.referenceTable === "factory_payrolls" || PAYROLL_TX_TYPES.has(r.txType)) && r.referenceId != null
-        )
-        .map((r: any) => r.referenceId as number);
-
-      const validPayrollIds = new Set<number>();
-      if (payrollRefIds.length > 0) {
-        const livePayrolls = await db
-          .select({ id: factoryPayrolls.id })
-          .from(factoryPayrolls)
-          .where(inArray(factoryPayrolls.id, payrollRefIds));
-        livePayrolls.forEach((p: any) => validPayrollIds.add(p.id));
-      }
-
-      // ── 1d. Safety-net: drop advance-backed daybook entries whose advance was deleted ─
-      // Covers ADVANCE_GIVEN entries left behind when an advance is deleted without
-      // the corresponding daybook row being cleaned up (e.g. older deletes).
-      // Also covers entries with referenceId IS NULL (legacy/orphaned) — these can
-      // never be verified so they are always excluded.
-      const ADVANCE_TX_TYPES = new Set(["ADVANCE_GIVEN", "ADVANCE_CASH_UPDATED"]);
-      const advanceRefIds = daybookRows
-        .filter(
-          (r: any) =>
-            (r.referenceTable === "factory_worker_advances" || ADVANCE_TX_TYPES.has(r.txType)) && r.referenceId != null
-        )
-        .map((r: any) => r.referenceId as number);
-
-      const validAdvanceIds = new Set<number>();
-      if (advanceRefIds.length > 0) {
-        const liveAdvances = await db
-          .select({ id: factoryWorkerAdvances.id })
-          .from(factoryWorkerAdvances)
-          .where(inArray(factoryWorkerAdvances.id, advanceRefIds));
-        liveAdvances.forEach((a: any) => validAdvanceIds.add(a.id));
-      }
-
-      // ── 1e. Safety-net: drop repayment-backed daybook entries whose repayment was deleted ─
-      const REPAYMENT_TX_TYPES = new Set(["ADVANCE_REPAYMENT"]);
-      const repaymentRefIds = daybookRows
-        .filter(
-          (r: any) =>
-            (r.referenceTable === "factory_advance_repayments" || REPAYMENT_TX_TYPES.has(r.txType)) &&
-            r.referenceId != null
-        )
-        .map((r: any) => r.referenceId as number);
-
-      const validRepaymentIds = new Set<number>();
-      if (repaymentRefIds.length > 0) {
-        const liveRepayments = await db
-          .select({ id: factoryAdvanceRepayments.id })
-          .from(factoryAdvanceRepayments)
-          .where(inArray(factoryAdvanceRepayments.id, repaymentRefIds));
-        liveRepayments.forEach((a: any) => validRepaymentIds.add(a.id));
-      }
-
-      // ── 1f. Safety-net: drop container-backed entries whose container was soft-deleted ─
-      // CONTAINER_IMPORT and PURCHASE entries reference a factory_containers row.
-      // If the container was soft-deleted (deletedAt IS NOT NULL) the daybook entry
-      // must be hidden — otherwise bulk-deleted containers leave ghost entries behind.
-      const CONTAINER_TX_TYPES = new Set(["CONTAINER_IMPORT", "PURCHASE"]);
-      const containerRefIds = daybookRows
-        .filter((r: any) => CONTAINER_TX_TYPES.has(r.txType) && r.referenceId != null)
-        .map((r: any) => r.referenceId as number);
-
-      const validContainerIds = new Set<number>();
-      if (containerRefIds.length > 0) {
-        const liveContainers = await db
-          .select({ id: factoryContainers.id })
-          .from(factoryContainers)
-          .where(and(inArray(factoryContainers.id, containerRefIds), isNull(factoryContainers.deletedAt)));
-        liveContainers.forEach((c: any) => validContainerIds.add(c.id));
-      }
+      // ── 1c. Shared source-integrity check for all registered source-backed types ────────
+      // Batch-fetches valid source IDs via the central daybookSourceIntegrity registry.
+      // Replaces the former per-type ad-hoc blocks (payrolls, advances, repayments,
+      // containers) with a single parallel fetch covering all 12 source groups.
+      const validSourceIds = await buildLegacyValidSourceIds(daybookRows, companyId);
 
       const filteredDaybookRows = daybookRows
         .filter((r: any) => {
-          // Drop voucher-backed entries whose voucher was deleted
+          // Voucher check uses live-data maps from block 1b (supports description/amount refresh).
           if (r.referenceTable === "vouchers" && r.referenceId != null) {
             return validVoucherIds.has(r.referenceId);
           }
-          // Drop payroll-backed entries whose payroll was deleted
-          // Match by referenceTable OR txType (older entries lack referenceTable)
-          if ((r.referenceTable === "factory_payrolls" || PAYROLL_TX_TYPES.has(r.txType)) && r.referenceId != null) {
-            return validPayrollIds.has(r.referenceId);
-          }
-          // Drop advance-backed entries whose advance was deleted.
-          // Also drop entries with NULL referenceId — they are legacy/orphaned and
-          // cannot be verified against any live advance record.
-          if (r.referenceTable === "factory_worker_advances" || ADVANCE_TX_TYPES.has(r.txType)) {
-            if (r.referenceId == null) return false;
-            return validAdvanceIds.has(r.referenceId);
-          }
-          // Drop repayment-backed entries whose repayment was deleted.
-          if (r.referenceTable === "factory_advance_repayments" || REPAYMENT_TX_TYPES.has(r.txType)) {
-            if (r.referenceId == null) return false;
-            return validRepaymentIds.has(r.referenceId);
-          }
-          // Drop container-backed entries whose container was soft-deleted
-          if (CONTAINER_TX_TYPES.has(r.txType) && r.referenceId != null) {
-            return validContainerIds.has(r.referenceId);
-          }
-          return true;
+          // All other source-backed types: registry-driven validity check.
+          return isRowIntegrityValid(r, validSourceIds);
         })
         .map((r: any) => {
           if (r.referenceTable === "vouchers" && r.referenceId != null) {

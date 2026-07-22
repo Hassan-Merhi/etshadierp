@@ -869,6 +869,7 @@ export function registerSupplierFxRoutes(app: Express) {
         txDate: created.date,
         txType: "SUPPLIER_FX_TRANSFER",
         referenceId: created.id,
+        referenceTable: "factory_supplier_fx_transfers",
         description: `${transferKind}: ${fromSupplier.name} ${created.fromCurrencyCode} ${parseFloat(created.fromAmount).toFixed(2)} → ${toSupplier.name} USD ${parseFloat(created.toAmountUsd).toFixed(2)}`,
         amountCurrency: parseFloat(created.fromAmount),
         amountUsd: parseFloat(created.toAmountUsd),

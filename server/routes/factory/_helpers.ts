@@ -1,4 +1,5 @@
 import { db } from "../../db";
+import { AUTO_FILL_REF_TABLE } from "../../services/factory/daybookSourceIntegrity";
 import {
   factoryFxRates,
   factoryDaybookEntries,
@@ -80,8 +81,10 @@ export async function writeDaybookEntry(
       companyId: opts.companyId,
       txDate: opts.txDate,
       txType: opts.txType,
-      referenceId: opts.referenceId || null,
-      referenceTable: opts.referenceTable || null,
+      referenceId: opts.referenceId ?? null,
+      referenceTable:
+        opts.referenceTable ??
+        (opts.referenceId != null ? (AUTO_FILL_REF_TABLE[opts.txType] ?? null) : null),
       description: opts.description,
       metaJson: opts.metaJson || null,
       currencyCode: currency,

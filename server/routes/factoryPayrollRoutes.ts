@@ -3,6 +3,7 @@ import { parseId, parseOptionalId } from "../lib/parseId";
 import { getClientDate } from "../lib/dateUtils";
 import type { Express } from "express";
 import { checkFactoryAdmin } from "./factory/_helpers";
+import { removeDaybookEntriesForSource } from "../services/factory/daybookSourceIntegrity";
 import { eq, and, sql, asc, gte, lte, desc, inArray } from "drizzle-orm";
 import { rebuildPayrollGenVoucher } from "./payroll/_payrollAccountingHelper";
 import PDFDocument from "pdfkit";
@@ -743,16 +744,14 @@ export function registerFactoryPayrollRoutes(app: Express, requireAuth: any, db:
           await tx.delete(factoryAdvanceRepayments).where(eq(factoryAdvanceRepayments.payrollId, id));
         }
 
-        // Delete any daybook entries referencing this payroll
-        await tx
-          .delete(factoryDaybookEntries)
-          .where(
-            and(
-              eq(factoryDaybookEntries.companyId, companyId),
-              eq(factoryDaybookEntries.referenceId, id),
-              eq(factoryDaybookEntries.referenceTable, "factory_payrolls")
-            )
-          );
+        // Delete PAYROLL_PAYMENT/PAYROLL_GENERATED daybook entries for this payroll,
+        // including legacy rows written before referenceTable was populated.
+        await removeDaybookEntriesForSource(tx, {
+          companyId,
+          referenceTable: "factory_payrolls",
+          referenceId: id,
+          txTypes: ["PAYROLL_PAYMENT", "PAYROLL_GENERATED"],
+        });
 
         // Remove and rebuild the PAYROLL-GEN expense voucher for this period so the
         // expense account reflects only the payrolls that still exist.

@@ -892,6 +892,7 @@ export function registerOrderFinalizeLoadingRoutes(app: Express) {
         txDate: loadingToday,
         txType: "LOADING_CREATED",
         referenceId: order.id,
+        referenceTable: "customer_orders",
         description: `Loading started for customer: ${loadingCustomer?.legalName || customerId}`,
       });
 
@@ -966,6 +967,7 @@ export function registerOrderFinalizeLoadingRoutes(app: Express) {
         txDate: lsToday,
         txType: "LOADING_SUBMITTED",
         referenceId: orderId,
+        referenceTable: "customer_orders",
         description: `Loading submitted: ${lsCustomer?.legalName || "Customer"}, ${bales.length} bale${bales.length !== 1 ? "s" : ""} scanned`,
         amountCurrency: lsTotalValue,
         amountUsd: lsTotalValue,
@@ -986,6 +988,7 @@ export function registerOrderFinalizeLoadingRoutes(app: Express) {
         txDate: lsToday,
         txType: "ORDER_VERIFIED",
         referenceId: orderId,
+        referenceTable: "customer_orders",
         description: `Order verified for customer: ${lsCustomer?.legalName || "Customer"}`,
         amountCurrency: verifyTotalValue,
         amountUsd: verifyTotalValue,

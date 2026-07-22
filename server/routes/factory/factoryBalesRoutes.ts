@@ -230,6 +230,7 @@ export function registerFactoryBalesRoutes(app: Express) {
         txDate: today,
         txType: "BALE_PRESSING",
         referenceId: result.pressingBatchId,
+        referenceTable: "factory_pressing_batches",
         description: `Pressing batch created: ${result.bales?.length || 0} bales`,
       });
 
@@ -329,6 +330,7 @@ export function registerFactoryBalesRoutes(app: Express) {
         txDate: today,
         txType: "BALE_PRESSING",
         referenceId: result.pressingBatchId,
+        referenceTable: "factory_pressing_batches",
         description: `Multi-product pressing batch: ${result.bales?.length || 0} bales`,
       });
 

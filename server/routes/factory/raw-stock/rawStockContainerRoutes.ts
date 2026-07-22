@@ -308,6 +308,7 @@ export function registerRawStockContainerRoutes(app: Express) {
           txDate: today,
           txType: "DUTY",
           referenceId: containerId,
+          referenceTable: "factory_containers",
           description: `Duty confirmed for container ${lockedContainer.containerNumber}: ${newDutyAmount.toFixed(2)}`,
           currencyCode: lockedContainer.currencyCode || "USD",
           amountCurrency: newDutyAmount,

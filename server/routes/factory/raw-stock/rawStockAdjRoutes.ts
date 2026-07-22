@@ -447,6 +447,7 @@ export function registerRawStockAdjRoutes(app: Express) {
             txDate: date,
             txType: "OFFLOAD_RAW_STOCK",
             referenceId: inserted.id,
+            referenceTable: "factory_raw_stock",
             description: `Manual purchase: ${kgNum} kg @ ${costNum} ${ccy} from ${supplierName}`,
             currencyCode: ccy,
             amountCurrency: totalAmount,

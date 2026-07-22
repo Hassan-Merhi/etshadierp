@@ -2,6 +2,7 @@ import type { Express, NextFunction, Request, Response } from "express";
 import { and, eq, inArray, or } from "drizzle-orm";
 import { requireAuth } from "../../auth";
 import { db, pool } from "../../db";
+import { buildPaginationIntegrityConditions } from "../../services/factory/daybookSourceIntegrity";
 import { factoryBaleProducts, factoryBales, factoryUserProfiles } from "@shared/schema";
 
 const MAX_PAGE_SIZE = 250;
@@ -185,9 +186,10 @@ export function registerFactoryDaybookPaginationRoutes(app: Express): void {
           `f.tx_type NOT IN ('LOADING_SUBMITTED','ORDER_VERIFIED','INVOICE_REVERTED','SUPPLIER_FX_TRANSFER_DELETE','WORKER_CREATED','ORDER_CANCELLED','CONTRACT_SETTLED','CONTRACT_REACTIVATED','CONTRACT_ENDED')`,
           `NOT (f.tx_type = 'PAYROLL_PAYMENT' AND COALESCE(f.amount_currency, 0) = 0)`,
           `(f.reference_table IS DISTINCT FROM 'vouchers' OR f.reference_id IS NULL OR live_voucher.id IS NOT NULL)`,
-          `NOT ((COALESCE(f.reference_table = 'factory_payrolls', false) OR f.tx_type IN ('PAYROLL_PAYMENT','PAYROLL_GENERATED')) AND f.reference_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM factory_payrolls p WHERE p.id = f.reference_id))`,
-          `NOT ((COALESCE(f.reference_table = 'factory_worker_advances', false) OR f.tx_type IN ('ADVANCE_GIVEN','ADVANCE_CASH_UPDATED')) AND (f.reference_id IS NULL OR NOT EXISTS (SELECT 1 FROM factory_worker_advances a WHERE a.id = f.reference_id)))`,
-          `NOT ((COALESCE(f.reference_table = 'factory_advance_repayments', false) OR f.tx_type = 'ADVANCE_REPAYMENT') AND (f.reference_id IS NULL OR NOT EXISTS (SELECT 1 FROM factory_advance_repayments r WHERE r.id = f.reference_id)))`,
+          // Shared source-integrity conditions — generated from the central registry.
+          // Covers all source-backed txTypes (payrolls, advances, repayments, containers,
+          // mix batches, customer orders, commissions, raw stock, etc.).
+          ...buildPaginationIntegrityConditions(companyParam),
         ];
         const voucherConditions = [
           `v.company_id = ${companyParam}`,
