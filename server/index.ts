@@ -49,8 +49,22 @@ const SERVER_BOOT_ID = Math.random().toString(36).slice(2);
 
 const app = express();
 
-// Compress all HTTP responses (gzip/deflate) — reduces bandwidth by 60-80%
-app.use(compression());
+// Compress text-based HTTP responses (gzip/deflate) — reduces bandwidth by 60-80%.
+// Binary/already-compressed types (xlsx, zip, pdf, images) are excluded because:
+//   1. They are already compressed internally (xlsx = ZIP) so gzip yields minimal savings.
+//   2. Routes set Content-Length to the uncompressed buffer size; if compression then
+//      shrinks the body, the browser sees a length mismatch and discards the download (0 B).
+const SKIP_COMPRESSION_RE =
+  /spreadsheet|zip|pdf|octet-stream|image\//i;
+app.use(
+  compression({
+    filter: (req, res) => {
+      const type = String(res.getHeader("Content-Type") ?? "");
+      if (SKIP_COMPRESSION_RE.test(type)) return false;
+      return compression.filter(req, res);
+    },
+  })
+);
 
 // Security headers (X-Frame-Options, X-Content-Type-Options, HSTS, Referrer-Policy, etc.)
 // CSP is intentionally disabled — the SPA relies on inline scripts/styles via Vite,
