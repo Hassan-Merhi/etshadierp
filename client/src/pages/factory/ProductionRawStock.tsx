@@ -267,11 +267,6 @@ export default function ProductionRawStock() {
           <Button variant="outline" onClick={() => setCategoriesDialogOpen(true)} className="gap-2">
             <Tag className="h-4 w-4" /> Categories
           </Button>
-          <Link href="/factory/raw-stock/recalculate">
-            <Button variant="outline" className="gap-2">
-              <Calculator className="h-4 w-4" /> Recalculate Cost
-            </Button>
-          </Link>
         </div>
       </div>
 
