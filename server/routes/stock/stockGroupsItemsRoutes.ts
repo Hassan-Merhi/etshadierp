@@ -1034,6 +1034,19 @@ export function registerStockGroupsItemsRoutes(app: Express) {
   });
 
   // Get single stock item by ID
+  // Bulk alias lookup — MUST be registered before /:id to prevent "all-code-aliases"
+  // being captured as a param value (parseInt → NaN → 400).
+  app.get("/api/stock-items/all-code-aliases", requireAuth, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      const aliases = await storage.getAllCompanyCodeAliases(companyId);
+      res.json(aliases);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   app.get("/api/stock-items/:id", requireAuth, async (req, res) => {
     try {
       const stockItemId = parseInt(req.params.id);

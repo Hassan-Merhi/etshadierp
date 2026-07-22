@@ -1037,19 +1037,6 @@ export function registerStockTransferAdjRoutes(app: Express) {
     }
   });
 
-  // Stock Item Code Aliases
-  // Get all code aliases for the current company (bulk, used by exports)
-  app.get("/api/stock-items/all-code-aliases", requireAuth, async (req, res) => {
-    try {
-      const companyId = req.session.currentCompanyId;
-      if (!companyId) return res.status(400).json({ message: "No company selected" });
-      const aliases = await storage.getAllCompanyCodeAliases(companyId);
-      res.json(aliases);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
-    }
-  });
-
   // Get all code aliases for a stock item
   app.get("/api/stock-items/:id/code-aliases", requireAuth, async (req, res) => {
     try {
