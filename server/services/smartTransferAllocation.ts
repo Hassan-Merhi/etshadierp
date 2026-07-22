@@ -1,6 +1,6 @@
-import { and, eq, inArray, isNull } from "drizzle-orm";
+import { and, eq, gte, inArray, isNull, lte } from "drizzle-orm";
 import { db } from "../db";
-import { inventory, stockItems } from "@shared/schema";
+import { inventory, salesItems, stockItems, vouchers } from "@shared/schema";
 import { loadOtwStockByItem, type OtwContainerDetail } from "./stockTransferAnalysis";
 import {
   analyzeLastTwoMultiSourceTransfers,
@@ -14,7 +14,6 @@ export interface SmartTransferPreviewOptions {
   includeOtw?: boolean;
   stockGroupIds?: number[];
   categoryIds?: number[];
-  minimumSourceReserve?: number;
   targetCoverageDays?: number;
 }
 
@@ -95,7 +94,6 @@ export interface SmartTransferPreviewResult {
   shortfallQuantity: number;
   shortfall: boolean;
   includeOtw: boolean;
-  minimumSourceReserve: number;
   targetCoverageDays: number;
   stockGroupIds: number[];
   categoryIds: number[];
@@ -318,13 +316,13 @@ export async function buildSmartTransferPreview(
   if (!Number.isInteger(companyId) || companyId <= 0) throw new Error("A valid company is required");
 
   const includeOtw = options.includeOtw !== false;
-  const minimumSourceReserve = wholeNonNegative(options.minimumSourceReserve ?? 0);
   const targetCoverageDays = Math.min(180, Math.max(1, wholeNonNegative(options.targetCoverageDays ?? 21)));
+  const asOfDate = options.asOfDate ?? new Date().toISOString().slice(0, 10);
   const stockGroupIds = uniquePositiveIds(options.stockGroupIds);
   const categoryIds = uniquePositiveIds(options.categoryIds);
 
   const history = await analyzeLastTwoMultiSourceTransfers(companyId, sourceLocationIds, destinationLocationId, {
-    asOfDate: options.asOfDate,
+    asOfDate,
   });
 
   const warnings: string[] = [];
@@ -348,7 +346,6 @@ export async function buildSmartTransferPreview(
       shortfallQuantity: requestedTarget,
       shortfall: true,
       includeOtw,
-      minimumSourceReserve,
       targetCoverageDays,
       stockGroupIds,
       categoryIds,
@@ -410,15 +407,56 @@ export async function buildSmartTransferPreview(
   );
   const sourceStocksByItem = new Map<number, SmartTransferSourceStock[]>();
 
+  // Fetch recent sales at source locations (last 30 days) to reserve stock for
+  // items actively selling at the warehouse itself so we don't drain it.
+  const thirtyDaysAgo = (() => {
+    const d = new Date(`${asOfDate}T00:00:00.000Z`);
+    d.setDate(d.getDate() - 30);
+    return d.toISOString().slice(0, 10);
+  })();
+  const sourceSalesRows = stockItemIds.length > 0
+    ? await db
+        .select({
+          stockItemId: salesItems.stockItemId,
+          locationId: vouchers.locationId,
+          quantity: salesItems.quantity,
+        })
+        .from(salesItems)
+        .innerJoin(vouchers, eq(salesItems.voucherId, vouchers.id))
+        .where(
+          and(
+            eq(vouchers.companyId, companyId),
+            eq(vouchers.voucherType, "Sales"),
+            eq(vouchers.optional, false),
+            isNull(vouchers.deletedAt),
+            inArray(vouchers.locationId, history.selectedSourceLocationIds),
+            inArray(salesItems.stockItemId, stockItemIds),
+            gte(vouchers.voucherDate, thirtyDaysAgo),
+            lte(vouchers.voucherDate, asOfDate)
+          )
+        )
+    : [];
+
+  // Build a map of (stockItemId, locationId) → total units sold in last 30 days at source
+  const sourceSalesMap = new Map<string, number>();
+  for (const row of sourceSalesRows) {
+    const key = `${row.stockItemId}:${row.locationId}`;
+    sourceSalesMap.set(key, (sourceSalesMap.get(key) ?? 0) + parseQuantity(row.quantity));
+  }
+
   for (const row of sourceInventoryRows) {
     const currentStock = wholeNonNegative(parseQuantity(row.quantity));
-    const availableQty = Math.max(0, currentStock - minimumSourceReserve);
+    // Reserve stock for local source sales: keep enough for the next coverage period
+    const sourceSalesQty = sourceSalesMap.get(`${row.stockItemId}:${row.locationId}`) ?? 0;
+    const sourceDailyRate = sourceSalesQty / 30;
+    const localReserve = sourceDailyRate > 0.1 ? Math.ceil(sourceDailyRate * Math.min(targetCoverageDays, 14)) : 0;
+    const availableQty = Math.max(0, currentStock - localReserve);
     const list = sourceStocksByItem.get(row.stockItemId) ?? [];
     list.push({
       sourceLocationId: row.locationId,
       sourceLocationName: sourceNameById.get(row.locationId) ?? `Location #${row.locationId}`,
       currentStock,
-      reserveQty: Math.min(currentStock, minimumSourceReserve),
+      reserveQty: localReserve,
       availableQty,
       averageRate: roundNumber(parseQuantity(row.averageRate), 2),
     });
@@ -470,7 +508,7 @@ export async function buildSmartTransferPreview(
       continue;
     }
     if (totalAvailable <= 0) {
-      exclude(`No whole units remain across the selected sources after preserving ${minimumSourceReserve} per source.`);
+      exclude("No whole units remain across the selected sources (sources may be reserved for local sales or out of stock).");
       continue;
     }
     if (performance.classification === "overstocked") {
@@ -497,6 +535,15 @@ export async function buildSmartTransferPreview(
       const lowCoverage =
         performance.estimatedDaysOfStockRemaining === null || performance.estimatedDaysOfStockRemaining < 14;
       calculatedNeed = lowCoverage ? coverageNeed : 0;
+    }
+
+    // If the destination already has enough stock to cover the target period AND
+    // is actively selling the item, it's self-sufficient — skip it.
+    const hasActiveSales = performance.latestSalesPerDay > 0.1;
+    const coverageDaysRemaining = performance.estimatedDaysOfStockRemaining;
+    if (hasActiveSales && coverageDaysRemaining !== null && coverageDaysRemaining >= targetCoverageDays) {
+      exclude(`Destination has ${Math.floor(coverageDaysRemaining)} days of stock remaining and is actively selling.`);
+      continue;
     }
 
     if (calculatedNeed <= 0) {
@@ -549,13 +596,13 @@ export async function buildSmartTransferPreview(
     requestedTarget = candidates.reduce((sum, c) => sum + c.calculatedNeed, 0);
   }
 
-  // Fair-share cap: no single item should take more than 1.5× its proportional
-  // slice of the total target. This prevents a strong-seller with very high
-  // available stock from consuming most of the allocation while other items that
-  // were in the last orders get zero. The remaining units after the cap are
-  // redistributed to other eligible candidates by the weight algorithm.
+  // Fair-share cap: prevent a single item from consuming too large a share when
+  // there are many candidates. Set at 3× proportional share to still allow
+  // strong sellers to take significantly more than average while keeping some
+  // balance. Items whose calculatedNeed is below the cap are naturally bounded
+  // by that need, so in practice the cap only constrains runaway strong sellers.
   const fairShareCap =
-    candidates.length > 0 ? Math.ceil((requestedTarget / candidates.length) * 1.5) : requestedTarget;
+    candidates.length > 0 ? Math.ceil((requestedTarget / candidates.length) * 3) : requestedTarget;
 
   const itemAllocations = allocateWholeUnitsByWeight(
     candidates.map((candidate) => ({
@@ -681,7 +728,6 @@ export async function buildSmartTransferPreview(
     shortfallQuantity,
     shortfall: shortfallQuantity > 0,
     includeOtw,
-    minimumSourceReserve,
     targetCoverageDays,
     stockGroupIds,
     categoryIds,

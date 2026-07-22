@@ -1,4 +1,4 @@
-import { and, desc, eq, gte, inArray, isNull, lt, lte, sql } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, isNull, lt, lte, notInArray, sql } from "drizzle-orm";
 import { db } from "../db";
 import {
   inventory,
@@ -441,6 +441,165 @@ export async function analyzeLastTwoMultiSourceTransfers(
     });
   }
 
+  // --- Supplemental items: items selling at destination but not in recent transfers ---
+  // Look back 90 days for destination sales of items not already captured above.
+  const ninetyDaysAgo = (() => {
+    const d = new Date(`${asOfDate}T00:00:00.000Z`);
+    d.setDate(d.getDate() - 90);
+    return d.toISOString().slice(0, 10);
+  })();
+
+  const supplementalSaleRows = stockItemIds.length > 0
+    ? await db
+        .select({
+          stockItemId: salesItems.stockItemId,
+          voucherDate: vouchers.voucherDate,
+          quantity: salesItems.quantity,
+        })
+        .from(salesItems)
+        .innerJoin(vouchers, eq(salesItems.voucherId, vouchers.id))
+        .where(
+          and(
+            eq(vouchers.companyId, companyId),
+            eq(vouchers.voucherType, "Sales"),
+            eq(vouchers.optional, false),
+            isNull(vouchers.deletedAt),
+            eq(vouchers.locationId, destinationLocationId),
+            notInArray(salesItems.stockItemId, stockItemIds),
+            gte(vouchers.voucherDate, ninetyDaysAgo),
+            lte(vouchers.voucherDate, asOfDate)
+          )
+        )
+        .orderBy(vouchers.voucherDate)
+    : await db
+        .select({
+          stockItemId: salesItems.stockItemId,
+          voucherDate: vouchers.voucherDate,
+          quantity: salesItems.quantity,
+        })
+        .from(salesItems)
+        .innerJoin(vouchers, eq(salesItems.voucherId, vouchers.id))
+        .where(
+          and(
+            eq(vouchers.companyId, companyId),
+            eq(vouchers.voucherType, "Sales"),
+            eq(vouchers.optional, false),
+            isNull(vouchers.deletedAt),
+            eq(vouchers.locationId, destinationLocationId),
+            gte(vouchers.voucherDate, ninetyDaysAgo),
+            lte(vouchers.voucherDate, asOfDate)
+          )
+        )
+        .orderBy(vouchers.voucherDate);
+
+  // Build sales map for supplemental items
+  const suppSalesByItem = new Map<number, Array<{ voucherDate: string; quantity: number }>>();
+  for (const sale of supplementalSaleRows) {
+    const list = suppSalesByItem.get(sale.stockItemId) ?? [];
+    list.push({ voucherDate: sale.voucherDate, quantity: parseQuantity(sale.quantity) });
+    suppSalesByItem.set(sale.stockItemId, list);
+  }
+
+  if (suppSalesByItem.size > 0) {
+    const suppStockItemIds = Array.from(suppSalesByItem.keys());
+
+    const [suppItemMetaRows, suppDestInvRows] = await Promise.all([
+      db
+        .select({
+          id: stockItems.id,
+          name: stockItems.name,
+          code: stockItems.code,
+        })
+        .from(stockItems)
+        .where(
+          and(
+            eq(stockItems.companyId, companyId),
+            inArray(stockItems.id, suppStockItemIds),
+            eq(stockItems.active, true),
+            isNull(stockItems.deletedAt)
+          )
+        ),
+      db
+        .select({ stockItemId: inventory.stockItemId, quantity: inventory.quantity })
+        .from(inventory)
+        .where(
+          and(
+            eq(inventory.companyId, companyId),
+            eq(inventory.locationId, destinationLocationId),
+            inArray(inventory.stockItemId, suppStockItemIds)
+          )
+        ),
+    ]);
+
+    const suppMetaById = new Map(suppItemMetaRows.map((r) => [r.id, r]));
+    const suppDestQtyById = new Map(suppDestInvRows.map((r) => [r.stockItemId, parseQuantity(r.quantity)]));
+
+    // Use the same latest window as the historical analysis
+    const suppLatestWindowDays = latestWindowDays;
+    const latestWindowStart = newerTransfer!.voucherDate;
+
+    for (const [stockItemId, itemSales] of suppSalesByItem.entries()) {
+      const meta = suppMetaById.get(stockItemId);
+      if (!meta) continue; // inactive / deleted item
+
+      const total90DaySales = itemSales.reduce((sum, s) => sum + s.quantity, 0);
+      const latestWindowSales = itemSales.filter((s) => s.voucherDate >= latestWindowStart);
+      const salesAfterNewerTransfer = latestWindowSales.reduce((sum, s) => sum + s.quantity, 0);
+      const currentDestinationQty = suppDestQtyById.get(stockItemId) ?? 0;
+
+      // Use the 90-day window for averageSalesPerDay; latest window for latestSalesPerDay
+      const averageSalesPerDay = total90DaySales / 90;
+      const latestSalesPerDay = salesAfterNewerTransfer / Math.max(1, suppLatestWindowDays);
+      const rateForCoverage = latestSalesPerDay > 0 ? latestSalesPerDay : averageSalesPerDay;
+      const estimatedDaysOfStockRemaining = rateForCoverage > 0 ? currentDestinationQty / rateForCoverage : null;
+
+      // Classify based on sales rate alone (no transfer baseline):
+      // Use daily rate tiers to assign a reasonable classification.
+      let classification: TransferPerformanceClassification;
+      if (rateForCoverage >= 1.0) {
+        classification = "good_seller";
+      } else if (rateForCoverage >= 0.3) {
+        classification = "normal_seller";
+      } else if (rateForCoverage >= 0.05) {
+        classification = "slow_seller";
+      } else {
+        continue; // essentially no sales — skip
+      }
+
+      // If destination already has lots of stock, call it overstocked and skip
+      if (estimatedDaysOfStockRemaining !== null && estimatedDaysOfStockRemaining > 60) {
+        continue;
+      }
+
+      itemPerformance.push({
+        stockItemId,
+        stockItemName: meta.name,
+        stockItemCode: meta.code,
+        historicalSourceLocationIds: [],
+        historicalSourceLocationNames: [],
+        olderTransferQty: 0,
+        newerTransferQty: 0,
+        totalTransferredQty: 0,
+        salesAfterOlderTransfer: roundNumber(total90DaySales - salesAfterNewerTransfer, 3),
+        salesAfterNewerTransfer: roundNumber(salesAfterNewerTransfer, 3),
+        totalSalesSinceOlderTransfer: roundNumber(total90DaySales, 3),
+        olderSellThroughPercentage: 0,
+        newerSellThroughPercentage: 0,
+        overallSellThroughPercentage: 0,
+        averageSalesPerDay: roundNumber(averageSalesPerDay, 3),
+        latestSalesPerDay: roundNumber(latestSalesPerDay, 3),
+        currentDestinationQty: roundNumber(currentDestinationQty, 3),
+        estimatedDaysOfStockRemaining:
+          estimatedDaysOfStockRemaining === null ? null : roundNumber(estimatedDaysOfStockRemaining, 1),
+        daysToSellOlderTransfer: null,
+        daysToSellNewerTransfer: null,
+        classification,
+        classificationLabel: performanceLabel(classification),
+        explanation: `Sales-based candidate: ${roundNumber(total90DaySales, 0)} units sold at destination in last 90 days (${roundNumber(latestSalesPerDay, 2)}/day recently). Not in recent transfers.`,
+      });
+    }
+  }
+
   const priority: Record<TransferPerformanceClassification, number> = {
     strong_seller: 0,
     good_seller: 1,
@@ -467,6 +626,6 @@ export async function analyzeLastTwoMultiSourceTransfers(
     newerTransfer,
     olderTransfer,
     items: itemPerformance,
-    summary: `Analyzed ${orders.length} of up to 4 completed transfer order(s) to ${destinationLocationName}. ${itemPerformance.length} transferred item(s) were compared against destination sales through ${asOfDate}.`,
+    summary: `Analyzed ${orders.length} of up to 4 completed transfer order(s) to ${destinationLocationName}. ${itemPerformance.length} item(s) considered (including sales-based candidates) through ${asOfDate}.`,
   };
 }

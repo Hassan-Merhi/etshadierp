@@ -248,7 +248,6 @@ export default function SmartTransferGeneratorDialog({
   const [sourceLocationIds, setSourceLocationIds] = useState<number[]>([]);
   const [targetQuantity, setTargetQuantity] = useState(""); // empty = auto from sales data
   const [includeOtw, setIncludeOtw] = useState(true);
-  const [minimumSourceReserve, setMinimumSourceReserve] = useState("0");
   const [targetCoverageDays, setTargetCoverageDays] = useState("21");
   const [stockGroupIds, setStockGroupIds] = useState<number[]>([]);
   const [categoryIds, setCategoryIds] = useState<number[]>([]);
@@ -357,12 +356,11 @@ export default function SmartTransferGeneratorDialog({
     return result;
   }, [sourceSummary, sourceLocationIds]);
 
-  const reserveQty = Math.max(0, Math.floor(numberValue(minimumSourceReserve, 0)));
   const getInventory = (stockItemId: number, sourceLocationId: number) => {
     const current = inventoryByItemSource.get(`${stockItemId}:${sourceLocationId}`) ?? { quantity: 0, rate: 0 };
     return {
       currentStock: current.quantity,
-      available: Math.max(0, current.quantity - reserveQty),
+      available: current.quantity,
       rate: current.rate,
     };
   };
@@ -381,7 +379,6 @@ export default function SmartTransferGeneratorDialog({
         includeOtw,
         stockGroupIds,
         categoryIds,
-        minimumSourceReserve: reserveQty,
         targetCoverageDays: Math.max(1, Math.floor(numberValue(targetCoverageDays, 21))),
       });
       return (await response.json()) as SmartPreviewResponse;
@@ -611,17 +608,6 @@ export default function SmartTransferGeneratorDialog({
                     onChange={(event) => setTargetQuantity(event.target.value)}
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="smart-reserve">Reserve/source</Label>
-                  <Input
-                    id="smart-reserve"
-                    type="number"
-                    min="0"
-                    step="1"
-                    value={minimumSourceReserve}
-                    onChange={(event) => setMinimumSourceReserve(event.target.value)}
-                  />
-                </div>
               </div>
 
               <div className="space-y-2">
@@ -822,7 +808,6 @@ export default function SmartTransferGeneratorDialog({
                                     <div><span className="text-muted-foreground">Newer sell-through:</span> {formatNumber(line.newerSellThroughPercentage, 1)}%</div>
                                     <div><span className="text-muted-foreground">Latest sales/day:</span> {formatNumber(line.latestSalesPerDay, 2)}</div>
                                     <div><span className="text-muted-foreground">Calculated need:</span> {formatNumber(line.calculatedNeed, 0)}</div>
-                                    <div><span className="text-muted-foreground">Reserve:</span> {formatNumber(line.sourceReserveQty, 0)}</div>
                                     <div><span className="text-muted-foreground">Confidence:</span> {formatNumber(line.confidence * 100, 0)}%</div>
                                     <p className="md:col-span-4 text-muted-foreground">{line.reason}</p>
                                   </div>

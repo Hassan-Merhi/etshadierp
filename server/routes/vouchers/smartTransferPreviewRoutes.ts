@@ -11,7 +11,6 @@ const smartTransferPreviewSchema = z.object({
   includeOtw: z.boolean().optional().default(true),
   stockGroupIds: z.array(z.coerce.number().int().positive()).max(100).optional().default([]),
   categoryIds: z.array(z.coerce.number().int().positive()).max(100).optional().default([]),
-  minimumSourceReserve: z.coerce.number().int().nonnegative().max(100_000).optional().default(0),
   targetCoverageDays: z.coerce.number().int().min(1).max(180).optional().default(21),
   asOfDate: z
     .string()
@@ -42,7 +41,6 @@ export function registerSmartTransferPreviewRoutes(app: Express) {
           includeOtw: parsed.includeOtw,
           stockGroupIds: parsed.stockGroupIds,
           categoryIds: parsed.categoryIds,
-          minimumSourceReserve: parsed.minimumSourceReserve,
           targetCoverageDays: parsed.targetCoverageDays,
         }
       );
