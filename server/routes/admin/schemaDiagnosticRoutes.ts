@@ -110,7 +110,7 @@ export function registerSchemaDiagnosticRoutes(app: Express) {
   // ── GET /api/admin/schema-check ─────────────────────────────────────────────
   app.get("/api/admin/schema-check", requireAuth, async (req, res) => {
     const session = req.session as any;
-    const role = session?.role;
+    const role = session?.currentRole ?? session?.role;
     if (!["Admin", "Developer"].includes(role)) {
       return res.status(403).json({ message: "Admin or Developer role required." });
     }
@@ -167,7 +167,7 @@ export function registerSchemaDiagnosticRoutes(app: Express) {
   // ── POST /api/admin/schema-fix ──────────────────────────────────────────────
   app.post("/api/admin/schema-fix", requireAuth, async (req, res) => {
     const session = req.session as any;
-    const role = session?.role;
+    const role = session?.currentRole ?? session?.role;
     if (!["Admin", "Developer"].includes(role)) {
       return res.status(403).json({ message: "Admin or Developer role required." });
     }
