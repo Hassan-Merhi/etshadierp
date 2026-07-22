@@ -114,7 +114,7 @@ function buildExplanation(
   latestSalesPerDay: number,
   estimatedDaysRemaining: number | null
 ): string {
-  const soldText = `${roundNumber(totalSales, 0)} sold after ${roundNumber(totalTransferredQty, 0)} transferred in the last two qualifying orders`;
+  const soldText = `${roundNumber(totalSales, 0)} sold after ${roundNumber(totalTransferredQty, 0)} transferred in the last qualifying orders`;
   switch (classification) {
     case "strong_seller":
       return `${soldText}; demand is strong and current destination stock is ${roundNumber(currentDestinationQty, 0)}.`;
@@ -137,10 +137,16 @@ function buildExplanation(
 /**
  * Read-only historical analyzer used by the smart multi-source transfer generator.
  *
- * It deliberately selects the last two TRANSFER VOUCHERS, not the last two item
+ * It deliberately selects the last FOUR TRANSFER VOUCHERS, not individual item
  * rows. A voucher can contain lines from any number of source locations because
  * the source is resolved from stock_transfer_items.source_location_id first,
  * with the legacy voucher-level source used only as a fallback.
+ *
+ * In the result:
+ *   newerTransfer = the most recent completed order (orders[0])
+ *   olderTransfer = the oldest of the four (orders[3] or fewer if <4 exist)
+ *   olderTransferQty per item = sum across all orders EXCEPT the newest
+ *   newerTransferQty per item = qty from the newest order only
  */
 export async function analyzeLastTwoMultiSourceTransfers(
   companyId: number,
@@ -219,7 +225,7 @@ export async function analyzeLastTwoMultiSourceTransfers(
       stockTransferVouchers.destinationLocationId
     )
     .orderBy(desc(vouchers.voucherDate), desc(vouchers.createdAt), desc(vouchers.id))
-    .limit(2);
+    .limit(4);
 
   if (headerRows.length === 0) {
     return {
@@ -285,8 +291,10 @@ export async function analyzeLastTwoMultiSourceTransfers(
     };
   });
 
+  // orders[0] = newest, orders[last] = oldest (up to 4 total)
   const newerTransfer = orders[0] ?? null;
-  const olderTransfer = orders[1] ?? null;
+  const olderTransfer = orders[orders.length - 1] ?? null;
+  const priorOrders = orders.slice(1); // all orders except the newest
   const allLines = orders.flatMap((order) => order.items);
   const stockItemIds = Array.from(new Set(allLines.map((line) => line.stockItemId)));
   const earliestTransferDate = olderTransfer?.voucherDate ?? newerTransfer!.voucherDate;
@@ -355,11 +363,13 @@ export async function analyzeLastTwoMultiSourceTransfers(
   for (const stockItemId of stockItemIds) {
     const identity = itemIdentity.get(stockItemId)!;
     const itemSales = salesByItem.get(stockItemId) ?? [];
-    const olderTransferQty = sumItemQuantity(olderTransfer, stockItemId);
+    // newerTransferQty = most recent order only; olderTransferQty = sum of all prior orders
     const newerTransferQty = sumItemQuantity(newerTransfer, stockItemId);
+    const olderTransferQty = priorOrders.reduce((sum, o) => sum + sumItemQuantity(o, stockItemId), 0);
 
-    const olderWindowSales = olderTransfer
-      ? itemSales.filter((sale) => sale.voucherDate >= olderTransfer.voucherDate && sale.voucherDate < newerTransfer!.voucherDate)
+    // olderWindowSales = everything from the oldest transfer up to (not incl.) the newest
+    const olderWindowSales = earliestTransferDate < newerTransfer!.voucherDate
+      ? itemSales.filter((sale) => sale.voucherDate >= earliestTransferDate && sale.voucherDate < newerTransfer!.voucherDate)
       : [];
     const newerWindowSales = itemSales.filter(
       (sale) => sale.voucherDate >= newerTransfer!.voucherDate && sale.voucherDate <= asOfDate
@@ -457,6 +467,6 @@ export async function analyzeLastTwoMultiSourceTransfers(
     newerTransfer,
     olderTransfer,
     items: itemPerformance,
-    summary: `Analyzed ${orders.length} completed transfer order(s) to ${destinationLocationName} from ${uniqueSourceIds.length} selected source location(s). ${itemPerformance.length} transferred item(s) were compared against destination sales through ${asOfDate}.`,
+    summary: `Analyzed ${orders.length} of up to 4 completed transfer order(s) to ${destinationLocationName}. ${itemPerformance.length} transferred item(s) were compared against destination sales through ${asOfDate}.`,
   };
 }

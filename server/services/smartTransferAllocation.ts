@@ -290,7 +290,7 @@ function buildLineReason(
     `${perf.classificationLabel}: ${roundNumber(perf.totalSalesSinceOlderTransfer, 0)} sold after ${roundNumber(
       perf.totalTransferredQty,
       0
-    )} transferred in the last two qualifying orders`,
+    )} transferred across the last ${perf.olderTransferQty > 0 ? "4" : "1"} qualifying order(s)`,
     `destination stock ${roundNumber(perf.currentDestinationQty, 0)}`,
   ];
   if (candidate.otwQty > 0) parts.push(`OTW ${roundNumber(candidate.otwQty, 0)} included`);
@@ -329,7 +329,9 @@ export async function buildSmartTransferPreview(
 
   const warnings: string[] = [];
   if (!history.olderTransfer) {
-    warnings.push("Only one completed historical transfer was found; the preview uses the available transfer and later sales.");
+    warnings.push("Only one completed historical transfer was found; the preview uses that transfer and later sales.");
+  } else if (history.newerTransfer && history.olderTransfer.transferId === history.newerTransfer.transferId) {
+    warnings.push("Fewer than 4 completed transfers were found; the preview uses all available history.");
   }
 
   if (history.items.length === 0) {
