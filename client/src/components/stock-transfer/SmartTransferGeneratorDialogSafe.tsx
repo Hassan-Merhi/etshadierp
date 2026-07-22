@@ -25,7 +25,11 @@ export default function SmartTransferGeneratorDialogSafe(props: Props) {
   const [preparedCompanyId, setPreparedCompanyId] = useState<number | null>(null);
 
   useEffect(() => {
-    if (!props.open) return;
+    if (!props.open) {
+      setPreparedCompanyId(null);
+      return;
+    }
+
     queryClient.removeQueries({
       predicate: (query) => query.queryKey.includes("smart-transfer-generator"),
     });
