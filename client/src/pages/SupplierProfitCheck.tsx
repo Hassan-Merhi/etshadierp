@@ -781,6 +781,26 @@ export default function SupplierProfitCheck() {
       setSavedProforma({ id: data.id, reference: data.reference });
       setShowConfirmModal(false);
       toast({ title: "Proforma saved", description: `Reference: ${data.reference}` });
+
+      // Auto-download supplier excel immediately using the freshly-returned id/reference
+      // (can't use savedProforma state here — it hasn't re-rendered yet)
+      try {
+        const exportRes = await fetch(
+          `/api/supplier-profit-check/proforma/${data.id}/export-supplier`,
+          { credentials: "include" }
+        );
+        if (exportRes.ok) {
+          const blob = await exportRes.blob();
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = `proforma-${data.reference}.xlsx`;
+          a.click();
+          URL.revokeObjectURL(url);
+        }
+      } catch {
+        // Non-fatal: the user can still click "Supplier Excel" to re-download
+      }
     } catch (err: any) {
       toast({ title: "Save failed", description: err.message, variant: "destructive" });
     } finally {
