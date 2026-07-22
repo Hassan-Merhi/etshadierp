@@ -6,6 +6,7 @@ import { registerVoucherJournalRoutes } from "./vouchers/voucherJournalRoutes";
 import { registerVoucherSalesUpdateRoutes } from "./vouchers/voucherSalesUpdateRoutes";
 import { registerVoucherPurchaseUpdateRoutes } from "./vouchers/voucherPurchaseUpdateRoutes";
 import { registerVoucherTransferRoutes } from "./vouchers/voucherTransferRoutes";
+import { registerSmartTransferPreviewRoutes } from "./vouchers/smartTransferPreviewRoutes";
 import { registerVoucherEntryRoutes } from "./voucherEntryRoutes";
 
 export function registerVoucherRoutes(app: Express) {
@@ -16,5 +17,6 @@ export function registerVoucherRoutes(app: Express) {
   registerVoucherSalesUpdateRoutes(app);
   registerVoucherPurchaseUpdateRoutes(app);
   registerVoucherTransferRoutes(app);
+  registerSmartTransferPreviewRoutes(app);
   registerVoucherEntryRoutes(app);
 }
