@@ -1,4 +1,4 @@
-import { and, eq, inArray, sql } from "drizzle-orm";
+import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 import { db } from "../db";
 import { adjustInventory } from "../inventoryHelper";
 import {
@@ -32,8 +32,15 @@ export interface StockTransferLifecycleResult {
   transferId: number;
   optional: boolean;
   inventoryApplied: boolean;
-  transition: "draft-edit" | "post" | "unpost" | "posted-edit" | "no-op";
+  transition: "draft-edit" | "post" | "unpost" | "posted-edit" | "no-op" | "recover";
+  totalAmount: string;
   items: Array<typeof stockTransferItems.$inferSelect>;
+}
+
+export interface SourceStockRequirement {
+  sourceLocationId: number;
+  stockItemId: number;
+  quantity: number;
 }
 
 function positiveInteger(value: unknown, label: string): number {
@@ -66,17 +73,44 @@ function normalizeItems(items: StockTransferLifecycleItem[], destinationLocation
       merged.set(key, { stockItemId, sourceLocationId, quantity, rate });
     }
   }
+
   return Array.from(merged.values()).sort(
-    (a, b) => a.stockItemId - b.stockItemId || a.sourceLocationId - b.sourceLocationId
+    (a, b) => a.sourceLocationId - b.sourceLocationId || a.stockItemId - b.stockItemId
+  );
+}
+
+export function aggregateSourceStockRequirements(
+  items: Array<Pick<StockTransferLifecycleItem, "sourceLocationId" | "stockItemId" | "quantity">>
+): SourceStockRequirement[] {
+  const requirements = new Map<string, SourceStockRequirement>();
+  for (const item of items) {
+    const key = `${item.sourceLocationId}:${item.stockItemId}`;
+    const existing = requirements.get(key);
+    if (existing) existing.quantity += item.quantity;
+    else requirements.set(key, { ...item });
+  }
+  return Array.from(requirements.values()).sort(
+    (a, b) => a.sourceLocationId - b.sourceLocationId || a.stockItemId - b.stockItemId
   );
 }
 
 async function lockTransfer(tx: any, transferId: number) {
   const result = await tx.execute(sql`
-    SELECT stv.*, v.company_id, v.optional, v.voucher_type, v.deleted_at
+    SELECT stv.*, v.company_id, v.optional, v.voucher_type, v.deleted_at, v.total_amount
     FROM stock_transfer_vouchers stv
     JOIN vouchers v ON v.id = stv.voucher_id
     WHERE stv.id = ${transferId}
+    FOR UPDATE OF stv, v
+  `);
+  return result.rows?.[0] ?? result[0];
+}
+
+async function lockTransferByVoucher(tx: any, voucherId: number) {
+  const result = await tx.execute(sql`
+    SELECT stv.*, v.company_id, v.optional, v.voucher_type, v.deleted_at, v.total_amount
+    FROM stock_transfer_vouchers stv
+    JOIN vouchers v ON v.id = stv.voucher_id
+    WHERE stv.voucher_id = ${voucherId}
     FOR UPDATE OF stv, v
   `);
   return result.rows?.[0] ?? result[0];
@@ -86,19 +120,75 @@ async function loadTransferItems(tx: any, transferId: number) {
   return tx.select().from(stockTransferItems).where(eq(stockTransferItems.transferId, transferId));
 }
 
+function persistedRowsToItems(
+  rows: Array<typeof stockTransferItems.$inferSelect>,
+  fallbackSourceLocationId: number | null | undefined,
+  destinationLocationId: number
+): StockTransferLifecycleItem[] {
+  return normalizeItems(
+    rows.map((item) => {
+      const sourceLocationId = item.sourceLocationId ?? fallbackSourceLocationId;
+      if (!sourceLocationId) throw new Error(`Transfer item ${item.id} is missing its source location`);
+      return {
+        stockItemId: item.stockItemId,
+        sourceLocationId,
+        quantity: Number(item.quantity),
+        rate: Number(item.rate ?? 0),
+      };
+    }),
+    destinationLocationId
+  );
+}
+
+async function assertCompanyScope(
+  tx: any,
+  companyId: number,
+  destinationLocationId: number,
+  items: StockTransferLifecycleItem[]
+) {
+  const locationIds = Array.from(
+    new Set([destinationLocationId, ...items.map((item) => item.sourceLocationId)])
+  );
+  const companyLocations = await tx
+    .select({ id: locations.id })
+    .from(locations)
+    .where(
+      and(
+        eq(locations.companyId, companyId),
+        inArray(locations.id, locationIds),
+        isNull(locations.deletedAt)
+      )
+    );
+  if (companyLocations.length !== locationIds.length) {
+    throw new Error("One or more transfer locations do not belong to the current company");
+  }
+
+  const itemIds = Array.from(new Set(items.map((item) => item.stockItemId)));
+  const companyItems = await tx
+    .select({ id: stockItems.id })
+    .from(stockItems)
+    .where(
+      and(
+        eq(stockItems.companyId, companyId),
+        inArray(stockItems.id, itemIds),
+        eq(stockItems.active, true),
+        isNull(stockItems.deletedAt)
+      )
+    );
+  if (companyItems.length !== itemIds.length) {
+    throw new Error("One or more stock items do not belong to the current company or are inactive");
+  }
+}
+
 async function reverseAppliedItems(
   tx: any,
   companyId: number,
   destinationLocationId: number,
-  items: Array<typeof stockTransferItems.$inferSelect>
+  items: StockTransferLifecycleItem[]
 ) {
-  for (const item of [...items].sort((a, b) => a.stockItemId - b.stockItemId || (a.sourceLocationId ?? 0) - (b.sourceLocationId ?? 0))) {
-    const sourceLocationId = item.sourceLocationId;
-    if (!sourceLocationId) throw new Error(`Transfer item ${item.id} is missing its source location`);
-    const quantity = Number(item.quantity);
-    const rate = Number(item.rate ?? 0);
-    await adjustInventory(tx, sourceLocationId, item.stockItemId, quantity, companyId, rate);
-    await adjustInventory(tx, destinationLocationId, item.stockItemId, -quantity, companyId);
+  for (const item of items) {
+    await adjustInventory(tx, item.sourceLocationId, item.stockItemId, item.quantity, companyId, item.rate);
+    await adjustInventory(tx, destinationLocationId, item.stockItemId, -item.quantity, companyId);
   }
 }
 
@@ -108,48 +198,33 @@ async function validateAndApplyItems(
   destinationLocationId: number,
   items: StockTransferLifecycleItem[]
 ) {
-  const sourceLocationIds = Array.from(new Set(items.map((item) => item.sourceLocationId)));
-  const locationIds = [...sourceLocationIds, destinationLocationId];
-  const companyLocations = await tx
-    .select({ id: locations.id })
-    .from(locations)
-    .where(and(eq(locations.companyId, companyId), inArray(locations.id, locationIds)));
-  if (companyLocations.length !== locationIds.length) {
-    throw new Error("One or more transfer locations do not belong to the current company");
-  }
+  await assertCompanyScope(tx, companyId, destinationLocationId, items);
+  const requirements = aggregateSourceStockRequirements(items);
 
-  const itemIds = Array.from(new Set(items.map((item) => item.stockItemId)));
-  const companyItems = await tx
-    .select({ id: stockItems.id })
-    .from(stockItems)
-    .where(and(eq(stockItems.companyId, companyId), inArray(stockItems.id, itemIds)));
-  if (companyItems.length !== itemIds.length) throw new Error("One or more stock items do not belong to the current company");
-
-  const requiredBySourceItem = new Map<string, number>();
-  for (const item of items) {
-    const key = `${item.sourceLocationId}:${item.stockItemId}`;
-    requiredBySourceItem.set(key, (requiredBySourceItem.get(key) ?? 0) + item.quantity);
-  }
-
-  for (const item of items) {
-    const key = `${item.sourceLocationId}:${item.stockItemId}`;
-    if (!requiredBySourceItem.has(key)) continue;
-    const required = requiredBySourceItem.get(key)!;
-    requiredBySourceItem.delete(key);
+  // Lock in deterministic source/item order. This serializes concurrent approvals
+  // touching the same stock and prevents two transfers from consuming one balance.
+  for (const requirement of requirements) {
     const locked = await tx.execute(sql`
       SELECT quantity
       FROM inventory
       WHERE company_id = ${companyId}
-        AND location_id = ${item.sourceLocationId}
-        AND stock_item_id = ${item.stockItemId}
+        AND location_id = ${requirement.sourceLocationId}
+        AND stock_item_id = ${requirement.stockItemId}
       FOR UPDATE
     `);
     const row = locked.rows?.[0] ?? locked[0];
     const available = Number(row?.quantity ?? 0);
-    if (available + 1e-9 < required) {
-      throw new Error(
-        `Insufficient stock for item ${item.stockItemId} at source ${item.sourceLocationId}: required ${required}, available ${available}`
+    if (available + 1e-9 < requirement.quantity) {
+      const error: any = new Error(
+        `Insufficient stock for item ${requirement.stockItemId} at source ${requirement.sourceLocationId}: ` +
+          `required ${requirement.quantity}, available ${available}`
       );
+      error.code = "STOCK_TRANSFER_INSUFFICIENT_STOCK";
+      error.stockItemId = requirement.stockItemId;
+      error.sourceLocationId = requirement.sourceLocationId;
+      error.requiredQuantity = requirement.quantity;
+      error.availableQuantity = available;
+      throw error;
     }
   }
 
@@ -176,11 +251,16 @@ async function replaceTransferItems(tx: any, transferId: number, items: StockTra
     .returning();
 }
 
+function headerSourceLocationId(items: StockTransferLifecycleItem[]): number | null {
+  const unique = Array.from(new Set(items.map((item) => item.sourceLocationId)));
+  return unique.length === 1 ? unique[0] : null;
+}
+
 /**
  * Saves a transfer according to its two persisted lifecycle flags.
  *
  * optional=true, inventoryApplied=false  -> draft edit, records only
- * optional=false, inventoryApplied=false -> post once
+ * optional=false, inventoryApplied=false -> post once (legacy recovery)
  * optional=true, inventoryApplied=true   -> unpost once, then records only
  * optional=false, inventoryApplied=true  -> reverse old + apply new posted edit
  */
@@ -194,14 +274,19 @@ export async function saveStockTransferLifecycle(input: SaveStockTransferLifecyc
     const locked = await lockTransfer(tx, transferId);
     if (!locked) throw new Error("Stock transfer not found");
     if (Number(locked.company_id) !== companyId) throw new Error("Stock transfer belongs to a different company");
-    if (locked.voucher_type !== "Stock Transfer") throw new Error("Voucher is not a stock transfer");
+    if (locked.voucher_type !== "Stock Transfer" && locked.voucher_type !== "StockTransfer") {
+      throw new Error("Voucher is not a stock transfer");
+    }
     if (locked.deleted_at) throw new Error("Deleted stock transfers cannot be changed");
 
     const voucherId = Number(locked.voucher_id);
     const wasApplied = Boolean(locked.inventory_applied);
     const willBeOptional = Boolean(locked.optional);
     const oldDestinationLocationId = Number(locked.destination_location_id);
-    const oldItems = await loadTransferItems(tx, transferId);
+    const oldRows = await loadTransferItems(tx, transferId);
+    const oldItems = oldRows.length
+      ? persistedRowsToItems(oldRows, locked.source_location_id ? Number(locked.source_location_id) : null, oldDestinationLocationId)
+      : [];
 
     let transition: StockTransferLifecycleResult["transition"];
     if (wasApplied && willBeOptional) transition = "unpost";
@@ -209,8 +294,11 @@ export async function saveStockTransferLifecycle(input: SaveStockTransferLifecyc
     else if (!wasApplied && !willBeOptional) transition = "post";
     else transition = "draft-edit";
 
-    if (wasApplied) await reverseAppliedItems(tx, companyId, oldDestinationLocationId, oldItems);
+    if (wasApplied && oldItems.length > 0) {
+      await reverseAppliedItems(tx, companyId, oldDestinationLocationId, oldItems);
+    }
 
+    await assertCompanyScope(tx, companyId, destinationLocationId, normalizedItems);
     const savedItems = await replaceTransferItems(tx, transferId, normalizedItems);
     const shouldApply = !willBeOptional;
     if (shouldApply) await validateAndApplyItems(tx, companyId, destinationLocationId, normalizedItems);
@@ -219,17 +307,15 @@ export async function saveStockTransferLifecycle(input: SaveStockTransferLifecyc
     await tx
       .update(stockTransferVouchers)
       .set({
-        sourceLocationId: normalizedItems[0].sourceLocationId,
+        sourceLocationId: headerSourceLocationId(normalizedItems),
         destinationLocationId,
         notes: input.notes,
         inventoryApplied: shouldApply,
       })
       .where(eq(stockTransferVouchers.id, transferId));
 
-    const voucherUpdates: Record<string, unknown> = {
-      totalAmount: totalAmount.toFixed(2),
-      locationId: normalizedItems[0].sourceLocationId,
-    };
+    const voucherUpdates: Record<string, unknown> = { totalAmount: totalAmount.toFixed(2) };
+    if (headerSourceLocationId(normalizedItems)) voucherUpdates.locationId = headerSourceLocationId(normalizedItems);
     if (input.voucherDate !== undefined) voucherUpdates.voucherDate = input.voucherDate;
     if (input.description !== undefined) voucherUpdates.description = input.description;
     await tx.update(vouchers).set(voucherUpdates).where(eq(vouchers.id, voucherId));
@@ -240,54 +326,153 @@ export async function saveStockTransferLifecycle(input: SaveStockTransferLifecyc
       optional: willBeOptional,
       inventoryApplied: shouldApply,
       transition,
+      totalAmount: totalAmount.toFixed(2),
       items: savedItems,
     };
   });
 }
 
-export async function finalizeOptionalStockTransfer(companyIdInput: number, voucherIdInput: number) {
+/**
+ * Finalizes a base optional stock transfer. Voucher, transfer and source stock
+ * are locked in one transaction, then stock is validated and applied exactly once.
+ */
+export async function finalizeOptionalStockTransfer(
+  companyIdInput: number,
+  voucherIdInput: number
+): Promise<StockTransferLifecycleResult> {
   const companyId = positiveInteger(companyIdInput, "Company ID");
   const voucherId = positiveInteger(voucherIdInput, "Voucher ID");
 
   return db.transaction(async (tx) => {
-    const lockedResult = await tx.execute(sql`
-      SELECT stv.*, v.company_id, v.optional, v.voucher_type, v.deleted_at
-      FROM stock_transfer_vouchers stv
-      JOIN vouchers v ON v.id = stv.voucher_id
-      WHERE stv.voucher_id = ${voucherId}
-      FOR UPDATE OF stv, v
-    `);
-    const locked = lockedResult.rows?.[0] ?? lockedResult[0];
+    const locked = await lockTransferByVoucher(tx, voucherId);
     if (!locked) throw new Error("Stock transfer not found");
     if (Number(locked.company_id) !== companyId) throw new Error("Stock transfer belongs to a different company");
-    if (locked.voucher_type !== "Stock Transfer") throw new Error("Voucher is not a stock transfer");
+    if (locked.voucher_type !== "Stock Transfer" && locked.voucher_type !== "StockTransfer") {
+      throw new Error("Voucher is not a stock transfer");
+    }
     if (locked.deleted_at) throw new Error("Deleted stock transfers cannot be finalized");
-
-    if (Boolean(locked.inventory_applied) && !Boolean(locked.optional)) {
-      return { voucherId, transferId: Number(locked.id), inventoryApplied: true, alreadyFinalized: true };
-    }
-    if (Boolean(locked.inventory_applied)) {
-      throw new Error("Draft lifecycle is inconsistent: optional transfer already has inventory applied");
-    }
 
     const transferId = Number(locked.id);
     const destinationLocationId = Number(locked.destination_location_id);
-    const persistedItems = await loadTransferItems(tx, transferId);
-    if (persistedItems.length === 0) throw new Error("Stock transfer has no items");
-    const items = normalizeItems(
-      persistedItems.map((item) => ({
-        stockItemId: item.stockItemId,
-        sourceLocationId: item.sourceLocationId ?? Number(locked.source_location_id),
-        quantity: Number(item.quantity),
-        rate: Number(item.rate ?? 0),
-      })),
+    const persistedRows = await loadTransferItems(tx, transferId);
+    if (persistedRows.length === 0) throw new Error("Stock transfer has no items");
+    const items = persistedRowsToItems(
+      persistedRows,
+      locked.source_location_id ? Number(locked.source_location_id) : null,
+      destinationLocationId
+    );
+    await assertCompanyScope(tx, companyId, destinationLocationId, items);
+    const totalAmount = items.reduce((sum, item) => sum + item.quantity * item.rate, 0).toFixed(2);
+
+    const inventoryApplied = Boolean(locked.inventory_applied);
+    const optional = Boolean(locked.optional);
+
+    if (inventoryApplied && !optional) {
+      return {
+        voucherId,
+        transferId,
+        optional: false,
+        inventoryApplied: true,
+        transition: "no-op",
+        totalAmount,
+        items: persistedRows,
+      };
+    }
+
+    let transition: StockTransferLifecycleResult["transition"] = "post";
+    if (!inventoryApplied) {
+      await validateAndApplyItems(tx, companyId, destinationLocationId, items);
+    } else {
+      // Legacy mismatch: stock already moved while header remained optional.
+      // Repair only the flags; never move stock a second time.
+      transition = "recover";
+    }
+
+    await tx
+      .update(stockTransferVouchers)
+      .set({ inventoryApplied: true })
+      .where(eq(stockTransferVouchers.id, transferId));
+    await tx
+      .update(vouchers)
+      .set({ optional: false, totalAmount })
+      .where(eq(vouchers.id, voucherId));
+
+    return {
+      voucherId,
+      transferId,
+      optional: false,
+      inventoryApplied: true,
+      transition,
+      totalAmount,
+      items: persistedRows,
+    };
+  });
+}
+
+export async function finalizeStockTransferByTransferId(companyIdInput: number, transferIdInput: number) {
+  const companyId = positiveInteger(companyIdInput, "Company ID");
+  const transferId = positiveInteger(transferIdInput, "Transfer ID");
+  const [transfer] = await db
+    .select({ voucherId: stockTransferVouchers.voucherId })
+    .from(stockTransferVouchers)
+    .where(eq(stockTransferVouchers.id, transferId))
+    .limit(1);
+  if (!transfer) throw new Error("Stock transfer not found");
+  return finalizeOptionalStockTransfer(companyId, transfer.voucherId);
+}
+
+/** Reopens a posted stock transfer as a draft, reversing stock at most once. */
+export async function reopenStockTransferAsDraft(
+  companyIdInput: number,
+  voucherIdInput: number,
+  headerUpdates: { voucherDate?: string; description?: string } = {}
+): Promise<StockTransferLifecycleResult> {
+  const companyId = positiveInteger(companyIdInput, "Company ID");
+  const voucherId = positiveInteger(voucherIdInput, "Voucher ID");
+
+  return db.transaction(async (tx) => {
+    const locked = await lockTransferByVoucher(tx, voucherId);
+    if (!locked) throw new Error("Stock transfer not found");
+    if (Number(locked.company_id) !== companyId) throw new Error("Stock transfer belongs to a different company");
+    if (locked.voucher_type !== "Stock Transfer" && locked.voucher_type !== "StockTransfer") {
+      throw new Error("Voucher is not a stock transfer");
+    }
+    if (locked.deleted_at) throw new Error("Deleted stock transfers cannot be changed");
+
+    const transferId = Number(locked.id);
+    const destinationLocationId = Number(locked.destination_location_id);
+    const persistedRows = await loadTransferItems(tx, transferId);
+    const items = persistedRowsToItems(
+      persistedRows,
+      locked.source_location_id ? Number(locked.source_location_id) : null,
       destinationLocationId
     );
 
-    await validateAndApplyItems(tx, companyId, destinationLocationId, items);
-    await tx.update(stockTransferVouchers).set({ inventoryApplied: true }).where(eq(stockTransferVouchers.id, transferId));
-    await tx.update(vouchers).set({ optional: false }).where(eq(vouchers.id, voucherId));
+    if (Boolean(locked.inventory_applied)) {
+      await reverseAppliedItems(tx, companyId, destinationLocationId, items);
+    }
 
-    return { voucherId, transferId, inventoryApplied: true, alreadyFinalized: false };
+    await tx
+      .update(stockTransferVouchers)
+      .set({ inventoryApplied: false })
+      .where(eq(stockTransferVouchers.id, transferId));
+    await tx
+      .update(vouchers)
+      .set({
+        optional: true,
+        ...(headerUpdates.voucherDate !== undefined ? { voucherDate: headerUpdates.voucherDate } : {}),
+        ...(headerUpdates.description !== undefined ? { description: headerUpdates.description } : {}),
+      })
+      .where(eq(vouchers.id, voucherId));
+
+    return {
+      voucherId,
+      transferId,
+      optional: true,
+      inventoryApplied: false,
+      transition: Boolean(locked.inventory_applied) ? "unpost" : "no-op",
+      totalAmount: String(locked.total_amount ?? "0"),
+      items: persistedRows,
+    };
   });
 }
