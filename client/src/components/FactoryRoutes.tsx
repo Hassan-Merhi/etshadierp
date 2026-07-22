@@ -23,6 +23,7 @@ import {
   FactoryInvoiceCreate, FactoryInvoiceDetail, FactoryInvoiceLoadingScan, FactoryInvoicing,
   FactoryKpis, FactoryLoadingsHub, FactoryLocationInventory, FactoryLocationInventoryMockup,
   FactoryNetPositionDetails, FactoryOpeningBalanceEdit, FactoryPOS, FactoryPartiesHub,
+  ProductionComparison,
   FactoryPayrollHub, FactoryPendingInvoiceVerify, FactoryPendingLoadings, FactoryPriceList,
   FactoryProductionIntelHub, FactoryRawMaterialsHub, FactoryRentalPayments, FactoryRentalShops,
   FactoryRentalWarehouses, FactoryReprintLabels, FactorySheetsAndSacks, FactoryStockAllocation,
@@ -228,6 +229,7 @@ export function FactoryRoutes({ user, myAccess, factoryDefaultPage }: FactoryRou
         <Redirect replace to="/factory/intelligence/financial-hub?section=net-position" />
       </Route>
       <Route path="/factory/financial-snapshot" component={FactoryFinancialSnapshot} />
+      <Route path="/factory/production-comparison" component={ProductionComparison} />
       <Route path="/factory/production-report">
         {() =>
           myAccess?.hiddenCostFields?.includes("hide_tab_production_analytics") ? (

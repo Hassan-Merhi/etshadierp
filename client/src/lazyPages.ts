@@ -151,6 +151,7 @@ export const FactoryNetPosition = lazy(() => import("@/pages/factory/FactoryNetP
 export const FactoryNetPositionDetails = lazy(() => import("@/pages/factory/FactoryNetPositionDetails"));
 export const FactoryFinancialSnapshot = lazy(() => import("@/pages/factory/FactoryFinancialSnapshot"));
 export const DailyProductionReport = lazy(() => import("@/pages/factory/DailyProductionReport"));
+export const ProductionComparison = lazy(() => import("@/pages/factory/ProductionComparison"));
 export const FactoryImport = lazy(() => import("@/pages/factory/FactoryImport"));
 export const FactoryBaleRelabeling = lazy(() => import("@/pages/factory/FactoryBaleRelabeling"));
 export const MergeBaleProducts = lazy(() => import("@/pages/factory/MergeBaleProducts"));
