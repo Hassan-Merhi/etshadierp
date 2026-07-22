@@ -599,10 +599,20 @@ export function registerAuthRoutes(app: Express) {
         "login", "permission_change", "settings_change",
       ]);
 
+      // Actions that represent real user edits — exclude noise (created, deleted, logins, exports, etc.)
+      const EXCLUDED_ACTIONS = [
+        "create", "delete", "login", "import", "export",
+        "send_whatsapp", "send_email", "permission_change", "settings_change", "approve",
+      ];
+
       const baseConditions: any[] = [
         sql`${auditLog.userId} NOT IN (
             SELECT user_id FROM user_company_roles WHERE role = 'Developer'
           )`,
+        // Never surface security infrastructure events
+        sql`${auditLog.tableName} != 'security_events'`,
+        // Only show meaningful edit/change actions
+        sql`lower(${auditLog.action}) NOT IN (${sql.join(EXCLUDED_ACTIONS.map((a) => sql`${a}`), sql`, `)})`,
         ...(companyId ? [eq(auditLog.companyId, companyId)] : []),
       ];
 
