@@ -540,10 +540,18 @@ export async function buildSmartTransferPreview(
       a.stockItemName.localeCompare(b.stockItemName)
   );
 
+  // Fair-share cap: no single item should take more than 1.5× its proportional
+  // slice of the total target. This prevents a strong-seller with very high
+  // available stock from consuming most of the allocation while other items that
+  // were in the last orders get zero. The remaining units after the cap are
+  // redistributed to other eligible candidates by the weight algorithm.
+  const fairShareCap =
+    candidates.length > 0 ? Math.ceil((requestedTarget / candidates.length) * 1.5) : requestedTarget;
+
   const itemAllocations = allocateWholeUnitsByWeight(
     candidates.map((candidate) => ({
       id: String(candidate.performance.stockItemId),
-      capacity: candidate.allocationCapacity,
+      capacity: Math.min(candidate.allocationCapacity, fairShareCap),
       weight: candidate.weight,
       priority: candidate.priority,
     })),

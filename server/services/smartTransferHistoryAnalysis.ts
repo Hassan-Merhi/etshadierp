@@ -202,7 +202,11 @@ export async function analyzeLastTwoMultiSourceTransfers(
         isNull(vouchers.deletedAt),
         eq(stockTransferVouchers.inventoryApplied, true),
         eq(stockTransferVouchers.destinationLocationId, destinationLocationId),
-        inArray(resolvedSourceLocationId, uniqueSourceIds),
+        // NOTE: intentionally no source-location filter here — we look at the last
+        // two completed transfers to this destination regardless of which warehouse
+        // they came from. The allocation engine filters based on current stock
+        // availability in the selected sources, so items with no available stock
+        // there are automatically excluded.
         lte(vouchers.voucherDate, asOfDate)
       )
     )
@@ -228,7 +232,7 @@ export async function analyzeLastTwoMultiSourceTransfers(
       newerTransfer: null,
       olderTransfer: null,
       items: [],
-      summary: `No completed stock transfer orders were found to ${destinationLocationName} from the selected source locations.`,
+      summary: `No completed stock transfer orders were found to ${destinationLocationName}.`,
     };
   }
 
@@ -245,7 +249,9 @@ export async function analyzeLastTwoMultiSourceTransfers(
     .from(stockTransferItems)
     .innerJoin(stockTransferVouchers, eq(stockTransferItems.transferId, stockTransferVouchers.id))
     .innerJoin(stockItems, eq(stockTransferItems.stockItemId, stockItems.id))
-    .where(and(inArray(stockTransferItems.transferId, transferIds), inArray(resolvedSourceLocationId, uniqueSourceIds)));
+    // Include all items from those transfers — the allocation engine will exclude
+    // any item that has no available stock in the currently selected sources.
+    .where(inArray(stockTransferItems.transferId, transferIds));
 
   const linesByTransferId = new Map<number, HistoricalTransferLine[]>();
   for (const row of transferLineRows) {
