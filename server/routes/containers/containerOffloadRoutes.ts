@@ -74,6 +74,7 @@ import { format } from "date-fns";
 import { z } from "zod";
 import { readExcel, sheetToJson, createWorkbook, jsonToSheet, aoaToSheet, writeWorkbook } from "../../excelHelper";
 import { adjustInventory, reverseInventoryByExactValue } from "../../inventoryHelper";
+import { syncSalesItemCostsForStockItems, applyInventoryRateDeltaAndSync } from "../../services/syncSalesItemCosts";
 
 export function registerContainerOffloadRoutes(app: Express) {
   app.post("/api/containers/:id/offload", requireAuth, requireNonPOS, async (req, res) => {
@@ -549,6 +550,46 @@ export function registerContainerOffloadRoutes(app: Express) {
 
       logger.info("Container offload succeeded", { module: "containers", action: "offload", userId: _uid, companyId: _cid, containerId: req.params.id, durationMs: Date.now() - _t });
       res.json(offload);
+
+      // ── Part A: sync sales_items costs after offload (fire-and-forget) ──
+      // The offload transaction just updated inventory.averageRate for all
+      // affected stock items. Propagate those updated rates into existing
+      // sales_items so the Sales Report reflects the correct landed cost.
+      Promise.resolve().then(async () => {
+        try {
+          const offloadItems = await db
+            .select({ stockItemId: containerOffloadItems.stockItemId })
+            .from(containerOffloadItems)
+            .where(eq(containerOffloadItems.offloadId, offload.id));
+
+          const stockItemIds = [...new Set(offloadItems.map((i) => i.stockItemId))];
+          if (stockItemIds.length === 0) return;
+
+          const result = await syncSalesItemCostsForStockItems(
+            container.companyId,
+            offload.locationId,
+            stockItemIds
+          );
+          if (result.updatedCount > 0) {
+            logger.info("Sales item costs synced after container offload", {
+              module: "containers",
+              action: "sync-sales-costs",
+              containerId,
+              locationId: offload.locationId,
+              stockItemIds,
+              updatedSalesItems: result.updatedCount,
+            });
+          }
+        } catch (syncErr: any) {
+          // Non-fatal — the offload itself succeeded; log and move on.
+          logger.error("Failed to sync sales item costs after offload (non-fatal)", {
+            module: "containers",
+            action: "sync-sales-costs",
+            containerId,
+            error: syncErr?.message,
+          });
+        }
+      });
     } catch (error: any) {
       logger.error("Container offload failed", { module: "containers", action: "offload", userId: _uid, companyId: _cid, containerId: req.params.id, durationMs: Date.now() - _t, error });
       console.error("Container offload error:", error);
@@ -904,6 +945,67 @@ export function registerContainerOffloadRoutes(app: Express) {
       res.json({
         success: true,
         message: "Container offload updated successfully",
+      });
+
+      // ── Part B: sync inventory averageRate + sales_items costs after charge edit (fire-and-forget) ──
+      // The PATCH route updates additionalCostPerBale in containerOffloads but does NOT
+      // automatically adjust inventory.averageRate. We compute the per-unit delta and
+      // apply it to inventory, then propagate to sales_items.
+      Promise.resolve().then(async () => {
+        try {
+          const companyId = req.session.currentCompanyId!;
+          const oldAdditionalCostPerBale = parseFloat(currentOffload.additionalCostPerBale || "0");
+          const delta = additionalCostPerBale - oldAdditionalCostPerBale;
+
+          // Get affected stock items from stored offload items (most accurate)
+          const offloadItems = await db
+            .select({ stockItemId: containerOffloadItems.stockItemId })
+            .from(containerOffloadItems)
+            .where(eq(containerOffloadItems.offloadId, currentOffload.id));
+
+          let stockItemIds: number[] = [...new Set(offloadItems.map((i) => i.stockItemId))];
+
+          // Fallback: derive from PO line items if no stored offload items
+          if (stockItemIds.length === 0) {
+            const pos = await storage.getPurchaseOrdersByContainer(containerId);
+            const idSet = new Set<number>();
+            for (const po of pos) {
+              const lineItems = await storage.getLineItemsByPO(po.id);
+              for (const li of lineItems) {
+                if (li.stockItemId && li.stockItemId !== 0) idSet.add(li.stockItemId);
+              }
+            }
+            stockItemIds = [...idSet];
+          }
+
+          if (stockItemIds.length === 0) return;
+
+          const result = await applyInventoryRateDeltaAndSync(
+            companyId,
+            currentOffload.locationId,
+            stockItemIds,
+            delta
+          );
+
+          if (result.updatedCount > 0 || Math.abs(delta) > 0.001) {
+            logger.info("Sales item costs synced after container charge edit", {
+              module: "containers",
+              action: "sync-sales-costs-patch",
+              containerId,
+              locationId: currentOffload.locationId,
+              delta,
+              stockItemIds,
+              updatedSalesItems: result.updatedCount,
+            });
+          }
+        } catch (syncErr: any) {
+          logger.error("Failed to sync sales item costs after charge edit (non-fatal)", {
+            module: "containers",
+            action: "sync-sales-costs-patch",
+            containerId,
+            error: syncErr?.message,
+          });
+        }
       });
     } catch (error: any) {
       console.error("Edit offload error:", error);
