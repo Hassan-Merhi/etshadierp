@@ -325,6 +325,15 @@ export default function SmartTransferGeneratorDialog({
     }
   }, [open, sourceLocationIds.length]);
 
+  // Strip any IDs restored from localStorage that don't belong to the current
+  // company's locations. This prevents cross-company stale IDs (e.g. IDs from
+  // a previously selected company) from reaching the preview API.
+  useEffect(() => {
+    if (locations.length === 0) return;
+    const validIds = new Set(locations.map((l) => l.id));
+    setSourceLocationIds((current) => current.filter((id) => validIds.has(id)));
+  }, [locations]);
+
   useEffect(() => {
     if (!destinationLocationId) return;
     setSourceLocationIds((current) => current.filter((id) => id !== destinationLocationId));
