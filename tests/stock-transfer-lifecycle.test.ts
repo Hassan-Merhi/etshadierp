@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { db } from "../server/db";
 import {
   companies,
@@ -12,6 +12,7 @@ import {
 } from "../shared/schema";
 import {
   finalizeOptionalStockTransfer,
+  reopenStockTransferAsDraft,
   saveStockTransferLifecycle,
 } from "../server/services/stockTransferLifecycle";
 
@@ -114,7 +115,7 @@ beforeAll(async () => {
 afterAll(cleanup);
 
 describe("stock transfer optional lifecycle", () => {
-  it("edits an optional draft without moving inventory", async () => {
+  it("edits a multi-source optional draft without moving inventory", async () => {
     const before = [await inventoryQty(sourceAId), await inventoryQty(sourceBId), await inventoryQty(destinationId)];
 
     const result = await saveStockTransferLifecycle({
@@ -130,12 +131,17 @@ describe("stock transfer optional lifecycle", () => {
 
     expect(result.transition).toBe("draft-edit");
     expect(result.inventoryApplied).toBe(false);
+    expect(result.items).toHaveLength(2);
     expect([await inventoryQty(sourceAId), await inventoryQty(sourceBId), await inventoryQty(destinationId)]).toEqual(before);
+
+    const [transfer] = await db.select().from(stockTransferVouchers).where(eq(stockTransferVouchers.id, transferId));
+    expect(transfer.sourceLocationId).toBeNull();
   });
 
   it("finalizes the draft atomically and applies each source exactly once", async () => {
     const first = await finalizeOptionalStockTransfer(companyId, voucherId);
-    expect(first.alreadyFinalized).toBe(false);
+    expect(first.transition).toBe("post");
+    expect(first.inventoryApplied).toBe(true);
     expect(await inventoryQty(sourceAId)).toBe(88);
     expect(await inventoryQty(sourceBId)).toBe(42);
     expect(await inventoryQty(destinationId)).toBe(20);
@@ -149,7 +155,7 @@ describe("stock transfer optional lifecycle", () => {
   it("is idempotent when finalize is called again", async () => {
     const before = [await inventoryQty(sourceAId), await inventoryQty(sourceBId), await inventoryQty(destinationId)];
     const second = await finalizeOptionalStockTransfer(companyId, voucherId);
-    expect(second.alreadyFinalized).toBe(true);
+    expect(second.transition).toBe("no-op");
     expect([await inventoryQty(sourceAId), await inventoryQty(sourceBId), await inventoryQty(destinationId)]).toEqual(before);
   });
 
@@ -168,21 +174,17 @@ describe("stock transfer optional lifecycle", () => {
     expect(await inventoryQty(destinationId)).toBe(15);
   });
 
-  it("unposts exactly once when the voucher becomes optional", async () => {
-    await db.update(vouchers).set({ optional: true }).where(eq(vouchers.id, voucherId));
-
-    const result = await saveStockTransferLifecycle({
-      companyId,
-      transferId,
-      destinationLocationId: destinationId,
-      notes: "Back to draft",
-      items: [{ stockItemId: itemId, sourceLocationId: sourceBId, quantity: 7, rate: 10 }],
-    });
-
-    expect(result.transition).toBe("unpost");
-    expect(result.inventoryApplied).toBe(false);
+  it("reopens a posted transfer and reverses inventory only once", async () => {
+    const first = await reopenStockTransferAsDraft(companyId, voucherId);
+    expect(first.transition).toBe("unpost");
+    expect(first.inventoryApplied).toBe(false);
     expect(await inventoryQty(sourceAId)).toBe(100);
     expect(await inventoryQty(sourceBId)).toBe(50);
+    expect(await inventoryQty(destinationId)).toBe(0);
+
+    const second = await reopenStockTransferAsDraft(companyId, voucherId);
+    expect(second.transition).toBe("no-op");
+    expect(await inventoryQty(sourceAId)).toBe(100);
     expect(await inventoryQty(destinationId)).toBe(0);
 
     const repeatedDraftEdit = await saveStockTransferLifecycle({
@@ -202,15 +204,16 @@ describe("stock transfer optional lifecycle", () => {
       .update(inventory)
       .set({ quantity: "5", totalValue: "50" })
       .where(and(eq(inventory.locationId, sourceBId), eq(inventory.stockItemId, itemId)));
-    await db.update(vouchers).set({ optional: true }).where(eq(vouchers.id, voucherId));
-    await db.update(stockTransferVouchers).set({ inventoryApplied: false }).where(eq(stockTransferVouchers.id, transferId));
 
-    await expect(finalizeOptionalStockTransfer(companyId, voucherId)).rejects.toThrow(/Insufficient stock/);
+    const before = [await inventoryQty(sourceBId), await inventoryQty(destinationId)];
+    await expect(finalizeOptionalStockTransfer(companyId, voucherId)).rejects.toMatchObject({
+      code: "STOCK_TRANSFER_INSUFFICIENT_STOCK",
+    });
 
     const [voucher] = await db.select().from(vouchers).where(eq(vouchers.id, voucherId));
     const [transfer] = await db.select().from(stockTransferVouchers).where(eq(stockTransferVouchers.id, transferId));
     expect(voucher.optional).toBe(true);
     expect(transfer.inventoryApplied).toBe(false);
-    expect(await inventoryQty(destinationId)).toBe(0);
+    expect([await inventoryQty(sourceBId), await inventoryQty(destinationId)]).toEqual(before);
   });
 });
