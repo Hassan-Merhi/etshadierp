@@ -260,13 +260,25 @@ export function registerAccountCurrencyRoutes(app: Express) {
       const cashSummary = await getCashBankAccountSummary(companyId, "ledger", id);
       if (cashSummary) {
         const displayBalance = cashSummary.currentTranslatedBaseBalance ?? cashSummary.historicalBaseBalance;
-        return res.json({ balance: Number(displayBalance), ...cashSummary });
+        // When the opening balance currency is unresolved (openingBalanceBaseAmount is null),
+        // getCashBankRevaluation excludes it from historicalBaseBalance to avoid mixing
+        // denominations. Add it back here so the returned `balance` reflects the true
+        // running balance (OB + debits − credits) for display in voucher details.
+        let balance = Number(displayBalance);
+        if (cashSummary.openingBalanceCurrencyUnresolved && cashSummary.unresolvedOpeningBalanceRaw != null) {
+          balance += Number(cashSummary.unresolvedOpeningBalanceRaw);
+        }
+        return res.json({ balance, ...cashSummary });
       }
 
       const historical = await getHistoricalLedgerBalance(companyId, id);
       if (historical) {
+        let balance = Number(historical.historicalBaseBalance);
+        if (historical.openingBalanceCurrencyUnresolved && historical.unresolvedOpeningBalanceRaw != null) {
+          balance += Number(historical.unresolvedOpeningBalanceRaw);
+        }
         return res.json({
-          balance: Number(historical.historicalBaseBalance),
+          balance,
           currentTranslatedBaseBalance: null,
           translationDifference: null,
           nativeBalancesByCurrency: {},
@@ -279,7 +291,11 @@ export function registerAccountCurrencyRoutes(app: Express) {
       const bankSummary = await getCashBankAccountSummary(companyId, "bank", id);
       if (!bankSummary) return res.status(404).json({ message: "Account not found" });
       const displayBalance = bankSummary.currentTranslatedBaseBalance ?? bankSummary.historicalBaseBalance;
-      return res.json({ balance: Number(displayBalance), ...bankSummary });
+      let bankBalance = Number(displayBalance);
+      if (bankSummary.openingBalanceCurrencyUnresolved && bankSummary.unresolvedOpeningBalanceRaw != null) {
+        bankBalance += Number(bankSummary.unresolvedOpeningBalanceRaw);
+      }
+      return res.json({ balance: bankBalance, ...bankSummary });
     } catch (error: any) {
       return res.status(500).json({ message: error.message });
     }
