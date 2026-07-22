@@ -185,6 +185,23 @@ export function registerStatsNetProfitRoutes(app: Express) {
            WHERE company_id = $1 AND deleted_at IS NULL
            ORDER BY code ASC`,
           [companyId]
+        ).catch(() =>
+          // Fallback for schemas where the category column hasn't been added yet
+          pool.query<{
+            id: number; company_id: number; code: string; name: string;
+            account_type: string; sub_type: string | null; opening_balance: string;
+            opening_balance_side: string; active: boolean; is_hidden: boolean;
+            parent_id: number | null; deleted_at: string | null; created_at: string;
+            category: string | null;
+          }>(
+            `SELECT id, company_id, code, name, account_type, sub_type,
+                    opening_balance, opening_balance_side, active, is_hidden,
+                    parent_id, deleted_at, created_at, NULL::text AS category
+             FROM ledger_accounts
+             WHERE company_id = $1 AND deleted_at IS NULL
+             ORDER BY code ASC`,
+            [companyId]
+          )
         ).then(r => r.rows.map(row => ({
           id: row.id,
           companyId: row.company_id,

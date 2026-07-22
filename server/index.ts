@@ -5832,11 +5832,13 @@ END $mig$`;
             ADD COLUMN IF NOT EXISTS rate_convention             VARCHAR(30);
 
           -- ledger_accounts: opening balance currency (migrations 20260720_003 + 006)
+          -- ledger_accounts: category column for net-profit classification
           ALTER TABLE ledger_accounts
             ADD COLUMN IF NOT EXISTS opening_balance_currency         VARCHAR(10),
             ADD COLUMN IF NOT EXISTS opening_balance_historical_rate  NUMERIC(20,10),
             ADD COLUMN IF NOT EXISTS opening_balance_base_amount      NUMERIC(20,6),
-            ADD COLUMN IF NOT EXISTS opening_balance_native_amount    NUMERIC(20,6);
+            ADD COLUMN IF NOT EXISTS opening_balance_native_amount    NUMERIC(20,6),
+            ADD COLUMN IF NOT EXISTS category                         TEXT;
 
           -- bank_accounts: opening balance currency (migrations 20260720_004 + 006)
           ALTER TABLE bank_accounts
