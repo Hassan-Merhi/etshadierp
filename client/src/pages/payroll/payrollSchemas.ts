@@ -36,7 +36,7 @@ export const salaryAdvanceSchema = z
       .min(1, "Amount is required")
       .refine((val) => !isNaN(parseFloat(val)) && parseFloat(val) > 0, "Amount must be positive"),
     advanceDate: z.date({
-      required_error: "Advance date is required",
+      error: "Advance date is required",
     }),
     cashAccountId: z.string().optional(),
     notes: z.string().optional(),

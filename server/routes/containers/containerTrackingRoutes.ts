@@ -103,7 +103,7 @@ export function registerContainerTrackingRoutes(app: Express) {
       if (!parseResult.success) {
         return res.status(400).json({
           message: "Invalid tracking data",
-          errors: parseResult.error.errors,
+          errors: parseResult.error.issues,
         });
       }
 

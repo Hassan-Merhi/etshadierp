@@ -1628,7 +1628,7 @@ export function registerAuthRoutes(app: Express) {
       if (!validationResult.success) {
         return res.status(400).json({
           message: "Validation error",
-          errors: validationResult.error.errors,
+          errors: validationResult.error.issues,
         });
       }
 

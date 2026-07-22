@@ -121,7 +121,7 @@ export function registerFactoryInsuranceRoutes(app: Express) {
       const companyId = resolveInsuranceCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const parsed = insertInsuranceMemberSchema.safeParse({ ...req.body, companyId });
-      if (!parsed.success) return res.status(400).json({ message: "Validation failed", errors: parsed.error.errors });
+      if (!parsed.success) return res.status(400).json({ message: "Validation failed", errors: parsed.error.issues });
       const data = parsed.data;
       const ledger = await findOrCreateLedger(companyId, `Insurance - ${data.name}`, "Liability");
       const inserted = await pool.query(
@@ -165,7 +165,7 @@ export function registerFactoryInsuranceRoutes(app: Express) {
       if (!existing) return res.status(404).json({ message: "Member not found" });
 
       const parsed = insertInsuranceMemberSchema.partial().omit({ companyId: true }).safeParse(req.body);
-      if (!parsed.success) return res.status(400).json({ message: "Validation failed", errors: parsed.error.errors });
+      if (!parsed.success) return res.status(400).json({ message: "Validation failed", errors: parsed.error.issues });
       const data = parsed.data;
       if (data.name && data.name !== existing.name && existing.ledgerAccountId) {
         await db
@@ -235,7 +235,7 @@ export function registerFactoryInsuranceRoutes(app: Express) {
   app.post("/api/insurance/generate", requireAuth, async (req: any, res: any) => {
     try {
       const parsed = z.object({ month: z.number().min(1).max(12), year: z.number().min(2000).max(2100) }).safeParse(req.body);
-      if (!parsed.success) return res.status(400).json({ message: "Validation failed", errors: parsed.error.errors });
+      if (!parsed.success) return res.status(400).json({ message: "Validation failed", errors: parsed.error.issues });
       const { month, year } = parsed.data;
       const companyId = resolveInsuranceCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });

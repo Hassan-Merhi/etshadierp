@@ -133,7 +133,7 @@ export function registerRentalPaymentsAccrualRoutes(
       return res.json(result.payments[0] ?? { ok: true, paymentGroupId: result.paymentGroupId });
     } catch (e: any) {
       if (e instanceof z.ZodError)
-        return res.status(400).json({ message: e.errors.map((err: any) => err.message).join(", ") });
+        return res.status(400).json({ message: e.issues.map((err: any) => err.message).join(", ") });
       if ((e as any).status === 400) return res.status(400).json({ message: e.message });
       console.error(`${tag} payments:`, e);
       res.status(500).json({ message: e.message });
@@ -220,7 +220,7 @@ export function registerRentalPaymentsAccrualRoutes(
       res.json({ processed: results.length, results });
     } catch (e: any) {
       if (e instanceof z.ZodError)
-        return res.status(400).json({ message: e.errors.map((err: any) => err.message).join(", ") });
+        return res.status(400).json({ message: e.issues.map((err: any) => err.message).join(", ") });
       console.error(`${tag} bulk-payments:`, e);
       res.status(500).json({ message: e.message });
     }

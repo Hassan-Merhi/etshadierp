@@ -663,7 +663,7 @@ export function registerRentalAccrualConfigRoutes(
       res.status(201).json(created);
     } catch (e: any) {
       if (e instanceof z.ZodError)
-        return res.status(400).json({ message: e.errors.map((err: any) => err.message).join(", ") });
+        return res.status(400).json({ message: e.issues.map((err: any) => err.message).join(", ") });
       res.status(500).json({ message: e.message });
     }
   });

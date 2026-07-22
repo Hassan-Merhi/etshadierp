@@ -982,7 +982,7 @@ export function registerVoucherEntryRoutes(app: Express) {
 
       const parseResult = bodySchema.safeParse(req.body);
       if (!parseResult.success) {
-        return res.status(400).json({ message: parseResult.error.errors[0].message });
+        return res.status(400).json({ message: parseResult.error.issues[0].message });
       }
 
       const { voucherIds } = parseResult.data;
@@ -1416,7 +1416,7 @@ export function registerVoucherEntryRoutes(app: Express) {
 
       res.json({ moved: entryIds.length, toAccount: toAccount.name });
     } catch (e: any) {
-      if (e instanceof z.ZodError) return res.status(400).json({ message: e.errors.map((x) => x.message).join(", ") });
+      if (e instanceof z.ZodError) return res.status(400).json({ message: e.issues.map((x) => x.message).join(", ") });
       res.status(500).json({ message: e.message });
     }
   });
