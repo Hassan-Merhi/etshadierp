@@ -240,34 +240,34 @@ export default function Daybook({ user }: { user?: any } = {}) {
 
   const cashAccountId = useMemo(() => {
     if (!selectedVoucher) return null;
-    if (selectedVoucher.voucherType === "Sales" || selectedVoucher.voucherType === "POS") {
-      return (
-        viewVoucherEntries.find((e) => !e.isStockItem && !e.stockItemId && parseFloat(e.debitAmount || "0") > 0)
-          ?.ledgerAccountId ||
-        viewVoucherEntries.find((e) => !e.isStockItem && !e.stockItemId && parseFloat(e.debitAmount || "0") > 0)
-          ?.bankAccountId ||
-        null
+    const vt = selectedVoucher.voucherType;
+
+    // Sales / POS — cash-in account is the debit non-stock entry
+    if (vt === "Sales" || vt === "POS") {
+      const e = viewVoucherEntries.find(
+        (e) => !e.isStockItem && !e.stockItemId && parseFloat(e.debitAmount || "0") > 0
       );
+      return e?.ledgerAccountId || e?.bankAccountId || null;
     }
-    if (selectedVoucher.voucherType === "Payment")
-      return (
-        viewVoucherEntries.find((e) => parseFloat(e.creditAmount || "0") > 0)?.ledgerAccountId ||
-        viewVoucherEntries.find((e) => parseFloat(e.creditAmount || "0") > 0)?.bankAccountId ||
-        null
-      );
-    if (selectedVoucher.voucherType === "Receipt")
-      return (
-        viewVoucherEntries.find((e) => parseFloat(e.debitAmount || "0") > 0)?.ledgerAccountId ||
-        viewVoucherEntries.find((e) => parseFloat(e.debitAmount || "0") > 0)?.bankAccountId ||
-        null
-      );
-    if (selectedVoucher.voucherType === "Journal")
-      return (
-        viewVoucherEntries.find((e) => !e.isStockItem && !e.stockItemId)?.ledgerAccountId ||
-        viewVoucherEntries.find((e) => !e.isStockItem && !e.stockItemId)?.bankAccountId ||
-        null
-      );
-    return null;
+
+    // Payment / Credit Note / Debit Note — source is the credit side (money going out)
+    if (vt === "Payment" || vt === "Credit Note" || vt === "Debit Note") {
+      const e = viewVoucherEntries.find((e) => parseFloat(e.creditAmount || "0") > 0);
+      return e?.ledgerAccountId || e?.bankAccountId || null;
+    }
+
+    // Receipt — source is the debit side (money coming in)
+    if (vt === "Receipt") {
+      const e = viewVoucherEntries.find((e) => parseFloat(e.debitAmount || "0") > 0);
+      return e?.ledgerAccountId || e?.bankAccountId || null;
+    }
+
+    // Journal / Transfer / Stock Transfer / Purchase and anything else —
+    // use the first non-stock entry that has a cash or bank account
+    const e = viewVoucherEntries.find(
+      (e) => !e.isStockItem && !e.stockItemId && (e.ledgerAccountId || e.bankAccountId)
+    );
+    return e?.ledgerAccountId || e?.bankAccountId || null;
   }, [selectedVoucher, viewVoucherEntries]);
 
   const [cashAccountBalance, setCashAccountBalance] = useState("0");
@@ -289,35 +289,43 @@ export default function Daybook({ user }: { user?: any } = {}) {
   }, [cashAccountId, viewDialogOpen, balanceRefreshKey]);
 
   useEffect(() => {
-    if (
-      !viewDialogOpen ||
-      !selectedVoucher ||
-      !["Payment", "Receipt", "Journal"].includes(selectedVoucher.voucherType)
-    ) {
+    if (!viewDialogOpen || !selectedVoucher) {
       setEntryBalances({});
       return;
     }
+    const vt = selectedVoucher.voucherType;
+
+    // Which entries to show balances for per voucher type
     const displayEntries = viewVoucherEntries.filter((e) => {
-      if (selectedVoucher.voucherType === "Payment") return parseFloat(e.debitAmount || "0") > 0;
-      if (selectedVoucher.voucherType === "Receipt") return parseFloat(e.creditAmount || "0") > 0;
-      return true;
+      if (vt === "Payment") return parseFloat(e.debitAmount || "0") > 0;
+      if (vt === "Receipt") return parseFloat(e.creditAmount || "0") > 0;
+      if (vt === "Sales" || vt === "POS") return !e.isStockItem && !e.stockItemId;
+      // Journal, Credit Note, Debit Note, Purchase, Transfer, Stock Transfer, and all
+      // other types — show balance for every entry that has an account reference
+      return !!(
+        e.ledgerAccountId ||
+        e.bankAccountId ||
+        e.customerId ||
+        e.employeeId ||
+        e.supplierId ||
+        e.factorySupplierId
+      );
     });
+
+    const resolveUrl = (entry: typeof viewVoucherEntries[number]): string | null => {
+      if (entry.ledgerAccountId) return `/api/accounts/ledger/${entry.ledgerAccountId}/balance`;
+      if (entry.bankAccountId)   return `/api/accounts/ledger/${entry.bankAccountId}/balance`;
+      if (entry.customerId)      return `/api/customers/${entry.customerId}/balance`;
+      if (entry.employeeId)      return `/api/employees/${entry.employeeId}/balance`;
+      if (entry.supplierId)      return `/api/suppliers/${entry.supplierId}/balance`;
+      if (entry.factorySupplierId) return `/api/factory/suppliers/${entry.factorySupplierId}/balance`;
+      return null;
+    };
+
     const results: Record<number, string> = {};
     Promise.all(
       displayEntries.map(async (entry) => {
-        const url = entry.ledgerAccountId
-          ? `/api/accounts/ledger/${entry.ledgerAccountId}/balance`
-          : entry.bankAccountId
-            ? `/api/accounts/ledger/${entry.bankAccountId}/balance`
-            : entry.customerId
-              ? `/api/customers/${entry.customerId}/balance`
-              : entry.employeeId
-                ? `/api/employees/${entry.employeeId}/balance`
-                : entry.supplierId
-                  ? `/api/suppliers/${entry.supplierId}/balance`
-                  : entry.factorySupplierId
-                    ? `/api/factory/suppliers/${entry.factorySupplierId}/balance`
-                    : null;
+        const url = resolveUrl(entry);
         if (!url) return;
         try {
           const res = await fetch(url, { credentials: "include", cache: "no-store" });
