@@ -60,8 +60,19 @@ export function registerSmartTransferPreviewRoutes(app: Express) {
         }
       );
 
+      const responsePreview = parsed.targetQuantity > 0 && preview.lines.length === 0
+        ? {
+            ...preview,
+            targetQuantity: parsed.targetQuantity,
+            achievedQuantity: 0,
+            shortfallQuantity: parsed.targetQuantity,
+            shortfall: true,
+            summary: `No eligible smart-transfer items qualified for the manually requested target of ${parsed.targetQuantity} unit(s).`,
+          }
+        : preview;
+
       res.set("Cache-Control", "no-store");
-      return res.json(preview);
+      return res.json(responsePreview);
     } catch (error: any) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({
