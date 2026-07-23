@@ -1,12 +1,12 @@
 import type { Express } from "express";
 import { z } from "zod";
 import { requireAuth, requireNonPOS } from "../../auth";
-import { buildSmartTransferForecastPreview } from "../../services/smartTransferForecasting";
+import { buildSmartTransferSourceOptimizedPreview } from "../../services/smartTransferSourceOptimization";
 
 const smartTransferPreviewSchema = z.object({
   destinationLocationId: z.coerce.number().int().positive(),
   sourceLocationIds: z.array(z.coerce.number().int().positive()).min(1).max(30),
-  // 0 = auto-compute from the Phase 1 demand forecast.
+  // 0 = auto-compute from the Phase 1 demand forecast, then optimize sources in Phase 2.
   targetQuantity: z.coerce.number().int().nonnegative().max(1_000_000).optional().default(0),
   includeOtw: z.boolean().optional().default(true),
   stockGroupIds: z.array(z.coerce.number().int().positive()).max(100).optional().default([]),
@@ -31,7 +31,7 @@ export function registerSmartTransferPreviewRoutes(app: Express) {
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const parsed = smartTransferPreviewSchema.parse(req.body);
-      const preview = await buildSmartTransferForecastPreview(
+      const preview = await buildSmartTransferSourceOptimizedPreview(
         companyId,
         parsed.sourceLocationIds,
         parsed.destinationLocationId,
