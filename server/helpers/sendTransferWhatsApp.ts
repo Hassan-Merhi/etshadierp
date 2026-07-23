@@ -6,6 +6,7 @@
  */
 
 import { db } from "../db";
+import { logger } from "../lib/logger";
 import { stockItems, locations, companies } from "@shared/schema";
 import { eq, inArray } from "drizzle-orm";
 import { generateTransferImageBuffer } from "./generateTransferImage";
@@ -36,10 +37,10 @@ export interface SendTransferWAOptions {
 export async function sendTransferWhatsApp(opts: SendTransferWAOptions): Promise<void> {
   const { destinationLocationId, sourceLocationName, destLocationName, items, voucherNumber, voucherDate } = opts;
 
-  console.log(`[TransferWA] Starting for ${voucherNumber} → destLocId=${destinationLocationId}, items=${items.length}`);
+  logger.info(`[TransferWA] Starting for ${voucherNumber} → destLocId=${destinationLocationId}, items=${items.length}`);
 
   if (!items || items.length === 0) {
-    console.warn(`[TransferWA] No items provided for ${voucherNumber} — skipping`);
+    logger.warn(`[TransferWA] No items provided for ${voucherNumber} — skipping`);
     return;
   }
 
@@ -55,11 +56,11 @@ export async function sendTransferWhatsApp(opts: SendTransferWAOptions): Promise
     .from(locations)
     .where(eq(locations.id, destinationLocationId));
 
-  console.log(`[TransferWA] destLoc=${JSON.stringify(destLoc)}`);
+  logger.info(`[TransferWA] destLoc=${JSON.stringify(destLoc)}`);
 
   // 1. Per-location transfer WA group (takes priority — location-specific group)
   if (destLoc?.transferWaGroupChatId) {
-    console.log(`[TransferWA] location.transferWaGroupChatId=${destLoc.transferWaGroupChatId}`);
+    logger.info(`[TransferWA] location.transferWaGroupChatId=${destLoc.transferWaGroupChatId}`);
     chatIds.add(destLoc.transferWaGroupChatId);
   } else if (destLoc?.companyId) {
     // 2. Fall back to per-company transfer WA group from Settings
@@ -67,23 +68,23 @@ export async function sendTransferWhatsApp(opts: SendTransferWAOptions): Promise
       .select({ transferWaGroupChatId: companies.transferWaGroupChatId })
       .from(companies)
       .where(eq(companies.id, destLoc.companyId));
-    console.log(`[TransferWA] company.transferWaGroupChatId=${company?.transferWaGroupChatId}`);
+    logger.info(`[TransferWA] company.transferWaGroupChatId=${company?.transferWaGroupChatId}`);
     if (company?.transferWaGroupChatId) {
       chatIds.add(company.transferWaGroupChatId);
     }
   }
 
   if (chatIds.size === 0) {
-    console.log(`[TransferWA] No WA groups configured for transfer ${voucherNumber} — skipping`);
+    logger.info(`[TransferWA] No WA groups configured for transfer ${voucherNumber} — skipping`);
     return;
   }
 
-  console.log(`[TransferWA] Sending to ${chatIds.size} group(s): ${[...chatIds].join(", ")}`);
+  logger.info(`[TransferWA] Sending to ${chatIds.size} group(s): ${[...chatIds].join(", ")}`);
 
   // Look up stock item names in a single query (guard against empty array)
   const uniqueIds = [...new Set(items.map((i) => i.stockItemId).filter((id) => id > 0))];
   if (uniqueIds.length === 0) {
-    console.warn(`[TransferWA] No valid stockItemIds in items for ${voucherNumber} — skipping`);
+    logger.warn(`[TransferWA] No valid stockItemIds in items for ${voucherNumber} — skipping`);
     return;
   }
 
@@ -121,7 +122,7 @@ export async function sendTransferWhatsApp(opts: SendTransferWAOptions): Promise
   // Try to generate PNG; fall back to text if Puppeteer/Chromium is unavailable
   let pngBuffer: Buffer | null = null;
   try {
-    console.log(`[TransferWA] Generating PNG for ${voucherNumber}...`);
+    logger.info(`[TransferWA] Generating PNG for ${voucherNumber}...`);
     pngBuffer = await generateTransferImageBuffer({
       voucherNumber,
       date: displayDate,
@@ -129,9 +130,9 @@ export async function sendTransferWhatsApp(opts: SendTransferWAOptions): Promise
       destLocationName,
       items: imageItems,
     });
-    console.log(`[TransferWA] PNG generated (${pngBuffer.length} bytes).`);
+    logger.info(`[TransferWA] PNG generated (${pngBuffer.length} bytes).`);
   } catch (imgErr: any) {
-    console.warn(
+    logger.warn(
       `[TransferWA] Image generation failed for ${voucherNumber} — falling back to text. Error: ${imgErr?.message}`
     );
   }
@@ -144,24 +145,24 @@ export async function sendTransferWhatsApp(opts: SendTransferWAOptions): Promise
     if (pngBuffer) {
       const result = await sendWhatsAppFileToChatIdPos(chatId, pngBuffer, fileName, "", "image/png");
       if (result.success) {
-        console.log(`[TransferWA] Sent ${voucherNumber} image to group ${chatId}`);
+        logger.info(`[TransferWA] Sent ${voucherNumber} image to group ${chatId}`);
       } else {
-        console.warn(
+        logger.warn(
           `[TransferWA] Image send failed for ${voucherNumber} → ${chatId}: ${result.error} — trying text fallback`
         );
         const textResult = await sendWhatsAppTextToChatIdPos(chatId, caption);
         if (textResult.success) {
-          console.log(`[TransferWA] Text fallback sent for ${voucherNumber} → ${chatId}`);
+          logger.info(`[TransferWA] Text fallback sent for ${voucherNumber} → ${chatId}`);
         } else {
-          console.warn(`[TransferWA] Text fallback also failed for ${voucherNumber} → ${chatId}: ${textResult.error}`);
+          logger.warn(`[TransferWA] Text fallback also failed for ${voucherNumber} → ${chatId}: ${textResult.error}`);
         }
       }
     } else {
       const textResult = await sendWhatsAppTextToChatIdPos(chatId, caption);
       if (textResult.success) {
-        console.log(`[TransferWA] Text message sent for ${voucherNumber} → ${chatId}`);
+        logger.info(`[TransferWA] Text message sent for ${voucherNumber} → ${chatId}`);
       } else {
-        console.warn(`[TransferWA] Text send failed for ${voucherNumber} → ${chatId}: ${textResult.error}`);
+        logger.warn(`[TransferWA] Text send failed for ${voucherNumber} → ${chatId}: ${textResult.error}`);
       }
     }
   }
