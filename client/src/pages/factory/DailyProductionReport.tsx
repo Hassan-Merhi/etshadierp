@@ -1984,12 +1984,12 @@ export default function DailyProductionReport() {
                     <StatRow label="Weight" value={fmtKg(data?.balanceOnTable.weightKg ?? 0)} />
                     <StatRow label="Batch Rate" value={fmtRate(data?.balanceOnTable.costPerKg ?? 0)} sub="per kg" />
                     <StatRow label="Value" value={fmtMoney(data?.balanceOnTable.value ?? 0)} />
-                    {/* Production Profit = (bales produced kg × balance batch rate) − bales produced value */}
+                    {/* Production Profit = bales produced value − (bales produced kg × balance batch rate) */}
                     {(() => {
                       const producedKg = data?.production.totalWeightKg ?? 0;
                       const batchRate  = data?.balanceOnTable.costPerKg ?? 0;
                       const producedVal = data?.production.totalValue ?? 0;
-                      const profit = (producedKg * batchRate) - producedVal;
+                      const profit = producedVal - (producedKg * batchRate);
                       const isPos = profit > 0;
                       const isNeg = profit < 0;
                       return (
