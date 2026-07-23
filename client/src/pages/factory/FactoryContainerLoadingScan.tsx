@@ -32,6 +32,7 @@ import {
   ChevronDown,
   ChevronUp,
   Pencil,
+  ShieldOff,
 } from "lucide-react";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
@@ -127,6 +128,7 @@ export default function FactoryContainerLoadingScan() {
   const [showScanErrorPopup, setShowScanErrorPopup] = useState(false);
   const [pendingBypassBaleRef, setPendingBypassBaleRef] = useState<string | null>(null);
   const [pendingBypassOverloadRef, setPendingBypassOverloadRef] = useState<string | null>(null);
+  const [ignoreProforma, setIgnoreProforma] = useState(false);
   const [showFinalizeDialog, setShowFinalizeDialog] = useState(false);
   const [finalizeDate, setFinalizeDate] = useState(new Date().toLocaleDateString("en-CA"));
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
@@ -599,11 +601,14 @@ export default function FactoryContainerLoadingScan() {
       addBaleMutation.mutate({
         scanCode: trimmed,
         locationId: parseInt(selectedLocationId),
-        allowBypassProforma: isBypassProforma || undefined,
+        // When ignoreProforma is ON, always bypass the proforma check so the
+        // first scan succeeds immediately (item still appears as "Not in Proforma"
+        // in the comparison table — only the double-scan requirement is skipped).
+        allowBypassProforma: ignoreProforma ? true : (isBypassProforma || undefined),
         allowBypassOverload: isBypassOverload || undefined,
       });
     },
-    [scanCode, orderId, selectedLocationId, pendingBypassBaleRef, pendingBypassOverloadRef, addBaleMutation]
+    [scanCode, orderId, selectedLocationId, pendingBypassBaleRef, pendingBypassOverloadRef, ignoreProforma, addBaleMutation]
   );
 
   const handleImportFile = useCallback(
@@ -901,6 +906,29 @@ export default function FactoryContainerLoadingScan() {
                       Scan Bale
                     </label>
                     <div className="flex items-center gap-1">
+                      <Button
+                        size="sm"
+                        variant={ignoreProforma ? "default" : "outline"}
+                        onClick={() => {
+                          setIgnoreProforma((v) => !v);
+                          // Clear any pending proforma bypass warning when turning the mode on
+                          setPendingBypassBaleRef(null);
+                        }}
+                        className={
+                          ignoreProforma
+                            ? "bg-amber-500 hover:bg-amber-600 text-white border-amber-500"
+                            : "text-muted-foreground"
+                        }
+                        title={
+                          ignoreProforma
+                            ? "Ignore Proforma is ON — items not in proforma scan through immediately (still flagged). Click to turn off."
+                            : "Turn on to scan items not in the proforma without needing to scan twice."
+                        }
+                        data-testid="button-ignore-proforma"
+                      >
+                        <ShieldOff className="h-3 w-3 mr-1" />
+                        {ignoreProforma ? "Ignore Proforma: ON" : "Ignore Proforma"}
+                      </Button>
                       <Button
                         size="sm"
                         variant="outline"
