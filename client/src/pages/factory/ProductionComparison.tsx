@@ -728,6 +728,9 @@ export default function ProductionComparison() {
                             fmt={(n) => (n > 0 ? "+" : "") + fmtNum(n)}
                           />
                         </TableCell>
+                        <TableCell className="text-center">
+                          <PctCell pct={pctChange(row.aQty, row.bQty)} />
+                        </TableCell>
                         <TableCell className="text-center tabular-nums text-sm">
                           {fmtKg(row.aKg)}
                         </TableCell>
