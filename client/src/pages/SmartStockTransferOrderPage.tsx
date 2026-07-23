@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import SmartTransferGeneratorDialog from "@/components/stock-transfer/SmartTransferGeneratorDialog";
+import SmartTransferFeedbackSummaryCard from "@/components/stock-transfer/SmartTransferFeedbackSummaryCard";
 import type { SmartPreviewOrderItem } from "@/components/stock-transfer/smartTransferPreviewUi";
 import BaseStockTransferOrder from "./StockTransferOrder.tsx";
 
@@ -39,7 +40,7 @@ export default function SmartStockTransferOrderPage() {
     return () => window.clearInterval(timer);
   }, []);
 
-  const importPreview = (payload: {
+  const importPreview = async (payload: {
     destinationLocationId: number;
     sourceLocationIds: number[];
     orderItems: SmartPreviewOrderItem[];
@@ -52,6 +53,26 @@ export default function SmartStockTransferOrderPage() {
       if (!replace) return;
     }
 
+    let feedbackSessionId: string | null = null;
+    try {
+      const feedbackResponse = await fetch("/api/stock-transfers/smart-feedback/import", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          destinationLocationId: payload.destinationLocationId,
+          sourceLocationIds: payload.sourceLocationIds,
+          items: payload.orderItems,
+        }),
+      });
+      if (feedbackResponse.ok) {
+        const feedback = await feedbackResponse.json();
+        feedbackSessionId = typeof feedback?.sessionId === "string" ? feedback.sessionId : null;
+      }
+    } catch (error) {
+      console.warn("[SmartTransferFeedback] Import tracking failed; continuing with the order import.", error);
+    }
+
     localStorage.setItem(SOURCE_STORAGE_KEY, JSON.stringify(payload.sourceLocationIds));
     localStorage.setItem(
       DRAFT_KEY,
@@ -62,6 +83,7 @@ export default function SmartStockTransferOrderPage() {
         isOptional: true,
         savedAt: new Date().toISOString(),
         generatedBy: "smart-multi-source-transfer",
+        smartFeedbackSessionId: feedbackSessionId,
       })
     );
     sessionStorage.setItem(AUTO_RESTORE_KEY, "1");
@@ -79,6 +101,7 @@ export default function SmartStockTransferOrderPage() {
 
       {!isEditingExistingVoucher && (
         <>
+          <SmartTransferFeedbackSummaryCard />
           <Button
             type="button"
             className="fixed bottom-6 right-6 z-40 h-12 rounded-full px-5 shadow-lg"
