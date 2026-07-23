@@ -68,16 +68,13 @@ interface SourceCandidate {
   selectionReason: string;
 }
 
-const DAY_MS = 24 * 60 * 60 * 1000;
-
 function parseQuantity(value: unknown): number {
   const parsed = Number.parseFloat(String(value ?? "0"));
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
 function wholeNonNegative(value: number): number {
-  if (!Number.isFinite(value) || value <= 0) return 0;
-  return Math.floor(value);
+  return Number.isFinite(value) && value > 0 ? Math.floor(value) : 0;
 }
 
 function clamp(value: number, min: number, max: number): number {
@@ -90,17 +87,13 @@ function isoDaysAgo(asOfDate: string, daysAgo: number): string {
   return date.toISOString().slice(0, 10);
 }
 
-function salesMetrics(
+function calculateSourceSales(
   rows: Array<{ date: string; quantity: number }>,
   sevenDayStart: string,
   thirtyDayStart: string
 ): SourceSalesMetrics {
-  const sales7 = rows
-    .filter((row) => row.date >= sevenDayStart)
-    .reduce((sum, row) => sum + row.quantity, 0);
-  const sales30 = rows
-    .filter((row) => row.date >= thirtyDayStart)
-    .reduce((sum, row) => sum + row.quantity, 0);
+  const sales7 = rows.filter((row) => row.date >= sevenDayStart).reduce((sum, row) => sum + row.quantity, 0);
+  const sales30 = rows.filter((row) => row.date >= thirtyDayStart).reduce((sum, row) => sum + row.quantity, 0);
   const sales90 = rows.reduce((sum, row) => sum + row.quantity, 0);
   const rate7 = sales7 / 7;
   const rate30 = sales30 / 30;
@@ -115,85 +108,6 @@ function salesMetrics(
     weight90 = 0.3;
   }
   if (sales30 < 5) {
-    weight7 = 0.15;
-    weight30 = 0.35;
-    weight90 = 0.5;
-  }
-
-  return {
-    sales7: roundNumber(sales7, 3),
-    sales30: roundNumber(sales30, 3),
-    sales90: roundNumber(sales90, 3),
-    rate7: roundNumber(rate7, 3),
-    rate30: roundNumber(rate30, 3),
-    rate90: roundNumber(rate90, 3),
-    forecastRate: roundNumber(Math.max(0, rate7 * weight7 + rate30 * weight30 + rate90 * weight90), 3),
-  };
-}
-
-function dynamicReserveDays(fCanCoverWholeItem: boolean;
-  sourceSelectionScore: number;
-  sourceRank: number;
-  sourceSelectionReason: string;
-}
-
-export type SmartTransferSourceOptimizedLine = SmartTransferForecastPreviewLine &
-  SmartTransferSourceOptimizationFields;
-
-export interface SmartTransferSourceOptimizedResult
-  extends Omit<SmartTransferForecastPreviewResult, "lines"> {
-  sourceOptimizationVersion: 2;
-  lines: SmartTransferSourceOptimizedLine[];
-}
-
-interface SourceSalesMetrics {
-  sales7: number;
-  sales30: number;
-  sales90: number;
-  rate7: number;
-  rate30: number;
-  rate90: number;
-  forecastRate: number;
-}
-
-interface SourceOptimizationState {
-  sourceLocationId: number;
-  sourceLocationName: string;
-  currentStock: number;
-  averageRate: number;
-  sales: SourceSalesMetrics;
-  reserveDays: number;
-  dynamicReserveQty: number;
-  pendingCommitmentQty: number;
-  availableQty: number;
-  coverageDaysAfterCommitments: number | null;
-  historicalRouteCount: number;
-  historicalRouteQty: number;
-  canCoverWholeItem: boolean;
-  selectionScore: number;
-  rank: number;
-  selectionReason: string;
-}
-
-const DAY_MS = 24 * 60 * 60 * 1000;
-
-function parseQuantity(value: unknownstockScore = Math.round(clamp(availableShare, 0, 1) * 35);
-  if (input.coverageDaysAfterCommitments !== null) {
-    if (input.coverageDaysAfterCommitments >= 90) overstockScore = Math.max(overstockScore, 35);
-    else if (input.coverageDaysAfterCommitments >= 60) overstockScore = Math.max(overstockScore, 30);
-    else if (input.coverageDaysAfterCommitments >= 30) overstockScore = Math.max(overstockScore, 22);
-    else if (input.coverageDaysAfterCommitments < 14) overstockScore = Math.min(overstockScore, 8);
-  } else if (input.availableQty > 0) {
-    overstockScore = Math.max(overstockScore, 28);
-  }
-
-  let localDemandProtection = 20;
-  if (input.forecastRate >= 1) localDemandProtection = 4;
-  else if (input.forecastRate >= 0.5) localDemandProtection = 8;
-  else if (input.forecastRate >= 0.2) localDemandProtection = 12;
-  else if (input.forecastRate > 0) localDemandProtection = 16;
-
-  const if (sales30 < 5) {
     weight7 = 0.15;
     weight30 = 0.35;
     weight90 = 0.5;
@@ -218,10 +132,7 @@ function parseQuantity(value: unknownstockScore = Math.round(clamp(availableShar
   };
 }
 
-function calculateReserveDays(
-  sales: SourceSalesMetrics,
-  targetCoverageDays: number
-): number {
+function calculateReserveDays(sales: SourceSalesMetrics, targetCoverageDays: number): number {
   if (sales.forecastRate <= 0.02 && sales.sales90 < 2) return 0;
   if (sales.forecastRate >= 1 || sales.sales7 >= 7) {
     return Math.min(30, Math.max(14, Math.min(targetCoverageDays, 21)));
@@ -232,7 +143,7 @@ function calculateReserveDays(
   return 7;
 }
 
-function calculateDynamicReserve(
+function calculateReserveQty(
   currentStock: number,
   sales: SourceSalesMetrics,
   reserveDays: number
@@ -244,11 +155,17 @@ function calculateDynamicReserve(
   return Math.min(currentStock, Math.max(minimumFloor, baseReserve + accelerationBuffer));
 }
 
-function sourceSelectionScore(
-  state: Omit<SourceOptimizationState, "selectionScore" | "rank" | "selectionReason">,
-  itemQuantity: number
-): number {
-  const availableRatio = state.currentStock > 0 ? state.availableQty / state.currentStock : 0;
+function calculateSourceScore(input: {
+  currentStock: number;
+  availableQty: number;
+  pendingCommitmentQty: number;
+  forecastRate: number;
+  coverageDaysAfterCommitments: number | null;
+  historicalRouteCount: number;
+  historicalRouteQty: number;
+  itemTotal: number;
+}): number {
+  const availableRatio = input.currentStock > 0 ? input.availableQty / input.currentStock : 0;
   let overstockScore = 0;
   if (availableRatio >= 0.6) overstockScore = 35;
   else if (availableRatio >= 0.4) overstockScore = 28;
@@ -256,19 +173,67 @@ function sourceSelectionScore(
   else if (availableRatio > 0) overstockScore = 10;
 
   let localProtectionScore = 0;
-  if (state.sales.forecastRate <= 0.02) localProtectionScore = 20;
-  else if (state.coverageDaysAfterCommitments === null) localProtectionScore = 18;
-  else if (state.coverageDaysAfterCommitments >= 60) localProtectionScore = 20;
-  else if (state.coverageDaysAfterCommitments >= 30) localProtectionScore = 15;
-  else if (state.coverageDaysAfterCommitments >= 21) localProtectionScore = 10;
-  else if (state.coverageDaysAfterCommitments >= 14) localProtectionScore = 5;
+  if (input.forecastRate <= 0.02) localProtectionScore = 20;
+  else if (input.coverageDaysAfterCommitments === null) localProtectionScore = 18;
+  else if (input.coverageDaysAfterCommitments >= 60) localProtectionScore = 20;
+  else if (input.coverageDaysAfterCommitments >= 30) localProtectionScore = 15;
+  else if (input.coverageDaysAfterCommitments >= 21) localProtectionScore = 10;
+  else if (input.coverageDaysAfterCommitments >= 14) localProtectionScore = 5;
 
   const routeScore = clamp(
-    state.historicalRouteCount * 4 + Math.round(Math.log1p(state.historicalRouteQty) * 2),
+    input.historicalRouteCount * 4 + Math.round(Math.log1p(input.historicalRouteQty) * 2),
     0,
     20
   );
-Preview(
+  const wholeItemScore = input.availableQty >= input.itemTotal ? 15 : input.availableQty >= input.itemTotal * 0.5 ? 8 : 2;
+  const pendingRatio = input.currentStock > 0 ? input.pendingCommitmentQty / input.currentStock : 0;
+  const commitmentScore = pendingRatio <= 0 ? 10 : pendingRatio <= 0.1 ? 8 : pendingRatio <= 0.25 ? 5 : 1;
+
+  return Math.round(clamp(overstockScore + localProtectionScore + routeScore + wholeItemScore + commitmentScore, 0, 100));
+}
+
+function buildSourceReason(source: Omit<SourceCandidate, "rank" | "selectionReason">): string {
+  const coverageText = source.coverageDaysAfterCommitments === null
+    ? "no meaningful local sales rate"
+    : `${roundNumber(source.coverageDaysAfterCommitments, 1)} local coverage days before reserve`;
+  const routeText = source.historicalRouteCount > 0
+    ? `${source.historicalRouteCount} completed route transfer(s), ${roundNumber(source.historicalRouteQty, 0)} unit(s)`
+    : "no recent completed route history";
+  return [
+    `source score ${source.selectionScore}/100`,
+    `stock ${source.currentStock}`,
+    `pending commitments ${source.pendingCommitmentQty}`,
+    `dynamic reserve ${source.dynamicReserveQty} for ${source.reserveDays} day(s)`,
+    `available ${source.availableQty}`,
+    coverageText,
+    routeText,
+    source.canCoverWholeItem ? "can fulfill the whole item quantity" : "used only if a split is required",
+  ].join("; ") + ".";
+}
+
+function allocateWithMinimumSplits(sources: SourceCandidate[], requested: number): Map<number, number> {
+  const result = new Map<number, number>();
+  const target = wholeNonNegative(requested);
+  if (target <= 0) return result;
+
+  const oneSource = sources.find((source) => source.availableQty >= target);
+  if (oneSource) {
+    result.set(oneSource.sourceLocationId, target);
+    return result;
+  }
+
+  let remaining = target;
+  for (const source of sources) {
+    if (remaining <= 0) break;
+    const quantity = Math.min(source.availableQty, remaining);
+    if (quantity <= 0) continue;
+    result.set(source.sourceLocationId, quantity);
+    remaining -= quantity;
+  }
+  return result;
+}
+
+export async function buildSmartTransferSourceOptimizedPreview(
   companyId: number,
   sourceLocationIds: number[],
   destinationLocationId: number,
@@ -429,37 +394,38 @@ Preview(
     const key = `${row.stockItemId}:${sourceLocationId}`;
     const currentStock = wholeNonNegative(parseQuantity(row.quantity));
     if (currentStock <= 0) continue;
-    const metrics = salesMetrics(salesBySourceItem.get(key) ?? [], sevenDayStart, thirtyDayStart);
-    const reserveDays = dynamicReserveDays(metrics.forecastRate, base.targetCoverageDays);
-    const reserveQty = dynamicReserveQty(metrics, reserveDays);
+    const sales = calculateSourceSales(salesBySourceItem.get(key) ?? [], sevenDayStart, thirtyDayStart);
+    const reserveDays = calculateReserveDays(sales, base.targetCoverageDays);
+    const dynamicReserveQty = calculateReserveQty(currentStock, sales, reserveDays);
     const pendingCommitmentQty = wholeNonNegative(pendingBySourceItem.get(key) ?? 0);
     const stockAfterCommitments = Math.max(0, currentStock - pendingCommitmentQty);
-    const availableQty = Math.max(0, stockAfterCommitments - reserveQty);
+    const availableQty = Math.max(0, stockAfterCommitments - dynamicReserveQty);
     if (availableQty <= 0) continue;
     const route = routeBySourceItem.get(key);
-    const coverageDaysAfterCommitments = metrics.forecastRate > 0
-      ? stockAfterCommitments / metrics.forecastRate
+    const coverageDaysAfterCommitments = sales.forecastRate > 0
+      ? stockAfterCommitments / sales.forecastRate
       : null;
     const canCoverWholeItem = availableQty >= itemTotal;
-    const selectionScore = sourceSelectionScore({
+    const selectionScore = calculateSourceScore({
       currentStock,
       availableQty,
       pendingCommitmentQty,
-      forecastRate: metrics.forecastRate,
+      forecastRate: sales.forecastRate,
       coverageDaysAfterCommitments,
       historicalRouteCount: route?.transferIds.size ?? 0,
       historicalRouteQty: route?.quantity ?? 0,
       itemTotal,
     });
-    const sourceWithoutReason = {
+
+    const candidateWithoutReason: Omit<SourceCandidate, "rank" | "selectionReason"> = {
       stockItemId: row.stockItemId,
       sourceLocationId,
       sourceLocationName: sourceNameById.get(sourceLocationId) ?? `Location #${sourceLocationId}`,
       currentStock,
       averageRate: roundNumber(parseQuantity(row.averageRate), 2),
-      sales: metrics,
+      sales,
       reserveDays,
-      dynamicReserveQty: reserveQty,
+      dynamicReserveQty,
       pendingCommitmentQty,
       availableQty,
       coverageDaysAfterCommitments:
@@ -471,16 +437,16 @@ Preview(
     };
     const list = sourceCandidatesByItem.get(row.stockItemId) ?? [];
     list.push({
-      ...sourceWithoutReason,
+      ...candidateWithoutReason,
       rank: 0,
-      selectionReason: buildSourceReason(sourceWithoutReason),
+      selectionReason: buildSourceReason(candidateWithoutReason),
     });
     sourceCandidatesByItem.set(row.stockItemId, list);
   }
 
   const lines: SmartTransferSourceOptimizedLine[] = [];
   let avoidedSplits = 0;
-  let pendingCommitmentTotal = 0;
+  const pendingKeysUsed = new Set<string>();
 
   for (const [stockItemId, itemTotal] of itemTotalById.entries()) {
     const representative = representativeById.get(stockItemId);
@@ -503,7 +469,7 @@ Preview(
     for (const source of sources) {
       const suggestedQuantity = allocations.get(source.sourceLocationId) ?? 0;
       if (suggestedQuantity <= 0) continue;
-      pendingCommitmentTotal += source.pendingCommitmentQty;
+      pendingKeysUsed.add(`${stockItemId}:${source.sourceLocationId}`);
       lines.push({
         ...representative,
         sourceLocationId: source.sourceLocationId,
@@ -556,6 +522,10 @@ Preview(
     (a, b) => b.suggestedQuantity - a.suggestedQuantity || a.sourceLocationName.localeCompare(b.sourceLocationName)
   );
 
+  const pendingCommitmentTotal = Array.from(pendingKeysUsed).reduce(
+    (sum, key) => sum + wholeNonNegative(pendingBySourceItem.get(key) ?? 0),
+    0
+  );
   const warnings = base.warnings.filter((warning) => !/source stock after reserve was insufficient/i.test(warning));
   if (shortfallQuantity > 0) {
     warnings.push(
@@ -564,11 +534,13 @@ Preview(
   }
   if (pendingCommitmentTotal > 0) {
     warnings.push(
-      `Unposted transfer commitments were deducted before source allocation; selected lines referenced ${pendingCommitmentTotal} committed unit(s) across their source/item balances.`
+      `${pendingCommitmentTotal} unposted committed unit(s) were deducted from the selected source/item balances before allocation.`
     );
   }
   if (avoidedSplits > 0) {
-    warnings.push(`Phase 2 removed ${avoidedSplits} unnecessary source split(s) by preferring sources that could fulfill whole item quantities.`);
+    warnings.push(
+      `Phase 2 removed ${avoidedSplits} unnecessary source split(s) by preferring sources that could fulfill whole item quantities.`
+    );
   }
 
   return {
