@@ -1,4 +1,6 @@
-import { Edit } from "lucide-react";
+import { Edit, MapPin } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
 import {
   Dialog,
   DialogContent,
@@ -88,6 +90,24 @@ export function VoucherDetailsDialog({
   ledgerAccounts = [],
   bankAccounts = [],
 }: VoucherDetailsDialogProps) {
+  const isStockTransferType =
+    selectedVoucher?.voucherType === "Stock Transfer" ||
+    selectedVoucher?.voucherType === "StockTransfer" ||
+    selectedVoucher?.voucherType === "Transfer";
+
+  const { data: voucherDetail } = useQuery<any>({
+    queryKey: ["/api/vouchers", selectedVoucher?.id, "detail-transfer"],
+    queryFn: async () => {
+      const res = await apiRequest("GET", `/api/vouchers/${selectedVoucher!.id}`);
+      if (!res.ok) return null;
+      return res.json();
+    },
+    enabled: !!selectedVoucher?.id && isStockTransferType && open,
+    staleTime: 30_000,
+  });
+
+  const transferDetail = voucherDetail?.transfer ?? null;
+
   if (!selectedVoucher) return null;
 
   const isPOSUser = !user || user?.role === "POS";
@@ -522,6 +542,15 @@ export function VoucherDetailsDialog({
                         </div>
                       );
                     })()}
+                  {/* ── Stock Transfer route bar ── */}
+                  {isStockTransferType && transferDetail && (
+                    <div className="flex items-center gap-2 mb-2 px-1 text-sm text-muted-foreground">
+                      <MapPin className="h-3.5 w-3.5 shrink-0" />
+                      <span className="font-medium text-foreground">{transferDetail.sourceLocationName || "—"}</span>
+                      <span>→</span>
+                      <span className="font-medium text-foreground">{transferDetail.destinationLocationName || "—"}</span>
+                    </div>
+                  )}
                   <div className="border rounded-md">
                     <Table>
                       <TableHeader className="sticky top-0 z-30 bg-background">
@@ -535,6 +564,7 @@ export function VoucherDetailsDialog({
                             <>
                               <TableHead>Item Name</TableHead>
                               {selectedVoucher.voucherType === "Mixed" && <TableHead>Type</TableHead>}
+                              {isStockTransferType && <TableHead>Source Location</TableHead>}
                               <TableHead className="text-right">Qty</TableHead>
                               {user && user?.role !== "POS" && (
                                 <>
@@ -597,6 +627,11 @@ export function VoucherDetailsDialog({
                                       <Badge variant={entry.adjustmentType === "Production" ? "default" : "secondary"}>
                                         {entry.adjustmentType || (qty > 0 ? "Production" : "Consumption")}
                                       </Badge>
+                                    </TableCell>
+                                  )}
+                                  {isStockTransferType && (
+                                    <TableCell className="text-sm text-muted-foreground">
+                                      {(entry as any).sourceLocationName || transferDetail?.sourceLocationName || "—"}
                                     </TableCell>
                                   )}
                                   <TableCell className="text-right font-mono">

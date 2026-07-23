@@ -610,20 +610,28 @@ export function registerVoucherQueryRoutes(app: Express) {
             .from(stockTransferItems)
             .where(eq(stockTransferItems.transferId, transfer[0].id));
 
+          const [sourceLocation, destLocation] = await Promise.all([
+            storage.getLocationById(transfer[0].sourceLocationId!),
+            storage.getLocationById(transfer[0].destinationLocationId!),
+          ]);
+
           const itemsWithDetails = await Promise.all(
             items.map(async (item) => {
               const stockItem = await storage.getStockItemById(item.stockItemId);
+              // Resolve per-item source location (falls back to transfer-level source)
+              const itemSourceLoc =
+                item.sourceLocationId && item.sourceLocationId !== transfer[0].sourceLocationId
+                  ? await storage.getLocationById(item.sourceLocationId)
+                  : null;
               return {
                 ...item,
                 stockItemCode: stockItem?.code || "",
                 stockItemName: stockItem?.name || "",
                 stockItemUom: stockItem?.uom || "",
+                sourceLocationName: itemSourceLoc?.name || sourceLocation?.name || "",
               };
             })
           );
-
-          const sourceLocation = await storage.getLocationById(transfer[0].sourceLocationId!);
-          const destLocation = await storage.getLocationById(transfer[0].destinationLocationId!);
 
           transferData = {
             ...transfer[0],
