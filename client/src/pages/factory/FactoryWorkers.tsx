@@ -255,7 +255,9 @@ export default function FactoryWorkers() {
     queryKey: ["/api/factory/worker-categories"],
     queryFn: async () => {
       const res = await fetch("/api/factory/worker-categories", { credentials: "include" });
-      return res.json();
+      if (!res.ok) throw new Error("Failed to fetch worker categories");
+      const data = await res.json();
+      return Array.isArray(data) ? data : [];
     },
   });
 
