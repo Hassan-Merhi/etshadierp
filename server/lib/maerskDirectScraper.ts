@@ -22,6 +22,7 @@
  */
 
 import { existsSync } from "fs";
+import { logger } from "./logger";
 import { execSync } from "child_process";
 import { createRequire } from "module";
 import type { CarrierTrackResult, TrackingEvent } from "./trackingProviders/types";
@@ -75,7 +76,7 @@ async function getSharedBrowser(): Promise<any> {
       await _sharedBrowser.pages(); // lightweight liveness check
       return _sharedBrowser;
     } catch {
-      console.warn("[MaerskDirect] Shared browser disconnected — relaunching");
+      logger.warn("[MaerskDirect] Shared browser disconnected — relaunching");
       _sharedBrowser = null;
     }
   }
@@ -88,7 +89,7 @@ async function getSharedBrowser(): Promise<any> {
   }
 
   const chromePath = getChromiumPath();
-  console.log("[MaerskDirect] Launching shared Chrome instance…");
+  logger.info("[MaerskDirect] Launching shared Chrome instance…");
   _sharedBrowser = await puppeteerExtra.launch({
     headless: true,
     ...(chromePath ? { executablePath: chromePath } : {}),
@@ -121,11 +122,11 @@ async function getSharedBrowser(): Promise<any> {
 
   // Auto-clear on crash so the next call relaunches cleanly
   _sharedBrowser.on("disconnected", () => {
-    console.warn("[MaerskDirect] Shared browser disconnected (crash or killed)");
+    logger.warn("[MaerskDirect] Shared browser disconnected (crash or killed)");
     _sharedBrowser = null;
   });
 
-  console.log("[MaerskDirect] Shared Chrome instance ready");
+  logger.info("[MaerskDirect] Shared Chrome instance ready");
   return _sharedBrowser;
 }
 
@@ -417,22 +418,22 @@ export async function scrapeMaerskDirect(containerNumber: string): Promise<Carri
 
   // ── Acquire global Puppeteer slot (shared with ParcelsApp scraper) ───────
   // Returns a "no_data" result immediately when the queue is full.
-  console.log(`[MaerskDirect] ${containerNumber}: waiting for Puppeteer slot…`);
+  logger.info(`[MaerskDirect] ${containerNumber}: waiting for Puppeteer slot…`);
   let release: (() => void) | null = null;
   try {
     release = await acquirePuppeteerSlot();
   } catch (err: any) {
     if (err?.message === "PUPPETEER_QUEUE_FULL") {
-      console.warn(`[MaerskDirect] ${containerNumber}: Puppeteer queue full — skipping (server busy)`);
+      logger.warn(`[MaerskDirect] ${containerNumber}: Puppeteer queue full — skipping (server busy)`);
       return emptyResult(containerNumber, "PUPPETEER_QUEUE_FULL");
     }
     throw err;
   }
-  console.log(`[MaerskDirect] ${containerNumber}: Puppeteer slot acquired`);
+  logger.info(`[MaerskDirect] ${containerNumber}: Puppeteer slot acquired`);
 
   let page: any = null;
   const hardStop = setTimeout(() => {
-    console.warn(`[MaerskDirect] ${containerNumber}: hard timeout — closing page`);
+    logger.warn(`[MaerskDirect] ${containerNumber}: hard timeout — closing page`);
     try {
       page?.close();
     } catch {
@@ -476,7 +477,7 @@ export async function scrapeMaerskDirect(containerNumber: string): Promise<Carri
                 .join(",")
             : "[array]";
         const etaScan = deepScanForEta(json);
-        console.log(
+        logger.info(
           `[MaerskDirect] ${containerNumber} JSON captured: ${url.slice(0, 110)}` +
             ` status=${status} keys=[${topKeys}]` +
             (etaScan ? ` ETA_FOUND: path=${etaScan.path} val=${etaScan.value}` : "")
@@ -490,14 +491,14 @@ export async function scrapeMaerskDirect(containerNumber: string): Promise<Carri
     // ── Step 1: Warm up session on Maersk homepage ────────────────────────────
     // Visiting the homepage first establishes Akamai/bot-protection cookies so
     // subsequent requests to the tracking page are treated as legitimate.
-    console.log(`[MaerskDirect] ${containerNumber}: warming up session on maersk.com…`);
+    logger.info(`[MaerskDirect] ${containerNumber}: warming up session on maersk.com…`);
     try {
       await page.goto("https://www.maersk.com", {
         waitUntil: "domcontentloaded",
         timeout: 15_000,
       });
     } catch {
-      console.log(`[MaerskDirect] ${containerNumber}: homepage warmup timed out — continuing`);
+      logger.info(`[MaerskDirect] ${containerNumber}: homepage warmup timed out — continuing`);
     }
     // Give Akamai cookies a moment to settle before hitting the tracking page.
     await new Promise((r) => setTimeout(r, 2_500));
@@ -506,15 +507,15 @@ export async function scrapeMaerskDirect(containerNumber: string): Promise<Carri
     // Use domcontentloaded — Maersk's SPA has continuous background polling
     // which means networkidle2 NEVER fires and always times out.
     const trackUrl = `https://www.maersk.com/tracking/${encodeURIComponent(containerNumber)}`;
-    console.log(`[MaerskDirect] ${containerNumber}: navigating to ${trackUrl}`);
+    logger.info(`[MaerskDirect] ${containerNumber}: navigating to ${trackUrl}`);
     try {
       await page.goto(trackUrl, { waitUntil: "domcontentloaded", timeout: NAV_TIMEOUT_MS });
     } catch {
-      console.log(`[MaerskDirect] ${containerNumber}: domcontentloaded timed out — continuing`);
+      logger.info(`[MaerskDirect] ${containerNumber}: domcontentloaded timed out — continuing`);
     }
 
     // ── Wait for API responses to arrive ─────────────────────────────────────
-    console.log(`[MaerskDirect] ${containerNumber}: waiting up to ${API_WAIT_MS / 1000}s for Maersk API data…`);
+    logger.info(`[MaerskDirect] ${containerNumber}: waiting up to ${API_WAIT_MS / 1000}s for Maersk API data…`);
     const pollStart = Date.now();
     while (Date.now() - pollStart < API_WAIT_MS) {
       const useful = capturedPayloads.find((p) => {
@@ -526,8 +527,8 @@ export async function scrapeMaerskDirect(containerNumber: string): Promise<Carri
     }
 
     const finalUrl: string = page.url();
-    console.log(`[MaerskDirect] ${containerNumber}: final URL: ${finalUrl}`);
-    console.log(`[MaerskDirect] ${containerNumber}: captured ${capturedPayloads.length} JSON response(s) total`);
+    logger.info(`[MaerskDirect] ${containerNumber}: final URL: ${finalUrl}`);
+    logger.info(`[MaerskDirect] ${containerNumber}: captured ${capturedPayloads.length} JSON response(s) total`);
 
     // ── Parse captured API responses ──────────────────────────────────────────
     // Maersk's SPA fires several JSON calls per page (schedules, autocomplete,
@@ -566,7 +567,7 @@ export async function scrapeMaerskDirect(containerNumber: string): Promise<Carri
       const latest = best.events[0] ?? null;
       const latestActual = best.events.find((e) => e.date && e.date <= new Date()) ?? latest;
       const status = best.latestStatus ?? latestActual?.status ?? latest?.status ?? null;
-      console.log(
+      logger.info(
         `[MaerskDirect] ${containerNumber}: success from ${best.url.slice(0, 80)} — ` +
           `status=${status ?? "?"} events=${best.events.length} eta=${best.eta ?? "none"} score=${best.score}` +
           (best.deepPath ? ` (deep-scan path=${best.deepPath})` : "")
@@ -606,7 +607,7 @@ export async function scrapeMaerskDirect(containerNumber: string): Promise<Carri
       const deepEta = !ndEta ? deepScanForEta(nextDataRaw) : null;
       const eta = ndEta ?? deepEta?.value ?? null;
       if (events.length > 0 || eta) {
-        console.log(
+        logger.info(
           `[MaerskDirect] ${containerNumber}: __NEXT_DATA__ hit — ` +
             `events=${events.length} eta=${eta ?? "none"}` +
             (deepEta ? ` (deep-scan path=${deepEta.path})` : "")
@@ -627,15 +628,15 @@ export async function scrapeMaerskDirect(containerNumber: string): Promise<Carri
           raw: { source: "__NEXT_DATA__" },
         };
       }
-      console.log(`[MaerskDirect] ${containerNumber}: __NEXT_DATA__ present but no useful data`);
+      logger.info(`[MaerskDirect] ${containerNumber}: __NEXT_DATA__ present but no useful data`);
     } else {
-      console.log(`[MaerskDirect] ${containerNumber}: no __NEXT_DATA__ found`);
+      logger.info(`[MaerskDirect] ${containerNumber}: no __NEXT_DATA__ found`);
     }
 
     // ── Fallback B: read rendered DOM text ────────────────────────────────────
     const bodyText: string = await page.evaluate(() => document.body?.innerText?.slice(0, 8000) ?? "").catch(() => "");
 
-    console.log(`[MaerskDirect] ${containerNumber} DOM[0:400]: ${bodyText.slice(0, 400)}`);
+    logger.info(`[MaerskDirect] ${containerNumber} DOM[0:400]: ${bodyText.slice(0, 400)}`);
 
     // Detect bot-challenge / error pages before attempting DOM ETA extraction
     const isBlocked = /access denied|captcha|bot.challenge|403.forbidden|challenge.required|DataDome|Akamai/i.test(
@@ -644,11 +645,11 @@ export async function scrapeMaerskDirect(containerNumber: string): Promise<Carri
     const isErrorPage = /something went wrong|unexpected error|we.re working to fix/i.test(bodyText.slice(0, 1500));
 
     if (isBlocked) {
-      console.log(`[MaerskDirect] ${containerNumber}: bot challenge / blocked page detected`);
+      logger.info(`[MaerskDirect] ${containerNumber}: bot challenge / blocked page detected`);
       return { ...emptyResult(containerNumber, "bot_challenge"), blocked: true };
     }
     if (isErrorPage) {
-      console.log(
+      logger.info(
         `[MaerskDirect] ${containerNumber}: Maersk error page detected — no tracking data served (bot detection or backend error)`
       );
       return emptyResult(containerNumber, "maersk_error_page");
@@ -674,7 +675,7 @@ export async function scrapeMaerskDirect(containerNumber: string): Promise<Carri
           )
         );
       }
-      console.log(
+      logger.info(
         `[MaerskDirect] ${containerNumber}: DOM label fallback — status=${status ?? "none"} eta=${eta ?? "none"}`
       );
       const fakeEvents: TrackingEvent[] = status
@@ -695,11 +696,11 @@ export async function scrapeMaerskDirect(containerNumber: string): Promise<Carri
       };
     }
 
-    console.log(`[MaerskDirect] ${containerNumber}: no tracking data found — 0 JSON captured, no ETA in DOM`);
+    logger.info(`[MaerskDirect] ${containerNumber}: no tracking data found — 0 JSON captured, no ETA in DOM`);
     return emptyResult(containerNumber, "no_tracking_data_found");
   } catch (err: any) {
     const msg = err?.message ?? String(err);
-    console.error(`[MaerskDirect] ${containerNumber}: unexpected error —`, msg);
+    logger.error(`[MaerskDirect] ${containerNumber}: unexpected error`, { error: msg });
 
     // If the browser crashed mid-scrape, clear the shared instance so next
     // call gets a fresh one
@@ -717,6 +718,6 @@ export async function scrapeMaerskDirect(containerNumber: string): Promise<Carri
       /* ignore */
     }
     release?.();
-    console.log(`[MaerskDirect] ${containerNumber}: Puppeteer slot released`);
+    logger.info(`[MaerskDirect] ${containerNumber}: Puppeteer slot released`);
   }
 }

@@ -8,6 +8,7 @@
  */
 
 import { db } from "../db";
+import { logger } from "../lib/logger";
 import { factoryContainers, factoryContainerTrackingEvents, factoryContainerTrackingChecks } from "../../shared/schema";
 import { and, eq, gte, sql } from "drizzle-orm";
 import {
@@ -151,7 +152,7 @@ async function saveTrackingCheck(
       rawResponseJson: rawResponse as any,
     });
   } catch (err: any) {
-    console.warn("[FactoryTracking] Check record save warn:", err?.message);
+    logger.warn("[FactoryTracking] Check record save warn", { error: err?.message });
   }
 }
 
@@ -172,7 +173,7 @@ async function saveDirectEvents(containerId: number, result: CarrierTrackResult)
         })
         .onConflictDoNothing();
     } catch (err: any) {
-      console.warn("[FactoryTracking] Direct event save warn:", err?.message);
+      logger.warn("[FactoryTracking] Direct event save warn", { error: err?.message });
     }
   }
 }
@@ -200,7 +201,7 @@ async function saveParcelsAppEvents(containerId: number, shipment: ParcelsAppShi
         })
         .onConflictDoNothing();
     } catch (err: any) {
-      console.warn("[FactoryTracking] ParcelsApp event save warn:", err?.message);
+      logger.warn("[FactoryTracking] ParcelsApp event save warn", { error: err?.message });
     }
   }
 }
@@ -218,7 +219,7 @@ async function setSchedulerMeta(
       .set(patch as any)
       .where(eq(factoryContainers.id, containerId));
   } catch (err: any) {
-    console.warn("[FactoryTracking] setSchedulerMeta warn:", err?.message);
+    logger.warn("[FactoryTracking] setSchedulerMeta warn", { error: err?.message });
   }
 }
 
@@ -284,20 +285,20 @@ async function trackOneContainer(
         ep(containerId, "JSON Cargo ETA", "skip", jc.message);
       } else if (jc.status === "updated" || jc.status === "unchanged") {
         ep(containerId, "JSON Cargo ETA", "success", jc.message);
-        console.log(`[FactoryTracking] ${containerNumber}: jsoncargo → ${jc.status} (${jc.message})`);
+        logger.info(`[FactoryTracking] ${containerNumber}: jsoncargo → ${jc.status} (${jc.message})`);
       } else {
         ep(containerId, "JSON Cargo ETA", "fail", jc.message);
-        console.log(`[FactoryTracking] ${containerNumber}: jsoncargo → ${jc.status} (${jc.message})`);
+        logger.info(`[FactoryTracking] ${containerNumber}: jsoncargo → ${jc.status} (${jc.message})`);
       }
     } catch (err: any) {
       ep(containerId, "JSON Cargo ETA", "fail", err?.message ?? "Unexpected error");
-      console.warn(`[FactoryTracking] ${containerNumber}: jsoncargo pre-check error —`, err?.message ?? err);
+      logger.warn(`[FactoryTracking] : jsoncargo pre-check error`, { error: err?.message ?? err });
     }
   }
 
   if (!isValidContainerNumber(containerNumber)) {
     const errMsg = `Invalid container number format: "${containerNumber}" (must be 4 letters + 7 digits)`;
-    console.log(`[FactoryTracking] ${containerNumber}: skipped — ${errMsg}`);
+    logger.info(`[FactoryTracking] ${containerNumber}: skipped — ${errMsg}`);
     await saveTrackingCheck(containerId, "skipped", "invalid_container_number", errMsg, null);
     await db
       .update(factoryContainers)
@@ -341,7 +342,7 @@ async function trackOneContainer(
         .update(factoryContainers)
         .set(updateSet as any)
         .where(eq(factoryContainers.id, containerId));
-      console.log(`[FactoryTracking] ${containerNumber} → ${result.provider}: status=${result.latestStatus ?? "?"}`);
+      logger.info(`[FactoryTracking] ${containerNumber} → ${result.provider}: status=${result.latestStatus ?? "?"}`);
 
       return {
         success: true,
@@ -355,7 +356,7 @@ async function trackOneContainer(
 
     const checkStatus = result.blocked ? "blocked" : result.noData ? "no_data" : "error";
     await saveTrackingCheck(containerId, result.provider, checkStatus, result.error ?? null, null);
-    console.log(`[FactoryTracking] ${containerNumber}: ${result.provider} failed — trying next provider`);
+    logger.info(`[FactoryTracking] ${containerNumber}: ${result.provider} failed — trying next provider`);
     lastDirectFallbackReason = result.provider + "_failed";
   }
 
@@ -406,7 +407,7 @@ async function trackViaParcelsAppFallback(
   }
   ep(containerId, "ParcelsApp API", "running");
   const effectiveHint = manualCarrierHint || (detectedCarrier && detectedCarrier !== "OTHER" ? detectedCarrier : null);
-  console.log(
+  logger.info(
     `[FactoryTracking] ${containerNumber} ParcelsApp fallback: dest=${destinationCountry} hint=${effectiveHint ?? "none"} manualHint=${manualCarrierHint ?? "none"} detected=${detectedCarrier ?? "none"}`
   );
   let result = await trackContainer(containerNumber, destinationCountry, effectiveHint ?? undefined);
@@ -418,7 +419,7 @@ async function trackViaParcelsAppFallback(
     result.rawResponse
   );
   if (result.timedOut && effectiveHint) {
-    console.log(
+    logger.info(
       `[FactoryTracking] ${containerNumber} ParcelsApp fallback timed out with hint="${effectiveHint}" — retrying without hint`
     );
     ep(containerId, "ParcelsApp API (retry no hint)", "running");
@@ -480,7 +481,7 @@ async function trackViaParcelsAppFallback(
     .set(updateSet as any)
     .where(eq(factoryContainers.id, containerId));
   ep(containerId, "ParcelsApp API", "success", lastStatus ?? "got data");
-  console.log(`[FactoryTracking] ${containerNumber} → parcelsapp (CMA fallback): status=${lastStatus ?? "?"}`);
+  logger.info(`[FactoryTracking] ${containerNumber} → parcelsapp (CMA fallback): status=${lastStatus ?? "?"}`);
   return { success: true, lastStatus, lastLocation, lastDescription, lastCheckedAt: now, error: null };
 }
 
@@ -540,7 +541,7 @@ async function trackViaParcelsApp(
         .set(updateSet as any)
         .where(eq(factoryContainers.id, containerId));
       ep(containerId, "HTTP scraper", "success", lastStatus ?? "got data");
-      console.log(`[FactoryTracking] ${containerNumber} → http_scraper: status=${lastStatus ?? "?"}`);
+      logger.info(`[FactoryTracking] ${containerNumber} → http_scraper: status=${lastStatus ?? "?"}`);
       return { success: true, lastStatus, lastLocation, lastDescription, lastCheckedAt: now, error: null };
     }
     ep(containerId, "HTTP scraper", "fail", scraped.error ?? "no data");
@@ -597,7 +598,7 @@ async function trackViaParcelsApp(
           await saveParcelsAppEvents(containerId, fakeShipment);
         }
         ep(containerId, "Maersk Puppeteer", "success", mdResult.latestStatus ?? "got data");
-        console.log(`[FactoryTracking] ${containerNumber} → maersk_scraper: status=${mdResult.latestStatus ?? "?"}`);
+        logger.info(`[FactoryTracking] ${containerNumber} → maersk_scraper: status=${mdResult.latestStatus ?? "?"}`);
         return {
           success: true,
           lastStatus: mdResult.latestStatus,
@@ -643,7 +644,7 @@ async function trackViaParcelsApp(
         .set(updateSet as any)
         .where(eq(factoryContainers.id, containerId));
       ep(containerId, "Maersk public HTTP", "success", mpResult.latestStatus ?? "got data");
-      console.log(`[FactoryTracking] ${containerNumber} → maersk_public: status=${mpResult.latestStatus ?? "?"}`);
+      logger.info(`[FactoryTracking] ${containerNumber} → maersk_public: status=${mpResult.latestStatus ?? "?"}`);
       return {
         success: true,
         lastStatus: mpResult.latestStatus,
@@ -658,13 +659,13 @@ async function trackViaParcelsApp(
       ep(containerId, "Maersk public HTTP", "fail", mpResult.error ?? "no data");
     }
 
-    console.log(`[FactoryTracking] ${containerNumber}: Maersk chain exhausted — falling through to ParcelsApp`);
+    logger.info(`[FactoryTracking] ${containerNumber}: Maersk chain exhausted — falling through to ParcelsApp`);
   }
 
   // ── CMA CGM provider chain ─────────────────────────────────────────────────
   // CMA_PREFIXES already defined above (before the HTTP scraper block).
   if (CMA_PREFIXES.test(containerNumber)) {
-    console.log(`[FactoryTracking] ${containerNumber}: CMA detected — trying carrier-specific providers...`);
+    logger.info(`[FactoryTracking] ${containerNumber}: CMA detected — trying carrier-specific providers...`);
 
     // Step 1: CMA CGM Official DCSA API (needs API key)
     if (cmaCgmApiProvider.isConfigured()) {
@@ -697,7 +698,7 @@ async function trackViaParcelsApp(
           .set(updateSet as any)
           .where(eq(factoryContainers.id, containerId));
         ep(containerId, "CMA CGM API", "success", apiResult.latestStatus ?? "got data");
-        console.log(`[FactoryTracking] ${containerNumber} → cma_cgm_api: status=${apiResult.latestStatus ?? "?"}`);
+        logger.info(`[FactoryTracking] ${containerNumber} → cma_cgm_api: status=${apiResult.latestStatus ?? "?"}`);
         return {
           success: true,
           lastStatus: apiResult.latestStatus,
@@ -708,7 +709,7 @@ async function trackViaParcelsApp(
         };
       }
       ep(containerId, "CMA CGM API", apiResult.noData ? "skip" : "fail", apiResult.error ?? "no data");
-      console.log(`[FactoryTracking] ${containerNumber}: CMA official API returned no data — trying public...`);
+      logger.info(`[FactoryTracking] ${containerNumber}: CMA official API returned no data — trying public...`);
     } else {
       ep(containerId, "CMA CGM API", "skip", "CMA_CGM_API_KEY not configured");
     }
@@ -744,7 +745,7 @@ async function trackViaParcelsApp(
           .set(updateSet as any)
           .where(eq(factoryContainers.id, containerId));
         ep(containerId, "CMA public HTTP", "success", cmaResult.latestStatus ?? "got data");
-        console.log(`[FactoryTracking] ${containerNumber} → cma_public: status=${cmaResult.latestStatus ?? "?"}`);
+        logger.info(`[FactoryTracking] ${containerNumber} → cma_public: status=${cmaResult.latestStatus ?? "?"}`);
         return {
           success: true,
           lastStatus: cmaResult.latestStatus,
@@ -755,7 +756,7 @@ async function trackViaParcelsApp(
         };
       }
       ep(containerId, "CMA public HTTP", cmaResult.blocked ? "blocked" : "fail", cmaResult.error ?? "no data");
-      console.log(`[FactoryTracking] ${containerNumber}: CMA public failed — trying 17track...`);
+      logger.info(`[FactoryTracking] ${containerNumber}: CMA public failed — trying 17track...`);
     } else {
       ep(containerId, "CMA public HTTP", "skip", "not enabled");
     }
@@ -792,7 +793,7 @@ async function trackViaParcelsApp(
             .set(updateSet as any)
             .where(eq(factoryContainers.id, containerId));
           ep(containerId, "17track API (CMA)", "success", result17.latestStatus ?? "got data");
-          console.log(`[FactoryTracking] ${containerNumber} → 17track (CMA): status=${result17.latestStatus ?? "?"}`);
+          logger.info(`[FactoryTracking] ${containerNumber} → 17track (CMA): status=${result17.latestStatus ?? "?"}`);
           return {
             success: true,
             lastStatus: result17.latestStatus,
@@ -833,7 +834,7 @@ async function trackViaParcelsApp(
     cmaCgmApiProvider.isConfigured()
   ) {
     ep(containerId, "CMA CGM API", "running", "checking if container is on a CMA ship");
-    console.log(`[FactoryTracking] ${containerNumber}: trying CMA CGM API (leasing/unknown carrier)...`);
+    logger.info(`[FactoryTracking] ${containerNumber}: trying CMA CGM API (leasing/unknown carrier)...`);
     const cmaFallResult = await cmaCgmApiProvider.track(containerNumber);
     await saveTrackingCheck(
       containerId,
@@ -861,7 +862,7 @@ async function trackViaParcelsApp(
         .set(updateSet as any)
         .where(eq(factoryContainers.id, containerId));
       ep(containerId, "CMA CGM API", "success", cmaFallResult.latestStatus ?? "got data");
-      console.log(
+      logger.info(
         `[FactoryTracking] ${containerNumber} → cma_cgm_api (leasing): status=${cmaFallResult.latestStatus ?? "?"}`
       );
       return {
@@ -874,7 +875,7 @@ async function trackViaParcelsApp(
       };
     }
     ep(containerId, "CMA CGM API", cmaFallResult.noData ? "skip" : "fail", cmaFallResult.error ?? "not on CMA ship");
-    console.log(
+    logger.info(
       `[FactoryTracking] ${containerNumber}: CMA API — not on CMA ship (${cmaFallResult.error ?? "no data"}) — proceeding`
     );
   }
@@ -908,7 +909,7 @@ async function trackViaParcelsApp(
         .set(updateSet as any)
         .where(eq(factoryContainers.id, containerId));
       ep(containerId, "Puppeteer scraper", "success", lastStatus ?? "got data");
-      console.log(`[FactoryTracking] ${containerNumber} → parcelsapp_scraper: status=${lastStatus ?? "?"}`);
+      logger.info(`[FactoryTracking] ${containerNumber} → parcelsapp_scraper: status=${lastStatus ?? "?"}`);
       return { success: true, lastStatus, lastLocation, lastDescription, lastCheckedAt: now, error: null };
     }
     ep(containerId, "Puppeteer scraper", scraped.blocked ? "blocked" : "fail", scraped.error ?? "no data");
@@ -947,7 +948,7 @@ async function trackViaParcelsApp(
           .set(updateSet as any)
           .where(eq(factoryContainers.id, containerId));
         ep(containerId, "17track API", "success", result17.latestStatus ?? "got data");
-        console.log(`[FactoryTracking] ${containerNumber} → 17track: status=${result17.latestStatus ?? "?"}`);
+        logger.info(`[FactoryTracking] ${containerNumber} → 17track: status=${result17.latestStatus ?? "?"}`);
         return {
           success: true,
           lastStatus: result17.latestStatus,
@@ -983,7 +984,7 @@ async function trackViaParcelsApp(
   ep(containerId, "ParcelsApp API", "running");
   const effectiveHintMain =
     manualCarrierHint || (detectedCarrier && detectedCarrier !== "OTHER" ? detectedCarrier : null);
-  console.log(
+  logger.info(
     `[FactoryTracking] ${containerNumber} ParcelsApp: dest=${destinationCountry} hint=${effectiveHintMain ?? "none"} manualHint=${manualCarrierHint ?? "none"} detected=${detectedCarrier ?? "none"}`
   );
   let result = await trackContainer(containerNumber, destinationCountry, effectiveHintMain ?? undefined);
@@ -997,7 +998,7 @@ async function trackViaParcelsApp(
   );
 
   if (result.timedOut && effectiveHintMain) {
-    console.log(
+    logger.info(
       `[FactoryTracking] ${containerNumber} ParcelsApp timed out with hint="${effectiveHintMain}" — retrying without hint`
     );
     ep(containerId, "ParcelsApp API (retry no hint)", "running");
@@ -1063,7 +1064,7 @@ async function trackViaParcelsApp(
     .where(eq(factoryContainers.id, containerId));
 
   ep(containerId, "ParcelsApp API", "success", lastStatus ?? "got data");
-  console.log(`[FactoryTracking] ${containerNumber} → parcelsapp: status=${lastStatus ?? "?"}`);
+  logger.info(`[FactoryTracking] ${containerNumber} → parcelsapp: status=${lastStatus ?? "?"}`);
   return { success: true, lastStatus, lastLocation, lastDescription, lastCheckedAt: now, error: null };
 }
 
@@ -1132,7 +1133,7 @@ export async function trackOneFactoryContainerById(containerId: number): Promise
     const trackStartedAt = new Date();
     const destinationCountry = row.destination || "Congo";
     const manualCarrierHint = row.trackingCarrierHint ?? null;
-    console.log(
+    logger.info(
       `[FactoryTracking] trackOneFactoryContainerById: container=${row.containerNumber} dest="${destinationCountry}" manualHint=${manualCarrierHint ?? "none"}`
     );
 
@@ -1183,10 +1184,10 @@ export async function trackOneFactoryContainerById(containerId: number): Promise
 }
 
 export async function trackDueFactoryContainers(): Promise<void> {
-  console.log("[FactoryTracking] Starting auto-tracking run...");
+  logger.info("[FactoryTracking] Starting auto-tracking run...");
 
   if (!anyProviderConfigured()) {
-    console.log("[FactoryTracking] No tracking providers configured — skipping.");
+    logger.info("[FactoryTracking] No tracking providers configured — skipping.");
     return;
   }
 
@@ -1216,12 +1217,12 @@ export async function trackDueFactoryContainers(): Promise<void> {
       .from(factoryContainers)
       .where(and(eq(factoryContainers.trackingEnabled, true), activeStatusFilter));
   } catch (err: any) {
-    console.error("[FactoryTracking] Failed to fetch containers:", err?.message);
+    logger.error("[FactoryTracking] Failed to fetch containers", { error: err?.message });
     return;
   }
 
   if (rows.length === 0) {
-    console.log("[FactoryTracking] No active tracking-enabled factory containers.");
+    logger.info("[FactoryTracking] No active tracking-enabled factory containers.");
     return;
   }
 
@@ -1236,7 +1237,7 @@ export async function trackDueFactoryContainers(): Promise<void> {
     return true;
   });
 
-  console.log(`[FactoryTracking] ${eligible.length} of ${rows.length} factory containers eligible for auto-tracking.`);
+  logger.info(`[FactoryTracking] ${eligible.length} of ${rows.length} factory containers eligible for auto-tracking.`);
 
   for (const row of eligible) {
     try {
@@ -1245,11 +1246,11 @@ export async function trackDueFactoryContainers(): Promise<void> {
       await trackOneContainer(row.id, row.containerNumber, destCountry, carrierHint);
       await new Promise((resolve) => setTimeout(resolve, 2000));
     } catch (err: any) {
-      console.error(`[FactoryTracking] Error tracking ${row.containerNumber}:`, err?.message);
+      logger.error(`[FactoryTracking] Error tracking `, { error: err?.message });
     }
   }
 
-  console.log("[FactoryTracking] Auto-tracking run complete.");
+  logger.info("[FactoryTracking] Auto-tracking run complete.");
 }
 
 export async function updateFactoryContainerTrackingSettings(
