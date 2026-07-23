@@ -1,4 +1,5 @@
 import { getClientDate } from "../../lib/dateUtils";
+import { logger } from "../../lib/logger";
 import type { Express } from "express";
 import { db } from "../../db";
 import { sanitiseFilename, contentDisposition } from "../../lib/contentDisposition";
@@ -307,7 +308,7 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
             if (!fsLib.existsSync(uploadDir)) fsLib.mkdirSync(uploadDir, { recursive: true });
             fsLib.writeFileSync(pathLib.default.join(uploadDir, generatedFilename), req.file.buffer);
           } catch (diskErr) {
-            console.warn("Container doc disk cache write failed (non-fatal):", diskErr);
+            logger.warn("Container doc disk cache write failed (non-fatal):", { error: diskErr });
           }
 
           const [doc] = await db
@@ -353,7 +354,7 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
 
           res.json(doc);
         } catch (innerErr: any) {
-          console.error("Error uploading container document:", innerErr);
+          logger.error("Error uploading container document:", { error: innerErr });
           res.status(500).json({ message: innerErr.message });
         }
       });
@@ -863,7 +864,7 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
 
       res.json(updated);
     } catch (error: any) {
-      console.error("Error editing daybook entry:", error);
+      logger.error("Error editing daybook entry:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -1144,7 +1145,7 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
         message: `Cost updated. New inclusive cost: ${updatedContainer?.ratePerKgUsd ?? "?"}/kg`,
       });
     } catch (error: any) {
-      console.error("Error in daybook cost-edit:", error);
+      logger.error("Error in daybook cost-edit:", { error: error });
       const status = error?.name === "UnresolvedExchangeRateError" ? 400 : 500;
       res.status(status).json({ message: error.message });
     }
@@ -1395,7 +1396,7 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
 
       res.json({ message: "Voucher voided successfully", voucherId });
     } catch (error: any) {
-      console.error("Error voiding voucher:", error);
+      logger.error("Error voiding voucher:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -1464,7 +1465,7 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
 
       res.json(result);
     } catch (error: any) {
-      console.error("Error fetching factory users:", error);
+      logger.error("Error fetching factory users:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -1537,7 +1538,7 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
         });
       });
     } catch (error: any) {
-      console.error("Error creating factory user:", error);
+      logger.error("Error creating factory user:", { error: error });
       res.status(400).json({ message: error.message });
     }
   });
@@ -1630,7 +1631,7 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
 
       res.json({ message: "User updated" });
     } catch (error: any) {
-      console.error("Error updating factory user:", error);
+      logger.error("Error updating factory user:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -1656,7 +1657,7 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
       });
       res.json({ message: "User removed successfully" });
     } catch (error: any) {
-      console.error("Error deleting factory user:", error);
+      logger.error("Error deleting factory user:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -1822,7 +1823,7 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
         companyName,
       });
     } catch (error: any) {
-      console.error("Error fetching my access:", error);
+      logger.error("Error fetching my access:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -2222,7 +2223,7 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
       );
       res.send(jsonStr);
     } catch (error: any) {
-      console.error("Export company data error:", error);
+      logger.error("Export company data error:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -2938,12 +2939,12 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
             details: summary,
           });
         } catch (importError: any) {
-          console.error("Import company data error:", importError);
+          logger.error("Import company data error:", { error: importError });
           res.status(500).json({ message: "Import failed: " + importError.message });
         }
       });
     } catch (error: any) {
-      console.error("Import company data error:", error);
+      logger.error("Import company data error:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });

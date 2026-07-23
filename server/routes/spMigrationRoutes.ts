@@ -13,6 +13,7 @@
  */
 
 import type { Express } from "express";
+import { logger } from "../lib/logger";
 import { db } from "../db";
 import { sql } from "drizzle-orm";
 import { requireAuth, requireRole } from "../auth";
@@ -579,7 +580,7 @@ export function registerSpMigrationRoutes(app: Express) {
       const { status, body } = await buildGcMigrationPreview(sourceId, targetId);
       return res.status(status).json(body);
     } catch (err: any) {
-      console.error("[SP Migration] preview error:", err);
+      logger.error("[SP Migration] preview error:", { error: err });
       return res.status(500).json({ message: "Internal server error" });
     }
   });
@@ -750,7 +751,7 @@ export function registerSpMigrationRoutes(app: Express) {
           }
 
           if (!verified) {
-            console.warn(`[SP Rollback] Skipped ${tbl} id=${id} — company_id mismatch or row not found`);
+            logger.warn(`[SP Rollback] Skipped ${tbl} id=${id} — company_id mismatch or row not found`);
             continue;
           }
 
@@ -798,7 +799,7 @@ export function registerSpMigrationRoutes(app: Express) {
 
       return res.json({ success: true, runId, rowsDeleted: deleted });
     } catch (err: any) {
-      console.error("[SP Migration] rollback error:", err);
+      logger.error("[SP Migration] rollback error:", { error: err });
       return res.status(500).json({ message: "Internal server error" });
     }
   });
@@ -828,7 +829,7 @@ export function registerSpMigrationRoutes(app: Express) {
 
         return res.json({ success: true, company: row });
       } catch (err: any) {
-        console.error("[SP Migration] create-sp-company error:", err);
+        logger.error("[SP Migration] create-sp-company error:", { error: err });
         return res.status(500).json({ message: "Internal server error" });
       }
     }
@@ -849,7 +850,7 @@ export function registerSpMigrationRoutes(app: Express) {
       const { status, body } = await buildGcMigrationPreview(sourceId, targetId);
       return res.status(status).json(body);
     } catch (err: any) {
-      console.error("[SP Migration] gc-preview error:", err);
+      logger.error("[SP Migration] gc-preview error:", { error: err });
       return res.status(500).json({ message: "Internal server error" });
     }
   });
@@ -905,7 +906,7 @@ export function registerSpMigrationRoutes(app: Express) {
 
       return res.json({ accounts });
     } catch (err: any) {
-      console.error("[SP Migration] gc-account-plan error:", err);
+      logger.error("[SP Migration] gc-account-plan error:", { error: err });
       return res.status(500).json({ message: "Internal server error" });
     }
   });
@@ -969,7 +970,7 @@ export function registerSpMigrationRoutes(app: Express) {
           createdCount: allNewIds.length,
         });
       } catch (err: any) {
-        console.error("[SP Migration] gc-create-accounts error:", err);
+        logger.error("[SP Migration] gc-create-accounts error:", { error: err });
         return res.status(500).json({ message: "Internal server error" });
       }
     }
@@ -1082,7 +1083,7 @@ export function registerSpMigrationRoutes(app: Express) {
 
         return res.json({ success: true, voucherId, voucherNumber, amount: amtStr, cashAccountName: cashAcctRow.name });
       } catch (err: any) {
-        console.error("[SP Migration] opening-balance error:", err);
+        logger.error("[SP Migration] opening-balance error:", { error: err });
         return res.status(500).json({ message: "Internal server error" });
       }
     }
@@ -1214,7 +1215,7 @@ export function registerSpMigrationRoutes(app: Express) {
             sql`UPDATE sp_migration_rehearsal_runs SET status = 'failed', error_message = ${err.message}, completed_at = now() WHERE id = ${runId}`
           )
           .catch(() => {});
-        console.error("[SP Migration] gc-stock-master error:", err);
+        logger.error("[SP Migration] gc-stock-master error:", { error: err });
         return res.status(500).json({ message: "Stock master migration failed", runId });
       }
     }
@@ -1432,7 +1433,7 @@ export function registerSpMigrationRoutes(app: Express) {
             sql`UPDATE sp_migration_rehearsal_runs SET status = 'failed', error_message = ${err.message}, completed_at = now() WHERE id = ${runId}`
           )
           .catch(() => {});
-        console.error("[SP Migration] gc-stock-opening error:", {
+        logger.error("[SP Migration] gc-stock-opening error:", {
           sourceCompanyId: sourceId,
           targetCompanyId: targetId,
           runId,
@@ -1673,7 +1674,7 @@ export function registerSpMigrationRoutes(app: Express) {
             sql`UPDATE sp_migration_rehearsal_runs SET status = 'failed', error_message = ${err.message}, completed_at = now() WHERE id = ${runId}`
           )
           .catch(() => {});
-        console.error("[SP Migration] gc-sales-readonly error:", {
+        logger.error("[SP Migration] gc-sales-readonly error:", {
           sourceCompanyId: sourceId,
           targetCompanyId: targetId,
           runId,
@@ -1925,7 +1926,7 @@ export function registerSpMigrationRoutes(app: Express) {
           sql`UPDATE sp_migration_rehearsal_runs SET status = 'failed', error_message = ${err.message}, completed_at = now() WHERE id = ${runId}`
         )
         .catch(() => {});
-      console.error("[SP Migration] gc-containers error:", {
+      logger.error("[SP Migration] gc-containers error:", {
         sourceCompanyId: sourceId,
         targetCompanyId: targetId,
         runId,
@@ -2099,7 +2100,7 @@ export function registerSpMigrationRoutes(app: Express) {
           ourSplitPct: ourPct,
         });
       } catch (err: any) {
-        console.error("[SP Migration] gc-profit-opening error:", err);
+        logger.error("[SP Migration] gc-profit-opening error:", { error: err });
         return res.status(500).json({ message: "Internal server error" });
       }
     }
@@ -2329,7 +2330,7 @@ export function registerSpMigrationRoutes(app: Express) {
 
         return res.json({ overall, areas, partialMigrationWarning });
       } catch (err: any) {
-        console.error("[SP Migration] gc-reconciliation error:", err);
+        logger.error("[SP Migration] gc-reconciliation error:", { error: err });
         return res.status(500).json({ message: "Internal server error" });
       }
     }

@@ -19,6 +19,7 @@
  */
 
 import { existsSync } from "fs";
+import { logger } from "./logger";
 import { execSync } from "child_process";
 import { createRequire } from "module";
 import type { ParcelsAppShipment } from "./parcelsAppClient";
@@ -95,7 +96,7 @@ export async function ensureChromiumInstalled(): Promise<void> {
   // blocking the server from accepting requests. If Chrome is not pre-installed
   // via the build or PUPPETEER_EXECUTABLE_PATH, the scraper is simply disabled.
   if (process.env.NODE_ENV === "production") {
-    console.log(
+    logger.info(
       "[Puppeteer] Production environment — skipping Chrome download. " +
       "Scraper will be disabled. Set PUPPETEER_EXECUTABLE_PATH to enable it."
     );
@@ -105,7 +106,7 @@ export async function ensureChromiumInstalled(): Promise<void> {
   try {
     _require.resolve("puppeteer");
   } catch {
-    console.log("[Puppeteer] puppeteer package not found — skipping Chrome download.");
+    logger.info("[Puppeteer] puppeteer package not found — skipping Chrome download.");
     return;
   }
 
@@ -114,19 +115,19 @@ export async function ensureChromiumInstalled(): Promise<void> {
     const p: string = typeof puppeteer.executablePath === "function" ? puppeteer.executablePath() : "";
     if (p && existsSync(p)) return;
 
-    console.log("[Puppeteer] Chrome not found — downloading…");
+    logger.info("[Puppeteer] Chrome not found — downloading…");
     execSync("npx puppeteer browsers install chrome", {
       stdio: "inherit",
       timeout: 300_000,
     });
     const chromePath = getChromiumPath();
     if (chromePath && existsSync(chromePath)) {
-      console.log("[Puppeteer] Chrome download complete — scraper ready.");
+      logger.info("[Puppeteer] Chrome download complete — scraper ready.");
     } else {
-      console.warn("[Puppeteer] Chrome still not found after download — scraper unavailable.");
+      logger.warn("[Puppeteer] Chrome still not found after download — scraper unavailable.");
     }
   } catch (err: any) {
-    console.warn("[Puppeteer] Chrome setup error:", err?.message ?? err);
+    logger.warn("[Puppeteer] Chrome setup error:", { error: err?.message ?? err });
   }
 }
 
@@ -146,7 +147,7 @@ async function getSharedBrowser(): Promise<any> {
       await _sharedBrowser.pages(); // lightweight liveness check
       return _sharedBrowser;
     } catch {
-      console.warn("[ParcelsAppScraper] Shared browser disconnected — relaunching");
+      logger.warn("[ParcelsAppScraper] Shared browser disconnected — relaunching");
       _sharedBrowser = null;
     }
   }
@@ -159,7 +160,7 @@ async function getSharedBrowser(): Promise<any> {
   }
 
   const chromePath = getChromiumPath();
-  console.log("[ParcelsAppScraper] Launching shared Chrome instance…");
+  logger.info("[ParcelsAppScraper] Launching shared Chrome instance…");
   _sharedBrowser = await puppeteerExtra.launch({
     headless: true,
     ...(chromePath ? { executablePath: chromePath } : {}),
@@ -201,11 +202,11 @@ async function getSharedBrowser(): Promise<any> {
   });
 
   _sharedBrowser.on("disconnected", () => {
-    console.warn("[ParcelsAppScraper] Shared browser disconnected (crash or killed)");
+    logger.warn("[ParcelsAppScraper] Shared browser disconnected (crash or killed)");
     _sharedBrowser = null;
   });
 
-  console.log("[ParcelsAppScraper] Shared Chrome instance ready");
+  logger.info("[ParcelsAppScraper] Shared Chrome instance ready");
   return _sharedBrowser;
 }
 
@@ -218,22 +219,22 @@ export async function scrapeTracking(containerNumber: string): Promise<ScraperRe
 
   // Acquire global slot — ensures at most 1 Puppeteer operation server-wide.
   // Rejects immediately with PUPPETEER_QUEUE_FULL when too many callers are waiting.
-  console.log(`[ParcelsAppScraper] ${containerNumber}: waiting for Puppeteer slot…`);
+  logger.info(`[ParcelsAppScraper] ${containerNumber}: waiting for Puppeteer slot…`);
   let release: (() => void) | null = null;
   try {
     release = await acquirePuppeteerSlot();
   } catch (err: any) {
     if (err?.message === "PUPPETEER_QUEUE_FULL") {
-      console.warn(`[ParcelsAppScraper] ${containerNumber}: Puppeteer queue full — skipping (server busy)`);
+      logger.warn(`[ParcelsAppScraper] ${containerNumber}: Puppeteer queue full — skipping (server busy)`);
       return { success: false, shipment: null, blocked: false, error: "PUPPETEER_QUEUE_FULL" };
     }
     throw err;
   }
-  console.log(`[ParcelsAppScraper] ${containerNumber}: Puppeteer slot acquired`);
+  logger.info(`[ParcelsAppScraper] ${containerNumber}: Puppeteer slot acquired`);
 
   let page: any = null;
   const hardStop = setTimeout(() => {
-    console.warn(`[ParcelsAppScraper] ${containerNumber}: hard timeout — closing page`);
+    logger.warn(`[ParcelsAppScraper] ${containerNumber}: hard timeout — closing page`);
     try {
       page?.close();
     } catch {

@@ -1,4 +1,5 @@
 import { logAudit } from "./helpers/auditHelpers";
+import { logger } from "../lib/logger";
 import { parseId, parseOptionalId } from "../lib/parseId";
 import { getClientDate } from "../lib/dateUtils";
 import type { Express } from "express";
@@ -361,12 +362,12 @@ export function registerFactoryPayrollRoutes(app: Express, requireAuth: any, db:
           changes: null,
         });
       } catch (auditErr) {
-        console.error("[payroll generate audit] non-fatal:", auditErr);
+        logger.error("[payroll generate audit] non-fatal:", { error: auditErr });
       }
 
       res.json(payrollRecords);
     } catch (error: any) {
-      console.error("Error generating payroll:", error);
+      logger.error("Error generating payroll:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -410,7 +411,7 @@ export function registerFactoryPayrollRoutes(app: Express, requireAuth: any, db:
 
       res.json(formatted);
     } catch (error: any) {
-      console.error("Error fetching payroll:", error);
+      logger.error("Error fetching payroll:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -571,12 +572,12 @@ export function registerFactoryPayrollRoutes(app: Express, requireAuth: any, db:
           },
         });
       } catch (auditErr) {
-        console.error("[payroll update audit] non-fatal:", auditErr);
+        logger.error("[payroll update audit] non-fatal:", { error: auditErr });
       }
 
       res.json(updated);
     } catch (error: any) {
-      console.error("Error updating payroll:", error);
+      logger.error("Error updating payroll:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -686,7 +687,7 @@ export function registerFactoryPayrollRoutes(app: Express, requireAuth: any, db:
 
       res.json({ message: "Payroll undone successfully", previousStatus: existing.status });
     } catch (error: any) {
-      console.error("Error undoing payroll:", error);
+      logger.error("Error undoing payroll:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -782,12 +783,12 @@ export function registerFactoryPayrollRoutes(app: Express, requireAuth: any, db:
           changes: { status: { old: existing.status, new: "DELETED" } },
         });
       } catch (auditErr) {
-        console.error("[payroll delete audit] non-fatal:", auditErr);
+        logger.error("[payroll delete audit] non-fatal:", { error: auditErr });
       }
 
       res.json({ message: "Payroll record deleted" });
     } catch (error: any) {
-      console.error("Error deleting payroll:", error);
+      logger.error("Error deleting payroll:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -836,7 +837,7 @@ export function registerFactoryPayrollRoutes(app: Express, requireAuth: any, db:
           changes: null,
         });
       } catch (auditErr) {
-        console.error("[payroll export-pdf audit] non-fatal:", auditErr);
+        logger.error("[payroll export-pdf audit] non-fatal:", { error: auditErr });
       }
       doc.pipe(res);
 
@@ -955,7 +956,7 @@ export function registerFactoryPayrollRoutes(app: Express, requireAuth: any, db:
 
       doc.end();
     } catch (error: any) {
-      console.error("Error exporting payroll PDF:", error);
+      logger.error("Error exporting payroll PDF:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -1184,14 +1185,14 @@ export function registerFactoryPayrollRoutes(app: Express, requireAuth: any, db:
           changes: null,
         });
       } catch (auditErr) {
-        console.error("[payroll export-excel audit] non-fatal:", auditErr);
+        logger.error("[payroll export-excel audit] non-fatal:", { error: auditErr });
       }
       res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
       res.setHeader("Content-Disposition", `attachment; filename=payroll_${startDate}_${endDate}.xlsx`);
       res.setHeader("Content-Length", xlsBuffer.byteLength);
       res.end(xlsBuffer);
     } catch (error: any) {
-      console.error("Error exporting payroll Excel:", error);
+      logger.error("Error exporting payroll Excel:", { error: error });
       if (!res.headersSent) res.status(500).json({ message: error.message });
     }
   });

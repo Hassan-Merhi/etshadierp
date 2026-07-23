@@ -6,6 +6,7 @@
  * behaviour is unchanged.
  */
 import type { Express } from "express";
+import { logger } from "../lib/logger";
 import { and, eq, sql } from "drizzle-orm";
 import { db } from "../db";
 import { storage } from "../storage";
@@ -31,7 +32,7 @@ export function registerBaleProductRoutes(app: Express) {
       const barcodes = await storage.getAllPendingBarcodes(companyId);
       res.json(barcodes);
     } catch (error: any) {
-      console.error("Error fetching pending barcodes:", error);
+      logger.error("Error fetching pending barcodes:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -48,7 +49,7 @@ export function registerBaleProductRoutes(app: Express) {
       }
       res.json(barcode);
     } catch (error: any) {
-      console.error("Error fetching pending barcode:", error);
+      logger.error("Error fetching pending barcode:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -63,7 +64,7 @@ export function registerBaleProductRoutes(app: Express) {
       const barcode = await storage.createPendingBarcode(data);
       res.json(barcode);
     } catch (error: any) {
-      console.error("Error creating pending barcode:", error);
+      logger.error("Error creating pending barcode:", { error: error });
       res.status(400).json({ message: error.message });
     }
   });
@@ -91,7 +92,7 @@ export function registerBaleProductRoutes(app: Express) {
       );
       res.json({ success: true, count: created.length, barcodes: created });
     } catch (error: any) {
-      console.error("Error importing pending barcodes:", error);
+      logger.error("Error importing pending barcodes:", { error: error });
       res.status(400).json({ message: error.message });
     }
   });
@@ -103,7 +104,7 @@ export function registerBaleProductRoutes(app: Express) {
       const barcode = await storage.updatePendingBarcode(id, req.body);
       res.json(barcode);
     } catch (error: any) {
-      console.error("Error updating pending barcode:", error);
+      logger.error("Error updating pending barcode:", { error: error });
       res.status(400).json({ message: error.message });
     }
   });
@@ -117,7 +118,7 @@ export function registerBaleProductRoutes(app: Express) {
       await storage.markBarcodesAsPrinted(ids);
       res.json({ success: true });
     } catch (error: any) {
-      console.error("Error marking barcodes as printed:", error);
+      logger.error("Error marking barcodes as printed:", { error: error });
       res.status(400).json({ message: error.message });
     }
   });
@@ -129,7 +130,7 @@ export function registerBaleProductRoutes(app: Express) {
       await storage.deletePendingBarcode(_bid);
       res.status(204).send();
     } catch (error: any) {
-      console.error("Error deleting pending barcode:", error);
+      logger.error("Error deleting pending barcode:", { error: error });
       res.status(400).json({ message: error.message });
     }
   });
@@ -196,7 +197,7 @@ export function registerBaleProductRoutes(app: Express) {
       const products = await storage.getAllBaleProducts(companyId);
       res.json(products);
     } catch (error: any) {
-      console.error("Error fetching bale products:", error);
+      logger.error("Error fetching bale products:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -215,7 +216,7 @@ export function registerBaleProductRoutes(app: Express) {
 
       res.json(product);
     } catch (error: any) {
-      console.error("Error fetching bale product:", error);
+      logger.error("Error fetching bale product:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -251,7 +252,7 @@ export function registerBaleProductRoutes(app: Express) {
       const product = await storage.createBaleProduct(data);
       res.json(product);
     } catch (error: any) {
-      console.error("Error creating bale product:", error);
+      logger.error("Error creating bale product:", { error: error });
       res.status(400).json({ message: error.message });
     }
   });
@@ -281,7 +282,7 @@ export function registerBaleProductRoutes(app: Express) {
       const product = await storage.updateBaleProduct(id, data);
       res.json(product);
     } catch (error: any) {
-      console.error("Error updating bale product:", error);
+      logger.error("Error updating bale product:", { error: error });
       res.status(400).json({ message: error.message });
     }
   });
@@ -310,7 +311,7 @@ export function registerBaleProductRoutes(app: Express) {
       await storage.deleteBaleProduct(id);
       res.json({ success: true });
     } catch (error: any) {
-      console.error("Error deleting bale product:", error);
+      logger.error("Error deleting bale product:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -423,7 +424,7 @@ export function registerBaleProductRoutes(app: Express) {
 
       res.json({ success: true, created, updated, categoriesCreated, count: created + updated });
     } catch (error: any) {
-      console.error("Error importing bale products from Excel:", error);
+      logger.error("Error importing bale products from Excel:", { error: error });
       res.status(400).json({ message: error.message });
     }
   });
