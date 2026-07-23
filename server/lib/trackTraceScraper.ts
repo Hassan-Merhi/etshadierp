@@ -13,6 +13,7 @@
  */
 
 import { existsSync } from "fs";
+import { logger } from "./logger";
 import { execSync } from "child_process";
 import { createRequire } from "module";
 import type { ParcelsAppShipment } from "./parcelsAppClient";
@@ -205,18 +206,18 @@ export async function scrapeTrackTrace(containerNumber: string): Promise<TrackTr
     // track-trace.com reads window.location.hash on load and runs the search.
     // networkidle2 waits until the AJAX tracking call completes (≤2 open reqs).
     const hashUrl = `https://www.track-trace.com/container#${encodeURIComponent(containerNumber)}`;
-    console.log(`[TrackTrace] Navigating to ${hashUrl}`);
+    logger.info(`[TrackTrace] Navigating to ${hashUrl}`);
     try {
       await page.goto(hashUrl, { waitUntil: "networkidle2", timeout: NAV_TIMEOUT_MS });
     } catch {
-      console.log(`[TrackTrace] networkidle2 timed out — continuing with what loaded`);
+      logger.info(`[TrackTrace] networkidle2 timed out — continuing with what loaded`);
     }
 
     // ── Step 2: wait for hash-based pre-fill, then submit via evaluate() ────────
     // track-trace.com reads the hash and pre-fills the input but does NOT
     // auto-submit. We wait 4 s for the JS to settle, then click submit entirely
     // inside page.evaluate() — returns a plain boolean, holds zero frame refs.
-    console.log(`[TrackTrace] Waiting 4 s for hash pre-fill…`);
+    logger.info(`[TrackTrace] Waiting 4 s for hash pre-fill…`);
     await new Promise((r) => setTimeout(r, 4_000));
 
     // Set up new-tab listener BEFORE clicking — "Track direct" opens a popup/tab
@@ -286,15 +287,15 @@ export async function scrapeTrackTrace(containerNumber: string): Promise<TrackTr
       }, containerNumber)
       .catch(() => ({ directHref: null, formAction: null, inputValue: null }));
 
-    console.log(`[TrackTrace] pageInfo:`, JSON.stringify(pageInfo));
+    logger.info(`[TrackTrace] pageInfo`, { pageInfo });
 
     // Navigate directly to the results URL if we have one; otherwise form-submit
     if (pageInfo.directHref && pageInfo.directHref !== page.url()) {
-      console.log(`[TrackTrace] Navigating directly to: ${pageInfo.directHref}`);
+      logger.info(`[TrackTrace] Navigating directly to: ${pageInfo.directHref}`);
       try {
         await page.goto(pageInfo.directHref, { waitUntil: "networkidle2", timeout: NAV_TIMEOUT_MS });
       } catch {
-        console.log(`[TrackTrace] Direct nav networkidle2 timed out — continuing`);
+        logger.info(`[TrackTrace] Direct nav networkidle2 timed out — continuing`);
       }
     } else {
       // Fall back: click/submit via evaluate()
@@ -320,13 +321,13 @@ export async function scrapeTrackTrace(containerNumber: string): Promise<TrackTr
           return "no_submit_found";
         }, containerNumber)
         .catch(() => "evaluate_error");
-      console.log(`[TrackTrace] Submit fallback: ${submitResult}`);
+      logger.info(`[TrackTrace] Submit fallback: ${submitResult}`);
     }
 
     // Wait for new tab OR try reading iframe contentDocument (same-origin about:blank)
-    console.log(`[TrackTrace] Waiting for new tab or iframe content (up to 12 s)…`);
+    logger.info(`[TrackTrace] Waiting for new tab or iframe content (up to 12 s)…`);
     newTabUrl = await newTabPromise;
-    console.log(`[TrackTrace] New tab URL: ${newTabUrl ?? "none"}`);
+    logger.info(`[TrackTrace] New tab URL: ${newTabUrl ?? "none"}`);
 
     // Also try reading iframe contentDocument — works if track-trace writes
     // content into about:blank iframes via document.write() (same-origin)
@@ -342,15 +343,15 @@ export async function scrapeTrackTrace(containerNumber: string): Promise<TrackTr
       )
       .catch(() => [] as string[]);
     const iframeContent = iframeTexts.filter((t) => t && t !== "cross-origin" && t.trim().length > 20).join("\n");
-    if (iframeContent) console.log(`[TrackTrace] Iframe content found: ${iframeContent.slice(0, 300)}`);
+    if (iframeContent) logger.info(`[TrackTrace] Iframe content found: ${iframeContent.slice(0, 300)}`);
 
     if (newTabUrl) {
       // Navigate main page to the carrier URL that opened in the new tab
-      console.log(`[TrackTrace] Following new tab → ${newTabUrl}`);
+      logger.info(`[TrackTrace] Following new tab → ${newTabUrl}`);
       try {
         await page.goto(newTabUrl, { waitUntil: "networkidle2", timeout: NAV_TIMEOUT_MS });
       } catch {
-        console.log(`[TrackTrace] Carrier page nav timed out — continuing`);
+        logger.info(`[TrackTrace] Carrier page nav timed out — continuing`);
       }
       await new Promise((r) => setTimeout(r, 6_000));
     } else if (!iframeContent) {
@@ -370,8 +371,8 @@ export async function scrapeTrackTrace(containerNumber: string): Promise<TrackTr
       .evaluate(() => document.documentElement?.innerHTML?.slice(0, 8000) ?? "")
       .catch(() => "");
 
-    console.log(`[TrackTrace] url=${finalUrl}`);
-    console.log(`[TrackTrace] ${containerNumber} body[0:400]: ${debugBodyText.slice(0, 400)}`);
+    logger.info(`[TrackTrace] url=${finalUrl}`);
+    logger.info(`[TrackTrace] ${containerNumber} body[0:400]: ${debugBodyText.slice(0, 400)}`);
 
     // ── Step 4: extract tracking data from the rendered page ──────────────────
     const extracted = await page
@@ -459,7 +460,7 @@ export async function scrapeTrackTrace(containerNumber: string): Promise<TrackTr
         pageTitle: "",
       }));
 
-    console.log(
+    logger.info(
       `[TrackTrace] ${containerNumber}: status="${extracted.bestStatus ?? "none"}" ` +
         `eta="${extracted.bestEta ?? "none"}" location="${extracted.bestLocation ?? "none"}"`
     );
@@ -509,7 +510,7 @@ export async function scrapeTrackTrace(containerNumber: string): Promise<TrackTr
     };
   } catch (err: any) {
     const msg = err?.message ?? String(err);
-    console.error(`[TrackTrace] ${containerNumber}: unexpected error —`, msg);
+    logger.error(`[TrackTrace] ${containerNumber}: unexpected error —`, { error: msg });
     return {
       success: false,
       shipment: null,
