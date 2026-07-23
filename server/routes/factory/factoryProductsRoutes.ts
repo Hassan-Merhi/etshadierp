@@ -1,4 +1,5 @@
 import { parseId, parseOptionalId } from "../../lib/parseId";
+import { logger } from "../../lib/logger";
 import { getClientDate } from "../../lib/dateUtils";
 import type { Express } from "express";
 import { db } from "../../db";
@@ -134,7 +135,7 @@ export function registerFactoryProductsRoutes(app: Express) {
 
       res.json(results);
     } catch (error: any) {
-      console.error("Error fetching factory categories:", error);
+      logger.error("Error fetching factory categories:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -148,7 +149,7 @@ export function registerFactoryProductsRoutes(app: Express) {
       const [category] = await db.insert(factoryCategories).values(parsed).returning();
       res.json(category);
     } catch (error: any) {
-      console.error("Error creating factory category:", error);
+      logger.error("Error creating factory category:", { error: error });
       res.status(400).json({ message: error.message });
     }
   });
@@ -170,7 +171,7 @@ export function registerFactoryProductsRoutes(app: Express) {
       if (!updated) return res.status(404).json({ message: "Category not found" });
       res.json(updated);
     } catch (error: any) {
-      console.error("Error updating factory category:", error);
+      logger.error("Error updating factory category:", { error: error });
       res.status(400).json({ message: error.message });
     }
   });
@@ -192,7 +193,7 @@ export function registerFactoryProductsRoutes(app: Express) {
       if (!updated) return res.status(404).json({ message: "Category not found" });
       res.json(updated);
     } catch (error: any) {
-      console.error("Error deleting factory category:", error);
+      logger.error("Error deleting factory category:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -214,7 +215,7 @@ export function registerFactoryProductsRoutes(app: Express) {
 
       res.json(results);
     } catch (error: any) {
-      console.error("Error fetching factory bale products:", error);
+      logger.error("Error fetching factory bale products:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -277,7 +278,7 @@ export function registerFactoryProductsRoutes(app: Express) {
 
       res.json({ articleCode: candidateCode });
     } catch (error: any) {
-      console.error("Error generating article code:", error);
+      logger.error("Error generating article code:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -328,7 +329,7 @@ export function registerFactoryProductsRoutes(app: Express) {
       if (!product) return res.status(404).json({ message: "Product not found" });
       res.json(product);
     } catch (error: any) {
-      console.error("Error fetching factory bale product:", error);
+      logger.error("Error fetching factory bale product:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -495,7 +496,7 @@ export function registerFactoryProductsRoutes(app: Express) {
 
       return res.json({ product, pressed, sales, loaded, currentStock });
     } catch (error: any) {
-      console.error("Error fetching bale product detail:", error);
+      logger.error("Error fetching bale product detail:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -759,7 +760,7 @@ export function registerFactoryProductsRoutes(app: Express) {
       }
       res.json(product);
     } catch (error: any) {
-      console.error("Error creating factory bale product:", error);
+      logger.error("Error creating factory bale product:", { error: error });
       const realMsg = error?.cause?.message || error?.message || "Unknown error";
       res.status(400).json({ message: realMsg });
     }
@@ -782,7 +783,7 @@ export function registerFactoryProductsRoutes(app: Express) {
       if (!updated) return res.status(404).json({ message: "Product not found" });
       res.json(updated);
     } catch (error: any) {
-      console.error("Error updating factory bale product:", error);
+      logger.error("Error updating factory bale product:", { error: error });
       res.status(400).json({ message: error.message });
     }
   });
@@ -891,7 +892,7 @@ export function registerFactoryProductsRoutes(app: Express) {
 
       res.json({ product: updatedProduct, balesUpdated });
     } catch (error: any) {
-      console.error("Error cascade updating bale product:", error);
+      logger.error("Error cascade updating bale product:", { error: error });
       res.status(400).json({ message: error.message });
     }
   });
@@ -1085,7 +1086,7 @@ export function registerFactoryProductsRoutes(app: Express) {
 
       res.json({ product, location, year, monthlyData, grandTotal });
     } catch (error: any) {
-      console.error("Error fetching bale product history:", error);
+      logger.error("Error fetching bale product history:", { error: error });
       res.status(500).json({ message: error.message });
     }
   }
@@ -1170,7 +1171,7 @@ export function registerFactoryProductsRoutes(app: Express) {
 
         res.json({ bales, sellingPrice: product?.sellingPrice || "0" });
       } catch (error: any) {
-        console.error("Error fetching monthly bale details:", error);
+        logger.error("Error fetching monthly bale details:", { error: error });
         res.status(500).json({ message: error.message });
       }
     }
@@ -1257,7 +1258,7 @@ export function registerFactoryProductsRoutes(app: Express) {
           sellingPrice: product?.sellingPrice || "0",
         });
       } catch (error: any) {
-        console.error("Error fetching all bale details:", error);
+        logger.error("Error fetching all bale details:", { error: error });
         res.status(500).json({ message: error.message });
       }
     }
@@ -1280,7 +1281,7 @@ export function registerFactoryProductsRoutes(app: Express) {
       if (!updated) return res.status(404).json({ message: "Product not found" });
       res.json(updated);
     } catch (error: any) {
-      console.error("Error deleting factory bale product:", error);
+      logger.error("Error deleting factory bale product:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -1341,7 +1342,7 @@ export function registerFactoryProductsRoutes(app: Express) {
 
       res.json({ total: products.length, matches });
     } catch (error: any) {
-      console.error("Error previewing bulk rename:", error);
+      logger.error("Error previewing bulk rename:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -1369,7 +1370,7 @@ export function registerFactoryProductsRoutes(app: Express) {
 
       res.json({ updated });
     } catch (error: any) {
-      console.error("Error applying bulk rename:", error);
+      logger.error("Error applying bulk rename:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -1445,7 +1446,7 @@ export function registerFactoryProductsRoutes(app: Express) {
 
       res.json({ movedBales, mergedProducts: sources.length, targetName: target.name });
     } catch (error: any) {
-      console.error("Error merging bale products:", error);
+      logger.error("Error merging bale products:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -1499,7 +1500,7 @@ export function registerFactoryProductsRoutes(app: Express) {
 
       res.json({ updated, skipped });
     } catch (error: any) {
-      console.error("Error bulk-updating bale product prices:", error);
+      logger.error("Error bulk-updating bale product prices:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -1699,12 +1700,12 @@ export function registerFactoryProductsRoutes(app: Express) {
             },
           });
         } catch (innerError: any) {
-          console.error("Error processing Excel import:", innerError);
+          logger.error("Error processing Excel import:", { error: innerError });
           res.status(500).json({ message: innerError.message });
         }
       });
     } catch (error: any) {
-      console.error("Error in Excel import:", error);
+      logger.error("Error in Excel import:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -1840,12 +1841,12 @@ export function registerFactoryProductsRoutes(app: Express) {
             totalProducts: allProducts.length,
           });
         } catch (innerErr: any) {
-          console.error("Validate import error:", innerErr);
+          logger.error("Validate import error:", { error: innerErr });
           return res.status(500).json({ message: innerErr.message || "Validation failed" });
         }
       });
     } catch (outerErr: any) {
-      console.error("Validate import outer error:", outerErr);
+      logger.error("Validate import outer error:", { error: outerErr });
       res.status(500).json({ message: outerErr.message || "Validation failed" });
     }
   });
@@ -1897,12 +1898,9 @@ export function registerFactoryProductsRoutes(app: Express) {
           const rowGroups: { product: any; qty: number; weight: number; prodDate: Date }[] = [];
           let totalBalesNeeded = 0;
 
-          console.log(
-            "Bale import: processing",
-            rows.length,
-            "rows. First row keys:",
-            rows.length > 0 ? Object.keys(rows[0]) : "none"
-          );
+          logger.info(`Bale import: processing ${rows.length} rows`, {
+            firstRowKeys: rows.length > 0 ? Object.keys(rows[0]) : "none",
+          });
 
           for (const row of rows) {
             const rawCode = getVal(
@@ -2032,12 +2030,12 @@ export function registerFactoryProductsRoutes(app: Express) {
           }
           res.json({ totalBalesCreated, skippedRows, skippedDetails: skippedDetails.slice(0, 20) });
         } catch (innerError: any) {
-          console.error("Error processing bale Excel import:", innerError);
+          logger.error("Error processing bale Excel import:", { error: innerError });
           res.status(500).json({ message: innerError.message });
         }
       });
     } catch (error: any) {
-      console.error("Error in bale Excel import:", error);
+      logger.error("Error in bale Excel import:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
