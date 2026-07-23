@@ -385,18 +385,27 @@ export async function buildSmartTransferForecastPreview(
   targetQuantity: number,
   options: SmartTransferPreviewOptions = {}
 ): Promise<SmartTransferForecastPreviewResult> {
+  const autoTarget = !targetQuantity || targetQuantity <= 0;
+  // Ask the existing engine for its full auto-sized candidate set first. This
+  // prevents an explicit target from hiding lower-ranked candidates before the
+  // Phase 1 score has a chance to compare and re-rank them.
   const base = await buildSmartTransferPreview(
     companyId,
     sourceLocationIds,
     destinationLocationId,
-    targetQuantity,
+    0,
     options
   );
 
   if (base.lines.length === 0) {
+    const requestedTarget = autoTarget ? base.targetQuantity : wholeNonNegative(targetQuantity);
     return {
       ...base,
       forecastingVersion: 1,
+      targetQuantity: requestedTarget,
+      achievedQuantity: 0,
+      shortfallQuantity: requestedTarget,
+      shortfall: requestedTarget > 0,
       lines: [],
       summary: `${base.summary} Phase 1 forecasting found no allocated lines to re-rank.`,
     };
@@ -404,7 +413,6 @@ export async function buildSmartTransferForecastPreview(
 
   const asOfDate = options.asOfDate ?? new Date().toISOString().slice(0, 10);
   const targetCoverageDays = base.targetCoverageDays;
-  const autoTarget = !targetQuantity || targetQuantity <= 0;
   const representativeByItem = new Map<number, SmartTransferPreviewLine>();
   for (const line of base.lines) {
     if (!representativeByItem.has(line.stockItemId)) representativeByItem.set(line.stockItemId, line);
