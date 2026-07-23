@@ -208,6 +208,7 @@ export const FactoryIntelSettings = lazy(() => import("@/pages/factory/FactorySe
 export const FactoryRentalWarehouses = lazy(() => import("@/pages/factory/FactoryRentalWarehouses"));
 export const FactoryRentalShops = lazy(() => import("@/pages/factory/FactoryRentalShops"));
 export const FactoryRentalPayments = lazy(() => import("@/pages/factory/FactoryRentalPayments"));
+export const FactoryContacts = lazy(() => import("@/pages/factory/FactoryContacts"));
 
 // ── Properties pages ──────────────────────────────────────────────────────────
 export const PropertiesDashboard = lazy(() => import("@/pages/properties/PropertiesDashboard"));

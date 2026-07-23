@@ -15,6 +15,7 @@ import {
   BarcodeLookup, Chat, ChatbotSettings, CompanyDataReset,
   ConflictCenter, CustomerLogosSettings, DailyProductionReport, DeletedItems,
   FactoryAccounts, FactoryAlerts, FactoryBaleProductAllMonths, FactoryBaleProductHistory,
+  FactoryContacts,
   FactoryBaleProductMonthDetail, FactoryBaleRelabeling, FactoryBaleTracking, FactoryBalesHub,
   FactoryBrokerVisualStatement, FactoryContainerCreate, FactoryContainerLoadingScan, FactoryContainersHub,
   FactoryCustomerStatement, FactoryDashboardIntel, FactoryDaybook, FactoryDispatchBatchDetail,
@@ -104,6 +105,7 @@ export function FactoryRoutes({ user, myAccess, factoryDefaultPage }: FactoryRou
       <Route path="/factory/stock-bale-list" component={FactoryStockBaleList} />
       <Route path="/factory/stock-query/:id" component={FactoryStockItemDetail} />
       <Route path="/factory/stock-query" component={StockQuery} />
+      <Route path="/factory/contacts" component={FactoryContacts} />
       <Route path="/factory/accounts" component={FactoryAccounts} />
       <Route path="/factory/agents" component={Agents} />
       <Route path="/factory/vouchers">{() => <FactoryVouchers />}</Route>

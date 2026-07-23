@@ -3303,3 +3303,32 @@ export const factoryContainerReceipts = pgTable(
 );
 
 export type FactoryContainerReceipt = typeof factoryContainerReceipts.$inferSelect;
+
+// ─── Factory Contacts ─────────────────────────────────────────────────────────
+export const factoryContacts = pgTable(
+  "factory_contacts",
+  {
+    id: serial("id").primaryKey(),
+    companyId: integer("company_id").notNull(),
+    name: text("name").notNull(),
+    role: text("role"),
+    numbers: jsonb("numbers").notNull().default([]),
+    notes: text("notes"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (t) => ({
+    byCompany: index("factory_contacts_company_idx").on(t.companyId),
+  })
+);
+
+export const insertFactoryContactSchema = createInsertSchema(factoryContacts).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+}).extend({
+  name: z.string().min(1, "Name is required"),
+  numbers: z.array(z.object({ label: z.string(), number: z.string() })).default([]),
+});
+export type InsertFactoryContact = z.infer<typeof insertFactoryContactSchema>;
+export type FactoryContact = typeof factoryContacts.$inferSelect;

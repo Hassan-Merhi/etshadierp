@@ -45,6 +45,7 @@ import {
   QrCode,
   Shield,
   Layers,
+  BookMarked,
 } from "lucide-react";
 import { Sidebar, SidebarContent } from "@/components/ui/sidebar";
 import { useQuery } from "@tanstack/react-query";
@@ -119,6 +120,7 @@ export const FACTORY_NAV_SECTIONS: FactoryNavSection[] = [
     items: [
       { title: "Daybook", url: "/factory/daybook", icon: BookOpen },
       { title: "Parties", url: "/factory/parties", icon: Users },
+      { title: "Contacts", url: "/factory/contacts", icon: BookMarked, viewableByAll: true },
       { title: "Payroll & Benefits", url: "/factory/payroll-hub", icon: HardHat },
       { title: "Analytics", url: "/factory/analytics", icon: TrendingUp, adminOnly: true },
     ],
