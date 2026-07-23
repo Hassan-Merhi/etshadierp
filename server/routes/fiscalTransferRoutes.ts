@@ -200,7 +200,7 @@ export function registerFiscalTransferRoutes(app: Express) {
       const transfer = await storage.getStockTransferByVoucherId(voucherId);
       res.json(transfer);
     } catch (error: any) {
-      console.error("[Stock Transfer GET] Error:", error.message);
+      logger.error("[Stock Transfer GET] Error:", { error: error.message });
       res.status(500).json({ message: error.message });
     }
   });
@@ -225,7 +225,7 @@ export function registerFiscalTransferRoutes(app: Express) {
 
       // Log if user confirmed negative inventory override
       if (allowNegativeInventory) {
-        console.log(
+        logger.info(
           `[AUDIT] User ${req.session.userId} confirmed negative inventory override for stock transfer. Items: ${JSON.stringify(items.map((i: any) => ({ stockItemId: i.stockItemId, quantity: i.quantity, sourceLocationId: i.sourceLocationId })))}`
         );
       }
@@ -411,7 +411,7 @@ export function registerFiscalTransferRoutes(app: Express) {
                 voucherDate: txResult.newVoucher.voucherDate,
               });
             } catch (e: any) {
-              console.error("[TransferWA] Failed to send:", e.message);
+              logger.error("[TransferWA] Failed to send:", { error: e.message });
             }
           });
         return;
@@ -471,7 +471,7 @@ export function registerFiscalTransferRoutes(app: Express) {
         }
       }
 
-      console.log("[Stock Transfer] Creating transfer:", {
+      logger.info("[Stock Transfer] Creating transfer:", {
         voucherId,
         destinationLocationId,
         itemCount: items.length,
@@ -506,7 +506,7 @@ export function registerFiscalTransferRoutes(app: Express) {
           .where(eq(vouchers.id, voucherId));
       }
 
-      console.log("[Stock Transfer] Transfer created successfully:", {
+      logger.info("[Stock Transfer] Transfer created successfully:", {
         transferId: transfer.transfer.id,
         itemsCount: transfer.items.length,
       });
@@ -540,12 +540,12 @@ export function registerFiscalTransferRoutes(app: Express) {
               voucherDate: voucher.voucherDate,
             });
           } catch (e: any) {
-            console.error("[TransferWA] Failed to send (original-flow):", e.message);
+            logger.error("[TransferWA] Failed to send (original-flow):", { error: e.message });
           }
         });
     } catch (error: any) {
       logger.error("stock transfer create failed", { module: "stockTransfer", action: "create", userId: _uid, companyId: _cid, durationMs: Date.now() - _t, error });
-      console.error("[Stock Transfer] Error creating transfer:", error.message, error.stack);
+      logger.error("[Stock Transfer] Error creating transfer:", { error: error.message, stack: error.stack });
       res.status(500).json({ message: error.message });
     }
   });
@@ -1075,11 +1075,11 @@ export function registerFiscalTransferRoutes(app: Express) {
               voucherDate: voucherRow.voucherDate,
             });
           } catch (e: any) {
-            console.error("[RevisedTransferWA] Failed to send (revision):", e.message);
+            logger.error("[RevisedTransferWA] Failed to send (revision):", { error: e.message });
           }
         });
     } catch (error: any) {
-      console.error("[Revision POST] Error:", error.message);
+      logger.error("[Revision POST] Error:", { error: error.message });
       res.status(500).json({ message: error.message });
     }
   });
@@ -1274,7 +1274,7 @@ export function registerFiscalTransferRoutes(app: Express) {
 
       res.json({ success: true });
     } catch (error: any) {
-      console.error("[Revision Approve] Error:", error.message);
+      logger.error("[Revision Approve] Error:", { error: error.message });
       res.status(500).json({ message: error.message });
     }
   });
@@ -1337,7 +1337,7 @@ export function registerFiscalTransferRoutes(app: Express) {
 
       res.json(updated);
     } catch (error: any) {
-      console.error("[Stock Transfer PUT] Error:", error.message);
+      logger.error("[Stock Transfer PUT] Error:", { error: error.message });
 
       // Check if this is a legacy transfer validation error (400) vs server error (500)
       if (error.message && error.message.includes("missing source location data")) {

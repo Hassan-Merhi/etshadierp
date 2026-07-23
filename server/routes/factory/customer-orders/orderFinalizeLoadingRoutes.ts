@@ -1,4 +1,5 @@
 import { trackOneContainerById } from "../../../services/containerTrackingService";
+import { logger } from "../../../lib/logger";
 import { parseId, parseOptionalId } from "../../../lib/parseId";
 import { dispatchNotification } from "../../../lib/notificationService";
 import { getClientDate } from "../../../lib/dateUtils";
@@ -367,7 +368,7 @@ export function registerOrderFinalizeLoadingRoutes(app: Express) {
 
       res.json(result);
     } catch (error: any) {
-      console.error("Error finalizing order:", error);
+      logger.error("Error finalizing order:", { error: error });
       res.status(400).json({ message: error.message });
     }
   });
@@ -427,7 +428,7 @@ export function registerOrderFinalizeLoadingRoutes(app: Express) {
         })),
       });
     } catch (error: any) {
-      console.error("Error fetching finalize preview:", error);
+      logger.error("Error fetching finalize preview:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -480,7 +481,7 @@ export function registerOrderFinalizeLoadingRoutes(app: Express) {
 
       res.json({ message: `${updated} bale(s) marked as SOLD`, updated, total: orderBales.length });
     } catch (error: any) {
-      console.error("Error force-syncing bale status:", error);
+      logger.error("Error force-syncing bale status:", { error: error });
       res.status(400).json({ message: error.message });
     }
   });
@@ -614,7 +615,7 @@ export function registerOrderFinalizeLoadingRoutes(app: Express) {
 
       res.json({ message: "Invoice reverted to Draft successfully" });
     } catch (error: any) {
-      console.error("Error unfinalizing order:", error);
+      logger.error("Error unfinalizing order:", { error: error });
       res.status(400).json({ message: error.message });
     }
   });
@@ -714,7 +715,7 @@ export function registerOrderFinalizeLoadingRoutes(app: Express) {
               changes: { status: { old: order.status, new: "CANCELLED" } },
             });
           } catch (auditErr) {
-            console.error("[order cancel V5 audit] non-fatal:", auditErr);
+            logger.error("[order cancel V5 audit] non-fatal:", { error: auditErr });
           }
           return res.json(updated);
         }
@@ -775,12 +776,12 @@ export function registerOrderFinalizeLoadingRoutes(app: Express) {
           changes: { status: { old: order.status, new: "CANCELLED" } },
         });
       } catch (auditErr) {
-        console.error("[order cancel audit] non-fatal:", auditErr);
+        logger.error("[order cancel audit] non-fatal:", { error: auditErr });
       }
 
       res.json(updated);
     } catch (error: any) {
-      console.error("Error cancelling order:", error);
+      logger.error("Error cancelling order:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -845,12 +846,12 @@ export function registerOrderFinalizeLoadingRoutes(app: Express) {
           changes: { status: { old: "CANCELLED", new: "LOADING" } },
         });
       } catch (auditErr) {
-        console.error("[order restore-loading audit] non-fatal:", auditErr);
+        logger.error("[order restore-loading audit] non-fatal:", { error: auditErr });
       }
 
       res.json(restored);
     } catch (error: any) {
-      console.error("Error restoring loading order:", error);
+      logger.error("Error restoring loading order:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -908,7 +909,7 @@ export function registerOrderFinalizeLoadingRoutes(app: Express) {
 
       res.json(order);
     } catch (error: any) {
-      console.error("Error creating loading order:", error);
+      logger.error("Error creating loading order:", { error: error });
       res.status(400).json({ message: error.message });
     }
   });
@@ -1007,7 +1008,7 @@ export function registerOrderFinalizeLoadingRoutes(app: Express) {
 
       res.json(updated);
     } catch (error: any) {
-      console.error("Error finalizing loading:", error);
+      logger.error("Error finalizing loading:", { error: error });
       res.status(400).json({ message: error.message });
     }
   });

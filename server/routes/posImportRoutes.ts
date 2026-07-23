@@ -6,6 +6,7 @@
  * unchanged.
  */
 import type { Express } from "express";
+import { logger } from "../lib/logger";
 import { and, eq } from "drizzle-orm";
 import { db } from "../db";
 import { storage } from "../storage";
@@ -88,7 +89,7 @@ export function registerPosImportRoutes(app: Express) {
         fileName: req.file.originalname,
       });
     } catch (error: any) {
-      console.error("POS Import parse error:", error);
+      logger.error("POS Import parse error:", { error: error });
       // File-parse errors are client errors (bad/corrupt file) — return 400, not 500
       res.status(400).json({ message: error.message || "Failed to parse Excel file" });
     }
@@ -183,7 +184,7 @@ export function registerPosImportRoutes(app: Express) {
         validatedItems,
       });
     } catch (error: any) {
-      console.error("POS Import validation error:", error);
+      logger.error("POS Import validation error:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -393,10 +394,10 @@ export function registerPosImportRoutes(app: Express) {
                 .replace(/\s+/g, " ")
                 .trim() + ".pdf";
             const invResult = await sendWhatsAppFileByUploadPos(_chatId, pdfBuffer, fileName, "");
-            if (!invResult.success) console.error(`[POSImport-bg] Invoice send failed: ${invResult.error}`);
-            else console.log(`[POSImport-bg] Invoice sent: ${fileName} → ${_chatId}`);
+            if (!invResult.success) logger.error(`[POSImport-bg] Invoice send failed: ${invResult.error}`);
+            else logger.info(`[POSImport-bg] Invoice sent: ${fileName} → ${_chatId}`);
           } catch (e: any) {
-            console.error("[POSImport-bg] Invoice send error:", e.message);
+            logger.error("[POSImport-bg] Invoice send error:", { error: e.message });
           }
 
           // 2. Stock report PDF
@@ -414,7 +415,7 @@ export function registerPosImportRoutes(app: Express) {
             } = await generateStockPdf(_companyId, companyName, _locId, _locName);
             const maxAllowedPages = Math.ceil(rowCount / 20) + 5;
             if (pageCount > maxAllowedPages) {
-              console.error(
+              logger.error(
                 `[POSImport-bg] Stock PDF safety guard: ${pageCount} pages for ${rowCount} rows — not sent`
               );
             } else {
@@ -432,11 +433,11 @@ export function registerPosImportRoutes(app: Express) {
                 `${stockName}.pdf`,
                 `Stock Report — ${_locName}\n${stampStr}`
               );
-              if (!stockRes.success) console.error(`[POSImport-bg] Stock send failed: ${stockRes.error}`);
-              else console.log(`[POSImport-bg] Stock report sent: ${stockName}.pdf → ${_chatId}`);
+              if (!stockRes.success) logger.error(`[POSImport-bg] Stock send failed: ${stockRes.error}`);
+              else logger.info(`[POSImport-bg] Stock report sent: ${stockName}.pdf → ${_chatId}`);
             }
           } catch (e: any) {
-            console.error("[POSImport-bg] Stock send error:", e.message);
+            logger.error("[POSImport-bg] Stock send error:", { error: e.message });
           }
         });
       }
@@ -446,7 +447,7 @@ export function registerPosImportRoutes(app: Express) {
       if (error.httpStatus === 400) {
         return res.status(400).json({ message: error.message });
       }
-      console.error("POS Import error:", error);
+      logger.error("POS Import error:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -481,7 +482,7 @@ export function registerPosImportRoutes(app: Express) {
       res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
       res.send(buffer);
     } catch (error: any) {
-      console.error("Template generation error:", error);
+      logger.error("Template generation error:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });

@@ -288,7 +288,7 @@ export function registerFactoryContainersRoutes(app: Express) {
 
       res.json(results);
     } catch (error: any) {
-      console.error("Error fetching factory containers:", error);
+      logger.error("Error fetching factory containers:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -602,7 +602,7 @@ export function registerFactoryContainersRoutes(app: Express) {
       res.json(container);
     } catch (error: any) {
       logger.error("factory container create failed", { module: "factoryContainers", action: "create", userId: _uid, companyId: _cid, durationMs: Date.now() - _t, error });
-      console.error("Error creating factory container:", error);
+      logger.error("Error creating factory container:", { error: error });
       res.status(400).json({ message: error.message });
     }
   });
@@ -1021,7 +1021,7 @@ export function registerFactoryContainersRoutes(app: Express) {
       const pgMsg = pgErr?.message ?? error?.message ?? "Unknown error";
       const pgCode = pgErr?.code;
       const pgConstraint = pgErr?.constraint;
-      console.error("[factory-container PATCH] DB error:", { pgCode, pgConstraint, pgMsg, full: error?.message });
+      logger.error("[factory-container PATCH] DB error:", { pgCode, pgConstraint, pgMsg, full: error?.message });
       const userMsg = pgCode
         ? `${pgMsg}${pgConstraint ? ` (constraint: ${pgConstraint})` : ""}`
         : pgMsg.split("\n\n").pop() || pgMsg;
@@ -1203,7 +1203,7 @@ export function registerFactoryContainersRoutes(app: Express) {
 
       res.json({ deleted: ownedIds.length, ids: ownedIds });
     } catch (error: any) {
-      console.error("Error bulk-deleting factory containers:", error);
+      logger.error("Error bulk-deleting factory containers:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -1314,7 +1314,7 @@ export function registerFactoryContainersRoutes(app: Express) {
       if (!updatedId) return res.status(404).json({ message: "Container not found" });
       res.json({ id: updatedId, message: "Container deleted" });
     } catch (error: any) {
-      console.error("Error deleting factory container:", error);
+      logger.error("Error deleting factory container:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -1411,7 +1411,7 @@ export function registerFactoryContainersRoutes(app: Express) {
 
       res.json({ created, skipped, total: allContainers.length, fxUnresolvedSkipped });
     } catch (error: any) {
-      console.error("Error backfilling import credits:", error);
+      logger.error("Error backfilling import credits:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -1588,7 +1588,7 @@ export function registerFactoryContainersRoutes(app: Express) {
 
       res.json({ charges: newCharges, total: total.toFixed(2) });
     } catch (error: any) {
-      console.error("Error syncing container other charges:", error);
+      logger.error("Error syncing container other charges:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -1683,7 +1683,7 @@ export function registerFactoryContainersRoutes(app: Express) {
 
       res.json({ containers: Array.from(grouped.values()) });
     } catch (error: any) {
-      console.error("Error previewing other charges currency:", error);
+      logger.error("Error previewing other charges currency:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -1822,7 +1822,7 @@ export function registerFactoryContainersRoutes(app: Express) {
 
       res.json({ fixed });
     } catch (error: any) {
-      console.error("Error fixing other charges currency:", error);
+      logger.error("Error fixing other charges currency:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -1994,7 +1994,7 @@ export function registerFactoryContainersRoutes(app: Express) {
         total: rows.length,
       });
     } catch (error: any) {
-      console.error("Error importing containers from Excel:", error);
+      logger.error("Error importing containers from Excel:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -2062,7 +2062,7 @@ export function registerFactoryContainersRoutes(app: Express) {
 
       res.json({ container: updated, fromSupplierName, toSupplierName: targetSupplier.name });
     } catch (error: any) {
-      console.error("Error moving container supplier:", error);
+      logger.error("Error moving container supplier:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });

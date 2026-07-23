@@ -6,6 +6,7 @@
  * unchanged.
  */
 import type { Express } from "express";
+import { logger } from "../lib/logger";
 import { and, desc, eq } from "drizzle-orm";
 import { db } from "../db";
 import { storage } from "../storage";
@@ -89,7 +90,7 @@ export function registerCreditSalesImportRoutes(app: Express) {
         fileName: req.file.originalname,
       });
     } catch (error: any) {
-      console.error("Credit Sales Import parse error:", error);
+      logger.error("Credit Sales Import parse error:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -173,7 +174,7 @@ export function registerCreditSalesImportRoutes(app: Express) {
         validatedItems,
       });
     } catch (error: any) {
-      console.error("Credit Sales Import validation error:", error);
+      logger.error("Credit Sales Import validation error:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -407,10 +408,10 @@ export function registerCreditSalesImportRoutes(app: Express) {
                 .replace(/\s+/g, " ")
                 .trim() + ".pdf";
             const invResult = await sendWhatsAppFileByUploadPos(_chatId, pdfBuffer, fileName, "");
-            if (!invResult.success) console.error(`[CreditImport-bg] Invoice send failed: ${invResult.error}`);
-            else console.log(`[CreditImport-bg] Invoice sent: ${fileName} → ${_chatId}`);
+            if (!invResult.success) logger.error(`[CreditImport-bg] Invoice send failed: ${invResult.error}`);
+            else logger.info(`[CreditImport-bg] Invoice sent: ${fileName} → ${_chatId}`);
           } catch (e: any) {
-            console.error("[CreditImport-bg] Invoice send error:", e.message);
+            logger.error("[CreditImport-bg] Invoice send error:", { error: e.message });
           }
 
           // 2. Stock report PDF
@@ -428,7 +429,7 @@ export function registerCreditSalesImportRoutes(app: Express) {
             } = await generateStockPdf(_companyId, companyName, _locId, _locName);
             const maxAllowedPages = Math.ceil(rowCount / 20) + 5;
             if (pageCount > maxAllowedPages) {
-              console.error(
+              logger.error(
                 `[CreditImport-bg] Stock PDF safety guard: ${pageCount} pages for ${rowCount} rows — not sent`
               );
             } else {
@@ -446,16 +447,16 @@ export function registerCreditSalesImportRoutes(app: Express) {
                 `${stockName}.pdf`,
                 `Stock Report — ${_locName}\n${stampStr}`
               );
-              if (!stockRes.success) console.error(`[CreditImport-bg] Stock send failed: ${stockRes.error}`);
-              else console.log(`[CreditImport-bg] Stock report sent: ${stockName}.pdf → ${_chatId}`);
+              if (!stockRes.success) logger.error(`[CreditImport-bg] Stock send failed: ${stockRes.error}`);
+              else logger.info(`[CreditImport-bg] Stock report sent: ${stockName}.pdf → ${_chatId}`);
             }
           } catch (e: any) {
-            console.error("[CreditImport-bg] Stock send error:", e.message);
+            logger.error("[CreditImport-bg] Stock send error:", { error: e.message });
           }
         });
       }
     } catch (error: any) {
-      console.error("Credit Sales Import error:", error);
+      logger.error("Credit Sales Import error:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -490,7 +491,7 @@ export function registerCreditSalesImportRoutes(app: Express) {
       res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
       res.send(buffer);
     } catch (error: any) {
-      console.error("Template generation error:", error);
+      logger.error("Template generation error:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
