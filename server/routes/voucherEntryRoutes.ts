@@ -1,4 +1,5 @@
 import type { Express } from "express";
+import { logger } from "../lib/logger";
 import { db } from "../db";
 import { storage } from "../storage";
 import { requireAuth, requireRole, canDelete, requireNonPOS, checkPOSLocation } from "../auth";
@@ -806,7 +807,7 @@ export function registerVoucherEntryRoutes(app: Express) {
           const saleItems = await tx.select().from(salesItems).where(eq(salesItems.voucherId, id));
 
           if (saleItems.length > 0) {
-            console.log(`[POS Delete] Voucher ${id}: Found ${saleItems.length} sale items to reverse`);
+            logger.info(`[POS Delete] Voucher ${id}: Found ${saleItems.length} sale items to reverse`);
 
             // Only reverse inventory if we have a definite location from the voucher
             // We don't guess the location to avoid restoring stock to the wrong place
@@ -817,7 +818,7 @@ export function registerVoucherEntryRoutes(app: Express) {
                 const qty = parseFloat(item.quantity);
                 const costPrice = parseFloat(item.costPrice || "0");
 
-                console.log(`[POS Delete] Restoring item ${item.stockItemId}: qty=${qty}, costPrice=${costPrice}`);
+                logger.info(`[POS Delete] Restoring item ${item.stockItemId}: qty=${qty}, costPrice=${costPrice}`);
 
                 const result = await adjustInventory(
                   tx,
@@ -827,17 +828,17 @@ export function registerVoucherEntryRoutes(app: Express) {
                   req.session.currentCompanyId!,
                   costPrice
                 );
-                console.log(
+                logger.info(
                   `[POS Delete] Item ${item.stockItemId}: qty ${result.previousQuantity} + ${qty} = ${result.newQuantity}, rate: ${result.averageRate.toFixed(2)}`
                 );
               }
             } else {
               // Log warning: can't reverse inventory without location
-              console.warn(`[POS Delete] Voucher ${id}: Cannot reverse inventory - no locationId on voucher`);
+              logger.warn(`[POS Delete] Voucher ${id}: Cannot reverse inventory - no locationId on voucher`);
             }
 
             // Delete sales items regardless of whether inventory was reversed
-            console.log(`[POS Delete] Deleting ${saleItems.length} sales items for voucher ${id}`);
+            logger.info(`[POS Delete] Deleting ${saleItems.length} sales items for voucher ${id}`);
             await tx.delete(salesItems).where(eq(salesItems.voucherId, id));
           }
         }
@@ -848,7 +849,7 @@ export function registerVoucherEntryRoutes(app: Express) {
           const noteItems = await tx.select().from(creditNoteItems).where(eq(creditNoteItems.voucherId, id));
 
           if (noteItems.length > 0) {
-            console.log(`[Credit/Debit Note Delete] Voucher ${id}: Found ${noteItems.length} items to reverse`);
+            logger.info(`[Credit/Debit Note Delete] Voucher ${id}: Found ${noteItems.length} items to reverse`);
 
             for (const item of noteItems) {
               const qty = parseFloat(item.quantity);
@@ -864,7 +865,7 @@ export function registerVoucherEntryRoutes(app: Express) {
                   -qty,
                   req.session.currentCompanyId!
                 );
-                console.log(
+                logger.info(
                   `[Credit Note Delete] Item ${item.stockItemId} at location ${item.locationId}: qty ${result.previousQuantity} - ${qty} = ${result.newQuantity}`
                 );
               } else {
@@ -878,14 +879,14 @@ export function registerVoucherEntryRoutes(app: Express) {
                   req.session.currentCompanyId!,
                   inventoryCost
                 );
-                console.log(
+                logger.info(
                   `[Debit Note Delete] Item ${item.stockItemId} at location ${item.locationId}: qty ${result.previousQuantity} + ${qty} = ${result.newQuantity}`
                 );
               }
             }
 
             // Delete the credit note items
-            console.log(`[Credit/Debit Note Delete] Deleting ${noteItems.length} credit_note_items for voucher ${id}`);
+            logger.info(`[Credit/Debit Note Delete] Deleting ${noteItems.length} credit_note_items for voucher ${id}`);
             await tx.delete(creditNoteItems).where(eq(creditNoteItems.voucherId, id));
           }
         }
@@ -1147,7 +1148,7 @@ export function registerVoucherEntryRoutes(app: Express) {
               const noteItems = await tx.select().from(creditNoteItems).where(eq(creditNoteItems.voucherId, id));
 
               if (noteItems.length > 0) {
-                console.log(
+                logger.info(
                   `[Bulk Delete Credit/Debit Note] Voucher ${id}: Found ${noteItems.length} items to reverse`
                 );
 

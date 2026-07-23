@@ -475,7 +475,7 @@ export function registerOrderVerifyRecoverRoutes(app: Express) {
         dataSource,
       });
     } catch (error: any) {
-      console.error("Error fetching verification summary:", error);
+      logger.error("Error fetching verification summary:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -619,7 +619,7 @@ export function registerOrderVerifyRecoverRoutes(app: Express) {
 
       await recalculateOrderTotals(db, orderId);
 
-      console.log(`[recover-bales] orderId=${orderId} linked=${linked} notFound=${notFound.length}`);
+      logger.info(`[recover-bales] orderId=${orderId} linked=${linked} notFound=${notFound.length}`);
 
       res.json({
         message: `${linked} bale(s) linked successfully`,
@@ -627,7 +627,7 @@ export function registerOrderVerifyRecoverRoutes(app: Express) {
         notFound,
       });
     } catch (error: any) {
-      console.error("Error recovering bales:", error);
+      logger.error("Error recovering bales:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -732,10 +732,10 @@ export function registerOrderVerifyRecoverRoutes(app: Express) {
 
       await recalculateOrderTotals(db, orderId);
 
-      console.log(`[auto-recover-bales] orderId=${orderId} totalLinked=${totalLinked}`);
+      logger.info(`[auto-recover-bales] orderId=${orderId} totalLinked=${totalLinked}`);
       res.json({ message: `${totalLinked} bale(s) auto-linked from stock`, linked: totalLinked, summary });
     } catch (error: any) {
-      console.error("Error auto-recovering bales:", error);
+      logger.error("Error auto-recovering bales:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -833,11 +833,11 @@ export function registerOrderVerifyRecoverRoutes(app: Express) {
               captionParts.join("\n"),
               "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             );
-            console.log(
+            logger.info(
               `[verify-whatsapp] Sent Excel invoice ${fileName} to ${loc.whatsappGroupChatId} for order #${orderId}`
             );
           } catch (e: any) {
-            console.error("[verify-whatsapp] Failed to send Excel to WhatsApp:", e.message);
+            logger.error("[verify-whatsapp] Failed to send Excel to WhatsApp:", { error: e.message });
           }
         });
       } else {
@@ -852,7 +852,7 @@ export function registerOrderVerifyRecoverRoutes(app: Express) {
         res.json(updated);
       }
     } catch (error: any) {
-      console.error("Error verifying order:", error);
+      logger.error("Error verifying order:", { error: error });
       res.status(400).json({ message: error.message });
     }
   });
@@ -913,7 +913,7 @@ export function registerOrderVerifyRecoverRoutes(app: Express) {
 
       res.json(updated);
     } catch (error: any) {
-      console.error("Error returning order to loading:", error);
+      logger.error("Error returning order to loading:", { error: error });
       res.status(400).json({ message: error.message });
     }
   });

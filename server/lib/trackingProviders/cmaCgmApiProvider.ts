@@ -11,6 +11,7 @@
  */
 
 import type { CarrierTrackResult, TrackingEvent } from "./types";
+import { logger } from "../../lib/logger";
 
 const BASE_URL = "https://apis.cma-cgm.net/operation/trackandtrace/v1/events";
 const TIMEOUT_MS = 15_000;
@@ -81,7 +82,7 @@ export async function track(containerNumber: string): Promise<CarrierTrackResult
 
   if (Date.now() < authFailureCooldownUntil) {
     const status = lastAuthFailureStatus ?? 403;
-    console.warn(
+    logger.warn(
       `[CmaCgmApi] ${containerNumber}: skipped during auth cooldown after HTTP ${status}`
     );
     return { ...base, blocked: true, error: `auth_${status}_cooldown` };
@@ -89,7 +90,7 @@ export async function track(containerNumber: string): Promise<CarrierTrackResult
 
   try {
     const url = `${BASE_URL}?equipmentReference=${encodeURIComponent(containerNumber)}`;
-    console.log(`[CmaCgmApi] ${containerNumber}: calling official DCSA API...`);
+    logger.info(`[CmaCgmApi] ${containerNumber}: calling official DCSA API...`);
 
     const res = await fetch(url, {
       headers: {
@@ -102,20 +103,20 @@ export async function track(containerNumber: string): Promise<CarrierTrackResult
     if (res.status === 401 || res.status === 403) {
       lastAuthFailureStatus = res.status;
       authFailureCooldownUntil = Date.now() + AUTH_FAILURE_COOLDOWN_MS;
-      console.warn(
+      logger.warn(
         `[CmaCgmApi] ${containerNumber}: authentication rejected (HTTP ${res.status}); pausing CMA API calls for 15 minutes`
       );
       return { ...base, blocked: true, error: `auth_${res.status}` };
     }
 
     if (res.status === 404) {
-      console.log(`[CmaCgmApi] ${containerNumber}: not found (HTTP 404)`);
+      logger.info(`[CmaCgmApi] ${containerNumber}: not found (HTTP 404)`);
       return { ...base, noData: true, error: "not_found" };
     }
 
     if (!res.ok) {
       const body = await res.text().catch(() => "");
-      console.log(`[CmaCgmApi] ${containerNumber}: HTTP ${res.status} — ${body.slice(0, 200)}`);
+      logger.info(`[CmaCgmApi] ${containerNumber}: HTTP ${res.status} — ${body.slice(0, 200)}`);
       return { ...base, error: `http_${res.status}` };
     }
 
@@ -125,14 +126,14 @@ export async function track(containerNumber: string): Promise<CarrierTrackResult
     const rawEvents: DcsaEvent[] = await res.json();
 
     if (!Array.isArray(rawEvents) || rawEvents.length === 0) {
-      console.log(`[CmaCgmApi] ${containerNumber}: empty response`);
+      logger.info(`[CmaCgmApi] ${containerNumber}: empty response`);
       return { ...base, noData: true, error: "no_events" };
     }
 
     return parseEvents(containerNumber, rawEvents, base);
   } catch (err: any) {
     const isTimeout = err?.name === "TimeoutError" || err?.name === "AbortError";
-    console.log(`[CmaCgmApi] ${containerNumber}: ${isTimeout ? "timeout" : (err?.message ?? "error")}`);
+    logger.info(`[CmaCgmApi] ${containerNumber}: ${isTimeout ? "timeout" : (err?.message ?? "error")}`);
     return { ...base, error: isTimeout ? "timeout" : (err?.message ?? "unknown_error") };
   }
 }
@@ -151,7 +152,7 @@ function parseEvents(containerNumber: string, rawEvents: DcsaEvent[], base: Carr
       const d = parseDate(ev.eventDateTime);
       if (d) {
         eta = d.toISOString().slice(0, 10);
-        console.log(
+        logger.info(
           `[CmaCgmApi] ${containerNumber}: ETA from POD arrival = ${eta} (${ev.transportCall?.location?.locationName ?? "?"})`
         );
         break;
@@ -198,7 +199,7 @@ function parseEvents(containerNumber: string, rawEvents: DcsaEvent[], base: Carr
   const latestDescription =
     [latestStatus, vesselName, voyage ? `voyage ${voyage}` : null].filter(Boolean).join(", ") || null;
 
-  console.log(
+  logger.info(
     `[CmaCgmApi] ${containerNumber}: success — status="${latestStatus}" eta=${eta ?? "none"} events=${rawEvents.length}`
   );
 

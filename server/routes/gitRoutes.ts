@@ -1,4 +1,5 @@
 import type { Express, Request, Response, NextFunction } from "express";
+import { logger } from "../lib/logger";
 import multer from "multer";
 import path from "path";
 import { randomUUID } from "crypto";
@@ -618,7 +619,7 @@ export function registerGitRoutes(app: Express) {
 
       return res.json({ asOf, mode: "single", companyId, companyName, agents });
     } catch (err) {
-      console.error("[gitRoutes] agent-duty-summary error:", err);
+      logger.error("[gitRoutes] agent-duty-summary error:", { error: err });
       return res.status(500).json({ message: "Internal server error" });
     }
   });
@@ -681,7 +682,7 @@ export function registerGitRoutes(app: Express) {
         });
       }
     } catch (err) {
-      console.error("[gitRoutes] listing error:", err);
+      logger.error("[gitRoutes] listing error:", { error: err });
       res.status(500).json({ message: "Internal server error" });
     }
   }
@@ -776,7 +777,7 @@ export function registerGitRoutes(app: Express) {
         summary: buildSummary(filtered),
       });
     } catch (err) {
-      console.error("[gitRoutes] summary error:", err);
+      logger.error("[gitRoutes] summary error:", { error: err });
       return res.status(500).json({ message: "Internal server error" });
     }
   });
@@ -877,7 +878,7 @@ export function registerGitRoutes(app: Express) {
         const buf = Buffer.from(await wb.xlsx.writeBuffer());
         res.send(buf);
       } catch (err: any) {
-        console.error("[ETA template]", err);
+        logger.error("[ETA template]", { error: err });
         res.status(500).json({ message: err.message });
       }
     }
@@ -1023,7 +1024,7 @@ export function registerGitRoutes(app: Express) {
         const buf = Buffer.from(await wb.xlsx.writeBuffer());
         res.send(buf);
       } catch (err: any) {
-        console.error("[GIT import template]", err);
+        logger.error("[GIT import template]", { error: err });
         res.status(500).json({ message: err.message });
       }
     }
@@ -1423,7 +1424,7 @@ export function registerGitRoutes(app: Express) {
 
         res.json({ updated, skipped, notFound, errors, importId: undoChanges.length > 0 ? importId : null });
       } catch (err: any) {
-        console.error("[GIT import excel]", err);
+        logger.error("[GIT import excel]", { error: err });
         res.status(500).json({ message: err.message });
       }
     }
@@ -1462,7 +1463,7 @@ export function registerGitRoutes(app: Express) {
 
         res.json({ reverted });
       } catch (err: any) {
-        console.error("[GIT import undo]", err);
+        logger.error("[GIT import undo]", { error: err });
         res.status(500).json({ message: err.message });
       }
     }
@@ -1568,7 +1569,7 @@ export function registerGitRoutes(app: Express) {
         if (!result.success) return res.status(500).json({ message: result.error || "Failed to send" });
         res.json({ ok: true, message: `Sent to WhatsApp group for ${agentName}.` });
       } catch (err: any) {
-        console.error("[AgentDutyWA] send error:", err);
+        logger.error("[AgentDutyWA] send error:", { error: err });
         res.status(500).json({ message: err.message });
       }
     }
@@ -1694,7 +1695,7 @@ export function registerGitRoutes(app: Express) {
         }
         res.json({ ok: true, message: "Sent to WhatsApp group." });
       } catch (err: any) {
-        console.error("[ContainersWA] send error:", err);
+        logger.error("[ContainersWA] send error:", { error: err });
         res.status(500).json({ message: err.message });
       }
     }

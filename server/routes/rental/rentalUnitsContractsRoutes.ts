@@ -1,4 +1,5 @@
 import type { Express, Request, Response } from "express";
+import { logger } from "../../lib/logger";
 import { buildSafeFilename, contentDisposition } from "../../lib/contentDisposition";
 import type ExcelJS from "exceljs";
 import {
@@ -73,12 +74,12 @@ export function registerRentalUnitsContractsRoutes(
         try {
           await postDueScheduledRentalPayments(companyId, module, asOf, shopExpenseAccountName);
         } catch (e: any) {
-          console.warn(`${tag} page-load scheduled-posting failed:`, e.message?.split("\n")[0]);
+          logger.warn(`${tag} page-load scheduled-posting failed:`, e.message?.split("\n")[0]);
         }
         try {
           await postRentAccrualForCompany(companyId, shopExpenseAccountName, module, incomeAccountName, asOf);
         } catch (e: any) {
-          console.warn(`${tag} page-load accrual failed:`, e.message?.split("\n")[0]);
+          logger.warn(`${tag} page-load accrual failed:`, e.message?.split("\n")[0]);
         }
       }
 
@@ -419,12 +420,12 @@ export function registerRentalUnitsContractsRoutes(
         } // end if (unitType === "SHOP")
       } catch (sharedErr: any) {
         // Column may not exist yet in production — owned units still load fine
-        console.warn(`${tag} shared-units skipped:`, sharedErr.message?.split("\n")[0]);
+        logger.warn(`${tag} shared-units skipped:`, sharedErr.message?.split("\n")[0]);
       }
 
       res.json([...ownedResults, ...sharedResults]);
     } catch (e: any) {
-      console.error(`${tag} units:`, e);
+      logger.error(`${tag} units:`, { error: e });
       res.status(500).json({ message: e.message });
     }
   });
@@ -496,7 +497,7 @@ export function registerRentalUnitsContractsRoutes(
           changes,
         });
       } catch (auditErr) {
-        console.error("[unit update audit] non-fatal:", auditErr);
+        logger.error("[unit update audit] non-fatal:", { error: auditErr });
       }
 
       res.json(updated);
@@ -548,7 +549,7 @@ export function registerRentalUnitsContractsRoutes(
           changes: { active: { old: true, new: false } },
         });
       } catch (auditErr) {
-        console.error("[unit delete audit] non-fatal:", auditErr);
+        logger.error("[unit delete audit] non-fatal:", { error: auditErr });
       }
 
       res.json({ ok: true });
@@ -612,7 +613,7 @@ export function registerRentalUnitsContractsRoutes(
     } catch (e: any) {
       if (e instanceof z.ZodError)
         return res.status(400).json({ message: e.issues.map((err: any) => err.message).join(", ") });
-      console.error(`${tag} contracts:`, e);
+      logger.error(`${tag} contracts:`, { error: e });
       res.status(500).json({ message: e.message });
     }
   });
@@ -678,7 +679,7 @@ export function registerRentalUnitsContractsRoutes(
           },
         });
       } catch (auditErr) {
-        console.error("[contract rent-update audit] non-fatal:", auditErr);
+        logger.error("[contract rent-update audit] non-fatal:", { error: auditErr });
       }
 
       res.json({ ok: true });
@@ -776,7 +777,7 @@ export function registerRentalUnitsContractsRoutes(
           },
         });
       } catch (auditErr) {
-        console.error("[contract info-update audit] non-fatal:", auditErr);
+        logger.error("[contract info-update audit] non-fatal:", { error: auditErr });
       }
 
       res.json({ ok: true });
@@ -1022,7 +1023,7 @@ export function registerRentalUnitsContractsRoutes(
       res.setHeader("Content-Length", xlsBuffer.byteLength);
       res.end(xlsBuffer);
     } catch (e: any) {
-      console.error(`${tag} statement export:`, e);
+      logger.error(`${tag} statement export:`, { error: e });
       if (!res.headersSent) res.status(500).json({ message: e.message });
     }
   });

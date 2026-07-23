@@ -1,4 +1,5 @@
 import { logAudit } from "../../helpers/auditHelpers";
+import { logger } from "../../../lib/logger";
 import { trackOneContainerById } from "../../../services/containerTrackingService";
 import { parseId, parseOptionalId } from "../../../lib/parseId";
 import { dispatchNotification } from "../../../lib/notificationService";
@@ -194,7 +195,7 @@ export function registerOrderCrudRoutes(app: Express) {
 
       res.json(orders);
     } catch (error: any) {
-      console.error("Error fetching customer orders:", error);
+      logger.error("Error fetching customer orders:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -282,7 +283,7 @@ export function registerOrderCrudRoutes(app: Express) {
 
       res.json({ ...order, lines, bales, charges });
     } catch (error: any) {
-      console.error("Error fetching customer order:", error);
+      logger.error("Error fetching customer order:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -411,7 +412,7 @@ export function registerOrderCrudRoutes(app: Express) {
         costHidden: hideCostData,
       });
     } catch (error: any) {
-      console.error("Error fetching order profitability:", error);
+      logger.error("Error fetching order profitability:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -435,7 +436,7 @@ export function registerOrderCrudRoutes(app: Express) {
       });
       res.json(order);
     } catch (error: any) {
-      console.error("Error creating customer order:", error);
+      logger.error("Error creating customer order:", { error: error });
       res.status(400).json({ message: error.message });
     }
   });
@@ -520,7 +521,7 @@ export function registerOrderCrudRoutes(app: Express) {
         linked: { orderId, proformaId: proformaIdInt, linesBackfilled: proformaLines.length },
       });
     } catch (error: any) {
-      console.error("Error linking proforma to loading:", error);
+      logger.error("Error linking proforma to loading:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -562,7 +563,7 @@ export function registerOrderCrudRoutes(app: Express) {
       });
       res.json({ success: true, order: updated });
     } catch (error: any) {
-      console.error("Error updating loading note:", error);
+      logger.error("Error updating loading note:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -623,7 +624,7 @@ export function registerOrderCrudRoutes(app: Express) {
       });
       res.json({ success: true, message: "Invoice moved to Deleted Items" });
     } catch (error: any) {
-      console.error("Error deleting customer order:", error);
+      logger.error("Error deleting customer order:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -665,7 +666,7 @@ export function registerOrderCrudRoutes(app: Express) {
       });
       res.json(updated);
     } catch (error: any) {
-      console.error("Error updating order date:", error);
+      logger.error("Error updating order date:", { error: error });
       res.status(400).json({ message: error.message });
     }
   });
@@ -717,7 +718,7 @@ export function registerOrderCrudRoutes(app: Express) {
       });
       res.json(updated);
     } catch (error: any) {
-      console.error("Error assigning container:", error);
+      logger.error("Error assigning container:", { error: error });
       res.status(400).json({ message: error.message });
     }
   });
@@ -755,7 +756,7 @@ export function registerOrderCrudRoutes(app: Express) {
 
       res.json(results);
     } catch (error: any) {
-      console.error("Error looking up bale:", error);
+      logger.error("Error looking up bale:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
