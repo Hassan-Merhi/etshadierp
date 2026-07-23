@@ -6,6 +6,7 @@
  * importRoutes.ts as a sub-registrar; behaviour is unchanged.
  */
 import type { Express } from "express";
+import { logger } from "../lib/logger";
 import { and, eq, desc } from "drizzle-orm";
 import { db } from "../db";
 import { storage } from "../storage";
@@ -78,7 +79,7 @@ export function registerStockTransferImportRoutes(app: Express) {
         fileName: req.file.originalname,
       });
     } catch (error: any) {
-      console.error("Stock Transfer Import parse error:", error);
+      logger.error("Stock Transfer Import parse error:", { error: error });
       // File-parse errors are client errors (bad/corrupt file) — return 400, not 500
       res.status(400).json({ message: error.message || "Failed to parse Excel file" });
     }
@@ -179,7 +180,7 @@ export function registerStockTransferImportRoutes(app: Express) {
         validatedItems,
       });
     } catch (error: any) {
-      console.error("Stock Transfer Import validation error:", error);
+      logger.error("Stock Transfer Import validation error:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -337,11 +338,11 @@ export function registerStockTransferImportRoutes(app: Express) {
             voucherDate: waDate,
           });
         } catch (e: any) {
-          console.error("[TransferWA] Failed to send:", e.message);
+          logger.error("[TransferWA] Failed to send:", { error: e.message });
         }
       });
     } catch (error: any) {
-      console.error("Stock Transfer Import error:", error);
+      logger.error("Stock Transfer Import error:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -373,7 +374,7 @@ export function registerStockTransferImportRoutes(app: Express) {
       res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
       res.send(buffer);
     } catch (error: any) {
-      console.error("Template generation error:", error);
+      logger.error("Template generation error:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -408,7 +409,7 @@ export function registerStockTransferImportRoutes(app: Express) {
       res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
       res.send(buffer);
     } catch (error: any) {
-      console.error("Template generation error:", error);
+      logger.error("Template generation error:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -477,7 +478,7 @@ export function registerStockTransferImportRoutes(app: Express) {
           items,
         });
       } catch (error: any) {
-        console.error("Stock Transfer Parse error:", error);
+        logger.error("Stock Transfer Parse error:", { error: error });
         res.status(500).json({ message: error.message });
       }
     }
@@ -597,7 +598,7 @@ export function registerStockTransferImportRoutes(app: Express) {
         validatedItems,
       });
     } catch (error: any) {
-      console.error("Stock Transfer Validate error:", error);
+      logger.error("Stock Transfer Validate error:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -809,12 +810,12 @@ export function registerStockTransferImportRoutes(app: Express) {
               voucherDate: waDateMs,
             });
           } catch (e: any) {
-            console.error("[TransferWA] Failed to send:", e.message);
+            logger.error("[TransferWA] Failed to send:", { error: e.message });
           }
         });
       }
     } catch (error: any) {
-      console.error("Stock Transfer Import error:", error);
+      logger.error("Stock Transfer Import error:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });

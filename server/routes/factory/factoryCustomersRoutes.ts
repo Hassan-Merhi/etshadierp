@@ -1,4 +1,5 @@
 import { getClientDate } from "../../lib/dateUtils";
+import { logger } from "../../lib/logger";
 import { buildSafeFilename, contentDisposition } from "../../lib/contentDisposition";
 import type { Express } from "express";
 import { db } from "../../db";
@@ -264,7 +265,7 @@ export function registerFactoryCustomersRoutes(app: Express) {
 
       res.json(customersWithBalances);
     } catch (error: any) {
-      console.error("Error fetching factory customers:", error);
+      logger.error("Error fetching factory customers:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -312,7 +313,7 @@ export function registerFactoryCustomersRoutes(app: Express) {
 
       res.status(201).json(customer);
     } catch (error: any) {
-      console.error("Error creating factory customer:", error);
+      logger.error("Error creating factory customer:", { error: error });
       res.status(400).json({ message: error.message });
     }
   });
@@ -342,7 +343,7 @@ export function registerFactoryCustomersRoutes(app: Express) {
 
       res.json(updated);
     } catch (error: any) {
-      console.error("Error updating factory customer:", error);
+      logger.error("Error updating factory customer:", { error: error });
       res.status(400).json({ message: error.message });
     }
   });
@@ -367,7 +368,7 @@ export function registerFactoryCustomersRoutes(app: Express) {
 
       res.json(deleted);
     } catch (error: any) {
-      console.error("Error deleting factory customer:", error);
+      logger.error("Error deleting factory customer:", { error: error });
       res.status(400).json({ message: error.message });
     }
   });
@@ -392,7 +393,7 @@ export function registerFactoryCustomersRoutes(app: Express) {
 
       res.json(restored);
     } catch (error: any) {
-      console.error("Error restoring factory customer:", error);
+      logger.error("Error restoring factory customer:", { error: error });
       res.status(400).json({ message: error.message });
     }
   });
@@ -411,7 +412,7 @@ export function registerFactoryCustomersRoutes(app: Express) {
 
       res.json(deletedCustomers);
     } catch (error: any) {
-      console.error("Error fetching deleted factory customers:", error);
+      logger.error("Error fetching deleted factory customers:", { error: error });
       res.status(400).json({ message: error.message });
     }
   });
@@ -624,7 +625,7 @@ export function registerFactoryCustomersRoutes(app: Express) {
         openingBalanceSide: openingSide,
       });
     } catch (error: any) {
-      console.error("Error fetching customer statement:", error);
+      logger.error("Error fetching customer statement:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -1221,7 +1222,7 @@ export function registerFactoryCustomersRoutes(app: Express) {
 
       doc.end();
     } catch (error: any) {
-      console.error("Error exporting customer statement PDF:", error);
+      logger.error("Error exporting customer statement PDF:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -1576,7 +1577,7 @@ export function registerFactoryCustomersRoutes(app: Express) {
       res.setHeader("Content-Length", xlsBuffer.byteLength);
       res.end(xlsBuffer);
     } catch (error: any) {
-      console.error("Error exporting customer statement Excel:", error);
+      logger.error("Error exporting customer statement Excel:", { error: error });
       if (!res.headersSent) res.status(500).json({ message: error.message });
     }
   });
@@ -1670,7 +1671,7 @@ export function registerFactoryCustomersRoutes(app: Express) {
 
       res.json({ message: "Migration complete", chargesFixed, narrationFixed });
     } catch (error: any) {
-      console.error("Migration error:", error);
+      logger.error("Migration error:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });

@@ -1,4 +1,5 @@
 import type { Express } from "express";
+import { logger } from "../../lib/logger";
 import { db } from "../../db";
 import { requireAuth } from "../../auth";
 import { getClientDate } from "../../lib/dateUtils";
@@ -546,7 +547,7 @@ export function registerFactoryStockAllocationV5Routes(app: Express) {
         res.json({ rows: filtered, totals: finalTotals, productNames: productNamesMap });
       }
     } catch (err: any) {
-      console.error("[V5] stock-allocation error:", err);
+      logger.error("[V5] stock-allocation error:", { error: err });
       res.status(500).json({ message: err.message });
     }
   });
@@ -674,7 +675,7 @@ export function registerFactoryStockAllocationV5Routes(app: Express) {
 
       res.json(result);
     } catch (err: any) {
-      console.error("[V5] proforma-with-loading error:", err);
+      logger.error("[V5] proforma-with-loading error:", { error: err });
       res.status(400).json({ message: err.message });
     }
   });
@@ -794,7 +795,7 @@ export function registerFactoryStockAllocationV5Routes(app: Express) {
         expectedLinesCreated: result.expectedLinesCreated,
       });
     } catch (err: any) {
-      console.error("[V5] add-containers error:", err);
+      logger.error("[V5] add-containers error:", { error: err });
       res.status(400).json({ message: err.message });
     }
   });
@@ -847,7 +848,7 @@ export function registerFactoryStockAllocationV5Routes(app: Express) {
 
       res.json({ proforma: updated });
     } catch (err: any) {
-      console.error("[V5] close-proforma error:", err);
+      logger.error("[V5] close-proforma error:", { error: err });
       res.status(400).json({ message: err.message });
     }
   });
@@ -935,7 +936,7 @@ export function registerFactoryStockAllocationV5Routes(app: Express) {
         articlesEdited: updates.length,
       });
     } catch (err: any) {
-      console.error("[V5] draft-expected-lines error:", err);
+      logger.error("[V5] draft-expected-lines error:", { error: err });
       res.status(400).json({ message: err.message });
     }
   });
@@ -1059,7 +1060,7 @@ export function registerFactoryStockAllocationV5Routes(app: Express) {
         shortageCount: rows.filter((r) => r.availableBalance < 0).length,
       });
     } catch (err: any) {
-      console.error("[V5] location-summary error:", err);
+      logger.error("[V5] location-summary error:", { error: err });
       res.status(500).json({ message: err.message });
     }
   });
@@ -1109,7 +1110,7 @@ export function registerFactoryStockAllocationV5Routes(app: Express) {
 
       res.json({ orders });
     } catch (err: any) {
-      console.error("[V5] recently-cancelled-containers error:", err);
+      logger.error("[V5] recently-cancelled-containers error:", { error: err });
       res.status(500).json({ message: err.message });
     }
   });
@@ -1193,7 +1194,7 @@ export function registerFactoryStockAllocationV5Routes(app: Express) {
 
       res.json({ id: orderId, restoredTo: restoreStatus, balasRestored: historyCount });
     } catch (err: any) {
-      console.error("[V5] restore-container error:", err);
+      logger.error("[V5] restore-container error:", { error: err });
       res.status(500).json({ message: err.message });
     }
   });
@@ -1238,7 +1239,7 @@ export function registerFactoryStockAllocationV5Routes(app: Express) {
 
       res.json({ orders });
     } catch (err: any) {
-      console.error("[V5] unlinked-loading-orders error:", err);
+      logger.error("[V5] unlinked-loading-orders error:", { error: err });
       res.status(500).json({ message: err.message });
     }
   });

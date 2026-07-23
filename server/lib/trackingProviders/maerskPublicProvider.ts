@@ -11,6 +11,7 @@
  */
 
 import type { CarrierTrackResult, TrackingEvent } from "./types";
+import { logger } from "../../lib/logger";
 
 const BROWSER_UA =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
@@ -54,7 +55,7 @@ export async function track(containerNumber: string): Promise<CarrierTrackResult
   }
 
   if (isRateLimited(containerNumber)) {
-    console.log(`[MaerskPublic] ${containerNumber}: rate-limited — skipping`);
+    logger.info(`[MaerskPublic] ${containerNumber}: rate-limited — skipping`);
     return { ...base, error: "rate_limited" };
   }
 
@@ -91,7 +92,7 @@ export async function track(containerNumber: string): Promise<CarrierTrackResult
       .map((c) => c.split(";")[0].trim())
       .filter(Boolean)
       .join("; ");
-    console.log(
+    logger.info(
       `[MaerskPublic] ${containerNumber}: prefetch done — ${sessionCookies ? "cookies acquired" : "no cookies"}`
     );
   } catch {
@@ -119,12 +120,12 @@ export async function track(containerNumber: string): Promise<CarrierTrackResult
     });
 
     if (res.status === 403 || res.status === 401 || res.status === 429) {
-      console.log(`[MaerskPublic] ${containerNumber}: blocked (HTTP ${res.status})`);
+      logger.info(`[MaerskPublic] ${containerNumber}: blocked (HTTP ${res.status})`);
       return { ...base, blocked: true, error: `blocked_http_${res.status}` };
     }
 
     if (!res.ok) {
-      console.log(`[MaerskPublic] ${containerNumber}: HTTP ${res.status}`);
+      logger.info(`[MaerskPublic] ${containerNumber}: HTTP ${res.status}`);
       return { ...base, error: `http_${res.status}` };
     }
 
@@ -132,7 +133,7 @@ export async function track(containerNumber: string): Promise<CarrierTrackResult
     if (!contentType.includes("application/json")) {
       const text = (await res.text()).slice(0, 300);
       const isChallenge = /captcha|datadome|challenge|cloudflare|bot/i.test(text);
-      console.log(`[MaerskPublic] ${containerNumber}: non-JSON response${isChallenge ? " (bot challenge)" : ""}`);
+      logger.info(`[MaerskPublic] ${containerNumber}: non-JSON response${isChallenge ? " (bot challenge)" : ""}`);
       return { ...base, blocked: isChallenge, error: isChallenge ? "captcha_challenge" : "non_json_response" };
     }
 
@@ -140,7 +141,7 @@ export async function track(containerNumber: string): Promise<CarrierTrackResult
     return parseResponse(containerNumber, data, base);
   } catch (err: any) {
     const isTimeout = err?.name === "TimeoutError" || err?.name === "AbortError";
-    console.log(`[MaerskPublic] ${containerNumber}: ${isTimeout ? "timeout" : (err?.message ?? "error")}`);
+    logger.info(`[MaerskPublic] ${containerNumber}: ${isTimeout ? "timeout" : (err?.message ?? "error")}`);
     return { ...base, error: isTimeout ? "timeout" : (err?.message ?? "unknown_error") };
   }
 }
@@ -260,18 +261,18 @@ function parseResponse(containerNumber: string, data: unknown, base: CarrierTrac
     if (deepResult) {
       eta = deepResult.value;
       deepEtaPath = deepResult.path;
-      console.log(
+      logger.info(
         `[MaerskPublic] ${containerNumber}: ETA from deep-scan path=${deepResult.path} val=${deepResult.value}`
       );
     }
   }
 
   if (!latest && !eta) {
-    console.log(`[MaerskPublic] ${containerNumber}: response parseable but no useful data`);
+    logger.info(`[MaerskPublic] ${containerNumber}: response parseable but no useful data`);
     return { ...base, noData: true, error: "no_useful_data", raw: data };
   }
 
-  console.log(
+  logger.info(
     `[MaerskPublic] ${containerNumber}: success — status=${latest?.status ?? "?"} events=${events.length}` +
       ` eta=${eta ?? "none"}${deepEtaPath ? ` (deep-scan path=${deepEtaPath})` : ""}`
   );

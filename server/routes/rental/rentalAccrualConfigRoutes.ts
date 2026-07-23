@@ -1,4 +1,5 @@
 import type { Express, Request, Response } from "express";
+import { logger } from "../../lib/logger";
 import {
   getCompanyId,
   findOrCreateLedgerAccount,
@@ -197,7 +198,7 @@ export function registerRentalAccrualConfigRoutes(
           }
 
           if (phantomRows.length > 0) {
-            console.log(`[re-accrue] phantom fix: ${phantomRows.length} rows, total correction=${phantomFixTotal}`);
+            logger.info(`[re-accrue] phantom fix: ${phantomRows.length} rows, total correction=${phantomFixTotal}`);
             await db.transaction(async (tx) => {
               const [corrV] = await tx
                 .insert(vouchers)
@@ -239,9 +240,9 @@ export function registerRentalAccrualConfigRoutes(
               }
               await tx.insert(voucherEntries).values(corrEntries);
             });
-            console.log(`[re-accrue] phantom fix voucher posted, total corrected=${phantomFixTotal}`);
+            logger.info(`[re-accrue] phantom fix voucher posted, total corrected=${phantomFixTotal}`);
           } else {
-            console.log(`[re-accrue] no phantom accruals detected`);
+            logger.info(`[re-accrue] no phantom accruals detected`);
           }
         }
       }
@@ -379,7 +380,7 @@ export function registerRentalAccrualConfigRoutes(
               }
               await tx.insert(voucherEntries).values(corrEntries);
             });
-            console.log(
+            logger.info(
               `[re-accrue] orphaned AP debit fix: ${orphanRows.length} rows, total corrected=${orphanedTotal}`
             );
           }
@@ -398,7 +399,7 @@ export function registerRentalAccrualConfigRoutes(
           )`
           )
         );
-      console.log(`[re-accrue] dangling stamp sweep cleared rows`);
+      logger.info(`[re-accrue] dangling stamp sweep cleared rows`);
 
       // 2b. Full reset for ALL fully-unpaid months (paidAmount = 0):
       //     Find every ledger row that still has an accrual stamp but has NOT yet
@@ -433,9 +434,9 @@ export function registerRentalAccrualConfigRoutes(
             sql`${propertyMonthlyLedger.paidAmount}::numeric = 0`
           )
         );
-      console.log(
+      logger.info(
         `[re-accrue] company=${companyId} ${curYear}-${curMonth} unpaidAccruedRows=${allUnpaidAccruedRows.length}`,
-        JSON.stringify(allUnpaidAccruedRows)
+        { unpaidAccruedRows: allUnpaidAccruedRows }
       );
 
       const voucherIdsToDelete = [
@@ -446,7 +447,7 @@ export function registerRentalAccrualConfigRoutes(
         ),
       ];
 
-      console.log(`[re-accrue] vouchersToDelete=${JSON.stringify(voucherIdsToDelete)}`);
+      logger.info(`[re-accrue] vouchersToDelete=${JSON.stringify(voucherIdsToDelete)}`);
 
       let reset = 0;
       if (voucherIdsToDelete.length > 0) {
@@ -476,11 +477,11 @@ export function registerRentalAccrualConfigRoutes(
         module,
         incomeAccountName
       );
-      console.log(`[re-accrue] result reset=${reset} accrued=${accrued} skipped=${skipped}`);
+      logger.info(`[re-accrue] result reset=${reset} accrued=${accrued} skipped=${skipped}`);
 
       res.json({ reset, accrued, skipped });
     } catch (e: any) {
-      console.error(`${tag} re-accrue:`, e);
+      logger.error(`${tag} re-accrue:`, { error: e });
       res.status(500).json({ message: e.message });
     }
   });
@@ -586,7 +587,7 @@ export function registerRentalAccrualConfigRoutes(
 
       res.json({ ok: true, reversalVoucherId });
     } catch (e: any) {
-      console.error(`${tag} reverse-accrual:`, e);
+      logger.error(`${tag} reverse-accrual:`, { error: e });
       res.status(500).json({ message: e.message });
     }
   });
