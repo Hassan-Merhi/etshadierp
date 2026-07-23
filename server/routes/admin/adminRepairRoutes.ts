@@ -1,4 +1,5 @@
 import { getClientDate } from "../../lib/dateUtils";
+import { logger } from "../../lib/logger";
 import { isReadonlyMigratedVoucher, READONLY_MIGRATED_VOUCHER_MESSAGE } from "../../lib/migratedVoucherGuard";
 import type { Express } from "express";
 import { db, pool } from "../../db";
@@ -184,7 +185,7 @@ export function registerAdminRepairRoutes(app: Express) {
         balanceZeroed: rawBalance.toFixed(2),
       });
     } catch (error: any) {
-      console.error("Recalculate equity adjustment error:", error);
+      logger.error("Recalculate equity adjustment error:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -235,7 +236,7 @@ export function registerAdminRepairRoutes(app: Express) {
         results,
       });
     } catch (error: any) {
-      console.error("Recalculate equity adjustment all error:", error);
+      logger.error("Recalculate equity adjustment all error:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -461,7 +462,7 @@ export function registerAdminRepairRoutes(app: Express) {
           "These vouchers have a locationId that points to a deleted or non-existent location. They are orphaned and can be safely deleted.",
       });
     } catch (error: any) {
-      console.error("Orphaned POS sales check error:", error);
+      logger.error("Orphaned POS sales check error:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -521,7 +522,7 @@ export function registerAdminRepairRoutes(app: Express) {
         voucherNumbers: orphanedVouchers.map((v) => v.voucherNumber),
       });
     } catch (error: any) {
-      console.error("Delete orphaned POS sales error:", error);
+      logger.error("Delete orphaned POS sales error:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -881,7 +882,7 @@ export function registerAdminRepairRoutes(app: Express) {
         ],
       });
     } catch (error: any) {
-      console.error("Rebuild inventory error:", error);
+      logger.error("Rebuild inventory error:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -941,7 +942,7 @@ export function registerAdminRepairRoutes(app: Express) {
 
       res.json(filtered);
     } catch (error: any) {
-      console.error("Negative inventory error:", error);
+      logger.error("Negative inventory error:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -1006,7 +1007,7 @@ export function registerAdminRepairRoutes(app: Express) {
 
       res.json(updated);
     } catch (error: any) {
-      console.error("Finalize voucher error:", error);
+      logger.error("Finalize voucher error:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -1018,16 +1019,16 @@ export function registerAdminRepairRoutes(app: Express) {
     try {
       const { runDevSeed } = await import("../../seedDev");
       const summary = await runDevSeed();
-      console.log("\n=== SEED DATA SUMMARY ===");
-      console.log(`Products: ${summary.products}`);
-      console.log(`Bales: ${summary.bales}`);
-      console.log(`Label Prints: ${summary.labelPrints} (${summary.scannedLabels} scanned)`);
-      console.log(`\nSample ARTICLE codes: ${summary.sampleArticleCodes.join(", ")}`);
-      console.log(`Sample REFERENCE numbers: ${summary.sampleReferenceNumbers.join(", ")}`);
-      console.log("========================\n");
+      logger.info("\n=== SEED DATA SUMMARY ===");
+      logger.info(`Products: ${summary.products}`);
+      logger.info(`Bales: ${summary.bales}`);
+      logger.info(`Label Prints: ${summary.labelPrints} (${summary.scannedLabels} scanned)`);
+      logger.info(`\nSample ARTICLE codes: ${summary.sampleArticleCodes.join(", ")}`);
+      logger.info(`Sample REFERENCE numbers: ${summary.sampleReferenceNumbers.join(", ")}`);
+      logger.info("========================\n");
       res.json(summary);
     } catch (error: any) {
-      console.error("Seed error:", error);
+      logger.error("Seed error:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -1107,7 +1108,7 @@ export function registerAdminRepairRoutes(app: Express) {
 
       res.json({ rows: previewRows });
     } catch (error: any) {
-      console.error("Inventory repair preview error:", error);
+      logger.error("Inventory repair preview error:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -1175,7 +1176,7 @@ export function registerAdminRepairRoutes(app: Express) {
           newValue,
         });
 
-        console.log(
+        logger.info(
           `[InventoryRepair] Corrected row id=${row.id} loc=${row.location_id} item=${row.stock_item_id}: qty=${qty} rate=${oldRate}->${newRate} value=${oldValue}->${newValue}`
         );
       }
@@ -1186,7 +1187,7 @@ export function registerAdminRepairRoutes(app: Express) {
         rows: correctedRows,
       });
     } catch (error: any) {
-      console.error("Inventory repair error:", error);
+      logger.error("Inventory repair error:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -1214,7 +1215,7 @@ export function registerAdminRepairRoutes(app: Express) {
       const fixed = (result as any).rows?.length ?? 0;
       res.json({ fixed, message: fixed > 0 ? `Restored ${fixed} bale(s) to IN_STOCK` : "No orphaned bales found" });
     } catch (error: any) {
-      console.error("[BaleOrphanFix] Error:", error);
+      logger.error("[BaleOrphanFix] Error:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });

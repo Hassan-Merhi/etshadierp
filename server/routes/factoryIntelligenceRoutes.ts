@@ -1,4 +1,5 @@
 import { getClientDate } from "../lib/dateUtils";
+import { logger } from "../lib/logger";
 import { cache } from "../lib/simpleCache";
 import type { Express } from "express";
 import { eq, and, desc, sql, between, gte, lte, sum, count, avg } from "drizzle-orm";
@@ -90,7 +91,7 @@ export function registerFactoryIntelligenceRoutes(app: Express, requireAuth: any
 
       res.json(result);
     } catch (error: any) {
-      console.error("Error fetching factory settings:", error);
+      logger.error("Error fetching factory settings:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -199,7 +200,7 @@ export function registerFactoryIntelligenceRoutes(app: Express, requireAuth: any
       cache.del(`factory_settings:${companyId}`);
       res.json({ ...result, ...resultExtra });
     } catch (error: any) {
-      console.error("Error updating factory settings:", error);
+      logger.error("Error updating factory settings:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -267,7 +268,7 @@ export function registerFactoryIntelligenceRoutes(app: Express, requireAuth: any
         containers: { loaded: loadedOrders.length },
       });
     } catch (error: any) {
-      console.error("Error fetching factory dashboard:", error);
+      logger.error("Error fetching factory dashboard:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -296,7 +297,7 @@ export function registerFactoryIntelligenceRoutes(app: Express, requireAuth: any
 
       res.json(results);
     } catch (error: any) {
-      console.error("Error fetching waste entries:", error);
+      logger.error("Error fetching waste entries:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -326,7 +327,7 @@ export function registerFactoryIntelligenceRoutes(app: Express, requireAuth: any
 
       res.json(entry);
     } catch (error: any) {
-      console.error("Error creating waste entry:", error);
+      logger.error("Error creating waste entry:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -345,7 +346,7 @@ export function registerFactoryIntelligenceRoutes(app: Express, requireAuth: any
       if (!deleted) return res.status(404).json({ message: "Waste entry not found" });
       res.json({ success: true });
     } catch (error: any) {
-      console.error("Error deleting waste entry:", error);
+      logger.error("Error deleting waste entry:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -408,7 +409,7 @@ export function registerFactoryIntelligenceRoutes(app: Express, requireAuth: any
 
       res.json(result);
     } catch (error: any) {
-      console.error("Error fetching daily KPIs:", error);
+      logger.error("Error fetching daily KPIs:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -459,7 +460,7 @@ export function registerFactoryIntelligenceRoutes(app: Express, requireAuth: any
       const result = Object.values(workerStats).sort((a, b) => b.balesCount - a.balesCount);
       res.json(result);
     } catch (error: any) {
-      console.error("Error fetching worker KPIs:", error);
+      logger.error("Error fetching worker KPIs:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -536,7 +537,7 @@ export function registerFactoryIntelligenceRoutes(app: Express, requireAuth: any
       result.sort((a: any, b: any) => a.wastePct - b.wastePct);
       res.json(result);
     } catch (error: any) {
-      console.error("Error fetching mix KPIs:", error);
+      logger.error("Error fetching mix KPIs:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -630,7 +631,7 @@ export function registerFactoryIntelligenceRoutes(app: Express, requireAuth: any
 
       res.json(result);
     } catch (error: any) {
-      console.error("Error fetching bale profitability:", error);
+      logger.error("Error fetching bale profitability:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -748,7 +749,7 @@ export function registerFactoryIntelligenceRoutes(app: Express, requireAuth: any
 
       res.json(result);
     } catch (error: any) {
-      console.error("Error fetching container profitability:", error);
+      logger.error("Error fetching container profitability:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -771,7 +772,7 @@ export function registerFactoryIntelligenceRoutes(app: Express, requireAuth: any
 
       res.json(results);
     } catch (error: any) {
-      console.error("Error fetching factory alerts:", error);
+      logger.error("Error fetching factory alerts:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -792,7 +793,7 @@ export function registerFactoryIntelligenceRoutes(app: Express, requireAuth: any
       if (!updated) return res.status(404).json({ message: "Alert not found" });
       res.json(updated);
     } catch (error: any) {
-      console.error("Error marking alert as read:", error);
+      logger.error("Error marking alert as read:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -920,7 +921,7 @@ export function registerFactoryIntelligenceRoutes(app: Express, requireAuth: any
 
       res.json({ newAlerts: newAlertCount });
     } catch (error: any) {
-      console.error("Error generating alerts:", error);
+      logger.error("Error generating alerts:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -1043,7 +1044,7 @@ export function registerFactoryIntelligenceRoutes(app: Express, requireAuth: any
       result.sort((a, b) => b.score - a.score);
       res.json(result);
     } catch (error: any) {
-      console.error("Error fetching supplier scores:", error);
+      logger.error("Error fetching supplier scores:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -1160,7 +1161,7 @@ export function registerFactoryIntelligenceRoutes(app: Express, requireAuth: any
 
       res.json({ suggestions });
     } catch (error: any) {
-      console.error("Error optimizing mix:", error);
+      logger.error("Error optimizing mix:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -1257,7 +1258,7 @@ export function registerFactoryIntelligenceRoutes(app: Express, requireAuth: any
         order,
       });
     } catch (error: any) {
-      console.error("Error tracing bale:", error);
+      logger.error("Error tracing bale:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -1281,7 +1282,7 @@ export function registerFactoryIntelligenceRoutes(app: Express, requireAuth: any
 
       res.json(photos);
     } catch (error: any) {
-      console.error("Error fetching bale photos:", error);
+      logger.error("Error fetching bale photos:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -1314,7 +1315,7 @@ export function registerFactoryIntelligenceRoutes(app: Express, requireAuth: any
 
         res.json(photo);
       } catch (error: any) {
-        console.error("Error uploading bale photo:", error);
+        logger.error("Error uploading bale photo:", { error: error });
         res.status(500).json({ message: error.message });
       }
     }
@@ -1346,7 +1347,7 @@ export function registerFactoryIntelligenceRoutes(app: Express, requireAuth: any
 
       res.json({ success: true });
     } catch (error: any) {
-      console.error("Error deleting bale photo:", error);
+      logger.error("Error deleting bale photo:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -1367,7 +1368,7 @@ export function registerFactoryIntelligenceRoutes(app: Express, requireAuth: any
       if (!fs.existsSync(filePath)) return res.status(404).json({ message: "File not found" });
       res.sendFile(filePath);
     } catch (error: any) {
-      console.error("Error serving bale photo:", error);
+      logger.error("Error serving bale photo:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -1452,7 +1453,7 @@ export function registerFactoryIntelligenceRoutes(app: Express, requireAuth: any
         expectedIncome: Math.round(expectedIncome * 100) / 100,
       });
     } catch (error: any) {
-      console.error("Error fetching cash flow forecast:", error);
+      logger.error("Error fetching cash flow forecast:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });

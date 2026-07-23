@@ -1,4 +1,5 @@
 import type { Express } from "express";
+import { logger } from "../../lib/logger";
 import { db, pool } from "../../db";
 import { requireAuth } from "../../auth";
 import {
@@ -145,7 +146,7 @@ export function registerFactoryShippingContainerRoutes(app: Express) {
 
       res.json(rows);
     } catch (error: any) {
-      console.error("Error fetching available invoices:", error);
+      logger.error("Error fetching available invoices:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -256,7 +257,7 @@ export function registerFactoryShippingContainerRoutes(app: Express) {
 
       res.json(rows);
     } catch (error: any) {
-      console.error("Error fetching shipping container rows:", error);
+      logger.error("Error fetching shipping container rows:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -313,7 +314,7 @@ export function registerFactoryShippingContainerRoutes(app: Express) {
 
       res.status(201).json(newRow);
     } catch (error: any) {
-      console.error("Error creating shipping container row:", error);
+      logger.error("Error creating shipping container row:", { error: error });
       if (error.code === "23505") {
         return res.status(409).json({ message: "This invoice already has a shipping container row" });
       }
@@ -352,7 +353,7 @@ export function registerFactoryShippingContainerRoutes(app: Express) {
 
       res.json(updated);
     } catch (error: any) {
-      console.error("Error updating shipping container row:", error);
+      logger.error("Error updating shipping container row:", { error: error });
       res.status(400).json({ message: error.message });
     }
   });
@@ -385,7 +386,7 @@ export function registerFactoryShippingContainerRoutes(app: Express) {
 
       res.json(updated);
     } catch (error: any) {
-      console.error("Error syncing order fields:", error);
+      logger.error("Error syncing order fields:", { error: error });
       res.status(400).json({ message: error.message });
     }
   });
@@ -420,7 +421,7 @@ export function registerFactoryShippingContainerRoutes(app: Express) {
 
       res.json(updated);
     } catch (error: any) {
-      console.error("Error marking row as done:", error);
+      logger.error("Error marking row as done:", { error: error });
       res.status(400).json({ message: error.message });
     }
   });
@@ -448,7 +449,7 @@ export function registerFactoryShippingContainerRoutes(app: Express) {
 
       res.json(updated);
     } catch (error: any) {
-      console.error("Error restoring row:", error);
+      logger.error("Error restoring row:", { error: error });
       res.status(400).json({ message: error.message });
     }
   });
@@ -515,7 +516,7 @@ export function registerFactoryShippingContainerRoutes(app: Express) {
 
       res.json({ ok: true });
     } catch (error: any) {
-      console.error("Error deleting shipping container row:", error);
+      logger.error("Error deleting shipping container row:", { error: error });
       res.status(error.message === "Row not found" ? 404 : 400).json({ message: error.message });
     }
   });
@@ -592,7 +593,7 @@ export function registerFactoryShippingContainerRoutes(app: Express) {
 
       res.json(docs);
     } catch (error: any) {
-      console.error("Error fetching documents:", error);
+      logger.error("Error fetching documents:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -638,7 +639,7 @@ export function registerFactoryShippingContainerRoutes(app: Express) {
         if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
         fs.writeFileSync(path.join(dir, generatedFilename), req.file.buffer);
       } catch (e) {
-        console.warn("Shipping container doc disk cache write failed (non-fatal):", e);
+        logger.warn("Shipping container doc disk cache write failed (non-fatal):", { error: e });
       }
 
       const username: string =
@@ -677,7 +678,7 @@ export function registerFactoryShippingContainerRoutes(app: Express) {
 
       res.json({ ...doc, isGhost: false });
     } catch (error: any) {
-      console.error("Error uploading document:", error);
+      logger.error("Error uploading document:", { error: error });
       res.status(400).json({ message: error.message });
     }
   });
@@ -724,7 +725,7 @@ export function registerFactoryShippingContainerRoutes(app: Express) {
 
       res.json({ success: true, deletedId: docId });
     } catch (error: any) {
-      console.error("Error deleting document:", error);
+      logger.error("Error deleting document:", { error: error });
       res.status(400).json({ message: error.message });
     }
   });
@@ -782,7 +783,7 @@ export function registerFactoryShippingContainerRoutes(app: Express) {
       res.setHeader("Content-Disposition", `${disposition}; filename="${safeDownloadName(docRow.originalName)}"`);
       res.send(buffer);
     } catch (error: any) {
-      console.error("Error serving document:", error);
+      logger.error("Error serving document:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -817,7 +818,7 @@ export function registerFactoryShippingContainerRoutes(app: Express) {
           if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
           fs.writeFileSync(path.join(dir, generatedFilename), req.file.buffer);
         } catch (e) {
-          console.warn("Shipping invoice disk cache write failed (non-fatal):", e);
+          logger.warn("Shipping invoice disk cache write failed (non-fatal):", { error: e });
         }
 
         await db
@@ -834,7 +835,7 @@ export function registerFactoryShippingContainerRoutes(app: Express) {
 
         res.json({ fileUrl, originalName: req.file.originalname, fileType: req.file.mimetype });
       } catch (error: any) {
-        console.error("Error uploading shipping invoice:", error);
+        logger.error("Error uploading shipping invoice:", { error: error });
         res.status(500).json({ message: error.message });
       }
     }
@@ -880,7 +881,7 @@ export function registerFactoryShippingContainerRoutes(app: Express) {
 
       res.json({ ok: true });
     } catch (error: any) {
-      console.error("Error deleting shipping invoice:", error);
+      logger.error("Error deleting shipping invoice:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -927,7 +928,7 @@ export function registerFactoryShippingContainerRoutes(app: Express) {
       res.setHeader("Content-Disposition", `inline; filename="${safeDownloadName(row.shippingInvoiceOriginalName)}"`);
       res.send(buffer);
     } catch (error: any) {
-      console.error("Error serving shipping invoice:", error);
+      logger.error("Error serving shipping invoice:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -950,7 +951,7 @@ export function registerFactoryShippingContainerRoutes(app: Express) {
       const removed = (result as any).rowCount ?? 0;
       res.json({ success: true, removed });
     } catch (error: any) {
-      console.error("Error cleaning up ghost documents:", error);
+      logger.error("Error cleaning up ghost documents:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -1124,7 +1125,7 @@ export function registerFactoryShippingContainerRoutes(app: Express) {
         whatsappContact: row.customerPhone || null,
       });
     } catch (error: any) {
-      console.error("Error building WhatsApp preview:", error);
+      logger.error("Error building WhatsApp preview:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -1269,7 +1270,7 @@ export function registerFactoryShippingContainerRoutes(app: Express) {
       res.setHeader("Content-Length", zipBuffer.length);
       res.end(zipBuffer);
     } catch (error: any) {
-      console.error("Error generating ZIP package:", error);
+      logger.error("Error generating ZIP package:", { error: error });
       if (!res.headersSent) res.status(500).json({ message: error.message });
     }
   });

@@ -1,4 +1,5 @@
 import type { Express } from "express";
+import { logger } from "../../../lib/logger";
 import crypto from "crypto";
 import { requireAuth, requireRole } from "../../../auth";
 import {
@@ -181,7 +182,7 @@ interface ZeroCostSourceTokenPayload {
 
 export function registerRawStockRecalcRoutes(app: Express) {
   // Ensure the undo log table exists (idempotent, runs once at startup).
-  ensureUndoLogTable().catch((err) => console.error("[recalc] Failed to create undo log table:", err));
+  ensureUndoLogTable().catch((err) => logger.error("[recalc] Failed to create undo log table:", { error: err }));
   // FIX 11: ensureTokenTable removed — consumed-tokens table DDL lives in migration
   // 20260718_factory_replay_consumed_tokens.sql; no startup DDL needed here.
 
@@ -198,7 +199,7 @@ export function registerRawStockRecalcRoutes(app: Express) {
         const rows = await getRawStockRecalcPreview(companyId);
         res.json(rows);
       } catch (err: any) {
-        console.error("[raw-stock recalc preview] error:", err);
+        logger.error("[raw-stock recalc preview] error:", { error: err });
         res.status(500).json({ message: err.message || "Failed to compute recalculation preview" });
       }
     }
@@ -224,7 +225,7 @@ export function registerRawStockRecalcRoutes(app: Express) {
         const rows = await getAffectedMixBatchesPreview(companyId, parsedIds, includeCompletedBatches === true);
         res.json(rows);
       } catch (err: any) {
-        console.error("[raw-stock recalc mix-batches-preview] error:", err);
+        logger.error("[raw-stock recalc mix-batches-preview] error:", { error: err });
         res.status(500).json({ message: err.message || "Failed to compute affected mix batches preview" });
       }
     }
@@ -394,16 +395,16 @@ export function registerRawStockRecalcRoutes(app: Express) {
             ]
           );
         } catch (undoErr) {
-          console.error("[recalc] Failed to save undo snapshot:", undoErr);
+          logger.error("[recalc] Failed to save undo snapshot:", { error: undoErr });
         }
 
         res.json({ dryRun: false, results });
       } catch (err: any) {
         if (err instanceof RepairTokenConfigurationError) {
-          console.error("Repair token configuration error (SESSION_SECRET missing/fallback in production):", err.message);
+          logger.error("Repair token configuration error (SESSION_SECRET missing/fallback in production):", { error: err.message });
           return res.status(500).json({ message: err.message, code: "REPAIR_TOKEN_MISCONFIGURED" });
         }
-        console.error("[raw-stock recalc apply] error:", err);
+        logger.error("[raw-stock recalc apply] error:", { error: err });
         res.status(500).json({ message: err.message || "Failed to apply recalculation" });
       }
     }
@@ -425,7 +426,7 @@ export function registerRawStockRecalcRoutes(app: Express) {
         const rows = await getZeroCostMixBatchSourcesPreview(companyId);
         res.json(rows);
       } catch (err: any) {
-        console.error("[raw-stock recalc zero-cost-sources] error:", err);
+        logger.error("[raw-stock recalc zero-cost-sources] error:", { error: err });
         res.status(500).json({ message: err.message || "Failed to compute zero-cost mix-batch-source preview" });
       }
     }
@@ -528,10 +529,10 @@ export function registerRawStockRecalcRoutes(app: Express) {
         res.json({ dryRun: false, results });
       } catch (err: any) {
         if (err instanceof RepairTokenConfigurationError) {
-          console.error("Repair token configuration error (SESSION_SECRET missing/fallback in production):", err.message);
+          logger.error("Repair token configuration error (SESSION_SECRET missing/fallback in production):", { error: err.message });
           return res.status(500).json({ message: err.message, code: "REPAIR_TOKEN_MISCONFIGURED" });
         }
-        console.error("[raw-stock recalc zero-cost-sources apply] error:", err);
+        logger.error("[raw-stock recalc zero-cost-sources apply] error:", { error: err });
         res.status(500).json({ message: err.message || "Failed to apply zero-cost source fix" });
       }
     }
@@ -635,7 +636,7 @@ export function registerRawStockRecalcRoutes(app: Express) {
 
         res.json({ results, applied: results.filter((r) => r.applied).length });
       } catch (err: any) {
-        console.error("[recalc auto-apply-fx] error:", err);
+        logger.error("[recalc auto-apply-fx] error:", { error: err });
         res.status(500).json({ message: err.message || "Failed to auto-apply FX rates" });
       }
     }
@@ -656,7 +657,7 @@ export function registerRawStockRecalcRoutes(app: Express) {
         const result = await getFullAuditScan(companyId);
         res.json(result);
       } catch (err: any) {
-        console.error("[raw-stock recalc full-audit] error:", err);
+        logger.error("[raw-stock recalc full-audit] error:", { error: err });
         res.status(500).json({ message: err.message || "Failed to run full audit scan" });
       }
     }
@@ -677,7 +678,7 @@ export function registerRawStockRecalcRoutes(app: Express) {
         const result = await getMixBatchSourceCostMismatchPreview(companyId);
         res.json(result);
       } catch (err: any) {
-        console.error("[raw-stock recalc source-cost-mismatches] error:", err);
+        logger.error("[raw-stock recalc source-cost-mismatches] error:", { error: err });
         res.status(500).json({ message: err.message || "Failed to scan source cost mismatches" });
       }
     }
@@ -810,7 +811,7 @@ export function registerRawStockRecalcRoutes(app: Express) {
           results,
         });
       } catch (err: any) {
-        console.error("[supplier-rate/recompute] error:", err);
+        logger.error("[supplier-rate/recompute] error:", { error: err });
         res.status(500).json({ message: err.message || "Failed to recompute supplier rate" });
       }
     }
@@ -873,7 +874,7 @@ export function registerRawStockRecalcRoutes(app: Express) {
 
         res.json(rows);
       } catch (err: any) {
-        console.error("[supplier-rate/recompute-audit] error:", err);
+        logger.error("[supplier-rate/recompute-audit] error:", { error: err });
         res.status(500).json({ message: err.message || "Failed to fetch recompute audit" });
       }
     }
@@ -961,7 +962,7 @@ export function registerRawStockRecalcRoutes(app: Express) {
           results,
         });
       } catch (err: any) {
-        console.error("[supplier-rate/restore-from-audit] error:", err);
+        logger.error("[supplier-rate/restore-from-audit] error:", { error: err });
         res.status(500).json({ message: err.message || "Failed to restore supplier rates" });
       }
     }
@@ -1133,16 +1134,16 @@ export function registerRawStockRecalcRoutes(app: Express) {
             ]
           );
         } catch (undoErr) {
-          console.error("[recalc] Failed to save undo snapshot:", undoErr);
+          logger.error("[recalc] Failed to save undo snapshot:", { error: undoErr });
         }
 
         res.json({ dryRun: false, results });
       } catch (err: any) {
         if (err instanceof RepairTokenConfigurationError) {
-          console.error("Repair token configuration error:", err.message);
+          logger.error("Repair token configuration error:", { error: err.message });
           return res.status(500).json({ message: err.message, code: "REPAIR_TOKEN_MISCONFIGURED" });
         }
-        console.error("[raw-stock recalc apply-all-safe] error:", err);
+        logger.error("[raw-stock recalc apply-all-safe] error:", { error: err });
         res.status(500).json({ message: err.message || "Failed to apply all safe repairs" });
       }
     }
@@ -1173,7 +1174,7 @@ export function registerRawStockRecalcRoutes(app: Express) {
         );
         res.json(rows);
       } catch (err: any) {
-        console.error("[recalc undo-log] error:", err);
+        logger.error("[recalc undo-log] error:", { error: err });
         res.status(500).json({ message: err.message || "Failed to load undo log" });
       }
     }
@@ -1345,7 +1346,7 @@ export function registerRawStockRecalcRoutes(app: Express) {
           suppliersRestored: snapshot.suppliers.length,
         });
       } catch (err: any) {
-        console.error("[recalc undo] error:", err);
+        logger.error("[recalc undo] error:", { error: err });
         res.status(500).json({ message: err.message || "Failed to undo recalculation" });
       }
     }
@@ -1364,7 +1365,7 @@ export function registerRawStockRecalcRoutes(app: Express) {
         const preview = await previewHistoricalCostReplay(companyId);
         res.json(preview);
       } catch (err: any) {
-        console.error("[historical-replay preview] error:", err);
+        logger.error("[historical-replay preview] error:", { error: err });
         res.status(500).json({ message: err.message || "Failed to compute historical replay preview" });
       }
     }
@@ -1566,7 +1567,7 @@ export function registerRawStockRecalcRoutes(app: Express) {
             code: "STALE_TOKEN",
           });
         }
-        console.error("[historical-replay apply] error:", err);
+        logger.error("[historical-replay apply] error:", { error: err });
         res.status(500).json({ message: err.message || "Failed to apply historical replay" });
       }
     }
@@ -1599,7 +1600,7 @@ export function registerRawStockRecalcRoutes(app: Express) {
         const skippedFx = rows.filter((r) => isTarget(r) && r.fxUnresolved);
         res.json({ affected, skippedFx, totalScanned: rows.length });
       } catch (err: any) {
-        console.error("[partial-offload-scan] error:", err);
+        logger.error("[partial-offload-scan] error:", { error: err });
         res.status(500).json({ message: err.message || "Failed to scan partial offload containers" });
       }
     }
@@ -1683,7 +1684,7 @@ export function registerRawStockRecalcRoutes(app: Express) {
         if (err instanceof RepairTokenConfigurationError) {
           return res.status(500).json({ message: err.message, code: "REPAIR_TOKEN_MISCONFIGURED" });
         }
-        console.error("[partial-offload-scan apply] error:", err);
+        logger.error("[partial-offload-scan apply] error:", { error: err });
         res.status(500).json({ message: err.message || "Failed to apply partial-offload fix" });
       }
     }

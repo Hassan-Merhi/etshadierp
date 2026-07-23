@@ -1,4 +1,5 @@
 import { parseId, parseOptionalId } from "../../lib/parseId";
+import { logger } from "../../lib/logger";
 import { getClientDate } from "../../lib/dateUtils";
 import { getExportPriceVisibility } from "../../helpers/exportVisibility";
 import { buildSafeFilename, contentDisposition } from "../../lib/contentDisposition";
@@ -301,7 +302,7 @@ export function registerFactoryCustomerProformaRoutes(app: Express) {
 
       res.json(result);
     } catch (error: any) {
-      console.error("Error fetching customer proformas:", error);
+      logger.error("Error fetching customer proformas:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -334,7 +335,7 @@ export function registerFactoryCustomerProformaRoutes(app: Express) {
       await syncProformaReservations(db, companyId, proforma.id);
       res.json(proforma);
     } catch (error: any) {
-      console.error("Error creating customer proforma:", error);
+      logger.error("Error creating customer proforma:", { error: error });
       res.status(400).json({ message: error.message });
     }
   });
@@ -381,7 +382,7 @@ export function registerFactoryCustomerProformaRoutes(app: Express) {
       await syncProformaReservations(db, companyId, id);
       res.json(updated);
     } catch (error: any) {
-      console.error("Error updating customer proforma:", error);
+      logger.error("Error updating customer proforma:", { error: error });
       res.status(400).json({ message: error.message });
     }
   });
@@ -405,7 +406,7 @@ export function registerFactoryCustomerProformaRoutes(app: Express) {
           .select({ id: customers.id, legalName: customers.legalName, deletedAt: customers.deletedAt })
           .from(customers)
           .where(eq(customers.id, proformaBefore.customerId));
-        console.log(
+        logger.info(
           `[PROFORMA DELETE] Deleting proforma id=${id} name="${proformaBefore.name}" customerId=${proformaBefore.customerId} customerName="${custBefore?.legalName}" customerDeletedAt=${custBefore?.deletedAt}`
         );
       }
@@ -433,14 +434,14 @@ export function registerFactoryCustomerProformaRoutes(app: Express) {
           .select({ id: customers.id, legalName: customers.legalName, deletedAt: customers.deletedAt })
           .from(customers)
           .where(eq(customers.id, proformaBefore.customerId));
-        console.log(
+        logger.info(
           `[PROFORMA DELETE] After deletion: customerId=${proformaBefore.customerId} customerName="${custAfter?.legalName}" customerDeletedAt=${custAfter?.deletedAt}`
         );
       }
 
       res.json({ message: "Proforma deleted" });
     } catch (error: any) {
-      console.error("Error deleting customer proforma:", error);
+      logger.error("Error deleting customer proforma:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -489,7 +490,7 @@ export function registerFactoryCustomerProformaRoutes(app: Express) {
               AND co.status IN ('LOADING', 'PENDING_VERIFICATION', 'VERIFIED', 'FINALIZED')
             GROUP BY fb.article_code`
       );
-      console.log(`[create-loading] proformaId=${proformaId} companyId=${companyId}`);
+      logger.info(`[create-loading] proformaId=${proformaId} companyId=${companyId}`);
       const alreadyLoadedMap = new Map<string, number>(
         ((alreadyLoadedRaw as any).rows || (alreadyLoadedRaw as unknown as any[])).map((r: any) => [
           r.articleCode,
@@ -504,7 +505,7 @@ export function registerFactoryCustomerProformaRoutes(app: Express) {
         const lineQty = Number(line.quantity) || 0;
         const alreadyLoaded = alreadyLoadedMap.get(line.articleCode) || 0;
         const remaining = Math.max(0, lineQty - alreadyLoaded);
-        console.log(
+        logger.info(
           `[create-loading] line articleCode=${line.articleCode} lineId=${line.id} qty=${lineQty} alreadyLoaded=${alreadyLoaded} remaining=${remaining}`
         );
         if (remaining === 0) {
@@ -648,7 +649,7 @@ export function registerFactoryCustomerProformaRoutes(app: Express) {
         ...(insufficientStock.length > 0 ? { warnings: insufficientStock } : {}),
       });
     } catch (error: any) {
-      console.error("Error creating loading from proforma:", error);
+      logger.error("Error creating loading from proforma:", { error: error });
       res.status(400).json({ message: error.message });
     }
   });
@@ -697,7 +698,7 @@ export function registerFactoryCustomerProformaRoutes(app: Express) {
 
       res.json({ ...line, ...(stockWarning ? { stockWarning } : {}) });
     } catch (error: any) {
-      console.error("Error creating proforma line:", error);
+      logger.error("Error creating proforma line:", { error: error });
       res.status(400).json({ message: error.message });
     }
   });
@@ -751,7 +752,7 @@ export function registerFactoryCustomerProformaRoutes(app: Express) {
       }
 
       if (updateData.quantity !== undefined) {
-        console.log(
+        logger.info(
           `[proforma-line PUT] lineId=${id} proformaId=${existingLine.proformaId} articleCode=${existingLine.articleCode} oldQty=${existingLine.quantity} newQty=${updateData.quantity}`
         );
       }
@@ -838,7 +839,7 @@ export function registerFactoryCustomerProformaRoutes(app: Express) {
 
       res.json({ ...updated, ...(stockWarning ? { stockWarning } : {}) });
     } catch (error: any) {
-      console.error("Error updating proforma line:", error);
+      logger.error("Error updating proforma line:", { error: error });
       res.status(400).json({ message: error.message });
     }
   });
@@ -864,7 +865,7 @@ export function registerFactoryCustomerProformaRoutes(app: Express) {
       await syncProformaReservations(db, companyId, lineToDelete.proformaId);
       res.json({ message: "Proforma line deleted" });
     } catch (error: any) {
-      console.error("Error deleting proforma line:", error);
+      logger.error("Error deleting proforma line:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -922,7 +923,7 @@ export function registerFactoryCustomerProformaRoutes(app: Express) {
 
       res.json(result);
     } catch (error: any) {
-      console.error("Error bulk creating proforma:", error);
+      logger.error("Error bulk creating proforma:", { error: error });
       res.status(400).json({ message: error.message });
     }
   });
@@ -973,7 +974,7 @@ export function registerFactoryCustomerProformaRoutes(app: Express) {
       await syncProformaReservations(db, companyId, id);
       res.json(result);
     } catch (error: any) {
-      console.error("Error replacing proforma lines:", error);
+      logger.error("Error replacing proforma lines:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -1020,7 +1021,7 @@ export function registerFactoryCustomerProformaRoutes(app: Express) {
 
       res.json({ updated, skipped, fixed });
     } catch (error: any) {
-      console.error("Error applying catalog prices:", error);
+      logger.error("Error applying catalog prices:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -1061,7 +1062,7 @@ export function registerFactoryCustomerProformaRoutes(app: Express) {
 
       res.json({ updated, skipped, fixed });
     } catch (error: any) {
-      console.error("Error applying production prices:", error);
+      logger.error("Error applying production prices:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -1124,13 +1125,13 @@ export function registerFactoryCustomerProformaRoutes(app: Express) {
         .from(customers)
         .where(eq(customers.id, proforma.customerId));
 
-      console.log(
+      logger.info(
         `[PROFORMA TRANSFER] id=${id} name="${proforma.name}" from customer ${proforma.customerId} ("${fromCustomer?.legalName}") → ${newCustomerId} ("${targetCustomer.legalName}")`
       );
 
       res.json({ ...updated, targetCustomerName: targetCustomer.legalName });
     } catch (error: any) {
-      console.error("Error transferring proforma:", error);
+      logger.error("Error transferring proforma:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -1293,7 +1294,7 @@ export function registerFactoryCustomerProformaRoutes(app: Express) {
         })),
       });
     } catch (error: any) {
-      console.error("Error fetching stock allocation:", error);
+      logger.error("Error fetching stock allocation:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -1449,7 +1450,7 @@ export function registerFactoryCustomerProformaRoutes(app: Express) {
         productNames: Object.fromEntries(productNameByCode),
       });
     } catch (error: any) {
-      console.error("Error fetching loading-mode stock allocation:", error);
+      logger.error("Error fetching loading-mode stock allocation:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -1484,7 +1485,7 @@ export function registerFactoryCustomerProformaRoutes(app: Express) {
         res.json({ reserved: true });
       }
     } catch (error: any) {
-      console.error("Error toggling reservation:", error);
+      logger.error("Error toggling reservation:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -1686,7 +1687,7 @@ export function registerFactoryCustomerProformaRoutes(app: Express) {
       res.setHeader("Content-Length", xlsBuffer.byteLength);
       res.end(xlsBuffer);
     } catch (error: any) {
-      console.error("Error exporting proforma to Excel:", error);
+      logger.error("Error exporting proforma to Excel:", { error: error });
       if (!res.headersSent) res.status(500).json({ message: error.message });
     }
   });
@@ -1921,7 +1922,7 @@ export function registerFactoryCustomerProformaRoutes(app: Express) {
 
       doc.end();
     } catch (error: any) {
-      console.error("Error exporting proforma to PDF:", error);
+      logger.error("Error exporting proforma to PDF:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
