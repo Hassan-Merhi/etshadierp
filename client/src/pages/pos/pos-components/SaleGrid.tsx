@@ -22,6 +22,9 @@ export interface SaleGridProps {
   clearActiveRowTimerRef: React.MutableRefObject<ReturnType<typeof setTimeout> | null>;
   focusCell: (rowIndex: number, colIndex: number) => void;
   toast: any;
+  /** When true (edit mode), skip the "incomplete item" mousedown guard so
+   *  items loaded from the DB don't lock the entire grid. */
+  isEditMode?: boolean;
 }
 
 export function SaleGrid({
@@ -43,6 +46,7 @@ export function SaleGrid({
   clearActiveRowTimerRef,
   focusCell,
   toast,
+  isEditMode = false,
 }: SaleGridProps) {
   return (
     <Card className="flex-1 overflow-hidden min-w-0">
@@ -76,9 +80,14 @@ export function SaleGrid({
                       key={col.key}
                       className={`${col.width} border-r h-9 ${col.key === "amount" ? "bg-muted/30" : ""}`}
                       onMouseDown={(e) => {
+                        // In edit mode all rows are loaded from the DB and already
+                        // have valid stockItemIds, so the incomplete-item guard is
+                        // irrelevant and would incorrectly lock the grid.
+                        if (isEditMode) return;
                         const invalidIdx = rows.findIndex((r) => r.itemName?.trim() && !r.stockItemId);
                         if (invalidIdx !== -1 && !(rowIndex === invalidIdx && col.key === "itemName")) {
-                          e.preventDefault();
+                          // Show warning but do NOT call e.preventDefault() — that
+                          // would block focus on every input and lock the entire grid.
                           toast({
                             title: "Select an item first",
                             description: `Row ${invalidIdx + 1} has an incomplete item. Please choose an item from the list.`,

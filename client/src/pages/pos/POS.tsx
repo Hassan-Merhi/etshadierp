@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { useLocation as useLocationContext } from "@/contexts/LocationContext";
 import { useCompany } from "@/contexts/CompanyContext";
 import { useLocation } from "wouter";
@@ -179,8 +179,16 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
     }
   }, [editVoucher, allLocations, selectedLocation, setSelectedLocation]);
 
-  // Populate form when editing an existing voucher (ISSUE 10)
+  // Guard: rows + notes + date are only populated ONCE per edit session.
+  // Without this, any dependency change (e.g. allLedgerAccounts re-fetching on
+  // window focus) would call setRows() again and wipe the user's in-progress edits.
+  const editRowsInitRef = useRef(false);
+
+  // Effect 1: Populate rows / notes / date from the voucher — runs once.
   useEffect(() => {
+    if (!editVoucherId) { editRowsInitRef.current = false; return; }
+    if (editRowsInitRef.current) return; // already populated; never reset user edits
+
     // Primary source: salesItems attached to the voucher object.
     // Fallback: view-entries endpoint (populated when salesItems is missing from the voucher).
     const resolvedItems: any[] = Array.isArray(editVoucher?.salesItems) && editVoucher.salesItems.length > 0
@@ -205,7 +213,8 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
       id: String(index + 1),
       itemName: item.stockItemName || "",
       stockItemCode: item.stockItemCode || "",
-      stockItemId: item.stockItemId,
+      // Ensure stockItemId is always a number (guard against 0/null from old data)
+      stockItemId: item.stockItemId ? Number(item.stockItemId) : undefined,
       salesItemId: item.id,
       quantity: parseFloat(item.quantity),
       rate: parseFloat(item.sellingPrice),
@@ -226,46 +235,52 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
       configuredPrice: undefined,
     });
     setRows(newRows);
+    editRowsInitRef.current = true;
 
     if (editVoucher.description) setNotes(editVoucher.description);
     if (editVoucher.voucherDate) setSaleDate(editVoucher.voucherDate);
+  }, [editVoucherId, editVoucher, editVoucherViewEntries]);
 
-    if (editVoucher.entries && editVoucher.entries.length > 0) {
-      const debitEntry = editVoucher.entries.find((e: any) => parseFloat(e.debitAmount || "0") > 0);
-      if (debitEntry) {
-        if (debitEntry.bankAccountId) {
-          setPaymentAccountType("bank");
-          setPaymentAccountId(String(debitEntry.bankAccountId));
+  // Effect 2: Detect payment account type once ledger accounts are available.
+  // This is separate from Effect 1 so that ledger-account re-fetches never
+  // reset the rows the user is actively editing.
+  useEffect(() => {
+    if (!editVoucher || !editVoucher.entries || editVoucher.entries.length === 0) return;
+
+    const debitEntry = editVoucher.entries.find((e: any) => parseFloat(e.debitAmount || "0") > 0);
+    if (!debitEntry) return;
+
+    if (debitEntry.bankAccountId) {
+      setPaymentAccountType("bank");
+      setPaymentAccountId(String(debitEntry.bankAccountId));
+      setIsCreditSale(false);
+    } else if (debitEntry.ledgerAccountId) {
+      const ledgerAccount = allLedgerAccounts.find((acc: any) => acc.id === debitEntry.ledgerAccountId);
+      if (ledgerAccount) {
+        if (ledgerAccount.accountType === "Cash") {
+          setPaymentAccountType("cash");
+          setPaymentAccountId(String(debitEntry.ledgerAccountId));
           setIsCreditSale(false);
-        } else if (debitEntry.ledgerAccountId) {
-          const ledgerAccount = allLedgerAccounts.find((acc: any) => acc.id === debitEntry.ledgerAccountId);
-          if (ledgerAccount) {
-            if (ledgerAccount.accountType === "Cash") {
-              setPaymentAccountType("cash");
-              setPaymentAccountId(String(debitEntry.ledgerAccountId));
-              setIsCreditSale(false);
-            } else {
-              setPaymentAccountType("credit");
-              setPaymentAccountId(String(debitEntry.ledgerAccountId));
-              setIsCreditSale(true);
-              setSelectedCustomerId(String(debitEntry.ledgerAccountId));
-            }
-          } else {
-            const isCreditSaleEntry = debitEntry.narration?.includes("Credit Sale");
-            if (isCreditSaleEntry) {
-              setPaymentAccountType("credit");
-              setIsCreditSale(true);
-              setSelectedCustomerId(String(debitEntry.ledgerAccountId));
-            } else {
-              setPaymentAccountType("cash");
-              setIsCreditSale(false);
-            }
-            setPaymentAccountId(String(debitEntry.ledgerAccountId));
-          }
+        } else {
+          setPaymentAccountType("credit");
+          setPaymentAccountId(String(debitEntry.ledgerAccountId));
+          setIsCreditSale(true);
+          setSelectedCustomerId(String(debitEntry.ledgerAccountId));
         }
+      } else {
+        const isCreditSaleEntry = debitEntry.narration?.includes("Credit Sale");
+        if (isCreditSaleEntry) {
+          setPaymentAccountType("credit");
+          setIsCreditSale(true);
+          setSelectedCustomerId(String(debitEntry.ledgerAccountId));
+        } else {
+          setPaymentAccountType("cash");
+          setIsCreditSale(false);
+        }
+        setPaymentAccountId(String(debitEntry.ledgerAccountId));
       }
     }
-  }, [editVoucher, editVoucherViewEntries, allLedgerAccounts]);
+  }, [editVoucher, allLedgerAccounts]);
 
   // ── WhatsApp / mutations / autosave ───────────────────────────────────────
   const { handleSendInvoiceWhatsApp, handleSendWhatsAppReport } = usePosWhatsApp({
@@ -465,6 +480,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
                 clearActiveRowTimerRef={clearActiveRowTimerRef}
                 focusCell={focusCell}
                 toast={toast}
+                isEditMode={!!editVoucherId}
               />
             </div>
             <div className="mt-2 px-1 pb-2">
