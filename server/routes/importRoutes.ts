@@ -1,109 +1,18 @@
 import { getClientDate } from "../lib/dateUtils";
 import type { Express } from "express";
-import { sendTransferWhatsApp } from "../helpers/sendTransferWhatsApp";
 import { db } from "../db";
 import { storage } from "../storage";
-import { requireAuth, requireRole, canDelete, requireNonPOS, checkPOSLocation } from "../auth";
-import { upload, logAudit, getCurrentExchangeRate, calculateHistoricalLocationInventory } from "./_helpers";
+import { requireAuth, requireNonPOS } from "../auth";
+import { upload } from "./_helpers";
 import {
   inventory,
-  stockItems,
-  stockGroups,
-  stockTransferVouchers,
-  stockTransferItems,
-  stockAdjustmentVouchers,
-  stockAdjustmentItems,
-  containers,
-  containerOffloads,
-  containerOffloadItems,
-  bankAccounts,
-  fixedAssets,
   ledgerAccounts,
-  insertLedgerAccountSchema,
-  insertStockGroupSchema,
-  insertStockItemSchema,
-  insertContainerSchema,
-  insertStockTransferVoucherSchema,
-  insertStockAdjustmentVoucherSchema,
-  updateStockTransferSchema,
-  updateStockAdjustmentSchema,
-  vouchers,
-  voucherEntries,
-  salesItems,
-  suppliers,
-  customers,
-  customerBalances,
-  employees,
-  locations,
-  userLocations,
-  userCompanyRoles,
-  companies,
-  auditLog,
-  users,
-  FEATURE_KEYS,
-  companySettings,
-  intercompanyPosConfigs,
   purchaseOrders,
-  poLineItems,
-  interCompanyTransfers,
-  insertInterCompanyTransferSchema,
-  insertContainerSaleSchema,
-  containerSales,
-  insertUserPreferencesSchema,
-  userPreferences,
-  insertDraftPosSaleSchema,
-  InsertDraftPosSale,
-  insertSalaryAdvanceSchema,
-  insertSalaryAdvanceDeductionSchema,
-  salaryAdvances,
-  salaryAdvanceDeductions,
-  fiscalPeriodClosures,
-  wasteDispatches,
-  wasteDispatchItems,
-  dashboardCashAccounts,
-  dashboardPayableAccounts,
-  dashboardAccountSelections,
-  insertDashboardCashAccountSchema,
-  insertDashboardPayableAccountSchema,
-  insertDashboardAccountSelectionSchema,
-  creditNoteItems,
-  pendingBarcodes,
-  insertPendingBarcodeSchema,
-  bales,
-  baleProducts,
-  baleProductCategories,
-  storedFiles,
-  stockItemLocationPrices,
   type Container,
 } from "@shared/schema";
-import {
-  eq,
-  and,
-  or,
-  desc,
-  asc,
-  lt,
-  gt,
-  ne,
-  inArray,
-  sql,
-  isNull,
-  isNotNull,
-  not,
-  gte,
-  lte,
-  like,
-  ilike,
-} from "drizzle-orm";
-import { format } from "date-fns";
-import { z } from "zod";
-import { readExcel, sheetToJson, createWorkbook, jsonToSheet, aoaToSheet, writeWorkbook } from "../excelHelper";
-import { adjustInventory, reverseInventoryByExactValue } from "../inventoryHelper";
-import { classifyNetPositionAccounts, getAccountNetBalance } from "../netPositionHelper";
-import { generateInvoicePdf } from "../helpers/generateInvoicePdf";
-import { generateStockPdf } from "../helpers/generateStockPdf";
-import { sendWhatsAppFileByUploadPos, sendWhatsAppFileToChatIdPos } from "../services/whatsappService";
-import { getErpExportVisibility } from "../helpers/exportVisibility";
+import { eq, and, sql, isNull, like } from "drizzle-orm";
+import { readExcel, sheetToJson, createWorkbook, jsonToSheet, writeWorkbook } from "../excelHelper";
+import { adjustInventory } from "../inventoryHelper";
 import { registerCreditSalesImportRoutes } from "./creditSalesImportRoutes";
 import { registerPosImportRoutes } from "./posImportRoutes";
 import { registerStockTransferImportRoutes } from "./stockTransferImportRoutes";
