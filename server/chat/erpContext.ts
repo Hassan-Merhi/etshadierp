@@ -7,6 +7,7 @@
  * behaviour is unchanged.
  */
 import { db } from "../db";
+import { logger } from "../lib/logger";
 import * as schema from "@shared/schema";
 import { and, desc, eq, gt, gte, isNull, sql } from "drizzle-orm";
 
@@ -22,10 +23,10 @@ export function clearERPContextCache(companyId?: number): void {
   if (companyId !== undefined) {
     const key = `erp-context:${companyId}`;
     erpContextCache.delete(key);
-    console.log(`[ChatService] Cache cleared for company ${companyId}`);
+    logger.info(`[ChatService] Cache cleared for company ${companyId}`);
   } else {
     erpContextCache.clear();
-    console.log("[ChatService] Cache cleared for all companies");
+    logger.info("[ChatService] Cache cleared for all companies");
   }
 }
 
@@ -35,13 +36,13 @@ export async function getCachedERPContext(companyId: number): Promise<ERPContext
   const cached = erpContextCache.get(key);
   if (cached && now < cached.expiresAt) {
     const ageMs = now - (cached.expiresAt - ERP_CACHE_TTL_MS);
-    console.log(`[ChatService] Cache HIT for company ${companyId} (age ${Math.round(ageMs / 1000)}s)`);
+    logger.info(`[ChatService] Cache HIT for company ${companyId} (age ${Math.round(ageMs / 1000)}s)`);
     return cached.context;
   }
-  console.log(`[ChatService] Cache MISS for company ${companyId} — fetching`);
+  logger.info(`[ChatService] Cache MISS for company ${companyId} — fetching`);
   const t0 = Date.now();
   const context = await getERPContext(companyId);
-  console.log(`[ChatService] Context loaded in ${Date.now() - t0}ms`);
+  logger.info(`[ChatService] Context loaded in ${Date.now() - t0}ms`);
   erpContextCache.set(key, { context, expiresAt: now + ERP_CACHE_TTL_MS });
   return context;
 }
@@ -585,7 +586,7 @@ export async function getERPContext(companyId: number): Promise<ERPContext> {
       })
       .filter((cb) => Math.abs(cb.balance) > 0.01);
   } catch (error) {
-    console.error("Error fetching customer balances:", error);
+    logger.error("Error fetching customer balances:", { error: error });
   }
 
   const financialSummary = {

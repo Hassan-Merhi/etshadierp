@@ -50,7 +50,7 @@ export function registerFactoryWhatsappRoutes(app: Express, requireAuth: any) {
         }
       );
     } catch (err: any) {
-      console.error("[factory-wa] GET rule error", err);
+      logger.error("[factory-wa] GET rule error", { error: err });
       res.status(500).json({ message: err.message });
     }
   });
@@ -100,7 +100,7 @@ export function registerFactoryWhatsappRoutes(app: Express, requireAuth: any) {
 
       res.json(upserted);
     } catch (err: any) {
-      console.error("[factory-wa] PUT rule error", err);
+      logger.error("[factory-wa] PUT rule error", { error: err });
       res.status(500).json({ message: err.message });
     }
   });
@@ -171,7 +171,7 @@ export function registerFactoryWhatsappRoutes(app: Express, requireAuth: any) {
       const result = await sendWhatsAppFileByUploadPos(rule.whatsappChatId, pdfBuf, fileName, caption);
 
       if (!result.success) {
-        console.error("[factory-wa] manual send failed", result.error);
+        logger.error("[factory-wa] manual send failed", { error: result.error });
         return res.status(502).json({ message: result.error ?? "WhatsApp send failed" });
       }
 
@@ -179,7 +179,7 @@ export function registerFactoryWhatsappRoutes(app: Express, requireAuth: any) {
       res.json({ success: true, fileName });
     } catch (err: any) {
       logger.error("factory whatsapp send-statement failed", { module: "factoryWhatsapp", action: "sendStatement", userId: _uid, companyId: _cid, durationMs: Date.now() - _t, error: err });
-      console.error("[factory-wa] POST send error", err);
+      logger.error("[factory-wa] POST send error", { error: err });
       res.status(500).json({ message: err.message });
     }
   });
@@ -287,14 +287,14 @@ export async function triggerAccountWhatsAppStatement(opts: {
     const result = await sendWhatsAppFileByUploadPos(rule.whatsappChatId, pdfBuf, fileName, caption);
 
     if (!result.success) {
-      console.error("[factory-wa] auto-send failed", { accountId, voucherType, error: result.error });
+      logger.error("[factory-wa] auto-send failed", { accountId, voucherType, error: result.error });
       return { sent: false, error: result.error };
     }
 
-    console.log(`[factory-wa] statement sent for account ${accountId} (${voucherType}, ${monthLabel})`);
+    logger.info(`[factory-wa] statement sent for account ${accountId} (${voucherType}, ${monthLabel})`);
     return { sent: true };
   } catch (err: any) {
-    console.error("[factory-wa] auto-send exception", err);
+    logger.error("[factory-wa] auto-send exception", { error: err });
     return { sent: false, error: err.message };
   }
 }

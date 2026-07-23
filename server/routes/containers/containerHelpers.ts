@@ -1,4 +1,5 @@
 import { parseId, parseOptionalId } from "../../lib/parseId";
+import { logger } from "../../lib/logger";
 import { getClientDate } from "../../lib/dateUtils";
 import type { Express, Request, Response, NextFunction } from "express";
 import { db } from "../../db";
@@ -266,7 +267,7 @@ export async function syncIntercoParentVoucher(
                   .where(eq(voucherEntries.id, fe.id));
               }
             }
-            console.log(
+            logger.info(
               `[syncIntercoParentVoucher] Updated fallback PARENT-FREIGHT journal #${existingFallback.id} for PO(s) ${nums.join(", ")}`
             );
             return { found: true, updated: true, voucherId: existingFallback.id, amount: freightAmtStr };
@@ -306,16 +307,16 @@ export async function syncIntercoParentVoucher(
               });
             }
             await dbOrTx.insert(voucherEntries).values(entriesToInsert);
-            console.log(
+            logger.info(
               `[syncIntercoParentVoucher] Created fallback PARENT-FREIGHT journal #${newFV.id} for PO(s) ${nums.join(", ")}`
             );
             return { found: true, updated: true, voucherId: newFV.id, amount: freightAmtStr };
           }
         } catch (fbErr) {
-          console.error("[syncIntercoParentVoucher] Failed to create fallback freight journal:", fbErr);
+          logger.error("[syncIntercoParentVoucher] Failed to create fallback freight journal:", { error: fbErr });
         }
       }
-      console.warn(`[syncIntercoParentVoucher] No INTERCO-PARENT voucher found for PO(s): ${nums.join(", ")}`);
+      logger.warn(`[syncIntercoParentVoucher] No INTERCO-PARENT voucher found for PO(s): ${nums.join(", ")}`);
       return { found: false, updated: false, amount: amountStr };
     }
 
@@ -344,7 +345,7 @@ export async function syncIntercoParentVoucher(
       return { found: true, updated: false, voucherId: parentVoucher.id, amount: amountStr, oldAmount: oldAmountStr };
     }
 
-    console.log(
+    logger.info(
       `[syncIntercoParentVoucher] PO(s) ${nums.join(", ")}: voucher #${parentVoucher.id} ${oldAmountStr} → ${amountStr}`
     );
 
@@ -402,7 +403,7 @@ export async function syncIntercoParentVoucher(
 
     return { found: true, updated: true, voucherId: parentVoucher.id, amount: amountStr, oldAmount: oldAmountStr };
   } catch (err) {
-    console.error("[syncIntercoParentVoucher] Error syncing parent INTERCO voucher:", err);
+    logger.error("[syncIntercoParentVoucher] Error syncing parent INTERCO voucher:", { error: err });
     return { found: false, updated: false, amount: amountStr };
   }
 }

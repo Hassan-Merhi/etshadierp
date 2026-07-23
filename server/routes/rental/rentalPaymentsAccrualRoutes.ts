@@ -1,4 +1,5 @@
 import type { Express, Request, Response } from "express";
+import { logger } from "../../lib/logger";
 import {
   getCompanyId,
   findOrCreateLedgerAccount,
@@ -135,7 +136,7 @@ export function registerRentalPaymentsAccrualRoutes(
       if (e instanceof z.ZodError)
         return res.status(400).json({ message: e.issues.map((err: any) => err.message).join(", ") });
       if ((e as any).status === 400) return res.status(400).json({ message: e.message });
-      console.error(`${tag} payments:`, e);
+      logger.error(`${tag} payments:`, { error: e });
       res.status(500).json({ message: e.message });
     }
   });
@@ -221,7 +222,7 @@ export function registerRentalPaymentsAccrualRoutes(
     } catch (e: any) {
       if (e instanceof z.ZodError)
         return res.status(400).json({ message: e.issues.map((err: any) => err.message).join(", ") });
-      console.error(`${tag} bulk-payments:`, e);
+      logger.error(`${tag} bulk-payments:`, { error: e });
       res.status(500).json({ message: e.message });
     }
   });
@@ -316,7 +317,7 @@ export function registerRentalPaymentsAccrualRoutes(
 
       res.json({ ok: true });
     } catch (e: any) {
-      console.error(`${tag} delete-payment:`, e);
+      logger.error(`${tag} delete-payment:`, { error: e });
       res.status(500).json({ message: e.message });
     }
   });
@@ -358,7 +359,7 @@ export function registerRentalPaymentsAccrualRoutes(
             if (ownerUnit) { unit = ownerUnit; isShared = true; }
           }
         } catch (sharedErr: any) {
-          console.warn(`${tag} shared-detail skipped:`, sharedErr.message?.split("\n")[0]);
+          logger.warn(`${tag} shared-detail skipped:`, sharedErr.message?.split("\n")[0]);
         }
       }
       if (!unit) return res.status(404).json({ message: "Unit not found" });
@@ -520,7 +521,7 @@ export function registerRentalPaymentsAccrualRoutes(
         isShared,
       });
     } catch (e: any) {
-      console.error(`${tag} detail:`, e);
+      logger.error(`${tag} detail:`, { error: e });
       res.status(500).json({ message: e.message });
     }
   });
@@ -590,7 +591,7 @@ export function registerRentalPaymentsAccrualRoutes(
 
       res.json(payments);
     } catch (e: any) {
-      console.error(`${tag} payments-log:`, e);
+      logger.error(`${tag} payments-log:`, { error: e });
       res.status(500).json({ message: e.message });
     }
   });
@@ -629,7 +630,7 @@ export function registerRentalPaymentsAccrualRoutes(
 
       res.json({ accrued, skipped });
     } catch (e: any) {
-      console.error(`${tag} accrue:`, e);
+      logger.error(`${tag} accrue:`, { error: e });
       res.status(500).json({ message: e.message });
     }
   });

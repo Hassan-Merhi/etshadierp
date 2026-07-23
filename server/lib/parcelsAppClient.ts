@@ -8,6 +8,7 @@
  * API key must be set in process.env.PARCELSAPP_API_KEY.
  * Never log or expose the key to the frontend.
  */
+import { logger } from "./logger";
 
 const BASE_URL = process.env.PARCELSAPP_API_BASE_URL || "https://parcelsapp.com/api/v3";
 
@@ -222,7 +223,7 @@ export async function trackContainer(
         return await initiateTracking(containerNumber, destinationCountry, carrier);
       } catch (err: any) {
         if (err?.isBusy && attempt < MAX_BUSY_RETRIES) {
-          console.warn(
+          logger.warn(
             `[ParcelsApp] ${containerNumber}: BUSY — retry ${attempt + 1}/${MAX_BUSY_RETRIES} in ${BUSY_RETRY_DELAY_MS / 1000}s`
           );
           await sleep(BUSY_RETRY_DELAY_MS);
@@ -274,13 +275,13 @@ export async function trackContainer(
           };
         }
       } catch (pollErr: any) {
-        console.warn(`[ParcelsApp] Poll attempt ${attempt + 1} error: ${pollErr?.message}`);
+        logger.warn(`[ParcelsApp] Poll attempt ${attempt + 1} error: ${pollErr?.message}`);
       }
     }
 
     // Timed out — but if we received any shipment data during polling, use it
     if (bestShipment) {
-      console.warn(
+      logger.warn(
         `[ParcelsApp] ${containerNumber}: timed out but returning partial data (${bestShipment.states?.length ?? 0} events)`
       );
       return {
@@ -443,7 +444,7 @@ export function deriveEstimatedDeliveryDate(shipment: ParcelsAppShipment): strin
   if (deliveredByRaw) {
     const d = tryDate(deliveredByRaw);
     if (d && d > todayStr) {
-      console.log(`[ParcelsApp] deriveEDD: using delivered_by=${deliveredByRaw} as future ETA (${d})`);
+      logger.info(`[ParcelsApp] deriveEDD: using delivered_by=${deliveredByRaw} as future ETA (${d})`);
       return d;
     }
   }
@@ -463,7 +464,7 @@ export function deriveEstimatedDeliveryDate(shipment: ParcelsAppShipment): strin
     if (isEtaEvent) {
       const d = tryDate(latestState.date);
       if (d && d >= todayStr) {
-        console.log(`[ParcelsApp] deriveEDD: using event status "${latestState.status}" date=${d} as ETA`);
+        logger.info(`[ParcelsApp] deriveEDD: using event status "${latestState.status}" date=${d} as ETA`);
         return d;
       }
     }
@@ -482,7 +483,7 @@ export function deriveEstimatedDeliveryDate(shipment: ParcelsAppShipment): strin
     if (arrivalPattern.test(textToCheck)) {
       const d = tryDate(state.date);
       if (d) {
-        console.log(`[ParcelsApp] deriveEDD: actual arrival event "${state.status}" → arrivalDate=${d}`);
+        logger.info(`[ParcelsApp] deriveEDD: actual arrival event "${state.status}" → arrivalDate=${d}`);
         return d;
       }
     }

@@ -135,7 +135,7 @@ export function registerPosWhatsAppRoutes(app: Express): void {
 
       res.json({ success: true, message: "Stock report sent to WhatsApp" });
     } catch (error: any) {
-      console.error("[/api/pos/send-shift-report]", {
+      logger.error("[/api/pos/send-shift-report]", {
         locationId: req.body.locationId,
         chatId: (error as any)?.chatId ?? undefined,
         error: error?.message ?? error,
@@ -184,11 +184,11 @@ export function registerPosWhatsAppRoutes(app: Express): void {
       const fileName = `Stock_${safeLocationName}_${format(now, "yyyyMMdd_HHmm")}.pdf`;
       const caption = "";
 
-      console.log(`[WA stock upload] chatId=${location.whatsappGroupChatId} file=${fileName} size=${pdfBuffer.length}`);
+      logger.info(`[WA stock upload] chatId=${location.whatsappGroupChatId} file=${fileName} size=${pdfBuffer.length}`);
       const result = await sendWhatsAppFileByUploadPos(location.whatsappGroupChatId, pdfBuffer, fileName, caption);
 
       if (!result.success) {
-        console.error("[/api/pos/send-stock-pdf]", {
+        logger.error("[/api/pos/send-stock-pdf]", {
           locationId,
           chatId: location.whatsappGroupChatId,
           error: result.error,
@@ -198,7 +198,7 @@ export function registerPosWhatsAppRoutes(app: Express): void {
 
       res.json({ success: true });
     } catch (error: any) {
-      console.error("[/api/pos/send-stock-pdf]", {
+      logger.error("[/api/pos/send-stock-pdf]", {
         locationId: req.body.locationId,
         error: error?.message ?? error,
       });
@@ -284,7 +284,7 @@ export function registerPosWhatsAppRoutes(app: Express): void {
           .trim() + ".pdf";
       const caption = "";
 
-      console.log(
+      logger.info(
         `[WA invoice upload] chatId=${location.whatsappGroupChatId} file=${fileName} size=${pdfBuffer.length}`
       );
       const result = await sendWhatsAppFileByUploadPos(location.whatsappGroupChatId, pdfBuffer, fileName, caption);
@@ -296,7 +296,7 @@ export function registerPosWhatsAppRoutes(app: Express): void {
       res.json({ success: true, message: "Invoice PDF sent to WhatsApp" });
     } catch (error: any) {
       logger.error("WhatsApp invoice send failed", { module: "pos", action: "sendInvoiceWhatsApp", userId: (req as any).user?.id, companyId: req.session.currentCompanyId, error });
-      console.error("[/api/pos/send-invoice-whatsapp]", error);
+      logger.error("[/api/pos/send-invoice-whatsapp]", { error: error });
       res.status(500).json({ message: error.message });
     }
   });

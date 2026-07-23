@@ -1,4 +1,5 @@
 import type { Express } from "express";
+import { logger } from "../lib/logger";
 import { round2 } from "../netPositionHelper";
 import { db } from "../db";
 import { storage } from "../storage";
@@ -1327,7 +1328,7 @@ export function registerDebugRoutes(app: Express) {
         containerAudit,
       });
     } catch (error: any) {
-      console.error("Import cycle diagnostics error:", error);
+      logger.error("Import cycle diagnostics error:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -1440,7 +1441,7 @@ export function registerDebugRoutes(app: Express) {
             "These vouchers exist for containers in OTW status that have no offload record. They were created during offload but not cleaned up when the offload was reversed.",
         });
       } catch (error: any) {
-        console.error("Orphaned charge vouchers diagnostics error:", error);
+        logger.error("Orphaned charge vouchers diagnostics error:", { error: error });
         res.status(500).json({ message: error.message });
       }
     }
@@ -1506,7 +1507,7 @@ export function registerDebugRoutes(app: Express) {
             containerNumber: container.containerNumber,
           });
 
-          console.log(`Deleted orphaned voucher: ${v.voucherNumber} for container ${container.containerNumber}`);
+          logger.info(`Deleted orphaned voucher: ${v.voucherNumber} for container ${container.containerNumber}`);
         }
       }
 
@@ -1517,7 +1518,7 @@ export function registerDebugRoutes(app: Express) {
         containersChecked: otwContainers.length,
       });
     } catch (error: any) {
-      console.error("Fix orphaned charge vouchers error:", error);
+      logger.error("Fix orphaned charge vouchers error:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -1550,12 +1551,12 @@ export function registerDebugRoutes(app: Express) {
           } catch (err: any) {
             errors++;
             errorDetails.push(`orderId=${order.id}: ${err.message}`);
-            console.error(`[recalc-factory-totals] error on orderId=${order.id}:`, err);
+            logger.error(`[recalc-factory-totals] error on orderId=${order.id}:`, { error: err });
           }
         }
         res.json({ total: orders.length, done, errors, errorDetails });
       } catch (error: any) {
-        console.error("Recalculate factory order totals error:", error);
+        logger.error("Recalculate factory order totals error:", { error: error });
         res.status(500).json({ message: error.message });
       }
     }
