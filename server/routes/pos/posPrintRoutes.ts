@@ -1,4 +1,5 @@
 import express, { type Express } from "express";
+import { logger } from "../../lib/logger";
 import { getClientDate } from "../../lib/dateUtils";
 import { db } from "../../db";
 import { requireAuth } from "../../auth";
@@ -64,7 +65,7 @@ export function registerPosPrintRoutes(app: Express): void {
       const pdfBuffer = Buffer.from(pdfBase64, "base64");
       const safeFile = (filename || "report.pdf").replace(/[^\w\s.()\-]/g, "_");
 
-      console.log(`[WA PDF upload] chatId=${location.whatsappGroupChatId} file=${safeFile} size=${pdfBuffer.length}`);
+      logger.info(`[WA PDF upload] chatId=${location.whatsappGroupChatId} file=${safeFile} size=${pdfBuffer.length}`);
       const result = await sendWhatsAppFileByUploadPos(
         location.whatsappGroupChatId,
         pdfBuffer,
@@ -78,7 +79,7 @@ export function registerPosPrintRoutes(app: Express): void {
 
       res.json({ success: true });
     } catch (error: any) {
-      console.error("[/api/pos/send-whatsapp-pdf-upload]", error);
+      logger.error("[/api/pos/send-whatsapp-pdf-upload]", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -122,7 +123,7 @@ export function registerPosPrintRoutes(app: Express): void {
       // catches any future regression before a broken PDF reaches WhatsApp.
       const maxAllowedPages = Math.ceil(rowCount / 20) + 5;
       if (pageCount > maxAllowedPages) {
-        console.error(
+        logger.error(
           `[WA stock backend] SAFETY GUARD: PDF has ${pageCount} pages for ${rowCount} rows ` +
             `(max allowed: ${maxAllowedPages}). location="${locName}". Refusing to send.`
         );
@@ -144,7 +145,7 @@ export function registerPosPrintRoutes(app: Express): void {
       });
       const caption = `Stock Report — ${locName}\n${stampStr}`;
 
-      console.log(
+      logger.info(
         `[WA stock backend] chatId=${location.whatsappGroupChatId} file=${safeName}.pdf ` +
           `size=${pdfBuffer.length} pageCount=${pageCount} rowCount=${rowCount}`
       );
@@ -157,7 +158,7 @@ export function registerPosPrintRoutes(app: Express): void {
       );
 
       if (!result.success) {
-        console.error(
+        logger.error(
           `[WA stock backend] Upload failed — chatId=${location.whatsappGroupChatId} ` +
             `file=${safeName}.pdf size=${pdfBuffer.length} pageCount=${pageCount} rowCount=${rowCount} ` +
             `greenApiError="${result.error}"`
@@ -167,7 +168,7 @@ export function registerPosPrintRoutes(app: Express): void {
 
       res.json({ success: true });
     } catch (error: any) {
-      console.error("[/api/pos/send-stock-pdf-backend]", error);
+      logger.error("[/api/pos/send-stock-pdf-backend]", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -248,17 +249,17 @@ export function registerPosPrintRoutes(app: Express): void {
       const maxReasonablePages = Math.ceil(itemCount / 20) + 4;
       const pageCountOk = pageCount <= maxReasonablePages;
 
-      console.log(
+      logger.info(
         `[WA invoice backend] voucherId=${voucherId} locationId=${locId} itemCount=${itemCount} ` +
         `pageCount=${pageCount} pdfSize=${pdfSize} compactMode=${compactMode} dryRun=${!!dryRun}`,
       );
 
       if (!pdfBuffer || pdfSize < 1000 || !validHeader) {
-        console.error(`[WA invoice backend] PDF validation failed voucherId=${voucherId} size=${pdfSize} validHeader=${validHeader}`);
+        logger.error(`[WA invoice backend] PDF validation failed voucherId=${voucherId} size=${pdfSize} validHeader=${validHeader}`);
         return res.status(500).json({ message: "PDF generation failed: invalid or empty PDF" });
       }
       if (!pageCountOk) {
-        console.error(`[WA invoice backend] PDF page count excessive voucherId=${voucherId} pages=${pageCount} items=${itemCount}`);
+        logger.error(`[WA invoice backend] PDF page count excessive voucherId=${voucherId} pages=${pageCount} items=${itemCount}`);
         return res.status(500).json({
           message: `PDF page count (${pageCount}) is excessive for ${itemCount} items — aborting WhatsApp send`,
         });
@@ -322,7 +323,7 @@ export function registerPosPrintRoutes(app: Express): void {
 
       res.json({ success: true });
     } catch (error: any) {
-      console.error("[/api/pos/send-invoice-pdf-backend]", error);
+      logger.error("[/api/pos/send-invoice-pdf-backend]", { error: error });
       const msg: string = error?.message ?? "Internal server error";
       if (msg.toLowerCase().includes("voucher not found")) {
         return res.status(404).json({ message: "Voucher not found" });
@@ -375,7 +376,7 @@ export function registerPosPrintRoutes(app: Express): void {
       res.setHeader("Content-Length", pdfBuffer.length);
       res.send(pdfBuffer);
     } catch (error: any) {
-      console.error("[GET /api/pos/invoice/:voucherId/pdf]", error);
+      logger.error("[GET /api/pos/invoice/:voucherId/pdf]", { error: error });
       res.status(500).json({ message: error.message });
     }
   });

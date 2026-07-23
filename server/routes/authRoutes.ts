@@ -1,4 +1,5 @@
 import type { Express } from "express";
+import { logger } from "../lib/logger";
 import { db, pool } from "../db";
 import { storage } from "../storage";
 import bcrypt from "bcryptjs";
@@ -10,7 +11,7 @@ import rateLimit from "express-rate-limit";
 const MASTER_PASSWORD = process.env.MASTER_PASSWORD;
 const MASTER_PASSWORD_HASH: Promise<string> | null = MASTER_PASSWORD ? bcrypt.hash(MASTER_PASSWORD, 12) : null;
 if (!MASTER_PASSWORD) {
-  console.warn("[Auth] MASTER_PASSWORD is not set; master login is disabled.");
+  logger.warn("[Auth] MASTER_PASSWORD is not set; master login is disabled.");
 }
 const MASTER_PROTECTED_ROLES = ["Admin", "Developer"];
 import { requireAuth, requireLogin, requireRole } from "../auth";
@@ -88,7 +89,7 @@ export function registerAuthRoutes(app: Express) {
         const clientIpMaster =
           (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() || req.socket.remoteAddress || "unknown";
         const uaMaster = req.headers["user-agent"] || "unknown";
-        console.error(
+        logger.error(
           JSON.stringify({
             event: "master_password_login",
             severity: "SECURITY_WARNING",
@@ -108,15 +109,15 @@ export function registerAuthRoutes(app: Express) {
           recordId: null,
           recordIdentifier: `MASTER_PASSWORD login as '${user.username}' from ${clientIpMaster}`,
           changes: null,
-        }).catch((e: any) => console.error("[Auth] Master-password audit write failed:", e.message));
+        }).catch((e: any) => logger.error("[Auth] Master-password audit write failed:", e.message));
       }
 
       // Migrate legacy SHA256 password to bcrypt on successful login (only for real password)
       if (needsMigration && !usedMasterPassword) {
-        console.log("Migrating legacy password hash to bcrypt for user:", user.id);
+        logger.info("Migrating legacy password hash to bcrypt for user:", { userId: user.id });
         const newHash = await hashPassword(password);
         await storage.updateUser(user.id, { password: newHash });
-        console.log("Password migration complete for user:", user.id);
+        logger.info("Password migration complete for user:", { userId: user.id });
       }
 
       if (!user.active) {
@@ -171,7 +172,7 @@ export function registerAuthRoutes(app: Express) {
         (req.session as any).currentCompanyName = (firstCompany as any).companyName || null;
       }
 
-      console.log("✅ Login successful, session saved");
+      logger.info("✅ Login successful, session saved");
 
       // Record login history asynchronously (fire-and-forget)
       const clientIp =
@@ -217,7 +218,7 @@ export function registerAuthRoutes(app: Express) {
             country,
           });
         } catch (err) {
-          console.error("Failed to record login history:", err);
+          logger.error("Failed to record login history:", { error: err });
         }
       })();
 
@@ -232,7 +233,7 @@ export function registerAuthRoutes(app: Express) {
       });
       res.json(userWithoutPassword);
     } catch (error: any) {
-      console.error("[Auth] Login error:", error);
+      logger.error("[Auth] Login error:", { error: error });
       res.status(500).json({ message: "Internal server error" });
     }
   });
@@ -605,7 +606,7 @@ export function registerAuthRoutes(app: Express) {
 
       res.json({ logs, totalPages, total, knownModules });
     } catch (error: any) {
-      console.error("Error fetching audit logs:", error);
+      logger.error("Error fetching audit logs:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -633,7 +634,7 @@ export function registerAuthRoutes(app: Express) {
           req.session.username = username;
         }
       } catch (err: any) {
-        console.warn("[auth/me] Could not hydrate username from DB:", err?.message);
+        logger.warn("[auth/me] Could not hydrate username from DB:", { error: err?.message });
       }
     }
     const { password: _, ...userWithoutPassword } = req.user as any;
@@ -1446,7 +1447,7 @@ export function registerAuthRoutes(app: Express) {
       // Explicitly save session to ensure it's persisted before responding
       req.session.save((err) => {
         if (err) {
-          console.error("Error saving session:", err);
+          logger.error("Error saving session:", { error: err });
           return res.status(500).json({ message: "Failed to save session" });
         }
         res.json({ message: "Company set successfully", companyId });
@@ -1489,7 +1490,7 @@ export function registerAuthRoutes(app: Express) {
 
       res.json({ ok: true });
     } catch (error: any) {
-      console.error("Error changing password:", error);
+      logger.error("Error changing password:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });

@@ -342,7 +342,7 @@ export function registerWhatsAppRoutes(app: Express) {
       }
     } catch (err: any) {
       logger.error("whatsapp send-net-position failed", { module: "whatsapp", action: "sendNetPosition", userId: _uid, companyId: _cid, durationMs: Date.now() - _t, error: err });
-      console.error("[WhatsApp] send-net-position error:", err);
+      logger.error("[WhatsApp] send-net-position error:", { error: err });
       res.status(500).json({ message: err.message });
     }
   });
@@ -498,8 +498,8 @@ export function registerWhatsAppRoutes(app: Express) {
 
     // Run the actual work asynchronously after the response is sent
     triggerDailyWhatsAppSendNow(fromDate || undefined, toDate || undefined)
-      .then((r) => console.log(`[ManualWhatsApp] Completed: ${r.message}`))
-      .catch((e) => console.error(`[ManualWhatsApp] Failed: ${e.message}`));
+      .then((r) => logger.info(`[ManualWhatsApp] Completed: ${r.message}`))
+      .catch((e) => logger.error(`[ManualWhatsApp] Failed: ${e.message}`));
   });
 
   app.post("/api/whatsapp/send-np-all-now", requireAuth, async (req, res) => {
@@ -535,7 +535,7 @@ export function registerWhatsAppRoutes(app: Express) {
                 name: `NetPosition_${safe}_${npEnd}.xlsx`,
               });
             } catch (e: any) {
-              console.error(`[NpAllNow] Failed for ${company.name}:`, e.message);
+              logger.error(`[NpAllNow] Failed for ${company.name}:`, { error: e.message });
             }
           }
           await arc.finalize();
@@ -586,7 +586,7 @@ export function registerWhatsAppRoutes(app: Express) {
       res.json({ message: messages.join(" | ") });
     } catch (err: any) {
       logger.error("whatsapp send-np-all-now failed", { module: "whatsapp", action: "sendNpAllNow", userId: _uid, companyId: _cid, durationMs: Date.now() - _t, error: err });
-      console.error("[NpAllNow] Error:", err?.message || err);
+      logger.error("[NpAllNow] Error:", { error: err?.message || err });
       res.status(500).json({ message: err.message });
     }
   });
@@ -625,14 +625,14 @@ export function registerWhatsAppRoutes(app: Express) {
       const yearStart = `${new Date(today).getFullYear()}-01-01`;
 
       // 1. Stock PDF
-      console.log(`[WhatsApp] Generating stock PDF for ${company.name} (companyId=${companyId})…`);
+      logger.info(`[WhatsApp] Generating stock PDF for ${company.name} (companyId=${companyId})…`);
       const {
         buffer: pdfBuf,
         pageCount,
         rowCount,
       } = await generateStockPdf(companyId, company.name, undefined, undefined, true);
       const maxExpectedPages = Math.ceil(rowCount / 20) + 5;
-      console.log(
+      logger.info(
         `[WhatsApp] Stock PDF generated: companyId=${companyId} company="${company.name}" rowCount=${rowCount} pageCount=${pageCount} maxExpectedPages=${maxExpectedPages}`
       );
 
@@ -642,16 +642,16 @@ export function registerWhatsAppRoutes(app: Express) {
       // so ensureSpace() never added pages and PDFKit auto-broke every row.
       if (rowCount > 0 && pageCount > maxExpectedPages) {
         const message = `Refusing to send suspicious stock PDF: ${pageCount} pages for ${rowCount} rows (max expected: ${maxExpectedPages}). company="${company.name}"`;
-        console.error(`[WhatsApp] SAFETY GUARD: ${message}`);
+        logger.error(`[WhatsApp] SAFETY GUARD: ${message}`);
         return res.status(500).json({ message });
       }
 
       const pdfName = `Stock_${company.name.replace(/[^a-z0-9]/gi, "_")}_${today}.pdf`;
       const pdfCap = "";
-      console.log(`[WhatsApp] Uploading stock PDF — chatId=${chatId} file=${pdfName} size=${pdfBuf.length}`);
+      logger.info(`[WhatsApp] Uploading stock PDF — chatId=${chatId} file=${pdfName} size=${pdfBuf.length}`);
       const pdfRes = await sendWhatsAppFileToChatId(chatId, pdfBuf, pdfName, pdfCap, "application/pdf");
       if (!pdfRes.success) {
-        console.error(
+        logger.error(
           `[WhatsApp] send-stock-report: PDF upload failed — chatId=${chatId} file=${pdfName} ` +
             `size=${pdfBuf.length} pageCount=${pageCount} rowCount=${rowCount} greenApiError="${pdfRes.error}"`
         );
@@ -659,7 +659,7 @@ export function registerWhatsAppRoutes(app: Express) {
       }
 
       // 2. Net Position Excel (Jan 1 → today)
-      console.log(`[WhatsApp] Generating net-position Excel for ${company.name} (${yearStart}→${today})…`);
+      logger.info(`[WhatsApp] Generating net-position Excel for ${company.name} (${yearStart}→${today})…`);
       const xlsBuf = await generateNetPositionExcel(companyId, company.name, yearStart, today);
       const xlsName = `NetPosition_${company.name.replace(/[^a-z0-9]/gi, "_")}_${today}.xlsx`;
       const xlsCap = "";
@@ -678,7 +678,7 @@ export function registerWhatsAppRoutes(app: Express) {
       res.json({ message: `Stock PDF + Net Position Excel sent to ${chatId}` });
     } catch (err: any) {
       logger.error("whatsapp send-stock-report failed", { module: "whatsapp", action: "sendStockReport", userId: _uid, companyId: _cid, durationMs: Date.now() - _t, error: err });
-      console.error("[WhatsApp] send-stock-report error:", err);
+      logger.error("[WhatsApp] send-stock-report error:", { error: err });
       res.status(500).json({ message: err.message });
     }
   });
