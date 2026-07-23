@@ -438,11 +438,17 @@ export function StockTransferForm({ voucherIdToEdit, isPOS, posUser }: StockTran
 
       if (isEditMode) {
         const destLoc = locations.find((l) => l.id === data.destinationLocationId);
+        const wasOptional = voucherToEdit?.optional === true;
+        const wantOptional = data.optional;
+        const isFinalizingTransfer = wasOptional && !wantOptional;
+
+        // The lifecycle middleware blocks PATCH optional:false with 409 —
+        // removing optional must go through /finalize after saving items.
         await modeApiRequest("PATCH", `/api/vouchers/${voucherIdToEdit}`, {
           voucherDate: format(data.voucherDate, "yyyy-MM-dd"),
           description: `Stock transfer to ${destLoc?.name || ""}`,
           totalAmount,
-          optional: data.optional,
+          ...(wantOptional ? { optional: true } : {}),
         });
         if (stockTransferToEdit?.id) {
           await modeApiRequest("PUT", `/api/stock-transfers/${stockTransferToEdit.id}`, {
@@ -469,6 +475,10 @@ export function StockTransferForm({ voucherIdToEdit, isPOS, posUser }: StockTran
               rate: e.rate,
             })),
           });
+        }
+        // After items are saved, finalize (validates stock + applies inventory atomically)
+        if (isFinalizingTransfer) {
+          await modeApiRequest("POST", `/api/vouchers/${voucherIdToEdit}/finalize`, {});
         }
         return { id: voucherIdToEdit };
       } else {

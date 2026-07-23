@@ -1035,9 +1035,17 @@ export default function StockTransferOrder() {
       optional: boolean;
     }) => {
       if (editVoucherId && existingTransfer?.id) {
+        const wasOptional = existingVoucher?.optional === true;
+        const wantOptional = data.optional;
+        const isFinalizingTransfer = wasOptional && !wantOptional;
+
+        // The lifecycle middleware blocks PATCH optional:false with 409 —
+        // removing optional must go through /finalize (validates stock + applies
+        // inventory atomically). Only send optional in PATCH when setting it true
+        // (reopening) or when it wasn't optional before (no change).
         await apiRequest("PATCH", `/api/vouchers/${editVoucherId}`, {
           voucherDate: data.voucherDate,
-          optional: data.optional,
+          ...(wantOptional ? { optional: true } : {}),
         });
         const response = await apiRequest("PUT", `/api/stock-transfers/${existingTransfer.id}`, {
           destinationLocationId: data.destinationLocationId,
@@ -1049,6 +1057,10 @@ export default function StockTransferOrder() {
             rate: item.rate,
           })),
         });
+        // After items are saved, finalize the transfer (applies inventory, clears optional flag)
+        if (isFinalizingTransfer) {
+          await apiRequest("POST", `/api/vouchers/${editVoucherId}/finalize`, {});
+        }
         return response.json();
       } else {
         const response = await apiRequest("POST", "/api/stock-transfers", {
@@ -2050,12 +2062,15 @@ export default function StockTransferOrder() {
                           <Switch
                             checked={rev.optional}
                             onCheckedChange={async (checked) => {
-                              await apiRequest("PATCH", `/api/stock-transfer-revisions/${rev.id}/optional`, {
-                                optional: checked,
-                              });
-                              queryClient.invalidateQueries({
-                                queryKey: ["/api/stock-transfers", existingTransfer.id, "revisions"],
-                              });
+                              try {
+                                await apiRequest("PATCH", `/api/stock-transfer-revisions/${rev.id}/optional`, {
+                                  optional: checked,
+                                });
+                              } finally {
+                                queryClient.invalidateQueries({
+                                  queryKey: ["/api/stock-transfers", existingTransfer.id, "revisions"],
+                                });
+                              }
                             }}
                             data-testid={`switch-revision-optional-${rev.id}`}
                           />
