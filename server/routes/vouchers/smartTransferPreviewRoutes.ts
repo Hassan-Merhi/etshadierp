@@ -2,6 +2,12 @@ import type { Express } from "express";
 import { z } from "zod";
 import { requireAuth, requireNonPOS } from "../../auth";
 import { buildSmartTransferTargetBalancedPreview } from "../../services/smartTransferTargetMix";
+import {
+  createSmartTransferPreviewFeedback,
+  getSmartTransferFeedbackSummary,
+  recordSmartTransferImportFeedback,
+  resetSmartTransferFeedback,
+} from "../../services/smartTransferFeedback";
 
 const smartTransferPreviewSchema = z.object({
   destinationLocationId: z.coerce.number().int().positive(),
@@ -26,6 +32,21 @@ const smartTransferPreviewSchema = z.object({
     .optional(),
 });
 
+const feedbackItemSchema = z.object({
+  stockItemId: z.coerce.number().int().positive(),
+  sourceLocationId: z.coerce.number().int().positive(),
+  quantity: z.coerce.number().positive().max(1_000_000),
+  stockItemName: z.string().max(300).optional(),
+  sourceLocationName: z.string().max(300).optional(),
+});
+
+const importFeedbackSchema = z.object({
+  destinationLocationId: z.coerce.number().int().positive(),
+  sourceLocationIds: z.array(z.coerce.number().int().positive()).min(1).max(30),
+  items: z.array(feedbackItemSchema).min(1).max(2_000),
+  feedbackSessionId: z.string().max(120).optional().nullable(),
+});
+
 export type SmartTransferPreviewRequest = z.infer<typeof smartTransferPreviewSchema>;
 
 export function registerSmartTransferPreviewRoutes(app: Express) {
@@ -36,7 +57,9 @@ export function registerSmartTransferPreviewRoutes(app: Express) {
   app.post("/api/stock-transfers/smart-preview", requireAuth, requireNonPOS, async (req, res) => {
     try {
       const companyId = req.session.currentCompanyId;
+      const userId = req.session.userId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
+      if (!userId) return res.status(401).json({ message: "Unauthorized" });
 
       const parsed = smartTransferPreviewSchema.parse(req.body);
       const preview = await buildSmartTransferTargetBalancedPreview(
@@ -71,8 +94,15 @@ export function registerSmartTransferPreviewRoutes(app: Express) {
           }
         : preview;
 
+      const feedbackSessionId = await createSmartTransferPreviewFeedback({
+        companyId,
+        userId,
+        requestInput: parsed,
+        preview: responsePreview as Record<string, any>,
+      });
+
       res.set("Cache-Control", "no-store");
-      return res.json(responsePreview);
+      return res.json({ ...responsePreview, feedbackSessionId });
     } catch (error: any) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({
@@ -91,6 +121,70 @@ export function registerSmartTransferPreviewRoutes(app: Express) {
 
       console.error("[SmartTransferPreview] Failed:", error);
       return res.status(500).json({ message: "Failed to generate smart transfer preview" });
+    }
+  });
+
+  /** Records the editable preview at the moment it is imported into the order editor. */
+  app.post("/api/stock-transfers/smart-feedback/import", requireAuth, requireNonPOS, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      const userId = req.session.userId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      if (!userId) return res.status(401).json({ message: "Unauthorized" });
+      const parsed = importFeedbackSchema.parse(req.body);
+      const result = await recordSmartTransferImportFeedback({
+        companyId,
+        userId,
+        destinationLocationId: parsed.destinationLocationId,
+        sourceLocationIds: parsed.sourceLocationIds,
+        importedItems: parsed.items,
+        sessionId: parsed.feedbackSessionId,
+      });
+      return res.json(result);
+    } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({
+          message: "Invalid smart transfer feedback payload",
+          errors: error.issues.map((issue) => ({ path: issue.path.join("."), message: issue.message })),
+        });
+      }
+      console.error("[SmartTransferFeedback] Import feedback failed:", error);
+      return res.status(500).json({ message: "Failed to record smart transfer feedback" });
+    }
+  });
+
+  /** Returns observe-only adoption, edit and post-transfer accuracy indicators. */
+  app.get("/api/stock-transfers/smart-feedback/summary", requireAuth, requireNonPOS, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      const days = z.coerce.number().int().min(7).max(365).optional().default(90).parse(req.query.days);
+      const summary = await getSmartTransferFeedbackSummary(companyId, days);
+      res.set("Cache-Control", "no-store");
+      return res.json(summary);
+    } catch (error: any) {
+      if (error instanceof z.ZodError) return res.status(400).json({ message: "days must be between 7 and 365" });
+      console.error("[SmartTransferFeedback] Summary failed:", error);
+      return res.status(500).json({ message: "Failed to load smart transfer feedback summary" });
+    }
+  });
+
+  /** Starts a new reporting baseline without deleting the immutable audit history. */
+  app.post("/api/stock-transfers/smart-feedback/reset", requireAuth, requireNonPOS, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      const userId = req.session.userId;
+      const role = req.session.currentRole;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      if (!userId) return res.status(401).json({ message: "Unauthorized" });
+      if (!["Admin", "Owner", "Developer"].includes(role || "")) {
+        return res.status(403).json({ message: "Only admins can reset the smart transfer feedback baseline" });
+      }
+      const resetSessionId = await resetSmartTransferFeedback({ companyId, userId });
+      return res.json({ success: true, resetSessionId });
+    } catch (error) {
+      console.error("[SmartTransferFeedback] Reset failed:", error);
+      return res.status(500).json({ message: "Failed to reset smart transfer feedback baseline" });
     }
   });
 }
