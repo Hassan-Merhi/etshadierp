@@ -138,6 +138,35 @@ function parseDate(raw: unknown): Date | null {
 }
 
 /**
+ * Convert a raw date/datetime string into a calendar date "YYYY-MM-DD"
+ * WITHOUT shifting it across timezones.
+ *
+ * Maersk reports arrival dates in the LOCAL time of the port. Round-tripping
+ * through Date#toISOString() re-expresses the instant in UTC, which can move
+ * the calendar day forward or backward — e.g. "2024-05-10T22:00:00-05:00" is
+ * "2024-05-11T03:00:00Z", so toISOString().slice(0,10) yields "2024-05-11",
+ * one day AFTER the date Maersk actually shows. To stay faithful to the
+ * carrier's displayed date we read the calendar part directly.
+ */
+export function formatEtaDate(raw: unknown): string | null {
+  if (raw == null) return null;
+  const s = String(raw).trim();
+  if (!s) return null;
+  // Fast path: string already begins with an ISO calendar date — take it
+  // verbatim so an explicit offset never drags the day across midnight.
+  const iso = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (iso) return `${iso[1]}-${iso[2]}-${iso[3]}`;
+  // Otherwise let Date parse it (e.g. "May 10, 2024"), then read the LOCAL
+  // calendar components rather than the UTC ones.
+  const d = new Date(s);
+  if (isNaN(d.getTime())) return null;
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+/**
  * Recursively walk any JSON object looking for ETA-named fields.
  * Returns { path, value: "YYYY-MM-DD" } for the first valid date found,
  * or null if none.  Only matches keys whose names explicitly mean
@@ -157,8 +186,8 @@ export function deepScanForEta(obj: unknown, depth = 0): { path: string; value: 
   }
   for (const [k, v] of Object.entries(obj as Record<string, unknown>)) {
     if (DEEP_ETA_KEY_RE.test(k) && typeof v === "string" && v.trim()) {
-      const d = new Date(v);
-      if (!isNaN(d.getTime())) return { path: k, value: d.toISOString().slice(0, 10) };
+      const value = formatEtaDate(v);
+      if (value) return { path: k, value };
     }
     if (v && typeof v === "object") {
       const r = deepScanForEta(v, depth + 1);
@@ -193,18 +222,43 @@ function parseEvents(rawEvents: unknown[]): TrackingEvent[] {
     });
 }
 
-function extractFromJson(data: unknown): {
+const normContainer = (v: unknown): string => String(v ?? "").replace(/\s+/g, "").toUpperCase();
+
+/**
+ * Pick the container the caller actually asked for out of a synergy/generic
+ * `containers[]` array. Falls back to the first entry only when no match is
+ * found — never blindly trusts index 0, since a response can carry several
+ * containers (e.g. a bill-of-lading lookup) and [0] may be a different box.
+ */
+function pickContainer(list: any[], wantContainer?: string): any {
+  if (!Array.isArray(list) || list.length === 0) return null;
+  const wanted = wantContainer ? normContainer(wantContainer) : "";
+  if (wanted) {
+    const match = list.find(
+      (c) => [c?.container_num, c?.containerNum, c?.containerNumber, c?.containerNo, c?.number].some((n) => normContainer(n) === wanted)
+    );
+    if (match) return match;
+  }
+  return list[0];
+}
+
+export function extractFromJson(
+  data: unknown,
+  wantContainer?: string
+): {
   events: TrackingEvent[];
   eta: string | null;
   latestStatus: string | null;
+  /** True when the structured Maersk "synergy" schema was recognised. */
+  synergy: boolean;
 } {
-  if (!data || typeof data !== "object") return { events: [], eta: null, latestStatus: null };
+  if (!data || typeof data !== "object") return { events: [], eta: null, latestStatus: null, synergy: false };
   const d = data as Record<string, any>;
 
   // ── Maersk "synergy" tracking API format ─────────────────────────────────
   const synergyContainers: any[] = d.containers ?? [];
   if (synergyContainers.length > 0) {
-    const c = synergyContainers[0];
+    const c = pickContainer(synergyContainers, wantContainer);
     const locations: any[] = c.locations ?? [];
 
     if (locations.length > 0) {
@@ -264,8 +318,7 @@ function extractFromJson(data: unknown): {
         }
       }
 
-      const etaDate = parseDate(etaRaw);
-      const eta = etaDate ? etaDate.toISOString().slice(0, 10) : null;
+      const eta = formatEtaDate(etaRaw);
 
       let latestActualStatus: string | null = null;
       for (let i = locations.length - 1; i >= 0; i--) {
@@ -280,7 +333,7 @@ function extractFromJson(data: unknown): {
       const statusFromField: string | null = c.status ?? null;
       const latestStatus = latestActualStatus ?? statusFromField;
 
-      return { events: allEvents, eta, latestStatus };
+      return { events: allEvents, eta, latestStatus, synergy: true };
     }
   }
 
@@ -291,7 +344,7 @@ function extractFromJson(data: unknown): {
   let etaRaw: unknown = null;
 
   if (containers.length > 0) {
-    const c = containers[0];
+    const c = pickContainer(containers, wantContainer);
     rawEvents = c.containerEvents ?? c.events ?? c.milestones ?? c.movements ?? [];
 
     // portCalls: destination is the last entry or the one flagged isDestination.
@@ -333,10 +386,9 @@ function extractFromJson(data: unknown): {
   }
 
   const events = parseEvents(Array.isArray(rawEvents) ? rawEvents : []);
-  const etaDate = parseDate(String(etaRaw ?? ""));
-  const eta = etaDate ? etaDate.toISOString().slice(0, 10) : null;
+  const eta = formatEtaDate(etaRaw);
 
-  return { events, eta, latestStatus: null };
+  return { events, eta, latestStatus: null, synergy: false };
 }
 
 const SCRAPER_TIMEOUT_MS = 90_000;
@@ -478,36 +530,60 @@ export async function scrapeMaerskDirect(containerNumber: string): Promise<Carri
     console.log(`[MaerskDirect] ${containerNumber}: captured ${capturedPayloads.length} JSON response(s) total`);
 
     // ── Parse captured API responses ──────────────────────────────────────────
+    // Maersk's SPA fires several JSON calls per page (schedules, autocomplete,
+    // the real tracking payload). Returning on the FIRST payload that has any
+    // data risks locking onto a partial response whose ETA is missing or stale,
+    // while the authoritative tracking payload arrives a moment later. Instead
+    // we score EVERY captured payload and keep the richest/most authoritative
+    // one: the structured "synergy" schema wins over ad-hoc shapes, a real ETA
+    // beats none, and more events break ties.
+    let best: {
+      score: number;
+      events: TrackingEvent[];
+      eta: string | null;
+      latestStatus: string | null;
+      url: string;
+      data: unknown;
+      deepPath?: string;
+    } | null = null;
+
     for (const payload of capturedPayloads) {
-      const { events, eta: jsonEta, latestStatus: parsedStatus } = extractFromJson(payload.data);
+      const { events, eta: jsonEta, latestStatus: parsedStatus, synergy } = extractFromJson(payload.data, containerNumber);
 
       // Also try the deep recursive scan in case extractFromJson missed a nested ETA key
       const deepEta = !jsonEta ? deepScanForEta(payload.data) : null;
       const eta = jsonEta ?? deepEta?.value ?? null;
 
-      if (events.length > 0 || eta) {
-        const latest = events[0] ?? null;
-        const latestActual = events.find((e) => e.date && e.date <= new Date()) ?? latest;
-        const status = parsedStatus ?? latestActual?.status ?? latest?.status ?? null;
-        console.log(
-          `[MaerskDirect] ${containerNumber}: success from ${payload.url.slice(0, 80)} — ` +
-            `status=${status ?? "?"} events=${events.length} eta=${eta ?? "none"}` +
-            (deepEta ? ` (deep-scan path=${deepEta.path})` : "")
-        );
-        return {
-          success: true,
-          provider: "maersk_scraper",
-          carrier: "MAERSK",
-          containerNumber,
-          latestStatus: status,
-          latestLocation: latestActual?.location ?? latest?.location ?? null,
-          latestEventDate: latestActual?.date ?? latest?.date ?? null,
-          latestDescription: latestActual?.description ?? latest?.description ?? null,
-          eta,
-          events,
-          raw: payload.data,
-        };
+      if (events.length === 0 && !eta) continue;
+
+      const score = (synergy ? 1_000_000 : 0) + (eta ? 10_000 : 0) + events.length;
+      if (!best || score > best.score) {
+        best = { score, events, eta, latestStatus: parsedStatus, url: payload.url, data: payload.data, deepPath: deepEta?.path };
       }
+    }
+
+    if (best) {
+      const latest = best.events[0] ?? null;
+      const latestActual = best.events.find((e) => e.date && e.date <= new Date()) ?? latest;
+      const status = best.latestStatus ?? latestActual?.status ?? latest?.status ?? null;
+      console.log(
+        `[MaerskDirect] ${containerNumber}: success from ${best.url.slice(0, 80)} — ` +
+          `status=${status ?? "?"} events=${best.events.length} eta=${best.eta ?? "none"} score=${best.score}` +
+          (best.deepPath ? ` (deep-scan path=${best.deepPath})` : "")
+      );
+      return {
+        success: true,
+        provider: "maersk_scraper",
+        carrier: "MAERSK",
+        containerNumber,
+        latestStatus: status,
+        latestLocation: latestActual?.location ?? latest?.location ?? null,
+        latestEventDate: latestActual?.date ?? latest?.date ?? null,
+        latestDescription: latestActual?.description ?? latest?.description ?? null,
+        eta: best.eta,
+        events: best.events,
+        raw: best.data,
+      };
     }
 
     // ── Fallback A: __NEXT_DATA__ embedded in page ────────────────────────────
@@ -526,7 +602,7 @@ export async function scrapeMaerskDirect(containerNumber: string): Promise<Carri
       .catch(() => null);
 
     if (nextDataRaw && typeof nextDataRaw === "object") {
-      const { events, eta: ndEta, latestStatus: ndStatus } = extractFromJson(nextDataRaw);
+      const { events, eta: ndEta, latestStatus: ndStatus } = extractFromJson(nextDataRaw, containerNumber);
       const deepEta = !ndEta ? deepScanForEta(nextDataRaw) : null;
       const eta = ndEta ?? deepEta?.value ?? null;
       if (events.length > 0 || eta) {
@@ -591,13 +667,12 @@ export async function scrapeMaerskDirect(containerNumber: string): Promise<Carri
       const etaStr = etaMatch?.[1] ?? null;
       let eta: string | null = null;
       if (etaStr) {
-        const d = new Date(
+        eta = formatEtaDate(
           etaStr.replace(
             /\bJan\b|\bFeb\b|\bMar\b|\bApr\b|\bMay\b|\bJun\b|\bJul\b|\bAug\b|\bSep\b|\bOct\b|\bNov\b|\bDec\b/i,
             (m) => m.slice(0, 3)
           )
         );
-        if (!isNaN(d.getTime())) eta = d.toISOString().slice(0, 10);
       }
       console.log(
         `[MaerskDirect] ${containerNumber}: DOM label fallback — status=${status ?? "none"} eta=${eta ?? "none"}`
