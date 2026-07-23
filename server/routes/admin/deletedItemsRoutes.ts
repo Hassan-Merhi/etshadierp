@@ -1,4 +1,5 @@
 import { getClientDate } from "../../lib/dateUtils";
+import { logger } from "../../lib/logger";
 import type { Express } from "express";
 import { db, pool } from "../../db";
 import { storage } from "../../storage";
@@ -261,7 +262,7 @@ export function registerDeletedItemsRoutes(app: Express) {
   app.delete("/api/orphaned-records/delete-all", requireAuth, requireNonPOS, async (req, res) => {
     try {
       const companyId = req.session.currentCompanyId;
-      console.log("[DELETE-ALL] Starting delete-all for companyId:", companyId);
+      logger.info("[DELETE-ALL] Starting delete-all for companyId:", { companyId: companyId });
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       // Find all orphaned vouchers (those with deleted or non-existent locations)
@@ -283,9 +284,9 @@ export function registerDeletedItemsRoutes(app: Express) {
           )
         );
 
-      console.log("[DELETE-ALL] Found orphaned vouchers:", orphanedVouchers.length);
+      logger.info("[DELETE-ALL] Found orphaned vouchers", { count: orphanedVouchers.length });
       if (orphanedVouchers.length > 0) {
-        console.log("[DELETE-ALL] First 3 vouchers:", JSON.stringify(orphanedVouchers.slice(0, 3)));
+        logger.info("[DELETE-ALL] First 3 vouchers", { sample: orphanedVouchers.slice(0, 3) });
       }
 
       if (orphanedVouchers.length === 0) {
@@ -295,7 +296,7 @@ export function registerDeletedItemsRoutes(app: Express) {
           .from(vouchers)
           .where(eq(vouchers.companyId, companyId))
           .limit(5);
-        console.log("[DELETE-ALL] Sample vouchers for company:", JSON.stringify(allVouchers));
+        logger.info("[DELETE-ALL] Sample vouchers for company", { vouchers: allVouchers });
         return res.json({
           success: true,
           deleted: 0,
@@ -305,7 +306,7 @@ export function registerDeletedItemsRoutes(app: Express) {
       }
 
       const orphanedIds = orphanedVouchers.map((v) => v.id);
-      console.log("[DELETE-ALL] Deleting from related tables for", orphanedIds.length, "vouchers");
+      logger.info("[DELETE-ALL] Deleting from related tables", { voucherCount: orphanedIds.length });
 
       // Use parameterized array binding (= ANY($1)) instead of string-interpolated IN list
       // to keep the query injection-safe even if the source of the IDs ever changes.
@@ -321,7 +322,7 @@ export function registerDeletedItemsRoutes(app: Express) {
 
       res.json({ success: true, deleted: orphanedIds.length });
     } catch (error: any) {
-      console.error("Error deleting orphaned vouchers:", error);
+      logger.error("Error deleting orphaned vouchers:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -576,7 +577,7 @@ export function registerDeletedItemsRoutes(app: Express) {
         asOfDate,
       });
     } catch (error: any) {
-      console.error("Location summary error:", error);
+      logger.error("Location summary error:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -794,7 +795,7 @@ export function registerDeletedItemsRoutes(app: Express) {
           )
           .orderBy(desc(vouchers.voucherDate));
       } catch (err) {
-        console.error("Error fetching orphaned POS sales:", err);
+        logger.error("Error fetching orphaned POS sales:", { error: err });
         orphanedPosSales = [];
       }
 

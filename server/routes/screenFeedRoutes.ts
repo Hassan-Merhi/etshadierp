@@ -1,4 +1,5 @@
 import type { Express } from "express";
+import { logger } from "../lib/logger";
 import { requireAuth, requireLogin } from "../auth";
 import { screenFeedStore, watcherPollStore } from "../screenFeedStore";
 import {
@@ -37,7 +38,7 @@ export function registerScreenFeedRoutes(app: Express) {
     const watched = lastPoll > 0 && ageMs < WATCHER_TIMEOUT_MS;
 
     if (isDev) {
-      console.log(
+      logger.info(
         `[ScreenFeed] being-watched userId=${userId} watched=${watched} lastPollAgeMs=${lastPoll > 0 ? ageMs : "never"}`,
       );
     }
@@ -53,7 +54,7 @@ export function registerScreenFeedRoutes(app: Express) {
     const userId = String(getSessionUserId(req));
     const event = req.params.event;
     const extra = req.query.d ? String(req.query.d) : "";
-    console.log(`[ScreenFeed][TRACE] userId=${userId} event=${event}${extra ? " d=" + extra : ""}`);
+    logger.info(`[ScreenFeed][TRACE] userId=${userId} event=${event}${extra ? " d=" + extra : ""}`);
     res.status(204).end();
   });
 
@@ -63,7 +64,7 @@ export function registerScreenFeedRoutes(app: Express) {
 
     const userId = String(getSessionUserId(req));
     if (isDev) {
-      console.log(
+      logger.info(
         `[ScreenFeed] POST /api/screen-feed received from userId=${userId} body_keys=${Object.keys(req.body ?? {}).join(",")}`,
       );
     }
@@ -72,14 +73,14 @@ export function registerScreenFeedRoutes(app: Express) {
 
     if (!isValidScreenFeedDataUrl(dataUrl)) {
       if (isDev) {
-        console.warn(
+        logger.warn(
           `[ScreenFeed] POST rejected: missing or invalid dataUrl (type=${typeof dataUrl} starts=${typeof dataUrl === "string" ? dataUrl.slice(0, 30) : "N/A"})`,
         );
       }
       return res.status(400).end();
     }
     if (dataUrl.length > MAX_FRAME_SIZE) {
-      if (isDev) console.warn(`[ScreenFeed] POST rejected: frame too large (${dataUrl.length} bytes)`);
+      if (isDev) logger.warn(`[ScreenFeed] POST rejected: frame too large (${dataUrl.length} bytes)`);
       return res.status(204).end();
     }
 
@@ -88,7 +89,7 @@ export function registerScreenFeedRoutes(app: Express) {
     screenFeedStore.set(userId, { dataUrl, capturedAt: new Date(), userId, username, clicks: safeClicks });
 
     if (isDev) {
-      console.log(
+      logger.info(
         `[ScreenFeed] POST frame stored userId=${userId} frameLen=${dataUrl.length} clicks=${safeClicks.length}`,
       );
     }
@@ -110,7 +111,7 @@ export function registerScreenFeedRoutes(app: Express) {
 
     if (isDev) {
       const frameAgeMs = frame ? Date.now() - frame.capturedAt.getTime() : null;
-      console.log(
+      logger.info(
         `[ScreenFeed] GET /:userId watchedUserId=${watchedUserId} hasFrame=${hasFrame} frameAgeMs=${frameAgeMs}`,
       );
     }

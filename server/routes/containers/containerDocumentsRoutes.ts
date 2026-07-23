@@ -1,4 +1,5 @@
 import { parseId, parseOptionalId } from "../../lib/parseId";
+import { logger } from "../../lib/logger";
 import { getClientDate } from "../../lib/dateUtils";
 import type { Express, Request, Response, NextFunction } from "express";
 import { db } from "../../db";
@@ -213,7 +214,7 @@ export function registerContainerDocumentsRoutes(app: Express) {
 
       res.json(exportData);
     } catch (error: any) {
-      console.error("Container export error:", error);
+      logger.error("Container export error:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -322,7 +323,7 @@ export function registerContainerDocumentsRoutes(app: Express) {
       res.setHeader("Content-Disposition", `attachment; filename="containers_export_${getClientDate(req)}.xlsx"`);
       res.send(buffer);
     } catch (error: any) {
-      console.error("Container export-all error:", error);
+      logger.error("Container export-all error:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -431,7 +432,7 @@ export function registerContainerDocumentsRoutes(app: Express) {
           const items = await tx.select().from(salesItems).where(eq(salesItems.voucherId, voucher.id)).execute();
 
           if (items.length === 0) {
-            console.warn(`No sales items found for voucher ${voucher.id}, skipping`);
+            logger.warn(`No sales items found for voucher ${voucher.id}, skipping`);
             skippedCount++;
             return;
           }
@@ -440,7 +441,7 @@ export function registerContainerDocumentsRoutes(app: Express) {
           const totalSales = items.reduce((sum, item) => sum + parseFloat(item.totalSales || "0"), 0);
 
           if (totalSales === 0) {
-            console.warn(`Voucher ${voucher.id} has zero sales, skipping`);
+            logger.warn(`Voucher ${voucher.id} has zero sales, skipping`);
             skippedCount++;
             return;
           }
@@ -450,7 +451,7 @@ export function registerContainerDocumentsRoutes(app: Express) {
           const stockItem = await tx.select().from(stockItems).where(eq(stockItems.id, firstItem.stockItemId)).limit(1);
 
           if (stockItem.length === 0) {
-            console.warn(`Could not find stock item ${firstItem.stockItemId} for voucher ${voucher.id}, skipping`);
+            logger.warn(`Could not find stock item ${firstItem.stockItemId} for voucher ${voucher.id}, skipping`);
             skippedCount++;
             return;
           }
@@ -463,7 +464,7 @@ export function registerContainerDocumentsRoutes(app: Express) {
             .limit(1);
 
           if (inventoryRecords.length === 0) {
-            console.warn(`Could not determine location for voucher ${voucher.id}, skipping`);
+            logger.warn(`Could not determine location for voucher ${voucher.id}, skipping`);
             skippedCount++;
             return;
           }
@@ -472,7 +473,7 @@ export function registerContainerDocumentsRoutes(app: Express) {
           const cashAccountId = locationCashAccountMap[locationId];
 
           if (!cashAccountId) {
-            console.warn(`No cash account mapped for location ${locationId}, skipping voucher ${voucher.id}`);
+            logger.warn(`No cash account mapped for location ${locationId}, skipping voucher ${voucher.id}`);
             skippedCount++;
             return;
           }
@@ -511,7 +512,7 @@ export function registerContainerDocumentsRoutes(app: Express) {
         totalSalesVouchers: allVouchers.length,
       });
     } catch (error: any) {
-      console.error("Sales backfill error:", error);
+      logger.error("Sales backfill error:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
