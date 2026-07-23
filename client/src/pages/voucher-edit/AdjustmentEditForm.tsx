@@ -90,7 +90,7 @@ export function AdjustmentEditForm({
               />
 
               <div className="flex-1">
-                <FormLabel>Location</FormLabel>
+                <Label className="text-sm font-medium">Location</Label>
                 <Input value={location?.name || "N/A"} disabled className="mt-2" data-testid="input-location" />
                 <p className="text-xs text-muted-foreground mt-1">
                   Location cannot be changed to maintain inventory accuracy

@@ -90,7 +90,7 @@ export function TransferEditForm({
               />
 
               <div className="flex-1">
-                <FormLabel>Source Location</FormLabel>
+                <Label className="text-sm font-medium">Source Location</Label>
                 <Input
                   value={sourceLocation?.name || "N/A"}
                   disabled
@@ -100,7 +100,7 @@ export function TransferEditForm({
               </div>
 
               <div className="flex-1">
-                <FormLabel>Destination Location</FormLabel>
+                <Label className="text-sm font-medium">Destination Location</Label>
                 <Input
                   value={destinationLocation?.name || "N/A"}
                   disabled
