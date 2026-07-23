@@ -55,7 +55,9 @@ describe("Smoke — Accounts", () => {
   it("GET /api/accounts/all returns 200", async () => {
     const res = await agent.get("/api/accounts/all");
     expect(res.status).toBe(200);
-    expect(Array.isArray(res.body)).toBe(true);
+    // Contract is { accounts: [...] } (see AccountsLegacy.tsx: `accountsResponse?.accounts`),
+    // not a bare array — assert the documented shape.
+    expect(Array.isArray(res.body.accounts)).toBe(true);
   });
 
   it("GET /api/accounts/ledger/:id/balance returns 200", async () => {
@@ -251,6 +253,83 @@ describe("Smoke — Auth boundary", () => {
     const anonAgent = request.agent(ctx.app);
     const res = await anonAgent.get(`/api/inventory?locationId=${ctx.locationId}`);
     expect(res.status).toBe(401);
+  });
+});
+
+// ── Decomposed route-module registration guard ───────────────────────────────
+// Each endpoint below lives in a sub-registrar that was split out of a larger
+// "god-file" route module. A dropped `registerXRoutes(app)` call — or a broken
+// import inside a split file — surfaces here as a 404/500 instead of a real
+// response. These assertions keep the sub-registrar wiring honest.
+describe("Smoke — Decomposed route modules", () => {
+  it("exchangeRateRoutes: GET /api/exchange-rates returns 200", async () => {
+    const res = await agent.get("/api/exchange-rates");
+    expect(res.status).toBe(200);
+  });
+
+  it("userPresenceRoutes: GET /api/user-presence returns 200", async () => {
+    const res = await agent.get("/api/user-presence");
+    expect(res.status).toBe(200);
+  });
+
+  it("accountTransactionRoutes: GET /api/accounts/supplier/:id/transactions is non-500", async () => {
+    const res = await agent.get("/api/accounts/supplier/1/transactions");
+    expect(res.status).toBeLessThan(500);
+  });
+
+  it("accountStatementRoutes: GET /api/accounts/ledger/:id/deleted-vouchers returns 200", async () => {
+    const res = await agent.get(`/api/accounts/ledger/${ctx.cashAccountId}/deleted-vouchers`);
+    expect(res.status).toBe(200);
+  });
+
+  it("accountStatementRoutes: GET /api/accounts/ledger/:id/pre-period-balance returns 200", async () => {
+    const res = await agent.get(`/api/accounts/ledger/${ctx.cashAccountId}/pre-period-balance`);
+    expect(res.status).toBe(200);
+  });
+
+  it("financialSalesRoutes: GET /api/fiscal-period/closures returns 200", async () => {
+    const res = await agent.get("/api/fiscal-period/closures");
+    expect(res.status).toBe(200);
+  });
+
+  it("financialSalesRoutes: GET /api/financial/sales returns 200", async () => {
+    const today = new Date().toISOString().split("T")[0];
+    const res = await agent.get(`/api/financial/sales?startDate=2024-01-01&endDate=${today}`);
+    expect(res.status).toBe(200);
+  });
+
+  it("stockAdjustmentWasteRoutes: GET /api/waste-dispatches returns 200", async () => {
+    const res = await agent.get("/api/waste-dispatches");
+    expect(res.status).toBe(200);
+  });
+
+  it("stockAdjustmentWasteRoutes: GET /api/stock-adjustments is non-500", async () => {
+    const res = await agent.get("/api/stock-adjustments");
+    expect(res.status).toBeLessThan(500);
+  });
+
+  it("payrollRoutes: GET /api/payroll/runs returns 200", async () => {
+    const res = await agent.get("/api/payroll/runs");
+    expect(res.status).toBe(200);
+  });
+
+  it("stockSummaryLocationRoutes: GET /api/locations/:loc/stock-items/:id/monthly-summary returns 200", async () => {
+    const res = await agent.get(
+      `/api/locations/${ctx.locationId}/stock-items/${ctx.stockItemIds[0]}/monthly-summary?year=2024&month=1`,
+    );
+    expect(res.status).toBe(200);
+  });
+
+  it("stockSummaryLocationRoutes: GET /api/locations/:loc/stock-items/:id/transactions is non-500", async () => {
+    const res = await agent.get(
+      `/api/locations/${ctx.locationId}/stock-items/${ctx.stockItemIds[0]}/transactions`,
+    );
+    expect(res.status).toBeLessThan(500);
+  });
+
+  it("chatbotRoutes: GET /api/chatbot/status returns 200", async () => {
+    const res = await agent.get("/api/chatbot/status");
+    expect(res.status).toBe(200);
   });
 });
 
