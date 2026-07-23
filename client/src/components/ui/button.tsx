@@ -65,8 +65,19 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
         aria-busy={isLoading || undefined}
         {...props}
       >
-        {isLoading ? <Loader2 className="animate-spin motion-reduce:animate-none" aria-hidden="true" /> : null}
-        {isLoading ? <span>{loadingLabel}</span> : children}
+        {asChild ? (
+          // When asChild=true the Slot requires exactly one React element child.
+          // Rendering the loading wrapper alongside children produces [null, child]
+          // which trips Radix's single-element guard and throws.
+          children
+        ) : isLoading ? (
+          <>
+            <Loader2 className="animate-spin motion-reduce:animate-none" aria-hidden="true" />
+            <span>{loadingLabel}</span>
+          </>
+        ) : (
+          children
+        )}
       </Comp>
     );
   },
