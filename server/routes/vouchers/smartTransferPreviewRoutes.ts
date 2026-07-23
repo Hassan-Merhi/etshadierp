@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { z } from "zod";
 import { requireAuth, requireNonPOS } from "../../auth";
-import { buildSmartTransferBusinessRulePreview } from "../../services/smartTransferBusinessRules";
+import { buildSmartTransferTargetBalancedPreview } from "../../services/smartTransferTargetMix";
 
 const smartTransferPreviewSchema = z.object({
   destinationLocationId: z.coerce.number().int().positive(),
@@ -39,7 +39,7 @@ export function registerSmartTransferPreviewRoutes(app: Express) {
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const parsed = smartTransferPreviewSchema.parse(req.body);
-      const preview = await buildSmartTransferBusinessRulePreview(
+      const preview = await buildSmartTransferTargetBalancedPreview(
         companyId,
         parsed.sourceLocationIds,
         parsed.destinationLocationId,
