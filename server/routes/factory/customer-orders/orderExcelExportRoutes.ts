@@ -1,4 +1,5 @@
 import { logAudit } from "../../helpers/auditHelpers";
+import { logger } from "../../../lib/logger";
 import { contentDisposition } from "../../../lib/contentDisposition";
 import { trackOneContainerById } from "../../../services/containerTrackingService";
 import { parseId, parseOptionalId } from "../../../lib/parseId";
@@ -201,7 +202,7 @@ async function buildInvoiceWorkbookBuffer(params: InvoiceWorkbookParams): Promis
   const safeStr = (v: any): string => (v == null ? "" : String(v));
   const safeNum = (v: any): number => { const n = Number(v); return isFinite(n) ? n : 0; };
 
-  console.log(`[ExcelExport] orderId=${orderId} companyId=${companyId} stage=started`);
+  logger.info(`[ExcelExport] orderId=${orderId} companyId=${companyId} stage=started`);
 
   const workbook = new ExcelJS.Workbook();
   const sheet = workbook.addWorksheet("Commercial Invoice");
@@ -324,7 +325,7 @@ async function buildInvoiceWorkbookBuffer(params: InvoiceWorkbookParams): Promis
   } catch {}
 
   // ── Data rows ──
-  console.log(`[ExcelExport] orderId=${orderId} stage=writing-rows count=${params.lines.length}`);
+  logger.info(`[ExcelExport] orderId=${orderId} stage=writing-rows count=${params.lines.length}`);
   let totalQty = 0, totalWtAll = 0, totalAll = 0;
   params.lines.forEach((g, idx) => {
     const qty   = safeNum(g.qty);
@@ -444,23 +445,23 @@ async function buildInvoiceWorkbookBuffer(params: InvoiceWorkbookParams): Promis
         sr.getCell(8).border = thinBorder;
       });
     } catch (summaryErr: any) {
-      console.warn(`[ExcelExport] orderId=${orderId} stage=summary-skipped reason=${summaryErr.message}`);
+      logger.warn(`[ExcelExport] orderId=${orderId} stage=summary-skipped reason=${summaryErr.message}`);
     }
   }
 
   // ── Write buffer (with temp-file fallback if writeBuffer produces empty output) ──
-  console.log(`[ExcelExport] orderId=${orderId} stage=writebuffer-started`);
+  logger.info(`[ExcelExport] orderId=${orderId} stage=writebuffer-started`);
   let xlsBuffer = normalizeExcelBuffer(await workbook.xlsx.writeBuffer());
-  console.log(`[ExcelExport] orderId=${orderId} stage=writebuffer-complete bytes=${xlsBuffer.length}`);
+  logger.info(`[ExcelExport] orderId=${orderId} stage=writebuffer-complete bytes=${xlsBuffer.length}`);
 
   if (xlsBuffer.length === 0) {
     // Primary serialization produced an empty buffer. Retry via a temp file.
-    console.warn(`[ExcelExport] orderId=${orderId} stage=writebuffer-empty-retrying-file`);
+    logger.warn(`[ExcelExport] orderId=${orderId} stage=writebuffer-empty-retrying-file`);
     const tempPath = path.join(os.tmpdir(), `invoice-${crypto.randomUUID()}.xlsx`);
     try {
       await workbook.xlsx.writeFile(tempPath);
       xlsBuffer = normalizeExcelBuffer(await fs.promises.readFile(tempPath));
-      console.log(`[ExcelExport] orderId=${orderId} stage=writefile-complete bytes=${xlsBuffer.length}`);
+      logger.info(`[ExcelExport] orderId=${orderId} stage=writefile-complete bytes=${xlsBuffer.length}`);
     } finally {
       fs.promises.unlink(tempPath).catch(() => {});
     }
@@ -477,7 +478,7 @@ async function buildInvoiceWorkbookBuffer(params: InvoiceWorkbookParams): Promis
     throw new Error(`Generated buffer has invalid XLSX signature: ${signatureHex || "missing"}`);
   }
 
-  console.log(`[ExcelExport] orderId=${orderId} stage=buffer-validated bytes=${xlsBuffer.length}`);
+  logger.info(`[ExcelExport] orderId=${orderId} stage=buffer-validated bytes=${xlsBuffer.length}`);
   return xlsBuffer;
 }
 
@@ -626,7 +627,7 @@ export function registerOrderExcelExportRoutes(app: Express) {
           changes: { format: { old: null, new: "xlsx" }, orderId: { old: null, new: orderId } },
         });
       } catch (auditErr) {
-        console.error("[ExcelExport] audit write failed:", auditErr);
+        logger.error("[ExcelExport] audit write failed:", { error: auditErr });
       }
       res.status(200);
       res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
@@ -636,9 +637,9 @@ export function registerOrderExcelExportRoutes(app: Express) {
       res.setHeader("Pragma", "no-cache");
       res.setHeader("X-Content-Type-Options", "nosniff");
       res.end(xlsBuffer);
-      console.log(`[ExcelExport] orderId=${orderId} stage=response-sent bytes=${xlsBuffer.length}`);
+      logger.info(`[ExcelExport] orderId=${orderId} stage=response-sent bytes=${xlsBuffer.length}`);
     } catch (error: any) {
-      console.error(`[ExcelExport] /export/excel failed:`, error.message, error.stack);
+      logger.error(`[ExcelExport] /export/excel failed:`, { error: error.message, stack: error.stack });
       if (!res.headersSent) res.status(500).json({ message: error.message });
     }
   });
@@ -764,7 +765,7 @@ export function registerOrderExcelExportRoutes(app: Express) {
           changes: { format: { old: null, new: "xlsx" }, orderId: { old: null, new: orderId } },
         });
       } catch (auditErr) {
-        console.error("[ExcelExport] audit write failed:", auditErr);
+        logger.error("[ExcelExport] audit write failed:", { error: auditErr });
       }
       res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
       res.setHeader("Content-Disposition", contentDisposition(fileName));
@@ -773,9 +774,9 @@ export function registerOrderExcelExportRoutes(app: Express) {
       res.setHeader("Pragma", "no-cache");
       res.setHeader("X-Content-Type-Options", "nosniff");
       res.end(xlsBuffer);
-      console.log(`[ExcelExport] orderId=${orderId} stage=response-sent bytes=${xlsBuffer.length}`);
+      logger.info(`[ExcelExport] orderId=${orderId} stage=response-sent bytes=${xlsBuffer.length}`);
     } catch (error: any) {
-      console.error(`[ExcelExport] /export-excel failed:`, error.message, error.stack);
+      logger.error(`[ExcelExport] /export-excel failed:`, { error: error.message, stack: error.stack });
       if (!res.headersSent) {
         res.status(500).json({ message: error.message });
       }

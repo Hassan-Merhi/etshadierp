@@ -1,4 +1,5 @@
 import { parseId, parseOptionalId } from "../../lib/parseId";
+import { logger } from "../../lib/logger";
 import { getClientDate } from "../../lib/dateUtils";
 import { getExportPriceVisibility } from "../../helpers/exportVisibility";
 import type { Express } from "express";
@@ -433,7 +434,7 @@ export function registerFactoryStockRoutes(app: Express) {
 
       res.json({ bales: result.bales, totalWeight: result.totalWeight });
     } catch (error: any) {
-      console.error("Error in stock entry:", error);
+      logger.error("Error in stock entry:", { error: error });
       res.status(400).json({ message: error.message });
     }
   });
@@ -632,7 +633,7 @@ export function registerFactoryStockRoutes(app: Express) {
 
       res.json({ imported: result.count, totalWeight: result.totalWeight, bales: result.bales });
     } catch (error: any) {
-      console.error("Error importing bales:", error);
+      logger.error("Error importing bales:", { error: error });
       res.status(400).json({ message: error.message });
     }
   });
@@ -756,7 +757,7 @@ export function registerFactoryStockRoutes(app: Express) {
 
       res.json({ removed: result.removed.length, bales: result.removed });
     } catch (error: any) {
-      console.error("Error removing bales:", error);
+      logger.error("Error removing bales:", { error: error });
       res.status(400).json({ message: error.message });
     }
   });
@@ -863,7 +864,7 @@ export function registerFactoryStockRoutes(app: Express) {
 
       res.json({ removed: result.removed.length, bales: result.removed });
     } catch (error: any) {
-      console.error("Error removing bales by product:", error);
+      logger.error("Error removing bales by product:", { error: error });
       res.status(400).json({ message: error.message });
     }
   });
@@ -1013,7 +1014,7 @@ export function registerFactoryStockRoutes(app: Express) {
       const result = Array.from(grouped.values()).sort((a, b) => a.productName.localeCompare(b.productName));
       res.json(result);
     } catch (error: any) {
-      console.error("Error fetching factory location inventory:", error);
+      logger.error("Error fetching factory location inventory:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -1132,7 +1133,7 @@ export function registerFactoryStockRoutes(app: Express) {
 
       res.json(result);
     } catch (error: any) {
-      console.error("Error fetching available factory location inventory:", error);
+      logger.error("Error fetching available factory location inventory:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -1536,7 +1537,7 @@ export function registerFactoryStockRoutes(app: Express) {
       res.setHeader("Content-Length", xlsBuffer.byteLength);
       res.end(xlsBuffer);
     } catch (error: any) {
-      console.error("Error exporting inventory Excel:", error);
+      logger.error("Error exporting inventory Excel:", { error: error });
       if (!res.headersSent) res.status(500).json({ message: error.message });
     }
   });
@@ -1946,7 +1947,7 @@ export function registerFactoryStockRoutes(app: Express) {
       res.setHeader("Content-Length", xlsBuffer.byteLength);
       res.end(xlsBuffer);
     } catch (error: any) {
-      console.error("Error exporting all-locations inventory Excel:", error);
+      logger.error("Error exporting all-locations inventory Excel:", { error: error });
       if (!res.headersSent) res.status(500).json({ message: error.message });
     }
   });
@@ -1984,7 +1985,7 @@ export function registerFactoryStockRoutes(app: Express) {
 
       res.json(results.map((b) => ({ ...b, isInLoadingOrder: loadingBaleIds.has(b.id) })));
     } catch (error: any) {
-      console.error("Error fetching in-stock bales:", error);
+      logger.error("Error fetching in-stock bales:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -2014,7 +2015,7 @@ export function registerFactoryStockRoutes(app: Express) {
       }));
       res.json(result);
     } catch (error: any) {
-      console.error("Error fetching in-stock locations:", error);
+      logger.error("Error fetching in-stock locations:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -2076,7 +2077,7 @@ export function registerFactoryStockRoutes(app: Express) {
 
       res.json(result);
     } catch (error: any) {
-      console.error("Error fetching bale stock list:", error);
+      logger.error("Error fetching bale stock list:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -2144,7 +2145,7 @@ export function registerFactoryStockRoutes(app: Express) {
 
       res.json(result);
     } catch (error: any) {
-      console.error("Error fetching bale stock count:", error);
+      logger.error("Error fetching bale stock count:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
