@@ -68,11 +68,29 @@ export const formatSmartCurrency = (value: number): string => {
   return "$" + absValue.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 };
 
-export const goToStatement = (accountId: number, appMode: string, customerId?: number, accountType?: string) => {
+export const goToStatement = (
+  accountId: number,
+  appMode: string,
+  customerId?: number,
+  accountType?: string,
+  navigate?: (url: string) => void,
+) => {
   if (customerId && appMode === "factory") {
+    // Customer detail — keep new-tab (no factory-context problem for customer pages)
     window.open(`/factory/customers/${customerId}`, "_blank");
     return;
   }
-  const basePath = appMode === "factory" ? "/factory" : "";
-  window.open(`${basePath}/ledger-monthly/${accountId}`, "_blank");
+  if (appMode === "factory") {
+    // Same-tab SPA navigation keeps the factory session context intact.
+    // window.open(_blank) opens a fresh tab where factory context isn't
+    // re-established, causing the access guard to redirect to home.
+    const url = `/factory/accounts?accountId=${accountId}&accountType=ledger`;
+    if (navigate) {
+      navigate(url);
+    } else {
+      window.location.href = url;
+    }
+    return;
+  }
+  window.open(`/ledger-monthly/${accountId}`, "_blank");
 };

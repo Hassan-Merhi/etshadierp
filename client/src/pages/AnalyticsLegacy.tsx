@@ -996,8 +996,14 @@ export default function Analytics() {
       window.open(`/factory/customers/${customerId}`, "_blank");
       return;
     }
-    const basePath = appMode === "factory" ? "/factory" : "";
-    window.open(`${basePath}/ledger-monthly/${accountId}`, "_blank");
+    if (appMode === "factory") {
+      // Same-tab SPA navigation keeps the factory session/company context intact.
+      // window.open(_blank) opens a fresh tab without factory context → guard
+      // redirects to home.
+      navigate(`/factory/accounts?accountId=${accountId}&accountType=ledger`);
+      return;
+    }
+    window.open(`/ledger-monthly/${accountId}`, "_blank");
   };
 
   // Render hierarchical accounts (filters out zero-balance accounts)

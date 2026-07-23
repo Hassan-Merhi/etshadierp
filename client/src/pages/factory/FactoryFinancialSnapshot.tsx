@@ -734,7 +734,7 @@ export default function FactoryFinancialSnapshot() {
                           >
                             <button
                               className="flex items-center gap-1.5 min-w-0 text-left hover-elevate rounded flex-1 py-0.5 px-1"
-                              onClick={() => navigate(`/accounts?accountId=${acct.id}&accountType=ledger${netPosition?.asOf ? `&endDate=${netPosition.asOf}` : ""}`)}
+                              onClick={() => navigate(`/factory/accounts?accountId=${acct.id}&accountType=ledger${netPosition?.asOf ? `&endDate=${netPosition.asOf}` : ""}`)}
                               data-testid={`button-advance-account-${acct.id}`}
                             >
                               <ExternalLink className="h-3 w-3 text-muted-foreground shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
@@ -839,7 +839,7 @@ export default function FactoryFinancialSnapshot() {
                           >
                             <button
                               className="flex items-center gap-1.5 min-w-0 text-left hover-elevate rounded flex-1 py-0.5 px-1"
-                              onClick={() => navigate(`/accounts?accountId=${acct.id}&accountType=ledger${netPosition?.asOf ? `&endDate=${netPosition.asOf}` : ""}`)}
+                              onClick={() => navigate(`/factory/accounts?accountId=${acct.id}&accountType=ledger${netPosition?.asOf ? `&endDate=${netPosition.asOf}` : ""}`)}
                               data-testid={`button-cashbank-account-${acct.id}`}
                             >
                               <ExternalLink className="h-3 w-3 text-muted-foreground shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
@@ -938,7 +938,7 @@ export default function FactoryFinancialSnapshot() {
                           >
                             <button
                               className="flex items-center gap-1.5 min-w-0 text-left hover-elevate rounded flex-1 py-0.5 px-1"
-                              onClick={() => navigate(`/accounts?accountId=${acct.id}&accountType=ledger${netPosition?.asOf ? `&endDate=${netPosition.asOf}` : ""}`)}
+                              onClick={() => navigate(`/factory/accounts?accountId=${acct.id}&accountType=ledger${netPosition?.asOf ? `&endDate=${netPosition.asOf}` : ""}`)}
                               data-testid={`button-agent-account-${acct.id}`}
                             >
                               <ExternalLink className="h-3 w-3 text-muted-foreground shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
@@ -1037,7 +1037,7 @@ export default function FactoryFinancialSnapshot() {
                           >
                             <button
                               className="flex items-center gap-1.5 min-w-0 text-left hover-elevate rounded flex-1 py-0.5 px-1"
-                              onClick={() => navigate(`/accounts?accountId=${acct.id}&accountType=ledger${netPosition?.asOf ? `&endDate=${netPosition.asOf}` : ""}`)}
+                              onClick={() => navigate(`/factory/accounts?accountId=${acct.id}&accountType=ledger${netPosition?.asOf ? `&endDate=${netPosition.asOf}` : ""}`)}
                               data-testid={`button-freight-account-${acct.id}`}
                             >
                               <ExternalLink className="h-3 w-3 text-muted-foreground shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
