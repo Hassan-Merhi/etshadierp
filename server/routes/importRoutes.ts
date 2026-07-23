@@ -1,4 +1,5 @@
 import { getClientDate } from "../lib/dateUtils";
+import { logger } from "../lib/logger";
 import type { Express } from "express";
 import { db } from "../db";
 import { storage } from "../storage";
@@ -111,7 +112,7 @@ export function registerImportRoutes(app: Express) {
         errors,
       });
     } catch (error: any) {
-      console.error("PO Import validation error:", error);
+      logger.error("PO Import validation error:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -519,12 +520,12 @@ export function registerImportRoutes(app: Express) {
                     companyId: currentCompanyId,
                     parentCreditAccountId: parentCreditAccountId,
                   });
-                  console.log(
+                  logger.info(
                     `Auto-created Parent Credit Account: ${creditAccountName} (ID: ${parentCreditAccountId})`
                   );
                 }
               } catch (err: any) {
-                console.log(
+                logger.info(
                   `Parent Credit Account creation attempt ${attempt + 1} failed, will retry fetch:`,
                   err?.message
                 );
@@ -804,7 +805,7 @@ export function registerImportRoutes(app: Express) {
         grandTotal: containerPreview.grandTotal,
       });
     } catch (error: any) {
-      console.error("PO Import error:", error);
+      logger.error("PO Import error:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -901,7 +902,7 @@ export function registerImportRoutes(app: Express) {
       res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
       res.send(buffer);
     } catch (error: any) {
-      console.error("Template generation error:", error);
+      logger.error("Template generation error:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -1054,7 +1055,7 @@ export function registerImportRoutes(app: Express) {
             .length,
         });
       } catch (err: any) {
-        console.error("Silent transfer parse error:", err);
+        logger.error("Silent transfer parse error:", { error: err });
         res.status(500).json({ message: err.message });
       }
     }
@@ -1087,7 +1088,7 @@ export function registerImportRoutes(app: Express) {
 
       res.json({ success: true, itemsTransferred: items.length });
     } catch (err: any) {
-      console.error("Silent transfer apply error:", err);
+      logger.error("Silent transfer apply error:", { error: err });
       res.status(500).json({ message: err.message });
     }
   });
@@ -1132,7 +1133,7 @@ export function registerImportRoutes(app: Express) {
 
       res.json({ success: true, applied, type });
     } catch (err: any) {
-      console.error("Silent production/consumption error:", err);
+      logger.error("Silent production/consumption error:", { error: err });
       res.status(500).json({ message: err.message });
     }
   });

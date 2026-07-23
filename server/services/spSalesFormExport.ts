@@ -1,4 +1,5 @@
 import ExcelJS from "exceljs";
+import { logger } from "../lib/logger";
 import path from "path";
 import fs from "fs";
 import { db } from "../db";
@@ -132,7 +133,7 @@ const S_DATE_START = 6; // F – first date column
 // ── Main export function ──────────────────────────────────────────────────────
 
 export async function generateSpSalesFormExcel(params: SpSalesFormParams): Promise<Buffer> {
-  console.log("RUNNING NEW SP EXPORT FIX 2026-07-06 DIRECT ENTRY WRITE");
+  logger.info("RUNNING NEW SP EXPORT FIX 2026-07-06 DIRECT ENTRY WRITE");
   const { companyId, fromDate, toDate, locationId } = params;
 
   // Build conditional location SQL fragments — injected into both queries below.
@@ -159,7 +160,7 @@ export async function generateSpSalesFormExcel(params: SpSalesFormParams): Promi
   // if the requested range is longer so the caller can investigate.
   const effectiveDayCount = Math.min(dayCount, E_TEMPLATE_MAX_DAYS);
   if (dayCount > E_TEMPLATE_MAX_DAYS) {
-    console.warn(
+    logger.warn(
       `[spSalesFormExport] WARNING: requested ${dayCount} days exceeds template ` +
       `capacity (${E_TEMPLATE_MAX_DAYS} days). Export will be clamped to ` +
       `${E_TEMPLATE_MAX_DAYS} days; data beyond ${dates[E_TEMPLATE_MAX_DAYS - 1]} is dropped.`
@@ -167,7 +168,7 @@ export async function generateSpSalesFormExcel(params: SpSalesFormParams): Promi
   }
 
   // ── Diagnostic log (confirms the server is running the latest code) ────────
-  console.log(
+  logger.info(
     `[spSalesFormExport] fromDate=${fromDate} toDate=${toDate} dayCount=${dayCount}` +
     ` effectiveDayCount=${effectiveDayCount} locationId=${locationId ?? "none"}` +
     ` firstClearedENTRYdateBlockCol=${E_DATE_START + effectiveDayCount * 3} (dayIndex=${effectiveDayCount})` +
@@ -837,12 +838,12 @@ export async function generateSpSalesFormExcel(params: SpSalesFormParams): Promi
     }
 
     if (mismatches.length > 0) {
-      console.warn(
+      logger.warn(
         `[spSalesFormExport] Sales alignment issues (${mismatches.length}):\n` +
         mismatches.map((m, i) => `  ${i + 1}. ${m}`).join("\n")
       );
     } else {
-      console.info(
+      logger.info(
         `[spSalesFormExport] Sales alignment OK — ${dayCount} day(s), F1=${firstDateWritten ?? fromDate}, BM formula references Sales!`
       );
     }
@@ -874,7 +875,7 @@ export async function generateSpSalesFormExcel(params: SpSalesFormParams): Promi
     const allErrors = Object.entries(errorsBySheet)
       .flatMap(([, errs]) => errs);
     if (allErrors.length > 0) {
-      console.warn(`[spSalesFormExport] Formula errors detected (all sheets):`, allErrors);
+      logger.warn(`[spSalesFormExport] Formula errors detected (all sheets):`, { errors: allErrors });
     }
 
     // NOTE: ExcelJS reads cached formula results embedded at write-time; it does not
@@ -893,7 +894,7 @@ export async function generateSpSalesFormExcel(params: SpSalesFormParams): Promi
   } catch (scanErr: any) {
     // Re-throw export-abort errors; swallow scan infrastructure failures only.
     if (scanErr.message?.startsWith("SP Sales Form export aborted")) throw scanErr;
-    console.error("[spSalesFormExport] Error scan failed (non-critical):", scanErr.message);
+    logger.error("[spSalesFormExport] Error scan failed (non-critical):", { error: scanErr.message });
   }
 
   return buf;

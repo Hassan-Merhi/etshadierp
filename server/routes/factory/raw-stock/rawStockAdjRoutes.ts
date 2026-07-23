@@ -1,4 +1,5 @@
 import { parseId, parseOptionalId } from "../../../lib/parseId";
+import { logger } from "../../../lib/logger";
 import { getClientDate } from "../../../lib/dateUtils";
 import type { Express } from "express";
 import { db } from "../../../db";
@@ -319,7 +320,7 @@ export function registerRawStockAdjRoutes(app: Express) {
 
       res.json(all);
     } catch (error: any) {
-      console.error("Raw material history error:", error);
+      logger.error("Raw material history error:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -458,7 +459,7 @@ export function registerRawStockAdjRoutes(app: Express) {
 
       res.json(inserted);
     } catch (error: any) {
-      console.error("Error creating raw stock adjustment:", error);
+      logger.error("Error creating raw stock adjustment:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -563,7 +564,7 @@ export function registerRawStockAdjRoutes(app: Express) {
 
       res.json({ success: true });
     } catch (error: any) {
-      console.error("Error deleting raw stock adjustment:", error);
+      logger.error("Error deleting raw stock adjustment:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -640,7 +641,7 @@ export function registerRawStockAdjRoutes(app: Express) {
 
       res.json({ success: true });
     } catch (error: any) {
-      console.error("Error deleting batch source:", error);
+      logger.error("Error deleting batch source:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -691,7 +692,7 @@ export function registerRawStockAdjRoutes(app: Express) {
 
       res.json({ success: true });
     } catch (error: any) {
-      console.error("Error deleting raw stock receipt:", error);
+      logger.error("Error deleting raw stock receipt:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -733,7 +734,7 @@ export function registerRawStockAdjRoutes(app: Express) {
 
       res.json({ success: true });
     } catch (error: any) {
-      console.error("Error updating raw stock receipt:", error);
+      logger.error("Error updating raw stock receipt:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -782,7 +783,7 @@ export function registerRawStockAdjRoutes(app: Express) {
 
       res.json(enriched);
     } catch (error: any) {
-      console.error("Error fetching factory raw stock by container:", error);
+      logger.error("Error fetching factory raw stock by container:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -856,7 +857,7 @@ export function registerRawStockAdjRoutes(app: Express) {
 
       res.json(response);
     } catch (error: any) {
-      console.error("Error fetching available containers:", error);
+      logger.error("Error fetching available containers:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });

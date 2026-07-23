@@ -1,4 +1,5 @@
 import { Express } from "express";
+import { logger } from "../lib/logger";
 import { pool } from "../db";
 import ExcelJS from "exceljs";
 
@@ -22,7 +23,7 @@ export function registerSupplierProfitCheckRoutes(app: Express, requireAuth: any
 
       res.json(result.rows);
     } catch (err: any) {
-      console.error("[supplier-profit-check/location-groups]", err.message);
+      logger.error("[supplier-profit-check/location-groups]", { error: err.message });
       res.status(500).json({ message: err.message });
     }
   });
@@ -52,7 +53,7 @@ export function registerSupplierProfitCheckRoutes(app: Express, requireAuth: any
 
       res.json(result.rows);
     } catch (err: any) {
-      console.error("[supplier-profit-check/otw-containers]", err.message);
+      logger.error("[supplier-profit-check/otw-containers]", { error: err.message });
       res.status(500).json({ message: err.message });
     }
   });
@@ -403,7 +404,7 @@ export function registerSupplierProfitCheckRoutes(app: Express, requireAuth: any
 
       res.json(rows);
     } catch (err: any) {
-      console.error("[supplier-profit-check/analyze]", err.message);
+      logger.error("[supplier-profit-check/analyze]", { error: err.message });
       res.status(500).json({ message: err.message });
     }
   });
@@ -457,7 +458,7 @@ export function registerSupplierProfitCheckRoutes(app: Express, requireAuth: any
 
       res.json({ id: proforma.id, reference: proforma.reference });
     } catch (err: any) {
-      console.error("[supplier-profit-check/save-proforma]", err.message);
+      logger.error("[supplier-profit-check/save-proforma]", { error: err.message });
       res.status(500).json({ message: err.message });
     }
   });
@@ -649,7 +650,7 @@ export function registerSupplierProfitCheckRoutes(app: Express, requireAuth: any
         const buffer = Buffer.from(await wb.xlsx.writeBuffer());
         res.send(buffer);
       } catch (err: any) {
-        console.error("[export-supplier]", err.message);
+        logger.error("[export-supplier]", { error: err.message });
         res.status(500).json({ message: err.message });
       }
     }
@@ -872,7 +873,7 @@ export function registerSupplierProfitCheckRoutes(app: Express, requireAuth: any
       const buffer = Buffer.from(await wb.xlsx.writeBuffer());
       res.send(buffer);
     } catch (err: any) {
-      console.error("[export-internal]", err.message);
+      logger.error("[export-internal]", { error: err.message });
       res.status(500).json({ message: err.message });
     }
   });
@@ -1190,7 +1191,7 @@ export function registerSupplierProfitCheckRoutes(app: Express, requireAuth: any
 
       res.json({ rows, notFound });
     } catch (err: any) {
-      console.error("[supplier-profit-check/import-by-codes]", err.message);
+      logger.error("[supplier-profit-check/import-by-codes]", { error: err.message });
       res.status(500).json({ message: err.message });
     }
   });
@@ -1240,7 +1241,7 @@ export function registerSupplierProfitCheckRoutes(app: Express, requireAuth: any
 
       res.json({ id: item.id, code: item.code, name: item.name, stockGroupId: item.stock_group_id });
     } catch (err: any) {
-      console.error("[supplier-profit-check/add-stock-item]", err.message);
+      logger.error("[supplier-profit-check/add-stock-item]", { error: err.message });
       res.status(500).json({ message: err.message });
     }
   });

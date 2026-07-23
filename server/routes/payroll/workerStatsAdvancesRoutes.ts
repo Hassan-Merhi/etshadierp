@@ -1,4 +1,5 @@
 import { parseId, parseOptionalId } from "../../lib/parseId";
+import { logger } from "../../lib/logger";
 import { getClientDate } from "../../lib/dateUtils";
 import type { Express } from "express";
 import { db } from "../../db";
@@ -220,7 +221,7 @@ export function registerWorkerStatsAdvancesRoutes(app: Express) {
         recentPayrolls: payrolls.slice(0, 5),
       });
     } catch (error: any) {
-      console.error("Error fetching worker stats:", error);
+      logger.error("Error fetching worker stats:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -265,7 +266,7 @@ export function registerWorkerStatsAdvancesRoutes(app: Express) {
 
       res.json(repayments);
     } catch (error: any) {
-      console.error("Error fetching advance repayments:", error);
+      logger.error("Error fetching advance repayments:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -307,7 +308,7 @@ export function registerWorkerStatsAdvancesRoutes(app: Express) {
       }));
       res.json(enriched);
     } catch (error: any) {
-      console.error("Error fetching advances:", error);
+      logger.error("Error fetching advances:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -328,7 +329,7 @@ export function registerWorkerStatsAdvancesRoutes(app: Express) {
 
       res.json(advances);
     } catch (error: any) {
-      console.error("Error fetching worker advances:", error);
+      logger.error("Error fetching worker advances:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -460,7 +461,7 @@ export function registerWorkerStatsAdvancesRoutes(app: Express) {
 
       res.json(result);
     } catch (error: any) {
-      console.error("Error creating advance:", error);
+      logger.error("Error creating advance:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -693,7 +694,7 @@ export function registerWorkerStatsAdvancesRoutes(app: Express) {
 
       res.json({ created: results.length, advances: results });
     } catch (error: any) {
-      console.error("Error creating bulk advances:", error);
+      logger.error("Error creating bulk advances:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -723,7 +724,7 @@ export function registerWorkerStatsAdvancesRoutes(app: Express) {
       if (!updated) return res.status(404).json({ message: "Advance not found" });
       res.json(updated);
     } catch (error: any) {
-      console.error("Error updating advance:", error);
+      logger.error("Error updating advance:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -832,7 +833,7 @@ export function registerWorkerStatsAdvancesRoutes(app: Express) {
 
       res.json({ changes, totalAdvances: allAdvances.length });
     } catch (e: any) {
-      console.error("Advance reconcile preview error:", e);
+      logger.error("Advance reconcile preview error:", { error: e });
       res.status(500).json({ message: e.message });
     }
   });

@@ -1,4 +1,5 @@
 import { parseId, parseOptionalId } from "../../../lib/parseId";
+import { logger } from "../../../lib/logger";
 import { getClientDate } from "../../../lib/dateUtils";
 import type { Express } from "express";
 import { db } from "../../../db";
@@ -334,7 +335,7 @@ export function registerRawStockBalanceRoutes(app: Express) {
 
       res.json(result);
     } catch (error: any) {
-      console.error("Error creating opening balance:", error);
+      logger.error("Error creating opening balance:", { error: error });
       res.status(400).json({ message: error.message });
     }
   });
@@ -383,7 +384,7 @@ export function registerRawStockBalanceRoutes(app: Express) {
 
       res.json({ ...row, remainingKg: (received - used).toFixed(3) });
     } catch (error: any) {
-      console.error("Error fetching opening balance record:", error);
+      logger.error("Error fetching opening balance record:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -567,7 +568,7 @@ export function registerRawStockBalanceRoutes(app: Express) {
 
       res.json({ message: "Opening balance updated successfully" });
     } catch (error: any) {
-      console.error("Error updating opening balance:", error);
+      logger.error("Error updating opening balance:", { error: error });
       res.status(400).json({ message: error.message });
     }
   });
@@ -620,7 +621,7 @@ export function registerRawStockBalanceRoutes(app: Express) {
 
       res.json({ message: "Opening balance deleted. Linked bales remain intact." });
     } catch (error: any) {
-      console.error("Error deleting opening balance:", error);
+      logger.error("Error deleting opening balance:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -653,7 +654,7 @@ export function registerRawStockBalanceRoutes(app: Express) {
 
       res.json(bales);
     } catch (error: any) {
-      console.error("Error fetching unlinked bales:", error);
+      logger.error("Error fetching unlinked bales:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -781,7 +782,7 @@ export function registerRawStockBalanceRoutes(app: Express) {
 
       res.json({ success: true, mixBatchId: result.mixBatchId, totalKg, balesUpdated: baleIds.length });
     } catch (error: any) {
-      console.error("Error assigning raw stock to bales:", error);
+      logger.error("Error assigning raw stock to bales:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -993,7 +994,7 @@ export function registerRawStockBalanceRoutes(app: Express) {
         message: `Recalculated used KG for ${updated} raw stock records.`,
       });
     } catch (error: any) {
-      console.error("Error recalculating raw stock used:", error);
+      logger.error("Error recalculating raw stock used:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -1093,7 +1094,7 @@ export function registerRawStockBalanceRoutes(app: Express) {
         message: `Updated cost/kg on ${changes.length} bale(s) across ${allBatches.length} batch(es).`,
       });
     } catch (error: any) {
-      console.error("Error recalculating bale costs:", error);
+      logger.error("Error recalculating bale costs:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });

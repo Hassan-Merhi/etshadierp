@@ -1,4 +1,5 @@
 import type { Express } from "express";
+import { logger } from "../lib/logger";
 import rateLimit from "express-rate-limit";
 import { db } from "../db";
 import { requireAuth, requireRole, requireNonPOS } from "../auth";
@@ -218,8 +219,8 @@ export function registerChatbotRoutes(app: Express) {
         readFiles: result.readFiles ?? null,
       });
     } catch (error: any) {
-      console.error("[Chatbot] ERROR:", error.message);
-      console.error("[Chatbot] Stack:", error.stack);
+      logger.error("[Chatbot] ERROR:", { error: error.message });
+      logger.error("[Chatbot] Stack:", { stack: error.stack });
       res.status(500).json({ message: "Chat error: " + error.message });
     }
   });
@@ -237,8 +238,8 @@ export function registerChatbotRoutes(app: Express) {
       const history = await getConversationHistory(sessionId, userId, 50);
       res.json(history);
     } catch (error: any) {
-      console.error("[Chatbot] History ERROR:", error.message);
-      console.error("[Chatbot] History Stack:", error.stack);
+      logger.error("[Chatbot] History ERROR:", { error: error.message });
+      logger.error("[Chatbot] History Stack:", { stack: error.stack });
       res.status(500).json({ message: "History error: " + error.message });
     }
   });
@@ -694,7 +695,7 @@ export function registerChatbotRoutes(app: Express) {
       clearERPContextCache(companyId);
       res.json({ success: true, transferId: createdTransferId, voucherId: createdVoucherId, optional: isOptional, voucher: data.voucher });
     } catch (error: any) {
-      console.error("[Chatbot] confirm-stock-transfer error:", error.message);
+      logger.error("[Chatbot] confirm-stock-transfer error:", { error: error.message });
       res.status(500).json({ message: "Internal server error" });
     }
   });
@@ -957,7 +958,7 @@ export function registerChatbotRoutes(app: Express) {
 
       res.json({ success: true, filePath });
     } catch (error: any) {
-      console.error("[Chatbot] apply-patch error:", error.message);
+      logger.error("[Chatbot] apply-patch error:", { error: error.message });
       res.status(500).json({ message: "Internal server error" });
     }
   });
@@ -1042,7 +1043,7 @@ export function registerChatbotRoutes(app: Express) {
 
         res.json({ success: true, filePath: row.filePath });
       } catch (error: any) {
-        console.error("[Chatbot] revert-patch error:", error.message);
+        logger.error("[Chatbot] revert-patch error:", { error: error.message });
         res.status(500).json({ message: "Internal server error" });
       }
     }
@@ -1157,7 +1158,7 @@ export function registerChatbotRoutes(app: Express) {
 
       res.json({ success: true, commitHash: result.commitHash, branch: result.branch });
     } catch (error: any) {
-      console.error("[Chatbot] git-push error:", error.message);
+      logger.error("[Chatbot] git-push error:", { error: error.message });
       res.status(500).json({ message: "Internal server error" });
     }
   });

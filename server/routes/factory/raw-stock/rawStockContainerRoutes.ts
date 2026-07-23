@@ -1,4 +1,5 @@
 import { parseId, parseOptionalId } from "../../../lib/parseId";
+import { logger } from "../../../lib/logger";
 import { getClientDate } from "../../../lib/dateUtils";
 import type { Express } from "express";
 import { db } from "../../../db";
@@ -318,7 +319,7 @@ export function registerRawStockContainerRoutes(app: Express) {
 
       res.json({ message: "Duty confirmed and costs recalculated", newCostPerKg: resultCostPerKg });
     } catch (error: any) {
-      console.error("Error confirming duty:", error);
+      logger.error("Error confirming duty:", { error: error });
       res.status((error as any).status || 500).json({ message: error.message });
     }
   });
@@ -502,7 +503,7 @@ export function registerRawStockContainerRoutes(app: Express) {
         rawStock: newRawStock,
       });
     } catch (error: any) {
-      console.error("Error adding post-offload charges:", error);
+      logger.error("Error adding post-offload charges:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -529,7 +530,7 @@ export function registerRawStockContainerRoutes(app: Express) {
 
       res.json(rows);
     } catch (error: any) {
-      console.error("Error fetching post-offload charge history:", error);
+      logger.error("Error fetching post-offload charge history:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -666,7 +667,7 @@ export function registerRawStockContainerRoutes(app: Express) {
           rawStockRowsUpdated: mutResult.cascadeResult?.rawStockRowsUpdated ?? 0,
         });
       } catch (error: any) {
-        console.error("Error editing post-offload charge:", error);
+        logger.error("Error editing post-offload charge:", { error: error });
         res.status(500).json({ message: error.message });
       }
     }
@@ -738,7 +739,7 @@ export function registerRawStockContainerRoutes(app: Express) {
           rawStockRowsUpdated: mutResult.cascadeResult?.rawStockRowsUpdated ?? 0,
         });
       } catch (error: any) {
-        console.error("Error undoing post-offload charge:", error);
+        logger.error("Error undoing post-offload charge:", { error: error });
         res.status(500).json({ message: error.message });
       }
     }
@@ -797,7 +798,7 @@ export function registerRawStockContainerRoutes(app: Express) {
           supplierLockedRateNewExact: mutResult.supplierLockedRateAfter,
         });
       } catch (error: any) {
-        console.error("Error rebuilding legacy post-offload charge:", error);
+        logger.error("Error rebuilding legacy post-offload charge:", { error: error });
         res.status(500).json({ message: error.message });
       }
     }
@@ -819,7 +820,7 @@ export function registerRawStockContainerRoutes(app: Express) {
 
       res.json(logs);
     } catch (error: any) {
-      console.error("Error fetching duty audit log:", error);
+      logger.error("Error fetching duty audit log:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -844,7 +845,7 @@ export function registerRawStockContainerRoutes(app: Express) {
 
       res.json(results);
     } catch (error: any) {
-      console.error("Error fetching commissions:", error);
+      logger.error("Error fetching commissions:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });

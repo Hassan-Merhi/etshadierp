@@ -1,4 +1,5 @@
 import { parseId, parseOptionalId } from "../../lib/parseId";
+import { logger } from "../../lib/logger";
 import { buildSafeFilename, contentDisposition } from "../../lib/contentDisposition";
 import type { Express } from "express";
 import { db } from "../../db";
@@ -238,7 +239,7 @@ export function registerFactoryInvoiceLoadingRoutes(app: Express) {
 
       res.json(summary);
     } catch (error: any) {
-      console.error("loading-summary error:", error);
+      logger.error("loading-summary error:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -335,7 +336,7 @@ export function registerFactoryInvoiceLoadingRoutes(app: Express) {
       const summary = await buildLoadingSummary(invoiceId, companyId, session.id);
       res.status(201).json({ session, summary });
     } catch (error: any) {
-      console.error("create loading session error:", error);
+      logger.error("create loading session error:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -479,7 +480,7 @@ export function registerFactoryInvoiceLoadingRoutes(app: Express) {
       const summary = await buildLoadingSummary(invoiceId, companyId, sessionId);
       res.json({ loadingBale, bale, summary });
     } catch (error: any) {
-      console.error("scan-bale error:", error);
+      logger.error("scan-bale error:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -527,7 +528,7 @@ export function registerFactoryInvoiceLoadingRoutes(app: Express) {
         const summary = await buildLoadingSummary(session.invoiceId, companyId, sessionId);
         res.json({ removed: deleted[0], summary });
       } catch (error: any) {
-        console.error("remove bale error:", error);
+        logger.error("remove bale error:", { error: error });
         res.status(500).json({ message: error.message });
       }
     }
@@ -573,7 +574,7 @@ export function registerFactoryInvoiceLoadingRoutes(app: Express) {
       const summary = await buildLoadingSummary(session.invoiceId, companyId, sessionId);
       res.json({ session: updated, summary });
     } catch (error: any) {
-      console.error("complete session error:", error);
+      logger.error("complete session error:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -609,7 +610,7 @@ export function registerFactoryInvoiceLoadingRoutes(app: Express) {
       const summary = await buildLoadingSummary(session.invoiceId, companyId);
       res.json({ session: updated, summary });
     } catch (error: any) {
-      console.error("cancel session error:", error);
+      logger.error("cancel session error:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -918,7 +919,7 @@ export function registerFactoryInvoiceLoadingRoutes(app: Express) {
       res.setHeader("Content-Length", xlsBuf1.byteLength);
       res.end(xlsBuf1);
     } catch (error: any) {
-      console.error("loading report excel error:", error);
+      logger.error("loading report excel error:", { error: error });
       if (!res.headersSent) res.status(500).json({ message: error.message });
     }
   });
@@ -1433,7 +1434,7 @@ ${
 
       res.json({ proformaId: result.id, proformaName });
     } catch (error: any) {
-      console.error("create-remaining-proforma error:", error);
+      logger.error("create-remaining-proforma error:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
