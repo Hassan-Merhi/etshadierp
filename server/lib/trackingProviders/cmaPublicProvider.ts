@@ -13,6 +13,7 @@
  */
 
 import type { CarrierTrackResult, TrackingEvent } from "./types";
+import { logger } from "../../lib/logger";
 
 const PUBLIC_BASE = "https://www.cma-cgm.com/ebusiness/tracking/json";
 const TIMEOUT_MS = 10_000;
@@ -52,7 +53,7 @@ export async function track(containerNumber: string): Promise<CarrierTrackResult
   }
 
   if (isRateLimited(containerNumber)) {
-    console.log(`[CMAPublic] ${containerNumber}: rate-limited — skipping`);
+    logger.info(`[CMAPublic] ${containerNumber}: rate-limited — skipping`);
     return { ...base, error: "rate_limited" };
   }
 
@@ -79,12 +80,12 @@ export async function track(containerNumber: string): Promise<CarrierTrackResult
     });
 
     if (res.status === 403 || res.status === 401 || res.status === 429) {
-      console.log(`[CMAPublic] ${containerNumber}: blocked (HTTP ${res.status})`);
+      logger.info(`[CMAPublic] ${containerNumber}: blocked (HTTP ${res.status})`);
       return { ...base, blocked: true, error: `blocked_http_${res.status}` };
     }
 
     if (!res.ok) {
-      console.log(`[CMAPublic] ${containerNumber}: HTTP ${res.status}`);
+      logger.info(`[CMAPublic] ${containerNumber}: HTTP ${res.status}`);
       return { ...base, error: `http_${res.status}` };
     }
 
@@ -92,7 +93,7 @@ export async function track(containerNumber: string): Promise<CarrierTrackResult
     if (!contentType.includes("application/json") && !contentType.includes("text/javascript")) {
       const text = (await res.text()).slice(0, 300);
       const isChallenge = /captcha|datadome|challenge|cloudflare|bot/i.test(text);
-      console.log(`[CMAPublic] ${containerNumber}: non-JSON response${isChallenge ? " (bot challenge)" : ""}`);
+      logger.info(`[CMAPublic] ${containerNumber}: non-JSON response${isChallenge ? " (bot challenge)" : ""}`);
       return { ...base, blocked: isChallenge, error: isChallenge ? "captcha_challenge" : "non_json_response" };
     }
 
@@ -100,7 +101,7 @@ export async function track(containerNumber: string): Promise<CarrierTrackResult
     return parseResponse(containerNumber, data, base);
   } catch (err: any) {
     const isTimeout = err?.name === "TimeoutError" || err?.name === "AbortError";
-    console.log(`[CMAPublic] ${containerNumber}: ${isTimeout ? "timeout" : (err?.message ?? "error")}`);
+    logger.info(`[CMAPublic] ${containerNumber}: ${isTimeout ? "timeout" : (err?.message ?? "error")}`);
     return { ...base, error: isTimeout ? "timeout" : (err?.message ?? "unknown_error") };
   }
 }
@@ -158,11 +159,11 @@ function parseResponse(containerNumber: string, data: unknown, base: CarrierTrac
   const eta = etaDate ? etaDate.toISOString().slice(0, 10) : null;
 
   if (!latest && !eta) {
-    console.log(`[CMAPublic] ${containerNumber}: response parseable but no useful data`);
+    logger.info(`[CMAPublic] ${containerNumber}: response parseable but no useful data`);
     return { ...base, noData: true, error: "no_useful_data", raw: data };
   }
 
-  console.log(`[CMAPublic] ${containerNumber}: success — status=${latest?.status ?? "?"} events=${events.length}`);
+  logger.info(`[CMAPublic] ${containerNumber}: success — status=${latest?.status ?? "?"} events=${events.length}`);
 
   return {
     ...base,

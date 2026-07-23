@@ -1,4 +1,5 @@
 import { trackOneContainerById } from "../../../services/containerTrackingService";
+import { logger } from "../../../lib/logger";
 import { parseId, parseOptionalId } from "../../../lib/parseId";
 import { dispatchNotification } from "../../../lib/notificationService";
 import { getClientDate } from "../../../lib/dateUtils";
@@ -407,7 +408,7 @@ export function registerBaleScanningRoutes(app: Express) {
 
       res.json({ ...updatedOrder, bales: updatedBales, lines: updatedLines, charges: updatedCharges });
     } catch (error: any) {
-      console.error("Error adding bale to order:", error);
+      logger.error("Error adding bale to order:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -761,7 +762,7 @@ export function registerBaleScanningRoutes(app: Express) {
 
       res.json({ added: totalAdded, notFound, order: updatedOrder, bales: updatedBales });
     } catch (error: any) {
-      console.error("Error bulk importing bales:", error);
+      logger.error("Error bulk importing bales:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -839,7 +840,7 @@ export function registerBaleScanningRoutes(app: Express) {
 
       res.json({ ...updatedOrder, bales: updatedBales, lines: updatedLines, charges: updatedCharges });
     } catch (error: any) {
-      console.error("Error removing bale from order:", error);
+      logger.error("Error removing bale from order:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -1004,7 +1005,7 @@ export function registerBaleScanningRoutes(app: Express) {
         newGrandTotal: finalOrder?.grandTotal,
       });
     } catch (error: any) {
-      console.error("Error returning bale to stock:", error);
+      logger.error("Error returning bale to stock:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -1047,7 +1048,7 @@ export function registerBaleScanningRoutes(app: Express) {
 
       res.json({ ...order, totalBalesInOrder: remainingCount });
     } catch (error: any) {
-      console.error("Error fetching bale order info:", error);
+      logger.error("Error fetching bale order info:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -1241,7 +1242,7 @@ export function registerBaleScanningRoutes(app: Express) {
         replacementRef: replacementBale.referenceNumber,
       });
     } catch (error: any) {
-      console.error("Error swapping bale:", error);
+      logger.error("Error swapping bale:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -1342,7 +1343,7 @@ export function registerBaleScanningRoutes(app: Express) {
         .where(eq(customerOrderCharges.orderId, orderId));
       res.json({ ...updatedOrder, bales: updatedBales, lines: updatedLines, charges: updatedCharges });
     } catch (error: any) {
-      console.error("Exchange bale error:", error);
+      logger.error("Exchange bale error:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });

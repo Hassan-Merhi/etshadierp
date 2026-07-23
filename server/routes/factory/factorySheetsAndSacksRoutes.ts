@@ -1,4 +1,5 @@
 import type { Express } from "express";
+import { logger } from "../../lib/logger";
 import { pool } from "../../db";
 import { requireAuth } from "../../auth";
 
@@ -98,7 +99,7 @@ export function registerFactorySheetsAndSacksRoutes(app: Express) {
       );
       res.json(rows);
     } catch (err: any) {
-      console.error("GET /api/factory/sheets-sacks/log error:", err);
+      logger.error("GET /api/factory/sheets-sacks/log error:", { error: err });
       res.status(500).json({ message: err.message });
     }
   });
@@ -118,7 +119,7 @@ export function registerFactorySheetsAndSacksRoutes(app: Express) {
       );
       res.json(rows);
     } catch (err: any) {
-      console.error("GET /api/factory/sheets-sacks error:", err);
+      logger.error("GET /api/factory/sheets-sacks error:", { error: err });
       res.status(500).json({ message: err.message || "Failed to fetch items" });
     }
   });
@@ -167,7 +168,7 @@ export function registerFactorySheetsAndSacksRoutes(app: Express) {
         client.release();
       }
     } catch (err: any) {
-      console.error("POST /api/factory/sheets-sacks error:", err);
+      logger.error("POST /api/factory/sheets-sacks error:", { error: err });
       res.status(500).json({ message: err.message || "Failed to create item" });
     }
   });
@@ -207,7 +208,7 @@ export function registerFactorySheetsAndSacksRoutes(app: Express) {
       if (rows.length === 0) return res.status(404).json({ message: "Item not found" });
       res.json(rows[0]);
     } catch (err: any) {
-      console.error("PATCH /api/factory/sheets-sacks/:id error:", err);
+      logger.error("PATCH /api/factory/sheets-sacks/:id error:", { error: err });
       res.status(500).json({ message: err.message || "Failed to update item" });
     }
   });
@@ -265,7 +266,7 @@ export function registerFactorySheetsAndSacksRoutes(app: Express) {
         client.release();
       }
     } catch (err: any) {
-      console.error("PATCH /api/factory/sheets-sacks/:id/restock error:", err);
+      logger.error("PATCH /api/factory/sheets-sacks/:id/restock error:", { error: err });
       res.status(500).json({ message: err.message || "Failed to restock" });
     }
   });
@@ -326,7 +327,7 @@ export function registerFactorySheetsAndSacksRoutes(app: Express) {
         client.release();
       }
     } catch (err: any) {
-      console.error("PATCH /api/factory/sheets-sacks/:id/deduct error:", err);
+      logger.error("PATCH /api/factory/sheets-sacks/:id/deduct error:", { error: err });
       res.status(500).json({ message: err.message || "Failed to deduct" });
     }
   });
@@ -346,7 +347,7 @@ export function registerFactorySheetsAndSacksRoutes(app: Express) {
       if (!rowCount) return res.status(404).json({ message: "Item not found" });
       res.json({ success: true });
     } catch (err: any) {
-      console.error("DELETE /api/factory/sheets-sacks/:id error:", err);
+      logger.error("DELETE /api/factory/sheets-sacks/:id error:", { error: err });
       res.status(500).json({ message: err.message || "Failed to delete" });
     }
   });

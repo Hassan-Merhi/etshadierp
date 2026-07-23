@@ -1,4 +1,5 @@
 import { parseId, parseOptionalId } from "../../lib/parseId";
+import { logger } from "../../lib/logger";
 import { getClientDate } from "../../lib/dateUtils";
 import type { Express, Request, Response, NextFunction } from "express";
 import { db } from "../../db";
@@ -345,7 +346,7 @@ export function registerContainerFreightWriteRoutes(app: Express) {
                   : undefined
               );
               if (!_b1Sync.found) {
-                console.warn(
+                logger.warn(
                   `[PO-PATCH items] No INTERCO-PARENT voucher for PO(s): ${Array.isArray(_b1PoNums) ? _b1PoNums.join(", ") : _b1PoNums}`
                 );
               }
@@ -429,11 +430,11 @@ export function registerContainerFreightWriteRoutes(app: Express) {
                 : undefined
             );
             if (!_b1PostSync.found) {
-              console.warn(
+              logger.warn(
                 `[PO-PATCH items post-tx] No INTERCO-PARENT voucher found for PO(s): ${Array.isArray(_b1PoNumsForSync) ? _b1PoNumsForSync.join(", ") : _b1PoNumsForSync}`
               );
             } else if (_b1PostSync.updated) {
-              console.log(
+              logger.info(
                 `[PO-PATCH items post-tx] Updated parent JV #${_b1PostSync.voucherId}: ${_b1PostSync.oldAmount} → ${_b1PostSync.amount}`
               );
             }
@@ -689,7 +690,7 @@ export function registerContainerFreightWriteRoutes(app: Express) {
               .where(eq(voucherEntries.voucherId, existingPO.voucherId));
 
             if (newHasParentFreight && newFreightParentAccountId) {
-              console.log(
+              logger.info(
                 `[PO-PATCH charges] Freight posting: PO=${existingPO.poNumber} company=${existingPO.companyId} freightAcct=${newFreightParentAccountId} parentCoId=${_pfParentId} sameCompany=${_isSameCompanyOrNoInterco} freightAmt=${newFreight}`
               );
 
@@ -1187,7 +1188,7 @@ export function registerContainerFreightWriteRoutes(app: Express) {
               : undefined
           );
           if (!_b2Sync.found) {
-            console.warn(
+            logger.warn(
               `[PO-PATCH charges] No INTERCO-PARENT voucher for PO(s): ${Array.isArray(_b2PoNums) ? _b2PoNums.join(", ") : _b2PoNums}`
             );
           }
@@ -1368,7 +1369,7 @@ export function registerContainerFreightWriteRoutes(app: Express) {
         count: backfilledCount,
       });
     } catch (error: any) {
-      console.error("Backfill error:", error);
+      logger.error("Backfill error:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });

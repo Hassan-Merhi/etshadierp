@@ -1,4 +1,5 @@
 import { parseId, parseOptionalId } from "../../lib/parseId";
+import { logger } from "../../lib/logger";
 import { logAudit } from "../_helpers";
 import type { Express, Request, Response } from "express";
 import { db, pool } from "../../db";
@@ -227,7 +228,7 @@ export async function maybeRunAutoTransfer(
       });
     }
   } catch (err) {
-    console.error("[RentalAutoTransfer] failed:", err);
+    logger.error("[RentalAutoTransfer] failed:", { error: err });
   }
 }
 
@@ -595,23 +596,20 @@ export async function postRentAccrualForCompany(
 
     const pendingRows = allUnaccrued.filter((r) => isDue(r) && contractsWithPositiveOutstanding.has(r.contractId));
 
-    console.log(
+    logger.info(
       `[postRentAccrual] company=${companyId} unaccrued=${allUnaccrued.length} pendingDue=${pendingRows.length} alreadyDone=${alreadyDone} curYear=${curYear} curMonth=${curMonth} curDay=${curDay} contractsWithPositiveOutstanding=${contractsWithPositiveOutstanding.size}`
     );
     if (pendingRows.length > 0) {
-      console.log(
-        `[postRentAccrual] pendingRows sample:`,
-        JSON.stringify(
-          pendingRows.slice(0, 3).map((r) => ({
-            id: r.id,
-            year: r.year,
-            month: r.month,
-            contractId: r.contractId,
-            paid: r.paidAmount,
-            expected: r.expectedAmount,
-          }))
-        )
-      );
+      logger.info(`[postRentAccrual] pendingRows sample`, {
+        sample: pendingRows.slice(0, 3).map((r) => ({
+          id: r.id,
+          year: r.year,
+          month: r.month,
+          contractId: r.contractId,
+          paid: r.paidAmount,
+          expected: r.expectedAmount,
+        })),
+      });
     }
 
     // ── Pass 1 transaction ──
@@ -757,7 +755,7 @@ export async function postRentAccrualForCompany(
         // Log the full error — Drizzle formats errors as "Failed query:\n<SQL>\n<pg error>",
         // so split("\n")[0] always shows the useless header.  Log all lines instead.
         const detail = (e.message ?? String(e)).replace(/\n/g, " | ");
-        console.error(`[ERP/rental] batch accrual failed company ${companyId}: ${detail}`);
+        logger.error(`[ERP/rental] batch accrual failed company ${companyId}: ${detail}`);
         // intentional fall-through: partial failure logged, continue to recognition passes
       }
     } // end if (pendingRows.length > 0)
@@ -905,7 +903,7 @@ export async function postRentAccrualForCompany(
       }
     } catch (e: any) {
       const detail = (e.message ?? String(e)).replace(/\n/g, " | ");
-      console.error(`[ERP/rental] advance recognition pass failed company ${companyId}: ${detail}`);
+      logger.error(`[ERP/rental] advance recognition pass failed company ${companyId}: ${detail}`);
     }
   } // end Pass 1.5
 
@@ -1021,7 +1019,7 @@ export async function postRentAccrualForCompany(
       }
     } catch (e: any) {
       const detail = (e.message ?? String(e)).replace(/\n/g, " | ");
-      console.error(`[ERP/rental] prepaid recognition failed company ${companyId}: ${detail}`);
+      logger.error(`[ERP/rental] prepaid recognition failed company ${companyId}: ${detail}`);
     }
   }
 
@@ -1152,7 +1150,7 @@ export async function postRentAccrualForCompany(
     }
   } catch (e: any) {
     const detail = (e.message ?? String(e)).replace(/\n/g, " | ");
-    console.error(`[ERP/rental] deferred recognition failed company ${companyId}: ${detail}`);
+    logger.error(`[ERP/rental] deferred recognition failed company ${companyId}: ${detail}`);
   }
 
   return { accrued, skipped: alreadyDone };

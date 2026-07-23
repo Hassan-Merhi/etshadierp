@@ -6,6 +6,7 @@
  * sub-registrar; behaviour is unchanged.
  */
 import type { Express } from "express";
+import { logger } from "../lib/logger";
 import { eq, and, desc, lt, gt, ne, sql } from "drizzle-orm";
 import { db } from "../db";
 import { requireAuth } from "../auth";
@@ -37,9 +38,9 @@ export function registerUserPresenceRoutes(app: Express) {
       // Fire-and-forget stale row cleanup; never blocks the response.
       db.delete(userPresence)
         .where(lt(userPresence.lastSeen, threeMinutesAgo))
-        .catch((err: any) => console.error("[Presence] Stale cleanup error:", err.message));
+        .catch((err: any) => logger.error("[Presence] Stale cleanup error:", { error: err.message }));
     } catch (error: any) {
-      console.error("[Presence] Error fetching active users:", error.message);
+      logger.error("[Presence] Error fetching active users:", { error: error.message });
       res.status(500).json({ message: error.message });
     }
   });
@@ -86,7 +87,7 @@ export function registerUserPresenceRoutes(app: Express) {
         },
       })
       .catch((err: any) => {
-        console.error("[Presence] Heartbeat upsert error:", err.message);
+        logger.error("[Presence] Heartbeat upsert error:", { error: err.message });
       });
 
     // Log route changes to activity log so admins can watch navigation history.
@@ -100,7 +101,7 @@ export function registerUserPresenceRoutes(app: Express) {
           route,
         })
         .catch((err: any) => {
-          console.error("[ActivityLog] Insert error:", err.message);
+          logger.error("[ActivityLog] Insert error:", { error: err.message });
         });
 
       // Prune: keep only last 200 entries per user (fire-and-forget).
@@ -171,7 +172,7 @@ export function registerUserPresenceRoutes(app: Express) {
     if (sessionId) {
       db.delete(userPresence)
         .where(eq(userPresence.sessionId, sessionId))
-        .catch((err: any) => console.error("[Presence] Delete error:", err.message));
+        .catch((err: any) => logger.error("[Presence] Delete error:", { error: err.message }));
     }
   });
 
@@ -183,7 +184,7 @@ export function registerUserPresenceRoutes(app: Express) {
     if (sessionId) {
       db.delete(userPresence)
         .where(eq(userPresence.sessionId, sessionId))
-        .catch((err: any) => console.error("[Presence] Leave delete error:", err.message));
+        .catch((err: any) => logger.error("[Presence] Leave delete error:", { error: err.message }));
     }
   });
 }

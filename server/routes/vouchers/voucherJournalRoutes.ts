@@ -456,7 +456,7 @@ export function registerVoucherJournalRoutes(app: Express) {
           });
         }
       } catch (dbErr) {
-        console.error("Factory daybook write failed (non-fatal):", dbErr);
+        logger.error("Factory daybook write failed (non-fatal):", { error: dbErr });
       }
 
       // WhatsApp rule check — prompt the frontend instead of auto-sending
@@ -487,7 +487,7 @@ export function registerVoucherJournalRoutes(app: Express) {
           });
         }
       } catch (waErr: any) {
-        console.error("WhatsApp rule check error (non-fatal):", waErr);
+        logger.error("WhatsApp rule check error (non-fatal):", { error: waErr });
       }
 
       try {
@@ -509,7 +509,7 @@ export function registerVoucherJournalRoutes(app: Express) {
       res.json({ ...result, whatsapp: waJournalResult });
     } catch (error: any) {
       logger.error("journal voucher create failed", { module: "vouchers", action: "createJournal", userId: _uid, companyId: _cid, durationMs: Date.now() - _t, error });
-      console.error("Error creating journal voucher:", error);
+      logger.error("Error creating journal voucher:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -751,7 +751,7 @@ export function registerVoucherJournalRoutes(app: Express) {
           }
         }
       } catch (ictErr: any) {
-        console.error("[ICT sync] Counterpart update failed (non-fatal):", ictErr?.message);
+        logger.error("[ICT sync] Counterpart update failed (non-fatal):", { error: ictErr?.message });
       }
 
       // WhatsApp rule check — prompt the frontend instead of auto-sending
@@ -780,7 +780,7 @@ export function registerVoucherJournalRoutes(app: Express) {
           });
         }
       } catch (waErr: any) {
-        console.error("WhatsApp rule check error (non-fatal):", waErr);
+        logger.error("WhatsApp rule check error (non-fatal):", { error: waErr });
       }
 
       try {
@@ -820,7 +820,7 @@ export function registerVoucherJournalRoutes(app: Express) {
       res.json({ voucher: result.voucher, entries: result.entries, whatsapp: waJournalPatch });
     } catch (error: any) {
       logger.error("journal voucher update failed", { module: "vouchers", action: "updateJournal", userId: _uid, companyId: _cid, durationMs: Date.now() - _t, error });
-      console.error("Error updating journal voucher:", error);
+      logger.error("Error updating journal voucher:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });

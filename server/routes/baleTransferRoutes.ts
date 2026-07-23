@@ -6,6 +6,7 @@
  * unchanged.
  */
 import type { Express } from "express";
+import { logger } from "../lib/logger";
 import { desc, eq, sql } from "drizzle-orm";
 import { db } from "../db";
 import { storage } from "../storage";
@@ -49,7 +50,7 @@ export function registerBaleTransferRoutes(app: Express) {
 
       res.json(transfers);
     } catch (error: any) {
-      console.error("Error fetching bale transfers:", error);
+      logger.error("Error fetching bale transfers:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -132,12 +133,12 @@ export function registerBaleTransferRoutes(app: Express) {
           });
         }
       } catch (dbErr) {
-        console.error("Factory daybook write failed (non-fatal):", dbErr);
+        logger.error("Factory daybook write failed (non-fatal):", { error: dbErr });
       }
 
       res.json({ success: true, transferId: result.id, transfer: result });
     } catch (error: any) {
-      console.error("Error creating bale transfer:", error);
+      logger.error("Error creating bale transfer:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -193,7 +194,7 @@ export function registerBaleTransferRoutes(app: Express) {
 
       res.json({ ...transfer, items });
     } catch (error: any) {
-      console.error("Error fetching bale transfer:", error);
+      logger.error("Error fetching bale transfer:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -219,7 +220,7 @@ export function registerBaleTransferRoutes(app: Express) {
 
       res.json({ success: true, transfer: updated });
     } catch (error: any) {
-      console.error("Error completing bale transfer:", error);
+      logger.error("Error completing bale transfer:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -256,7 +257,7 @@ export function registerBaleTransferRoutes(app: Express) {
 
       res.json({ success: true });
     } catch (error: any) {
-      console.error("Error deleting bale transfer:", error);
+      logger.error("Error deleting bale transfer:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });

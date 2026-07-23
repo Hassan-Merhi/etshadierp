@@ -1,4 +1,5 @@
 import { getClientDate } from "../../../lib/dateUtils";
+import { logger } from "../../../lib/logger";
 import type { Express } from "express";
 import { db } from "../../../db";
 import { requireAuth } from "../../../auth";
@@ -375,7 +376,7 @@ export function registerEmployeeLedgerWasteRoutes(app: Express) {
         },
       });
     } catch (error: any) {
-      console.error("Error fetching bale ledger:", error);
+      logger.error("Error fetching bale ledger:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -500,7 +501,7 @@ export function registerEmployeeLedgerWasteRoutes(app: Express) {
 
       res.json({ baleDetails: details });
     } catch (error: any) {
-      console.error("Error fetching bale ledger details:", error);
+      logger.error("Error fetching bale ledger details:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -609,7 +610,7 @@ export function registerEmployeeLedgerWasteRoutes(app: Express) {
 
       res.json({ bales: filtered, categories: wasteCategories });
     } catch (error: any) {
-      console.error("Error fetching waste bales:", error);
+      logger.error("Error fetching waste bales:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -656,7 +657,7 @@ export function registerEmployeeLedgerWasteRoutes(app: Express) {
         }))
       );
     } catch (error: any) {
-      console.error("Error fetching waste dispatch history:", error);
+      logger.error("Error fetching waste dispatch history:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -723,7 +724,7 @@ export function registerEmployeeLedgerWasteRoutes(app: Express) {
 
       res.json({ message: "Waste dispatch deleted and bales restored to stock", restoredBales: bales.length });
     } catch (error: any) {
-      console.error("[Waste Dispatch DELETE]", error.message);
+      logger.error("[Waste Dispatch DELETE]", { error: error.message });
       res.status(500).json({ message: error.message });
     }
   });
@@ -856,7 +857,7 @@ export function registerEmployeeLedgerWasteRoutes(app: Express) {
         })),
       });
     } catch (error: any) {
-      console.error("Error submitting waste dispatch:", error);
+      logger.error("Error submitting waste dispatch:", { error: error });
       res.status(400).json({ message: error.message });
     }
   });

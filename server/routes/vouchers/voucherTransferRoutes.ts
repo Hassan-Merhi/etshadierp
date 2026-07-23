@@ -1,4 +1,5 @@
 import type { Express } from "express";
+import { logger } from "../../lib/logger";
 import { db } from "../../db";
 import { storage } from "../../storage";
 import { requireAuth, requireRole, canDelete, requireNonPOS, checkPOSLocation } from "../../auth";
@@ -208,7 +209,7 @@ export function registerVoucherTransferRoutes(app: Express) {
         }
       }
 
-      console.log(`[Stock Transfer Edit] Starting update for voucher ${id}`);
+      logger.info(`[Stock Transfer Edit] Starting update for voucher ${id}`);
 
       // Snapshot old transfer items before the transaction mutates them
       const _preTransfer = await db
@@ -402,7 +403,7 @@ export function registerVoucherTransferRoutes(app: Express) {
       } catch {
         /* non-fatal */
       }
-      console.log(`[Stock Transfer Edit] Successfully updated voucher ${id}`);
+      logger.info(`[Stock Transfer Edit] Successfully updated voucher ${id}`);
       res.json(updated);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
@@ -506,7 +507,7 @@ export function registerVoucherTransferRoutes(app: Express) {
                 existingVoucher.companyId,
                 costPrice
               );
-              console.log(
+              logger.info(
                 `[Sales Edit] Reversed inventory at old location ${oldLocationId}: ${oldItem.stockItemId} qty +${quantity} (was ${result.previousQuantity}, now ${result.newQuantity})`
               );
             }
@@ -524,7 +525,7 @@ export function registerVoucherTransferRoutes(app: Express) {
                 -quantity,
                 existingVoucher.companyId
               );
-              console.log(
+              logger.info(
                 `[Sales Edit] Deducted inventory at new location ${newLocationId}: ${item.stockItemId} qty -${quantity} (was ${result.previousQuantity}, now ${result.newQuantity})`
               );
             }
@@ -757,7 +758,7 @@ export function registerVoucherTransferRoutes(app: Express) {
           }
         }
       } catch (ictErr: any) {
-        console.error("[ICT sync] Counterpart update failed (non-fatal):", ictErr?.message);
+        logger.error("[ICT sync] Counterpart update failed (non-fatal):", { error: ictErr?.message });
       }
 
       // ── CHARGE voucher sync ──────────────────────────────────────────────
@@ -913,7 +914,7 @@ export function registerVoucherTransferRoutes(app: Express) {
         negativeInventoryFound: negativeInventory.length,
       });
     } catch (error: any) {
-      console.error("[Fix Sales Inventory] Error:", error);
+      logger.error("[Fix Sales Inventory] Error:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });

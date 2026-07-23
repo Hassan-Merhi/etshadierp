@@ -1,4 +1,5 @@
 import { parseId, parseOptionalId } from "../../lib/parseId";
+import { logger } from "../../lib/logger";
 import { getClientDate } from "../../lib/dateUtils";
 import type { Express } from "express";
 import { buildSafeFilename, contentDisposition } from "../../lib/contentDisposition";
@@ -226,7 +227,7 @@ export function registerWorkerStatementRoutes(app: Express) {
 
       res.json({ message: "Repayment deleted", restoredBalance: restoredBal.toFixed(2) });
     } catch (error: any) {
-      console.error("Error deleting repayment:", error);
+      logger.error("Error deleting repayment:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -391,7 +392,7 @@ export function registerWorkerStatementRoutes(app: Express) {
         skippedPayrollIds: skipped,
       });
     } catch (error: any) {
-      console.error("Error backfilling payroll vouchers:", error);
+      logger.error("Error backfilling payroll vouchers:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -479,7 +480,7 @@ export function registerWorkerStatementRoutes(app: Express) {
 
       res.json(entries);
     } catch (error: any) {
-      console.error("Error fetching factory worker statement:", error);
+      logger.error("Error fetching factory worker statement:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -753,7 +754,7 @@ export function registerWorkerStatementRoutes(app: Express) {
 
       doc.end();
     } catch (err: any) {
-      console.error("Worker statement PDF error:", err);
+      logger.error("Worker statement PDF error:", { error: err });
       if (!res.headersSent) res.status(500).json({ message: err.message });
     }
   });
@@ -795,7 +796,7 @@ export function registerWorkerStatementRoutes(app: Express) {
       if (!deleted) return res.status(404).json({ message: "Worker not found" });
       res.json({ message: "Worker deleted successfully" });
     } catch (error: any) {
-      console.error("Error deleting factory worker:", error);
+      logger.error("Error deleting factory worker:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -966,7 +967,7 @@ export function registerWorkerStatementRoutes(app: Express) {
         total: deletedPayrollVouchers + deletedAdvanceVouchers,
       });
     } catch (error: any) {
-      console.error("Repair orphaned vouchers error:", error);
+      logger.error("Repair orphaned vouchers error:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });

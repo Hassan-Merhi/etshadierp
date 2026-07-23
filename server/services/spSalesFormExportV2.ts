@@ -37,6 +37,7 @@
  */
 
 import ExcelJS from "exceljs";
+import { logger } from "../lib/logger";
 import { SpSalesFormV2Params } from "./sp-sales-form-v2/types";
 import { toUtcDate, addDays, dateStr } from "./sp-sales-form-v2/dateHelpers";
 import {
@@ -60,7 +61,7 @@ export type { SpSalesFormV2Params } from "./sp-sales-form-v2/types";
 export async function generateSpSalesFormExcelV2(params: SpSalesFormV2Params): Promise<Buffer> {
   const { companyId, locationId, fromDate, toDate, cashAccountId } = params;
 
-  console.log(`[spSalesFormExportV2] start companyId=${companyId} locationId=${locationId ?? "all"} ${fromDate}→${toDate}`);
+  logger.info(`[spSalesFormExportV2] start companyId=${companyId} locationId=${locationId ?? "all"} ${fromDate}→${toDate}`);
 
   // Build date list
   const startDate = toUtcDate(fromDate);
@@ -77,13 +78,13 @@ export async function generateSpSalesFormExcelV2(params: SpSalesFormV2Params): P
     cashAccountId ? fetchCashAccountBalance(cashAccountId, companyId, dayBefore) : Promise.resolve(null),
     fetchAgeingData(companyId, locationId, toDate),
   ]);
-  console.log(`[spSalesFormExportV2] cashAccountId=${cashAccountId ?? "none"} openingCashBalance=${openingCashBalance ?? "n/a (manual)"}`);
-  console.log(`[spSalesFormExportV2] openItems=${openMap.size} closeItems=${closeMap.size} saleRows=${salesRows.length} dayCount=${dayCount}`);
+  logger.info(`[spSalesFormExportV2] cashAccountId=${cashAccountId ?? "none"} openingCashBalance=${openingCashBalance ?? "n/a (manual)"}`);
+  logger.info(`[spSalesFormExportV2] openItems=${openMap.size} closeItems=${closeMap.size} saleRows=${salesRows.length} dayCount=${dayCount}`);
 
   // Build item registry
   const items = buildItemRegistry(openMap, closeMap, salesRows, dayCount);
 
-  console.log(`[spSalesFormExportV2] totalItems=${items.length}`);
+  logger.info(`[spSalesFormExportV2] totalItems=${items.length}`);
 
   // Build workbook (sheet order per spec)
   const wb = new ExcelJS.Workbook();
@@ -104,11 +105,11 @@ export async function generateSpSalesFormExcelV2(params: SpSalesFormV2Params): P
   const errors = scanErrors(wb);
   if (errors.length > 0) {
     const detail = errors.map(e => `${e.sheet}!${e.cell}: ${e.value}`).join(", ");
-    console.error(`[spSalesFormExportV2] Excel errors found: ${detail}`);
+    logger.error(`[spSalesFormExportV2] Excel errors found: ${detail}`);
     throw new Error(`Excel formula errors detected in export: ${detail}`);
   }
 
   const buf = await wb.xlsx.writeBuffer();
-  console.log(`[spSalesFormExportV2] done bufferSize=${buf.byteLength}`);
+  logger.info(`[spSalesFormExportV2] done bufferSize=${buf.byteLength}`);
   return Buffer.from(buf);
 }

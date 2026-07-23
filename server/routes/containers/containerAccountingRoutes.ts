@@ -1,4 +1,5 @@
 import { parseId, parseOptionalId } from "../../lib/parseId";
+import { logger } from "../../lib/logger";
 import { getClientDate } from "../../lib/dateUtils";
 import type { Express, Request, Response, NextFunction } from "express";
 import { db } from "../../db";
@@ -122,7 +123,7 @@ export function registerContainerAccountingRoutes(app: Express) {
             sql`UPDATE voucher_entries SET narration = REPLACE(narration, ${oldNumber}, ${newNumber}) WHERE narration LIKE ${"%" + oldNumber + "%"}`
           );
         } catch (syncErr) {
-          console.error("[container number sync] Error updating voucher descriptions:", syncErr);
+          logger.error("[container number sync] Error updating voucher descriptions:", { error: syncErr });
         }
       }
 
@@ -579,7 +580,7 @@ export function registerContainerAccountingRoutes(app: Express) {
                 const localMismatch = Math.abs(currentLocalTotal - expectedLocalTotal) > 0.001 || freightEntryMissing;
 
                 if (localMismatch) {
-                  console.log(
+                  logger.info(
                     `[SyncAll] PO ${po.poNumber}: local voucher #${po.voucherId} ${currentLocalTotal} → ${expectedLocalTotal}`
                   );
                   await db
@@ -856,7 +857,7 @@ export function registerContainerAccountingRoutes(app: Express) {
                 await db.delete(voucherEntries).where(eq(voucherEntries.voucherId, stalePFV.id));
                 await db.delete(vouchers).where(eq(vouchers.id, stalePFV.id));
                 updatedFreightVouchers++;
-                console.log(`[SyncAll] Deleted stale PARENT-FREIGHT journal for same-company PO ${po.poNumber}`);
+                logger.info(`[SyncAll] Deleted stale PARENT-FREIGHT journal for same-company PO ${po.poNumber}`);
               }
             }
 
@@ -865,7 +866,7 @@ export function registerContainerAccountingRoutes(app: Express) {
             // (they can be deleted manually from the daybook if no longer needed).
           } catch (poErr: any) {
             errors.push(`PO ${po.poNumber}: ${poErr.message}`);
-            console.error(`[SyncAll] Error processing PO ${po.poNumber}:`, poErr);
+            logger.error(`[SyncAll] Error processing PO ${po.poNumber}:`, { error: poErr });
           }
         }
 
@@ -982,7 +983,7 @@ export function registerContainerAccountingRoutes(app: Express) {
         }
 
         const scannedContainers = containerIds.length;
-        console.log(
+        logger.info(
           `[SyncAll] Done. POs=${scannedPOs} Containers=${scannedContainers} LocalVouchers=${updatedLocalVouchers} ParentVouchers=${updatedParentVouchers} FreightVouchers=${updatedFreightVouchers} ContainerCharges=${updatedContainerCharges} ContainerTotals=${updatedContainers} Skipped=${skipped.length} NotFound=${notFoundParentVouchers.length} Errors=${errors.length}`
         );
 
@@ -1001,7 +1002,7 @@ export function registerContainerAccountingRoutes(app: Express) {
           message: `Scanned ${scannedPOs} POs. Updated ${updatedLocalVouchers} local vouchers, ${updatedParentVouchers} parent JVs, ${updatedContainers} container totals.`,
         });
       } catch (error: any) {
-        console.error("[SyncAll] Fatal error:", error);
+        logger.error("[SyncAll] Fatal error:", { error: error });
         res.status(500).json({ message: error.message });
       }
     }

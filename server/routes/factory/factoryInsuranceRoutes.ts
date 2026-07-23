@@ -1,4 +1,5 @@
 import type { Express } from "express";
+import { logger } from "../../lib/logger";
 import { z } from "zod";
 import { and, desc, eq } from "drizzle-orm";
 import { db, pool } from "../../db";
@@ -74,7 +75,7 @@ export function registerFactoryInsuranceRoutes(app: Express) {
       const rows = await db.select().from(insuranceMembers).where(where).orderBy(insuranceMembers.name);
       res.json(rows);
     } catch (error: unknown) {
-      console.error("GET /api/insurance/members error:", error);
+      logger.error("GET /api/insurance/members error:", { error: error });
       res.status(500).json({ message: errorMessage(error, "Failed to fetch insurance members") });
     }
   });
@@ -111,7 +112,7 @@ export function registerFactoryInsuranceRoutes(app: Express) {
         .orderBy(desc(vouchers.voucherDate), desc(vouchers.id));
       res.json(entries);
     } catch (error: unknown) {
-      console.error("GET /api/insurance/members/:id/entries error:", error);
+      logger.error("GET /api/insurance/members/:id/entries error:", { error: error });
       res.status(500).json({ message: errorMessage(error, "Failed to fetch entries") });
     }
   });
@@ -146,7 +147,7 @@ export function registerFactoryInsuranceRoutes(app: Express) {
       );
       res.status(201).json(inserted.rows[0]);
     } catch (error: unknown) {
-      console.error("POST /api/insurance/members error:", error);
+      logger.error("POST /api/insurance/members error:", { error: error });
       res.status(500).json({ message: errorMessage(error, "Failed to create insurance member") });
     }
   });
@@ -180,7 +181,7 @@ export function registerFactoryInsuranceRoutes(app: Express) {
         .returning();
       res.json(updated);
     } catch (error: unknown) {
-      console.error("PATCH /api/insurance/members/:id error:", error);
+      logger.error("PATCH /api/insurance/members/:id error:", { error: error });
       res.status(500).json({ message: errorMessage(error, "Failed to update insurance member") });
     }
   });
@@ -204,7 +205,7 @@ export function registerFactoryInsuranceRoutes(app: Express) {
         .returning();
       res.json(updated);
     } catch (error: unknown) {
-      console.error("PATCH /api/insurance/members/:id/toggle error:", error);
+      logger.error("PATCH /api/insurance/members/:id/toggle error:", { error: error });
       res.status(500).json({ message: errorMessage(error, "Failed to toggle member status") });
     }
   });
@@ -227,7 +228,7 @@ export function registerFactoryInsuranceRoutes(app: Express) {
       }
       res.json({ success: true });
     } catch (error: unknown) {
-      console.error("DELETE /api/insurance/members/:id error:", error);
+      logger.error("DELETE /api/insurance/members/:id error:", { error: error });
       res.status(500).json({ message: errorMessage(error, "Failed to delete insurance member") });
     }
   });
@@ -316,7 +317,7 @@ export function registerFactoryInsuranceRoutes(app: Express) {
         period: monthLabel,
       });
     } catch (error: unknown) {
-      console.error("POST /api/insurance/generate error:", error);
+      logger.error("POST /api/insurance/generate error:", { error: error });
       res.status(500).json({ message: errorMessage(error, "Failed to generate insurance entries") });
     }
   });

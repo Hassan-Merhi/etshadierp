@@ -7,6 +7,7 @@
  * unchanged.
  */
 import type { Express } from "express";
+import { logger } from "../lib/logger";
 import { eq, and, or, desc, inArray, gte, lte, like, sql } from "drizzle-orm";
 import { db } from "../db";
 import { storage } from "../storage";
@@ -343,7 +344,7 @@ export function registerOffloadRoutes(app: Express) {
             : "Offload restored — stock re-added, vouchers made active, container marked OFFLOADED.",
         });
       } catch (error: any) {
-        console.error("Error toggling offload optional:", error);
+        logger.error("Error toggling offload optional:", { error: error });
         res.status(500).json({ message: error.message });
       }
     }
@@ -506,7 +507,7 @@ export function registerOffloadRoutes(app: Express) {
           },
         });
       } catch (error: any) {
-        console.error("Container offload diagnostics error:", error);
+        logger.error("Container offload diagnostics error:", { error: error });
         res.status(500).json({ message: error.message });
       }
     }
@@ -533,7 +534,7 @@ export function registerOffloadRoutes(app: Express) {
 
       res.json(allContainers);
     } catch (error: any) {
-      console.error("Get containers for diagnostics error:", error);
+      logger.error("Get containers for diagnostics error:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -667,19 +668,19 @@ export function registerOffloadRoutes(app: Express) {
             });
 
             created++;
-            console.log(
+            logger.info(
               `[POC backfill] voucherId=${voucher.id} chargeId=${chargeId} container=${containerNumber} voucherCompanyId=${voucherCompanyId} cpAcctId=${cpAcctId}`
             );
           } catch (err: any) {
             errors++;
             errorDetails.push(`chargeId=${row.id}: ${err.message}`);
-            console.error(`[POC backfill] error on chargeId=${row.id}:`, err);
+            logger.error(`[POC backfill] error on chargeId=${row.id}:`, { error: err });
           }
         }
 
         res.json({ scanned, created, skippedExisting, errors, errorDetails });
       } catch (error: any) {
-        console.error("Backfill post-offload vouchers error:", error);
+        logger.error("Backfill post-offload vouchers error:", { error: error });
         res.status(500).json({ message: error.message });
       }
     }

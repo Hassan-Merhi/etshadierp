@@ -1,4 +1,5 @@
 import { parseId, parseOptionalId } from "../../lib/parseId";
+import { logger } from "../../lib/logger";
 import { getClientDate } from "../../lib/dateUtils";
 import type { Express } from "express";
 import { db } from "../../db";
@@ -264,7 +265,7 @@ export function registerAdvanceManagementRoutes(app: Express) {
 
       res.json({ message: `Reconciliation complete — ${updatedCount} advance record(s) updated` });
     } catch (e: any) {
-      console.error("Advance reconcile error:", e);
+      logger.error("Advance reconcile error:", { error: e });
       res.status(500).json({ message: e.message });
     }
   });
@@ -363,7 +364,7 @@ export function registerAdvanceManagementRoutes(app: Express) {
 
       res.json({ message: "Advance deleted" });
     } catch (error: any) {
-      console.error("Error deleting advance:", error);
+      logger.error("Error deleting advance:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -423,7 +424,7 @@ export function registerAdvanceManagementRoutes(app: Express) {
 
       res.json({ message: "Advance reversed and restored to outstanding" });
     } catch (error: any) {
-      console.error("Error reversing advance:", error);
+      logger.error("Error reversing advance:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -465,7 +466,7 @@ export function registerAdvanceManagementRoutes(app: Express) {
 
       res.json(unvouchered);
     } catch (error: any) {
-      console.error("Error fetching unvouchered advances:", error);
+      logger.error("Error fetching unvouchered advances:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -610,7 +611,7 @@ export function registerAdvanceManagementRoutes(app: Express) {
         skipped: result.skipped,
       });
     } catch (error: any) {
-      console.error("Error posting advance accounting:", error);
+      logger.error("Error posting advance accounting:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -795,7 +796,7 @@ export function registerAdvanceManagementRoutes(app: Express) {
         vouchersPatched: result.vouchersPatched,
       });
     } catch (error: any) {
-      console.error("Error bulk-updating advance cash accounts:", error);
+      logger.error("Error bulk-updating advance cash accounts:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -822,7 +823,7 @@ export function registerAdvanceManagementRoutes(app: Express) {
       const totalBalance = outstanding.reduce((s: number, a: any) => s + parseFloat(a.remainingBalance || "0"), 0);
       res.json({ totalBalance: totalBalance.toFixed(2), count: outstanding.length });
     } catch (error: any) {
-      console.error("Error fetching advance balance:", error);
+      logger.error("Error fetching advance balance:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
