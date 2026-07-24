@@ -1773,41 +1773,82 @@ export function registerFactoryBaleExportRoutes(app: Express) {
       const kgDiff = totalBaleWeightKg - totalMixWeightKg;
 
       // ── Supplier mix breakdown (per day, per supplier) ──
-      // Fetch container → supplier name for container-type sources that have no direct supplierId
-      const containerOnlyIds = [
+      // Use inventorySupplierId — the canonical ownership field set on ALL source types,
+      // including batch-to-batch sources. This traces back to the ultimate raw-material supplier
+      // even when the immediate source is another mix batch.
+      const inventorySupplierIds = [
         ...new Set(
           mixSourceRows
-            .filter((s: any) => s.containerId != null && s.supplierId == null)
+            .filter((s: any) => s.inventorySupplierId != null)
+            .map((s: any) => s.inventorySupplierId as number)
+        ),
+      ];
+
+      // Also collect direct supplierId / container supplierId as fallback
+      const allSupplierIdsForNames = [
+        ...new Set([
+          ...inventorySupplierIds,
+          ...reportSupplierIds,
+        ]),
+      ];
+
+      const supplierNameById = new Map<number, string>();
+      if (allSupplierIdsForNames.length > 0) {
+        const sRows = await pool.query(
+          `SELECT id, name FROM factory_suppliers WHERE id = ANY($1)`,
+          [allSupplierIdsForNames]
+        );
+        for (const r of sRows.rows) {
+          supplierNameById.set(r.id as number, r.name as string);
+        }
+      }
+
+      // Fallback: container → supplier name for sources without inventorySupplierId
+      const containerIds = [
+        ...new Set(
+          mixSourceRows
+            .filter((s: any) => s.inventorySupplierId == null && s.containerId != null)
             .map((s: any) => s.containerId as number)
         ),
       ];
-      const containerSupplierNameMap = new Map<number, string>();
-      if (containerOnlyIds.length > 0) {
+      const containerSupplierIdMap = new Map<number, number | null>();
+      if (containerIds.length > 0) {
         const cRows = await pool.query(
-          `SELECT c.id, COALESCE(s.name, 'Unknown') AS supplier_name
-           FROM factory_containers c
-           LEFT JOIN factory_suppliers s ON s.id = c.supplier_id
-           WHERE c.id = ANY($1)`,
-          [containerOnlyIds]
+          `SELECT id, supplier_id FROM factory_containers WHERE id = ANY($1)`,
+          [containerIds]
         );
         for (const r of cRows.rows) {
-          containerSupplierNameMap.set(r.id as number, r.supplier_name as string);
+          containerSupplierIdMap.set(r.id as number, r.supplier_id as number | null);
+          // Fetch supplier name if not already loaded
+          if (r.supplier_id && !supplierNameById.has(r.supplier_id as number)) {
+            const snRow = await pool.query(
+              `SELECT name FROM factory_suppliers WHERE id = $1`,
+              [r.supplier_id]
+            );
+            if (snRow.rows[0]) supplierNameById.set(r.supplier_id as number, snRow.rows[0].name as string);
+          }
         }
       }
 
-      // Fetch names for directly-linked supplier IDs
-      const directSupplierNameMap = new Map<number, string>();
-      if (reportSupplierIds.length > 0) {
-        const sRows = await pool.query(
-          `SELECT id, name FROM factory_suppliers WHERE id = ANY($1)`,
-          [reportSupplierIds]
-        );
-        for (const r of sRows.rows) {
-          directSupplierNameMap.set(r.id as number, r.name as string);
+      // Resolve supplier name for one source row
+      function resolveSupplierName(src: any): string {
+        // 1. inventorySupplierId — most authoritative
+        if (src.inventorySupplierId != null) {
+          return supplierNameById.get(src.inventorySupplierId) ?? `Supplier #${src.inventorySupplierId}`;
         }
+        // 2. Direct supplierId on the source row
+        if (src.supplierId != null) {
+          return supplierNameById.get(src.supplierId) ?? `Supplier #${src.supplierId}`;
+        }
+        // 3. Container → supplier
+        if (src.containerId != null) {
+          const csid = containerSupplierIdMap.get(src.containerId);
+          if (csid) return supplierNameById.get(csid) ?? `Supplier #${csid}`;
+        }
+        return "Unknown";
       }
 
-      // Group sources → (date, supplierName) → { totalKg, totalCost }
+      // Group ALL sources (including batch-to-batch) by (date, supplierName)
       type SupDay = { date: string; supplierName: string; totalKg: number; totalCost: number };
       const supDayMap = new Map<string, SupDay>();
 
@@ -1818,18 +1859,14 @@ export function registerFactoryBaleExportRoutes(app: Express) {
         const sources = reportSourcesByBatch.get(batch.id) || [];
 
         for (const src of sources) {
-          if (src.sourceBatchId != null) continue; // skip batch-to-batch
-
-          // Supplier name
-          let supplierName = "Unknown";
-          if (src.supplierId != null) {
-            supplierName = directSupplierNameMap.get(src.supplierId) ?? `Supplier #${src.supplierId}`;
-          } else if (src.containerId != null) {
-            supplierName = containerSupplierNameMap.get(src.containerId) ?? "Unknown";
+          const supplierName = resolveSupplierName(src);
+          if (supplierName === "Unknown" && src.inventorySupplierId == null &&
+              src.supplierId == null && src.containerId == null) {
+            continue; // truly unresolvable — skip
           }
 
-          // Cost using same logic as correctedBatchRows
           const w = parseFloat(src.weightKg || "0");
+          // Use effective cost: locked rate for direct-supplier sources, stored costPerKg otherwise
           let cpk: number;
           if (src.supplierId != null) {
             cpk = reportSupplierRateMap.get(src.supplierId) ?? parseFloat(src.costPerKg || "0");
