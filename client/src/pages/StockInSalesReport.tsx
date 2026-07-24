@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ComponentType } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { format, parseISO } from "date-fns";
 import { useLocation } from "wouter";
@@ -18,6 +18,7 @@ import {
   Scale,
   TrendingDown,
   TrendingUp,
+  type LucideIcon,
 } from "lucide-react";
 
 import { PageHeader } from "@/components/PageHeader";
@@ -147,7 +148,7 @@ function MultiSelectFilter<T extends { id: number; name: string }>({
 interface SummaryPillProps {
   label: string;
   value: string;
-  icon: ComponentType<{ className?: string }>;
+  icon: LucideIcon;
   tone?: "default" | "positive" | "negative";
   testId: string;
 }
