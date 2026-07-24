@@ -8,9 +8,15 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent } from "@/components/ui/card";
 import {
-  Dialog,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
@@ -219,9 +225,9 @@ export default function FactoryContacts() {
         </div>
 
         {isLoading ? (
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {[1, 2, 3].map((i) => (
-              <div key={i} className="h-40 rounded-xl border bg-muted/30 animate-pulse" />
+          <div className="space-y-2">
+            {[1, 2, 3, 4].map((i) => (
+              <div key={i} className="h-12 rounded border bg-muted/30 animate-pulse" />
             ))}
           </div>
         ) : filtered.length === 0 ? (
@@ -238,65 +244,81 @@ export default function FactoryContacts() {
             )}
           </div>
         ) : (
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {filtered.map((c) => (
-              <Card key={c.id} className="group relative">
-                <CardContent className="p-4">
-                  {/* Action buttons */}
-                  <div className="absolute top-3 right-3 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      className="h-7 w-7"
-                      onClick={() => openEdit(c)}
-                    >
-                      <Pencil className="h-3.5 w-3.5" />
-                    </Button>
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      className="h-7 w-7 text-destructive hover:text-destructive"
-                      onClick={() => setDeleteTarget(c)}
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </Button>
-                  </div>
-
-                  {/* Name + role */}
-                  <div className="pr-14 mb-3">
-                    <h3 className="font-semibold text-base leading-tight">{c.name}</h3>
-                    {c.role && (
-                      <Badge variant="secondary" className="mt-1 text-xs font-normal">
-                        {c.role}
-                      </Badge>
-                    )}
-                  </div>
-
-                  {/* Phone numbers */}
-                  {c.numbers.length > 0 && (
-                    <div className="space-y-1.5 mb-3">
-                      {c.numbers.map((n, i) => (
-                        <div key={i} className="flex items-center gap-2 text-sm">
-                          <Phone className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-                          <span className="font-mono">{n.number}</span>
-                          {n.label && (
-                            <span className="text-xs text-muted-foreground">({n.label})</span>
-                          )}
-                          <CopyButton text={n.number} />
+          <div className="rounded-md border">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-[180px]">Name</TableHead>
+                  <TableHead className="w-[140px]">Role</TableHead>
+                  <TableHead>Phone Numbers</TableHead>
+                  <TableHead>Notes</TableHead>
+                  <TableHead className="w-[80px] text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filtered.map((c) => (
+                  <TableRow key={c.id} className="group">
+                    <TableCell className="font-semibold align-top py-3">{c.name}</TableCell>
+                    <TableCell className="align-top py-3">
+                      {c.role ? (
+                        <Badge variant="secondary" className="text-xs font-normal">
+                          {c.role}
+                        </Badge>
+                      ) : (
+                        <span className="text-muted-foreground text-xs">—</span>
+                      )}
+                    </TableCell>
+                    <TableCell className="align-top py-3">
+                      {c.numbers.length > 0 ? (
+                        <div className="space-y-1">
+                          {c.numbers.map((n, i) => (
+                            <div key={i} className="flex items-center gap-2 text-sm">
+                              <Phone className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                              <span className="font-mono">{n.number}</span>
+                              {n.label && (
+                                <span className="text-xs text-muted-foreground">({n.label})</span>
+                              )}
+                              <CopyButton text={n.number} />
+                            </div>
+                          ))}
                         </div>
-                      ))}
-                    </div>
-                  )}
-
-                  {/* Notes */}
-                  {c.notes && (
-                    <p className="text-xs text-muted-foreground border-t pt-2 mt-2 whitespace-pre-wrap line-clamp-3">
-                      {c.notes}
-                    </p>
-                  )}
-                </CardContent>
-              </Card>
-            ))}
+                      ) : (
+                        <span className="text-muted-foreground text-xs">—</span>
+                      )}
+                    </TableCell>
+                    <TableCell className="align-top py-3 max-w-[260px]">
+                      {c.notes ? (
+                        <p className="text-xs text-muted-foreground whitespace-pre-wrap line-clamp-3">
+                          {c.notes}
+                        </p>
+                      ) : (
+                        <span className="text-muted-foreground text-xs">—</span>
+                      )}
+                    </TableCell>
+                    <TableCell className="align-top py-3 text-right">
+                      <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-7 w-7"
+                          onClick={() => openEdit(c)}
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-7 w-7 text-destructive hover:text-destructive"
+                          onClick={() => setDeleteTarget(c)}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
           </div>
         )}
       </div>
