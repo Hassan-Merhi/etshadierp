@@ -1,4 +1,5 @@
 import { getClientDate } from "../../lib/dateUtils";
+import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
 import type { Express } from "express";
 import { db, pool } from "../../db";
@@ -159,8 +160,8 @@ export function registerImportExportRoutes(app: Express) {
         .where(eq(fileFolders.companyId, companyId))
         .orderBy(asc(fileFolders.name));
       res.json(folders);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -172,8 +173,8 @@ export function registerImportExportRoutes(app: Express) {
       if (!name?.trim()) return res.status(400).json({ message: "Folder name required" });
       const [folder] = await db.insert(fileFolders).values({ companyId, name: name.trim() }).returning();
       res.json(folder);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -190,8 +191,8 @@ export function registerImportExportRoutes(app: Express) {
         .returning();
       if (!updated) return res.status(404).json({ message: "Folder not found" });
       res.json(updated);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -215,8 +216,8 @@ export function registerImportExportRoutes(app: Express) {
         .returning({ id: fileFolders.id });
       if (!deleted) return res.status(404).json({ message: "Folder not found" });
       res.json({ message: "Folder deleted" });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -241,8 +242,8 @@ export function registerImportExportRoutes(app: Express) {
         .where(eq(storedFiles.companyId, companyId))
         .orderBy(desc(storedFiles.uploadedAt));
       res.json(files);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -269,8 +270,8 @@ export function registerImportExportRoutes(app: Express) {
         })
         .returning({ id: storedFiles.id });
       res.json({ id: inserted.id, message: "File uploaded successfully" });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -290,8 +291,8 @@ export function registerImportExportRoutes(app: Express) {
         .returning({ id: storedFiles.id });
       if (!updated) return res.status(404).json({ message: "File not found" });
       res.json({ message: "File updated" });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -310,8 +311,8 @@ export function registerImportExportRoutes(app: Express) {
       res.set("Content-Disposition", `attachment; filename="${encodeURIComponent(outName)}"`);
       res.set("Content-Length", buffer.length.toString());
       res.send(buffer);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -329,8 +330,8 @@ export function registerImportExportRoutes(app: Express) {
       res.set("Content-Disposition", `inline; filename="${encodeURIComponent(file.displayName || file.fileName)}"`);
       res.set("Content-Length", buffer.length.toString());
       res.send(buffer);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -344,8 +345,8 @@ export function registerImportExportRoutes(app: Express) {
         .returning({ id: storedFiles.id });
       if (!deleted) return res.status(404).json({ message: "File not found" });
       res.json({ message: "File deleted" });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -355,8 +356,8 @@ export function registerImportExportRoutes(app: Express) {
       const companyId = req.session?.currentCompanyId;
       const list = await storage.listSpreadsheets(companyId);
       res.json(list);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -367,8 +368,8 @@ export function registerImportExportRoutes(app: Express) {
       const sheet = await storage.getSpreadsheet(id, companyId);
       if (!sheet) return res.status(404).json({ message: "Spreadsheet not found" });
       res.json(sheet);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -379,8 +380,8 @@ export function registerImportExportRoutes(app: Express) {
       const { name, data } = req.body;
       const sheet = await storage.createSpreadsheet(companyId, name || "Untitled Spreadsheet", data ?? [], username);
       res.status(201).json(sheet);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -395,8 +396,8 @@ export function registerImportExportRoutes(app: Express) {
       const sheet = await storage.updateSpreadsheet(id, companyId, fields);
       if (!sheet) return res.status(404).json({ message: "Spreadsheet not found" });
       res.json(sheet);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -406,8 +407,8 @@ export function registerImportExportRoutes(app: Express) {
       const id = parseInt(req.params.id);
       await storage.deleteSpreadsheet(id, companyId);
       res.json({ message: "Spreadsheet deleted" });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -422,8 +423,8 @@ export function registerImportExportRoutes(app: Express) {
         req.session?.currentRole === "Developer";
       const sheets = await storage.getLiveSpreadsheets(companyId, !isAdmin);
       res.json(sheets);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -437,8 +438,8 @@ export function registerImportExportRoutes(app: Express) {
       const parsed = insertLiveSpreadsheetSchema.parse({ ...req.body, companyId });
       const sheet = await storage.createLiveSpreadsheet(parsed);
       res.json(sheet);
-    } catch (error: any) {
-      res.status(400).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(400).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -454,8 +455,8 @@ export function registerImportExportRoutes(app: Express) {
       const sheet = await storage.updateLiveSpreadsheet(id, companyId, fields);
       if (!sheet) return res.status(404).json({ message: "Not found" });
       res.json(sheet);
-    } catch (error: any) {
-      res.status(400).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(400).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -469,8 +470,8 @@ export function registerImportExportRoutes(app: Express) {
       const id = parseInt(req.params.id);
       await storage.deleteLiveSpreadsheet(id, companyId);
       res.json({ message: "Deleted" });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -480,8 +481,8 @@ export function registerImportExportRoutes(app: Express) {
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const rows = await db.select().from(agentAccounts).where(eq(agentAccounts.companyId, companyId));
       res.json(rows);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -501,8 +502,8 @@ export function registerImportExportRoutes(app: Express) {
         })
         .returning();
       res.json(row);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -515,8 +516,8 @@ export function registerImportExportRoutes(app: Express) {
         .delete(agentAccounts)
         .where(and(eq(agentAccounts.companyId, companyId), eq(agentAccounts.accountId, accountId)));
       res.json({ success: true });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -527,8 +528,8 @@ export function registerImportExportRoutes(app: Express) {
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const rows = await db.select().from(freightAccounts).where(eq(freightAccounts.companyId, companyId));
       res.json(rows);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -548,8 +549,8 @@ export function registerImportExportRoutes(app: Express) {
         })
         .returning();
       res.json(row);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -562,8 +563,8 @@ export function registerImportExportRoutes(app: Express) {
         .delete(freightAccounts)
         .where(and(eq(freightAccounts.companyId, companyId), eq(freightAccounts.accountId, accountId)));
       res.json({ success: true });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -581,8 +582,8 @@ export function registerImportExportRoutes(app: Express) {
         .from(snapshotPinnedAccounts)
         .where(and(eq(snapshotPinnedAccounts.companyId, companyId), eq(snapshotPinnedAccounts.cardKey, cardKey)));
       res.json(rows);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -604,8 +605,8 @@ export function registerImportExportRoutes(app: Express) {
         })
         .returning();
       res.json(row);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -626,8 +627,8 @@ export function registerImportExportRoutes(app: Express) {
           )
         );
       res.json({ success: true });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -647,8 +648,8 @@ export function registerImportExportRoutes(app: Express) {
       try {
         const all = await storage.getAllCompanies();
         res.json(all);
-      } catch (error: any) {
-        res.status(500).json({ message: error.message });
+      } catch (error: unknown) {
+        res.status(500).json({ message: getErrorMessage(error) });
       }
     }
   );
@@ -664,8 +665,8 @@ export function registerImportExportRoutes(app: Express) {
         if (isNaN(companyId)) return res.status(400).json({ message: "Invalid companyId" });
         const accounts = await storage.getAllLedgerAccounts(companyId, true);
         res.json(accounts);
-      } catch (error: any) {
-        res.status(500).json({ message: error.message });
+      } catch (error: unknown) {
+        res.status(500).json({ message: getErrorMessage(error) });
       }
     }
   );
@@ -767,8 +768,8 @@ export function registerImportExportRoutes(app: Express) {
           grandTotalDebit,
           grandTotalCredit,
         });
-      } catch (error: any) {
-        res.status(500).json({ message: error.message });
+      } catch (error: unknown) {
+        res.status(500).json({ message: getErrorMessage(error) });
       }
     }
   );
@@ -894,9 +895,9 @@ export function registerImportExportRoutes(app: Express) {
             wasRenamed: p.originalCode !== p.finalCode,
           })),
         });
-      } catch (error: any) {
+      } catch (error: unknown) {
         logger.error("[AccountMigration] Error:", { error: error });
-        res.status(500).json({ message: error.message });
+        res.status(500).json({ message: getErrorMessage(error) });
       }
     }
   );
@@ -947,9 +948,9 @@ export function registerImportExportRoutes(app: Express) {
           restoredAccountCount: accounts.length,
           restoredVoucherCount: (movedVoucherIds ?? []).length,
         });
-      } catch (error: any) {
+      } catch (error: unknown) {
         logger.error("[AccountMigration] Undo error:", { error: error });
-        res.status(500).json({ message: error.message });
+        res.status(500).json({ message: getErrorMessage(error) });
       }
     }
   );

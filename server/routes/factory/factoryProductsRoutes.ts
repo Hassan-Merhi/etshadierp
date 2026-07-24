@@ -1,4 +1,5 @@
 import { parseId, parseOptionalId } from "../../lib/parseId";
+import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
 import { getClientDate } from "../../lib/dateUtils";
 import type { Express } from "express";
@@ -134,9 +135,9 @@ export function registerFactoryProductsRoutes(app: Express) {
         .orderBy(factoryCategories.name);
 
       res.json(results);
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error fetching factory categories:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -148,9 +149,9 @@ export function registerFactoryProductsRoutes(app: Express) {
       const parsed = insertFactoryCategorySchema.parse({ ...req.body, companyId });
       const [category] = await db.insert(factoryCategories).values(parsed).returning();
       res.json(category);
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error creating factory category:", { error: error });
-      res.status(400).json({ message: error.message });
+      res.status(400).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -170,9 +171,9 @@ export function registerFactoryProductsRoutes(app: Express) {
 
       if (!updated) return res.status(404).json({ message: "Category not found" });
       res.json(updated);
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error updating factory category:", { error: error });
-      res.status(400).json({ message: error.message });
+      res.status(400).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -192,9 +193,9 @@ export function registerFactoryProductsRoutes(app: Express) {
 
       if (!updated) return res.status(404).json({ message: "Category not found" });
       res.json(updated);
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error deleting factory category:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -214,9 +215,9 @@ export function registerFactoryProductsRoutes(app: Express) {
         .orderBy(factoryBaleProducts.id);
 
       res.json(results);
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error fetching factory bale products:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -277,9 +278,9 @@ export function registerFactoryProductsRoutes(app: Express) {
       }
 
       res.json({ articleCode: candidateCode });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error generating article code:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -307,8 +308,8 @@ export function registerFactoryProductsRoutes(app: Express) {
       `);
 
       res.json(rows.rows);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -328,9 +329,9 @@ export function registerFactoryProductsRoutes(app: Express) {
 
       if (!product) return res.status(404).json({ message: "Product not found" });
       res.json(product);
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error fetching factory bale product:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -495,9 +496,9 @@ export function registerFactoryProductsRoutes(app: Express) {
       };
 
       return res.json({ product, pressed, sales, loaded, currentStock });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error fetching bale product detail:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -738,14 +739,15 @@ export function registerFactoryProductsRoutes(app: Express) {
         try {
           [product] = await db.insert(factoryBaleProducts).values(buildInsertValues(articleCode, code)).returning();
           break;
-        } catch (insertErr: any) {
+        } catch (insertErr: unknown) {
           // DrizzleQueryError wraps the real pg error in .cause
-          const causeMsg: string = insertErr?.cause?.message || "";
-          const msg: string = insertErr?.message || "";
+          const insertErrObj = insertErr as { cause?: { message?: string }; message?: string };
+          const causeMsg: string = insertErrObj.cause?.message || "";
+          const msg: string = insertErrObj.message || "";
           const combined = causeMsg + msg;
           const isCodeDup = combined.includes("unique") || combined.includes("duplicate");
           if (!isCodeDup || !retryPrefix || retryAttempts >= 100) {
-            const realMsg = insertErr?.cause?.message || insertErr?.message || "Insert failed";
+            const realMsg = insertErrObj.cause?.message || insertErrObj.message || "Insert failed";
             throw new Error(realMsg, { cause: insertErr });
           }
           retryAttempts++;
@@ -759,9 +761,10 @@ export function registerFactoryProductsRoutes(app: Express) {
         }
       }
       res.json(product);
-    } catch (error: any) {
-      logger.error("Error creating factory bale product:", { error: error });
-      const realMsg = error?.cause?.message || error?.message || "Unknown error";
+    } catch (error: unknown) {
+      logger.error("Error creating factory bale product:", { error });
+      const errObj = error as { cause?: { message?: string }; message?: string };
+      const realMsg = errObj.cause?.message || errObj.message || "Unknown error";
       res.status(400).json({ message: realMsg });
     }
   });
@@ -782,9 +785,9 @@ export function registerFactoryProductsRoutes(app: Express) {
 
       if (!updated) return res.status(404).json({ message: "Product not found" });
       res.json(updated);
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error updating factory bale product:", { error: error });
-      res.status(400).json({ message: error.message });
+      res.status(400).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -891,9 +894,9 @@ export function registerFactoryProductsRoutes(app: Express) {
       }
 
       res.json({ product: updatedProduct, balesUpdated });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error cascade updating bale product:", { error: error });
-      res.status(400).json({ message: error.message });
+      res.status(400).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -1085,9 +1088,9 @@ export function registerFactoryProductsRoutes(app: Express) {
       };
 
       res.json({ product, location, year, monthlyData, grandTotal });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error fetching bale product history:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   }
 
@@ -1170,9 +1173,9 @@ export function registerFactoryProductsRoutes(app: Express) {
           .where(and(eq(factoryBaleProducts.id, productId), eq(factoryBaleProducts.companyId, companyId)));
 
         res.json({ bales, sellingPrice: product?.sellingPrice || "0" });
-      } catch (error: any) {
+      } catch (error: unknown) {
         logger.error("Error fetching monthly bale details:", { error: error });
-        res.status(500).json({ message: error.message });
+        res.status(500).json({ message: getErrorMessage(error) });
       }
     }
   );
@@ -1257,9 +1260,9 @@ export function registerFactoryProductsRoutes(app: Express) {
           })),
           sellingPrice: product?.sellingPrice || "0",
         });
-      } catch (error: any) {
+      } catch (error: unknown) {
         logger.error("Error fetching all bale details:", { error: error });
-        res.status(500).json({ message: error.message });
+        res.status(500).json({ message: getErrorMessage(error) });
       }
     }
   );
@@ -1280,9 +1283,9 @@ export function registerFactoryProductsRoutes(app: Express) {
 
       if (!updated) return res.status(404).json({ message: "Product not found" });
       res.json(updated);
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error deleting factory bale product:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -1302,8 +1305,8 @@ export function registerFactoryProductsRoutes(app: Express) {
         .where(and(eq(factoryBaleProducts.companyId, companyId), inArray(factoryBaleProducts.id, ids)));
 
       res.json({ updated: ids.length });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -1341,9 +1344,9 @@ export function registerFactoryProductsRoutes(app: Express) {
         }));
 
       res.json({ total: products.length, matches });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error previewing bulk rename:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -1369,9 +1372,9 @@ export function registerFactoryProductsRoutes(app: Express) {
       }
 
       res.json({ updated });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error applying bulk rename:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -1445,9 +1448,9 @@ export function registerFactoryProductsRoutes(app: Express) {
       });
 
       res.json({ movedBales, mergedProducts: sources.length, targetName: target.name });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error merging bale products:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -1499,9 +1502,9 @@ export function registerFactoryProductsRoutes(app: Express) {
       }
 
       res.json({ updated, skipped });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error bulk-updating bale product prices:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -1512,7 +1515,7 @@ export function registerFactoryProductsRoutes(app: Express) {
 
       upload.single("file")(req, res, async (err: any) => {
         try {
-          if (err) return res.status(400).json({ message: err.message });
+          if (err) return res.status(400).json({ message: getErrorMessage(err) });
 
           const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
           if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -1699,14 +1702,14 @@ export function registerFactoryProductsRoutes(app: Express) {
               sellingPrice: detectedSellingPriceCol,
             },
           });
-        } catch (innerError: any) {
+        } catch (innerError: unknown) {
           logger.error("Error processing Excel import:", { error: innerError });
-          res.status(500).json({ message: innerError.message });
+          res.status(500).json({ message: getErrorMessage(innerError) });
         }
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error in Excel import:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -1717,7 +1720,7 @@ export function registerFactoryProductsRoutes(app: Express) {
 
       upload.single("file")(req, res, async (err: any) => {
         try {
-          if (err) return res.status(400).json({ message: err.message });
+          if (err) return res.status(400).json({ message: getErrorMessage(err) });
 
           const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
           if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -1840,14 +1843,14 @@ export function registerFactoryProductsRoutes(app: Express) {
             totalWeight,
             totalProducts: allProducts.length,
           });
-        } catch (innerErr: any) {
+        } catch (innerErr: unknown) {
           logger.error("Validate import error:", { error: innerErr });
-          return res.status(500).json({ message: innerErr.message || "Validation failed" });
+          return res.status(500).json({ message: getErrorMessage(innerErr) });
         }
       });
-    } catch (outerErr: any) {
+    } catch (outerErr: unknown) {
       logger.error("Validate import outer error:", { error: outerErr });
-      res.status(500).json({ message: outerErr.message || "Validation failed" });
+      res.status(500).json({ message: getErrorMessage(outerErr) });
     }
   });
 
@@ -1858,7 +1861,7 @@ export function registerFactoryProductsRoutes(app: Express) {
 
       upload.single("file")(req, res, async (err: any) => {
         try {
-          if (err) return res.status(400).json({ message: err.message });
+          if (err) return res.status(400).json({ message: getErrorMessage(err) });
 
           const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
           if (!companyId) return res.status(400).json({ message: "No company selected" });
@@ -2029,14 +2032,14 @@ export function registerFactoryProductsRoutes(app: Express) {
             });
           }
           res.json({ totalBalesCreated, skippedRows, skippedDetails: skippedDetails.slice(0, 20) });
-        } catch (innerError: any) {
+        } catch (innerError: unknown) {
           logger.error("Error processing bale Excel import:", { error: innerError });
-          res.status(500).json({ message: innerError.message });
+          res.status(500).json({ message: getErrorMessage(innerError) });
         }
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error in bale Excel import:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -2078,15 +2081,15 @@ export function registerFactoryProductsRoutes(app: Express) {
         .where(and(...conditions))
         .orderBy(asc(factoryBaleProductImages.sortOrder), asc(factoryBaleProductImages.uploadedAt));
       res.json(images);
-    } catch (e: any) {
-      res.status(500).json({ message: e.message });
+    } catch (e: unknown) {
+      res.status(500).json({ message: getErrorMessage(e) });
     }
   });
 
   app.post("/api/factory/bale-product-images", requireAuth, (req: any, res: any) => {
     productImageUpload.single("image")(req, res, async (err: any) => {
       try {
-        if (err) return res.status(400).json({ message: err.message });
+        if (err) return res.status(400).json({ message: getErrorMessage(err) });
         const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
         if (!companyId) return res.status(400).json({ message: "No company selected" });
         if (!req.file) return res.status(400).json({ message: "No image uploaded" });
@@ -2105,8 +2108,8 @@ export function registerFactoryProductsRoutes(app: Express) {
           })
           .returning();
         res.json(created);
-      } catch (e: any) {
-        res.status(500).json({ message: e.message });
+      } catch (e: unknown) {
+        res.status(500).json({ message: getErrorMessage(e) });
       }
     });
   });
@@ -2132,8 +2135,8 @@ export function registerFactoryProductsRoutes(app: Express) {
         .delete(factoryBaleProductImages)
         .where(and(eq(factoryBaleProductImages.id, id), eq(factoryBaleProductImages.companyId, companyId)));
       res.json({ ok: true });
-    } catch (e: any) {
-      res.status(500).json({ message: e.message });
+    } catch (e: unknown) {
+      res.status(500).json({ message: getErrorMessage(e) });
     }
   });
 }
