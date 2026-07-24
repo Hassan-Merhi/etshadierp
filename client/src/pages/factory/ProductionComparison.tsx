@@ -23,7 +23,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { TrendingUp, TrendingDown, Minus, AlertTriangle, Check, ChevronDown, X } from "lucide-react";
+import { TrendingUp, TrendingDown, Minus, AlertTriangle, Check, ChevronDown, X, Package, Scale } from "lucide-react";
+import React from "react";
 import { cn } from "@/lib/utils";
 
 // ── Date helpers ─────────────────────────────────────────────────────────────
@@ -292,22 +293,51 @@ function StatCard({
   value,
   sub,
   valueClass,
+  accent,
+  icon,
+  extraLine,
 }: {
   title: string;
   value: string;
   sub?: string;
   valueClass?: string;
+  accent?: "green" | "red" | "neutral";
+  icon?: React.ReactNode;
+  extraLine?: { label: string; value: string };
 }) {
+  const borderClass =
+    accent === "green"
+      ? "border-emerald-500/40"
+      : accent === "red"
+        ? "border-red-500/40"
+        : "";
   return (
-    <Card>
-      <CardHeader className="pb-1 pt-4 px-4">
-        <CardTitle className="text-xs font-medium text-muted-foreground tracking-wide uppercase">
-          {title}
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="px-4 pb-4">
-        <p className={`text-2xl font-bold leading-none ${valueClass ?? ""}`}>{value}</p>
-        {sub && <p className="text-xs text-muted-foreground mt-1">{sub}</p>}
+    <Card className={cn("relative overflow-hidden", borderClass)}>
+      {accent === "green" && (
+        <div className="absolute inset-x-0 top-0 h-0.5 bg-emerald-500/60 rounded-t" />
+      )}
+      {accent === "red" && (
+        <div className="absolute inset-x-0 top-0 h-0.5 bg-red-500/60 rounded-t" />
+      )}
+      <CardContent className="px-4 pt-4 pb-4">
+        <div className="flex items-start justify-between gap-2 mb-2">
+          <p className="text-xs font-semibold text-muted-foreground tracking-widest uppercase leading-tight">
+            {title}
+          </p>
+          {icon && <span className="text-muted-foreground/50 shrink-0">{icon}</span>}
+        </div>
+        <p className={cn("text-3xl font-extrabold leading-none tabular-nums", valueClass)}>
+          {value}
+        </p>
+        {extraLine && (
+          <div className="mt-2 flex items-center gap-1.5">
+            <span className="text-xs text-muted-foreground">{extraLine.label}</span>
+            <span className="text-sm font-semibold tabular-nums text-foreground/80">
+              {extraLine.value}
+            </span>
+          </div>
+        )}
+        {sub && <p className="text-xs text-muted-foreground mt-1.5">{sub}</p>}
       </CardContent>
     </Card>
   );
@@ -557,27 +587,21 @@ export default function ProductionComparison() {
       {/* Content */}
       {!isLoading && !fetchError && (
         <>
-          {/* Row 1: A bales, B bales, A kg, B kg */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          {/* Row 1: Period A & B — bales with kg underneath */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <StatCard
-              title={`${labelA} — Bales`}
-              value={fmtNum(totalABales)}
+              title={labelA}
+              value={fmtNum(totalABales) + " bales"}
               sub={fmtDateRange(rangeA[0], rangeA[1])}
+              icon={<Package className="h-4 w-4" />}
+              extraLine={{ label: "Weight:", value: `${fmtKg(totalAKg)} kg` }}
             />
             <StatCard
-              title={`${labelB} — Bales`}
-              value={fmtNum(totalBBales)}
+              title={labelB}
+              value={fmtNum(totalBBales) + " bales"}
               sub={fmtDateRange(rangeB[0], rangeB[1])}
-            />
-            <StatCard
-              title={`${labelA} — Kilograms`}
-              value={`${fmtKg(totalAKg)} kg`}
-              sub={fmtDateRange(rangeA[0], rangeA[1])}
-            />
-            <StatCard
-              title={`${labelB} — Kilograms`}
-              value={`${fmtKg(totalBKg)} kg`}
-              sub={fmtDateRange(rangeB[0], rangeB[1])}
+              icon={<Package className="h-4 w-4" />}
+              extraLine={{ label: "Weight:", value: `${fmtKg(totalBKg)} kg` }}
             />
           </div>
 
@@ -587,6 +611,8 @@ export default function ProductionComparison() {
               title="Bale Difference"
               value={`${baleDiff > 0 ? "+" : ""}${fmtNum(baleDiff)}`}
               sub={`${labelA} vs ${labelB}`}
+              accent={baleDiff > 0 ? "green" : baleDiff < 0 ? "red" : "neutral"}
+              icon={<Package className="h-4 w-4" />}
               valueClass={
                 baleDiff > 0
                   ? "text-emerald-600"
@@ -599,6 +625,8 @@ export default function ProductionComparison() {
               title="Kilogram Difference"
               value={`${kgDiff > 0 ? "+" : ""}${fmtKg(kgDiff)} kg`}
               sub={`${labelA} vs ${labelB}`}
+              accent={kgDiff > 0 ? "green" : kgDiff < 0 ? "red" : "neutral"}
+              icon={<Scale className="h-4 w-4" />}
               valueClass={
                 kgDiff > 0
                   ? "text-emerald-600"
@@ -611,6 +639,7 @@ export default function ProductionComparison() {
               title="% Change"
               value={fmtPct(balePct)}
               sub={`Bales · Kg: ${fmtPct(kgPct)}`}
+              accent={(balePct ?? 0) > 0 ? "green" : (balePct ?? 0) < 0 ? "red" : "neutral"}
               valueClass={
                 (balePct ?? 0) > 0
                   ? "text-emerald-600"
