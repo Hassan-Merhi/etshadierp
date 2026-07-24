@@ -1,4 +1,5 @@
 import express, { type Express } from "express";
+import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
 import { getClientDate } from "../../lib/dateUtils";
 import { db } from "../../db";
@@ -78,9 +79,9 @@ export function registerPosPrintRoutes(app: Express): void {
       }
 
       res.json({ success: true });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("[/api/pos/send-whatsapp-pdf-upload]", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -167,9 +168,9 @@ export function registerPosPrintRoutes(app: Express): void {
       }
 
       res.json({ success: true });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("[/api/pos/send-stock-pdf-backend]", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -322,9 +323,9 @@ export function registerPosPrintRoutes(app: Express): void {
       if (!result.success) return res.status(502).json({ message: result.error ?? "WhatsApp send failed" });
 
       res.json({ success: true });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("[/api/pos/send-invoice-pdf-backend]", { error: error });
-      const msg: string = error?.message ?? "Internal server error";
+      const msg: string = getErrorMessage(error) ?? "Internal server error";
       if (msg.toLowerCase().includes("voucher not found")) {
         return res.status(404).json({ message: "Voucher not found" });
       }
@@ -375,9 +376,9 @@ export function registerPosPrintRoutes(app: Express): void {
       res.setHeader("Content-Disposition", `inline; filename="${safeName}.pdf"`);
       res.setHeader("Content-Length", pdfBuffer.length);
       res.send(pdfBuffer);
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("[GET /api/pos/invoice/:voucherId/pdf]", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 }

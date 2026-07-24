@@ -6,6 +6,7 @@
  * reportsRoutes.ts as a sub-registrar; behaviour is unchanged.
  */
 import type { Express } from "express";
+import { getErrorMessage } from "../lib/httpHandlers";
 import { logger } from "../lib/logger";
 import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 import { db } from "../db";
@@ -119,8 +120,8 @@ export function registerReportsClosingStockRoutes(app: Express) {
           value: grandTotal.value,
         },
       });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -262,9 +263,9 @@ export function registerReportsClosingStockRoutes(app: Express) {
         totalValue: totalTransferValue.toFixed(2),
         targetLocation: defaultLocation.name,
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error transferring closing stock:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -475,9 +476,9 @@ export function registerReportsClosingStockRoutes(app: Express) {
         totalValue: totalValue.toFixed(2),
         asOfDate: targetDateStr,
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error carrying forward closing stock:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -580,8 +581,8 @@ export function registerReportsClosingStockRoutes(app: Express) {
           value: totals.value,
         },
       });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 }

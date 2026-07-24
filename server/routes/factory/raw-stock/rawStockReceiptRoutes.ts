@@ -1,4 +1,5 @@
 import { parseId, parseOptionalId } from "../../../lib/parseId";
+import { getErrorMessage } from "../../../lib/httpHandlers";
 import { logger } from "../../../lib/logger";
 import { getClientDate } from "../../../lib/dateUtils";
 import type { Express } from "express";
@@ -158,8 +159,8 @@ export function registerRawStockReceiptRoutes(app: Express) {
         } else {
           try {
             supplierLockedRateMap.set(s.id, await getLockedSupplierRate(db, companyId, s.id));
-          } catch (rateErr: any) {
-            logger.error(`[raw-stock] getLockedSupplierRate failed for supplier ${s.id}:`, { error: rateErr?.message });
+          } catch (rateErr: unknown) {
+            logger.error(`[raw-stock] getLockedSupplierRate failed for supplier ${s.id}:`, { error: getErrorMessage(rateErr) });
             supplierLockedRateMap.set(s.id, 0);
           }
         }
@@ -547,9 +548,9 @@ export function registerRawStockReceiptRoutes(app: Express) {
       }
 
       res.json(aggregated);
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error fetching factory raw stock:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -699,9 +700,9 @@ export function registerRawStockReceiptRoutes(app: Express) {
       });
 
       res.json({ success: true, message: "Cost updated and cascaded to mix batches and bales" });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error updating raw stock cost:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -862,9 +863,9 @@ export function registerRawStockReceiptRoutes(app: Express) {
       });
 
       res.json({ deducted: deductKg, rowsUpdated: updates.length, adjCreated: adjDeductKg > 0 });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error deducting received kg:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 }

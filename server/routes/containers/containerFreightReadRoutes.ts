@@ -1,4 +1,5 @@
 import { parseId, parseOptionalId } from "../../lib/parseId";
+import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
 import { getClientDate } from "../../lib/dateUtils";
 import type { Express, Request, Response, NextFunction } from "express";
@@ -101,8 +102,8 @@ export function registerContainerFreightReadRoutes(app: Express) {
 
       const next = String(maxSeq + 1).padStart(3, "0");
       res.json({ poNumber: `${prefix}${next}` });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -122,8 +123,8 @@ export function registerContainerFreightReadRoutes(app: Express) {
         .where(and(eq(ledgerAccounts.companyId, parentCompanyId), eq(ledgerAccounts.active, true)))
         .orderBy(asc(ledgerAccounts.name));
       res.json(accounts);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -360,8 +361,8 @@ export function registerContainerFreightReadRoutes(app: Express) {
         intercoTotal: result.amount,
         updatedVouchers: 0,
       });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -623,9 +624,9 @@ export function registerContainerFreightReadRoutes(app: Express) {
         ...finalCharges,
         itemsTotal: po.itemsTotal?.toString() || "0",
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Get PO error:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 }

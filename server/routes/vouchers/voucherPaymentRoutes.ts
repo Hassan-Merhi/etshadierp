@@ -1,4 +1,5 @@
 import type { Express } from "express";
+import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
 import { db } from "../../db";
 import { storage } from "../../storage";
@@ -516,7 +517,7 @@ export function registerVoucherPaymentRoutes(app: Express) {
           voucherType: voucherType as "Payment" | "Receipt",
           voucherDate: voucherDate,
         });
-      } catch (waErr: any) {
+      } catch (waErr: unknown) {
         logger.error("WhatsApp rule check error (non-fatal):", { error: waErr });
       }
 
@@ -556,9 +557,9 @@ export function registerVoucherPaymentRoutes(app: Express) {
       ).catch(() => {});
 
       res.json({ ...result, whatsapp: waResult });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error creating payment/receipt voucher:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -805,7 +806,7 @@ export function registerVoucherPaymentRoutes(app: Express) {
           voucherType: voucherType as "Payment" | "Receipt",
           voucherDate: voucherDate,
         });
-      } catch (waErr: any) {
+      } catch (waErr: unknown) {
         logger.error("WhatsApp rule check error (non-fatal):", { error: waErr });
       }
 
@@ -843,9 +844,9 @@ export function registerVoucherPaymentRoutes(app: Express) {
         /* non-fatal */
       }
       res.json({ voucher: result.voucher, entries: result.entries, whatsapp: waResultPatch });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error updating payment/receipt voucher:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 

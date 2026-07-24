@@ -6,6 +6,7 @@
  * chatbotRoutes.ts as a sub-registrar; behaviour is unchanged.
  */
 import type { Express } from "express";
+import { getErrorMessage } from "../lib/httpHandlers";
 import { logger } from "../lib/logger";
 import { eq, and, desc } from "drizzle-orm";
 import { db } from "../db";
@@ -148,8 +149,8 @@ export function registerChatbotPoImportRoutes(app: Express) {
           const pdfParse = (pdfParseModule.default ?? pdfParseModule) as (buf: Buffer) => Promise<{ text: string }>;
           const parsed = await pdfParse(req.file.buffer);
           pdfText = parsed.text;
-        } catch (pdfErr: any) {
-          return res.status(400).json({ message: `Could not read PDF: ${pdfErr.message}` });
+        } catch (pdfErr: unknown) {
+          return res.status(400).json({ message: `Could not read PDF: ${getErrorMessage(pdfErr)}` });
         }
         if (!pdfText.trim())
           return res.status(400).json({ message: "PDF appears to be empty or is image-only (no extractable text)" });
@@ -187,8 +188,8 @@ export function registerChatbotPoImportRoutes(app: Express) {
         let wb;
         try {
           wb = await readExcel(req.file.buffer);
-        } catch (xlErr: any) {
-          return res.status(400).json({ message: `Could not read file: ${xlErr.message}` });
+        } catch (xlErr: unknown) {
+          return res.status(400).json({ message: `Could not read file: ${getErrorMessage(xlErr)}` });
         }
         const sheetName = wb.SheetNames[0];
         if (!sheetName) return res.status(400).json({ message: "Excel file is empty" });
@@ -339,7 +340,7 @@ export function registerChatbotPoImportRoutes(app: Express) {
       if (!extracted.supplierCode && supplierCode) extracted.supplierCode = supplierCode;
       if (!extracted.importDate && importDateRaw) extracted.importDate = importDateRaw;
       return res.json(await buildResponse(extracted));
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("PO file parse error:", { error: error });
       res.status(500).json({ message: "Internal server error" });
     }
@@ -491,7 +492,7 @@ export function registerChatbotPoImportRoutes(app: Express) {
         crossCompany: !!(await storage.getParentCompanyId()),
         availableProformas,
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("PO import confirm error:", { error: error });
       res.status(500).json({ message: "Internal server error" });
     }

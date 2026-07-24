@@ -1,4 +1,5 @@
 import { parseId, parseOptionalId } from "../../lib/parseId";
+import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
 import { getClientDate } from "../../lib/dateUtils";
 import type { Express, Request, Response, NextFunction } from "express";
@@ -128,8 +129,8 @@ export function registerContainerAccountingRoutes(app: Express) {
       }
 
       res.json(updated);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -411,8 +412,8 @@ export function registerContainerAccountingRoutes(app: Express) {
         skipped,
         errors,
       });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -864,8 +865,8 @@ export function registerContainerAccountingRoutes(app: Express) {
             // INTERCO-FREIGHT vouchers are no longer created — freight is recorded
             // directly inside the purchase voucher. Legacy ones are left in place
             // (they can be deleted manually from the daybook if no longer needed).
-          } catch (poErr: any) {
-            errors.push(`PO ${po.poNumber}: ${poErr.message}`);
+          } catch (poErr: unknown) {
+            errors.push(`PO ${po.poNumber}: ${getErrorMessage(poErr)}`);
             logger.error(`[SyncAll] Error processing PO ${po.poNumber}:`, { error: poErr });
           }
         }
@@ -977,8 +978,8 @@ export function registerContainerAccountingRoutes(app: Express) {
                 }
               }
             }
-          } catch (cErr: any) {
-            errors.push(`Container ${cid}: ${cErr.message}`);
+          } catch (cErr: unknown) {
+            errors.push(`Container ${cid}: ${getErrorMessage(cErr)}`);
           }
         }
 
@@ -1001,9 +1002,9 @@ export function registerContainerAccountingRoutes(app: Express) {
           errors,
           message: `Scanned ${scannedPOs} POs. Updated ${updatedLocalVouchers} local vouchers, ${updatedParentVouchers} parent JVs, ${updatedContainers} container totals.`,
         });
-      } catch (error: any) {
+      } catch (error: unknown) {
         logger.error("[SyncAll] Fatal error:", { error: error });
-        res.status(500).json({ message: error.message });
+        res.status(500).json({ message: getErrorMessage(error) });
       }
     }
   );

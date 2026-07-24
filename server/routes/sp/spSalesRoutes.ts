@@ -1,4 +1,5 @@
 import type { Express } from "express";
+import { getErrorMessage } from "../../lib/httpHandlers";
 import { db } from "../../db";
 import { requireAuth } from "../../auth";
 import { sql, eq, and, gt, isNull, desc, asc } from "drizzle-orm";
@@ -37,8 +38,8 @@ export function registerSpSalesRoutes(app: Express) {
       }));
 
       res.json(result);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -293,8 +294,8 @@ export function registerSpSalesRoutes(app: Express) {
       });
 
       res.json(result);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -312,8 +313,8 @@ export function registerSpSalesRoutes(app: Express) {
         .orderBy(asc(spStockMovements.createdAt));
 
       res.json(movements);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -329,8 +330,8 @@ export function registerSpSalesRoutes(app: Express) {
         .orderBy(asc(spStockMovements.createdAt));
 
       res.json(movements);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 }

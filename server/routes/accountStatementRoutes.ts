@@ -6,6 +6,7 @@
  * from accountRoutes.ts as a sub-registrar; behaviour is unchanged.
  */
 import type { Express } from "express";
+import { getErrorMessage } from "../lib/httpHandlers";
 import { logger } from "../lib/logger";
 import path from "path";
 import fs from "fs";
@@ -82,8 +83,8 @@ export function registerAccountStatementRoutes(app: Express) {
         .orderBy(desc(vouchers.deletedAt));
 
       res.json(results);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -293,8 +294,8 @@ export function registerAccountStatementRoutes(app: Express) {
       }
 
       res.json({ balance });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -357,9 +358,9 @@ export function registerAccountStatementRoutes(app: Express) {
       return;
 
       // Legacy code below is unreachable — kept for reference only
-    } catch (err: any) {
+    } catch (err: unknown) {
       logger.error("Statement PDF error:", { error: err });
-      if (!res.headersSent) res.status(500).json({ message: err.message });
+      if (!res.headersSent) res.status(500).json({ message: getErrorMessage(err) });
     }
   });
 
@@ -602,9 +603,9 @@ export function registerAccountStatementRoutes(app: Express) {
       res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
       res.setHeader("Content-Disposition", `attachment; filename="${safeAccName}_Statement.xlsx"`);
       res.end(buf);
-    } catch (err: any) {
+    } catch (err: unknown) {
       logger.error("Account statement Excel error:", { error: err });
-      if (!res.headersSent) res.status(500).json({ message: err.message });
+      if (!res.headersSent) res.status(500).json({ message: getErrorMessage(err) });
     }
   });
 }
