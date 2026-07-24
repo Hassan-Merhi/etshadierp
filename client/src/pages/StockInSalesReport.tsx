@@ -119,7 +119,7 @@ function MultiSelectFilter<T extends { id: number; name: string }>({
             onClick={() => onChange([])}
             data-testid={`${testId}-all`}
           >
-            <Checkbox checked={selectedIds.length === 0} className="h-4 w-4 pointer-events-none" />
+            <Checkbox checked={selectedIds.length === 0} className="pointer-events-none h-4 w-4" />
             <span className="text-sm font-medium">All {label}</span>
           </div>
           <div className="my-1 border-t" />
@@ -135,7 +135,7 @@ function MultiSelectFilter<T extends { id: number; name: string }>({
                 }
                 data-testid={`${testId}-option-${item.id}`}
               >
-                <Checkbox checked={selected} className="h-4 w-4 pointer-events-none" />
+                <Checkbox checked={selected} className="pointer-events-none h-4 w-4" />
                 <span className="text-sm">{item.name}</span>
               </div>
             );
