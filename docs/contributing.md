@@ -62,6 +62,21 @@ The server starts on port 5000 and serves both the API and the Vite frontend.
 
 ---
 
+## Git Hooks (type-check gate)
+
+`npm install` runs a `prepare` step (`scripts/setup-git-hooks.mjs`) that points
+git at the committed hooks in `scripts/git-hooks/`. The **pre-push** hook runs
+`npm run check` (`tsc --noEmit`) and blocks the push if the type-check fails,
+keeping the 0-error baseline enforced locally even when CI cannot run.
+
+Bypass once for a WIP branch (avoid on `main`):
+
+```bash
+SKIP_TSC_CHECK=1 git push …
+```
+
+---
+
 ## Environment Variables
 
 | Variable | Description |

@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+#
+# Pre-push gate: enforce the 0-error TypeScript baseline locally.
+#
+# Runs `npm run check` (tsc --noEmit) before any push is allowed. This keeps the
+# clean type-check baseline enforced even when GitHub Actions cannot run (e.g.
+# exhausted Actions minutes on a private repo). It does not depend on CI.
+#
+# Escape hatch (use sparingly, e.g. pushing a WIP branch that is not main):
+#   SKIP_TSC_CHECK=1 git push ...
+#
+set -euo pipefail
+
+if [ "${SKIP_TSC_CHECK:-0}" = "1" ]; then
+  echo "pre-push: SKIP_TSC_CHECK=1 set — skipping tsc gate." >&2
+  exit 0
+fi
+
+echo "pre-push: running type-check (npm run check)…" >&2
+if ! npm run --silent check; then
+  echo "" >&2
+  echo "pre-push: type-check FAILED — push blocked." >&2
+  echo "  Fix the TypeScript errors above, or bypass once with:" >&2
+  echo "    SKIP_TSC_CHECK=1 git push …" >&2
+  exit 1
+fi
+
+echo "pre-push: type-check clean — allowing push." >&2
+exit 0
