@@ -6,6 +6,7 @@
  * sub-registrar; behaviour is unchanged.
  */
 import type { Express } from "express";
+import { getErrorMessage } from "../lib/httpHandlers";
 import { logger } from "../lib/logger";
 import { eq, and, or, desc, sql } from "drizzle-orm";
 import { db } from "../db";
@@ -50,9 +51,9 @@ export function registerProductionBaleRoutes(app: Express) {
 
       const bales = await storage.getAllProductionBales(companyId, filters);
       res.json(bales);
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error fetching production bales:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -70,9 +71,9 @@ export function registerProductionBaleRoutes(app: Express) {
       }
 
       res.json(bale);
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error fetching bale by barcode:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -223,9 +224,9 @@ export function registerProductionBaleRoutes(app: Express) {
         count: result.bales.length,
         pressingBatchId: result.pressingBatchId,
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error creating production bales:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -247,9 +248,9 @@ export function registerProductionBaleRoutes(app: Express) {
         .orderBy(desc(productionBales.createdAt));
 
       res.json(pending);
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error fetching pending bales:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -281,9 +282,9 @@ export function registerProductionBaleRoutes(app: Express) {
       }
 
       res.json(results[0]);
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error looking up bale:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -320,9 +321,9 @@ export function registerProductionBaleRoutes(app: Express) {
       );
 
       res.json(batchesWithBales);
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error fetching pressing batches:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -358,9 +359,9 @@ export function registerProductionBaleRoutes(app: Express) {
         pendingCount: bales.filter((b) => b.status === "PENDING").length,
         finalizedCount: bales.filter((b) => b.status !== "PENDING").length,
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error fetching pressing batch:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -483,9 +484,9 @@ export function registerProductionBaleRoutes(app: Express) {
       });
 
       res.json({ updated: updated.length, bales: updated, pressingBatchId: batch.id });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error finalizing bales:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -499,9 +500,9 @@ export function registerProductionBaleRoutes(app: Express) {
 
       const bale = await storage.createProductionBale(data);
       res.json(bale);
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error creating production bale:", { error: error });
-      res.status(400).json({ message: error.message });
+      res.status(400).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -521,9 +522,9 @@ export function registerProductionBaleRoutes(app: Express) {
 
       const created = await storage.bulkCreateProductionBales(validatedBales);
       res.json({ success: true, count: created.length, bales: created });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error bulk creating bales:", { error: error });
-      res.status(400).json({ message: error.message });
+      res.status(400).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -536,9 +537,9 @@ export function registerProductionBaleRoutes(app: Express) {
 
       const barcode = await storage.getNextBaleBarcode(companyId);
       res.json({ barcode });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error generating barcode:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -563,9 +564,9 @@ export function registerProductionBaleRoutes(app: Express) {
       });
 
       res.json(bale);
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error updating bale from scan:", { error: error });
-      res.status(400).json({ message: error.message });
+      res.status(400).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -592,9 +593,9 @@ export function registerProductionBaleRoutes(app: Express) {
       // Convert to base64 data URL
       const dataUrl = `data:image/png;base64,${png.toString("base64")}`;
       res.json({ dataUrl });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error generating barcode:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -622,9 +623,9 @@ export function registerProductionBaleRoutes(app: Express) {
       res.setHeader("Content-Type", "image/png");
       res.setHeader("Cache-Control", "public, max-age=86400");
       res.send(png);
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error generating barcode image:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -639,9 +640,9 @@ export function registerProductionBaleRoutes(app: Express) {
       if (isNaN(id)) return res.status(400).json({ message: "Invalid bale ID" });
       await storage.deleteProductionBale(id, companyId);
       res.json({ success: true });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error deleting production bale:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -672,9 +673,9 @@ export function registerProductionBaleRoutes(app: Express) {
       }
 
       res.json(updated);
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error updating bale status:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -710,9 +711,9 @@ export function registerProductionBaleRoutes(app: Express) {
         .returning();
 
       res.json({ updated: updated.length });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error bulk updating bale status:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -753,9 +754,9 @@ export function registerProductionBaleRoutes(app: Express) {
 
       const created = await storage.bulkCreateProductionBales(balesData);
       res.json({ success: true, count: created.length, bales: created });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error importing Excel:", { error: error });
-      res.status(400).json({ message: error.message });
+      res.status(400).json({ message: getErrorMessage(error) });
     }
   });
 }

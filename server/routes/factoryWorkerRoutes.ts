@@ -1,4 +1,5 @@
 import { parseId, parseOptionalId } from "../lib/parseId";
+import { getErrorMessage } from "../lib/httpHandlers";
 import { logger } from "../lib/logger";
 import { getClientDate } from "../lib/dateUtils";
 import { db, pool } from "../db";
@@ -155,8 +156,8 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
           })
           .returning();
         if (found) return found;
-      } catch (err: any) {
-        if (err?.message?.includes("company_code_unique")) {
+      } catch (err: unknown) {
+        if (getErrorMessage(err)?.includes("company_code_unique")) {
           const [nowFound] = await db
             .select({ id: ledgerAccounts.id })
             .from(ledgerAccounts)
@@ -219,9 +220,9 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
       }));
 
       res.json(result);
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error fetching factory workers with balances:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -274,9 +275,9 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
       }));
 
       res.json(enriched);
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error fetching factory workers:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -292,8 +293,8 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
         .orderBy(factoryWorkers.nationality);
       const list = rows.map((r: any) => r.nationality as string).filter(Boolean);
       res.json(list);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -313,8 +314,8 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
       const result: Record<number, number> = {};
       for (const row of rows) result[row.workerId] = row.count;
       res.json(result);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -472,9 +473,9 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
       res.setHeader("Content-Disposition", 'attachment; filename="worker_import_template.xlsx"');
       res.setHeader("Content-Length", xlsBuffer.byteLength);
       res.end(xlsBuffer);
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error generating template:", { error: error });
-      if (!res.headersSent) res.status(500).json({ message: error.message });
+      if (!res.headersSent) res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -640,9 +641,9 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
               }
               created++;
             }
-          } catch (e: any) {
+          } catch (e: unknown) {
             skipped++;
-            errors.push(`Row ${i + 2}: ${e.message}`);
+            errors.push(`Row ${i + 2}: ${getErrorMessage(e)}`);
           }
         }
 
@@ -656,9 +657,9 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
         });
 
         res.json({ created, updated, skipped, errors });
-      } catch (error: any) {
+      } catch (error: unknown) {
         logger.error("Error importing workers:", { error: error });
-        res.status(500).json({ message: error.message });
+        res.status(500).json({ message: getErrorMessage(error) });
       }
     }
   );
@@ -689,9 +690,9 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
       }
 
       res.json({ updated: results.length, codes: results });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error reassigning worker codes:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -739,9 +740,9 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
           payrollCount: payrolls.length,
         },
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error fetching factory worker:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -843,9 +844,9 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
       }
 
       res.json(worker);
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error creating factory worker:", { error: error });
-      res.status(400).json({ message: error.message });
+      res.status(400).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -904,9 +905,9 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
       });
 
       res.json(updated);
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error updating factory worker:", { error: error });
-      res.status(400).json({ message: error.message });
+      res.status(400).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -941,9 +942,9 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
       });
 
       res.json(updated);
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error ending worker contract:", { error: error });
-      res.status(400).json({ message: error.message });
+      res.status(400).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -977,9 +978,9 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
       });
 
       res.json(updated);
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error reactivating worker:", { error: error });
-      res.status(400).json({ message: error.message });
+      res.status(400).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -1016,9 +1017,9 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
       });
 
       res.json(updated);
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error uploading worker photo:", { error: error });
-      res.status(400).json({ message: error.message });
+      res.status(400).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -1038,9 +1039,9 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
       }
       if (!fs.existsSync(filePath)) return res.status(404).json({ message: "File not found" });
       res.sendFile(filePath);
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error serving worker photo:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -1095,9 +1096,9 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
         })
         .returning();
       res.json(doc);
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error uploading worker document:", { error: error });
-      res.status(400).json({ message: error.message });
+      res.status(400).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -1127,8 +1128,8 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
         .where(and(eq(factoryWorkerDocuments.workerId, workerId), eq(factoryWorkerDocuments.companyId, companyId)))
         .orderBy(desc(factoryWorkerDocuments.uploadedAt));
       res.json(docs);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -1156,8 +1157,8 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
       if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
       await db.delete(factoryWorkerDocuments).where(eq(factoryWorkerDocuments.id, docId));
       res.json({ success: true });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -1212,9 +1213,9 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
         res.setHeader("Content-Disposition", `inline; filename="${doc.originalName.replace(/"/g, "")}"`);
       }
       res.send(buf);
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error serving worker document:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -1245,9 +1246,9 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
         .orderBy(desc(factoryBales.finalizedAt));
 
       res.json(bales);
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error fetching worker bales:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -1518,9 +1519,9 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
         settlementPayrollId: settlement.id,
         workerUpdated: true,
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error settling worker contract:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 

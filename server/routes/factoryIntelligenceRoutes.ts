@@ -1,4 +1,5 @@
 import { getClientDate } from "../lib/dateUtils";
+import { getErrorMessage } from "../lib/httpHandlers";
 import { logger } from "../lib/logger";
 import { cache } from "../lib/simpleCache";
 import type { Express } from "express";
@@ -90,9 +91,9 @@ export function registerFactoryIntelligenceRoutes(app: Express, requireAuth: any
       });
 
       res.json(result);
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error fetching factory settings:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -199,9 +200,9 @@ export function registerFactoryIntelligenceRoutes(app: Express, requireAuth: any
       const resultExtra = (result as any).extraSettings ?? {};
       cache.del(`factory_settings:${companyId}`);
       res.json({ ...result, ...resultExtra });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error updating factory settings:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -267,9 +268,9 @@ export function registerFactoryIntelligenceRoutes(app: Express, requireAuth: any
         workers: { active: activeWorkers.length, attendanceToday: attendanceTodayCount },
         containers: { loaded: loadedOrders.length },
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error fetching factory dashboard:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -296,9 +297,9 @@ export function registerFactoryIntelligenceRoutes(app: Express, requireAuth: any
         .orderBy(desc(factoryWasteEntries.date));
 
       res.json(results);
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error fetching waste entries:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -326,9 +327,9 @@ export function registerFactoryIntelligenceRoutes(app: Express, requireAuth: any
         .returning();
 
       res.json(entry);
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error creating waste entry:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -345,9 +346,9 @@ export function registerFactoryIntelligenceRoutes(app: Express, requireAuth: any
 
       if (!deleted) return res.status(404).json({ message: "Waste entry not found" });
       res.json({ success: true });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error deleting waste entry:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -408,9 +409,9 @@ export function registerFactoryIntelligenceRoutes(app: Express, requireAuth: any
         .sort((a, b) => a.date.localeCompare(b.date));
 
       res.json(result);
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error fetching daily KPIs:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -459,9 +460,9 @@ export function registerFactoryIntelligenceRoutes(app: Express, requireAuth: any
 
       const result = Object.values(workerStats).sort((a, b) => b.balesCount - a.balesCount);
       res.json(result);
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error fetching worker KPIs:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -536,9 +537,9 @@ export function registerFactoryIntelligenceRoutes(app: Express, requireAuth: any
 
       result.sort((a: any, b: any) => a.wastePct - b.wastePct);
       res.json(result);
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error fetching mix KPIs:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -630,9 +631,9 @@ export function registerFactoryIntelligenceRoutes(app: Express, requireAuth: any
       });
 
       res.json(result);
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error fetching bale profitability:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -748,9 +749,9 @@ export function registerFactoryIntelligenceRoutes(app: Express, requireAuth: any
       });
 
       res.json(result);
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error fetching container profitability:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -771,9 +772,9 @@ export function registerFactoryIntelligenceRoutes(app: Express, requireAuth: any
         .limit(50);
 
       res.json(results);
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error fetching factory alerts:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -792,9 +793,9 @@ export function registerFactoryIntelligenceRoutes(app: Express, requireAuth: any
 
       if (!updated) return res.status(404).json({ message: "Alert not found" });
       res.json(updated);
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error marking alert as read:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -920,9 +921,9 @@ export function registerFactoryIntelligenceRoutes(app: Express, requireAuth: any
       }
 
       res.json({ newAlerts: newAlertCount });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error generating alerts:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -1043,9 +1044,9 @@ export function registerFactoryIntelligenceRoutes(app: Express, requireAuth: any
 
       result.sort((a, b) => b.score - a.score);
       res.json(result);
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error fetching supplier scores:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -1160,9 +1161,9 @@ export function registerFactoryIntelligenceRoutes(app: Express, requireAuth: any
       }
 
       res.json({ suggestions });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error optimizing mix:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -1257,9 +1258,9 @@ export function registerFactoryIntelligenceRoutes(app: Express, requireAuth: any
         shippingContainer,
         order,
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error tracing bale:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -1281,9 +1282,9 @@ export function registerFactoryIntelligenceRoutes(app: Express, requireAuth: any
         .orderBy(desc(factoryBalePhotos.uploadedAt));
 
       res.json(photos);
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error fetching bale photos:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -1314,9 +1315,9 @@ export function registerFactoryIntelligenceRoutes(app: Express, requireAuth: any
           .returning();
 
         res.json(photo);
-      } catch (error: any) {
+      } catch (error: unknown) {
         logger.error("Error uploading bale photo:", { error: error });
-        res.status(500).json({ message: error.message });
+        res.status(500).json({ message: getErrorMessage(error) });
       }
     }
   );
@@ -1346,9 +1347,9 @@ export function registerFactoryIntelligenceRoutes(app: Express, requireAuth: any
       await db.delete(factoryBalePhotos).where(eq(factoryBalePhotos.id, photoId));
 
       res.json({ success: true });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error deleting bale photo:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -1367,9 +1368,9 @@ export function registerFactoryIntelligenceRoutes(app: Express, requireAuth: any
       }
       if (!fs.existsSync(filePath)) return res.status(404).json({ message: "File not found" });
       res.sendFile(filePath);
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error serving bale photo:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -1452,9 +1453,9 @@ export function registerFactoryIntelligenceRoutes(app: Express, requireAuth: any
         totalOutgoing: Math.round(totalOutgoing * 100) / 100,
         expectedIncome: Math.round(expectedIncome * 100) / 100,
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error fetching cash flow forecast:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 }

@@ -6,6 +6,7 @@
  * behaviour is unchanged.
  */
 import type { Express } from "express";
+import { getErrorMessage } from "../lib/httpHandlers";
 import { logger } from "../lib/logger";
 import { and, eq, sql } from "drizzle-orm";
 import { db } from "../db";
@@ -31,9 +32,9 @@ export function registerBaleProductRoutes(app: Express) {
       }
       const barcodes = await storage.getAllPendingBarcodes(companyId);
       res.json(barcodes);
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error fetching pending barcodes:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -48,9 +49,9 @@ export function registerBaleProductRoutes(app: Express) {
         return res.status(404).json({ message: "Barcode not found" });
       }
       res.json(barcode);
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error fetching pending barcode:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -63,9 +64,9 @@ export function registerBaleProductRoutes(app: Express) {
       const data = insertPendingBarcodeSchema.parse({ ...req.body, companyId });
       const barcode = await storage.createPendingBarcode(data);
       res.json(barcode);
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error creating pending barcode:", { error: error });
-      res.status(400).json({ message: error.message });
+      res.status(400).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -91,9 +92,9 @@ export function registerBaleProductRoutes(app: Express) {
         }))
       );
       res.json({ success: true, count: created.length, barcodes: created });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error importing pending barcodes:", { error: error });
-      res.status(400).json({ message: error.message });
+      res.status(400).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -103,9 +104,9 @@ export function registerBaleProductRoutes(app: Express) {
       if (isNaN(id)) return res.status(400).json({ message: "Invalid barcode ID" });
       const barcode = await storage.updatePendingBarcode(id, req.body);
       res.json(barcode);
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error updating pending barcode:", { error: error });
-      res.status(400).json({ message: error.message });
+      res.status(400).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -117,9 +118,9 @@ export function registerBaleProductRoutes(app: Express) {
       }
       await storage.markBarcodesAsPrinted(ids);
       res.json({ success: true });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error marking barcodes as printed:", { error: error });
-      res.status(400).json({ message: error.message });
+      res.status(400).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -129,9 +130,9 @@ export function registerBaleProductRoutes(app: Express) {
       if (isNaN(_bid)) return res.status(400).json({ message: "Invalid barcode ID" });
       await storage.deletePendingBarcode(_bid);
       res.status(204).send();
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error deleting pending barcode:", { error: error });
-      res.status(400).json({ message: error.message });
+      res.status(400).json({ message: getErrorMessage(error) });
     }
   });
   // Bale Product Categories API Routes
@@ -141,8 +142,8 @@ export function registerBaleProductRoutes(app: Express) {
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const categories = await storage.getAllBaleProductCategories(companyId);
       res.json(categories);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -155,8 +156,8 @@ export function registerBaleProductRoutes(app: Express) {
       if (existing) return res.status(409).json({ message: `Category "${data.name}" already exists` });
       const created = await storage.createBaleProductCategory(data);
       res.json(created);
-    } catch (error: any) {
-      res.status(400).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(400).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -168,8 +169,8 @@ export function registerBaleProductRoutes(app: Express) {
       if (!existing) return res.status(404).json({ message: "Category not found" });
       const updated = await storage.updateBaleProductCategory(id, req.body);
       res.json(updated);
-    } catch (error: any) {
-      res.status(400).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(400).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -181,8 +182,8 @@ export function registerBaleProductRoutes(app: Express) {
       if (!existing) return res.status(404).json({ message: "Category not found" });
       await storage.deleteBaleProductCategory(id);
       res.json({ success: true });
-    } catch (error: any) {
-      res.status(400).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(400).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -196,9 +197,9 @@ export function registerBaleProductRoutes(app: Express) {
 
       const products = await storage.getAllBaleProducts(companyId);
       res.json(products);
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error fetching bale products:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -215,9 +216,9 @@ export function registerBaleProductRoutes(app: Express) {
       }
 
       res.json(product);
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error fetching bale product:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -251,9 +252,9 @@ export function registerBaleProductRoutes(app: Express) {
 
       const product = await storage.createBaleProduct(data);
       res.json(product);
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error creating bale product:", { error: error });
-      res.status(400).json({ message: error.message });
+      res.status(400).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -281,9 +282,9 @@ export function registerBaleProductRoutes(app: Express) {
 
       const product = await storage.updateBaleProduct(id, data);
       res.json(product);
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error updating bale product:", { error: error });
-      res.status(400).json({ message: error.message });
+      res.status(400).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -310,9 +311,9 @@ export function registerBaleProductRoutes(app: Express) {
 
       await storage.deleteBaleProduct(id);
       res.json({ success: true });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error deleting bale product:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -423,9 +424,9 @@ export function registerBaleProductRoutes(app: Express) {
       });
 
       res.json({ success: true, created, updated, categoriesCreated, count: created + updated });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error importing bale products from Excel:", { error: error });
-      res.status(400).json({ message: error.message });
+      res.status(400).json({ message: getErrorMessage(error) });
     }
   });
 }

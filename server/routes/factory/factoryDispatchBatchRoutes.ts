@@ -1,4 +1,5 @@
 import type { Express, Request } from "express";
+import { getErrorMessage } from "../../lib/httpHandlers";
 import { db } from "../../db";
 import { requireAuth } from "../../auth";
 import { parseId } from "../../lib/parseId";
@@ -103,8 +104,8 @@ export function registerDispatchBatchRoutes(app: Express) {
       `);
 
       res.json((rows as any).rows || rows);
-    } catch (err: any) {
-      res.status(500).json({ message: err.message });
+    } catch (err: unknown) {
+      res.status(500).json({ message: getErrorMessage(err) });
     }
   });
 
@@ -192,8 +193,8 @@ export function registerDispatchBatchRoutes(app: Express) {
       });
 
       res.status(201).json(result);
-    } catch (err: any) {
-      res.status(400).json({ message: err.message });
+    } catch (err: unknown) {
+      res.status(400).json({ message: getErrorMessage(err) });
     }
   });
 
@@ -293,8 +294,8 @@ export function registerDispatchBatchRoutes(app: Express) {
         articleTotals: (articleTotals as any).rows || articleTotals,
         finalInvoice,
       });
-    } catch (err: any) {
-      res.status(500).json({ message: err.message });
+    } catch (err: unknown) {
+      res.status(500).json({ message: getErrorMessage(err) });
     }
   });
 
@@ -327,8 +328,8 @@ export function registerDispatchBatchRoutes(app: Express) {
         .where(and(eq(customerDispatchBatches.id, batchId), eq(customerDispatchBatches.companyId, companyId)))
         .returning();
       res.json(updated);
-    } catch (err: any) {
-      res.status(500).json({ message: err.message });
+    } catch (err: unknown) {
+      res.status(500).json({ message: getErrorMessage(err) });
     }
   });
 
@@ -379,8 +380,8 @@ export function registerDispatchBatchRoutes(app: Express) {
       });
 
       res.json({ ok: true });
-    } catch (err: any) {
-      res.status(400).json({ message: err.message });
+    } catch (err: unknown) {
+      res.status(400).json({ message: getErrorMessage(err) });
     }
   });
 
@@ -437,8 +438,8 @@ export function registerDispatchBatchRoutes(app: Express) {
       });
 
       res.status(201).json(result);
-    } catch (err: any) {
-      res.status(400).json({ message: err.message });
+    } catch (err: unknown) {
+      res.status(400).json({ message: getErrorMessage(err) });
     }
   });
 
@@ -473,8 +474,8 @@ export function registerDispatchBatchRoutes(app: Express) {
         .where(and(eq(customerDispatchTruckRides.id, rideId), eq(customerDispatchTruckRides.companyId, companyId)))
         .returning();
       res.json(updated);
-    } catch (err: any) {
-      res.status(500).json({ message: err.message });
+    } catch (err: unknown) {
+      res.status(500).json({ message: getErrorMessage(err) });
     }
   });
 
@@ -639,9 +640,9 @@ export function registerDispatchBatchRoutes(app: Express) {
       });
 
       res.status(201).json(result);
-    } catch (err: any) {
+    } catch (err: unknown) {
       // Distinguish validation errors (400) from DB/system errors (500)
-      const msg = err.message || "";
+      const msg = getErrorMessage(err) || "";
       const is400 =
         msg.includes("not found") ||
         msg.includes("not available") ||
@@ -650,7 +651,7 @@ export function registerDispatchBatchRoutes(app: Express) {
         msg.includes("cancelled") ||
         msg.includes("dispatched") ||
         msg.includes("invoiced");
-      res.status(is400 ? 400 : 500).json({ message: err.message });
+      res.status(is400 ? 400 : 500).json({ message: getErrorMessage(err) });
     }
   });
 
@@ -704,8 +705,8 @@ export function registerDispatchBatchRoutes(app: Express) {
       });
 
       res.json({ ok: true });
-    } catch (err: any) {
-      res.status(400).json({ message: err.message });
+    } catch (err: unknown) {
+      res.status(400).json({ message: getErrorMessage(err) });
     }
   });
 
@@ -745,8 +746,8 @@ export function registerDispatchBatchRoutes(app: Express) {
       });
 
       res.json(result);
-    } catch (err: any) {
-      res.status(400).json({ message: err.message });
+    } catch (err: unknown) {
+      res.status(400).json({ message: getErrorMessage(err) });
     }
   });
 
@@ -797,8 +798,8 @@ export function registerDispatchBatchRoutes(app: Express) {
       });
 
       res.json(result);
-    } catch (err: any) {
-      res.status(400).json({ message: err.message });
+    } catch (err: unknown) {
+      res.status(400).json({ message: getErrorMessage(err) });
     }
   });
 
@@ -939,8 +940,8 @@ export function registerDispatchBatchRoutes(app: Express) {
         mismatchedArticles: mismatches,
         canGenerate: parseInt(totals?.totalBales || "0") > 0 && loadingRides.length === 0,
       });
-    } catch (err: any) {
-      res.status(500).json({ message: err.message });
+    } catch (err: unknown) {
+      res.status(500).json({ message: getErrorMessage(err) });
     }
   });
 
@@ -1187,8 +1188,8 @@ export function registerDispatchBatchRoutes(app: Express) {
       });
 
       res.status(201).json({ ok: true, ...result });
-    } catch (err: any) {
-      const msg = err.message || "";
+    } catch (err: unknown) {
+      const msg = getErrorMessage(err) || "";
       const is400 =
         msg.includes("not found") ||
         msg.includes("already") ||
@@ -1198,7 +1199,7 @@ export function registerDispatchBatchRoutes(app: Express) {
         msg.includes("LOADING status") ||
         msg.includes("FULLY_INVOICED") ||
         msg.includes("CANCELLED");
-      res.status(is400 ? 400 : 500).json({ message: err.message });
+      res.status(is400 ? 400 : 500).json({ message: getErrorMessage(err) });
     }
   });
 
@@ -1309,8 +1310,8 @@ export function registerDispatchBatchRoutes(app: Express) {
             }
           : null,
       });
-    } catch (err: any) {
-      res.status(500).json({ message: err.message });
+    } catch (err: unknown) {
+      res.status(500).json({ message: getErrorMessage(err) });
     }
   });
 
@@ -1360,8 +1361,8 @@ export function registerDispatchBatchRoutes(app: Express) {
         reservedBalesCount: parseInt(reservedRow?.cnt || "0"),
         dispatchedRidesNotInvoiced: parseInt(ridesRow?.cnt || "0"),
       });
-    } catch (err: any) {
-      res.status(500).json({ message: err.message });
+    } catch (err: unknown) {
+      res.status(500).json({ message: getErrorMessage(err) });
     }
   });
 
@@ -1397,8 +1398,8 @@ export function registerDispatchBatchRoutes(app: Express) {
       `);
 
       res.json((rows as any).rows || rows);
-    } catch (err: any) {
-      res.status(500).json({ message: err.message });
+    } catch (err: unknown) {
+      res.status(500).json({ message: getErrorMessage(err) });
     }
   });
 }

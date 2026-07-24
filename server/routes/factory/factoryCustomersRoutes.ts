@@ -1,4 +1,5 @@
 import { getClientDate } from "../../lib/dateUtils";
+import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
 import { buildSafeFilename, contentDisposition } from "../../lib/contentDisposition";
 import type { Express } from "express";
@@ -264,9 +265,9 @@ export function registerFactoryCustomersRoutes(app: Express) {
       });
 
       res.json(customersWithBalances);
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error fetching factory customers:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -312,9 +313,9 @@ export function registerFactoryCustomersRoutes(app: Express) {
         .returning();
 
       res.status(201).json(customer);
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error creating factory customer:", { error: error });
-      res.status(400).json({ message: error.message });
+      res.status(400).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -342,9 +343,9 @@ export function registerFactoryCustomersRoutes(app: Express) {
       const [updated] = await db.update(customers).set(parsed).where(eq(customers.id, customerId)).returning();
 
       res.json(updated);
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error updating factory customer:", { error: error });
-      res.status(400).json({ message: error.message });
+      res.status(400).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -367,9 +368,9 @@ export function registerFactoryCustomersRoutes(app: Express) {
         .returning();
 
       res.json(deleted);
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error deleting factory customer:", { error: error });
-      res.status(400).json({ message: error.message });
+      res.status(400).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -392,9 +393,9 @@ export function registerFactoryCustomersRoutes(app: Express) {
         .returning();
 
       res.json(restored);
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error restoring factory customer:", { error: error });
-      res.status(400).json({ message: error.message });
+      res.status(400).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -411,9 +412,9 @@ export function registerFactoryCustomersRoutes(app: Express) {
         .orderBy(desc(customers.deletedAt));
 
       res.json(deletedCustomers);
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error fetching deleted factory customers:", { error: error });
-      res.status(400).json({ message: error.message });
+      res.status(400).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -624,9 +625,9 @@ export function registerFactoryCustomersRoutes(app: Express) {
         openingBalance,
         openingBalanceSide: openingSide,
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error fetching customer statement:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -649,8 +650,8 @@ export function registerFactoryCustomersRoutes(app: Express) {
         .set({ statementNote: statementNote || null })
         .where(eq(customers.id, customerId));
       res.json({ ok: true });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -680,8 +681,8 @@ export function registerFactoryCustomersRoutes(app: Express) {
         .set({ rowNote: rowNote || null })
         .where(eq(customerBalances.id, entryId));
       res.json({ ok: true });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -1221,9 +1222,9 @@ export function registerFactoryCustomersRoutes(app: Express) {
       }
 
       doc.end();
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error exporting customer statement PDF:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -1576,9 +1577,9 @@ export function registerFactoryCustomersRoutes(app: Express) {
       );
       res.setHeader("Content-Length", xlsBuffer.byteLength);
       res.end(xlsBuffer);
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error exporting customer statement Excel:", { error: error });
-      if (!res.headersSent) res.status(500).json({ message: error.message });
+      if (!res.headersSent) res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -1670,9 +1671,9 @@ export function registerFactoryCustomersRoutes(app: Express) {
       }
 
       res.json({ message: "Migration complete", chargesFixed, narrationFixed });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Migration error:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -1717,8 +1718,8 @@ export function registerFactoryCustomersRoutes(app: Express) {
         )
         .orderBy(asc(customerLogos.createdAt));
       res.json(logos);
-    } catch (e: any) {
-      res.status(500).json({ message: e.message });
+    } catch (e: unknown) {
+      res.status(500).json({ message: getErrorMessage(e) });
     }
   });
 
@@ -1749,8 +1750,8 @@ export function registerFactoryCustomersRoutes(app: Express) {
           })
           .returning();
         res.status(201).json(logo);
-      } catch (e: any) {
-        res.status(500).json({ message: e.message });
+      } catch (e: unknown) {
+        res.status(500).json({ message: getErrorMessage(e) });
       }
     });
   });
@@ -1774,8 +1775,8 @@ export function registerFactoryCustomersRoutes(app: Express) {
         .where(eq(customerLogos.id, logoId))
         .returning();
       res.json(updated);
-    } catch (e: any) {
-      res.status(500).json({ message: e.message });
+    } catch (e: unknown) {
+      res.status(500).json({ message: getErrorMessage(e) });
     }
   });
 
@@ -1796,8 +1797,8 @@ export function registerFactoryCustomersRoutes(app: Express) {
         .where(eq(customerLogos.id, logoId))
         .returning();
       res.json(updated);
-    } catch (e: any) {
-      res.status(500).json({ message: e.message });
+    } catch (e: unknown) {
+      res.status(500).json({ message: getErrorMessage(e) });
     }
   });
 
@@ -1817,8 +1818,8 @@ export function registerFactoryCustomersRoutes(app: Express) {
       res.setHeader("Content-Type", logo.mimeType);
       res.setHeader("Cache-Control", "private, max-age=86400");
       res.sendFile(filePath);
-    } catch (e: any) {
-      res.status(500).json({ message: e.message });
+    } catch (e: unknown) {
+      res.status(500).json({ message: getErrorMessage(e) });
     }
   });
 

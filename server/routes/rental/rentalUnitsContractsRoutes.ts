@@ -1,4 +1,5 @@
 import type { Express, Request, Response } from "express";
+import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
 import { buildSafeFilename, contentDisposition } from "../../lib/contentDisposition";
 import type ExcelJS from "exceljs";
@@ -73,13 +74,13 @@ export function registerRentalUnitsContractsRoutes(
       if ((module === "ERP" || module === "FACTORY") && unitType === "SHOP") {
         try {
           await postDueScheduledRentalPayments(companyId, module, asOf, shopExpenseAccountName);
-        } catch (e: any) {
-          logger.warn(`${tag} page-load scheduled-posting failed:`, e.message?.split("\n")[0]);
+        } catch (e: unknown) {
+          logger.warn(`${tag} page-load scheduled-posting failed:`, { error: getErrorMessage(e).split("\n")[0] });
         }
         try {
           await postRentAccrualForCompany(companyId, shopExpenseAccountName, module, incomeAccountName, asOf);
-        } catch (e: any) {
-          logger.warn(`${tag} page-load accrual failed:`, e.message?.split("\n")[0]);
+        } catch (e: unknown) {
+          logger.warn(`${tag} page-load accrual failed:`, { error: getErrorMessage(e).split("\n")[0] });
         }
       }
 
@@ -418,15 +419,15 @@ export function registerRentalUnitsContractsRoutes(
               .filter(Boolean) as typeof ownedResults;
           }
         } // end if (unitType === "SHOP")
-      } catch (sharedErr: any) {
+      } catch (sharedErr: unknown) {
         // Column may not exist yet in production — owned units still load fine
-        logger.warn(`${tag} shared-units skipped:`, sharedErr.message?.split("\n")[0]);
+        logger.warn(`${tag} shared-units skipped:`, { error: getErrorMessage(sharedErr).split("\n")[0] });
       }
 
       res.json([...ownedResults, ...sharedResults]);
-    } catch (e: any) {
+    } catch (e: unknown) {
       logger.error(`${tag} units:`, { error: e });
-      res.status(500).json({ message: e.message });
+      res.status(500).json({ message: getErrorMessage(e) });
     }
   });
 
@@ -451,10 +452,10 @@ export function registerRentalUnitsContractsRoutes(
         changes: { unitNumber: { old: null, new: created.unitNumber } },
       });
       res.json(created);
-    } catch (e: any) {
+    } catch (e: unknown) {
       if (e instanceof z.ZodError)
         return res.status(400).json({ message: e.issues.map((err: any) => err.message).join(", ") });
-      res.status(500).json({ message: e.message });
+      res.status(500).json({ message: getErrorMessage(e) });
     }
   });
 
@@ -501,8 +502,8 @@ export function registerRentalUnitsContractsRoutes(
       }
 
       res.json(updated);
-    } catch (e: any) {
-      res.status(500).json({ message: e.message });
+    } catch (e: unknown) {
+      res.status(500).json({ message: getErrorMessage(e) });
     }
   });
 
@@ -553,8 +554,8 @@ export function registerRentalUnitsContractsRoutes(
       }
 
       res.json({ ok: true });
-    } catch (e: any) {
-      res.status(500).json({ message: e.message });
+    } catch (e: unknown) {
+      res.status(500).json({ message: getErrorMessage(e) });
     }
   });
 
@@ -610,11 +611,11 @@ export function registerRentalUnitsContractsRoutes(
         },
       });
       res.json(created);
-    } catch (e: any) {
+    } catch (e: unknown) {
       if (e instanceof z.ZodError)
         return res.status(400).json({ message: e.issues.map((err: any) => err.message).join(", ") });
       logger.error(`${tag} contracts:`, { error: e });
-      res.status(500).json({ message: e.message });
+      res.status(500).json({ message: getErrorMessage(e) });
     }
   });
 
@@ -683,10 +684,10 @@ export function registerRentalUnitsContractsRoutes(
       }
 
       res.json({ ok: true });
-    } catch (e: any) {
+    } catch (e: unknown) {
       if (e instanceof z.ZodError)
         return res.status(400).json({ message: e.issues.map((err: any) => err.message).join(", ") });
-      res.status(500).json({ message: e.message });
+      res.status(500).json({ message: getErrorMessage(e) });
     }
   });
 
@@ -781,10 +782,10 @@ export function registerRentalUnitsContractsRoutes(
       }
 
       res.json({ ok: true });
-    } catch (e: any) {
+    } catch (e: unknown) {
       if (e instanceof z.ZodError)
         return res.status(400).json({ message: e.issues.map((err: any) => err.message).join(", ") });
-      res.status(500).json({ message: e.message });
+      res.status(500).json({ message: getErrorMessage(e) });
     }
   });
 
@@ -1022,9 +1023,9 @@ export function registerRentalUnitsContractsRoutes(
       res.setHeader("Content-Disposition", contentDisposition(filename));
       res.setHeader("Content-Length", xlsBuffer.byteLength);
       res.end(xlsBuffer);
-    } catch (e: any) {
+    } catch (e: unknown) {
       logger.error(`${tag} statement export:`, { error: e });
-      if (!res.headersSent) res.status(500).json({ message: e.message });
+      if (!res.headersSent) res.status(500).json({ message: getErrorMessage(e) });
     }
   });
 
@@ -1052,10 +1053,10 @@ export function registerRentalUnitsContractsRoutes(
         .set({ notes: notes || null })
         .where(eq(propertyContracts.id, id));
       res.json({ ok: true });
-    } catch (e: any) {
+    } catch (e: unknown) {
       if (e instanceof z.ZodError)
         return res.status(400).json({ message: e.issues.map((err: any) => err.message).join(", ") });
-      res.status(500).json({ message: e.message });
+      res.status(500).json({ message: getErrorMessage(e) });
     }
   });
 
@@ -1083,10 +1084,10 @@ export function registerRentalUnitsContractsRoutes(
         .set({ statementNote: statementNote || null })
         .where(eq(propertyContracts.id, id));
       res.json({ ok: true });
-    } catch (e: any) {
+    } catch (e: unknown) {
       if (e instanceof z.ZodError)
         return res.status(400).json({ message: e.issues.map((err: any) => err.message).join(", ") });
-      res.status(500).json({ message: e.message });
+      res.status(500).json({ message: getErrorMessage(e) });
     }
   });
 
@@ -1253,10 +1254,10 @@ export function registerRentalUnitsContractsRoutes(
         changes: { status: { old: "ACTIVE", new: "ENDED" }, endDate: { old: null, new: endDate } },
       });
       res.json({ ok: true });
-    } catch (e: any) {
+    } catch (e: unknown) {
       if (e instanceof z.ZodError)
         return res.status(400).json({ message: e.issues.map((err: any) => err.message).join(", ") });
-      res.status(500).json({ message: e.message });
+      res.status(500).json({ message: getErrorMessage(e) });
     }
   });
 
@@ -1380,10 +1381,10 @@ export function registerRentalUnitsContractsRoutes(
       }
 
       res.json({ ok: true });
-    } catch (e: any) {
+    } catch (e: unknown) {
       if (e instanceof z.ZodError)
         return res.status(400).json({ message: e.issues.map((err: any) => err.message).join(", ") });
-      res.status(500).json({ message: e.message });
+      res.status(500).json({ message: getErrorMessage(e) });
     }
   });
 
@@ -1410,8 +1411,8 @@ export function registerRentalUnitsContractsRoutes(
       await db.update(propertyContracts).set({ guaranteePostedToStatement: false }).where(eq(propertyContracts.id, id));
 
       res.json({ ok: true });
-    } catch (e: any) {
-      res.status(500).json({ message: e.message });
+    } catch (e: unknown) {
+      res.status(500).json({ message: getErrorMessage(e) });
     }
   });
 
@@ -1526,10 +1527,10 @@ export function registerRentalUnitsContractsRoutes(
       await maybeRunAutoTransfer(companyId, module, cashAccountId, amount, dateStr, unitLabel, savedPayment?.id, notes);
 
       res.json({ ok: true });
-    } catch (e: any) {
+    } catch (e: unknown) {
       if (e instanceof z.ZodError)
         return res.status(400).json({ message: e.issues.map((err: any) => err.message).join(", ") });
-      res.status(500).json({ message: e.message });
+      res.status(500).json({ message: getErrorMessage(e) });
     }
   });
 
@@ -1756,10 +1757,10 @@ export function registerRentalUnitsContractsRoutes(
       });
 
       res.json({ ok: true, allocations });
-    } catch (e: any) {
+    } catch (e: unknown) {
       if (e instanceof z.ZodError)
         return res.status(400).json({ message: e.issues.map((err: any) => err.message).join(", ") });
-      res.status(500).json({ message: e.message });
+      res.status(500).json({ message: getErrorMessage(e) });
     }
   });
 
@@ -1849,8 +1850,8 @@ export function registerRentalUnitsContractsRoutes(
       });
 
       res.json({ ok: true, reversed: totalReversed });
-    } catch (e: any) {
-      res.status(500).json({ message: e.message });
+    } catch (e: unknown) {
+      res.status(500).json({ message: getErrorMessage(e) });
     }
   });
 

@@ -1,4 +1,5 @@
 import type { Express } from "express";
+import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
 import { db } from "../../db";
 import { storage } from "../../storage";
@@ -130,8 +131,8 @@ export function registerStockMergeRoutes(app: Express) {
         /* non-fatal */
       }
       res.json(updated);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -169,8 +170,8 @@ export function registerStockMergeRoutes(app: Express) {
 
       const updated = await storage.updateStockAdjustmentItem(itemId, req.body);
       res.json(updated);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -238,8 +239,8 @@ export function registerStockMergeRoutes(app: Express) {
       });
 
       res.json(result);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -251,8 +252,8 @@ export function registerStockMergeRoutes(app: Express) {
       }
       const archives = await storage.getStockGroupLocationArchives(req.session.currentCompanyId);
       res.json(archives);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -270,8 +271,8 @@ export function registerStockMergeRoutes(app: Express) {
       }
       const items = await storage.getStockGroupLocationArchiveItems(archive.id);
       res.json({ archive, items });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -292,8 +293,8 @@ export function registerStockMergeRoutes(app: Express) {
         notes
       );
       res.json(archive);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -307,8 +308,8 @@ export function registerStockMergeRoutes(app: Express) {
         req.session.currentCompanyId
       );
       res.json(archive);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -324,8 +325,8 @@ export function registerStockMergeRoutes(app: Express) {
         await storage.deleteStockGroupLocationArchive(parseInt(req.params.id), req.session.currentCompanyId);
       }
       res.json({ success: true });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -466,8 +467,8 @@ export function registerStockMergeRoutes(app: Express) {
         totalValueAfter,
         warnings,
       });
-    } catch (error: any) {
-      return res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      return res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -664,14 +665,14 @@ export function registerStockMergeRoutes(app: Express) {
           mergedByUserId: userId,
           notes: notes ?? null,
         });
-      } catch (auditErr: any) {
+      } catch (auditErr: unknown) {
         // Audit log failure is non-fatal — merge already committed
-        logger.error("[Merge] Audit log insert failed (merge succeeded):", { error: auditErr?.message });
+        logger.error("[Merge] Audit log insert failed (merge succeeded):", { error: getErrorMessage(auditErr) });
       }
 
       return res.json({ success: true, keptItemId: keptId, mergedItemId: duplicateId });
-    } catch (error: any) {
-      return res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      return res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -959,14 +960,14 @@ export function registerStockMergeRoutes(app: Express) {
             keptItemId: keptId,
             mergedItemId: duplicateId,
           });
-        } catch (pairErr: any) {
-          results.push({ oldCode, keepCode, status: "error", reason: pairErr.message });
+        } catch (pairErr: unknown) {
+          results.push({ oldCode, keepCode, status: "error", reason: getErrorMessage(pairErr) });
         }
       }
 
       return res.json({ results });
-    } catch (error: any) {
-      return res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      return res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -1044,8 +1045,8 @@ export function registerStockMergeRoutes(app: Express) {
       }
 
       return res.json({ fixed: totalFixed, mergesChecked: mergeLogs.length, aliasesChecked: uncovered.length });
-    } catch (error: any) {
-      return res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      return res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -1061,8 +1062,8 @@ export function registerStockMergeRoutes(app: Express) {
         .orderBy(desc(stockItemMergeLogs.mergedAt))
         .limit(50);
       return res.json(logs);
-    } catch (error: any) {
-      return res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      return res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -1109,8 +1110,8 @@ export function registerStockMergeRoutes(app: Express) {
       }));
 
       return res.json(data);
-    } catch (error: any) {
-      return res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      return res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -1165,8 +1166,8 @@ export function registerStockMergeRoutes(app: Express) {
         restoredName,
         message: `"${restoredName}" has been restored as a separate active item. Its code alias has been removed. Please manually adjust inventory quantities between this item and the kept item.`,
       });
-    } catch (error: any) {
-      return res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      return res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -1316,8 +1317,8 @@ export function registerStockMergeRoutes(app: Express) {
       });
 
       return res.json({ success: true, message: `"${mergedItemName}" has been restored as a separate item.` });
-    } catch (error: any) {
-      return res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      return res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
