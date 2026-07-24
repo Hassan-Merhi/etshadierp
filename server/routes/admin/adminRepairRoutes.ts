@@ -1,4 +1,5 @@
 import { getClientDate } from "../../lib/dateUtils";
+import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
 import { isReadonlyMigratedVoucher, READONLY_MIGRATED_VOUCHER_MESSAGE } from "../../lib/migratedVoucherGuard";
 import type { Express } from "express";
@@ -184,9 +185,9 @@ export function registerAdminRepairRoutes(app: Express) {
         newAdjustment: newAdjustment.toFixed(2),
         balanceZeroed: rawBalance.toFixed(2),
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Recalculate equity adjustment error:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -235,9 +236,9 @@ export function registerAdminRepairRoutes(app: Express) {
         message: `Processed ${results.length} ${results.length === 1 ? "company" : "companies"} — ${adjustedCount} adjusted, ${skippedCount} already balanced.`,
         results,
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Recalculate equity adjustment all error:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -385,8 +386,8 @@ export function registerAdminRepairRoutes(app: Express) {
         message: `Cleanup complete: Fixed ${allOrphanedSalesItems.length} orphaned sales items, ${allOrphanedEntries.length} orphaned entries. Found ${negativeInventory.length} negative inventory items.`,
         results,
       });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -461,9 +462,9 @@ export function registerAdminRepairRoutes(app: Express) {
         explanation:
           "These vouchers have a locationId that points to a deleted or non-existent location. They are orphaned and can be safely deleted.",
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Orphaned POS sales check error:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -521,9 +522,9 @@ export function registerAdminRepairRoutes(app: Express) {
         deletedSalesItems,
         voucherNumbers: orphanedVouchers.map((v) => v.voucherNumber),
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Delete orphaned POS sales error:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -881,9 +882,9 @@ export function registerAdminRepairRoutes(app: Express) {
           "Quick adjustments (manual add/subtract) are not backed by vouchers and cannot be replayed. They may appear as discrepancies.",
         ],
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Rebuild inventory error:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -941,9 +942,9 @@ export function registerAdminRepairRoutes(app: Express) {
       }
 
       res.json(filtered);
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Negative inventory error:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -1006,9 +1007,9 @@ export function registerAdminRepairRoutes(app: Express) {
       });
 
       res.json(updated);
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Finalize voucher error:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -1027,9 +1028,9 @@ export function registerAdminRepairRoutes(app: Express) {
       logger.info(`Sample REFERENCE numbers: ${summary.sampleReferenceNumbers.join(", ")}`);
       logger.info("========================\n");
       res.json(summary);
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Seed error:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -1107,9 +1108,9 @@ export function registerAdminRepairRoutes(app: Express) {
       }
 
       res.json({ rows: previewRows });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Inventory repair preview error:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -1186,9 +1187,9 @@ export function registerAdminRepairRoutes(app: Express) {
         corrected: correctedRows.length,
         rows: correctedRows,
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Inventory repair error:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -1214,9 +1215,9 @@ export function registerAdminRepairRoutes(app: Express) {
       `);
       const fixed = (result as any).rows?.length ?? 0;
       res.json({ fixed, message: fixed > 0 ? `Restored ${fixed} bale(s) to IN_STOCK` : "No orphaned bales found" });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("[BaleOrphanFix] Error:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 

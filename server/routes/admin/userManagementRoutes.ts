@@ -1,4 +1,5 @@
 import { getClientDate } from "../../lib/dateUtils";
+import { getErrorMessage } from "../../lib/httpHandlers";
 import type { Express } from "express";
 import { db, pool } from "../../db";
 import { storage } from "../../storage";
@@ -467,8 +468,8 @@ export function registerUserManagementRoutes(app: Express) {
         activeCount: accountsWithUsage.filter((a) => !a.isDeleted).length,
         withEntriesCount: accountsWithUsage.filter((a) => a.usageCount > 0).length,
       });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -534,8 +535,8 @@ export function registerUserManagementRoutes(app: Express) {
         employeeId: employee.id,
         employeeCode: employee.code,
       });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -637,8 +638,8 @@ export function registerUserManagementRoutes(app: Express) {
         results,
         summary: { migrated, deleted, skipped, total: results.length },
       });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -658,8 +659,8 @@ export function registerUserManagementRoutes(app: Express) {
 
       const permissions = await storage.getRoleFeaturePermissions(companyId);
       res.json(permissions);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -713,8 +714,8 @@ export function registerUserManagementRoutes(app: Express) {
       }
 
       res.json({ message: "Permissions updated successfully", permissions: results });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -733,8 +734,8 @@ export function registerUserManagementRoutes(app: Express) {
       const rolePermissions = allPermissions.filter((p) => p.role === role);
 
       res.json(rolePermissions);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -750,8 +751,8 @@ export function registerUserManagementRoutes(app: Express) {
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const pageKeys = await storage.getErpUserPageAccess(companyId, req.params.userId);
       res.json({ pageKeys });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -763,8 +764,8 @@ export function registerUserManagementRoutes(app: Express) {
       if (!Array.isArray(pageKeys)) return res.status(400).json({ message: "pageKeys must be an array" });
       await storage.setErpUserPageAccess(companyId, req.params.userId, pageKeys);
       res.json({ message: "Page access updated", pageKeys });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -772,8 +773,8 @@ export function registerUserManagementRoutes(app: Express) {
     try {
       const fields = await storage.getErpUserHiddenCostFields(req.params.userId);
       res.json({ hiddenCostFields: fields });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -784,8 +785,8 @@ export function registerUserManagementRoutes(app: Express) {
         return res.status(400).json({ message: "hiddenCostFields must be an array" });
       await storage.setErpUserHiddenCostFields(req.params.userId, hiddenCostFields);
       res.json({ message: "Cost visibility updated", hiddenCostFields });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -801,8 +802,8 @@ export function registerUserManagementRoutes(app: Express) {
       }
       const pageKeys = await storage.getErpUserPageAccess(companyId, userId);
       res.json({ pageKeys, fullAccess: false, hiddenErpCostFields });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 

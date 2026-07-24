@@ -1,4 +1,5 @@
 import { parseId, parseOptionalId } from "../../lib/parseId";
+import { getErrorMessage } from "../../lib/httpHandlers";
 import { and, eq, isNull, inArray, sql } from "drizzle-orm";
 import { sqlArray } from "../../lib/sqlArray";
 import { db } from "../../db";
@@ -92,8 +93,8 @@ export function registerFactoryStockAllocationV3Routes(app: any) {
 
       const rows = result.rows;
       res.json(rows);
-    } catch (e: any) {
-      res.status(500).json({ message: e.message });
+    } catch (e: unknown) {
+      res.status(500).json({ message: getErrorMessage(e) });
     }
   });
 
@@ -139,8 +140,8 @@ export function registerFactoryStockAllocationV3Routes(app: any) {
       `);
 
       res.json(result.rows);
-    } catch (e: any) {
-      res.status(500).json({ message: e.message });
+    } catch (e: unknown) {
+      res.status(500).json({ message: getErrorMessage(e) });
     }
   });
 
@@ -215,8 +216,8 @@ export function registerFactoryStockAllocationV3Routes(app: any) {
       const proformaLines = lineRows.rows;
 
       res.json({ ...load, bales, proformaLines });
-    } catch (e: any) {
-      res.status(500).json({ message: e.message });
+    } catch (e: unknown) {
+      res.status(500).json({ message: getErrorMessage(e) });
     }
   });
 
@@ -247,8 +248,8 @@ export function registerFactoryStockAllocationV3Routes(app: any) {
         .returning();
 
       res.status(201).json(load);
-    } catch (e: any) {
-      res.status(500).json({ message: e.message });
+    } catch (e: unknown) {
+      res.status(500).json({ message: getErrorMessage(e) });
     }
   });
 
@@ -277,8 +278,8 @@ export function registerFactoryStockAllocationV3Routes(app: any) {
         .returning();
 
       res.json(updated);
-    } catch (e: any) {
-      res.status(500).json({ message: e.message });
+    } catch (e: unknown) {
+      res.status(500).json({ message: getErrorMessage(e) });
     }
   });
 
@@ -414,8 +415,8 @@ export function registerFactoryStockAllocationV3Routes(app: any) {
         .returning();
 
       res.status(201).json({ ...added, baleStatus: bale.status });
-    } catch (e: any) {
-      res.status(500).json({ message: e.message });
+    } catch (e: unknown) {
+      res.status(500).json({ message: getErrorMessage(e) });
     }
   });
 
@@ -446,8 +447,8 @@ export function registerFactoryStockAllocationV3Routes(app: any) {
         .where(and(eq(factoryV3LoadBales.id, lbId), eq(factoryV3LoadBales.loadId, loadId)));
 
       res.json({ ok: true });
-    } catch (e: any) {
-      res.status(500).json({ message: e.message });
+    } catch (e: unknown) {
+      res.status(500).json({ message: getErrorMessage(e) });
     }
   });
 
@@ -495,8 +496,8 @@ export function registerFactoryStockAllocationV3Routes(app: any) {
         .returning();
 
       res.json(updated);
-    } catch (e: any) {
-      res.status(500).json({ message: e.message });
+    } catch (e: unknown) {
+      res.status(500).json({ message: getErrorMessage(e) });
     }
   });
 
@@ -524,8 +525,8 @@ export function registerFactoryStockAllocationV3Routes(app: any) {
         .returning();
 
       res.json(updated);
-    } catch (e: any) {
-      res.status(500).json({ message: e.message });
+    } catch (e: unknown) {
+      res.status(500).json({ message: getErrorMessage(e) });
     }
   });
 
@@ -573,8 +574,8 @@ export function registerFactoryStockAllocationV3Routes(app: any) {
       `);
 
       res.json(result.rows);
-    } catch (e: any) {
-      res.status(500).json({ message: e.message });
+    } catch (e: unknown) {
+      res.status(500).json({ message: getErrorMessage(e) });
     }
   });
 
@@ -603,8 +604,8 @@ export function registerFactoryStockAllocationV3Routes(app: any) {
       `);
 
       res.json(result.rows);
-    } catch (e: any) {
-      res.status(500).json({ message: e.message });
+    } catch (e: unknown) {
+      res.status(500).json({ message: getErrorMessage(e) });
     }
   });
 }

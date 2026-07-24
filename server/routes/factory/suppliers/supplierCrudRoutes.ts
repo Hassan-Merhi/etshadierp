@@ -1,4 +1,5 @@
 import { parseId, parseOptionalId } from "../../../lib/parseId";
+import { getErrorMessage } from "../../../lib/httpHandlers";
 import { logger } from "../../../lib/logger";
 import { getClientDate } from "../../../lib/dateUtils";
 import type { Express } from "express";
@@ -633,9 +634,9 @@ export function registerSupplierCrudRoutes(app: Express) {
         .orderBy(factorySuppliers.name);
 
       res.json(results);
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error fetching factory suppliers:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -647,9 +648,9 @@ export function registerSupplierCrudRoutes(app: Express) {
       const parsed = insertFactorySupplierSchema.parse({ ...req.body, companyId });
       const [supplier] = await db.insert(factorySuppliers).values(parsed).returning();
       res.json(supplier);
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error creating factory supplier:", { error: error });
-      res.status(400).json({ message: error.message });
+      res.status(400).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -669,9 +670,9 @@ export function registerSupplierCrudRoutes(app: Express) {
 
       if (!updated) return res.status(404).json({ message: "Supplier not found" });
       res.json(updated);
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error updating factory supplier:", { error: error });
-      res.status(400).json({ message: error.message });
+      res.status(400).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -691,9 +692,9 @@ export function registerSupplierCrudRoutes(app: Express) {
 
       if (!updated) return res.status(404).json({ message: "Supplier not found" });
       res.json(updated);
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error deleting factory supplier:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -710,9 +711,9 @@ export function registerSupplierCrudRoutes(app: Express) {
         .returning();
       if (!updated) return res.status(404).json({ message: "Supplier not found" });
       res.json(updated);
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error reactivating factory supplier:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -751,9 +752,9 @@ export function registerSupplierCrudRoutes(app: Express) {
         .returning();
 
       res.json(updated);
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error updating supplier opening balance:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -784,9 +785,9 @@ export function registerSupplierCrudRoutes(app: Express) {
         .returning();
       if (!updated) return res.status(404).json({ message: "Supplier not found" });
       res.json(updated);
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error setting broker flag:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -851,9 +852,9 @@ export function registerSupplierCrudRoutes(app: Express) {
         .where(and(eq(factorySuppliers.id, id), eq(factorySuppliers.companyId, companyId)));
 
       res.json({ message: "Supplier permanently deleted" });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error permanently deleting factory supplier:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -871,8 +872,8 @@ export function registerSupplierCrudRoutes(app: Express) {
         .where(eq(factorySupplierCategories.companyId, companyId))
         .orderBy(asc(factorySupplierCategories.displayOrder), asc(factorySupplierCategories.name));
       res.json(cats);
-    } catch (err: any) {
-      res.status(500).json({ message: err.message });
+    } catch (err: unknown) {
+      res.status(500).json({ message: getErrorMessage(err) });
     }
   });
 
@@ -883,8 +884,8 @@ export function registerSupplierCrudRoutes(app: Express) {
       const parsed = insertFactorySupplierCategorySchema.parse({ ...req.body, companyId });
       const [created] = await db.insert(factorySupplierCategories).values(parsed).returning();
       res.json(created);
-    } catch (err: any) {
-      res.status(400).json({ message: err.message });
+    } catch (err: unknown) {
+      res.status(400).json({ message: getErrorMessage(err) });
     }
   });
 
@@ -906,8 +907,8 @@ export function registerSupplierCrudRoutes(app: Express) {
         .returning();
       if (!updated) return res.status(404).json({ message: "Category not found" });
       res.json(updated);
-    } catch (err: any) {
-      res.status(400).json({ message: err.message });
+    } catch (err: unknown) {
+      res.status(400).json({ message: getErrorMessage(err) });
     }
   });
 
@@ -928,8 +929,8 @@ export function registerSupplierCrudRoutes(app: Express) {
         .returning();
       if (!deleted) return res.status(404).json({ message: "Category not found" });
       res.json({ message: "Category deleted" });
-    } catch (err: any) {
-      res.status(500).json({ message: err.message });
+    } catch (err: unknown) {
+      res.status(500).json({ message: getErrorMessage(err) });
     }
   });
 
@@ -964,9 +965,9 @@ export function registerSupplierCrudRoutes(app: Express) {
         .where(and(...paymentConditions))
         .orderBy(desc(factorySupplierPayments.date));
       res.json(payments);
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error fetching supplier payments:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -1056,9 +1057,9 @@ export function registerSupplierCrudRoutes(app: Express) {
         effectiveDate: (req.body.effectiveDate as string) || null,
       });
       res.json(created);
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error creating supplier payment:", { error: error });
-      res.status(400).json({ message: error.message });
+      res.status(400).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -1113,9 +1114,9 @@ export function registerSupplierCrudRoutes(app: Express) {
         });
       }
       res.json({ message: "Payment deleted" });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error deleting supplier payment:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
