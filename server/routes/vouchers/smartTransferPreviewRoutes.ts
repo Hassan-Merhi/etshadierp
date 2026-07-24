@@ -1,4 +1,5 @@
 import type { Express } from "express";
+import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
 import { z } from "zod";
 import { requireAuth, requireNonPOS } from "../../auth";
@@ -104,7 +105,7 @@ export function registerSmartTransferPreviewRoutes(app: Express) {
 
       res.set("Cache-Control", "no-store");
       return res.json({ ...responsePreview, feedbackSessionId });
-    } catch (error: any) {
+    } catch (error: unknown) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({
           message: "Invalid smart transfer preview request",
@@ -115,7 +116,7 @@ export function registerSmartTransferPreviewRoutes(app: Express) {
         });
       }
 
-      const message = String(error?.message || "");
+      const message = String(getErrorMessage(error) || "");
       const isInputError =
         /valid company|required|positive whole number|source location|destination location|YYYY-MM-DD|not found/i.test(message);
       if (isInputError) return res.status(400).json({ message });
@@ -142,7 +143,7 @@ export function registerSmartTransferPreviewRoutes(app: Express) {
         sessionId: parsed.feedbackSessionId,
       });
       return res.json(result);
-    } catch (error: any) {
+    } catch (error: unknown) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({
           message: "Invalid smart transfer feedback payload",
@@ -163,7 +164,7 @@ export function registerSmartTransferPreviewRoutes(app: Express) {
       const summary = await getSmartTransferFeedbackSummary(companyId, days);
       res.set("Cache-Control", "no-store");
       return res.json(summary);
-    } catch (error: any) {
+    } catch (error: unknown) {
       if (error instanceof z.ZodError) return res.status(400).json({ message: "days must be between 7 and 365" });
       logger.error("[SmartTransferFeedback] Summary failed:", { error: error });
       return res.status(500).json({ message: "Failed to load smart transfer feedback summary" });

@@ -1,4 +1,5 @@
 import { parseId, parseOptionalId } from "../../lib/parseId";
+import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
 import { getClientDate } from "../../lib/dateUtils";
 import type { Express } from "express";
@@ -125,8 +126,8 @@ async function findOrCreateLedger(
         .values(insertVals)
         .returning({ id: ledgerAccounts.id });
       return created;
-    } catch (err: any) {
-      if (err?.code === "23505" || err?.message?.includes("unique")) {
+    } catch (err: unknown) {
+      if ((err as { code?: string }).code === "23505" || getErrorMessage(err)?.includes("unique")) {
         const [nowFound] = await db
           .select({ id: ledgerAccounts.id })
           .from(ledgerAccounts)
@@ -207,8 +208,8 @@ export function registerPayrollCoreRoutes(app: Express) {
         .where(eq(ledgerAccounts.companyId, companyId))
         .orderBy(ledgerAccounts.name);
       res.json(accounts);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -238,8 +239,8 @@ export function registerPayrollCoreRoutes(app: Express) {
       const workerMap = new Map(workers.map((w: any) => [w.id, w]));
       const result = payrolls.map((p: any) => ({ ...p, worker: workerMap.get(p.workerId) || null }));
       res.json(result);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -442,9 +443,9 @@ export function registerPayrollCoreRoutes(app: Express) {
       }
 
       res.json(result);
-    } catch (err: any) {
+    } catch (err: unknown) {
       logger.error("GET /api/factory/workers/amount-due error:", { error: err });
-      res.status(500).json({ message: err.message });
+      res.status(500).json({ message: getErrorMessage(err) });
     }
   });
 
@@ -461,8 +462,8 @@ export function registerPayrollCoreRoutes(app: Express) {
         .where(and(eq(factoryPayrolls.workerId, id), eq(factoryPayrolls.companyId, companyId)))
         .orderBy(desc(factoryPayrolls.periodEnd));
       res.json(payrolls);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -675,8 +676,8 @@ export function registerPayrollCoreRoutes(app: Express) {
       });
 
       res.json(result);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -975,8 +976,8 @@ export function registerPayrollCoreRoutes(app: Express) {
         return count;
       });
       res.json({ created });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -1008,8 +1009,8 @@ export function registerPayrollCoreRoutes(app: Express) {
         .orderBy(factoryAttendance.attendanceDate);
 
       res.json({ payroll, attendance: attendanceRows });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -1097,9 +1098,9 @@ export function registerPayrollCoreRoutes(app: Express) {
       });
 
       res.json(updated);
-    } catch (error: any) {
-      if (error.message === "Payroll record not found") return res.status(404).json({ message: error.message });
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      if (getErrorMessage(error) === "Payroll record not found") return res.status(404).json({ message: getErrorMessage(error) });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -1179,8 +1180,8 @@ export function registerPayrollCoreRoutes(app: Express) {
         .where(eq(factoryPayrolls.id, id));
 
       res.json({ message: "Accounting entry generated", voucherId: pVoucher.id });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -1297,8 +1298,8 @@ export function registerPayrollCoreRoutes(app: Express) {
       });
 
       res.json({ updated: payrollIds.length });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -1475,8 +1476,8 @@ export function registerPayrollCoreRoutes(app: Express) {
       doc.text(totalAmt.toFixed(2), COL.amount, y + 7, { width: COL_W.amount, align: "right" });
 
       doc.end();
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -1665,8 +1666,8 @@ export function registerPayrollCoreRoutes(app: Express) {
         vouchersUpdated,
         bonusEntriesCreated: bonusesRecorded,
       });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -1822,9 +1823,9 @@ export function registerPayrollCoreRoutes(app: Express) {
         salaryAccountsReparented: (salReparent as any).rowCount ?? 0,
         bonusAccountsReparented:  (bonReparent as any).rowCount ?? 0,
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("migrate-worker-names error:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -1880,9 +1881,9 @@ export function registerPayrollCoreRoutes(app: Express) {
         salaryAccountsReparented: (salRes as any).rowCount ?? 0,
         bonusAccountsReparented:  (bonRes as any).rowCount ?? 0,
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("migrate-salary-groups error:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 }

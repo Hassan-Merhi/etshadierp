@@ -1,4 +1,5 @@
 import type { Express } from "express";
+import { getErrorMessage } from "../../lib/httpHandlers";
 import { db } from "../../db";
 import { storage } from "../../storage";
 import { requireAuth, requireRole, canDelete, requireNonPOS, checkPOSLocation } from "../../auth";
@@ -479,8 +480,8 @@ export function registerVoucherSalesUpdateRoutes(app: Express) {
         /* non-fatal */
       }
       res.json({ ...updated, entries: newEntries });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -766,11 +767,11 @@ export function registerVoucherSalesUpdateRoutes(app: Express) {
       // Fetch updated voucher outside transaction
       const updated = await storage.getVoucherById(id);
       res.json(updated);
-    } catch (error: any) {
-      if (error.name === "ValidationError") {
-        return res.status(400).json({ message: error.message });
+    } catch (error: unknown) {
+      if ((error as { name?: string }).name === "ValidationError") {
+        return res.status(400).json({ message: getErrorMessage(error) });
       }
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -1164,8 +1165,8 @@ export function registerVoucherSalesUpdateRoutes(app: Express) {
       const updated = await db.update(vouchers).set(voucherUpdates).where(eq(vouchers.id, id)).returning();
 
       res.json(updated[0]);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 

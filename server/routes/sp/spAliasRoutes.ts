@@ -1,4 +1,5 @@
 import type { Express } from "express";
+import { getErrorMessage } from "../../lib/httpHandlers";
 import { db } from "../../db";
 import { requireAuth } from "../../auth";
 import { sql } from "drizzle-orm";
@@ -21,8 +22,8 @@ export function registerSpAliasRoutes(app: Express) {
         ORDER BY a.alias_code ASC
       `);
       res.json((rows as any).rows ?? (rows as any));
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -42,10 +43,10 @@ export function registerSpAliasRoutes(app: Express) {
         })
         .returning();
       res.json(row);
-    } catch (error: any) {
-      if (error.code === "23505")
+    } catch (error: unknown) {
+      if ((error as { code?: string }).code === "23505")
         return res.status(400).json({ message: "Alias code already exists for this company" });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -57,8 +58,8 @@ export function registerSpAliasRoutes(app: Express) {
         sql`DELETE FROM stock_item_code_aliases WHERE id = ${parseInt(req.params.id)} AND company_id = ${companyId}`
       );
       res.json({ ok: true });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 }

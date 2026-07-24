@@ -1,4 +1,5 @@
 import { parseId, parseOptionalId } from "../../lib/parseId";
+import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
 import { getClientDate } from "../../lib/dateUtils";
 import type { Express } from "express";
@@ -94,8 +95,8 @@ async function findOrCreateLedger(companyId: number, name: string, accountType: 
         .values({ companyId, code: nextCode, name, accountType, active: true, isHidden: false })
         .returning({ id: ledgerAccounts.id });
       return created;
-    } catch (err: any) {
-      if (err?.code === "23505" || err?.message?.includes("unique")) {
+    } catch (err: unknown) {
+      if ((err as { code?: string }).code === "23505" || getErrorMessage(err)?.includes("unique")) {
         const [nowFound] = await db
           .select({ id: ledgerAccounts.id })
           .from(ledgerAccounts)
@@ -220,9 +221,9 @@ export function registerWorkerStatsAdvancesRoutes(app: Express) {
         payrollCount: payrolls.length,
         recentPayrolls: payrolls.slice(0, 5),
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error fetching worker stats:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -265,9 +266,9 @@ export function registerWorkerStatsAdvancesRoutes(app: Express) {
         .orderBy(desc(factoryAdvanceRepayments.repaymentDate));
 
       res.json(repayments);
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error fetching advance repayments:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -307,9 +308,9 @@ export function registerWorkerStatsAdvancesRoutes(app: Express) {
         workerName: workerMap[a.workerId] || `Worker #${a.workerId}`,
       }));
       res.json(enriched);
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error fetching advances:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -328,9 +329,9 @@ export function registerWorkerStatsAdvancesRoutes(app: Express) {
         .orderBy(desc(factoryWorkerAdvances.advanceDate));
 
       res.json(advances);
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error fetching worker advances:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -460,9 +461,9 @@ export function registerWorkerStatsAdvancesRoutes(app: Express) {
       });
 
       res.json(result);
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error creating advance:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -491,8 +492,8 @@ export function registerWorkerStatsAdvancesRoutes(app: Express) {
         .where(eq(factoryWorkerDeductions.companyId, companyId))
         .orderBy(desc(factoryWorkerDeductions.createdAt));
       res.json(rows);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -509,8 +510,8 @@ export function registerWorkerStatsAdvancesRoutes(app: Express) {
         .where(and(eq(factoryWorkerDeductions.companyId, companyId), eq(factoryWorkerDeductions.workerId, workerId)))
         .orderBy(desc(factoryWorkerDeductions.createdAt));
       res.json(deductions);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -538,8 +539,8 @@ export function registerWorkerStatsAdvancesRoutes(app: Express) {
         } as any)
         .returning();
       res.json(deduction);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -558,8 +559,8 @@ export function registerWorkerStatsAdvancesRoutes(app: Express) {
       if (existing.applied) return res.status(400).json({ message: "Cannot delete an already-applied deduction" });
       await db.delete(factoryWorkerDeductions).where(eq(factoryWorkerDeductions.id, deductionId));
       res.json({ message: "Deduction deleted" });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -693,9 +694,9 @@ export function registerWorkerStatsAdvancesRoutes(app: Express) {
       });
 
       res.json({ created: results.length, advances: results });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error creating bulk advances:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -723,9 +724,9 @@ export function registerWorkerStatsAdvancesRoutes(app: Express) {
 
       if (!updated) return res.status(404).json({ message: "Advance not found" });
       res.json(updated);
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error updating advance:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -832,9 +833,9 @@ export function registerWorkerStatsAdvancesRoutes(app: Express) {
       }
 
       res.json({ changes, totalAdvances: allAdvances.length });
-    } catch (e: any) {
+    } catch (e: unknown) {
       logger.error("Advance reconcile preview error:", { error: e });
-      res.status(500).json({ message: e.message });
+      res.status(500).json({ message: getErrorMessage(e) });
     }
   });
 

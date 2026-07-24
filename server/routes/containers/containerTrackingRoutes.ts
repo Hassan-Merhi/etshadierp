@@ -1,4 +1,5 @@
 import { parseId, parseOptionalId } from "../../lib/parseId";
+import { getErrorMessage } from "../../lib/httpHandlers";
 import { getClientDate } from "../../lib/dateUtils";
 import type { Express, Request, Response, NextFunction } from "express";
 import { db } from "../../db";
@@ -170,9 +171,9 @@ export function registerContainerTrackingRoutes(app: Express) {
 
       logger.info("container tracking update succeeded", { module: "containers", action: "updateTracking", userId: _uid, companyId: _cid, containerId: id, durationMs: Date.now() - _t });
       res.json(updated);
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("container tracking update failed", { module: "containers", action: "updateTracking", userId: _uid, companyId: _cid, durationMs: Date.now() - _t, error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -301,8 +302,8 @@ export function registerContainerTrackingRoutes(app: Express) {
             await db.update(containers).set(updateData).where(eq(containers.id, container.id));
             updated++;
           }
-        } catch (rowError: any) {
-          errors.push(`Error processing ${row.containerNumber || "unknown"}: ${rowError.message}`);
+        } catch (rowError: unknown) {
+          errors.push(`Error processing ${row.containerNumber || "unknown"}: ${getErrorMessage(rowError)}`);
         }
       }
 
@@ -313,8 +314,8 @@ export function registerContainerTrackingRoutes(app: Express) {
         total: rows.length,
         errors: errors.slice(0, 10), // Return first 10 errors
       });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -336,11 +337,11 @@ export function registerContainerTrackingRoutes(app: Express) {
         companyId: req.session.currentCompanyId,
       });
       res.json(result);
-    } catch (error: any) {
-      if (error?.message === "Container not found") {
+    } catch (error: unknown) {
+      if (getErrorMessage(error) === "Container not found") {
         return res.status(404).json({ message: "Container not found" });
       }
-      res.status(500).json({ message: error?.message ?? "Failed to refresh ETA" });
+      res.status(500).json({ message: getErrorMessage(error) ?? "Failed to refresh ETA" });
     }
   });
 
@@ -360,11 +361,11 @@ export function registerContainerTrackingRoutes(app: Express) {
         companyId: req.session.currentCompanyId,
       });
       res.json(result);
-    } catch (error: any) {
-      if (error?.message === "Container not found") {
+    } catch (error: unknown) {
+      if (getErrorMessage(error) === "Container not found") {
         return res.status(404).json({ message: "Container not found" });
       }
-      res.status(500).json({ message: error?.message ?? "Failed to refresh ETA" });
+      res.status(500).json({ message: getErrorMessage(error) ?? "Failed to refresh ETA" });
     }
   });
 
@@ -396,8 +397,8 @@ export function registerContainerTrackingRoutes(app: Express) {
             `${summary.errors} failed.`;
 
       res.json({ ...summary, message });
-    } catch (error: any) {
-      res.status(500).json({ message: error?.message ?? "Bulk ETA refresh failed" });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) ?? "Bulk ETA refresh failed" });
     }
   });
 
@@ -409,8 +410,8 @@ export function registerContainerTrackingRoutes(app: Express) {
     try {
       const summary = await getEtaTrackingSummary(req.session.currentCompanyId);
       res.json(summary);
-    } catch (error: any) {
-      res.status(500).json({ message: error?.message ?? "Failed to load ETA tracking summary" });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) ?? "Failed to load ETA tracking summary" });
     }
   });
 

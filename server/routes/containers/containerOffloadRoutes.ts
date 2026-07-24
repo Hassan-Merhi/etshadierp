@@ -1,4 +1,5 @@
 import { parseId, parseOptionalId } from "../../lib/parseId";
+import { getErrorMessage } from "../../lib/httpHandlers";
 import { getClientDate } from "../../lib/dateUtils";
 import type { Express, Request, Response, NextFunction } from "express";
 import { logger } from "../../lib/logger";
@@ -580,20 +581,20 @@ export function registerContainerOffloadRoutes(app: Express) {
               updatedSalesItems: result.updatedCount,
             });
           }
-        } catch (syncErr: any) {
+        } catch (syncErr: unknown) {
           // Non-fatal — the offload itself succeeded; log and move on.
           logger.error("Failed to sync sales item costs after offload (non-fatal)", {
             module: "containers",
             action: "sync-sales-costs",
             containerId,
-            error: syncErr?.message,
+            error: getErrorMessage(syncErr),
           });
         }
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Container offload failed", { module: "containers", action: "offload", userId: _uid, companyId: _cid, containerId: req.params.id, durationMs: Date.now() - _t, error });
       logger.error("Container offload error:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -776,9 +777,9 @@ export function registerContainerOffloadRoutes(app: Express) {
           success: true,
           message: "Container offload reversed successfully",
         });
-      } catch (error: any) {
+      } catch (error: unknown) {
         logger.error("Reverse offload error:", { error: error });
-        res.status(500).json({ message: error.message });
+        res.status(500).json({ message: getErrorMessage(error) });
       }
     }
   );
@@ -1003,18 +1004,18 @@ export function registerContainerOffloadRoutes(app: Express) {
               updatedSalesItems: result.updatedCount,
             });
           }
-        } catch (syncErr: any) {
+        } catch (syncErr: unknown) {
           logger.error("Failed to sync sales item costs after charge edit (non-fatal)", {
             module: "containers",
             action: "sync-sales-costs-patch",
             containerId,
-            error: syncErr?.message,
+            error: getErrorMessage(syncErr),
           });
         }
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Edit offload error:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -1089,9 +1090,9 @@ export function registerContainerOffloadRoutes(app: Express) {
         charges:         allCharges,
         totalCharges:    parseFloat(offloadRow.totalCharges || "0"),
       });
-    } catch (err: any) {
-      logger.error("[offload-charges]", { error: err.message });
-      res.status(500).json({ message: err.message });
+    } catch (err: unknown) {
+      logger.error("[offload-charges]", { error: getErrorMessage(err) });
+      res.status(500).json({ message: getErrorMessage(err) });
     }
   });
 }

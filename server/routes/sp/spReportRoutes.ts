@@ -1,4 +1,5 @@
 import type { Express } from "express";
+import { getErrorMessage } from "../../lib/httpHandlers";
 import { db } from "../../db";
 import { requireAuth } from "../../auth";
 import { sql, eq, asc, desc } from "drizzle-orm";
@@ -43,8 +44,8 @@ export function registerSpReportRoutes(app: Express) {
       });
 
       res.json({ openingBalance: 0, movements, closingBalance: runningBalance });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -132,8 +133,8 @@ export function registerSpReportRoutes(app: Express) {
         supplierShare,
         saleCount,
       });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -180,8 +181,8 @@ export function registerSpReportRoutes(app: Express) {
       }));
 
       res.json(result);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -268,8 +269,8 @@ export function registerSpReportRoutes(app: Express) {
       });
 
       res.json({ rows, paymentsTotal, remainingPayable: payableBalance });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -287,8 +288,8 @@ export function registerSpReportRoutes(app: Express) {
         .orderBy(desc(spProfitSplits.periodMonth));
 
       res.json(splits);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -327,11 +328,11 @@ export function registerSpReportRoutes(app: Express) {
         .returning();
 
       res.json(split);
-    } catch (error: any) {
-      if (error.code === "23505") {
+    } catch (error: unknown) {
+      if ((error as { code?: string }).code === "23505") {
         return res.status(400).json({ message: `Profit split for ${req.body.periodMonth} already exists` });
       }
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 }

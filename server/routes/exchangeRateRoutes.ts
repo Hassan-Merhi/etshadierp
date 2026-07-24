@@ -6,6 +6,7 @@
  * unchanged.
  */
 import type { Express } from "express";
+import { getErrorMessage } from "../lib/httpHandlers";
 import { logger } from "../lib/logger";
 import { eq, and, ne, isNull, sql } from "drizzle-orm";
 import { db } from "../db";
@@ -54,8 +55,8 @@ export function registerExchangeRateRoutes(app: Express) {
       const hasRate = rateDate === today;
 
       res.json({ hasRate, latestRate, today });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -68,8 +69,8 @@ export function registerExchangeRateRoutes(app: Express) {
       }
       const rates = await storage.getExchangeRates(companyId);
       res.json(rates);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -87,8 +88,8 @@ export function registerExchangeRateRoutes(app: Express) {
       }
       const rate = await storage.getLatestExchangeRate(companyId, fromCurrency as string, toCurrency as string);
       res.json(rate || null);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -313,8 +314,8 @@ export function registerExchangeRateRoutes(app: Express) {
       }
 
       res.json(rate);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 }

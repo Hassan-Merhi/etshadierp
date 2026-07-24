@@ -1,4 +1,5 @@
 import type { Express } from "express";
+import { getErrorMessage, getErrorStack } from "../lib/httpHandlers";
 import { db } from "../db";
 import { storage } from "../storage";
 import { requireAuth, requireNonPOS } from "../auth";
@@ -183,8 +184,8 @@ export function registerFiscalTransferRoutes(app: Express) {
           : allResult;
 
       res.json(result);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -199,9 +200,9 @@ export function registerFiscalTransferRoutes(app: Express) {
 
       const transfer = await storage.getStockTransferByVoucherId(voucherId);
       res.json(transfer);
-    } catch (error: any) {
-      logger.error("[Stock Transfer GET] Error:", { error: error.message });
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      logger.error("[Stock Transfer GET] Error:", { error: getErrorMessage(error) });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -410,8 +411,8 @@ export function registerFiscalTransferRoutes(app: Express) {
                 voucherNumber: txResult.newVoucher.voucherNumber,
                 voucherDate: txResult.newVoucher.voucherDate,
               });
-            } catch (e: any) {
-              logger.error("[TransferWA] Failed to send:", { error: e.message });
+            } catch (e: unknown) {
+              logger.error("[TransferWA] Failed to send:", { error: getErrorMessage(e) });
             }
           });
         return;
@@ -539,14 +540,14 @@ export function registerFiscalTransferRoutes(app: Express) {
               voucherNumber: voucher.voucherNumber,
               voucherDate: voucher.voucherDate,
             });
-          } catch (e: any) {
-            logger.error("[TransferWA] Failed to send (original-flow):", { error: e.message });
+          } catch (e: unknown) {
+            logger.error("[TransferWA] Failed to send (original-flow):", { error: getErrorMessage(e) });
           }
         });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("stock transfer create failed", { module: "stockTransfer", action: "create", userId: _uid, companyId: _cid, durationMs: Date.now() - _t, error });
-      logger.error("[Stock Transfer] Error creating transfer:", { error: error.message, stack: error.stack });
-      res.status(500).json({ message: error.message });
+      logger.error("[Stock Transfer] Error creating transfer:", { error: getErrorMessage(error), stack: getErrorStack(error) });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -562,8 +563,8 @@ export function registerFiscalTransferRoutes(app: Express) {
         .where(eq(stockTransferVouchers.id, id))
         .execute();
       res.json({ success: true });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -661,8 +662,8 @@ export function registerFiscalTransferRoutes(app: Express) {
       }
 
       res.json(finalRevisions);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -768,8 +769,8 @@ export function registerFiscalTransferRoutes(app: Express) {
       }
 
       res.json(finalRevisions);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -899,8 +900,8 @@ export function registerFiscalTransferRoutes(app: Express) {
         })),
         revisions,
       });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -1074,13 +1075,13 @@ export function registerFiscalTransferRoutes(app: Express) {
               voucherNumber: voucherRow.voucherNumber,
               voucherDate: voucherRow.voucherDate,
             });
-          } catch (e: any) {
-            logger.error("[RevisedTransferWA] Failed to send (revision):", { error: e.message });
+          } catch (e: unknown) {
+            logger.error("[RevisedTransferWA] Failed to send (revision):", { error: getErrorMessage(e) });
           }
         });
-    } catch (error: any) {
-      logger.error("[Revision POST] Error:", { error: error.message });
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      logger.error("[Revision POST] Error:", { error: getErrorMessage(error) });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -1092,8 +1093,8 @@ export function registerFiscalTransferRoutes(app: Express) {
       const { optional } = req.body;
       await db.update(stockTransferRevisions).set({ optional: !!optional }).where(eq(stockTransferRevisions.id, id));
       res.json({ success: true });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -1273,9 +1274,9 @@ export function registerFiscalTransferRoutes(app: Express) {
       });
 
       res.json({ success: true });
-    } catch (error: any) {
-      logger.error("[Revision Approve] Error:", { error: error.message });
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      logger.error("[Revision Approve] Error:", { error: getErrorMessage(error) });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -1287,8 +1288,8 @@ export function registerFiscalTransferRoutes(app: Express) {
       await db.delete(stockTransferRevisionItems).where(eq(stockTransferRevisionItems.revisionId, id));
       await db.delete(stockTransferRevisions).where(eq(stockTransferRevisions.id, id));
       res.json({ success: true });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -1336,15 +1337,15 @@ export function registerFiscalTransferRoutes(app: Express) {
         .where(eq(vouchers.id, updated.transfer.voucherId));
 
       res.json(updated);
-    } catch (error: any) {
-      logger.error("[Stock Transfer PUT] Error:", { error: error.message });
+    } catch (error: unknown) {
+      logger.error("[Stock Transfer PUT] Error:", { error: getErrorMessage(error) });
 
       // Check if this is a legacy transfer validation error (400) vs server error (500)
-      if (error.message && error.message.includes("missing source location data")) {
-        return res.status(400).json({ message: error.message });
+      if (getErrorMessage(error) && getErrorMessage(error).includes("missing source location data")) {
+        return res.status(400).json({ message: getErrorMessage(error) });
       }
 
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 

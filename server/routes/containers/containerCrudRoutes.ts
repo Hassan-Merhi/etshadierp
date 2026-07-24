@@ -1,4 +1,5 @@
 import { parseId, parseOptionalId } from "../../lib/parseId";
+import { getErrorMessage } from "../../lib/httpHandlers";
 import { getClientDate } from "../../lib/dateUtils";
 import type { Express, Request, Response, NextFunction } from "express";
 import { db } from "../../db";
@@ -86,8 +87,8 @@ export function registerContainerCrudRoutes(app: Express) {
       }
       const containers = await storage.getAllContainers(req.session.currentCompanyId);
       res.json(containers);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -99,8 +100,8 @@ export function registerContainerCrudRoutes(app: Express) {
       }
       const containers = await storage.getActiveContainers(req.session.currentCompanyId);
       res.json(containers);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -112,8 +113,8 @@ export function registerContainerCrudRoutes(app: Express) {
       }
       const soldContainers = await storage.getSoldContainers(req.session.currentCompanyId);
       res.json(soldContainers);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -199,10 +200,10 @@ export function registerContainerCrudRoutes(app: Express) {
             creditAmount: totalAmount.toFixed(2),
             narration: `Container ${container.containerNumber} - ${itemName} (${totalKg}kg @ $${ratePerKg}/kg)`,
           });
-        } catch (voucherError: any) {
+        } catch (voucherError: unknown) {
           // Rollback: Delete container if voucher creation fails
           await storage.deleteContainer(container.id);
-          throw new Error(`Failed to create purchase voucher: ${voucherError.message}`, { cause: voucherError });
+          throw new Error(`Failed to create purchase voucher: ${getErrorMessage(voucherError)}`, { cause: voucherError });
         }
       }
 
@@ -227,15 +228,15 @@ export function registerContainerCrudRoutes(app: Express) {
       }
       logger.info("container create succeeded", { module: "containers", action: "create", userId: _uid, companyId: _cid, containerId: container.id, durationMs: Date.now() - _t });
       res.status(201).json(container);
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("container create failed", { module: "containers", action: "create", userId: _uid, companyId: _cid, durationMs: Date.now() - _t, error });
-      if (error.name === "ZodError") {
+      if ((error as { name?: string }).name === "ZodError") {
         return res.status(400).json({
           message: "Validation error",
-          errors: error.errors,
+          errors: (error as { errors?: unknown }).errors,
         });
       }
-      return res.status(500).json({ message: error.message });
+      return res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -282,8 +283,8 @@ export function registerContainerCrudRoutes(app: Express) {
         );
 
       res.json(rows);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -326,8 +327,8 @@ export function registerContainerCrudRoutes(app: Express) {
         charges,
         offloadId,
       });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -373,8 +374,8 @@ export function registerContainerCrudRoutes(app: Express) {
         /* non-fatal */
       }
       res.json({ message: "Container deleted successfully" });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
