@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import { requireAuth, requireNonPOS } from "../../auth";
 import { logger } from "../../lib/logger";
+import { getStockInSalesDetail } from "../../services/reports/stockInSalesDetailService";
 import { getStockInSalesReport } from "../../services/reports/stockInSalesReportService";
 
 const isoDateSchema = z
@@ -40,10 +41,28 @@ const reportQuerySchema = z.object({
   search: z.string().trim().max(100, "Search is too long").optional(),
 });
 
+const detailQuerySchema = z.object({
+  startDate: isoDateSchema,
+  endDate: isoDateSchema,
+  locationIds: idListSchema,
+  stockGroupIds: idListSchema,
+  search: z.string().trim().max(100, "Search is too long").optional(),
+  stockInPage: z.coerce.number().int().positive().max(100_000).default(1),
+  stockOutPage: z.coerce.number().int().positive().max(100_000).default(1),
+  limit: z.coerce.number().int().min(25).max(250).default(100),
+  exportAll: z
+    .preprocess((value) => value === "true" || value === "1" || value === true, z.boolean())
+    .default(false),
+});
+
 function firstQueryValue(value: unknown): string | undefined {
   if (Array.isArray(value)) return value.length > 0 ? String(value[0]) : undefined;
   if (typeof value === "string") return value;
   return undefined;
+}
+
+function invalidRange(startDate: string | undefined, endDate: string | undefined): boolean {
+  return !!startDate && !!endDate && startDate > endDate;
 }
 
 export function registerStockInSalesReportRoutes(app: Express) {
@@ -70,7 +89,7 @@ export function registerStockInSalesReportRoutes(app: Express) {
       });
     }
 
-    if (parsed.data.startDate && parsed.data.endDate && parsed.data.startDate > parsed.data.endDate) {
+    if (invalidRange(parsed.data.startDate, parsed.data.endDate)) {
       return res.status(400).json({ message: "Start date cannot be after end date" });
     }
 
@@ -96,6 +115,62 @@ export function registerStockInSalesReportRoutes(app: Express) {
         error,
       });
       return res.status(500).json({ message: "Failed to generate stock in and sales report" });
+    }
+  });
+
+  app.get("/api/reports/stock-in-sales/detail", requireAuth, requireNonPOS, async (req, res) => {
+    const companyId = req.session.currentCompanyId;
+    if (!companyId) {
+      return res.status(400).json({ message: "No company selected" });
+    }
+
+    const parsed = detailQuerySchema.safeParse({
+      startDate: firstQueryValue(req.query.startDate),
+      endDate: firstQueryValue(req.query.endDate),
+      locationIds: req.query.locationIds ?? req.query.locationId,
+      stockGroupIds: req.query.stockGroupIds ?? req.query.stockGroupId,
+      search: firstQueryValue(req.query.search),
+      stockInPage: firstQueryValue(req.query.stockInPage),
+      stockOutPage: firstQueryValue(req.query.stockOutPage),
+      limit: firstQueryValue(req.query.limit),
+      exportAll: req.query.exportAll,
+    });
+
+    if (!parsed.success) {
+      return res.status(400).json({
+        message: "Invalid stock in and sales detail filters",
+        errors: parsed.error.flatten(),
+      });
+    }
+
+    if (invalidRange(parsed.data.startDate, parsed.data.endDate)) {
+      return res.status(400).json({ message: "Start date cannot be after end date" });
+    }
+
+    try {
+      const result = await getStockInSalesDetail({
+        companyId,
+        startDate: parsed.data.startDate,
+        endDate: parsed.data.endDate,
+        locationIds: parsed.data.locationIds,
+        stockGroupIds: parsed.data.stockGroupIds,
+        search: parsed.data.search || undefined,
+        stockInPage: parsed.data.stockInPage,
+        stockOutPage: parsed.data.stockOutPage,
+        limit: parsed.data.limit,
+        exportAll: parsed.data.exportAll,
+      });
+
+      res.setHeader("Cache-Control", "private, no-store");
+      return res.json(result);
+    } catch (error: any) {
+      logger.error("Stock in and sales detail error", {
+        module: "reports",
+        action: "stock-in-sales-detail",
+        companyId,
+        error,
+      });
+      return res.status(500).json({ message: "Failed to load stock in and sales details" });
     }
   });
 }
