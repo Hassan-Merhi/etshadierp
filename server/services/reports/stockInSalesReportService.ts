@@ -135,12 +135,10 @@ function getPeriodBounds(periodKey: string, grouping: StockInSalesGrouping): { p
 function addCommonItemFilters(
   conditions: SQL[],
   filters: StockInSalesReportFilters,
-  locationColumn: typeof containerOffloads.locationId | typeof vouchers.locationId | typeof creditNoteItems.locationId,
+  locationCondition: SQL | undefined,
   searchExtraConditions: SQL[]
 ): void {
-  if (filters.locationIds.length > 0) {
-    conditions.push(inArray(locationColumn, filters.locationIds));
-  }
+  if (locationCondition) conditions.push(locationCondition);
   if (filters.stockGroupIds.length > 0) {
     conditions.push(inArray(stockItems.stockGroupId, filters.stockGroupIds));
   }
@@ -181,7 +179,7 @@ async function getStockInRows(filters: StockInSalesReportFilters): Promise<Aggre
   addCommonItemFilters(
     conditions,
     filters,
-    containerOffloads.locationId,
+    filters.locationIds.length > 0 ? inArray(containerOffloads.locationId, filters.locationIds) : undefined,
     searchPattern ? [ilike(containers.containerNumber, searchPattern)] : []
   );
 
@@ -211,7 +209,6 @@ async function getSalesRows(filters: StockInSalesReportFilters): Promise<Aggrega
     eq(vouchers.optional, false),
     isNull(vouchers.deletedAt),
     eq(stockItems.companyId, filters.companyId),
-    eq(locations.companyId, filters.companyId),
   ];
 
   if (filters.startDate) conditions.push(gte(vouchers.voucherDate, filters.startDate));
@@ -221,8 +218,10 @@ async function getSalesRows(filters: StockInSalesReportFilters): Promise<Aggrega
   addCommonItemFilters(
     conditions,
     filters,
-    vouchers.locationId,
-    searchPattern ? [ilike(vouchers.voucherNumber, searchPattern)] : []
+    filters.locationIds.length > 0 ? inArray(vouchers.locationId, filters.locationIds) : undefined,
+    searchPattern
+      ? [ilike(vouchers.voucherNumber, searchPattern), ilike(vouchers.locationName, searchPattern)]
+      : []
   );
 
   return db
@@ -236,7 +235,10 @@ async function getSalesRows(filters: StockInSalesReportFilters): Promise<Aggrega
     .from(salesItems)
     .innerJoin(vouchers, eq(salesItems.voucherId, vouchers.id))
     .innerJoin(stockItems, eq(salesItems.stockItemId, stockItems.id))
-    .innerJoin(locations, eq(vouchers.locationId, locations.id))
+    .leftJoin(
+      locations,
+      and(eq(vouchers.locationId, locations.id), eq(locations.companyId, filters.companyId))
+    )
     .leftJoin(stockGroups, eq(stockItems.stockGroupId, stockGroups.id))
     .where(and(...conditions))
     .groupBy(periodKey)
@@ -265,7 +267,7 @@ async function getCreditAndDebitNoteRows(filters: StockInSalesReportFilters): Pr
   addCommonItemFilters(
     conditions,
     filters,
-    creditNoteItems.locationId,
+    filters.locationIds.length > 0 ? inArray(creditNoteItems.locationId, filters.locationIds) : undefined,
     searchPattern ? [ilike(vouchers.voucherNumber, searchPattern)] : []
   );
 
