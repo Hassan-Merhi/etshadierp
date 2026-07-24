@@ -1,4 +1,5 @@
 import { parseId, parseOptionalId } from "../../lib/parseId";
+import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
 import type { Express } from "express";
 import { db, pool } from "../../db";
@@ -108,8 +109,8 @@ export function registerFactoryStatusBuilderSheetsRoutes(app: Express) {
         .where(eq(statusBuilderSheets.companyId, companyId))
         .orderBy(asc(statusBuilderSheets.orderIndex), asc(statusBuilderSheets.id));
       res.json(sheets);
-    } catch (err: any) {
-      res.status(500).json({ message: err.message });
+    } catch (err: unknown) {
+      res.status(500).json({ message: getErrorMessage(err) });
     }
   });
 
@@ -140,8 +141,8 @@ export function registerFactoryStatusBuilderSheetsRoutes(app: Express) {
         .returning();
 
       res.status(201).json(created);
-    } catch (err: any) {
-      res.status(500).json({ message: err.message });
+    } catch (err: unknown) {
+      res.status(500).json({ message: getErrorMessage(err) });
     }
   });
 
@@ -190,8 +191,8 @@ export function registerFactoryStatusBuilderSheetsRoutes(app: Express) {
       }
 
       res.json(updated);
-    } catch (err: any) {
-      res.status(500).json({ message: err.message });
+    } catch (err: unknown) {
+      res.status(500).json({ message: getErrorMessage(err) });
     }
   });
 
@@ -221,8 +222,8 @@ export function registerFactoryStatusBuilderSheetsRoutes(app: Express) {
         params
       );
       res.json(rows);
-    } catch (err: any) {
-      res.status(500).json({ message: err.message });
+    } catch (err: unknown) {
+      res.status(500).json({ message: getErrorMessage(err) });
     }
   });
 
@@ -241,8 +242,8 @@ export function registerFactoryStatusBuilderSheetsRoutes(app: Express) {
 
       if (!deleted) return res.status(404).json({ message: "Sheet not found" });
       res.json({ ok: true });
-    } catch (err: any) {
-      res.status(500).json({ message: err.message });
+    } catch (err: unknown) {
+      res.status(500).json({ message: getErrorMessage(err) });
     }
   });
 
@@ -334,8 +335,8 @@ export function registerFactoryStatusBuilderSheetsRoutes(app: Express) {
         .orderBy(asc(statusBuilderSheets.orderIndex), asc(statusBuilderSheets.id));
 
       res.json(finalSheets);
-    } catch (err: any) {
-      res.status(500).json({ message: err.message });
+    } catch (err: unknown) {
+      res.status(500).json({ message: getErrorMessage(err) });
     }
   });
 
@@ -358,8 +359,8 @@ export function registerFactoryStatusBuilderSheetsRoutes(app: Express) {
       res.setHeader("Content-Disposition", 'attachment; filename="status-builder-template.xlsx"');
       res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
       res.send(buf);
-    } catch (err: any) {
-      res.status(500).json({ message: err.message });
+    } catch (err: unknown) {
+      res.status(500).json({ message: getErrorMessage(err) });
     }
   });
 
@@ -402,8 +403,8 @@ export function registerFactoryStatusBuilderSheetsRoutes(app: Express) {
       res.setHeader("Content-Disposition", 'attachment; filename="status-builder.xlsx"');
       res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
       res.send(buf);
-    } catch (err: any) {
-      res.status(500).json({ message: err.message });
+    } catch (err: unknown) {
+      res.status(500).json({ message: getErrorMessage(err) });
     }
   });
 }

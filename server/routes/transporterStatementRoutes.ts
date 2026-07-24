@@ -1,4 +1,5 @@
 import type { Express } from "express";
+import { getErrorMessage } from "../lib/httpHandlers";
 import { logger } from "../lib/logger";
 import { db } from "../db";
 import { requireAuth, requireNonPOS } from "../auth";
@@ -57,8 +58,8 @@ export function registerTransporterStatementRoutes(app: Express) {
       `);
 
       res.json(result.rows);
-    } catch (err: any) {
-      res.status(500).json({ message: err.message });
+    } catch (err: unknown) {
+      res.status(500).json({ message: getErrorMessage(err) });
     }
   });
 
@@ -76,8 +77,8 @@ export function registerTransporterStatementRoutes(app: Express) {
       );
       const row = rows.rows?.[0] as { payment_terms_days: number } | undefined;
       res.json({ paymentTermsDays: row?.payment_terms_days ?? 0 });
-    } catch (err: any) {
-      res.status(500).json({ message: err.message });
+    } catch (err: unknown) {
+      res.status(500).json({ message: getErrorMessage(err) });
     }
   });
 
@@ -103,8 +104,8 @@ export function registerTransporterStatementRoutes(app: Express) {
       );
 
       res.json({ paymentTermsDays });
-    } catch (err: any) {
-      res.status(400).json({ message: err.message });
+    } catch (err: unknown) {
+      res.status(400).json({ message: getErrorMessage(err) });
     }
   });
 
@@ -134,8 +135,8 @@ export function registerTransporterStatementRoutes(app: Express) {
       }
 
       res.json({ ok: true, dueDate });
-    } catch (err: any) {
-      res.status(400).json({ message: err.message });
+    } catch (err: unknown) {
+      res.status(400).json({ message: getErrorMessage(err) });
     }
   });
 
@@ -271,9 +272,9 @@ export function registerTransporterStatementRoutes(app: Express) {
       }
 
       res.json({ ok: true, sent, failed, errors });
-    } catch (err: any) {
+    } catch (err: unknown) {
       logger.error("[TransporterStatement/send-whatsapp]", { error: err });
-      res.status(500).json({ message: err.message });
+      res.status(500).json({ message: getErrorMessage(err) });
     }
   });
 
@@ -359,9 +360,9 @@ export function registerTransporterStatementRoutes(app: Express) {
       }
 
       res.json({ ok: true, allocationsCreated: newAllocations.length });
-    } catch (err: any) {
+    } catch (err: unknown) {
       logger.error("[TransporterStatement/reallocate]", { error: err });
-      res.status(500).json({ message: err.message });
+      res.status(500).json({ message: getErrorMessage(err) });
     }
   });
 
@@ -576,9 +577,9 @@ export function registerTransporterStatementRoutes(app: Express) {
           filteredRows.length > 0 ? filteredRows[filteredRows.length - 1].runningBalance : runningBalance.toFixed(2),
         rows: filteredRows,
       });
-    } catch (err: any) {
+    } catch (err: unknown) {
       logger.error("[TransporterStatement]", { error: err });
-      res.status(500).json({ message: err.message });
+      res.status(500).json({ message: getErrorMessage(err) });
     }
   });
 }

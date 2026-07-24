@@ -1,4 +1,5 @@
 import { trackOneContainerById } from "../../../services/containerTrackingService";
+import { getErrorMessage } from "../../../lib/httpHandlers";
 import { logger } from "../../../lib/logger";
 import { parseId, parseOptionalId } from "../../../lib/parseId";
 import { dispatchNotification } from "../../../lib/notificationService";
@@ -407,9 +408,9 @@ export function registerBaleScanningRoutes(app: Express) {
         .where(eq(customerOrderCharges.orderId, orderId));
 
       res.json({ ...updatedOrder, bales: updatedBales, lines: updatedLines, charges: updatedCharges });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error adding bale to order:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -761,9 +762,9 @@ export function registerBaleScanningRoutes(app: Express) {
       const [updatedOrder] = await db.select().from(customerOrders).where(eq(customerOrders.id, orderId));
 
       res.json({ added: totalAdded, notFound, order: updatedOrder, bales: updatedBales });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error bulk importing bales:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -839,9 +840,9 @@ export function registerBaleScanningRoutes(app: Express) {
         .where(eq(customerOrderCharges.orderId, orderId));
 
       res.json({ ...updatedOrder, bales: updatedBales, lines: updatedLines, charges: updatedCharges });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error removing bale from order:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -1004,9 +1005,9 @@ export function registerBaleScanningRoutes(app: Express) {
         invoiceNumber: finalOrder?.invoiceNumber,
         newGrandTotal: finalOrder?.grandTotal,
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error returning bale to stock:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -1047,9 +1048,9 @@ export function registerBaleScanningRoutes(app: Express) {
       const remainingCount = Number(baleCount[0]?.count ?? 0);
 
       res.json({ ...order, totalBalesInOrder: remainingCount });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error fetching bale order info:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -1241,9 +1242,9 @@ export function registerBaleScanningRoutes(app: Express) {
         replacedRef: currentBale.referenceNumber,
         replacementRef: replacementBale.referenceNumber,
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error swapping bale:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -1342,9 +1343,9 @@ export function registerBaleScanningRoutes(app: Express) {
         .from(customerOrderCharges)
         .where(eq(customerOrderCharges.orderId, orderId));
       res.json({ ...updatedOrder, bales: updatedBales, lines: updatedLines, charges: updatedCharges });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Exchange bale error:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -1366,8 +1367,8 @@ export function registerBaleScanningRoutes(app: Express) {
         .where(eq(customerOrderBaleRemovals.orderId, orderId))
         .orderBy(desc(customerOrderBaleRemovals.removedAt));
       res.json(removals);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 }

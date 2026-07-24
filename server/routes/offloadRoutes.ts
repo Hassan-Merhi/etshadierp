@@ -7,6 +7,7 @@
  * unchanged.
  */
 import type { Express } from "express";
+import { getErrorMessage } from "../lib/httpHandlers";
 import { logger } from "../lib/logger";
 import { eq, and, or, desc, inArray, gte, lte, like, sql } from "drizzle-orm";
 import { db } from "../db";
@@ -69,8 +70,8 @@ export function registerOffloadRoutes(app: Express) {
         .execute();
 
       res.json(offloads);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -215,8 +216,8 @@ export function registerOffloadRoutes(app: Express) {
       };
 
       res.json({ ...offload, items, poCharges, additionalCharges, liveCharges });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -343,9 +344,9 @@ export function registerOffloadRoutes(app: Express) {
             ? "Offload suspended — stock removed, vouchers set to optional, container moved back to OTW."
             : "Offload restored — stock re-added, vouchers made active, container marked OFFLOADED.",
         });
-      } catch (error: any) {
+      } catch (error: unknown) {
         logger.error("Error toggling offload optional:", { error: error });
-        res.status(500).json({ message: error.message });
+        res.status(500).json({ message: getErrorMessage(error) });
       }
     }
   );
@@ -506,9 +507,9 @@ export function registerOffloadRoutes(app: Express) {
             invalid: lineItemDetails.filter((i) => !i.isValid).length,
           },
         });
-      } catch (error: any) {
+      } catch (error: unknown) {
         logger.error("Container offload diagnostics error:", { error: error });
-        res.status(500).json({ message: error.message });
+        res.status(500).json({ message: getErrorMessage(error) });
       }
     }
   );
@@ -533,9 +534,9 @@ export function registerOffloadRoutes(app: Express) {
         .orderBy(desc(containers.id));
 
       res.json(allContainers);
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Get containers for diagnostics error:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -671,17 +672,17 @@ export function registerOffloadRoutes(app: Express) {
             logger.info(
               `[POC backfill] voucherId=${voucher.id} chargeId=${chargeId} container=${containerNumber} voucherCompanyId=${voucherCompanyId} cpAcctId=${cpAcctId}`
             );
-          } catch (err: any) {
+          } catch (err: unknown) {
             errors++;
-            errorDetails.push(`chargeId=${row.id}: ${err.message}`);
+            errorDetails.push(`chargeId=${row.id}: ${getErrorMessage(err)}`);
             logger.error(`[POC backfill] error on chargeId=${row.id}:`, { error: err });
           }
         }
 
         res.json({ scanned, created, skippedExisting, errors, errorDetails });
-      } catch (error: any) {
+      } catch (error: unknown) {
         logger.error("Backfill post-offload vouchers error:", { error: error });
-        res.status(500).json({ message: error.message });
+        res.status(500).json({ message: getErrorMessage(error) });
       }
     }
   );

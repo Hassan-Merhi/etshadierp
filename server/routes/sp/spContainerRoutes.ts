@@ -1,4 +1,5 @@
 import type { Express } from "express";
+import { getErrorMessage } from "../../lib/httpHandlers";
 import { db } from "../../db";
 import { requireAuth } from "../../auth";
 import { sql, eq, and, isNull, desc, asc } from "drizzle-orm";
@@ -40,8 +41,8 @@ export function registerSpContainerRoutes(app: Express) {
       }));
 
       res.json(result);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -183,8 +184,8 @@ export function registerSpContainerRoutes(app: Express) {
       });
 
       res.json(result);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -321,8 +322,8 @@ export function registerSpContainerRoutes(app: Express) {
       });
 
       res.json(updated);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -369,8 +370,8 @@ export function registerSpContainerRoutes(app: Express) {
         .where(and(eq(spStockMovements.containerId, id), eq(spStockMovements.companyId, companyId)));
 
       res.json({ ...container, lines, prepaid, offload: offload || null, offloadCharges, movements });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -442,8 +443,8 @@ export function registerSpContainerRoutes(app: Express) {
         discountPct: container.discountPct,
         unmappedCount: enriched.filter((l) => !l.aliasResolved).length,
       });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -466,8 +467,8 @@ export function registerSpContainerRoutes(app: Express) {
         .orderBy(desc(spPrepaidCharges.createdAt));
 
       res.json(rows);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -573,8 +574,8 @@ export function registerSpContainerRoutes(app: Express) {
       });
 
       res.json(result);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 }

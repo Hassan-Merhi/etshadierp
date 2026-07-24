@@ -1,4 +1,5 @@
 import type { Express } from "express";
+import { getErrorMessage } from "../lib/httpHandlers";
 import { db } from "../db";
 import { storage } from "../storage";
 import { requireAuth } from "../auth";
@@ -531,8 +532,8 @@ export function registerAccountRoutes(app: Express) {
       const allAccounts = [...accounts, ...supplierAccountsList];
 
       res.json({ accounts: allAccounts, asOfDate: effectiveEndDate });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -565,8 +566,8 @@ export function registerAccountRoutes(app: Express) {
         .sort((a, b) => b.balance - a.balance);
 
       res.json(payableAccounts);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -615,8 +616,8 @@ export function registerAccountRoutes(app: Express) {
         .limit(100);
 
       res.json(results);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -635,8 +636,8 @@ export function registerAccountRoutes(app: Express) {
           balance: 0,
         }))
       );
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -1009,8 +1010,8 @@ export function registerAccountRoutes(app: Express) {
         }
       }
       res.json(accounts);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -1176,8 +1177,8 @@ export function registerAccountRoutes(app: Express) {
       const balance = rawOB * (rawSide === "Cr" ? -1 : 1) + linkedBankOB + debits - credits;
 
       res.json({ balance });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -1213,8 +1214,8 @@ export function registerAccountRoutes(app: Express) {
       }));
 
       res.json(result);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 

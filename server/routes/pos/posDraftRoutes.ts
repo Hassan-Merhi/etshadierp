@@ -1,4 +1,5 @@
 import { type Express } from "express";
+import { getErrorMessage } from "../../lib/httpHandlers";
 import { db } from "../../db";
 import { storage } from "../../storage";
 import { requireAuth } from "../../auth";
@@ -32,8 +33,8 @@ export function registerPosDraftRoutes(app: Express): void {
       }
       const prices = await storage.getLastSoldPrices(req.session.currentCompanyId!);
       res.json(prices);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -49,8 +50,8 @@ export function registerPosDraftRoutes(app: Express): void {
       const locationId = req.query.locationId ? parseInt(req.query.locationId as string) : undefined;
       const drafts = await storage.getAllDraftPosSales(userId, locationId);
       res.json(drafts);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -70,8 +71,8 @@ export function registerPosDraftRoutes(app: Express): void {
       }
 
       res.json(draft);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -103,8 +104,8 @@ export function registerPosDraftRoutes(app: Express): void {
 
       const draft = await storage.createDraftPosSale(draftData, items);
       res.status(201).json(draft);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -138,8 +139,8 @@ export function registerPosDraftRoutes(app: Express): void {
 
       const draft = await storage.updateDraftPosSale(id, updateData, items);
       res.json(draft);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -164,8 +165,8 @@ export function registerPosDraftRoutes(app: Express): void {
 
       await storage.deleteDraftPosSale(id);
       res.status(204).send();
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 }

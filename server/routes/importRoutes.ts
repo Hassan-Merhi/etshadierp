@@ -1,4 +1,5 @@
 import { getClientDate } from "../lib/dateUtils";
+import { getErrorMessage } from "../lib/httpHandlers";
 import { logger } from "../lib/logger";
 import type { Express } from "express";
 import { db } from "../db";
@@ -111,9 +112,9 @@ export function registerImportRoutes(app: Express) {
         valid: errors.length === 0,
         errors,
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("PO Import validation error:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -524,10 +525,10 @@ export function registerImportRoutes(app: Express) {
                     `Auto-created Parent Credit Account: ${creditAccountName} (ID: ${parentCreditAccountId})`
                   );
                 }
-              } catch (err: any) {
+              } catch (err: unknown) {
                 logger.info(
                   `Parent Credit Account creation attempt ${attempt + 1} failed, will retry fetch:`,
-                  err?.message
+                  { error: getErrorMessage(err) }
                 );
                 // On any error, loop will retry with fetch-first approach
               }
@@ -804,9 +805,9 @@ export function registerImportRoutes(app: Express) {
         itemsCount: containerPreview.itemsCount,
         grandTotal: containerPreview.grandTotal,
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("PO Import error:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -901,9 +902,9 @@ export function registerImportRoutes(app: Express) {
       res.setHeader("Content-Disposition", "attachment; filename=PO_Import_Template.xlsx");
       res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
       res.send(buffer);
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Template generation error:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -930,8 +931,8 @@ export function registerImportRoutes(app: Express) {
       res.setHeader("Content-Disposition", "attachment; filename=Silent_Transfer_Template.xlsx");
       res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
       res.send(buffer);
-    } catch (err: any) {
-      res.status(500).json({ message: err.message });
+    } catch (err: unknown) {
+      res.status(500).json({ message: getErrorMessage(err) });
     }
   });
 
@@ -1054,9 +1055,9 @@ export function registerImportRoutes(app: Express) {
           totalRows: rawData.filter((r: any) => (r.Barcode || r.barcode || r.Code || r.code || "").toString().trim())
             .length,
         });
-      } catch (err: any) {
+      } catch (err: unknown) {
         logger.error("Silent transfer parse error:", { error: err });
-        res.status(500).json({ message: err.message });
+        res.status(500).json({ message: getErrorMessage(err) });
       }
     }
   );
@@ -1087,9 +1088,9 @@ export function registerImportRoutes(app: Express) {
       });
 
       res.json({ success: true, itemsTransferred: items.length });
-    } catch (err: any) {
+    } catch (err: unknown) {
       logger.error("Silent transfer apply error:", { error: err });
-      res.status(500).json({ message: err.message });
+      res.status(500).json({ message: getErrorMessage(err) });
     }
   });
 
@@ -1132,9 +1133,9 @@ export function registerImportRoutes(app: Express) {
       });
 
       res.json({ success: true, applied, type });
-    } catch (err: any) {
+    } catch (err: unknown) {
       logger.error("Silent production/consumption error:", { error: err });
-      res.status(500).json({ message: err.message });
+      res.status(500).json({ message: getErrorMessage(err) });
     }
   });
 }
