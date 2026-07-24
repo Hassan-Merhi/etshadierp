@@ -1772,6 +1772,86 @@ export function registerFactoryBaleExportRoutes(app: Express) {
       // ── Kg comparison ──
       const kgDiff = totalBaleWeightKg - totalMixWeightKg;
 
+      // ── Supplier mix breakdown (per day, per supplier) ──
+      // Fetch container → supplier name for container-type sources that have no direct supplierId
+      const containerOnlyIds = [
+        ...new Set(
+          mixSourceRows
+            .filter((s: any) => s.containerId != null && s.supplierId == null)
+            .map((s: any) => s.containerId as number)
+        ),
+      ];
+      const containerSupplierNameMap = new Map<number, string>();
+      if (containerOnlyIds.length > 0) {
+        const cRows = await pool.query(
+          `SELECT c.id, COALESCE(s.name, 'Unknown') AS supplier_name
+           FROM factory_containers c
+           LEFT JOIN factory_suppliers s ON s.id = c.supplier_id
+           WHERE c.id = ANY($1)`,
+          [containerOnlyIds]
+        );
+        for (const r of cRows.rows) {
+          containerSupplierNameMap.set(r.id as number, r.supplier_name as string);
+        }
+      }
+
+      // Fetch names for directly-linked supplier IDs
+      const directSupplierNameMap = new Map<number, string>();
+      if (reportSupplierIds.length > 0) {
+        const sRows = await pool.query(
+          `SELECT id, name FROM factory_suppliers WHERE id = ANY($1)`,
+          [reportSupplierIds]
+        );
+        for (const r of sRows.rows) {
+          directSupplierNameMap.set(r.id as number, r.name as string);
+        }
+      }
+
+      // Group sources → (date, supplierName) → { totalKg, totalCost }
+      type SupDay = { date: string; supplierName: string; totalKg: number; totalCost: number };
+      const supDayMap = new Map<string, SupDay>();
+
+      for (const batch of mixBatchRows as any[]) {
+        const batchDate: string = batch.batchDate
+          ? String(batch.batchDate).slice(0, 10)
+          : String(batch.createdAt).slice(0, 10);
+        const sources = reportSourcesByBatch.get(batch.id) || [];
+
+        for (const src of sources) {
+          if (src.sourceBatchId != null) continue; // skip batch-to-batch
+
+          // Supplier name
+          let supplierName = "Unknown";
+          if (src.supplierId != null) {
+            supplierName = directSupplierNameMap.get(src.supplierId) ?? `Supplier #${src.supplierId}`;
+          } else if (src.containerId != null) {
+            supplierName = containerSupplierNameMap.get(src.containerId) ?? "Unknown";
+          }
+
+          // Cost using same logic as correctedBatchRows
+          const w = parseFloat(src.weightKg || "0");
+          let cpk: number;
+          if (src.supplierId != null) {
+            cpk = reportSupplierRateMap.get(src.supplierId) ?? parseFloat(src.costPerKg || "0");
+          } else {
+            cpk = parseFloat(src.costPerKg || "0");
+          }
+
+          const key = `${batchDate}::${supplierName}`;
+          const ex = supDayMap.get(key);
+          if (ex) {
+            ex.totalKg += w;
+            ex.totalCost += w * cpk;
+          } else {
+            supDayMap.set(key, { date: batchDate, supplierName, totalKg: w, totalCost: w * cpk });
+          }
+        }
+      }
+
+      const supplierMixBreakdown = [...supDayMap.values()].sort((a, b) =>
+        a.date !== b.date ? a.date.localeCompare(b.date) : a.supplierName.localeCompare(b.supplierName)
+      );
+
       res.json({
         from: from || null,
         to: to || null,
@@ -1816,6 +1896,7 @@ export function registerFactoryBaleExportRoutes(app: Express) {
           diffKg: kgDiff,
           diffLabel: kgDiff >= 0 ? "more produced than mixed" : "less produced than mixed",
         },
+        supplierMixBreakdown,
       });
     } catch (error: any) {
       logger.error("Error fetching production value report:", { error: error });

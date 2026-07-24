@@ -89,12 +89,24 @@ interface ProductRow {
   qty: number;
   totalWeightKg: number;
 }
+interface SupplierDayRow {
+  date: string;
+  supplierName: string;
+  totalKg: number;
+  totalCost: number;
+}
 interface ReportData {
   production: {
     totalBales: number;
     totalWeightKg: number;
     byProduct: ProductRow[];
   };
+  summary?: {
+    batchCost: number;
+    productionValue: number;
+    statusValue: number;
+  };
+  supplierMixBreakdown?: SupplierDayRow[];
 }
 type Preset = "today-yesterday" | "month" | "year" | "custom";
 
@@ -117,6 +129,13 @@ function fmtKg(n: number) {
 }
 function fmtNum(n: number) {
   return n.toLocaleString("en-US");
+}
+function fmtMoney(n: number) {
+  const sign = n < 0 ? "-" : "+";
+  return `${sign}$${Math.abs(n).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+function fmtUsd(n: number) {
+  return `$${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 function pctChange(a: number, b: number): number | null {
   if (b === 0 && a === 0) return 0;
@@ -355,6 +374,8 @@ export default function ProductionComparison() {
   const [filterCategories, setFilterCategories] = useState<string[]>([]);
   const [filterGrades, setFilterGrades] = useState<string[]>([]);
   const [filterProduct, setFilterProduct] = useState("");
+  // Supplier mix breakdown filter
+  const [filterSuppliers, setFilterSuppliers] = useState<string[]>([]);
 
   const [rangeA, rangeB] = useMemo<[[string, string], [string, string]]>(() => {
     if (preset === "today-yesterday")
@@ -488,8 +509,77 @@ export default function ProductionComparison() {
   const balePct = pctChange(totalABales, totalBBales);
   const kgPct = pctChange(totalAKg, totalBKg);
 
+  // ── Profit ──
+  const profitA = qA.data?.summary?.statusValue ?? null;
+  const profitB = qB.data?.summary?.statusValue ?? null;
+  const profitDiff = profitA != null && profitB != null ? profitA - profitB : null;
+
+  // ── Supplier mix breakdown ──
+  const allSuppliers = useMemo(() => {
+    const s = new Set<string>();
+    for (const r of [...(qA.data?.supplierMixBreakdown ?? []), ...(qB.data?.supplierMixBreakdown ?? [])]) {
+      if (r.supplierName) s.add(r.supplierName);
+    }
+    return [...s].sort();
+  }, [qA.data, qB.data]);
+
+  const supplierBreakdownA = useMemo(() => {
+    const rows = (qA.data?.supplierMixBreakdown ?? []).filter(
+      (r) => filterSuppliers.length === 0 || filterSuppliers.includes(r.supplierName)
+    );
+    return rows;
+  }, [qA.data, filterSuppliers]);
+
+  const supplierBreakdownB = useMemo(() => {
+    const rows = (qB.data?.supplierMixBreakdown ?? []).filter(
+      (r) => filterSuppliers.length === 0 || filterSuppliers.includes(r.supplierName)
+    );
+    return rows;
+  }, [qB.data, filterSuppliers]);
+
+  // Merged supplier summary: per-supplier totals for A and B
+  const supplierSummary = useMemo(() => {
+    const map = new Map<string, { supplier: string; aKg: number; aCost: number; bKg: number; bCost: number }>();
+    const add = (rows: SupplierDayRow[], period: "a" | "b") => {
+      for (const r of rows) {
+        const ex = map.get(r.supplierName);
+        if (ex) {
+          if (period === "a") { ex.aKg += r.totalKg; ex.aCost += r.totalCost; }
+          else { ex.bKg += r.totalKg; ex.bCost += r.totalCost; }
+        } else {
+          map.set(r.supplierName, period === "a"
+            ? { supplier: r.supplierName, aKg: r.totalKg, aCost: r.totalCost, bKg: 0, bCost: 0 }
+            : { supplier: r.supplierName, aKg: 0, aCost: 0, bKg: r.totalKg, bCost: r.totalCost }
+          );
+        }
+      }
+    };
+    add(supplierBreakdownA, "a");
+    add(supplierBreakdownB, "b");
+    return [...map.values()].sort((a, b) => a.supplier.localeCompare(b.supplier));
+  }, [supplierBreakdownA, supplierBreakdownB]);
+
+  // Per-day breakdown (combined A+B rows, labelled by period)
+  const dailyBreakdown = useMemo(() => {
+    const rows: Array<SupplierDayRow & { period: string }> = [
+      ...supplierBreakdownA.map((r) => ({ ...r, period: labelA })),
+      ...supplierBreakdownB.map((r) => ({ ...r, period: labelB })),
+    ];
+    return rows.sort((a, b) =>
+      a.date !== b.date ? a.date.localeCompare(b.date) :
+      a.period !== b.period ? a.period.localeCompare(b.period) :
+      a.supplierName.localeCompare(b.supplierName)
+    );
+  }, [supplierBreakdownA, supplierBreakdownB, labelA, labelB]);
+
+  const totalSupAKg = supplierBreakdownA.reduce((s, r) => s + r.totalKg, 0);
+  const totalSupACost = supplierBreakdownA.reduce((s, r) => s + r.totalCost, 0);
+  const totalSupBKg = supplierBreakdownB.reduce((s, r) => s + r.totalKg, 0);
+  const totalSupBCost = supplierBreakdownB.reduce((s, r) => s + r.totalCost, 0);
+
   const hasActiveFilter =
     filterCategories.length > 0 || filterGrades.length > 0 || filterProduct !== "";
+  const hasSupplierFilter = filterSuppliers.length > 0;
 
   return (
     <div className="flex flex-col gap-4 p-4 md:p-6">
@@ -650,7 +740,153 @@ export default function ProductionComparison() {
             />
           </div>
 
-          {/* ── Filters ── */}
+          {/* Row 3: Production Profit */}
+          {(profitA != null || profitB != null) && (
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <StatCard
+                title={`${labelA} — Production Profit`}
+                value={profitA != null ? fmtMoney(profitA) : "—"}
+                sub={fmtDateRange(rangeA[0], rangeA[1])}
+                accent={profitA != null ? (profitA > 0 ? "green" : profitA < 0 ? "red" : "neutral") : undefined}
+                valueClass={
+                  profitA == null ? "text-muted-foreground"
+                    : profitA > 0 ? "text-emerald-600"
+                    : profitA < 0 ? "text-red-500"
+                    : "text-muted-foreground"
+                }
+              />
+              <StatCard
+                title={`${labelB} — Production Profit`}
+                value={profitB != null ? fmtMoney(profitB) : "—"}
+                sub={fmtDateRange(rangeB[0], rangeB[1])}
+                accent={profitB != null ? (profitB > 0 ? "green" : profitB < 0 ? "red" : "neutral") : undefined}
+                valueClass={
+                  profitB == null ? "text-muted-foreground"
+                    : profitB > 0 ? "text-emerald-600"
+                    : profitB < 0 ? "text-red-500"
+                    : "text-muted-foreground"
+                }
+              />
+              <StatCard
+                title="Profit Difference"
+                value={profitDiff != null ? fmtMoney(profitDiff) : "—"}
+                sub={`${labelA} vs ${labelB}`}
+                accent={profitDiff != null ? (profitDiff > 0 ? "green" : profitDiff < 0 ? "red" : "neutral") : undefined}
+                valueClass={
+                  profitDiff == null ? "text-muted-foreground"
+                    : profitDiff > 0 ? "text-emerald-600"
+                    : profitDiff < 0 ? "text-red-500"
+                    : "text-muted-foreground"
+                }
+              />
+            </div>
+          )}
+
+          {/* ── Mix by Supplier ── */}
+          {(supplierBreakdownA.length > 0 || supplierBreakdownB.length > 0) && (
+            <div className="rounded-lg border overflow-hidden">
+              {/* Header row */}
+              <div className="flex items-center justify-between gap-3 px-4 py-3 border-b bg-muted/30">
+                <div>
+                  <p className="text-sm font-semibold">Raw Material by Supplier</p>
+                  <p className="text-xs text-muted-foreground">
+                    Mix batch usage per supplier · {labelA}: {fmtKg(totalSupAKg)} kg / {fmtUsd(totalSupACost)}
+                    {" · "}
+                    {labelB}: {fmtKg(totalSupBKg)} kg / {fmtUsd(totalSupBCost)}
+                  </p>
+                </div>
+                <MultiSelectFilter
+                  options={allSuppliers}
+                  selected={filterSuppliers}
+                  onChange={setFilterSuppliers}
+                  placeholder="Suppliers"
+                  allLabel="All Suppliers"
+                  className="w-44 shrink-0"
+                />
+              </div>
+
+              {/* Supplier summary table */}
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Supplier</TableHead>
+                    <TableHead className="text-right">{labelA} — kg</TableHead>
+                    <TableHead className="text-right">{labelA} — cost</TableHead>
+                    <TableHead className="text-right">{labelB} — kg</TableHead>
+                    <TableHead className="text-right">{labelB} — cost</TableHead>
+                    <TableHead className="text-right">Kg Diff</TableHead>
+                    <TableHead className="text-right">Cost Diff</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {supplierSummary.map((row) => {
+                    const kd = row.aKg - row.bKg;
+                    const cd = row.aCost - row.bCost;
+                    return (
+                      <TableRow key={row.supplier}>
+                        <TableCell className="font-medium">{row.supplier}</TableCell>
+                        <TableCell className="text-right tabular-nums">{fmtKg(row.aKg)} kg</TableCell>
+                        <TableCell className="text-right tabular-nums text-muted-foreground">{fmtUsd(row.aCost)}</TableCell>
+                        <TableCell className="text-right tabular-nums">{fmtKg(row.bKg)} kg</TableCell>
+                        <TableCell className="text-right tabular-nums text-muted-foreground">{fmtUsd(row.bCost)}</TableCell>
+                        <TableCell className="text-right">
+                          <DiffCell value={kd} fmt={(n) => `${n > 0 ? "+" : ""}${fmtKg(n)} kg`} />
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <DiffCell value={cd} fmt={(n) => `${n > 0 ? "+" : ""}${fmtUsd(Math.abs(n))}`} />
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                  {supplierSummary.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={7} className="text-center text-muted-foreground py-6 text-sm">
+                        {hasSupplierFilter ? "No data for selected suppliers." : "No mix batch data."}
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+
+              {/* Daily detail (collapsible-style: always shown when ≤30 rows, hidden behind toggle otherwise) */}
+              {dailyBreakdown.length > 0 && (
+                <details className="group">
+                  <summary className="flex items-center gap-2 px-4 py-2 text-xs text-muted-foreground cursor-pointer border-t hover:bg-muted/20 select-none list-none">
+                    <ChevronDown className="h-3.5 w-3.5 group-open:rotate-180 transition-transform" />
+                    Per-day breakdown ({dailyBreakdown.length} rows)
+                  </summary>
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="w-[110px]">Date</TableHead>
+                          <TableHead className="w-[80px]">Period</TableHead>
+                          <TableHead>Supplier</TableHead>
+                          <TableHead className="text-right">kg Used</TableHead>
+                          <TableHead className="text-right">Cost</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {dailyBreakdown.map((r, i) => (
+                          <TableRow key={i}>
+                            <TableCell className="tabular-nums text-sm">{r.date}</TableCell>
+                            <TableCell>
+                              <Badge variant="outline" className="text-xs font-normal">{r.period}</Badge>
+                            </TableCell>
+                            <TableCell className="font-medium text-sm">{r.supplierName}</TableCell>
+                            <TableCell className="text-right tabular-nums text-sm">{fmtKg(r.totalKg)} kg</TableCell>
+                            <TableCell className="text-right tabular-nums text-sm text-muted-foreground">{fmtUsd(r.totalCost)}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </details>
+              )}
+            </div>
+          )}
+
+          {/* ── Bale filters ── */}
           <div className="flex flex-wrap gap-3 items-center">
             <MultiSelectFilter
               options={categories}
@@ -698,7 +934,7 @@ export default function ProductionComparison() {
             )}
           </div>
 
-          {/* ── Comparison table ── */}
+          {/* ── Bale comparison table ── */}
           {filtered.length === 0 ? (
             <div className="rounded-lg border p-12 text-center text-sm text-muted-foreground">
               {mergedAll.length === 0
