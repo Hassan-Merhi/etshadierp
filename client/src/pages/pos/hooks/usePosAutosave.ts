@@ -30,9 +30,13 @@ export function usePosAutosave({
   setLastAutosaved,
   refetchDrafts,
 }: PosAutosaveParams) {
-  // Autosave every 7 seconds
+  // Autosave every 3 seconds — stops permanently on 401 (session expired)
   useEffect(() => {
+    // Tracks whether the session has expired; once true, all future ticks are no-ops.
+    let sessionLost = false;
+
     const interval = setInterval(async () => {
+      if (sessionLost) return; // session expired — stop hammering the server
       const s = autoSaveStateRef.current;
       if (!s.activeLocation) return;
       if (autoSaveInProgressRef.current || s.saveDraftIsPending) return;
@@ -80,8 +84,13 @@ export function usePosAutosave({
         lastSavedFingerprintRef.current = fingerprint;
         setLastAutosaved(new Date());
         refetchDrafts();
-      } catch {
-        // Silent autosave failures
+      } catch (err: unknown) {
+        // Stop autosave entirely if session has expired (401) — avoids
+        // hammering the server with unauthenticated requests every 3 seconds.
+        if (err && typeof err === "object" && "status" in err && (err as any).status === 401) {
+          sessionLost = true;
+        }
+        // All other failures are silent — transient network issues, etc.
       } finally {
         autoSaveInProgressRef.current = false;
       }
