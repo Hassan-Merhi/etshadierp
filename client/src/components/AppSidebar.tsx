@@ -101,6 +101,7 @@ export const ERP_NAV_SECTIONS: NavSection[] = [
     color: NAV_COLOR.analytics,
     items: [
       { title: "Sales Report", url: "/sales-report", icon: PieChart },
+      { title: "Stock In & Sales", url: "/stock-in-sales-report", icon: BarChart3 },
       { title: "Analytics", url: "/analytics", icon: BarChart3 },
       { title: "Net Profit Report", url: "/net-profit-report", icon: TrendingUp },
     ],
@@ -160,7 +161,7 @@ export function useErpVisibleSections(user?: any): {
     const isAdmin = effectiveRole === "Admin" || effectiveRole === "Developer";
     const isDeveloper = effectiveRole === "Developer";
     const isOwner = effectiveRole === "Owner";
-    const featureKey = ROUTE_TO_FEATURE[item.url];
+    const featureKey = item.url === "/stock-in-sales-report" ? "sales_report" : ROUTE_TO_FEATURE[item.url];
 
     if (item.url === "/tracking") return ["Admin", "Developer", "Owner"].includes(effectiveRole);
 
@@ -368,7 +369,7 @@ export function AppSidebar({ user }: { user?: any }) {
               </Badge>
             </a>
           )}
-          {!["Admin", "Owner", "Developer"].includes(user?.currentRole ?? user?.role ?? "") && (
+          {!['Admin', 'Owner', 'Developer'].includes(user?.currentRole ?? user?.role ?? '') && (
             <SidebarFlatLink href="/my-settings" icon={KeyRound} label="My Settings" testId="link-my-settings" />
           )}
           <SidebarFlatLink
