@@ -410,16 +410,14 @@ export default function StockInSalesReport() {
           data-testid="period-filter-stock-in-sales-report"
         />
 
-        <Button
-          variant="outline"
-          size="sm"
-          className="gap-1.5 cursor-default"
+        <div
+          className="flex h-9 cursor-default items-center gap-1.5 rounded-md border border-input bg-background px-3 text-sm font-medium"
           title={selectedCompany?.name || "Current Company"}
           data-testid="button-stock-in-sales-current-company"
         >
           <Building2 className="h-4 w-4" />
           Current Company
-        </Button>
+        </div>
 
         <div className="h-5 w-px bg-border" />
 
@@ -445,17 +443,14 @@ export default function StockInSalesReport() {
           </SelectContent>
         </Select>
 
-        <Button
-          variant="default"
-          size="sm"
-          className="gap-1.5 cursor-default"
-          aria-pressed="true"
-          title="Cash sales, credit sales, and notes are shown as one net result"
+        <div
+          className="flex h-9 cursor-default items-center gap-1.5 rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground"
+          aria-label="Cash and credit sales merged"
           data-testid="button-stock-in-sales-merged"
         >
           <GitMerge className="h-4 w-4" />
           Merged
-        </Button>
+        </div>
 
         <MultiSelectFilter
           label="Locations"
