@@ -10,6 +10,7 @@ import { registerSpReportRoutes } from "./spReportRoutes";
 import { registerSpExportRoutes } from "./spExportRoutes";
 import { registerSpMigrationPhase2Routes } from "./spMigrationPhase2Routes";
 import { registerSpMigrationCutoverRoutes } from "./spMigrationCutoverRoutes";
+import { registerSpMigrationFinalVerificationRoutes } from "./spMigrationFinalVerification";
 import { ensureCutoverHardening, installExplicitCompanyWriteGuard } from "./spMigrationCutoverHardening";
 import { ensureSpSupplierVoucherSyncTrigger, repairSpSupplierVoucherLinks } from "./spSupplierVoucherSync";
 
@@ -26,6 +27,7 @@ export function registerSpRoutes(app: Express) {
   installExplicitCompanyWriteGuard(app);
   registerSpMigrationCutoverRoutes(app);
   registerSpMigrationPhase2Routes(app);
+  registerSpMigrationFinalVerificationRoutes(app);
   void ensureCutoverHardening().catch((error) => {
     logger.warn("[SP Cutover] Hardening indexes deferred", {
       error: error instanceof Error ? error.message : String(error),
