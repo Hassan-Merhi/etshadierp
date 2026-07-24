@@ -28,19 +28,28 @@ import { repairSpSupplierVoucherLinks } from "./spSupplierVoucherSync";
 
 const installedApps = new WeakSet<object>();
 let holdCache: { expiresAt: number; byCompany: Map<number, any> } | null = null;
+let phase4RouteSchemaPromise: Promise<void> | null = null;
 
 function invalidatePhase4HoldCache(): void {
   holdCache = null;
   invalidateCutoverLockCache();
 }
 
-async function ensurePhase4Schema(): Promise<void> {
-  await Promise.all([ensurePhase4CutoverSchema(), ensureCutoverHardening()]);
-  await db.execute(sql.raw(`
-    ALTER TABLE sp_migration_cutovers
-      ADD COLUMN IF NOT EXISTS rollback_window_hours INTEGER NOT NULL DEFAULT 72,
-      ADD COLUMN IF NOT EXISTS finalize_started_at TIMESTAMPTZ
-  `));
+function ensurePhase4Schema(): Promise<void> {
+  if (!phase4RouteSchemaPromise) {
+    phase4RouteSchemaPromise = (async () => {
+      await Promise.all([ensurePhase4CutoverSchema(), ensureCutoverHardening()]);
+      await db.execute(sql.raw(`
+        ALTER TABLE sp_migration_cutovers
+          ADD COLUMN IF NOT EXISTS rollback_window_hours INTEGER NOT NULL DEFAULT 72,
+          ADD COLUMN IF NOT EXISTS finalize_started_at TIMESTAMPTZ
+      `));
+    })().catch((error) => {
+      phase4RouteSchemaPromise = null;
+      throw error;
+    });
+  }
+  return phase4RouteSchemaPromise;
 }
 
 function collectCompanyIds(req: Request): number[] {
@@ -271,11 +280,11 @@ async function targetLiveActivity(targetId: number, activatedAt?: string | null)
   return { ...counts, total: Object.values(counts).reduce((sum, value) => sum + value, 0) };
 }
 
-async function normalizedVerification(sourceId: number, targetId: number): Promise<any> {
+async function normalizedVerification(sourceId: number, targetId: number, requireUnusedTarget = true): Promise<any> {
   const verification = await buildFinalMigrationVerification(sourceId, targetId);
   verification.blockers = (verification.blockers ?? []).filter((issue: any) => issue.code !== "TARGET_ALREADY_LIVE");
   const activity = await targetLiveActivity(targetId);
-  if (activity.total > 0) {
+  if (requireUnusedTarget && activity.total > 0) {
     verification.blockers.push({
       code: "TARGET_ALREADY_LIVE",
       message: `Target contains ${activity.total} genuine non-migration transaction(s).`,
@@ -629,14 +638,15 @@ async function statusCutover(req: any, res: any): Promise<any> {
   return res.json({
     liveCutover: live,
     latestCutover: (latestResult as any).rows?.[0] ?? null,
-    verification: await normalizedVerification(pair.sourceId, pair.targetId),
+    verification: await normalizedVerification(pair.sourceId, pair.targetId, !live || live.status === "prepared"),
   });
 }
 
 async function finalVerification(req: any, res: any): Promise<any> {
   const pair = await validateMigrationPair(req, res, false);
   if (!pair) return;
-  return res.json(await normalizedVerification(pair.sourceId, pair.targetId));
+  const live = await getLiveCutover(pair.sourceId, pair.targetId);
+  return res.json(await normalizedVerification(pair.sourceId, pair.targetId, !live || live.status === "prepared"));
 }
 
 export function registerSpMigrationPhase4Routes(app: Express): void {
