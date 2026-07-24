@@ -1,4 +1,5 @@
 import { getClientDate } from "../../lib/dateUtils";
+import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
 import type { Express } from "express";
 import { db, pool } from "../../db";
@@ -207,8 +208,8 @@ export function registerDeletedItemsRoutes(app: Express) {
         orphanedVouchers,
         unbalancedVouchers,
       });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -253,8 +254,8 @@ export function registerDeletedItemsRoutes(app: Express) {
         .where(inArray(vouchers.id, voucherIds));
 
       res.json({ success: true, updated: voucherIds.length, newLocationName: newLocation.name });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -321,9 +322,9 @@ export function registerDeletedItemsRoutes(app: Express) {
       });
 
       res.json({ success: true, deleted: orphanedIds.length });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error deleting orphaned vouchers:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -576,9 +577,9 @@ export function registerDeletedItemsRoutes(app: Express) {
         grandTotals,
         asOfDate,
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Location summary error:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -618,8 +619,8 @@ export function registerDeletedItemsRoutes(app: Express) {
         message: `Cleaned up ${deletedCount} orphaned charge vouchers`,
         deletedCount,
       });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -964,8 +965,8 @@ export function registerDeletedItemsRoutes(app: Express) {
           deletedCustomerProformas.length +
           deletedCustomerOrders.length,
       });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -1145,8 +1146,8 @@ export function registerDeletedItemsRoutes(app: Express) {
       }
 
       res.json({ message: `${type} restored successfully` });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -1328,8 +1329,8 @@ export function registerDeletedItemsRoutes(app: Express) {
       }
 
       res.json({ message: `${type} permanently deleted` });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 

@@ -1,4 +1,5 @@
 import cron from "node-cron";
+import { getErrorMessage, getErrorStack } from "../lib/httpHandlers";
 import archiver from "archiver";
 import { PassThrough } from "stream";
 import { logger } from "../lib/logger";
@@ -48,9 +49,9 @@ async function buildNetPositionZip(companies: any[], startDate: string, endDate:
           await generateNetPositionExcel(company.id, company.name, startDate, endDate, pass);
           if (!pass.destroyed) pass.end();
           logger.info(`[NetPositionExport] Added ${company.name}`);
-        } catch (e: any) {
-          logger.error(`[NetPositionExport] Failed for ${company.name}:`, { error: e.message });
-          if (!pass.destroyed) pass.destroy(e);
+        } catch (e: unknown) {
+          logger.error(`[NetPositionExport] Failed for ${company.name}:`, { error: getErrorMessage(e) });
+          if (!pass.destroyed) pass.destroy(e instanceof Error ? e : undefined);
         }
       }
 
@@ -133,8 +134,8 @@ export async function checkAndRecoverDailyExport(): Promise<void> {
     }
     logger.info("[DailyExport] Recovery check: re-running today's failed/missed export...");
     await runDailyExport();
-  } catch (e: any) {
-    logger.error("[DailyExport] Recovery check error:", { error: e?.message || e });
+  } catch (e: unknown) {
+    logger.error("[DailyExport] Recovery check error:", { error: getErrorMessage(e) || e });
   }
 }
 
@@ -303,9 +304,9 @@ async function runDailyExport(): Promise<boolean> {
     });
 
     return finalStatus !== "failed";
-  } catch (err: any) {
-    logger.error(`[DailyExport] Unexpected error in run ${runId}:`, { error: err?.stack || err?.message || err });
-    await finishExportRun(runId, { status: "failed", skippedReason: err?.message || "Unexpected error" }).catch(
+  } catch (err: unknown) {
+    logger.error(`[DailyExport] Unexpected error in run ${runId}:`, { error: getErrorStack(err) || getErrorMessage(err) || err });
+    await finishExportRun(runId, { status: "failed", skippedReason: getErrorMessage(err) || "Unexpected error" }).catch(
       () => {}
     );
     return false;
@@ -377,8 +378,8 @@ async function runDailyWhatsAppSend(
     const errMsg = zipRes.error || "Send failed";
     logger.error(`[WhatsApp] Daily ZIP send error: ${errMsg}`);
     return { sent: false, skipped: false, error: errMsg };
-  } catch (err: any) {
-    const errMsg = err?.message || "Unknown error";
+  } catch (err: unknown) {
+    const errMsg = getErrorMessage(err) || "Unknown error";
     logger.error("[WhatsApp] Daily send error:", { error: errMsg });
     return { sent: false, skipped: false, error: errMsg };
   }
@@ -534,8 +535,8 @@ export async function checkAndRunStockReport(): Promise<void> {
     // Mark as sent
     await pool.query(`UPDATE whatsapp_stock_settings SET last_sent_at = now() WHERE id = 1`);
     logger.info(`[StockReport] Done — last_sent_at updated.`);
-  } catch (err: any) {
-    logger.error("[StockReport] Error:", { error: err?.message || err });
+  } catch (err: unknown) {
+    logger.error("[StockReport] Error:", { error: getErrorMessage(err) || err });
   }
 }
 
@@ -615,8 +616,8 @@ export async function checkAndRunNetPositionExport(): Promise<void> {
     // Mark as sent
     await pool.query(`UPDATE net_position_export_settings SET last_sent_at = now() WHERE id = 1`);
     logger.info(`[NetPositionExport] Done — last_sent_at updated.`);
-  } catch (err: any) {
-    logger.error("[NetPositionExport] Error:", { error: err?.message || err });
+  } catch (err: unknown) {
+    logger.error("[NetPositionExport] Error:", { error: getErrorMessage(err) || err });
   }
 }
 
@@ -663,12 +664,12 @@ async function runMonthlyWhatsAppNetPosition() {
         const caption = "";
         const result = await sendWhatsAppFile(buffer, fileName, caption);
         logger.info(`[WhatsApp] ${company.name}: sent=${result.sent} failed=${result.failed}`);
-      } catch (compErr: any) {
-        logger.error(`[WhatsApp] Failed for ${company.name}:`, { error: compErr.message });
+      } catch (compErr: unknown) {
+        logger.error(`[WhatsApp] Failed for ${company.name}:`, { error: getErrorMessage(compErr) });
       }
     }
     logger.info("[WhatsApp] Monthly net-position send complete.");
-  } catch (err: any) {
+  } catch (err: unknown) {
     logger.error("[WhatsApp] Monthly send error:", { error: err });
   }
 }
@@ -772,8 +773,8 @@ export async function checkOverdueCustomers(): Promise<void> {
     } else {
       logger.error("[OverdueCheck] Failed to send WhatsApp reminder:", { error: waRes.errors });
     }
-  } catch (err: any) {
-    logger.error("[OverdueCheck] Error during overdue check:", { error: err.message });
+  } catch (err: unknown) {
+    logger.error("[OverdueCheck] Error during overdue check:", { error: getErrorMessage(err) });
   }
 }
 
@@ -827,8 +828,8 @@ async function checkAndRunScheduledDailyExport(): Promise<void> {
         logger.error(`[DailyExport] All ${MAX_ATTEMPTS} attempts failed.`);
       }
     }
-  } catch (err: any) {
-    logger.error("[DailyExport] checkAndRunScheduledDailyExport error:", { error: err?.message || err });
+  } catch (err: unknown) {
+    logger.error("[DailyExport] checkAndRunScheduledDailyExport error:", { error: getErrorMessage(err) || err });
   }
 }
 
@@ -854,14 +855,14 @@ async function runMonthlyRentalAccrual() {
           await ensureMonthlyForCompany(companyId, module as any);
           const { accrued } = await postRentAccrualForCompany(companyId, expense, module, income);
           totalAccrued += accrued;
-        } catch (err: any) {
-          logger.error(`[RentalAccrual] company=${companyId} module=${module}: ${err?.message}`);
+        } catch (err: unknown) {
+          logger.error(`[RentalAccrual] company=${companyId} module=${module}: ${getErrorMessage(err)}`);
         }
       }
     }
     logger.info(`[RentalAccrual] Monthly auto-accrual complete — ${totalAccrued} rows accrued.`);
-  } catch (err: any) {
-    logger.error("[RentalAccrual] Fatal error:", { error: err?.message });
+  } catch (err: unknown) {
+    logger.error("[RentalAccrual] Fatal error:", { error: getErrorMessage(err) });
   }
 }
 
@@ -878,7 +879,7 @@ export function startScheduler() {
       try {
         await runMonthlyWhatsAppNetPosition();
         logger.info("cron monthlyNetPosition succeeded", { module: "scheduler", action: "monthlyNetPosition", durationMs: Date.now() - _t });
-      } catch (err: any) {
+      } catch (err: unknown) {
         logger.error("cron monthlyNetPosition failed", { module: "scheduler", action: "monthlyNetPosition", durationMs: Date.now() - _t, error: err });
       }
     },
@@ -896,7 +897,7 @@ export function startScheduler() {
       try {
         await runMonthlyRentalAccrual();
         logger.info("cron monthlyRentalAccrual succeeded", { module: "scheduler", action: "monthlyRentalAccrual", durationMs: Date.now() - _t });
-      } catch (err: any) {
+      } catch (err: unknown) {
         logger.error("cron monthlyRentalAccrual failed", { module: "scheduler", action: "monthlyRentalAccrual", durationMs: Date.now() - _t, error: err });
       }
     },
@@ -919,7 +920,7 @@ export function startScheduler() {
         await checkAndRunScheduledDailyExport();
         await checkAndRunContainersWhatsApp();
         logger.info("cron hourlyChecks succeeded", { module: "scheduler", action: "hourlyChecks", durationMs: Date.now() - _t });
-      } catch (err: any) {
+      } catch (err: unknown) {
         logger.error("cron hourlyChecks failed", { module: "scheduler", action: "hourlyChecks", durationMs: Date.now() - _t, error: err });
       }
     },
@@ -937,7 +938,7 @@ export function startScheduler() {
       try {
         await checkOverdueCustomers();
         logger.info("cron overdueCheck succeeded", { module: "scheduler", action: "overdueCheck", durationMs: Date.now() - _t });
-      } catch (err: any) {
+      } catch (err: unknown) {
         logger.error("cron overdueCheck failed", { module: "scheduler", action: "overdueCheck", durationMs: Date.now() - _t, error: err });
       }
     },
@@ -955,7 +956,7 @@ export function startScheduler() {
       try {
         await purgeOldSoftDeletes();
         logger.info("cron softDeletePurge succeeded", { module: "scheduler", action: "softDeletePurge", durationMs: Date.now() - _t });
-      } catch (err: any) {
+      } catch (err: unknown) {
         logger.error("cron softDeletePurge failed", { module: "scheduler", action: "softDeletePurge", durationMs: Date.now() - _t, error: err });
       }
     },
@@ -973,14 +974,14 @@ export function startScheduler() {
       try {
         const { trackDueContainers } = await import("./containerTrackingService");
         await trackDueContainers();
-      } catch (err: any) {
+      } catch (err: unknown) {
         logger.error("cron containerTracking (ERP) failed", { module: "scheduler", action: "containerTracking", durationMs: Date.now() - _t, error: err });
       }
       try {
         const { trackDueFactoryContainers } = await import("./factoryContainerTrackingService");
         await trackDueFactoryContainers();
         logger.info("cron containerTracking succeeded", { module: "scheduler", action: "containerTracking", durationMs: Date.now() - _t });
-      } catch (err: any) {
+      } catch (err: unknown) {
         logger.error("cron containerTracking (factory) failed", { module: "scheduler", action: "containerTracking", durationMs: Date.now() - _t, error: err });
       }
     },
@@ -1069,9 +1070,9 @@ async function purgeOldSoftDeletes(): Promise<void> {
 
     await client.query("COMMIT");
     logger.info("[Purge] 30-day soft-delete purge complete.");
-  } catch (err: any) {
+  } catch (err: unknown) {
     await client.query("ROLLBACK").catch(() => {});
-    logger.error("[Purge] Error during soft-delete purge (rolled back):", { error: err.message });
+    logger.error("[Purge] Error during soft-delete purge (rolled back):", { error: getErrorMessage(err) });
   } finally {
     client.release();
   }
@@ -1116,8 +1117,8 @@ async function checkAndRunContainersWhatsApp(): Promise<void> {
     } else {
       logger.error("[ContainersWA] Scheduled send failed:", { error: result.error });
     }
-  } catch (err: any) {
-    logger.error("[ContainersWA] Error:", { error: err?.message });
+  } catch (err: unknown) {
+    logger.error("[ContainersWA] Error:", { error: getErrorMessage(err) });
   }
 }
 
@@ -1141,8 +1142,8 @@ export async function triggerDailyWhatsAppSendNow(fromDate?: string, toDate?: st
   let zip: Buffer, names: string[], skipped: string[];
   try {
     ({ zip, names, skipped } = await buildFullExportZip(companies, fromDate, toDate));
-  } catch (err: any) {
-    await finishExportRun(runId, { status: "failed", skippedReason: err.message });
+  } catch (err: unknown) {
+    await finishExportRun(runId, { status: "failed", skippedReason: getErrorMessage(err) });
     throw err;
   }
 

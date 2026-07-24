@@ -107,7 +107,7 @@ export function requireLegacyPrivilegedWrite(options: LegacyPrivilegedWriteOptio
       });
       await audit(req, options, "allowed", "AUTHORIZED", sourceId);
       return next();
-    } catch (error: any) {
+    } catch (error: unknown) {
       const denied = error instanceof PrivilegedOperationError || error instanceof AuthorizationDeniedError;
       if (!denied) return next(error);
       try {

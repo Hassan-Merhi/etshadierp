@@ -112,7 +112,7 @@ export function requireStoredFileAccess(action: "read" | "download") {
       res.setHeader("X-Content-Type-Options", "nosniff");
       res.setHeader("Cache-Control", "private, no-store");
       return next();
-    } catch (error: any) {
+    } catch (error: unknown) {
       const denied = error instanceof AuthorizationDeniedError || error instanceof ProtectedAssetAccessError;
       if (!denied) return next(error);
       try {

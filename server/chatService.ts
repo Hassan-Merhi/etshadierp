@@ -1,4 +1,5 @@
 import { db } from "./db";
+import { getErrorMessage, getErrorStack } from "./lib/httpHandlers";
 import { logger } from "./lib/logger";
 import * as schema from "@shared/schema";
 import {
@@ -329,7 +330,7 @@ export async function chat(
             const { content, totalLines, truncated } = await readProjectFile(fp);
             codeContext += `\n\n**File: ${fp}** (${totalLines} lines${truncated ? `, first 300 shown` : ""})\n\`\`\`typescript\n${content}\n\`\`\``;
             if (!codeReadFiles.includes(fp)) codeReadFiles.push(fp);
-          } catch (err: any) {
+          } catch (err: unknown) {
             // Still not found — fall back to grep by base name
             const basename = fp.replace(/.*\//, "").replace(/\.\w+$/, "");
             const grepResult = await grepProjectFiles(basename, ".").catch(() => "(not found)");
@@ -343,7 +344,7 @@ export async function chat(
           try {
             const grepResult = await grepProjectFiles(pattern, ".");
             codeContext = `\n\n**Search results for \`${pattern}\`:**\n\`\`\`\n${grepResult}\n\`\`\``;
-          } catch (err: any) {
+          } catch (err: unknown) {
             codeContext = `\n\n**Search error:** ${(err as Error).message}`;
           }
         } else if (/\b(?:list files|ls\b|what files|directory)\b/i.test(userMessage)) {
@@ -352,7 +353,7 @@ export async function chat(
           try {
             const entries = await listProjectDir(dir);
             codeContext = `\n\n**Directory listing for \`${dir}\`:**\n${entries.join("\n")}`;
-          } catch (err: any) {
+          } catch (err: unknown) {
             codeContext = `\n\n**Listing error:** ${(err as Error).message}`;
           }
         }
@@ -1859,20 +1860,20 @@ If the intent does not match any type, output: null`;
       filePatchDrafts: filePatchDrafts && filePatchDrafts.length > 0 ? filePatchDrafts : undefined,
       readFiles: codeReadFiles.length > 0 ? codeReadFiles : undefined,
     };
-  } catch (error: any) {
-    logger.error("[ChatService] ERROR:", { error: error.message });
-    logger.error("[ChatService] Stack:", { error: error.stack });
+  } catch (error: unknown) {
+    logger.error("[ChatService] ERROR:", { error: getErrorMessage(error) });
+    logger.error("[ChatService] Stack:", { error: getErrorStack(error) });
     if (
-      error.message?.includes("API_KEY") ||
-      error.message?.includes("API key") ||
-      error.message?.includes("not configured")
+      getErrorMessage(error)?.includes("API_KEY") ||
+      getErrorMessage(error)?.includes("API key") ||
+      getErrorMessage(error)?.includes("not configured")
     ) {
       return {
         response: "Invalid or missing API key. Please check your AI provider configuration in Settings.",
         suggestions: [],
       };
     }
-    if (error.message?.includes("quota") || error.message?.includes("rate limit") || error.message?.includes("429")) {
+    if (getErrorMessage(error)?.includes("quota") || getErrorMessage(error)?.includes("rate limit") || getErrorMessage(error)?.includes("429")) {
       const available = getAvailableProviders();
       return {
         response: `API quota exceeded. ${available.length > 1 ? "Trying fallback providers also failed. " : ""}Please try again later or add additional AI provider keys in your environment.`,
@@ -1881,7 +1882,7 @@ If the intent does not match any type, output: null`;
     }
     // Catch-all: return a friendly inline error so the route always returns 200
     return {
-      response: `Sorry, something went wrong while processing your request. (${error.message || "Unknown error"})`,
+      response: `Sorry, something went wrong while processing your request. (${getErrorMessage(error) || "Unknown error"})`,
       suggestions: [],
     };
   }

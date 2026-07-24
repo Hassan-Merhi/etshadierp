@@ -41,8 +41,8 @@ export async function cleanupStaleTemporaryExportArchives(
           if (nowMs - stat.mtimeMs < maxAgeMs) return;
           await fs.promises.rm(filePath, { force: true });
           removed += 1;
-        } catch (error: any) {
-          if (error?.code !== "ENOENT") {
+        } catch (error: unknown) {
+          if ((error as { code?: string }).code !== "ENOENT") {
             logger.warn(`[ExportArchive] Failed to inspect or remove stale file ${filePath}:`, { error: error });
           }
         }
@@ -98,8 +98,8 @@ export async function releaseTemporaryExportArchive(filePath: string | undefined
   if (!filePath) return;
   try {
     await fs.promises.rm(filePath, { force: true });
-  } catch (error: any) {
-    if (error?.code !== "ENOENT") {
+  } catch (error: unknown) {
+    if ((error as { code?: string }).code !== "ENOENT") {
       logger.warn(`[ExportArchive] Failed to release temporary archive ${filePath}:`, { error: error });
     }
   }
@@ -113,8 +113,8 @@ export async function streamTemporaryExportArchive(
   let stat: fs.Stats;
   try {
     stat = await fs.promises.stat(filePath);
-  } catch (error: any) {
-    if (error?.code === "ENOENT") throw new Error("Export archive has expired or was already downloaded");
+  } catch (error: unknown) {
+    if ((error as { code?: string }).code === "ENOENT") throw new Error("Export archive has expired or was already downloaded");
     throw error;
   }
 

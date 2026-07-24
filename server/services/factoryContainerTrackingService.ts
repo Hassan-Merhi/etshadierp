@@ -8,6 +8,7 @@
  */
 
 import { db } from "../db";
+import { getErrorMessage } from "../lib/httpHandlers";
 import { logger } from "../lib/logger";
 import { factoryContainers, factoryContainerTrackingEvents, factoryContainerTrackingChecks } from "../../shared/schema";
 import { and, eq, gte, sql } from "drizzle-orm";
@@ -151,8 +152,8 @@ async function saveTrackingCheck(
       errorMessage,
       rawResponseJson: rawResponse as any,
     });
-  } catch (err: any) {
-    logger.warn("[FactoryTracking] Check record save warn", { error: err?.message });
+  } catch (err: unknown) {
+    logger.warn("[FactoryTracking] Check record save warn", { error: getErrorMessage(err) });
   }
 }
 
@@ -172,8 +173,8 @@ async function saveDirectEvents(containerId: number, result: CarrierTrackResult)
           rawEventJson: { provider: result.provider, ...ev } as any,
         })
         .onConflictDoNothing();
-    } catch (err: any) {
-      logger.warn("[FactoryTracking] Direct event save warn", { error: err?.message });
+    } catch (err: unknown) {
+      logger.warn("[FactoryTracking] Direct event save warn", { error: getErrorMessage(err) });
     }
   }
 }
@@ -200,8 +201,8 @@ async function saveParcelsAppEvents(containerId: number, shipment: ParcelsAppShi
           rawEventJson: ev as any,
         })
         .onConflictDoNothing();
-    } catch (err: any) {
-      logger.warn("[FactoryTracking] ParcelsApp event save warn", { error: err?.message });
+    } catch (err: unknown) {
+      logger.warn("[FactoryTracking] ParcelsApp event save warn", { error: getErrorMessage(err) });
     }
   }
 }
@@ -218,8 +219,8 @@ async function setSchedulerMeta(
       .update(factoryContainers)
       .set(patch as any)
       .where(eq(factoryContainers.id, containerId));
-  } catch (err: any) {
-    logger.warn("[FactoryTracking] setSchedulerMeta warn", { error: err?.message });
+  } catch (err: unknown) {
+    logger.warn("[FactoryTracking] setSchedulerMeta warn", { error: getErrorMessage(err) });
   }
 }
 
@@ -290,9 +291,9 @@ async function trackOneContainer(
         ep(containerId, "JSON Cargo ETA", "fail", jc.message);
         logger.info(`[FactoryTracking] ${containerNumber}: jsoncargo → ${jc.status} (${jc.message})`);
       }
-    } catch (err: any) {
-      ep(containerId, "JSON Cargo ETA", "fail", err?.message ?? "Unexpected error");
-      logger.warn(`[FactoryTracking] : jsoncargo pre-check error`, { error: err?.message ?? err });
+    } catch (err: unknown) {
+      ep(containerId, "JSON Cargo ETA", "fail", getErrorMessage(err) ?? "Unexpected error");
+      logger.warn(`[FactoryTracking] : jsoncargo pre-check error`, { error: getErrorMessage(err) ?? err });
     }
   }
 
@@ -1216,8 +1217,8 @@ export async function trackDueFactoryContainers(): Promise<void> {
       })
       .from(factoryContainers)
       .where(and(eq(factoryContainers.trackingEnabled, true), activeStatusFilter));
-  } catch (err: any) {
-    logger.error("[FactoryTracking] Failed to fetch containers", { error: err?.message });
+  } catch (err: unknown) {
+    logger.error("[FactoryTracking] Failed to fetch containers", { error: getErrorMessage(err) });
     return;
   }
 
@@ -1245,8 +1246,8 @@ export async function trackDueFactoryContainers(): Promise<void> {
       const carrierHint = row.trackingCarrierHint ?? null;
       await trackOneContainer(row.id, row.containerNumber, destCountry, carrierHint);
       await new Promise((resolve) => setTimeout(resolve, 2000));
-    } catch (err: any) {
-      logger.error(`[FactoryTracking] Error tracking `, { error: err?.message });
+    } catch (err: unknown) {
+      logger.error(`[FactoryTracking] Error tracking `, { error: getErrorMessage(err) });
     }
   }
 

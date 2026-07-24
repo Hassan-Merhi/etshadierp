@@ -1,4 +1,5 @@
 import type { Express, Request, Response } from "express";
+import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
 import {
   getCompanyId,
@@ -480,9 +481,9 @@ export function registerRentalAccrualConfigRoutes(
       logger.info(`[re-accrue] result reset=${reset} accrued=${accrued} skipped=${skipped}`);
 
       res.json({ reset, accrued, skipped });
-    } catch (e: any) {
+    } catch (e: unknown) {
       logger.error(`${tag} re-accrue:`, { error: e });
-      res.status(500).json({ message: e.message });
+      res.status(500).json({ message: getErrorMessage(e) });
     }
   });
 
@@ -586,9 +587,9 @@ export function registerRentalAccrualConfigRoutes(
       });
 
       res.json({ ok: true, reversalVoucherId });
-    } catch (e: any) {
+    } catch (e: unknown) {
       logger.error(`${tag} reverse-accrual:`, { error: e });
-      res.status(500).json({ message: e.message });
+      res.status(500).json({ message: getErrorMessage(e) });
     }
   });
 
@@ -633,8 +634,8 @@ export function registerRentalAccrualConfigRoutes(
       );
 
       res.json(enriched);
-    } catch (e: any) {
-      res.status(500).json({ message: e.message });
+    } catch (e: unknown) {
+      res.status(500).json({ message: getErrorMessage(e) });
     }
   });
 
@@ -662,10 +663,10 @@ export function registerRentalAccrualConfigRoutes(
         })
         .returning();
       res.status(201).json(created);
-    } catch (e: any) {
+    } catch (e: unknown) {
       if (e instanceof z.ZodError)
         return res.status(400).json({ message: e.issues.map((err: any) => err.message).join(", ") });
-      res.status(500).json({ message: e.message });
+      res.status(500).json({ message: getErrorMessage(e) });
     }
   });
 
@@ -681,8 +682,8 @@ export function registerRentalAccrualConfigRoutes(
         .delete(rentalAutoTransferConfigs)
         .where(and(eq(rentalAutoTransferConfigs.id, id), eq(rentalAutoTransferConfigs.companyId, companyId)));
       res.json({ ok: true });
-    } catch (e: any) {
-      res.status(500).json({ message: e.message });
+    } catch (e: unknown) {
+      res.status(500).json({ message: getErrorMessage(e) });
     }
   });
 }

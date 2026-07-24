@@ -1,4 +1,5 @@
 import { eq, and, or, sql, asc } from "drizzle-orm";
+import { getErrorMessage } from "../lib/httpHandlers";
 import { db } from "../db";
 import * as schema from "@shared/schema";
 import type { User, InsertUser, Company, InsertCompany, UserCompanyRole, InsertUserCompanyRole } from "@shared/schema";
@@ -73,8 +74,8 @@ export async function deleteCompany(id: number): Promise<void> {
   const safe = async (query: any) => {
     try {
       await db.execute(query);
-    } catch (e: any) {
-      if (e.code === "42P01" || e.message?.includes("does not exist")) return;
+    } catch (e: unknown) {
+      if ((e as { code?: string }).code === "42P01" || getErrorMessage(e)?.includes("does not exist")) return;
       throw e;
     }
   };
@@ -251,8 +252,8 @@ export async function deleteCompany(id: number): Promise<void> {
     await db
       .delete(schema.interCompanyTransfers)
       .where(or(eq(schema.interCompanyTransfers.fromCompanyId, id), eq(schema.interCompanyTransfers.toCompanyId, id)));
-  } catch (e: any) {
-    if (!e.message?.includes("does not exist")) throw e;
+  } catch (e: unknown) {
+    if (!getErrorMessage(e)?.includes("does not exist")) throw e;
   }
 
   await db.delete(schema.userCompanyRoles).where(eq(schema.userCompanyRoles.companyId, id));

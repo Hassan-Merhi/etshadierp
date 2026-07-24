@@ -17,6 +17,7 @@
  */
 
 import type { ParcelsAppShipment } from "./parcelsAppClient";
+import { getErrorMessage } from "../lib/httpHandlers";
 import { logger } from "./logger";
 
 export interface HttpScraperResult {
@@ -131,8 +132,8 @@ async function tryMsc(containerNumber: string): Promise<HttpScraperResult> {
     }
     const shipment = toShipment(containerNumber, latest?.status ?? null, latest?.location ?? null, etaRaw, events);
     return { success: true, shipment, rawResponse: data };
-  } catch (err: any) {
-    return { success: false, shipment: null, error: `MSC: ${err?.message ?? "error"}` };
+  } catch (err: unknown) {
+    return { success: false, shipment: null, error: `MSC: ${getErrorMessage(err) ?? "error"}` };
   }
 }
 
@@ -164,8 +165,8 @@ async function tryHapag(containerNumber: string): Promise<HttpScraperResult> {
     const etaRaw = data?.containerJourneys?.[0]?.eta ?? data?.eta ?? null;
     const shipment = toShipment(containerNumber, latest?.status ?? null, latest?.location ?? null, etaRaw, events);
     return { success: true, shipment, rawResponse: data };
-  } catch (err: any) {
-    return { success: false, shipment: null, error: `Hapag: ${err?.message ?? "error"}` };
+  } catch (err: unknown) {
+    return { success: false, shipment: null, error: `Hapag: ${getErrorMessage(err) ?? "error"}` };
   }
 }
 
@@ -195,8 +196,8 @@ async function tryCosco(containerNumber: string): Promise<HttpScraperResult> {
     const etaRaw = detail.estimatedArrivalDate ?? detail.eta ?? null;
     const shipment = toShipment(containerNumber, latest?.status ?? null, latest?.location ?? null, etaRaw, events);
     return { success: true, shipment, rawResponse: data };
-  } catch (err: any) {
-    return { success: false, shipment: null, error: `COSCO: ${err?.message ?? "error"}` };
+  } catch (err: unknown) {
+    return { success: false, shipment: null, error: `COSCO: ${getErrorMessage(err) ?? "error"}` };
   }
 }
 
@@ -225,8 +226,8 @@ async function tryEvergreen(containerNumber: string): Promise<HttpScraperResult>
     const etaRaw = data?.ETA ?? data?.eta ?? null;
     const shipment = toShipment(containerNumber, latest?.status ?? null, latest?.location ?? null, etaRaw, events);
     return { success: true, shipment, rawResponse: data };
-  } catch (err: any) {
-    return { success: false, shipment: null, error: `Evergreen: ${err?.message ?? "error"}` };
+  } catch (err: unknown) {
+    return { success: false, shipment: null, error: `Evergreen: ${getErrorMessage(err) ?? "error"}` };
   }
 }
 
@@ -308,8 +309,8 @@ async function tryMaerskHtml(containerNumber: string): Promise<HttpScraperResult
       shipment: null,
       error: isBlocked ? "Maersk page: bot challenge" : "Maersk page: no tracking data in HTML",
     };
-  } catch (err: any) {
-    return { success: false, shipment: null, error: `Maersk page: ${err?.message ?? "error"}` };
+  } catch (err: unknown) {
+    return { success: false, shipment: null, error: `Maersk page: ${getErrorMessage(err) ?? "error"}` };
   }
 }
 
@@ -349,8 +350,8 @@ async function tryPageHtml(containerNumber: string): Promise<HttpScraperResult> 
     }
 
     return { success: false, shipment: null, error: "No embedded tracking data in page" };
-  } catch (err: any) {
-    return { success: false, shipment: null, error: `Page HTML: ${err?.message ?? "error"}` };
+  } catch (err: unknown) {
+    return { success: false, shipment: null, error: `Page HTML: ${getErrorMessage(err) ?? "error"}` };
   }
 }
 

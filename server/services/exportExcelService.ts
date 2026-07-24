@@ -1,4 +1,5 @@
 import ExcelJS from "exceljs";
+import { getErrorMessage } from "../lib/httpHandlers";
 import { logger } from "../lib/logger";
 import { pool } from "../db";
 import type { CompanyExportData } from "./exportDataService";
@@ -538,8 +539,8 @@ async function qStream(sql: string): Promise<any[]> {
   try {
     const r = await pool.query(sql);
     return r.rows;
-  } catch (err: any) {
-    logger.warn(`[ExportStream] Query warning: ${err.message}`);
+  } catch (err: unknown) {
+    logger.warn(`[ExportStream] Query warning: ${getErrorMessage(err)}`);
     return [];
   }
 }
@@ -574,8 +575,8 @@ export async function streamCompanyWorkbookDirect(
     const rows = await qStream(sql);
     try {
       addSheet(wb, sheetName, rows);
-    } catch (sheetErr: any) {
-      logger.warn(`[FullExport] Sheet failed: ${sheetName} - ${sheetErr.message}`);
+    } catch (sheetErr: unknown) {
+      logger.warn(`[FullExport] Sheet failed: ${sheetName} - ${getErrorMessage(sheetErr)}`);
     }
     summaryRows.push([sheetName, rows.length]);
     // rows goes out of scope here — GC can reclaim it before next fetch

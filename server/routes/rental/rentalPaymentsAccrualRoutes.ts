@@ -1,4 +1,5 @@
 import type { Express, Request, Response } from "express";
+import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
 import {
   getCompanyId,
@@ -132,12 +133,12 @@ export function registerRentalPaymentsAccrualRoutes(
         });
       }
       return res.json(result.payments[0] ?? { ok: true, paymentGroupId: result.paymentGroupId });
-    } catch (e: any) {
+    } catch (e: unknown) {
       if (e instanceof z.ZodError)
         return res.status(400).json({ message: e.issues.map((err: any) => err.message).join(", ") });
-      if ((e as any).status === 400) return res.status(400).json({ message: e.message });
+      if ((e as { status?: number }).status === 400) return res.status(400).json({ message: getErrorMessage(e) });
       logger.error(`${tag} payments:`, { error: e });
-      res.status(500).json({ message: e.message });
+      res.status(500).json({ message: getErrorMessage(e) });
     }
   });
 
@@ -213,17 +214,17 @@ export function registerRentalPaymentsAccrualRoutes(
             paymentGroupId: result.paymentGroupId,
             paymentsCreated: result.payments.length,
           });
-        } catch (itemErr: any) {
-          results.push({ contractId: data.contractId, error: itemErr.message });
+        } catch (itemErr: unknown) {
+          results.push({ contractId: data.contractId, error: getErrorMessage(itemErr) });
         }
       }
 
       res.json({ processed: results.length, results });
-    } catch (e: any) {
+    } catch (e: unknown) {
       if (e instanceof z.ZodError)
         return res.status(400).json({ message: e.issues.map((err: any) => err.message).join(", ") });
       logger.error(`${tag} bulk-payments:`, { error: e });
-      res.status(500).json({ message: e.message });
+      res.status(500).json({ message: getErrorMessage(e) });
     }
   });
 
@@ -316,9 +317,9 @@ export function registerRentalPaymentsAccrualRoutes(
       });
 
       res.json({ ok: true });
-    } catch (e: any) {
+    } catch (e: unknown) {
       logger.error(`${tag} delete-payment:`, { error: e });
-      res.status(500).json({ message: e.message });
+      res.status(500).json({ message: getErrorMessage(e) });
     }
   });
 
@@ -358,8 +359,8 @@ export function registerRentalPaymentsAccrualRoutes(
             const [ownerUnit] = await db.select().from(propertyUnits).where(eq(propertyUnits.id, unitId));
             if (ownerUnit) { unit = ownerUnit; isShared = true; }
           }
-        } catch (sharedErr: any) {
-          logger.warn(`${tag} shared-detail skipped:`, sharedErr.message?.split("\n")[0]);
+        } catch (sharedErr: unknown) {
+          logger.warn(`${tag} shared-detail skipped:`, { error: getErrorMessage(sharedErr).split("\n")[0] });
         }
       }
       if (!unit) return res.status(404).json({ message: "Unit not found" });
@@ -520,9 +521,9 @@ export function registerRentalPaymentsAccrualRoutes(
         pastContracts,
         isShared,
       });
-    } catch (e: any) {
+    } catch (e: unknown) {
       logger.error(`${tag} detail:`, { error: e });
-      res.status(500).json({ message: e.message });
+      res.status(500).json({ message: getErrorMessage(e) });
     }
   });
 
@@ -542,8 +543,8 @@ export function registerRentalPaymentsAccrualRoutes(
           )
         );
       res.json(accts.sort((a, b) => a.name.localeCompare(b.name)));
-    } catch (e: any) {
-      res.status(500).json({ message: e.message });
+    } catch (e: unknown) {
+      res.status(500).json({ message: getErrorMessage(e) });
     }
   });
 
@@ -590,9 +591,9 @@ export function registerRentalPaymentsAccrualRoutes(
         .orderBy(desc(propertyPayments.paymentDate));
 
       res.json(payments);
-    } catch (e: any) {
+    } catch (e: unknown) {
       logger.error(`${tag} payments-log:`, { error: e });
-      res.status(500).json({ message: e.message });
+      res.status(500).json({ message: getErrorMessage(e) });
     }
   });
 
@@ -603,8 +604,8 @@ export function registerRentalPaymentsAccrualRoutes(
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       await ensureMonthlyForCompany(companyId, module);
       res.json({ ok: true });
-    } catch (e: any) {
-      res.status(500).json({ message: e.message });
+    } catch (e: unknown) {
+      res.status(500).json({ message: getErrorMessage(e) });
     }
   });
 
@@ -629,9 +630,9 @@ export function registerRentalPaymentsAccrualRoutes(
       );
 
       res.json({ accrued, skipped });
-    } catch (e: any) {
+    } catch (e: unknown) {
       logger.error(`${tag} accrue:`, { error: e });
-      res.status(500).json({ message: e.message });
+      res.status(500).json({ message: getErrorMessage(e) });
     }
   });
 
@@ -703,8 +704,8 @@ export function registerRentalPaymentsAccrualRoutes(
       }
 
       res.json(Array.from(groups.values()).map((g) => ({ ...g, totalAmount: g.totalAmount.toFixed(2) })));
-    } catch (e: any) {
-      res.status(500).json({ message: e.message });
+    } catch (e: unknown) {
+      res.status(500).json({ message: getErrorMessage(e) });
     }
   });
 
@@ -717,8 +718,8 @@ export function registerRentalPaymentsAccrualRoutes(
       const asOf = getClientDate(req);
       const posted = await postDueScheduledRentalPayments(companyId, module, asOf, shopExpenseAccountName);
       res.json({ posted, asOf });
-    } catch (e: any) {
-      res.status(500).json({ message: e.message });
+    } catch (e: unknown) {
+      res.status(500).json({ message: getErrorMessage(e) });
     }
   });
 
@@ -744,8 +745,8 @@ export function registerRentalPaymentsAccrualRoutes(
 
       if (deleted.length === 0) return res.status(404).json({ message: "Scheduled payment group not found or already posted" });
       res.json({ cancelled: deleted.length, groupId });
-    } catch (e: any) {
-      res.status(500).json({ message: e.message });
+    } catch (e: unknown) {
+      res.status(500).json({ message: getErrorMessage(e) });
     }
   });
 

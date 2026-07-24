@@ -11,6 +11,7 @@
  */
 
 import type { CarrierTrackResult, TrackingEvent } from "./types";
+import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
 
 const BASE_URL = "https://apis.cma-cgm.net/operation/trackandtrace/v1/events";
@@ -131,10 +132,10 @@ export async function track(containerNumber: string): Promise<CarrierTrackResult
     }
 
     return parseEvents(containerNumber, rawEvents, base);
-  } catch (err: any) {
-    const isTimeout = err?.name === "TimeoutError" || err?.name === "AbortError";
-    logger.info(`[CmaCgmApi] ${containerNumber}: ${isTimeout ? "timeout" : (err?.message ?? "error")}`);
-    return { ...base, error: isTimeout ? "timeout" : (err?.message ?? "unknown_error") };
+  } catch (err: unknown) {
+    const isTimeout = (err as { name?: string }).name === "TimeoutError" || (err as { name?: string }).name === "AbortError";
+    logger.info(`[CmaCgmApi] ${containerNumber}: ${isTimeout ? "timeout" : (getErrorMessage(err) ?? "error")}`);
+    return { ...base, error: isTimeout ? "timeout" : (getErrorMessage(err) ?? "unknown_error") };
   }
 }
 
