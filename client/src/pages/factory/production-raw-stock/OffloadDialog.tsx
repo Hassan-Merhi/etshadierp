@@ -90,6 +90,50 @@ export function OffloadDialog({
   const [additionalCharges, setAdditionalCharges] = useState<any[]>([]);
   const [mixBatchAllocations, setMixBatchAllocations] = useState<any[]>([]);
 
+  // ── Additional charge helpers ──────────────────────────────────────────────
+  const handleAddAdditionalCharge = () => {
+    setAdditionalCharges((prev) => [
+      ...prev,
+      { id: Date.now().toString(), description: "", amount: "", currencyCode: "USD", fxRate: "1", fxRateLoading: false, ledgerAccountId: "" },
+    ]);
+  };
+
+  const handleRemoveAdditionalCharge = (id: string) => {
+    setAdditionalCharges((prev) => prev.filter((c) => c.id !== id));
+  };
+
+  const handleUpdateAdditionalCharge = (id: string, field: string, value: string) => {
+    if (field === "currencyCode") {
+      if (value === "USD") {
+        setAdditionalCharges((prev) =>
+          prev.map((c) => (c.id === id ? { ...c, currencyCode: "USD", fxRate: "1", fxRateLoading: false } : c))
+        );
+      } else {
+        setAdditionalCharges((prev) =>
+          prev.map((c) => (c.id === id ? { ...c, currencyCode: value, fxRate: "", fxRateLoading: true } : c))
+        );
+        factoryApiRequest("GET", `/api/factory/fx-rates/latest/${value}`)
+          .then((res) => (res.ok ? res.json() : null))
+          .then((data) => {
+            setAdditionalCharges((prev) =>
+              prev.map((c) =>
+                c.id === id ? { ...c, fxRate: data?.rate ? String(data.rate) : "", fxRateLoading: false } : c
+              )
+            );
+          })
+          .catch(() => {
+            setAdditionalCharges((prev) =>
+              prev.map((c) => (c.id === id ? { ...c, fxRate: "", fxRateLoading: false } : c))
+            );
+          });
+      }
+      return;
+    }
+    setAdditionalCharges((prev) =>
+      prev.map((c) => (c.id === id ? { ...c, [field]: value } : c))
+    );
+  };
+
   const selectedContainer = useMemo(() => {
     return availableContainers?.find((c) => c.id.toString() === selectedContainerId);
   }, [availableContainers, selectedContainerId]);
@@ -321,6 +365,7 @@ export function OffloadDialog({
             description: c.description || "Additional Charge",
             amount: c.amount,
             currencyCode: c.currencyCode || "USD",
+            fxRateToUsd: c.fxRate || (c.currencyCode === "USD" ? "1" : undefined),
             ledgerAccountId: p?.type === "ledger" ? p.id : null,
             supplierId: p?.type === "supplier" ? p.id : null,
           };
@@ -591,6 +636,87 @@ export function OffloadDialog({
                   suppliers={factorySuppliers}
                   disabled={otherChargesFromContainer}
                 />
+              </div>
+
+              <Separator />
+
+              {/* ── Extra Charges (multiple rows) ── */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label className="text-sm text-muted-foreground">Extra Charges</Label>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-7 gap-1 text-xs"
+                    onClick={handleAddAdditionalCharge}
+                  >
+                    <Plus className="h-3 w-3" />
+                    Add
+                  </Button>
+                </div>
+                {additionalCharges.length > 0 && (
+                  <div className="space-y-3">
+                    {additionalCharges.map((charge) => (
+                      <div key={charge.id} className="rounded-md border p-3 space-y-2 bg-muted/20">
+                        <div className="grid grid-cols-[1fr_auto_auto] gap-2 items-center">
+                          <Input
+                            placeholder="Description"
+                            value={charge.description}
+                            onChange={(e) => handleUpdateAdditionalCharge(charge.id, "description", e.target.value)}
+                          />
+                          <Select
+                            value={charge.currencyCode}
+                            onValueChange={(v) => handleUpdateAdditionalCharge(charge.id, "currencyCode", v)}
+                          >
+                            <SelectTrigger className="w-24">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="USD">USD</SelectItem>
+                              <SelectItem value="EUR">EUR</SelectItem>
+                              <SelectItem value="AUD">AUD</SelectItem>
+                              <SelectItem value="GBP">GBP</SelectItem>
+                              <SelectItem value="LBP">LBP</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                            onClick={() => handleRemoveAdditionalCharge(charge.id)}
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          placeholder="Amount"
+                          value={charge.amount}
+                          onChange={(e) => handleUpdateAdditionalCharge(charge.id, "amount", e.target.value)}
+                        />
+                        {charge.currencyCode !== "USD" && (
+                          <p className="text-xs text-muted-foreground">
+                            {charge.fxRateLoading
+                              ? "Fetching exchange rate…"
+                              : parseFloat(charge.fxRate) > 0
+                                ? `1 ${charge.currencyCode} = ${formatNumber(parseFloat(charge.fxRate))} USD`
+                                : "Exchange rate unavailable — will use container FX rate"}
+                          </p>
+                        )}
+                        <AccountCombobox
+                          value={charge.ledgerAccountId}
+                          onValueChange={(v) => handleUpdateAdditionalCharge(charge.id, "ledgerAccountId", v)}
+                          accounts={ledgerAccounts}
+                          suppliers={factorySuppliers}
+                          placeholder="Select account"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
 
