@@ -19,6 +19,14 @@ export function usePresence() {
       headers: { "Content-Type": "application/json" },
       credentials: "include",
       body: JSON.stringify({ route, type }),
+    }).then((res) => {
+      // Session expired — stop the heartbeat interval so we don't flood the
+      // server with unauthenticated PATCHes. The global fetch interceptor will
+      // also fire scheduleSessionExpiredRedirect(), unmounting everything.
+      if (res.status === 401 && intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
     }).catch(() => {});
   }, []);
 

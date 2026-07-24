@@ -56,6 +56,25 @@ export function resetCsrfToken() {
 // Empty string in all web builds — every code path below falls back unchanged.
 const _CAPACITOR_API_BASE: string = ((import.meta as any).env?.VITE_API_BASE_URL as string) || "";
 
+/* ── Session-expiry redirect ─────────────────────────────────────────────── */
+// Single-fire: when any /api/* request returns 401 while the user is on an
+// authenticated page, redirect to /auth once. This stops all React Query
+// polling, setInterval heartbeats, and screen-feed polls by unmounting every
+// authenticated component — the correct response to an expired idle session.
+let _sessionExpiredHandled = false;
+
+function scheduleSessionExpiredRedirect() {
+  if (_sessionExpiredHandled) return;
+  if (typeof window === "undefined") return;
+  // Don't redirect when the user is already on the auth page — avoids redirect
+  // loops from wrong-password 401s during login.
+  const path = window.location.pathname;
+  if (path === "/auth" || path.startsWith("/auth/")) return;
+  _sessionExpiredHandled = true;
+  // Small delay so the current render cycle finishes cleanly before we navigate.
+  setTimeout(() => { window.location.href = "/auth"; }, 300);
+}
+
 /* ── Global fetch interceptor ────────────────────────────────────────────── */
 // Wraps window.fetch so that ALL state-changing requests to /api/* (including
 // raw fetch() calls in legacy pages, hooks, sync engines, dialogs, etc.) get
@@ -125,6 +144,8 @@ if (typeof window !== "undefined" && !(window as any).__csrfFetchPatched) {
                 /* not JSON — not a CSRF error */
               }
             }
+            // Session-expiry detection for state-changing /api/* requests
+            if (res.status === 401) scheduleSessionExpiredRedirect();
             return res;
           }
         }
@@ -132,7 +153,21 @@ if (typeof window !== "undefined" && !(window as any).__csrfFetchPatched) {
     } catch {
       // Never block a legitimate request because of interceptor errors
     }
-    return originalFetch(input, init);
+    // GET (and other non-state-changing) requests fall through here.
+    // Capture the response so we can detect session expiry on polling queries.
+    const fallbackRes = await originalFetch(input, init);
+    if (fallbackRes.status === 401) {
+      try {
+        const urlStr =
+          typeof input === "string" ? input
+          : input instanceof Request ? input.url
+          : String(input);
+        if (urlStr.includes("/api/") && !urlStr.includes("/api/csrf-token")) {
+          scheduleSessionExpiredRedirect();
+        }
+      } catch { /* opaque URL — skip */ }
+    }
+    return fallbackRes;
   }
 
   window.fetch = (input: RequestInfo | URL, init?: RequestInit) => fetchWithCsrf(input, init);
@@ -334,6 +369,11 @@ export const getQueryFn: <T>(options: { on401: UnauthorizedBehavior }) => QueryF
 // (component unmounted), just remove the error so it doesn't flash on remount.
 const globalQueryCache = new QueryCache({
   onError: (error: any, query) => {
+    // Session expiry: redirect once and let component unmounts clear all intervals.
+    if (error?.status === 401) {
+      scheduleSessionExpiredRedirect();
+      return;
+    }
     if (error?.name !== "AbortError") return;
     // Swallow — schedule a transparent recovery refetch if the component is still mounted
     const observerCount = query.getObserversCount();
