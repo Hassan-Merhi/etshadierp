@@ -3,8 +3,13 @@ import { z } from "zod";
 
 import { requireAuth, requireNonPOS } from "../../auth";
 import { logger } from "../../lib/logger";
+import { requirePageAccess } from "../../lib/permissionMiddleware";
 import { getStockInSalesComparison } from "../../services/reports/stockInSalesComparisonService";
 import { getStockInSalesDetail } from "../../services/reports/stockInSalesDetailService";
+import {
+  resolveStockInSalesLocationIds,
+  StockInSalesLocationAccessError,
+} from "../../services/reports/stockInSalesLocationAccess";
 import { getStockInSalesReport } from "../../services/reports/stockInSalesReportService";
 
 const isoDateSchema = z
@@ -77,170 +82,219 @@ function invalidRange(startDate: string | undefined, endDate: string | undefined
   return !!startDate && !!endDate && startDate > endDate;
 }
 
+function locationAccessResponse(error: unknown, res: any): boolean {
+  if (!(error instanceof StockInSalesLocationAccessError)) return false;
+  res.status(error.statusCode).json({ message: error.message });
+  return true;
+}
+
+async function resolveRequestLocationIds(req: any, requestedLocationIds: number[]): Promise<number[]> {
+  const companyId = req.session.currentCompanyId;
+  const userId = req.session.userId;
+  const role = req.session.currentRole;
+  if (!companyId || !userId || !role) {
+    throw new StockInSalesLocationAccessError("An active company session is required");
+  }
+
+  return resolveStockInSalesLocationIds({
+    companyId,
+    userId,
+    role,
+    currentLocationId: req.session.currentLocationId,
+    requestedLocationIds,
+  });
+}
+
 export function registerStockInSalesReportRoutes(app: Express) {
-  app.get("/api/reports/stock-in-sales", requireAuth, requireNonPOS, async (req, res) => {
-    const companyId = req.session.currentCompanyId;
-    if (!companyId) {
-      return res.status(400).json({ message: "No company selected" });
-    }
+  const reportPageAccess = requirePageAccess("page_sales_report");
 
-    const parsed = reportQuerySchema.safeParse({
-      startDate: firstQueryValue(req.query.startDate),
-      endDate: firstQueryValue(req.query.endDate),
-      grouping: firstQueryValue(req.query.grouping),
-      profitFilter: firstQueryValue(req.query.profitFilter),
-      locationIds: req.query.locationIds ?? req.query.locationId,
-      stockGroupIds: req.query.stockGroupIds ?? req.query.stockGroupId,
-      search: firstQueryValue(req.query.search),
-    });
+  app.get(
+    "/api/reports/stock-in-sales",
+    requireAuth,
+    requireNonPOS,
+    reportPageAccess,
+    async (req, res) => {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
 
-    if (!parsed.success) {
-      return res.status(400).json({
-        message: "Invalid stock in and sales report filters",
-        errors: parsed.error.flatten(),
-      });
-    }
-
-    if (invalidRange(parsed.data.startDate, parsed.data.endDate)) {
-      return res.status(400).json({ message: "Start date cannot be after end date" });
-    }
-
-    try {
-      const result = await getStockInSalesReport({
-        companyId,
-        startDate: parsed.data.startDate,
-        endDate: parsed.data.endDate,
-        grouping: parsed.data.grouping,
-        profitFilter: parsed.data.profitFilter,
-        locationIds: parsed.data.locationIds,
-        stockGroupIds: parsed.data.stockGroupIds,
-        search: parsed.data.search || undefined,
+      const parsed = reportQuerySchema.safeParse({
+        startDate: firstQueryValue(req.query.startDate),
+        endDate: firstQueryValue(req.query.endDate),
+        grouping: firstQueryValue(req.query.grouping),
+        profitFilter: firstQueryValue(req.query.profitFilter),
+        locationIds: req.query.locationIds ?? req.query.locationId,
+        stockGroupIds: req.query.stockGroupIds ?? req.query.stockGroupId,
+        search: firstQueryValue(req.query.search),
       });
 
-      res.setHeader("Cache-Control", "private, no-store");
-      return res.json(result);
-    } catch (error: any) {
-      logger.error("Stock in and sales report error", {
-        module: "reports",
-        action: "stock-in-sales",
-        companyId,
-        error,
-      });
-      return res.status(500).json({ message: "Failed to generate stock in and sales report" });
+      if (!parsed.success) {
+        return res.status(400).json({
+          message: "Invalid stock in and sales report filters",
+          errors: parsed.error.flatten(),
+        });
+      }
+
+      if (invalidRange(parsed.data.startDate, parsed.data.endDate)) {
+        return res.status(400).json({ message: "Start date cannot be after end date" });
+      }
+
+      try {
+        const locationIds = await resolveRequestLocationIds(req, parsed.data.locationIds);
+        const result = await getStockInSalesReport({
+          companyId,
+          startDate: parsed.data.startDate,
+          endDate: parsed.data.endDate,
+          grouping: parsed.data.grouping,
+          profitFilter: parsed.data.profitFilter,
+          locationIds,
+          stockGroupIds: parsed.data.stockGroupIds,
+          search: parsed.data.search || undefined,
+        });
+
+        res.setHeader("Cache-Control", "private, no-store");
+        return res.json(result);
+      } catch (error: any) {
+        if (locationAccessResponse(error, res)) return;
+        logger.error("Stock in and sales report error", {
+          module: "reports",
+          action: "stock-in-sales",
+          companyId,
+          error,
+        });
+        return res.status(500).json({ message: "Failed to generate stock in and sales report" });
+      }
     }
-  });
+  );
 
-  app.get("/api/reports/stock-in-sales/detail", requireAuth, requireNonPOS, async (req, res) => {
-    const companyId = req.session.currentCompanyId;
-    if (!companyId) {
-      return res.status(400).json({ message: "No company selected" });
-    }
+  app.get(
+    "/api/reports/stock-in-sales/detail",
+    requireAuth,
+    requireNonPOS,
+    reportPageAccess,
+    async (req, res) => {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
 
-    const parsed = detailQuerySchema.safeParse({
-      startDate: firstQueryValue(req.query.startDate),
-      endDate: firstQueryValue(req.query.endDate),
-      locationIds: req.query.locationIds ?? req.query.locationId,
-      stockGroupIds: req.query.stockGroupIds ?? req.query.stockGroupId,
-      search: firstQueryValue(req.query.search),
-      stockInPage: firstQueryValue(req.query.stockInPage),
-      stockOutPage: firstQueryValue(req.query.stockOutPage),
-      limit: firstQueryValue(req.query.limit),
-      exportAll: req.query.exportAll,
-    });
-
-    if (!parsed.success) {
-      return res.status(400).json({
-        message: "Invalid stock in and sales detail filters",
-        errors: parsed.error.flatten(),
-      });
-    }
-
-    if (invalidRange(parsed.data.startDate, parsed.data.endDate)) {
-      return res.status(400).json({ message: "Start date cannot be after end date" });
-    }
-
-    try {
-      const result = await getStockInSalesDetail({
-        companyId,
-        startDate: parsed.data.startDate,
-        endDate: parsed.data.endDate,
-        locationIds: parsed.data.locationIds,
-        stockGroupIds: parsed.data.stockGroupIds,
-        search: parsed.data.search || undefined,
-        stockInPage: parsed.data.stockInPage,
-        stockOutPage: parsed.data.stockOutPage,
-        limit: parsed.data.limit,
-        exportAll: parsed.data.exportAll,
-      });
-
-      res.setHeader("Cache-Control", "private, no-store");
-      return res.json(result);
-    } catch (error: any) {
-      logger.error("Stock in and sales detail error", {
-        module: "reports",
-        action: "stock-in-sales-detail",
-        companyId,
-        error,
-      });
-      return res.status(500).json({ message: "Failed to load stock in and sales details" });
-    }
-  });
-
-  app.get("/api/reports/stock-in-sales/comparison", requireAuth, requireNonPOS, async (req, res) => {
-    const companyId = req.session.currentCompanyId;
-    if (!companyId) {
-      return res.status(400).json({ message: "No company selected" });
-    }
-
-    const parsed = comparisonQuerySchema.safeParse({
-      startDate: firstQueryValue(req.query.startDate),
-      endDate: firstQueryValue(req.query.endDate),
-      grouping: firstQueryValue(req.query.grouping),
-      search: firstQueryValue(req.query.search),
-      sideALocationId: firstQueryValue(req.query.sideALocationId),
-      sideAStockGroupIds: req.query.sideAStockGroupIds,
-      sideBLocationId: firstQueryValue(req.query.sideBLocationId),
-      sideBStockGroupIds: req.query.sideBStockGroupIds,
-    });
-
-    if (!parsed.success) {
-      return res.status(400).json({
-        message: "Invalid stock in and sales comparison filters",
-        errors: parsed.error.flatten(),
-      });
-    }
-
-    if (invalidRange(parsed.data.startDate, parsed.data.endDate)) {
-      return res.status(400).json({ message: "Start date cannot be after end date" });
-    }
-
-    try {
-      const result = await getStockInSalesComparison({
-        companyId,
-        startDate: parsed.data.startDate,
-        endDate: parsed.data.endDate,
-        grouping: parsed.data.grouping,
-        search: parsed.data.search || undefined,
-        sideA: {
-          locationId: parsed.data.sideALocationId,
-          stockGroupIds: parsed.data.sideAStockGroupIds,
-        },
-        sideB: {
-          locationId: parsed.data.sideBLocationId,
-          stockGroupIds: parsed.data.sideBStockGroupIds,
-        },
+      const parsed = detailQuerySchema.safeParse({
+        startDate: firstQueryValue(req.query.startDate),
+        endDate: firstQueryValue(req.query.endDate),
+        locationIds: req.query.locationIds ?? req.query.locationId,
+        stockGroupIds: req.query.stockGroupIds ?? req.query.stockGroupId,
+        search: firstQueryValue(req.query.search),
+        stockInPage: firstQueryValue(req.query.stockInPage),
+        stockOutPage: firstQueryValue(req.query.stockOutPage),
+        limit: firstQueryValue(req.query.limit),
+        exportAll: req.query.exportAll,
       });
 
-      res.setHeader("Cache-Control", "private, no-store");
-      return res.json(result);
-    } catch (error: any) {
-      logger.error("Stock in and sales comparison error", {
-        module: "reports",
-        action: "stock-in-sales-comparison",
-        companyId,
-        error,
-      });
-      return res.status(500).json({ message: "Failed to compare stock in and sales" });
+      if (!parsed.success) {
+        return res.status(400).json({
+          message: "Invalid stock in and sales detail filters",
+          errors: parsed.error.flatten(),
+        });
+      }
+
+      if (invalidRange(parsed.data.startDate, parsed.data.endDate)) {
+        return res.status(400).json({ message: "Start date cannot be after end date" });
+      }
+
+      try {
+        const locationIds = await resolveRequestLocationIds(req, parsed.data.locationIds);
+        const result = await getStockInSalesDetail({
+          companyId,
+          startDate: parsed.data.startDate,
+          endDate: parsed.data.endDate,
+          locationIds,
+          stockGroupIds: parsed.data.stockGroupIds,
+          search: parsed.data.search || undefined,
+          stockInPage: parsed.data.stockInPage,
+          stockOutPage: parsed.data.stockOutPage,
+          limit: parsed.data.limit,
+          exportAll: parsed.data.exportAll,
+        });
+
+        res.setHeader("Cache-Control", "private, no-store");
+        return res.json(result);
+      } catch (error: any) {
+        if (locationAccessResponse(error, res)) return;
+        logger.error("Stock in and sales detail error", {
+          module: "reports",
+          action: "stock-in-sales-detail",
+          companyId,
+          error,
+        });
+        return res.status(500).json({ message: "Failed to load stock in and sales details" });
+      }
     }
-  });
+  );
+
+  app.get(
+    "/api/reports/stock-in-sales/comparison",
+    requireAuth,
+    requireNonPOS,
+    reportPageAccess,
+    async (req, res) => {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+
+      const parsed = comparisonQuerySchema.safeParse({
+        startDate: firstQueryValue(req.query.startDate),
+        endDate: firstQueryValue(req.query.endDate),
+        grouping: firstQueryValue(req.query.grouping),
+        search: firstQueryValue(req.query.search),
+        sideALocationId: firstQueryValue(req.query.sideALocationId),
+        sideAStockGroupIds: req.query.sideAStockGroupIds,
+        sideBLocationId: firstQueryValue(req.query.sideBLocationId),
+        sideBStockGroupIds: req.query.sideBStockGroupIds,
+      });
+
+      if (!parsed.success) {
+        return res.status(400).json({
+          message: "Invalid stock in and sales comparison filters",
+          errors: parsed.error.flatten(),
+        });
+      }
+
+      if (invalidRange(parsed.data.startDate, parsed.data.endDate)) {
+        return res.status(400).json({ message: "Start date cannot be after end date" });
+      }
+
+      try {
+        await resolveRequestLocationIds(req, [parsed.data.sideALocationId, parsed.data.sideBLocationId]);
+        const result = await getStockInSalesComparison({
+          companyId,
+          startDate: parsed.data.startDate,
+          endDate: parsed.data.endDate,
+          grouping: parsed.data.grouping,
+          search: parsed.data.search || undefined,
+          sideA: {
+            locationId: parsed.data.sideALocationId,
+            stockGroupIds: parsed.data.sideAStockGroupIds,
+          },
+          sideB: {
+            locationId: parsed.data.sideBLocationId,
+            stockGroupIds: parsed.data.sideBStockGroupIds,
+          },
+        });
+
+        res.setHeader("Cache-Control", "private, no-store");
+        return res.json(result);
+      } catch (error: any) {
+        if (locationAccessResponse(error, res)) return;
+        logger.error("Stock in and sales comparison error", {
+          module: "reports",
+          action: "stock-in-sales-comparison",
+          companyId,
+          error,
+        });
+        return res.status(500).json({ message: "Failed to compare stock in and sales" });
+      }
+    }
+  );
 }
