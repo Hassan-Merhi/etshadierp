@@ -90,10 +90,56 @@ async function phase4WriteGuard(req: Request, res: Response, next: NextFunction)
     if (!req.path.startsWith("/api")) return next();
     if (
       req.path.startsWith("/api/auth/") ||
-      req.path.startsWith("/api/sp/migration/") ||
       req.path.startsWith("/api/health") ||
       req.path === "/api/csrf-token"
     ) {
+      return next();
+    }
+
+    if (req.path.startsWith("/api/sp/migration/")) {
+      const allowedMigrationWrite =
+        req.path.startsWith("/api/sp/migration/cutover") ||
+        req.path.startsWith("/api/sp/migration/gc-suspense-review/") ||
+        req.path.startsWith("/api/sp/migration/gc-container-charge-review/");
+      if (allowedMigrationWrite) return next();
+
+      const migrationCompanyIds = collectCompanyIds(req);
+      const runId = String((req.body as any)?.runId ?? "").trim();
+      if (runId) {
+        const run = await db.execute(sql`
+          SELECT source_company_id, target_company_id
+          FROM sp_migration_rehearsal_runs
+          WHERE id = ${runId}
+          LIMIT 1
+        `);
+        const row = (run as any).rows?.[0];
+        if (row) {
+          migrationCompanyIds.push(pn(row.source_company_id), pn(row.target_company_id));
+        }
+      }
+      const uniqueMigrationCompanyIds = Array.from(new Set(migrationCompanyIds.filter(Boolean)));
+      if (uniqueMigrationCompanyIds.length > 0) {
+        const active = await db.execute(sql`
+          SELECT id, source_company_id, target_company_id, status
+          FROM sp_migration_cutovers
+          WHERE status IN ('prepared', 'active')
+            AND (
+              source_company_id = ANY(${uniqueMigrationCompanyIds}) OR
+              target_company_id = ANY(${uniqueMigrationCompanyIds})
+            )
+          ORDER BY id DESC
+          LIMIT 1
+        `);
+        const cutover = (active as any).rows?.[0];
+        if (cutover) {
+          return void res.status(423).json({
+            message: "This migration step is blocked while production cutover is prepared or active. Use only cutover controls and review mappings.",
+            code: "SP_MIGRATION_WRITE_LOCKED",
+            cutoverId: pn(cutover.id),
+            status: cutover.status,
+          });
+        }
+      }
       return next();
     }
 
@@ -313,6 +359,7 @@ async function finalizeCutover(req: any, res: any): Promise<any> {
     return res.status(409).json({ message: "Cutover finalization is already running or awaiting recovery." });
   }
 
+  const partialDeltaSummary: Record<string, any> = {};
   try {
     const migrationBody = {
       sourceCompanyId: pair.sourceId,
@@ -321,20 +368,26 @@ async function finalizeCutover(req: any, res: any): Promise<any> {
       confirmation: "MIGRATE",
     };
     const salesDelta = await invokeMigrationHandler(importHistoricalSales, req, migrationBody);
+    partialDeltaSummary.salesDelta = salesDelta;
     const salesRepair = await reconcileHistoricalSalesCopy({
       runId: String(salesDelta.runId),
       sourceId: pair.sourceId,
       targetId: pair.targetId,
     });
+    partialDeltaSummary.salesRepair = salesRepair;
     const containerDelta = await invokeMigrationHandler(importContainers, req, migrationBody);
+    partialDeltaSummary.containerDelta = containerDelta;
     const containerRepair = await reconcileMigrationOwnedContainers({
       runId: String(containerDelta.runId),
       sourceId: pair.sourceId,
       targetId: pair.targetId,
       sourceCompanyName: pair.sourceCompany.name,
     });
+    partialDeltaSummary.containerRepair = containerRepair;
     const stockDelta = await synchronizeExactCutoverStock(cutoverId, pair.sourceId, pair.targetId);
+    partialDeltaSummary.stockDelta = stockDelta;
     const supplierLinksRepaired = await repairSpSupplierVoucherLinks(pair.targetId);
+    partialDeltaSummary.supplierLinksRepaired = supplierLinksRepaired;
 
     const repairBlockers = [...(salesRepair.blockers ?? []), ...(containerRepair.blockers ?? [])];
     const verification = await normalizedVerification(pair.sourceId, pair.targetId);
@@ -411,6 +464,7 @@ async function finalizeCutover(req: any, res: any): Promise<any> {
     await db.execute(sql`
       UPDATE sp_migration_cutovers
       SET finalize_started_at = NULL, failure_message = ${message},
+          delta_summary = ${JSON.stringify(partialDeltaSummary)}::jsonb,
           recovery_summary = ${JSON.stringify(recovery)}::jsonb, updated_at = now()
       WHERE id = ${cutoverId}
     `).catch(() => undefined);
