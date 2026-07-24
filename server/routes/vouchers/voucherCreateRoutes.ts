@@ -1,4 +1,5 @@
 import type { Express } from "express";
+import { getErrorMessage } from "../../lib/httpHandlers";
 import { db } from "../../db";
 import { storage } from "../../storage";
 import { logger } from "../../lib/logger";
@@ -156,8 +157,8 @@ export function registerVoucherCreateRoutes(app: Express) {
       const exchangeRate = companyId ? await getCurrentExchangeRate(companyId) : null;
       const voucher = await storage.createVoucher({ ...req.body, exchangeRate });
       res.json(voucher);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -371,9 +372,9 @@ export function registerVoucherCreateRoutes(app: Express) {
 
       logger.info("Voucher with-entries create succeeded", { module: "vouchers", action: "createWithEntries", userId: _uid, companyId: _cid, voucherId: createdVoucher.id, durationMs: Date.now() - _t });
       res.json(result);
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Voucher with-entries create failed", { module: "vouchers", action: "createWithEntries", userId: _uid, companyId: _cid, durationMs: Date.now() - _t, error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 

@@ -1,4 +1,5 @@
 import { getClientDate } from "../../../lib/dateUtils";
+import { getErrorMessage } from "../../../lib/httpHandlers";
 import { logger } from "../../../lib/logger";
 import type { Express } from "express";
 import { db } from "../../../db";
@@ -160,9 +161,9 @@ export function registerEmployeeAttendanceRoutes(app: Express) {
         .filter((r) => r.balance > 0);
 
       res.json({ employees: result });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Payroll breakdown error:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -349,9 +350,9 @@ export function registerEmployeeAttendanceRoutes(app: Express) {
           totalPossibleDays: workers.length * dates.length,
         },
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Attendance report error:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -496,8 +497,8 @@ export function registerEmployeeAttendanceRoutes(app: Express) {
           };
         }),
       });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 }

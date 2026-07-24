@@ -1,4 +1,5 @@
 import type { Express } from "express";
+import { getErrorMessage } from "../../lib/httpHandlers";
 import { db } from "../../db";
 import { storage } from "../../storage";
 import { requireAuth, requireRole, canDelete, requireNonPOS, checkPOSLocation } from "../../auth";
@@ -224,8 +225,8 @@ export function registerStatsSalesRoutes(app: Express) {
         updatedCount,
         updates: updates.slice(0, 50), // Limit response to first 50 updates
       });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -246,8 +247,8 @@ export function registerStatsSalesRoutes(app: Express) {
         endDate as string | undefined
       );
       res.json(result);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -262,8 +263,8 @@ export function registerStatsSalesRoutes(app: Express) {
       const { asOfDate } = req.query;
       const result = await getBalanceSheet(companyId, asOfDate as string | undefined);
       res.json(result);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 

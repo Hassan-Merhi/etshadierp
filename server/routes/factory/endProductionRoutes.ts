@@ -16,6 +16,7 @@
  */
 
 import type { Express } from "express";
+import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
 import { db, pool } from "../../db";
 import { factoryProductionSessions, factorySettings } from "@shared/schema";
@@ -101,9 +102,9 @@ export function registerEndProductionRoutes(app: Express, requireAuth: any) {
         );
 
       res.json(session ?? null);
-    } catch (err: any) {
+    } catch (err: unknown) {
       logger.error("[endProduction] GET session error:", { error: err });
-      res.status(500).json({ message: err.message });
+      res.status(500).json({ message: getErrorMessage(err) });
     }
   });
 
@@ -194,9 +195,9 @@ export function registerEndProductionRoutes(app: Express, requireAuth: any) {
         session,
         whatsapp: waResult,
       });
-    } catch (err: any) {
+    } catch (err: unknown) {
       logger.error("[endProduction] POST end-production error:", { error: err });
-      res.status(500).json({ message: err.message });
+      res.status(500).json({ message: getErrorMessage(err) });
     }
   });
 
@@ -237,9 +238,9 @@ export function registerEndProductionRoutes(app: Express, requireAuth: any) {
       }
 
       res.json({ message: "Worker Matrix PDF sent to WhatsApp.", whatsapp: waResult });
-    } catch (err: any) {
+    } catch (err: unknown) {
       logger.error("[endProduction] POST manual send error:", { error: err });
-      res.status(500).json({ message: err.message });
+      res.status(500).json({ message: getErrorMessage(err) });
     }
   });
 }
