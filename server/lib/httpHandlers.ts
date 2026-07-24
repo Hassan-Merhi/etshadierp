@@ -32,6 +32,10 @@ export function getErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : "Unexpected server error";
 }
 
+export function getErrorStack(error: unknown): string | undefined {
+  return error instanceof Error ? error.stack : undefined;
+}
+
 export function sendHttpError(response: Response, error: unknown): void {
   if (error instanceof HttpError) {
     response.status(error.statusCode).json({ message: error.message });
