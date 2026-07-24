@@ -25,11 +25,11 @@ import { startupMigrations } from "./startupSchema";
 const isProduction = process.env.NODE_ENV === "production";
 
 process.on("unhandledRejection", (reason: any) => {
-  console.error("[UnhandledRejection]", reason?.message || reason, reason?.stack || "");
+  logger.error("[UnhandledRejection]", { reason: reason?.message ?? reason, stack: reason?.stack ?? "" });
   if (isProduction) process.exit(1);
 });
 process.on("uncaughtException", (err: Error) => {
-  console.error("[UncaughtException]", err.message, err.stack);
+  logger.error("[UncaughtException]", { message: err.message, error: err.stack });
   if (isProduction) process.exit(1);
 });
 
@@ -169,8 +169,8 @@ app.set("etag", false);
 const PgSession = connectPgSimple(session);
 
 if (!process.env.SESSION_SECRET) {
-  console.error("CRITICAL: SESSION_SECRET environment variable is not set!");
-  console.error("Please set a strong, random SESSION_SECRET for production security.");
+  logger.error("CRITICAL: SESSION_SECRET environment variable is not set!");
+  logger.error("Please set a strong, random SESSION_SECRET for production security.");
   if (process.env.NODE_ENV === "production") {
     process.exit(1);
   }
@@ -218,7 +218,7 @@ if (process.env.DATABASE_URL || process.env.PGHOST) {
     createTableIfMissing: true,
   });
 
-  console.log(`✓ PostgreSQL session store configured (SSL: ${requiresSSL ? "enabled" : "disabled"})`);
+  logger.info(`✓ PostgreSQL session store configured (SSL: ${requiresSSL ? "enabled" : "disabled"})`);
 }
 
 app.use(session(sessionConfig));
@@ -323,7 +323,7 @@ app.use((req, res, next) => {
   )
     return next();
 
-  console.warn(
+  logger.warn(
     `[OriginGuard] BLOCKED ${method} ${req.path} | host=${host} origin=${originHeader || "-"} referer=${refererHeader || "-"}`
   );
   return res.status(403).json({
@@ -365,7 +365,7 @@ app.use((req, res, next) => {
   if (typeof got === "string" && got === expected) return next();
 
   if (CSRF_ENFORCE) {
-    console.warn(
+    logger.warn(
       `[CSRF] BLOCKED ${method} ${req.path} | expected=${expected.slice(0, 8)}… got=${typeof got === "string" ? got.slice(0, 8) + "…" : "<missing>"}`
     );
     return res.status(403).json({
@@ -373,7 +373,7 @@ app.use((req, res, next) => {
       code: "CSRF_TOKEN_MISMATCH",
     });
   } else {
-    console.warn(`[CSRF warn-only] ${method} ${req.path} | got=${typeof got === "string" ? "present" : "missing"}`);
+    logger.warn(`[CSRF warn-only] ${method} ${req.path} | got=${typeof got === "string" ? "present" : "missing"}`);
     next();
   }
 });
@@ -416,9 +416,9 @@ let migrationsDone = false;
   setupWS(server);
   if (process.env.ENABLE_SCHEDULERS !== "false") {
     startScheduler();
-    console.log("[Schedulers] Started (ENABLE_SCHEDULERS != false)");
+    logger.info("[Schedulers] Started (ENABLE_SCHEDULERS != false)");
   } else {
-    console.log("[Schedulers] Disabled via ENABLE_SCHEDULERS=false");
+    logger.info("[Schedulers] Disabled via ENABLE_SCHEDULERS=false");
   }
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
@@ -572,7 +572,7 @@ END $mig$`;
 
           if (isConnDrop) {
             // Reconnect and retry once — if retry also fails, record as a failure
-            console.error(`[Migration] Connection dropped — reconnecting... (${errMsg.split("\n")[0]})`);
+            logger.error(`[Migration] Connection dropped — reconnecting... (${errMsg.split("\n")[0]})`);
             try {
               await migrationClient.end().catch(() => {});
               migrationClient = new Client({
@@ -583,7 +583,7 @@ END $mig$`;
               await migrationClient.query(`SET lock_timeout = '30s'`);
               await migrationClient.query(`SET statement_timeout = '120s'`);
               await migrationClient.query(safeMigration(migration));
-              console.log(`[Migration] Reconnected and retried successfully`);
+              logger.info(`[Migration] Reconnected and retried successfully`);
             } catch (retryErr: any) {
               const retryMsg: string = retryErr.message ?? String(retryErr);
               failedMigrations.push({
@@ -593,13 +593,13 @@ END $mig$`;
             }
           } else if (isLockTimeout) {
             // Lock timeout — wait 5 s for in-flight queries to drain, then retry once
-            console.warn(
+            logger.warn(
               `[Migration] Lock timeout — waiting 5s before retry... (${migration.trim().substring(0, 80)})`
             );
             await new Promise((r) => setTimeout(r, 5000));
             try {
               await migrationClient.query(safeMigration(migration));
-              console.log(`[Migration] Lock-timeout retry succeeded`);
+              logger.info(`[Migration] Lock-timeout retry succeeded`);
             } catch (retryErr: any) {
               const retryMsg: string = retryErr.message ?? String(retryErr);
               failedMigrations.push({
@@ -619,13 +619,13 @@ END $mig$`;
       }
 
       if (failedMigrations.length > 0) {
-        console.error(`✗ ${failedMigrations.length} migration(s) failed at startup:`);
+        logger.error(`✗ ${failedMigrations.length} migration(s) failed at startup:`);
         for (const { sql, error } of failedMigrations) {
-          console.error(`  SQL: ${sql}`);
-          console.error(`  ERR: ${error}`);
+          logger.error(`  SQL: ${sql}`);
+          logger.error(`  ERR: ${error}`);
         }
       } else {
-        console.log("✓ Database tables and columns verified/migrated");
+        logger.info("✓ Database tables and columns verified/migrated");
       }
 
       // ── Post-migration critical-table existence check ────────────────────────
@@ -645,13 +645,13 @@ END $mig$`;
         const found = new Set<string>(tableCheck.rows.map((r: any) => r.table_name as string));
         const missing = IC_TABLES.filter((t) => !found.has(t));
         if (missing.length > 0) {
-          console.error(
+          logger.error(
             `✗ Missing critical tables after migration: ${missing.join(", ")} — ` +
               `IC notification feature will not work. Run the CREATE TABLE statements manually.`
           );
         }
       } catch (tableCheckErr: any) {
-        console.error(`[Migration] ✗ Could not verify IC table existence: ${tableCheckErr.message}`);
+        logger.error(`[Migration] ✗ Could not verify IC table existence: ${tableCheckErr.message}`);
       }
 
       // Backfill POS_EXPENSE daybook entries for any factory POS sales
@@ -774,7 +774,7 @@ END $mig$`;
           [nowYear, nowMonth]
         );
 
-        console.log(`[RentalFix] Found ${overpaidResult.rows.length} overpaid ledger row(s) to fix`);
+        logger.info(`[RentalFix] Found ${overpaidResult.rows.length} overpaid ledger row(s) to fix`);
 
         for (const row of overpaidResult.rows) {
           const paidAmt = Number(row.paid_amount);
@@ -786,7 +786,7 @@ END $mig$`;
 
           if (excess < 0.005) continue;
 
-          console.log(
+          logger.info(
             `[RentalFix] contract=${row.contract_id} ledger=${row.id} ` +
               `month=${row.year}/${row.month} paid=${paidAmt} capacity=${capacity} excess=${excess}`
           );
@@ -833,13 +833,13 @@ END $mig$`;
           }
 
           if (targetYear === null || targetMonth === null) {
-            console.warn(
+            logger.warn(
               `[RentalFix] No target slot found for contract=${row.contract_id} ledger=${row.id} — skipping`
             );
             continue;
           }
 
-          console.log(`[RentalFix] → moving excess $${excess} to ${targetYear}/${targetMonth}`);
+          logger.info(`[RentalFix] → moving excess $${excess} to ${targetYear}/${targetMonth}`);
 
           // 3. Create or top-up the target month
           await migrationClient.query(
@@ -876,14 +876,14 @@ END $mig$`;
             );
           }
 
-          console.log(
+          logger.info(
             `[RentalFix] Done: contract=${row.contract_id} fixed ${row.year}/${row.month} → ${targetYear}/${targetMonth}`
           );
         }
 
-        console.log("[RentalFix] Rental overpayment fix complete");
+        logger.info("[RentalFix] Rental overpayment fix complete");
       } catch (e: any) {
-        console.error("[RentalFix] Migration error:", e.message);
+        logger.error("[RentalFix] Migration error:", { error: e.message });
       }
 
       // One-time: convert all PARTIALLY_OFFLOADED containers to OFFLOADED.
@@ -993,7 +993,7 @@ END $mig$`;
                     [tgt.id, tgt.year, tgt.month, Number(pmt.id)]
                   );
                   pmtFixed++;
-                  console.log(
+                  logger.info(
                     `[AllocationFix] pmt=${pmt.id} contract=${cid} moved ${origForYear}/${origForMonth} → ${tgt.year}/${tgt.month}`
                   );
                 }
@@ -1003,7 +1003,7 @@ END $mig$`;
         }
 
         if (pmtFixed > 0) {
-          console.log(`[AllocationFix] Phase 1 complete — reassigned ${pmtFixed} payment record(s)`);
+          logger.info(`[AllocationFix] Phase 1 complete — reassigned ${pmtFixed} payment record(s)`);
         }
 
         // Phase 2: sync every ledger row's paid_amount to sum of its linked payments
@@ -1023,12 +1023,12 @@ END $mig$`;
         const ledgerFixed = syncResult.rowCount ?? 0;
 
         if (pmtFixed > 0 || ledgerFixed > 0) {
-          console.log(`[AllocationFix] Phase 2 complete — corrected ${ledgerFixed} ledger paid_amount(s)`);
+          logger.info(`[AllocationFix] Phase 2 complete — corrected ${ledgerFixed} ledger paid_amount(s)`);
         } else {
-          console.log(`[AllocationFix] All payment allocations and ledger amounts are correct`);
+          logger.info(`[AllocationFix] All payment allocations and ledger amounts are correct`);
         }
       } catch (e: any) {
-        console.error("[AllocationFix] Error:", e.message);
+        logger.error("[AllocationFix] Error:", { error: e.message });
       }
 
       // ── Merge split Production/Consumption ledger accounts ───────────────────
@@ -1092,14 +1092,14 @@ END $mig$`;
           mergedCount++;
         }
         if (mergedCount > 0) {
-          console.log(
+          logger.info(
             `[StockAdjFix] Merged Production/Consumption accounts → unified STOCK_ADJUSTMENT for ${mergedCount} company(ies)`
           );
         } else {
-          console.log(`[StockAdjFix] All companies already use unified STOCK_ADJUSTMENT — nothing to merge`);
+          logger.info(`[StockAdjFix] All companies already use unified STOCK_ADJUSTMENT — nothing to merge`);
         }
       } catch (e: any) {
-        console.error("[StockAdjFix] Error:", e.message);
+        logger.error("[StockAdjFix] Error:", { error: e.message });
       }
 
       // ── Fix bonus expense accounts: update accountType → "Indirect Expense" ──
@@ -1112,10 +1112,10 @@ END $mig$`;
           RETURNING id
         `);
         if (bonusFix.rowCount && bonusFix.rowCount > 0) {
-          console.log(`[BonusExpFix] Updated ${bonusFix.rowCount} bonus expense account(s) → Indirect Expense`);
+          logger.info(`[BonusExpFix] Updated ${bonusFix.rowCount} bonus expense account(s) → Indirect Expense`);
         }
       } catch (e: any) {
-        console.error("[BonusExpFix] Error:", e.message);
+        logger.error("[BonusExpFix] Error:", { error: e.message });
       }
 
       // ── Auto-fix credit note variance entries posted to wrong account ────────
@@ -1187,12 +1187,12 @@ END $mig$`;
             totalFixed += entryIds.length;
           }
 
-          console.log(
+          logger.info(
             `[CreditNoteVarianceFix] Moved ${totalFixed} variance entry/entries → Sales Returns & Allowances`
           );
         }
       } catch (e: any) {
-        console.error("[CreditNoteVarianceFix] Error:", e.message);
+        logger.error("[CreditNoteVarianceFix] Error:", { error: e.message });
       }
 
       // ── Auto-fix orphaned RESERVED_FOR_ORDER bales ───────────────────────────
@@ -1215,10 +1215,10 @@ END $mig$`;
         `);
         const fixed = orphanResult.rows.length;
         if (fixed > 0) {
-          console.log(`[BaleOrphanFix] Restored ${fixed} orphaned RESERVED_FOR_ORDER bale(s) → IN_STOCK`);
+          logger.info(`[BaleOrphanFix] Restored ${fixed} orphaned RESERVED_FOR_ORDER bale(s) → IN_STOCK`);
         }
       } catch (e: any) {
-        console.error("[BaleOrphanFix] Error:", e.message);
+        logger.error("[BaleOrphanFix] Error:", { error: e.message });
       }
 
       // ── Back-fill insurance_members from existing "Insurance - …" accounts ───
@@ -1249,10 +1249,10 @@ END $mig$`;
           RETURNING id
         `);
         if (memberBackfill.rowCount && memberBackfill.rowCount > 0) {
-          console.log(`[InsuranceMemberBackfill] Created ${memberBackfill.rowCount} missing insurance_members row(s) from ledger accounts`);
+          logger.info(`[InsuranceMemberBackfill] Created ${memberBackfill.rowCount} missing insurance_members row(s) from ledger accounts`);
         }
       } catch (e: any) {
-        console.error("[InsuranceMemberBackfill] Error:", e.message);
+        logger.error("[InsuranceMemberBackfill] Error:", { error: e.message });
       }
 
       // ── Soft-delete orphaned Insurance ledger accounts ───────────────────────
@@ -1272,10 +1272,10 @@ END $mig$`;
           RETURNING id
         `);
         if (insuranceFix.rowCount && insuranceFix.rowCount > 0) {
-          console.log(`[InsuranceFix] Soft-deleted ${insuranceFix.rowCount} orphaned Insurance ledger account(s)`);
+          logger.info(`[InsuranceFix] Soft-deleted ${insuranceFix.rowCount} orphaned Insurance ledger account(s)`);
         }
       } catch (e: any) {
-        console.error("[InsuranceFix] Error:", e.message);
+        logger.error("[InsuranceFix] Error:", { error: e.message });
       }
 
       // Auto-fix sequence desyncs (can happen after data restores / bulk imports with explicit IDs)
@@ -1300,7 +1300,7 @@ END $mig$`;
         }
       }
     } catch (err: any) {
-      console.error("Migration connection error:", err.message);
+      logger.error("Migration connection error:", { error: err.message });
     } finally {
       await migrationClient.end();
       migrationsDone = true;
@@ -1315,14 +1315,14 @@ END $mig$`;
     for (let attempt = 1; attempt <= 3; attempt++) {
       try {
         await pool.query("SELECT 1");
-        console.log(`✓ DB connection pool warmed up (attempt ${attempt})`);
+        logger.info(`✓ DB connection pool warmed up (attempt ${attempt})`);
         return;
       } catch (err: any) {
-        console.warn(`⚠️  DB warmup attempt ${attempt} failed: ${err.message}`);
+        logger.warn(`⚠️  DB warmup attempt ${attempt} failed: ${err.message}`);
         if (attempt < 3) await new Promise((r) => setTimeout(r, 3000));
       }
     }
-    console.error("✗ DB warmup failed after 3 attempts — queries will connect lazily");
+    logger.error("✗ DB warmup failed after 3 attempts — queries will connect lazily");
   };
 
   // Ensure Puppeteer's Chrome binary is present before the server starts
@@ -1356,19 +1356,19 @@ END $mig$`;
         const normalCount = parseInt(normalUserRows.rows[0]?.n ?? "0", 10);
         const oldRoleCount = parseInt(oldRoleRows.rows[0]?.n ?? "0", 10);
         const canDeleteOk = parseInt(canDeleteCol.rows[0]?.n ?? "0", 10) > 0;
-        console.log(
+        logger.info(
           `[MigrationDiag] POS roles: ${posCount} (${posWithStn} with pos_station set) | ` +
             `Normal User roles: ${normalCount} | ` +
             `Old roles remaining: ${oldRoleCount} | ` +
             `can_delete_records column: ${canDeleteOk ? "✓ present" : "✗ MISSING"}`
         );
         if (oldRoleCount > 0) {
-          console.warn(
+          logger.warn(
             `[MigrationDiag] ⚠️  ${oldRoleCount} row(s) still have old roles (POS1–POS6 or User) — check /api/admin/deployment-diagnostics`
           );
         }
       } catch (e: any) {
-        console.warn("[MigrationDiag] Could not run startup diagnostic:", e.message);
+        logger.warn("[MigrationDiag] Could not run startup diagnostic:", { error: e.message });
       }
     }, 30000);
 
@@ -1383,13 +1383,13 @@ END $mig$`;
           RETURNING id, reference_number
         `);
         if (r.rowCount && r.rowCount > 0) {
-          console.log(
-            `[BaleStatusFix] Fixed ${r.rowCount} bale(s) with deletedAt set but status != DELETED:`,
-            r.rows.map((x: any) => x.reference_number).join(", ")
+          logger.info(
+            `[BaleStatusFix] Fixed ${r.rowCount} bale(s) with deletedAt set but status != DELETED`,
+            { detail: r.rows.map((x: any) => x.reference_number).join(", ") }
           );
         }
       } catch (e: any) {
-        console.warn("[BaleStatusFix] Could not fix inconsistent bale statuses:", e.message);
+        logger.warn("[BaleStatusFix] Could not fix inconsistent bale statuses:", { error: e.message });
       }
     })();
 
@@ -1406,13 +1406,13 @@ END $mig$`;
           RETURNING id, run_type
         `);
         if (r.rowCount && r.rowCount > 0) {
-          console.log(
-            `[ExportRun] Startup: marked ${r.rowCount} orphaned run(s) as failed:`,
-            r.rows.map((x: any) => `#${x.id} ${x.run_type}`).join(", ")
+          logger.info(
+            `[ExportRun] Startup: marked ${r.rowCount} orphaned run(s) as failed`,
+            { detail: r.rows.map((x: any) => `#${x.id} ${x.run_type}`).join(", ") }
           );
         }
       } catch (e: any) {
-        console.warn("[ExportRun] Startup orphan-cleanup failed:", e.message);
+        logger.warn("[ExportRun] Startup orphan-cleanup failed:", { error: e.message });
       }
     };
 
@@ -1428,13 +1428,13 @@ END $mig$`;
           RETURNING id, run_type
         `);
         if (r.rowCount && r.rowCount > 0) {
-          console.log(
-            `[ExportRun] Periodic: timed out ${r.rowCount} hung run(s):`,
-            r.rows.map((x: any) => `#${x.id} ${x.run_type}`).join(", ")
+          logger.info(
+            `[ExportRun] Periodic: timed out ${r.rowCount} hung run(s)`,
+            { detail: r.rows.map((x: any) => `#${x.id} ${x.run_type}`).join(", ") }
           );
         }
       } catch (e: any) {
-        console.warn("[ExportRun] Periodic hung-run cleanup failed:", e.message);
+        logger.warn("[ExportRun] Periodic hung-run cleanup failed:", { error: e.message });
       }
     };
 
@@ -1445,7 +1445,7 @@ END $mig$`;
       try {
         await checkAndRecoverDailyExport();
       } catch (e: any) {
-        console.warn("[DailyExport] Startup recovery call failed:", e?.message);
+        logger.warn("[DailyExport] Startup recovery call failed:", { error: e?.message });
       }
     }, 90 * 1000);
   };
@@ -1461,7 +1461,7 @@ END $mig$`;
 
   server.on("error", (err: any) => {
     if (err.code === "EADDRINUSE") {
-      console.warn(`Port ${port} in use — killing zombie process and retrying...`);
+      logger.warn(`Port ${port} in use — killing zombie process and retrying...`);
       try {
         const { execSync } = require("child_process");
         execSync(`fuser -k ${port}/tcp`, { stdio: "ignore" });
@@ -1469,24 +1469,24 @@ END $mig$`;
       setTimeout(() => {
         server.removeAllListeners("error");
         server.on("error", (e: any) => {
-          console.error("Server error:", e);
+          logger.error("Server error:", { error: e });
         });
         doListen();
       }, 600);
     } else {
-      console.error("Server error:", err);
+      logger.error("Server error:", { error: err });
     }
   });
 
   // Graceful shutdown: close DB pool so zero-downtime deploys don't leave
   // zombie connections that exhaust max_connections on the next instance.
   const shutdown = async (signal: string) => {
-    console.log(`[Shutdown] ${signal} received — closing DB pool...`);
+    logger.info(`[Shutdown] ${signal} received — closing DB pool...`);
     try {
       await pool.end();
-      console.log("[Shutdown] DB pool closed cleanly.");
+      logger.info("[Shutdown] DB pool closed cleanly.");
     } catch (e: any) {
-      console.warn("[Shutdown] DB pool close error:", e.message);
+      logger.warn("[Shutdown] DB pool close error:", { error: e.message });
     }
     process.exit(0);
   };
@@ -1502,7 +1502,7 @@ END $mig$`;
   // kill-switch for severe lock contention).
   const migrationsEnabled = process.env.RUN_STARTUP_MIGRATIONS !== "false";
   if (!migrationsEnabled) {
-    console.log("⚠ Startup migrations DISABLED via RUN_STARTUP_MIGRATIONS=false");
+    logger.info("⚠ Startup migrations DISABLED via RUN_STARTUP_MIGRATIONS=false");
     migrationsDone = true;
   }
 
@@ -1520,7 +1520,7 @@ END $mig$`;
         );
       } catch (idxErr: any) {
         // Non-fatal: upsertExchangeRate has a fallback that works without the index.
-        console.warn("[startup] Could not ensure exchange_rates unique index:", idxErr?.message);
+        logger.warn("[startup] Could not ensure exchange_rates unique index:", { error: idxErr?.message });
       }
 
       // ── Always-running multi-currency schema columns ──────────────────────────
@@ -1625,9 +1625,9 @@ END $mig$`;
           CREATE UNIQUE INDEX IF NOT EXISTS fiscal_closures_company_period_unique
             ON fiscal_period_closures (company_id, period_end_date);
         `);
-        console.log("[startup] ✓ Multi-currency schema columns ensured");
+        logger.info("[startup] ✓ Multi-currency schema columns ensured");
       } catch (colErr: any) {
-        console.error("[startup] ✗ Could not ensure multi-currency columns:", colErr?.message);
+        logger.error("[startup] ✗ Could not ensure multi-currency columns:", { error: colErr?.message });
         // Non-fatal: the app will start but the dashboard net-profit query may still fail
         // if the columns are genuinely absent.
       }
@@ -1636,7 +1636,7 @@ END $mig$`;
         try {
           await runMigrations();
         } catch (err: any) {
-          console.error("Migration error (non-fatal — server will still start):", err?.message ?? err);
+          logger.error("Migration error (non-fatal — server will still start):", { error: err?.message ?? err });
           migrationsDone = true;
         }
       }
@@ -1645,7 +1645,7 @@ END $mig$`;
       doListen();
     })
     .catch((err: any) => {
-      console.error("Fatal startup error:", err?.message ?? err);
+      logger.error("Fatal startup error:", { error: err?.message ?? err });
       process.exit(1);
     });
 })();
