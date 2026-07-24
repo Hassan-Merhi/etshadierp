@@ -1,4 +1,5 @@
 import type { Express, NextFunction, Request, Response } from "express";
+import { getErrorMessage } from "../../lib/httpHandlers";
 import { db, pool } from "../../db";
 import { requireAuth, requireRole } from "../../auth";
 import { persistSecurityEvent } from "../../services/security/securityAuditRuntime";
@@ -41,8 +42,8 @@ export function registerSecurityPermissionRoutes(app: Express) {
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const permissions = await loadNamedPermissions(db, req.params.userId, companyId);
       res.json({ userId: req.params.userId, companyId, permissions });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -78,10 +79,10 @@ export function registerSecurityPermissionRoutes(app: Express) {
       );
       await invalidateUserCompanySessions(pool, req.params.userId, companyId);
       res.json({ userId: req.params.userId, companyId, permissions: saved });
-    } catch (error: any) {
-      if (error?.message === "Invalid permissions") return res.status(400).json({ message: "Invalid request" });
-      if (error?.message === "User not found") return res.status(404).json({ message: "Not found" });
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      if (getErrorMessage(error) === "Invalid permissions") return res.status(400).json({ message: "Invalid request" });
+      if (getErrorMessage(error) === "User not found") return res.status(404).json({ message: "Not found" });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 }

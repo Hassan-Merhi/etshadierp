@@ -1,4 +1,5 @@
 import { eq, and, or, isNull, asc, desc, sql, ne, ilike } from "drizzle-orm";
+import { getErrorMessage } from "../lib/httpHandlers";
 import { logger } from "../lib/logger";
 import { db, pool } from "../db";
 import * as schema from "@shared/schema";
@@ -114,7 +115,7 @@ export async function getOrCreateLedgerAccount(account: InsertLedgerAccount): Pr
       })
       .returning();
     return created;
-  } catch (insertErr: any) {
+  } catch (insertErr: unknown) {
     const [byCode] = await db
       .select()
       .from(schema.ledgerAccounts)
@@ -150,11 +151,11 @@ export async function getOrCreateLedgerAccount(account: InsertLedgerAccount): Pr
     }
 
     logger.error("[getOrCreateLedgerAccount] INSERT failed and no existing row found", {
-      code: insertErr.code,
+      code: (insertErr as { code?: string }).code,
       companyId: account.companyId,
       accountCode: code,
       name: account.name,
-      error: insertErr.message,
+      error: getErrorMessage(insertErr),
     });
     throw insertErr;
   }

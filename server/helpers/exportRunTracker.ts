@@ -1,4 +1,5 @@
 import { pool } from "../db";
+import { getErrorMessage } from "../lib/httpHandlers";
 import { logger } from "../lib/logger";
 
 /** Maps camelCase field names to their snake_case DB column names. */
@@ -32,8 +33,8 @@ export async function createExportRun(
       runType,
     ]);
     return r.rows[0].id as number;
-  } catch (err: any) {
-    logger.warn("[ExportRun] Failed to create run record:", { error: err.message });
+  } catch (err: unknown) {
+    logger.warn("[ExportRun] Failed to create run record:", { error: getErrorMessage(err) });
     return 0;
   }
 }
@@ -50,8 +51,8 @@ export async function updateExportRun(id: number, data: Record<string, any>): Pr
   const values = [...entries.map(([, v]) => v), id];
   try {
     await pool.query(`UPDATE daily_export_runs SET ${setClauses.join(", ")} WHERE id = $${values.length}`, values);
-  } catch (err: any) {
-    logger.warn(`[ExportRun] Failed to update run ${id}:`, { error: err.message });
+  } catch (err: unknown) {
+    logger.warn(`[ExportRun] Failed to update run ${id}:`, { error: getErrorMessage(err) });
   }
 }
 

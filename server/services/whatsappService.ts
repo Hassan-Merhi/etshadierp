@@ -8,6 +8,7 @@
  */
 
 import { pool } from "../db";
+import { getErrorMessage } from "../lib/httpHandlers";
 import { logger } from "../lib/logger";
 import FormDataLib from "form-data";
 
@@ -355,9 +356,9 @@ export async function sendWhatsAppText(
         throw new Error(`Green API ${response.status}: ${body}`);
       }
       sent++;
-    } catch (e: any) {
+    } catch (e: unknown) {
       failed++;
-      errors.push(e.message ?? "Unknown error");
+      errors.push(getErrorMessage(e) ?? "Unknown error");
       logger.error("[WhatsApp] Text send failed:", { error: e });
     }
   }

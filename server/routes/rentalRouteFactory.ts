@@ -1,4 +1,5 @@
 import type { Express, Request, Response } from "express";
+import { getErrorMessage } from "../lib/httpHandlers";
 import { logger } from "../lib/logger";
 import { registerRentalUnitsContractsRoutes } from "./rental/rentalUnitsContractsRoutes";
 import { registerRentalPaymentsAccrualRoutes } from "./rental/rentalPaymentsAccrualRoutes";
@@ -35,9 +36,9 @@ export function registerRentalRoutes(
       const asOf = (req.query.asOf as string | undefined) || getClientDate(req);
       const result = await runRentalReconciliation(companyId, module, asOf);
       res.json(result);
-    } catch (e: any) {
+    } catch (e: unknown) {
       logger.error(`[${module}/rental] reconciliation:`, { error: e });
-      res.status(500).json({ message: e.message });
+      res.status(500).json({ message: getErrorMessage(e) });
     }
   });
 }

@@ -1,4 +1,5 @@
 import type { Express, RequestHandler } from "express";
+import { getErrorMessage } from "../lib/httpHandlers";
 import { logger } from "../lib/logger";
 import { requireAuth, requireNonPOS } from "../auth";
 import { getHistoricalCurrencyReadiness } from "../services/accounting/historicalCurrencyReadiness";
@@ -36,11 +37,11 @@ export const guardUnresolvedHistoricalCurrency: RequestHandler = async (req, res
       readiness,
       backfillWasRun: false,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error("Historical currency readiness check failed:", { error: error });
     return res.status(500).json({
       code: "HISTORICAL_CURRENCY_READINESS_FAILED",
-      message: error.message,
+      message: getErrorMessage(error),
     });
   }
 };
@@ -58,8 +59,8 @@ export function registerHistoricalCurrencyGuardRoutes(app: Express) {
         if (!companyId) return res.status(400).json({ message: "No company selected" });
         const asOfDate = typeof req.query.toDate === "string" ? req.query.toDate : null;
         return res.json(await getHistoricalCurrencyReadiness(companyId, asOfDate));
-      } catch (error: any) {
-        return res.status(500).json({ message: error.message });
+      } catch (error: unknown) {
+        return res.status(500).json({ message: getErrorMessage(error) });
       }
     },
   );

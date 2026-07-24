@@ -226,7 +226,7 @@ export function registerSpMigrationFinalVerificationRoutes(app: Express): void {
         }
         const report = await buildFinalSpVerification(sourceId, targetId);
         return res.status(report.overall === "FAIL" ? 409 : 200).json(report);
-      } catch (error: any) {
+      } catch (error: unknown) {
         logger.error("[SP Migration] final verification error", { error });
         return res.status(500).json({ message: "Final Supplier Partner verification failed" });
       }

@@ -1,4 +1,5 @@
 import type { Express } from "express";
+import { getErrorMessage } from "../../lib/httpHandlers";
 import { and, eq, inArray } from "drizzle-orm";
 import { db } from "../../db";
 import { requireAuth } from "../../auth";
@@ -77,8 +78,8 @@ export function registerFactoryContainerReadAccessRoutes(app: Express) {
           complete: requiredTypes.every((docType: any) => uploadedTypeIds.has(docType.id)),
         },
       });
-    } catch (error: any) {
-      return res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      return res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -126,8 +127,8 @@ export function registerFactoryContainerReadAccessRoutes(app: Express) {
           return { ...freight, payments: freightPayments, totalPaid, computedStatus };
         })
       );
-    } catch (error: any) {
-      return res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      return res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 }

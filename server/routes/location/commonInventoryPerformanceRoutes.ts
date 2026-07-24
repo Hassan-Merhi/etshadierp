@@ -1,4 +1,5 @@
 import type { Express, NextFunction, Request, Response } from "express";
+import { getErrorMessage } from "../../lib/httpHandlers";
 import { db } from "../../db";
 import { requireAuth } from "../../auth";
 import { inventory, locations, stockGroups, stockItems } from "@shared/schema";
@@ -63,8 +64,8 @@ export function registerCommonInventoryPerformanceRoutes(app: Express): void {
       const total = countRows[0]?.total ?? 0;
 
       return res.json({ data, page, pageSize, total, totalPages: Math.ceil(total / pageSize) });
-    } catch (error: any) {
-      return res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      return res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -133,8 +134,8 @@ export function registerCommonInventoryPerformanceRoutes(app: Express): void {
       const [countRows, data] = await Promise.all([countQuery, dataQuery]);
       const total = countRows[0]?.total ?? 0;
       return res.json({ data, page, pageSize, total, totalPages: Math.ceil(total / pageSize) });
-    } catch (error: any) {
-      return res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      return res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 }

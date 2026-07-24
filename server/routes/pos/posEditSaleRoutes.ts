@@ -1,4 +1,5 @@
 import { type Express } from "express";
+import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
 import { requireAuth, canModifyDate } from "../../auth";
 import { updatePosSale } from "../../services/pos/edit/updateSaleService";
@@ -56,15 +57,15 @@ export function registerPosEditSaleRoutes(app: Express): void {
         }
       }
       res.status(result.status).json(result.body);
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("POS sale update failed", { module: "pos", action: "updateSale", userId: _uid, companyId: _cid, durationMs: Date.now() - _t, error });
-      if (error.message.includes("Inventory not found")) {
-        return res.status(404).json({ message: error.message });
+      if (getErrorMessage(error).includes("Inventory not found")) {
+        return res.status(404).json({ message: getErrorMessage(error) });
       }
-      if (error.message.includes("Insufficient stock")) {
-        return res.status(400).json({ message: error.message });
+      if (getErrorMessage(error).includes("Insufficient stock")) {
+        return res.status(400).json({ message: getErrorMessage(error) });
       }
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 }

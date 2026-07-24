@@ -1,4 +1,5 @@
 import { trackOneFactoryContainerById } from "../../../services/factoryContainerTrackingService";
+import { getErrorMessage } from "../../../lib/httpHandlers";
 import { parseId, parseOptionalId } from "../../../lib/parseId";
 import { dispatchNotification } from "../../../lib/notificationService";
 import { getClientDate } from "../../../lib/dateUtils";
@@ -159,8 +160,8 @@ export function registerOrderTrackingRoutes(app: Express) {
         .orderBy(desc(customerOrders.orderDate), desc(customerOrders.id));
 
       res.json(rows);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -222,8 +223,8 @@ export function registerOrderTrackingRoutes(app: Express) {
         tracked: queued,
         message: `Tracking started for ${queued} container${queued !== 1 ? "s" : ""}. ETAs will update shortly.`,
       });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 

@@ -1,4 +1,5 @@
 import ExcelJS from "exceljs";
+import { getErrorMessage } from "../lib/httpHandlers";
 import { logger } from "../lib/logger";
 import path from "path";
 import fs from "fs";
@@ -891,10 +892,10 @@ export async function generateSpSalesFormExcel(params: SpSalesFormParams): Promi
         criticalErrors.slice(0, 20).join("\n")
       );
     }
-  } catch (scanErr: any) {
+  } catch (scanErr: unknown) {
     // Re-throw export-abort errors; swallow scan infrastructure failures only.
-    if (scanErr.message?.startsWith("SP Sales Form export aborted")) throw scanErr;
-    logger.error("[spSalesFormExport] Error scan failed (non-critical):", { error: scanErr.message });
+    if (getErrorMessage(scanErr)?.startsWith("SP Sales Form export aborted")) throw scanErr;
+    logger.error("[spSalesFormExport] Error scan failed (non-critical):", { error: getErrorMessage(scanErr) });
   }
 
   return buf;
