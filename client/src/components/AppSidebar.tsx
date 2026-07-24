@@ -66,6 +66,8 @@ const defaultPinnedItems: NavItem[] = [
   { title: "Vouchers", url: "/vouchers", icon: Receipt },
 ];
 
+const SETTINGS_HIDDEN_ROLES = new Set(["Admin", "Owner", "Developer"]);
+
 export const ERP_NAV_SECTIONS: NavSection[] = [
   {
     label: "Inventory",
@@ -212,6 +214,7 @@ export function AppSidebar({ user }: { user?: any }) {
   const { toast } = useToast();
   const { conflictCount } = useConnectivity();
   const { selectedCompany } = useCompany();
+  const currentRole = user?.currentRole ?? user?.role ?? "";
   const prevUnreadRef = useRef<number>(-1);
 
   const { items: pinnedItems, reorder: reorderPinned } = usePinnedOrder("erp-pinned-order", defaultPinnedItems);
@@ -369,7 +372,7 @@ export function AppSidebar({ user }: { user?: any }) {
               </Badge>
             </a>
           )}
-          {! ["Admin", "Owner", "Developer"].includes(user?.currentRole ?? user?.role ?? "") && (
+          {!SETTINGS_HIDDEN_ROLES.has(currentRole) && (
             <SidebarFlatLink href="/my-settings" icon={KeyRound} label="My Settings" testId="link-my-settings" />
           )}
           <SidebarFlatLink
