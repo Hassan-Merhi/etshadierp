@@ -1766,8 +1766,8 @@ export function registerFactoryBaleExportRoutes(app: Express) {
       const balanceWeightKg = Math.max(0, allTimeMixKg - allTimeBaleKg);
       const balanceValue = Math.round(balanceWeightKg * allTimeBlendedCpk * 100) / 100;
 
-      // ── STATUS = Production value − Batch cost ──
-      const statusValue = totalProductionValue - totalMixCost;
+      // ── PRODUCTION PROFIT = Bales value − (Produced kg × balance-on-table blended rate) ──
+      const statusValue = totalProductionValue - (totalBaleWeightKg * allTimeBlendedCpk);
 
       // ── Kg comparison ──
       const kgDiff = totalBaleWeightKg - totalMixWeightKg;
