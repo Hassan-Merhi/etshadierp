@@ -47,6 +47,7 @@ import { useDateFormat } from "@/contexts/DateFormatContext";
 import { useToast } from "@/hooks/use-toast";
 import { ExcelJS, writeFile } from "@/lib/excelHelper";
 import { formatNumber } from "@/lib/formatNumber";
+import StockInSalesReportComparison from "./StockInSalesReportComparison";
 import StockInSalesReportDetail from "./StockInSalesReportDetail";
 
 interface LocationOption {
@@ -188,8 +189,12 @@ const EMPTY_METRICS: StockInSalesMetrics = {
 };
 
 export default function StockInSalesReport() {
-  if (new URLSearchParams(window.location.search).get("view") === "detail") {
+  const view = new URLSearchParams(window.location.search).get("view");
+  if (view === "detail") {
     return <StockInSalesReportDetail />;
+  }
+  if (view === "comparison") {
+    return <StockInSalesReportComparison />;
   }
 
   const { selectedCompany } = useCompany();
@@ -296,6 +301,20 @@ export default function StockInSalesReport() {
     window.location.assign(`/stock-in-sales-report?${params.toString()}`);
   };
 
+  const openComparison = () => {
+    const params = new URLSearchParams({ view: "comparison", grouping });
+    if (periodFilter.fromDate) params.set("startDate", periodFilter.fromDate);
+    if (periodFilter.toDate) params.set("endDate", periodFilter.toDate);
+    if (debouncedSearch) params.set("search", debouncedSearch);
+    if (selectedLocations[0]) params.set("sideALocationId", selectedLocations[0]);
+    if (selectedLocations[1]) params.set("sideBLocationId", selectedLocations[1]);
+    if (selectedStockGroups.length > 0) {
+      params.set("sideAStockGroupIds", selectedStockGroups.join(","));
+      params.set("sideBStockGroupIds", selectedStockGroups.join(","));
+    }
+    window.location.assign(`/stock-in-sales-report?${params.toString()}`);
+  };
+
   const exportExcel = async () => {
     if (!data || rows.length === 0) return;
     setIsExporting(true);
@@ -384,8 +403,7 @@ export default function StockInSalesReport() {
           <Button
             variant="outline"
             size="sm"
-            disabled
-            title="Location and stock-group comparison is added in Phase 4"
+            onClick={openComparison}
             data-testid="button-stock-in-sales-compare"
           >
             <GitCompare className="mr-2 h-4 w-4" /> Compare
