@@ -1,4 +1,5 @@
 import Decimal from "decimal.js";
+import { getErrorMessage } from "../../lib/httpHandlers";
 import { parseId, parseOptionalId } from "../../lib/parseId";
 import { getClientDate } from "../../lib/dateUtils";
 import { logger } from "../../lib/logger";
@@ -287,9 +288,9 @@ export function registerFactoryContainersRoutes(app: Express) {
         .orderBy(desc(factoryContainers.createdAt));
 
       res.json(results);
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error fetching factory containers:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -335,8 +336,8 @@ export function registerFactoryContainersRoutes(app: Express) {
         .where(and(eq(factoryContainers.id, id), eq(factoryContainers.companyId, companyId)));
       if (!row) return res.status(404).json({ message: "Container not found" });
       res.json(row);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -423,9 +424,9 @@ export function registerFactoryContainersRoutes(app: Express) {
             commFxResolved = parseFloat(
               await getOrFetchFxRateToUsd(companyId, commFxCcy, importDate)
             );
-          } catch (err: any) {
+          } catch (err: unknown) {
             return res.status(400).json({
-              message: `Cannot resolve FX rate for commission currency ${commFxCcy} on ${importDate}. ${err.message}`,
+              message: `Cannot resolve FX rate for commission currency ${commFxCcy} on ${importDate}. ${getErrorMessage(err)}`,
             });
           }
         }
@@ -600,10 +601,10 @@ export function registerFactoryContainersRoutes(app: Express) {
 
       logger.info("factory container create succeeded", { module: "factoryContainers", action: "create", userId: _uid, companyId: _cid, containerId: container.id, durationMs: Date.now() - _t });
       res.json(container);
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("factory container create failed", { module: "factoryContainers", action: "create", userId: _uid, companyId: _cid, durationMs: Date.now() - _t, error });
       logger.error("Error creating factory container:", { error: error });
-      res.status(400).json({ message: error.message });
+      res.status(400).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -717,9 +718,9 @@ export function registerFactoryContainersRoutes(app: Express) {
               commFxResolved = parseFloat(
                 await getOrFetchFxRateToUsd(companyId, effCommCcy, effDate)
               );
-            } catch (err: any) {
+            } catch (err: unknown) {
               return res.status(400).json({
-                message: `Cannot resolve FX rate for commission currency ${effCommCcy} on ${effDate}. ${err.message}`,
+                message: `Cannot resolve FX rate for commission currency ${effCommCcy} on ${effDate}. ${getErrorMessage(err)}`,
               });
             }
           }
@@ -1015,13 +1016,13 @@ export function registerFactoryContainersRoutes(app: Express) {
 
       logger.info("factory container update succeeded", { module: "factoryContainers", action: "update", userId: _uid, companyId: _cid, containerId: id, durationMs: Date.now() - _t });
       res.json(updated);
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("factory container update failed", { module: "factoryContainers", action: "update", userId: _uid, companyId: _cid, durationMs: Date.now() - _t, error });
-      const pgErr = error?.cause ?? error;
-      const pgMsg = pgErr?.message ?? error?.message ?? "Unknown error";
-      const pgCode = pgErr?.code;
-      const pgConstraint = pgErr?.constraint;
-      logger.error("[factory-container PATCH] DB error:", { pgCode, pgConstraint, pgMsg, full: error?.message });
+      const pgErr = (error as { cause?: unknown }).cause ?? error;
+      const pgMsg = getErrorMessage(pgErr) ?? getErrorMessage(error) ?? "Unknown error";
+      const pgCode = (pgErr as { code?: string }).code;
+      const pgConstraint = (pgErr as { constraint?: string }).constraint;
+      logger.error("[factory-container PATCH] DB error:", { pgCode, pgConstraint, pgMsg, full: getErrorMessage(error) });
       const userMsg = pgCode
         ? `${pgMsg}${pgConstraint ? ` (constraint: ${pgConstraint})` : ""}`
         : pgMsg.split("\n\n").pop() || pgMsg;
@@ -1202,9 +1203,9 @@ export function registerFactoryContainersRoutes(app: Express) {
       });
 
       res.json({ deleted: ownedIds.length, ids: ownedIds });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error bulk-deleting factory containers:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -1313,9 +1314,9 @@ export function registerFactoryContainersRoutes(app: Express) {
 
       if (!updatedId) return res.status(404).json({ message: "Container not found" });
       res.json({ id: updatedId, message: "Container deleted" });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error deleting factory container:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -1410,9 +1411,9 @@ export function registerFactoryContainersRoutes(app: Express) {
       }
 
       res.json({ created, skipped, total: allContainers.length, fxUnresolvedSkipped });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error backfilling import credits:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -1433,8 +1434,8 @@ export function registerFactoryContainersRoutes(app: Express) {
         )
         .orderBy(factoryContainerOtherCharges.createdAt);
       res.json(charges);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -1587,9 +1588,9 @@ export function registerFactoryContainersRoutes(app: Express) {
       }
 
       res.json({ charges: newCharges, total: total.toFixed(2) });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error syncing container other charges:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -1682,9 +1683,9 @@ export function registerFactoryContainersRoutes(app: Express) {
       }
 
       res.json({ containers: Array.from(grouped.values()) });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error previewing other charges currency:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -1821,9 +1822,9 @@ export function registerFactoryContainersRoutes(app: Express) {
       }
 
       res.json({ fixed });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error fixing other charges currency:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -1907,8 +1908,8 @@ export function registerFactoryContainersRoutes(app: Express) {
           } else {
             try {
               fxRate = parseFloat(await getOrFetchFxRateToUsd(companyId, currencyCode, importDate));
-            } catch (fxErr: any) {
-              errors.push(`Row ${rowNum} (${row.containerNumber}): ${fxErr.message}`);
+            } catch (fxErr: unknown) {
+              errors.push(`Row ${rowNum} (${row.containerNumber}): ${getErrorMessage(fxErr)}`);
               continue;
             }
           }
@@ -1983,8 +1984,8 @@ export function registerFactoryContainersRoutes(app: Express) {
 
             results.push(container);
           });
-        } catch (err: any) {
-          errors.push(`Row ${rowNum} (${row.containerNumber || "unknown"}): ${err.message}`);
+        } catch (err: unknown) {
+          errors.push(`Row ${rowNum} (${row.containerNumber || "unknown"}): ${getErrorMessage(err)}`);
         }
       }
 
@@ -1993,9 +1994,9 @@ export function registerFactoryContainersRoutes(app: Express) {
         errors,
         total: rows.length,
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error importing containers from Excel:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -2061,9 +2062,9 @@ export function registerFactoryContainersRoutes(app: Express) {
         .returning();
 
       res.json({ container: updated, fromSupplierName, toSupplierName: targetSupplier.name });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error moving container supplier:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 

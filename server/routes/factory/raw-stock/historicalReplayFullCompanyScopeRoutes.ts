@@ -1,4 +1,5 @@
 import type { Express } from "express";
+import { getErrorMessage } from "../../../lib/httpHandlers";
 import { requireAuth, requireRole } from "../../../auth";
 import { pool } from "../../../db";
 import {
@@ -110,10 +111,10 @@ export function registerHistoricalReplayFullCompanyScopeRoutes(app: Express): vo
         req.body.includeCompletedBatches = true;
         req.body.includeFinalizedBales = false;
         return next();
-      } catch (error: any) {
+      } catch (error: unknown) {
         return res.status(500).json({
-          message: error.message || "Failed to prepare the full-company Historical Replay scope",
-          code: error.code,
+          message: getErrorMessage(error) || "Failed to prepare the full-company Historical Replay scope",
+          code: (error as { code?: string }).code,
         });
       }
     }

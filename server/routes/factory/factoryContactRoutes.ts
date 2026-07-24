@@ -1,4 +1,5 @@
 import type { Express, Request, Response } from "express";
+import { getErrorMessage } from "../../lib/httpHandlers";
 import { db } from "../../db";
 import { requireAuth } from "../../auth";
 import { factoryContacts } from "@shared/schema";
@@ -33,8 +34,8 @@ export function registerFactoryContactRoutes(app: Express) {
         .orderBy(asc(factoryContacts.name));
 
       res.json(rows);
-    } catch (e: any) {
-      res.status(500).json({ message: e.message });
+    } catch (e: unknown) {
+      res.status(500).json({ message: getErrorMessage(e) });
     }
   });
 
@@ -53,8 +54,8 @@ export function registerFactoryContactRoutes(app: Express) {
         .returning();
 
       res.json(row);
-    } catch (e: any) {
-      res.status(500).json({ message: e.message });
+    } catch (e: unknown) {
+      res.status(500).json({ message: getErrorMessage(e) });
     }
   });
 
@@ -78,8 +79,8 @@ export function registerFactoryContactRoutes(app: Express) {
 
       if (!row) return res.status(404).json({ message: "Contact not found" });
       res.json(row);
-    } catch (e: any) {
-      res.status(500).json({ message: e.message });
+    } catch (e: unknown) {
+      res.status(500).json({ message: getErrorMessage(e) });
     }
   });
 
@@ -97,8 +98,8 @@ export function registerFactoryContactRoutes(app: Express) {
         .where(and(eq(factoryContacts.id, id), eq(factoryContacts.companyId, companyId)));
 
       res.json({ ok: true });
-    } catch (e: any) {
-      res.status(500).json({ message: e.message });
+    } catch (e: unknown) {
+      res.status(500).json({ message: getErrorMessage(e) });
     }
   });
 }

@@ -1,4 +1,5 @@
 import { logAudit } from "../../helpers/auditHelpers";
+import { getErrorMessage, getErrorStack } from "../../../lib/httpHandlers";
 import { logger } from "../../../lib/logger";
 import { contentDisposition } from "../../../lib/contentDisposition";
 import { trackOneContainerById } from "../../../services/containerTrackingService";
@@ -444,8 +445,8 @@ async function buildInvoiceWorkbookBuffer(params: InvoiceWorkbookParams): Promis
         sr.getCell(7).border = thinBorder;
         sr.getCell(8).border = thinBorder;
       });
-    } catch (summaryErr: any) {
-      logger.warn(`[ExcelExport] orderId=${orderId} stage=summary-skipped reason=${summaryErr.message}`);
+    } catch (summaryErr: unknown) {
+      logger.warn(`[ExcelExport] orderId=${orderId} stage=summary-skipped reason=${getErrorMessage(summaryErr)}`);
     }
   }
 
@@ -638,9 +639,9 @@ export function registerOrderExcelExportRoutes(app: Express) {
       res.setHeader("X-Content-Type-Options", "nosniff");
       res.end(xlsBuffer);
       logger.info(`[ExcelExport] orderId=${orderId} stage=response-sent bytes=${xlsBuffer.length}`);
-    } catch (error: any) {
-      logger.error(`[ExcelExport] /export/excel failed:`, { error: error.message, stack: error.stack });
-      if (!res.headersSent) res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      logger.error(`[ExcelExport] /export/excel failed:`, { error: getErrorMessage(error), stack: getErrorStack(error) });
+      if (!res.headersSent) res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -775,10 +776,10 @@ export function registerOrderExcelExportRoutes(app: Express) {
       res.setHeader("X-Content-Type-Options", "nosniff");
       res.end(xlsBuffer);
       logger.info(`[ExcelExport] orderId=${orderId} stage=response-sent bytes=${xlsBuffer.length}`);
-    } catch (error: any) {
-      logger.error(`[ExcelExport] /export-excel failed:`, { error: error.message, stack: error.stack });
+    } catch (error: unknown) {
+      logger.error(`[ExcelExport] /export-excel failed:`, { error: getErrorMessage(error), stack: getErrorStack(error) });
       if (!res.headersSent) {
-        res.status(500).json({ message: error.message });
+        res.status(500).json({ message: getErrorMessage(error) });
       }
     }
   });

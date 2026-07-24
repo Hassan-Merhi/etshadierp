@@ -1,4 +1,5 @@
 import { getClientDate } from "../../../lib/dateUtils";
+import { getErrorMessage } from "../../../lib/httpHandlers";
 import { logger } from "../../../lib/logger";
 import type { Express } from "express";
 import { db } from "../../../db";
@@ -141,8 +142,8 @@ export function registerEmployeeCrudRoutes(app: Express) {
         .orderBy(employees.firstName);
 
       res.json(rows);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -162,8 +163,8 @@ export function registerEmployeeCrudRoutes(app: Express) {
 
       if (!emp) return res.status(404).json({ message: "Employee not found" });
       res.json(emp);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -219,8 +220,8 @@ export function registerEmployeeCrudRoutes(app: Express) {
         .returning();
 
       res.status(201).json(emp);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -250,8 +251,8 @@ export function registerEmployeeCrudRoutes(app: Express) {
 
       if (!updated) return res.status(404).json({ message: "Employee not found" });
       res.json(updated);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -272,8 +273,8 @@ export function registerEmployeeCrudRoutes(app: Express) {
 
       if (!deleted) return res.status(404).json({ message: "Employee not found" });
       res.json({ message: "Employee deleted successfully" });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -325,8 +326,8 @@ export function registerEmployeeCrudRoutes(app: Express) {
       });
 
       res.json({ employee: emp, rows });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -422,8 +423,8 @@ export function registerEmployeeCrudRoutes(app: Express) {
       });
 
       res.json(result);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -507,8 +508,8 @@ export function registerEmployeeCrudRoutes(app: Express) {
       });
 
       res.json(result);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -702,8 +703,8 @@ export function registerEmployeeCrudRoutes(app: Express) {
       });
 
       res.json({ voucher: txResult.bulkVoucher, results: txResult.results, totalSalary, totalDeduction, totalNet });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -789,9 +790,9 @@ export function registerEmployeeCrudRoutes(app: Express) {
       }
 
       res.json({ updated: results.length, employees: results });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error recalculating employee balances:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -844,9 +845,9 @@ export function registerEmployeeCrudRoutes(app: Express) {
         newDeposits,
         newWithdrawals,
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error recalculating employee balance:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -947,8 +948,8 @@ export function registerEmployeeCrudRoutes(app: Express) {
       });
 
       res.json({ preview });
-    } catch (err: any) {
-      res.status(500).json({ message: err.message });
+    } catch (err: unknown) {
+      res.status(500).json({ message: getErrorMessage(err) });
     }
   });
 
@@ -997,8 +998,8 @@ export function registerEmployeeCrudRoutes(app: Express) {
         notes: r.notes,
       }));
       res.json({ employees: emps, attendance });
-    } catch (err: any) {
-      res.status(500).json({ message: err.message });
+    } catch (err: unknown) {
+      res.status(500).json({ message: getErrorMessage(err) });
     }
   });
 
@@ -1020,8 +1021,8 @@ export function registerEmployeeCrudRoutes(app: Express) {
         `);
       }
       res.json({ saved: records.length });
-    } catch (err: any) {
-      res.status(500).json({ message: err.message });
+    } catch (err: unknown) {
+      res.status(500).json({ message: getErrorMessage(err) });
     }
   });
 
@@ -1049,8 +1050,8 @@ export function registerEmployeeCrudRoutes(app: Express) {
         notes: r.notes,
       }));
       res.json(attendance);
-    } catch (err: any) {
-      res.status(500).json({ message: err.message });
+    } catch (err: unknown) {
+      res.status(500).json({ message: getErrorMessage(err) });
     }
   });
 
@@ -1136,8 +1137,8 @@ export function registerEmployeeCrudRoutes(app: Express) {
       }
 
       res.json({ voucher: bulkVoucher, results, totalAmount });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 

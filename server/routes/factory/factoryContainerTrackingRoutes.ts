@@ -1,4 +1,5 @@
 import type { Express } from "express";
+import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
 import { db } from "../../db";
 import { requireAuth } from "../../auth";
@@ -40,9 +41,9 @@ export function registerFactoryContainerTrackingRoutes(app: Express) {
 
         const result = await refreshFactoryContainerEta(containerId, { forceRefresh, companyId });
         res.json(result);
-      } catch (err: any) {
-        const status = err.message?.includes("not found") ? 404 : 500;
-        res.status(status).json({ message: err.message || "Failed to refresh ETA" });
+      } catch (err: unknown) {
+        const status = getErrorMessage(err)?.includes("not found") ? 404 : 500;
+        res.status(status).json({ message: getErrorMessage(err) || "Failed to refresh ETA" });
       }
     }
   );
@@ -68,8 +69,8 @@ export function registerFactoryContainerTrackingRoutes(app: Express) {
           ...summary,
           message: `Checked ${summary.total} container(s): ${summary.updated} updated, ${summary.unchanged} unchanged, ${summary.errors} error(s).`,
         });
-      } catch (err: any) {
-        res.status(500).json({ message: err.message || "Failed to refresh ETAs" });
+      } catch (err: unknown) {
+        res.status(500).json({ message: getErrorMessage(err) || "Failed to refresh ETAs" });
       }
     }
   );
@@ -84,8 +85,8 @@ export function registerFactoryContainerTrackingRoutes(app: Express) {
         const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
         const summary = await getFactoryEtaTrackingSummary(companyId);
         res.json(summary);
-      } catch (err: any) {
-        res.status(500).json({ message: err.message || "Failed to fetch ETA tracking summary" });
+      } catch (err: unknown) {
+        res.status(500).json({ message: getErrorMessage(err) || "Failed to fetch ETA tracking summary" });
       }
     }
   );
@@ -112,8 +113,8 @@ export function registerFactoryContainerTrackingRoutes(app: Express) {
         .orderBy(desc(factoryContainerTrackingEvents.eventTime));
 
       res.json(events);
-    } catch (err: any) {
-      res.status(500).json({ message: err.message || "Failed to fetch tracking events" });
+    } catch (err: unknown) {
+      res.status(500).json({ message: getErrorMessage(err) || "Failed to fetch tracking events" });
     }
   });
 
@@ -145,8 +146,8 @@ export function registerFactoryContainerTrackingRoutes(app: Express) {
         .limit(50);
 
       res.json(checks);
-    } catch (err: any) {
-      res.status(500).json({ message: err.message || "Failed to fetch tracking checks" });
+    } catch (err: unknown) {
+      res.status(500).json({ message: getErrorMessage(err) || "Failed to fetch tracking checks" });
     }
   });
 
@@ -157,8 +158,8 @@ export function registerFactoryContainerTrackingRoutes(app: Express) {
       if (containerId === null) return res.status(400).json({ message: "Invalid container id" });
       const steps = getFactoryTrackingProgress(containerId);
       res.json(steps);
-    } catch (err: any) {
-      res.status(500).json({ message: err.message || "Failed to fetch tracking progress" });
+    } catch (err: unknown) {
+      res.status(500).json({ message: getErrorMessage(err) || "Failed to fetch tracking progress" });
     }
   });
 
@@ -186,23 +187,23 @@ export function registerFactoryContainerTrackingRoutes(app: Express) {
       }
 
       // Fire tracking in background so we never block the HTTP response
-      trackOneFactoryContainerById(containerId).catch((err: any) => {
-        logger.error(`[FactoryTracking] Background track error for container ${containerId}:`, { error: err?.message });
+      trackOneFactoryContainerById(containerId).catch((err: unknown) => {
+        logger.error(`[FactoryTracking] Background track error for container ${containerId}:`, { error: getErrorMessage(err) });
       });
 
       res.json({ success: true, queued: true, containerId });
-    } catch (err: any) {
+    } catch (err: unknown) {
       const status =
-        err.code === "TRACKING_BUSY" || err.message === "PUPPETEER_QUEUE_FULL"
+        (err as { code?: string }).code === "TRACKING_BUSY" || getErrorMessage(err) === "PUPPETEER_QUEUE_FULL"
           ? 429
-          : err.message?.includes("not found")
+          : getErrorMessage(err)?.includes("not found")
             ? 404
-            : err.message?.includes("disabled")
+            : getErrorMessage(err)?.includes("disabled")
               ? 400
-              : err.message?.includes("quota")
+              : getErrorMessage(err)?.includes("quota")
                 ? 429
                 : 500;
-      res.status(status).json({ message: err.message || "Tracking failed", code: err.code ?? null });
+      res.status(status).json({ message: getErrorMessage(err) || "Tracking failed", code: (err as { code?: string }).code ?? null });
     }
   });
 
@@ -231,8 +232,8 @@ export function registerFactoryContainerTrackingRoutes(app: Express) {
         trackingCarrierHint,
       });
       res.json({ success: true });
-    } catch (err: any) {
-      res.status(500).json({ message: err.message || "Failed to update tracking settings" });
+    } catch (err: unknown) {
+      res.status(500).json({ message: getErrorMessage(err) || "Failed to update tracking settings" });
     }
   });
 }

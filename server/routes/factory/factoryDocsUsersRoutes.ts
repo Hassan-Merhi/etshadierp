@@ -1,4 +1,5 @@
 import { getClientDate } from "../../lib/dateUtils";
+import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
 import type { Express } from "express";
 import { db } from "../../db";
@@ -221,8 +222,8 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
       req.session.factoryAdminOverrideBy = targetUser.username;
 
       return res.json({ success: true, expiresAt, adminUsername: targetUser.username });
-    } catch (error: any) {
-      return res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      return res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -230,8 +231,8 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
     try {
       const rows = await db.select().from(containerDocumentTypes).orderBy(containerDocumentTypes.label);
       res.json(rows);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -239,8 +240,8 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
     try {
       const [row] = await db.insert(containerDocumentTypes).values(req.body).returning();
       res.json(row);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -270,8 +271,8 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
         isGhost: !d.storageKey && !d.fileData,
       }));
       res.json({ documents: docs, docTypes, completeness });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -353,13 +354,13 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
           await db.update(containers).set({ docReceived: allComplete }).where(eq(containers.id, containerId));
 
           res.json(doc);
-        } catch (innerErr: any) {
+        } catch (innerErr: unknown) {
           logger.error("Error uploading container document:", { error: innerErr });
-          res.status(500).json({ message: innerErr.message });
+          res.status(500).json({ message: getErrorMessage(innerErr) });
         }
       });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -403,8 +404,8 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
       await db.update(containers).set({ docReceived: allComplete }).where(eq(containers.id, containerId));
 
       res.json({ success: true });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -466,8 +467,8 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
       }
 
       safeSendFile(res, folder, filename);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -494,8 +495,8 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
         })
       );
       res.json(freightWithPayments);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -538,8 +539,8 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
       });
 
       res.json(row);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -579,8 +580,8 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
       });
 
       res.json({ success: true });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -636,8 +637,8 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
       });
 
       res.json(payment);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -691,8 +692,8 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
       });
 
       res.json({ success: true });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -738,8 +739,8 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
                 : "UNPAID";
       }
       res.json(statusByContainer);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -863,9 +864,9 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
       }
 
       res.json(updated);
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error editing daybook entry:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -878,8 +879,8 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
         .where(eq(factoryDaybookEntryEdits.daybookEntryId, entryId))
         .orderBy(desc(factoryDaybookEntryEdits.editedAt));
       res.json(edits);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -1144,10 +1145,10 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
         container: updatedContainer,
         message: `Cost updated. New inclusive cost: ${updatedContainer?.ratePerKgUsd ?? "?"}/kg`,
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error in daybook cost-edit:", { error: error });
-      const status = error?.name === "UnresolvedExchangeRateError" ? 400 : 500;
-      res.status(status).json({ message: error.message });
+      const status = (error as { name?: string }).name === "UnresolvedExchangeRateError" ? 400 : 500;
+      res.status(status).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -1178,8 +1179,8 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
 
       await db.delete(factoryDaybookEntries).where(eq(factoryDaybookEntries.id, id));
       res.json({ success: true });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -1395,9 +1396,9 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
       });
 
       res.json({ message: "Voucher voided successfully", voucherId });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error voiding voucher:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -1464,9 +1465,9 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
       });
 
       res.json(result);
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error fetching factory users:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -1537,9 +1538,9 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
           pageAccess: pageAccess || [],
         });
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error creating factory user:", { error: error });
-      res.status(400).json({ message: error.message });
+      res.status(400).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -1630,9 +1631,9 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
       });
 
       res.json({ message: "User updated" });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error updating factory user:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -1656,9 +1657,9 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
         await tx.delete(users).where(eq(users.id, userId));
       });
       res.json({ message: "User removed successfully" });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error deleting factory user:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -1822,9 +1823,9 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
         companyId,
         companyName,
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error fetching my access:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -1854,8 +1855,8 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
         fileType: req.file.mimetype,
         fileSize: req.file.size,
       });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -1870,8 +1871,8 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
         typingStatus.delete(senderId);
       }
       res.json({ success: true });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -1882,8 +1883,8 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
       const record = typingStatus.get(otherUserId);
       const isTyping = !!record && record.receiverId === currentUserId && record.until > Date.now();
       res.json({ isTyping });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -1946,8 +1947,8 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
       );
 
       res.json(usersWithUnread);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -1968,8 +1969,8 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
         .orderBy(directMessages.createdAt);
 
       res.json(messages);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -1998,8 +1999,8 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
 
       broadcast({ type: "invalidate" });
       res.json(msg);
-    } catch (error: any) {
-      res.status(400).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(400).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -2020,8 +2021,8 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
         );
 
       res.json({ success: true });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -2040,8 +2041,8 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
         );
 
       res.json({ success: true });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -2053,8 +2054,8 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
         .from(directMessages)
         .where(and(eq(directMessages.receiverId, currentUserId), sql`${directMessages.readAt} IS NULL`));
       res.json({ count: result?.count || 0 });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -2222,9 +2223,9 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
         `attachment; filename="company_${companyId}_export_${getClientDate(req)}.json"`
       );
       res.send(jsonStr);
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Export company data error:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -2938,14 +2939,14 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
             totalRecords,
             details: summary,
           });
-        } catch (importError: any) {
+        } catch (importError: unknown) {
           logger.error("Import company data error:", { error: importError });
-          res.status(500).json({ message: "Import failed: " + importError.message });
+          res.status(500).json({ message: "Import failed: " + getErrorMessage(importError) });
         }
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Import company data error:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -2975,8 +2976,8 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
         .orderBy(sql`SUM(${containerSales.totalAmount}) DESC`);
 
       res.json(rows);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -3024,8 +3025,8 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
         byCustomer,
         grand: grand ?? { sales: 0, totalAmount: "0", depositAmount: "0", cashSales: "0", creditSales: "0" },
       });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -3066,8 +3067,8 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
       const paid = rows.reduce((sum, r) => sum + parseFloat(r.paidAmount || "0"), 0);
 
       res.json({ rows, summary: { total, paid, outstanding: total - paid, count: rows.length } });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -3122,8 +3123,8 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
           },
         },
       });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -3188,8 +3189,8 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
       const validCount = results.filter((r: any) => r.valid).length;
       const invalidCount = results.length - validCount;
       res.json({ results, validCount, invalidCount });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -3325,8 +3326,8 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
       });
 
       res.json(result);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -3362,8 +3363,8 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
       }));
 
       res.json(enriched);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 

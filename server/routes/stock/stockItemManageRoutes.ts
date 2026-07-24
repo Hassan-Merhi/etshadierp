@@ -1,4 +1,5 @@
 import type { Express } from "express";
+import { getErrorMessage } from "../../lib/httpHandlers";
 import { db } from "../../db";
 import { storage } from "../../storage";
 import { requireAuth, requireRole, canDelete, requireNonPOS, checkPOSLocation } from "../../auth";
@@ -184,8 +185,8 @@ export function registerStockItemManageRoutes(app: Express) {
         /* non-fatal */
       }
       res.json(updated);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -246,8 +247,8 @@ export function registerStockItemManageRoutes(app: Express) {
         /* non-fatal */
       }
       res.json({ message: "Stock item deleted successfully" });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -284,8 +285,8 @@ export function registerStockItemManageRoutes(app: Express) {
       );
 
       res.json(transactions);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -328,8 +329,8 @@ export function registerStockItemManageRoutes(app: Express) {
         sales,
         inventoryLocations,
       });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -361,8 +362,8 @@ export function registerStockItemManageRoutes(app: Express) {
       const voucherHistory = await storage.getVoucherHistoryForItem(stockItemId, req.session.currentCompanyId);
 
       res.json(voucherHistory);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -392,8 +393,8 @@ export function registerStockItemManageRoutes(app: Express) {
 
       const aliases = await storage.getStockItemCodeAliases(stockItemId);
       res.json(aliases);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -430,11 +431,11 @@ export function registerStockItemManageRoutes(app: Express) {
 
       const alias = await storage.createStockItemCodeAlias(validatedAlias);
       res.status(201).json(alias);
-    } catch (error: any) {
-      if (error.name === "ZodError") {
-        return res.status(400).json({ message: "Validation error", errors: error.errors });
+    } catch (error: unknown) {
+      if ((error as { name?: string }).name === "ZodError") {
+        return res.status(400).json({ message: "Validation error", errors: (error as { errors?: unknown }).errors });
       }
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -465,8 +466,8 @@ export function registerStockItemManageRoutes(app: Express) {
 
       await storage.deleteStockItemCodeAlias(aliasId);
       res.json({ message: "Code alias deleted successfully" });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -522,8 +523,8 @@ export function registerStockItemManageRoutes(app: Express) {
         /* non-fatal */
       }
       res.json(updated);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 }
