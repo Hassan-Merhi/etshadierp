@@ -77,14 +77,13 @@ export function ensurePhase4CutoverSchema(): Promise<void> {
   return phase4SchemaPromise;
 }
 
-async function loadTargetInventoryRows(targetId: number, targetItemIds: number[], targetLocationIds: number[]): Promise<any[]> {
-  if (targetItemIds.length === 0 || targetLocationIds.length === 0) return [];
+async function loadTargetInventoryRows(targetId: number, targetItemIds: number[]): Promise<any[]> {
+  if (targetItemIds.length === 0) return [];
   const result = await db.execute(sql`
     SELECT id, stock_item_id, location_id, quantity, average_rate, total_value
     FROM inventory
     WHERE company_id = ${targetId}
       AND stock_item_id = ANY(${targetItemIds})
-      AND location_id = ANY(${targetLocationIds})
     ORDER BY id ASC
   `);
   return (result as any).rows ?? [];
@@ -188,8 +187,7 @@ export async function buildExactInventoryPlan(sourceId: number, targetId: number
 
   const targetRows = await loadTargetInventoryRows(
     targetId,
-    Array.from(new Set(Array.from(stockItemMap.values()))),
-    Array.from(new Set(targetLocationBySource.values()))
+    Array.from(new Set(Array.from(stockItemMap.values())))
   );
   const targetByKey = new Map<string, any>();
   for (const targetRow of targetRows) {
