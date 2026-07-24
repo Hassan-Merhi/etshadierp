@@ -425,7 +425,10 @@ export default function SmartTransferGeneratorDialog({
           sourceLocationName,
           availableAtSource: inventory.available,
           sourceCurrentStock: inventory.currentStock,
-          sourceReserveQty: Math.min(inventory.currentStock, reserveQty),
+          // Manual source override carries no auto-computed local-sales reserve
+          // (that value is only produced server-side from sales history), so
+          // reserve 0 here rather than referencing an undefined `reserveQty`.
+          sourceReserveQty: 0,
           sourceAverageRate: inventory.rate,
           suggestedQuantity: Math.min(line.suggestedQuantity, inventory.available),
           reason: `${line.reason} Source changed manually to ${sourceLocationName}.`,
@@ -477,7 +480,9 @@ export default function SmartTransferGeneratorDialog({
         sourceLocationName: sourceName,
         availableAtSource: inventory.available,
         sourceCurrentStock: inventory.currentStock,
-        sourceReserveQty: Math.min(inventory.currentStock, reserveQty),
+        // Manually added line has no server-computed local-sales reserve; use 0
+        // rather than referencing an undefined `reserveQty`.
+        sourceReserveQty: 0,
         sourceAverageRate: inventory.rate,
         destinationStock: 0,
         otwQty: 0,
