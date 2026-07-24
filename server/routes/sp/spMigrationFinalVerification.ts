@@ -5,7 +5,7 @@ import { db } from "../../db";
 import { logger } from "../../lib/logger";
 import { ensurePhase2Schema, getSuspenseReview, pn } from "./spMigrationPhase2Common";
 import { buildCutoverReadiness } from "./spMigrationCutoverReadiness";
-import { ensureCutoverSchema, getActiveCutoverForPair } from "./spMigrationCutoverState";
+import { ensureCutoverSchema, getLiveCutover } from "./spMigrationCutoverState";
 
 export type VerificationStatus = "PASS" | "WARN" | "FAIL";
 export type VerificationArea = {
@@ -162,7 +162,7 @@ export async function buildFinalSpVerification(sourceId: number, targetId: numbe
     WHERE company_id = ${sourceId}
   `);
   const access = (userAccess as any).rows?.[0] ?? {};
-  const cutover = await getActiveCutoverForPair(sourceId, targetId);
+  const cutover = await getLiveCutover(sourceId, targetId);
   const activated = cutover?.status === "active";
   const oldRoleCount = pn(access.old_non_developer_roles);
   areas.push({
