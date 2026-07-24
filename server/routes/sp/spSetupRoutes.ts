@@ -4,6 +4,7 @@ import { requireAuth } from "../../auth";
 import { eq, and, isNull, asc } from "drizzle-orm";
 import { ledgerAccounts, locations, bankAccounts } from "@shared/schema";
 import { requireSpCompany, getSpAccount, SP_ACCOUNTS } from "./spHelpers";
+import { getSpSupplierVoucherLinkGapCount, repairSpSupplierVoucherLinks } from "./spSupplierVoucherSync";
 
 // ── Setup ─────────────────────────────────────────────────────────────────
 
@@ -49,7 +50,20 @@ export function registerSpSetupRoutes(app: Express) {
         created.push("Default location: Main Warehouse");
       }
 
-      res.json({ created, existing, message: created.length > 0 ? "Setup complete" : "Already configured" });
+      // Repair historical SP Goods-OTW vouchers and ensure future container
+      // supplier edits remain synchronized with the voucher header.
+      const repairedSupplierVoucherLinks = await repairSpSupplierVoucherLinks(companyId);
+
+      res.json({
+        created,
+        existing,
+        repairedSupplierVoucherLinks,
+        requiredAccountCount: SP_ACCOUNTS.length,
+        message:
+          created.length > 0 || repairedSupplierVoucherLinks > 0
+            ? "Setup and supplier-link repair complete"
+            : "Already configured",
+      });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
@@ -75,8 +89,16 @@ export function registerSpSetupRoutes(app: Express) {
         .where(and(eq(locations.companyId, companyId), isNull(locations.deletedAt)));
 
       const banks = await db.select().from(bankAccounts).where(eq(bankAccounts.companyId, companyId));
+      const supplierVoucherLinkGapCount = await getSpSupplierVoucherLinkGapCount(companyId);
 
-      res.json({ isConfigured, spAccounts, locations: locs, bankAccounts: banks });
+      res.json({
+        isConfigured,
+        spAccounts,
+        requiredAccountCount: SP_ACCOUNTS.length,
+        locations: locs,
+        bankAccounts: banks,
+        supplierVoucherLinkGapCount,
+      });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
