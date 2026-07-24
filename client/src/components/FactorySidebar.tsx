@@ -359,7 +359,7 @@ export function FactorySidebar({ user }: { user?: any }) {
         )}
 
         <div className="mt-4 pt-3 border-t border-sidebar-border/60 space-y-0.5">
-          {isPrivileged && (
+          {isDeveloper && (
             <SidebarFlatLink
               href="/factory/spreadsheet"
               icon={TableProperties}
@@ -367,14 +367,16 @@ export function FactorySidebar({ user }: { user?: any }) {
               testId="link-factory-spreadsheet"
             />
           )}
-          <SidebarFlatLink
-            href="/factory/chat"
-            icon={MessageCircle}
-            label="Chat"
-            color={NAV_COLOR.pinned}
-            badge={chatUnread?.count}
-            testId="link-factory-chat"
-          />
+          {isDeveloper && (
+            <SidebarFlatLink
+              href="/factory/chat"
+              icon={MessageCircle}
+              label="Chat"
+              color={NAV_COLOR.pinned}
+              badge={chatUnread?.count}
+              testId="link-factory-chat"
+            />
+          )}
           {conflictCount > 0 && (
             <a
               href="/factory/conflicts"

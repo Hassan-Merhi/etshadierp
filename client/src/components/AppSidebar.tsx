@@ -173,7 +173,7 @@ export function useErpVisibleSections(user?: any): {
     if (item.url === "/company-transfer") return isDeveloper;
     if (item.url === "/spreadsheet") return isDeveloper;
     if (item.url === "/live-sheets") return isDeveloper;
-    if (item.url === "/chat") return !isPOSUser;
+    if (item.url === "/chat") return isDeveloper;
     if (item.url === "/settings" && isOwner) return false;
 
     if (isDeveloper || isAdmin || myErpPages?.fullAccess) return true;
