@@ -12,6 +12,15 @@ import {
   vouchers,
 } from "@shared/schema";
 
+/**
+ * Return the first row from a `.execute()` result, supporting both possible
+ * shapes: a node-postgres `QueryResult` (`{ rows: [...] }`) and a bare row
+ * array. Keeps the both-shapes runtime behaviour while remaining type-safe.
+ */
+function firstRow<T = Record<string, unknown>>(res: any): T | undefined {
+  return (res?.rows ?? res)?.[0];
+}
+
 export interface PendingRevisionItemInput {
   stockItemId: number;
   stockItemName: string;
@@ -119,10 +128,10 @@ async function lockTransferScope(tx: any, transferId: number) {
     WHERE stv.id = ${transferId}
     FOR UPDATE OF stv, v
   `);
-  return result.rows?.[0] ?? result[0];
+  return firstRow(result);
 }
 
-function assertLockedTransfer(locked: any, companyId: number) {
+function assertLockedTransfer(locked: any, companyId: number): asserts locked {
   if (!locked) throw new Error("Stock transfer not found");
   if (Number(locked.company_id) !== companyId) throw new Error("Stock transfer belongs to a different company");
   if (locked.voucher_type !== "Stock Transfer" && locked.voucher_type !== "StockTransfer") {
@@ -202,7 +211,7 @@ export async function savePendingStockTransferRevision(
       LIMIT 1
       FOR UPDATE
     `);
-    const existing = existingResult.rows?.[0] ?? existingResult[0];
+    const existing = firstRow(existingResult);
 
     let revisionId: number;
     let revisionNumber: number;
@@ -229,7 +238,7 @@ export async function savePendingStockTransferRevision(
         FROM stock_transfer_revisions
         WHERE transfer_id = ${transferId}
       `);
-      const maxRow = maxResult.rows?.[0] ?? maxResult[0];
+      const maxRow = firstRow(maxResult);
       revisionNumber = Number(maxRow?.max_revision ?? latest?.revisionNumber ?? 0) + 1;
       const [created] = await tx
         .insert(stockTransferRevisions)
@@ -347,7 +356,7 @@ export async function approvePendingStockTransferRevision(
       WHERE str.id = ${revisionId}
       FOR UPDATE OF str, stv, v
     `);
-    const requested = requestedResult.rows?.[0] ?? requestedResult[0];
+    const requested = firstRow(requestedResult);
     if (!requested) throw new Error("Revision not found");
     if (Number(requested.company_id) !== companyId) throw new Error("Revision belongs to a different company");
     if (requested.voucher_type !== "Stock Transfer" && requested.voucher_type !== "StockTransfer") {
@@ -496,7 +505,7 @@ export async function approvePendingStockTransferRevision(
             AND stock_item_id = ${requirement.stockItemId}
           FOR UPDATE
         `);
-        const row = lockedInventory.rows?.[0] ?? lockedInventory[0];
+        const row = firstRow(lockedInventory);
         const available = Number(row?.quantity ?? 0);
         if (available + 1e-9 < requirement.quantity) {
           const error: any = new Error(
@@ -521,7 +530,7 @@ export async function approvePendingStockTransferRevision(
             AND stock_item_id = ${stockItemId}
           FOR UPDATE
         `);
-        const row = lockedDestination.rows?.[0] ?? lockedDestination[0];
+        const row = firstRow(lockedDestination);
         const available = Number(row?.quantity ?? 0);
         if (available + 1e-9 < required) {
           const error: any = new Error(
