@@ -1,13 +1,14 @@
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { format, parseISO } from "date-fns";
 import {
   ArrowLeft,
   ArrowLeftRight,
   BarChart3,
-  Building2,
   Check,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   GitCompare,
   RefreshCw,
   Search,
@@ -76,11 +77,21 @@ interface ComparisonRow extends ComparisonSet {
   periodEnd: string;
 }
 
+interface ItemComparisonRow extends ComparisonSet {
+  stockItemId: number;
+  stockItemCode: string;
+  stockItemName: string;
+  stockGroupId: number | null;
+  stockGroupName: string;
+}
+
 interface ComparisonResponse {
   generatedAt: string;
   summary: ComparisonSet;
   rows: ComparisonRow[];
   rowCount: number;
+  itemRows: ItemComparisonRow[];
+  itemRowCount: number;
 }
 
 const EMPTY_METRICS: Metrics = {
@@ -104,6 +115,8 @@ const METRICS: Array<{ key: MetricKey; label: string; kind: "qty" | "money" | "r
   { key: "costProfit", label: "Cost Profit", kind: "money" },
   { key: "avgProfitPerBale", label: "Average Profit / Bale", kind: "rate" },
 ];
+
+const ITEM_PAGE_SIZE = 50;
 
 function initialParams() {
   return new URLSearchParams(window.location.search);
@@ -240,6 +253,8 @@ export default function StockInSalesReportComparison() {
   const [sideBGroupIds, setSideBGroupIds] = useState<string[]>(() =>
     (params.get("sideBStockGroupIds") || "").split(",").filter(Boolean)
   );
+  const [itemMetric, setItemMetric] = useState<MetricKey>("costProfit");
+  const [itemPage, setItemPage] = useState(1);
 
   const { data: locations = [] } = useQuery<LocationOption[]>({
     queryKey: ["/api/locations", selectedCompany?.id],
@@ -273,6 +288,8 @@ export default function StockInSalesReportComparison() {
     return `/api/reports/stock-in-sales/comparison?${query.toString()}`;
   }, [period, grouping, search, sideALocationId, sideBLocationId, sideAGroupIds, sideBGroupIds]);
 
+  useEffect(() => setItemPage(1), [queryUrl, itemMetric]);
+
   const { data, isLoading, isFetching, isError, error, refetch } = useQuery<ComparisonResponse, Error>({
     queryKey: [queryUrl, selectedCompany?.id],
     enabled: !!selectedCompany?.id && !!queryUrl,
@@ -285,14 +302,18 @@ export default function StockInSalesReportComparison() {
     difference: EMPTY_METRICS,
   };
 
+  const selectedItemMetric = METRICS.find((metric) => metric.key === itemMetric) ?? METRICS[0];
+  const itemTotalPages = Math.max(1, Math.ceil((data?.itemRows.length || 0) / ITEM_PAGE_SIZE));
+  const pagedItemRows = (data?.itemRows || []).slice((itemPage - 1) * ITEM_PAGE_SIZE, itemPage * ITEM_PAGE_SIZE);
+
   const formatMetric = (key: MetricKey, kind: "qty" | "money" | "rate", value: number): string => {
     if (kind === "qty") return formatNumber(value, 3);
     if (kind === "money") return value < 0 ? `-${formatAmount(Math.abs(value))}` : formatAmount(value);
     if (selectedCurrency === "CFA") {
       const converted = convertToDisplay(value);
-      return `${value > 0 ? "" : value < 0 ? "-" : ""}CFA ${formatNumber(Math.abs(converted), 2)}`;
+      return `${value < 0 ? "-" : ""}CFA ${formatNumber(Math.abs(converted), 2)}`;
     }
-    return `${value > 0 ? "" : value < 0 ? "-" : ""}$ ${formatNumber(Math.abs(value), key === "avgProfitPerBale" ? 2 : 6)}`;
+    return `${value < 0 ? "-" : ""}$ ${formatNumber(Math.abs(value), key === "avgProfitPerBale" ? 2 : 6)}`;
   };
 
   const differenceClass = (value: number) =>
@@ -335,6 +356,7 @@ export default function StockInSalesReportComparison() {
     setSideBLocationId("");
     setSideAGroupIds([]);
     setSideBGroupIds([]);
+    setItemMetric("costProfit");
   };
 
   const renderValue = (key: MetricKey, kind: "qty" | "money" | "rate", value: number, difference = false): ReactNode => (
@@ -523,6 +545,80 @@ export default function StockInSalesReportComparison() {
                   </TableBody>
                 </Table>
               </div>
+            </div>
+          </section>
+
+          <section className="space-y-3">
+            <div className="flex flex-wrap items-end justify-between gap-3">
+              <div>
+                <h2 className="text-lg font-semibold">Item comparison</h2>
+                <p className="text-xs text-muted-foreground">Choose any report metric to compare every matching stock item across the two sides.</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <Select value={itemMetric} onValueChange={(value) => setItemMetric(value as MetricKey)}>
+                  <SelectTrigger className="w-52" data-testid="select-item-comparison-metric">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {METRICS.map((metric) => (
+                      <SelectItem key={metric.key} value={metric.key}>{metric.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {data && <span className="text-xs text-muted-foreground">{data.itemRowCount} item{data.itemRowCount === 1 ? "" : "s"}</span>}
+              </div>
+            </div>
+            <div className="overflow-hidden rounded-xl border">
+              <div className="overflow-x-auto">
+                <Table className="min-w-[820px]">
+                  <TableHeader>
+                    <TableRow className="bg-muted/40">
+                      <TableHead>Item</TableHead>
+                      <TableHead>Stock Group</TableHead>
+                      <TableHead className="text-right">{sideALabel}</TableHead>
+                      <TableHead className="text-right">{sideBLabel}</TableHead>
+                      <TableHead className="text-right">Difference (A − B)</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {isLoading ? (
+                      Array.from({ length: 8 }).map((_, index) => (
+                        <TableRow key={index}>
+                          {Array.from({ length: 5 }).map((__, cell) => <TableCell key={cell}><Skeleton className="h-4 w-full max-w-28" /></TableCell>)}
+                        </TableRow>
+                      ))
+                    ) : pagedItemRows.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={5} className="py-10 text-center text-sm text-muted-foreground">No matching stock items found.</TableCell>
+                      </TableRow>
+                    ) : pagedItemRows.map((row) => (
+                      <TableRow key={row.stockItemId}>
+                        <TableCell>
+                          <div className="font-medium">{row.stockItemName}</div>
+                          <div className="text-xs text-muted-foreground">{row.stockItemCode}</div>
+                        </TableCell>
+                        <TableCell className="text-muted-foreground">{row.stockGroupName}</TableCell>
+                        <TableCell className="text-right">{renderValue(itemMetric, selectedItemMetric.kind, row.sideA[itemMetric])}</TableCell>
+                        <TableCell className="text-right">{renderValue(itemMetric, selectedItemMetric.kind, row.sideB[itemMetric])}</TableCell>
+                        <TableCell className="text-right font-semibold">{renderValue(itemMetric, selectedItemMetric.kind, row.difference[itemMetric], true)}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+              {data && data.itemRowCount > ITEM_PAGE_SIZE && (
+                <div className="flex items-center justify-between border-t px-4 py-3">
+                  <p className="text-xs text-muted-foreground">Page {itemPage} of {itemTotalPages}</p>
+                  <div className="flex gap-2">
+                    <Button variant="outline" size="sm" onClick={() => setItemPage((page) => Math.max(1, page - 1))} disabled={itemPage <= 1}>
+                      <ChevronLeft className="mr-1 h-4 w-4" /> Previous
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={() => setItemPage((page) => Math.min(itemTotalPages, page + 1))} disabled={itemPage >= itemTotalPages}>
+                      Next <ChevronRight className="ml-1 h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              )}
             </div>
           </section>
         </>
