@@ -10,6 +10,7 @@ import { registerSpReportRoutes } from "./spReportRoutes";
 import { registerSpExportRoutes } from "./spExportRoutes";
 import { registerSpMigrationPhase2Routes } from "./spMigrationPhase2Routes";
 import { registerSpMigrationCutoverRoutes } from "./spMigrationCutoverRoutes";
+import { ensureCutoverHardening, installExplicitCompanyWriteGuard } from "./spMigrationCutoverHardening";
 import { ensureSpSupplierVoucherSyncTrigger, repairSpSupplierVoucherLinks } from "./spSupplierVoucherSync";
 
 // ── Supplier Partner (SP) route registration ─────────────────────────────────
@@ -19,10 +20,17 @@ import { ensureSpSupplierVoucherSyncTrigger, repairSpSupplierVoucherLinks } from
 // only file boundaries and helper imports changed.
 export function registerSpRoutes(app: Express) {
   // These focused migration handlers register before the legacy migration router.
-  // Phase 3 also moves its write guard before the first Express route, giving the
-  // source-company read-only lock complete API coverage without changing every module.
+  // Phase 3 also moves its write guards before the first Express route, giving
+  // source-company read-only locks full API coverage, including endpoints that
+  // accept an explicit companyId while another company is selected in session.
+  installExplicitCompanyWriteGuard(app);
   registerSpMigrationCutoverRoutes(app);
   registerSpMigrationPhase2Routes(app);
+  void ensureCutoverHardening().catch((error) => {
+    logger.warn("[SP Cutover] Hardening indexes deferred", {
+      error: error instanceof Error ? error.message : String(error),
+    });
+  });
 
   // Keep SP container supplier linkage correct even when an older company does
   // not revisit the Setup screen after deployment. Fresh-database startup can
