@@ -1,4 +1,5 @@
 import type { Express } from "express";
+import { getErrorMessage, getErrorStack } from "../lib/httpHandlers";
 import { logger } from "../lib/logger";
 import rateLimit from "express-rate-limit";
 import { db } from "../db";
@@ -108,7 +109,7 @@ export function registerChatbotRoutes(app: Express) {
         hasApiKey,
         isAdminOrOwner: userRole === "Admin" || userRole === "Owner" || userRole === "Developer",
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       res.status(500).json({ message: "Internal server error" });
     }
   });
@@ -146,7 +147,7 @@ export function registerChatbotRoutes(app: Express) {
       }
 
       res.json({ success: true, provider: normalizedProvider });
-    } catch (error: any) {
+    } catch (error: unknown) {
       res.status(500).json({ message: "Internal server error" });
     }
   });
@@ -218,10 +219,10 @@ export function registerChatbotRoutes(app: Express) {
         filePatchDrafts: result.filePatchDrafts ?? null,
         readFiles: result.readFiles ?? null,
       });
-    } catch (error: any) {
-      logger.error("[Chatbot] ERROR:", { error: error.message });
-      logger.error("[Chatbot] Stack:", { stack: error.stack });
-      res.status(500).json({ message: "Chat error: " + error.message });
+    } catch (error: unknown) {
+      logger.error("[Chatbot] ERROR:", { error: getErrorMessage(error) });
+      logger.error("[Chatbot] Stack:", { stack: getErrorStack(error) });
+      res.status(500).json({ message: "Chat error: " + getErrorMessage(error) });
     }
   });
 
@@ -237,10 +238,10 @@ export function registerChatbotRoutes(app: Express) {
       // Pass userId to ensure users can only access their own chat history
       const history = await getConversationHistory(sessionId, userId, 50);
       res.json(history);
-    } catch (error: any) {
-      logger.error("[Chatbot] History ERROR:", { error: error.message });
-      logger.error("[Chatbot] History Stack:", { stack: error.stack });
-      res.status(500).json({ message: "History error: " + error.message });
+    } catch (error: unknown) {
+      logger.error("[Chatbot] History ERROR:", { error: getErrorMessage(error) });
+      logger.error("[Chatbot] History Stack:", { stack: getErrorStack(error) });
+      res.status(500).json({ message: "History error: " + getErrorMessage(error) });
     }
   });
 
@@ -296,7 +297,7 @@ export function registerChatbotRoutes(app: Express) {
       }));
 
       res.json(enrichedHistory);
-    } catch (error: any) {
+    } catch (error: unknown) {
       res.status(500).json({ message: "Internal server error" });
     }
   });
@@ -329,7 +330,7 @@ export function registerChatbotRoutes(app: Express) {
           lastMessageTime: r.lastMessageTime,
         }))
       );
-    } catch (error: any) {
+    } catch (error: unknown) {
       res.status(500).json({ message: "Internal server error" });
     }
   });
@@ -387,7 +388,7 @@ export function registerChatbotRoutes(app: Express) {
         .delete(chatMessages)
         .where(and(eq(chatMessages.sessionId, sessionId), eq(chatMessages.companyId, companyId)));
       res.json({ success: true });
-    } catch (error: any) {
+    } catch (error: unknown) {
       res.status(500).json({ message: "Internal server error" });
     }
   });
@@ -486,7 +487,7 @@ export function registerChatbotRoutes(app: Express) {
         overdueCustomers,
         pendingPayrolls,
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       res.status(500).json({ message: "Internal server error" });
     }
   });
@@ -507,7 +508,7 @@ export function registerChatbotRoutes(app: Express) {
       await db.update(users).set({ chatbotEnabled: enabled }).where(eq(users.id, userId));
 
       res.json({ message: `Chatbot ${enabled ? "enabled" : "disabled"} for user` });
-    } catch (error: any) {
+    } catch (error: unknown) {
       res.status(500).json({ message: "Internal server error" });
     }
   });
@@ -532,7 +533,7 @@ export function registerChatbotRoutes(app: Express) {
         .where(eq(users.active, true));
 
       res.json(allUsers);
-    } catch (error: any) {
+    } catch (error: unknown) {
       res.status(500).json({ message: "Internal server error" });
     }
   });
@@ -565,7 +566,7 @@ export function registerChatbotRoutes(app: Express) {
         status: status || "confirmed",
       } as any);
       res.json({ success: true });
-    } catch (error: any) {
+    } catch (error: unknown) {
       res.status(500).json({ message: "Internal server error" });
     }
   });
@@ -694,8 +695,8 @@ export function registerChatbotRoutes(app: Express) {
 
       clearERPContextCache(companyId);
       res.json({ success: true, transferId: createdTransferId, voucherId: createdVoucherId, optional: isOptional, voucher: data.voucher });
-    } catch (error: any) {
-      logger.error("[Chatbot] confirm-stock-transfer error:", { error: error.message });
+    } catch (error: unknown) {
+      logger.error("[Chatbot] confirm-stock-transfer error:", { error: getErrorMessage(error) });
       res.status(500).json({ message: "Internal server error" });
     }
   });
@@ -744,7 +745,7 @@ export function registerChatbotRoutes(app: Express) {
         .where(eq(voucherEntries.voucherId, v.id));
 
       res.json({ found: true, voucher: v, entries });
-    } catch (error: any) {
+    } catch (error: unknown) {
       res.status(500).json({ message: "Internal server error" });
     }
   });
@@ -866,7 +867,7 @@ export function registerChatbotRoutes(app: Express) {
       });
 
       res.json({ results });
-    } catch (error: any) {
+    } catch (error: unknown) {
       res.status(500).json({ message: "Internal server error" });
     }
   });
@@ -895,8 +896,8 @@ export function registerChatbotRoutes(app: Express) {
       let absPath: string;
       try {
         absPath = resolveWorkspacePath(filePath);
-      } catch (e: any) {
-        return res.status(400).json({ message: e.message });
+      } catch (e: unknown) {
+        return res.status(400).json({ message: getErrorMessage(e) });
       }
 
       // Stale guard: enforce whenever the file exists on disk.
@@ -957,8 +958,8 @@ export function registerChatbotRoutes(app: Express) {
       });
 
       res.json({ success: true, filePath });
-    } catch (error: any) {
-      logger.error("[Chatbot] apply-patch error:", { error: error.message });
+    } catch (error: unknown) {
+      logger.error("[Chatbot] apply-patch error:", { error: getErrorMessage(error) });
       res.status(500).json({ message: "Internal server error" });
     }
   });
@@ -988,7 +989,7 @@ export function registerChatbotRoutes(app: Express) {
         .orderBy(desc(codePatchHistory.appliedAt))
         .limit(100);
       res.json(rows);
-    } catch (error: any) {
+    } catch (error: unknown) {
       res.status(500).json({ message: "Internal server error" });
     }
   });
@@ -1018,8 +1019,8 @@ export function registerChatbotRoutes(app: Express) {
         let absPath: string;
         try {
           absPath = resolveWorkspacePath(row.filePath);
-        } catch (e: any) {
-          return res.status(400).json({ message: e.message });
+        } catch (e: unknown) {
+          return res.status(400).json({ message: getErrorMessage(e) });
         }
 
         const dir = path.dirname(absPath);
@@ -1042,8 +1043,8 @@ export function registerChatbotRoutes(app: Express) {
         });
 
         res.json({ success: true, filePath: row.filePath });
-      } catch (error: any) {
-        logger.error("[Chatbot] revert-patch error:", { error: error.message });
+      } catch (error: unknown) {
+        logger.error("[Chatbot] revert-patch error:", { error: getErrorMessage(error) });
         res.status(500).json({ message: "Internal server error" });
       }
     }
@@ -1093,8 +1094,8 @@ export function registerChatbotRoutes(app: Express) {
       for (const f of files) {
         try {
           resolveWorkspacePath(f);
-        } catch (e: any) {
-          return res.status(400).json({ message: e.message });
+        } catch (e: unknown) {
+          return res.status(400).json({ message: getErrorMessage(e) });
         }
       }
 
@@ -1157,8 +1158,8 @@ export function registerChatbotRoutes(app: Express) {
       });
 
       res.json({ success: true, commitHash: result.commitHash, branch: result.branch });
-    } catch (error: any) {
-      logger.error("[Chatbot] git-push error:", { error: error.message });
+    } catch (error: unknown) {
+      logger.error("[Chatbot] git-push error:", { error: getErrorMessage(error) });
       res.status(500).json({ message: "Internal server error" });
     }
   });
@@ -1191,7 +1192,7 @@ export function registerChatbotRoutes(app: Express) {
       const safeUrl = baseUrl.replace(/https?:\/\/[^@]+@/, "https://");
 
       res.json({ repoUrl: safeUrl, hasToken, configured: !!baseUrl });
-    } catch (error: any) {
+    } catch (error: unknown) {
       res.status(500).json({ message: "Internal server error" });
     }
   });
@@ -1236,7 +1237,7 @@ export function registerChatbotRoutes(app: Express) {
       }
 
       res.json({ success: true });
-    } catch (error: any) {
+    } catch (error: unknown) {
       res.status(500).json({ message: "Internal server error" });
     }
   });

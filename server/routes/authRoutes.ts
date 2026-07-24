@@ -1,4 +1,5 @@
 import type { Express } from "express";
+import { getErrorMessage } from "../lib/httpHandlers";
 import { logger } from "../lib/logger";
 import { db, pool } from "../db";
 import { storage } from "../storage";
@@ -109,7 +110,7 @@ export function registerAuthRoutes(app: Express) {
           recordId: null,
           recordIdentifier: `MASTER_PASSWORD login as '${user.username}' from ${clientIpMaster}`,
           changes: null,
-        }).catch((e: any) => logger.error("[Auth] Master-password audit write failed:", e.message));
+        }).catch((e: unknown) => logger.error("[Auth] Master-password audit write failed:", { error: getErrorMessage(e) }));
       }
 
       // Migrate legacy SHA256 password to bcrypt on successful login (only for real password)
@@ -232,7 +233,7 @@ export function registerAuthRoutes(app: Express) {
         });
       });
       res.json(userWithoutPassword);
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("[Auth] Login error:", { error: error });
       res.status(500).json({ message: "Internal server error" });
     }
@@ -303,8 +304,8 @@ export function registerAuthRoutes(app: Express) {
       });
 
       res.json(sessions);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -329,8 +330,8 @@ export function registerAuthRoutes(app: Express) {
 
       await rawPool.query(`DELETE FROM session WHERE sid = $1`, [sid]);
       res.json({ ok: true });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -343,8 +344,8 @@ export function registerAuthRoutes(app: Express) {
 
       await rawPool.query(`DELETE FROM session WHERE sess->>'userId' = $1 AND sid != $2`, [userId, currentSid]);
       res.json({ ok: true });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -365,8 +366,8 @@ export function registerAuthRoutes(app: Express) {
         .limit(500);
 
       res.json(history);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -605,9 +606,9 @@ export function registerAuthRoutes(app: Express) {
       const knownModules = modulesResult.map((r) => r.tableName).filter(Boolean);
 
       res.json({ logs, totalPages, total, knownModules });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error fetching audit logs:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -633,8 +634,8 @@ export function registerAuthRoutes(app: Express) {
           username = dbUser.username;
           req.session.username = username;
         }
-      } catch (err: any) {
-        logger.warn("[auth/me] Could not hydrate username from DB:", { error: err?.message });
+      } catch (err: unknown) {
+        logger.warn("[auth/me] Could not hydrate username from DB:", { error: getErrorMessage(err) });
       }
     }
     const { password: _, ...userWithoutPassword } = req.user as any;
@@ -655,8 +656,8 @@ export function registerAuthRoutes(app: Express) {
       // Developer accounts are never visible to anyone in user lists
       const usersWithoutPasswords = users.filter((u) => !devUserIds.has(u.id)).map(({ password, ...user }) => user);
       res.json(usersWithoutPasswords);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -679,8 +680,8 @@ export function registerAuthRoutes(app: Express) {
 
       const { password: _, ...userWithoutPassword } = user;
       res.status(201).json(userWithoutPassword);
-    } catch (error: any) {
-      res.status(400).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(400).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -697,8 +698,8 @@ export function registerAuthRoutes(app: Express) {
       const user = await storage.updateUser(id, updates);
       const { password: _, ...userWithoutPassword } = user;
       res.json(userWithoutPassword);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -725,8 +726,8 @@ export function registerAuthRoutes(app: Express) {
 
       await storage.deleteUser(id);
       res.json({ message: "User deleted successfully" });
-    } catch (error: any) {
-      res.status(400).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(400).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -765,8 +766,8 @@ export function registerAuthRoutes(app: Express) {
       await storage.updateUser(userId, { password: hashedPassword });
 
       res.json({ message: "Password changed successfully" });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -795,8 +796,8 @@ export function registerAuthRoutes(app: Express) {
       await storage.updateUser(userId, { password: hashedPassword });
 
       res.json({ message: `Password reset successfully for user: ${user.username}` });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -806,8 +807,8 @@ export function registerAuthRoutes(app: Express) {
       const { userId } = req.params;
       const roles = await storage.getUserCompaniesWithRoles(userId);
       res.json(roles);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -857,8 +858,8 @@ export function registerAuthRoutes(app: Express) {
       });
 
       res.status(201).json(role);
-    } catch (error: any) {
-      res.status(400).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(400).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -906,8 +907,8 @@ export function registerAuthRoutes(app: Express) {
       }
 
       res.json(role);
-    } catch (error: any) {
-      res.status(400).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(400).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -941,8 +942,8 @@ export function registerAuthRoutes(app: Express) {
       }
 
       res.status(204).send();
-    } catch (error: any) {
-      res.status(400).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(400).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -956,8 +957,8 @@ export function registerAuthRoutes(app: Express) {
         .from(userLocations)
         .where(and(eq(userLocations.userId, userId), eq(userLocations.companyId, parseInt(companyId))));
       res.json(locations);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -996,8 +997,8 @@ export function registerAuthRoutes(app: Express) {
         .where(and(eq(userLocations.userId, userId), eq(userLocations.companyId, companyIdNum)));
 
       res.json(updated);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -1023,8 +1024,8 @@ export function registerAuthRoutes(app: Express) {
         .where(and(eq(userLocationCashAccounts.userId, userId), eq(userLocationCashAccounts.companyId, companyId)));
 
       res.json(mappings);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -1076,8 +1077,8 @@ export function registerAuthRoutes(app: Express) {
         });
 
         res.json({ success: true });
-      } catch (error: any) {
-        res.status(500).json({ message: error.message });
+      } catch (error: unknown) {
+        res.status(500).json({ message: getErrorMessage(error) });
       }
     }
   );
@@ -1178,8 +1179,8 @@ export function registerAuthRoutes(app: Express) {
       }
 
       res.json(userLocs);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
   // User Preferences routes
@@ -1197,8 +1198,8 @@ export function registerAuthRoutes(app: Express) {
       }
 
       res.json(prefs[0]);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -1251,8 +1252,8 @@ export function registerAuthRoutes(app: Express) {
         .returning();
 
       res.json(updated[0]);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -1261,8 +1262,8 @@ export function registerAuthRoutes(app: Express) {
     try {
       const companies = await storage.getAllCompanies();
       res.json(companies);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -1324,8 +1325,8 @@ export function registerAuthRoutes(app: Express) {
         [req.user.id]
       );
       res.json(rows);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -1333,8 +1334,8 @@ export function registerAuthRoutes(app: Express) {
     try {
       const company = await storage.createCompany(req.body);
       res.status(201).json(company);
-    } catch (error: any) {
-      res.status(400).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(400).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -1347,8 +1348,8 @@ export function registerAuthRoutes(app: Express) {
         return res.status(404).json({ message: "Company not found" });
       }
       res.json(company);
-    } catch (error: any) {
-      res.status(400).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(400).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -1357,8 +1358,8 @@ export function registerAuthRoutes(app: Express) {
       const { id } = req.params;
       const company = await storage.updateCompany(parseInt(id), req.body);
       res.json(company);
-    } catch (error: any) {
-      res.status(400).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(400).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -1367,8 +1368,8 @@ export function registerAuthRoutes(app: Express) {
       const { id } = req.params;
       await storage.deleteCompany(parseInt(id));
       res.json({ message: "Company deleted successfully" });
-    } catch (error: any) {
-      res.status(400).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(400).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -1452,8 +1453,8 @@ export function registerAuthRoutes(app: Express) {
         }
         res.json({ message: "Company set successfully", companyId });
       });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -1489,9 +1490,9 @@ export function registerAuthRoutes(app: Express) {
       await db.update(users).set({ password: hashed }).where(eq(users.id, userId));
 
       res.json({ ok: true });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error changing password:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -1518,8 +1519,8 @@ export function registerAuthRoutes(app: Express) {
       await new Promise<void>((resolve, reject) => req.session.save((err) => (err ? reject(err) : resolve())));
 
       res.json({ ok: true });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 }
