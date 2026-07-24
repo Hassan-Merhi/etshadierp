@@ -1,4 +1,5 @@
 import type { Express } from "express";
+import { logger } from "../../lib/logger";
 import { z } from "zod";
 import { requireAuth, requireNonPOS } from "../../auth";
 import { buildSmartTransferTargetBalancedPreview } from "../../services/smartTransferTargetMix";
@@ -119,7 +120,7 @@ export function registerSmartTransferPreviewRoutes(app: Express) {
         /valid company|required|positive whole number|source location|destination location|YYYY-MM-DD|not found/i.test(message);
       if (isInputError) return res.status(400).json({ message });
 
-      console.error("[SmartTransferPreview] Failed:", error);
+      logger.error("[SmartTransferPreview] Failed:", { error: error });
       return res.status(500).json({ message: "Failed to generate smart transfer preview" });
     }
   });
@@ -148,7 +149,7 @@ export function registerSmartTransferPreviewRoutes(app: Express) {
           errors: error.issues.map((issue) => ({ path: issue.path.join("."), message: issue.message })),
         });
       }
-      console.error("[SmartTransferFeedback] Import feedback failed:", error);
+      logger.error("[SmartTransferFeedback] Import feedback failed:", { error: error });
       return res.status(500).json({ message: "Failed to record smart transfer feedback" });
     }
   });
@@ -164,7 +165,7 @@ export function registerSmartTransferPreviewRoutes(app: Express) {
       return res.json(summary);
     } catch (error: any) {
       if (error instanceof z.ZodError) return res.status(400).json({ message: "days must be between 7 and 365" });
-      console.error("[SmartTransferFeedback] Summary failed:", error);
+      logger.error("[SmartTransferFeedback] Summary failed:", { error: error });
       return res.status(500).json({ message: "Failed to load smart transfer feedback summary" });
     }
   });
@@ -183,7 +184,7 @@ export function registerSmartTransferPreviewRoutes(app: Express) {
       const resetSessionId = await resetSmartTransferFeedback({ companyId, userId });
       return res.json({ success: true, resetSessionId });
     } catch (error) {
-      console.error("[SmartTransferFeedback] Reset failed:", error);
+      logger.error("[SmartTransferFeedback] Reset failed:", { error: error });
       return res.status(500).json({ message: "Failed to reset smart transfer feedback baseline" });
     }
   });

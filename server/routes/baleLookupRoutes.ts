@@ -6,6 +6,7 @@
  * behaviour is unchanged.
  */
 import type { Express } from "express";
+import { logger } from "../lib/logger";
 import { eq, and, or, desc, sql, inArray, ilike } from "drizzle-orm";
 import { db } from "../db";
 import { storage } from "../storage";
@@ -135,7 +136,7 @@ export function registerBaleLookupRoutes(app: Express) {
 
       res.json({ product: displayProduct || null, labelPrints: allEntries });
     } catch (error: any) {
-      console.error("Error looking up article:", error);
+      logger.error("Error looking up article:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -525,7 +526,7 @@ export function registerBaleLookupRoutes(app: Express) {
         auditHistory,
       });
     } catch (error: any) {
-      console.error("Error looking up reference:", error);
+      logger.error("Error looking up reference:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -556,7 +557,7 @@ export function registerBaleLookupRoutes(app: Express) {
       const scannedUser = await storage.getUser(req.session.userId!);
       res.json({ ...updated, scannedByName: scannedUser?.username || null });
     } catch (error: any) {
-      console.error("Error scanning label:", error);
+      logger.error("Error scanning label:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -621,7 +622,7 @@ export function registerBaleLookupRoutes(app: Express) {
 
         res.json({ message: "Bale deleted from linked records" });
       } catch (error: any) {
-        console.error("Error deleting bale everywhere:", error);
+        logger.error("Error deleting bale everywhere:", { error: error });
         res.status(500).json({ message: error.message });
       }
     }
@@ -704,7 +705,7 @@ export function registerBaleLookupRoutes(app: Express) {
 
         res.json({ message: "Bale product changed", newArticleCode, newProductName });
       } catch (error: any) {
-        console.error("Error changing bale product:", error);
+        logger.error("Error changing bale product:", { error: error });
         res.status(500).json({ message: error.message });
       }
     }

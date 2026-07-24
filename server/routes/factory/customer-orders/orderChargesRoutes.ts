@@ -1,4 +1,5 @@
 import { trackOneContainerById } from "../../../services/containerTrackingService";
+import { logger } from "../../../lib/logger";
 import { parseId, parseOptionalId } from "../../../lib/parseId";
 import { dispatchNotification } from "../../../lib/notificationService";
 import { getClientDate } from "../../../lib/dateUtils";
@@ -352,7 +353,7 @@ export function registerOrderChargesRoutes(app: Express) {
 
       res.json({ ...updatedOrder, charges: updatedCharges, warning: chargeWarning });
     } catch (error: any) {
-      console.error("Error adding charge to order:", error);
+      logger.error("Error adding charge to order:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -498,7 +499,7 @@ export function registerOrderChargesRoutes(app: Express) {
         message: `${linked} charge${linked !== 1 ? "s" : ""} successfully linked to the ledger.${skippedMsg}`,
       });
     } catch (error: any) {
-      console.error("Error relinking charge vouchers:", error);
+      logger.error("Error relinking charge vouchers:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -749,7 +750,7 @@ export function registerOrderChargesRoutes(app: Express) {
 
       res.json({ ...updatedOrder, charges: updatedCharges });
     } catch (error: any) {
-      console.error("[PATCH charge]", error);
+      logger.error("[PATCH charge]", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -861,7 +862,7 @@ export function registerOrderChargesRoutes(app: Express) {
 
       res.json({ ...updatedOrder, charges: updatedCharges });
     } catch (error: any) {
-      console.error("Error removing charge from order:", error);
+      logger.error("Error removing charge from order:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });

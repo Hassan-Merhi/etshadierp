@@ -1,4 +1,5 @@
 import { parseId, parseOptionalId } from "../lib/parseId";
+import { logger } from "../lib/logger";
 import { requireNonPOS } from "../auth";
 import type { Express } from "express";
 import { db } from "../db";
@@ -231,7 +232,7 @@ export function registerGlobalTransactionRoutes(app: Express, requireAuth: any) 
         companies: allCompanyRows,
       });
     } catch (err) {
-      console.error("[GlobalTransactions]", err);
+      logger.error("[GlobalTransactions]", { error: err });
       return res.status(500).json({ message: "Failed to fetch global transactions" });
     }
   });
@@ -279,7 +280,7 @@ export function registerGlobalTransactionRoutes(app: Express, requireAuth: any) 
 
       return res.json(types.map((t) => t.voucherType));
     } catch (err) {
-      console.error("[GlobalTransactions/types]", err);
+      logger.error("[GlobalTransactions/types]", { error: err });
       return res.status(500).json({ message: "Failed to fetch voucher types" });
     }
   });
@@ -365,7 +366,7 @@ export function registerGlobalTransactionRoutes(app: Express, requireAuth: any) 
 
       return res.json({ voucher, entries });
     } catch (err) {
-      console.error("[GlobalTransactions/detail]", err);
+      logger.error("[GlobalTransactions/detail]", { error: err });
       return res.status(500).json({ message: "Failed to fetch voucher detail" });
     }
   });
@@ -670,7 +671,7 @@ export function registerGlobalTransactionRoutes(app: Express, requireAuth: any) 
       // Default: return base entries
       return res.json(entries);
     } catch (err) {
-      console.error("[GlobalTransactions/view-entries]", err);
+      logger.error("[GlobalTransactions/view-entries]", { error: err });
       return res.status(500).json({ message: "Failed to fetch view entries" });
     }
   });

@@ -7,6 +7,7 @@
  */
 
 import type { Express, Request, Response } from "express";
+import { logger } from "../lib/logger";
 import { db } from "../db";
 import { requireAuth, requireRole } from "../auth";
 import { containers, containerTrackingEvents } from "../../shared/schema";
@@ -232,18 +233,18 @@ export function registerContainerTrackingRoutes(app: Express) {
 
       // Fire tracking in the background — providers (especially Puppeteer/scraper) can
       // take well over 2 minutes, so we return 202 immediately and let the client poll.
-      console.log(`[TrackNow] ${row.containerNumber}: starting background track...`);
+      logger.info(`[TrackNow] ${row.containerNumber}: starting background track...`);
       res.status(202).json({ started: true, containerNumber: row.containerNumber });
 
       trackOneContainerById(containerId)
         .then((r) => {
-          console.log(
+          logger.info(
             `[TrackNow] ${row.containerNumber}: done — success=${r.success} ` +
               `provider=${r.provider ?? "none"} oldEta=${r.oldEta ?? "null"} newEta=${r.newEta ?? "null"}`
           );
         })
         .catch((err) => {
-          console.error(`[TrackNow] ${row.containerNumber}: background error —`, err?.message ?? err);
+          logger.error(`[TrackNow] ${row.containerNumber}: background error —`, { error: err?.message ?? err });
         });
     } catch (err: any) {
       if (!res.headersSent) {
@@ -362,7 +363,7 @@ export function registerContainerTrackingRoutes(app: Express) {
     // ── maersk_direct ─────────────────────────────────────────────────────────
     const directAvailable = isMaerskDirectScraperAvailable();
     if (directAvailable) {
-      console.log(`[DebugEta] ${containerNumber}: running maersk_direct…`);
+      logger.info(`[DebugEta] ${containerNumber}: running maersk_direct…`);
       try {
         const r = await scrapeMaerskDirect(containerNumber);
         const deepEta = !r.eta ? deepScanForEta(r.raw ?? {}) : null;
@@ -393,7 +394,7 @@ export function registerContainerTrackingRoutes(app: Express) {
     }
 
     // ── maersk_public ─────────────────────────────────────────────────────────
-    console.log(`[DebugEta] ${containerNumber}: running maersk_public…`);
+    logger.info(`[DebugEta] ${containerNumber}: running maersk_public…`);
     try {
       const r = await maerskPublicTrack(containerNumber);
       const deepEta = !r.eta ? deepScanForEta(r.raw ?? {}) : null;

@@ -1,4 +1,5 @@
 import { parseId, parseOptionalId } from "../../../lib/parseId";
+import { logger } from "../../../lib/logger";
 import { getClientDate } from "../../../lib/dateUtils";
 import type { Express } from "express";
 import { db } from "../../../db";
@@ -158,7 +159,7 @@ export function registerRawStockReceiptRoutes(app: Express) {
           try {
             supplierLockedRateMap.set(s.id, await getLockedSupplierRate(db, companyId, s.id));
           } catch (rateErr: any) {
-            console.error(`[raw-stock] getLockedSupplierRate failed for supplier ${s.id}:`, rateErr?.message);
+            logger.error(`[raw-stock] getLockedSupplierRate failed for supplier ${s.id}:`, { error: rateErr?.message });
             supplierLockedRateMap.set(s.id, 0);
           }
         }
@@ -547,7 +548,7 @@ export function registerRawStockReceiptRoutes(app: Express) {
 
       res.json(aggregated);
     } catch (error: any) {
-      console.error("Error fetching factory raw stock:", error);
+      logger.error("Error fetching factory raw stock:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -699,7 +700,7 @@ export function registerRawStockReceiptRoutes(app: Express) {
 
       res.json({ success: true, message: "Cost updated and cascaded to mix batches and bales" });
     } catch (error: any) {
-      console.error("Error updating raw stock cost:", error);
+      logger.error("Error updating raw stock cost:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -862,7 +863,7 @@ export function registerRawStockReceiptRoutes(app: Express) {
 
       res.json({ deducted: deductKg, rowsUpdated: updates.length, adjCreated: adjDeductKg > 0 });
     } catch (error: any) {
-      console.error("Error deducting received kg:", error);
+      logger.error("Error deducting received kg:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });

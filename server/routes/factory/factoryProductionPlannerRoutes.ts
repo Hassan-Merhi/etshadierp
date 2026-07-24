@@ -1,4 +1,5 @@
 import { Express } from "express";
+import { logger } from "../../lib/logger";
 import { db } from "../../db";
 import { requireAuth } from "../../auth";
 import { sql } from "drizzle-orm";
@@ -107,7 +108,7 @@ export function registerProductionPlannerRoutes(app: Express) {
         actuals,
       });
     } catch (e: any) {
-      console.error("[ProductionPlanner] GET error:", e.message);
+      logger.error("[ProductionPlanner] GET error:", { error: e.message });
       res.status(500).json({ message: e.message });
     }
   });
@@ -154,7 +155,7 @@ export function registerProductionPlannerRoutes(app: Express) {
 
       res.json({ message: "Plan saved successfully" });
     } catch (e: any) {
-      console.error("[ProductionPlanner] POST error:", e.message);
+      logger.error("[ProductionPlanner] POST error:", { error: e.message });
       res.status(500).json({ message: e.message });
     }
   });
@@ -202,7 +203,7 @@ export function registerProductionPlannerRoutes(app: Express) {
         fromDate: String(prevRows[0].plan_date),
       });
     } catch (e: any) {
-      console.error("[ProductionPlanner] copy-previous error:", e.message);
+      logger.error("[ProductionPlanner] copy-previous error:", { error: e.message });
       res.status(500).json({ message: e.message });
     }
   });
@@ -238,7 +239,7 @@ export function registerProductionPlannerRoutes(app: Express) {
       }
       res.json(map);
     } catch (e: any) {
-      console.error("[ProductionPlanner] worker-targets error:", e.message);
+      logger.error("[ProductionPlanner] worker-targets error:", { error: e.message });
       res.status(500).json({ message: e.message });
     }
   });

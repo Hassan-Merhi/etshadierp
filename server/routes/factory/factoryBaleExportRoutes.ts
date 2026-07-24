@@ -1,4 +1,5 @@
 import type { Express } from "express";
+import { logger } from "../../lib/logger";
 import { db, pool } from "../../db";
 import { requireAuth } from "../../auth";
 import Decimal from "decimal.js";
@@ -515,7 +516,7 @@ export function registerFactoryBaleExportRoutes(app: Express) {
       const totalKgUsed = usages.reduce((s: number, u: any) => s + (parseFloat(u.kgUsed) || 0), 0);
       res.json({ date: allTime ? "all" : date, allTime, usages, totalKgUsed: totalKgUsed.toFixed(3) });
     } catch (error: any) {
-      console.error("Error fetching daily report:", error);
+      logger.error("Error fetching daily report:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -684,7 +685,7 @@ export function registerFactoryBaleExportRoutes(app: Express) {
 
       return res.status(400).json({ message: "Invalid format. Use excel or pdf." });
     } catch (error: any) {
-      console.error("Error exporting production report:", error);
+      logger.error("Error exporting production report:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -1378,7 +1379,7 @@ export function registerFactoryBaleExportRoutes(app: Express) {
 
       return res.status(400).json({ message: "Invalid format." });
     } catch (error: any) {
-      console.error("Error generating weekly report:", error);
+      logger.error("Error generating weekly report:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -1817,7 +1818,7 @@ export function registerFactoryBaleExportRoutes(app: Express) {
         },
       });
     } catch (error: any) {
-      console.error("Error fetching production value report:", error);
+      logger.error("Error fetching production value report:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });

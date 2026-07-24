@@ -1,4 +1,5 @@
 import type { Express } from "express";
+import { logger } from "../../lib/logger";
 import { pool } from "../../db";
 import { requireAuth } from "../../auth";
 
@@ -155,10 +156,10 @@ export function registerStatsCountryActivityRoutes(app: Express) {
             }
           }
         } catch (_locErr: any) {
-          console.error("[country-activity] location breakdown failed (non-fatal):", _locErr.message);
+          logger.error("[country-activity] location breakdown failed (non-fatal):", { error: _locErr.message });
         }
       } catch (_offloadErr: any) {
-        console.error("[country-activity] offloads query failed (non-fatal):", _offloadErr.message);
+        logger.error("[country-activity] offloads query failed (non-fatal):", { error: _offloadErr.message });
       }
 
       // ── 3. Containers imported per company per day ────────────────────────
@@ -208,7 +209,7 @@ export function registerStatsCountryActivityRoutes(app: Express) {
           }
         }
       } catch (_poErr: any) {
-        console.error("[country-activity] containers (imports) query failed (non-fatal):", _poErr.message);
+        logger.error("[country-activity] containers (imports) query failed (non-fatal):", { error: _poErr.message });
       }
 
       // ── 4. Build date spine ──────────────────────────────────────────────
@@ -221,7 +222,7 @@ export function registerStatsCountryActivityRoutes(app: Express) {
         `, [startDateStr, endDateStr]);
         dateSeries = datesResult.rows.map((r) => toDateKey(r.day));
       } catch (_dsErr: any) {
-        console.error("[country-activity] generate_series failed, using JS fallback:", _dsErr.message);
+        logger.error("[country-activity] generate_series failed, using JS fallback:", { error: _dsErr.message });
         const cur = new Date(endDateStr + "T00:00:00");
         const start = new Date(startDateStr + "T00:00:00");
         while (cur >= start) {
@@ -260,7 +261,7 @@ export function registerStatsCountryActivityRoutes(app: Express) {
 
       res.json({ companies: result, days, startDate: startDateStr, endDate: endDateStr, dateSeries });
     } catch (err: any) {
-      console.error("GET /api/stats/country-activity error:", err);
+      logger.error("GET /api/stats/country-activity error:", { error: err });
       res.status(500).json({ message: err.message || "Failed to fetch country activity" });
     }
   });

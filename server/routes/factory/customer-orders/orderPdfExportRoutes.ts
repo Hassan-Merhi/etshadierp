@@ -1,4 +1,5 @@
 import { logAudit } from "../../helpers/auditHelpers";
+import { logger } from "../../../lib/logger";
 import { contentDisposition } from "../../../lib/contentDisposition";
 import { trackOneContainerById } from "../../../services/containerTrackingService";
 import { parseId, parseOptionalId } from "../../../lib/parseId";
@@ -232,7 +233,7 @@ export function registerOrderPdfExportRoutes(app: Express) {
       res.setHeader("Content-Length", xlsBuffer.byteLength);
       res.end(xlsBuffer);
     } catch (error: any) {
-      console.error("Error exporting pending loading:", error);
+      logger.error("Error exporting pending loading:", { error: error });
       if (!res.headersSent) res.status(500).json({ message: error.message });
     }
   });
@@ -528,11 +529,11 @@ export function registerOrderPdfExportRoutes(app: Express) {
           changes: { format: { old: null, new: "pdf" }, orderId: { old: null, new: orderId } },
         });
       } catch (auditErr) {
-        console.error("[PdfExport] audit write failed:", auditErr);
+        logger.error("[PdfExport] audit write failed:", { error: auditErr });
       }
       doc.end();
     } catch (error: any) {
-      console.error("Error exporting order to PDF:", error);
+      logger.error("Error exporting order to PDF:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -922,7 +923,7 @@ export function registerOrderPdfExportRoutes(app: Express) {
       res.setHeader("Content-Length", xlsBuffer.byteLength);
       res.end(xlsBuffer);
     } catch (error: any) {
-      console.error("Error exporting loading status:", error);
+      logger.error("Error exporting loading status:", { error: error });
       if (!res.headersSent) res.status(500).json({ message: error.message });
     }
   });

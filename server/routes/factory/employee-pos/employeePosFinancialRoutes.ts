@@ -1,4 +1,5 @@
 import { getClientDate } from "../../../lib/dateUtils";
+import { logger } from "../../../lib/logger";
 import type { Express } from "express";
 import { db } from "../../../db";
 import { requireAuth } from "../../../auth";
@@ -430,7 +431,7 @@ export function registerEmployeePosFinancialRoutes(app: Express) {
 
       res.json(result);
     } catch (error: any) {
-      console.error("Error creating factory POS sale:", error);
+      logger.error("Error creating factory POS sale:", { error: error });
       res.status(400).json({ message: error.message });
     }
   });
@@ -746,7 +747,7 @@ export function registerEmployeePosFinancialRoutes(app: Express) {
 
       res.json(result);
     } catch (error: any) {
-      console.error("Error editing factory POS sale:", error);
+      logger.error("Error editing factory POS sale:", { error: error });
       res.status(400).json({ message: error.message });
     }
   });
@@ -799,7 +800,7 @@ export function registerEmployeePosFinancialRoutes(app: Express) {
 
       res.json({ ok: true });
     } catch (error: any) {
-      console.error("Error voiding factory POS sale:", error);
+      logger.error("Error voiding factory POS sale:", { error: error });
       res.status(400).json({ message: error.message });
     }
   });
@@ -1032,7 +1033,7 @@ export function registerEmployeePosFinancialRoutes(app: Express) {
         })),
       });
     } catch (error: any) {
-      console.error("Factory financial-snapshot error:", error);
+      logger.error("Factory financial-snapshot error:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });

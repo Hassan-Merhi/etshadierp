@@ -7,6 +7,7 @@
  * focused on chat orchestration; behaviour is unchanged.
  */
 import { GoogleGenAI } from "@google/genai";
+import { logger } from "../lib/logger";
 import OpenAI from "openai";
 import { db } from "../db";
 import * as schema from "@shared/schema";
@@ -50,7 +51,7 @@ export async function getSelectedAIProvider(): Promise<AIProvider> {
       }
     }
   } catch (error) {
-    console.log("[ChatService] Could not get AI provider setting, using default");
+    logger.info("[ChatService] Could not get AI provider setting, using default");
   }
   return "gemini"; // Default to Gemini
 }
@@ -170,7 +171,7 @@ export async function callAIWithFallback(
     if (!available.includes(currentProvider)) continue;
 
     try {
-      console.log(`[ChatService] Trying ${currentProvider}...`);
+      logger.info(`[ChatService] Trying ${currentProvider}...`);
       let response: string;
 
       switch (currentProvider) {
@@ -187,10 +188,10 @@ export async function callAIWithFallback(
           continue;
       }
 
-      console.log(`[ChatService] Successfully used ${currentProvider}`);
+      logger.info(`[ChatService] Successfully used ${currentProvider}`);
       return { response, usedProvider: currentProvider };
     } catch (error: any) {
-      console.error(`[ChatService] ${currentProvider} failed:`, error.message);
+      logger.error(`[ChatService] ${currentProvider} failed:`, { error: error.message });
       lastError = error;
       // Continue to next provider
     }

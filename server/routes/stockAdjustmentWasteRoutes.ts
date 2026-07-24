@@ -32,7 +32,7 @@ export function registerStockAdjustmentWasteRoutes(app: Express) {
       const adjustment = await storage.getStockAdjustmentByVoucherId(voucherId);
       res.json(adjustment);
     } catch (error: any) {
-      console.error("[Stock Adjustment GET] Error:", error.message);
+      logger.error("[Stock Adjustment GET] Error:", { error: error.message });
       res.status(500).json({ message: error.message });
     }
   });
@@ -146,7 +146,7 @@ export function registerStockAdjustmentWasteRoutes(app: Express) {
 
       res.json(updated);
     } catch (error: any) {
-      console.error("[Stock Adjustment PUT] Error:", error.message);
+      logger.error("[Stock Adjustment PUT] Error:", { error: error.message });
       res.status(500).json({ message: error.message });
     }
   });
@@ -326,7 +326,7 @@ export function registerStockAdjustmentWasteRoutes(app: Express) {
 
       res.json({ ...dispatch, voucherNumber: dispatchNumber });
     } catch (error: any) {
-      console.error("[Waste Dispatch POST] Error:", error.message);
+      logger.error("[Waste Dispatch POST] Error:", { error: error.message });
       res.status(500).json({ message: error.message });
     }
   });
@@ -355,7 +355,7 @@ export function registerStockAdjustmentWasteRoutes(app: Express) {
 
       res.json({ message: "Waste dispatch deleted and inventory reversed" });
     } catch (error: any) {
-      console.error("[Waste Dispatch DELETE] Error:", error.message);
+      logger.error("[Waste Dispatch DELETE] Error:", { error: error.message });
       res.status(500).json({ message: error.message });
     }
   });

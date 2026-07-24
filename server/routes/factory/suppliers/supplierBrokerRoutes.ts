@@ -1,4 +1,5 @@
 import { parseId, parseOptionalId } from "../../../lib/parseId";
+import { logger } from "../../../lib/logger";
 import { getClientDate } from "../../../lib/dateUtils";
 import { buildSafeFilename, contentDisposition } from "../../../lib/contentDisposition";
 import type { Express } from "express";
@@ -634,7 +635,7 @@ export function registerSupplierBrokerRoutes(app: Express) {
       if (!data) return res.status(404).json({ message: "Supplier not found" });
       return res.json(data);
     } catch (err: any) {
-      console.error("Broker statement error:", err);
+      logger.error("Broker statement error:", { error: err });
       return res.status(500).json({ message: err.message });
     }
   });
@@ -829,7 +830,7 @@ export function registerSupplierBrokerRoutes(app: Express) {
       res.setHeader("Content-Length", xlsBuffer.byteLength);
       res.end(xlsBuffer);
     } catch (err: any) {
-      console.error("Broker statement export error:", err);
+      logger.error("Broker statement export error:", { error: err });
       if (!res.headersSent) res.status(500).json({ message: err.message });
     }
   });
@@ -1077,7 +1078,7 @@ export function registerSupplierBrokerRoutes(app: Express) {
         paidByCurrency,
       });
     } catch (err: any) {
-      console.error("Broker visual statement error:", err);
+      logger.error("Broker visual statement error:", { error: err });
       return res.status(500).json({ message: err.message });
     }
   });
@@ -1116,7 +1117,7 @@ export function registerSupplierBrokerRoutes(app: Express) {
 
       return res.json(containers);
     } catch (err: any) {
-      console.error("Direct containers error:", err);
+      logger.error("Direct containers error:", { error: err });
       return res.status(500).json({ message: err.message });
     }
   });

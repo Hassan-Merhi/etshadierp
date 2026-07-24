@@ -1,4 +1,5 @@
 import type { Express } from "express";
+import { logger } from "../lib/logger";
 import { db } from "../db";
 import { requireAuth, requireRole } from "../auth";
 import {
@@ -398,7 +399,7 @@ export function registerBalanceRepairRoutes(app: Express) {
       };
       res.json(result);
     } catch (err: any) {
-      console.error("[BalanceRepair] scan error:", err);
+      logger.error("[BalanceRepair] scan error:", { error: err });
       res.status(500).json({ message: err.message });
     }
   });
@@ -695,7 +696,7 @@ export function registerBalanceRepairRoutes(app: Express) {
         snapshot,
       });
     } catch (err: any) {
-      console.error("[BalanceRepair] apply error:", err);
+      logger.error("[BalanceRepair] apply error:", { error: err });
       res.status(500).json({ message: err.message });
     }
   });
@@ -773,7 +774,7 @@ export function registerBalanceRepairRoutes(app: Express) {
         depositsRestored: (snapshot.depositSnapshots ?? []).length,
       });
     } catch (err: any) {
-      console.error("[BalanceRepair] undo error:", err);
+      logger.error("[BalanceRepair] undo error:", { error: err });
       res.status(500).json({ message: err.message });
     }
   });
@@ -941,7 +942,7 @@ export function registerBalanceRepairRoutes(app: Express) {
 
         res.json({ fixed, total: payments.length, message: `Reallocated ${fixed} payment(s) to the correct months.` });
       } catch (err: any) {
-        console.error("[BalanceRepair] reallocate error:", err);
+        logger.error("[BalanceRepair] reallocate error:", { error: err });
         res.status(500).json({ message: err.message });
       }
     }

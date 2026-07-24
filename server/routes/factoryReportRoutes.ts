@@ -1,4 +1,5 @@
 import { parseId, parseOptionalId } from "../lib/parseId";
+import { logger } from "../lib/logger";
 import { getClientDate } from "../lib/dateUtils";
 import type { Express } from "express";
 import PDFDocument from "pdfkit";
@@ -325,7 +326,7 @@ export function registerFactoryReportRoutes(app: Express, requireAuth: any, db: 
         metaJson: JSON.stringify({ format, startDate, endDate, supplierId: supplierId || null }),
       });
     } catch (error: any) {
-      console.error("Error generating supplier usage report:", error);
+      logger.error("Error generating supplier usage report:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -901,7 +902,7 @@ export function registerFactoryReportRoutes(app: Express, requireAuth: any, db: 
 
       res.json(enriched);
     } catch (err: any) {
-      console.error("[mix-batches-by-date]", err);
+      logger.error("[mix-batches-by-date]", { error: err });
       res.status(500).json({ message: err.message });
     }
   });
@@ -962,11 +963,11 @@ export function registerFactoryReportRoutes(app: Express, requireAuth: any, db: 
           });
         }
       } catch (auditErr) {
-        console.error("[mix-batch-wa] audit write failed:", auditErr);
+        logger.error("[mix-batch-wa] audit write failed:", { error: auditErr });
       }
       res.json({ ok: true, message: "Mix batch image sent to WhatsApp group." });
     } catch (err: any) {
-      console.error("[mix-batch-wa] send error:", err);
+      logger.error("[mix-batch-wa] send error:", { error: err });
       res.status(500).json({ message: err.message });
     }
   });

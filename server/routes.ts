@@ -1,4 +1,5 @@
 import type { Express } from "express";
+import { logger } from "./lib/logger";
 import { createServer, type Server } from "http";
 import { broadcast } from "./wsServer";
 import multer from "multer";
@@ -249,7 +250,7 @@ async function getCurrentExchangeRate(companyId: number): Promise<string | null>
     const rate = await storage.getLatestExchangeRate(companyId, company.baseCurrency, company.displayCurrency);
     return rate?.rate || null;
   } catch (error) {
-    console.error("Error fetching exchange rate:", error);
+    logger.error("Error fetching exchange rate:", { error: error });
     return null;
   }
 }
@@ -342,12 +343,12 @@ async function runIntercompanyPosTransfer(
         debitIsRunningTotal: false, // DEST: CR is running total, DR is per-sale cash outlet
       });
     } else {
-      console.warn(
+      logger.warn(
         `[IntercompanyPOS] Could not find cash account "${cashName}" in company ${config.destCompanyId}. Dest voucher skipped.`
       );
     }
   } catch (err: any) {
-    console.error("[IntercompanyPOS] Auto-transfer failed:", err?.message ?? err);
+    logger.error("[IntercompanyPOS] Auto-transfer failed:", { error: err?.message ?? err });
   }
 }
 
@@ -543,7 +544,7 @@ async function logAudit(params: {
       changes: params.changes,
     });
   } catch (error) {
-    console.error("Error logging audit:", error);
+    logger.error("Error logging audit:", { error: error });
     throw error; // Rethrow to ensure audit failures are not silently ignored
   }
 }
@@ -885,7 +886,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const result = await db.execute(sql`SELECT 1 as test`);
       res.json({ status: "ok", message: "Database connection successful" });
     } catch (error: any) {
-      console.error("Database connection failed:", error);
+      logger.error("Database connection failed:", { error: error });
       res.status(500).json({ status: "error", message: error.message });
     }
   });
