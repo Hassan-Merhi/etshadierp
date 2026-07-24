@@ -12,6 +12,7 @@
  */
 
 import type { Express } from "express";
+import { getErrorMessage } from "../lib/httpHandlers";
 import { requireAuth } from "../auth";
 import { pool } from "../db";
 import { logger } from "../lib/logger";
@@ -60,8 +61,8 @@ export function registerWhatsAppRoutes(app: Express) {
         dailyRecipientName: s.daily_recipient_name ?? null,
         hasCredentials: !!(s.instance_id && s.api_token),
       });
-    } catch (err: any) {
-      res.status(500).json({ message: err.message });
+    } catch (err: unknown) {
+      res.status(500).json({ message: getErrorMessage(err) });
     }
   });
 
@@ -97,8 +98,8 @@ export function registerWhatsAppRoutes(app: Express) {
       );
 
       res.json({ message: "Saved" });
-    } catch (err: any) {
-      res.status(500).json({ message: err.message });
+    } catch (err: unknown) {
+      res.status(500).json({ message: getErrorMessage(err) });
     }
   });
 
@@ -121,8 +122,8 @@ export function registerWhatsAppRoutes(app: Express) {
           active: r.active,
         }))
       );
-    } catch (err: any) {
-      res.status(500).json({ message: err.message });
+    } catch (err: unknown) {
+      res.status(500).json({ message: getErrorMessage(err) });
     }
   });
 
@@ -146,8 +147,8 @@ export function registerWhatsAppRoutes(app: Express) {
       );
       const r = result.rows[0];
       res.json({ id: r.id, chatId: r.chat_id, name: r.name, isGroup: r.is_group, active: r.active });
-    } catch (err: any) {
-      res.status(500).json({ message: err.message });
+    } catch (err: unknown) {
+      res.status(500).json({ message: getErrorMessage(err) });
     }
   });
 
@@ -168,8 +169,8 @@ export function registerWhatsAppRoutes(app: Express) {
         return res.status(404).json({ message: "Recipient not found" });
       }
       res.json({ message: "Updated" });
-    } catch (err: any) {
-      res.status(500).json({ message: err.message });
+    } catch (err: unknown) {
+      res.status(500).json({ message: getErrorMessage(err) });
     }
   });
 
@@ -186,8 +187,8 @@ export function registerWhatsAppRoutes(app: Express) {
         return res.status(404).json({ message: "Recipient not found" });
       }
       res.json({ message: "Deleted" });
-    } catch (err: any) {
-      res.status(500).json({ message: err.message });
+    } catch (err: unknown) {
+      res.status(500).json({ message: getErrorMessage(err) });
     }
   });
 
@@ -201,8 +202,8 @@ export function registerWhatsAppRoutes(app: Express) {
       }
       const chats = await fetchGreenApiChats(s.instanceId, s.apiToken);
       res.json(chats);
-    } catch (err: any) {
-      res.status(500).json({ message: err.message });
+    } catch (err: unknown) {
+      res.status(500).json({ message: getErrorMessage(err) });
     }
   });
 
@@ -220,8 +221,8 @@ export function registerWhatsAppRoutes(app: Express) {
         enabled: s.enabled,
         hasCredentials: !!(s.instanceId && s.apiToken),
       });
-    } catch (err: any) {
-      res.status(500).json({ message: err.message });
+    } catch (err: unknown) {
+      res.status(500).json({ message: getErrorMessage(err) });
     }
   });
 
@@ -247,8 +248,8 @@ export function registerWhatsAppRoutes(app: Express) {
       );
 
       res.json({ message: "Saved" });
-    } catch (err: any) {
-      res.status(500).json({ message: err.message });
+    } catch (err: unknown) {
+      res.status(500).json({ message: getErrorMessage(err) });
     }
   });
 
@@ -260,8 +261,8 @@ export function registerWhatsAppRoutes(app: Express) {
       }
       const chats = await fetchGreenApiChats(s.instanceId, s.apiToken);
       res.json(chats);
-    } catch (err: any) {
-      res.status(500).json({ message: err.message });
+    } catch (err: unknown) {
+      res.status(500).json({ message: getErrorMessage(err) });
     }
   });
 
@@ -276,8 +277,8 @@ export function registerWhatsAppRoutes(app: Express) {
       }
       const state = await getGreenInstanceState(s.instanceId, s.apiToken);
       res.json({ state });
-    } catch (err: any) {
-      res.status(500).json({ message: err.message });
+    } catch (err: unknown) {
+      res.status(500).json({ message: getErrorMessage(err) });
     }
   });
 
@@ -290,8 +291,8 @@ export function registerWhatsAppRoutes(app: Express) {
       }
       const state = await getGreenInstanceState(s.instanceId, s.apiToken);
       res.json({ state });
-    } catch (err: any) {
-      res.status(500).json({ message: err.message });
+    } catch (err: unknown) {
+      res.status(500).json({ message: getErrorMessage(err) });
     }
   });
 
@@ -340,10 +341,10 @@ export function registerWhatsAppRoutes(app: Express) {
       } else {
         res.status(502).json({ message: result.errors[0] || "Send failed", ...result });
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       logger.error("whatsapp send-net-position failed", { module: "whatsapp", action: "sendNetPosition", userId: _uid, companyId: _cid, durationMs: Date.now() - _t, error: err });
       logger.error("[WhatsApp] send-net-position error:", { error: err });
-      res.status(500).json({ message: err.message });
+      res.status(500).json({ message: getErrorMessage(err) });
     }
   });
 
@@ -379,8 +380,8 @@ export function registerWhatsAppRoutes(app: Express) {
         sendDayOfWeek: row.send_day_of_week ?? 1,
         lastSentAt: row.last_sent_at ?? null,
       });
-    } catch (err: any) {
-      res.status(500).json({ message: err.message });
+    } catch (err: unknown) {
+      res.status(500).json({ message: getErrorMessage(err) });
     }
   });
 
@@ -412,8 +413,8 @@ export function registerWhatsAppRoutes(app: Express) {
         ]
       );
       res.json({ message: "Saved" });
-    } catch (err: any) {
-      res.status(500).json({ message: err.message });
+    } catch (err: unknown) {
+      res.status(500).json({ message: getErrorMessage(err) });
     }
   });
 
@@ -452,8 +453,8 @@ export function registerWhatsAppRoutes(app: Express) {
         autoSend: row.auto_send ?? false,
         lastSentAt: row.last_sent_at ?? null,
       });
-    } catch (err: any) {
-      res.status(500).json({ message: err.message });
+    } catch (err: unknown) {
+      res.status(500).json({ message: getErrorMessage(err) });
     }
   });
 
@@ -481,8 +482,8 @@ export function registerWhatsAppRoutes(app: Express) {
         ]
       );
       res.json({ message: "Saved" });
-    } catch (err: any) {
-      res.status(500).json({ message: err.message });
+    } catch (err: unknown) {
+      res.status(500).json({ message: getErrorMessage(err) });
     }
   });
 
@@ -499,7 +500,7 @@ export function registerWhatsAppRoutes(app: Express) {
     // Run the actual work asynchronously after the response is sent
     triggerDailyWhatsAppSendNow(fromDate || undefined, toDate || undefined)
       .then((r) => logger.info(`[ManualWhatsApp] Completed: ${r.message}`))
-      .catch((e) => logger.error(`[ManualWhatsApp] Failed: ${e.message}`));
+      .catch((e) => logger.error(`[ManualWhatsApp] Failed: ${getErrorMessage(e)}`));
   });
 
   app.post("/api/whatsapp/send-np-all-now", requireAuth, async (req, res) => {
@@ -534,8 +535,8 @@ export function registerWhatsAppRoutes(app: Express) {
               arc.append(Buffer.isBuffer(buf) ? buf : Buffer.from(buf), {
                 name: `NetPosition_${safe}_${npEnd}.xlsx`,
               });
-            } catch (e: any) {
-              logger.error(`[NpAllNow] Failed for ${company.name}:`, { error: e.message });
+            } catch (e: unknown) {
+              logger.error(`[NpAllNow] Failed for ${company.name}:`, { error: getErrorMessage(e) });
             }
           }
           await arc.finalize();
@@ -584,10 +585,10 @@ export function registerWhatsAppRoutes(app: Express) {
 
       logger.info("whatsapp send-np-all-now succeeded", { module: "whatsapp", action: "sendNpAllNow", userId: _uid, companyId: _cid, durationMs: Date.now() - _t });
       res.json({ message: messages.join(" | ") });
-    } catch (err: any) {
+    } catch (err: unknown) {
       logger.error("whatsapp send-np-all-now failed", { module: "whatsapp", action: "sendNpAllNow", userId: _uid, companyId: _cid, durationMs: Date.now() - _t, error: err });
-      logger.error("[NpAllNow] Error:", { error: err?.message || err });
-      res.status(500).json({ message: err.message });
+      logger.error("[NpAllNow] Error:", { error: getErrorMessage(err) || err });
+      res.status(500).json({ message: getErrorMessage(err) });
     }
   });
 
@@ -676,10 +677,10 @@ export function registerWhatsAppRoutes(app: Express) {
 
       logger.info("whatsapp send-stock-report succeeded", { module: "whatsapp", action: "sendStockReport", userId: _uid, companyId: _cid, durationMs: Date.now() - _t });
       res.json({ message: `Stock PDF + Net Position Excel sent to ${chatId}` });
-    } catch (err: any) {
+    } catch (err: unknown) {
       logger.error("whatsapp send-stock-report failed", { module: "whatsapp", action: "sendStockReport", userId: _uid, companyId: _cid, durationMs: Date.now() - _t, error: err });
       logger.error("[WhatsApp] send-stock-report error:", { error: err });
-      res.status(500).json({ message: err.message });
+      res.status(500).json({ message: getErrorMessage(err) });
     }
   });
 }
