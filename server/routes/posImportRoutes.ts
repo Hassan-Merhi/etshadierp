@@ -6,6 +6,7 @@
  * unchanged.
  */
 import type { Express } from "express";
+import { getErrorMessage } from "../lib/httpHandlers";
 import { logger } from "../lib/logger";
 import { and, eq } from "drizzle-orm";
 import { db } from "../db";
@@ -88,10 +89,10 @@ export function registerPosImportRoutes(app: Express) {
         totalValue,
         fileName: req.file.originalname,
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("POS Import parse error:", { error: error });
       // File-parse errors are client errors (bad/corrupt file) — return 400, not 500
-      res.status(400).json({ message: error.message || "Failed to parse Excel file" });
+      res.status(400).json({ message: getErrorMessage(error) || "Failed to parse Excel file" });
     }
   });
 
@@ -183,9 +184,9 @@ export function registerPosImportRoutes(app: Express) {
         warnings,
         validatedItems,
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("POS Import validation error:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -396,8 +397,8 @@ export function registerPosImportRoutes(app: Express) {
             const invResult = await sendWhatsAppFileByUploadPos(_chatId, pdfBuffer, fileName, "");
             if (!invResult.success) logger.error(`[POSImport-bg] Invoice send failed: ${invResult.error}`);
             else logger.info(`[POSImport-bg] Invoice sent: ${fileName} → ${_chatId}`);
-          } catch (e: any) {
-            logger.error("[POSImport-bg] Invoice send error:", { error: e.message });
+          } catch (e: unknown) {
+            logger.error("[POSImport-bg] Invoice send error:", { error: getErrorMessage(e) });
           }
 
           // 2. Stock report PDF
@@ -436,19 +437,19 @@ export function registerPosImportRoutes(app: Express) {
               if (!stockRes.success) logger.error(`[POSImport-bg] Stock send failed: ${stockRes.error}`);
               else logger.info(`[POSImport-bg] Stock report sent: ${stockName}.pdf → ${_chatId}`);
             }
-          } catch (e: any) {
-            logger.error("[POSImport-bg] Stock send error:", { error: e.message });
+          } catch (e: unknown) {
+            logger.error("[POSImport-bg] Stock send error:", { error: getErrorMessage(e) });
           }
         });
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       // httpStatus=400 means bad user input (e.g. unknown barcode); transaction
       // already rolled back at this point.
-      if (error.httpStatus === 400) {
-        return res.status(400).json({ message: error.message });
+      if ((error as { httpStatus?: number }).httpStatus === 400) {
+        return res.status(400).json({ message: getErrorMessage(error) });
       }
       logger.error("POS Import error:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -481,9 +482,9 @@ export function registerPosImportRoutes(app: Express) {
       res.setHeader("Content-Disposition", "attachment; filename=POS_Import_Template.xlsx");
       res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
       res.send(buffer);
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Template generation error:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 }

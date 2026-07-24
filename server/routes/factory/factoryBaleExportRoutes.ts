@@ -1,4 +1,5 @@
 import type { Express } from "express";
+import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
 import { db, pool } from "../../db";
 import { requireAuth } from "../../auth";
@@ -515,9 +516,9 @@ export function registerFactoryBaleExportRoutes(app: Express) {
 
       const totalKgUsed = usages.reduce((s: number, u: any) => s + (parseFloat(u.kgUsed) || 0), 0);
       res.json({ date: allTime ? "all" : date, allTime, usages, totalKgUsed: totalKgUsed.toFixed(3) });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error fetching daily report:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -684,9 +685,9 @@ export function registerFactoryBaleExportRoutes(app: Express) {
       }
 
       return res.status(400).json({ message: "Invalid format. Use excel or pdf." });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error exporting production report:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -1378,9 +1379,9 @@ export function registerFactoryBaleExportRoutes(app: Express) {
       }
 
       return res.status(400).json({ message: "Invalid format." });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error generating weekly report:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -1396,8 +1397,8 @@ export function registerFactoryBaleExportRoutes(app: Express) {
         groupChatId: s?.weekly_report_wa_group_chat_id || "",
         hasCredentials: !!(s?.instance_id && s?.api_token),
       });
-    } catch (e: any) {
-      res.status(500).json({ message: e.message });
+    } catch (e: unknown) {
+      res.status(500).json({ message: getErrorMessage(e) });
     }
   });
 
@@ -1409,8 +1410,8 @@ export function registerFactoryBaleExportRoutes(app: Express) {
         [groupChatId || ""]
       );
       res.json({ success: true });
-    } catch (e: any) {
-      res.status(500).json({ message: e.message });
+    } catch (e: unknown) {
+      res.status(500).json({ message: getErrorMessage(e) });
     }
   });
 
@@ -1439,8 +1440,8 @@ export function registerFactoryBaleExportRoutes(app: Express) {
       );
       if (!result.success) return res.status(500).json({ message: result.error || "Failed to send WhatsApp message" });
       res.json({ success: true });
-    } catch (e: any) {
-      res.status(500).json({ message: e.message });
+    } catch (e: unknown) {
+      res.status(500).json({ message: getErrorMessage(e) });
     }
   });
 
@@ -1935,9 +1936,9 @@ export function registerFactoryBaleExportRoutes(app: Express) {
         },
         supplierMixBreakdown,
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error fetching production value report:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 }

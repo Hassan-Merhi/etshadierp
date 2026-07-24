@@ -7,6 +7,7 @@
  */
 
 import type { Express, Request, Response } from "express";
+import { getErrorMessage } from "../lib/httpHandlers";
 import { logger } from "../lib/logger";
 import { db } from "../db";
 import { requireAuth, requireRole } from "../auth";
@@ -165,8 +166,8 @@ export function registerContainerTrackingRoutes(app: Express) {
     try {
       const result = await testConnection();
       res.json(result);
-    } catch (err: any) {
-      res.status(500).json({ ok: false, error: err?.message });
+    } catch (err: unknown) {
+      res.status(500).json({ ok: false, error: getErrorMessage(err) });
     }
   });
 
@@ -246,9 +247,9 @@ export function registerContainerTrackingRoutes(app: Express) {
         .catch((err) => {
           logger.error(`[TrackNow] ${row.containerNumber}: background error —`, { error: err?.message ?? err });
         });
-    } catch (err: any) {
+    } catch (err: unknown) {
       if (!res.headersSent) {
-        res.status(500).json({ message: err?.message ?? "Tracking failed" });
+        res.status(500).json({ message: getErrorMessage(err) ?? "Tracking failed" });
       }
     }
   });
@@ -271,8 +272,8 @@ export function registerContainerTrackingRoutes(app: Express) {
         .orderBy(desc(containerTrackingEvents.eventTime))
         .limit(100);
       res.json(events);
-    } catch (err: any) {
-      res.status(500).json({ message: err?.message ?? "Failed to load events" });
+    } catch (err: unknown) {
+      res.status(500).json({ message: getErrorMessage(err) ?? "Failed to load events" });
     }
   });
 
@@ -289,8 +290,8 @@ export function registerContainerTrackingRoutes(app: Express) {
     try {
       const updated = await setBulkTrackingEnabled(trackingEnabled);
       res.json({ updated, trackingEnabled });
-    } catch (err: any) {
-      res.status(500).json({ message: err?.message ?? "Bulk update failed" });
+    } catch (err: unknown) {
+      res.status(500).json({ message: getErrorMessage(err) ?? "Bulk update failed" });
     }
   });
 
@@ -327,8 +328,8 @@ export function registerContainerTrackingRoutes(app: Express) {
             ? "No containers eligible for tracking (all may be offloaded or have invalid numbers)."
             : `Tracking started for ${queued} container${queued !== 1 ? "s" : ""}. Results will appear shortly.`,
       });
-    } catch (err: any) {
-      res.status(500).json({ message: err?.message ?? "Bulk track failed" });
+    } catch (err: unknown) {
+      res.status(500).json({ message: getErrorMessage(err) ?? "Bulk track failed" });
     }
   });
 
@@ -381,8 +382,8 @@ export function registerContainerTrackingRoutes(app: Express) {
           deepScanPath: deepEta?.path ?? null,
           blocked: (r as any).blocked ?? false,
         });
-      } catch (e: any) {
-        providersAttempted.push({ provider: "maersk_direct", success: false, etaFound: null, error: e?.message });
+      } catch (e: unknown) {
+        providersAttempted.push({ provider: "maersk_direct", success: false, etaFound: null, error: getErrorMessage(e) });
       }
     } else {
       providersAttempted.push({
@@ -412,8 +413,8 @@ export function registerContainerTrackingRoutes(app: Express) {
         deepScanPath: deepEta?.path ?? null,
         blocked: (r as any).blocked ?? false,
       });
-    } catch (e: any) {
-      providersAttempted.push({ provider: "maersk_public", success: false, etaFound: null, error: e?.message });
+    } catch (e: unknown) {
+      providersAttempted.push({ provider: "maersk_public", success: false, etaFound: null, error: getErrorMessage(e) });
     }
 
     res.json({
@@ -467,8 +468,8 @@ export function registerContainerTrackingRoutes(app: Express) {
         return;
       }
       res.json(updated);
-    } catch (err: any) {
-      res.status(500).json({ message: err?.message ?? "Update failed" });
+    } catch (err: unknown) {
+      res.status(500).json({ message: getErrorMessage(err) ?? "Update failed" });
     }
   });
 }

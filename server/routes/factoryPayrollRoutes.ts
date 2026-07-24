@@ -1,4 +1,5 @@
 import { logAudit } from "./helpers/auditHelpers";
+import { getErrorMessage } from "../lib/httpHandlers";
 import { logger } from "../lib/logger";
 import { parseId, parseOptionalId } from "../lib/parseId";
 import { getClientDate } from "../lib/dateUtils";
@@ -366,9 +367,9 @@ export function registerFactoryPayrollRoutes(app: Express, requireAuth: any, db:
       }
 
       res.json(payrollRecords);
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error generating payroll:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -410,9 +411,9 @@ export function registerFactoryPayrollRoutes(app: Express, requireAuth: any, db:
       }));
 
       res.json(formatted);
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error fetching payroll:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -461,8 +462,8 @@ export function registerFactoryPayrollRoutes(app: Express, requireAuth: any, db:
 
       if (!row) return res.status(404).json({ message: "Payroll not found" });
       res.json(row);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -576,9 +577,9 @@ export function registerFactoryPayrollRoutes(app: Express, requireAuth: any, db:
       }
 
       res.json(updated);
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error updating payroll:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -686,9 +687,9 @@ export function registerFactoryPayrollRoutes(app: Express, requireAuth: any, db:
       });
 
       res.json({ message: "Payroll undone successfully", previousStatus: existing.status });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error undoing payroll:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -787,9 +788,9 @@ export function registerFactoryPayrollRoutes(app: Express, requireAuth: any, db:
       }
 
       res.json({ message: "Payroll record deleted" });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error deleting payroll:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -955,9 +956,9 @@ export function registerFactoryPayrollRoutes(app: Express, requireAuth: any, db:
       });
 
       doc.end();
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error exporting payroll PDF:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -1191,9 +1192,9 @@ export function registerFactoryPayrollRoutes(app: Express, requireAuth: any, db:
       res.setHeader("Content-Disposition", `attachment; filename=payroll_${startDate}_${endDate}.xlsx`);
       res.setHeader("Content-Length", xlsBuffer.byteLength);
       res.end(xlsBuffer);
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error exporting payroll Excel:", { error: error });
-      if (!res.headersSent) res.status(500).json({ message: error.message });
+      if (!res.headersSent) res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 }

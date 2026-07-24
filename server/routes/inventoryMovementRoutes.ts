@@ -8,6 +8,7 @@
  * closures move with it. Behaviour is unchanged.
  */
 import type { Express } from "express";
+import { getErrorMessage } from "../lib/httpHandlers";
 import { logger } from "../lib/logger";
 import { eq, and, or, desc, isNull, isNotNull, gte, lte, lt } from "drizzle-orm";
 import { db } from "../db";
@@ -479,8 +480,8 @@ export function registerInventoryMovementRoutes(app: Express) {
       };
 
       res.json({ months: monthlySummary, grandTotal: gt });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -587,8 +588,8 @@ export function registerInventoryMovementRoutes(app: Express) {
       };
 
       res.json({ transactions, totals });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -690,9 +691,9 @@ export function registerInventoryMovementRoutes(app: Express) {
       };
 
       res.json({ summary, issues });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Inventory reconciliation error:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -734,8 +735,8 @@ export function registerInventoryMovementRoutes(app: Express) {
         .orderBy(desc(vouchers.createdAt));
 
       res.json(todayVouchers);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -769,9 +770,9 @@ export function registerInventoryMovementRoutes(app: Express) {
 
       const result = await storage.updateCostPricesByBarcode(locationId, req.session.currentCompanyId, updates);
       res.json(result);
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error updating cost prices:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -958,10 +959,10 @@ export function registerInventoryMovementRoutes(app: Express) {
               quantity: quantity,
             });
           }
-        } catch (error: any) {
+        } catch (error: unknown) {
           results.errors.push({
             code: item.code,
-            error: error.message,
+            error: getErrorMessage(error),
           });
         }
       }
@@ -970,8 +971,8 @@ export function registerInventoryMovementRoutes(app: Express) {
         message: `Import completed: ${results.created.length} created, ${results.updated.length} updated, ${results.skipped.length} skipped, ${results.errors.length} errors`,
         results,
       });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 

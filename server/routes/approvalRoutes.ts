@@ -1,4 +1,5 @@
 import type { Express } from "express";
+import { getErrorMessage } from "../lib/httpHandlers";
 import { db } from "../db";
 import { requireAuth } from "../auth";
 import { approvalRequests } from "@shared/schema";
@@ -26,8 +27,8 @@ export function registerApprovalRoutes(app: Express) {
         rows = rows.filter((r) => r.status === status);
       }
       res.json(rows);
-    } catch (e: any) {
-      res.status(500).json({ message: e.message });
+    } catch (e: unknown) {
+      res.status(500).json({ message: getErrorMessage(e) });
     }
   });
 
@@ -44,8 +45,8 @@ export function registerApprovalRoutes(app: Express) {
         .orderBy(desc(approvalRequests.requestedAt))
         .limit(100);
       res.json(rows);
-    } catch (e: any) {
-      res.status(500).json({ message: e.message });
+    } catch (e: unknown) {
+      res.status(500).json({ message: getErrorMessage(e) });
     }
   });
 
@@ -87,8 +88,8 @@ export function registerApprovalRoutes(app: Express) {
         changes: { status: { old: null, new: "pending" } },
       });
       res.status(201).json(row);
-    } catch (e: any) {
-      res.status(500).json({ message: e.message });
+    } catch (e: unknown) {
+      res.status(500).json({ message: getErrorMessage(e) });
     }
   });
 
@@ -136,8 +137,8 @@ export function registerApprovalRoutes(app: Express) {
         changes: { status: { old: "pending", new: "approved" } },
       });
       res.json(updated);
-    } catch (e: any) {
-      res.status(500).json({ message: e.message });
+    } catch (e: unknown) {
+      res.status(500).json({ message: getErrorMessage(e) });
     }
   });
 
@@ -185,8 +186,8 @@ export function registerApprovalRoutes(app: Express) {
         changes: { status: { old: "pending", new: "rejected" } },
       });
       res.json(updated);
-    } catch (e: any) {
-      res.status(500).json({ message: e.message });
+    } catch (e: unknown) {
+      res.status(500).json({ message: getErrorMessage(e) });
     }
   });
 
@@ -226,8 +227,8 @@ export function registerApprovalRoutes(app: Express) {
         changes: { status: { old: "approved", new: "executed" } },
       });
       res.json(updated);
-    } catch (e: any) {
-      res.status(500).json({ message: e.message });
+    } catch (e: unknown) {
+      res.status(500).json({ message: getErrorMessage(e) });
     }
   });
 
@@ -251,8 +252,8 @@ export function registerApprovalRoutes(app: Express) {
       }
       await db.update(approvalRequests).set({ status: "cancelled" }).where(eq(approvalRequests.id, id));
       res.json({ ok: true });
-    } catch (e: any) {
-      res.status(500).json({ message: e.message });
+    } catch (e: unknown) {
+      res.status(500).json({ message: getErrorMessage(e) });
     }
   });
 }

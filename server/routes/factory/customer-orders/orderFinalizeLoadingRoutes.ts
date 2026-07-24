@@ -1,4 +1,5 @@
 import { trackOneContainerById } from "../../../services/containerTrackingService";
+import { getErrorMessage } from "../../../lib/httpHandlers";
 import { logger } from "../../../lib/logger";
 import { parseId, parseOptionalId } from "../../../lib/parseId";
 import { dispatchNotification } from "../../../lib/notificationService";
@@ -367,9 +368,9 @@ export function registerOrderFinalizeLoadingRoutes(app: Express) {
       }).catch(() => {});
 
       res.json(result);
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error finalizing order:", { error: error });
-      res.status(400).json({ message: error.message });
+      res.status(400).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -427,9 +428,9 @@ export function registerOrderFinalizeLoadingRoutes(app: Express) {
           status: b.status,
         })),
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error fetching finalize preview:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -480,9 +481,9 @@ export function registerOrderFinalizeLoadingRoutes(app: Express) {
       }
 
       res.json({ message: `${updated} bale(s) marked as SOLD`, updated, total: orderBales.length });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error force-syncing bale status:", { error: error });
-      res.status(400).json({ message: error.message });
+      res.status(400).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -614,9 +615,9 @@ export function registerOrderFinalizeLoadingRoutes(app: Express) {
       });
 
       res.json({ message: "Invoice reverted to Draft successfully" });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error unfinalizing order:", { error: error });
-      res.status(400).json({ message: error.message });
+      res.status(400).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -780,9 +781,9 @@ export function registerOrderFinalizeLoadingRoutes(app: Express) {
       }
 
       res.json(updated);
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error cancelling order:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -850,9 +851,9 @@ export function registerOrderFinalizeLoadingRoutes(app: Express) {
       }
 
       res.json(restored);
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error restoring loading order:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -908,9 +909,9 @@ export function registerOrderFinalizeLoadingRoutes(app: Express) {
       }).catch(() => {});
 
       res.json(order);
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error creating loading order:", { error: error });
-      res.status(400).json({ message: error.message });
+      res.status(400).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -1007,9 +1008,9 @@ export function registerOrderFinalizeLoadingRoutes(app: Express) {
       }).catch(() => {});
 
       res.json(updated);
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error finalizing loading:", { error: error });
-      res.status(400).json({ message: error.message });
+      res.status(400).json({ message: getErrorMessage(error) });
     }
   });
 }

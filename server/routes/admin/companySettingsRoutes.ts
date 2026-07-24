@@ -1,4 +1,5 @@
 import { getClientDate } from "../../lib/dateUtils";
+import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
 import type { Express } from "express";
 import { db, pool } from "../../db";
@@ -217,9 +218,9 @@ export function registerCompanySettingsRoutes(app: Express) {
           "Purchase Orders",
         ],
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Reset company data error:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -228,9 +229,9 @@ export function registerCompanySettingsRoutes(app: Express) {
     try {
       const parentCompanyId = await storage.getParentCompanyId();
       res.json({ parentCompanyId });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Get parent company error:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -264,9 +265,9 @@ export function registerCompanySettingsRoutes(app: Express) {
         await storage.setParentCompanyId(null);
         res.json({ success: true, parentCompanyId: null });
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Set parent company error:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -384,9 +385,9 @@ export function registerCompanySettingsRoutes(app: Express) {
 
       logger.info(`Company data reset completed for company ${companyId}:`, { results: results });
       res.json({ success: true, results });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Company data reset error:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -414,9 +415,9 @@ export function registerCompanySettingsRoutes(app: Express) {
         message: `Restored ${restoredCount} vouchers`,
         vouchersRestored: restoredCount,
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Undo company reset error:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -490,9 +491,9 @@ export function registerCompanySettingsRoutes(app: Express) {
             pick(posStationCol) > 0,
         },
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("[DeploymentDiag] Error:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -535,13 +536,13 @@ export function registerCompanySettingsRoutes(app: Express) {
           try {
             await client.query(stmt);
             results.push({ sql: label, status: "ok" });
-          } catch (err: any) {
-            results.push({ sql: label, status: "error", error: err.message?.split("\n")[0] });
+          } catch (err: unknown) {
+            results.push({ sql: label, status: "error", error: getErrorMessage(err)?.split("\n")[0] });
           }
         }
         res.json({ success: true, results });
-      } catch (err: any) {
-        res.status(500).json({ success: false, message: err.message, results });
+      } catch (err: unknown) {
+        res.status(500).json({ success: false, message: getErrorMessage(err), results });
       } finally {
         client.release();
       }

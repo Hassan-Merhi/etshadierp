@@ -1,4 +1,5 @@
 import { parseId, parseOptionalId } from "../../lib/parseId";
+import { getErrorMessage } from "../../lib/httpHandlers";
 import type { Express } from "express";
 import { db } from "../../db";
 import { requireAuth } from "../../auth";
@@ -161,8 +162,8 @@ export function registerFactorySheetsRoutes(app: Express) {
         .where(eq(factorySheets.companyId, companyId))
         .orderBy(asc(factorySheets.orderIndex), asc(factorySheets.id));
       res.json(sheets);
-    } catch (err: any) {
-      res.status(500).json({ message: err.message });
+    } catch (err: unknown) {
+      res.status(500).json({ message: getErrorMessage(err) });
     }
   });
 
@@ -193,8 +194,8 @@ export function registerFactorySheetsRoutes(app: Express) {
         .returning();
 
       res.status(201).json(created);
-    } catch (err: any) {
-      res.status(500).json({ message: err.message });
+    } catch (err: unknown) {
+      res.status(500).json({ message: getErrorMessage(err) });
     }
   });
 
@@ -244,8 +245,8 @@ export function registerFactorySheetsRoutes(app: Express) {
       }
 
       res.json(updated);
-    } catch (err: any) {
-      res.status(500).json({ message: err.message });
+    } catch (err: unknown) {
+      res.status(500).json({ message: getErrorMessage(err) });
     }
   });
 
@@ -264,8 +265,8 @@ export function registerFactorySheetsRoutes(app: Express) {
 
       if (!deleted) return res.status(404).json({ message: "Sheet not found" });
       res.json({ ok: true });
-    } catch (err: any) {
-      res.status(500).json({ message: err.message });
+    } catch (err: unknown) {
+      res.status(500).json({ message: getErrorMessage(err) });
     }
   });
 
@@ -384,8 +385,8 @@ export function registerFactorySheetsRoutes(app: Express) {
         .orderBy(asc(factorySheets.orderIndex), asc(factorySheets.id));
 
       res.json(finalSheets);
-    } catch (err: any) {
-      res.status(500).json({ message: err.message });
+    } catch (err: unknown) {
+      res.status(500).json({ message: getErrorMessage(err) });
     }
   });
 
@@ -421,8 +422,8 @@ export function registerFactorySheetsRoutes(app: Express) {
       res.setHeader("Content-Disposition", 'attachment; filename="factory-sheets-template.xlsx"');
       res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
       res.send(buf);
-    } catch (err: any) {
-      res.status(500).json({ message: err.message });
+    } catch (err: unknown) {
+      res.status(500).json({ message: getErrorMessage(err) });
     }
   });
 
@@ -471,8 +472,8 @@ export function registerFactorySheetsRoutes(app: Express) {
       res.setHeader("Content-Disposition", 'attachment; filename="factory-sheets.xlsx"');
       res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
       res.send(buf);
-    } catch (err: any) {
-      res.status(500).json({ message: err.message });
+    } catch (err: unknown) {
+      res.status(500).json({ message: getErrorMessage(err) });
     }
   });
 }

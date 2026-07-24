@@ -14,6 +14,7 @@
  */
 
 import multer from "multer";
+import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
 import { db } from "../../db";
 import { labelDesignColors } from "../../../shared/schema";
@@ -92,8 +93,8 @@ export function registerLabelBannersRoutes(app: any, requireAuth: any) {
         .from(labelDesignColors)
         .orderBy(asc(labelDesignColors.sortOrder), asc(labelDesignColors.createdAt));
       res.json(colors.map((c) => ({ ...c, imageData: undefined, ...rowInfo(c) })));
-    } catch (e: any) {
-      res.status(500).json({ message: e.message });
+    } catch (e: unknown) {
+      res.status(500).json({ message: getErrorMessage(e) });
     }
   });
 
@@ -105,8 +106,8 @@ export function registerLabelBannersRoutes(app: any, requireAuth: any) {
         .from(labelDesignColors)
         .orderBy(asc(labelDesignColors.sortOrder), asc(labelDesignColors.createdAt));
       res.json(colors.map((c) => ({ slot: c.slug, ...rowInfo(c) })));
-    } catch (e: any) {
-      res.status(500).json({ message: e.message });
+    } catch (e: unknown) {
+      res.status(500).json({ message: getErrorMessage(e) });
     }
   });
 
@@ -160,8 +161,8 @@ export function registerLabelBannersRoutes(app: any, requireAuth: any) {
           .returning();
 
         res.json({ ...row, imageData: undefined, ...rowInfo(row) });
-      } catch (e: any) {
-        res.status(500).json({ message: e.message });
+      } catch (e: unknown) {
+        res.status(500).json({ message: getErrorMessage(e) });
       }
     });
   });
@@ -184,8 +185,8 @@ export function registerLabelBannersRoutes(app: any, requireAuth: any) {
         .returning();
       if (!updated) return res.status(404).json({ message: "Color not found" });
       res.json({ ...updated, imageData: undefined, ...rowInfo(updated) });
-    } catch (e: any) {
-      res.status(500).json({ message: e.message });
+    } catch (e: unknown) {
+      res.status(500).json({ message: getErrorMessage(e) });
     }
   });
 
@@ -199,8 +200,8 @@ export function registerLabelBannersRoutes(app: any, requireAuth: any) {
 
       await db.delete(labelDesignColors).where(eq(labelDesignColors.slug, slug));
       res.json({ ok: true });
-    } catch (e: any) {
-      res.status(500).json({ message: e.message });
+    } catch (e: unknown) {
+      res.status(500).json({ message: getErrorMessage(e) });
     }
   });
 
@@ -227,8 +228,8 @@ export function registerLabelBannersRoutes(app: any, requireAuth: any) {
 
         logger.info(`[LabelBanners] "${slug}" updated in DB (${req.file.size} bytes)`);
         res.json({ slot: slug, hasCustom: true, lastModified: imageUpdatedAt.getTime() });
-      } catch (e: any) {
-        res.status(500).json({ message: e.message });
+      } catch (e: unknown) {
+        res.status(500).json({ message: getErrorMessage(e) });
       }
     });
   });
@@ -243,8 +244,8 @@ export function registerLabelBannersRoutes(app: any, requireAuth: any) {
         .where(eq(labelDesignColors.slug, slug));
       logger.info(`[LabelBanners] "${slug}" reverted to default`);
       res.json({ slot: slug, hasCustom: false, lastModified: null });
-    } catch (e: any) {
-      res.status(500).json({ message: e.message });
+    } catch (e: unknown) {
+      res.status(500).json({ message: getErrorMessage(e) });
     }
   });
 }

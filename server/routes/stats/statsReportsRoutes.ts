@@ -1,4 +1,5 @@
 import type { Express } from "express";
+import { getErrorMessage } from "../../lib/httpHandlers";
 import { db } from "../../db";
 import { storage } from "../../storage";
 import { requireAuth, requireRole, canDelete, requireNonPOS, checkPOSLocation } from "../../auth";
@@ -178,8 +179,8 @@ export function registerStatsReportsRoutes(app: Express) {
           stockGroupId: stockGroupId || null,
         },
       });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -277,8 +278,8 @@ export function registerStatsReportsRoutes(app: Express) {
           stockGroupId: stockGroupId || null,
         },
       });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -376,8 +377,8 @@ export function registerStatsReportsRoutes(app: Express) {
           endDate: endDate || null,
         },
       });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -504,8 +505,8 @@ export function registerStatsReportsRoutes(app: Express) {
       };
       _setCached(_ratiosCacheKey, _ratiosResult);
       res.json(_ratiosResult);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -656,8 +657,8 @@ export function registerStatsReportsRoutes(app: Express) {
               : "Closing balances are aggregated across all locations",
         },
       });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -783,8 +784,8 @@ export function registerStatsReportsRoutes(app: Express) {
             }
           : null,
       });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
