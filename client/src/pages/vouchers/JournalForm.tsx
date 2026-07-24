@@ -141,13 +141,13 @@ export function JournalForm({ voucherIdToEdit, isPOS }: JournalFormProps) {
   const [accountPickersNeeded, setAccountPickersNeeded] = useState(() => !!voucherIdToEdit);
   const hydratedVoucherIdRef = useRef<number | null>(null);
 
-  const { data: bankAccounts = [] } = useQuery<BankAccount[]>({
+  const { data: bankAccounts = [], isFetched: bankAccountsFetched } = useQuery<BankAccount[]>({
     queryKey: ["/api/bank-accounts", selectedCompany?.id],
   });
-  const { data: ledgerAccounts = [] } = useQuery<LedgerAccount[]>({
+  const { data: ledgerAccounts = [], isFetched: ledgerAccountsFetched } = useQuery<LedgerAccount[]>({
     queryKey: ["/api/ledger-accounts", selectedCompany?.id],
   });
-  const { data: suppliers = [] } = useQuery<Supplier[]>({
+  const { data: suppliers = [], isFetched: suppliersFetched } = useQuery<Supplier[]>({
     queryKey: ["/api/suppliers", selectedCompany?.id],
     enabled: accountPickersNeeded && !!selectedCompany && !isPropertiesCompany,
     staleTime: 5 * 60 * 1000,
@@ -156,7 +156,7 @@ export function JournalForm({ voucherIdToEdit, isPOS }: JournalFormProps) {
     queryKey: ["/api/factory/suppliers", selectedCompany?.id],
     enabled: isFactoryCompany,
   });
-  const { data: customers = [] } = useQuery<Customer[]>({
+  const { data: customers = [], isFetched: customersFetched } = useQuery<Customer[]>({
     queryKey: ["/api/customers", selectedCompany?.id],
     enabled: accountPickersNeeded && !!selectedCompany,
     staleTime: 5 * 60 * 1000,
@@ -388,13 +388,20 @@ export function JournalForm({ voucherIdToEdit, isPOS }: JournalFormProps) {
       !voucherToEdit ||
       voucherToEdit.voucherType !== "Journal" ||
       !Array.isArray(voucherToEdit.entries) ||
-      voucherToEdit.entries.length === 0 ||
-      allAccounts.length === 0
+      voucherToEdit.entries.length === 0
     )
       return;
     if (hydratedVoucherIdRef.current === voucherToEdit.id) return;
+    // Wait for the always-fetched core lists to settle before looking up names.
+    // Without this the effect fires as soon as any fast list (employees, fixedAssets)
+    // arrives, ledgerAccounts.find() returns undefined, and names are locked blank.
+    if (!ledgerAccountsFetched || !bankAccountsFetched) return;
     const needsFactorySuppliers = voucherToEdit.entries.some((e: any) => e.factorySupplierId);
     if (needsFactorySuppliers && factorySuppliersList.length === 0) return;
+    const needsSuppliers = voucherToEdit.entries.some((e: any) => e.supplierId);
+    if (needsSuppliers && !suppliersFetched) return;
+    const needsCustomers = voucherToEdit.entries.some((e: any) => e.customerId);
+    if (needsCustomers && !customersFetched) return;
 
     const formEntries = voucherToEdit.entries.map((entry: any) => {
       let accountType: "ledger" | "bank" | "supplier" | "employee" | "fixedAsset" | "customer" | "factorySupplier" =
@@ -453,11 +460,15 @@ export function JournalForm({ voucherIdToEdit, isPOS }: JournalFormProps) {
     voucherToEdit,
     allAccounts,
     bankAccounts,
+    bankAccountsFetched,
     ledgerAccounts,
+    ledgerAccountsFetched,
     suppliers,
+    suppliersFetched,
     employees,
     fixedAssets,
     customers,
+    customersFetched,
     factorySuppliersList,
     journalForm,
   ]);

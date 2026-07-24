@@ -16,11 +16,15 @@ interface UseVoucherHydrationProps {
   voucherToEdit: any;
   allAccounts: any[];
   bankAccounts: BankAccount[];
+  bankAccountsFetched: boolean;
   ledgerAccounts: LedgerAccount[];
+  ledgerAccountsFetched: boolean;
   suppliers: Supplier[];
+  suppliersFetched: boolean;
   employees: Employee[];
   fixedAssets: FixedAsset[];
   customers: Customer[];
+  customersFetched: boolean;
   factorySuppliersList: FactorySupplierBasic[];
   form: UseFormReturn<VoucherFormData>;
   setTransactionRate: (rate: number) => void;
@@ -31,11 +35,15 @@ export function useVoucherHydration({
   voucherToEdit,
   allAccounts,
   bankAccounts,
+  bankAccountsFetched,
   ledgerAccounts,
+  ledgerAccountsFetched,
   suppliers,
+  suppliersFetched,
   employees,
   fixedAssets,
   customers,
+  customersFetched,
   factorySuppliersList,
   form,
   setTransactionRate,
@@ -44,10 +52,21 @@ export function useVoucherHydration({
   const hydratedVoucherIdRef = useRef<number | null>(null);
 
   useEffect(() => {
-    if (voucherToEdit && voucherToEdit.entries && allAccounts.length > 0) {
+    if (voucherToEdit && voucherToEdit.entries) {
       if (hydratedVoucherIdRef.current === voucherToEdit.id) return;
+      // Wait until the always-fetched core account lists have settled so that
+      // lookups (e.g. ledgerAccounts.find) don't return undefined just because
+      // those queries haven't resolved yet.  Without this guard the effect can
+      // fire as soon as a fast-loading list (employees, fixedAssets) arrives and
+      // the idempotency ref then blocks re-hydration once the real lists load.
+      if (!ledgerAccountsFetched || !bankAccountsFetched) return;
+      // Per-type guards: only wait for a list when the voucher actually uses it.
       const needsFactorySuppliers = voucherToEdit.entries.some((e: any) => e.factorySupplierId);
       if (needsFactorySuppliers && factorySuppliersList.length === 0) return;
+      const needsSuppliers = voucherToEdit.entries.some((e: any) => e.supplierId);
+      if (needsSuppliers && !suppliersFetched) return;
+      const needsCustomers = voucherToEdit.entries.some((e: any) => e.customerId);
+      if (needsCustomers && !customersFetched) return;
 
       const allEntries = voucherToEdit.entries;
       let paymentEntry: any = null;
@@ -238,11 +257,15 @@ export function useVoucherHydration({
     voucherToEdit,
     allAccounts,
     bankAccounts,
+    bankAccountsFetched,
     ledgerAccounts,
+    ledgerAccountsFetched,
     suppliers,
+    suppliersFetched,
     employees,
     fixedAssets,
     customers,
+    customersFetched,
     factorySuppliersList,
     form,
   ]);

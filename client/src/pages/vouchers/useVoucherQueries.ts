@@ -46,17 +46,17 @@ export function useVoucherQueries({
   const needsStockData =
     isPOS || activeTab === "transfer" || activeTab === "transferorder" || activeTab === "adjustment";
 
-  const { data: bankAccounts = [] } = useQuery<BankAccount[]>({
+  const { data: bankAccounts = [], isFetched: bankAccountsFetched } = useQuery<BankAccount[]>({
     queryKey: ["/api/bank-accounts", selectedCompany?.id],
     enabled: !!selectedCompany?.id,
   });
 
-  const { data: ledgerAccounts = [] } = useQuery<LedgerAccount[]>({
+  const { data: ledgerAccounts = [], isFetched: ledgerAccountsFetched } = useQuery<LedgerAccount[]>({
     queryKey: ["/api/ledger-accounts", selectedCompany?.id],
     enabled: !!selectedCompany?.id,
   });
 
-  const { data: suppliers = [] } = useQuery<Supplier[]>({
+  const { data: suppliers = [], isFetched: suppliersFetched } = useQuery<Supplier[]>({
     queryKey: ["/api/suppliers", selectedCompany?.id],
     enabled: accountPickersNeeded && !!selectedCompany && !isPropertiesCompany,
     staleTime: 5 * 60 * 1000,
@@ -67,7 +67,7 @@ export function useVoucherQueries({
     enabled: isFactoryCompany,
   });
 
-  const { data: customers = [] } = useQuery<Customer[]>({
+  const { data: customers = [], isFetched: customersFetched } = useQuery<Customer[]>({
     queryKey: ["/api/customers", selectedCompany?.id],
     enabled: accountPickersNeeded && !!selectedCompany,
     staleTime: 5 * 60 * 1000,
@@ -208,9 +208,13 @@ export function useVoucherQueries({
 
   return {
     bankAccounts,
+    bankAccountsFetched,
     ledgerAccounts,
+    ledgerAccountsFetched,
     suppliers,
+    suppliersFetched,
     customers,
+    customersFetched,
     employees,
     fixedAssets,
     factorySuppliersList,
