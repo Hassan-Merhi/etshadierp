@@ -1,4 +1,5 @@
 import { parseId, parseOptionalId } from "../../../lib/parseId";
+import { getErrorMessage } from "../../../lib/httpHandlers";
 import { logger } from "../../../lib/logger";
 import { getClientDate } from "../../../lib/dateUtils";
 import type { Express } from "express";
@@ -859,8 +860,8 @@ export function registerSupplierBalanceRoutes(app: Express) {
         outstandingUsd,
         fxUnresolved: balanceFxUnresolved.has(supplierId),
       });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -1467,9 +1468,9 @@ export function registerSupplierBalanceRoutes(app: Express) {
       });
 
       res.json(suppliersWithBalances.sort((a: any, b: any) => a.name.localeCompare(b.name)));
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error fetching factory suppliers with balances:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 }

@@ -1,4 +1,5 @@
 import type { Express } from "express";
+import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
 import { db } from "../../db";
 import { requireAuth } from "../../auth";
@@ -256,9 +257,9 @@ export function registerFactoryStockAllocationV2Routes(app: Express) {
         })),
         productNames: productNamesMap,
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("[V2] stock-allocation error:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -407,9 +408,9 @@ export function registerFactoryStockAllocationV2Routes(app: Express) {
         })),
         productNames: Object.fromEntries(productNameByCode),
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("[V2] loading-mode error:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 }

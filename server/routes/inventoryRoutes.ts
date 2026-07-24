@@ -1,4 +1,5 @@
 import type { Express } from "express";
+import { getErrorMessage } from "../lib/httpHandlers";
 import { logger } from "../lib/logger";
 import { db } from "../db";
 import { storage } from "../storage";
@@ -90,9 +91,9 @@ export function registerInventoryRoutes(app: Express) {
         total,
         totalPages: Math.ceil(total / pageSizeNum),
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Inventory fetch failed", { module: "inventory", action: "getInventory", companyId: req.session.currentCompanyId, error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -204,11 +205,11 @@ export function registerInventoryRoutes(app: Express) {
         newQuantity: result.newQty,
         adjustment: result.adjustedQty,
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Quick adjust error:", { error: error });
       const isBusinessError =
-        error.message?.includes("Cannot subtract") || error.message?.includes("non-existent inventory");
-      res.status(isBusinessError ? 400 : 500).json({ message: error.message });
+        getErrorMessage(error)?.includes("Cannot subtract") || getErrorMessage(error)?.includes("non-existent inventory");
+      res.status(isBusinessError ? 400 : 500).json({ message: getErrorMessage(error) });
     }
   });
 

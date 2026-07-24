@@ -1,4 +1,5 @@
 import type { Express } from "express";
+import { getErrorMessage } from "../../lib/httpHandlers";
 import { db } from "../../db";
 import { requireAuth } from "../../auth";
 import { sql, eq, and, isNull } from "drizzle-orm";
@@ -40,8 +41,8 @@ export function registerSpOffloadRoutes(app: Express) {
       `);
 
       res.json((agents as any).rows ?? agents);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -457,8 +458,8 @@ export function registerSpOffloadRoutes(app: Express) {
       });
 
       res.json(result);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 }

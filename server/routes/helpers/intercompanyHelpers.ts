@@ -1,4 +1,5 @@
 import { db } from "../../db";
+import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
 import {
   intercompanyPosConfigs,
@@ -87,8 +88,8 @@ export async function runIntercompanyPosTransfer(
         `[IntercompanyPOS] Could not find cash account "${cashName}" in company ${config.destCompanyId}. Dest voucher skipped.`
       );
     }
-  } catch (err: any) {
-    logger.error("[IntercompanyPOS] Auto-transfer failed:", { error: err?.message ?? err });
+  } catch (err: unknown) {
+    logger.error("[IntercompanyPOS] Auto-transfer failed:", { error: getErrorMessage(err) ?? err });
   }
 }
 
@@ -162,8 +163,8 @@ export async function recalculateIntercompanyForDate(companyId: number, date: st
         await runIntercompanyPosTransfer(companyId, entry.ledgerAccountId, amount, date);
       }
     }
-  } catch (err: any) {
-    logger.error("[IntercompanyPOS Recalc] Error:", { error: err?.message ?? err });
+  } catch (err: unknown) {
+    logger.error("[IntercompanyPOS Recalc] Error:", { error: getErrorMessage(err) ?? err });
   }
 }
 

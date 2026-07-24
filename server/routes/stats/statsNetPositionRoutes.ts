@@ -1,4 +1,5 @@
 import type { Express } from "express";
+import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
 import { db, pool } from "../../db";
 import { storage } from "../../storage";
@@ -665,9 +666,9 @@ export function registerStatsNetPositionRoutes(app: Express) {
       res.setHeader("Content-Disposition", `attachment; filename="Net_Position_${dateTag}.xlsx"`);
       res.setHeader("Content-Length", xlsBuffer.byteLength);
       res.end(xlsBuffer);
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Net position Excel error:", { error: error });
-      if (!res.headersSent) res.status(500).json({ message: error.message });
+      if (!res.headersSent) res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 

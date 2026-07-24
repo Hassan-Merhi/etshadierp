@@ -11,6 +11,7 @@
  * to API clients — only the safe status/message shapes below.
  */
 import { db } from "../db";
+import { getErrorMessage } from "../lib/httpHandlers";
 import { containers } from "@shared/schema";
 import { eq, and, inArray } from "drizzle-orm";
 import {
@@ -279,14 +280,14 @@ export async function refreshMultipleContainerEtas(
       try {
         const r = await refreshContainerEta(id, opts);
         results.push(r);
-      } catch (err: any) {
+      } catch (err: unknown) {
         results.push({
           containerId: id,
           containerNumber: null,
           status: "error",
           oldEta: null,
           newEta: null,
-          message: err?.message ?? "Refresh failed",
+          message: getErrorMessage(err) ?? "Refresh failed",
         });
       }
     }

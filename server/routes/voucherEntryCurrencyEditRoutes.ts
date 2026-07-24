@@ -1,4 +1,5 @@
 import type { Express } from "express";
+import { getErrorMessage } from "../lib/httpHandlers";
 import { and, eq } from "drizzle-orm";
 import { db } from "../db";
 import { requireAuth } from "../auth";
@@ -128,9 +129,9 @@ export function registerVoucherEntryCurrencyEditRoutes(app: Express) {
       }
 
       return res.json(updated);
-    } catch (error: any) {
-      const status = /rate|required|cannot have both|must have either/i.test(error.message) ? 400 : 500;
-      return res.status(status).json({ message: error.message });
+    } catch (error: unknown) {
+      const status = /rate|required|cannot have both|must have either/i.test(getErrorMessage(error)) ? 400 : 500;
+      return res.status(status).json({ message: getErrorMessage(error) });
     }
   });
 }

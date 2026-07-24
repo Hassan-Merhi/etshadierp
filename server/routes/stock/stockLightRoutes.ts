@@ -1,4 +1,5 @@
 import type { Express } from "express";
+import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
 import { and, asc, eq, isNull } from "drizzle-orm";
 import { stockItems } from "@shared/schema";
@@ -36,10 +37,10 @@ export function registerStockLightRoutes(app: Express) {
         .orderBy(asc(stockItems.name), asc(stockItems.id));
 
       return res.json(rows);
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("[stock-items/light] Failed to load lightweight stock items", {
         companyId: req.session?.currentCompanyId || req.session?.factoryCompanyId || null,
-        error: error?.message || String(error),
+        error: getErrorMessage(error) || String(error),
       });
       return res.status(500).json({ message: "Failed to load stock items" });
     }

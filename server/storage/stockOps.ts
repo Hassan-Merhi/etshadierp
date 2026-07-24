@@ -1,4 +1,5 @@
 import { eq, and, isNull, sql, inArray } from "drizzle-orm";
+import { getErrorMessage } from "../lib/httpHandlers";
 import { db, pool } from "../db";
 import * as schema from "@shared/schema";
 import type { StockTransferItem, StockAdjustmentItem } from "@shared/schema";
@@ -45,8 +46,8 @@ export async function updateCostPricesByBarcode(
           errors.push(`Item not found in inventory for barcode: ${update.barcode}`);
         }
       });
-    } catch (err: any) {
-      errors.push(`Error processing ${update.barcode}: ${err.message}`);
+    } catch (err: unknown) {
+      errors.push(`Error processing ${update.barcode}: ${getErrorMessage(err)}`);
     }
   }
 

@@ -7,6 +7,7 @@
  * cadence via JSONCARGO_REFRESH_HOURS, never expose the API key/raw response.
  */
 import { db } from "../db";
+import { getErrorMessage } from "../lib/httpHandlers";
 import { factoryContainers } from "@shared/schema";
 import { eq, and } from "drizzle-orm";
 import {
@@ -279,14 +280,14 @@ export async function refreshMultipleFactoryContainerEtas(
       try {
         const r = await refreshFactoryContainerEta(id, opts);
         results.push(r);
-      } catch (err: any) {
+      } catch (err: unknown) {
         results.push({
           containerId: id,
           containerNumber: null,
           status: "error",
           oldEta: null,
           newEta: null,
-          message: err?.message ?? "Refresh failed",
+          message: getErrorMessage(err) ?? "Refresh failed",
         });
       }
     }
