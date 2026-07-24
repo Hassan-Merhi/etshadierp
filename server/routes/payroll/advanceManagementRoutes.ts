@@ -1,4 +1,5 @@
 import { parseId, parseOptionalId } from "../../lib/parseId";
+import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
 import { getClientDate } from "../../lib/dateUtils";
 import type { Express } from "express";
@@ -94,8 +95,8 @@ async function findOrCreateLedger(companyId: number, name: string, accountType: 
         .values({ companyId, code: nextCode, name, accountType, active: true, isHidden: false })
         .returning({ id: ledgerAccounts.id });
       return created;
-    } catch (err: any) {
-      if (err?.code === "23505" || err?.message?.includes("unique")) {
+    } catch (err: unknown) {
+      if ((err as { code?: string }).code === "23505" || getErrorMessage(err)?.includes("unique")) {
         const [nowFound] = await db
           .select({ id: ledgerAccounts.id })
           .from(ledgerAccounts)
@@ -264,9 +265,9 @@ export function registerAdvanceManagementRoutes(app: Express) {
       });
 
       res.json({ message: `Reconciliation complete — ${updatedCount} advance record(s) updated` });
-    } catch (e: any) {
+    } catch (e: unknown) {
       logger.error("Advance reconcile error:", { error: e });
-      res.status(500).json({ message: e.message });
+      res.status(500).json({ message: getErrorMessage(e) });
     }
   });
 
@@ -363,9 +364,9 @@ export function registerAdvanceManagementRoutes(app: Express) {
       });
 
       res.json({ message: "Advance deleted" });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error deleting advance:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -423,9 +424,9 @@ export function registerAdvanceManagementRoutes(app: Express) {
       });
 
       res.json({ message: "Advance reversed and restored to outstanding" });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error reversing advance:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -465,9 +466,9 @@ export function registerAdvanceManagementRoutes(app: Express) {
       const unvouchered = allAdvances.filter((a) => !voucheredIds.has(a.id) || a.cashAccountId === null);
 
       res.json(unvouchered);
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error fetching unvouchered advances:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -610,9 +611,9 @@ export function registerAdvanceManagementRoutes(app: Express) {
         posted: result.posted,
         skipped: result.skipped,
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error posting advance accounting:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -795,9 +796,9 @@ export function registerAdvanceManagementRoutes(app: Express) {
         vouchersCreated: result.vouchersCreated,
         vouchersPatched: result.vouchersPatched,
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error bulk-updating advance cash accounts:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -822,9 +823,9 @@ export function registerAdvanceManagementRoutes(app: Express) {
 
       const totalBalance = outstanding.reduce((s: number, a: any) => s + parseFloat(a.remainingBalance || "0"), 0);
       res.json({ totalBalance: totalBalance.toFixed(2), count: outstanding.length });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error fetching advance balance:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 

@@ -1,4 +1,5 @@
 import type { Express } from "express";
+import { getErrorMessage } from "../lib/httpHandlers";
 import { logger } from "../lib/logger";
 import { db } from "../db";
 import { storage } from "../storage";
@@ -184,8 +185,8 @@ export function registerVoucherEntryRoutes(app: Express) {
       });
 
       res.json(transformedEntries);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -496,8 +497,8 @@ export function registerVoucherEntryRoutes(app: Express) {
       }
 
       res.json(entries);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -561,8 +562,8 @@ export function registerVoucherEntryRoutes(app: Express) {
       }
 
       res.json(entry);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -640,8 +641,8 @@ export function registerVoucherEntryRoutes(app: Express) {
       }
 
       res.json(updated);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -968,8 +969,8 @@ export function registerVoucherEntryRoutes(app: Express) {
       });
 
       res.json({ message: "Voucher deleted successfully" });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -1324,8 +1325,8 @@ export function registerVoucherEntryRoutes(app: Express) {
           });
 
           deletedCount++;
-        } catch (err: any) {
-          errors.push(`Failed to delete voucher ${id}: ${err.message}`);
+        } catch (err: unknown) {
+          errors.push(`Failed to delete voucher ${id}: ${getErrorMessage(err)}`);
         }
       }
 
@@ -1334,8 +1335,8 @@ export function registerVoucherEntryRoutes(app: Express) {
         deletedCount,
         errors: errors.length > 0 ? errors : undefined,
       });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -1374,8 +1375,8 @@ export function registerVoucherEntryRoutes(app: Express) {
         .orderBy(desc(vouchers.voucherDate), desc(vouchers.id));
 
       res.json(rows);
-    } catch (e: any) {
-      res.status(500).json({ message: e.message });
+    } catch (e: unknown) {
+      res.status(500).json({ message: getErrorMessage(e) });
     }
   });
 
@@ -1416,9 +1417,9 @@ export function registerVoucherEntryRoutes(app: Express) {
       await db.update(voucherEntries).set({ ledgerAccountId: toAccountId }).where(inArray(voucherEntries.id, entryIds));
 
       res.json({ moved: entryIds.length, toAccount: toAccount.name });
-    } catch (e: any) {
+    } catch (e: unknown) {
       if (e instanceof z.ZodError) return res.status(400).json({ message: e.issues.map((x) => x.message).join(", ") });
-      res.status(500).json({ message: e.message });
+      res.status(500).json({ message: getErrorMessage(e) });
     }
   });
 }

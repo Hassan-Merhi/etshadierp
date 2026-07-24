@@ -11,6 +11,7 @@
  */
 
 import type { Express } from "express";
+import { getErrorMessage } from "../lib/httpHandlers";
 import { db } from "../db";
 import { aiAgentTasks, aiAgentApprovals } from "@shared/schema";
 import { eq, and, desc } from "drizzle-orm";
@@ -160,7 +161,7 @@ async function assertTaskOwner(taskId: number, companyId: number) {
     .where(and(eq(aiAgentTasks.id, taskId), eq(aiAgentTasks.companyId, companyId)));
   if (!task) {
     const err: any = new Error("Task not found");
-    err.status = 404;
+    (err as { status?: number }).status = 404;
     throw err;
   }
   return task;
@@ -247,8 +248,8 @@ export function registerAiAgentRoutes(app: Express) {
           .returning();
 
         res.status(201).json({ ...task, plan });
-      } catch (err: any) {
-        res.status(err.status ?? 500).json({ message: err.status ? err.message : "Internal server error" });
+      } catch (err: unknown) {
+        res.status((err as { status?: number }).status ?? 500).json({ message: (err as { status?: number }).status ? getErrorMessage(err) : "Internal server error" });
       }
     }
   );
@@ -272,7 +273,7 @@ export function registerAiAgentRoutes(app: Express) {
           .limit(50);
 
         res.json(tasks);
-      } catch (err: any) {
+      } catch (err: unknown) {
         res.status(500).json({ message: "Internal server error" });
       }
     }
@@ -301,8 +302,8 @@ export function registerAiAgentRoutes(app: Express) {
           .orderBy(desc(aiAgentApprovals.createdAt));
 
         res.json({ ...task, approvals });
-      } catch (err: any) {
-        res.status(err.status ?? 500).json({ message: err.status ? err.message : "Internal server error" });
+      } catch (err: unknown) {
+        res.status((err as { status?: number }).status ?? 500).json({ message: (err as { status?: number }).status ? getErrorMessage(err) : "Internal server error" });
       }
     }
   );
@@ -395,8 +396,8 @@ export function registerAiAgentRoutes(app: Express) {
           .where(eq(aiAgentTasks.id, taskId));
 
         res.json({ status: newStatus, plan, approvalId });
-      } catch (err: any) {
-        res.status(err.status ?? 500).json({ message: err.status ? err.message : "Internal server error" });
+      } catch (err: unknown) {
+        res.status((err as { status?: number }).status ?? 500).json({ message: (err as { status?: number }).status ? getErrorMessage(err) : "Internal server error" });
       }
     }
   );
@@ -423,8 +424,8 @@ export function registerAiAgentRoutes(app: Express) {
           .where(eq(aiAgentTasks.id, taskId));
 
         res.json({ success: true });
-      } catch (err: any) {
-        res.status(err.status ?? 500).json({ message: err.status ? err.message : "Internal server error" });
+      } catch (err: unknown) {
+        res.status((err as { status?: number }).status ?? 500).json({ message: (err as { status?: number }).status ? getErrorMessage(err) : "Internal server error" });
       }
     }
   );
@@ -513,8 +514,8 @@ export function registerAiAgentRoutes(app: Express) {
           .where(eq(aiAgentTasks.id, approval.taskId));
 
         res.json({ success: true, taskStatus: finalStatus, plan });
-      } catch (err: any) {
-        res.status(err.status ?? 500).json({ message: err.status ? err.message : "Internal server error" });
+      } catch (err: unknown) {
+        res.status((err as { status?: number }).status ?? 500).json({ message: (err as { status?: number }).status ? getErrorMessage(err) : "Internal server error" });
       }
     }
   );
@@ -572,8 +573,8 @@ export function registerAiAgentRoutes(app: Express) {
           .where(eq(aiAgentTasks.id, approval.taskId));
 
         res.json({ success: true, taskStatus: "cancelled" });
-      } catch (err: any) {
-        res.status(err.status ?? 500).json({ message: err.status ? err.message : "Internal server error" });
+      } catch (err: unknown) {
+        res.status((err as { status?: number }).status ?? 500).json({ message: (err as { status?: number }).status ? getErrorMessage(err) : "Internal server error" });
       }
     }
   );

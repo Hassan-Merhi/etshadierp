@@ -1,4 +1,5 @@
 import type { Express, NextFunction, Request, Response } from "express";
+import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
 import { z } from "zod";
 import { eq } from "drizzle-orm";
@@ -159,8 +160,8 @@ export function registerStockTransferRevisionLifecycleRoutes(app: Express) {
               voucherNumber: result.voucherNumber,
               voucherDate: result.voucherDate,
             });
-          } catch (error: any) {
-            logger.error("[RevisedTransferWA] Failed to send safe pending revision:", { error: error.message });
+          } catch (error: unknown) {
+            logger.error("[RevisedTransferWA] Failed to send safe pending revision:", { error: getErrorMessage(error) });
           }
         });
       } catch (error) {

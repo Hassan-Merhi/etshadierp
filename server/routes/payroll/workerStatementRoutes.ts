@@ -1,4 +1,5 @@
 import { parseId, parseOptionalId } from "../../lib/parseId";
+import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
 import { getClientDate } from "../../lib/dateUtils";
 import type { Express } from "express";
@@ -95,8 +96,8 @@ async function findOrCreateLedger(companyId: number, name: string, accountType: 
         .values({ companyId, code: nextCode, name, accountType, active: true, isHidden: false })
         .returning({ id: ledgerAccounts.id });
       return created;
-    } catch (err: any) {
-      if (err?.code === "23505" || err?.message?.includes("unique")) {
+    } catch (err: unknown) {
+      if ((err as { code?: string }).code === "23505" || getErrorMessage(err)?.includes("unique")) {
         const [nowFound] = await db
           .select({ id: ledgerAccounts.id })
           .from(ledgerAccounts)
@@ -226,9 +227,9 @@ export function registerWorkerStatementRoutes(app: Express) {
       });
 
       res.json({ message: "Repayment deleted", restoredBalance: restoredBal.toFixed(2) });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error deleting repayment:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -391,9 +392,9 @@ export function registerWorkerStatementRoutes(app: Express) {
         backfilledPayrollIds: backfilledIds,
         skippedPayrollIds: skipped,
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error backfilling payroll vouchers:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -479,9 +480,9 @@ export function registerWorkerStatementRoutes(app: Express) {
       }
 
       res.json(entries);
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error fetching factory worker statement:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -753,9 +754,9 @@ export function registerWorkerStatementRoutes(app: Express) {
       doc.text(`${fmtAmt(closing)} ${closingSide}`, colX[5] + 2, y + 4, { width: colW[5] - 4, align: "right" });
 
       doc.end();
-    } catch (err: any) {
+    } catch (err: unknown) {
       logger.error("Worker statement PDF error:", { error: err });
-      if (!res.headersSent) res.status(500).json({ message: err.message });
+      if (!res.headersSent) res.status(500).json({ message: getErrorMessage(err) });
     }
   });
 
@@ -795,9 +796,9 @@ export function registerWorkerStatementRoutes(app: Express) {
 
       if (!deleted) return res.status(404).json({ message: "Worker not found" });
       res.json({ message: "Worker deleted successfully" });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error deleting factory worker:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -966,9 +967,9 @@ export function registerWorkerStatementRoutes(app: Express) {
         deletedAdvanceVouchers,
         total: deletedPayrollVouchers + deletedAdvanceVouchers,
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Repair orphaned vouchers error:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 }

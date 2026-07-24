@@ -5,6 +5,7 @@
  */
 
 import { db as globalDb } from "../../db";
+import { getErrorMessage } from "../../lib/httpHandlers";
 import { eq, and, sql, inArray, ne, isNull } from "drizzle-orm";
 import { ledgerAccounts, vouchers, voucherEntries, factoryPayrolls, factoryWorkers } from "@shared/schema";
 import { normalizeVoucherEntryAmounts } from "../../services/accounting/currencyAmounts";
@@ -78,8 +79,8 @@ export async function findOrCreateLedger(
         .values(insertVals)
         .returning({ id: ledgerAccounts.id });
       return created;
-    } catch (err: any) {
-      if (err?.code === "23505" || err?.message?.includes("unique")) {
+    } catch (err: unknown) {
+      if ((err as { code?: string }).code === "23505" || getErrorMessage(err)?.includes("unique")) {
         const [nowFound] = await globalDb
           .select({ id: ledgerAccounts.id })
           .from(ledgerAccounts)

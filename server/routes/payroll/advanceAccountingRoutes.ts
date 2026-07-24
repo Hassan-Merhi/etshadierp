@@ -1,4 +1,5 @@
 import { parseId, parseOptionalId } from "../../lib/parseId";
+import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
 import { getClientDate } from "../../lib/dateUtils";
 import type { Express } from "express";
@@ -94,8 +95,8 @@ async function findOrCreateLedger(companyId: number, name: string, accountType: 
         .values({ companyId, code: nextCode, name, accountType, active: true, isHidden: false })
         .returning({ id: ledgerAccounts.id });
       return created;
-    } catch (err: any) {
-      if (err?.code === "23505" || err?.message?.includes("unique")) {
+    } catch (err: unknown) {
+      if ((err as { code?: string }).code === "23505" || getErrorMessage(err)?.includes("unique")) {
         const [nowFound] = await db
           .select({ id: ledgerAccounts.id })
           .from(ledgerAccounts)
@@ -320,9 +321,9 @@ export function registerAdvanceAccountingRoutes(app: Express) {
       });
 
       res.json(result);
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error in repay-by-month:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -392,9 +393,9 @@ export function registerAdvanceAccountingRoutes(app: Express) {
 
       const balance = openingBal + totalDebit - totalCredit;
       res.json({ accountId, name: acct.name, balance: balance.toFixed(2) });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error fetching account balance:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -483,9 +484,9 @@ export function registerAdvanceAccountingRoutes(app: Express) {
       res.json({
         message: `Cash adjustment posted — ${isCredit ? "CR" : "DR"} ${cashAcct.name} $${amount.toFixed(2)}`,
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error posting cash adjustment:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -600,9 +601,9 @@ export function registerAdvanceAccountingRoutes(app: Express) {
           noRepayment: auditAdvances.filter((a: any) => a.caseType === "no_repayment").length,
         },
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error in repayment-audit:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -832,9 +833,9 @@ export function registerAdvanceAccountingRoutes(app: Express) {
       });
 
       res.json({ message: `Posted ${result} missing repayment voucher(s) successfully.`, posted: result });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error in post-repayment-vouchers:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -862,9 +863,9 @@ export function registerAdvanceAccountingRoutes(app: Express) {
         .orderBy(desc(factoryAdvanceRepayments.repaymentDate));
 
       res.json(repayments);
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error fetching advance repayments:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -1022,9 +1023,9 @@ export function registerAdvanceAccountingRoutes(app: Express) {
       });
 
       res.json(result);
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error recording advance repayment:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -1192,9 +1193,9 @@ export function registerAdvanceAccountingRoutes(app: Express) {
       });
 
       res.json(result);
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error bulk repaying advances:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 }

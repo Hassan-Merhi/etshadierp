@@ -1,4 +1,5 @@
 import type { Express } from "express";
+import { getErrorMessage } from "../lib/httpHandlers";
 import { pool } from "../db";
 import { requireAuth, requireNonPOS } from "../auth";
 import { normalizeOpeningBalanceCurrency } from "../services/accounting/openingBalanceCurrency";
@@ -176,8 +177,8 @@ export function registerOpeningBalanceResolutionRoutes(app: Express) {
           [companyId, companyId],
         );
         return res.json(result.rows);
-      } catch (error: any) {
-        return res.status(500).json({ message: error.message });
+      } catch (error: unknown) {
+        return res.status(500).json({ message: getErrorMessage(error) });
       }
     },
   );
@@ -260,8 +261,8 @@ export function registerOpeningBalanceResolutionRoutes(app: Express) {
         );
 
         return res.json({ entityType, ...result.rows[0] });
-      } catch (error: any) {
-        return res.status(400).json({ message: error.message });
+      } catch (error: unknown) {
+        return res.status(400).json({ message: getErrorMessage(error) });
       }
     },
   );
