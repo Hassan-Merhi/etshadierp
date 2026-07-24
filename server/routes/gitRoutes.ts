@@ -1,4 +1,5 @@
 import type { Express, Request, Response, NextFunction } from "express";
+import { getErrorMessage } from "../lib/httpHandlers";
 import { logger } from "../lib/logger";
 import multer from "multer";
 import path from "path";
@@ -877,9 +878,9 @@ export function registerGitRoutes(app: Express) {
         res.setHeader("Content-Disposition", `attachment; filename="eta_update_${today}.xlsx"`);
         const buf = Buffer.from(await wb.xlsx.writeBuffer());
         res.send(buf);
-      } catch (err: any) {
+      } catch (err: unknown) {
         logger.error("[ETA template]", { error: err });
-        res.status(500).json({ message: err.message });
+        res.status(500).json({ message: getErrorMessage(err) });
       }
     }
   );
@@ -1023,9 +1024,9 @@ export function registerGitRoutes(app: Express) {
         res.setHeader("Content-Disposition", 'attachment; filename="container_import_template.xlsx"');
         const buf = Buffer.from(await wb.xlsx.writeBuffer());
         res.send(buf);
-      } catch (err: any) {
+      } catch (err: unknown) {
         logger.error("[GIT import template]", { error: err });
-        res.status(500).json({ message: err.message });
+        res.status(500).json({ message: getErrorMessage(err) });
       }
     }
   );
@@ -1423,9 +1424,9 @@ export function registerGitRoutes(app: Express) {
         }
 
         res.json({ updated, skipped, notFound, errors, importId: undoChanges.length > 0 ? importId : null });
-      } catch (err: any) {
+      } catch (err: unknown) {
         logger.error("[GIT import excel]", { error: err });
-        res.status(500).json({ message: err.message });
+        res.status(500).json({ message: getErrorMessage(err) });
       }
     }
   );
@@ -1462,9 +1463,9 @@ export function registerGitRoutes(app: Express) {
         importUndoStore.delete(importId);
 
         res.json({ reverted });
-      } catch (err: any) {
+      } catch (err: unknown) {
         logger.error("[GIT import undo]", { error: err });
-        res.status(500).json({ message: err.message });
+        res.status(500).json({ message: getErrorMessage(err) });
       }
     }
   );
@@ -1480,8 +1481,8 @@ export function registerGitRoutes(app: Express) {
         hasCredentials: !!(main?.instanceId && main?.apiToken),
         waEnabled: main?.enabled ?? false,
       });
-    } catch (err: any) {
-      res.status(500).json({ message: err.message });
+    } catch (err: unknown) {
+      res.status(500).json({ message: getErrorMessage(err) });
     }
   });
 
@@ -1497,8 +1498,8 @@ export function registerGitRoutes(app: Express) {
         const { setCompanyTransferWaGroupChatId } = await import("../services/whatsappService");
         await setCompanyTransferWaGroupChatId(companyId, String(groupChatId));
         res.json({ ok: true });
-      } catch (err: any) {
-        res.status(500).json({ message: err.message });
+      } catch (err: unknown) {
+        res.status(500).json({ message: getErrorMessage(err) });
       }
     }
   );
@@ -1514,8 +1515,8 @@ export function registerGitRoutes(app: Express) {
         hasCredentials: !!(main?.instanceId && main?.apiToken),
         waEnabled: main?.enabled ?? false,
       });
-    } catch (err: any) {
-      res.status(500).json({ message: err.message });
+    } catch (err: unknown) {
+      res.status(500).json({ message: getErrorMessage(err) });
     }
   });
 
@@ -1529,8 +1530,8 @@ export function registerGitRoutes(app: Express) {
         const { updateAgentDutyWaGroups } = await import("../services/whatsappService");
         await updateAgentDutyWaGroups(groups);
         res.json({ ok: true });
-      } catch (err: any) {
-        res.status(500).json({ message: err.message });
+      } catch (err: unknown) {
+        res.status(500).json({ message: getErrorMessage(err) });
       }
     }
   );
@@ -1568,9 +1569,9 @@ export function registerGitRoutes(app: Express) {
         const result = await sendWhatsAppFileToChatId(groupChatId, buffer, finalFileName, caption, "image/png");
         if (!result.success) return res.status(500).json({ message: result.error || "Failed to send" });
         res.json({ ok: true, message: `Sent to WhatsApp group for ${agentName}.` });
-      } catch (err: any) {
+      } catch (err: unknown) {
         logger.error("[AgentDutyWA] send error:", { error: err });
-        res.status(500).json({ message: err.message });
+        res.status(500).json({ message: getErrorMessage(err) });
       }
     }
   );
@@ -1589,8 +1590,8 @@ export function registerGitRoutes(app: Express) {
         hasCredentials: !!(main?.instanceId && main?.apiToken),
         waEnabled: main?.enabled ?? false,
       });
-    } catch (err: any) {
-      res.status(500).json({ message: err.message });
+    } catch (err: unknown) {
+      res.status(500).json({ message: getErrorMessage(err) });
     }
   });
 
@@ -1604,8 +1605,8 @@ export function registerGitRoutes(app: Express) {
         const { updateContainersWaSettings } = await import("../services/whatsappService");
         await updateContainersWaSettings(String(groupChatId), Boolean(scheduleEnabled), Number(scheduleHour));
         res.json({ ok: true });
-      } catch (err: any) {
-        res.status(500).json({ message: err.message });
+      } catch (err: unknown) {
+        res.status(500).json({ message: getErrorMessage(err) });
       }
     }
   );
@@ -1694,9 +1695,9 @@ export function registerGitRoutes(app: Express) {
           return res.status(500).json({ message: result.error || "Failed to send" });
         }
         res.json({ ok: true, message: "Sent to WhatsApp group." });
-      } catch (err: any) {
+      } catch (err: unknown) {
         logger.error("[ContainersWA] send error:", { error: err });
-        res.status(500).json({ message: err.message });
+        res.status(500).json({ message: getErrorMessage(err) });
       }
     }
   );
@@ -1711,8 +1712,8 @@ export function registerGitRoutes(app: Express) {
       );
       const note = (row.rows[0] as any)?.note ?? "";
       res.json({ note });
-    } catch (err: any) {
-      res.status(500).json({ message: err.message });
+    } catch (err: unknown) {
+      res.status(500).json({ message: getErrorMessage(err) });
     }
   });
 
@@ -1727,8 +1728,8 @@ export function registerGitRoutes(app: Express) {
             ON CONFLICT (company_id, agent_name) DO UPDATE SET note = ${note}, updated_at = now()`
       );
       res.json({ ok: true, note });
-    } catch (err: any) {
-      res.status(500).json({ message: err.message });
+    } catch (err: unknown) {
+      res.status(500).json({ message: getErrorMessage(err) });
     }
   });
 
@@ -1738,8 +1739,8 @@ export function registerGitRoutes(app: Express) {
       const companyId = parseInt(req.params.companyId, 10);
       const rows = await db.execute(sql`SELECT agent_name, note FROM git_agent_notes WHERE company_id = ${companyId}`);
       res.json({ notes: rows.rows.map((r: any) => ({ agentName: r.agent_name, note: r.note ?? "" })) });
-    } catch (err: any) {
-      res.status(500).json({ message: err.message });
+    } catch (err: unknown) {
+      res.status(500).json({ message: getErrorMessage(err) });
     }
   });
 
@@ -1765,8 +1766,8 @@ export function registerGitRoutes(app: Express) {
         });
       }
       res.json({ byAgent });
-    } catch (err: any) {
-      res.status(500).json({ message: err.message });
+    } catch (err: unknown) {
+      res.status(500).json({ message: getErrorMessage(err) });
     }
   });
 
@@ -1790,8 +1791,8 @@ export function registerGitRoutes(app: Express) {
           createdAt: r.created_at,
         }))
       );
-    } catch (err: any) {
-      res.status(500).json({ message: err.message });
+    } catch (err: unknown) {
+      res.status(500).json({ message: getErrorMessage(err) });
     }
   });
 
@@ -1819,8 +1820,8 @@ export function registerGitRoutes(app: Express) {
         type: r.type,
         createdAt: r.created_at,
       });
-    } catch (err: any) {
-      res.status(500).json({ message: err.message });
+    } catch (err: unknown) {
+      res.status(500).json({ message: getErrorMessage(err) });
     }
   });
 
@@ -1834,8 +1835,8 @@ export function registerGitRoutes(app: Express) {
             WHERE id = ${id} AND company_id = ${companyId} AND agent_name = ${agentName}`
       );
       res.json({ ok: true });
-    } catch (err: any) {
-      res.status(500).json({ message: err.message });
+    } catch (err: unknown) {
+      res.status(500).json({ message: getErrorMessage(err) });
     }
   });
 
@@ -1854,8 +1855,8 @@ export function registerGitRoutes(app: Express) {
             ORDER BY created_at ASC`
       );
       res.json({ designations: (result.rows as any[]).map((r) => ({ containerId: r.container_id })) });
-    } catch (err: any) {
-      res.status(500).json({ message: err.message });
+    } catch (err: unknown) {
+      res.status(500).json({ message: getErrorMessage(err) });
     }
   });
 
@@ -1879,8 +1880,8 @@ export function registerGitRoutes(app: Express) {
         );
       }
       res.json({ ok: true, count: containerIds.length });
-    } catch (err: any) {
-      res.status(500).json({ message: err.message });
+    } catch (err: unknown) {
+      res.status(500).json({ message: getErrorMessage(err) });
     }
   });
 
@@ -1961,8 +1962,8 @@ export function registerGitRoutes(app: Express) {
         ok: true,
         replaced: { from: oldC.container_number, to: newC.container_number },
       });
-    } catch (err: any) {
-      res.status(500).json({ message: err.message });
+    } catch (err: unknown) {
+      res.status(500).json({ message: getErrorMessage(err) });
     }
   });
 }

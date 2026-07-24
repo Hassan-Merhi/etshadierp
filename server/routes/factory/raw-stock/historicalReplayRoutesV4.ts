@@ -1,4 +1,5 @@
 import type { Express } from "express";
+import { getErrorMessage } from "../../../lib/httpHandlers";
 import { logger } from "../../../lib/logger";
 import crypto from "crypto";
 import { requireAuth, requireRole } from "../../../auth";
@@ -355,16 +356,16 @@ export function registerHistoricalReplayRoutesV4(app: Express): void {
         } finally {
           client.release();
         }
-      } catch (error: any) {
+      } catch (error: unknown) {
         const stale = [
           "HISTORICAL_REPLAY_UNDO_STALE",
           "HISTORICAL_REPLAY_UNDO_INVALID",
           "HISTORICAL_REPLAY_UNDO_SCOPE_VIOLATION",
           "HISTORICAL_REPLAY_INVARIANT_VIOLATION",
-        ].includes(error?.code);
-        return res.status(error?.statusCode ?? (stale ? 409 : 500)).json({
-          message: error.message || "Failed to undo historical replay",
-          code: error?.code,
+        ].includes((error as { code?: string }).code ?? "");
+        return res.status((error as { statusCode?: number }).statusCode ?? (stale ? 409 : 500)).json({
+          message: getErrorMessage(error) || "Failed to undo historical replay",
+          code: (error as { code?: string }).code,
         });
       }
     }
@@ -380,9 +381,9 @@ export function registerHistoricalReplayRoutesV4(app: Express): void {
       try {
         const preview = await previewHistoricalCostReplay(companyId);
         res.json(preview);
-      } catch (error: any) {
+      } catch (error: unknown) {
         logger.error("[historical-replay v4 preview] error:", { error: error });
-        res.status(500).json({ message: error.message || "Failed to compute historical replay preview" });
+        res.status(500).json({ message: getErrorMessage(error) || "Failed to compute historical replay preview" });
       }
     }
   );
@@ -497,13 +498,13 @@ export function registerHistoricalReplayRoutesV4(app: Express): void {
         let payload: HistoricalReplayTokenPayload;
         try {
           payload = verifyRepairToken<HistoricalReplayTokenPayload>(providedToken);
-        } catch (error: any) {
+        } catch (error: unknown) {
           if (error instanceof ExpiredRepairTokenError) {
             return res.status(400).json({
               message: "Confirmation token expired — re-run Prepare Historical Replay.",
             });
           }
-          return res.status(400).json({ message: `Invalid confirmation token: ${error.message}` });
+          return res.status(400).json({ message: `Invalid confirmation token: ${getErrorMessage(error)}` });
         }
 
         if (payload.companyId !== companyId) return res.status(400).json({ message: "Token company mismatch" });
@@ -604,16 +605,16 @@ export function registerHistoricalReplayRoutesV4(app: Express): void {
         });
 
         return res.json({ success: true, ...result });
-      } catch (error: any) {
+      } catch (error: unknown) {
         if (
           error instanceof StaleTokenError
-          || error?.code === "STALE_TOKEN"
-          || error?.code === "HISTORICAL_REPLAY_SCOPE_VIOLATION"
-          || error?.code === "HISTORICAL_REPLAY_INVARIANT_VIOLATION"
+          || (error as { code?: string }).code === "STALE_TOKEN"
+          || (error as { code?: string }).code === "HISTORICAL_REPLAY_SCOPE_VIOLATION"
+          || (error as { code?: string }).code === "HISTORICAL_REPLAY_INVARIANT_VIOLATION"
         ) {
           return res.status(409).json({
-            message: error.message,
-            code: error?.code ?? "STALE_TOKEN",
+            message: getErrorMessage(error),
+            code: (error as { code?: string }).code ?? "STALE_TOKEN",
           });
         }
         if (error instanceof RepairTokenConfigurationError) {
@@ -624,7 +625,7 @@ export function registerHistoricalReplayRoutesV4(app: Express): void {
         }
         logger.error("[historical-replay v4 apply] error:", { error: error });
         return res.status(500).json({
-          message: error.message || "Failed to apply historical replay",
+          message: getErrorMessage(error) || "Failed to apply historical replay",
         });
       }
     }

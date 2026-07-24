@@ -1,4 +1,5 @@
 import { getClientDate } from "../../../lib/dateUtils";
+import { getErrorMessage } from "../../../lib/httpHandlers";
 import type { Express } from "express";
 import { db } from "../../../db";
 import { requireAuth } from "../../../auth";
@@ -144,8 +145,8 @@ export function registerEmployeeAdvancesBonusRoutes(app: Express) {
         ORDER BY ea.advance_date DESC, ea.id DESC
       `);
       res.json(result.rows);
-    } catch (err: any) {
-      res.status(500).json({ message: err.message });
+    } catch (err: unknown) {
+      res.status(500).json({ message: getErrorMessage(err) });
     }
   });
 
@@ -171,8 +172,8 @@ export function registerEmployeeAdvancesBonusRoutes(app: Express) {
         RETURNING *
       `);
       res.status(201).json(result.rows[0]);
-    } catch (err: any) {
-      res.status(500).json({ message: err.message });
+    } catch (err: unknown) {
+      res.status(500).json({ message: getErrorMessage(err) });
     }
   });
 
@@ -202,8 +203,8 @@ export function registerEmployeeAdvancesBonusRoutes(app: Express) {
         UPDATE employee_advances SET remaining_balance = ${Math.max(0, remaining).toFixed(2)}, fully_paid = ${fullyPaid} WHERE id = ${advId}
       `);
       res.json({ message: "Repayment recorded", remaining: Math.max(0, remaining).toFixed(2) });
-    } catch (err: any) {
-      res.status(500).json({ message: err.message });
+    } catch (err: unknown) {
+      res.status(500).json({ message: getErrorMessage(err) });
     }
   });
 
@@ -223,8 +224,8 @@ export function registerEmployeeAdvancesBonusRoutes(app: Express) {
         ORDER BY r.repayment_date DESC
       `);
       res.json(result.rows);
-    } catch (err: any) {
-      res.status(500).json({ message: err.message });
+    } catch (err: unknown) {
+      res.status(500).json({ message: getErrorMessage(err) });
     }
   });
 
@@ -239,8 +240,8 @@ export function registerEmployeeAdvancesBonusRoutes(app: Express) {
         sql`DELETE FROM employee_advances WHERE id = ${parseInt(req.params.id)} AND company_id = ${companyId}`
       );
       res.json({ message: "Advance deleted" });
-    } catch (err: any) {
-      res.status(500).json({ message: err.message });
+    } catch (err: unknown) {
+      res.status(500).json({ message: getErrorMessage(err) });
     }
   });
 
@@ -261,8 +262,8 @@ export function registerEmployeeAdvancesBonusRoutes(app: Express) {
         ORDER BY eb.bonus_date DESC, eb.id DESC
       `);
       res.json(result.rows);
-    } catch (err: any) {
-      res.status(500).json({ message: err.message });
+    } catch (err: unknown) {
+      res.status(500).json({ message: getErrorMessage(err) });
     }
   });
 
@@ -344,8 +345,8 @@ export function registerEmployeeAdvancesBonusRoutes(app: Express) {
         RETURNING *
       `);
       res.status(201).json(bonusResult.rows[0]);
-    } catch (err: any) {
-      res.status(500).json({ message: err.message });
+    } catch (err: unknown) {
+      res.status(500).json({ message: getErrorMessage(err) });
     }
   });
 
@@ -377,8 +378,8 @@ export function registerEmployeeAdvancesBonusRoutes(app: Express) {
         sql`DELETE FROM employee_bonuses WHERE id = ${parseInt(req.params.id)} AND company_id = ${companyId}`
       );
       res.json({ message: "Bonus deleted and reversed" });
-    } catch (err: any) {
-      res.status(500).json({ message: err.message });
+    } catch (err: unknown) {
+      res.status(500).json({ message: getErrorMessage(err) });
     }
   });
 
@@ -406,8 +407,8 @@ export function registerEmployeeAdvancesBonusRoutes(app: Express) {
         ORDER BY wb.bonus_date DESC, wb.id DESC
       `);
       res.json(result.rows);
-    } catch (err: any) {
-      res.status(500).json({ message: err.message });
+    } catch (err: unknown) {
+      res.status(500).json({ message: getErrorMessage(err) });
     }
   });
 
@@ -426,8 +427,8 @@ export function registerEmployeeAdvancesBonusRoutes(app: Express) {
         RETURNING *
       `);
       res.status(201).json(result.rows[0]);
-    } catch (err: any) {
-      res.status(500).json({ message: err.message });
+    } catch (err: unknown) {
+      res.status(500).json({ message: getErrorMessage(err) });
     }
   });
 
@@ -515,8 +516,8 @@ export function registerEmployeeAdvancesBonusRoutes(app: Express) {
       });
 
       res.json({ message: "Bonus marked as paid" });
-    } catch (err: any) {
-      res.status(500).json({ message: err.message });
+    } catch (err: unknown) {
+      res.status(500).json({ message: getErrorMessage(err) });
     }
   });
 
@@ -548,8 +549,8 @@ export function registerEmployeeAdvancesBonusRoutes(app: Express) {
       });
 
       res.json({ message: "Bonus deleted and reversed" });
-    } catch (err: any) {
-      res.status(500).json({ message: err.message });
+    } catch (err: unknown) {
+      res.status(500).json({ message: getErrorMessage(err) });
     }
   });
 

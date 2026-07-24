@@ -1,4 +1,5 @@
 import { parseId, parseOptionalId } from "../../lib/parseId";
+import { getErrorMessage } from "../../lib/httpHandlers";
 import type { Express, Request, Response } from "express";
 import { db } from "../../db";
 import { requireAuth } from "../../auth";
@@ -59,8 +60,8 @@ export function registerFactoryTransporterRoutes(app: Express) {
           outstanding: (balances[t.id]?.charged ?? 0) - (balances[t.id]?.paid ?? 0),
         }))
       );
-    } catch (e: any) {
-      res.status(500).json({ message: e.message });
+    } catch (e: unknown) {
+      res.status(500).json({ message: getErrorMessage(e) });
     }
   });
 
@@ -106,8 +107,8 @@ export function registerFactoryTransporterRoutes(app: Express) {
         totalPaid,
         outstanding: totalCharged - totalPaid,
       });
-    } catch (e: any) {
-      res.status(500).json({ message: e.message });
+    } catch (e: unknown) {
+      res.status(500).json({ message: getErrorMessage(e) });
     }
   });
 
@@ -144,10 +145,10 @@ export function registerFactoryTransporterRoutes(app: Express) {
         .returning();
 
       res.json(created);
-    } catch (e: any) {
+    } catch (e: unknown) {
       if (e instanceof z.ZodError)
         return res.status(400).json({ message: e.issues.map((x: any) => x.message).join(", ") });
-      res.status(500).json({ message: e.message });
+      res.status(500).json({ message: getErrorMessage(e) });
     }
   });
 
@@ -174,8 +175,8 @@ export function registerFactoryTransporterRoutes(app: Express) {
         .returning();
 
       res.json(updated);
-    } catch (e: any) {
-      res.status(500).json({ message: e.message });
+    } catch (e: unknown) {
+      res.status(500).json({ message: getErrorMessage(e) });
     }
   });
 
@@ -248,10 +249,10 @@ export function registerFactoryTransporterRoutes(app: Express) {
       });
 
       res.json(tx);
-    } catch (e: any) {
+    } catch (e: unknown) {
       if (e instanceof z.ZodError)
         return res.status(400).json({ message: e.issues.map((x: any) => x.message).join(", ") });
-      res.status(500).json({ message: e.message });
+      res.status(500).json({ message: getErrorMessage(e) });
     }
   });
 
@@ -324,10 +325,10 @@ export function registerFactoryTransporterRoutes(app: Express) {
       });
 
       res.json(tx);
-    } catch (e: any) {
+    } catch (e: unknown) {
       if (e instanceof z.ZodError)
         return res.status(400).json({ message: e.issues.map((x: any) => x.message).join(", ") });
-      res.status(500).json({ message: e.message });
+      res.status(500).json({ message: getErrorMessage(e) });
     }
   });
 
@@ -356,8 +357,8 @@ export function registerFactoryTransporterRoutes(app: Express) {
       });
 
       res.json({ ok: true });
-    } catch (e: any) {
-      res.status(500).json({ message: e.message });
+    } catch (e: unknown) {
+      res.status(500).json({ message: getErrorMessage(e) });
     }
   });
 
@@ -374,8 +375,8 @@ export function registerFactoryTransporterRoutes(app: Express) {
         .orderBy(asc(ledgerAccounts.name));
 
       res.json(accounts);
-    } catch (e: any) {
-      res.status(500).json({ message: e.message });
+    } catch (e: unknown) {
+      res.status(500).json({ message: getErrorMessage(e) });
     }
   });
 }

@@ -7,6 +7,7 @@
  * unchanged.
  */
 import type { Express } from "express";
+import { getErrorMessage } from "../lib/httpHandlers";
 import { logger } from "../lib/logger";
 import { eq, and, desc, inArray, isNull, sql } from "drizzle-orm";
 import { db, pool } from "../db";
@@ -142,8 +143,8 @@ export function registerPayrollRoutes(app: Express) {
         voucher,
         employee: updatedDepositEmployee || employee,
       });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -298,8 +299,8 @@ export function registerPayrollRoutes(app: Express) {
         deposits: updatedResults,
         totalAmount,
       });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -456,8 +457,8 @@ export function registerPayrollRoutes(app: Express) {
         bonuses: updatedBonusResults,
         totalAmount,
       });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -603,8 +604,8 @@ export function registerPayrollRoutes(app: Express) {
         withdrawals: updatedWithdrawResults,
         totalAmount,
       });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -644,9 +645,9 @@ export function registerPayrollRoutes(app: Express) {
         totalQuantity: result[0]?.totalQuantity ?? "0",
         locationName: loc[0]?.name ?? "",
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("[/api/payroll/sales-summary]", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -785,9 +786,9 @@ export function registerPayrollRoutes(app: Express) {
       }
 
       return res.json({ results });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("[/api/payroll/auto-calculate-bonuses]", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -902,8 +903,8 @@ export function registerPayrollRoutes(app: Express) {
         voucher,
         employee: updatedBonusEmployee || employee,
       });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -1000,8 +1001,8 @@ export function registerPayrollRoutes(app: Express) {
         voucher,
         employee: updatedEmployee || employee,
       });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -1083,8 +1084,8 @@ export function registerPayrollRoutes(app: Express) {
         voucher,
         employee,
       });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -1203,8 +1204,8 @@ export function registerPayrollRoutes(app: Express) {
         paymentsProcessed: payments.length,
         totalAmount: totalAmount.toFixed(2),
       });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -1235,8 +1236,8 @@ export function registerPayrollRoutes(app: Express) {
         }))
       );
       res.json({ ...run, items });
-    } catch (e: any) {
-      res.status(500).json({ message: e.message });
+    } catch (e: unknown) {
+      res.status(500).json({ message: getErrorMessage(e) });
     }
   });
 
@@ -1277,8 +1278,8 @@ export function registerPayrollRoutes(app: Express) {
         })
       );
       res.json(result);
-    } catch (e: any) {
-      res.status(500).json({ message: e.message });
+    } catch (e: unknown) {
+      res.status(500).json({ message: getErrorMessage(e) });
     }
   });
 
@@ -1426,7 +1427,7 @@ export function registerPayrollRoutes(app: Express) {
             voucherType: "Payment",
             voucherDate: payDate,
           });
-        } catch (waErr: any) {
+        } catch (waErr: unknown) {
           logger.error("[payroll-wa] WhatsApp trigger error (non-fatal):", { error: waErr });
         }
 
@@ -1461,8 +1462,8 @@ export function registerPayrollRoutes(app: Express) {
       }
 
       res.status(400).json({ message: "Unknown action" });
-    } catch (e: any) {
-      res.status(500).json({ message: e.message });
+    } catch (e: unknown) {
+      res.status(500).json({ message: getErrorMessage(e) });
     }
   });
 
@@ -1481,8 +1482,8 @@ export function registerPayrollRoutes(app: Express) {
       await db.delete(erpPayrollRunItems).where(eq(erpPayrollRunItems.runId, runId));
       await db.delete(erpPayrollRuns).where(eq(erpPayrollRuns.id, runId));
       res.json({ message: "Deleted" });
-    } catch (e: any) {
-      res.status(500).json({ message: e.message });
+    } catch (e: unknown) {
+      res.status(500).json({ message: getErrorMessage(e) });
     }
   });
 
@@ -1564,8 +1565,8 @@ export function registerPayrollRoutes(app: Express) {
       });
 
       res.json({ message: "Payroll run reversed to draft" });
-    } catch (e: any) {
-      res.status(500).json({ message: e.message });
+    } catch (e: unknown) {
+      res.status(500).json({ message: getErrorMessage(e) });
     }
   });
 
@@ -1625,8 +1626,8 @@ export function registerPayrollRoutes(app: Express) {
           : null,
         runs: runDetails,
       });
-    } catch (e: any) {
-      res.status(500).json({ message: e.message });
+    } catch (e: unknown) {
+      res.status(500).json({ message: getErrorMessage(e) });
     }
   });
 
@@ -1924,8 +1925,8 @@ export function registerPayrollRoutes(app: Express) {
         bonusesMigrated,
         bonusesAlreadyCorrect,
       });
-    } catch (e: any) {
-      res.status(500).json({ message: e.message });
+    } catch (e: unknown) {
+      res.status(500).json({ message: getErrorMessage(e) });
     }
   });
 
@@ -1942,8 +1943,8 @@ export function registerPayrollRoutes(app: Express) {
 
       const employeesWithBalances = await storage.getEmployeesWithBalances(req.session.currentCompanyId);
       res.json(employeesWithBalances);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -2007,8 +2008,8 @@ export function registerPayrollRoutes(app: Express) {
         workerPayments,
         grandTotal: grandTotal.toFixed(2),
       });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 

@@ -1,4 +1,5 @@
 import type { Express } from "express";
+import { getErrorMessage } from "../../../lib/httpHandlers";
 import { logger } from "../../../lib/logger";
 import { requireAuth, requireRole } from "../../../auth";
 import { pool } from "../../../db";
@@ -229,11 +230,11 @@ export function registerHistoricalReplayPhase6GuardRoutes(app: Express): void {
         );
         if (financialImpact) preview.financialImpact = financialImpact;
         return res.json(preview);
-      } catch (error: any) {
+      } catch (error: unknown) {
         logger.error("[historical-replay v7 preview] error:", { error: error });
         return res.status(500).json({
-          message: error.message || "Failed to compute Historical Replay preview",
-          code: error.code,
+          message: getErrorMessage(error) || "Failed to compute Historical Replay preview",
+          code: (error as { code?: string }).code,
         });
       }
     }
@@ -334,11 +335,11 @@ export function registerHistoricalReplayPhase6GuardRoutes(app: Express): void {
         );
         await client.query("COMMIT");
         return res.json({ success: true, adjustmentId, valuationBasis });
-      } catch (error: any) {
+      } catch (error: unknown) {
         await client.query("ROLLBACK");
         return res.status(500).json({
-          message: error.message || "Failed to classify adjustment",
-          code: error.code,
+          message: getErrorMessage(error) || "Failed to classify adjustment",
+          code: (error as { code?: string }).code,
         });
       } finally {
         client.release();
@@ -436,10 +437,10 @@ export function registerHistoricalReplayPhase6GuardRoutes(app: Express): void {
         req.body.forceSupplierIds = [];
         req.body.includeFinalizedBales = false;
         return next();
-      } catch (error: any) {
+      } catch (error: unknown) {
         return res.status(500).json({
-          message: error.message || "Failed to validate Historical Replay prepare request",
-          code: error.code,
+          message: getErrorMessage(error) || "Failed to validate Historical Replay prepare request",
+          code: (error as { code?: string }).code,
         });
       }
     }

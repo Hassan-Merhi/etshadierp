@@ -1,4 +1,5 @@
 import type { Express } from "express";
+import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
 import { db, pool } from "../../db";
 import { requireAuth } from "../../auth";
@@ -145,9 +146,9 @@ export function registerFactoryShippingContainerRoutes(app: Express) {
         .orderBy(desc(customerOrders.createdAt));
 
       res.json(rows);
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error fetching available invoices:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -188,8 +189,8 @@ export function registerFactoryShippingContainerRoutes(app: Express) {
       }
 
       res.json({ created: orders.length });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -256,9 +257,9 @@ export function registerFactoryShippingContainerRoutes(app: Express) {
       );
 
       res.json(rows);
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error fetching shipping container rows:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -313,12 +314,12 @@ export function registerFactoryShippingContainerRoutes(app: Express) {
         .returning();
 
       res.status(201).json(newRow);
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error creating shipping container row:", { error: error });
-      if (error.code === "23505") {
+      if ((error as { code?: string }).code === "23505") {
         return res.status(409).json({ message: "This invoice already has a shipping container row" });
       }
-      res.status(400).json({ message: error.message });
+      res.status(400).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -352,9 +353,9 @@ export function registerFactoryShippingContainerRoutes(app: Express) {
         .returning();
 
       res.json(updated);
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error updating shipping container row:", { error: error });
-      res.status(400).json({ message: error.message });
+      res.status(400).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -385,9 +386,9 @@ export function registerFactoryShippingContainerRoutes(app: Express) {
         .returning();
 
       res.json(updated);
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error syncing order fields:", { error: error });
-      res.status(400).json({ message: error.message });
+      res.status(400).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -420,9 +421,9 @@ export function registerFactoryShippingContainerRoutes(app: Express) {
         .returning();
 
       res.json(updated);
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error marking row as done:", { error: error });
-      res.status(400).json({ message: error.message });
+      res.status(400).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -448,9 +449,9 @@ export function registerFactoryShippingContainerRoutes(app: Express) {
         .returning();
 
       res.json(updated);
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error restoring row:", { error: error });
-      res.status(400).json({ message: error.message });
+      res.status(400).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -515,9 +516,9 @@ export function registerFactoryShippingContainerRoutes(app: Express) {
       });
 
       res.json({ ok: true });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error deleting shipping container row:", { error: error });
-      res.status(error.message === "Row not found" ? 404 : 400).json({ message: error.message });
+      res.status(getErrorMessage(error) === "Row not found" ? 404 : 400).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -592,9 +593,9 @@ export function registerFactoryShippingContainerRoutes(app: Express) {
       });
 
       res.json(docs);
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error fetching documents:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -677,9 +678,9 @@ export function registerFactoryShippingContainerRoutes(app: Express) {
       }
 
       res.json({ ...doc, isGhost: false });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error uploading document:", { error: error });
-      res.status(400).json({ message: error.message });
+      res.status(400).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -724,9 +725,9 @@ export function registerFactoryShippingContainerRoutes(app: Express) {
       }
 
       res.json({ success: true, deletedId: docId });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error deleting document:", { error: error });
-      res.status(400).json({ message: error.message });
+      res.status(400).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -782,9 +783,9 @@ export function registerFactoryShippingContainerRoutes(app: Express) {
       const disposition = isInline ? "inline" : "attachment";
       res.setHeader("Content-Disposition", `${disposition}; filename="${safeDownloadName(docRow.originalName)}"`);
       res.send(buffer);
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error serving document:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -834,9 +835,9 @@ export function registerFactoryShippingContainerRoutes(app: Express) {
           .where(eq(factoryShippingContainerRows.id, id));
 
         res.json({ fileUrl, originalName: req.file.originalname, fileType: req.file.mimetype });
-      } catch (error: any) {
+      } catch (error: unknown) {
         logger.error("Error uploading shipping invoice:", { error: error });
-        res.status(500).json({ message: error.message });
+        res.status(500).json({ message: getErrorMessage(error) });
       }
     }
   );
@@ -880,9 +881,9 @@ export function registerFactoryShippingContainerRoutes(app: Express) {
         .where(eq(factoryShippingContainerRows.id, id));
 
       res.json({ ok: true });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error deleting shipping invoice:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -927,9 +928,9 @@ export function registerFactoryShippingContainerRoutes(app: Express) {
       if (row.shippingInvoiceFileType) res.setHeader("Content-Type", row.shippingInvoiceFileType);
       res.setHeader("Content-Disposition", `inline; filename="${safeDownloadName(row.shippingInvoiceOriginalName)}"`);
       res.send(buffer);
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error serving shipping invoice:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -950,9 +951,9 @@ export function registerFactoryShippingContainerRoutes(app: Express) {
 
       const removed = (result as any).rowCount ?? 0;
       res.json({ success: true, removed });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error cleaning up ghost documents:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -970,8 +971,8 @@ export function registerFactoryShippingContainerRoutes(app: Express) {
         .where(eq(factoryShippingAvailability.companyId, companyId))
         .orderBy(desc(factoryShippingAvailability.date));
       res.json(rows);
-    } catch (e: any) {
-      res.status(500).json({ message: e.message });
+    } catch (e: unknown) {
+      res.status(500).json({ message: getErrorMessage(e) });
     }
   });
 
@@ -983,8 +984,8 @@ export function registerFactoryShippingContainerRoutes(app: Express) {
       if (!parsed.success) return res.status(400).json({ message: parsed.error.issues[0]?.message || "Invalid data" });
       const [row] = await db.insert(factoryShippingAvailability).values(parsed.data).returning();
       res.json(row);
-    } catch (e: any) {
-      res.status(500).json({ message: e.message });
+    } catch (e: unknown) {
+      res.status(500).json({ message: getErrorMessage(e) });
     }
   });
 
@@ -1008,8 +1009,8 @@ export function registerFactoryShippingContainerRoutes(app: Express) {
         .returning();
       if (!row) return res.status(404).json({ message: "Not found" });
       res.json(row);
-    } catch (e: any) {
-      res.status(500).json({ message: e.message });
+    } catch (e: unknown) {
+      res.status(500).json({ message: getErrorMessage(e) });
     }
   });
 
@@ -1023,8 +1024,8 @@ export function registerFactoryShippingContainerRoutes(app: Express) {
         .delete(factoryShippingAvailability)
         .where(and(eq(factoryShippingAvailability.id, id), eq(factoryShippingAvailability.companyId, companyId)));
       res.json({ ok: true });
-    } catch (e: any) {
-      res.status(500).json({ message: e.message });
+    } catch (e: unknown) {
+      res.status(500).json({ message: getErrorMessage(e) });
     }
   });
 
@@ -1124,9 +1125,9 @@ export function registerFactoryShippingContainerRoutes(app: Express) {
         defaultMessage,
         whatsappContact: row.customerPhone || null,
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error building WhatsApp preview:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -1269,9 +1270,9 @@ export function registerFactoryShippingContainerRoutes(app: Express) {
       res.setHeader("Content-Disposition", `attachment; filename="${zipFilename}"`);
       res.setHeader("Content-Length", zipBuffer.length);
       res.end(zipBuffer);
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error generating ZIP package:", { error: error });
-      if (!res.headersSent) res.status(500).json({ message: error.message });
+      if (!res.headersSent) res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 }

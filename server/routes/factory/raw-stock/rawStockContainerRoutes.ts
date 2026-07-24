@@ -1,4 +1,5 @@
 import { parseId, parseOptionalId } from "../../../lib/parseId";
+import { getErrorMessage } from "../../../lib/httpHandlers";
 import { logger } from "../../../lib/logger";
 import { getClientDate } from "../../../lib/dateUtils";
 import type { Express } from "express";
@@ -318,9 +319,9 @@ export function registerRawStockContainerRoutes(app: Express) {
       });
 
       res.json({ message: "Duty confirmed and costs recalculated", newCostPerKg: resultCostPerKg });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error confirming duty:", { error: error });
-      res.status((error as any).status || 500).json({ message: error.message });
+      res.status((error as any).status || 500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -399,8 +400,8 @@ export function registerRawStockContainerRoutes(app: Express) {
             txDate,
             companyId,
           });
-        } catch (e: any) {
-          return res.status(400).json({ message: e.message });
+        } catch (e: unknown) {
+          return res.status(400).json({ message: getErrorMessage(e) });
         }
 
         let acctCtx: AccountingContext = { voucherCompanyId: companyId, chargesPayableAcctId: 0 };
@@ -502,9 +503,9 @@ export function registerRawStockContainerRoutes(app: Express) {
         affectedBalesCount: cascadeResult?.affectedBales?.length ?? 0,
         rawStock: newRawStock,
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error adding post-offload charges:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -529,9 +530,9 @@ export function registerRawStockContainerRoutes(app: Express) {
         .orderBy(desc(factoryOffloadAdditionalCharges.createdAt));
 
       res.json(rows);
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error fetching post-offload charge history:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -594,8 +595,8 @@ export function registerRawStockContainerRoutes(app: Express) {
             txDate,
             companyId,
           });
-        } catch (e: any) {
-          return res.status(400).json({ message: e.message });
+        } catch (e: unknown) {
+          return res.status(400).json({ message: getErrorMessage(e) });
         }
 
         let acctCtx: AccountingContext = { voucherCompanyId: companyId, chargesPayableAcctId: 0 };
@@ -644,8 +645,8 @@ export function registerRawStockContainerRoutes(app: Express) {
               accountingCtx: acctCtx,
             });
           });
-        } catch (err: any) {
-          if (err.status === 409) return res.status(409).json({ message: err.message });
+        } catch (err: unknown) {
+          if ((err as { status?: number }).status === 409) return res.status(409).json({ message: getErrorMessage(err) });
           throw err;
         }
 
@@ -666,9 +667,9 @@ export function registerRawStockContainerRoutes(app: Express) {
           affectedBalesCount: mutResult.cascadeResult?.affectedBales?.length ?? 0,
           rawStockRowsUpdated: mutResult.cascadeResult?.rawStockRowsUpdated ?? 0,
         });
-      } catch (error: any) {
+      } catch (error: unknown) {
         logger.error("Error editing post-offload charge:", { error: error });
-        res.status(500).json({ message: error.message });
+        res.status(500).json({ message: getErrorMessage(error) });
       }
     }
   );
@@ -712,8 +713,8 @@ export function registerRawStockContainerRoutes(app: Express) {
               legacyBaselineRate: legacyBaselineRate !== undefined ? parseFloat(legacyBaselineRate) : undefined,
             });
           });
-        } catch (err: any) {
-          if (err.status === 409) return res.status(409).json({ message: err.message });
+        } catch (err: unknown) {
+          if ((err as { status?: number }).status === 409) return res.status(409).json({ message: getErrorMessage(err) });
           throw err;
         }
 
@@ -738,9 +739,9 @@ export function registerRawStockContainerRoutes(app: Express) {
           affectedBalesCount: mutResult.cascadeResult?.affectedBales?.length ?? 0,
           rawStockRowsUpdated: mutResult.cascadeResult?.rawStockRowsUpdated ?? 0,
         });
-      } catch (error: any) {
+      } catch (error: unknown) {
         logger.error("Error undoing post-offload charge:", { error: error });
-        res.status(500).json({ message: error.message });
+        res.status(500).json({ message: getErrorMessage(error) });
       }
     }
   );
@@ -786,8 +787,8 @@ export function registerRawStockContainerRoutes(app: Express) {
               expectedVersion: expectedVersion !== undefined ? parseInt(expectedVersion) : undefined,
             });
           });
-        } catch (err: any) {
-          if (err.status === 409) return res.status(409).json({ message: err.message });
+        } catch (err: unknown) {
+          if ((err as { status?: number }).status === 409) return res.status(409).json({ message: getErrorMessage(err) });
           throw err;
         }
 
@@ -797,9 +798,9 @@ export function registerRawStockContainerRoutes(app: Express) {
           supplierLockedRateOldExact: mutResult.supplierLockedRateBefore,
           supplierLockedRateNewExact: mutResult.supplierLockedRateAfter,
         });
-      } catch (error: any) {
+      } catch (error: unknown) {
         logger.error("Error rebuilding legacy post-offload charge:", { error: error });
-        res.status(500).json({ message: error.message });
+        res.status(500).json({ message: getErrorMessage(error) });
       }
     }
   );
@@ -819,9 +820,9 @@ export function registerRawStockContainerRoutes(app: Express) {
         .orderBy(desc(factoryDutyAuditLog.createdAt));
 
       res.json(logs);
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error fetching duty audit log:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -844,9 +845,9 @@ export function registerRawStockContainerRoutes(app: Express) {
         );
 
       res.json(results);
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error fetching commissions:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 }
