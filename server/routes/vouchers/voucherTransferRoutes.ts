@@ -1,4 +1,5 @@
 import type { Express } from "express";
+import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
 import { db } from "../../db";
 import { storage } from "../../storage";
@@ -405,8 +406,8 @@ export function registerVoucherTransferRoutes(app: Express) {
       }
       logger.info(`[Stock Transfer Edit] Successfully updated voucher ${id}`);
       res.json(updated);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -671,7 +672,7 @@ export function registerVoucherTransferRoutes(app: Express) {
           .update(fde)
           .set({ amountCurrency: newTotal, amountUsd: newTotal })
           .where(and(eq(fde.referenceTable, "vouchers"), eq(fde.referenceId, id)));
-      } catch (error: any) {
+      } catch (error: unknown) {
         // Cleanup: Restore old entries if update failed after deletion
         if (oldEntries.length > 0 && createdEntries.length === 0) {
           for (const oldEntry of oldEntries) {
@@ -757,8 +758,8 @@ export function registerVoucherTransferRoutes(app: Express) {
             }
           }
         }
-      } catch (ictErr: any) {
-        logger.error("[ICT sync] Counterpart update failed (non-fatal):", { error: ictErr?.message });
+      } catch (ictErr: unknown) {
+        logger.error("[ICT sync] Counterpart update failed (non-fatal):", { error: getErrorMessage(ictErr) });
       }
 
       // ── CHARGE voucher sync ──────────────────────────────────────────────
@@ -799,8 +800,8 @@ export function registerVoucherTransferRoutes(app: Express) {
       const result = { voucher: updatedVoucher, entries: createdEntries };
 
       res.json(result);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -913,9 +914,9 @@ export function registerVoucherTransferRoutes(app: Express) {
         salesVoucherCount: salesVouchers.length,
         negativeInventoryFound: negativeInventory.length,
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("[Fix Sales Inventory] Error:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 

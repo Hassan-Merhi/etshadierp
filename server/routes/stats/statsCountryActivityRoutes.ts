@@ -1,4 +1,5 @@
 import type { Express } from "express";
+import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
 import { pool } from "../../db";
 import { requireAuth } from "../../auth";
@@ -155,11 +156,11 @@ export function registerStatsCountryActivityRoutes(app: Express) {
               });
             }
           }
-        } catch (_locErr: any) {
-          logger.error("[country-activity] location breakdown failed (non-fatal):", { error: _locErr.message });
+        } catch (_locErr: unknown) {
+          logger.error("[country-activity] location breakdown failed (non-fatal):", { error: getErrorMessage(_locErr) });
         }
-      } catch (_offloadErr: any) {
-        logger.error("[country-activity] offloads query failed (non-fatal):", { error: _offloadErr.message });
+      } catch (_offloadErr: unknown) {
+        logger.error("[country-activity] offloads query failed (non-fatal):", { error: getErrorMessage(_offloadErr) });
       }
 
       // ── 3. Containers imported per company per day ────────────────────────
@@ -208,8 +209,8 @@ export function registerStatsCountryActivityRoutes(app: Express) {
             }
           }
         }
-      } catch (_poErr: any) {
-        logger.error("[country-activity] containers (imports) query failed (non-fatal):", { error: _poErr.message });
+      } catch (_poErr: unknown) {
+        logger.error("[country-activity] containers (imports) query failed (non-fatal):", { error: getErrorMessage(_poErr) });
       }
 
       // ── 4. Build date spine ──────────────────────────────────────────────
@@ -221,8 +222,8 @@ export function registerStatsCountryActivityRoutes(app: Express) {
           ORDER BY day DESC
         `, [startDateStr, endDateStr]);
         dateSeries = datesResult.rows.map((r) => toDateKey(r.day));
-      } catch (_dsErr: any) {
-        logger.error("[country-activity] generate_series failed, using JS fallback:", { error: _dsErr.message });
+      } catch (_dsErr: unknown) {
+        logger.error("[country-activity] generate_series failed, using JS fallback:", { error: getErrorMessage(_dsErr) });
         const cur = new Date(endDateStr + "T00:00:00");
         const start = new Date(startDateStr + "T00:00:00");
         while (cur >= start) {
@@ -260,9 +261,9 @@ export function registerStatsCountryActivityRoutes(app: Express) {
       });
 
       res.json({ companies: result, days, startDate: startDateStr, endDate: endDateStr, dateSeries });
-    } catch (err: any) {
+    } catch (err: unknown) {
       logger.error("GET /api/stats/country-activity error:", { error: err });
-      res.status(500).json({ message: err.message || "Failed to fetch country activity" });
+      res.status(500).json({ message: getErrorMessage(err) || "Failed to fetch country activity" });
     }
   });
 }

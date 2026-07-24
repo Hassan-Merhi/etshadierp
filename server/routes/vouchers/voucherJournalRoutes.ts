@@ -1,4 +1,5 @@
 import type { Express } from "express";
+import { getErrorMessage } from "../../lib/httpHandlers";
 import { db } from "../../db";
 import { storage } from "../../storage";
 import { isReadonlyMigratedVoucher, READONLY_MIGRATED_VOUCHER_MESSAGE } from "../../lib/migratedVoucherGuard";
@@ -486,7 +487,7 @@ export function registerVoucherJournalRoutes(app: Express) {
             voucherDate: voucherDate,
           });
         }
-      } catch (waErr: any) {
+      } catch (waErr: unknown) {
         logger.error("WhatsApp rule check error (non-fatal):", { error: waErr });
       }
 
@@ -507,10 +508,10 @@ export function registerVoucherJournalRoutes(app: Express) {
       }
       logger.info("journal voucher create succeeded", { module: "vouchers", action: "createJournal", userId: _uid, companyId: _cid, voucherId: result.voucher.id, durationMs: Date.now() - _t });
       res.json({ ...result, whatsapp: waJournalResult });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("journal voucher create failed", { module: "vouchers", action: "createJournal", userId: _uid, companyId: _cid, durationMs: Date.now() - _t, error });
       logger.error("Error creating journal voucher:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -750,8 +751,8 @@ export function registerVoucherJournalRoutes(app: Express) {
             }
           }
         }
-      } catch (ictErr: any) {
-        logger.error("[ICT sync] Counterpart update failed (non-fatal):", { error: ictErr?.message });
+      } catch (ictErr: unknown) {
+        logger.error("[ICT sync] Counterpart update failed (non-fatal):", { error: getErrorMessage(ictErr) });
       }
 
       // WhatsApp rule check — prompt the frontend instead of auto-sending
@@ -779,7 +780,7 @@ export function registerVoucherJournalRoutes(app: Express) {
             voucherDate: voucherDate,
           });
         }
-      } catch (waErr: any) {
+      } catch (waErr: unknown) {
         logger.error("WhatsApp rule check error (non-fatal):", { error: waErr });
       }
 
@@ -818,10 +819,10 @@ export function registerVoucherJournalRoutes(app: Express) {
       }
       logger.info("journal voucher update succeeded", { module: "vouchers", action: "updateJournal", userId: _uid, companyId: _cid, voucherId: result.voucher.id, durationMs: Date.now() - _t });
       res.json({ voucher: result.voucher, entries: result.entries, whatsapp: waJournalPatch });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("journal voucher update failed", { module: "vouchers", action: "updateJournal", userId: _uid, companyId: _cid, durationMs: Date.now() - _t, error });
       logger.error("Error updating journal voucher:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 }

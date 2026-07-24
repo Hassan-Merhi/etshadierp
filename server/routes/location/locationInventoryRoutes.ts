@@ -1,4 +1,5 @@
 import type { Express } from "express";
+import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
 import { db } from "../../db";
 import { storage } from "../../storage";
@@ -51,8 +52,8 @@ export function registerLocationInventoryRoutes(app: Express) {
         .where(and(eq(inventory.locationId, locationId), inArray(inventory.stockItemId, stockItemIds)));
 
       res.json(rows);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -131,9 +132,9 @@ export function registerLocationInventoryRoutes(app: Express) {
       } else {
         res.json(inventory);
       }
-    } catch (error: any) {
-      logger.error(`[inventory] ERROR locationId=${req.params.locationId}:`, { error: error?.message ?? error });
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      logger.error(`[inventory] ERROR locationId=${req.params.locationId}:`, { error: getErrorMessage(error) ?? error });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -205,8 +206,8 @@ export function registerLocationInventoryRoutes(app: Express) {
         contentDisposition(buildSafeFilename([location.name, "inventory", getClientDate(req)], "xlsx"))
       );
       res.send(excelBuffer);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -242,8 +243,8 @@ export function registerLocationInventoryRoutes(app: Express) {
       res.setHeader("Content-Type", "application/pdf");
       res.setHeader("Content-Disposition", `attachment; filename="${fileName}"`);
       res.send(buffer);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -309,8 +310,8 @@ export function registerLocationInventoryRoutes(app: Express) {
         res.setHeader("Content-Type", "application/pdf");
         res.setHeader("Content-Disposition", `attachment; filename="${fileName}"`);
         res.send(buffer);
-      } catch (error: any) {
-        res.status(500).json({ message: error.message });
+      } catch (error: unknown) {
+        res.status(500).json({ message: getErrorMessage(error) });
       }
     }
   );

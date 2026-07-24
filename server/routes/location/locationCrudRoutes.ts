@@ -1,4 +1,5 @@
 import type { Express } from "express";
+import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
 import { db } from "../../db";
 import { storage } from "../../storage";
@@ -18,9 +19,9 @@ export function registerLocationCrudRoutes(app: Express) {
 
       const locations = await storage.getAllLocations(companyId);
       res.json(locations);
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("[/api/locations] Error:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -93,8 +94,8 @@ export function registerLocationCrudRoutes(app: Express) {
         /* non-fatal */
       }
       res.status(201).json(location);
-    } catch (error: any) {
-      res.status(400).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(400).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -119,8 +120,8 @@ export function registerLocationCrudRoutes(app: Express) {
       }
 
       res.json(location);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -175,8 +176,8 @@ export function registerLocationCrudRoutes(app: Express) {
         /* non-fatal */
       }
       res.json(updated);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -219,8 +220,8 @@ export function registerLocationCrudRoutes(app: Express) {
         /* non-fatal */
       }
       res.json({ message: "Location deleted successfully" });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 }

@@ -6,6 +6,7 @@
  * accountRoutes.ts as a sub-registrar; behaviour is unchanged.
  */
 import type { Express } from "express";
+import { getErrorMessage } from "../lib/httpHandlers";
 import { logger } from "../lib/logger";
 import { eq, and, isNull } from "drizzle-orm";
 import { db, pool } from "../db";
@@ -120,8 +121,8 @@ export function registerAccountTransactionRoutes(app: Express) {
         startDate: rawStart ?? null,
         endDate: effectiveEndDate,
       });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -184,8 +185,8 @@ export function registerAccountTransactionRoutes(app: Express) {
         startDate: rawStart ?? null,
         endDate: effectiveEndDate,
       });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -248,8 +249,8 @@ export function registerAccountTransactionRoutes(app: Express) {
         startDate: rawStart ?? null,
         endDate: effectiveEndDate,
       });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -322,8 +323,8 @@ export function registerAccountTransactionRoutes(app: Express) {
         startDate: rawStart ?? null,
         endDate: effectiveEndDate,
       });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -386,8 +387,8 @@ export function registerAccountTransactionRoutes(app: Express) {
         startDate: rawStart ?? null,
         endDate: effectiveEndDate,
       });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -459,8 +460,8 @@ export function registerAccountTransactionRoutes(app: Express) {
         startDate: rawStart ?? null,
         endDate: effectiveEndDate,
       });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 }

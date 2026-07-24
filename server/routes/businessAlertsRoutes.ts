@@ -1,4 +1,5 @@
 import type { Express } from "express";
+import { getErrorMessage } from "../lib/httpHandlers";
 import { pool } from "../db";
 import { requireAuth } from "../auth";
 
@@ -189,8 +190,8 @@ export function registerBusinessAlertRoutes(app: Express) {
       query += ` ORDER BY created_at DESC LIMIT 200`;
       const result = await pool.query(query, params);
       res.json(result.rows);
-    } catch (e: any) {
-      res.status(500).json({ message: e.message });
+    } catch (e: unknown) {
+      res.status(500).json({ message: getErrorMessage(e) });
     }
   });
 
@@ -211,8 +212,8 @@ export function registerBusinessAlertRoutes(app: Express) {
         summary[row.severity] = parseInt(row.count, 10);
       }
       res.json(summary);
-    } catch (e: any) {
-      res.status(500).json({ message: e.message });
+    } catch (e: unknown) {
+      res.status(500).json({ message: getErrorMessage(e) });
     }
   });
 
@@ -227,8 +228,8 @@ export function registerBusinessAlertRoutes(app: Express) {
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       await runAlertChecks(companyId);
       res.json({ ok: true, message: "Alert checks completed" });
-    } catch (e: any) {
-      res.status(500).json({ message: e.message });
+    } catch (e: unknown) {
+      res.status(500).json({ message: getErrorMessage(e) });
     }
   });
 
@@ -246,8 +247,8 @@ export function registerBusinessAlertRoutes(app: Express) {
         [userId, id, companyId]
       );
       res.json({ ok: true });
-    } catch (e: any) {
-      res.status(500).json({ message: e.message });
+    } catch (e: unknown) {
+      res.status(500).json({ message: getErrorMessage(e) });
     }
   });
 
@@ -264,8 +265,8 @@ export function registerBusinessAlertRoutes(app: Express) {
         [id, companyId]
       );
       res.json({ ok: true });
-    } catch (e: any) {
-      res.status(500).json({ message: e.message });
+    } catch (e: unknown) {
+      res.status(500).json({ message: getErrorMessage(e) });
     }
   });
 
@@ -286,8 +287,8 @@ export function registerBusinessAlertRoutes(app: Express) {
         [id, companyId]
       );
       res.json({ ok: true });
-    } catch (e: any) {
-      res.status(500).json({ message: e.message });
+    } catch (e: unknown) {
+      res.status(500).json({ message: getErrorMessage(e) });
     }
   });
 }

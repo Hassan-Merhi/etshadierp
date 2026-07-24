@@ -7,6 +7,7 @@
  * used for mix-batch and bale-export routes; behaviour is unchanged.
  */
 import type { Express } from "express";
+import { getErrorMessage } from "../../lib/httpHandlers";
 import { and, desc, eq } from "drizzle-orm";
 import { db } from "../../db";
 import { requireAuth } from "../../auth";
@@ -29,8 +30,8 @@ export function registerFactoryFxRatesRoutes(app: Express) {
         .where(and(...conditions))
         .orderBy(desc(factoryFxRates.effectiveDate));
       res.json(results);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -43,7 +44,7 @@ export function registerFactoryFxRatesRoutes(app: Express) {
       try {
         const rate = await getOrFetchFxRateToUsd(companyId, currency, today);
         res.json({ rate, effectiveDate: today });
-      } catch (err: any) {
+      } catch (err: unknown) {
         const [fallback] = await db
           .select()
           .from(factoryFxRates)
@@ -53,11 +54,11 @@ export function registerFactoryFxRatesRoutes(app: Express) {
         if (fallback) {
           res.json({ rate: fallback.rateToUsd, effectiveDate: fallback.effectiveDate });
         } else {
-          res.status(404).json({ message: err.message });
+          res.status(404).json({ message: getErrorMessage(err) });
         }
       }
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -72,8 +73,8 @@ export function registerFactoryFxRatesRoutes(app: Express) {
       }
       const rate = await getOrFetchFxRateToUsd(companyId, currency, dateISO);
       res.json({ rate, effectiveDate: dateISO });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -90,8 +91,8 @@ export function registerFactoryFxRatesRoutes(app: Express) {
       });
       const [rate] = await db.insert(factoryFxRates).values(parsed).returning();
       res.json(rate);
-    } catch (error: any) {
-      res.status(400).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(400).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -105,8 +106,8 @@ export function registerFactoryFxRatesRoutes(app: Express) {
         .delete(factoryFxRates)
         .where(and(eq(factoryFxRates.companyId, companyId), eq(factoryFxRates.currencyCode, currency)));
       res.json({ ok: true });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 }

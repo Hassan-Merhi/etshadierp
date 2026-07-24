@@ -1,4 +1,5 @@
 import { parseId, parseOptionalId } from "../lib/parseId";
+import { getErrorMessage } from "../lib/httpHandlers";
 import type { Express } from "express";
 import { eq, and, inArray, gte, lte } from "drizzle-orm";
 import PDFDocument from "pdfkit";
@@ -52,8 +53,8 @@ export function registerFactoryAttendanceRoutes(app: Express, requireAuth: any, 
         );
 
       res.json({ workers, attendance: existing });
-    } catch (err: any) {
-      res.status(500).json({ message: err.message });
+    } catch (err: unknown) {
+      res.status(500).json({ message: getErrorMessage(err) });
     }
   });
 
@@ -105,8 +106,8 @@ export function registerFactoryAttendanceRoutes(app: Express, requireAuth: any, 
       }
 
       res.json({ success: true, count: records.length });
-    } catch (err: any) {
-      res.status(500).json({ message: err.message });
+    } catch (err: unknown) {
+      res.status(500).json({ message: getErrorMessage(err) });
     }
   });
 
@@ -139,8 +140,8 @@ export function registerFactoryAttendanceRoutes(app: Express, requireAuth: any, 
         .orderBy(factoryAttendance.attendanceDate);
 
       res.json(records);
-    } catch (err: any) {
-      res.status(500).json({ message: err.message });
+    } catch (err: unknown) {
+      res.status(500).json({ message: getErrorMessage(err) });
     }
   });
 
@@ -188,8 +189,8 @@ export function registerFactoryAttendanceRoutes(app: Express, requireAuth: any, 
         .orderBy(factoryAttendance.attendanceDate);
 
       res.json({ workers, attendance });
-    } catch (err: any) {
-      res.status(500).json({ message: err.message });
+    } catch (err: unknown) {
+      res.status(500).json({ message: getErrorMessage(err) });
     }
   });
 
@@ -331,8 +332,8 @@ export function registerFactoryAttendanceRoutes(app: Express, requireAuth: any, 
       }
 
       doc.end();
-    } catch (err: any) {
-      if (!res.headersSent) res.status(500).json({ message: err.message });
+    } catch (err: unknown) {
+      if (!res.headersSent) res.status(500).json({ message: getErrorMessage(err) });
     }
   });
 }

@@ -1,4 +1,5 @@
 import type { Express } from "express";
+import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
 import { db } from "../../db";
 import { storage } from "../../storage";
@@ -209,8 +210,8 @@ export function registerVoucherQueryRoutes(app: Express) {
       }
 
       res.json(sanitizedVouchers);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -338,8 +339,8 @@ export function registerVoucherQueryRoutes(app: Express) {
       }
 
       res.json(result); // Already in chronological order
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -376,8 +377,8 @@ export function registerVoucherQueryRoutes(app: Express) {
       }));
 
       res.json(posWithCompanyName);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -427,9 +428,9 @@ export function registerVoucherQueryRoutes(app: Express) {
       }
 
       res.json(filtered);
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Optional vouchers error:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -677,8 +678,8 @@ export function registerVoucherQueryRoutes(app: Express) {
         transferData,
         customerName,
       });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 

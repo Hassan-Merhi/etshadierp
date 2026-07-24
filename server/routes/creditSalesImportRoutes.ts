@@ -6,6 +6,7 @@
  * unchanged.
  */
 import type { Express } from "express";
+import { getErrorMessage } from "../lib/httpHandlers";
 import { logger } from "../lib/logger";
 import { and, desc, eq } from "drizzle-orm";
 import { db } from "../db";
@@ -89,9 +90,9 @@ export function registerCreditSalesImportRoutes(app: Express) {
         totalValue,
         fileName: req.file.originalname,
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Credit Sales Import parse error:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -173,9 +174,9 @@ export function registerCreditSalesImportRoutes(app: Express) {
         warnings,
         validatedItems,
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Credit Sales Import validation error:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -410,8 +411,8 @@ export function registerCreditSalesImportRoutes(app: Express) {
             const invResult = await sendWhatsAppFileByUploadPos(_chatId, pdfBuffer, fileName, "");
             if (!invResult.success) logger.error(`[CreditImport-bg] Invoice send failed: ${invResult.error}`);
             else logger.info(`[CreditImport-bg] Invoice sent: ${fileName} → ${_chatId}`);
-          } catch (e: any) {
-            logger.error("[CreditImport-bg] Invoice send error:", { error: e.message });
+          } catch (e: unknown) {
+            logger.error("[CreditImport-bg] Invoice send error:", { error: getErrorMessage(e) });
           }
 
           // 2. Stock report PDF
@@ -450,14 +451,14 @@ export function registerCreditSalesImportRoutes(app: Express) {
               if (!stockRes.success) logger.error(`[CreditImport-bg] Stock send failed: ${stockRes.error}`);
               else logger.info(`[CreditImport-bg] Stock report sent: ${stockName}.pdf → ${_chatId}`);
             }
-          } catch (e: any) {
-            logger.error("[CreditImport-bg] Stock send error:", { error: e.message });
+          } catch (e: unknown) {
+            logger.error("[CreditImport-bg] Stock send error:", { error: getErrorMessage(e) });
           }
         });
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Credit Sales Import error:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -490,9 +491,9 @@ export function registerCreditSalesImportRoutes(app: Express) {
       res.setHeader("Content-Disposition", "attachment; filename=Credit_Sales_Import_Template.xlsx");
       res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
       res.send(buffer);
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Template generation error:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 }

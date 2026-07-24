@@ -1,4 +1,5 @@
 import { trackOneContainerById } from "../../../services/containerTrackingService";
+import { getErrorMessage } from "../../../lib/httpHandlers";
 import { parseId, parseOptionalId } from "../../../lib/parseId";
 import { dispatchNotification } from "../../../lib/notificationService";
 import { getClientDate } from "../../../lib/dateUtils";
@@ -474,9 +475,9 @@ export function registerOrderVerifyRecoverRoutes(app: Express) {
         totalLoadedWeight: Object.values(loadedByArticle).reduce((s, g) => s + g.totalWeight, 0),
         dataSource,
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error fetching verification summary:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -626,9 +627,9 @@ export function registerOrderVerifyRecoverRoutes(app: Express) {
         linked,
         notFound,
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error recovering bales:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -734,9 +735,9 @@ export function registerOrderVerifyRecoverRoutes(app: Express) {
 
       logger.info(`[auto-recover-bales] orderId=${orderId} totalLinked=${totalLinked}`);
       res.json({ message: `${totalLinked} bale(s) auto-linked from stock`, linked: totalLinked, summary });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error auto-recovering bales:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -836,8 +837,8 @@ export function registerOrderVerifyRecoverRoutes(app: Express) {
             logger.info(
               `[verify-whatsapp] Sent Excel invoice ${fileName} to ${loc.whatsappGroupChatId} for order #${orderId}`
             );
-          } catch (e: any) {
-            logger.error("[verify-whatsapp] Failed to send Excel to WhatsApp:", { error: e.message });
+          } catch (e: unknown) {
+            logger.error("[verify-whatsapp] Failed to send Excel to WhatsApp:", { error: getErrorMessage(e) });
           }
         });
       } else {
@@ -851,9 +852,9 @@ export function registerOrderVerifyRecoverRoutes(app: Express) {
           .returning();
         res.json(updated);
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error verifying order:", { error: error });
-      res.status(400).json({ message: error.message });
+      res.status(400).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -912,9 +913,9 @@ export function registerOrderVerifyRecoverRoutes(app: Express) {
       }
 
       res.json(updated);
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error returning order to loading:", { error: error });
-      res.status(400).json({ message: error.message });
+      res.status(400).json({ message: getErrorMessage(error) });
     }
   });
 

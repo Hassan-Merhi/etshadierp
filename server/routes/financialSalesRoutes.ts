@@ -6,6 +6,7 @@
  * fiscalTransferRoutes.ts as a sub-registrar; behaviour is unchanged.
  */
 import type { Express } from "express";
+import { getErrorMessage } from "../lib/httpHandlers";
 import { eq, and, inArray, isNull, sql } from "drizzle-orm";
 import { db } from "../db";
 import { storage } from "../storage";
@@ -95,8 +96,8 @@ export function registerFinancialSalesRoutes(app: Express) {
       );
 
       res.json(closure);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -109,8 +110,8 @@ export function registerFinancialSalesRoutes(app: Express) {
 
       const closures = await storage.getFiscalPeriodClosures(req.session.currentCompanyId);
       res.json(closures);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -216,8 +217,8 @@ export function registerFinancialSalesRoutes(app: Express) {
       }
 
       res.json(Array.from(salesByLocation.values()));
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -278,8 +279,8 @@ export function registerFinancialSalesRoutes(app: Express) {
         totalAmount,
         totalTransactions: salesVouchers.length,
       });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -408,8 +409,8 @@ export function registerFinancialSalesRoutes(app: Express) {
         });
 
         res.json(transactions);
-      } catch (error: any) {
-        res.status(500).json({ message: error.message });
+      } catch (error: unknown) {
+        res.status(500).json({ message: getErrorMessage(error) });
       }
     }
   );

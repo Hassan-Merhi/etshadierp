@@ -1,4 +1,5 @@
 import type { Express } from "express";
+import { getErrorMessage } from "../lib/httpHandlers";
 import { logger } from "../lib/logger";
 import { db, pool } from "../db";
 import { storage } from "../storage";
@@ -858,8 +859,8 @@ export function registerReportsRoutes(app: Express) {
       };
       _npsSetCache(npsCacheKey, npsResult);
       res.json(npsResult);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -1010,8 +1011,8 @@ export function registerReportsRoutes(app: Express) {
           endDate: end.toISOString().split("T")[0],
         },
       });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -1185,8 +1186,8 @@ export function registerReportsRoutes(app: Express) {
         totals,
         closingBalance,
       });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -1381,8 +1382,8 @@ export function registerReportsRoutes(app: Express) {
           credit: entriesCredit,
         },
       });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -1615,9 +1616,9 @@ export function registerReportsRoutes(app: Express) {
         byTransporter,
         totals: { count: otwContainers.length, amount: totalAmount, totalItems },
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Dashboard container tracking error:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 

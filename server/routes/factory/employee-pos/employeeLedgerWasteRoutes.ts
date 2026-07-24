@@ -1,4 +1,5 @@
 import { getClientDate } from "../../../lib/dateUtils";
+import { getErrorMessage } from "../../../lib/httpHandlers";
 import { logger } from "../../../lib/logger";
 import type { Express } from "express";
 import { db } from "../../../db";
@@ -375,9 +376,9 @@ export function registerEmployeeLedgerWasteRoutes(app: Express) {
           grand: sumBucket([...currentStock, ...wasteStock, ...sold, ...wasteDispatched, ...pendingLoading]),
         },
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error fetching bale ledger:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -500,9 +501,9 @@ export function registerEmployeeLedgerWasteRoutes(app: Express) {
         }));
 
       res.json({ baleDetails: details });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error fetching bale ledger details:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -609,9 +610,9 @@ export function registerEmployeeLedgerWasteRoutes(app: Express) {
         : enriched;
 
       res.json({ bales: filtered, categories: wasteCategories });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error fetching waste bales:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -656,9 +657,9 @@ export function registerEmployeeLedgerWasteRoutes(app: Express) {
           bales: balesByDispatch.get(d.id) || [],
         }))
       );
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error fetching waste dispatch history:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -723,9 +724,9 @@ export function registerEmployeeLedgerWasteRoutes(app: Express) {
       });
 
       res.json({ message: "Waste dispatch deleted and bales restored to stock", restoredBales: bales.length });
-    } catch (error: any) {
-      logger.error("[Waste Dispatch DELETE]", { error: error.message });
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      logger.error("[Waste Dispatch DELETE]", { error: getErrorMessage(error) });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -856,9 +857,9 @@ export function registerEmployeeLedgerWasteRoutes(app: Express) {
           totalCost: parseFloat(b.totalCost as string) || 0,
         })),
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error submitting waste dispatch:", { error: error });
-      res.status(400).json({ message: error.message });
+      res.status(400).json({ message: getErrorMessage(error) });
     }
   });
 
