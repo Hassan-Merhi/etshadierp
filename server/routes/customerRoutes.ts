@@ -1,4 +1,5 @@
 import type { Express } from "express";
+import { getErrorMessage } from "../lib/httpHandlers";
 import { db } from "../db";
 import { storage } from "../storage";
 import { requireAuth, requireRole, canDelete, requireNonPOS, checkPOSLocation } from "../auth";
@@ -79,8 +80,8 @@ export function registerCustomerRoutes(app: Express) {
       }
       const list = await storage.getAllCustomers(req.session.currentCompanyId);
       res.json(list.map((c: any) => ({ id: c.id, legalName: c.legalName })));
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -93,8 +94,8 @@ export function registerCustomerRoutes(app: Express) {
       const limit = search ? 50 : undefined;
       const result = await storage.getAllCustomers(req.session.currentCompanyId, search, limit);
       res.json(result);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -249,8 +250,8 @@ export function registerCustomerRoutes(app: Express) {
       });
 
       res.json(customersWithBalances);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -286,8 +287,8 @@ export function registerCustomerRoutes(app: Express) {
       }
 
       res.json(transactions);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -311,8 +312,8 @@ export function registerCustomerRoutes(app: Express) {
       }
 
       res.json(customer);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -396,8 +397,8 @@ export function registerCustomerRoutes(app: Express) {
       }
 
       res.status(201).json(customer);
-    } catch (error: any) {
-      res.status(400).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(400).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -485,8 +486,8 @@ export function registerCustomerRoutes(app: Express) {
       }
 
       res.json(updatedCustomer);
-    } catch (error: any) {
-      res.status(400).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(400).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -526,8 +527,8 @@ export function registerCustomerRoutes(app: Express) {
         /* non-fatal */
       }
       res.status(204).send();
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -539,8 +540,8 @@ export function registerCustomerRoutes(app: Express) {
       }
       const sales = await storage.getContainerSales(req.session.currentCompanyId);
       res.json(sales);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -553,8 +554,8 @@ export function registerCustomerRoutes(app: Express) {
 
       const sales = await storage.getContainerSalesByCustomer(customerId, req.session.currentCompanyId!);
       res.json(sales);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -677,8 +678,8 @@ export function registerCustomerRoutes(app: Express) {
       });
 
       res.status(201).json(sale);
-    } catch (error: any) {
-      res.status(400).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(400).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -691,8 +692,8 @@ export function registerCustomerRoutes(app: Express) {
       // Get all transfers where current company is either sender or receiver
       const transfers = await storage.getAllInterCompanyTransfers(req.session.currentCompanyId);
       res.json(transfers);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -825,8 +826,8 @@ export function registerCustomerRoutes(app: Express) {
       });
 
       res.status(201).json(transfer);
-    } catch (error: any) {
-      res.status(400).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(400).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -848,8 +849,8 @@ export function registerCustomerRoutes(app: Express) {
       }
       const accounts = await storage.getAllLedgerAccounts(companyId, true);
       res.json(accounts);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -891,8 +892,8 @@ export function registerCustomerRoutes(app: Express) {
       }));
 
       res.json(enriched);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -1029,8 +1030,8 @@ export function registerCustomerRoutes(app: Express) {
         .returning();
 
       res.status(201).json(transfer);
-    } catch (error: any) {
-      res.status(400).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(400).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -1063,8 +1064,8 @@ export function registerCustomerRoutes(app: Express) {
       await db.delete(interCompanyTransfers).where(eq(interCompanyTransfers.id, id));
 
       res.json({ success: true });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 }

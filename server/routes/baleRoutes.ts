@@ -1,4 +1,5 @@
 import type { Express } from "express";
+import { getErrorMessage } from "../lib/httpHandlers";
 import { logger } from "../lib/logger";
 import { db } from "../db";
 import { storage } from "../storage";
@@ -45,9 +46,9 @@ export function registerBaleRoutes(app: Express) {
 
       const bales = await storage.getAllBales(companyId);
       res.json(bales);
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error fetching bales:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -72,9 +73,9 @@ export function registerBaleRoutes(app: Express) {
       }
 
       res.json(bale);
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error fetching bale:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -93,9 +94,9 @@ export function registerBaleRoutes(app: Express) {
       }
 
       res.json(bale);
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error fetching bale by barcode:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -115,9 +116,9 @@ export function registerBaleRoutes(app: Express) {
 
       const bale = await storage.createBale(data);
       res.json(bale);
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error creating bale:", { error: error });
-      res.status(400).json({ message: error.message });
+      res.status(400).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -145,9 +146,9 @@ export function registerBaleRoutes(app: Express) {
       const { companyId: _, ...updateData } = req.body;
       const bale = await storage.updateBale(id, updateData);
       res.json(bale);
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error updating bale:", { error: error });
-      res.status(400).json({ message: error.message });
+      res.status(400).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -173,9 +174,9 @@ export function registerBaleRoutes(app: Express) {
 
       await storage.deleteBale(id);
       res.json({ success: true });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error deleting bale:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -195,9 +196,9 @@ export function registerBaleRoutes(app: Express) {
 
       const created = await storage.bulkCreateBales(validatedBales);
       res.json({ success: true, count: created.length, bales: created });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error importing bales:", { error: error });
-      res.status(400).json({ message: error.message });
+      res.status(400).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -236,9 +237,9 @@ export function registerBaleRoutes(app: Express) {
       );
 
       res.json({ preview });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error in price-import preview:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -264,9 +265,9 @@ export function registerBaleRoutes(app: Express) {
       }
 
       res.json({ success: true, updated });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error in price-import apply:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -324,9 +325,9 @@ export function registerBaleRoutes(app: Express) {
         return result;
       });
       res.json({ refs });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error allocating label ref pool:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -393,9 +394,9 @@ export function registerBaleRoutes(app: Express) {
       });
 
       res.json({ labelPrints });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error creating bale label prints:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -435,8 +436,8 @@ export function registerBaleRoutes(app: Express) {
         }
       }
       res.json({ success: true, printedAt: new Date().toISOString() });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -456,9 +457,9 @@ export function registerBaleRoutes(app: Express) {
         storage.getCompanySettings(companyId).then((s) => s || { companyId })
       );
       res.json(settings);
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error fetching company settings:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -474,9 +475,9 @@ export function registerBaleRoutes(app: Express) {
       const settings = await storage.upsertCompanySettings(data);
       cache.del(`company_settings:${companyId}`);
       res.json(settings);
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error updating company settings:", { error: error });
-      res.status(400).json({ message: error.message });
+      res.status(400).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -502,9 +503,9 @@ export function registerBaleRoutes(app: Express) {
 
       const balance = await storage.getCustomerBalance(customerId, companyId);
       res.json({ customerId, balance });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error fetching customer balance:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -525,9 +526,9 @@ export function registerBaleRoutes(app: Express) {
 
       const statement = await storage.getCustomerStatement(customerId, companyId, startDate, endDate);
       res.json(statement);
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error fetching customer statement:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -559,8 +560,8 @@ export function registerBaleRoutes(app: Express) {
       const sanitizedItems = isPOS ? items.map(({ averageRate, ...rest }) => rest) : items;
 
       res.json(sanitizedItems);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -585,8 +586,8 @@ export function registerBaleRoutes(app: Express) {
           totalCost: b.totalCost,
         }))
       );
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
