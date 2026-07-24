@@ -22,6 +22,7 @@
  */
 
 import { db } from "../../db";
+import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
 import { pool } from "../../db";
 import {
@@ -716,10 +717,10 @@ export async function postDueScheduledRentalPayments(
         shopExpenseAccountName, incomeAccountName, isShared
       );
       if (didPost) posted++;
-    } catch (err: any) {
+    } catch (err: unknown) {
       logger.error(
         `[rentalPostingService] Failed to post group ${row.payment_group_id}:`,
-        err.message?.split("\n")[0]
+        { error: getErrorMessage(err).split("\n")[0] }
       );
     }
   }
@@ -843,8 +844,8 @@ async function postScheduledGroup(
         new Decimal(totalAmount).toFixed(2), paymentDate, unitLabel, firstRow.id, notes ?? undefined
       );
     }
-  } catch (e: any) {
-    logger.warn("[rentalPostingService] auto-transfer failed:", e.message?.split("\n")[0]);
+  } catch (e: unknown) {
+    logger.warn("[rentalPostingService] auto-transfer failed:", { error: getErrorMessage(e).split("\n")[0] });
   }
 
   return true;

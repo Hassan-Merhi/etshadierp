@@ -5,6 +5,7 @@
  * from fiscalTransferRoutes.ts as a sub-registrar; behaviour is unchanged.
  */
 import type { Express } from "express";
+import { getErrorMessage } from "../lib/httpHandlers";
 import { eq, and, desc, sql } from "drizzle-orm";
 import { db } from "../db";
 import { storage } from "../storage";
@@ -31,9 +32,9 @@ export function registerStockAdjustmentWasteRoutes(app: Express) {
 
       const adjustment = await storage.getStockAdjustmentByVoucherId(voucherId);
       res.json(adjustment);
-    } catch (error: any) {
-      logger.error("[Stock Adjustment GET] Error:", { error: error.message });
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      logger.error("[Stock Adjustment GET] Error:", { error: getErrorMessage(error) });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -96,9 +97,9 @@ export function registerStockAdjustmentWasteRoutes(app: Express) {
 
       logger.info("stock adjustment create succeeded", { module: "stockAdjustment", action: "create", userId: _uid, companyId: _cid, durationMs: Date.now() - _t, adjustmentId: adjustment.adjustment.id });
       res.status(201).json(adjustment);
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("stock adjustment create failed", { module: "stockAdjustment", action: "create", userId: _uid, companyId: _cid, durationMs: Date.now() - _t, error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -145,9 +146,9 @@ export function registerStockAdjustmentWasteRoutes(app: Express) {
         .where(eq(vouchers.id, updated.adjustment.voucherId));
 
       res.json(updated);
-    } catch (error: any) {
-      logger.error("[Stock Adjustment PUT] Error:", { error: error.message });
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      logger.error("[Stock Adjustment PUT] Error:", { error: getErrorMessage(error) });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -177,8 +178,8 @@ export function registerStockAdjustmentWasteRoutes(app: Express) {
         .orderBy(desc(wasteDispatches.createdAt));
 
       res.json(dispatches);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -222,8 +223,8 @@ export function registerStockAdjustmentWasteRoutes(app: Express) {
         .where(eq(wasteDispatchItems.dispatchId, id));
 
       res.json({ ...dispatch, items });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -325,9 +326,9 @@ export function registerStockAdjustmentWasteRoutes(app: Express) {
       }
 
       res.json({ ...dispatch, voucherNumber: dispatchNumber });
-    } catch (error: any) {
-      logger.error("[Waste Dispatch POST] Error:", { error: error.message });
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      logger.error("[Waste Dispatch POST] Error:", { error: getErrorMessage(error) });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -354,9 +355,9 @@ export function registerStockAdjustmentWasteRoutes(app: Express) {
       await db.delete(wasteDispatches).where(eq(wasteDispatches.id, id));
 
       res.json({ message: "Waste dispatch deleted and inventory reversed" });
-    } catch (error: any) {
-      logger.error("[Waste Dispatch DELETE] Error:", { error: error.message });
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      logger.error("[Waste Dispatch DELETE] Error:", { error: getErrorMessage(error) });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 }

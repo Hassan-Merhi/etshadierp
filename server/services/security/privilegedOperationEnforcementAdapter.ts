@@ -118,7 +118,7 @@ export function requirePrivilegedOperation(options: PrivilegedRouteOptions) {
       });
       await recordPrivilegedDecision(req, options, "allowed", "AUTHORIZED");
       return next();
-    } catch (error: any) {
+    } catch (error: unknown) {
       if (error instanceof PrivilegedOperationError || error instanceof AuthorizationDeniedError) {
         try {
           await recordPrivilegedDecision(req, options, "denied", error.code);

@@ -1,4 +1,5 @@
 import express, { type Request, Response, NextFunction } from "express";
+import { getErrorMessage } from "./lib/httpHandlers";
 import compression from "compression";
 import helmet from "helmet";
 import session from "express-session";
@@ -557,9 +558,9 @@ END $mig$`;
       for (const migration of migrations) {
         try {
           await migrationClient.query(safeMigration(migration));
-        } catch (err: any) {
-          const errMsg: string = err.message ?? String(err);
-          const errCode: string = err.code ?? "";
+        } catch (err: unknown) {
+          const errMsg: string = getErrorMessage(err) ?? String(err);
+          const errCode: string = (err as { code?: string }).code ?? "";
           // PG connection-drop codes: 57P01 admin_shutdown, 08006 connection_failure,
           // 08003 connection_does_not_exist, 08001 unable_to_connect
           const isConnDrop =
@@ -584,8 +585,8 @@ END $mig$`;
               await migrationClient.query(`SET statement_timeout = '120s'`);
               await migrationClient.query(safeMigration(migration));
               logger.info(`[Migration] Reconnected and retried successfully`);
-            } catch (retryErr: any) {
-              const retryMsg: string = retryErr.message ?? String(retryErr);
+            } catch (retryErr: unknown) {
+              const retryMsg: string = getErrorMessage(retryErr) ?? String(retryErr);
               failedMigrations.push({
                 sql: migration.trim().substring(0, 120),
                 error: retryMsg.split("\n")[0],
@@ -600,8 +601,8 @@ END $mig$`;
             try {
               await migrationClient.query(safeMigration(migration));
               logger.info(`[Migration] Lock-timeout retry succeeded`);
-            } catch (retryErr: any) {
-              const retryMsg: string = retryErr.message ?? String(retryErr);
+            } catch (retryErr: unknown) {
+              const retryMsg: string = getErrorMessage(retryErr) ?? String(retryErr);
               failedMigrations.push({
                 sql: migration.trim().substring(0, 120),
                 error: `lock-timeout retry failed: ${retryMsg.split("\n")[0]}`,
@@ -650,8 +651,8 @@ END $mig$`;
               `IC notification feature will not work. Run the CREATE TABLE statements manually.`
           );
         }
-      } catch (tableCheckErr: any) {
-        logger.error(`[Migration] ✗ Could not verify IC table existence: ${tableCheckErr.message}`);
+      } catch (tableCheckErr: unknown) {
+        logger.error(`[Migration] ✗ Could not verify IC table existence: ${getErrorMessage(tableCheckErr)}`);
       }
 
       // Backfill POS_EXPENSE daybook entries for any factory POS sales
@@ -882,8 +883,8 @@ END $mig$`;
         }
 
         logger.info("[RentalFix] Rental overpayment fix complete");
-      } catch (e: any) {
-        logger.error("[RentalFix] Migration error:", { error: e.message });
+      } catch (e: unknown) {
+        logger.error("[RentalFix] Migration error:", { error: getErrorMessage(e) });
       }
 
       // One-time: convert all PARTIALLY_OFFLOADED containers to OFFLOADED.
@@ -1027,8 +1028,8 @@ END $mig$`;
         } else {
           logger.info(`[AllocationFix] All payment allocations and ledger amounts are correct`);
         }
-      } catch (e: any) {
-        logger.error("[AllocationFix] Error:", { error: e.message });
+      } catch (e: unknown) {
+        logger.error("[AllocationFix] Error:", { error: getErrorMessage(e) });
       }
 
       // ── Merge split Production/Consumption ledger accounts ───────────────────
@@ -1098,8 +1099,8 @@ END $mig$`;
         } else {
           logger.info(`[StockAdjFix] All companies already use unified STOCK_ADJUSTMENT — nothing to merge`);
         }
-      } catch (e: any) {
-        logger.error("[StockAdjFix] Error:", { error: e.message });
+      } catch (e: unknown) {
+        logger.error("[StockAdjFix] Error:", { error: getErrorMessage(e) });
       }
 
       // ── Fix bonus expense accounts: update accountType → "Indirect Expense" ──
@@ -1114,8 +1115,8 @@ END $mig$`;
         if (bonusFix.rowCount && bonusFix.rowCount > 0) {
           logger.info(`[BonusExpFix] Updated ${bonusFix.rowCount} bonus expense account(s) → Indirect Expense`);
         }
-      } catch (e: any) {
-        logger.error("[BonusExpFix] Error:", { error: e.message });
+      } catch (e: unknown) {
+        logger.error("[BonusExpFix] Error:", { error: getErrorMessage(e) });
       }
 
       // ── Auto-fix credit note variance entries posted to wrong account ────────
@@ -1191,8 +1192,8 @@ END $mig$`;
             `[CreditNoteVarianceFix] Moved ${totalFixed} variance entry/entries → Sales Returns & Allowances`
           );
         }
-      } catch (e: any) {
-        logger.error("[CreditNoteVarianceFix] Error:", { error: e.message });
+      } catch (e: unknown) {
+        logger.error("[CreditNoteVarianceFix] Error:", { error: getErrorMessage(e) });
       }
 
       // ── Auto-fix orphaned RESERVED_FOR_ORDER bales ───────────────────────────
@@ -1217,8 +1218,8 @@ END $mig$`;
         if (fixed > 0) {
           logger.info(`[BaleOrphanFix] Restored ${fixed} orphaned RESERVED_FOR_ORDER bale(s) → IN_STOCK`);
         }
-      } catch (e: any) {
-        logger.error("[BaleOrphanFix] Error:", { error: e.message });
+      } catch (e: unknown) {
+        logger.error("[BaleOrphanFix] Error:", { error: getErrorMessage(e) });
       }
 
       // ── Back-fill insurance_members from existing "Insurance - …" accounts ───
@@ -1251,8 +1252,8 @@ END $mig$`;
         if (memberBackfill.rowCount && memberBackfill.rowCount > 0) {
           logger.info(`[InsuranceMemberBackfill] Created ${memberBackfill.rowCount} missing insurance_members row(s) from ledger accounts`);
         }
-      } catch (e: any) {
-        logger.error("[InsuranceMemberBackfill] Error:", { error: e.message });
+      } catch (e: unknown) {
+        logger.error("[InsuranceMemberBackfill] Error:", { error: getErrorMessage(e) });
       }
 
       // ── Soft-delete orphaned Insurance ledger accounts ───────────────────────
@@ -1274,8 +1275,8 @@ END $mig$`;
         if (insuranceFix.rowCount && insuranceFix.rowCount > 0) {
           logger.info(`[InsuranceFix] Soft-deleted ${insuranceFix.rowCount} orphaned Insurance ledger account(s)`);
         }
-      } catch (e: any) {
-        logger.error("[InsuranceFix] Error:", { error: e.message });
+      } catch (e: unknown) {
+        logger.error("[InsuranceFix] Error:", { error: getErrorMessage(e) });
       }
 
       // Auto-fix sequence desyncs (can happen after data restores / bulk imports with explicit IDs)
@@ -1299,8 +1300,8 @@ END $mig$`;
           /* table may not exist yet on first run — skip */
         }
       }
-    } catch (err: any) {
-      logger.error("Migration connection error:", { error: err.message });
+    } catch (err: unknown) {
+      logger.error("Migration connection error:", { error: getErrorMessage(err) });
     } finally {
       await migrationClient.end();
       migrationsDone = true;
@@ -1317,8 +1318,8 @@ END $mig$`;
         await pool.query("SELECT 1");
         logger.info(`✓ DB connection pool warmed up (attempt ${attempt})`);
         return;
-      } catch (err: any) {
-        logger.warn(`⚠️  DB warmup attempt ${attempt} failed: ${err.message}`);
+      } catch (err: unknown) {
+        logger.warn(`⚠️  DB warmup attempt ${attempt} failed: ${getErrorMessage(err)}`);
         if (attempt < 3) await new Promise((r) => setTimeout(r, 3000));
       }
     }
@@ -1367,8 +1368,8 @@ END $mig$`;
             `[MigrationDiag] ⚠️  ${oldRoleCount} row(s) still have old roles (POS1–POS6 or User) — check /api/admin/deployment-diagnostics`
           );
         }
-      } catch (e: any) {
-        logger.warn("[MigrationDiag] Could not run startup diagnostic:", { error: e.message });
+      } catch (e: unknown) {
+        logger.warn("[MigrationDiag] Could not run startup diagnostic:", { error: getErrorMessage(e) });
       }
     }, 30000);
 
@@ -1388,8 +1389,8 @@ END $mig$`;
             { detail: r.rows.map((x: any) => x.reference_number).join(", ") }
           );
         }
-      } catch (e: any) {
-        logger.warn("[BaleStatusFix] Could not fix inconsistent bale statuses:", { error: e.message });
+      } catch (e: unknown) {
+        logger.warn("[BaleStatusFix] Could not fix inconsistent bale statuses:", { error: getErrorMessage(e) });
       }
     })();
 
@@ -1411,8 +1412,8 @@ END $mig$`;
             { detail: r.rows.map((x: any) => `#${x.id} ${x.run_type}`).join(", ") }
           );
         }
-      } catch (e: any) {
-        logger.warn("[ExportRun] Startup orphan-cleanup failed:", { error: e.message });
+      } catch (e: unknown) {
+        logger.warn("[ExportRun] Startup orphan-cleanup failed:", { error: getErrorMessage(e) });
       }
     };
 
@@ -1433,8 +1434,8 @@ END $mig$`;
             { detail: r.rows.map((x: any) => `#${x.id} ${x.run_type}`).join(", ") }
           );
         }
-      } catch (e: any) {
-        logger.warn("[ExportRun] Periodic hung-run cleanup failed:", { error: e.message });
+      } catch (e: unknown) {
+        logger.warn("[ExportRun] Periodic hung-run cleanup failed:", { error: getErrorMessage(e) });
       }
     };
 
@@ -1444,8 +1445,8 @@ END $mig$`;
     setTimeout(async () => {
       try {
         await checkAndRecoverDailyExport();
-      } catch (e: any) {
-        logger.warn("[DailyExport] Startup recovery call failed:", { error: e?.message });
+      } catch (e: unknown) {
+        logger.warn("[DailyExport] Startup recovery call failed:", { error: getErrorMessage(e) });
       }
     }, 90 * 1000);
   };
@@ -1485,8 +1486,8 @@ END $mig$`;
     try {
       await pool.end();
       logger.info("[Shutdown] DB pool closed cleanly.");
-    } catch (e: any) {
-      logger.warn("[Shutdown] DB pool close error:", { error: e.message });
+    } catch (e: unknown) {
+      logger.warn("[Shutdown] DB pool close error:", { error: getErrorMessage(e) });
     }
     process.exit(0);
   };
@@ -1518,9 +1519,9 @@ END $mig$`;
           `CREATE UNIQUE INDEX IF NOT EXISTS exchange_rates_company_date_pair_unique
            ON exchange_rates (company_id, effective_date, from_currency, to_currency)`
         );
-      } catch (idxErr: any) {
+      } catch (idxErr: unknown) {
         // Non-fatal: upsertExchangeRate has a fallback that works without the index.
-        logger.warn("[startup] Could not ensure exchange_rates unique index:", { error: idxErr?.message });
+        logger.warn("[startup] Could not ensure exchange_rates unique index:", { error: getErrorMessage(idxErr) });
       }
 
       // ── Always-running multi-currency schema columns ──────────────────────────
@@ -1626,8 +1627,8 @@ END $mig$`;
             ON fiscal_period_closures (company_id, period_end_date);
         `);
         logger.info("[startup] ✓ Multi-currency schema columns ensured");
-      } catch (colErr: any) {
-        logger.error("[startup] ✗ Could not ensure multi-currency columns:", { error: colErr?.message });
+      } catch (colErr: unknown) {
+        logger.error("[startup] ✗ Could not ensure multi-currency columns:", { error: getErrorMessage(colErr) });
         // Non-fatal: the app will start but the dashboard net-profit query may still fail
         // if the columns are genuinely absent.
       }
@@ -1635,8 +1636,8 @@ END $mig$`;
       if (migrationsEnabled) {
         try {
           await runMigrations();
-        } catch (err: any) {
-          logger.error("Migration error (non-fatal — server will still start):", { error: err?.message ?? err });
+        } catch (err: unknown) {
+          logger.error("Migration error (non-fatal — server will still start):", { error: getErrorMessage(err) ?? err });
           migrationsDone = true;
         }
       }
@@ -1644,8 +1645,8 @@ END $mig$`;
     .then(() => {
       doListen();
     })
-    .catch((err: any) => {
-      logger.error("Fatal startup error:", { error: err?.message ?? err });
+    .catch((err: unknown) => {
+      logger.error("Fatal startup error:", { error: getErrorMessage(err) ?? err });
       process.exit(1);
     });
 })();

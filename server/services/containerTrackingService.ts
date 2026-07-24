@@ -26,6 +26,7 @@
  */
 
 import { db } from "../db";
+import { getErrorMessage } from "../lib/httpHandlers";
 import { logger } from "../lib/logger";
 import { containers, containerTrackingEvents, containerTrackingChecks } from "../../shared/schema";
 import { and, eq, inArray, gte, sql, desc, isNotNull, isNull } from "drizzle-orm";
@@ -134,8 +135,8 @@ export async function getParcelsAppUsageStats(): Promise<{ used: number; limit: 
 
     const used = result[0]?.count ?? 0;
     return { used, limit };
-  } catch (err: any) {
-    logger.warn("[ContainerTracking] Could not read quota from DB:", { error: err?.message });
+  } catch (err: unknown) {
+    logger.warn("[ContainerTracking] Could not read quota from DB:", { error: getErrorMessage(err) });
     return { used: 0, limit };
   }
 }
@@ -215,8 +216,8 @@ async function setSchedulerMeta(
       .update(containers)
       .set(patch as any)
       .where(eq(containers.id, containerId));
-  } catch (err: any) {
-    logger.warn("[ContainerTracking] setSchedulerMeta warn:", { error: err?.message });
+  } catch (err: unknown) {
+    logger.warn("[ContainerTracking] setSchedulerMeta warn:", { error: getErrorMessage(err) });
   }
 }
 
@@ -292,8 +293,8 @@ export async function trackDueContainers(): Promise<void> {
       })
       .from(containers)
       .where(and(eq(containers.trackingEnabled, true), activeStatusFilter));
-  } catch (err: any) {
-    logger.error("[ContainerTracking] Failed to fetch containers:", { error: err?.message });
+  } catch (err: unknown) {
+    logger.error("[ContainerTracking] Failed to fetch containers:", { error: getErrorMessage(err) });
     return;
   }
 
@@ -451,8 +452,8 @@ export async function trackDueContainers(): Promise<void> {
       await trackOneContainer(row.id, row.containerNumber, row.trackingCarrierHint ?? undefined);
       // Clear skip reason; record when the scheduler plans to check again
       await setSchedulerMeta(row.id, null, priority.nextRecommendedCheckAt);
-    } catch (err: any) {
-      logger.error(`[ContainerTracking] Error tracking ${row.containerNumber}:`, { error: err?.message });
+    } catch (err: unknown) {
+      logger.error(`[ContainerTracking] Error tracking ${row.containerNumber}:`, { error: getErrorMessage(err) });
     }
     await sleep(1_500);
   }
@@ -557,14 +558,14 @@ export async function trackAllEnabledNow(): Promise<number> {
       try {
         await trackOneContainer(row.id, row.containerNumber, row.trackingCarrierHint ?? undefined);
         await sleep(2_000);
-      } catch (err: any) {
-        logger.error(`[BulkTracking] Error tracking ${row.containerNumber}:`, { error: err?.message });
+      } catch (err: unknown) {
+        logger.error(`[BulkTracking] Error tracking ${row.containerNumber}:`, { error: getErrorMessage(err) });
       }
       _bulkProgress.processed = i + 1;
     }
     logger.info(`[BulkTracking] Manual run complete for ${eligible.length} containers.`);
   })()
-    .catch((err: any) => logger.error("[BulkTracking] Unexpected error:", { error: err?.message }))
+    .catch((err: unknown) => logger.error("[BulkTracking] Unexpected error:", { error: getErrorMessage(err) }))
     .finally(() => {
       _bulkRunning = false;
       _bulkProgress.running = false;
@@ -836,8 +837,8 @@ async function trackOneContainer(
       if (jc.status !== "skipped_recent") {
         logger.info(`[ContainerTracking] ${containerNumber}: jsoncargo → ${jc.status} (${jc.message})`);
       }
-    } catch (err: any) {
-      logger.warn(`[ContainerTracking] ${containerNumber}: jsoncargo pre-check error —`, { error: err?.message ?? err });
+    } catch (err: unknown) {
+      logger.warn(`[ContainerTracking] ${containerNumber}: jsoncargo pre-check error —`, { error: getErrorMessage(err) ?? err });
     }
   }
 
@@ -1941,8 +1942,8 @@ async function saveDirectEvents(containerId: number, result: CarrierTrackResult)
           rawEventJson: { provider: result.provider, ...ev } as any,
         })
         .onConflictDoNothing();
-    } catch (err: any) {
-      logger.warn("[ContainerTracking] Direct event save warn:", { error: err?.message });
+    } catch (err: unknown) {
+      logger.warn("[ContainerTracking] Direct event save warn:", { error: getErrorMessage(err) });
     }
   }
 }
@@ -1970,8 +1971,8 @@ async function saveParcelsAppEvents(containerId: number, shipment: ParcelsAppShi
           rawEventJson: ev as any,
         })
         .onConflictDoNothing();
-    } catch (err: any) {
-      logger.warn("[ContainerTracking] ParcelsApp event save warn:", { error: err?.message });
+    } catch (err: unknown) {
+      logger.warn("[ContainerTracking] ParcelsApp event save warn:", { error: getErrorMessage(err) });
     }
   }
 }
@@ -1992,8 +1993,8 @@ async function saveTrackingCheck(
       errorMessage,
       rawResponseJson: rawResponse as any,
     });
-  } catch (err: any) {
-    logger.warn("[ContainerTracking] Check record save warn:", { error: err?.message });
+  } catch (err: unknown) {
+    logger.warn("[ContainerTracking] Check record save warn:", { error: getErrorMessage(err) });
   }
 }
 

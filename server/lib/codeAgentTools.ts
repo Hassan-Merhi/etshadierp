@@ -4,6 +4,7 @@
  */
 
 import path from "path";
+import { getErrorMessage } from "../lib/httpHandlers";
 import fs from "fs";
 import { execFile } from "child_process";
 import { promisify } from "util";
@@ -133,9 +134,9 @@ export async function grepProjectFiles(pattern: string, relDir: string = "."): P
     // Strip workspace root from paths for cleaner output
     const rootPfx = WORKSPACE_ROOT + path.sep;
     return stdout.replace(new RegExp(rootPfx.replace(/\//g, "\\/"), "g"), "");
-  } catch (e: any) {
-    if (e.code === 1) return "(no matches found)";
-    throw new Error(`grep failed: ${e.message}`, { cause: e });
+  } catch (e: unknown) {
+    if ((e as { code?: number }).code === 1) return "(no matches found)";
+    throw new Error(`grep failed: ${getErrorMessage(e)}`, { cause: e });
   }
 }
 

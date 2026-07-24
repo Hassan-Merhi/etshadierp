@@ -170,8 +170,8 @@ export async function track(containerNumber: string, carrier: JsonCargoCarrier):
       const eta = extractEtaDate(rawEta);
 
       return { success: true, eta, errorCategory: null, errorMessage: null };
-    } catch (err: any) {
-      const isTimeout = err?.name === "TimeoutError" || err?.name === "AbortError";
+    } catch (err: unknown) {
+      const isTimeout = (err as { name?: string }).name === "TimeoutError" || (err as { name?: string }).name === "AbortError";
       lastError = isTimeout
         ? emptyResult("timeout", "JSONCargo request timed out")
         : emptyResult("network_error", "Network error contacting JSONCargo");

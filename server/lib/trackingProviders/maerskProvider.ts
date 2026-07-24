@@ -13,6 +13,7 @@
  */
 
 import type { CarrierTrackResult, TrackingEvent } from "./types";
+import { getErrorMessage } from "../../lib/httpHandlers";
 
 const API_BASE = "https://api.maersk.com";
 const TOKEN_URL = `${API_BASE}/oauth2/access_token`;
@@ -197,8 +198,8 @@ export async function track(containerNumber: string): Promise<CarrierTrackResult
       events,
       raw,
     };
-  } catch (err: any) {
-    if (err?.message?.includes("401") || err?.message?.includes("403")) {
+  } catch (err: unknown) {
+    if (getErrorMessage(err)?.includes("401") || getErrorMessage(err)?.includes("403")) {
       _token = null;
     }
     return {
@@ -213,7 +214,7 @@ export async function track(containerNumber: string): Promise<CarrierTrackResult
       eta: null,
       events: [],
       raw: null,
-      error: err?.message ?? "maersk_api_error",
+      error: getErrorMessage(err) ?? "maersk_api_error",
     };
   }
 }

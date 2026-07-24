@@ -22,6 +22,7 @@
  */
 
 import { existsSync } from "fs";
+import { getErrorMessage } from "../lib/httpHandlers";
 import { logger } from "./logger";
 import { execSync } from "child_process";
 import { createRequire } from "module";
@@ -422,8 +423,8 @@ export async function scrapeMaerskDirect(containerNumber: string): Promise<Carri
   let release: (() => void) | null = null;
   try {
     release = await acquirePuppeteerSlot();
-  } catch (err: any) {
-    if (err?.message === "PUPPETEER_QUEUE_FULL") {
+  } catch (err: unknown) {
+    if (getErrorMessage(err) === "PUPPETEER_QUEUE_FULL") {
       logger.warn(`[MaerskDirect] ${containerNumber}: Puppeteer queue full — skipping (server busy)`);
       return emptyResult(containerNumber, "PUPPETEER_QUEUE_FULL");
     }
@@ -698,8 +699,8 @@ export async function scrapeMaerskDirect(containerNumber: string): Promise<Carri
 
     logger.info(`[MaerskDirect] ${containerNumber}: no tracking data found — 0 JSON captured, no ETA in DOM`);
     return emptyResult(containerNumber, "no_tracking_data_found");
-  } catch (err: any) {
-    const msg = err?.message ?? String(err);
+  } catch (err: unknown) {
+    const msg = getErrorMessage(err) ?? String(err);
     logger.error(`[MaerskDirect] ${containerNumber}: unexpected error`, { error: msg });
 
     // If the browser crashed mid-scrape, clear the shared instance so next
