@@ -94,13 +94,14 @@ export interface StockInSalesDetailResult {
 }
 
 const EXPORT_LIMIT = 20_000;
-const ZERO = new Decimal(0);
 
 function toNumber(value: unknown, decimals: number): number {
   try {
-    return Number(new Decimal(value === null || value === undefined || value === "" ? 0 : String(value))
-      .toDecimalPlaces(decimals, Decimal.ROUND_HALF_UP)
-      .toString());
+    return Number(
+      new Decimal(value === null || value === undefined || value === "" ? 0 : String(value))
+        .toDecimalPlaces(decimals, Decimal.ROUND_HALF_UP)
+        .toString()
+    );
   } catch {
     return 0;
   }
@@ -242,29 +243,9 @@ async function loadStockIn(
   };
 }
 
-interface RawStockOutRow {
-  id: number;
-  sourceType: string;
-  activityDate: string;
-  voucherId: number;
-  voucherNumber: string;
-  isCreditSale: boolean | null;
-  locationId: number | null;
-  locationName: string | null;
-  stockGroupId: number | null;
-  stockGroupName: string | null;
-  stockItemId: number;
-  stockItemCode: string;
-  stockItemName: string;
-  quantity: string | number;
-  sellingRate: string | number;
-  unitCost: string | number;
-  totalSales: string | number;
-  totalCost: string | number;
-  costProfit: string | number;
-}
-
-function buildStockOutUnion(filters: StockInSalesDetailFilters): SQL {
+async function loadStockOut(
+  filters: StockInSalesDetailFilters
+): Promise<PaginationResult<StockOutDetailRow>> {
   const salesConditions: SQL[] = [
     eq(vouchers.companyId, filters.companyId),
     eq(vouchers.voucherType, "Sales"),
@@ -300,107 +281,100 @@ function buildStockOutUnion(filters: StockInSalesDetailFilters): SQL {
     filters.search ? [ilike(vouchers.voucherNumber, `%${filters.search}%`)] : []
   );
 
-  return sql`
-    SELECT
-      ${salesItems.id} AS "id",
-      'Sale'::text AS "sourceType",
-      ${vouchers.voucherDate}::text AS "activityDate",
-      ${vouchers.id} AS "voucherId",
-      ${vouchers.voucherNumber} AS "voucherNumber",
-      ${vouchers.isCreditSale} AS "isCreditSale",
-      ${vouchers.locationId} AS "locationId",
-      COALESCE(${locations.name}, ${vouchers.locationName}, 'Unassigned') AS "locationName",
-      ${stockGroups.id} AS "stockGroupId",
-      COALESCE(${stockGroups.name}, 'Unassigned') AS "stockGroupName",
-      ${stockItems.id} AS "stockItemId",
-      ${stockItems.code} AS "stockItemCode",
-      ${stockItems.name} AS "stockItemName",
-      ${salesItems.quantity} AS "quantity",
-      ${salesItems.sellingPrice} AS "sellingRate",
-      ${salesItems.costPrice} AS "unitCost",
-      ${salesItems.totalSales} AS "totalSales",
-      ${salesItems.totalCost} AS "totalCost",
-      ${salesItems.profit} AS "costProfit"
-    FROM ${salesItems}
-    INNER JOIN ${vouchers} ON ${salesItems.voucherId} = ${vouchers.id}
-    INNER JOIN ${stockItems} ON ${salesItems.stockItemId} = ${stockItems.id}
-    LEFT JOIN ${locations}
-      ON ${vouchers.locationId} = ${locations.id}
-      AND ${locations.companyId} = ${filters.companyId}
-    LEFT JOIN ${stockGroups} ON ${stockItems.stockGroupId} = ${stockGroups.id}
-    WHERE ${and(...salesConditions)}
-
-    UNION ALL
-
-    SELECT
-      ${creditNoteItems.id} AS "id",
-      ${vouchers.voucherType}::text AS "sourceType",
-      ${vouchers.voucherDate}::text AS "activityDate",
-      ${vouchers.id} AS "voucherId",
-      ${vouchers.voucherNumber} AS "voucherNumber",
-      NULL::boolean AS "isCreditSale",
-      ${creditNoteItems.locationId} AS "locationId",
-      COALESCE(${locations.name}, 'Unassigned') AS "locationName",
-      ${stockGroups.id} AS "stockGroupId",
-      COALESCE(${stockGroups.name}, 'Unassigned') AS "stockGroupName",
-      ${stockItems.id} AS "stockItemId",
-      ${stockItems.code} AS "stockItemCode",
-      ${stockItems.name} AS "stockItemName",
-      (CASE WHEN ${vouchers.voucherType} = 'Credit Note' THEN -1 ELSE 1 END * ${creditNoteItems.quantity}) AS "quantity",
-      ${creditNoteItems.rate} AS "sellingRate",
-      ${creditNoteItems.inventoryCost} AS "unitCost",
-      (CASE WHEN ${vouchers.voucherType} = 'Credit Note' THEN -1 ELSE 1 END * ${creditNoteItems.totalValue}) AS "totalSales",
-      (CASE WHEN ${vouchers.voucherType} = 'Credit Note' THEN -1 ELSE 1 END * (${creditNoteItems.quantity} * ${creditNoteItems.inventoryCost})) AS "totalCost",
-      (CASE WHEN ${vouchers.voucherType} = 'Credit Note' THEN -1 ELSE 1 END * (${creditNoteItems.totalValue} - (${creditNoteItems.quantity} * ${creditNoteItems.inventoryCost}))) AS "costProfit"
-    FROM ${creditNoteItems}
-    INNER JOIN ${vouchers} ON ${creditNoteItems.voucherId} = ${vouchers.id}
-    INNER JOIN ${stockItems} ON ${creditNoteItems.stockItemId} = ${stockItems.id}
-    INNER JOIN ${locations} ON ${creditNoteItems.locationId} = ${locations.id}
-    LEFT JOIN ${stockGroups} ON ${stockItems.stockGroupId} = ${stockGroups.id}
-    WHERE ${and(...noteConditions)}
-  `;
-}
-
-async function loadStockOut(
-  filters: StockInSalesDetailFilters
-): Promise<PaginationResult<StockOutDetailRow>> {
-  const union = buildStockOutUnion(filters);
-  const requestedLimit = filters.exportAll ? EXPORT_LIMIT : filters.limit;
-  const requestedPage = filters.exportAll ? 1 : filters.stockOutPage;
-  const offset = (requestedPage - 1) * requestedLimit;
-
-  const [countResult, dataResult] = await Promise.all([
-    db.execute(sql`SELECT COUNT(*)::int AS total FROM (${union}) AS report_rows`),
-    db.execute(sql`
-      SELECT *
-      FROM (${union}) AS report_rows
-      ORDER BY "activityDate" DESC, "voucherNumber" DESC, "id" DESC
-      LIMIT ${requestedLimit}
-      OFFSET ${offset}
-    `),
+  const salesWhere = and(...salesConditions);
+  const notesWhere = and(...noteConditions);
+  const [salesCount, noteCount, rawSalesRows, rawNoteRows] = await Promise.all([
+    db
+      .select({ total: sql<number>`COUNT(*)::int` })
+      .from(salesItems)
+      .innerJoin(vouchers, eq(salesItems.voucherId, vouchers.id))
+      .innerJoin(stockItems, eq(salesItems.stockItemId, stockItems.id))
+      .leftJoin(locations, and(eq(vouchers.locationId, locations.id), eq(locations.companyId, filters.companyId)))
+      .leftJoin(stockGroups, eq(stockItems.stockGroupId, stockGroups.id))
+      .where(salesWhere),
+    db
+      .select({ total: sql<number>`COUNT(*)::int` })
+      .from(creditNoteItems)
+      .innerJoin(vouchers, eq(creditNoteItems.voucherId, vouchers.id))
+      .innerJoin(stockItems, eq(creditNoteItems.stockItemId, stockItems.id))
+      .innerJoin(locations, eq(creditNoteItems.locationId, locations.id))
+      .leftJoin(stockGroups, eq(stockItems.stockGroupId, stockGroups.id))
+      .where(notesWhere),
+    db
+      .select({
+        id: salesItems.id,
+        activityDate: vouchers.voucherDate,
+        voucherId: vouchers.id,
+        voucherNumber: vouchers.voucherNumber,
+        isCreditSale: vouchers.isCreditSale,
+        locationId: vouchers.locationId,
+        locationName: sql<string>`COALESCE(${locations.name}, ${vouchers.locationName}, 'Unassigned')`,
+        stockGroupId: stockGroups.id,
+        stockGroupName: stockGroups.name,
+        stockItemId: stockItems.id,
+        stockItemCode: stockItems.code,
+        stockItemName: stockItems.name,
+        quantity: salesItems.quantity,
+        sellingRate: salesItems.sellingPrice,
+        unitCost: salesItems.costPrice,
+        totalSales: salesItems.totalSales,
+        totalCost: salesItems.totalCost,
+        costProfit: salesItems.profit,
+      })
+      .from(salesItems)
+      .innerJoin(vouchers, eq(salesItems.voucherId, vouchers.id))
+      .innerJoin(stockItems, eq(salesItems.stockItemId, stockItems.id))
+      .leftJoin(locations, and(eq(vouchers.locationId, locations.id), eq(locations.companyId, filters.companyId)))
+      .leftJoin(stockGroups, eq(stockItems.stockGroupId, stockGroups.id))
+      .where(salesWhere)
+      .orderBy(desc(vouchers.voucherDate), desc(vouchers.voucherNumber), desc(salesItems.id))
+      .limit(EXPORT_LIMIT),
+    db
+      .select({
+        id: creditNoteItems.id,
+        sourceType: vouchers.voucherType,
+        activityDate: vouchers.voucherDate,
+        voucherId: vouchers.id,
+        voucherNumber: vouchers.voucherNumber,
+        locationId: creditNoteItems.locationId,
+        locationName: locations.name,
+        stockGroupId: stockGroups.id,
+        stockGroupName: stockGroups.name,
+        stockItemId: stockItems.id,
+        stockItemCode: stockItems.code,
+        stockItemName: stockItems.name,
+        quantity: creditNoteItems.quantity,
+        sellingRate: creditNoteItems.rate,
+        unitCost: creditNoteItems.inventoryCost,
+        totalSales: creditNoteItems.totalValue,
+      })
+      .from(creditNoteItems)
+      .innerJoin(vouchers, eq(creditNoteItems.voucherId, vouchers.id))
+      .innerJoin(stockItems, eq(creditNoteItems.stockItemId, stockItems.id))
+      .innerJoin(locations, eq(creditNoteItems.locationId, locations.id))
+      .leftJoin(stockGroups, eq(stockItems.stockGroupId, stockGroups.id))
+      .where(notesWhere)
+      .orderBy(desc(vouchers.voucherDate), desc(vouchers.voucherNumber), desc(creditNoteItems.id))
+      .limit(EXPORT_LIMIT),
   ]);
 
-  const total = Number((countResult.rows?.[0] as any)?.total || 0);
-  const rawRows = (dataResult.rows || []) as unknown as RawStockOutRow[];
-  const rows: StockOutDetailRow[] = rawRows.map((row) => {
+  const saleRows: StockOutDetailRow[] = rawSalesRows.map((row) => {
     const quantity = toNumber(row.quantity, 3);
     const costProfit = toNumber(row.costProfit, 2);
-    const sourceType =
-      row.sourceType === "Credit Note" || row.sourceType === "Debit Note" ? row.sourceType : "Sale";
     return {
-      id: Number(row.id),
-      sourceType,
+      id: row.id,
+      sourceType: "Sale",
       activityDate: String(row.activityDate),
-      voucherId: Number(row.voucherId),
-      voucherNumber: String(row.voucherNumber),
+      voucherId: row.voucherId,
+      voucherNumber: row.voucherNumber,
       isCreditSale: row.isCreditSale,
-      locationId: row.locationId === null ? null : Number(row.locationId),
-      locationName: row.locationName || "Unassigned",
-      stockGroupId: row.stockGroupId === null ? null : Number(row.stockGroupId),
+      locationId: row.locationId,
+      locationName: row.locationName,
+      stockGroupId: row.stockGroupId,
       stockGroupName: row.stockGroupName || "Unassigned",
-      stockItemId: Number(row.stockItemId),
-      stockItemCode: String(row.stockItemCode),
-      stockItemName: String(row.stockItemName),
+      stockItemId: row.stockItemId,
+      stockItemCode: row.stockItemCode,
+      stockItemName: row.stockItemName,
       quantity,
       sellingRate: toNumber(row.sellingRate, 6),
       unitCost: toNumber(row.unitCost, 6),
@@ -411,13 +385,61 @@ async function loadStockOut(
     };
   });
 
+  const noteRows: StockOutDetailRow[] = rawNoteRows.map((row) => {
+    const sourceType = row.sourceType === "Credit Note" ? "Credit Note" : "Debit Note";
+    const sign = sourceType === "Credit Note" ? -1 : 1;
+    const quantity = toNumber(new Decimal(row.quantity).times(sign), 3);
+    const totalSales = toNumber(new Decimal(row.totalSales).times(sign), 2);
+    const totalCost = toNumber(new Decimal(row.quantity).times(row.unitCost).times(sign), 2);
+    const costProfit = toNumber(new Decimal(totalSales).minus(totalCost), 2);
+    return {
+      id: row.id,
+      sourceType,
+      activityDate: String(row.activityDate),
+      voucherId: row.voucherId,
+      voucherNumber: row.voucherNumber,
+      isCreditSale: null,
+      locationId: row.locationId,
+      locationName: row.locationName,
+      stockGroupId: row.stockGroupId,
+      stockGroupName: row.stockGroupName || "Unassigned",
+      stockItemId: row.stockItemId,
+      stockItemCode: row.stockItemCode,
+      stockItemName: row.stockItemName,
+      quantity,
+      sellingRate: toNumber(row.sellingRate, 6),
+      unitCost: toNumber(row.unitCost, 6),
+      totalSales,
+      totalCost,
+      costProfit,
+      avgProfitPerBale: divideOrZero(costProfit, quantity),
+    };
+  });
+
+  const combined = [...saleRows, ...noteRows].sort((a, b) => {
+    const dateCompare = b.activityDate.localeCompare(a.activityDate);
+    if (dateCompare !== 0) return dateCompare;
+    const voucherCompare = b.voucherNumber.localeCompare(a.voucherNumber);
+    if (voucherCompare !== 0) return voucherCompare;
+    return b.id - a.id;
+  });
+
+  const databaseTotal = Number(salesCount[0]?.total || 0) + Number(noteCount[0]?.total || 0);
+  const availableRows = combined.slice(0, EXPORT_LIMIT);
+  const truncated = databaseTotal > availableRows.length;
+  const requestedLimit = filters.exportAll ? EXPORT_LIMIT : filters.limit;
+  const requestedPage = filters.exportAll ? 1 : filters.stockOutPage;
+  const offset = (requestedPage - 1) * requestedLimit;
+  const rows = filters.exportAll ? availableRows : availableRows.slice(offset, offset + requestedLimit);
+  const total = truncated ? availableRows.length : databaseTotal;
+
   return {
     rows,
     total,
     page: requestedPage,
     limit: requestedLimit,
     totalPages: Math.max(1, Math.ceil(total / requestedLimit)),
-    truncated: filters.exportAll ? total > rows.length : false,
+    truncated,
   };
 }
 
