@@ -369,7 +369,7 @@ export function AppSidebar({ user }: { user?: any }) {
               </Badge>
             </a>
           )}
-          {!['Admin', 'Owner', 'Developer'].includes(user?.currentRole ?? user?.role ?? '') && (
+          {! ["Admin", "Owner", "Developer"].includes(user?.currentRole ?? user?.role ?? "") && (
             <SidebarFlatLink href="/my-settings" icon={KeyRound} label="My Settings" testId="link-my-settings" />
           )}
           <SidebarFlatLink
