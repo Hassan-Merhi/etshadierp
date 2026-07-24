@@ -1,4 +1,5 @@
 import type { Express } from "express";
+import { getErrorMessage } from "../lib/httpHandlers";
 import { logger } from "../lib/logger";
 import { db } from "../db";
 import { requireAuth, requireRole } from "../auth";
@@ -398,9 +399,9 @@ export function registerBalanceRepairRoutes(app: Express) {
           ledgerDrifts.length + voucherEntryMissing.length + orphanedTransfers.length + depositFlagMismatches.length,
       };
       res.json(result);
-    } catch (err: any) {
+    } catch (err: unknown) {
       logger.error("[BalanceRepair] scan error:", { error: err });
-      res.status(500).json({ message: err.message });
+      res.status(500).json({ message: getErrorMessage(err) });
     }
   });
 
@@ -695,9 +696,9 @@ export function registerBalanceRepairRoutes(app: Express) {
         depositsFixed: snapshot.depositSnapshots.length,
         snapshot,
       });
-    } catch (err: any) {
+    } catch (err: unknown) {
       logger.error("[BalanceRepair] apply error:", { error: err });
-      res.status(500).json({ message: err.message });
+      res.status(500).json({ message: getErrorMessage(err) });
     }
   });
 
@@ -773,9 +774,9 @@ export function registerBalanceRepairRoutes(app: Express) {
         orphansRestored: (snapshot.transfersDeleted ?? []).length,
         depositsRestored: (snapshot.depositSnapshots ?? []).length,
       });
-    } catch (err: any) {
+    } catch (err: unknown) {
       logger.error("[BalanceRepair] undo error:", { error: err });
-      res.status(500).json({ message: err.message });
+      res.status(500).json({ message: getErrorMessage(err) });
     }
   });
 
@@ -941,9 +942,9 @@ export function registerBalanceRepairRoutes(app: Express) {
         });
 
         res.json({ fixed, total: payments.length, message: `Reallocated ${fixed} payment(s) to the correct months.` });
-      } catch (err: any) {
+      } catch (err: unknown) {
         logger.error("[BalanceRepair] reallocate error:", { error: err });
-        res.status(500).json({ message: err.message });
+        res.status(500).json({ message: getErrorMessage(err) });
       }
     }
   );

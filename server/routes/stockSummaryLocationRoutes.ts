@@ -6,6 +6,7 @@
  * stockSummaryRoutes.ts as a sub-registrar; behaviour is unchanged.
  */
 import type { Express } from "express";
+import { getErrorMessage } from "../lib/httpHandlers";
 import { logger } from "../lib/logger";
 import { eq, and, or, isNull, sql } from "drizzle-orm";
 import { db } from "../db";
@@ -398,9 +399,9 @@ export function registerStockSummaryLocationRoutes(app: Express) {
         monthlyData,
         grandTotal,
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Location stock item monthly summary error:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -546,8 +547,8 @@ export function registerStockSummaryLocationRoutes(app: Express) {
 
       const byDate = (a: any, b: any) => new Date(a.date).getTime() - new Date(b.date).getTime();
       res.json({ inTransactions: inTx.sort(byDate), outTransactions: outTx.sort(byDate) });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -1283,9 +1284,9 @@ export function registerStockSummaryLocationRoutes(app: Express) {
           transactions: transactionsWithBalance,
           totals,
         });
-      } catch (error: any) {
+      } catch (error: unknown) {
         logger.error("Location stock item monthly vouchers error:", { error: error });
-        res.status(500).json({ message: error.message });
+        res.status(500).json({ message: getErrorMessage(error) });
       }
     }
   );
@@ -1725,9 +1726,9 @@ export function registerStockSummaryLocationRoutes(app: Express) {
       totals.outwardRate = totals.outwardQty > 0 ? totals.outwardValue / totals.outwardQty : 0;
 
       res.json({ stockItem, location, startDate, endDate, transactions: out, totals });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Location stock item transactions range error:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 

@@ -1,4 +1,5 @@
 import type { Express } from "express";
+import { getErrorMessage } from "../../lib/httpHandlers";
 import { pool } from "../../db";
 import { requireAuth } from "../../auth";
 
@@ -40,8 +41,8 @@ export function registerFactoryGroundScanRoutes(app: Express) {
               [companyId]
             );
       return res.json(result.rows);
-    } catch (e: any) {
-      return res.status(500).json({ message: e.message });
+    } catch (e: unknown) {
+      return res.status(500).json({ message: getErrorMessage(e) });
     }
   });
 
@@ -84,8 +85,8 @@ export function registerFactoryGroundScanRoutes(app: Express) {
         ]
       );
       return res.status(201).json(result.rows[0]);
-    } catch (e: any) {
-      return res.status(500).json({ message: e.message });
+    } catch (e: unknown) {
+      return res.status(500).json({ message: getErrorMessage(e) });
     }
   });
 
@@ -134,8 +135,8 @@ export function registerFactoryGroundScanRoutes(app: Express) {
         }
       }
       return res.json({ inserted, skipped });
-    } catch (e: any) {
-      return res.status(500).json({ message: e.message });
+    } catch (e: unknown) {
+      return res.status(500).json({ message: getErrorMessage(e) });
     }
   });
 
@@ -147,8 +148,8 @@ export function registerFactoryGroundScanRoutes(app: Express) {
       if (isNaN(id)) return res.status(400).json({ message: "Invalid id" });
       await pool.query(`DELETE FROM factory_ground_scan_items WHERE id=$1 AND company_id=$2`, [id, companyId]);
       return res.json({ success: true });
-    } catch (e: any) {
-      return res.status(500).json({ message: e.message });
+    } catch (e: unknown) {
+      return res.status(500).json({ message: getErrorMessage(e) });
     }
   });
 
@@ -169,8 +170,8 @@ export function registerFactoryGroundScanRoutes(app: Express) {
         ]);
       }
       return res.json({ success: true });
-    } catch (e: any) {
-      return res.status(500).json({ message: e.message });
+    } catch (e: unknown) {
+      return res.status(500).json({ message: getErrorMessage(e) });
     }
   });
 }

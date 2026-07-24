@@ -6,6 +6,7 @@
  * behaviour is unchanged.
  */
 import type { Express } from "express";
+import { getErrorMessage } from "../lib/httpHandlers";
 import { logger } from "../lib/logger";
 import { eq, and, or, desc, sql, inArray, ilike } from "drizzle-orm";
 import { db } from "../db";
@@ -135,9 +136,9 @@ export function registerBaleLookupRoutes(app: Express) {
       ];
 
       res.json({ product: displayProduct || null, labelPrints: allEntries });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error looking up article:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -525,9 +526,9 @@ export function registerBaleLookupRoutes(app: Express) {
         loadedOnOrder,
         auditHistory,
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error looking up reference:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -556,9 +557,9 @@ export function registerBaleLookupRoutes(app: Express) {
 
       const scannedUser = await storage.getUser(req.session.userId!);
       res.json({ ...updated, scannedByName: scannedUser?.username || null });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error scanning label:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -621,9 +622,9 @@ export function registerBaleLookupRoutes(app: Express) {
         });
 
         res.json({ message: "Bale deleted from linked records" });
-      } catch (error: any) {
+      } catch (error: unknown) {
         logger.error("Error deleting bale everywhere:", { error: error });
-        res.status(500).json({ message: error.message });
+        res.status(500).json({ message: getErrorMessage(error) });
       }
     }
   );
@@ -704,9 +705,9 @@ export function registerBaleLookupRoutes(app: Express) {
         });
 
         res.json({ message: "Bale product changed", newArticleCode, newProductName });
-      } catch (error: any) {
+      } catch (error: unknown) {
         logger.error("Error changing bale product:", { error: error });
-        res.status(500).json({ message: error.message });
+        res.status(500).json({ message: getErrorMessage(error) });
       }
     }
   );

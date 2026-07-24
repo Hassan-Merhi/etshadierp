@@ -1,4 +1,5 @@
 import type { Express, RequestHandler } from "express";
+import { getErrorMessage } from "../lib/httpHandlers";
 import Decimal from "decimal.js";
 import { and, eq, isNull } from "drizzle-orm";
 import { db, pool } from "../db";
@@ -159,8 +160,8 @@ export const normalizeAccountOpeningBalance: RequestHandler = async (req, res, n
 
     req.body = normalizedOpeningPayload(req.body || {}, existing, baseCurrency);
     return next();
-  } catch (error: any) {
-    return res.status(400).json({ message: error.message });
+  } catch (error: unknown) {
+    return res.status(400).json({ message: getErrorMessage(error) });
   }
 };
 
@@ -245,8 +246,8 @@ export function registerAccountCurrencyRoutes(app: Express) {
       const companyId = req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       return res.json(await getCashBankRevaluation(companyId));
-    } catch (error: any) {
-      return res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      return res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -303,8 +304,8 @@ export function registerAccountCurrencyRoutes(app: Express) {
       }
       bankBalance += Number(bankSummary.unresolvedLegacyNetRaw || 0);
       return res.json({ balance: bankBalance, ...bankSummary });
-    } catch (error: any) {
-      return res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      return res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -333,8 +334,8 @@ export function registerAccountCurrencyRoutes(app: Express) {
           };
         }),
       );
-    } catch (error: any) {
-      return res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      return res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 }

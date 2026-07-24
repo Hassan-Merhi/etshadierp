@@ -1,4 +1,5 @@
 import { parseId, parseOptionalId } from "../../../lib/parseId";
+import { getErrorMessage } from "../../../lib/httpHandlers";
 import { logger } from "../../../lib/logger";
 import { getClientDate } from "../../../lib/dateUtils";
 import { buildSafeFilename, contentDisposition } from "../../../lib/contentDisposition";
@@ -634,9 +635,9 @@ export function registerSupplierBrokerRoutes(app: Express) {
       const data = await buildBrokerStatement(brokerId, companyId, includeOtw);
       if (!data) return res.status(404).json({ message: "Supplier not found" });
       return res.json(data);
-    } catch (err: any) {
+    } catch (err: unknown) {
       logger.error("Broker statement error:", { error: err });
-      return res.status(500).json({ message: err.message });
+      return res.status(500).json({ message: getErrorMessage(err) });
     }
   });
 
@@ -829,9 +830,9 @@ export function registerSupplierBrokerRoutes(app: Express) {
       );
       res.setHeader("Content-Length", xlsBuffer.byteLength);
       res.end(xlsBuffer);
-    } catch (err: any) {
+    } catch (err: unknown) {
       logger.error("Broker statement export error:", { error: err });
-      if (!res.headersSent) res.status(500).json({ message: err.message });
+      if (!res.headersSent) res.status(500).json({ message: getErrorMessage(err) });
     }
   });
 
@@ -1077,9 +1078,9 @@ export function registerSupplierBrokerRoutes(app: Express) {
         creditByCurrency,
         paidByCurrency,
       });
-    } catch (err: any) {
+    } catch (err: unknown) {
       logger.error("Broker visual statement error:", { error: err });
-      return res.status(500).json({ message: err.message });
+      return res.status(500).json({ message: getErrorMessage(err) });
     }
   });
 
@@ -1116,9 +1117,9 @@ export function registerSupplierBrokerRoutes(app: Express) {
         .orderBy(desc(factoryContainers.arrivalDate), desc(factoryContainers.createdAt));
 
       return res.json(containers);
-    } catch (err: any) {
+    } catch (err: unknown) {
       logger.error("Direct containers error:", { error: err });
-      return res.status(500).json({ message: err.message });
+      return res.status(500).json({ message: getErrorMessage(err) });
     }
   });
 

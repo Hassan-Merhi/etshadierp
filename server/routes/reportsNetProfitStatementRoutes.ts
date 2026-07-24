@@ -6,6 +6,7 @@
  * from reportsRoutes.ts as a sub-registrar; behaviour is unchanged.
  */
 import type { Express } from "express";
+import { getErrorMessage } from "../lib/httpHandlers";
 import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 import { db } from "../db";
 import { storage } from "../storage";
@@ -81,8 +82,8 @@ export function registerReportsNetProfitStatementRoutes(app: Express) {
       const result = { accounts, total };
       _npsSetCache(cacheKey, result);
       res.json(result);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -153,8 +154,8 @@ export function registerReportsNetProfitStatementRoutes(app: Express) {
       const result = { accounts, total };
       _npsSetCache(cacheKey, result);
       res.json(result);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -244,8 +245,8 @@ export function registerReportsNetProfitStatementRoutes(app: Express) {
       const result = { accounts, total };
       _npsSetCache(cacheKey, result);
       res.json(result);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -321,8 +322,8 @@ export function registerReportsNetProfitStatementRoutes(app: Express) {
       const result = { accounts, total };
       _npsSetCache(cacheKey, result);
       res.json(result);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 }

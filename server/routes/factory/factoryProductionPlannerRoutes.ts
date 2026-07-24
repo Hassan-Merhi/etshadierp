@@ -1,4 +1,5 @@
 import { Express } from "express";
+import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
 import { db } from "../../db";
 import { requireAuth } from "../../auth";
@@ -107,9 +108,9 @@ export function registerProductionPlannerRoutes(app: Express) {
         entries,
         actuals,
       });
-    } catch (e: any) {
-      logger.error("[ProductionPlanner] GET error:", { error: e.message });
-      res.status(500).json({ message: e.message });
+    } catch (e: unknown) {
+      logger.error("[ProductionPlanner] GET error:", { error: getErrorMessage(e) });
+      res.status(500).json({ message: getErrorMessage(e) });
     }
   });
 
@@ -154,9 +155,9 @@ export function registerProductionPlannerRoutes(app: Express) {
       }
 
       res.json({ message: "Plan saved successfully" });
-    } catch (e: any) {
-      logger.error("[ProductionPlanner] POST error:", { error: e.message });
-      res.status(500).json({ message: e.message });
+    } catch (e: unknown) {
+      logger.error("[ProductionPlanner] POST error:", { error: getErrorMessage(e) });
+      res.status(500).json({ message: getErrorMessage(e) });
     }
   });
 
@@ -202,9 +203,9 @@ export function registerProductionPlannerRoutes(app: Express) {
         notes: prevRows[0].notes ?? "",
         fromDate: String(prevRows[0].plan_date),
       });
-    } catch (e: any) {
-      logger.error("[ProductionPlanner] copy-previous error:", { error: e.message });
-      res.status(500).json({ message: e.message });
+    } catch (e: unknown) {
+      logger.error("[ProductionPlanner] copy-previous error:", { error: getErrorMessage(e) });
+      res.status(500).json({ message: getErrorMessage(e) });
     }
   });
 
@@ -238,9 +239,9 @@ export function registerProductionPlannerRoutes(app: Express) {
         map[Number(e.workerId)] = { targetBales: Number(e.targetBales), workerCount: Number(e.workerCount) };
       }
       res.json(map);
-    } catch (e: any) {
-      logger.error("[ProductionPlanner] worker-targets error:", { error: e.message });
-      res.status(500).json({ message: e.message });
+    } catch (e: unknown) {
+      logger.error("[ProductionPlanner] worker-targets error:", { error: getErrorMessage(e) });
+      res.status(500).json({ message: getErrorMessage(e) });
     }
   });
 
@@ -263,8 +264,8 @@ export function registerProductionPlannerRoutes(app: Express) {
       }
 
       res.json({ message: "Plan deleted" });
-    } catch (e: any) {
-      res.status(500).json({ message: e.message });
+    } catch (e: unknown) {
+      res.status(500).json({ message: getErrorMessage(e) });
     }
   });
 }

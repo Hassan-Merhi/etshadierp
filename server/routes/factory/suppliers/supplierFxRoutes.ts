@@ -1,4 +1,5 @@
 import { parseId, parseOptionalId } from "../../../lib/parseId";
+import { getErrorMessage } from "../../../lib/httpHandlers";
 import { logger } from "../../../lib/logger";
 import { getClientDate } from "../../../lib/dateUtils";
 import type { Express } from "express";
@@ -630,9 +631,9 @@ export function registerSupplierFxRoutes(app: Express) {
         .where(eq(factorySupplierFxTransfers.companyId, companyId))
         .orderBy(desc(factorySupplierFxTransfers.date));
       res.json(transfers);
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error fetching FX transfers:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -879,9 +880,9 @@ export function registerSupplierFxRoutes(app: Express) {
       });
 
       res.json(created);
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error creating FX transfer:", { error: error });
-      res.status(400).json({ message: error.message });
+      res.status(400).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -926,9 +927,9 @@ export function registerSupplierFxRoutes(app: Express) {
       });
 
       res.json({ message: "FX transfer deleted" });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error deleting FX transfer:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -1047,8 +1048,8 @@ export function registerSupplierFxRoutes(app: Express) {
       }
 
       return res.json({ suppliers: result, cachedAt: Date.now() });
-    } catch (err: any) {
-      return res.status(500).json({ message: err.message });
+    } catch (err: unknown) {
+      return res.status(500).json({ message: getErrorMessage(err) });
     }
   });
 
@@ -1369,9 +1370,9 @@ export function registerSupplierFxRoutes(app: Express) {
         remaining: rem.toFixed(4),
         transfers: results,
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Bulk FX settlement error:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 

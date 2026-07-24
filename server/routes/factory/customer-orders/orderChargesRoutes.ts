@@ -1,4 +1,5 @@
 import { trackOneContainerById } from "../../../services/containerTrackingService";
+import { getErrorMessage } from "../../../lib/httpHandlers";
 import { logger } from "../../../lib/logger";
 import { parseId, parseOptionalId } from "../../../lib/parseId";
 import { dispatchNotification } from "../../../lib/notificationService";
@@ -352,9 +353,9 @@ export function registerOrderChargesRoutes(app: Express) {
       }
 
       res.json({ ...updatedOrder, charges: updatedCharges, warning: chargeWarning });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error adding charge to order:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -498,9 +499,9 @@ export function registerOrderChargesRoutes(app: Express) {
         linked,
         message: `${linked} charge${linked !== 1 ? "s" : ""} successfully linked to the ledger.${skippedMsg}`,
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error relinking charge vouchers:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -749,9 +750,9 @@ export function registerOrderChargesRoutes(app: Express) {
         .where(eq(customerOrderCharges.orderId, orderId));
 
       res.json({ ...updatedOrder, charges: updatedCharges });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("[PATCH charge]", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -861,9 +862,9 @@ export function registerOrderChargesRoutes(app: Express) {
       }
 
       res.json({ ...updatedOrder, charges: updatedCharges });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error removing charge from order:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 

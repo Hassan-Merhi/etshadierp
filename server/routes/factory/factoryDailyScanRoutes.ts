@@ -1,4 +1,5 @@
 import type { Express } from "express";
+import { getErrorMessage } from "../../lib/httpHandlers";
 import { pool } from "../../db";
 import { requireAuth } from "../../auth";
 import { logger } from "../../lib/logger";
@@ -28,8 +29,8 @@ export function registerFactoryDailyScanRoutes(app: Express) {
         [companyId, date]
       );
       return res.json(result.rows);
-    } catch (e: any) {
-      return res.status(500).json({ message: e.message });
+    } catch (e: unknown) {
+      return res.status(500).json({ message: getErrorMessage(e) });
     }
   });
 
@@ -47,8 +48,8 @@ export function registerFactoryDailyScanRoutes(app: Express) {
         [companyId]
       );
       return res.json(result.rows);
-    } catch (e: any) {
-      return res.status(500).json({ message: e.message });
+    } catch (e: unknown) {
+      return res.status(500).json({ message: getErrorMessage(e) });
     }
   });
 
@@ -68,8 +69,8 @@ export function registerFactoryDailyScanRoutes(app: Express) {
         [companyId, date]
       );
       return res.json(result.rows);
-    } catch (e: any) {
-      return res.status(500).json({ message: e.message });
+    } catch (e: unknown) {
+      return res.status(500).json({ message: getErrorMessage(e) });
     }
   });
 
@@ -116,9 +117,9 @@ export function registerFactoryDailyScanRoutes(app: Express) {
       );
       logger.info("Factory bale scan succeeded", { module: "factory", action: "dailyBaleScan", userId, factoryCompanyId: companyId, durationMs: Date.now() - _t });
       return res.status(201).json(result.rows[0]);
-    } catch (e: any) {
+    } catch (e: unknown) {
       logger.error("Factory bale scan failed", { module: "factory", action: "dailyBaleScan", durationMs: Date.now() - _t, error: e });
-      return res.status(500).json({ message: e.message });
+      return res.status(500).json({ message: getErrorMessage(e) });
     }
   });
 
@@ -131,8 +132,8 @@ export function registerFactoryDailyScanRoutes(app: Express) {
       if (isNaN(id)) return res.status(400).json({ message: "Invalid id" });
       await pool.query(`DELETE FROM factory_daily_bale_scans WHERE id = $1 AND company_id = $2`, [id, companyId]);
       return res.json({ success: true });
-    } catch (e: any) {
-      return res.status(500).json({ message: e.message });
+    } catch (e: unknown) {
+      return res.status(500).json({ message: getErrorMessage(e) });
     }
   });
 }

@@ -1,4 +1,5 @@
 import { parseId, parseOptionalId } from "../lib/parseId";
+import { getErrorMessage } from "../lib/httpHandlers";
 import { logger } from "../lib/logger";
 /**
  * Factory Account WhatsApp Auto-Statement Routes
@@ -49,9 +50,9 @@ export function registerFactoryWhatsappRoutes(app: Express, requireAuth: any) {
           sendOnJournal: true,
         }
       );
-    } catch (err: any) {
+    } catch (err: unknown) {
       logger.error("[factory-wa] GET rule error", { error: err });
-      res.status(500).json({ message: err.message });
+      res.status(500).json({ message: getErrorMessage(err) });
     }
   });
 
@@ -99,9 +100,9 @@ export function registerFactoryWhatsappRoutes(app: Express, requireAuth: any) {
         .returning();
 
       res.json(upserted);
-    } catch (err: any) {
+    } catch (err: unknown) {
       logger.error("[factory-wa] PUT rule error", { error: err });
-      res.status(500).json({ message: err.message });
+      res.status(500).json({ message: getErrorMessage(err) });
     }
   });
 
@@ -177,10 +178,10 @@ export function registerFactoryWhatsappRoutes(app: Express, requireAuth: any) {
 
       logger.info("factory whatsapp send-statement succeeded", { module: "factoryWhatsapp", action: "sendStatement", userId: _uid, companyId: _cid, durationMs: Date.now() - _t });
       res.json({ success: true, fileName });
-    } catch (err: any) {
+    } catch (err: unknown) {
       logger.error("factory whatsapp send-statement failed", { module: "factoryWhatsapp", action: "sendStatement", userId: _uid, companyId: _cid, durationMs: Date.now() - _t, error: err });
       logger.error("[factory-wa] POST send error", { error: err });
-      res.status(500).json({ message: err.message });
+      res.status(500).json({ message: getErrorMessage(err) });
     }
   });
 }
@@ -293,8 +294,8 @@ export async function triggerAccountWhatsAppStatement(opts: {
 
     logger.info(`[factory-wa] statement sent for account ${accountId} (${voucherType}, ${monthLabel})`);
     return { sent: true };
-  } catch (err: any) {
+  } catch (err: unknown) {
     logger.error("[factory-wa] auto-send exception", { error: err });
-    return { sent: false, error: err.message };
+    return { sent: false, error: getErrorMessage(err) };
   }
 }

@@ -1,4 +1,5 @@
 import Decimal from "decimal.js";
+import { getErrorMessage } from "../../../lib/httpHandlers";
 import { logger } from "../../../lib/logger";
 import { logAudit } from "../../helpers/auditHelpers";
 import { parseId, parseOptionalId } from "../../../lib/parseId";
@@ -204,7 +205,7 @@ export function registerRawStockOffloadRoutes(app: Express) {
       } else {
         try {
           fxRate = parseFloat(await getOrFetchFxRateToUsd(companyId, currencyCode, offloadDate));
-        } catch (err: any) {
+        } catch (err: unknown) {
           // Do NOT silently default to 1 for a non-USD offload — that would understate
           // (or overstate) the USD landed cost by the entire FX differential with no
           // trace of why. The container's own fxRateToUsd is only a legitimate fallback
@@ -217,7 +218,7 @@ export function registerRawStockOffloadRoutes(app: Express) {
           );
           if (!containerRateLooksSet) {
             return res.status(400).json({
-              message: `No valid FX rate available for ${currencyCode} on ${offloadDate}, and the container has no explicitly-set fxRateToUsd to fall back on. Provide fxRateToUsd explicitly to offload this container. (${err.message})`,
+              message: `No valid FX rate available for ${currencyCode} on ${offloadDate}, and the container has no explicitly-set fxRateToUsd to fall back on. Provide fxRateToUsd explicitly to offload this container. (${getErrorMessage(err)})`,
             });
           }
           fxRate = containerRate;
@@ -274,9 +275,9 @@ export function registerRawStockOffloadRoutes(app: Express) {
             resolvedCommFxRate = parseFloat(
               await getOrFetchFxRateToUsd(companyId, commCurrency, offloadDate)
             );
-          } catch (err: any) {
+          } catch (err: unknown) {
             return res.status(400).json({
-              message: `Cannot resolve FX rate for commission currency ${commCurrency} on ${offloadDate}. ${err.message}`,
+              message: `Cannot resolve FX rate for commission currency ${commCurrency} on ${offloadDate}. ${getErrorMessage(err)}`,
             });
           }
         }
@@ -1079,9 +1080,9 @@ export function registerRawStockOffloadRoutes(app: Express) {
         changes: null,
       });
       res.json({ rawStock, commission: commissionRecord });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error offloading container:", { error: error });
-      res.status(400).json({ message: error.message });
+      res.status(400).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -1459,9 +1460,9 @@ export function registerRawStockOffloadRoutes(app: Express) {
         changes: null,
       });
       res.json({ message: "Offload reversed successfully. Container is back to its previous status." });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error reversing offload:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 }

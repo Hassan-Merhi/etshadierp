@@ -1,4 +1,5 @@
 import { parseId, parseOptionalId } from "../../lib/parseId";
+import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
 import { logAudit } from "../_helpers";
 import type { Express, Request, Response } from "express";
@@ -751,10 +752,10 @@ export async function postRentAccrualForCompany(
 
           accrued += entries.length;
         });
-      } catch (e: any) {
+      } catch (e: unknown) {
         // Log the full error — Drizzle formats errors as "Failed query:\n<SQL>\n<pg error>",
         // so split("\n")[0] always shows the useless header.  Log all lines instead.
-        const detail = (e.message ?? String(e)).replace(/\n/g, " | ");
+        const detail = (getErrorMessage(e) ?? String(e)).replace(/\n/g, " | ");
         logger.error(`[ERP/rental] batch accrual failed company ${companyId}: ${detail}`);
         // intentional fall-through: partial failure logged, continue to recognition passes
       }
@@ -901,8 +902,8 @@ export async function postRentAccrualForCompany(
           accrued += locked15.length;
         });
       }
-    } catch (e: any) {
-      const detail = (e.message ?? String(e)).replace(/\n/g, " | ");
+    } catch (e: unknown) {
+      const detail = (getErrorMessage(e) ?? String(e)).replace(/\n/g, " | ");
       logger.error(`[ERP/rental] advance recognition pass failed company ${companyId}: ${detail}`);
     }
   } // end Pass 1.5
@@ -1017,8 +1018,8 @@ export async function postRentAccrualForCompany(
           accrued += duePrepaid.length;
         });
       }
-    } catch (e: any) {
-      const detail = (e.message ?? String(e)).replace(/\n/g, " | ");
+    } catch (e: unknown) {
+      const detail = (getErrorMessage(e) ?? String(e)).replace(/\n/g, " | ");
       logger.error(`[ERP/rental] prepaid recognition failed company ${companyId}: ${detail}`);
     }
   }
@@ -1148,8 +1149,8 @@ export async function postRentAccrualForCompany(
         });
       }
     }
-  } catch (e: any) {
-    const detail = (e.message ?? String(e)).replace(/\n/g, " | ");
+  } catch (e: unknown) {
+    const detail = (getErrorMessage(e) ?? String(e)).replace(/\n/g, " | ");
     logger.error(`[ERP/rental] deferred recognition failed company ${companyId}: ${detail}`);
   }
 
