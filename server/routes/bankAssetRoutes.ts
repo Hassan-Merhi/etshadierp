@@ -1,4 +1,5 @@
 import type { Express } from "express";
+import { getErrorMessage } from "../lib/httpHandlers";
 import { logger } from "../lib/logger";
 import { createHash } from "crypto";
 import Decimal from "decimal.js";
@@ -82,8 +83,8 @@ export function registerBankAssetRoutes(app: Express) {
       }
       const accounts = await storage.getAllBankAccounts(req.session.currentCompanyId);
       res.json(accounts);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -152,8 +153,8 @@ export function registerBankAssetRoutes(app: Express) {
         /* non-fatal */
       }
       res.status(201).json(account);
-    } catch (error: any) {
-      res.status(400).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(400).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -203,8 +204,8 @@ export function registerBankAssetRoutes(app: Express) {
         /* non-fatal */
       }
       res.json(account);
-    } catch (error: any) {
-      res.status(400).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(400).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -238,8 +239,8 @@ export function registerBankAssetRoutes(app: Express) {
         /* non-fatal */
       }
       res.status(204).send();
-    } catch (error: any) {
-      res.status(400).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(400).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -475,9 +476,9 @@ export function registerBankAssetRoutes(app: Express) {
           ? currentCfaPerUsd.toDecimalPlaces(10).toFixed(10)
           : null,
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Bank revaluation error:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -532,8 +533,8 @@ export function registerBankAssetRoutes(app: Express) {
         };
       });
       res.json(transformedAssets);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -556,8 +557,8 @@ export function registerBankAssetRoutes(app: Express) {
 
       const asset = await storage.createFixedAsset(parsed);
       res.status(201).json(asset);
-    } catch (error: any) {
-      res.status(400).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(400).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -586,8 +587,8 @@ export function registerBankAssetRoutes(app: Express) {
 
       if (!deleted) return res.status(404).json({ message: "Fixed asset not found" });
       res.json({ message: "Fixed asset deleted successfully" });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -803,9 +804,9 @@ export function registerBankAssetRoutes(app: Express) {
         rowCount: rows.length,
         preview,
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("PO Import parse error:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 

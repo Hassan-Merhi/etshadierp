@@ -1,4 +1,5 @@
 import type { Express } from "express";
+import { getErrorMessage } from "../lib/httpHandlers";
 import { logger } from "../lib/logger";
 import { db } from "../db";
 import { requireAuth } from "../auth";
@@ -558,9 +559,9 @@ export function registerAiImportRoutes(app: Express) {
         status: "uploaded",
         message: `${rawRows.length} rows staged. Call /validate to check them.`,
       });
-    } catch (error: any) {
-      logger.error("[AI Import] upload error:", { error: error.message });
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      logger.error("[AI Import] upload error:", { error: getErrorMessage(error) });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -575,8 +576,8 @@ export function registerAiImportRoutes(app: Express) {
 
       const job = await assertJobOwnership(jobId, companyId);
       res.json(job);
-    } catch (error: any) {
-      res.status((error as any).status ?? 500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status((error as any).status ?? 500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -603,8 +604,8 @@ export function registerAiImportRoutes(app: Express) {
         .orderBy(aiImportRows.rowNumber);
 
       res.json(rows);
-    } catch (error: any) {
-      res.status((error as any).status ?? 500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status((error as any).status ?? 500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -675,9 +676,9 @@ export function registerAiImportRoutes(app: Express) {
             ? `${errorRows} row(s) have errors that must be fixed before confirming.`
             : `All rows valid. Call /confirm to proceed.`,
       });
-    } catch (error: any) {
-      logger.error("[AI Import] validate error:", { error: error.message });
-      res.status((error as any).status ?? 500).json({ message: error.message });
+    } catch (error: unknown) {
+      logger.error("[AI Import] validate error:", { error: getErrorMessage(error) });
+      res.status((error as any).status ?? 500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -712,9 +713,9 @@ export function registerAiImportRoutes(app: Express) {
         warningRows: job.warningRows,
         message: "Job confirmed. Call /post to create the records.",
       });
-    } catch (error: any) {
-      logger.error("[AI Import] confirm error:", { error: error.message });
-      res.status((error as any).status ?? 500).json({ message: error.message });
+    } catch (error: unknown) {
+      logger.error("[AI Import] confirm error:", { error: getErrorMessage(error) });
+      res.status((error as any).status ?? 500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -807,8 +808,8 @@ export function registerAiImportRoutes(app: Express) {
         warnings: result.warnings,
         correctionsApplied: corrections.length,
       });
-    } catch (error: any) {
-      res.status((error as any).status ?? 500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status((error as any).status ?? 500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -833,8 +834,8 @@ export function registerAiImportRoutes(app: Express) {
         .orderBy(aiCorrectionMemory.memoryType, aiCorrectionMemory.rawValue);
 
       res.json(rows);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -858,8 +859,8 @@ export function registerAiImportRoutes(app: Express) {
 
       await db.delete(aiCorrectionMemory).where(eq(aiCorrectionMemory.id, corrId));
       res.json({ success: true });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -924,9 +925,9 @@ export function registerAiImportRoutes(app: Express) {
         records: created,
         message: `${created.length} record(s) created successfully.`,
       });
-    } catch (error: any) {
-      logger.error("[AI Import] post error:", { error: error.message });
-      res.status((error as any).status ?? 500).json({ message: error.message });
+    } catch (error: unknown) {
+      logger.error("[AI Import] post error:", { error: getErrorMessage(error) });
+      res.status((error as any).status ?? 500).json({ message: getErrorMessage(error) });
     }
   });
 }

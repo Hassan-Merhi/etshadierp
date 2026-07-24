@@ -1,4 +1,5 @@
 import type { Express } from "express";
+import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
 import { db } from "../../db";
 import { requireAuth } from "../../auth";
@@ -546,9 +547,9 @@ export function registerFactoryStockAllocationV5Routes(app: Express) {
       } else {
         res.json({ rows: filtered, totals: finalTotals, productNames: productNamesMap });
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       logger.error("[V5] stock-allocation error:", { error: err });
-      res.status(500).json({ message: err.message });
+      res.status(500).json({ message: getErrorMessage(err) });
     }
   });
 
@@ -585,8 +586,8 @@ export function registerFactoryStockAllocationV5Routes(app: Express) {
 
       res.set("Cache-Control", "private, max-age=60");
       res.json({ stockAvailable, totalLoaded, expectedToLoad, freeToPromise });
-    } catch (err: any) {
-      res.status(500).json({ message: err.message });
+    } catch (err: unknown) {
+      res.status(500).json({ message: getErrorMessage(err) });
     }
   });
 
@@ -674,9 +675,9 @@ export function registerFactoryStockAllocationV5Routes(app: Express) {
       });
 
       res.json(result);
-    } catch (err: any) {
+    } catch (err: unknown) {
       logger.error("[V5] proforma-with-loading error:", { error: err });
-      res.status(400).json({ message: err.message });
+      res.status(400).json({ message: getErrorMessage(err) });
     }
   });
 
@@ -794,9 +795,9 @@ export function registerFactoryStockAllocationV5Routes(app: Express) {
         orders: result.orders,
         expectedLinesCreated: result.expectedLinesCreated,
       });
-    } catch (err: any) {
+    } catch (err: unknown) {
       logger.error("[V5] add-containers error:", { error: err });
-      res.status(400).json({ message: err.message });
+      res.status(400).json({ message: getErrorMessage(err) });
     }
   });
 
@@ -847,9 +848,9 @@ export function registerFactoryStockAllocationV5Routes(app: Express) {
         .returning();
 
       res.json({ proforma: updated });
-    } catch (err: any) {
+    } catch (err: unknown) {
       logger.error("[V5] close-proforma error:", { error: err });
-      res.status(400).json({ message: err.message });
+      res.status(400).json({ message: getErrorMessage(err) });
     }
   });
 
@@ -935,9 +936,9 @@ export function registerFactoryStockAllocationV5Routes(app: Express) {
         eligibleContainers: eligibleIds.length,
         articlesEdited: updates.length,
       });
-    } catch (err: any) {
+    } catch (err: unknown) {
       logger.error("[V5] draft-expected-lines error:", { error: err });
-      res.status(400).json({ message: err.message });
+      res.status(400).json({ message: getErrorMessage(err) });
     }
   });
 
@@ -1059,9 +1060,9 @@ export function registerFactoryStockAllocationV5Routes(app: Express) {
         rows,
         shortageCount: rows.filter((r) => r.availableBalance < 0).length,
       });
-    } catch (err: any) {
+    } catch (err: unknown) {
       logger.error("[V5] location-summary error:", { error: err });
-      res.status(500).json({ message: err.message });
+      res.status(500).json({ message: getErrorMessage(err) });
     }
   });
 
@@ -1109,9 +1110,9 @@ export function registerFactoryStockAllocationV5Routes(app: Express) {
       }));
 
       res.json({ orders });
-    } catch (err: any) {
+    } catch (err: unknown) {
       logger.error("[V5] recently-cancelled-containers error:", { error: err });
-      res.status(500).json({ message: err.message });
+      res.status(500).json({ message: getErrorMessage(err) });
     }
   });
 
@@ -1193,9 +1194,9 @@ export function registerFactoryStockAllocationV5Routes(app: Express) {
       await recalculateOrderTotals(db, orderId);
 
       res.json({ id: orderId, restoredTo: restoreStatus, balasRestored: historyCount });
-    } catch (err: any) {
+    } catch (err: unknown) {
       logger.error("[V5] restore-container error:", { error: err });
-      res.status(500).json({ message: err.message });
+      res.status(500).json({ message: getErrorMessage(err) });
     }
   });
 
@@ -1238,9 +1239,9 @@ export function registerFactoryStockAllocationV5Routes(app: Express) {
       }));
 
       res.json({ orders });
-    } catch (err: any) {
+    } catch (err: unknown) {
       logger.error("[V5] unlinked-loading-orders error:", { error: err });
-      res.status(500).json({ message: err.message });
+      res.status(500).json({ message: getErrorMessage(err) });
     }
   });
 }

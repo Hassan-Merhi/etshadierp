@@ -6,6 +6,7 @@
  * importRoutes.ts as a sub-registrar; behaviour is unchanged.
  */
 import type { Express } from "express";
+import { getErrorMessage } from "../lib/httpHandlers";
 import { logger } from "../lib/logger";
 import { and, eq, desc } from "drizzle-orm";
 import { db } from "../db";
@@ -78,10 +79,10 @@ export function registerStockTransferImportRoutes(app: Express) {
         totalItems: items.length,
         fileName: req.file.originalname,
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Stock Transfer Import parse error:", { error: error });
       // File-parse errors are client errors (bad/corrupt file) — return 400, not 500
-      res.status(400).json({ message: error.message || "Failed to parse Excel file" });
+      res.status(400).json({ message: getErrorMessage(error) || "Failed to parse Excel file" });
     }
   });
 
@@ -179,9 +180,9 @@ export function registerStockTransferImportRoutes(app: Express) {
         warnings,
         validatedItems,
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Stock Transfer Import validation error:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -337,13 +338,13 @@ export function registerStockTransferImportRoutes(app: Express) {
             voucherNumber: waVoucher,
             voucherDate: waDate,
           });
-        } catch (e: any) {
-          logger.error("[TransferWA] Failed to send:", { error: e.message });
+        } catch (e: unknown) {
+          logger.error("[TransferWA] Failed to send:", { error: getErrorMessage(e) });
         }
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Stock Transfer Import error:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -373,9 +374,9 @@ export function registerStockTransferImportRoutes(app: Express) {
       res.setHeader("Content-Disposition", "attachment; filename=Stock_Transfer_Import_Template.xlsx");
       res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
       res.send(buffer);
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Template generation error:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -408,9 +409,9 @@ export function registerStockTransferImportRoutes(app: Express) {
       res.setHeader("Content-Disposition", "attachment; filename=Stock_Transfer_Multi_Source_Template.xlsx");
       res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
       res.send(buffer);
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Template generation error:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -477,9 +478,9 @@ export function registerStockTransferImportRoutes(app: Express) {
           success: true,
           items,
         });
-      } catch (error: any) {
+      } catch (error: unknown) {
         logger.error("Stock Transfer Parse error:", { error: error });
-        res.status(500).json({ message: error.message });
+        res.status(500).json({ message: getErrorMessage(error) });
       }
     }
   );
@@ -597,9 +598,9 @@ export function registerStockTransferImportRoutes(app: Express) {
         warnings,
         validatedItems,
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Stock Transfer Validate error:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -809,14 +810,14 @@ export function registerStockTransferImportRoutes(app: Express) {
               voucherNumber: waVoucherMs,
               voucherDate: waDateMs,
             });
-          } catch (e: any) {
-            logger.error("[TransferWA] Failed to send:", { error: e.message });
+          } catch (e: unknown) {
+            logger.error("[TransferWA] Failed to send:", { error: getErrorMessage(e) });
           }
         });
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Stock Transfer Import error:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 }

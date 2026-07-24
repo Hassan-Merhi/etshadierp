@@ -1,4 +1,5 @@
 import { getClientDate } from "../../../lib/dateUtils";
+import { getErrorMessage } from "../../../lib/httpHandlers";
 import { logger } from "../../../lib/logger";
 import type { Express } from "express";
 import { db } from "../../../db";
@@ -133,8 +134,8 @@ export function registerEmployeePosFinancialRoutes(app: Express) {
         .where(eq(factoryPosSales.companyId, companyId))
         .orderBy(desc(factoryPosSales.createdAt));
       res.json(sales);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -151,8 +152,8 @@ export function registerEmployeePosFinancialRoutes(app: Express) {
       if (!sale) return res.status(404).json({ message: "Sale not found" });
       const items = await db.select().from(factoryPosSaleItems).where(eq(factoryPosSaleItems.saleId, saleId));
       res.json({ ...sale, items });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -430,9 +431,9 @@ export function registerEmployeePosFinancialRoutes(app: Express) {
       });
 
       res.json(result);
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error creating factory POS sale:", { error: error });
-      res.status(400).json({ message: error.message });
+      res.status(400).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -746,9 +747,9 @@ export function registerEmployeePosFinancialRoutes(app: Express) {
       });
 
       res.json(result);
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error editing factory POS sale:", { error: error });
-      res.status(400).json({ message: error.message });
+      res.status(400).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -799,9 +800,9 @@ export function registerEmployeePosFinancialRoutes(app: Express) {
       });
 
       res.json({ ok: true });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error voiding factory POS sale:", { error: error });
-      res.status(400).json({ message: error.message });
+      res.status(400).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -816,8 +817,8 @@ export function registerEmployeePosFinancialRoutes(app: Express) {
         .where(eq(factoryWorkerCategories.companyId, companyId))
         .orderBy(factoryWorkerCategories.name);
       res.json(cats);
-    } catch (e: any) {
-      res.status(500).json({ message: e.message });
+    } catch (e: unknown) {
+      res.status(500).json({ message: getErrorMessage(e) });
     }
   });
 
@@ -828,8 +829,8 @@ export function registerEmployeePosFinancialRoutes(app: Express) {
       const body = insertFactoryWorkerCategorySchema.parse({ ...req.body, companyId });
       const [cat] = await db.insert(factoryWorkerCategories).values(body).returning();
       res.json(cat);
-    } catch (e: any) {
-      res.status(400).json({ message: e.message });
+    } catch (e: unknown) {
+      res.status(400).json({ message: getErrorMessage(e) });
     }
   });
 
@@ -846,8 +847,8 @@ export function registerEmployeePosFinancialRoutes(app: Express) {
         .returning();
       if (!cat) return res.status(404).json({ message: "Not found" });
       res.json(cat);
-    } catch (e: any) {
-      res.status(400).json({ message: e.message });
+    } catch (e: unknown) {
+      res.status(400).json({ message: getErrorMessage(e) });
     }
   });
 
@@ -860,8 +861,8 @@ export function registerEmployeePosFinancialRoutes(app: Express) {
         .delete(factoryWorkerCategories)
         .where(and(eq(factoryWorkerCategories.id, id), eq(factoryWorkerCategories.companyId, companyId)));
       res.json({ ok: true });
-    } catch (e: any) {
-      res.status(500).json({ message: e.message });
+    } catch (e: unknown) {
+      res.status(500).json({ message: getErrorMessage(e) });
     }
   });
 
@@ -1032,9 +1033,9 @@ export function registerEmployeePosFinancialRoutes(app: Express) {
           accountType: a.accountType,
         })),
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Factory financial-snapshot error:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 

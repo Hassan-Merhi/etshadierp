@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState, type LucideIcon } from "react";
+import { useEffect, useMemo, useState } from "react";
+import type { LucideIcon } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { format, parseISO } from "date-fns";
 import {
