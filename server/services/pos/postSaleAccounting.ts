@@ -11,6 +11,7 @@
  * columns always store the historical base (USD) value so legacy queries keep working.
  */
 import { db } from "../../db";
+import { logger } from "../../lib/logger";
 import { storage } from "../../storage";
 import { ledgerAccounts, voucherEntries } from "@shared/schema";
 import { eq, and, isNull } from "drizzle-orm";
@@ -38,7 +39,7 @@ export async function getOrCreateSalesRevenueAccount(
 
   if (salesAccount.accountType !== "Income") {
     // Validate that Sales account is of type Income for proper import cycle balance
-    console.warn(
+    logger.warn(
       `[POS Sale] WARNING: SALES account has type "${salesAccount.accountType}" instead of "Income". This will cause import cycle imbalance!`
     );
     return {
@@ -172,7 +173,7 @@ function normalizePosEntry(
     };
   } catch (e) {
     // Fallback for legacy paths: if normalization fails (missing rate etc.) store as-is
-    console.warn("[POS] normalizeVoucherEntryAmounts failed, using legacy storage:", (e as any)?.message);
+    logger.warn("[POS] normalizeVoucherEntryAmounts failed, using legacy storage:", { error: (e as any)?.message });
     const dStr = Math.abs(debitAmt).toFixed(2);
     const cStr = Math.abs(creditAmt).toFixed(2);
     return {
@@ -275,13 +276,13 @@ export async function insertSaleAccountingEntries(
         debitEntry.customerId = linkedCustId;
       }
     }
-    console.log("[POS Sale] Using ledgerAccountId for cash/credit:", accountId);
+    logger.info("[POS Sale] Using ledgerAccountId for cash/credit:", { accountId: accountId });
   } else {
     debitEntry.bankAccountId = accountId;
-    console.log("[POS Sale] Using bankAccountId for bank:", accountId);
+    logger.info("[POS Sale] Using bankAccountId for bank:", { accountId: accountId });
   }
 
-  console.log("[POS Sale] Debit entry:", debitEntry);
+  logger.info("[POS Sale] Debit entry:", { entry: debitEntry });
   await tx.insert(voucherEntries).values(debitEntry);
 
   if (!isSpCompany) {

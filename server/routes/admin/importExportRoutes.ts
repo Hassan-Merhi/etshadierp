@@ -1,4 +1,5 @@
 import { getClientDate } from "../../lib/dateUtils";
+import { logger } from "../../lib/logger";
 import type { Express } from "express";
 import { db, pool } from "../../db";
 import { storage } from "../../storage";
@@ -871,7 +872,7 @@ export function registerImportExportRoutes(app: Express) {
         const sharedVoucherCount = allTouchedVoucherIds.size - exclusiveVoucherIds.length;
         const totalEntries = accountPlans.reduce((s, p) => s + p.entryCount, 0);
 
-        console.log(
+        logger.info(
           `[AccountMigration] Batch of ${accountIds.length} account(s) moved from company ${srcCompanyId} → ${destCompanyId}. ` +
             `${totalEntries} entries, ${exclusiveVoucherIds.length} vouchers moved, ${sharedVoucherCount} shared vouchers left in source.`
         );
@@ -894,7 +895,7 @@ export function registerImportExportRoutes(app: Express) {
           })),
         });
       } catch (error: any) {
-        console.error("[AccountMigration] Error:", error);
+        logger.error("[AccountMigration] Error:", { error: error });
         res.status(500).json({ message: error.message });
       }
     }
@@ -936,7 +937,7 @@ export function registerImportExportRoutes(app: Express) {
           }
         });
 
-        console.log(
+        logger.info(
           `[AccountMigration] UNDO: ${accounts.length} account(s) moved back from company ${destCompanyId} → ${srcCompanyId}. ` +
             `${(movedVoucherIds ?? []).length} vouchers restored.`
         );
@@ -947,7 +948,7 @@ export function registerImportExportRoutes(app: Express) {
           restoredVoucherCount: (movedVoucherIds ?? []).length,
         });
       } catch (error: any) {
-        console.error("[AccountMigration] Undo error:", error);
+        logger.error("[AccountMigration] Undo error:", { error: error });
         res.status(500).json({ message: error.message });
       }
     }

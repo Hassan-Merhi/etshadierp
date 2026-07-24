@@ -592,7 +592,7 @@ export function registerContainerOffloadRoutes(app: Express) {
       });
     } catch (error: any) {
       logger.error("Container offload failed", { module: "containers", action: "offload", userId: _uid, companyId: _cid, containerId: req.params.id, durationMs: Date.now() - _t, error });
-      console.error("Container offload error:", error);
+      logger.error("Container offload error:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -777,7 +777,7 @@ export function registerContainerOffloadRoutes(app: Express) {
           message: "Container offload reversed successfully",
         });
       } catch (error: any) {
-        console.error("Reverse offload error:", error);
+        logger.error("Reverse offload error:", { error: error });
         res.status(500).json({ message: error.message });
       }
     }
@@ -1013,7 +1013,7 @@ export function registerContainerOffloadRoutes(app: Express) {
         }
       });
     } catch (error: any) {
-      console.error("Edit offload error:", error);
+      logger.error("Edit offload error:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -1090,7 +1090,7 @@ export function registerContainerOffloadRoutes(app: Express) {
         totalCharges:    parseFloat(offloadRow.totalCharges || "0"),
       });
     } catch (err: any) {
-      console.error("[offload-charges]", err.message);
+      logger.error("[offload-charges]", { error: err.message });
       res.status(500).json({ message: err.message });
     }
   });

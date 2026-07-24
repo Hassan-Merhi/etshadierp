@@ -1,4 +1,5 @@
 import { trackOneContainerById } from "../../../services/containerTrackingService";
+import { logger } from "../../../lib/logger";
 import { parseId, parseOptionalId } from "../../../lib/parseId";
 import { dispatchNotification } from "../../../lib/notificationService";
 import { getClientDate } from "../../../lib/dateUtils";
@@ -271,7 +272,7 @@ export function registerOrderPricingRoutes(app: Express) {
         repriced: updated,
       });
     } catch (error: any) {
-      console.error("Error repricing order:", error);
+      logger.error("Error repricing order:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -395,7 +396,7 @@ export function registerOrderPricingRoutes(app: Express) {
         repriced: updated,
       });
     } catch (error: any) {
-      console.error("Error repricing order with production prices:", error);
+      logger.error("Error repricing order with production prices:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -500,7 +501,7 @@ export function registerOrderPricingRoutes(app: Express) {
         repriced: updated,
       });
     } catch (error: any) {
-      console.error("Error applying proforma prices:", error);
+      logger.error("Error applying proforma prices:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -559,7 +560,7 @@ export function registerOrderPricingRoutes(app: Express) {
 
       res.json(updatedOrder);
     } catch (error: any) {
-      console.error("Error repricing article:", error);
+      logger.error("Error repricing article:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });

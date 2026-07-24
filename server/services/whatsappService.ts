@@ -8,6 +8,7 @@
  */
 
 import { pool } from "../db";
+import { logger } from "../lib/logger";
 import FormDataLib from "form-data";
 
 export interface WaSettings {
@@ -188,12 +189,12 @@ async function sendGreenApiFileUpload({
 
   if (!response.ok) {
     const body = await response.text();
-    console.error("[WA upload] Green API error", response.status, body, { chatId, fileName, size: buffer.length });
+    logger.error("[WA upload] Green API error", { status: response.status, body, chatId, fileName, size: buffer.length });
     return { success: false, error: `Green API ${response.status}: ${body}` };
   }
 
   const json = (await response.json().catch(() => ({}))) as any;
-  console.log("[WA upload] Green API response", json, { chatId, fileName, size: buffer.length });
+  logger.info("[WA upload] Green API response", { response: json, chatId, fileName, size: buffer.length });
   return { success: true };
 }
 
@@ -357,7 +358,7 @@ export async function sendWhatsAppText(
     } catch (e: any) {
       failed++;
       errors.push(e.message ?? "Unknown error");
-      console.error("[WhatsApp] Text send failed:", e);
+      logger.error("[WhatsApp] Text send failed:", { error: e });
     }
   }
 
@@ -573,7 +574,7 @@ export async function sendWhatsAppFile(
     } else {
       failed++;
       errors.push((r as PromiseRejectedResult).reason?.message ?? "Unknown error");
-      console.error("[WhatsApp] Send failed:", (r as PromiseRejectedResult).reason);
+      logger.error("[WhatsApp] Send failed:", (r as PromiseRejectedResult).reason);
     }
   }
 

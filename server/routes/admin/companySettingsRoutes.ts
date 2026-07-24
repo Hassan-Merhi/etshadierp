@@ -1,4 +1,5 @@
 import { getClientDate } from "../../lib/dateUtils";
+import { logger } from "../../lib/logger";
 import type { Express } from "express";
 import { db, pool } from "../../db";
 import { storage } from "../../storage";
@@ -217,7 +218,7 @@ export function registerCompanySettingsRoutes(app: Express) {
         ],
       });
     } catch (error: any) {
-      console.error("Reset company data error:", error);
+      logger.error("Reset company data error:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -228,7 +229,7 @@ export function registerCompanySettingsRoutes(app: Express) {
       const parentCompanyId = await storage.getParentCompanyId();
       res.json({ parentCompanyId });
     } catch (error: any) {
-      console.error("Get parent company error:", error);
+      logger.error("Get parent company error:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -264,7 +265,7 @@ export function registerCompanySettingsRoutes(app: Express) {
         res.json({ success: true, parentCompanyId: null });
       }
     } catch (error: any) {
-      console.error("Set parent company error:", error);
+      logger.error("Set parent company error:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -293,7 +294,7 @@ export function registerCompanySettingsRoutes(app: Express) {
           .where(and(eq(containers.companyId, companyId), eq(containers.status, "OTW")));
 
         const otwContainerNumbers = otwContainers.map((c) => c.containerNumber);
-        console.log("OTW containers to preserve:", otwContainerNumbers);
+        logger.info("OTW containers to preserve:", { otwContainerNumbers: otwContainerNumbers });
 
         // 2. Get inter-company credit account IDs (accounts with "Credit" in name - e.g., "KINSHASA Credit")
         const interCompanyAccounts = await tx
@@ -301,10 +302,7 @@ export function registerCompanySettingsRoutes(app: Express) {
           .from(ledgerAccounts)
           .where(and(eq(ledgerAccounts.companyId, companyId), sql`"ledger_accounts"."name" ILIKE '%Credit%'`));
         const interCompanyAccountIds = new Set(interCompanyAccounts.map((a) => a.id));
-        console.log(
-          "Inter-company credit accounts to preserve:",
-          interCompanyAccounts.map((a) => a.name)
-        );
+        logger.info("Inter-company credit accounts to preserve", { accounts: interCompanyAccounts.map((a) => a.name) });
 
         // 3. Get voucher IDs that have entries involving inter-company credit accounts
         const interCompanyAccountIdArray = [...interCompanyAccountIds];
@@ -316,7 +314,7 @@ export function registerCompanySettingsRoutes(app: Express) {
                 .where(inArray(voucherEntries.ledgerAccountId, interCompanyAccountIdArray))
             : [];
         const interCompanyVoucherIds = new Set(interCompanyVoucherEntries.map((e) => e.voucherId));
-        console.log("Vouchers involving inter-company accounts to preserve:", interCompanyVoucherIds.size);
+        logger.info("Vouchers involving inter-company accounts to preserve", { count: interCompanyVoucherIds.size });
 
         // 4. Get ALL vouchers for this company
         const allVouchers = await tx
@@ -330,7 +328,7 @@ export function registerCompanySettingsRoutes(app: Express) {
         const vouchersToDelete = allVouchers.filter((v) => {
           // Preserve vouchers that involve inter-company credit accounts
           if (interCompanyVoucherIds.has(v.id)) {
-            console.log("Preserving inter-company voucher:", v.id, v.voucherType, v.description);
+            logger.info("Preserving inter-company voucher", { voucherId: v.id, voucherType: v.voucherType, description: v.description });
             return false; // Don't delete
           }
 
@@ -339,15 +337,15 @@ export function registerCompanySettingsRoutes(app: Express) {
             // Check if any OTW container number is in the description
             const belongsToOtw = otwContainerNumbers.some((cn) => v.description && v.description.includes(cn));
             if (belongsToOtw) {
-              console.log("Preserving OTW voucher:", v.id, v.description);
+              logger.info("Preserving OTW voucher", { voucherId: v.id, description: v.description });
               return false; // Don't delete - it's for an OTW container
             }
           }
           return true; // Delete all other vouchers
         });
         const voucherIdsToDelete = vouchersToDelete.map((v) => v.id);
-        console.log("Vouchers to delete:", voucherIdsToDelete.length);
-        console.log("Vouchers preserved (OTW + inter-company):", allVouchers.length - voucherIdsToDelete.length);
+        logger.info("Vouchers to delete", { count: voucherIdsToDelete.length });
+        logger.info("Vouchers preserved (OTW + inter-company)", { count: allVouchers.length - voucherIdsToDelete.length });
 
         if (voucherIdsToDelete.length > 0) {
           // SOFT DELETE vouchers only - DON'T delete voucher entries
@@ -384,10 +382,10 @@ export function registerCompanySettingsRoutes(app: Express) {
         }
       });
 
-      console.log(`Company data reset completed for company ${companyId}:`, results);
+      logger.info(`Company data reset completed for company ${companyId}:`, { results: results });
       res.json({ success: true, results });
     } catch (error: any) {
-      console.error("Company data reset error:", error);
+      logger.error("Company data reset error:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -410,14 +408,14 @@ export function registerCompanySettingsRoutes(app: Express) {
 
       const restoredCount = result.length;
 
-      console.log(`Undo reset completed for company ${companyId}: restored ${restoredCount} vouchers`);
+      logger.info(`Undo reset completed for company ${companyId}: restored ${restoredCount} vouchers`);
       res.json({
         success: true,
         message: `Restored ${restoredCount} vouchers`,
         vouchersRestored: restoredCount,
       });
     } catch (error: any) {
-      console.error("Undo company reset error:", error);
+      logger.error("Undo company reset error:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -493,7 +491,7 @@ export function registerCompanySettingsRoutes(app: Express) {
         },
       });
     } catch (error: any) {
-      console.error("[DeploymentDiag] Error:", error);
+      logger.error("[DeploymentDiag] Error:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });

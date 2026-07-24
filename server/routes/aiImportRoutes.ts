@@ -1,4 +1,5 @@
 import type { Express } from "express";
+import { logger } from "../lib/logger";
 import { db } from "../db";
 import { requireAuth } from "../auth";
 import { upload, logAudit } from "./_helpers";
@@ -558,7 +559,7 @@ export function registerAiImportRoutes(app: Express) {
         message: `${rawRows.length} rows staged. Call /validate to check them.`,
       });
     } catch (error: any) {
-      console.error("[AI Import] upload error:", error.message);
+      logger.error("[AI Import] upload error:", { error: error.message });
       res.status(500).json({ message: error.message });
     }
   });
@@ -675,7 +676,7 @@ export function registerAiImportRoutes(app: Express) {
             : `All rows valid. Call /confirm to proceed.`,
       });
     } catch (error: any) {
-      console.error("[AI Import] validate error:", error.message);
+      logger.error("[AI Import] validate error:", { error: error.message });
       res.status((error as any).status ?? 500).json({ message: error.message });
     }
   });
@@ -712,7 +713,7 @@ export function registerAiImportRoutes(app: Express) {
         message: "Job confirmed. Call /post to create the records.",
       });
     } catch (error: any) {
-      console.error("[AI Import] confirm error:", error.message);
+      logger.error("[AI Import] confirm error:", { error: error.message });
       res.status((error as any).status ?? 500).json({ message: error.message });
     }
   });
@@ -924,7 +925,7 @@ export function registerAiImportRoutes(app: Express) {
         message: `${created.length} record(s) created successfully.`,
       });
     } catch (error: any) {
-      console.error("[AI Import] post error:", error.message);
+      logger.error("[AI Import] post error:", { error: error.message });
       res.status((error as any).status ?? 500).json({ message: error.message });
     }
   });

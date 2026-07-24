@@ -1,4 +1,5 @@
 import type { Express } from "express";
+import { logger } from "../../lib/logger";
 import { db } from "../../db";
 import { storage } from "../../storage";
 import { isReadonlyMigratedVoucher, READONLY_MIGRATED_VOUCHER_MESSAGE } from "../../lib/migratedVoucherGuard";
@@ -502,7 +503,7 @@ export function registerVoucherPaymentRoutes(app: Express) {
           });
         }
       } catch (dbErr) {
-        console.error("Factory daybook write failed (non-fatal):", dbErr);
+        logger.error("Factory daybook write failed (non-fatal):", { error: dbErr });
       }
 
       // WhatsApp rule check — prompt the frontend instead of auto-sending
@@ -516,7 +517,7 @@ export function registerVoucherPaymentRoutes(app: Express) {
           voucherDate: voucherDate,
         });
       } catch (waErr: any) {
-        console.error("WhatsApp rule check error (non-fatal):", waErr);
+        logger.error("WhatsApp rule check error (non-fatal):", { error: waErr });
       }
 
       // Log the payment/receipt creation
@@ -556,7 +557,7 @@ export function registerVoucherPaymentRoutes(app: Express) {
 
       res.json({ ...result, whatsapp: waResult });
     } catch (error: any) {
-      console.error("Error creating payment/receipt voucher:", error);
+      logger.error("Error creating payment/receipt voucher:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -805,7 +806,7 @@ export function registerVoucherPaymentRoutes(app: Express) {
           voucherDate: voucherDate,
         });
       } catch (waErr: any) {
-        console.error("WhatsApp rule check error (non-fatal):", waErr);
+        logger.error("WhatsApp rule check error (non-fatal):", { error: waErr });
       }
 
       try {
@@ -843,7 +844,7 @@ export function registerVoucherPaymentRoutes(app: Express) {
       }
       res.json({ voucher: result.voucher, entries: result.entries, whatsapp: waResultPatch });
     } catch (error: any) {
-      console.error("Error updating payment/receipt voucher:", error);
+      logger.error("Error updating payment/receipt voucher:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });

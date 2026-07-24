@@ -1,4 +1,5 @@
 import fs from "fs";
+import { logger } from "../lib/logger";
 import os from "os";
 import path from "path";
 import { pipeline } from "stream/promises";
@@ -42,17 +43,17 @@ export async function cleanupStaleTemporaryExportArchives(
           removed += 1;
         } catch (error: any) {
           if (error?.code !== "ENOENT") {
-            console.warn(`[ExportArchive] Failed to inspect or remove stale file ${filePath}:`, error);
+            logger.warn(`[ExportArchive] Failed to inspect or remove stale file ${filePath}:`, { error: error });
           }
         }
       })
     );
   } catch (error) {
-    console.warn("[ExportArchive] Startup stale-file cleanup failed:", error);
+    logger.warn("[ExportArchive] Startup stale-file cleanup failed:", { error: error });
   }
 
   if (removed > 0) {
-    console.log(`[ExportArchive] Removed ${removed} stale temporary archive(s).`);
+    logger.info(`[ExportArchive] Removed ${removed} stale temporary archive(s).`);
   }
   return removed;
 }
@@ -99,7 +100,7 @@ export async function releaseTemporaryExportArchive(filePath: string | undefined
     await fs.promises.rm(filePath, { force: true });
   } catch (error: any) {
     if (error?.code !== "ENOENT") {
-      console.warn(`[ExportArchive] Failed to release temporary archive ${filePath}:`, error);
+      logger.warn(`[ExportArchive] Failed to release temporary archive ${filePath}:`, { error: error });
     }
   }
 }

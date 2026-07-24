@@ -1,4 +1,5 @@
 import { parseId, parseOptionalId } from "../../../lib/parseId";
+import { logger } from "../../../lib/logger";
 import { getClientDate } from "../../../lib/dateUtils";
 import type { Express } from "express";
 import { db } from "../../../db";
@@ -630,7 +631,7 @@ export function registerSupplierFxRoutes(app: Express) {
         .orderBy(desc(factorySupplierFxTransfers.date));
       res.json(transfers);
     } catch (error: any) {
-      console.error("Error fetching FX transfers:", error);
+      logger.error("Error fetching FX transfers:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -859,7 +860,7 @@ export function registerSupplierFxRoutes(app: Express) {
         }
         if (rows.length > 0) await db.insert(factoryFxAllocations).values(rows);
       } catch (allocErr) {
-        console.error("FX allocation error (non-fatal):", allocErr);
+        logger.error("FX allocation error (non-fatal):", { error: allocErr });
       }
       // ─────────────────────────────────────────────────────────────────────────
 
@@ -879,7 +880,7 @@ export function registerSupplierFxRoutes(app: Express) {
 
       res.json(created);
     } catch (error: any) {
-      console.error("Error creating FX transfer:", error);
+      logger.error("Error creating FX transfer:", { error: error });
       res.status(400).json({ message: error.message });
     }
   });
@@ -926,7 +927,7 @@ export function registerSupplierFxRoutes(app: Express) {
 
       res.json({ message: "FX transfer deleted" });
     } catch (error: any) {
-      console.error("Error deleting FX transfer:", error);
+      logger.error("Error deleting FX transfer:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -1369,7 +1370,7 @@ export function registerSupplierFxRoutes(app: Express) {
         transfers: results,
       });
     } catch (error: any) {
-      console.error("Bulk FX settlement error:", error);
+      logger.error("Bulk FX settlement error:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
