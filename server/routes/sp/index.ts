@@ -9,6 +9,7 @@ import { registerSpAliasRoutes } from "./spAliasRoutes";
 import { registerSpReportRoutes } from "./spReportRoutes";
 import { registerSpExportRoutes } from "./spExportRoutes";
 import { registerSpMigrationPhase2Routes } from "./spMigrationPhase2Routes";
+import { registerSpMigrationCutoverRoutes } from "./spMigrationCutoverRoutes";
 import { ensureSpSupplierVoucherSyncTrigger, repairSpSupplierVoucherLinks } from "./spSupplierVoucherSync";
 
 // ── Supplier Partner (SP) route registration ─────────────────────────────────
@@ -17,9 +18,10 @@ import { ensureSpSupplierVoucherSyncTrigger, repairSpSupplierVoucherLinks } from
 // adjustment call below is byte-for-byte identical to the original file —
 // only file boundaries and helper imports changed.
 export function registerSpRoutes(app: Express) {
-  // These routes must register before the legacy migration router in routes.ts.
-  // They safely replace only the incomplete Step 6, Step 7, review, and rollback
-  // surfaces while leaving the rest of the staged migration unchanged.
+  // These focused migration handlers register before the legacy migration router.
+  // Phase 3 also moves its write guard before the first Express route, giving the
+  // source-company read-only lock complete API coverage without changing every module.
+  registerSpMigrationCutoverRoutes(app);
   registerSpMigrationPhase2Routes(app);
 
   // Keep SP container supplier linkage correct even when an older company does
