@@ -2,6 +2,7 @@ import type { ComponentType } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Switch, Route, Redirect } from "wouter";
 import NotFound from "@/pages/not-found";
+import StockInSalesReport from "@/pages/StockInSalesReport";
 import {
   AICommandCenter,
   AccountGroups,
@@ -353,6 +354,7 @@ export function ErpRoutes({ user }: ErpRoutesProps) {
 
       {/* Sales Report */}
       {G("/sales-report", "sales_report", SalesReport)}
+      {G("/stock-in-sales-report", "sales_report", StockInSalesReport)}
       {canAccess("sales_report") && <Route path="/sales-report/detail" component={SalesReportDetail} />}
       {canAccess("sales_report") && <Route path="/sales-report/comparison" component={SalesReportComparison} />}
 
