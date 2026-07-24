@@ -1,4 +1,5 @@
 import type { Express } from "express";
+import { getErrorMessage } from "../lib/httpHandlers";
 import { db } from "../db";
 import { storage } from "../storage";
 import { requireAuth, requireNonPOS } from "../auth";
@@ -31,8 +32,8 @@ export function registerEmployeeRoutes(app: Express) {
         };
       });
       res.json(transformedEmployees);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -53,8 +54,8 @@ export function registerEmployeeRoutes(app: Express) {
       }
       const balance = parseFloat((employee as any).currentBalance || "0").toFixed(2);
       res.json({ balance });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -108,8 +109,8 @@ export function registerEmployeeRoutes(app: Express) {
       }
 
       res.status(201).json(employee);
-    } catch (error: any) {
-      res.status(400).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(400).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -121,8 +122,8 @@ export function registerEmployeeRoutes(app: Express) {
       const employeeId = parseInt(req.params.id);
       const rates = await storage.getEmployeeBaleRates(employeeId, companyId);
       return res.json(rates);
-    } catch (e: any) {
-      res.status(500).json({ message: e.message });
+    } catch (e: unknown) {
+      res.status(500).json({ message: getErrorMessage(e) });
     }
   });
 
@@ -142,8 +143,8 @@ export function registerEmployeeRoutes(app: Express) {
         }));
       await storage.setEmployeeBaleRates(employeeId, companyId, valid);
       return res.json({ ok: true });
-    } catch (e: any) {
-      res.status(500).json({ message: e.message });
+    } catch (e: unknown) {
+      res.status(500).json({ message: getErrorMessage(e) });
     }
   });
 
@@ -154,8 +155,8 @@ export function registerEmployeeRoutes(app: Express) {
       const employeeId = parseInt(req.params.id);
       const rates = await storage.getEmployeeBalePctRates(employeeId, companyId);
       return res.json(rates);
-    } catch (e: any) {
-      res.status(500).json({ message: e.message });
+    } catch (e: unknown) {
+      res.status(500).json({ message: getErrorMessage(e) });
     }
   });
 
@@ -175,8 +176,8 @@ export function registerEmployeeRoutes(app: Express) {
         }));
       await storage.setEmployeeBalePctRates(employeeId, companyId, valid);
       return res.json({ ok: true });
-    } catch (e: any) {
-      res.status(500).json({ message: e.message });
+    } catch (e: unknown) {
+      res.status(500).json({ message: getErrorMessage(e) });
     }
   });
 
@@ -237,8 +238,8 @@ export function registerEmployeeRoutes(app: Express) {
       if (!updated) return res.status(404).json({ message: "Employee not found" });
 
       res.json(updated);
-    } catch (error: any) {
-      res.status(400).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(400).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -295,8 +296,8 @@ export function registerEmployeeRoutes(app: Express) {
       }
 
       res.json({ message: "Employee deleted successfully" });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 

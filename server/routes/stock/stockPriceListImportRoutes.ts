@@ -1,4 +1,5 @@
 import type { Express } from "express";
+import { getErrorMessage } from "../../lib/httpHandlers";
 import { db } from "../../db";
 import { storage } from "../../storage";
 import { requireAuth, requireRole, canDelete, requireNonPOS, checkPOSLocation } from "../../auth";
@@ -95,8 +96,8 @@ export function registerStockPriceListImportRoutes(app: Express) {
         followerLocationIds,
       }));
       res.json(result);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -125,8 +126,8 @@ export function registerStockPriceListImportRoutes(app: Express) {
       }
 
       res.json({ message: "Price groups saved" });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -265,8 +266,8 @@ export function registerStockPriceListImportRoutes(app: Express) {
       }
 
       res.json(rows);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -384,8 +385,8 @@ export function registerStockPriceListImportRoutes(app: Express) {
       });
 
       res.json({ masters: masterLocations, items: result });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -444,11 +445,11 @@ export function registerStockPriceListImportRoutes(app: Express) {
 
           const created = await storage.createStockItem(parsed);
           results.created.push(created);
-        } catch (error: any) {
+        } catch (error: unknown) {
           results.errors.push({
             code: item.code,
             name: item.name,
-            error: error.message,
+            error: getErrorMessage(error),
           });
         }
       }
@@ -457,8 +458,8 @@ export function registerStockPriceListImportRoutes(app: Express) {
         message: `Import completed: ${results.created.length} created, ${results.skipped.length} skipped, ${results.errors.length} errors`,
         results,
       });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -535,8 +536,8 @@ export function registerStockPriceListImportRoutes(app: Express) {
       }
 
       res.json({ imported, skipped, notFound: notFoundCodes.length, notFoundCodes });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -593,8 +594,8 @@ export function registerStockPriceListImportRoutes(app: Express) {
       }
 
       res.json({ updated, notFound, categoryNotFound, notFoundCodes, categoryNotFoundNames });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -737,8 +738,8 @@ export function registerStockPriceListImportRoutes(app: Express) {
           message: `Import complete: ${summary.itemsUpdated} updated, ${summary.gradesCreated} grades created, ${summary.categoriesCreated} categories created, ${summary.skipped} skipped`,
           ...summary,
         });
-      } catch (error: any) {
-        res.status(500).json({ message: error.message });
+      } catch (error: unknown) {
+        res.status(500).json({ message: getErrorMessage(error) });
       }
     }
   );

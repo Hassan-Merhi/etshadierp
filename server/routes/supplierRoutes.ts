@@ -1,4 +1,5 @@
 import type { Express } from "express";
+import { getErrorMessage } from "../lib/httpHandlers";
 import { db, pool } from "../db";
 import { storage } from "../storage";
 import { requireAuth, requireRole, canDelete, requireNonPOS, checkPOSLocation } from "../auth";
@@ -118,8 +119,8 @@ export function registerSupplierRoutes(app: Express) {
       const limit = search ? 50 : undefined;
       const result = await storage.getAllSuppliers(search, limit);
       res.json(result);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -163,8 +164,8 @@ export function registerSupplierRoutes(app: Express) {
       } else {
         res.json(suppliersWithStats);
       }
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -181,8 +182,8 @@ export function registerSupplierRoutes(app: Express) {
       }
 
       res.json(supplier);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -202,8 +203,8 @@ export function registerSupplierRoutes(app: Express) {
       // company — never guessed via "lowest company ID".
       const { balance } = await getSupplierBalanceForContext(supplier, companyId || undefined);
       res.json({ balance });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -270,8 +271,8 @@ export function registerSupplierRoutes(app: Express) {
         /* non-fatal */
       }
       res.status(201).json(supplier);
-    } catch (error: any) {
-      res.status(400).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(400).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -319,8 +320,8 @@ export function registerSupplierRoutes(app: Express) {
         /* non-fatal */
       }
       res.json(updatedSupplier);
-    } catch (error: any) {
-      res.status(400).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(400).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -355,8 +356,8 @@ export function registerSupplierRoutes(app: Express) {
         /* non-fatal */
       }
       res.status(204).send();
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -370,8 +371,8 @@ export function registerSupplierRoutes(app: Express) {
         .set({ stockGroupId: stockGroupId ?? null })
         .where(eq(suppliers.id, supplierId));
       res.json({ success: true });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 

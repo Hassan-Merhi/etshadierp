@@ -1,4 +1,5 @@
 import type { Express, Request, Response } from "express";
+import { getErrorMessage } from "../lib/httpHandlers";
 import { pool } from "../db";
 import { requireAuth, requireRole } from "../auth";
 import { logger } from "../lib/logger";
@@ -32,8 +33,8 @@ export function registerExportRoutes(app: Express) {
     try {
       const result = await pool.query(`SELECT id, email, active, created_at FROM export_recipients ORDER BY id`);
       res.json(result.rows);
-    } catch (err: any) {
-      res.status(500).json({ message: err.message });
+    } catch (err: unknown) {
+      res.status(500).json({ message: getErrorMessage(err) });
     }
   });
 
@@ -47,11 +48,11 @@ export function registerExportRoutes(app: Express) {
         email.trim().toLowerCase(),
       ]);
       res.json(result.rows[0]);
-    } catch (err: any) {
-      if (err.message?.includes("unique") || err.message?.includes("duplicate")) {
+    } catch (err: unknown) {
+      if (getErrorMessage(err)?.includes("unique") || getErrorMessage(err)?.includes("duplicate")) {
         return res.status(409).json({ message: "Email already exists" });
       }
-      res.status(500).json({ message: err.message });
+      res.status(500).json({ message: getErrorMessage(err) });
     }
   });
 
@@ -59,8 +60,8 @@ export function registerExportRoutes(app: Express) {
     try {
       await pool.query(`DELETE FROM export_recipients WHERE id = $1`, [req.params.id]);
       res.json({ success: true });
-    } catch (err: any) {
-      res.status(500).json({ message: err.message });
+    } catch (err: unknown) {
+      res.status(500).json({ message: getErrorMessage(err) });
     }
   });
 
@@ -88,8 +89,8 @@ export function registerExportRoutes(app: Express) {
         scheduleHour: row.schedule_hour ?? 18,
         scheduleTimezone: row.schedule_timezone || "America/New_York",
       });
-    } catch (err: any) {
-      res.status(500).json({ message: err.message });
+    } catch (err: unknown) {
+      res.status(500).json({ message: getErrorMessage(err) });
     }
   });
 
@@ -134,8 +135,8 @@ export function registerExportRoutes(app: Express) {
         await pool.query(`UPDATE export_settings SET ${setParts.join(", ")} WHERE id = $${idx}`, params);
       }
       res.json({ success: true });
-    } catch (err: any) {
-      res.status(500).json({ message: err.message });
+    } catch (err: unknown) {
+      res.status(500).json({ message: getErrorMessage(err) });
     }
   });
 
@@ -287,15 +288,15 @@ export function registerExportRoutes(app: Express) {
             emailAttempts: emailRes.attempts,
           });
         }
-      } catch (err: any) {
+      } catch (err: unknown) {
         logger.error("Export job failed", {
           module: "export",
           action: "start",
           durationMs: Date.now() - _t,
           error: err,
         });
-        failJob(job, err.message || "Unexpected error");
-        await finishExportRun(runId, { status: "failed", skippedReason: err.message || "Unexpected error" }).catch(
+        failJob(job, getErrorMessage(err) || "Unexpected error");
+        await finishExportRun(runId, { status: "failed", skippedReason: getErrorMessage(err) || "Unexpected error" }).catch(
           () => {}
         );
       }
@@ -326,7 +327,7 @@ export function registerExportRoutes(app: Express) {
     const dateLabel = new Date().toISOString().substring(0, 10);
     try {
       await streamTemporaryExportArchive(res, job.zipFilePath, `DailyExport_${dateLabel}.zip`);
-    } catch (err: any) {
+    } catch (err: unknown) {
       logger.error("Export archive download failed", {
         module: "export",
         action: "download",
@@ -334,9 +335,9 @@ export function registerExportRoutes(app: Express) {
         error: err,
       });
       if (!res.headersSent) {
-        res.status(500).json({ message: err.message || "Export archive is unavailable" });
+        res.status(500).json({ message: getErrorMessage(err) || "Export archive is unavailable" });
       } else if (!res.writableEnded) {
-        res.destroy(err);
+        res.destroy(err instanceof Error ? err : undefined);
       }
     } finally {
       // A completed archive is single-use. Remove it after success, disconnect,
@@ -351,8 +352,8 @@ export function registerExportRoutes(app: Express) {
     try {
       const companies = await fetchAllCompanies();
       res.json(companies);
-    } catch (err: any) {
-      res.status(500).json({ message: err.message });
+    } catch (err: unknown) {
+      res.status(500).json({ message: getErrorMessage(err) });
     }
   });
 
@@ -372,9 +373,9 @@ export function registerExportRoutes(app: Express) {
       const count = r.rowCount ?? 0;
       logger.info(`[ExportRun] Manual dismiss: cleared ${count} stuck run(s)`);
       res.json({ cleared: count, ids: r.rows.map((x: any) => x.id) });
-    } catch (e: any) {
-      logger.error("[ExportRun] Manual dismiss failed:", { error: e.message });
-      res.status(500).json({ message: e.message });
+    } catch (e: unknown) {
+      logger.error("[ExportRun] Manual dismiss failed:", { error: getErrorMessage(e) });
+      res.status(500).json({ message: getErrorMessage(e) });
     }
   });
 
@@ -492,8 +493,8 @@ export function registerExportRoutes(app: Express) {
         },
         issues,
       });
-    } catch (err: any) {
-      res.status(500).json({ message: err.message });
+    } catch (err: unknown) {
+      res.status(500).json({ message: getErrorMessage(err) });
     }
   });
 }

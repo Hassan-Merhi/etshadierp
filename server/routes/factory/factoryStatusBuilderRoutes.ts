@@ -1,4 +1,5 @@
 import { parseId, parseOptionalId } from "../../lib/parseId";
+import { getErrorMessage } from "../../lib/httpHandlers";
 import type { Express } from "express";
 import { db } from "../../db";
 import { requireAuth } from "../../auth";
@@ -95,8 +96,8 @@ export function registerFactoryStatusBuilderRoutes(app: Express) {
       }
 
       res.json(template);
-    } catch (err: any) {
-      res.status(500).json({ error: err.message });
+    } catch (err: unknown) {
+      res.status(500).json({ error: getErrorMessage(err) });
     }
   });
 
@@ -112,8 +113,8 @@ export function registerFactoryStatusBuilderRoutes(app: Express) {
         .where(eq(statusReportTemplates.id, id))
         .returning();
       res.json(updated);
-    } catch (err: any) {
-      res.status(500).json({ error: err.message });
+    } catch (err: unknown) {
+      res.status(500).json({ error: getErrorMessage(err) });
     }
   });
 
@@ -128,8 +129,8 @@ export function registerFactoryStatusBuilderRoutes(app: Express) {
         .where(eq(statusMetrics.templateId, templateId))
         .orderBy(asc(statusMetrics.sortOrder));
       res.json(metrics);
-    } catch (err: any) {
-      res.status(500).json({ error: err.message });
+    } catch (err: unknown) {
+      res.status(500).json({ error: getErrorMessage(err) });
     }
   });
 
@@ -152,8 +153,8 @@ export function registerFactoryStatusBuilderRoutes(app: Express) {
         })
         .returning();
       res.json(metric);
-    } catch (err: any) {
-      res.status(500).json({ error: err.message });
+    } catch (err: unknown) {
+      res.status(500).json({ error: getErrorMessage(err) });
     }
   });
 
@@ -169,8 +170,8 @@ export function registerFactoryStatusBuilderRoutes(app: Express) {
         .where(eq(statusMetrics.id, id))
         .returning();
       res.json(updated);
-    } catch (err: any) {
-      res.status(500).json({ error: err.message });
+    } catch (err: unknown) {
+      res.status(500).json({ error: getErrorMessage(err) });
     }
   });
 
@@ -183,8 +184,8 @@ export function registerFactoryStatusBuilderRoutes(app: Express) {
       await db.delete(statusMetricValues).where(eq(statusMetricValues.metricId, id));
       await db.delete(statusMetrics).where(eq(statusMetrics.id, id));
       res.json({ success: true });
-    } catch (err: any) {
-      res.status(500).json({ error: err.message });
+    } catch (err: unknown) {
+      res.status(500).json({ error: getErrorMessage(err) });
     }
   });
 
@@ -241,8 +242,8 @@ export function registerFactoryStatusBuilderRoutes(app: Express) {
 
       const values = await db.select().from(statusMetricValues).where(eq(statusMetricValues.runId, run.id));
       res.json({ run, values });
-    } catch (err: any) {
-      res.status(500).json({ error: err.message });
+    } catch (err: unknown) {
+      res.status(500).json({ error: getErrorMessage(err) });
     }
   });
 
@@ -311,8 +312,8 @@ export function registerFactoryStatusBuilderRoutes(app: Express) {
       await db.update(statusReportRuns).set({ updatedAt: now }).where(eq(statusReportRuns.id, runId));
       const updated = await db.select().from(statusMetricValues).where(eq(statusMetricValues.runId, runId));
       res.json({ values: updated });
-    } catch (err: any) {
-      res.status(500).json({ error: err.message });
+    } catch (err: unknown) {
+      res.status(500).json({ error: getErrorMessage(err) });
     }
   });
 
@@ -367,8 +368,8 @@ export function registerFactoryStatusBuilderRoutes(app: Express) {
 
       const updated = await db.select().from(statusMetricValues).where(eq(statusMetricValues.runId, runId));
       res.json({ values: updated });
-    } catch (err: any) {
-      res.status(500).json({ error: err.message });
+    } catch (err: unknown) {
+      res.status(500).json({ error: getErrorMessage(err) });
     }
   });
 }

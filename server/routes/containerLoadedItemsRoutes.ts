@@ -7,6 +7,7 @@
  * shared barcode/alias helpers now live in ./helpers/proformaBarcodeHelpers.
  */
 import { Express } from "express";
+import { getErrorMessage } from "../lib/httpHandlers";
 import { logger } from "../lib/logger";
 import { eq, and, inArray } from "drizzle-orm";
 import ExcelJS from "exceljs";
@@ -46,8 +47,8 @@ export function registerContainerLoadedItemsRoutes(app: Express, requireAuth: an
         .from(supplierContainerLoadedItems)
         .where(eq(supplierContainerLoadedItems.containerId, containerId));
       res.json(items);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -76,8 +77,8 @@ export function registerContainerLoadedItemsRoutes(app: Express, requireAuth: an
         })
         .returning();
       res.json(item);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -106,8 +107,8 @@ export function registerContainerLoadedItemsRoutes(app: Express, requireAuth: an
         .where(eq(supplierContainerLoadedItems.id, itemId))
         .returning();
       res.json(updated);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -126,8 +127,8 @@ export function registerContainerLoadedItemsRoutes(app: Express, requireAuth: an
         return res.status(403).json({ message: "Access denied" });
       await db.delete(supplierContainerLoadedItems).where(eq(supplierContainerLoadedItems.id, itemId));
       res.json({ success: true });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -160,8 +161,8 @@ export function registerContainerLoadedItemsRoutes(app: Express, requireAuth: an
         .from(supplierContainerLoadedItems)
         .where(eq(supplierContainerLoadedItems.containerId, containerId));
       res.json({ imported: values.length, items: allItems });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -231,8 +232,8 @@ export function registerContainerLoadedItemsRoutes(app: Express, requireAuth: an
         .from(supplierContainerLoadedItems)
         .where(eq(supplierContainerLoadedItems.containerId, containerId));
       res.json({ imported: values.length, skipped: skippedCount, items: allItems });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -380,8 +381,8 @@ export function registerContainerLoadedItemsRoutes(app: Express, requireAuth: an
           loadedItems,
           aliasConflicts,
         });
-      } catch (error: any) {
-        res.status(500).json({ message: error.message });
+      } catch (error: unknown) {
+        res.status(500).json({ message: getErrorMessage(error) });
       }
     }
   );
@@ -818,9 +819,9 @@ export function registerContainerLoadedItemsRoutes(app: Express, requireAuth: an
         res.setHeader("Content-Disposition", `attachment; filename="${fileName}"`);
         res.setHeader("Content-Length", xlsBuffer.byteLength);
         res.end(xlsBuffer);
-      } catch (error: any) {
+      } catch (error: unknown) {
         logger.error("Export error:", { error: error });
-        if (!res.headersSent) res.status(500).json({ message: error.message });
+        if (!res.headersSent) res.status(500).json({ message: getErrorMessage(error) });
       }
     }
   );
@@ -1151,9 +1152,9 @@ export function registerContainerLoadedItemsRoutes(app: Express, requireAuth: an
         res.setHeader("Content-Disposition", `attachment; filename="${summaryFileName}"`);
         res.setHeader("Content-Length", xlsBuffer2.byteLength);
         res.end(xlsBuffer2);
-      } catch (error: any) {
+      } catch (error: unknown) {
         logger.error("Summary export error:", { error: error });
-        if (!res.headersSent) res.status(500).json({ message: error.message });
+        if (!res.headersSent) res.status(500).json({ message: getErrorMessage(error) });
       }
     }
   );

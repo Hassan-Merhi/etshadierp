@@ -6,6 +6,7 @@
  * sub-registrar; behaviour is unchanged.
  */
 import type { Express } from "express";
+import { getErrorMessage } from "../lib/httpHandlers";
 import { logger } from "../lib/logger";
 import { eq, and, desc } from "drizzle-orm";
 import { db } from "../db";
@@ -59,9 +60,9 @@ export function registerProductionRawStockRoutes(app: Express) {
       });
 
       res.json(result);
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error fetching production raw stock:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -117,9 +118,9 @@ export function registerProductionRawStockRoutes(app: Express) {
         .returning();
 
       res.json(record);
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error offloading container:", { error: error });
-      res.status(400).json({ message: error.message });
+      res.status(400).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -142,9 +143,9 @@ export function registerProductionRawStockRoutes(app: Express) {
 
       const available = allContainers.filter((c) => !offloadedIdList.includes(c.id));
       res.json(available);
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error fetching available containers:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -158,9 +159,9 @@ export function registerProductionRawStockRoutes(app: Express) {
 
       const batches = await storage.getAllMixBatches(companyId);
       res.json(batches);
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error fetching mix batches:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -183,9 +184,9 @@ export function registerProductionRawStockRoutes(app: Express) {
       }
 
       res.json(batch);
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error fetching mix batch:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -349,9 +350,9 @@ export function registerProductionRawStockRoutes(app: Express) {
       });
 
       res.json(result);
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error creating mix batch:", { error: error });
-      res.status(400).json({ message: error.message });
+      res.status(400).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -369,9 +370,9 @@ export function registerProductionRawStockRoutes(app: Express) {
 
       const sources = await storage.getMixBatchSources(id, companyId);
       res.json(sources);
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error fetching mix batch sources:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -399,9 +400,9 @@ export function registerProductionRawStockRoutes(app: Express) {
 
       const source = await storage.addMixBatchSource(data);
       res.json(source);
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error adding mix batch source:", { error: error });
-      res.status(400).json({ message: error.message });
+      res.status(400).json({ message: getErrorMessage(error) });
     }
   });
 }

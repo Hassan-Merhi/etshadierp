@@ -6,6 +6,7 @@
  * as a sub-registrar; behaviour is unchanged.
  */
 import type { Express } from "express";
+import { getErrorMessage } from "../lib/httpHandlers";
 import { and, eq, inArray, isNull, or, sql } from "drizzle-orm";
 import { db } from "../db";
 import { storage } from "../storage";
@@ -135,8 +136,8 @@ export function registerDashboardAccountRoutes(app: Express) {
       });
 
       res.json(enrichedAccounts.filter((a) => a !== null));
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -173,8 +174,8 @@ export function registerDashboardAccountRoutes(app: Express) {
       const [account] = await db.insert(dashboardCashAccounts).values(data).returning().execute();
 
       res.json(account);
-    } catch (error: any) {
-      res.status(400).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(400).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -193,8 +194,8 @@ export function registerDashboardAccountRoutes(app: Express) {
         .execute();
 
       res.json({ success: true });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -215,8 +216,8 @@ export function registerDashboardAccountRoutes(app: Express) {
         )
       );
       res.json({ success: true });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -285,8 +286,8 @@ export function registerDashboardAccountRoutes(app: Express) {
       });
 
       res.json(enrichedAccounts.filter((a) => a !== null));
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -319,8 +320,8 @@ export function registerDashboardAccountRoutes(app: Express) {
       const [account] = await db.insert(dashboardPayableAccounts).values(data).returning().execute();
 
       res.json(account);
-    } catch (error: any) {
-      res.status(400).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(400).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -341,8 +342,8 @@ export function registerDashboardAccountRoutes(app: Express) {
         .execute();
 
       res.json({ success: true });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -363,8 +364,8 @@ export function registerDashboardAccountRoutes(app: Express) {
         )
       );
       res.json({ success: true });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -446,8 +447,8 @@ export function registerDashboardAccountRoutes(app: Express) {
       }
 
       res.json({ accountIds: selection.accountIds || [], accounts });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -498,8 +499,8 @@ export function registerDashboardAccountRoutes(app: Express) {
       }
 
       res.json({ success: true });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 }
