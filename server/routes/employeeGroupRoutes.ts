@@ -5,6 +5,7 @@
  * employeeRoutes.ts as a sub-registrar; behaviour is unchanged.
  */
 import type { Express } from "express";
+import { getErrorMessage } from "../lib/httpHandlers";
 import { and, eq } from "drizzle-orm";
 import { db } from "../db";
 import { storage } from "../storage";
@@ -20,8 +21,8 @@ export function registerEmployeeGroupRoutes(app: Express) {
       }
       const groups = await storage.getAllEmployeeGroups(req.session.currentCompanyId);
       res.json(groups);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -39,8 +40,8 @@ export function registerEmployeeGroupRoutes(app: Express) {
         return res.status(403).json({ message: "Access denied: group belongs to a different company" });
       }
       res.json(group);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -55,8 +56,8 @@ export function registerEmployeeGroupRoutes(app: Express) {
       });
       const group = await storage.createEmployeeGroup(parsed);
       res.status(201).json(group);
-    } catch (error: any) {
-      res.status(400).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(400).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -64,8 +65,8 @@ export function registerEmployeeGroupRoutes(app: Express) {
     try {
       const group = await storage.updateEmployeeGroup(parseInt(req.params.id), req.body);
       res.json(group);
-    } catch (error: any) {
-      res.status(400).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(400).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -73,8 +74,8 @@ export function registerEmployeeGroupRoutes(app: Express) {
     try {
       await storage.deleteEmployeeGroup(parseInt(req.params.id));
       res.status(204).send();
-    } catch (error: any) {
-      res.status(400).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(400).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -82,8 +83,8 @@ export function registerEmployeeGroupRoutes(app: Express) {
     try {
       const members = await storage.getEmployeeGroupMembers(parseInt(req.params.id));
       res.json(members);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -101,8 +102,8 @@ export function registerEmployeeGroupRoutes(app: Express) {
       }
       await storage.addEmployeeToGroup(groupId, employeeId);
       res.status(201).send();
-    } catch (error: any) {
-      res.status(400).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(400).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -118,8 +119,8 @@ export function registerEmployeeGroupRoutes(app: Express) {
       }
       await storage.removeEmployeeFromGroup(groupId, parseInt(req.params.employeeId));
       res.status(204).send();
-    } catch (error: any) {
-      res.status(400).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(400).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -132,8 +133,8 @@ export function registerEmployeeGroupRoutes(app: Express) {
       const allGroups = await storage.getAllEmployeeGroups(req.session.currentCompanyId);
       const workerGroups = allGroups.filter((g: any) => (g.groupType || g.group_type) === "Worker");
       res.json(workerGroups);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -171,8 +172,8 @@ export function registerEmployeeGroupRoutes(app: Express) {
         })
       );
       res.json(groupsWithMembers);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -188,8 +189,8 @@ export function registerEmployeeGroupRoutes(app: Express) {
       });
       const group = await storage.createEmployeeGroup(parsed);
       res.status(201).json(group);
-    } catch (error: any) {
-      res.status(400).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(400).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -197,8 +198,8 @@ export function registerEmployeeGroupRoutes(app: Express) {
     try {
       await storage.deleteEmployeeGroup(parseInt(req.params.id));
       res.status(204).send();
-    } catch (error: any) {
-      res.status(400).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(400).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -206,8 +207,8 @@ export function registerEmployeeGroupRoutes(app: Express) {
     try {
       const members = await storage.getEmployeeGroupMembers(parseInt(req.params.id));
       res.json(members);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -237,8 +238,8 @@ export function registerEmployeeGroupRoutes(app: Express) {
 
       await storage.addEmployeeToGroup(groupId, workerId);
       res.status(201).send();
-    } catch (error: any) {
-      res.status(400).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(400).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -259,8 +260,8 @@ export function registerEmployeeGroupRoutes(app: Express) {
 
       await storage.removeEmployeeFromGroup(groupId, workerId);
       res.status(204).send();
-    } catch (error: any) {
-      res.status(400).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(400).json({ message: getErrorMessage(error) });
     }
   });
 }

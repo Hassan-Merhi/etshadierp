@@ -1,4 +1,5 @@
 import type { Express } from "express";
+import { getErrorMessage } from "./lib/httpHandlers";
 import { logger } from "./lib/logger";
 import { createServer, type Server } from "http";
 import { broadcast } from "./wsServer";
@@ -347,8 +348,8 @@ async function runIntercompanyPosTransfer(
         `[IntercompanyPOS] Could not find cash account "${cashName}" in company ${config.destCompanyId}. Dest voucher skipped.`
       );
     }
-  } catch (err: any) {
-    logger.error("[IntercompanyPOS] Auto-transfer failed:", { error: err?.message ?? err });
+  } catch (err: unknown) {
+    logger.error("[IntercompanyPOS] Auto-transfer failed:", { error: getErrorMessage(err) ?? err });
   }
 }
 
@@ -885,9 +886,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const result = await db.execute(sql`SELECT 1 as test`);
       res.json({ status: "ok", message: "Database connection successful" });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Database connection failed:", { error: error });
-      res.status(500).json({ status: "error", message: error.message });
+      res.status(500).json({ status: "error", message: getErrorMessage(error) });
     }
   });
 
@@ -912,8 +913,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .from(intercompanyPosConfigs)
         .where(eq(intercompanyPosConfigs.sourceCompanyId, companyId));
       res.json(config || null);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -959,8 +960,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           .returning();
         return res.status(201).json(created);
       }
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -971,8 +972,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!companyId) return res.status(400).json({ message: "companyId required" });
       const accounts = await storage.getAllLedgerAccounts(parseInt(companyId as string));
       res.json(accounts);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -1000,8 +1001,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .where(and(eq(erpWorkerDocs.companyId, companyId), eq(erpWorkerDocs.employeeId, employeeId)))
         .orderBy(desc(erpWorkerDocs.uploadedAt));
       res.json(docs);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -1014,8 +1015,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const parsed = insertErpWorkerDocSchema.parse({ ...req.body, companyId, employeeId });
       const [doc] = await db.insert(erpWorkerDocs).values(parsed).returning();
       res.status(201).json(doc);
-    } catch (error: any) {
-      res.status(400).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(400).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -1037,8 +1038,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .where(eq(erpWorkerDocs.id, docId))
         .returning();
       res.json(updated);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -1055,8 +1056,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!existing) return res.status(404).json({ message: "Document not found" });
       await db.delete(erpWorkerDocs).where(eq(erpWorkerDocs.id, docId));
       res.json({ message: "Document deleted" });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -1076,8 +1077,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.set("Content-Type", doc.fileType);
       res.set("Content-Disposition", `attachment; filename="${doc.fileName}"`);
       res.send(buffer);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -1091,8 +1092,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       const advances = await storage.getAllSalaryAdvances(req.session.currentCompanyId);
       res.json(advances);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -1105,8 +1106,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const advances = await storage.getSalaryAdvancesByEmployee(employeeId);
       res.json(advances);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -1191,8 +1192,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       res.status(201).json(advance);
-    } catch (error: any) {
-      res.status(400).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(400).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -1256,8 +1257,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         newRemainingBalance: newRemainingBalance.toFixed(2),
         fullyPaid: isFullyPaid,
       });
-    } catch (error: any) {
-      res.status(400).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(400).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -1277,8 +1278,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       await storage.deleteSalaryAdvance(advanceId);
       res.json({ message: "Salary advance deleted successfully" });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -1391,8 +1392,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       res.json({ message: `Reconciliation complete. ${fixed} advance(s) corrected.`, fixed });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -1425,8 +1426,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           workerName: `${r.employeeFirstName} ${r.employeeLastName}`.trim(),
         }))
       );
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 

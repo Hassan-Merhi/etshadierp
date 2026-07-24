@@ -1,4 +1,5 @@
 import { parseId, parseOptionalId } from "../lib/parseId";
+import { getErrorMessage } from "../lib/httpHandlers";
 import { logger } from "../lib/logger";
 import { logAudit } from "./_helpers";
 import { Express } from "express";
@@ -65,8 +66,8 @@ export function registerSupplierProformaRoutes(app: Express, requireAuth: any) {
         .from(supplierProformas)
         .where(and(eq(supplierProformas.companyId, companyId), eq(supplierProformas.supplierId, supplierId)));
       res.json(proformas);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -86,8 +87,8 @@ export function registerSupplierProformaRoutes(app: Express, requireAuth: any) {
         .from(supplierProformaLines)
         .where(eq(supplierProformaLines.proformaId, proformaId));
       res.json({ ...proforma, lines });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -137,8 +138,8 @@ export function registerSupplierProformaRoutes(app: Express, requireAuth: any) {
         changes: { supplierId: { old: null, new: supplierId }, reference: { old: null, new: proforma.reference } },
       });
       res.json({ ...proforma, lines: allLines });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -159,8 +160,8 @@ export function registerSupplierProformaRoutes(app: Express, requireAuth: any) {
         .returning();
       if (!updated) return res.status(404).json({ message: "Proforma not found" });
       res.json(updated);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -185,8 +186,8 @@ export function registerSupplierProformaRoutes(app: Express, requireAuth: any) {
         changes: { deleted: { old: false, new: true } },
       });
       res.json({ success: true });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -215,8 +216,8 @@ export function registerSupplierProformaRoutes(app: Express, requireAuth: any) {
         .returning();
       await db.update(supplierProformas).set({ updatedAt: new Date() }).where(eq(supplierProformas.id, proformaId));
       res.json(line);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -246,8 +247,8 @@ export function registerSupplierProformaRoutes(app: Express, requireAuth: any) {
         .returning();
       await db.update(supplierProformas).set({ updatedAt: new Date() }).where(eq(supplierProformas.id, proforma.id));
       res.json(updated);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -267,8 +268,8 @@ export function registerSupplierProformaRoutes(app: Express, requireAuth: any) {
       await db.delete(supplierProformaLines).where(eq(supplierProformaLines.id, lineId));
       await db.update(supplierProformas).set({ updatedAt: new Date() }).where(eq(supplierProformas.id, proforma.id));
       res.json({ success: true });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -305,8 +306,8 @@ export function registerSupplierProformaRoutes(app: Express, requireAuth: any) {
         .from(supplierProformaLines)
         .where(eq(supplierProformaLines.proformaId, proformaId));
       res.json({ imported: lineValues.length, lines: allLines });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -551,9 +552,9 @@ export function registerSupplierProformaRoutes(app: Express, requireAuth: any) {
       res.setHeader("Content-Disposition", `attachment; filename="${safeRef}.xlsx"`);
       const buf = Buffer.from(await wb.xlsx.writeBuffer());
       res.end(buf);
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Proforma export error:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -598,8 +599,8 @@ export function registerSupplierProformaRoutes(app: Express, requireAuth: any) {
         .returning();
 
       res.json(updated);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 }

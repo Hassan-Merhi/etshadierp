@@ -1,4 +1,5 @@
 import { Express } from "express";
+import { getErrorMessage } from "../lib/httpHandlers";
 import { logger } from "../lib/logger";
 import { pool } from "../db";
 import ExcelJS from "exceljs";
@@ -22,9 +23,9 @@ export function registerSupplierProfitCheckRoutes(app: Express, requireAuth: any
       );
 
       res.json(result.rows);
-    } catch (err: any) {
-      logger.error("[supplier-profit-check/location-groups]", { error: err.message });
-      res.status(500).json({ message: err.message });
+    } catch (err: unknown) {
+      logger.error("[supplier-profit-check/location-groups]", { error: getErrorMessage(err) });
+      res.status(500).json({ message: getErrorMessage(err) });
     }
   });
 
@@ -52,9 +53,9 @@ export function registerSupplierProfitCheckRoutes(app: Express, requireAuth: any
       );
 
       res.json(result.rows);
-    } catch (err: any) {
-      logger.error("[supplier-profit-check/otw-containers]", { error: err.message });
-      res.status(500).json({ message: err.message });
+    } catch (err: unknown) {
+      logger.error("[supplier-profit-check/otw-containers]", { error: getErrorMessage(err) });
+      res.status(500).json({ message: getErrorMessage(err) });
     }
   });
 
@@ -403,9 +404,9 @@ export function registerSupplierProfitCheckRoutes(app: Express, requireAuth: any
       });
 
       res.json(rows);
-    } catch (err: any) {
-      logger.error("[supplier-profit-check/analyze]", { error: err.message });
-      res.status(500).json({ message: err.message });
+    } catch (err: unknown) {
+      logger.error("[supplier-profit-check/analyze]", { error: getErrorMessage(err) });
+      res.status(500).json({ message: getErrorMessage(err) });
     }
   });
 
@@ -457,9 +458,9 @@ export function registerSupplierProfitCheckRoutes(app: Express, requireAuth: any
       }
 
       res.json({ id: proforma.id, reference: proforma.reference });
-    } catch (err: any) {
-      logger.error("[supplier-profit-check/save-proforma]", { error: err.message });
-      res.status(500).json({ message: err.message });
+    } catch (err: unknown) {
+      logger.error("[supplier-profit-check/save-proforma]", { error: getErrorMessage(err) });
+      res.status(500).json({ message: getErrorMessage(err) });
     }
   });
 
@@ -506,8 +507,8 @@ export function registerSupplierProfitCheckRoutes(app: Express, requireAuth: any
 
       await pool.query(`UPDATE supplier_proformas SET updated_at = now() WHERE id = $1`, [proformaId]);
       res.json({ ok: true });
-    } catch (err: any) {
-      res.status(500).json({ message: err.message });
+    } catch (err: unknown) {
+      res.status(500).json({ message: getErrorMessage(err) });
     }
   });
 
@@ -649,9 +650,9 @@ export function registerSupplierProfitCheckRoutes(app: Express, requireAuth: any
         res.setHeader("Content-Disposition", `attachment; filename="proforma-${proforma.reference}.xlsx"`);
         const buffer = Buffer.from(await wb.xlsx.writeBuffer());
         res.send(buffer);
-      } catch (err: any) {
-        logger.error("[export-supplier]", { error: err.message });
-        res.status(500).json({ message: err.message });
+      } catch (err: unknown) {
+        logger.error("[export-supplier]", { error: getErrorMessage(err) });
+        res.status(500).json({ message: getErrorMessage(err) });
       }
     }
   );
@@ -872,9 +873,9 @@ export function registerSupplierProfitCheckRoutes(app: Express, requireAuth: any
       res.setHeader("Content-Disposition", `attachment; filename="profit-analysis-${proformaRef || "export"}.xlsx"`);
       const buffer = Buffer.from(await wb.xlsx.writeBuffer());
       res.send(buffer);
-    } catch (err: any) {
-      logger.error("[export-internal]", { error: err.message });
-      res.status(500).json({ message: err.message });
+    } catch (err: unknown) {
+      logger.error("[export-internal]", { error: getErrorMessage(err) });
+      res.status(500).json({ message: getErrorMessage(err) });
     }
   });
 
@@ -891,8 +892,8 @@ export function registerSupplierProfitCheckRoutes(app: Express, requireAuth: any
         [supplierId]
       );
       res.json(result.rows);
-    } catch (err: any) {
-      res.status(500).json({ message: err.message });
+    } catch (err: unknown) {
+      res.status(500).json({ message: getErrorMessage(err) });
     }
   });
 
@@ -913,8 +914,8 @@ export function registerSupplierProfitCheckRoutes(app: Express, requireAuth: any
         [supplierId, stockItemId, poPrice ?? null, avgPrice ?? null]
       );
       res.json({ ok: true });
-    } catch (err: any) {
-      res.status(500).json({ message: err.message });
+    } catch (err: unknown) {
+      res.status(500).json({ message: getErrorMessage(err) });
     }
   });
 
@@ -1190,9 +1191,9 @@ export function registerSupplierProfitCheckRoutes(app: Express, requireAuth: any
       });
 
       res.json({ rows, notFound });
-    } catch (err: any) {
-      logger.error("[supplier-profit-check/import-by-codes]", { error: err.message });
-      res.status(500).json({ message: err.message });
+    } catch (err: unknown) {
+      logger.error("[supplier-profit-check/import-by-codes]", { error: getErrorMessage(err) });
+      res.status(500).json({ message: getErrorMessage(err) });
     }
   });
 
@@ -1240,9 +1241,9 @@ export function registerSupplierProfitCheckRoutes(app: Express, requireAuth: any
       }
 
       res.json({ id: item.id, code: item.code, name: item.name, stockGroupId: item.stock_group_id });
-    } catch (err: any) {
-      logger.error("[supplier-profit-check/add-stock-item]", { error: err.message });
-      res.status(500).json({ message: err.message });
+    } catch (err: unknown) {
+      logger.error("[supplier-profit-check/add-stock-item]", { error: getErrorMessage(err) });
+      res.status(500).json({ message: getErrorMessage(err) });
     }
   });
 }

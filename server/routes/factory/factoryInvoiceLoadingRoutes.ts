@@ -1,4 +1,5 @@
 import { parseId, parseOptionalId } from "../../lib/parseId";
+import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
 import { buildSafeFilename, contentDisposition } from "../../lib/contentDisposition";
 import type { Express } from "express";
@@ -238,9 +239,9 @@ export function registerFactoryInvoiceLoadingRoutes(app: Express) {
       if (!summary) return res.status(404).json({ message: "Invoice not found" });
 
       res.json(summary);
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("loading-summary error:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -335,9 +336,9 @@ export function registerFactoryInvoiceLoadingRoutes(app: Express) {
 
       const summary = await buildLoadingSummary(invoiceId, companyId, session.id);
       res.status(201).json({ session, summary });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("create loading session error:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -479,9 +480,9 @@ export function registerFactoryInvoiceLoadingRoutes(app: Express) {
 
       const summary = await buildLoadingSummary(invoiceId, companyId, sessionId);
       res.json({ loadingBale, bale, summary });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("scan-bale error:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -527,9 +528,9 @@ export function registerFactoryInvoiceLoadingRoutes(app: Express) {
 
         const summary = await buildLoadingSummary(session.invoiceId, companyId, sessionId);
         res.json({ removed: deleted[0], summary });
-      } catch (error: any) {
+      } catch (error: unknown) {
         logger.error("remove bale error:", { error: error });
-        res.status(500).json({ message: error.message });
+        res.status(500).json({ message: getErrorMessage(error) });
       }
     }
   );
@@ -573,9 +574,9 @@ export function registerFactoryInvoiceLoadingRoutes(app: Express) {
 
       const summary = await buildLoadingSummary(session.invoiceId, companyId, sessionId);
       res.json({ session: updated, summary });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("complete session error:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -609,9 +610,9 @@ export function registerFactoryInvoiceLoadingRoutes(app: Express) {
 
       const summary = await buildLoadingSummary(session.invoiceId, companyId);
       res.json({ session: updated, summary });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("cancel session error:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -918,9 +919,9 @@ export function registerFactoryInvoiceLoadingRoutes(app: Express) {
       res.setHeader("Content-Disposition", contentDisposition(filename));
       res.setHeader("Content-Length", xlsBuf1.byteLength);
       res.end(xlsBuf1);
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("loading report excel error:", { error: error });
-      if (!res.headersSent) res.status(500).json({ message: error.message });
+      if (!res.headersSent) res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -1038,8 +1039,8 @@ ${
 
       res.setHeader("Content-Type", "text/html");
       res.send(html);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -1240,8 +1241,8 @@ ${
       res.setHeader("Content-Disposition", contentDisposition(filename));
       res.setHeader("Content-Length", xlsBuf2.byteLength);
       res.end(xlsBuf2);
-    } catch (error: any) {
-      if (!res.headersSent) res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      if (!res.headersSent) res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -1370,8 +1371,8 @@ ${
 
       res.setHeader("Content-Type", "text/html");
       res.send(html);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -1433,9 +1434,9 @@ ${
       await syncProformaReservations(db, companyId, result.id).catch(() => {});
 
       res.json({ proformaId: result.id, proformaName });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("create-remaining-proforma error:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 }

@@ -1,4 +1,5 @@
 import { logAudit } from "../helpers/auditHelpers";
+import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
 import { parseId, parseOptionalId } from "../../lib/parseId";
 import { getClientDate } from "../../lib/dateUtils";
@@ -208,9 +209,9 @@ export function registerFactoryMixBatchRoutes(app: Express) {
       });
 
       res.json(enriched);
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error fetching mix batches:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -232,9 +233,9 @@ export function registerFactoryMixBatchRoutes(app: Express) {
       const total = parseFloat(batch.totalWeightKg) || 0;
       const used = parseFloat(batch.usedKg) || 0;
       res.json({ ...batch, remainingKg: (total - used).toFixed(3) });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error fetching mix batch:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -547,9 +548,9 @@ export function registerFactoryMixBatchRoutes(app: Express) {
         },
       });
       res.json(result);
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error updating mix batch:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -585,9 +586,9 @@ export function registerFactoryMixBatchRoutes(app: Express) {
         .returning();
 
       res.json(updated);
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error finalizing mix batch:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -669,9 +670,9 @@ export function registerFactoryMixBatchRoutes(app: Express) {
         changes: null,
       });
       res.json({ id: result.id, message: "Mix batch moved to Deleted Items" });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error deleting mix batch:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -990,9 +991,9 @@ export function registerFactoryMixBatchRoutes(app: Express) {
         },
       });
       res.json(result);
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error creating mix batch:", { error: error });
-      res.status(400).json({ message: error.message });
+      res.status(400).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -1258,9 +1259,9 @@ export function registerFactoryMixBatchRoutes(app: Express) {
       }
 
       res.json(result);
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error topping up mix batch:", { error: error });
-      res.status(400).json({ message: error.message });
+      res.status(400).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -1319,9 +1320,9 @@ export function registerFactoryMixBatchRoutes(app: Express) {
       });
 
       res.json({ success: true, balesUpdated: baleIds.length, totalKg });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error assigning bales to mix batch:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -1401,9 +1402,9 @@ export function registerFactoryMixBatchRoutes(app: Express) {
       );
 
       res.json(enriched);
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error fetching mix batch sources:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -1526,9 +1527,9 @@ export function registerFactoryMixBatchRoutes(app: Express) {
       });
 
       res.json({ success: true, results });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error consuming mix batches:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -1566,9 +1567,9 @@ export function registerFactoryMixBatchRoutes(app: Express) {
         .orderBy(desc(factoryMixBatches.createdAt));
 
       res.json(rows);
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error fetching supplier mix batch history:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 }

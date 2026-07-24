@@ -1,4 +1,5 @@
 import type { Express } from "express";
+import { getErrorMessage } from "../lib/httpHandlers";
 import { logger } from "../lib/logger";
 import { db } from "../db";
 import { requireAuth, requireRole } from "../auth";
@@ -78,8 +79,8 @@ export async function triggerIntercompanyNotifications(
         companyId,
       }).catch(() => {});
     }
-  } catch (err: any) {
-    logger.error("[IntercompanyNotif] trigger failed (non-fatal):", { error: err?.message });
+  } catch (err: unknown) {
+    logger.error("[IntercompanyNotif] trigger failed (non-fatal):", { error: getErrorMessage(err) });
   }
 }
 
@@ -120,8 +121,8 @@ export function registerIntercompanyNotificationRoutes(app: Express) {
       }));
 
       res.json(enriched);
-    } catch (err: any) {
-      res.status(500).json({ message: err.message });
+    } catch (err: unknown) {
+      res.status(500).json({ message: getErrorMessage(err) });
     }
   });
 
@@ -146,8 +147,8 @@ export function registerIntercompanyNotificationRoutes(app: Express) {
           .where(eq(intercompanyLinkRecipients.linkId, linkId));
 
         res.json(rows);
-      } catch (err: any) {
-        res.status(500).json({ message: err.message });
+      } catch (err: unknown) {
+        res.status(500).json({ message: getErrorMessage(err) });
       }
     }
   );
@@ -163,8 +164,8 @@ export function registerIntercompanyNotificationRoutes(app: Express) {
         .from(userCompanyRoles)
         .where(and(eq(userCompanyRoles.companyId, companyId), ne(userCompanyRoles.role, "Developer")));
       res.json(rows.map((r) => r.userId));
-    } catch (err: any) {
-      res.status(500).json({ message: err.message });
+    } catch (err: unknown) {
+      res.status(500).json({ message: getErrorMessage(err) });
     }
   });
 
@@ -219,8 +220,8 @@ export function registerIntercompanyNotificationRoutes(app: Express) {
       }
 
       res.json(link);
-    } catch (err: any) {
-      res.status(500).json({ message: err.message });
+    } catch (err: unknown) {
+      res.status(500).json({ message: getErrorMessage(err) });
     }
   });
 
@@ -299,8 +300,8 @@ export function registerIntercompanyNotificationRoutes(app: Express) {
       }
 
       res.json(updated);
-    } catch (err: any) {
-      res.status(500).json({ message: err.message });
+    } catch (err: unknown) {
+      res.status(500).json({ message: getErrorMessage(err) });
     }
   });
 
@@ -311,8 +312,8 @@ export function registerIntercompanyNotificationRoutes(app: Express) {
       if (isNaN(linkId)) return res.status(400).json({ message: "Invalid ID" });
       await db.delete(intercompanyAccountLinks).where(eq(intercompanyAccountLinks.id, linkId));
       res.json({ success: true });
-    } catch (err: any) {
-      res.status(500).json({ message: err.message });
+    } catch (err: unknown) {
+      res.status(500).json({ message: getErrorMessage(err) });
     }
   });
 
@@ -346,8 +347,8 @@ export function registerIntercompanyNotificationRoutes(app: Express) {
 
       res.set("Cache-Control", "private, max-age=30");
       res.json({ count: row?.count ?? 0 });
-    } catch (err: any) {
-      res.status(500).json({ message: err.message });
+    } catch (err: unknown) {
+      res.status(500).json({ message: getErrorMessage(err) });
     }
   });
 
@@ -425,8 +426,8 @@ export function registerIntercompanyNotificationRoutes(app: Express) {
       });
 
       res.json(enriched);
-    } catch (err: any) {
-      res.status(500).json({ message: err.message });
+    } catch (err: unknown) {
+      res.status(500).json({ message: getErrorMessage(err) });
     }
   });
 
@@ -475,8 +476,8 @@ export function registerIntercompanyNotificationRoutes(app: Express) {
       });
 
       res.json(enriched);
-    } catch (err: any) {
-      res.status(500).json({ message: err.message });
+    } catch (err: unknown) {
+      res.status(500).json({ message: getErrorMessage(err) });
     }
   });
 
@@ -614,12 +615,12 @@ export function registerIntercompanyNotificationRoutes(app: Express) {
       });
 
       res.json({ success: true, voucherId: result.voucherId, voucherNumber: result.voucherNumber });
-    } catch (err: any) {
-      if (err.message === "ALREADY_PROCESSED") {
+    } catch (err: unknown) {
+      if (getErrorMessage(err) === "ALREADY_PROCESSED") {
         return res.status(409).json({ message: "This request has already been processed by another user." });
       }
       logger.error("[IC approve]", { error: err });
-      res.status(500).json({ message: err.message });
+      res.status(500).json({ message: getErrorMessage(err) });
     }
   });
 
@@ -680,8 +681,8 @@ export function registerIntercompanyNotificationRoutes(app: Express) {
       }
 
       res.json({ success: true });
-    } catch (err: any) {
-      res.status(500).json({ message: err.message });
+    } catch (err: unknown) {
+      res.status(500).json({ message: getErrorMessage(err) });
     }
   });
 }
