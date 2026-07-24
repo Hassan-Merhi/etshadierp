@@ -6,6 +6,7 @@
  * receivable voucher entry so customer ledgers/statements can attribute it.
  */
 import { customers } from "@shared/schema";
+import { logger } from "../../lib/logger";
 import { eq, and } from "drizzle-orm";
 
 /**
@@ -23,7 +24,7 @@ export async function findLinkedCustomerId(tx: any, companyId: number, accountId
       .limit(1);
     return linkedCust?.id;
   } catch (e) {
-    console.error("[POS Sale] customer lookup for credit-sale entry failed:", e);
+    logger.error("[POS Sale] customer lookup for credit-sale entry failed:", { error: e });
     return undefined;
   }
 }

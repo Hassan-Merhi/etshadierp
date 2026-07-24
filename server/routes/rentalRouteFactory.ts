@@ -1,4 +1,5 @@
 import type { Express, Request, Response } from "express";
+import { logger } from "../lib/logger";
 import { registerRentalUnitsContractsRoutes } from "./rental/rentalUnitsContractsRoutes";
 import { registerRentalPaymentsAccrualRoutes } from "./rental/rentalPaymentsAccrualRoutes";
 import { registerRentalAccrualConfigRoutes } from "./rental/rentalAccrualConfigRoutes";
@@ -35,7 +36,7 @@ export function registerRentalRoutes(
       const result = await runRentalReconciliation(companyId, module, asOf);
       res.json(result);
     } catch (e: any) {
-      console.error(`[${module}/rental] reconciliation:`, e);
+      logger.error(`[${module}/rental] reconciliation:`, { error: e });
       res.status(500).json({ message: e.message });
     }
   });

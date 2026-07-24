@@ -1,4 +1,5 @@
 import { parseId, parseOptionalId } from "../../lib/parseId";
+import { logger } from "../../lib/logger";
 import { getClientDate } from "../../lib/dateUtils";
 import type { Express, Request, Response, NextFunction } from "express";
 import { db } from "../../db";
@@ -506,7 +507,7 @@ export function registerContainerFreightReadRoutes(app: Express) {
         purchaseOrders: posWithItems,
       });
     } catch (error) {
-      console.error("Error fetching container POs:", error);
+      logger.error("Error fetching container POs:", { error: error });
       res.status(500).json({ message: "Failed to fetch purchase orders" });
     }
   });
@@ -623,7 +624,7 @@ export function registerContainerFreightReadRoutes(app: Express) {
         itemsTotal: po.itemsTotal?.toString() || "0",
       });
     } catch (error: any) {
-      console.error("Get PO error:", error);
+      logger.error("Get PO error:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });

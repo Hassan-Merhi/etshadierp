@@ -205,7 +205,7 @@ export function registerInventoryRoutes(app: Express) {
         adjustment: result.adjustedQty,
       });
     } catch (error: any) {
-      console.error("Quick adjust error:", error);
+      logger.error("Quick adjust error:", { error: error });
       const isBusinessError =
         error.message?.includes("Cannot subtract") || error.message?.includes("non-existent inventory");
       res.status(isBusinessError ? 400 : 500).json({ message: error.message });

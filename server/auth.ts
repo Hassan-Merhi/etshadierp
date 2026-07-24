@@ -1,4 +1,5 @@
 import { Request, Response, NextFunction } from "express";
+import { logger } from "./lib/logger";
 import { db } from "./db";
 import { userLocations } from "@shared/schema";
 import { eq, and } from "drizzle-orm";
@@ -15,7 +16,7 @@ function logDenied(params: {
   path: string;
   reason: string;
 }) {
-  console.error(
+  logger.error(
     JSON.stringify({
       event: "access_denied",
       ts: new Date().toISOString(),

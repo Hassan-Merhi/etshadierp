@@ -1,4 +1,5 @@
 import { eq, and, isNull, asc, sql } from "drizzle-orm";
+import { logger } from "../../lib/logger";
 import { db, pool } from "../../db";
 import * as schema from "@shared/schema";
 
@@ -100,7 +101,7 @@ export async function getLocationInventory(companyId: number, locationId: number
     );
 
     const result = qr.rows;
-    console.log(
+    logger.info(
       `[getLocationInventory] companyId=${companyId} locationId=${locationId} includeZero=false → ${result.length} rows`
     );
     return result;
@@ -156,7 +157,7 @@ export async function getLocationInventory(companyId: number, locationId: number
   );
 
   const result = qr2.rows;
-  console.log(
+  logger.info(
     `[getLocationInventory] companyId=${companyId} locationId=${locationId} includeZero=true → ${result.length} rows`
   );
   return result;

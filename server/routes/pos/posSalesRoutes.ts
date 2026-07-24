@@ -61,7 +61,7 @@ export function registerPosSalesRoutes(app: Express): void {
             changes: null,
           });
         } catch (auditErr) {
-          console.error("[POS create audit] non-fatal:", auditErr);
+          logger.error("[POS create audit] non-fatal:", { error: auditErr });
         }
       }
       res.status(result.status).json(result.body);

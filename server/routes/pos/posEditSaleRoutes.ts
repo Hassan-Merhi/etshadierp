@@ -52,7 +52,7 @@ export function registerPosEditSaleRoutes(app: Express): void {
             changes: null,
           });
         } catch (auditErr) {
-          console.error("[POS edit audit] non-fatal:", auditErr);
+          logger.error("[POS edit audit] non-fatal:", { error: auditErr });
         }
       }
       res.status(result.status).json(result.body);

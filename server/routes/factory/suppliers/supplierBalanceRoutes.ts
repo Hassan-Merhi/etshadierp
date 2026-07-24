@@ -1,4 +1,5 @@
 import { parseId, parseOptionalId } from "../../../lib/parseId";
+import { logger } from "../../../lib/logger";
 import { getClientDate } from "../../../lib/dateUtils";
 import type { Express } from "express";
 import { db } from "../../../db";
@@ -1467,7 +1468,7 @@ export function registerSupplierBalanceRoutes(app: Express) {
 
       res.json(suppliersWithBalances.sort((a: any, b: any) => a.name.localeCompare(b.name)));
     } catch (error: any) {
-      console.error("Error fetching factory suppliers with balances:", error);
+      logger.error("Error fetching factory suppliers with balances:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });

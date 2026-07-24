@@ -1,4 +1,5 @@
 import type { Express } from "express";
+import { logger } from "../lib/logger";
 import { createHash } from "crypto";
 import Decimal from "decimal.js";
 import { db, pool } from "../db";
@@ -475,7 +476,7 @@ export function registerBankAssetRoutes(app: Express) {
           : null,
       });
     } catch (error: any) {
-      console.error("Bank revaluation error:", error);
+      logger.error("Bank revaluation error:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -803,7 +804,7 @@ export function registerBankAssetRoutes(app: Express) {
         preview,
       });
     } catch (error: any) {
-      console.error("PO Import parse error:", error);
+      logger.error("PO Import parse error:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });

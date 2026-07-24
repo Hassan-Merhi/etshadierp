@@ -1,4 +1,5 @@
 import type { Express } from "express";
+import { logger } from "../../lib/logger";
 import { db } from "../../db";
 import { storage } from "../../storage";
 import { requireAuth, requireRole, canDelete, requireNonPOS, checkPOSLocation } from "../../auth";
@@ -665,7 +666,7 @@ export function registerStockMergeRoutes(app: Express) {
         });
       } catch (auditErr: any) {
         // Audit log failure is non-fatal — merge already committed
-        console.error("[Merge] Audit log insert failed (merge succeeded):", auditErr?.message);
+        logger.error("[Merge] Audit log insert failed (merge succeeded):", { error: auditErr?.message });
       }
 
       return res.json({ success: true, keptItemId: keptId, mergedItemId: duplicateId });

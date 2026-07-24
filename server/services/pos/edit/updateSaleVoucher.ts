@@ -9,6 +9,7 @@
  * only the code location changed.
  */
 import { vouchers } from "@shared/schema";
+import { logger } from "../../../lib/logger";
 import { eq } from "drizzle-orm";
 
 /** Updates voucher description, total amount, location, and optionally date. */
@@ -32,7 +33,7 @@ export async function updateVoucherRecord(
   };
   if (locationChanged) {
     voucherUpdate.locationId = targetLocationId;
-    console.log(`[POS Sales Edit] Updated voucher ${voucherId} location from ${oldLocationId} to ${targetLocationId}`);
+    logger.info(`[POS Sales Edit] Updated voucher ${voucherId} location from ${oldLocationId} to ${targetLocationId}`);
   }
   if (voucherDate) {
     voucherUpdate.voucherDate = new Date(voucherDate);

@@ -1,4 +1,5 @@
 import type { Express } from "express";
+import { logger } from "../lib/logger";
 import { db } from "../db";
 import { storage } from "../storage";
 import { requireAuth, requireRole, canDelete, requireNonPOS, checkPOSLocation } from "../auth";
@@ -1185,7 +1186,7 @@ export function registerLedgerRoutes(app: Express) {
           sqlStatements.length > 0 ? sqlStatements.join("\n\n") : "No accounts needed to be created or updated",
       });
     } catch (error: any) {
-      console.error("Error initializing accounting balances:", error);
+      logger.error("Error initializing accounting balances:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });

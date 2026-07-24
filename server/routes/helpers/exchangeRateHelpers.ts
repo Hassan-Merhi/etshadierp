@@ -1,4 +1,5 @@
 import { storage } from "../../storage";
+import { logger } from "../../lib/logger";
 
 // ─── Exchange rate ────────────────────────────────────────────────────────────
 export async function getCurrentExchangeRate(companyId: number): Promise<string | null> {
@@ -10,7 +11,7 @@ export async function getCurrentExchangeRate(companyId: number): Promise<string 
     const rate = await storage.getLatestExchangeRate(companyId, company.baseCurrency, company.displayCurrency);
     return rate?.rate || null;
   } catch (error) {
-    console.error("Error fetching exchange rate:", error);
+    logger.error("Error fetching exchange rate:", { error: error });
     return null;
   }
 }

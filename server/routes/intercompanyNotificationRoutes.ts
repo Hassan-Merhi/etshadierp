@@ -1,4 +1,5 @@
 import type { Express } from "express";
+import { logger } from "../lib/logger";
 import { db } from "../db";
 import { requireAuth, requireRole } from "../auth";
 import { dispatchNotification } from "../lib/notificationService";
@@ -78,7 +79,7 @@ export async function triggerIntercompanyNotifications(
       }).catch(() => {});
     }
   } catch (err: any) {
-    console.error("[IntercompanyNotif] trigger failed (non-fatal):", err?.message);
+    logger.error("[IntercompanyNotif] trigger failed (non-fatal):", { error: err?.message });
   }
 }
 
@@ -617,7 +618,7 @@ export function registerIntercompanyNotificationRoutes(app: Express) {
       if (err.message === "ALREADY_PROCESSED") {
         return res.status(409).json({ message: "This request has already been processed by another user." });
       }
-      console.error("[IC approve]", err);
+      logger.error("[IC approve]", { error: err });
       res.status(500).json({ message: err.message });
     }
   });

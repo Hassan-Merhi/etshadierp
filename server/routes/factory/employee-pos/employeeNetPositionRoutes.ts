@@ -1,4 +1,5 @@
 import { getClientDate } from "../../../lib/dateUtils";
+import { logger } from "../../../lib/logger";
 import { getRentalBillingDay, getRentalPeriodDueDate } from "../../../services/rental/rentalPeriodService";
 import { pool } from "../../../db";
 import type { Express } from "express";
@@ -1736,7 +1737,7 @@ export function registerEmployeeNetPositionRoutes(app: Express) {
         payrollPayable: employeeSalariesPayable,
       });
     } catch (error: any) {
-      console.error("Factory net-position error:", error);
+      logger.error("Factory net-position error:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });

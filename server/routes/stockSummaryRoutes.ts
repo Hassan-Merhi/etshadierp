@@ -1,4 +1,5 @@
 import type { Express } from "express";
+import { logger } from "../lib/logger";
 import { db } from "../db";
 import { storage } from "../storage";
 import { requireAuth } from "../auth";
@@ -273,7 +274,7 @@ export function registerStockSummaryRoutes(app: Express) {
         grandTotal,
       });
     } catch (error: any) {
-      console.error("Stock item monthly summary error:", error);
+      logger.error("Stock item monthly summary error:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -787,7 +788,7 @@ export function registerStockSummaryRoutes(app: Express) {
         totals,
       });
     } catch (error: any) {
-      console.error("Stock item monthly vouchers error:", error);
+      logger.error("Stock item monthly vouchers error:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });

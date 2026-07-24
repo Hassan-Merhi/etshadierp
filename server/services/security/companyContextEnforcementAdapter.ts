@@ -1,4 +1,5 @@
 import type { NextFunction, Request, Response } from "express";
+import { logger } from "../../lib/logger";
 import { db } from "../../db";
 import { persistSecurityEvent } from "./securityAuditRuntime";
 
@@ -94,7 +95,7 @@ export function requireExplicitCompanyContext(options: CompanyContextOptions = {
     try {
       await auditCompanyDecision(req, decision);
     } catch (auditError) {
-      console.error("Security audit persistence failed:", auditError);
+      logger.error("Security audit persistence failed:", { error: auditError });
       if (!decision.allowed) return res.status(500).json({ message: "Security audit unavailable" });
     }
 

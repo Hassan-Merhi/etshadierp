@@ -1,4 +1,5 @@
 import type { Express } from "express";
+import { logger } from "../../lib/logger";
 import { db } from "../../db";
 import { storage } from "../../storage";
 import { buildSafeFilename, contentDisposition } from "../../lib/contentDisposition";
@@ -131,7 +132,7 @@ export function registerLocationInventoryRoutes(app: Express) {
         res.json(inventory);
       }
     } catch (error: any) {
-      console.error(`[inventory] ERROR locationId=${req.params.locationId}:`, error?.message ?? error);
+      logger.error(`[inventory] ERROR locationId=${req.params.locationId}:`, { error: error?.message ?? error });
       res.status(500).json({ message: error.message });
     }
   });

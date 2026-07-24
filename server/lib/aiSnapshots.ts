@@ -16,6 +16,7 @@
  */
 
 import { db } from "../db";
+import { logger } from "./logger";
 import { aiCompanySnapshots } from "@shared/schema";
 import * as schema from "@shared/schema";
 import { eq, and, sql, isNull, desc, inArray } from "drizzle-orm";
@@ -229,7 +230,7 @@ export async function getOrBuildAISnapshot(companyId: number, snapshotType: stri
     .where(and(eq(aiCompanySnapshots.companyId, companyId), eq(aiCompanySnapshots.snapshotType, snapshotType)));
 
   if (existing && existing.expiresAt > now) {
-    console.log(
+    logger.info(
       `[AISnapshot] HIT  company=${companyId} type=${snapshotType}` +
         ` (expires in ${Math.round((existing.expiresAt.getTime() - now.getTime()) / 1000)}s)`
     );
@@ -242,7 +243,7 @@ export async function getOrBuildAISnapshot(companyId: number, snapshotType: stri
 
   const t0 = Date.now();
   const data = await builder(companyId);
-  console.log(
+  logger.info(
     `[AISnapshot] MISS company=${companyId} type=${snapshotType}` + ` built in ${Date.now() - t0}ms, TTL=${ttl}s`
   );
 

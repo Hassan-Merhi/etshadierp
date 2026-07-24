@@ -1,4 +1,5 @@
 import { parseId, parseOptionalId } from "../../lib/parseId";
+import { logger } from "../../lib/logger";
 import type { Express } from "express";
 import { db, pool } from "../../db";
 import { requireAuth } from "../../auth";
@@ -185,7 +186,7 @@ export function registerFactoryStatusBuilderSheetsRoutes(app: Express) {
           rows as SRow[],
           (columns ?? existing.columns) as any[],
           req.user?.username || req.user?.name
-        ).catch((e) => console.error("[StatusBuilder] history log failed:", e.message));
+        ).catch((e) => logger.error("[StatusBuilder] history log failed:", { error: e.message }));
       }
 
       res.json(updated);

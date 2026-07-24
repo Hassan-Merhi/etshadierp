@@ -1,4 +1,5 @@
 import { parseId, parseOptionalId } from "../../../lib/parseId";
+import { logger } from "../../../lib/logger";
 import { getClientDate } from "../../../lib/dateUtils";
 import type { Express } from "express";
 import { db } from "../../../db";
@@ -1036,7 +1037,7 @@ export function registerSupplierStatementRoutes(app: Express) {
         },
       });
     } catch (error: any) {
-      console.error("Error fetching supplier statement:", error);
+      logger.error("Error fetching supplier statement:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });

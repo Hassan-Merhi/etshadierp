@@ -13,6 +13,7 @@ export interface RetryResult<T> {
  * `shouldRetry` (optional) decides if a failed result is worth retrying — return
  *   false for configuration / permanent errors that won't change between retries.
  */
+import { logger } from "../lib/logger";
 export async function retryAsync<T>(options: {
   label: string;
   attempts: number;
@@ -36,17 +37,17 @@ export async function retryAsync<T>(options: {
       }
 
       if (options.shouldRetry && !options.shouldRetry(result)) {
-        console.log(`[${options.label}] Attempt ${attempt}: non-retryable failure — stopping.`);
+        logger.info(`[${options.label}] Attempt ${attempt}: non-retryable failure — stopping.`);
         return { result, attempts: attempt };
       }
 
       if (attempt < options.attempts) {
-        console.log(`[${options.label}] Attempt ${attempt} failed. Waiting ${options.delayMs / 1000}s before retry...`);
+        logger.info(`[${options.label}] Attempt ${attempt} failed. Waiting ${options.delayMs / 1000}s before retry...`);
         await delay(options.delayMs);
       }
     } catch (err: any) {
       lastError = err;
-      console.log(
+      logger.info(
         `[${options.label}] Attempt ${attempt} threw: ${err?.message}. ${attempt < options.attempts ? `Waiting ${options.delayMs / 1000}s...` : "No more retries."}`
       );
       if (attempt < options.attempts) {

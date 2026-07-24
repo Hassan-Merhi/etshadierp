@@ -17,6 +17,7 @@
  * same reason.
  */
 import { db } from "../../../db";
+import { logger } from "../../../lib/logger";
 import { storage } from "../../../storage";
 import { logAudit, recalculateIntercompanyForDate } from "../../../routes/_helpers";
 import { salesItems, voucherEntries, stockItems, vouchers } from "@shared/schema";
@@ -203,7 +204,7 @@ export async function updatePosSale(params: UpdatePosSaleParams): Promise<{ stat
   if (newDate !== oldDate) datesToRecalc.add(newDate);
   for (const d of datesToRecalc) {
     recalculateIntercompanyForDate(currentCompanyId, d).catch((error) =>
-      console.error("[IntercompanyPOS Recalc] Unhandled:", error)
+      logger.error("[IntercompanyPOS Recalc] Unhandled:", { error: error })
     );
   }
 

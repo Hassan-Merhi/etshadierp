@@ -1,4 +1,5 @@
 import { getClientDate } from "../../../lib/dateUtils";
+import { logger } from "../../../lib/logger";
 import type { Express } from "express";
 import { db } from "../../../db";
 import { requireAuth } from "../../../auth";
@@ -789,7 +790,7 @@ export function registerEmployeeCrudRoutes(app: Express) {
 
       res.json({ updated: results.length, employees: results });
     } catch (error: any) {
-      console.error("Error recalculating employee balances:", error);
+      logger.error("Error recalculating employee balances:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -844,7 +845,7 @@ export function registerEmployeeCrudRoutes(app: Express) {
         newWithdrawals,
       });
     } catch (error: any) {
-      console.error("Error recalculating employee balance:", error);
+      logger.error("Error recalculating employee balance:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });

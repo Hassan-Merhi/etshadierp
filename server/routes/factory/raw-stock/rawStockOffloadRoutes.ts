@@ -1,4 +1,5 @@
 import Decimal from "decimal.js";
+import { logger } from "../../../lib/logger";
 import { logAudit } from "../../helpers/auditHelpers";
 import { parseId, parseOptionalId } from "../../../lib/parseId";
 import { getClientDate } from "../../../lib/dateUtils";
@@ -1079,7 +1080,7 @@ export function registerRawStockOffloadRoutes(app: Express) {
       });
       res.json({ rawStock, commission: commissionRecord });
     } catch (error: any) {
-      console.error("Error offloading container:", error);
+      logger.error("Error offloading container:", { error: error });
       res.status(400).json({ message: error.message });
     }
   });
@@ -1459,7 +1460,7 @@ export function registerRawStockOffloadRoutes(app: Express) {
       });
       res.json({ message: "Offload reversed successfully. Container is back to its previous status." });
     } catch (error: any) {
-      console.error("Error reversing offload:", error);
+      logger.error("Error reversing offload:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });

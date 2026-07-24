@@ -6,6 +6,7 @@
  * unchanged.
  */
 import type { Express } from "express";
+import { logger } from "../lib/logger";
 import { eq, and, ne, isNull, sql } from "drizzle-orm";
 import { db } from "../db";
 import { storage } from "../storage";
@@ -303,12 +304,12 @@ export function registerExchangeRateRoutes(app: Express) {
           }
 
           await db.insert(voucherEntries).values(entryRows);
-          console.log(
+          logger.info(
             `[FX Revaluation] Created voucher ${voucherNumber}: ${adjustments.length} cash account(s) adjusted, total Δ ${totalAbsDiff.toFixed(2)}`
           );
         })();
       } catch (revalErr) {
-        console.error("[FX Revaluation] Error during auto-revaluation:", revalErr);
+        logger.error("[FX Revaluation] Error during auto-revaluation:", { error: revalErr });
       }
 
       res.json(rate);

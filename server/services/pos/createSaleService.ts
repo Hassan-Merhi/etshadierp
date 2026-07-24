@@ -17,6 +17,7 @@
  * still triggers a proper rollback.
  */
 import { randomUUID } from "node:crypto";
+import { logger } from "../../lib/logger";
 import { db } from "../../db";
 import { storage } from "../../storage";
 import { logAudit, runIntercompanyPosTransfer } from "../../routes/_helpers";
@@ -85,7 +86,7 @@ export async function createPosSale(
   if ("error" in accountResult) return err(accountResult.error);
   const { accountType, accountId, customerAccount } = accountResult;
 
-  console.log("[POS Sale] Payment info:", {
+  logger.info("[POS Sale] Payment info:", {
     provided: { paymentAccountType: body.paymentAccountType, paymentAccountId, cashAccountId, isCreditSale },
     resolved: { accountType, accountId },
   });
@@ -284,7 +285,7 @@ export async function createPosSale(
   if (!isCreditSale && accountType === "cash") {
     // fire-and-forget; never let errors surface to the client
     runIntercompanyPosTransfer(currentCompanyId, accountId, grandTotal, voucherDate).catch((err) =>
-      console.error("[IntercompanyPOS] Unhandled:", err)
+      logger.error("[IntercompanyPOS] Unhandled:", { error: err })
     );
   }
 

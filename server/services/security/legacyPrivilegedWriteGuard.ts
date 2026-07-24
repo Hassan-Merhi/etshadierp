@@ -1,4 +1,5 @@
 import type { NextFunction, Request, Response } from "express";
+import { logger } from "../../lib/logger";
 import { db } from "../../db";
 import {
   AuthorizationDeniedError,
@@ -112,7 +113,7 @@ export function requireLegacyPrivilegedWrite(options: LegacyPrivilegedWriteOptio
       try {
         await audit(req, options, "denied", error.code, sourceId);
       } catch (auditError) {
-        console.error("Security audit persistence failed:", auditError);
+        logger.error("Security audit persistence failed:", { error: auditError });
       }
       return res.status(403).json({ message: "Forbidden" });
     }

@@ -14,6 +14,7 @@
  */
 
 import type { CarrierTrackResult } from "./types";
+import { logger } from "../../lib/logger";
 
 export type DetectedCarrier = "MAERSK" | "CMA" | "MSC" | "HAPAG" | "OTHER" | null;
 
@@ -113,7 +114,7 @@ export function anyDirectProviderPossible(): boolean {
 
 export function resolveProvider(containerNumber: string): ProviderResolution {
   const detectedCarrier = detectCarrier(containerNumber);
-  console.log(
+  logger.info(
     `[ProviderResolver] container=${containerNumber} prefix=${containerNumber.slice(0, 4).toUpperCase()} ` +
       `detectedCarrier=${detectedCarrier ?? "unknown"} directProviders=[none]`
   );

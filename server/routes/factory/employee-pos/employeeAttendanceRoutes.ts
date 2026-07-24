@@ -1,4 +1,5 @@
 import { getClientDate } from "../../../lib/dateUtils";
+import { logger } from "../../../lib/logger";
 import type { Express } from "express";
 import { db } from "../../../db";
 import { requireAuth } from "../../../auth";
@@ -160,7 +161,7 @@ export function registerEmployeeAttendanceRoutes(app: Express) {
 
       res.json({ employees: result });
     } catch (error: any) {
-      console.error("Payroll breakdown error:", error);
+      logger.error("Payroll breakdown error:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -349,7 +350,7 @@ export function registerEmployeeAttendanceRoutes(app: Express) {
         },
       });
     } catch (error: any) {
-      console.error("Attendance report error:", error);
+      logger.error("Attendance report error:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });

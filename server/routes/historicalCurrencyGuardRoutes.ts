@@ -1,4 +1,5 @@
 import type { Express, RequestHandler } from "express";
+import { logger } from "../lib/logger";
 import { requireAuth, requireNonPOS } from "../auth";
 import { getHistoricalCurrencyReadiness } from "../services/accounting/historicalCurrencyReadiness";
 
@@ -36,7 +37,7 @@ export const guardUnresolvedHistoricalCurrency: RequestHandler = async (req, res
       backfillWasRun: false,
     });
   } catch (error: any) {
-    console.error("Historical currency readiness check failed:", error);
+    logger.error("Historical currency readiness check failed:", { error: error });
     return res.status(500).json({
       code: "HISTORICAL_CURRENCY_READINESS_FAILED",
       message: error.message,

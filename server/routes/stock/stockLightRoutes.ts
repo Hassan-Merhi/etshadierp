@@ -1,4 +1,5 @@
 import type { Express } from "express";
+import { logger } from "../../lib/logger";
 import { and, asc, eq, isNull } from "drizzle-orm";
 import { stockItems } from "@shared/schema";
 import { requireAuth } from "../../auth";
@@ -36,7 +37,7 @@ export function registerStockLightRoutes(app: Express) {
 
       return res.json(rows);
     } catch (error: any) {
-      console.error("[stock-items/light] Failed to load lightweight stock items", {
+      logger.error("[stock-items/light] Failed to load lightweight stock items", {
         companyId: req.session?.currentCompanyId || req.session?.factoryCompanyId || null,
         error: error?.message || String(error),
       });

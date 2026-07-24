@@ -1,4 +1,5 @@
 import type { Express } from "express";
+import { logger } from "../../lib/logger";
 import { db } from "../../db";
 import { requireAuth } from "../../auth";
 import { parseId } from "../../lib/parseId";
@@ -186,7 +187,7 @@ export function registerFactoryContainerTrackingRoutes(app: Express) {
 
       // Fire tracking in background so we never block the HTTP response
       trackOneFactoryContainerById(containerId).catch((err: any) => {
-        console.error(`[FactoryTracking] Background track error for container ${containerId}:`, err?.message);
+        logger.error(`[FactoryTracking] Background track error for container ${containerId}:`, { error: err?.message });
       });
 
       res.json({ success: true, queued: true, containerId });

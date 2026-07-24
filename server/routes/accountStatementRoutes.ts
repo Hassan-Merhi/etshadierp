@@ -6,6 +6,7 @@
  * from accountRoutes.ts as a sub-registrar; behaviour is unchanged.
  */
 import type { Express } from "express";
+import { logger } from "../lib/logger";
 import path from "path";
 import fs from "fs";
 import { eq, and, desc, isNull, isNotNull, sql } from "drizzle-orm";
@@ -357,7 +358,7 @@ export function registerAccountStatementRoutes(app: Express) {
 
       // Legacy code below is unreachable — kept for reference only
     } catch (err: any) {
-      console.error("Statement PDF error:", err);
+      logger.error("Statement PDF error:", { error: err });
       if (!res.headersSent) res.status(500).json({ message: err.message });
     }
   });
@@ -602,7 +603,7 @@ export function registerAccountStatementRoutes(app: Express) {
       res.setHeader("Content-Disposition", `attachment; filename="${safeAccName}_Statement.xlsx"`);
       res.end(buf);
     } catch (err: any) {
-      console.error("Account statement Excel error:", err);
+      logger.error("Account statement Excel error:", { error: err });
       if (!res.headersSent) res.status(500).json({ message: err.message });
     }
   });

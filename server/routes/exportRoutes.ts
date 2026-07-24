@@ -370,10 +370,10 @@ export function registerExportRoutes(app: Express) {
         RETURNING id, run_type
       `);
       const count = r.rowCount ?? 0;
-      console.log(`[ExportRun] Manual dismiss: cleared ${count} stuck run(s)`);
+      logger.info(`[ExportRun] Manual dismiss: cleared ${count} stuck run(s)`);
       res.json({ cleared: count, ids: r.rows.map((x: any) => x.id) });
     } catch (e: any) {
-      console.error("[ExportRun] Manual dismiss failed:", e.message);
+      logger.error("[ExportRun] Manual dismiss failed:", { error: e.message });
       res.status(500).json({ message: e.message });
     }
   });

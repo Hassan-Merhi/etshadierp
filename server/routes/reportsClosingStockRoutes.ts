@@ -6,6 +6,7 @@
  * reportsRoutes.ts as a sub-registrar; behaviour is unchanged.
  */
 import type { Express } from "express";
+import { logger } from "../lib/logger";
 import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 import { db } from "../db";
 import { storage } from "../storage";
@@ -262,7 +263,7 @@ export function registerReportsClosingStockRoutes(app: Express) {
         targetLocation: defaultLocation.name,
       });
     } catch (error: any) {
-      console.error("Error transferring closing stock:", error);
+      logger.error("Error transferring closing stock:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -475,7 +476,7 @@ export function registerReportsClosingStockRoutes(app: Express) {
         asOfDate: targetDateStr,
       });
     } catch (error: any) {
-      console.error("Error carrying forward closing stock:", error);
+      logger.error("Error carrying forward closing stock:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });

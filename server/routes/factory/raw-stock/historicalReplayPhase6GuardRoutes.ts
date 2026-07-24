@@ -1,4 +1,5 @@
 import type { Express } from "express";
+import { logger } from "../../../lib/logger";
 import { requireAuth, requireRole } from "../../../auth";
 import { pool } from "../../../db";
 import {
@@ -229,7 +230,7 @@ export function registerHistoricalReplayPhase6GuardRoutes(app: Express): void {
         if (financialImpact) preview.financialImpact = financialImpact;
         return res.json(preview);
       } catch (error: any) {
-        console.error("[historical-replay v7 preview] error:", error);
+        logger.error("[historical-replay v7 preview] error:", { error: error });
         return res.status(500).json({
           message: error.message || "Failed to compute Historical Replay preview",
           code: error.code,

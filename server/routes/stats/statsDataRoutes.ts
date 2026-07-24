@@ -1,4 +1,5 @@
 import type { Express } from "express";
+import { logger } from "../../lib/logger";
 import { db } from "../../db";
 import { storage } from "../../storage";
 import { requireAuth, requireRole, canDelete, requireNonPOS, checkPOSLocation } from "../../auth";
@@ -256,7 +257,7 @@ export function registerStatsDataRoutes(app: Express) {
 
       res.json(enhancedSalesData);
     } catch (error: any) {
-      console.error("Sales report error:", error);
+      logger.error("Sales report error:", { error: error });
       res.status(500).json({ message: error.message, details: error.toString() });
     }
   });
@@ -390,7 +391,7 @@ export function registerStatsDataRoutes(app: Express) {
 
       res.json(allSalesData);
     } catch (error: any) {
-      console.error("All companies sales report error:", error);
+      logger.error("All companies sales report error:", { error: error });
       res.status(500).json({ message: error.message, details: error.toString() });
     }
   });

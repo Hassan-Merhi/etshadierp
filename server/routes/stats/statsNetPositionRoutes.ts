@@ -1,4 +1,5 @@
 import type { Express } from "express";
+import { logger } from "../../lib/logger";
 import { db, pool } from "../../db";
 import { storage } from "../../storage";
 import { requireAuth, requireRole, canDelete, requireNonPOS, checkPOSLocation } from "../../auth";
@@ -658,14 +659,14 @@ export function registerStatsNetPositionRoutes(app: Express) {
           changes: { format: { old: null, new: "xlsx" } },
         });
       } catch (auditErr) {
-        console.error("[NetPositionExcel] audit write failed:", auditErr);
+        logger.error("[NetPositionExcel] audit write failed:", { error: auditErr });
       }
       res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
       res.setHeader("Content-Disposition", `attachment; filename="Net_Position_${dateTag}.xlsx"`);
       res.setHeader("Content-Length", xlsBuffer.byteLength);
       res.end(xlsBuffer);
     } catch (error: any) {
-      console.error("Net position Excel error:", error);
+      logger.error("Net position Excel error:", { error: error });
       if (!res.headersSent) res.status(500).json({ message: error.message });
     }
   });

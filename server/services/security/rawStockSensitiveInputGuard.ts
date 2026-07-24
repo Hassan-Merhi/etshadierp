@@ -1,4 +1,5 @@
 import type { NextFunction, Request, Response } from "express";
+import { logger } from "../../lib/logger";
 import { db } from "../../db";
 import { persistSecurityEvent } from "./securityAuditRuntime";
 import {
@@ -152,7 +153,7 @@ export async function requireRawStockSensitiveInput(req: Request, res: Response,
       try {
         await auditInputDecision(req, routePath, "denied", error.issues[0]?.code || error.code);
       } catch (auditError) {
-        console.error("Security audit persistence failed:", auditError);
+        logger.error("Security audit persistence failed:", { error: auditError });
         return res.status(500).json({ message: "Security audit unavailable" });
       }
       return res.status(400).json({ message: "Invalid request" });

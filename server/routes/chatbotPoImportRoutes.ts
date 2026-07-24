@@ -6,6 +6,7 @@
  * chatbotRoutes.ts as a sub-registrar; behaviour is unchanged.
  */
 import type { Express } from "express";
+import { logger } from "../lib/logger";
 import { eq, and, desc } from "drizzle-orm";
 import { db } from "../db";
 import { storage } from "../storage";
@@ -339,7 +340,7 @@ export function registerChatbotPoImportRoutes(app: Express) {
       if (!extracted.importDate && importDateRaw) extracted.importDate = importDateRaw;
       return res.json(await buildResponse(extracted));
     } catch (error: any) {
-      console.error("PO file parse error:", error);
+      logger.error("PO file parse error:", { error: error });
       res.status(500).json({ message: "Internal server error" });
     }
   });
@@ -491,7 +492,7 @@ export function registerChatbotPoImportRoutes(app: Express) {
         availableProformas,
       });
     } catch (error: any) {
-      console.error("PO import confirm error:", error);
+      logger.error("PO import confirm error:", { error: error });
       res.status(500).json({ message: "Internal server error" });
     }
   });

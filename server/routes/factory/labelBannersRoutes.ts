@@ -14,6 +14,7 @@
  */
 
 import multer from "multer";
+import { logger } from "../../lib/logger";
 import { db } from "../../db";
 import { labelDesignColors } from "../../../shared/schema";
 import { eq, asc } from "drizzle-orm";
@@ -224,7 +225,7 @@ export function registerLabelBannersRoutes(app: any, requireAuth: any) {
 
         await db.update(labelDesignColors).set({ imageData, imageUpdatedAt }).where(eq(labelDesignColors.slug, slug));
 
-        console.log(`[LabelBanners] "${slug}" updated in DB (${req.file.size} bytes)`);
+        logger.info(`[LabelBanners] "${slug}" updated in DB (${req.file.size} bytes)`);
         res.json({ slot: slug, hasCustom: true, lastModified: imageUpdatedAt.getTime() });
       } catch (e: any) {
         res.status(500).json({ message: e.message });
@@ -240,7 +241,7 @@ export function registerLabelBannersRoutes(app: any, requireAuth: any) {
         .update(labelDesignColors)
         .set({ imageData: null, imageUpdatedAt: null })
         .where(eq(labelDesignColors.slug, slug));
-      console.log(`[LabelBanners] "${slug}" reverted to default`);
+      logger.info(`[LabelBanners] "${slug}" reverted to default`);
       res.json({ slot: slug, hasCustom: false, lastModified: null });
     } catch (e: any) {
       res.status(500).json({ message: e.message });

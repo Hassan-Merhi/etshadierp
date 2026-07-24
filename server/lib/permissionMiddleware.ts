@@ -16,6 +16,7 @@
  */
 
 import type { Request, Response, NextFunction } from "express";
+import { logger } from "./logger";
 import { storage } from "../storage";
 import { buildPermissionMap, canAccess } from "./permissionHelpers";
 
@@ -52,7 +53,7 @@ async function getPermMap(req: any): Promise<Map<string, boolean>> {
     const rows = await storage.getRoleFeaturePermissions(companyId);
     req._permMap = buildPermissionMap(rows, role);
   } catch (err) {
-    console.error("[permissionMiddleware] Failed to load permissions:", err);
+    logger.error("[permissionMiddleware] Failed to load permissions:", { error: err });
     req._permMap = new Map<string, boolean>();
   }
 
@@ -66,7 +67,7 @@ function sendDenied(req: any, res: Response, key: string, permType: PermMiddlewa
   const username = req.session?.username ?? null;
   const companyId = req.session?.currentCompanyId ?? null;
 
-  console.warn(
+  logger.warn(
     JSON.stringify({
       event: "access_denied",
       permType,
@@ -119,7 +120,7 @@ export function requirePermission(key: string, permType: PermMiddlewareType = "m
       next();
     } catch (err) {
       // Fail-open: unexpected errors must not lock out legitimate users.
-      console.error("[permissionMiddleware] Unexpected error for key", key, err);
+      logger.error("[permissionMiddleware] Unexpected error for key", { key, error: err });
       next();
     }
   };

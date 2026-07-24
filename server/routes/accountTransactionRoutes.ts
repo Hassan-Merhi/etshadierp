@@ -6,6 +6,7 @@
  * accountRoutes.ts as a sub-registrar; behaviour is unchanged.
  */
 import type { Express } from "express";
+import { logger } from "../lib/logger";
 import { eq, and, isNull } from "drizzle-orm";
 import { db, pool } from "../db";
 import { storage } from "../storage";
@@ -77,7 +78,7 @@ export function registerAccountTransactionRoutes(app: Express) {
       } catch (e) {
         // If the factory-customer lookup fails for any reason, fall back to
         // the regular ledger entries so the page never breaks.
-        console.error("[ledger transactions] factory-customer lookup failed:", e);
+        logger.error("[ledger transactions] factory-customer lookup failed:", { error: e });
       }
 
       // 3. Main query: period transactions capped at today

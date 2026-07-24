@@ -1,4 +1,5 @@
 import type { Express } from "express";
+import { logger } from "../../lib/logger";
 import { db, pool } from "../../db";
 import { storage } from "../../storage";
 import { requireAuth, requireRole, canDelete, requireNonPOS, checkPOSLocation } from "../../auth";
@@ -687,7 +688,7 @@ export function registerStatsNetProfitRoutes(app: Express) {
         rawSalaryAdvances = round2(parseFloat((saRow as any)?.total || "0"));
       } catch (saErr: any) {
         // Fallback: column may be absent on old production schemas. Dashboard still loads.
-        console.warn("[/api/stats/net-profit] salary_advances query skipped (schema gap):", saErr?.message);
+        logger.warn("[/api/stats/net-profit] salary_advances query skipped (schema gap):", { error: saErr?.message });
       }
       // For CFA companies, worker balances come from voucher entries.
       // Guard: only convert if ALL entries are pre-migration (hasMigratedEntries=false).
@@ -916,7 +917,7 @@ export function registerStatsNetProfitRoutes(app: Express) {
           }
         }
       } catch (rentalErr: any) {
-        console.warn("[/api/stats/net-profit] Rental section skipped (schema or data error):", rentalErr.message);
+        logger.warn("[/api/stats/net-profit] Rental section skipped (schema or data error):", { error: rentalErr.message });
         // Non-fatal: dashboard continues without rent figures
       }
 
@@ -1092,7 +1093,7 @@ export function registerStatsNetProfitRoutes(app: Express) {
       _setCached(_cacheKey, _result);
       res.json(_result);
     } catch (error: any) {
-      console.error("[/api/stats/net-profit] Unhandled error:", error);
+      logger.error("[/api/stats/net-profit] Unhandled error:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });

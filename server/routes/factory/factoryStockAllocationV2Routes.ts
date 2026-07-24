@@ -1,4 +1,5 @@
 import type { Express } from "express";
+import { logger } from "../../lib/logger";
 import { db } from "../../db";
 import { requireAuth } from "../../auth";
 import { customerProformas, customerProformaLines, customers } from "@shared/schema";
@@ -256,7 +257,7 @@ export function registerFactoryStockAllocationV2Routes(app: Express) {
         productNames: productNamesMap,
       });
     } catch (error: any) {
-      console.error("[V2] stock-allocation error:", error);
+      logger.error("[V2] stock-allocation error:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -407,7 +408,7 @@ export function registerFactoryStockAllocationV2Routes(app: Express) {
         productNames: Object.fromEntries(productNameByCode),
       });
     } catch (error: any) {
-      console.error("[V2] loading-mode error:", error);
+      logger.error("[V2] loading-mode error:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });

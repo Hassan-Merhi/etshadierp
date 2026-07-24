@@ -1,4 +1,5 @@
 import { parseId, parseOptionalId } from "../lib/parseId";
+import { logger } from "../lib/logger";
 import { logAudit } from "./_helpers";
 import { Express } from "express";
 import { db } from "../db";
@@ -551,7 +552,7 @@ export function registerSupplierProformaRoutes(app: Express, requireAuth: any) {
       const buf = Buffer.from(await wb.xlsx.writeBuffer());
       res.end(buf);
     } catch (error: any) {
-      console.error("Proforma export error:", error);
+      logger.error("Proforma export error:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
