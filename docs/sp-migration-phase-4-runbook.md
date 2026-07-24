@@ -124,7 +124,7 @@ Call `POST /api/sp/migration/cutover/release-target-hold` with:
 - Confirm supplier statement and Goods-OTW voucher supplier filters.
 - Confirm POS users open the correct target location and cash account.
 - Confirm the old ERP rejects writes with `SP_SOURCE_READ_ONLY`.
-- Confirm the post-activation verification areas remain `PASS`; legitimate post-cutover activity is reported but no longer treated as a preparation blocker.
+- Confirm the migration-copy areas remain correct. After genuine target activity starts, the readiness endpoint may show `TARGET_ALREADY_LIVE`; that is expected and also prevents rollback.
 
 ## Production warning
 
