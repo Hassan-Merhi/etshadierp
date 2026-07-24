@@ -1,4 +1,5 @@
 import { parseId, parseOptionalId } from "../../lib/parseId";
+import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
 import { getClientDate } from "../../lib/dateUtils";
 import { getExportPriceVisibility } from "../../helpers/exportVisibility";
@@ -204,8 +205,8 @@ export function registerFactoryCustomerProformaRoutes(app: Express) {
       }
       const enrichedLines = lines.map((l: any) => ({ ...l, weightPerBaleKg: weightMap.get(l.articleCode) || "0" }));
       res.json({ ...proforma, lines: enrichedLines });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -301,9 +302,9 @@ export function registerFactoryCustomerProformaRoutes(app: Express) {
       }));
 
       res.json(result);
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error fetching customer proformas:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -334,9 +335,9 @@ export function registerFactoryCustomerProformaRoutes(app: Express) {
       // Sync reservations — no lines yet, but initialises a clean slate
       await syncProformaReservations(db, companyId, proforma.id);
       res.json(proforma);
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error creating customer proforma:", { error: error });
-      res.status(400).json({ message: error.message });
+      res.status(400).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -381,9 +382,9 @@ export function registerFactoryCustomerProformaRoutes(app: Express) {
       // Sync reservations — critical when isActive toggled (releases/restores reservation)
       await syncProformaReservations(db, companyId, id);
       res.json(updated);
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error updating customer proforma:", { error: error });
-      res.status(400).json({ message: error.message });
+      res.status(400).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -440,9 +441,9 @@ export function registerFactoryCustomerProformaRoutes(app: Express) {
       }
 
       res.json({ message: "Proforma deleted" });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error deleting customer proforma:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -648,9 +649,9 @@ export function registerFactoryCustomerProformaRoutes(app: Express) {
         balesAdded: totalBalesAdded,
         ...(insufficientStock.length > 0 ? { warnings: insufficientStock } : {}),
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error creating loading from proforma:", { error: error });
-      res.status(400).json({ message: error.message });
+      res.status(400).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -697,9 +698,9 @@ export function registerFactoryCustomerProformaRoutes(app: Express) {
       }
 
       res.json({ ...line, ...(stockWarning ? { stockWarning } : {}) });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error creating proforma line:", { error: error });
-      res.status(400).json({ message: error.message });
+      res.status(400).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -838,9 +839,9 @@ export function registerFactoryCustomerProformaRoutes(app: Express) {
       }
 
       res.json({ ...updated, ...(stockWarning ? { stockWarning } : {}) });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error updating proforma line:", { error: error });
-      res.status(400).json({ message: error.message });
+      res.status(400).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -864,9 +865,9 @@ export function registerFactoryCustomerProformaRoutes(app: Express) {
       // Sync — removed line releases its reservation
       await syncProformaReservations(db, companyId, lineToDelete.proformaId);
       res.json({ message: "Proforma line deleted" });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error deleting proforma line:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -922,9 +923,9 @@ export function registerFactoryCustomerProformaRoutes(app: Express) {
       }
 
       res.json(result);
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error bulk creating proforma:", { error: error });
-      res.status(400).json({ message: error.message });
+      res.status(400).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -973,9 +974,9 @@ export function registerFactoryCustomerProformaRoutes(app: Express) {
       // Sync — all lines replaced, recalculate reservation state
       await syncProformaReservations(db, companyId, id);
       res.json(result);
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error replacing proforma lines:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -1020,9 +1021,9 @@ export function registerFactoryCustomerProformaRoutes(app: Express) {
       }
 
       res.json({ updated, skipped, fixed });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error applying catalog prices:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -1061,9 +1062,9 @@ export function registerFactoryCustomerProformaRoutes(app: Express) {
       }
 
       res.json({ updated, skipped, fixed });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error applying production prices:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -1130,9 +1131,9 @@ export function registerFactoryCustomerProformaRoutes(app: Express) {
       );
 
       res.json({ ...updated, targetCustomerName: targetCustomer.legalName });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error transferring proforma:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -1151,8 +1152,8 @@ export function registerFactoryCustomerProformaRoutes(app: Express) {
         .where(eq(customerProformaLines.id, lineId))
         .returning();
       res.json(updated);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -1293,9 +1294,9 @@ export function registerFactoryCustomerProformaRoutes(app: Express) {
             .map((b: any) => ({ articleCode: b.articleCode, count: b.count })),
         })),
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error fetching stock allocation:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -1449,9 +1450,9 @@ export function registerFactoryCustomerProformaRoutes(app: Express) {
         })),
         productNames: Object.fromEntries(productNameByCode),
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error fetching loading-mode stock allocation:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -1484,9 +1485,9 @@ export function registerFactoryCustomerProformaRoutes(app: Express) {
         await db.insert(proformaStockReservations).values({ companyId, proformaId, articleCode });
         res.json({ reserved: true });
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error toggling reservation:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -1686,9 +1687,9 @@ export function registerFactoryCustomerProformaRoutes(app: Express) {
       res.setHeader("Content-Disposition", contentDisposition(buildSafeFilename(["proforma", proforma.name], "xlsx")));
       res.setHeader("Content-Length", xlsBuffer.byteLength);
       res.end(xlsBuffer);
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error exporting proforma to Excel:", { error: error });
-      if (!res.headersSent) res.status(500).json({ message: error.message });
+      if (!res.headersSent) res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -1921,9 +1922,9 @@ export function registerFactoryCustomerProformaRoutes(app: Express) {
       });
 
       doc.end();
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error exporting proforma to PDF:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -1949,8 +1950,8 @@ export function registerFactoryCustomerProformaRoutes(app: Express) {
         [companyId, customerId]
       );
       return res.json(result.rows);
-    } catch (e: any) {
-      return res.status(500).json({ message: e.message });
+    } catch (e: unknown) {
+      return res.status(500).json({ message: getErrorMessage(e) });
     }
   });
 
@@ -2015,8 +2016,8 @@ export function registerFactoryCustomerProformaRoutes(app: Express) {
           backfilled += backfillRes.rowCount ?? 0;
         }
         return res.json({ saved, backfilled });
-      } catch (e: any) {
-        return res.status(500).json({ message: e.message });
+      } catch (e: unknown) {
+        return res.status(500).json({ message: getErrorMessage(e) });
       }
     }
   );
@@ -2046,8 +2047,8 @@ export function registerFactoryCustomerProformaRoutes(app: Express) {
         saved++;
       }
       return res.json({ saved });
-    } catch (e: any) {
-      return res.status(500).json({ message: e.message });
+    } catch (e: unknown) {
+      return res.status(500).json({ message: getErrorMessage(e) });
     }
   });
 
@@ -2064,8 +2065,8 @@ export function registerFactoryCustomerProformaRoutes(app: Express) {
         [companyId, customerId, articleCode]
       );
       return res.json({ deleted: true });
-    } catch (e: any) {
-      return res.status(500).json({ message: e.message });
+    } catch (e: unknown) {
+      return res.status(500).json({ message: getErrorMessage(e) });
     }
   });
 

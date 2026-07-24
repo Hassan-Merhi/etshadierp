@@ -1,4 +1,5 @@
 import type { Express } from "express";
+import { getErrorMessage } from "../../lib/httpHandlers";
 import { db, pool } from "../../db";
 import { storage } from "../../storage";
 import { requireAuth, requireRole, canDelete, requireNonPOS, checkPOSLocation } from "../../auth";
@@ -84,8 +85,8 @@ export function registerStockGroupsItemsRoutes(app: Express) {
       }
       const groups = await storage.getAllStockGroups(req.session.currentCompanyId);
       res.json(groups);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -113,8 +114,8 @@ export function registerStockGroupsItemsRoutes(app: Express) {
 
       const group = await storage.createStockGroup(parsed);
       res.status(201).json(group);
-    } catch (error: any) {
-      res.status(400).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(400).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -133,8 +134,8 @@ export function registerStockGroupsItemsRoutes(app: Express) {
         .where(and(...conds))
         .orderBy(asc(stockGrades.name));
       res.json(rows);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -159,8 +160,8 @@ export function registerStockGroupsItemsRoutes(app: Express) {
         /* non-fatal */
       }
       res.status(201).json(created);
-    } catch (error: any) {
-      res.status(400).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(400).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -200,8 +201,8 @@ export function registerStockGroupsItemsRoutes(app: Express) {
         /* non-fatal */
       }
       res.json(updated);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -232,8 +233,8 @@ export function registerStockGroupsItemsRoutes(app: Express) {
         /* non-fatal */
       }
       res.json({ message: "Stock grade deactivated" });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -252,8 +253,8 @@ export function registerStockGroupsItemsRoutes(app: Express) {
         .where(and(...conds))
         .orderBy(asc(stockCategories.name));
       res.json(rows);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -278,8 +279,8 @@ export function registerStockGroupsItemsRoutes(app: Express) {
         /* non-fatal */
       }
       res.status(201).json(created);
-    } catch (error: any) {
-      res.status(400).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(400).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -319,8 +320,8 @@ export function registerStockGroupsItemsRoutes(app: Express) {
         /* non-fatal */
       }
       res.json(updated);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -351,8 +352,8 @@ export function registerStockGroupsItemsRoutes(app: Express) {
         /* non-fatal */
       }
       res.json({ message: "Stock category deactivated" });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -423,8 +424,8 @@ export function registerStockGroupsItemsRoutes(app: Express) {
         total,
         totalPages: Math.ceil(total / pageSizeNum),
       });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -483,8 +484,8 @@ export function registerStockGroupsItemsRoutes(app: Express) {
         /* non-fatal */
       }
       res.status(201).json(item);
-    } catch (error: any) {
-      res.status(400).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(400).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -561,8 +562,8 @@ export function registerStockGroupsItemsRoutes(app: Express) {
         deleted: validIds.length,
         skipped: skippedCount,
       });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -597,8 +598,8 @@ export function registerStockGroupsItemsRoutes(app: Express) {
         .where(and(inArray(stockItems.id, validIds), eq(stockItems.companyId, companyId)));
 
       res.json({ message: `Category updated for ${validIds.length} item(s)`, updated: validIds.length });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -696,8 +697,8 @@ export function registerStockGroupsItemsRoutes(app: Express) {
         /* non-fatal */
       }
       res.json({ message, updated, notFound });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -774,8 +775,8 @@ export function registerStockGroupsItemsRoutes(app: Express) {
 
       const message = `Updated opening balances for ${updated} item(s)${notFound > 0 ? `. ${notFound} barcode(s) not found: ${notFoundBarcodes.slice(0, 5).join(", ")}${notFoundBarcodes.length > 5 ? "..." : ""}` : "."}`;
       res.json({ message, updated, notFound, notFoundBarcodes });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -806,8 +807,8 @@ export function registerStockGroupsItemsRoutes(app: Express) {
       }
 
       res.json({ message: `Successfully updated ${updated} stock item(s) from 'bale' to 'BL'`, updated });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -855,8 +856,8 @@ export function registerStockGroupsItemsRoutes(app: Express) {
         try {
           await storage.updateStockItem(item.id, { name: newName });
           results.push({ id: item.id, oldName: item.name, newName });
-        } catch (err: any) {
-          failures.push({ id: item.id, name: item.name, reason: err.message });
+        } catch (err: unknown) {
+          failures.push({ id: item.id, name: item.name, reason: getErrorMessage(err) });
         }
       }
 
@@ -866,8 +867,8 @@ export function registerStockGroupsItemsRoutes(app: Express) {
         results,
         failures,
       });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -889,8 +890,8 @@ export function registerStockGroupsItemsRoutes(app: Express) {
         ORDER BY pli.stock_item_id, pli.id DESC
       `);
       res.json(result.rows);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -925,8 +926,8 @@ export function registerStockGroupsItemsRoutes(app: Express) {
         ORDER BY c.offload_date DESC, pli.item_name
       `);
       res.json(result.rows);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -967,8 +968,8 @@ export function registerStockGroupsItemsRoutes(app: Express) {
       `);
 
       res.json(rows.rows);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -1028,8 +1029,8 @@ export function registerStockGroupsItemsRoutes(app: Express) {
       res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
       res.setHeader("Content-Disposition", 'attachment; filename="grade-category-template.xlsx"');
       res.send(buffer);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -1042,8 +1043,8 @@ export function registerStockGroupsItemsRoutes(app: Express) {
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const aliases = await storage.getAllCompanyCodeAliases(companyId);
       res.json(aliases);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -1070,8 +1071,8 @@ export function registerStockGroupsItemsRoutes(app: Express) {
       }
 
       res.json(stockItem);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
   // Get all location prices for the current company (for export)
@@ -1083,8 +1084,8 @@ export function registerStockGroupsItemsRoutes(app: Express) {
       }
       const prices = await storage.getAllLocationPrices(companyId);
       res.json(prices);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -1103,8 +1104,8 @@ export function registerStockGroupsItemsRoutes(app: Express) {
 
       const prices = await storage.getStockItemLocationPrices(stockItemId, companyId);
       res.json(prices);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -1140,8 +1141,8 @@ export function registerStockGroupsItemsRoutes(app: Express) {
       }
 
       res.json({ message: "Location price updated successfully" });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -1155,8 +1156,8 @@ export function registerStockGroupsItemsRoutes(app: Express) {
 
       await storage.deleteLocationPrice(priceId);
       res.json({ message: "Location price deleted successfully" });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
