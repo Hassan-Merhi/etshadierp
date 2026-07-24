@@ -13,6 +13,7 @@
  */
 
 import { existsSync } from "fs";
+import { getErrorMessage } from "../lib/httpHandlers";
 import { logger } from "./logger";
 import { execSync } from "child_process";
 import { createRequire } from "module";
@@ -508,8 +509,8 @@ export async function scrapeTrackTrace(containerNumber: string): Promise<TrackTr
       blocked: false,
       rawResponse: { extracted, capturedJson, finalUrl, debugBodyText: debugBodyText.slice(0, 1000) },
     };
-  } catch (err: any) {
-    const msg = err?.message ?? String(err);
+  } catch (err: unknown) {
+    const msg = getErrorMessage(err) ?? String(err);
     logger.error(`[TrackTrace] ${containerNumber}: unexpected error —`, { error: msg });
     return {
       success: false,

@@ -1,4 +1,5 @@
 import { parseId, parseOptionalId } from "../../../lib/parseId";
+import { getErrorMessage } from "../../../lib/httpHandlers";
 import { logger } from "../../../lib/logger";
 import { getClientDate } from "../../../lib/dateUtils";
 import type { Express } from "express";
@@ -1036,9 +1037,9 @@ export function registerSupplierStatementRoutes(app: Express) {
           totalOwed: (totalValue + totalDirectCommissions).toFixed(2),
         },
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error fetching supplier statement:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 

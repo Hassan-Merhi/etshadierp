@@ -1,4 +1,5 @@
 import type { Express } from "express";
+import { getErrorMessage } from "../../../lib/httpHandlers";
 import { logger } from "../../../lib/logger";
 import { requireAuth, requireRole } from "../../../auth";
 import { getLockedRateDiagnosticsForCompany } from "../../../services/factory/rawStockLockedRate";
@@ -23,9 +24,9 @@ export function registerRawStockDiagnosticRoutes(app: Express) {
 
         const rows = await getLockedRateDiagnosticsForCompany(companyId);
         res.json(rows);
-      } catch (error: any) {
+      } catch (error: unknown) {
         logger.error("Error running locked-rate diagnostics:", { error: error });
-        res.status(500).json({ message: error.message });
+        res.status(500).json({ message: getErrorMessage(error) });
       }
     }
   );

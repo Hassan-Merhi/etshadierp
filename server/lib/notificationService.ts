@@ -1,4 +1,5 @@
 import { db } from "../db";
+import { getErrorMessage } from "../lib/httpHandlers";
 import { logger } from "./logger";
 import { notifications, notificationRules, users } from "@shared/schema";
 import { eq, and, gte, inArray } from "drizzle-orm";
@@ -76,7 +77,7 @@ export async function dispatchNotification(opts: DispatchOptions): Promise<void>
         isRead: false,
       });
     }
-  } catch (err: any) {
-    logger.error("[NotificationService] Failed to dispatch notification:", { error: err?.message });
+  } catch (err: unknown) {
+    logger.error("[NotificationService] Failed to dispatch notification:", { error: getErrorMessage(err) });
   }
 }

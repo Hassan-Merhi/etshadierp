@@ -5,6 +5,7 @@
  */
 
 import { execFile } from "child_process";
+import { getErrorMessage } from "../lib/httpHandlers";
 import { promisify } from "util";
 import path from "path";
 import { WORKSPACE_ROOT, resolveWorkspacePath } from "./codeAgentTools";
@@ -110,8 +111,8 @@ export async function commitAndPush(params: {
     await git(["push", repoUrl, `HEAD:refs/heads/${branch}`]);
 
     return { success: true, commitHash, branch };
-  } catch (e: any) {
-    const raw: string = e.message ?? String(e);
+  } catch (e: unknown) {
+    const raw: string = getErrorMessage(e) ?? String(e);
     // Sanitize: strip any credential-bearing URLs before surfacing to callers/logs
     const msg = raw.replace(/https?:\/\/[^@\s]+@[^\s]*/gi, "<redacted-url>");
     if (

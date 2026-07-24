@@ -9,6 +9,7 @@
  */
 
 import { db } from "./db";
+import { getErrorMessage } from "./lib/httpHandlers";
 import * as schema from "@shared/schema";
 import { eq, and, isNull, inArray } from "drizzle-orm";
 import {
@@ -383,7 +384,7 @@ export async function runTool(
       default:
         return { ok: false, error: `Unknown tool: ${toolName}` };
     }
-  } catch (err: any) {
-    return { ok: false, error: String(err?.message ?? err) };
+  } catch (err: unknown) {
+    return { ok: false, error: String(getErrorMessage(err) ?? err) };
   }
 }

@@ -5,6 +5,7 @@
  */
 
 import { db } from "../db";
+import { getErrorMessage } from "../lib/httpHandlers";
 import { logger } from "../lib/logger";
 import { stockItems, locations, companies } from "@shared/schema";
 import { eq, inArray } from "drizzle-orm";
@@ -116,9 +117,9 @@ export async function sendRevisedTransferWhatsApp(opts: SendRevisedTransferWAOpt
       items: imageItems,
     });
     logger.info(`[RevisedTransferWA] PNG generated (${pngBuffer.length} bytes).`);
-  } catch (imgErr: any) {
+  } catch (imgErr: unknown) {
     logger.warn(
-      `[RevisedTransferWA] Image generation failed for ${voucherNumber} — falling back to text. Error: ${imgErr?.message}`
+      `[RevisedTransferWA] Image generation failed for ${voucherNumber} — falling back to text. Error: ${getErrorMessage(imgErr)}`
     );
   }
 

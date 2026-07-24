@@ -7,6 +7,7 @@
  * focused on chat orchestration; behaviour is unchanged.
  */
 import { GoogleGenAI } from "@google/genai";
+import { getErrorMessage } from "../lib/httpHandlers";
 import { logger } from "../lib/logger";
 import OpenAI from "openai";
 import { db } from "../db";
@@ -190,9 +191,9 @@ export async function callAIWithFallback(
 
       logger.info(`[ChatService] Successfully used ${currentProvider}`);
       return { response, usedProvider: currentProvider };
-    } catch (error: any) {
-      logger.error(`[ChatService] ${currentProvider} failed:`, { error: error.message });
-      lastError = error;
+    } catch (error: unknown) {
+      logger.error(`[ChatService] ${currentProvider} failed:`, { error: getErrorMessage(error) });
+      lastError = error as Error;
       // Continue to next provider
     }
   }
