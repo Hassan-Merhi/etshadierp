@@ -1,4 +1,5 @@
 import { db } from "./db";
+import { logger } from "./lib/logger";
 import * as schema from "@shared/schema";
 import {
   readProjectFile,
@@ -289,7 +290,7 @@ export async function chat(
     // ── Step 1: Classify intent (pure regex, no AI call) ─────────────────
     const intent = classifyChatIntent(userMessage, pageContext);
     const isActionIntent = ACTION_INTENTS.has(intent);
-    console.log(`[ChatService] Intent: ${intent} (action=${isActionIntent})`);
+    logger.info(`[ChatService] Intent: ${intent} (action=${isActionIntent})`);
 
     // ── Step 2: Load ERP context only when needed ─────────────────────────
     let context: ERPContext | null = null;
@@ -312,7 +313,7 @@ export async function chat(
         "Help me write a professional email",
         "What are the pros and cons of React vs Vue?",
       ];
-      console.log("[ChatService] general_knowledge intent — skipping ERP context");
+      logger.info("[ChatService] general_knowledge intent — skipping ERP context");
     } else if (intent === "code_read") {
       // ── Code Read: read project files or grep, inject into system prompt ──────
       const filePaths = extractFilePathsFromMessage(userMessage);
@@ -357,7 +358,7 @@ export async function chat(
 
       systemPrompt = `You are a coding assistant with access to this TypeScript ERP/POS project (React + Express + PostgreSQL). Answer the user's question clearly and concisely about the code.${codeContext}\n\nIf you reference specific parts of the code, use code blocks with the language specified.`;
       suggestions = ["Explain how this works", "Find related files", "Show me all usages"];
-      console.log("[ChatService] code_read intent — loaded file/grep context");
+      logger.info("[ChatService] code_read intent — loaded file/grep context");
     } else if (intent === "code_edit") {
       // ── Code Edit: load files and build structured output prompt ──────────────
       // Support up to 3 explicitly-named files; fall back to keyword grep for pathless edits.
@@ -381,7 +382,7 @@ export async function chat(
           contentBlocks.push(
             `Current content of \`${fp}\`${note} (${totalLines} lines${truncated ? ", first 300 shown" : ""}):\n\`\`\`typescript\n${content}\n\`\`\``
           );
-          console.log(`[ChatService] code_edit — read ${fp} (${totalLines} lines${truncated ? ", truncated" : ""})`);
+          logger.info(`[ChatService] code_edit — read ${fp} (${totalLines} lines${truncated ? ", truncated" : ""})`);
         } catch {
           contentBlocks.push(`File \`${fp}\` does not exist yet — you will be creating it.`);
           if (!codeReadFiles.includes(fp)) codeReadFiles.push(fp);
@@ -427,7 +428,7 @@ export async function chat(
             contentBlocks.push(
               `Current content of \`${fp}\`${note} (${totalLines} lines${truncated ? ", first 300 shown" : ""}):\n\`\`\`typescript\n${content}\n\`\`\``
             );
-            console.log(
+            logger.info(
               `[ChatService] code_edit (pathless) — inferred ${fp} (${totalLines} lines${truncated ? ", truncated" : ""})`
             );
           } catch {
@@ -467,24 +468,24 @@ Rules:
 - Use the multi-file format ONLY when the change genuinely requires editing more than one file`;
 
       suggestions = ["Apply this change", "Show me the diff", "Explain what changed"];
-      console.log(`[ChatService] code_edit intent — targets: ${codeReadFiles.join(", ") || "(inferred)"}`);
+      logger.info(`[ChatService] code_edit intent — targets: ${codeReadFiles.join(", ") || "(inferred)"}`);
     } else if (isActionIntent) {
       // Action intents: skip the expensive full-context load, use a light prompt
       systemPrompt = buildActionSystemPrompt(intent, pageContext);
       suggestions = [];
-      console.log("[ChatService] Skipping getERPContext for action intent");
+      logger.info("[ChatService] Skipping getERPContext for action intent");
     } else if (TOOL_INTENTS.has(intent)) {
       // Tool intents: targeted DB queries, no full ERP context
       const toolStart = Date.now();
       const toolData = await loadToolData(intent, companyId, userMessage);
-      console.log(`[ChatService] Tool data loaded in ${Date.now() - toolStart}ms for intent "${intent}"`);
+      logger.info(`[ChatService] Tool data loaded in ${Date.now() - toolStart}ms for intent "${intent}"`);
       systemPrompt = buildToolSystemPrompt(intent, toolData, pageContext);
       suggestions = [];
     } else {
       // General / unclassified: load full cached ERP context
       const ctxStart = Date.now();
       context = await getCachedERPContext(companyId);
-      console.log(`[ChatService] Context ready in ${Date.now() - ctxStart}ms (company ${companyId})`);
+      logger.info(`[ChatService] Context ready in ${Date.now() - ctxStart}ms (company ${companyId})`);
       systemPrompt = buildSystemPrompt(context, userPreferences);
       suggestions = generateQuickSuggestions(context);
 
@@ -506,7 +507,7 @@ Rules:
     const adminProvider = await getSelectedAIProvider();
     const smartOverride = detectSmartProvider(userMessage, available);
     const selectedProvider = smartOverride ?? adminProvider;
-    console.log(
+    logger.info(
       `[ChatService] Provider: ${selectedProvider} (smart=${smartOverride ?? "none"}, admin=${adminProvider}), Available: ${available.join(", ")}`
     );
 
@@ -526,7 +527,7 @@ Rules:
       selectedProvider
     );
     if (earlyMultiSourceTransfer) {
-      console.log(`[ChatService] Early deterministic multi-source stock-transfer route handled request; hard-returning.`);
+      logger.info(`[ChatService] Early deterministic multi-source stock-transfer route handled request; hard-returning.`);
       return earlyMultiSourceTransfer;
     }
 
@@ -537,7 +538,7 @@ Rules:
       conversationHistory,
       userMessage
     );
-    console.log(`[ChatService] AI call (${usedProvider}) took ${Date.now() - aiStart}ms`);
+    logger.info(`[ChatService] AI call (${usedProvider}) took ${Date.now() - aiStart}ms`);
 
     // ── Code Edit: parse filePatchDrafts (single or multi-file) from AI JSON ──
     let filePatchDrafts: any[] | undefined = undefined;
@@ -5474,7 +5475,7 @@ If the intent does not match any type, output: null`;
       }
     }
 
-    console.log(`[ChatService] Total chat time: ${Date.now() - chatStart}ms`);
+    logger.info(`[ChatService] Total chat time: ${Date.now() - chatStart}ms`);
     return {
       response: finalResponse,
       suggestions,
@@ -5493,8 +5494,8 @@ If the intent does not match any type, output: null`;
       readFiles: codeReadFiles.length > 0 ? codeReadFiles : undefined,
     };
   } catch (error: any) {
-    console.error("[ChatService] ERROR:", error.message);
-    console.error("[ChatService] Stack:", error.stack);
+    logger.error("[ChatService] ERROR:", { error: error.message });
+    logger.error("[ChatService] Stack:", { error: error.stack });
     if (
       error.message?.includes("API_KEY") ||
       error.message?.includes("API key") ||
@@ -5601,7 +5602,7 @@ Rules:
     if (!Array.isArray(parsed.items)) return null;
     return parsed;
   } catch (err) {
-    console.error("[ChatService] extractPOFromText AI error:", err);
+    logger.error("[ChatService] extractPOFromText AI error:", { error: err });
     return null;
   }
 }
