@@ -404,6 +404,7 @@ export default function ProductionComparison() {
 
   const qA = useQuery<ReportData>({
     queryKey: ["/api/factory/production-value-report", rangeA[0], rangeA[1]],
+    staleTime: 0,
     queryFn: async () => {
       const r = await fetch(
         `/api/factory/production-value-report?from=${rangeA[0]}&to=${rangeA[1]}`,
@@ -416,6 +417,7 @@ export default function ProductionComparison() {
 
   const qB = useQuery<ReportData>({
     queryKey: ["/api/factory/production-value-report", rangeB[0], rangeB[1]],
+    staleTime: 0,
     queryFn: async () => {
       const r = await fetch(
         `/api/factory/production-value-report?from=${rangeB[0]}&to=${rangeB[1]}`,
