@@ -27,6 +27,7 @@ import {
   KeyRound,
   LayoutGrid,
   Handshake,
+  Link2,
   Wrench,
   Bot,
   ShieldCheck,
@@ -285,6 +286,8 @@ export function AppSidebar({ user }: { user?: any }) {
                 color: NAV_COLOR.operations,
                 items: [
                   { title: "SP Reports", url: "/sp/reports", icon: BarChart3 },
+                  { title: "Opening Stock", url: "/sp/opening-stock", icon: Layers },
+                  { title: "Aliases", url: "/sp/aliases", icon: Link2 },
                   { title: "Setup", url: "/sp/setup", icon: Wrench },
                   { title: "GC Migration", url: "/sp/gc-migration", icon: Building2 },
                 ],
