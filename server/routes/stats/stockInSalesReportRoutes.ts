@@ -3,11 +3,7 @@ import { z } from "zod";
 
 import { requireAuth, requireNonPOS } from "../../auth";
 import { logger } from "../../lib/logger";
-import {
-  getStockInSalesReport,
-  type StockInSalesGrouping,
-  type StockInSalesProfitFilter,
-} from "../../services/reports/stockInSalesReportService";
+import { getStockInSalesReport } from "../../services/reports/stockInSalesReportService";
 
 const isoDateSchema = z
   .string()
@@ -83,8 +79,8 @@ export function registerStockInSalesReportRoutes(app: Express) {
         companyId,
         startDate: parsed.data.startDate,
         endDate: parsed.data.endDate,
-        grouping: parsed.data.grouping as StockInSalesGrouping,
-        profitFilter: parsed.data.profitFilter as StockInSalesProfitFilter,
+        grouping: parsed.data.grouping,
+        profitFilter: parsed.data.profitFilter,
         locationIds: parsed.data.locationIds,
         stockGroupIds: parsed.data.stockGroupIds,
         search: parsed.data.search || undefined,
@@ -99,10 +95,7 @@ export function registerStockInSalesReportRoutes(app: Express) {
         companyId,
         error,
       });
-      return res.status(500).json({
-        message: "Failed to generate stock in and sales report",
-        details: error?.message || String(error),
-      });
+      return res.status(500).json({ message: "Failed to generate stock in and sales report" });
     }
   });
 }
