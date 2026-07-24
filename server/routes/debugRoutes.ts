@@ -1,4 +1,5 @@
 import type { Express } from "express";
+import { getErrorMessage } from "../lib/httpHandlers";
 import { logger } from "../lib/logger";
 import { round2 } from "../netPositionHelper";
 import { db } from "../db";
@@ -134,8 +135,8 @@ export function registerDebugRoutes(app: Express) {
             calculatedRate: totalQty > 0 ? totalValue / totalQty : 0,
           },
         });
-      } catch (error: any) {
-        res.status(500).json({ message: error.message });
+      } catch (error: unknown) {
+        res.status(500).json({ message: getErrorMessage(error) });
       }
     }
   );
@@ -1327,9 +1328,9 @@ export function registerDebugRoutes(app: Express) {
         reconciliation,
         containerAudit,
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Import cycle diagnostics error:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -1440,9 +1441,9 @@ export function registerDebugRoutes(app: Express) {
           explanation:
             "These vouchers exist for containers in OTW status that have no offload record. They were created during offload but not cleaned up when the offload was reversed.",
         });
-      } catch (error: any) {
+      } catch (error: unknown) {
         logger.error("Orphaned charge vouchers diagnostics error:", { error: error });
-        res.status(500).json({ message: error.message });
+        res.status(500).json({ message: getErrorMessage(error) });
       }
     }
   );
@@ -1517,9 +1518,9 @@ export function registerDebugRoutes(app: Express) {
         deletedVouchers,
         containersChecked: otwContainers.length,
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Fix orphaned charge vouchers error:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -1548,16 +1549,16 @@ export function registerDebugRoutes(app: Express) {
           try {
             await recalculateOrderTotals(db, order.id);
             done++;
-          } catch (err: any) {
+          } catch (err: unknown) {
             errors++;
-            errorDetails.push(`orderId=${order.id}: ${err.message}`);
+            errorDetails.push(`orderId=${order.id}: ${getErrorMessage(err)}`);
             logger.error(`[recalc-factory-totals] error on orderId=${order.id}:`, { error: err });
           }
         }
         res.json({ total: orders.length, done, errors, errorDetails });
-      } catch (error: any) {
+      } catch (error: unknown) {
         logger.error("Recalculate factory order totals error:", { error: error });
-        res.status(500).json({ message: error.message });
+        res.status(500).json({ message: getErrorMessage(error) });
       }
     }
   );

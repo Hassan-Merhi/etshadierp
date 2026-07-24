@@ -1,4 +1,5 @@
 import { type Express } from "express";
+import { getErrorMessage } from "../../lib/httpHandlers";
 import { db } from "../../db";
 import { storage } from "../../storage";
 import { requireAuth } from "../../auth";
@@ -28,8 +29,8 @@ export function registerPosShiftRoutes(app: Express): void {
 
       const shift = await storage.getCurrentShift(userId, locationId);
       res.json(shift || null);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -56,8 +57,8 @@ export function registerPosShiftRoutes(app: Express): void {
         shifts = shifts.filter((s) => s.userId === posUserId);
       }
       res.json(shifts);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -82,8 +83,8 @@ export function registerPosShiftRoutes(app: Express): void {
       }
 
       res.json(shift);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -145,8 +146,8 @@ export function registerPosShiftRoutes(app: Express): void {
       });
 
       res.json(shift);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -185,8 +186,8 @@ export function registerPosShiftRoutes(app: Express): void {
 
       const closedShift = await storage.closeShift(shiftId, closingCash.toString(), notes);
       res.json(closedShift);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 }

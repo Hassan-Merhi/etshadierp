@@ -6,6 +6,7 @@
  * unchanged.
  */
 import type { Express } from "express";
+import { getErrorMessage } from "../lib/httpHandlers";
 import { logger } from "../lib/logger";
 import { desc, eq, sql } from "drizzle-orm";
 import { db } from "../db";
@@ -49,9 +50,9 @@ export function registerBaleTransferRoutes(app: Express) {
         .orderBy(desc(baleTransfers.createdAt));
 
       res.json(transfers);
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error fetching bale transfers:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -137,9 +138,9 @@ export function registerBaleTransferRoutes(app: Express) {
       }
 
       res.json({ success: true, transferId: result.id, transfer: result });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error creating bale transfer:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -193,9 +194,9 @@ export function registerBaleTransferRoutes(app: Express) {
         .where(eq(baleTransferItems.transferId, transferId));
 
       res.json({ ...transfer, items });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error fetching bale transfer:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -219,9 +220,9 @@ export function registerBaleTransferRoutes(app: Express) {
         .returning();
 
       res.json({ success: true, transfer: updated });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error completing bale transfer:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -256,9 +257,9 @@ export function registerBaleTransferRoutes(app: Express) {
       });
 
       res.json({ success: true });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error deleting bale transfer:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -296,8 +297,8 @@ export function registerBaleTransferRoutes(app: Express) {
       }
 
       res.json({ success: true });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 }

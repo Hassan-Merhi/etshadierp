@@ -1,4 +1,5 @@
 import type { Express } from "express";
+import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
 import { db } from "../../db";
 import { storage } from "../../storage";
@@ -116,8 +117,8 @@ export function registerStatsDataRoutes(app: Express) {
       }
       const result = await getMonthlyData(companyId);
       res.json(result);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -130,8 +131,8 @@ export function registerStatsDataRoutes(app: Express) {
       }
       const result = await getStockSummary(companyId);
       res.json(result);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -145,8 +146,8 @@ export function registerStatsDataRoutes(app: Express) {
 
       const result = await getExpenseBreakdown(companyId);
       res.json(result);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -256,9 +257,9 @@ export function registerStatsDataRoutes(app: Express) {
       });
 
       res.json(enhancedSalesData);
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Sales report error:", { error: error });
-      res.status(500).json({ message: error.message, details: error.toString() });
+      res.status(500).json({ message: getErrorMessage(error), details: String(error) });
     }
   });
 
@@ -390,9 +391,9 @@ export function registerStatsDataRoutes(app: Express) {
       }
 
       res.json(allSalesData);
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("All companies sales report error:", { error: error });
-      res.status(500).json({ message: error.message, details: error.toString() });
+      res.status(500).json({ message: getErrorMessage(error), details: String(error) });
     }
   });
 

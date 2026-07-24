@@ -1,4 +1,5 @@
 import { trackOneContainerById } from "../../../services/containerTrackingService";
+import { getErrorMessage } from "../../../lib/httpHandlers";
 import { logger } from "../../../lib/logger";
 import { parseId, parseOptionalId } from "../../../lib/parseId";
 import { dispatchNotification } from "../../../lib/notificationService";
@@ -271,9 +272,9 @@ export function registerOrderPricingRoutes(app: Express) {
         charges: updatedCharges,
         repriced: updated,
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error repricing order:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -395,9 +396,9 @@ export function registerOrderPricingRoutes(app: Express) {
         charges: updatedCharges,
         repriced: updated,
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error repricing order with production prices:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -500,9 +501,9 @@ export function registerOrderPricingRoutes(app: Express) {
         charges: updatedCharges,
         repriced: updated,
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error applying proforma prices:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -559,9 +560,9 @@ export function registerOrderPricingRoutes(app: Express) {
       }
 
       res.json(updatedOrder);
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error repricing article:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -644,14 +645,14 @@ export function registerOrderPricingRoutes(app: Express) {
             await recalculateOrderTotals(db, order.id);
             changedOrderIds.push(order.id);
           }
-        } catch (err: any) {
-          errors.push(`Order ${order.id}: ${err.message}`);
+        } catch (err: unknown) {
+          errors.push(`Order ${order.id}: ${getErrorMessage(err)}`);
         }
       }
 
       res.json({ ordersScanned, balesRepaired, changedOrderIds, errors });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 

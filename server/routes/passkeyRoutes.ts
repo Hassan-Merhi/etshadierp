@@ -1,4 +1,5 @@
 import type { Express, Request, Response } from "express";
+import { getErrorMessage } from "../lib/httpHandlers";
 import {
   generateRegistrationOptions,
   verifyRegistrationResponse,
@@ -62,8 +63,8 @@ export function registerPasskeyRoutes(app: Express) {
 
       (req.session as any).passkeyChallenge = options.challenge;
       res.json(options);
-    } catch (err: any) {
-      res.status(500).json({ message: err.message });
+    } catch (err: unknown) {
+      res.status(500).json({ message: getErrorMessage(err) });
     }
   });
 
@@ -99,8 +100,8 @@ export function registerPasskeyRoutes(app: Express) {
 
       delete (req.session as any).passkeyChallenge;
       res.json({ verified: true });
-    } catch (err: any) {
-      res.status(500).json({ message: err.message });
+    } catch (err: unknown) {
+      res.status(500).json({ message: getErrorMessage(err) });
     }
   });
 
@@ -130,8 +131,8 @@ export function registerPasskeyRoutes(app: Express) {
 
       (req.session as any).passkeyChallenge = options.challenge;
       res.json(options);
-    } catch (err: any) {
-      res.status(500).json({ message: err.message });
+    } catch (err: unknown) {
+      res.status(500).json({ message: getErrorMessage(err) });
     }
   });
 
@@ -204,8 +205,8 @@ export function registerPasskeyRoutes(app: Express) {
       if (!userRecord) return res.status(401).json({ message: "User not found" });
       const { password: _pw, ...userWithoutPassword } = userRecord;
       res.json({ ...userWithoutPassword, currentRole: req.session.currentRole ?? null });
-    } catch (err: any) {
-      res.status(500).json({ message: err.message });
+    } catch (err: unknown) {
+      res.status(500).json({ message: getErrorMessage(err) });
     }
   });
 
@@ -218,8 +219,8 @@ export function registerPasskeyRoutes(app: Express) {
         WHERE user_id = ${userId} ORDER BY created_at DESC
       `);
       res.json(rows.rows);
-    } catch (err: any) {
-      res.status(500).json({ message: err.message });
+    } catch (err: unknown) {
+      res.status(500).json({ message: getErrorMessage(err) });
     }
   });
 
@@ -232,8 +233,8 @@ export function registerPasskeyRoutes(app: Express) {
         WHERE id = ${parseInt(req.params.id)} AND user_id = ${userId}
       `);
       res.json({ ok: true });
-    } catch (err: any) {
-      res.status(500).json({ message: err.message });
+    } catch (err: unknown) {
+      res.status(500).json({ message: getErrorMessage(err) });
     }
   });
 }

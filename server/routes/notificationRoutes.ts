@@ -1,4 +1,5 @@
 import type { Express } from "express";
+import { getErrorMessage } from "../lib/httpHandlers";
 import { db } from "../db";
 import { requireAuth } from "../auth";
 import { notifications, notificationRules, users, companies } from "@shared/schema";
@@ -69,8 +70,8 @@ export function registerNotificationRoutes(app: Express) {
       }));
 
       res.json(enriched);
-    } catch (err: any) {
-      res.status(500).json({ message: err.message });
+    } catch (err: unknown) {
+      res.status(500).json({ message: getErrorMessage(err) });
     }
   });
 
@@ -103,8 +104,8 @@ export function registerNotificationRoutes(app: Express) {
         .set({ isRead: true, readAt: new Date() })
         .where(and(eq(notifications.id, id), eq(notifications.recipientUserId, userId)));
       res.json({ ok: true });
-    } catch (err: any) {
-      res.status(500).json({ message: err.message });
+    } catch (err: unknown) {
+      res.status(500).json({ message: getErrorMessage(err) });
     }
   });
 
@@ -121,8 +122,8 @@ export function registerNotificationRoutes(app: Express) {
         .set({ isRead: true, readAt: new Date() })
         .where(and(...conds));
       res.json({ ok: true });
-    } catch (err: any) {
-      res.status(500).json({ message: err.message });
+    } catch (err: unknown) {
+      res.status(500).json({ message: getErrorMessage(err) });
     }
   });
 
@@ -135,8 +136,8 @@ export function registerNotificationRoutes(app: Express) {
       }
       const rules = await db.select().from(notificationRules).orderBy(notificationRules.eventType);
       res.json(rules);
-    } catch (err: any) {
-      res.status(500).json({ message: err.message });
+    } catch (err: unknown) {
+      res.status(500).json({ message: getErrorMessage(err) });
     }
   });
 
@@ -168,8 +169,8 @@ export function registerNotificationRoutes(app: Express) {
       }
       const updated = await db.select().from(notificationRules).where(eq(notificationRules.eventType, eventType));
       res.json(updated);
-    } catch (err: any) {
-      res.status(500).json({ message: err.message });
+    } catch (err: unknown) {
+      res.status(500).json({ message: getErrorMessage(err) });
     }
   });
 
@@ -191,8 +192,8 @@ export function registerNotificationRoutes(app: Express) {
         )
         .orderBy(users.username);
       res.json(allUsers);
-    } catch (err: any) {
-      res.status(500).json({ message: err.message });
+    } catch (err: unknown) {
+      res.status(500).json({ message: getErrorMessage(err) });
     }
   });
 }
