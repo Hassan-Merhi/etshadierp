@@ -1,4 +1,5 @@
 import { parseId, parseOptionalId } from "../../lib/parseId";
+import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
 import { getClientDate } from "../../lib/dateUtils";
 import type { Express, Request, Response, NextFunction } from "express";
@@ -213,9 +214,9 @@ export function registerContainerDocumentsRoutes(app: Express) {
       };
 
       res.json(exportData);
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Container export error:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -322,9 +323,9 @@ export function registerContainerDocumentsRoutes(app: Express) {
       res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
       res.setHeader("Content-Disposition", `attachment; filename="containers_export_${getClientDate(req)}.xlsx"`);
       res.send(buffer);
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Container export-all error:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -511,9 +512,9 @@ export function registerContainerDocumentsRoutes(app: Express) {
         skippedCount,
         totalSalesVouchers: allVouchers.length,
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Sales backfill error:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 

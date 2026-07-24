@@ -19,6 +19,7 @@
  */
 
 import { existsSync } from "fs";
+import { getErrorMessage } from "../lib/httpHandlers";
 import { logger } from "./logger";
 import { execSync } from "child_process";
 import { createRequire } from "module";
@@ -126,8 +127,8 @@ export async function ensureChromiumInstalled(): Promise<void> {
     } else {
       logger.warn("[Puppeteer] Chrome still not found after download — scraper unavailable.");
     }
-  } catch (err: any) {
-    logger.warn("[Puppeteer] Chrome setup error:", { error: err?.message ?? err });
+  } catch (err: unknown) {
+    logger.warn("[Puppeteer] Chrome setup error:", { error: getErrorMessage(err) ?? err });
   }
 }
 
@@ -223,8 +224,8 @@ export async function scrapeTracking(containerNumber: string): Promise<ScraperRe
   let release: (() => void) | null = null;
   try {
     release = await acquirePuppeteerSlot();
-  } catch (err: any) {
-    if (err?.message === "PUPPETEER_QUEUE_FULL") {
+  } catch (err: unknown) {
+    if (getErrorMessage(err) === "PUPPETEER_QUEUE_FULL") {
       logger.warn(`[ParcelsAppScraper] ${containerNumber}: Puppeteer queue full — skipping (server busy)`);
       return { success: false, shipment: null, blocked: false, error: "PUPPETEER_QUEUE_FULL" };
     }
@@ -342,7 +343,7 @@ export async function scrapeTracking(containerNumber: string): Promise<ScraperRe
       rawResponse: capturedData,
       error: shipment ? undefined : "No matching shipment in page response",
     };
-  } catch (err: any) {
+  } catch (err: unknown) {
     clearTimeout(hardStop);
     if (page) {
       try {
@@ -356,7 +357,7 @@ export async function scrapeTracking(containerNumber: string): Promise<ScraperRe
       success: false,
       shipment: null,
       blocked: false,
-      error: `Scraper error: ${err?.message ?? "Unknown"}`,
+      error: `Scraper error: ${getErrorMessage(err) ?? "Unknown"}`,
     };
   }
 }

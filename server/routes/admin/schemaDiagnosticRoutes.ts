@@ -9,6 +9,7 @@
  */
 
 import type { Express } from "express";
+import { getErrorMessage } from "../../lib/httpHandlers";
 import { pool } from "../../db";
 import { requireAuth } from "../../auth";
 
@@ -159,8 +160,8 @@ export function registerSchemaDiagnosticRoutes(app: Express) {
           ? null
           : "POST to /api/admin/schema-fix to apply the missing additions automatically.",
       });
-    } catch (err: any) {
-      return res.status(500).json({ message: err.message });
+    } catch (err: unknown) {
+      return res.status(500).json({ message: getErrorMessage(err) });
     }
   });
 
@@ -198,8 +199,8 @@ export function registerSchemaDiagnosticRoutes(app: Express) {
           ON fiscal_period_closures (company_id, period_end_date)
         `);
         applied.push("TABLE fiscal_period_closures");
-      } catch (err: any) {
-        failed.push({ item: "TABLE fiscal_period_closures", error: err.message });
+      } catch (err: unknown) {
+        failed.push({ item: "TABLE fiscal_period_closures", error: getErrorMessage(err) });
       }
     }
 
@@ -227,8 +228,8 @@ export function registerSchemaDiagnosticRoutes(app: Express) {
       try {
         await pool.query(sql);
         applied.push(`${tbl}.${col}`);
-      } catch (err: any) {
-        failed.push({ item: `${tbl}.${col}`, error: err.message });
+      } catch (err: unknown) {
+        failed.push({ item: `${tbl}.${col}`, error: getErrorMessage(err) });
       }
     }
 

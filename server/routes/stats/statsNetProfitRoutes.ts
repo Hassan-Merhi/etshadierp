@@ -1,4 +1,5 @@
 import type { Express } from "express";
+import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
 import { db, pool } from "../../db";
 import { storage } from "../../storage";
@@ -686,9 +687,9 @@ export function registerStatsNetProfitRoutes(app: Express) {
           .from(salaryAdvances)
           .where(and(eq(salaryAdvances.companyId, companyId), eq(salaryAdvances.fullyPaid, false)));
         rawSalaryAdvances = round2(parseFloat((saRow as any)?.total || "0"));
-      } catch (saErr: any) {
+      } catch (saErr: unknown) {
         // Fallback: column may be absent on old production schemas. Dashboard still loads.
-        logger.warn("[/api/stats/net-profit] salary_advances query skipped (schema gap):", { error: saErr?.message });
+        logger.warn("[/api/stats/net-profit] salary_advances query skipped (schema gap):", { error: getErrorMessage(saErr) });
       }
       // For CFA companies, worker balances come from voucher entries.
       // Guard: only convert if ALL entries are pre-migration (hasMigratedEntries=false).
@@ -916,8 +917,8 @@ export function registerStatsNetProfitRoutes(app: Express) {
             onUsAccounts.push({ name: "Rent Payable", code: "RENT_PAYABLE", value: val, category: "Rent Payable" });
           }
         }
-      } catch (rentalErr: any) {
-        logger.warn("[/api/stats/net-profit] Rental section skipped (schema or data error):", { error: rentalErr.message });
+      } catch (rentalErr: unknown) {
+        logger.warn("[/api/stats/net-profit] Rental section skipped (schema or data error):", { error: getErrorMessage(rentalErr) });
         // Non-fatal: dashboard continues without rent figures
       }
 
@@ -1092,9 +1093,9 @@ export function registerStatsNetProfitRoutes(app: Express) {
       };
       _setCached(_cacheKey, _result);
       res.json(_result);
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("[/api/stats/net-profit] Unhandled error:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 

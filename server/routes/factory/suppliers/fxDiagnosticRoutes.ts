@@ -15,6 +15,7 @@
  * exposed to ordinary factory users.
  */
 import type { Express } from "express";
+import { getErrorMessage } from "../../../lib/httpHandlers";
 import { logger } from "../../../lib/logger";
 import { and, eq, ne } from "drizzle-orm";
 import { db } from "../../../db";
@@ -253,9 +254,9 @@ export function registerFactoryFxDiagnosticRoutes(app: Express) {
           rows: unresolved,
           reconciliation,
         });
-      } catch (error: any) {
+      } catch (error: unknown) {
         logger.error("Error running factory FX diagnostic:", { error: error });
-        res.status(500).json({ message: error.message });
+        res.status(500).json({ message: getErrorMessage(error) });
       }
     }
   );
@@ -322,7 +323,7 @@ export function registerFactoryFxDiagnosticRoutes(app: Express) {
         let tokenPayload: RepairTokenPayload;
         try {
           tokenPayload = verifyRepairToken<RepairTokenPayload>(confirmationToken);
-        } catch (err: any) {
+        } catch (err: unknown) {
           if (err instanceof ExpiredRepairTokenError) {
             return res.status(400).json({ code: "TOKEN_EXPIRED", message: err.message });
           }
@@ -405,7 +406,7 @@ export function registerFactoryFxDiagnosticRoutes(app: Express) {
         });
 
         res.json({ dryRun: false, result });
-      } catch (error: any) {
+      } catch (error: unknown) {
         if (error instanceof ManualReviewRequiredError) {
           return res.status(409).json({ message: error.message, code: "MANUAL_REVIEW_REQUIRED" });
         }
@@ -417,7 +418,7 @@ export function registerFactoryFxDiagnosticRoutes(app: Express) {
           return res.status(500).json({ message: error.message, code: "REPAIR_TOKEN_MISCONFIGURED" });
         }
         logger.error("Error applying FX resolution repair:", { error: error });
-        res.status(500).json({ message: error.message });
+        res.status(500).json({ message: getErrorMessage(error) });
       }
     }
   );

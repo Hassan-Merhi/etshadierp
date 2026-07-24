@@ -1,4 +1,5 @@
 import { logAudit } from "../../helpers/auditHelpers";
+import { getErrorMessage } from "../../../lib/httpHandlers";
 import { logger } from "../../../lib/logger";
 import { contentDisposition } from "../../../lib/contentDisposition";
 import { trackOneContainerById } from "../../../services/containerTrackingService";
@@ -232,9 +233,9 @@ export function registerOrderPdfExportRoutes(app: Express) {
       res.setHeader("Content-Disposition", contentDisposition(`loading_${safeName}`));
       res.setHeader("Content-Length", xlsBuffer.byteLength);
       res.end(xlsBuffer);
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error exporting pending loading:", { error: error });
-      if (!res.headersSent) res.status(500).json({ message: error.message });
+      if (!res.headersSent) res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -532,9 +533,9 @@ export function registerOrderPdfExportRoutes(app: Express) {
         logger.error("[PdfExport] audit write failed:", { error: auditErr });
       }
       doc.end();
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error exporting order to PDF:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -922,9 +923,9 @@ export function registerOrderPdfExportRoutes(app: Express) {
       );
       res.setHeader("Content-Length", xlsBuffer.byteLength);
       res.end(xlsBuffer);
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error exporting loading status:", { error: error });
-      if (!res.headersSent) res.status(500).json({ message: error.message });
+      if (!res.headersSent) res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 

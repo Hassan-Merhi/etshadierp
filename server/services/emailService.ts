@@ -1,4 +1,5 @@
 import nodemailer from "nodemailer";
+import { getErrorMessage } from "../lib/httpHandlers";
 import { logger } from "../lib/logger";
 import { pool } from "../db";
 import {
@@ -47,8 +48,8 @@ export async function sendExportEmail(
 
   try {
     await assertExportAttachmentAvailable(attachmentSource);
-  } catch (error: any) {
-    return { success: false, error: error?.message || "Export attachment is unavailable." };
+  } catch (error: unknown) {
+    return { success: false, error: getErrorMessage(error) || "Export attachment is unavailable." };
   }
 
   // Gmail attachment limit is 25MB — reject before opening an SMTP connection.
@@ -72,11 +73,11 @@ export async function sendExportEmail(
   // Verify the connection before sending.
   try {
     await transporter.verify();
-  } catch (verifyErr: any) {
+  } catch (verifyErr: unknown) {
     transporter.close();
     return {
       success: false,
-      error: `Gmail authentication failed: ${verifyErr.message}. Check your Gmail address and App Password in settings.`,
+      error: `Gmail authentication failed: ${getErrorMessage(verifyErr)}. Check your Gmail address and App Password in settings.`,
     };
   }
 
@@ -120,8 +121,8 @@ Generated automatically at ${new Date().toUTCString()}.
           attachments: [attachment],
         });
         sent += 1;
-      } catch (error: any) {
-        const message = error?.message || String(error);
+      } catch (error: unknown) {
+        const message = getErrorMessage(error) || String(error);
         errors.push(`${recipient}: ${message}`);
         logger.warn(`[EmailService] Export email failed for ${recipient}: ${message}`);
       }

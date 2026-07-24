@@ -1,4 +1,5 @@
 import { parseId, parseOptionalId } from "../../lib/parseId";
+import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
 import { getClientDate } from "../../lib/dateUtils";
 import type { Express, Request, Response, NextFunction } from "express";
@@ -1229,8 +1230,8 @@ export function registerContainerFreightWriteRoutes(app: Express) {
         /* non-fatal */
       }
       res.json(updated);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -1276,8 +1277,8 @@ export function registerContainerFreightWriteRoutes(app: Express) {
         /* non-fatal */
       }
       res.json({ message: "Purchase order deleted successfully" });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -1368,9 +1369,9 @@ export function registerContainerFreightWriteRoutes(app: Express) {
         message: "Backfill completed successfully",
         count: backfilledCount,
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Backfill error:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 

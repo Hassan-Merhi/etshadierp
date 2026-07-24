@@ -6,6 +6,7 @@
  * sub-registrar; behaviour is unchanged.
  */
 import type { Express } from "express";
+import { getErrorMessage } from "../lib/httpHandlers";
 import { logger } from "../lib/logger";
 import { eq, and, desc, lt, gt, ne, sql } from "drizzle-orm";
 import { db } from "../db";
@@ -38,10 +39,10 @@ export function registerUserPresenceRoutes(app: Express) {
       // Fire-and-forget stale row cleanup; never blocks the response.
       db.delete(userPresence)
         .where(lt(userPresence.lastSeen, threeMinutesAgo))
-        .catch((err: any) => logger.error("[Presence] Stale cleanup error:", { error: err.message }));
-    } catch (error: any) {
-      logger.error("[Presence] Error fetching active users:", { error: error.message });
-      res.status(500).json({ message: error.message });
+        .catch((err: unknown) => logger.error("[Presence] Stale cleanup error:", { error: getErrorMessage(err) }));
+    } catch (error: unknown) {
+      logger.error("[Presence] Error fetching active users:", { error: getErrorMessage(error) });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -86,8 +87,8 @@ export function registerUserPresenceRoutes(app: Express) {
           lastSeen: sql`now()`,
         },
       })
-      .catch((err: any) => {
-        logger.error("[Presence] Heartbeat upsert error:", { error: err.message });
+      .catch((err: unknown) => {
+        logger.error("[Presence] Heartbeat upsert error:", { error: getErrorMessage(err) });
       });
 
     // Log route changes to activity log so admins can watch navigation history.
@@ -100,8 +101,8 @@ export function registerUserPresenceRoutes(app: Express) {
           companyName,
           route,
         })
-        .catch((err: any) => {
-          logger.error("[ActivityLog] Insert error:", { error: err.message });
+        .catch((err: unknown) => {
+          logger.error("[ActivityLog] Insert error:", { error: getErrorMessage(err) });
         });
 
       // Prune: keep only last 200 entries per user (fire-and-forget).
@@ -135,8 +136,8 @@ export function registerUserPresenceRoutes(app: Express) {
         ...rows[0],
         lastSeen: rows[0].lastSeen instanceof Date ? rows[0].lastSeen.toISOString() : String(rows[0].lastSeen),
       });
-    } catch (e: any) {
-      res.status(500).json({ message: e.message });
+    } catch (e: unknown) {
+      res.status(500).json({ message: getErrorMessage(e) });
     }
   });
 
@@ -160,8 +161,8 @@ export function registerUserPresenceRoutes(app: Express) {
           occurredAt: r.occurredAt instanceof Date ? r.occurredAt.toISOString() : String(r.occurredAt),
         }))
       );
-    } catch (e: any) {
-      res.status(500).json({ message: e.message });
+    } catch (e: unknown) {
+      res.status(500).json({ message: getErrorMessage(e) });
     }
   });
 
@@ -172,7 +173,7 @@ export function registerUserPresenceRoutes(app: Express) {
     if (sessionId) {
       db.delete(userPresence)
         .where(eq(userPresence.sessionId, sessionId))
-        .catch((err: any) => logger.error("[Presence] Delete error:", { error: err.message }));
+        .catch((err: unknown) => logger.error("[Presence] Delete error:", { error: getErrorMessage(err) }));
     }
   });
 
@@ -184,7 +185,7 @@ export function registerUserPresenceRoutes(app: Express) {
     if (sessionId) {
       db.delete(userPresence)
         .where(eq(userPresence.sessionId, sessionId))
-        .catch((err: any) => logger.error("[Presence] Leave delete error:", { error: err.message }));
+        .catch((err: unknown) => logger.error("[Presence] Leave delete error:", { error: getErrorMessage(err) }));
     }
   });
 }

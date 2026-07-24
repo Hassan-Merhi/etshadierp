@@ -9,6 +9,7 @@
  * Never log or expose the key to the frontend.
  */
 import { logger } from "./logger";
+import { getErrorMessage } from "../lib/httpHandlers";
 
 const BASE_URL = process.env.PARCELSAPP_API_BASE_URL || "https://parcelsapp.com/api/v3";
 
@@ -221,8 +222,8 @@ export async function trackContainer(
     for (let attempt = 0; attempt <= MAX_BUSY_RETRIES; attempt++) {
       try {
         return await initiateTracking(containerNumber, destinationCountry, carrier);
-      } catch (err: any) {
-        if (err?.isBusy && attempt < MAX_BUSY_RETRIES) {
+      } catch (err: unknown) {
+        if ((err as { isBusy?: boolean }).isBusy && attempt < MAX_BUSY_RETRIES) {
           logger.warn(
             `[ParcelsApp] ${containerNumber}: BUSY — retry ${attempt + 1}/${MAX_BUSY_RETRIES} in ${BUSY_RETRY_DELAY_MS / 1000}s`
           );
@@ -274,8 +275,8 @@ export async function trackContainer(
             timedOut: false,
           };
         }
-      } catch (pollErr: any) {
-        logger.warn(`[ParcelsApp] Poll attempt ${attempt + 1} error: ${pollErr?.message}`);
+      } catch (pollErr: unknown) {
+        logger.warn(`[ParcelsApp] Poll attempt ${attempt + 1} error: ${getErrorMessage(pollErr)}`);
       }
     }
 
@@ -299,12 +300,12 @@ export async function trackContainer(
       error: "Tracking request timed out after polling",
       timedOut: true,
     };
-  } catch (err: any) {
+  } catch (err: unknown) {
     return {
       success: false,
       shipment: null,
       rawResponse,
-      error: err?.message ?? "Unknown error",
+      error: getErrorMessage(err) ?? "Unknown error",
     };
   }
 }
@@ -529,7 +530,7 @@ export async function testConnection(): Promise<{
       current: data.current,
       resetDate: data.resetDate,
     };
-  } catch (err: any) {
-    return { ok: false, error: err?.message ?? "Unknown error" };
+  } catch (err: unknown) {
+    return { ok: false, error: getErrorMessage(err) ?? "Unknown error" };
   }
 }

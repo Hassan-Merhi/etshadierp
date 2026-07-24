@@ -155,7 +155,7 @@ export function registerStockInSalesReportRoutes(app: Express) {
 
         res.setHeader("Cache-Control", "private, no-store");
         return res.json(result);
-      } catch (error: any) {
+      } catch (error: unknown) {
         if (locationAccessResponse(error, res)) return;
         logger.error("Stock in and sales report error", {
           module: "reports",
@@ -219,7 +219,7 @@ export function registerStockInSalesReportRoutes(app: Express) {
 
         res.setHeader("Cache-Control", "private, no-store");
         return res.json(result);
-      } catch (error: any) {
+      } catch (error: unknown) {
         if (locationAccessResponse(error, res)) return;
         logger.error("Stock in and sales detail error", {
           module: "reports",
@@ -285,7 +285,7 @@ export function registerStockInSalesReportRoutes(app: Express) {
 
         res.setHeader("Cache-Control", "private, no-store");
         return res.json(result);
-      } catch (error: any) {
+      } catch (error: unknown) {
         if (locationAccessResponse(error, res)) return;
         logger.error("Stock in and sales comparison error", {
           module: "reports",

@@ -1,4 +1,5 @@
 import { type Express } from "express";
+import { getErrorMessage } from "../../lib/httpHandlers";
 import { db } from "../../db";
 import { storage } from "../../storage";
 import { requireAuth } from "../../auth";
@@ -82,8 +83,8 @@ export function registerPosCustomerRoutes(app: Express): void {
       );
 
       res.json(customersWithBalances);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -148,8 +149,8 @@ export function registerPosCustomerRoutes(app: Express): void {
       });
 
       res.status(201).json(customer);
-    } catch (error: any) {
-      res.status(400).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(400).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -184,8 +185,8 @@ export function registerPosCustomerRoutes(app: Express): void {
       }
 
       res.json(transactions);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 }

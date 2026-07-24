@@ -1,4 +1,5 @@
 import type { Express } from "express";
+import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
 import Decimal from "decimal.js";
 import { requireAuth, requireNonPOS } from "../../auth";
@@ -142,9 +143,9 @@ export function registerStatsMultiCurrencyRoutes(app: Express) {
         const companyId = req.session.currentCompanyId;
         if (!companyId) return res.status(400).json({ message: "No company selected" });
         return res.json(await getCashBankRevaluation(companyId));
-      } catch (error: any) {
+      } catch (error: unknown) {
         logger.error("Multi-currency cash/bank revaluation failed:", { error: error });
-        return res.status(500).json({ message: error.message });
+        return res.status(500).json({ message: getErrorMessage(error) });
       }
     },
   );
@@ -170,9 +171,9 @@ export function registerStatsMultiCurrencyRoutes(app: Express) {
         const summary = await getCashBankAccountSummary(companyId, kind, accountId);
         if (!summary) return res.status(404).json({ message: "Cash/bank account not found" });
         return res.json(summary);
-      } catch (error: any) {
+      } catch (error: unknown) {
         logger.error("Multi-currency account summary failed:", { error: error });
-        return res.status(500).json({ message: error.message });
+        return res.status(500).json({ message: getErrorMessage(error) });
       }
     },
   );

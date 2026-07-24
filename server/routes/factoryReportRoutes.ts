@@ -1,4 +1,5 @@
 import { parseId, parseOptionalId } from "../lib/parseId";
+import { getErrorMessage } from "../lib/httpHandlers";
 import { logger } from "../lib/logger";
 import { getClientDate } from "../lib/dateUtils";
 import type { Express } from "express";
@@ -325,9 +326,9 @@ export function registerFactoryReportRoutes(app: Express, requireAuth: any, db: 
         description: `Supplier Usage Report (${format.toUpperCase()}) – ${startDate} to ${endDate}${supplierId ? ` – ${supplierMap.get(supplierId)?.name || `Supplier #${supplierId}`}` : " – All Suppliers"}`,
         metaJson: JSON.stringify({ format, startDate, endDate, supplierId: supplierId || null }),
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Error generating supplier usage report:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -901,9 +902,9 @@ export function registerFactoryReportRoutes(app: Express, requireAuth: any, db: 
       });
 
       res.json(enriched);
-    } catch (err: any) {
+    } catch (err: unknown) {
       logger.error("[mix-batches-by-date]", { error: err });
-      res.status(500).json({ message: err.message });
+      res.status(500).json({ message: getErrorMessage(err) });
     }
   });
 
@@ -966,9 +967,9 @@ export function registerFactoryReportRoutes(app: Express, requireAuth: any, db: 
         logger.error("[mix-batch-wa] audit write failed:", { error: auditErr });
       }
       res.json({ ok: true, message: "Mix batch image sent to WhatsApp group." });
-    } catch (err: any) {
+    } catch (err: unknown) {
       logger.error("[mix-batch-wa] send error:", { error: err });
-      res.status(500).json({ message: err.message });
+      res.status(500).json({ message: getErrorMessage(err) });
     }
   });
 }

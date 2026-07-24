@@ -1,4 +1,5 @@
 import type { Express } from "express";
+import { getErrorMessage } from "../../lib/httpHandlers";
 import { db } from "../../db";
 import { requireAuth } from "../../auth";
 import { eq, and, isNull, asc } from "drizzle-orm";
@@ -64,8 +65,8 @@ export function registerSpSetupRoutes(app: Express) {
             ? "Setup and supplier-link repair complete"
             : "Already configured",
       });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -99,8 +100,8 @@ export function registerSpSetupRoutes(app: Express) {
         bankAccounts: banks,
         supplierVoucherLinkGapCount,
       });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 }

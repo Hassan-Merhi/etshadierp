@@ -1,4 +1,5 @@
 import { db } from "./db";
+import { getErrorMessage } from "./lib/httpHandlers";
 import { eq, and, sql } from "drizzle-orm";
 import { users, baleProducts, baleLabelPrints, productionBales, baleSequences, mixBatches } from "@shared/schema";
 
@@ -106,8 +107,8 @@ export async function runDevSeed() {
       `);
       const bale = result.rows[0] as any;
       createdBales.push({ ...bale, product });
-    } catch (e: any) {
-      if (e.message?.includes("duplicate")) continue;
+    } catch (e: unknown) {
+      if (getErrorMessage(e)?.includes("duplicate")) continue;
       throw e;
     }
   }
@@ -153,8 +154,8 @@ export async function runDevSeed() {
         if (sampleArticles.length < 5 && !sampleArticles.includes(bale.product.articleCode)) {
           sampleArticles.push(bale.product.articleCode);
         }
-      } catch (e: any) {
-        if (e.message?.includes("duplicate")) continue;
+      } catch (e: unknown) {
+        if (getErrorMessage(e)?.includes("duplicate")) continue;
         throw e;
       }
       labelIdx++;

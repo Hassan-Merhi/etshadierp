@@ -1,4 +1,5 @@
 import { type Express } from "express";
+import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
 import { getClientDate } from "../../lib/dateUtils";
 import { db } from "../../db";
@@ -134,13 +135,13 @@ export function registerPosWhatsAppRoutes(app: Express): void {
       }
 
       res.json({ success: true, message: "Stock report sent to WhatsApp" });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("[/api/pos/send-shift-report]", {
         locationId: req.body.locationId,
         chatId: (error as any)?.chatId ?? undefined,
-        error: error?.message ?? error,
+        error: getErrorMessage(error) ?? error,
       });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -197,12 +198,12 @@ export function registerPosWhatsAppRoutes(app: Express): void {
       }
 
       res.json({ success: true });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("[/api/pos/send-stock-pdf]", {
         locationId: req.body.locationId,
-        error: error?.message ?? error,
+        error: getErrorMessage(error) ?? error,
       });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
@@ -294,10 +295,10 @@ export function registerPosWhatsAppRoutes(app: Express): void {
 
       logger.info("WhatsApp invoice send succeeded", { module: "pos", action: "sendInvoiceWhatsApp", userId: (req as any).user?.id, companyId: req.session.currentCompanyId, voucherId });
       res.json({ success: true, message: "Invoice PDF sent to WhatsApp" });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("WhatsApp invoice send failed", { module: "pos", action: "sendInvoiceWhatsApp", userId: (req as any).user?.id, companyId: req.session.currentCompanyId, error });
       logger.error("[/api/pos/send-invoice-whatsapp]", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 }
