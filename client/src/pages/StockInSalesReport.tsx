@@ -130,7 +130,9 @@ function MultiSelectFilter<T extends { id: number; name: string }>({
               <div
                 key={item.id}
                 className="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 hover-elevate"
-                onClick={() => onChange(selected ? selectedIds.filter((value) => value !== id) : [...selectedIds, id])}
+                onClick={() =>
+                  onChange(selected ? selectedIds.filter((value) => value !== id) : [...selectedIds, id])
+                }
                 data-testid={`${testId}-option-${item.id}`}
               >
                 <Checkbox checked={selected} className="h-4 w-4 pointer-events-none" />
@@ -138,7 +140,9 @@ function MultiSelectFilter<T extends { id: number; name: string }>({
               </div>
             );
           })}
-          {items.length === 0 && <p className="px-2 py-3 text-xs text-muted-foreground">No options available</p>}
+          {items.length === 0 && (
+            <p className="px-2 py-3 text-xs text-muted-foreground">No options available</p>
+          )}
         </div>
       </PopoverContent>
     </Popover>
@@ -240,14 +244,7 @@ export default function StockInSalesReport() {
     return `/api/reports/stock-in-sales?${params.toString()}`;
   }, [periodFilter, grouping, profitFilter, selectedLocations, selectedStockGroups, debouncedSearch]);
 
-  const {
-    data,
-    isLoading,
-    isFetching,
-    isError,
-    error,
-    refetch,
-  } = useQuery<StockInSalesResponse, Error>({
+  const { data, isLoading, isFetching, isError, error, refetch } = useQuery<StockInSalesResponse, Error>({
     queryKey: [queryUrl, selectedCompany?.id],
     enabled: !!selectedCompany?.id,
     staleTime: 30 * 1000,
@@ -483,7 +480,9 @@ export default function StockInSalesReport() {
           Clear
         </Button>
 
-        {isFetching && !isLoading && <RefreshCw className="h-4 w-4 animate-spin text-muted-foreground" aria-label="Refreshing" />}
+        {isFetching && !isLoading && (
+          <RefreshCw className="h-4 w-4 animate-spin text-muted-foreground" aria-label="Refreshing" />
+        )}
       </div>
 
       <div>
@@ -547,7 +546,9 @@ export default function StockInSalesReport() {
                           <BarChart3 className="h-5 w-5 text-muted-foreground" />
                         </div>
                         <p className="text-sm font-medium">No stock-in or sales activity found</p>
-                        <p className="text-xs text-muted-foreground">Try adjusting the date range, locations, groups, or search</p>
+                        <p className="text-xs text-muted-foreground">
+                          Try adjusting the date range, locations, groups, or search
+                        </p>
                       </div>
                     </TableCell>
                   </TableRow>
@@ -606,12 +607,16 @@ export default function StockInSalesReport() {
                       <TableCell className="py-3 text-right font-mono text-sm">
                         {formatAmount(summary.stockInValue)}
                       </TableCell>
-                      <TableCell className="py-3 text-right font-mono text-sm">{formatRate(summary.stockInAvgRate)}</TableCell>
+                      <TableCell className="py-3 text-right font-mono text-sm">
+                        {formatRate(summary.stockInAvgRate)}
+                      </TableCell>
                       <TableCell className="py-3 text-right font-mono text-sm">
                         {formatNumber(summary.stockOutQty, 3)}
                       </TableCell>
                       <TableCell className="py-3 text-right font-mono text-sm">{formatAmount(summary.totalSales)}</TableCell>
-                      <TableCell className="py-3 text-right font-mono text-sm">{formatAmount(summary.costOfSales)}</TableCell>
+                      <TableCell className="py-3 text-right font-mono text-sm">
+                        {formatAmount(summary.costOfSales)}
+                      </TableCell>
                       <TableCell
                         className={`py-3 text-right font-mono text-sm ${
                           summary.costProfit > 0
