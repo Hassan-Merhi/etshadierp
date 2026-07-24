@@ -58,21 +58,23 @@ const _CAPACITOR_API_BASE: string = ((import.meta as any).env?.VITE_API_BASE_URL
 
 /* ── Session-expiry redirect ─────────────────────────────────────────────── */
 // Single-fire: when any /api/* request returns 401 while the user is on an
-// authenticated page, redirect to /auth once. This stops all React Query
+// authenticated page, redirect to /login once. This stops all React Query
 // polling, setInterval heartbeats, and screen-feed polls by unmounting every
 // authenticated component — the correct response to an expired idle session.
+// NOTE: the server uses 401 exclusively for session issues; permission denials
+// use 403, so every 401 we see here genuinely means "session gone".
 let _sessionExpiredHandled = false;
 
 function scheduleSessionExpiredRedirect() {
   if (_sessionExpiredHandled) return;
   if (typeof window === "undefined") return;
-  // Don't redirect when the user is already on the auth page — avoids redirect
-  // loops from wrong-password 401s during login.
+  // Don't redirect when already on the login page — avoids loops from
+  // wrong-password 401s and initial unauthenticated loads.
   const path = window.location.pathname;
-  if (path === "/auth" || path.startsWith("/auth/")) return;
+  if (path === "/login" || path.startsWith("/login/")) return;
   _sessionExpiredHandled = true;
   // Small delay so the current render cycle finishes cleanly before we navigate.
-  setTimeout(() => { window.location.href = "/auth"; }, 300);
+  setTimeout(() => { window.location.href = "/login"; }, 300);
 }
 
 /* ── Global fetch interceptor ────────────────────────────────────────────── */
