@@ -1,4 +1,5 @@
 import { db } from "../../db";
+import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
 import { AUTO_FILL_REF_TABLE } from "../../services/factory/daybookSourceIntegrity";
 import {
@@ -151,7 +152,7 @@ export async function getOrFetchFxRateToUsd(companyId: number, currencyCode: str
     });
 
     return rateStr;
-  } catch (err: any) {
+  } catch (err: unknown) {
     const [fallback] = await db
       .select()
       .from(factoryFxRates)
@@ -160,7 +161,7 @@ export async function getOrFetchFxRateToUsd(companyId: number, currencyCode: str
       .limit(1);
 
     if (fallback) return fallback.rateToUsd;
-    throw new Error(`No FX rate available for ${dateISO}/${currencyCode}. External API error: ${err.message}`, { cause: err });
+    throw new Error(`No FX rate available for ${dateISO}/${currencyCode}. External API error: ${getErrorMessage(err)}`, { cause: err });
   }
 }
 

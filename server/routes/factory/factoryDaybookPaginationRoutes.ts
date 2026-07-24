@@ -1,4 +1,5 @@
 import type { Express, NextFunction, Request, Response } from "express";
+import { getErrorMessage } from "../../lib/httpHandlers";
 import { and, eq, inArray, or } from "drizzle-orm";
 import { requireAuth } from "../../auth";
 import { db, pool } from "../../db";
@@ -390,8 +391,8 @@ export function registerFactoryDaybookPaginationRoutes(app: Express): void {
           hasNextPage: page < totalPages,
           hasPreviousPage: page > 1 && totalPages > 0,
         });
-      } catch (error: any) {
-        return res.status(500).json({ message: error.message });
+      } catch (error: unknown) {
+        return res.status(500).json({ message: getErrorMessage(error) });
       }
     }
   );

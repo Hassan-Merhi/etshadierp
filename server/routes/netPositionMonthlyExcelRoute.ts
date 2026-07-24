@@ -1,4 +1,5 @@
 import { parseOptionalId } from "../lib/parseId";
+import { getErrorMessage } from "../lib/httpHandlers";
 import { logger } from "../lib/logger";
 /**
  * GET /api/reports/net-position-monthly-excel
@@ -42,9 +43,9 @@ export function registerNetPositionMonthlyExcelRoute(app: Express) {
       );
       await generateNetPositionExcel(companyId, companyName, startDate, endDate, res);
       res.end();
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Net position monthly Excel error:", { error: error });
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 }

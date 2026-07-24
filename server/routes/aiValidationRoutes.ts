@@ -1,4 +1,5 @@
 import type { Express } from "express";
+import { getErrorMessage } from "../lib/httpHandlers";
 import { logger } from "../lib/logger";
 import Papa from "papaparse";
 import { db } from "../db";
@@ -457,9 +458,9 @@ export function registerAiValidationRoutes(app: Express) {
       }
 
       res.json(result);
-    } catch (err: any) {
-      logger.error("[AI Validation] run error:", { error: err.message });
-      res.status(500).json({ message: err.message });
+    } catch (err: unknown) {
+      logger.error("[AI Validation] run error:", { error: getErrorMessage(err) });
+      res.status(500).json({ message: getErrorMessage(err) });
     }
   });
 }

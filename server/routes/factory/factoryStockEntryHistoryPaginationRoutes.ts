@@ -1,4 +1,5 @@
 import type { Express, NextFunction, Request, Response } from "express";
+import { getErrorMessage } from "../../lib/httpHandlers";
 import { requireAuth } from "../../auth";
 import { pool } from "../../db";
 import { getClientDate } from "../../lib/dateUtils";
@@ -184,8 +185,8 @@ export function registerFactoryStockEntryHistoryPaginationRoutes(app: Express): 
           hasNextPage: page < totalPages,
           hasPreviousPage: page > 1 && totalPages > 0,
         });
-      } catch (error: any) {
-        return res.status(500).json({ message: error.message });
+      } catch (error: unknown) {
+        return res.status(500).json({ message: getErrorMessage(error) });
       }
     }
   );

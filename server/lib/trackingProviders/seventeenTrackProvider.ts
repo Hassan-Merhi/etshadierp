@@ -16,6 +16,7 @@
  */
 
 import type { CarrierTrackResult, TrackingEvent } from "./types";
+import { getErrorMessage } from "../../lib/httpHandlers";
 
 const BASE_URL = "https://api.17track.net/track/v2.2";
 
@@ -242,9 +243,9 @@ export async function track(containerNumber: string, carrierCode?: number): Prom
       events,
       raw: data,
     };
-  } catch (err: any) {
+  } catch (err: unknown) {
     return emptyResult(containerNumber, {
-      error: err?.message ?? "Unknown error",
+      error: getErrorMessage(err) ?? "Unknown error",
     });
   }
 }

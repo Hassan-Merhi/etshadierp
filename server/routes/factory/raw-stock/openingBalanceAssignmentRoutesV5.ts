@@ -1,4 +1,5 @@
 import type { Express } from "express";
+import { getErrorMessage } from "../../../lib/httpHandlers";
 import { logger } from "../../../lib/logger";
 import Decimal from "decimal.js";
 import { requireAuth } from "../../../auth";
@@ -259,11 +260,11 @@ export function registerOpeningBalanceAssignmentRoutesV5(app: Express): void {
           totalKg: totalKg.toNumber(),
           balesUpdated: baleIds.length,
         });
-      } catch (error: any) {
+      } catch (error: unknown) {
         await client.query("ROLLBACK");
         logger.error("[opening-balance assignment v5] error:", { error: error });
-        return res.status(error?.statusCode ?? 500).json({
-          message: error.message || "Failed to assign opening-balance stock to bales",
+        return res.status((error as { statusCode?: number }).statusCode ?? 500).json({
+          message: getErrorMessage(error) || "Failed to assign opening-balance stock to bales",
         });
       } finally {
         client.release();

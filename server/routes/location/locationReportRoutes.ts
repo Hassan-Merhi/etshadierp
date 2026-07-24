@@ -1,4 +1,5 @@
 import type { Express } from "express";
+import { getErrorMessage } from "../../lib/httpHandlers";
 import { storage } from "../../storage";
 import { requireAuth, requireNonPOS } from "../../auth";
 
@@ -63,8 +64,8 @@ export function registerLocationReportRoutes(app: Express) {
       }
 
       res.json({ message: "Stock list sent to WhatsApp", itemCount: rows.length });
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 }

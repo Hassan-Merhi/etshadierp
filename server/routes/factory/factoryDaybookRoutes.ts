@@ -1,4 +1,5 @@
 import type { Express } from "express";
+import { getErrorMessage } from "../../lib/httpHandlers";
 import { db } from "../../db";
 import { buildLegacyValidSourceIds, isRowIntegrityValid } from "../../services/factory/daybookSourceIntegrity";
 import { requireAuth } from "../../auth";
@@ -509,8 +510,8 @@ export function registerFactoryDaybookRoutes(app: Express) {
       });
 
       res.json(merged);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 

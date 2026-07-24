@@ -14,6 +14,7 @@ export interface RetryResult<T> {
  *   false for configuration / permanent errors that won't change between retries.
  */
 import { logger } from "../lib/logger";
+import { getErrorMessage } from "../lib/httpHandlers";
 export async function retryAsync<T>(options: {
   label: string;
   attempts: number;
@@ -45,10 +46,10 @@ export async function retryAsync<T>(options: {
         logger.info(`[${options.label}] Attempt ${attempt} failed. Waiting ${options.delayMs / 1000}s before retry...`);
         await delay(options.delayMs);
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       lastError = err;
       logger.info(
-        `[${options.label}] Attempt ${attempt} threw: ${err?.message}. ${attempt < options.attempts ? `Waiting ${options.delayMs / 1000}s...` : "No more retries."}`
+        `[${options.label}] Attempt ${attempt} threw: ${getErrorMessage(err)}. ${attempt < options.attempts ? `Waiting ${options.delayMs / 1000}s...` : "No more retries."}`
       );
       if (attempt < options.attempts) {
         await delay(options.delayMs);

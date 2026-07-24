@@ -431,7 +431,7 @@ export async function requireNonSP(req: Request, res: Response, next: NextFuncti
       });
     }
     next();
-  } catch (err: any) {
+  } catch (err: unknown) {
     next(err);
   }
 }
