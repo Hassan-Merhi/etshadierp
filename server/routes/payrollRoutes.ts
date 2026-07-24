@@ -7,6 +7,7 @@
  * unchanged.
  */
 import type { Express } from "express";
+import { logger } from "../lib/logger";
 import { eq, and, desc, inArray, isNull, sql } from "drizzle-orm";
 import { db, pool } from "../db";
 import { storage } from "../storage";
@@ -644,7 +645,7 @@ export function registerPayrollRoutes(app: Express) {
         locationName: loc[0]?.name ?? "",
       });
     } catch (error: any) {
-      console.error("[/api/payroll/sales-summary]", error);
+      logger.error("[/api/payroll/sales-summary]", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -785,7 +786,7 @@ export function registerPayrollRoutes(app: Express) {
 
       return res.json({ results });
     } catch (error: any) {
-      console.error("[/api/payroll/auto-calculate-bonuses]", error);
+      logger.error("[/api/payroll/auto-calculate-bonuses]", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -1426,7 +1427,7 @@ export function registerPayrollRoutes(app: Express) {
             voucherDate: payDate,
           });
         } catch (waErr: any) {
-          console.error("[payroll-wa] WhatsApp trigger error (non-fatal):", waErr);
+          logger.error("[payroll-wa] WhatsApp trigger error (non-fatal):", { error: waErr });
         }
 
         return res.json({ ...updated, voucher, whatsapp: waResult });

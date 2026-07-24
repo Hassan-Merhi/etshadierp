@@ -1,4 +1,5 @@
 import { db } from "../../db";
+import { logger } from "../../lib/logger";
 import {
   inventory,
   salesItems,
@@ -206,7 +207,7 @@ export async function calculateHistoricalLocationInventory(
     const adjustmentsForSample = adjustmentsAfterDate.filter((a) => a.stockItemId === sample.stockItemId);
     const reversedQty = adjustmentsForSample.reduce((s, a) => s + (parseFloat(a.quantity) || 0), 0);
     const historicalQty = inventoryMap.get(sample.stockItemId)?.quantity ?? 0;
-    console.log(
+    logger.info(
       `[calculateHistoricalLocationInventory] DEBUG sample stockItemId=${sample.stockItemId} locationId=${locationId} cutoff=${cutoffDateStr} ` +
         `currentQty=${currentQty} afterCutoffAdjustmentsQty(signed,reversed)=${reversedQty} historicalOpeningQty=${historicalQty}`
     );

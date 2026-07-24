@@ -1,4 +1,5 @@
 import type { Express } from "express";
+import { logger } from "../../lib/logger";
 import { db } from "../../db";
 import { storage } from "../../storage";
 import { requireAuth, checkPOSLocation } from "../../auth";
@@ -18,7 +19,7 @@ export function registerLocationCrudRoutes(app: Express) {
       const locations = await storage.getAllLocations(companyId);
       res.json(locations);
     } catch (error: any) {
-      console.error("[/api/locations] Error:", error);
+      logger.error("[/api/locations] Error:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });

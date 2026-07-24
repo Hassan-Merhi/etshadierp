@@ -1,4 +1,5 @@
 import type { Express } from "express";
+import { logger } from "../../lib/logger";
 import { db } from "../../db";
 import { storage } from "../../storage";
 import { requireAuth, requireRole, canDelete, requireNonPOS, checkPOSLocation } from "../../auth";
@@ -427,7 +428,7 @@ export function registerVoucherQueryRoutes(app: Express) {
 
       res.json(filtered);
     } catch (error: any) {
-      console.error("Optional vouchers error:", error);
+      logger.error("Optional vouchers error:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });

@@ -7,6 +7,7 @@
  * shared barcode/alias helpers now live in ./helpers/proformaBarcodeHelpers.
  */
 import { Express } from "express";
+import { logger } from "../lib/logger";
 import { eq, and, inArray } from "drizzle-orm";
 import ExcelJS from "exceljs";
 import { db } from "../db";
@@ -818,7 +819,7 @@ export function registerContainerLoadedItemsRoutes(app: Express, requireAuth: an
         res.setHeader("Content-Length", xlsBuffer.byteLength);
         res.end(xlsBuffer);
       } catch (error: any) {
-        console.error("Export error:", error);
+        logger.error("Export error:", { error: error });
         if (!res.headersSent) res.status(500).json({ message: error.message });
       }
     }
@@ -1151,7 +1152,7 @@ export function registerContainerLoadedItemsRoutes(app: Express, requireAuth: an
         res.setHeader("Content-Length", xlsBuffer2.byteLength);
         res.end(xlsBuffer2);
       } catch (error: any) {
-        console.error("Summary export error:", error);
+        logger.error("Summary export error:", { error: error });
         if (!res.headersSent) res.status(500).json({ message: error.message });
       }
     }

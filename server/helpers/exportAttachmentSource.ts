@@ -1,4 +1,5 @@
 import fs from "fs";
+import { logger } from "../lib/logger";
 
 const EXPORT_MARKER_KEY = Symbol.for("erp.export-buffer-bridge.marker");
 const DEFAULT_CLEANUP_DELAY_MS = 15 * 60 * 1000;
@@ -44,7 +45,7 @@ export function armExportAttachmentCleanup(
     marker.cleanupTimer = undefined;
     fs.promises.rm(marker.path, { force: true }).catch((error: any) => {
       if (error?.code !== "ENOENT") {
-        console.warn(`[ExportAttachment] Failed to remove managed attachment ${marker.path}:`, error);
+        logger.warn(`[ExportAttachment] Failed to remove managed attachment ${marker.path}:`, { error: error });
       }
     });
   }, marker.cleanupDelayMs ?? delayMs);

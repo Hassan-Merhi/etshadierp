@@ -1,4 +1,5 @@
 import type { Express } from "express";
+import { logger } from "../lib/logger";
 import { db } from "../db";
 import { requireAuth, requireNonPOS } from "../auth";
 import { ledgerAccounts, vouchers, voucherEntries, containers } from "@shared/schema";
@@ -271,7 +272,7 @@ export function registerTransporterStatementRoutes(app: Express) {
 
       res.json({ ok: true, sent, failed, errors });
     } catch (err: any) {
-      console.error("[TransporterStatement/send-whatsapp]", err);
+      logger.error("[TransporterStatement/send-whatsapp]", { error: err });
       res.status(500).json({ message: err.message });
     }
   });
@@ -359,7 +360,7 @@ export function registerTransporterStatementRoutes(app: Express) {
 
       res.json({ ok: true, allocationsCreated: newAllocations.length });
     } catch (err: any) {
-      console.error("[TransporterStatement/reallocate]", err);
+      logger.error("[TransporterStatement/reallocate]", { error: err });
       res.status(500).json({ message: err.message });
     }
   });
@@ -576,7 +577,7 @@ export function registerTransporterStatementRoutes(app: Express) {
         rows: filteredRows,
       });
     } catch (err: any) {
-      console.error("[TransporterStatement]", err);
+      logger.error("[TransporterStatement]", { error: err });
       res.status(500).json({ message: err.message });
     }
   });

@@ -1,4 +1,5 @@
 import { pool } from "../db";
+import { logger } from "../lib/logger";
 
 export interface CompanyExportData {
   company: any;
@@ -180,7 +181,7 @@ async function q(sql: string, params?: any[]): Promise<any[]> {
     const result = params ? await pool.query(sql, params) : await pool.query(sql);
     return result.rows;
   } catch (err: any) {
-    console.warn(`[ExportData] Query warning: ${err.message}`);
+    logger.warn(`[ExportData] Query warning: ${err.message}`);
     return [];
   }
 }

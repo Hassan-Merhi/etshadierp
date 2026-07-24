@@ -1,4 +1,5 @@
 import { pool } from "../db";
+import { logger } from "../lib/logger";
 
 /** Maps camelCase field names to their snake_case DB column names. */
 const FIELD_MAP: Record<string, string> = {
@@ -32,7 +33,7 @@ export async function createExportRun(
     ]);
     return r.rows[0].id as number;
   } catch (err: any) {
-    console.warn("[ExportRun] Failed to create run record:", err.message);
+    logger.warn("[ExportRun] Failed to create run record:", { error: err.message });
     return 0;
   }
 }
@@ -50,7 +51,7 @@ export async function updateExportRun(id: number, data: Record<string, any>): Pr
   try {
     await pool.query(`UPDATE daily_export_runs SET ${setClauses.join(", ")} WHERE id = $${values.length}`, values);
   } catch (err: any) {
-    console.warn(`[ExportRun] Failed to update run ${id}:`, err.message);
+    logger.warn(`[ExportRun] Failed to update run ${id}:`, { error: err.message });
   }
 }
 

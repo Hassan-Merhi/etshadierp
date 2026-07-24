@@ -1,4 +1,5 @@
 import { db } from "../../db";
+import { logger } from "../../lib/logger";
 import { sql } from "drizzle-orm";
 import { calculateHistoricalLocationInventory } from "../../routes/helpers/inventoryHistoryHelpers";
 import { pn } from "./styleHelpers";
@@ -32,7 +33,7 @@ export async function fetchInventory(
   // this as-of-date snapshot, and how many are aggregated for "All Locations".
   // Gated behind DEBUG_HISTORICAL_INVENTORY=1 to keep routine exports quiet.
   if (process.env.DEBUG_HISTORICAL_INVENTORY === "1") {
-    console.log(
+    logger.info(
       `[spSalesFormExportV2:fetchInventory] asOfDate=${asOfDate} locationId=${locationId ?? "all"} locationsIncluded=${locationIds.length} [${locationIds.join(",")}]`
     );
   }

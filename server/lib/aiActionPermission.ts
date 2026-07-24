@@ -1,4 +1,5 @@
 import { Request } from "express";
+import { logger } from "./logger";
 import { db } from "../db";
 import { users, aiActionLog } from "@shared/schema";
 import { eq } from "drizzle-orm";
@@ -95,6 +96,6 @@ export async function logAIAction(params: {
       createdRecordId: params.createdRecordId ?? null,
     } as any);
   } catch (err) {
-    console.error("[AIActionLog] write failed:", (err as Error).message);
+    logger.error("[AIActionLog] write failed:", { error: (err as Error).message });
   }
 }

@@ -8,6 +8,7 @@
  * closures move with it. Behaviour is unchanged.
  */
 import type { Express } from "express";
+import { logger } from "../lib/logger";
 import { eq, and, or, desc, isNull, isNotNull, gte, lte, lt } from "drizzle-orm";
 import { db } from "../db";
 import { storage } from "../storage";
@@ -690,7 +691,7 @@ export function registerInventoryMovementRoutes(app: Express) {
 
       res.json({ summary, issues });
     } catch (error: any) {
-      console.error("Inventory reconciliation error:", error);
+      logger.error("Inventory reconciliation error:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -769,7 +770,7 @@ export function registerInventoryMovementRoutes(app: Express) {
       const result = await storage.updateCostPricesByBarcode(locationId, req.session.currentCompanyId, updates);
       res.json(result);
     } catch (error: any) {
-      console.error("Error updating cost prices:", error);
+      logger.error("Error updating cost prices:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });

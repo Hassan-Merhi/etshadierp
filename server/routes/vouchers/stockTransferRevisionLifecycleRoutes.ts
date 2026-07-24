@@ -1,4 +1,5 @@
 import type { Express, NextFunction, Request, Response } from "express";
+import { logger } from "../../lib/logger";
 import { z } from "zod";
 import { eq } from "drizzle-orm";
 import { requireAuth, requireNonPOS } from "../../auth";
@@ -49,7 +50,7 @@ function errorStatus(error: unknown): number {
 
 function sendError(res: Response, error: unknown, context: string) {
   const status = errorStatus(error);
-  if (status === 500) console.error(`[StockTransferRevisionLifecycle ${context}]`, error);
+  if (status === 500) logger.error(`[StockTransferRevisionLifecycle ${context}]`, { error: error });
   const payload: Record<string, unknown> = {
     message: String((error as any)?.message ?? `Failed to ${context.toLowerCase()} stock transfer revision`),
   };
@@ -159,7 +160,7 @@ export function registerStockTransferRevisionLifecycleRoutes(app: Express) {
               voucherDate: result.voucherDate,
             });
           } catch (error: any) {
-            console.error("[RevisedTransferWA] Failed to send safe pending revision:", error.message);
+            logger.error("[RevisedTransferWA] Failed to send safe pending revision:", { error: error.message });
           }
         });
       } catch (error) {

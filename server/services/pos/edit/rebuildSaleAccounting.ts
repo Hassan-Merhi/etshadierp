@@ -14,6 +14,7 @@
  * the current company rate.
  */
 import { voucherEntries } from "@shared/schema";
+import { logger } from "../../../lib/logger";
 import { normalizeVoucherEntryAmounts } from "../../../services/accounting/currencyAmounts";
 
 /**
@@ -56,7 +57,7 @@ function normalizePosEntry(
       rateConvention: norm.rateConvention,
     };
   } catch (e) {
-    console.warn("[POS Edit] normalizeVoucherEntryAmounts failed, using legacy storage:", (e as any)?.message);
+    logger.warn("[POS Edit] normalizeVoucherEntryAmounts failed, using legacy storage:", (e as any)?.message);
     const dStr = Math.abs(debitAmt).toFixed(2);
     const cStr = Math.abs(creditAmt).toFixed(2);
     return {

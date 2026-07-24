@@ -1,4 +1,5 @@
 import type { Express, Request, Response } from "express";
+import { logger } from "../../lib/logger";
 import { db } from "../../db";
 import { requireAuth, requireRole } from "../../auth";
 import { loadCompanySecurityAnomalies } from "../../services/security/securityAuditRuntime";
@@ -23,7 +24,7 @@ export function registerSecurityAnomalyRoutes(app: Express) {
           ...result,
         });
       } catch (error) {
-        console.error("Security anomaly query failed:", error);
+        logger.error("Security anomaly query failed:", { error: error });
         return res.status(500).json({ message: "Failed to load security anomalies" });
       }
     }

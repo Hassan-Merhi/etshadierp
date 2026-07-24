@@ -12,6 +12,7 @@
  * only the code location changed.
  */
 import { db } from "../../../db";
+import { logger } from "../../../lib/logger";
 import { locations, vouchers } from "@shared/schema";
 import { eq, and, isNull } from "drizzle-orm";
 import type { HandlerErrorResult } from "./posEditSaleTypes";
@@ -103,6 +104,6 @@ export async function validateNewLocationBelongsToCompany(
   if (!newLocation) {
     return { error: { status: 400, body: { message: "Invalid location or location not found" } } };
   }
-  console.log(`[POS Sales Edit] Location changing from ${oldLocationId} to ${targetLocationId}`);
+  logger.info(`[POS Sales Edit] Location changing from ${oldLocationId} to ${targetLocationId}`);
   return { ok: true };
 }

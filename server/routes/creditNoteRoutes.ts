@@ -1,4 +1,5 @@
 import type { Express } from "express";
+import { logger } from "../lib/logger";
 import { db } from "../db";
 import { normalizeVoucherEntryAmounts } from "../services/accounting/currencyAmounts";
 import { storage } from "../storage";
@@ -435,7 +436,7 @@ export function registerCreditNoteRoutes(app: Express) {
         message: `${noteType} created successfully`,
       });
     } catch (error: any) {
-      console.error("Credit/Debit note error:", error);
+      logger.error("Credit/Debit note error:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -575,7 +576,7 @@ export function registerCreditNoteRoutes(app: Express) {
         items: itemsWithCosts,
       });
     } catch (error: any) {
-      console.error("Get credit note error:", error);
+      logger.error("Get credit note error:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -841,7 +842,7 @@ export function registerCreditNoteRoutes(app: Express) {
         message: `${noteType} updated successfully`,
       });
     } catch (error: any) {
-      console.error("Update credit note error:", error);
+      logger.error("Update credit note error:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });

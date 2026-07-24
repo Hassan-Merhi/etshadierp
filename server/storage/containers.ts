@@ -1,4 +1,5 @@
 import { eq, and, isNull, asc, desc, sql, ne } from "drizzle-orm";
+import { logger } from "../lib/logger";
 import { db } from "../db";
 import * as schema from "@shared/schema";
 import type {
@@ -688,7 +689,7 @@ export async function offloadContainer(
   for (const item of allLineItems) {
     const stockItemId = item.stockItemId;
     if (!stockItemId || stockItemId === 0) {
-      console.warn(`Skipping line item ${item.id} - invalid stock item ID: ${stockItemId}`);
+      logger.warn(`Skipping line item ${item.id} - invalid stock item ID: ${stockItemId}`);
       continue;
     }
     const quantity = parseFloat(item.quantity);

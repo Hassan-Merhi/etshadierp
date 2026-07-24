@@ -1,4 +1,5 @@
 import nodemailer from "nodemailer";
+import { logger } from "../lib/logger";
 import { pool } from "../db";
 import {
   assertExportAttachmentAvailable,
@@ -122,7 +123,7 @@ Generated automatically at ${new Date().toUTCString()}.
       } catch (error: any) {
         const message = error?.message || String(error);
         errors.push(`${recipient}: ${message}`);
-        console.warn(`[EmailService] Export email failed for ${recipient}: ${message}`);
+        logger.warn(`[EmailService] Export email failed for ${recipient}: ${message}`);
       }
     }
 
@@ -131,7 +132,7 @@ Generated automatically at ${new Date().toUTCString()}.
     }
 
     if (errors.length > 0) {
-      console.warn(`[EmailService] ${errors.length}/${recipients.length} emails failed to deliver.`);
+      logger.warn(`[EmailService] ${errors.length}/${recipients.length} emails failed to deliver.`);
     }
 
     return { success: true };

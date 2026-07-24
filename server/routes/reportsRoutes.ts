@@ -1,4 +1,5 @@
 import type { Express } from "express";
+import { logger } from "../lib/logger";
 import { db, pool } from "../db";
 import { storage } from "../storage";
 import { requireAuth, requireRole, canDelete, requireNonPOS, checkPOSLocation } from "../auth";
@@ -1615,7 +1616,7 @@ export function registerReportsRoutes(app: Express) {
         totals: { count: otwContainers.length, amount: totalAmount, totalItems },
       });
     } catch (error: any) {
-      console.error("Dashboard container tracking error:", error);
+      logger.error("Dashboard container tracking error:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });

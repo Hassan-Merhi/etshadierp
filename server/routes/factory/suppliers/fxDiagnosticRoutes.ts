@@ -15,6 +15,7 @@
  * exposed to ordinary factory users.
  */
 import type { Express } from "express";
+import { logger } from "../../../lib/logger";
 import { and, eq, ne } from "drizzle-orm";
 import { db } from "../../../db";
 import { requireAuth, requireRole } from "../../../auth";
@@ -253,7 +254,7 @@ export function registerFactoryFxDiagnosticRoutes(app: Express) {
           reconciliation,
         });
       } catch (error: any) {
-        console.error("Error running factory FX diagnostic:", error);
+        logger.error("Error running factory FX diagnostic:", { error: error });
         res.status(500).json({ message: error.message });
       }
     }
@@ -412,10 +413,10 @@ export function registerFactoryFxDiagnosticRoutes(app: Express) {
           return res.status(409).json({ message: error.message, code: "ALREADY_CONFIRMED" });
         }
         if (error instanceof RepairTokenConfigurationError) {
-          console.error("Repair token configuration error (SESSION_SECRET missing/fallback in production):", error.message);
+          logger.error("Repair token configuration error (SESSION_SECRET missing/fallback in production):", { error: error.message });
           return res.status(500).json({ message: error.message, code: "REPAIR_TOKEN_MISCONFIGURED" });
         }
-        console.error("Error applying FX resolution repair:", error);
+        logger.error("Error applying FX resolution repair:", { error: error });
         res.status(500).json({ message: error.message });
       }
     }

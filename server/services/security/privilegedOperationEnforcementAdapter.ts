@@ -1,4 +1,5 @@
 import type { NextFunction, Request, Response } from "express";
+import { logger } from "../../lib/logger";
 import { db } from "../../db";
 import {
   AuthorizationDeniedError,
@@ -93,7 +94,7 @@ export function requirePrivilegedOperation(options: PrivilegedRouteOptions) {
       try {
         await recordPrivilegedDecision(req, options, "denied", "COMPANY_CONTEXT_REQUIRED");
       } catch (auditError) {
-        console.error("Security audit persistence failed:", auditError);
+        logger.error("Security audit persistence failed:", { error: auditError });
       }
       return res.status(403).json({ message: "Forbidden" });
     }
@@ -122,7 +123,7 @@ export function requirePrivilegedOperation(options: PrivilegedRouteOptions) {
         try {
           await recordPrivilegedDecision(req, options, "denied", error.code);
         } catch (auditError) {
-          console.error("Security audit persistence failed:", auditError);
+          logger.error("Security audit persistence failed:", { error: auditError });
         }
         return res.status(403).json({ message: "Forbidden" });
       }

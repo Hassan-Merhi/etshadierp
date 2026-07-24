@@ -1,4 +1,5 @@
 import { sql } from "drizzle-orm";
+import { logger } from "./lib/logger";
 
 type TxOrDb = {
   select: Function;
@@ -90,7 +91,7 @@ async function settleNegativeLayers(
 
     const variance = (incomingRate - parseFloat(layer.provisional_rate ?? "0")) * consume;
     if (Math.abs(variance) > 0.01) {
-      console.log(
+      logger.info(
         `[settleNegativeLayers] Cost variance: loc=${locationId} item=${stockItemId} ` +
           `qty=${consume.toFixed(3)} provisional=${layer.provisional_rate} actual=${incomingRate} variance=${variance.toFixed(2)}`
       );
@@ -329,7 +330,7 @@ export async function reverseInventoryByExactValue(
     newRate = newValue / newQty;
   } else {
     if (newValue !== 0) {
-      console.warn(
+      logger.warn(
         `[reverseInventoryByExactValue] Normalising: loc=${locationId} item=${stockItemId} ` +
           `newValue=${newValue} → 0 (newQty=${newQty})`
       );

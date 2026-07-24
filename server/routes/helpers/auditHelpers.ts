@@ -1,4 +1,5 @@
 import { db } from "../../db";
+import { logger } from "../../lib/logger";
 import {
   auditLog,
   ledgerAccounts,
@@ -70,7 +71,7 @@ export async function logAudit(
       changes: params.changes,
     });
   } catch (error) {
-    console.error("Error logging audit:", error);
+    logger.error("Error logging audit:", { error: error });
     throw error;
   }
 }

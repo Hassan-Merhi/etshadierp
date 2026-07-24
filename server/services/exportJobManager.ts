@@ -1,4 +1,5 @@
 import fs from "fs";
+import { logger } from "../lib/logger";
 
 export type StepType = "info" | "success" | "error" | "warning";
 
@@ -29,7 +30,7 @@ function removeFileQuietly(filePath: string | undefined): void {
   try {
     fs.rmSync(filePath, { force: true });
   } catch (error) {
-    console.warn(`[ExportJob] Failed to remove temporary archive ${filePath}:`, error);
+    logger.warn(`[ExportJob] Failed to remove temporary archive ${filePath}:`, { error: error });
   }
 }
 

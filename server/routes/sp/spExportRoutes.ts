@@ -1,4 +1,5 @@
 import type { Express } from "express";
+import { logger } from "../../lib/logger";
 import { db } from "../../db";
 import { requireAuth } from "../../auth";
 import { sql } from "drizzle-orm";
@@ -92,13 +93,13 @@ export function registerSpExportRoutes(app: Express) {
           );
           const found = firstQueryRow(r);
           if (!found) {
-            console.warn(
+            logger.warn(
               `[/api/sp/sales-form/export-v2] cashAccountId=${cashId} not found for companyId=${companyId}; ignoring`
             );
             cashId = undefined;
           }
         } catch (e) {
-          console.warn(`[/api/sp/sales-form/export-v2] cashAccountId validation failed:`, e);
+          logger.warn(`[/api/sp/sales-form/export-v2] cashAccountId validation failed:`, { error: e });
           cashId = undefined;
         }
       }
@@ -138,7 +139,7 @@ export function registerSpExportRoutes(app: Express) {
       res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
       res.send(buffer);
     } catch (error: any) {
-      console.error("[/api/sp/sales-form/export-v2]", error);
+      logger.error("[/api/sp/sales-form/export-v2]", { error: error });
       res.status(500).json({ message: error.message });
     }
   });

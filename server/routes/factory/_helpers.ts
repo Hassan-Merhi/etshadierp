@@ -1,4 +1,5 @@
 import { db } from "../../db";
+import { logger } from "../../lib/logger";
 import { AUTO_FILL_REF_TABLE } from "../../services/factory/daybookSourceIntegrity";
 import {
   factoryFxRates,
@@ -68,7 +69,7 @@ export async function writeDaybookEntry(
   // silently mispricing.
   const { looksSet: daybookFxLooksSet } = resolveStoredFxRate(currency, opts.fxRateToUsd ?? null);
   if (!daybookFxLooksSet && currency !== "USD") {
-    console.warn(
+    logger.warn(
       `[writeDaybookEntry] Unresolved exchange rate for ${currency} on txType=${opts.txType} companyId=${opts.companyId} — amountUsd may be inaccurate`
     );
   }

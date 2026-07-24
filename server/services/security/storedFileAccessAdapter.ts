@@ -1,4 +1,5 @@
 import type { NextFunction, Request, Response } from "express";
+import { logger } from "../../lib/logger";
 import { eq } from "drizzle-orm";
 import { storedFiles } from "@shared/schema";
 import { db } from "../../db";
@@ -117,7 +118,7 @@ export function requireStoredFileAccess(action: "read" | "download") {
       try {
         await audit(req, action, "denied", error.code, assetId);
       } catch (auditError) {
-        console.error("Security audit persistence failed:", auditError);
+        logger.error("Security audit persistence failed:", { error: auditError });
       }
       return res.status(404).json({ message: "Not found" });
     }

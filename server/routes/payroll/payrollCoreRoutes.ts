@@ -1,4 +1,5 @@
 import { parseId, parseOptionalId } from "../../lib/parseId";
+import { logger } from "../../lib/logger";
 import { getClientDate } from "../../lib/dateUtils";
 import type { Express } from "express";
 import { db } from "../../db";
@@ -442,7 +443,7 @@ export function registerPayrollCoreRoutes(app: Express) {
 
       res.json(result);
     } catch (err: any) {
-      console.error("GET /api/factory/workers/amount-due error:", err);
+      logger.error("GET /api/factory/workers/amount-due error:", { error: err });
       res.status(500).json({ message: err.message });
     }
   });
@@ -1822,7 +1823,7 @@ export function registerPayrollCoreRoutes(app: Express) {
         bonusAccountsReparented:  (bonReparent as any).rowCount ?? 0,
       });
     } catch (error: any) {
-      console.error("migrate-worker-names error:", error);
+      logger.error("migrate-worker-names error:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -1880,7 +1881,7 @@ export function registerPayrollCoreRoutes(app: Express) {
         bonusAccountsReparented:  (bonRes as any).rowCount ?? 0,
       });
     } catch (error: any) {
-      console.error("migrate-salary-groups error:", error);
+      logger.error("migrate-salary-groups error:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });

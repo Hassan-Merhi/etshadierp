@@ -1,4 +1,5 @@
 import { parseId, parseOptionalId } from "../../lib/parseId";
+import { logger } from "../../lib/logger";
 import { getClientDate } from "../../lib/dateUtils";
 import type { Express, Request, Response, NextFunction } from "express";
 import { db } from "../../db";
@@ -148,7 +149,7 @@ export function registerContainerCostingRoutes(app: Express) {
 
       res.json({ preview });
     } catch (error: any) {
-      console.error("Error in container price-import preview:", error);
+      logger.error("Error in container price-import preview:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -224,7 +225,7 @@ export function registerContainerCostingRoutes(app: Express) {
 
       res.json({ success: true, updated: allLineItemIds.length });
     } catch (error: any) {
-      console.error("Error in container price-import apply:", error);
+      logger.error("Error in container price-import apply:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });

@@ -22,6 +22,7 @@
  */
 
 import { db } from "../../db";
+import { logger } from "../../lib/logger";
 import { pool } from "../../db";
 import {
   propertyPayments,
@@ -716,7 +717,7 @@ export async function postDueScheduledRentalPayments(
       );
       if (didPost) posted++;
     } catch (err: any) {
-      console.error(
+      logger.error(
         `[rentalPostingService] Failed to post group ${row.payment_group_id}:`,
         err.message?.split("\n")[0]
       );
@@ -843,7 +844,7 @@ async function postScheduledGroup(
       );
     }
   } catch (e: any) {
-    console.warn("[rentalPostingService] auto-transfer failed:", e.message?.split("\n")[0]);
+    logger.warn("[rentalPostingService] auto-transfer failed:", e.message?.split("\n")[0]);
   }
 
   return true;

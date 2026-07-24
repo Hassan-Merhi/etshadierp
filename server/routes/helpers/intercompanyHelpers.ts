@@ -1,4 +1,5 @@
 import { db } from "../../db";
+import { logger } from "../../lib/logger";
 import {
   intercompanyPosConfigs,
   companies,
@@ -82,12 +83,12 @@ export async function runIntercompanyPosTransfer(
         debitIsRunningTotal: false,
       });
     } else {
-      console.warn(
+      logger.warn(
         `[IntercompanyPOS] Could not find cash account "${cashName}" in company ${config.destCompanyId}. Dest voucher skipped.`
       );
     }
   } catch (err: any) {
-    console.error("[IntercompanyPOS] Auto-transfer failed:", err?.message ?? err);
+    logger.error("[IntercompanyPOS] Auto-transfer failed:", { error: err?.message ?? err });
   }
 }
 
@@ -162,7 +163,7 @@ export async function recalculateIntercompanyForDate(companyId: number, date: st
       }
     }
   } catch (err: any) {
-    console.error("[IntercompanyPOS Recalc] Error:", err?.message ?? err);
+    logger.error("[IntercompanyPOS Recalc] Error:", { error: err?.message ?? err });
   }
 }
 

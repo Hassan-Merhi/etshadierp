@@ -5,6 +5,7 @@
  * Extracted from chatService.ts; behaviour is unchanged.
  */
 import { db } from "../db";
+import { logger } from "../lib/logger";
 import * as schema from "@shared/schema";
 import { and, desc, eq } from "drizzle-orm";
 
@@ -91,5 +92,5 @@ export async function saveFeedback(
   feedback: "positive" | "negative",
   userId: string
 ): Promise<void> {
-  console.log(`Feedback saved: Message ${messageId} - ${feedback} by user ${userId}`);
+  logger.info(`Feedback saved: Message ${messageId} - ${feedback} by user ${userId}`);
 }

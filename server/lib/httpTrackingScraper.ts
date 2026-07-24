@@ -17,6 +17,7 @@
  */
 
 import type { ParcelsAppShipment } from "./parcelsAppClient";
+import { logger } from "./logger";
 
 export interface HttpScraperResult {
   success: boolean;
@@ -375,7 +376,7 @@ function extractFromNuxt(payload: any, containerNumber: string): ParcelsAppShipm
 
 export async function httpScrapeTracking(containerNumber: string): Promise<HttpScraperResult> {
   const carrier = detectCarrier(containerNumber);
-  console.log(`[HttpScraper] ${containerNumber}: detected carrier=${carrier ?? "unknown"}`);
+  logger.info(`[HttpScraper] ${containerNumber}: detected carrier=${carrier ?? "unknown"}`);
 
   let result: HttpScraperResult;
 
@@ -413,9 +414,9 @@ export async function httpScrapeTracking(containerNumber: string): Promise<HttpS
   }
 
   if (!result.success) {
-    console.log(`[HttpScraper] ${containerNumber}: ${result.error ?? "no data"}`);
+    logger.info(`[HttpScraper] ${containerNumber}: ${result.error ?? "no data"}`);
   } else {
-    console.log(`[HttpScraper] ${containerNumber}: success via carrier=${carrier ?? "page"}`);
+    logger.info(`[HttpScraper] ${containerNumber}: success via carrier=${carrier ?? "page"}`);
   }
 
   return result;

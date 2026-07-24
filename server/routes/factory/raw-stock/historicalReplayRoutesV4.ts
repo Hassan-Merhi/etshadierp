@@ -1,4 +1,5 @@
 import type { Express } from "express";
+import { logger } from "../../../lib/logger";
 import crypto from "crypto";
 import { requireAuth, requireRole } from "../../../auth";
 import { pool } from "../../../db";
@@ -380,7 +381,7 @@ export function registerHistoricalReplayRoutesV4(app: Express): void {
         const preview = await previewHistoricalCostReplay(companyId);
         res.json(preview);
       } catch (error: any) {
-        console.error("[historical-replay v4 preview] error:", error);
+        logger.error("[historical-replay v4 preview] error:", { error: error });
         res.status(500).json({ message: error.message || "Failed to compute historical replay preview" });
       }
     }
@@ -621,7 +622,7 @@ export function registerHistoricalReplayRoutesV4(app: Express): void {
             code: "REPAIR_TOKEN_MISCONFIGURED",
           });
         }
-        console.error("[historical-replay v4 apply] error:", error);
+        logger.error("[historical-replay v4 apply] error:", { error: error });
         return res.status(500).json({
           message: error.message || "Failed to apply historical replay",
         });

@@ -1,4 +1,5 @@
 import type { Express } from "express";
+import { logger } from "../lib/logger";
 import Papa from "papaparse";
 import { db } from "../db";
 import { requireAuth } from "../auth";
@@ -457,7 +458,7 @@ export function registerAiValidationRoutes(app: Express) {
 
       res.json(result);
     } catch (err: any) {
-      console.error("[AI Validation] run error:", err.message);
+      logger.error("[AI Validation] run error:", { error: err.message });
       res.status(500).json({ message: err.message });
     }
   });

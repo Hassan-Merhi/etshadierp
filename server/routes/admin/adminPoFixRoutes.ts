@@ -1,4 +1,5 @@
 import { getClientDate } from "../../lib/dateUtils";
+import { logger } from "../../lib/logger";
 import type { Express } from "express";
 import { db, pool } from "../../db";
 import { storage } from "../../storage";
@@ -516,7 +517,7 @@ export function registerAdminPoFixRoutes(app: Express) {
         processedCompanies: 1,
       });
     } catch (error: any) {
-      console.error("Fix old PO credits error:", error);
+      logger.error("Fix old PO credits error:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -658,7 +659,7 @@ export function registerAdminPoFixRoutes(app: Express) {
         details,
       });
     } catch (error: any) {
-      console.error("Fix parent PO supplier entries error:", error);
+      logger.error("Fix parent PO supplier entries error:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -757,7 +758,7 @@ export function registerAdminPoFixRoutes(app: Express) {
         processedCompanies: 1,
       });
     } catch (error: any) {
-      console.error("Reverse PO credits error:", error);
+      logger.error("Reverse PO credits error:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });

@@ -1,4 +1,5 @@
 import type { Express, NextFunction, Request, Response } from "express";
+import { logger } from "../../lib/logger";
 import { z } from "zod";
 import { requireAuth, requireNonPOS } from "../../auth";
 import { requireActionAccess } from "../../lib/permissionMiddleware";
@@ -54,7 +55,7 @@ function errorStatus(error: unknown): number {
 
 function sendError(res: Response, error: unknown, context: string) {
   const status = errorStatus(error);
-  if (status === 500) console.error(`[StockTransferLifecycle ${context}]`, error);
+  if (status === 500) logger.error(`[StockTransferLifecycle ${context}]`, { error: error });
   const payload: Record<string, unknown> = {
     message: String((error as any)?.message ?? `Failed to ${context.toLowerCase()} stock transfer`),
   };

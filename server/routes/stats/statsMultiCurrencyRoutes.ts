@@ -1,4 +1,5 @@
 import type { Express } from "express";
+import { logger } from "../../lib/logger";
 import Decimal from "decimal.js";
 import { requireAuth, requireNonPOS } from "../../auth";
 import {
@@ -127,7 +128,7 @@ export function registerStatsMultiCurrencyRoutes(app: Express) {
         return originalJson(adjusted);
       }) as typeof res.json;
     } catch (error) {
-      console.error("Unable to prepare cash-only Net Position translation:", error);
+      logger.error("Unable to prepare cash-only Net Position translation:", { error: error });
     }
     return next();
   });
@@ -142,7 +143,7 @@ export function registerStatsMultiCurrencyRoutes(app: Express) {
         if (!companyId) return res.status(400).json({ message: "No company selected" });
         return res.json(await getCashBankRevaluation(companyId));
       } catch (error: any) {
-        console.error("Multi-currency cash/bank revaluation failed:", error);
+        logger.error("Multi-currency cash/bank revaluation failed:", { error: error });
         return res.status(500).json({ message: error.message });
       }
     },
@@ -170,7 +171,7 @@ export function registerStatsMultiCurrencyRoutes(app: Express) {
         if (!summary) return res.status(404).json({ message: "Cash/bank account not found" });
         return res.json(summary);
       } catch (error: any) {
-        console.error("Multi-currency account summary failed:", error);
+        logger.error("Multi-currency account summary failed:", { error: error });
         return res.status(500).json({ message: error.message });
       }
     },

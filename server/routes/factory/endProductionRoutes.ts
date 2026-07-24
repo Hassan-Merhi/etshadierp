@@ -16,6 +16,7 @@
  */
 
 import type { Express } from "express";
+import { logger } from "../../lib/logger";
 import { db, pool } from "../../db";
 import { factoryProductionSessions, factorySettings } from "@shared/schema";
 import { eq, and, sql } from "drizzle-orm";
@@ -101,7 +102,7 @@ export function registerEndProductionRoutes(app: Express, requireAuth: any) {
 
       res.json(session ?? null);
     } catch (err: any) {
-      console.error("[endProduction] GET session error:", err);
+      logger.error("[endProduction] GET session error:", { error: err });
       res.status(500).json({ message: err.message });
     }
   });
@@ -194,7 +195,7 @@ export function registerEndProductionRoutes(app: Express, requireAuth: any) {
         whatsapp: waResult,
       });
     } catch (err: any) {
-      console.error("[endProduction] POST end-production error:", err);
+      logger.error("[endProduction] POST end-production error:", { error: err });
       res.status(500).json({ message: err.message });
     }
   });
@@ -237,7 +238,7 @@ export function registerEndProductionRoutes(app: Express, requireAuth: any) {
 
       res.json({ message: "Worker Matrix PDF sent to WhatsApp.", whatsapp: waResult });
     } catch (err: any) {
-      console.error("[endProduction] POST manual send error:", err);
+      logger.error("[endProduction] POST manual send error:", { error: err });
       res.status(500).json({ message: err.message });
     }
   });

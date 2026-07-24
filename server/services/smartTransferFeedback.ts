@@ -1,4 +1,5 @@
 import { randomUUID } from "crypto";
+import { logger } from "../lib/logger";
 import { and, desc, eq, gte, inArray, isNull, lte } from "drizzle-orm";
 import { db } from "../db";
 import {
@@ -208,7 +209,7 @@ export async function createSmartTransferPreviewFeedback(params: {
     } as any);
     return sessionId;
   } catch (error) {
-    console.error("[SmartTransferFeedback] Preview log failed:", (error as Error).message);
+    logger.error("[SmartTransferFeedback] Preview log failed:", { error: (error as Error).message });
     return null;
   }
 }

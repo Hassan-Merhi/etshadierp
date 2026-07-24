@@ -6,6 +6,7 @@
  * stockSummaryRoutes.ts as a sub-registrar; behaviour is unchanged.
  */
 import type { Express } from "express";
+import { logger } from "../lib/logger";
 import { eq, and, or, isNull, sql } from "drizzle-orm";
 import { db } from "../db";
 import { storage } from "../storage";
@@ -398,7 +399,7 @@ export function registerStockSummaryLocationRoutes(app: Express) {
         grandTotal,
       });
     } catch (error: any) {
-      console.error("Location stock item monthly summary error:", error);
+      logger.error("Location stock item monthly summary error:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
@@ -1283,7 +1284,7 @@ export function registerStockSummaryLocationRoutes(app: Express) {
           totals,
         });
       } catch (error: any) {
-        console.error("Location stock item monthly vouchers error:", error);
+        logger.error("Location stock item monthly vouchers error:", { error: error });
         res.status(500).json({ message: error.message });
       }
     }
@@ -1725,7 +1726,7 @@ export function registerStockSummaryLocationRoutes(app: Express) {
 
       res.json({ stockItem, location, startDate, endDate, transactions: out, totals });
     } catch (error: any) {
-      console.error("Location stock item transactions range error:", error);
+      logger.error("Location stock item transactions range error:", { error: error });
       res.status(500).json({ message: error.message });
     }
   });
