@@ -201,3 +201,23 @@ describe("FactoryWorkersHub", () => {
     ).toBeInTheDocument();
   });
 });
+
+// ── 10. FactoryCustomers ──────────────────────────────────────────────────────
+describe("FactoryCustomers page", () => {
+  it("renders the page title heading", async () => {
+    const { default: FactoryCustomers } = await import(
+      "@/pages/factory/FactoryCustomers"
+    );
+    renderWithProviders(<FactoryCustomers />);
+    expect(await screen.findByTestId("text-page-title")).toBeInTheDocument();
+  });
+});
+
+// ── 11. BaleTransfers ─────────────────────────────────────────────────────────
+describe("BaleTransfers page", () => {
+  it("renders the page title heading", async () => {
+    const { default: BaleTransfers } = await import("@/pages/BaleTransfers");
+    renderWithProviders(<BaleTransfers />);
+    expect(await screen.findByTestId("text-page-title")).toBeInTheDocument();
+  });
+});
