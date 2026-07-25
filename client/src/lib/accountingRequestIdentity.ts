@@ -1,23 +1,56 @@
-const JOURNAL_REQUEST_TTL_MS = 30 * 60 * 1000;
-const MAX_PENDING_JOURNAL_IDENTITIES = 100;
+const ACCOUNTING_REQUEST_TTL_MS = 30 * 60 * 1000;
+const MAX_PENDING_ACCOUNTING_IDENTITIES = 100;
 
-const pendingJournalRequestIds = new Map<
+const pendingAccountingRequestIds = new Map<
   string,
   { requestId: string; createdAt: number }
 >();
 
+type AccountingRequestPayload = Record<string, unknown>;
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return !!value && typeof value === "object" && !Array.isArray(value);
+}
+
 function isActiveManualJournal(
+  method: string,
+  pathname: string,
+  data: unknown
+): data is AccountingRequestPayload {
+  return (
+    method.toUpperCase() === "POST" &&
+    pathname === "/api/vouchers/journal" &&
+    isRecord(data) &&
+    data.optional !== true
+  );
+}
+
+function isActiveGenericVoucher(
+  method: string,
+  pathname: string,
+  data: unknown
+): data is AccountingRequestPayload {
+  if (
+    method.toUpperCase() !== "POST" ||
+    pathname !== "/api/vouchers/with-entries" ||
+    !isRecord(data) ||
+    !isRecord(data.voucher)
+  ) {
+    return false;
+  }
+
+  return data.voucher.optional !== true;
+}
+
+export function isProtectedAccountingRequest(
   method: string,
   url: string,
   data: unknown
-): data is Record<string, unknown> {
+): data is AccountingRequestPayload {
+  const pathname = url.split("?")[0];
   return (
-    method.toUpperCase() === "POST" &&
-    url.split("?")[0] === "/api/vouchers/journal" &&
-    !!data &&
-    typeof data === "object" &&
-    !Array.isArray(data) &&
-    (data as Record<string, unknown>).optional !== true
+    isActiveManualJournal(method, pathname, data) ||
+    isActiveGenericVoucher(method, pathname, data)
   );
 }
 
@@ -25,54 +58,54 @@ function createClientRequestId(): string {
   if (typeof globalThis.crypto?.randomUUID === "function") {
     return globalThis.crypto.randomUUID();
   }
-  return `journal-${Date.now()}-${Math.random().toString(36).slice(2, 12)}`;
+  return `accounting-${Date.now()}-${Math.random().toString(36).slice(2, 12)}`;
 }
 
-function journalPayloadKey(
+function accountingPayloadKey(
   method: string,
   url: string,
-  data: Record<string, unknown>
+  data: AccountingRequestPayload
 ): string {
   const payload = { ...data };
   delete payload.clientRequestId;
   return `${method.toUpperCase()}:${url.split("?")[0]}:${JSON.stringify(payload)}`;
 }
 
-function prunePendingJournalIdentities(): void {
-  const cutoff = Date.now() - JOURNAL_REQUEST_TTL_MS;
-  for (const [key, value] of pendingJournalRequestIds) {
-    if (value.createdAt < cutoff) pendingJournalRequestIds.delete(key);
+function prunePendingAccountingIdentities(): void {
+  const cutoff = Date.now() - ACCOUNTING_REQUEST_TTL_MS;
+  for (const [key, value] of pendingAccountingRequestIds) {
+    if (value.createdAt < cutoff) pendingAccountingRequestIds.delete(key);
   }
 
-  while (pendingJournalRequestIds.size > MAX_PENDING_JOURNAL_IDENTITIES) {
-    const oldestKey = pendingJournalRequestIds.keys().next().value as string | undefined;
+  while (pendingAccountingRequestIds.size > MAX_PENDING_ACCOUNTING_IDENTITIES) {
+    const oldestKey = pendingAccountingRequestIds.keys().next().value as string | undefined;
     if (!oldestKey) break;
-    pendingJournalRequestIds.delete(oldestKey);
+    pendingAccountingRequestIds.delete(oldestKey);
   }
 }
 
 /**
- * Active manual journals receive a stable identity before apiRequest sees them.
- * The same payload reuses its identity after an uncertain network result. A
- * successful response, a definite client error, or safe offline queueing releases
- * the in-memory identity; the queued JSON body still keeps its own request ID.
+ * Protected accounting writes receive a stable identity before the request is
+ * sent. The same payload reuses its identity after an uncertain network result.
+ * A successful response or definite 4xx rejection releases the identity; queued
+ * JSON retains its own request ID and server-side replay protection.
  */
 export function attachAccountingRequestIdentity(
   method: string,
   url: string,
   data: unknown
 ): unknown {
-  if (!isActiveManualJournal(method, url, data)) return data;
+  if (!isProtectedAccountingRequest(method, url, data)) return data;
   if (typeof data.clientRequestId === "string" && data.clientRequestId.trim()) {
     return data;
   }
 
-  prunePendingJournalIdentities();
-  const key = journalPayloadKey(method, url, data);
-  const existing = pendingJournalRequestIds.get(key);
+  prunePendingAccountingIdentities();
+  const key = accountingPayloadKey(method, url, data);
+  const existing = pendingAccountingRequestIds.get(key);
   const requestId = existing?.requestId || createClientRequestId();
   if (!existing) {
-    pendingJournalRequestIds.set(key, { requestId, createdAt: Date.now() });
+    pendingAccountingRequestIds.set(key, { requestId, createdAt: Date.now() });
   }
 
   return { ...data, clientRequestId: requestId };
@@ -83,6 +116,10 @@ export function releaseAccountingRequestIdentity(
   url: string,
   data: unknown
 ): void {
-  if (!isActiveManualJournal(method, url, data)) return;
-  pendingJournalRequestIds.delete(journalPayloadKey(method, url, data));
+  if (!isProtectedAccountingRequest(method, url, data)) return;
+  pendingAccountingRequestIds.delete(accountingPayloadKey(method, url, data));
+}
+
+export function shouldReleaseAccountingRequestIdentity(status: number): boolean {
+  return (status >= 200 && status < 400) || (status >= 400 && status < 500);
 }
