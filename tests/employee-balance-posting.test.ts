@@ -17,6 +17,22 @@ describe("collectEmployeeBalanceDeltas", () => {
     });
   });
 
+  it("produces the exact inverse delta for update and deletion reversal", () => {
+    const deltas = collectEmployeeBalanceDeltas({
+      entries: [
+        { employeeId: 10, debitAmount: "25", creditAmount: "0" },
+        { employeeId: 10, debitAmount: "0", creditAmount: "100" },
+      ],
+      direction: "reverse",
+    });
+
+    expect(deltas.byEmployeeId.get(10)).toEqual({
+      balanceChange: "-75.00",
+      deposits: "-100.00",
+      withdrawals: "-25.00",
+    });
+  });
+
   it("maps EMP ledger entries to the employee code when no direct employeeId exists", () => {
     const deltas = collectEmployeeBalanceDeltas({
       entries: [
@@ -30,6 +46,23 @@ describe("collectEmployeeBalanceDeltas", () => {
       balanceChange: "20.00",
       deposits: "30.00",
       withdrawals: "10.00",
+    });
+  });
+
+  it("reverses EMP ledger totals without swapping deposit and withdrawal history", () => {
+    const deltas = collectEmployeeBalanceDeltas({
+      entries: [
+        { ledgerAccountId: 50, debitAmount: "10", creditAmount: "0" },
+        { ledgerAccountId: 50, debitAmount: "0", creditAmount: "30" },
+      ],
+      employeeCodeByLedgerId: new Map([[50, "EMP001"]]),
+      direction: "reverse",
+    });
+
+    expect(deltas.byEmployeeCode.get("EMP001")).toEqual({
+      balanceChange: "-20.00",
+      deposits: "-30.00",
+      withdrawals: "-10.00",
     });
   });
 
