@@ -860,13 +860,16 @@ export function registerRawStockOffloadRoutes(app: Express) {
           }
         }
 
-        // 7. Delete any creation-time FACTORY-FREIGHT vouchers and daybook entries
+        // 7. Delete any creation-time FACTORY-FREIGHT and FACTORY-OC vouchers
         //    before posting new offload ones (prevents double-posting).
         //    Container creation (factoryContainersRoutes.ts) posts a stable, non-suffixed
         //    `FACTORY-FREIGHT-{id}` voucher number when freight is set at creation time —
         //    match that exact form too, not just the `-{timestamp}` suffixed offload form,
         //    or the creation-time voucher survives and freight gets expensed twice.
-        const existingFreightVouchers = await tx
+        //    Likewise, the other-charges sync endpoint posts `FACTORY-OC-{id}-{chargeId}-{ts}`
+        //    vouchers while the container is in PENDING state; these must also be cleared
+        //    so the offload doesn't double-count them alongside its own OC vouchers.
+        const existingPreOffloadVouchers = await tx
           .select({ id: vouchers.id })
           .from(vouchers)
           .where(
@@ -875,12 +878,13 @@ export function registerRawStockOffloadRoutes(app: Express) {
               eq(vouchers.sourceModule, "FACTORY"),
               or(
                 eq(vouchers.voucherNumber, `FACTORY-FREIGHT-${containerId}`),
-                ilike(vouchers.voucherNumber, `FACTORY-FREIGHT-${containerId}-%`)
+                ilike(vouchers.voucherNumber, `FACTORY-FREIGHT-${containerId}-%`),
+                ilike(vouchers.voucherNumber, `FACTORY-OC-${containerId}-%`)
               )
             )
           );
-        if (existingFreightVouchers.length > 0) {
-          const vIds = existingFreightVouchers.map((v: any) => v.id);
+        if (existingPreOffloadVouchers.length > 0) {
+          const vIds = existingPreOffloadVouchers.map((v: any) => v.id);
           await tx.delete(voucherEntries).where(inArray(voucherEntries.voucherId, vIds));
           await tx.delete(vouchers).where(inArray(vouchers.id, vIds));
         }
