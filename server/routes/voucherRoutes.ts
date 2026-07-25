@@ -16,7 +16,6 @@ import { registerVoucherTransferRoutes } from "./vouchers/voucherTransferRoutes"
 import { registerSmartTransferPreviewRoutes } from "./vouchers/smartTransferPreviewRoutes";
 import { registerStockTransferLifecycleRoutes } from "./vouchers/stockTransferLifecycleRoutes";
 import { registerStockTransferRevisionLifecycleRoutes } from "./vouchers/stockTransferRevisionLifecycleRoutes";
-import { registerVoucherEntryRoutes } from "./voucherEntryRoutes";
 
 export function registerVoucherRoutes(app: Express) {
   // Stock-transfer lifecycle routes must shadow the older direct transfer editor.
@@ -39,13 +38,12 @@ export function registerVoucherRoutes(app: Express) {
   registerCentralJournalLifecycleRoutes(app);
   registerVoucherJournalRoutes(app);
 
-  // Stock Transfer deletion must run before the generic voucher delete route in
-  // voucherEntryRoutes so inventory reversal is row-locked and replay-safe.
+  // Stock Transfer deletion must run before the generic voucher delete routes,
+  // which server/routes.ts registers once immediately after this registry.
   registerCentralStockTransferDeleteRoutes(app);
 
   registerVoucherSalesUpdateRoutes(app);
   registerVoucherPurchaseUpdateRoutes(app);
   registerVoucherTransferRoutes(app);
   registerSmartTransferPreviewRoutes(app);
-  registerVoucherEntryRoutes(app);
 }
