@@ -274,8 +274,9 @@ export function OffloadDialog({
     const ocVal = parseFloat(container.otherCharges || "0");
     setOtherCharges(ocVal > 0 ? String(ocVal) : "");
     setOtherChargesFromContainer(ocVal > 0);
-    setOtherChargesCurrencyCode(ccy);
-    setOtherChargesFxRate(ccy === "USD" ? "1" : container.fxRateToUsd || "1");
+    const effectiveOcCcy = (container as any).otherChargesCurrencyCode || ccy;
+    setOtherChargesCurrencyCode(effectiveOcCcy);
+    setOtherChargesFxRate(effectiveOcCcy === "USD" ? "1" : container.fxRateToUsd || "1");
     if (container.otherChargesSupplierId) setOtherChargesAccountId(`SUP:${container.otherChargesSupplierId}`);
     else if (container.otherChargesAccountId) setOtherChargesAccountId(String(container.otherChargesAccountId));
 
