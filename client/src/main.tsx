@@ -88,7 +88,11 @@ function showStaleAssetRecoveryMessage() {
     } catch {
       /* sessionStorage may be blocked */
     }
-    window.location.reload();
+
+    const cleanUrl = new URL(window.location.href);
+    cleanUrl.searchParams.delete("_asset_recovery");
+    cleanUrl.searchParams.delete("_sw");
+    window.location.replace(cleanUrl.toString());
   });
 
   content.append(title, description, button);
