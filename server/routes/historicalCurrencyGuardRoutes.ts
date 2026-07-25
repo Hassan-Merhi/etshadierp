@@ -5,13 +5,15 @@ import { requireAuth, requireNonPOS } from "../auth";
 import { getHistoricalCurrencyReadiness } from "../services/accounting/historicalCurrencyReadiness";
 
 function isGuardedFinancialPath(pathname: string): boolean {
+  // Only guard reports that AGGREGATE across currencies and need base-USD amounts
+  // for correct cross-currency totals.  Per-account statement PDFs/Excels only
+  // display a single account's own debit/credit amounts — they never reference
+  // base_debit_amount — so the backfill readiness check is irrelevant for them.
   return (
     pathname === "/api/stats/net-profit" ||
     pathname.startsWith("/api/stats/net-position") ||
     pathname.startsWith("/api/reports/net-position") ||
-    pathname.startsWith("/api/reports/net-profit") ||
-    pathname.includes("/statement-pdf") ||
-    pathname.includes("/statement-excel")
+    pathname.startsWith("/api/reports/net-profit")
   );
 }
 
