@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildSpOffloadLockScope,
   classifySpOffloadState,
-} from "../server/routes/sp/spOffloadConcurrencyGuard";
+} from "../server/services/sp/spOffloadConcurrencyPolicy";
 
 describe("SP offload concurrency policy", () => {
   it("scopes the advisory lock to company and container", () => {
