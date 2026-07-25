@@ -23,6 +23,7 @@ const EXPECTED_COLUMNS: {
 }[] = [
   // ── vouchers ────────────────────────────────────────────────────────────────
   { table: "vouchers", column: "currency", ddl: "VARCHAR(3) NOT NULL DEFAULT 'USD'" },
+  { table: "vouchers", column: "supplier_id", ddl: "INTEGER" },
 
   // ── voucher_entries (multi-currency) ─────────────────────────────────────────
   { table: "voucher_entries", column: "transaction_currency",      ddl: "VARCHAR(3)" },
@@ -33,6 +34,7 @@ const EXPECTED_COLUMNS: {
   { table: "voucher_entries", column: "historical_exchange_rate",  ddl: "NUMERIC(20,10)" },
   { table: "voucher_entries", column: "rate_convention",           ddl: "VARCHAR(30)" },
   { table: "voucher_entries", column: "factory_supplier_id",       ddl: "INTEGER" },
+  { table: "voucher_entries", column: "supplier_id",               ddl: "INTEGER" },
 
   // ── ledger_accounts ──────────────────────────────────────────────────────────
   { table: "ledger_accounts", column: "opening_balance_currency",        ddl: "VARCHAR(10)" },
@@ -40,6 +42,11 @@ const EXPECTED_COLUMNS: {
   { table: "ledger_accounts", column: "opening_balance_base_amount",     ddl: "NUMERIC(20,6)" },
   { table: "ledger_accounts", column: "opening_balance_native_amount",   ddl: "NUMERIC(20,6)" },
   { table: "ledger_accounts", column: "category",                        ddl: "TEXT" },
+  { table: "ledger_accounts", column: "sub_type",                        ddl: "TEXT" },
+
+  // ── Supplier Partner container linkage ───────────────────────────────────────
+  { table: "sp_containers", column: "supplier_id",          ddl: "INTEGER" },
+  { table: "sp_containers", column: "goods_otw_voucher_id", ddl: "INTEGER" },
 
   // ── bank_accounts ────────────────────────────────────────────────────────────
   { table: "bank_accounts", column: "opening_balance_currency",        ddl: "VARCHAR(10)" },
