@@ -27,14 +27,7 @@ No historical repair, migration, deployment, or production database command is p
 - insert `PAYROLL_GENERATED` daybook row; and
 - continue to the next worker.
 
-A failure midway could therefore leave:
-
-- a partial payroll batch;
-- some workers' advances deducted without the rest of the batch;
-- repayment rows for only part of the batch; or
-- payroll rows without matching daybook rows.
-
-A concurrent retry could also generate duplicate payroll rows and deduct advances again.
+A failure midway could therefore leave a partial payroll batch, partially reduced advances, incomplete repayment rows, or payroll rows without matching daybook rows. A concurrent retry could also generate duplicate payroll rows and deduct advances again.
 
 ### Protected behavior
 
@@ -66,35 +59,40 @@ The following legacy calculations are preserved:
 
 No mark-paid, payment voucher, payroll undo, payroll delete, or `PAYROLL-GEN` rebuild behavior changed in this slice.
 
-## Remaining 2D map
+## 2D.2 — Supplier Partner non-POS offload in progress
 
-### 2D.2 — Supplier Partner non-POS offload
+### Existing strengths retained
 
-Current strengths:
+- Voucher A, Voucher B, charge entries, offload rows, stock movements, inventory updates, and container status updates remain owned by the existing posting transaction.
+- Prepaid balances continue to use row locks before consumption.
+- Existing SP voucher numbering, stock-cost formulas, parent-agent entries, prepaid treatment, and intercompany logic are unchanged.
 
-- Voucher A, Voucher B, charge entries, offload rows, stock movements, inventory updates, and container status updates are largely inside one transaction.
-- Prepaid balances use row locks before consumption.
+### Concurrency and replay protection implemented
 
-Confirmed gap:
+A guard registered before `POST /api/sp/offload` now:
 
-- Container existence/status and location are checked before the transaction.
-- Two simultaneous offload requests can both observe `status = open` and enter the posting transaction.
-- Some bank/ledger ownership validation inside the transaction still reads through the global `db` connection instead of the transaction handle.
+1. resolves the selected Supplier Partner company;
+2. acquires a company/container advisory lock for the complete request lifetime;
+3. rejects a simultaneous request with `SP_OFFLOAD_IN_PROGRESS`;
+4. validates the requested location belongs to the company;
+5. loads any completed offload and its persisted landed-charge allocation;
+6. returns the existing offload only when date, location, total landed cost, charge types, descriptions, prepaid IDs, bank IDs, ledger IDs, and parent-agent IDs match;
+7. returns `SP_OFFLOAD_REPLAY_MISMATCH` for a changed retry; and
+8. preserves the normal camelCase offload response shape on replay.
 
-Required work:
+The guard does not recalculate or replace any SP accounting formula. The legacy transaction continues only for an open container with no completed offload.
 
-- lock the SP container row before status validation;
-- revalidate location and posting accounts within the transaction;
-- return the existing offload on safe replay or reject an incompatible duplicate;
-- preserve all SP voucher numbering, prepaid, parent-agent, stock, and intercompany rules.
+### Remaining SP boundary
 
-### 2D.3 — ERP/factory container offload and own-account freight
+Three bank/ledger ownership checks within the legacy posting transaction still use the global database connection rather than the transaction handle. They are read-only checks and the new guard prevents duplicate offload posting, but they should still be converted to transaction-owned reads before 2D.2 is marked complete.
+
+## 2D.3 — ERP/factory container offload and own-account freight
 
 Confirmed risk:
 
-- Offload edit reversal runs in one transaction;
-- status reset is committed separately;
-- the new offload is then executed through another transaction/service;
+- Offload edit reversal runs in one transaction.
+- Status reset is committed separately.
+- The new offload is then executed through another transaction/service.
 - SP follow-up journals may run in another transaction.
 
 A failure between those stages can leave a reversed container in an intermediate state. The convergence must preserve exact inventory-value reversal and the existing own/parent/supplier freight policy:
@@ -105,7 +103,7 @@ A failure between those stages can leave a reversed container in an intermediate
 
 This area requires a dedicated lifecycle service rather than wrapping the current route superficially.
 
-### 2D.4 — Rental accounting verification
+## 2D.4 — Rental accounting verification
 
 The current rental payment service already provides:
 
@@ -122,8 +120,11 @@ Program 2D should add lifecycle regression coverage and inspect deletion/reversa
 - monthly attendance-based payroll calculation;
 - weekday fallback for daily workers;
 - per-bale and per-kilogram earnings;
-- advance deduction capped at gross pay; and
-- company/period concurrency-lock scoping.
+- advance deduction capped at gross pay;
+- company/period payroll concurrency-lock scoping;
+- company/container SP offload lock scoping;
+- exact compatible replay matching; and
+- conflict detection for changed date, location, landed total, description, or charge-account allocation.
 
 ## Verification limitation
 
