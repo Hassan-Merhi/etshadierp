@@ -19,6 +19,7 @@ import {
   type PostingActor,
   type PostingSourceIdentity,
 } from "./centralPostingEngine";
+import { assertCustomerLinkedLedgerPairs } from "./customerLinkedLedgerValidation";
 
 const IDEMPOTENCY_TABLE = "accounting_posting_idempotency";
 const POSTING_AUDIT_TABLE = "accounting_postings";
@@ -215,6 +216,10 @@ export function createDatabasePostingDependencies(): CentralPostingDependencies 
             label: "Supplier",
           }),
         ]);
+
+        // A customer+ledger pair is allowed only when the ledger is the exact
+        // company-scoped linked ledger stored on that customer record.
+        await assertCustomerLinkedLedgerPairs({ tx, companyId, entries });
       },
     },
 
