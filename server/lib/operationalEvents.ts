@@ -14,6 +14,7 @@ export interface OperationalEventInput {
   status?: number;
   durationMs?: number;
   responseBytes?: number;
+  budgetBytes?: number;
   companyId?: number;
   userId?: number;
   // Optional diagnostic metrics attached by bandwidth/performance events.
@@ -21,6 +22,11 @@ export interface OperationalEventInput {
   apiEndpointCount?: number;
   staticAssetCount?: number;
   windowMs?: number;
+  totalApiResponseBytes?: number;
+  totalStaticAssetResponseBytes?: number;
+  apiWindowBudgetBytes?: number;
+  staticWindowBudgetBytes?: number;
+  endpointWindowBudgetBytes?: number;
   ranked?: unknown[];
   staticAssets?: unknown[];
   heapDeltaBytes?: number;
@@ -76,12 +82,28 @@ export function recordOperationalEvent(input: OperationalEventInput): void {
     status: event.status,
     durationMs: event.durationMs,
     responseBytes: event.responseBytes,
+    budgetBytes: event.budgetBytes,
     companyId: event.companyId,
     userId: event.userId,
+    endpointCount: event.endpointCount,
+    apiEndpointCount: event.apiEndpointCount,
+    staticAssetCount: event.staticAssetCount,
+    windowMs: event.windowMs,
+    totalApiResponseBytes: event.totalApiResponseBytes,
+    totalStaticAssetResponseBytes: event.totalStaticAssetResponseBytes,
+    apiWindowBudgetBytes: event.apiWindowBudgetBytes,
+    staticWindowBudgetBytes: event.staticWindowBudgetBytes,
+    endpointWindowBudgetBytes: event.endpointWindowBudgetBytes,
+    ranked: event.ranked,
+    staticAssets: event.staticAssets,
+    heapDeltaBytes: event.heapDeltaBytes,
+    dbQueryCount: event.dbQueryCount,
+    dbDurationMs: event.dbDurationMs,
   };
 
   if (event.severity === "critical") logger.error(event.message, context);
-  else logger.warn(event.message, context);
+  else if (event.severity === "warning") logger.warn(event.message, context);
+  else logger.info(event.message, context);
 }
 
 export function recordIntegrityEvent(

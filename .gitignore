@@ -38,6 +38,7 @@ ts-errors*.txt
 
 # Browser smoke screenshots and reports (regenerated on demand)
 artifacts/responsive-smoke/
+artifacts/bandwidth-smoke/
 
 # User-uploaded content (runtime data, not source)
 uploads/

@@ -1,5 +1,4 @@
 import { useEffect, useRef } from "react";
-import html2canvas from "html2canvas";
 
 // How often to check if a Developer is watching us (cheap GET, no canvas).
 // Kept at 15 s to avoid saturating the Android WebView JS↔Java bridge with
@@ -15,6 +14,21 @@ const CLICK_RETAIN_MS = 8000;
 const MAX_DATA_URL_LEN = 1_300_000;
 
 const isDev = import.meta.env.DEV;
+
+type Html2Canvas = typeof import("html2canvas")["default"];
+let html2canvasPromise: Promise<Html2Canvas> | null = null;
+
+async function loadHtml2Canvas(): Promise<Html2Canvas> {
+  if (!html2canvasPromise) {
+    html2canvasPromise = import("html2canvas")
+      .then((module) => module.default)
+      .catch((error) => {
+        html2canvasPromise = null;
+        throw error;
+      });
+  }
+  return html2canvasPromise;
+}
 
 export interface ClickEvent {
   x: number;
@@ -99,6 +113,7 @@ const html2canvasBaseOpts = {
 } as const;
 
 async function tryCapture(opts: Record<string, any>): Promise<HTMLCanvasElement> {
+  const html2canvas = await loadHtml2Canvas();
   return Promise.race([
     html2canvas(document.body, {
       ...opts,
@@ -138,12 +153,11 @@ function buildFallbackCanvas(): HTMLCanvasElement {
   ctx.font = "14px monospace";
   ctx.fillText(window.location.href.slice(0, 90), 24, 80);
 
-  ctx.fillStyle = dark ? "#888" : "#888";
+  ctx.fillStyle = "#888";
   ctx.font = "12px system-ui, sans-serif";
   ctx.fillText(new Date().toLocaleTimeString(), 24, 110);
   ctx.fillText("(html2canvas unavailable — simplified frame)", 24, 132);
 
-  // Rough header bar
   const headerEl = document.querySelector("header");
   if (headerEl) {
     ctx.fillStyle = dark ? "#2c2c2e" : "#ddd";
@@ -153,7 +167,6 @@ function buildFallbackCanvas(): HTMLCanvasElement {
     ctx.fillText(headerEl.textContent?.trim().slice(0, 80) ?? "", 12, 186);
   }
 
-  // List visible <h1>/<h2> text on page
   let y = 220;
   document.querySelectorAll("h1, h2, h3").forEach((el) => {
     const t = el.textContent?.trim().slice(0, 80);
@@ -168,15 +181,8 @@ function buildFallbackCanvas(): HTMLCanvasElement {
   return c;
 }
 
-/**
- * Temporarily patch CanvasRenderingContext2D.createPattern so that the
- * "InvalidStateError: canvas element with a width or height of 0" that
- * html2canvas triggers in Replit's Chromium sandbox returns null instead
- * of throwing. html2canvas checks for null before applying the pattern,
- * so the render continues with a blank fill rather than crashing.
- * The original method is restored in the finally block.
- */
-function withSafeCreatePattern<T>(fn: () => T): T {
+/** Keep the createPattern guard installed until the asynchronous render settles. */
+async function withSafeCreatePattern<T>(fn: () => Promise<T>): Promise<T> {
   const orig = CanvasRenderingContext2D.prototype.createPattern;
   CanvasRenderingContext2D.prototype.createPattern = function (
     image: CanvasImageSource,
@@ -189,7 +195,7 @@ function withSafeCreatePattern<T>(fn: () => T): T {
     }
   };
   try {
-    return fn();
+    return await fn();
   } finally {
     CanvasRenderingContext2D.prototype.createPattern = orig;
   }
@@ -207,7 +213,6 @@ async function captureAndUpload() {
     trace("capture-ok");
   } catch (err) {
     trace("capture-fail-p1", String(err).slice(0, 80));
-    // Retry once with very conservative settings
     try {
       canvas = await withSafeCreatePattern(() =>
         tryCapture({
@@ -219,8 +224,6 @@ async function captureAndUpload() {
       trace("capture-ok-retry");
     } catch (err2) {
       trace("capture-fail-p2", String(err2).slice(0, 80));
-      // Ultimate fallback: synthesise a simple text-based frame so the
-      // Developer still gets *something* to see.
       canvas = buildFallbackCanvas();
       trace("capture-fallback");
     }
@@ -267,7 +270,6 @@ export function useScreenFeed() {
   const captureRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
-    // Reset busyRef in case HMR fired mid-capture and left it stuck at true.
     busyRef.current = false;
     trace("hook-mounted");
 
@@ -316,10 +318,6 @@ export function useScreenFeed() {
         const nowWatched = Boolean(data?.watched);
 
         if (nowWatched) {
-          // Always attempt startCapturing — it's a no-op if already running.
-          // This handles the case where watchedRef is true (e.g. after HMR) but
-          // captureRef was cleared by the effect cleanup, causing the capture
-          // loop to be silently stopped while still being watched.
           watchedRef.current = true;
           startCapturing();
         } else if (watchedRef.current) {
@@ -334,7 +332,7 @@ export function useScreenFeed() {
       }
     };
 
-    pollWatcherStatus();
+    void pollWatcherStatus();
     const pollId = setInterval(pollWatcherStatus, POLL_INTERVAL_MS);
 
     return () => {

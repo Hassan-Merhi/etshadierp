@@ -6,12 +6,16 @@ import "./index.css";
 import "./mobile-browser-compat.css";
 
 const ASSET_RECOVERY_PREFIX = "assetRecovery:";
-const SW_RELOAD_PREFIX = "swReload:";
+const LEGACY_RECOVERY_PREFIXES = ["swReload:", "chunkReload:", "chunkRetry:"];
 const RECOVERY_STABLE_MS = 10_000;
 let assetRecoveryInFlight = false;
 
 function pathScopedKey(prefix: string) {
   return `${prefix}${window.location.pathname}`;
+}
+
+function isRecoveryMarker(key: string) {
+  return key.startsWith(ASSET_RECOVERY_PREFIX) || LEGACY_RECOVERY_PREFIXES.some((prefix) => key.startsWith(prefix));
 }
 
 function removeRecoveryMarkersAfterStableLoad() {
@@ -20,7 +24,7 @@ function removeRecoveryMarkersAfterStableLoad() {
       const toDelete: string[] = [];
       for (let i = 0; i < sessionStorage.length; i++) {
         const key = sessionStorage.key(i);
-        if (key && (key.startsWith(ASSET_RECOVERY_PREFIX) || key.startsWith(SW_RELOAD_PREFIX))) {
+        if (key && isRecoveryMarker(key)) {
           toDelete.push(key);
         }
       }
@@ -103,6 +107,9 @@ function showStaleAssetRecoveryMessage() {
 async function clearErpCachesForRecovery() {
   if (!("serviceWorker" in navigator)) return;
 
+  // Only force a service-worker update during an actual chunk-recovery event.
+  // Normal page loads rely on the browser's built-in update checks so every
+  // tab does not revalidate and then reload the application independently.
   const registration = await navigator.serviceWorker.getRegistration("/").catch(() => undefined);
   await registration?.update().catch(() => undefined);
 
@@ -194,28 +201,13 @@ window.addEventListener("unhandledrejection", (event) => {
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.addEventListener("message", (event) => {
     if (event?.data?.type === "SW_UPDATED") {
-      if (assetRecoveryInFlight) return;
-
-      const version = String(event.data.version || "unknown");
-      const reloadKey = pathScopedKey(`${SW_RELOAD_PREFIX}${version}:`);
-      const url = new URL(window.location.href);
-      let alreadyReloaded = url.searchParams.get("_sw") === version;
-
-      try {
-        alreadyReloaded = alreadyReloaded || !!sessionStorage.getItem(reloadKey);
-      } catch {
-        /* URL marker remains available */
-      }
-
-      if (!alreadyReloaded) {
-        try {
-          sessionStorage.setItem(reloadKey, "1");
-        } catch {
-          /* URL marker remains available */
-        }
-        url.searchParams.set("_sw", version);
-        window.location.replace(url.toString());
-      }
+      // Do not reload every controlled tab. The existing production version
+      // banner will offer one user-controlled refresh when the build changes.
+      window.dispatchEvent(
+        new CustomEvent("erp:service-worker-updated", {
+          detail: { version: String(event.data.version || "unknown") },
+        })
+      );
     } else if (event?.data?.type === "TRIGGER_SYNC") {
       import("./lib/featureFlags").then(({ OFFLINE_MODE_ENABLED }) => {
         if (OFFLINE_MODE_ENABLED) {
@@ -224,11 +216,6 @@ if ("serviceWorker" in navigator) {
       });
     }
   });
-
-  // Explicitly bypass HTTP caching when checking the service-worker script.
-  navigator.serviceWorker.getRegistration("/").then((registration) => {
-    if (registration) registration.update().catch(() => {});
-  }).catch(() => {});
 }
 
 createRoot(document.getElementById("root")!).render(<App />);

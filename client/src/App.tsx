@@ -24,7 +24,8 @@ import { AuthenticatedApp } from "@/app/AuthenticatedApp";
 // ── Production-only update banner ─────────────────────────────────────────────
 // Polls /api/version every 5 minutes. When the build version changes it shows a
 // small non-blocking toast with a manual "Refresh" button. It NEVER auto-refreshes.
-// In development, Vite HMR handles reconnection — this component does nothing.
+// A service-worker update triggers the same version check immediately without
+// forcing every open tab to download the full application again.
 function UpdateBanner() {
   const { toast } = useToast();
   const notifiedRef = useRef(false);
@@ -83,9 +84,17 @@ function UpdateBanner() {
       }
     }
 
-    checkVersion(); // initial check
+    const handleServiceWorkerUpdate = () => {
+      void checkVersion();
+    };
+
+    void checkVersion(); // initial check
     const id = setInterval(checkVersion, 5 * 60 * 1000); // every 5 minutes
-    return () => clearInterval(id);
+    window.addEventListener("erp:service-worker-updated", handleServiceWorkerUpdate);
+    return () => {
+      clearInterval(id);
+      window.removeEventListener("erp:service-worker-updated", handleServiceWorkerUpdate);
+    };
   }, [toast]);
 
   return null;
