@@ -103,7 +103,7 @@ async function guardSpOffload(req: Request, res: Response, next: NextFunction): 
        FROM locations
        WHERE id = $1 AND company_id = $2 AND deleted_at IS NULL
        LIMIT 1
-       FOR KEY SHARE`,
+       FOR SHARE`,
       [locationId, companyId]
     );
     if (!locationResult.rows[0]) {
@@ -211,7 +211,7 @@ async function guardSpOffload(req: Request, res: Response, next: NextFunction): 
          AND sub_type = ANY($2::text[])
          AND deleted_at IS NULL
        ORDER BY sub_type
-       FOR KEY SHARE`,
+       FOR SHARE`,
       [companyId, requiredSubTypes]
     );
     const foundSubTypes = new Set(controlAccounts.rows.map((row) => row.sub_type));
@@ -234,7 +234,7 @@ async function guardSpOffload(req: Request, res: Response, next: NextFunction): 
          FROM bank_accounts
          WHERE company_id = $1 AND id = ANY($2::int[])
          ORDER BY id
-         FOR KEY SHARE`,
+         FOR SHARE`,
         [companyId, bankIds]
       );
       const foundIds = new Set(bankRows.rows.map((row) => Number(row.id)));
@@ -258,7 +258,7 @@ async function guardSpOffload(req: Request, res: Response, next: NextFunction): 
            AND id = ANY($2::int[])
            AND deleted_at IS NULL
          ORDER BY id
-         FOR KEY SHARE`,
+         FOR SHARE`,
         [companyId, ledgerIds]
       );
       const foundIds = new Set(ledgerRows.rows.map((row) => Number(row.id)));
@@ -287,7 +287,7 @@ async function guardSpOffload(req: Request, res: Response, next: NextFunction): 
            AND id = ANY($2::int[])
            AND deleted_at IS NULL
          ORDER BY id
-         FOR KEY SHARE`,
+         FOR SHARE`,
         [parentCompanyId, parentAgentIds]
       );
       const foundIds = new Set(parentLedgers.rows.map((row) => Number(row.id)));
