@@ -19,7 +19,7 @@ services:
           property: connectionString
       - key: SESSION_SECRET
         generateValue: true
-    healthCheckPath: /api/health
+    healthCheckPath: /api/health/ready
     autoDeploy: true
 
 databases:
