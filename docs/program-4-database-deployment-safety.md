@@ -23,9 +23,7 @@ The repository currently has two parallel migration systems:
 
 The startup path also contains always-running DDL and historical repair operations. Several repair failures are caught and logged without preventing startup. The migration executor records statement failures but marks `migrationsDone = true` in its `finally` block, and the surrounding startup catch also treats migration errors as non-fatal.
 
-Render currently checks `/api/health`, while database status is exposed separately at `/api/health/db`.
-
-These behaviors are not changed in Phase 4A. They are the inputs for Phase 4B.
+Before Phase 4B, Render checked `/api/health`, which only proved that the HTTP server answered.
 
 ### Phase 4A implementation
 
@@ -71,14 +69,36 @@ Do not run the apply command against production until the registry report, datab
 
 ## Phase 4B — Fail-closed readiness
 
-Planned work:
+### Implementation
 
-- Track migration status as `starting`, `ready`, or `failed` rather than one boolean.
-- Preserve the exact migration failure summary.
-- Return 503 from a dedicated readiness endpoint when required schema checks fail.
-- Point Render to the readiness endpoint only after validating the behavior on a non-production database.
-- Stop marking migrations ready from a `finally` block.
-- Separate required schema checks from optional compatibility repairs.
+- Added `server/criticalSchemaReadiness.mjs`, which defines a deliberately small set of deployment-critical schema requirements.
+- The requirements cover foundational company, authentication, accounting, inventory, exchange-rate, salary-advance, and fiscal-period objects.
+- Strengthened the existing `/api/health/ready` runtime endpoint.
+  - Confirms the server is listening and not shutting down.
+  - Confirms PostgreSQL accepts a connection and query.
+  - Confirms required tables exist.
+  - Confirms required columns exist.
+  - Confirms the exchange-rate upsert uniqueness index exists.
+  - Returns HTTP 503 with exact missing object names when the schema is incomplete.
+- Added a 30-second schema-result cache, configurable with `READINESS_SCHEMA_CACHE_MS`, so frequent health polling does not repeatedly scan PostgreSQL catalogs.
+- Changed `render.yaml` from `/api/health` to `/api/health/ready`.
+- Kept `/api/health` unchanged for lightweight browser connectivity checks.
+- Added regression coverage for complete and incomplete schema snapshots and for Render's health-check path.
+
+### Deployment behavior
+
+When this branch is eventually merged and deployed:
+
+- A new instance with a complete critical schema returns 200 and becomes healthy.
+- A new instance with a missing critical table, column, or index returns 503.
+- Render should keep the previous healthy deployment serving traffic rather than promoting the incomplete instance.
+- Optional startup repair failures do not block deployment unless they leave a required schema object missing.
+
+### Important limitation
+
+The large legacy migration executor in `server/index.ts` still catches and logs many migration or repair errors. Phase 4B protects deployment by checking the resulting schema rather than trusting its `migrationsDone` boolean. Separating all historical data repairs from startup remains future migration-cleanup work and should be done incrementally, not as one large rewrite.
+
+No migration or database repair was executed as part of Phase 4B.
 
 ## Phase 4C — Backup, rollback, and recovery
 
@@ -92,4 +112,4 @@ Planned work:
 
 ## Merge rule
 
-This branch remains isolated and unmerged until explicit owner approval. The new runner must remain opt-in until Phase 4B and a non-production migration rehearsal are complete.
+This branch remains isolated and unmerged until explicit owner approval. The versioned migration runner remains opt-in, and production migration application still requires a reviewed backup and deployment plan.
