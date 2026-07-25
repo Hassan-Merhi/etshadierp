@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import { Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import SmartTransferGeneratorDialog from "@/components/stock-transfer/SmartTransferGeneratorDialog";
-import SmartTransferFeedbackSummaryCard from "@/components/stock-transfer/SmartTransferFeedbackSummaryCard";
 import type { SmartPreviewOrderItem } from "@/components/stock-transfer/smartTransferPreviewUi";
 import BaseStockTransferOrder from "./StockTransferOrder.tsx";
 
@@ -101,7 +100,6 @@ export default function SmartStockTransferOrderPage() {
 
       {!isEditingExistingVoucher && (
         <>
-          <SmartTransferFeedbackSummaryCard />
           <Button
             type="button"
             className="fixed bottom-6 right-6 z-40 h-12 rounded-full px-5 shadow-lg"
