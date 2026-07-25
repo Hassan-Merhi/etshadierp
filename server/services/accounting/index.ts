@@ -59,6 +59,16 @@ export type {
 } from "./customerLinkedLedgerValidation";
 
 export {
+  applyEmployeeBalanceDeltasTx,
+  collectEmployeeBalanceDeltas,
+} from "./employeeBalancePosting";
+export type {
+  EmployeeBalanceDelta,
+  EmployeeBalanceDeltaCollection,
+  EmployeeBalancePostingEntry,
+} from "./employeeBalancePosting";
+
+export {
   replaceVoucherTx,
   reverseVoucherTx,
   VoucherLifecycleError,
