@@ -81,6 +81,10 @@ export interface ValidatedPostingTotals {
   creditTotal: string;
 }
 
+export interface CentralPostingResult<V = unknown, E = unknown> extends VoucherWithEntries<V, E> {
+  replayed: boolean;
+}
+
 export class PostingValidationError extends Error {
   readonly code: string;
 
@@ -199,12 +203,15 @@ export function validateCentralPostingRequest(
  * boundary validates the posting before writes, enforces company ownership,
  * performs deterministic idempotency lookup/recording, and writes audit data
  * before the transaction is allowed to commit.
+ *
+ * `replayed` lets callers avoid repeating non-transactional compatibility side
+ * effects when the same idempotency key is submitted more than once.
  */
 export async function postBalancedVoucherTx(
   tx: any,
   request: CentralPostingRequest,
   dependencies: CentralPostingDependencies
-): Promise<VoucherWithEntries> {
+): Promise<CentralPostingResult> {
   const totals = validateCentralPostingRequest(request);
   const companyId = request.voucher.companyId;
 
@@ -213,7 +220,7 @@ export async function postBalancedVoucherTx(
     companyId,
     source: request.source,
   });
-  if (existing) return existing;
+  if (existing) return { ...existing, replayed: true };
 
   await dependencies.ownership.validateVoucherOwnership({
     tx,
@@ -241,5 +248,5 @@ export async function postBalancedVoucherTx(
     creditTotal: totals.creditTotal,
   });
 
-  return result;
+  return { ...result, replayed: false };
 }
