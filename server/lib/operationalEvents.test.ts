@@ -51,6 +51,44 @@ describe("operational event detection", () => {
     expect(loggerMock.warn).toHaveBeenCalledTimes(2);
   });
 
+  it("logs ranked bandwidth diagnostics with totals and endpoint rows", () => {
+    const ranked = [
+      {
+        method: "GET",
+        path: "/api/factory/daybook",
+        requests: 5,
+        totalResponseBytes: 2_500_000,
+      },
+    ];
+
+    recordOperationalEvent({
+      category: "bandwidth",
+      code: "endpoint_performance_ranking",
+      severity: "info",
+      message: "Ranked endpoint performance and bandwidth snapshot",
+      endpointCount: 4,
+      apiEndpointCount: 2,
+      staticAssetCount: 2,
+      windowMs: 300_000,
+      totalApiResponseBytes: 2_500_000,
+      totalStaticAssetResponseBytes: 1_500_000,
+      ranked,
+      staticAssets: [{ path: "/assets/index-ABC123.js", totalResponseBytes: 1_500_000 }],
+    });
+
+    expect(loggerMock.info).toHaveBeenCalledWith(
+      "Ranked endpoint performance and bandwidth snapshot",
+      expect.objectContaining({
+        endpointCount: 4,
+        apiEndpointCount: 2,
+        staticAssetCount: 2,
+        totalApiResponseBytes: 2_500_000,
+        totalStaticAssetResponseBytes: 1_500_000,
+        ranked,
+      }),
+    );
+  });
+
   it("keeps only the most recent bounded event metadata", () => {
     for (let index = 0; index < 60; index += 1) {
       recordOperationalEvent({
