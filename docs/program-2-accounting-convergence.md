@@ -2,7 +2,7 @@
 
 Baseline branch: `main`
 
-Baseline commit: `4db45950ba27bb58f7252347d3be02c4a946d55b`
+Original baseline commit: `4db45950ba27bb58f7252347d3be02c4a946d55b`
 
 Started: 2026-07-25
 
@@ -23,12 +23,12 @@ Every route cutover requires:
 
 ## Phase 2A — Manual journals and vouchers
 
-### Confirmed current state
+### Confirmed original state
 
-- `postBalancedVoucherTx` already validates decimal balance, entry sides, one accounting target per entry, declared totals, ownership hooks, idempotency hooks, and audit hooks.
-- The production manual journal and generic voucher routes still insert voucher and entry rows directly.
-- The central engine previously had no production database implementation for ownership, idempotency, or audit.
-- The engine previously returned an existing voucher for duplicate requests without telling the caller it was a replay. A caller could therefore repeat non-transactional compatibility effects such as employee-balance synchronization or daybook insertion.
+- `postBalancedVoucherTx` already validated decimal balance, entry sides, one accounting target per entry, declared totals, ownership hooks, idempotency hooks, and audit hooks.
+- Production manual journal and generic voucher routes inserted voucher and entry rows directly.
+- The central engine had no production database implementation for ownership, idempotency, or audit.
+- The engine returned an existing voucher for duplicate requests without telling the caller it was a replay. A caller could therefore repeat compatibility effects such as employee-balance synchronization or daybook insertion.
 - Journal `effectiveDate` was not part of the shared posting type and would have been lost by an unsafe direct cutover.
 - ERP suppliers are currently global in the Drizzle schema. Their existence can be verified, but company ownership cannot be truthfully enforced until Program 3 introduces a tenant boundary for them.
 
@@ -46,25 +46,46 @@ Every route cutover requires:
 - Added target-ID validation and de-duplication before database access.
 - Added focused tests for replay status and target grouping.
 
-### Deliberately not changed yet
+### Step 2A.2 completed — active manual journal creation
 
-- No HTTP route uses the new database adapter yet.
-- Manual journal creation, editing, deletion, daybook writes, order-charge synchronization, employee balances, WhatsApp prompts, and loan allocation behave exactly as before.
-- Optional/unbalanced voucher drafts remain outside the strict balanced-posting boundary.
-- No schema migration, database command, repair, backfill, or production deployment was executed.
+- Added a new `/api/vouchers/journal` handler before the legacy route.
+- Active journals are normalized and posted through `postBalancedVoucherTx`.
+- Optional journal drafts call `next()` and continue through the unchanged legacy route.
+- Journal update and deletion remain unchanged.
+- The client API wrapper adds a stable `clientRequestId` before the request reaches CSRF retry or offline queueing.
+- The same payload keeps the same request ID after an uncertain network result.
+- A confirmed success, a definite 4xx rejection, or safe offline queueing releases the in-memory identity so a later intentional journal receives a new ID.
+- The server combines that client ID with a normalized payload fingerprint. Reusing an ID with changed journal content cannot silently return a different posting.
+- Per-entry non-USD rounding is adjusted by no more than `0.001000` in base currency so both sides exactly equal the aggregate historical base total.
+- USD voucher rows preserve the previous `exchange_rate = NULL` behavior, while entry-level historical fields retain the identity rate.
+- Company ownership is checked before insert for every company-scoped accounting target.
+- Replayed requests do not repeat:
+  - employee balance synchronization;
+  - customer-order charge synchronization;
+  - factory daybook insertion;
+  - WhatsApp prompting;
+  - the compatibility voucher audit record.
+- Existing response fields remain present, with additional `replayed` and `clientRequestId` diagnostics.
 
-### Next Step 2A.2
+### Compatibility side effects preserved
 
-Migrate active manual journal creation only, while preserving every existing compatibility side effect. The route adapter must:
+On the first successful active-journal posting, the route still performs the existing:
 
-- accept a stable client request ID;
-- normalize all transaction/base currency fields before posting;
-- use `postBalancedVoucherTx` only for active balanced journals;
-- keep optional journal drafts on the compatibility path;
-- skip employee, order-charge, daybook, WhatsApp, audit-compatibility, and loan-allocation side effects when `replayed` is true;
-- return the same response fields currently consumed by the frontend.
+- employee balance synchronization;
+- customer-order charge linking and recalculation;
+- factory daybook write;
+- WhatsApp rule evaluation;
+- detailed voucher audit record.
 
-Journal update and deletion will remain unchanged until creation is proven.
+The transaction-owned central audit and idempotency marker are written before the voucher transaction commits.
+
+### Remaining Phase 2A work
+
+- Generic `/api/vouchers/with-entries` active voucher creation is not yet migrated.
+- Journal editing and deletion are not yet migrated.
+- Optional or intentionally unbalanced drafts remain on the compatibility path.
+- Employee balance synchronization is still a legacy post-commit incremental side effect. A failed partial employee sync cannot yet be proven fully idempotent; this must be resolved before journal edit/delete convergence.
+- The branch still needs usable build/test execution because GitHub Actions has repeatedly failed before exposing executable steps.
 
 ## Phase 2B — Payments and receipts
 
@@ -94,4 +115,4 @@ Planned last because of the highest regression risk:
 
 ## Merge rule
 
-This branch remains draft and unmerged until the current slice is reviewed. A route will not be switched to the central engine merely because the service compiles; its complete compatibility side effects must be mapped and protected first.
+This branch remains draft and unmerged until the current slice is reviewed. A route is not considered converged merely because its posting service compiles; every compatibility side effect and replay boundary must be mapped and protected first.
