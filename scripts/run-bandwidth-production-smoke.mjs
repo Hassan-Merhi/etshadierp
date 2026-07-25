@@ -123,9 +123,6 @@ try {
   await page.goto(`${BASE_URL}/login`, { waitUntil: "networkidle2", timeout: TIMEOUT_MS });
   await waitForSettledUi(page);
   if (AUTHENTICATED) await login(page);
-  if (`${window?.location || ""}`) {
-    // Deliberately empty: prevents accidental use of Node's non-existent window.
-  }
   if (new URL(page.url()).pathname !== ROUTE) {
     await page.goto(`${BASE_URL}${ROUTE}`, { waitUntil: "networkidle2", timeout: TIMEOUT_MS });
     await waitForSettledUi(page);
