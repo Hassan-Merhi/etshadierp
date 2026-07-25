@@ -208,7 +208,9 @@ export function TabAgentDuty() {
       {displaySections.map((section) => (
         <div key={section.companyId} className="space-y-4" data-testid={`company-section-${section.companyId}`}>
           {section.agents.filter(
-            (a) => a.activePreviewRows.length > 0 && (a.openBalance === null || a.openBalance !== 0)
+            (a) =>
+              (a.activePreviewRows.length > 0 || a.openRows.length > 0 || a.partialRows.length > 0) &&
+              (a.openBalance === null || a.openBalance !== 0)
           ).length === 0 ? (
             <div className="rounded-md border border-dashed px-4 py-6 text-center text-muted-foreground text-sm">
               <FileX className="h-6 w-6 mx-auto mb-1.5 opacity-40" />
@@ -217,7 +219,9 @@ export function TabAgentDuty() {
           ) : (
             section.agents
               .filter(
-                (agent) => agent.activePreviewRows.length > 0 && (agent.openBalance === null || agent.openBalance !== 0)
+                (agent) =>
+                  (agent.activePreviewRows.length > 0 || agent.openRows.length > 0 || agent.partialRows.length > 0) &&
+                  (agent.openBalance === null || agent.openBalance !== 0)
               )
               .map((agent) => (
                 <AgentCard
