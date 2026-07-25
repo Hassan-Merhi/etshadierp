@@ -5,9 +5,6 @@
  * server/routes/pos/posEditSaleRoutes.ts:
  *   - Supplier-partner accounting configuration lookup for edit-sale
  *   - Supplier-partner per-qty deduction rate lookup for a target location
- *
- * Every message, status code, and query is byte-identical to the original —
- * only the code location changed.
  */
 import { db } from "../../../db";
 import { storage } from "../../../storage";
@@ -84,10 +81,18 @@ export async function fetchSpEditAccountingContext(
   };
 }
 
-/** For SP companies, loads the target location's per-qty supplier payable deduction rate. */
-export async function fetchSpEditDeductionPerQty(isSpCompanyEdit: boolean, targetLocationId: number): Promise<number> {
+/**
+ * For SP companies, load the target location's per-qty supplier payable
+ * deduction rate. A transaction connection may be supplied so the rate is read
+ * after the sale voucher has been locked and the final target location resolved.
+ */
+export async function fetchSpEditDeductionPerQty(
+  isSpCompanyEdit: boolean,
+  targetLocationId: number,
+  connection: any = db
+): Promise<number> {
   if (!isSpCompanyEdit) return 0;
-  const [editTargetLoc] = await db
+  const [editTargetLoc] = await connection
     .select({ supplierPartnerPayableDeductionPerQty: locations.supplierPartnerPayableDeductionPerQty })
     .from(locations)
     .where(eq(locations.id, targetLocationId))
