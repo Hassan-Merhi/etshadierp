@@ -50,13 +50,17 @@ function normalizePath(req: Request): string {
     .join("/");
 }
 
+/** Returns true only for API endpoints included in the API bandwidth ranking. */
+function isApiPath(path: string): boolean {
+  return path === "/api" || path.startsWith("/api/");
+}
+
 /**
  * Returns true for Vite/webpack hashed static assets such as
  * /assets/index-DdXDEvCM.js or /assets/main-B4tkL4ok.css.
- * These are CDN-cached on the first visit and not meaningful API bandwidth.
  */
 function isStaticAsset(path: string): boolean {
-  return /^\/assets\/[^/]+-[A-Za-z0-9_-]{6,}\.(js|css|woff2?|ttf|png|jpg|svg|ico)$/.test(path);
+  return /^\/assets\/[^/]+-[A-Za-z0-9_-]{6,}\.(js|css|woff2?|ttf|png|jpe?g|webp|gif|svg|ico)$/i.test(path);
 }
 
 function formatRow(aggregate: EndpointAggregate) {
@@ -76,27 +80,30 @@ function formatRow(aggregate: EndpointAggregate) {
   };
 }
 
+function sumResponseBytes(rows: EndpointAggregate[]): number {
+  return rows.reduce((total, row) => total + row.totalResponseBytes, 0);
+}
+
 function emitRanking(): void {
   if (aggregates.size === 0) return;
 
   const topN = Math.round(positiveNumber(process.env.BANDWIDTH_DEBUG_TOP_N, DEFAULT_TOP_N));
   const all = [...aggregates.values()];
+  const apiAggregates = all.filter((aggregate) => isApiPath(aggregate.path));
+  const staticAggregates = all.filter((aggregate) => isStaticAsset(aggregate.path));
 
-  // Separate API routes from hashed static assets so API bandwidth is easy to read.
-  const apiRows = all
-    .filter((a) => !isStaticAsset(a.path))
+  const apiRows = apiAggregates
     .map(formatRow)
-    .sort((l, r) =>
-      r.totalResponseBytes !== l.totalResponseBytes
-        ? r.totalResponseBytes - l.totalResponseBytes
-        : r.requests - l.requests,
+    .sort((left, right) =>
+      right.totalResponseBytes !== left.totalResponseBytes
+        ? right.totalResponseBytes - left.totalResponseBytes
+        : right.requests - left.requests,
     )
     .slice(0, topN);
 
-  const staticRows = all
-    .filter((a) => isStaticAsset(a.path))
+  const staticRows = staticAggregates
     .map(formatRow)
-    .sort((l, r) => r.totalResponseBytes - l.totalResponseBytes)
+    .sort((left, right) => right.totalResponseBytes - left.totalResponseBytes)
     .slice(0, 10);
 
   recordOperationalEvent({
@@ -105,9 +112,11 @@ function emitRanking(): void {
     severity: "info",
     message: "Ranked endpoint performance and bandwidth snapshot",
     endpointCount: all.length,
-    apiEndpointCount: apiRows.length,
-    staticAssetCount: staticRows.length,
+    apiEndpointCount: apiAggregates.length,
+    staticAssetCount: staticAggregates.length,
     windowMs: positiveNumber(process.env.BANDWIDTH_DEBUG_REPORT_INTERVAL_MS, DEFAULT_REPORT_INTERVAL_MS),
+    totalApiResponseBytes: sumResponseBytes(apiAggregates),
+    totalStaticAssetResponseBytes: sumResponseBytes(staticAggregates),
     ranked: apiRows,
     staticAssets: staticRows,
   });
@@ -210,6 +219,7 @@ export function bandwidthDebugMiddleware(req: Request, res: Response, next: Next
 export const __bandwidthDebugTesting = {
   emitRanking,
   normalizePath,
+  isApiPath,
   isStaticAsset,
   clear(): void {
     aggregates.clear();
