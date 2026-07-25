@@ -17,26 +17,9 @@ No historical repair, migration, deployment, or production database command is p
 
 ## 2D.1 — Atomic factory payroll generation — complete
 
-### Previous failure window
+`POST /api/factory/payroll/generate` is protected by a company/period transaction advisory lock. Exact retries return the existing batch, historical partial batches create only missing workers, and payroll rows, advance reductions, repayment rows, and `PAYROLL_GENERATED` daybook rows commit together.
 
-`POST /api/factory/payroll/generate` previously wrote one worker at a time through the global database connection. A failure midway could leave a partial payroll batch, partially reduced advances, incomplete repayment rows, or payroll rows without matching daybook rows. Concurrent retries could also duplicate payroll rows and advance deductions.
-
-### Protected behavior
-
-The protected route is registered before the legacy generation route and preserves the existing array response and salary formulas.
-
-Generation now:
-
-1. validates the selected company and exact payroll period;
-2. acquires a transaction advisory lock scoped to company and period;
-3. loads existing payroll rows under the lock;
-4. returns the existing batch for an exact retry;
-5. creates only missing workers for a historical partial batch;
-6. locks salary-deduction advances in deterministic worker/ID order;
-7. writes payroll rows, advance reductions, repayment rows, and `PAYROLL_GENERATED` daybook rows in one transaction; and
-8. commits the whole batch or rolls everything back.
-
-The existing monthly, daily, per-bale, per-kilogram, and advance-cap formulas remain unchanged. Payroll mark-paid, undo, deletion, and `PAYROLL-GEN` rebuild routes remain on their existing specialized paths.
+The existing monthly, daily, per-bale, per-kilogram, and advance-cap formulas remain unchanged. Specialized mark-paid, undo, deletion, and `PAYROLL-GEN` rebuild routes remain on their existing paths.
 
 ## 2D.2 — Supplier Partner non-POS offload — complete by scope
 
@@ -48,74 +31,93 @@ A guard registered before `POST /api/sp/offload` now:
 2. acquires a company/container advisory lock for the full request;
 3. rejects simultaneous posting with `SP_OFFLOAD_IN_PROGRESS`;
 4. holds the container with `FOR KEY SHARE`, allowing the posting transaction to update status;
-5. holds the location, SP control accounts, bank accounts, current-company ledgers, and parent-agent ledgers with `FOR SHARE`, preventing ownership or soft-delete changes while posting runs;
-6. validates all referenced accounts before the legacy transaction writes;
+5. holds the location, SP control accounts, bank accounts, current-company ledgers, and parent-agent ledgers with `FOR SHARE`;
+6. validates all referenced accounts before posting;
 7. returns an existing offload only for an exact compatible retry; and
 8. rejects changed retries with `SP_OFFLOAD_REPLAY_MISMATCH`.
 
-Replay matching includes offload date, location, landed total, charge type, description, prepaid ID, bank ID, ledger ID, and parent-agent ID. The replay response preserves the normal camelCase `sp_offloads` shape.
+Replay matching includes offload date, location, landed total, charge type, description, prepaid ID, bank ID, ledger ID, and parent-agent ID.
 
-The large legacy posting route was deliberately not duplicated or superficially replaced.
+## 2D.3 — Atomic ERP container offload and freight — complete
 
-## 2D.3 — ERP container offload and freight — hardened, lifecycle extraction remaining
+### Active route ownership
 
-### Protection implemented
+The concurrency guard and central lifecycle route are registered before the legacy container-offload route for both:
 
-A guard registered before `POST /api/containers/:id/offload` now:
+- `POST /api/containers/:id/offload`; and
+- `PATCH /api/containers/:id/offload`.
 
-- scopes the container to the selected company;
-- serializes offload and offload-edit requests by company/container;
-- accepts only `OTW` and `OFFLOADED` lifecycle states;
-- validates and locks the destination location;
-- locks purchase orders and PO line items used for costing;
-- validates and locks all selected charge accounts before an old offload can be reversed;
-- validates own-account freight against the current company;
-- validates parent-agent accounts against the parent company; and
-- accepts parent-paid freight accounts from the current or parent company to preserve same-company and fallback posting behavior.
+The active POST and PATCH paths no longer execute the old reverse-commit-reset-repost sequence. The older route remains available only for reverse-offload and unrelated compatibility endpoints.
 
-Location and account rows use `FOR SHARE`, blocking concurrent soft deletion. The container uses `FOR KEY SHARE`, allowing the existing offload transaction to update status without deadlocking.
+### One transaction-owned lifecycle
 
-### Freight policy verified
+The central service now commits the following as one database transaction:
 
-The existing centralized PO calculator already applies the required policy:
+1. selected-company and lifecycle-state validation;
+2. destination, purchase-order, line-item, and account validation;
+3. exact reversal of stored offload quantities and values when editing;
+4. legacy value reconstruction only when historical offload-item rows are unavailable;
+5. deletion of prior offload charge vouchers and SP follow-up journals;
+6. inventory cost corrections;
+7. destination inventory quantity, value, and moving-average updates;
+8. container status, offload date, and duty synchronization;
+9. purchase-voucher description synchronization;
+10. duties, office, transport, transfer, and additional-charge vouchers;
+11. the replacement `container_offloads` record;
+12. exact `container_offload_items` snapshots; and
+13. Supplier Partner OTW reversal, stock recognition, settlement, and parent-agent journals.
+
+Any failure rolls back the reversal and replacement together. An edited container can no longer be left reversed, reset to OTW, or missing its replacement accounting because a later stage failed.
+
+### State protection
+
+The lifecycle refuses to post when:
+
+- the container belongs to another company;
+- the state is not `OTW` or `OFFLOADED`;
+- PATCH is used for a container that is not offloaded;
+- an offloaded container is missing its offload record;
+- an OTW container already has an offload record;
+- multiple offload records exist;
+- the destination, purchase orders, line items, or posting accounts are invalid; or
+- no positive stock quantity is available.
+
+The request guard serializes POST and PATCH by company/container and locks all source ownership rows for the complete request.
+
+### Freight policy preserved
+
+The centralized PO calculator remains the source of truth:
 
 - `supplier`: freight remains in the supplier share;
 - `own`: freight is excluded from supplier payable and posted to the selected own account; and
 - `parent`: freight is excluded from the supplier share and handled through parent/same-company posting rules.
 
-Regression coverage locks these formulas.
+Regression coverage locks these formulas. The offload lifecycle does not rewrite purchase-voucher freight allocation.
 
-### Remaining lifecycle boundary
+### Parent-company schema alignment
 
-The legacy edit path still performs:
+The database and existing routes already use `companies.parent_company_id`. Program 2D adds that existing column to the Drizzle `companies` definition so the atomic lifecycle can resolve the configured parent company transactionally. This is a TypeScript schema alignment only; no database migration was run.
 
-1. exact inventory and voucher reversal in one transaction;
-2. container status reset separately;
-3. the replacement offload in another transaction; and
-4. Supplier Partner follow-up journals in another transaction when applicable.
+### Derived post-commit synchronization
 
-The new guard prevents concurrent edits and rejects predictable validation failures before reversal, substantially reducing the failure window. It does not make those separate write transactions atomic. Completing 2D.3 requires extracting the existing reversal, repost, and SP follow-up logic into one transaction-owned lifecycle service. No safe reusable service currently exists in the repository.
+Sales-item cost synchronization remains a non-fatal derived update after the accounting and inventory transaction commits. A failure there is logged and does not roll back a valid offload.
 
 ## 2D.4 — Rental payment reversal — complete by scope
 
 Rental creation and scheduled posting already use one authoritative transaction core and a deterministic payment-group advisory lock.
 
-The previous deletion route read one split row before its transaction and subtracted that row's amount from the monthly ledger. Concurrent deletion or deletion of one row from a split payment could therefore leave incorrect payment groups, vouchers, recognition journals, or `paid_amount` values.
-
 A central deletion route now runs before the legacy route for ERP, Factory, and Properties rental modules. It:
 
-1. uses the same deterministic payment-group advisory lock as scheduled posting;
-2. locks all rows in the payment group in ID order;
-3. deletes the complete split-payment group;
-4. removes linked intercompany transfers and their vouchers;
-5. soft-deletes the shared rental payment voucher only when no outside payment references it;
-6. soft-deletes the related `AP-CLEAR-*` voucher;
-7. soft-deletes the `ADV-REC-*` recognition journal;
-8. clears recognition-journal links and advance flags;
-9. resets guarantee-release state when applicable; and
-10. rebuilds monthly `paid_amount` from the remaining `POSTED` payment rows.
+1. uses the same payment-group advisory lock as scheduled posting;
+2. locks and deletes the complete split-payment group;
+3. removes linked intercompany transfers and their vouchers;
+4. soft-deletes the shared rental payment voucher only when no outside payment references it;
+5. soft-deletes related `AP-CLEAR-*` and `ADV-REC-*` vouchers;
+6. clears recognition links and obsolete advance/prepaid flags;
+7. resets guarantee-release state when applicable; and
+8. rebuilds monthly `paid_amount` from the remaining `POSTED` rows.
 
-Deleting a scheduled payment therefore cannot reduce a legitimate posted balance. Prepaid and advance flags reset when no posted payment remains for the affected month.
+Deleting a scheduled payment cannot reduce a legitimate posted balance.
 
 ## Focused coverage added
 
@@ -127,11 +129,11 @@ Deleting a scheduled payment therefore cannot reduce a legitimate posted balance
 - rental recognition-voucher cleanup; and
 - scheduled-payment deletion preserving remaining posted totals.
 
-## Current status
+## Final status
 
 - 2D.1 Payroll generation: complete.
 - 2D.2 Supplier Partner offload: complete by scope.
-- 2D.3 ERP container lifecycle: guarded and prevalidated; full transaction extraction remains.
+- 2D.3 ERP container lifecycle: complete; active create and edit paths are atomic.
 - 2D.4 Rental reversal: complete by scope.
 
 ## Verification limitation
