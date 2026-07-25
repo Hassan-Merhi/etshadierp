@@ -46,7 +46,7 @@ Every route cutover requires:
 - Added target-ID validation and de-duplication before database access.
 - Added focused tests for replay status and target grouping.
 
-### Step 2A.2 completed — active manual journal creation
+### Step 2A.2 implemented — active manual journal creation
 
 - Added a new `/api/vouchers/journal` handler before the legacy route.
 - Active journals are normalized and posted through `postBalancedVoucherTx`.
@@ -111,12 +111,25 @@ A generic-route cutover must first add a stable identity boundary for all caller
 
 ### Remaining Phase 2A work
 
+- Obtain an executable build/test result for the active journal cutover.
 - Add retry-stable identity coverage for all `/api/vouchers/with-entries` callers.
 - Migrate generic active voucher creation only after those callers are covered.
 - Journal editing and deletion are not yet migrated.
 - Optional or intentionally unbalanced drafts remain on the compatibility path.
 - Employee balance synchronization is still a legacy post-commit incremental side effect. A failed partial employee sync cannot yet be proven fully idempotent; this must be resolved before journal edit/delete convergence.
-- The branch still needs usable build/test execution because GitHub Actions has repeatedly failed before exposing executable steps.
+
+## Verification status
+
+Focused regression tests were added for:
+
+- central-engine replay status;
+- request-ID retention and release;
+- manual journal USD and CFA normalization;
+- aggregate/per-line rounding balance;
+- company target grouping;
+- customer linked-ledger acceptance and mismatch rejection.
+
+GitHub Actions continues to fail before exposing executable steps or logs. Therefore the code is implemented on the draft branch, but a full build, type-check, and database-backed test pass is not claimed.
 
 ## Phase 2B — Payments and receipts
 
