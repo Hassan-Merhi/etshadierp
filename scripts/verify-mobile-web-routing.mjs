@@ -17,7 +17,10 @@ const gitignore = read(".gitignore");
 const pkg = JSON.parse(read("package.json"));
 const serviceWorker = read("client/public/sw.js");
 const main = read("client/src/main.tsx");
+const app = read("client/src/App.tsx");
 const indexHtml = read("client/index.html");
+const browserSmoke = read("scripts/run-responsive-browser-smoke.mjs");
+const regressionGuide = read("docs/mobile-tablet-web-regression.md");
 
 for (const [label, source] of [
   ["root production env", rootProduction],
@@ -47,8 +50,8 @@ if (pkg.scripts?.build?.includes("--mode capacitor")) {
   failures.push("standard web build must not use Capacitor mode");
 }
 
-if (!gitignore.includes("!client/.env.capacitor")) {
-  failures.push("client/.env.capacitor must remain tracked");
+for (const token of ["!client/.env.capacitor", "artifacts/responsive-smoke/"]) {
+  if (!gitignore.includes(token)) failures.push(`Gitignore contract missing: ${token}`);
 }
 
 for (const token of [
@@ -68,15 +71,19 @@ for (const token of [
 for (const token of [
   'const ASSET_RECOVERY_PREFIX = "assetRecovery:"',
   'const SW_RELOAD_PREFIX = "swReload:"',
-  'const RECOVERY_STABLE_MS = 10_000',
-  'event.preventDefault()',
+  "const RECOVERY_STABLE_MS = 10_000",
+  "event.preventDefault()",
   'type: "CLEAR_APP_CACHES"',
   'currentUrl.searchParams.set("_asset_recovery"',
   'url.searchParams.set("_sw", version)',
-  'showStaleAssetRecoveryMessage()',
-  'removeRecoveryMarkersAfterStableLoad()',
+  "showStaleAssetRecoveryMessage()",
+  "removeRecoveryMarkersAfterStableLoad()",
 ]) {
   if (!main.includes(token)) failures.push(`Client stale-asset recovery contract missing: ${token}`);
+}
+
+for (const token of ['"assetRecovery:"', '"swReload:"', '"chunkReload:"', '"chunkRetry:"']) {
+  if (!app.includes(token)) failures.push(`Manual update refresh guard missing: ${token}`);
 }
 
 for (const token of [
@@ -86,10 +93,47 @@ for (const token of [
   if (!indexHtml.includes(token)) failures.push(`Service-worker registration contract missing: ${token}`);
 }
 
+for (const token of [
+  'import puppeteer from "puppeteer"',
+  '{ name: "phone-portrait", width: 390, height: 844',
+  '{ name: "phone-landscape", width: 844, height: 390',
+  '{ name: "tablet-portrait", width: 768, height: 1024',
+  '{ name: "tablet-landscape", width: 1024, height: 768',
+  '{ name: "desktop", width: 1440, height: 900',
+  '{ name: "wide-desktop", width: 1920, height: 1080',
+  'process.env.ERP_SMOKE_USERNAME',
+  'process.env.ERP_SMOKE_PASSWORD',
+  'process.env.ERP_SMOKE_ROUTES',
+  'process.env.ERP_SMOKE_REQUIRE_EXACT_ROUTES === "1"',
+  'horizontalOverflow:',
+  'document.getElementById("main-content")',
+  'document.querySelector(\'[data-slot="sidebar-wrapper"]\')',
+  'page.on("pageerror"',
+  'page.on("requestfailed"',
+  '"artifacts/responsive-smoke"',
+  '"report.json"',
+]) {
+  if (!browserSmoke.includes(token)) failures.push(`Responsive browser smoke contract missing: ${token}`);
+}
+
+for (const token of [
+  "Phone portrait: 390 × 844",
+  "Tablet portrait: 768 × 1024",
+  "Desktop: 1440 × 900",
+  "ERP_SMOKE_BASE_URL",
+  "ERP_SMOKE_USERNAME",
+  "ERP_SMOKE_REQUIRE_EXACT_ROUTES=1",
+  "Service-worker deployment check",
+  "Desktop non-regression checks",
+  "Merge gate",
+]) {
+  if (!regressionGuide.includes(token)) failures.push(`Responsive regression guide missing: ${token}`);
+}
+
 if (failures.length) {
   console.error("Mobile/web compatibility verification failed:");
   for (const failure of failures) console.error(`- ${failure}`);
   process.exit(1);
 }
 
-console.log("Mobile/web routing and cache-recovery contracts verified.");
+console.log("Mobile/web routing, cache recovery, and responsive regression contracts verified.");
