@@ -99,6 +99,35 @@ The legacy editor also uses submitted currency metadata to normalize replacement
 
 After a successful edit, the existing WhatsApp prompt and detailed update-audit behavior remain present. The legacy edit route does not rewrite the factory daybook or rerun intercompany/loan side effects, so the protected editor does not introduce those new behaviors.
 
+## Step 2B.3 completed — exact active deletion reversal
+
+A protected Admin-only delete route now handles plain active `Payment` and `Receipt` vouchers before the generic deletion route.
+
+For a supported deletion, one transaction now:
+
+1. locks the voucher row;
+2. returns replay status immediately when the voucher is already deleted;
+3. loads the original voucher entries;
+4. reverses employee balance, deposit, and withdrawal effects exactly once;
+5. reverses and removes linked property-payment rows using the existing monthly-ledger rule;
+6. preserves the existing intercompany cleanup order by deleting the transfer record before the counterpart voucher;
+7. removes pending intercompany notification requests; and
+8. soft-deletes the selected voucher.
+
+The detailed deletion audit remains best-effort after the transaction. A repeated deletion does not reverse employee balances again.
+
+### Specialized deletion boundaries preserved
+
+The protected route intentionally calls the legacy deletion chain for:
+
+- `Receipt` vouchers that contain sales items, because those are POS sales requiring inventory restoration;
+- `SAL-*` payroll vouchers, because those require payroll-run and salary-advance reversal;
+- optional Payment/Receipt vouchers;
+- Journals, Sales, stock transfers, stock adjustments, notes, purchases, and every unrelated voucher type; and
+- read-only migrated vouchers, which remain blocked.
+
+The policy is checked before the transaction and again after the row lock so a compatibility-state change cannot partially execute the central deletion path.
+
 ## Focused coverage added
 
 - asset-account Payment direction;
@@ -109,22 +138,28 @@ After a successful edit, the existing WhatsApp prompt and detailed update-audit 
 - customer-only legacy edit target support;
 - non-USD exact debit/credit balance;
 - stable idempotency across regenerated voucher numbers;
-- invalid voucher-type rejection; and
-- Payment/Receipt request-identity retention and optional passthrough.
+- invalid voucher-type rejection;
+- Payment/Receipt request-identity retention and optional passthrough;
+- plain Payment/Receipt deletion eligibility;
+- POS Receipt deletion passthrough;
+- payroll voucher deletion passthrough; and
+- optional and unrelated voucher deletion passthrough.
 
 ## Intentionally unchanged
 
-- Payment/Receipt deletion;
 - optional Payment/Receipt lifecycle;
-- POS flows;
+- POS inventory reversal logic;
+- payroll-run and salary-advance reversal logic;
 - stock transfers;
 - containers;
 - Supplier Partner;
-- payroll;
-- rentals;
+- payroll posting;
+- rental posting;
 - database schema; and
 - historical records.
 
 ## Verification limitation
 
-GitHub Actions has repeatedly failed before exposing executable steps or logs. A complete build, type-check, and database-backed test pass is therefore not claimed. Step 2B.3 must converge deletion separately, reuse the generic voucher cleanup protections, reverse employee effects exactly once, and avoid intercepting unrelated voucher types.
+GitHub Actions has repeatedly failed before exposing executable steps or logs. A complete build, type-check, and database-backed test pass is therefore not claimed.
+
+Phase 2B is complete by implementation scope on the draft branch. Phase 2C must migrate POS and stock-transfer posting separately because those workflows own inventory effects in addition to accounting entries.
