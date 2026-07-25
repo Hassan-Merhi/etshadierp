@@ -23,6 +23,8 @@ When credentials are supplied, it also verifies that the authenticated app shell
 
 The target URL must serve a build of the pull-request branch. Testing the current production deployment does not validate unmerged code.
 
+A real rendered pass cannot be claimed from repository inspection alone. It requires a running pull-request build and a suitable test account.
+
 Login-only smoke:
 
 ```bash
