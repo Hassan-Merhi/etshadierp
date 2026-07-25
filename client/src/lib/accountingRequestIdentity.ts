@@ -25,6 +25,20 @@ function isActiveManualJournal(
   );
 }
 
+function isActivePaymentReceipt(
+  method: string,
+  pathname: string,
+  data: unknown
+): data is AccountingRequestPayload {
+  return (
+    method.toUpperCase() === "POST" &&
+    pathname === "/api/vouchers/payment-receipt" &&
+    isRecord(data) &&
+    data.optional !== true &&
+    (data.voucherType === "Payment" || data.voucherType === "Receipt")
+  );
+}
+
 function isActiveGenericVoucher(
   method: string,
   pathname: string,
@@ -50,6 +64,7 @@ export function isProtectedAccountingRequest(
   const pathname = url.split("?")[0];
   return (
     isActiveManualJournal(method, pathname, data) ||
+    isActivePaymentReceipt(method, pathname, data) ||
     isActiveGenericVoucher(method, pathname, data)
   );
 }
