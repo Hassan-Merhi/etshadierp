@@ -3,25 +3,8 @@ import { pool } from "../../db";
 import { requireAuth } from "../../auth";
 import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
+import { classifySpOffloadState } from "../../services/sp/spOffloadConcurrencyPolicy";
 import { requireSpCompany } from "./spHelpers";
-
-export interface SpOffloadLockScope {
-  companyId: number;
-  containerId: number;
-}
-
-export function buildSpOffloadLockScope(companyId: number, containerId: number): SpOffloadLockScope {
-  return { companyId, containerId };
-}
-
-export function classifySpOffloadState(
-  status: string | null | undefined,
-  hasExistingOffload: boolean
-): "post" | "replay" | "reject" {
-  if (status === "open") return "post";
-  if (hasExistingOffload) return "replay";
-  return "reject";
-}
 
 async function guardSpOffload(req: Request, res: Response, next: NextFunction): Promise<void> {
   const companyId = await requireSpCompany(req as any, res as any);
