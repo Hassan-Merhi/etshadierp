@@ -4,35 +4,87 @@ let schemaSetupPromise: Promise<void> | null = null;
 let triggerSetupPromise: Promise<void> | null = null;
 
 const REQUIRED_TABLES = ["sp_containers", "vouchers", "voucher_entries", "ledger_accounts"] as const;
-
-async function assertRequiredTablesReady(): Promise<void> {
-  const result = await pool.query<{ table_name: string }>(
-    `SELECT table_name
-       FROM information_schema.tables
-      WHERE table_schema = 'public'
-        AND table_name = ANY($1::text[])`,
-    [[...REQUIRED_TABLES]],
-  );
-  const found = new Set(result.rows.map((row) => row.table_name));
-  const missing = REQUIRED_TABLES.filter((table) => !found.has(table));
-  if (missing.length > 0) {
-    throw new Error(`SP supplier voucher synchronization tables are not ready: ${missing.join(", ")}`);
-  }
-}
+const REQUIRED_COLUMNS = [
+  {
+    table: "vouchers",
+    column: "supplier_id",
+    ddl: `ALTER TABLE vouchers ADD COLUMN supplier_id INTEGER`,
+  },
+  {
+    table: "voucher_entries",
+    column: "supplier_id",
+    ddl: `ALTER TABLE voucher_entries ADD COLUMN supplier_id INTEGER`,
+  },
+  {
+    table: "sp_containers",
+    column: "supplier_id",
+    ddl: `ALTER TABLE sp_containers ADD COLUMN supplier_id INTEGER`,
+  },
+  {
+    table: "sp_containers",
+    column: "goods_otw_voucher_id",
+    ddl: `ALTER TABLE sp_containers ADD COLUMN goods_otw_voucher_id INTEGER`,
+  },
+  {
+    table: "ledger_accounts",
+    column: "sub_type",
+    ddl: `ALTER TABLE ledger_accounts ADD COLUMN sub_type TEXT`,
+  },
+] as const;
 
 /**
  * Ensures the legacy supplier-link columns required by Supplier Partner voucher
  * synchronization exist even when bulk startup migrations are disabled.
+ * Existing columns are detected first so normal restarts do not request table locks.
  */
 export function ensureSpSupplierVoucherSyncSchema(): Promise<void> {
   if (!schemaSetupPromise) {
     schemaSetupPromise = (async () => {
-      await assertRequiredTablesReady();
-      await pool.query(`ALTER TABLE vouchers ADD COLUMN IF NOT EXISTS supplier_id INTEGER`);
-      await pool.query(`ALTER TABLE voucher_entries ADD COLUMN IF NOT EXISTS supplier_id INTEGER`);
-      await pool.query(`ALTER TABLE sp_containers ADD COLUMN IF NOT EXISTS supplier_id INTEGER`);
-      await pool.query(`ALTER TABLE sp_containers ADD COLUMN IF NOT EXISTS goods_otw_voucher_id INTEGER`);
-      await pool.query(`ALTER TABLE ledger_accounts ADD COLUMN IF NOT EXISTS sub_type TEXT`);
+      const client = await pool.connect();
+      let transactionStarted = false;
+
+      try {
+        await client.query("BEGIN");
+        transactionStarted = true;
+        await client.query(`SELECT pg_advisory_xact_lock(hashtext('sp-supplier-voucher-sync-schema-v1'))`);
+
+        const tableResult = await client.query<{ table_name: string }>(
+          `SELECT table_name
+             FROM information_schema.tables
+            WHERE table_schema = 'public'
+              AND table_name = ANY($1::text[])`,
+          [[...REQUIRED_TABLES]],
+        );
+        const found = new Set(tableResult.rows.map((row) => row.table_name));
+        const missingTables = REQUIRED_TABLES.filter((table) => !found.has(table));
+        if (missingTables.length > 0) {
+          throw new Error(`SP supplier voucher synchronization tables are not ready: ${missingTables.join(", ")}`);
+        }
+
+        for (const spec of REQUIRED_COLUMNS) {
+          const columnResult = await client.query<{ exists: boolean }>(
+            `SELECT EXISTS (
+               SELECT 1
+                 FROM information_schema.columns
+                WHERE table_schema = 'public'
+                  AND table_name = $1
+                  AND column_name = $2
+             ) AS exists`,
+            [spec.table, spec.column],
+          );
+          if (!columnResult.rows[0]?.exists) {
+            await client.query(spec.ddl);
+          }
+        }
+
+        await client.query("COMMIT");
+        transactionStarted = false;
+      } catch (error) {
+        if (transactionStarted) await client.query("ROLLBACK").catch(() => undefined);
+        throw error;
+      } finally {
+        client.release();
+      }
     })().catch((error) => {
       schemaSetupPromise = null;
       throw error;
