@@ -1,5 +1,6 @@
 import type { Express } from "express";
 import { registerRentalUnitsContractsRoutes } from "./rentalUnitsContractsRoutes";
+import { registerCentralRentalPaymentDeletionRoute } from "./centralRentalPaymentDeletionRoute";
 import { registerRentalPaymentsAccrualRoutes } from "./rentalPaymentsAccrualRoutes";
 import { registerRentalAccrualConfigRoutes } from "./rentalAccrualConfigRoutes";
 
@@ -13,6 +14,7 @@ export function registerRentalRoutes(
   shopExpenseAccountName: string = "Rent Expense - Shops"
 ) {
   registerRentalUnitsContractsRoutes(app, module, urlPrefix, incomeAccountName, shopExpenseAccountName);
+  registerCentralRentalPaymentDeletionRoute(app, module, urlPrefix);
   registerRentalPaymentsAccrualRoutes(app, module, urlPrefix, incomeAccountName, shopExpenseAccountName);
   registerRentalAccrualConfigRoutes(app, module, urlPrefix, incomeAccountName, shopExpenseAccountName);
 }
