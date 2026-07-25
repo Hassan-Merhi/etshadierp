@@ -79,9 +79,23 @@ On the first successful active-journal posting, the route still performs the exi
 
 The transaction-owned central audit and idempotency marker are written before the voucher transaction commits.
 
+### Step 2A.3 audit — generic voucher compatibility blocker
+
+The generic `/api/vouchers/with-entries` route is deliberately not switched yet.
+
+Its current customer compatibility behavior can persist both:
+
+- `customerId`; and
+- the customer's linked `ledgerAccountId`
+
+on the same voucher entry. The strict central engine currently requires exactly one accounting target per entry. Removing the linked ledger would change existing linked-ledger views and account reporting; allowing arbitrary multiple targets would weaken posting validation.
+
+The safe next design must introduce an explicit linked-party representation that permits only a verified party plus that party's own company-scoped linked ledger. It must reject unrelated dual targets and keep historical queries unchanged. Until that rule and its tests exist, the generic route remains on its current atomic transaction path.
+
 ### Remaining Phase 2A work
 
-- Generic `/api/vouchers/with-entries` active voucher creation is not yet migrated.
+- Design and test the verified party-plus-linked-ledger compatibility rule for `/api/vouchers/with-entries`.
+- Migrate generic active voucher creation only after that rule is proven.
 - Journal editing and deletion are not yet migrated.
 - Optional or intentionally unbalanced drafts remain on the compatibility path.
 - Employee balance synchronization is still a legacy post-commit incremental side effect. A failed partial employee sync cannot yet be proven fully idempotent; this must be resolved before journal edit/delete convergence.
