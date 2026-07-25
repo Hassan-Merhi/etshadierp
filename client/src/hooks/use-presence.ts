@@ -34,7 +34,7 @@ export function usePresence() {
     const now = Date.now();
     lastRouteRef.current = location;
 
-    if (now - lastSentAtRef.current >= ROUTE_DEBOUNCE_MS) {
+    if (document.visibilityState === "visible" && now - lastSentAtRef.current >= ROUTE_DEBOUNCE_MS) {
       lastSentAtRef.current = now;
       sendHeartbeat(location, "route_change");
     }
@@ -44,17 +44,21 @@ export function usePresence() {
     isMountedRef.current = true;
 
     intervalRef.current = setInterval(() => {
-      if (isMountedRef.current) {
+      // Hidden/background tabs do not need to stay independently present. One
+      // visible-tab heartbeat is enough, and visibility recovery below refreshes
+      // the state immediately when the user returns to this tab.
+      if (isMountedRef.current && document.visibilityState === "visible") {
         sendHeartbeat(lastRouteRef.current, "heartbeat");
         lastSentAtRef.current = Date.now();
       }
     }, HEARTBEAT_INTERVAL);
 
     const handleVisibilityChange = () => {
-      if (document.visibilityState === "visible" && isMountedRef.current) {
-        sendHeartbeat(lastRouteRef.current, "route_change");
-        lastSentAtRef.current = Date.now();
-      }
+      if (document.visibilityState !== "visible" || !isMountedRef.current) return;
+      const now = Date.now();
+      if (now - lastSentAtRef.current < ROUTE_DEBOUNCE_MS) return;
+      sendHeartbeat(lastRouteRef.current, "route_change");
+      lastSentAtRef.current = now;
     };
 
     const handleBeforeUnload = () => {
