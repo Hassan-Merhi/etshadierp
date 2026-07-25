@@ -16,6 +16,8 @@ const TARGET_FIELDS = [
   "factorySupplierId",
 ] as const;
 
+type TargetField = (typeof TARGET_FIELDS)[number];
+
 export interface PostingSourceIdentity {
   sourceType: string;
   sourceId: string;
@@ -122,6 +124,25 @@ function amount(value: string | undefined, field: string, index: number): Decima
   return parsed;
 }
 
+export function populatedPostingTargets(entry: VoucherEntryInsertFields): TargetField[] {
+  return TARGET_FIELDS.filter((field) => entry[field] != null);
+}
+
+/**
+ * Most voucher entries must reference one accounting target. The only supported
+ * compatibility exception is a customer plus that customer's own linked ledger.
+ * The database ownership adapter validates the relationship before insert.
+ */
+export function hasSupportedPostingTargetShape(entry: VoucherEntryInsertFields): boolean {
+  const populated = populatedPostingTargets(entry);
+  if (populated.length === 1) return true;
+  return (
+    populated.length === 2 &&
+    populated.includes("customerId") &&
+    populated.includes("ledgerAccountId")
+  );
+}
+
 export function validateCentralPostingRequest(
   request: CentralPostingRequest
 ): ValidatedPostingTotals {
@@ -150,12 +171,11 @@ export function validateCentralPostingRequest(
   entries.forEach((entry, index) => {
     const debit = amount(entry.debitAmount, "debitAmount", index);
     const credit = amount(entry.creditAmount, "creditAmount", index);
-    const targetCount = TARGET_FIELDS.filter((field) => entry[field] != null).length;
 
-    if (targetCount !== 1) {
+    if (!hasSupportedPostingTargetShape(entry)) {
       throw new PostingValidationError(
         "POSTING_TARGET_INVALID",
-        `Entry ${index + 1} must reference exactly one accounting target`
+        `Entry ${index + 1} must reference one accounting target or a verified customer and linked ledger pair`
       );
     }
     if (debit.isZero() === credit.isZero()) {
