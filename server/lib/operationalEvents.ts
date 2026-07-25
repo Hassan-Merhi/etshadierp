@@ -14,6 +14,7 @@ export interface OperationalEventInput {
   status?: number;
   durationMs?: number;
   responseBytes?: number;
+  budgetBytes?: number;
   companyId?: number;
   userId?: number;
   // Optional diagnostic metrics attached by bandwidth/performance events.
@@ -23,6 +24,9 @@ export interface OperationalEventInput {
   windowMs?: number;
   totalApiResponseBytes?: number;
   totalStaticAssetResponseBytes?: number;
+  apiWindowBudgetBytes?: number;
+  staticWindowBudgetBytes?: number;
+  endpointWindowBudgetBytes?: number;
   ranked?: unknown[];
   staticAssets?: unknown[];
   heapDeltaBytes?: number;
@@ -78,6 +82,7 @@ export function recordOperationalEvent(input: OperationalEventInput): void {
     status: event.status,
     durationMs: event.durationMs,
     responseBytes: event.responseBytes,
+    budgetBytes: event.budgetBytes,
     companyId: event.companyId,
     userId: event.userId,
     endpointCount: event.endpointCount,
@@ -86,6 +91,9 @@ export function recordOperationalEvent(input: OperationalEventInput): void {
     windowMs: event.windowMs,
     totalApiResponseBytes: event.totalApiResponseBytes,
     totalStaticAssetResponseBytes: event.totalStaticAssetResponseBytes,
+    apiWindowBudgetBytes: event.apiWindowBudgetBytes,
+    staticWindowBudgetBytes: event.staticWindowBudgetBytes,
+    endpointWindowBudgetBytes: event.endpointWindowBudgetBytes,
     ranked: event.ranked,
     staticAssets: event.staticAssets,
     heapDeltaBytes: event.heapDeltaBytes,
