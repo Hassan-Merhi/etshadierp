@@ -2,6 +2,7 @@ import type { Express, Request, Response } from "express";
 import { getErrorMessage } from "../lib/httpHandlers";
 import { logger } from "../lib/logger";
 import { registerRentalUnitsContractsRoutes } from "./rental/rentalUnitsContractsRoutes";
+import { registerCentralRentalPaymentDeletionRoute } from "./rental/centralRentalPaymentDeletionRoute";
 import { registerRentalPaymentsAccrualRoutes } from "./rental/rentalPaymentsAccrualRoutes";
 import { registerRentalAccrualConfigRoutes } from "./rental/rentalAccrualConfigRoutes";
 import { runRentalReconciliation } from "../services/rental/rentalReconciliationService";
@@ -20,6 +21,9 @@ export function registerRentalRoutes(
   shopExpenseAccountName: string = "Rent Expense - Shops"
 ) {
   registerRentalUnitsContractsRoutes(app, module, urlPrefix, incomeAccountName, shopExpenseAccountName);
+  // The central route owns DELETE /payments/:id. Registration order keeps the
+  // legacy creation, bulk, detail, and accrual handlers unchanged.
+  registerCentralRentalPaymentDeletionRoute(app, module, urlPrefix);
   registerRentalPaymentsAccrualRoutes(app, module, urlPrefix, incomeAccountName, shopExpenseAccountName);
   registerRentalAccrualConfigRoutes(app, module, urlPrefix, incomeAccountName, shopExpenseAccountName);
 
