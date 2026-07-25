@@ -4,6 +4,7 @@ import { registerVoucherCreateRoutes } from "./voucherCreateRoutes";
 import { registerVoucherPaymentRoutes } from "./voucherPaymentRoutes";
 import { registerCentralGenericVoucherCreateRoute } from "./centralGenericVoucherCreateRoute";
 import { registerCentralJournalCreateRoute } from "./centralJournalCreateRoute";
+import { registerCentralJournalLifecycleRoutes } from "./centralJournalLifecycleRoute";
 import { registerVoucherJournalRoutes } from "./voucherJournalRoutes";
 import { registerVoucherSalesUpdateRoutes } from "./voucherSalesUpdateRoutes";
 import { registerVoucherPurchaseUpdateRoutes } from "./voucherPurchaseUpdateRoutes";
@@ -21,6 +22,10 @@ export function registerVoucherRoutes(app: Express) {
   // Active manual journals use the central posting engine. Optional journals
   // call next() and continue into the unchanged legacy handler below.
   registerCentralJournalCreateRoute(app);
+  // Active Journal -> active Journal edits and active Journal deletions use
+  // transaction-bound employee reversal. Optional transitions and every
+  // non-journal deletion continue into the unchanged legacy routes.
+  registerCentralJournalLifecycleRoutes(app);
   registerVoucherJournalRoutes(app);
   registerVoucherSalesUpdateRoutes(app);
   registerVoucherPurchaseUpdateRoutes(app);
