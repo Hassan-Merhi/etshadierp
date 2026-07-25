@@ -21,6 +21,8 @@ export interface OperationalEventInput {
   apiEndpointCount?: number;
   staticAssetCount?: number;
   windowMs?: number;
+  totalApiResponseBytes?: number;
+  totalStaticAssetResponseBytes?: number;
   ranked?: unknown[];
   staticAssets?: unknown[];
   heapDeltaBytes?: number;
@@ -78,10 +80,22 @@ export function recordOperationalEvent(input: OperationalEventInput): void {
     responseBytes: event.responseBytes,
     companyId: event.companyId,
     userId: event.userId,
+    endpointCount: event.endpointCount,
+    apiEndpointCount: event.apiEndpointCount,
+    staticAssetCount: event.staticAssetCount,
+    windowMs: event.windowMs,
+    totalApiResponseBytes: event.totalApiResponseBytes,
+    totalStaticAssetResponseBytes: event.totalStaticAssetResponseBytes,
+    ranked: event.ranked,
+    staticAssets: event.staticAssets,
+    heapDeltaBytes: event.heapDeltaBytes,
+    dbQueryCount: event.dbQueryCount,
+    dbDurationMs: event.dbDurationMs,
   };
 
   if (event.severity === "critical") logger.error(event.message, context);
-  else logger.warn(event.message, context);
+  else if (event.severity === "warning") logger.warn(event.message, context);
+  else logger.info(event.message, context);
 }
 
 export function recordIntegrityEvent(
