@@ -24,6 +24,16 @@ export interface DeleteRentalPaymentResult {
   deletedCount: number;
 }
 
+/** Must remain identical to rentalPaymentPostingService.hashGroupId. */
+function hashPaymentGroupId(groupId: string): bigint {
+  let hash = 5381n;
+  for (let index = 0; index < groupId.length; index += 1) {
+    hash = ((hash << 5n) + hash + BigInt(groupId.charCodeAt(index))) & 0xffffffffffffffffn;
+  }
+  if (hash > 9223372036854775807n) hash -= 18446744073709551616n;
+  return hash;
+}
+
 function recognitionVoucherNumber(paymentDate: string, paymentGroupId: string): string {
   return `ADV-REC-${paymentDate.replace(/-/g, "")}-${paymentGroupId.slice(-6)}`;
 }
@@ -32,6 +42,31 @@ export async function deleteRentalPaymentGroup(
   input: DeleteRentalPaymentInput
 ): Promise<DeleteRentalPaymentResult> {
   return db.transaction(async (tx) => {
+    const [initialSeed] = await tx
+      .select()
+      .from(propertyPayments)
+      .where(
+        and(
+          eq(propertyPayments.id, input.paymentId),
+          eq(propertyPayments.companyId, input.companyId),
+          eq(propertyPayments.module, input.module)
+        )
+      );
+
+    if (!initialSeed) {
+      return {
+        found: false,
+        paymentGroupId: null,
+        deletedPaymentIds: [],
+        deletedCount: 0,
+      };
+    }
+
+    const lifecycleKey =
+      initialSeed.paymentGroupId ??
+      `legacy-rental-payment:${input.companyId}:${input.module}:${input.paymentId}`;
+    await tx.execute(sql`SELECT pg_advisory_xact_lock(${hashPaymentGroupId(lifecycleKey)})`);
+
     const [seed] = await tx
       .select()
       .from(propertyPayments)
@@ -47,7 +82,7 @@ export async function deleteRentalPaymentGroup(
     if (!seed) {
       return {
         found: false,
-        paymentGroupId: null,
+        paymentGroupId: initialSeed.paymentGroupId ?? null,
         deletedPaymentIds: [],
         deletedCount: 0,
       };
@@ -162,13 +197,23 @@ export async function deleteRentalPaymentGroup(
 
     for (const ledgerRowId of ledgerRowIds) {
       await tx.execute(sql`
-        UPDATE property_monthly_ledger ml
-        SET paid_amount = COALESCE((
-          SELECT SUM(pp.amount::numeric)
+        WITH remaining AS (
+          SELECT COALESCE(SUM(pp.amount::numeric), 0) AS posted_total
           FROM property_payments pp
-          WHERE pp.ledger_row_id = ml.id
+          WHERE pp.ledger_row_id = ${ledgerRowId}
             AND pp.posting_status = 'POSTED'
-        ), 0)
+        )
+        UPDATE property_monthly_ledger ml
+        SET paid_amount = remaining.posted_total,
+            used_prepaid_account = CASE
+              WHEN remaining.posted_total = 0 THEN false
+              ELSE ml.used_prepaid_account
+            END,
+            used_advance_account = CASE
+              WHEN remaining.posted_total = 0 THEN false
+              ELSE ml.used_advance_account
+            END
+        FROM remaining
         WHERE ml.id = ${ledgerRowId}
       `);
     }
