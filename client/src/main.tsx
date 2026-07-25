@@ -3,6 +3,7 @@ import "./lib/v5AllocationPaginationClient";
 import { createRoot } from "react-dom/client";
 import App from "./App";
 import "./index.css";
+import "./mobile-browser-compat.css";
 
 // Clear stale chunk-retry/reload counters from sessionStorage on every fresh page load.
 // These keys are written before a hard-reload attempt; if a reload succeeds the keys are
