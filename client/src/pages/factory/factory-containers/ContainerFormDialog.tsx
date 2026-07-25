@@ -60,7 +60,7 @@ type FormData = {
   otherChargesAccountId: string;
 };
 
-type OtherChargeLine = { amount: string; currencyCode: string; ledgerAccountId: string };
+type OtherChargeLine = { amount: string; currencyCode: string; ledgerAccountId: string; narration: string };
 
 const BLANK_FORM: FormData = {
   containerNumber: "",
@@ -166,6 +166,7 @@ export function ContainerFormDialog({
             amount: stripTrailingZeros(c.amount),
             currencyCode: c.currencyCode || containerCcy,
             ledgerAccountId: c.ledgerAccountId ? String(c.ledgerAccountId) : "",
+            narration: c.description || "",
           }))
         );
       })
@@ -259,7 +260,7 @@ export function ContainerFormDialog({
         charges: otherChargeLines
           .filter((l) => parseFloat(l.amount || "0") > 0)
           .map((l) => ({
-            description: "Other Charge",
+            description: l.narration?.trim() || "Other Charge",
             amount: l.amount,
             currencyCode: l.currencyCode || currency,
             ledgerAccountId: l.ledgerAccountId ? parseInt(l.ledgerAccountId) : null,
@@ -319,7 +320,7 @@ export function ContainerFormDialog({
       const validCharges = otherChargeLines
         .filter((l) => parseFloat(l.amount || "0") > 0)
         .map((l) => ({
-          description: "Other Charge",
+          description: l.narration?.trim() || "Other Charge",
           amount: l.amount,
           currencyCode: l.currencyCode || currency,
           ledgerAccountId: l.ledgerAccountId ? parseInt(l.ledgerAccountId) : null,

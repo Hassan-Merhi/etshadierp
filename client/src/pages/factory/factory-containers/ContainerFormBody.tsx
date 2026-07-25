@@ -30,7 +30,7 @@ type FormData = {
   otherChargesAccountId: string;
 };
 
-type OtherChargeLine = { amount: string; currencyCode: string; ledgerAccountId: string };
+type OtherChargeLine = { amount: string; currencyCode: string; ledgerAccountId: string; narration: string };
 
 interface ContainerFormBodyProps {
   formData: FormData;
@@ -520,7 +520,7 @@ export function ContainerFormBody({
               variant="outline"
               className="h-7 px-2 text-xs"
               onClick={() =>
-                setOtherChargeLines((prev) => [...prev, { amount: "", currencyCode: currency, ledgerAccountId: "" }])
+                setOtherChargeLines((prev) => [...prev, { amount: "", currencyCode: currency, ledgerAccountId: "", narration: "" }])
               }
               data-testid="button-add-other-charge"
             >
@@ -531,10 +531,11 @@ export function ContainerFormBody({
             <p className="text-xs text-muted-foreground py-1">No other charges. Click "Add Line" to add one.</p>
           )}
           {otherChargeLines.length > 0 && (
-            <div className="grid grid-cols-[1fr_auto_2fr_auto] gap-x-2 gap-y-1 items-center">
+            <div className="grid grid-cols-[1fr_auto_2fr_2fr_auto] gap-x-2 gap-y-1 items-center">
               <div className="text-xs text-muted-foreground font-medium">Amount</div>
               <div className="text-xs text-muted-foreground font-medium">CCY</div>
               <div className="text-xs text-muted-foreground font-medium">Account</div>
+              <div className="text-xs text-muted-foreground font-medium">Narration</div>
               <div />
               {otherChargeLines.map((line, idx) => (
                 <>
@@ -582,6 +583,13 @@ export function ContainerFormBody({
                       ))}
                     </SelectContent>
                   </Select>
+                  <Input
+                    key={`nar-${idx}`}
+                    value={line.narration}
+                    onChange={(e) => updateOtherChargeLine(idx, "narration", e.target.value)}
+                    placeholder="Narration (optional)"
+                    data-testid={`input-other-charge-narration-${idx}`}
+                  />
                   <Button
                     key={`del-${idx}`}
                     type="button"
