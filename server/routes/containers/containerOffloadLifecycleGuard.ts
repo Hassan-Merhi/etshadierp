@@ -1,6 +1,6 @@
 import type { Express, NextFunction, Request, Response } from "express";
 import { pool } from "../../db";
-import { requireAuth, requireNonPOS } from "../../auth";
+import { requireAuth, requireNonPOS, requireRole } from "../../auth";
 import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
 import {
@@ -305,6 +305,10 @@ async function guardContainerOffload(req: Request, res: Response, next: NextFunc
 
 export function registerContainerOffloadLifecycleGuard(app: Express): void {
   app.post("/api/containers/:id/offload", requireAuth, requireNonPOS, (req, res, next) => {
+    void guardContainerOffload(req, res, next);
+  });
+
+  app.patch("/api/containers/:id/offload", requireAuth, requireRole("Admin"), (req, res, next) => {
     void guardContainerOffload(req, res, next);
   });
 }
