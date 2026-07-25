@@ -1,4 +1,4 @@
-import { and, eq, inArray, sql } from "drizzle-orm";
+import { and, eq, inArray, isNull, notInArray, sql } from "drizzle-orm";
 import { db } from "../../db";
 import {
   interCompanyTransfers,
@@ -72,12 +72,10 @@ export async function deleteRentalPaymentGroup(
     const ledgerRowIds = [...new Set(groupRows.map((row) => row.ledgerRowId).filter((id): id is number => !!id))];
     const voucherIds = [...new Set(groupRows.map((row) => row.voucherId).filter((id): id is number => !!id))];
 
-    const linkedTransfers = paymentIds.length
-      ? await tx
-          .select()
-          .from(interCompanyTransfers)
-          .where(inArray(interCompanyTransfers.sourcePaymentId, paymentIds))
-      : [];
+    const linkedTransfers = await tx
+      .select()
+      .from(interCompanyTransfers)
+      .where(inArray(interCompanyTransfers.sourcePaymentId, paymentIds));
 
     for (const transfer of linkedTransfers) {
       const fromVoucherId = transfer.fromVoucherId;
@@ -97,7 +95,7 @@ export async function deleteRentalPaymentGroup(
       const [outsideReference] = await tx
         .select({ id: propertyPayments.id })
         .from(propertyPayments)
-        .where(and(eq(propertyPayments.voucherId, voucherId), sql`${propertyPayments.id} <> ALL(${paymentIds}::int[])`))
+        .where(and(eq(propertyPayments.voucherId, voucherId), notInArray(propertyPayments.id, paymentIds)))
         .limit(1);
 
       if (!outsideReference) {
@@ -109,7 +107,7 @@ export async function deleteRentalPaymentGroup(
             and(
               eq(vouchers.companyId, input.companyId),
               eq(vouchers.voucherNumber, `AP-CLEAR-${voucherId}`),
-              sql`${vouchers.deletedAt} IS NULL`
+              isNull(vouchers.deletedAt)
             )
           );
       }
@@ -124,7 +122,7 @@ export async function deleteRentalPaymentGroup(
           and(
             eq(vouchers.companyId, input.companyId),
             eq(vouchers.voucherNumber, recNumber),
-            sql`${vouchers.deletedAt} IS NULL`
+            isNull(vouchers.deletedAt)
           )
         )
         .for("update");
@@ -162,7 +160,7 @@ export async function deleteRentalPaymentGroup(
 
     await tx.delete(propertyPayments).where(inArray(propertyPayments.id, paymentIds));
 
-    if (ledgerRowIds.length > 0) {
+    for (const ledgerRowId of ledgerRowIds) {
       await tx.execute(sql`
         UPDATE property_monthly_ledger ml
         SET paid_amount = COALESCE((
@@ -171,7 +169,7 @@ export async function deleteRentalPaymentGroup(
           WHERE pp.ledger_row_id = ml.id
             AND pp.posting_status = 'POSTED'
         ), 0)
-        WHERE ml.id = ANY(${ledgerRowIds}::int[])
+        WHERE ml.id = ${ledgerRowId}
       `);
     }
 
