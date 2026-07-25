@@ -11,7 +11,10 @@ import {
 
 const hasDatabaseConfig = deploymentRuntimeConfig.databaseSource !== "missing-development-database";
 const startedAt = Date.now();
-const schemaCacheTtlMs = Math.max(5_000, Number.parseInt(process.env.READINESS_SCHEMA_CACHE_MS || "30000", 10));
+const configuredSchemaCacheMs = Number.parseInt(process.env.READINESS_SCHEMA_CACHE_MS || "30000", 10);
+const schemaCacheTtlMs = Number.isFinite(configuredSchemaCacheMs)
+  ? Math.max(5_000, configuredSchemaCacheMs)
+  : 30_000;
 let listening = false;
 let shuttingDown = false;
 let schemaCache = null;
@@ -114,12 +117,12 @@ Server.prototype.emit = function healthAwareEmit(event, ...args) {
 
   if (pathname === "/api/health/ready") {
     void probeDatabase().then((database) => {
-      const ready = listening && !shuttingDown && database.ok && database.schema?.ok === true;
+      const ready = listening && !shuttingDown && hasDatabaseConfig && database.ok && database.schema?.ok === true;
       sendJson(res, ready ? 200 : 503, {
         status: ready ? "ready" : "not_ready",
         listening,
         shuttingDown,
-        environmentValid: true,
+        environmentValid: hasDatabaseConfig,
         database,
         release: runtimeReleaseState,
       });
