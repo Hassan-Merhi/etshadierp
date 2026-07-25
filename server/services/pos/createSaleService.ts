@@ -8,6 +8,10 @@
  * handler. No business rule, SQL query, accounting entry, voucher field,
  * transaction boundary, or error message was changed — only relocated.
  *
+ * Program 2C adds one narrow safety boundary: company-scoped clientSaleId
+ * submissions are serialized inside the sale transaction so concurrent retries
+ * cannot create two vouchers or deduct inventory twice.
+ *
  * Returns a plain `{ status, body }` result for every outcome (success and
  * validation failures) so the route handler can respond with res.status(status).json(body)
  * unchanged. The two "insufficient stock" / "inventory not found" cases are
@@ -35,6 +39,7 @@ import { validateItemsBasic, calculateGrandTotal, validateInventoryAvailability 
 import { getOrCreateSalesRevenueAccount, fetchSupplierPartnerAccountingContext, insertSaleAccountingEntries } from "./postSaleAccounting";
 import { insertSaleVoucher } from "./createSaleVoucher";
 import { lockAndDeductInventoryForSaleItem } from "./deductSaleInventory";
+import { lockAndFindExistingPosSaleTx } from "./posSaleIdempotency";
 
 function err(result: HandlerErrorResult) {
   return { status: result.status, body: result.body };
@@ -91,7 +96,8 @@ export async function createPosSale(
     resolved: { accountType, accountId },
   });
 
-  // Fix 4: Idempotency — if this clientSaleId was already saved, return the existing sale
+  // Fast path for an already committed retry. The transaction repeats this
+  // lookup after acquiring a company-scoped advisory lock.
   const idempotentResult = await checkIdempotentSale(currentCompanyId, clientSaleId);
   if (idempotentResult) return idempotentResult;
 
@@ -125,7 +131,7 @@ export async function createPosSale(
   if ("error" in grandTotalResult) return err(grandTotalResult.error);
   const { grandTotal } = grandTotalResult;
 
-  // Get or create SALES revenue account (outside transaction for simplicity)
+  // Get or create SALES revenue account (outside transaction for compatibility)
   const salesAccountResult = await getOrCreateSalesRevenueAccount(currentCompanyId);
   if ("error" in salesAccountResult) return err(salesAccountResult.error);
   const { salesAccount } = salesAccountResult;
@@ -149,110 +155,168 @@ export async function createPosSale(
   const stockExistsError = await validateStockItemsExist(currentCompanyId, items);
   if (stockExistsError) return err(stockExistsError.error);
 
-  // STEP 1a: Validate inventory rows (best-effort pre-check; authoritative check is inside the transaction)
-  // NOTE: throws Error on missing inventory / insufficient stock — propagates to the route's catch block.
-  const inventoryValidation = await validateInventoryAvailability(locationId, items, canSellNegativeStock);
+  // STEP 1a: Validate inventory rows (best-effort pre-check; authoritative check is inside the transaction).
+  // A concurrent first request may commit between the fast idempotency lookup and
+  // this pre-check, so retry the lookup before surfacing a stock error.
+  let inventoryValidation: Awaited<ReturnType<typeof validateInventoryAvailability>>;
+  try {
+    inventoryValidation = await validateInventoryAvailability(locationId, items, canSellNegativeStock);
+  } catch (error: unknown) {
+    const committedRetry = await checkIdempotentSale(currentCompanyId, clientSaleId);
+    if (committedRetry) return committedRetry;
+    throw error;
+  }
 
   // ── SP company: fetch configured POS accounts & pre-compute supplier cost ──
   const spCtxResult = await fetchSupplierPartnerAccountingContext(isSpCompany, currentCompanyId, location, inventoryValidation);
   if ("error" in spCtxResult) return err(spCtxResult.error);
   const spCtx = spCtxResult;
 
-  // STEP 1b: Create accounting records, update inventory, and create sales items
-  // All wrapped in a single DB transaction for atomicity
-  const txResult = await db.transaction(async (tx) => {
-    const txVoucher = await insertSaleVoucher(tx, {
-      companyId: currentCompanyId,
-      locationId,
-      locationName: location.name,
-      voucherNumber,
-      voucherDate,
-      notes,
-      isCreditSale,
-      customerAccountName: customerAccount ? (customerAccount as any).name : undefined,
-      grandTotal,
-      effectiveShiftId,
-      clientSaleId,
-      currency,
-      exchangeRate,
-    });
-
-    await insertSaleAccountingEntries(tx, {
-      txVoucherId: txVoucher.id,
-      voucherNumber,
-      grandTotal,
-      isCreditSale,
-      accountType,
-      accountId,
-      location,
-      customerAccount,
-      companyId: currentCompanyId,
-      isSpCompany,
-      salesAccount,
-      spCtx,
-      // Thread through the voucher's currency/rate so entries carry dual-currency fields
-      currency: currency || "USD",
-      exchangeRate: exchangeRate ? String(exchangeRate) : null,
-    });
-
-    const txSaleItems: any[] = [];
-
-    for (const validatedItem of inventoryValidation) {
-      const { item, currentRate, inventoryRecord, currentQty, saleQty } = validatedItem;
-
-      const { costPrice } = await lockAndDeductInventoryForSaleItem(
+  // STEP 1b: Create accounting records, update inventory, and create sales items.
+  // All wrapped in a single DB transaction for atomicity. The advisory lock and
+  // second lookup close the simultaneous-request race that the old pre-check alone
+  // could not prevent.
+  let txResult: {
+    voucher: any;
+    saleItems: any[];
+    replayed: boolean;
+  };
+  try {
+    txResult = await db.transaction(async (tx) => {
+      const existing = await lockAndFindExistingPosSaleTx({
         tx,
-        parsedLocationId,
+        companyId: currentCompanyId,
+        clientSaleId,
+      });
+      if (existing) {
+        return {
+          voucher: existing.voucher,
+          saleItems: existing.saleItems,
+          replayed: true,
+        };
+      }
+
+      const txVoucher = await insertSaleVoucher(tx, {
+        companyId: currentCompanyId,
         locationId,
-        validatedItem,
-        canSellNegativeStock,
-        currentCompanyId
-      );
-
-      const [stockItem] = await tx.select().from(stockItems).where(eq(stockItems.id, item.stockItemId));
-
-      const qty = parseFloat(item.quantity);
-      const sellingPrice = parseFloat(item.rate) || 0;
-      const totalSales = qty * sellingPrice;
-      const totalCost = qty * costPrice;
-      const profit = totalSales - totalCost;
-
-      // Get configured selling price from location prices BEFORE insert so we can persist it
-      const [locPrice] = await tx
-        .select()
-        .from(stockItemLocationPrices)
-        .where(and(eq(stockItemLocationPrices.stockItemId, item.stockItemId), eq(stockItemLocationPrices.locationId, locationId)))
-        .limit(1);
-      const configuredPrice = locPrice?.sellingPrice || stockItem?.sellingPrice || "0";
-      const configuredPriceNum = parseFloat(configuredPrice);
-
-      await tx.insert(salesItems).values({
-        voucherId: txVoucher.id,
-        stockItemId: item.stockItemId,
-        quantity: qty.toString(),
-        sellingPrice: sellingPrice.toFixed(2),
-        costPrice: costPrice.toFixed(2),
-        totalSales: totalSales.toFixed(2),
-        totalCost: totalCost.toFixed(2),
-        profit: profit.toFixed(2),
-        configuredPrice: configuredPriceNum.toFixed(6),
+        locationName: location.name,
+        voucherNumber,
+        voucherDate,
+        notes,
+        isCreditSale,
+        customerAccountName: customerAccount ? (customerAccount as any).name : undefined,
+        grandTotal,
+        effectiveShiftId,
+        clientSaleId,
+        currency,
+        exchangeRate,
       });
-      const profitPerUnit = sellingPrice - configuredPriceNum;
-      const totalProfitVsConfigured = profitPerUnit * qty;
 
-      txSaleItems.push({
-        ...item,
-        stockItemName: stockItem?.name || "",
-        stockItemCode: stockItem?.code || "",
-        amount: totalSales.toFixed(2),
-        configuredPrice: configuredPriceNum.toFixed(2),
-        profitPerUnit: profitPerUnit.toFixed(2),
-        totalProfitVsConfigured: totalProfitVsConfigured.toFixed(2),
+      await insertSaleAccountingEntries(tx, {
+        txVoucherId: txVoucher.id,
+        voucherNumber,
+        grandTotal,
+        isCreditSale,
+        accountType,
+        accountId,
+        location,
+        customerAccount,
+        companyId: currentCompanyId,
+        isSpCompany,
+        salesAccount,
+        spCtx,
+        // Thread through the voucher's currency/rate so entries carry dual-currency fields
+        currency: currency || "USD",
+        exchangeRate: exchangeRate ? String(exchangeRate) : null,
       });
-    }
 
-    return { voucher: txVoucher, saleItems: txSaleItems };
-  });
+      const txSaleItems: any[] = [];
+
+      for (const validatedItem of inventoryValidation) {
+        const { item } = validatedItem;
+
+        const { costPrice } = await lockAndDeductInventoryForSaleItem(
+          tx,
+          parsedLocationId,
+          locationId,
+          validatedItem,
+          canSellNegativeStock,
+          currentCompanyId
+        );
+
+        const [stockItem] = await tx.select().from(stockItems).where(eq(stockItems.id, item.stockItemId));
+
+        const qty = parseFloat(item.quantity);
+        const sellingPrice = parseFloat(item.rate) || 0;
+        const totalSales = qty * sellingPrice;
+        const totalCost = qty * costPrice;
+        const profit = totalSales - totalCost;
+
+        // Get configured selling price from location prices BEFORE insert so we can persist it
+        const [locPrice] = await tx
+          .select()
+          .from(stockItemLocationPrices)
+          .where(and(eq(stockItemLocationPrices.stockItemId, item.stockItemId), eq(stockItemLocationPrices.locationId, locationId)))
+          .limit(1);
+        const configuredPrice = locPrice?.sellingPrice || stockItem?.sellingPrice || "0";
+        const configuredPriceNum = parseFloat(configuredPrice);
+
+        await tx.insert(salesItems).values({
+          voucherId: txVoucher.id,
+          stockItemId: item.stockItemId,
+          quantity: qty.toString(),
+          sellingPrice: sellingPrice.toFixed(2),
+          costPrice: costPrice.toFixed(2),
+          totalSales: totalSales.toFixed(2),
+          totalCost: totalCost.toFixed(2),
+          profit: profit.toFixed(2),
+          configuredPrice: configuredPriceNum.toFixed(6),
+        });
+        const profitPerUnit = sellingPrice - configuredPriceNum;
+        const totalProfitVsConfigured = profitPerUnit * qty;
+
+        txSaleItems.push({
+          ...item,
+          stockItemName: stockItem?.name || "",
+          stockItemCode: stockItem?.code || "",
+          amount: totalSales.toFixed(2),
+          configuredPrice: configuredPriceNum.toFixed(2),
+          profitPerUnit: profitPerUnit.toFixed(2),
+          totalProfitVsConfigured: totalProfitVsConfigured.toFixed(2),
+        });
+      }
+
+      return { voucher: txVoucher, saleItems: txSaleItems, replayed: false };
+    });
+  } catch (error: unknown) {
+    // If the competing request committed while this transaction was waiting on
+    // inventory locks, return that committed sale instead of reporting a stock
+    // failure for a retry that has already succeeded.
+    const committedRetry = await checkIdempotentSale(currentCompanyId, clientSaleId);
+    if (committedRetry) return committedRetry;
+    throw error;
+  }
+
+  if (txResult.replayed) {
+    const existingVoucher = txResult.voucher;
+    const existingLocation = existingVoucher.locationId
+      ? await storage.getLocationById(existingVoucher.locationId)
+      : null;
+    return {
+      status: 200,
+      body: {
+        voucher: existingVoucher,
+        location: existingLocation,
+        items: txResult.saleItems,
+        grandTotal: existingVoucher.totalAmount,
+        voucherNumber: existingVoucher.voucherNumber,
+        saleDate: existingVoucher.voucherDate,
+        isCreditSale: existingVoucher.isCreditSale,
+        customer: null,
+        _idempotent: true,
+      },
+    };
+  }
 
   const voucher = txResult.voucher;
   const saleItems = txResult.saleItems;
@@ -284,8 +348,8 @@ export async function createPosSale(
   // ── Intercompany POS auto-transfer (non-blocking, cash sales only) ──
   if (!isCreditSale && accountType === "cash") {
     // fire-and-forget; never let errors surface to the client
-    runIntercompanyPosTransfer(currentCompanyId, accountId, grandTotal, voucherDate).catch((err) =>
-      logger.error("[IntercompanyPOS] Unhandled:", { error: err })
+    runIntercompanyPosTransfer(currentCompanyId, accountId, grandTotal, voucherDate).catch((error) =>
+      logger.error("[IntercompanyPOS] Unhandled:", { error })
     );
   }
 
