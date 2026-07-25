@@ -75,7 +75,7 @@ describe("validateCentralPostingRequest", () => {
 });
 
 describe("postBalancedVoucherTx", () => {
-  it("returns an existing posting without inserting or auditing again", async () => {
+  it("returns an existing posting as a replay without inserting or auditing again", async () => {
     const existing = { voucher: { id: 77 }, entries: [{ id: 88 }] };
     const dependencies = {
       ownership: { validateVoucherOwnership: vi.fn() },
@@ -86,7 +86,10 @@ describe("postBalancedVoucherTx", () => {
       audit: { recordPosting: vi.fn() },
     };
 
-    await expect(postBalancedVoucherTx({}, request(), dependencies)).resolves.toBe(existing);
+    await expect(postBalancedVoucherTx({}, request(), dependencies)).resolves.toEqual({
+      ...existing,
+      replayed: true,
+    });
     expect(dependencies.ownership.validateVoucherOwnership).not.toHaveBeenCalled();
     expect(dependencies.idempotency.record).not.toHaveBeenCalled();
     expect(dependencies.audit.recordPosting).not.toHaveBeenCalled();
