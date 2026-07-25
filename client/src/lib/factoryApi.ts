@@ -65,6 +65,41 @@ function isAllowedFactoryPath(url: string): boolean {
 
 type RequestDelegate = (method: string, url: string, data?: unknown) => Promise<Response>;
 
+function createClientRequestId(): string {
+  if (typeof globalThis.crypto?.randomUUID === "function") {
+    return globalThis.crypto.randomUUID();
+  }
+  return `journal-${Date.now()}-${Math.random().toString(36).slice(2, 12)}`;
+}
+
+/**
+ * Active manual journals need a stable identity before apiRequest sees them.
+ * apiRequest keeps this object through CSRF retry, and the offline queue stores
+ * the same JSON body, so an uncertain response or reconnect cannot post twice.
+ */
+export function attachAccountingRequestIdentity(
+  method: string,
+  url: string,
+  data: unknown
+): unknown {
+  if (
+    method.toUpperCase() !== "POST" ||
+    url.split("?")[0] !== "/api/vouchers/journal" ||
+    !data ||
+    typeof data !== "object" ||
+    Array.isArray(data)
+  ) {
+    return data;
+  }
+
+  const payload = data as Record<string, unknown>;
+  if (payload.optional === true || typeof payload.clientRequestId === "string") {
+    return data;
+  }
+
+  return { ...payload, clientRequestId: createClientRequestId() };
+}
+
 /**
  * Shared replay guard for both ERP and Factory app modes. The UI may pass current
  * checkbox state, but a token-backed apply is rebuilt from the server-prepared
@@ -78,7 +113,8 @@ async function requestWithPreparedReplayState(
 ): Promise<Response> {
   const prepareRequest = isHistoricalReplayPrepareRequest(method, url, data);
   const token = historicalReplayTokenFromRequest(method, url, data);
-  const outboundData = freezeHistoricalReplayApplyRequest(method, url, data);
+  const preparedData = freezeHistoricalReplayApplyRequest(method, url, data);
+  const outboundData = attachAccountingRequestIdentity(method, url, preparedData);
   try {
     const response = await delegate(method, url, outboundData);
     if (prepareRequest && response.ok) {
