@@ -102,13 +102,30 @@ No migration or database repair was executed as part of Phase 4B.
 
 ## Phase 4C — Backup, rollback, and recovery
 
-Planned work:
+### Implementation
 
-- Document pre-deploy backup requirements.
-- Add a restore-verification checklist.
-- Classify migrations as additive, backfill, constraint, or destructive.
-- Require explicit rollback notes for non-additive migrations.
-- Add a failed-deployment recovery runbook.
+- Added `docs/operations/database-backup-rollback-recovery.md` as the current operational runbook.
+- Defined four migration risk classes: additive, backfill, constraint, and destructive.
+- Defined mandatory pre-deployment evidence: deployed commit, current commit, backup timestamp, size, checksum, database target, migration class, and approval.
+- Added safe `pg_dump` and disposable-database `pg_restore` procedures.
+- Added code rollback, readiness-503, data-repair, and full-database recovery procedures.
+- Added a restore-verification checklist and explicit recovery approval boundary.
+- Added `scripts/verify-database-backup.mjs`.
+  - Read-only: it never connects to or modifies a database.
+  - Recognizes PostgreSQL custom and plain-SQL backups.
+  - Checks file existence, type, size, age, and SHA-256.
+  - Supports `--max-age-hours` and `--json`.
+- Added regression coverage for backup format recognition, checksum output, age rejection, and unknown-file rejection.
+
+### Recovery boundary
+
+The tooling validates that a file looks like a fresh PostgreSQL backup, but it does not claim the backup is restorable. High-risk and destructive changes still require a restore rehearsal into a separate disposable database and verification through `/api/health/ready`.
+
+No backup, restore, migration, repair, production database command, or deployment was executed as part of Phase 4C.
+
+## Program status
+
+Phases 4A, 4B, and 4C are implemented on the isolated draft branch. Full build and database-backed verification remain blocked by the repository's GitHub Actions runner issue and must not be claimed as passed.
 
 ## Merge rule
 
