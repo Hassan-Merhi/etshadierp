@@ -195,6 +195,7 @@ export default function StockInSalesReportDetail() {
   const exportExcel = async () => {
     setIsExporting(true);
     try {
+      const workbook = new ExcelJS.Workbook();
       const exportParams = new URLSearchParams(baseParams);
       exportParams.set("exportAll", "true");
       const response = await fetch(`/api/reports/stock-in-sales/detail?${exportParams.toString()}`, {
@@ -202,8 +203,6 @@ export default function StockInSalesReportDetail() {
       });
       if (!response.ok) throw new Error("Failed to load export details");
       const exportData = (await response.json()) as DetailResponse;
-
-      const workbook = new ExcelJS.Workbook();
       const summarySheet = workbook.addWorksheet("Summary");
       summarySheet.columns = [
         { header: "Metric", key: "metric", width: 28 },
