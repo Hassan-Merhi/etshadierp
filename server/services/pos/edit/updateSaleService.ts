@@ -3,25 +3,17 @@
  *
  * PHASE 20 — POS Backend Edit-Sale Structural Split.
  *
- * Orchestrates the existing PUT /api/vouchers/:id/sales edit-sale flow,
- * calling the extracted functions in the EXACT same order as the original
- * monolithic route handler. No business rule, SQL query, accounting entry,
- * voucher field, transaction boundary, or error message was changed — only
- * relocated.
- *
- * Returns a plain `{ status, body }` result for every outcome (success and
- * validation failures) so the route handler can respond with
- * res.status(status).json(body) unchanged. Errors that were previously
- * thrown and mapped to a status code in the route's catch block (Insufficient
- * stock / Inventory not found / etc.) are still thrown as Error here for the
- * same reason.
+ * Program 2C keeps the existing edit formulas and response contract, while
+ * moving the authoritative voucher, location, currency, accounting-entry, and
+ * sales-item reads under one transaction lock. Concurrent edits therefore use
+ * the latest committed sale state instead of stale pre-transaction snapshots.
  */
 import { db } from "../../../db";
 import { logger } from "../../../lib/logger";
 import { storage } from "../../../storage";
 import { logAudit, recalculateIntercompanyForDate } from "../../../routes/_helpers";
 import { salesItems, voucherEntries, stockItems, vouchers } from "@shared/schema";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import type { HandlerErrorResult, UpdatePosSaleParams } from "./posEditSaleTypes";
 import { fetchSpEditAccountingContext, fetchSpEditDeductionPerQty } from "./posEditSaleHelpers";
 import { isReadonlyMigratedVoucher, READONLY_MIGRATED_VOUCHER_MESSAGE } from "../../../lib/migratedVoucherGuard";
@@ -49,119 +41,155 @@ export async function updatePosSale(params: UpdatePosSaleParams): Promise<{ stat
   if ("error" in spContextResult) return err(spContextResult.error);
   const { isSpCompanyEdit, editSpPayableAccountId, editSpDeductionClrAccountId } = spContextResult.context;
 
-  const { description, items, paymentAccountType: rawPaymentAccountType, paymentAccountId: rawPaymentAccountId, isCreditSale, voucherDate, locationId: newLocationId } =
-    body;
+  const {
+    description,
+    items,
+    paymentAccountType: rawPaymentAccountType,
+    paymentAccountId: rawPaymentAccountId,
+    isCreditSale,
+    voucherDate,
+    locationId: newLocationId,
+  } = body;
 
   if (!items || !Array.isArray(items) || items.length === 0) {
     return { status: 400, body: { message: "At least one item is required" } };
   }
 
-  // Validate all items have positive quantities and prices
   validateItemsPositive(items);
 
-  // Get existing voucher to validate it's a Sales voucher in the current company
+  // Fast validation before opening the transaction. The same state-sensitive
+  // checks are repeated against the locked voucher below.
   const voucherResult = await loadAndValidateExistingVoucher(voucherId, currentCompanyId);
   if ("error" in voucherResult) return err(voucherResult.error);
-  const { existingVoucher } = voucherResult;
+  const preExistingVoucher = voucherResult.existingVoucher;
 
-  if (isReadonlyMigratedVoucher(existingVoucher as any)) {
+  if (isReadonlyMigratedVoucher(preExistingVoucher as any)) {
     return err({ status: 403, body: { message: READONLY_MIGRATED_VOUCHER_MESSAGE } });
   }
 
-  // POS restrictions on existing sales (location-change block only — see
-  // applyPosRoleRestrictions for why the original payment-account "strip" was
-  // a no-op that must not actually be applied here).
-  const posRestrictionResult = applyPosRoleRestrictions(userRole, newLocationId, existingVoucher.locationId);
-  if ("error" in posRestrictionResult) return err(posRestrictionResult.error);
+  const preRestrictionResult = applyPosRoleRestrictions(userRole, newLocationId, preExistingVoucher.locationId);
+  if ("error" in preRestrictionResult) return err(preRestrictionResult.error);
+
   const paymentAccountType = rawPaymentAccountType;
   const paymentAccountId = rawPaymentAccountId;
 
-  // Determine target location - use new location if provided, otherwise keep existing
-  const oldLocationId = existingVoucher.locationId!;
-  const { targetLocationId, locationChanged } = resolveEditLocations(oldLocationId, newLocationId);
+  const transactionResult: any = await db.transaction(async (tx) => {
+    const [lockedVoucher] = await tx
+      .select()
+      .from(vouchers)
+      .where(and(eq(vouchers.id, voucherId), eq(vouchers.companyId, currentCompanyId)))
+      .for("update");
 
-  // SP edit: load target location's per-qty deduction rate
-  const editSpDeductionPerQty = await fetchSpEditDeductionPerQty(isSpCompanyEdit, targetLocationId);
+    if (!lockedVoucher || lockedVoucher.deletedAt) {
+      return { error: { status: 404, body: { message: "Voucher not found" } } };
+    }
+    if (lockedVoucher.voucherType !== "Sales") {
+      return {
+        error: {
+          status: 400,
+          body: { message: "Only Sales vouchers can be updated with this endpoint" },
+        },
+      };
+    }
+    if (isReadonlyMigratedVoucher(lockedVoucher as any)) {
+      return { error: { status: 403, body: { message: READONLY_MIGRATED_VOUCHER_MESSAGE } } };
+    }
 
-  // Validate new location belongs to company if changed
-  if (locationChanged) {
-    const newLocationResult = await validateNewLocationBelongsToCompany(targetLocationId, oldLocationId, currentCompanyId);
-    if ("error" in newLocationResult) return err(newLocationResult.error);
-  }
+    const restrictionResult = applyPosRoleRestrictions(userRole, newLocationId, lockedVoucher.locationId);
+    if ("error" in restrictionResult) return restrictionResult;
 
-  // Get existing voucher entries to recreate them
-  const oldEntries = await db.select().from(voucherEntries).where(eq(voucherEntries.voucherId, voucherId));
+    if (!lockedVoucher.locationId) {
+      return { error: { status: 400, body: { message: "Existing sale is missing a location" } } };
+    }
 
-  let grandTotal = 0;
-  let totalQtySoldEdit = 0;
+    const { targetLocationId, oldLocationId, locationChanged } = resolveEditLocations(
+      lockedVoucher.locationId,
+      newLocationId
+    );
 
-  // Begin transaction
-  await db.transaction(async (tx) => {
-    // Read + lock the CURRENT old sales items INSIDE the transaction (not before it
-    // starts). If two edits of the same voucher race (two tabs, a double-submit, or
-    // a network retry), this FOR UPDATE lock forces them to run strictly one after
-    // the other: the second edit sees the first edit's already-committed items as
-    // its "old" state, instead of both reversing the same stale pre-transaction
-    // snapshot and double-counting inventory.
+    if (locationChanged) {
+      const newLocationResult = await validateNewLocationBelongsToCompany(
+        targetLocationId,
+        oldLocationId,
+        currentCompanyId,
+        tx
+      );
+      if ("error" in newLocationResult) return newLocationResult;
+    }
+
+    const editSpDeductionPerQty = await fetchSpEditDeductionPerQty(
+      isSpCompanyEdit,
+      targetLocationId,
+      tx
+    );
+
+    // Voucher entries are loaded after the voucher lock, so account preservation
+    // and historical currency reconstruction use the latest committed edit.
+    const oldEntries = await tx
+      .select()
+      .from(voucherEntries)
+      .where(eq(voucherEntries.voucherId, voucherId));
+
+    // Lock the current sales items in the same transaction. A second edit waits,
+    // then sees the first edit's committed voucher, entries, location, and items.
     const oldSalesItems = await tx
       .select()
       .from(salesItems)
       .where(eq(salesItems.voucherId, voucherId))
       .for("update");
-    // Sort by stockItemId so the reversal loop always acquires locks in a
-    // consistent order — prevents deadlocks with concurrent sale transactions.
     oldSalesItems.sort((a, b) => a.stockItemId - b.stockItemId);
 
-    // Create map of old items by line ID for cost preservation (not stockItemId to handle duplicates)
     const oldItemsMap = new Map(oldSalesItems.map((item) => [item.id, item]));
 
-    // Reverse old inventory movements
-    await reverseOriginalSaleInventory(tx, existingVoucher, oldSalesItems);
-
-    // Delete old sales items and voucher entries
+    await reverseOriginalSaleInventory(tx, lockedVoucher, oldSalesItems);
     await clearOldSaleRecords(tx, voucherId);
 
-    // Create new sales items and apply new inventory movements
     const rebuildResult = await rebuildSaleItems(tx, {
       voucherId,
       targetLocationId,
       items,
       oldItemsMap,
       canSellNegativeStock,
-      companyId: existingVoucher.companyId,
+      companyId: lockedVoucher.companyId,
     });
-    grandTotal = rebuildResult.grandTotal;
-    totalQtySoldEdit = rebuildResult.totalQtySoldEdit;
 
-    // Update voucher description, total amount, location, and optionally date
     await updateVoucherRecord(tx, {
       voucherId,
       description,
-      grandTotal,
+      grandTotal: rebuildResult.grandTotal,
       locationChanged,
       targetLocationId,
       oldLocationId,
       voucherDate,
     });
 
-    // Recreate voucher entries with new total.
-    // Use the ORIGINAL voucher's stored currency and exchange rate — never the current
-    // company rate — so the historical accounting remains correct.
     await rebuildSaleAccountingEntries(tx, {
       voucherId,
       oldEntries,
-      grandTotal,
+      grandTotal: rebuildResult.grandTotal,
       paymentAccountType,
       paymentAccountId,
       isSpCompanyEdit,
       editSpPayableAccountId,
       editSpDeductionClrAccountId,
-      totalQtySoldEdit,
+      totalQtySoldEdit: rebuildResult.totalQtySoldEdit,
       editSpDeductionPerQty,
-      currency: existingVoucher.currency || "USD",
-      exchangeRate: existingVoucher.exchangeRate ? String(existingVoucher.exchangeRate) : null,
+      currency: lockedVoucher.currency || "USD",
+      exchangeRate: lockedVoucher.exchangeRate ? String(lockedVoucher.exchangeRate) : null,
     });
+
+    return {
+      existingVoucher: lockedVoucher,
+      targetLocationId,
+      grandTotal: rebuildResult.grandTotal,
+      totalQtySoldEdit: rebuildResult.totalQtySoldEdit,
+    };
   });
+
+  if (transactionResult.error) return err(transactionResult.error);
+
+  const existingVoucher = transactionResult.existingVoucher;
+  const targetLocationId = transactionResult.targetLocationId;
 
   // Fetch updated data to return for print template
   const [updatedVoucher] = await db.select().from(vouchers).where(eq(vouchers.id, voucherId)).limit(1);
@@ -190,33 +218,32 @@ export async function updatePosSale(params: UpdatePosSaleParams): Promise<{ stat
   let customerAccount = null;
   if (isCreditSale) {
     const updatedEntries = await db.select().from(voucherEntries).where(eq(voucherEntries.voucherId, voucherId));
-    const debitEntry = updatedEntries.find((e) => parseFloat(e.debitAmount || "0") > 0);
+    const debitEntry = updatedEntries.find((entry) => parseFloat(entry.debitAmount || "0") > 0);
     if (debitEntry?.ledgerAccountId) {
       customerAccount = await storage.getLedgerAccountById(debitEntry.ledgerAccountId);
     }
   }
 
-  // ── Recalculate INTERCO vouchers for affected date(s) (non-blocking) ──
-  // Always recalculate old date; if date changed, also recalculate new date.
+  // Recalculate INTERCO vouchers for affected date(s) (non-blocking).
   const oldDate = existingVoucher.voucherDate;
   const newDate = voucherDate || oldDate;
   const datesToRecalc = new Set<string>([oldDate]);
   if (newDate !== oldDate) datesToRecalc.add(newDate);
-  for (const d of datesToRecalc) {
-    recalculateIntercompanyForDate(currentCompanyId, d).catch((error) =>
-      logger.error("[IntercompanyPOS Recalc] Unhandled:", { error: error })
+  for (const date of datesToRecalc) {
+    recalculateIntercompanyForDate(currentCompanyId, date).catch((error) =>
+      logger.error("[IntercompanyPOS Recalc] Unhandled:", { error })
     );
   }
 
   try {
-    const _posChanges: Record<string, { old?: any; new?: any }> = {};
+    const changes: Record<string, { old?: any; new?: any }> = {};
     if (existingVoucher.totalAmount !== updatedVoucher.totalAmount)
-      _posChanges.totalAmount = { old: existingVoucher.totalAmount, new: updatedVoucher.totalAmount };
+      changes.totalAmount = { old: existingVoucher.totalAmount, new: updatedVoucher.totalAmount };
     if (existingVoucher.voucherDate !== updatedVoucher.voucherDate)
-      _posChanges.date = { old: existingVoucher.voucherDate, new: updatedVoucher.voucherDate };
+      changes.date = { old: existingVoucher.voucherDate, new: updatedVoucher.voucherDate };
     if (existingVoucher.locationId !== updatedVoucher.locationId)
-      _posChanges.locationId = { old: existingVoucher.locationId, new: updatedVoucher.locationId };
-    _posChanges.itemCount = { new: updatedSalesItems.length };
+      changes.locationId = { old: existingVoucher.locationId, new: updatedVoucher.locationId };
+    changes.itemCount = { new: updatedSalesItems.length };
     await logAudit({
       userId,
       username,
@@ -225,7 +252,7 @@ export async function updatePosSale(params: UpdatePosSaleParams): Promise<{ stat
       tableName: "vouchers",
       recordId: voucherId,
       recordIdentifier: updatedVoucher.voucherNumber,
-      changes: _posChanges,
+      changes,
     });
   } catch {
     /* non-fatal */
