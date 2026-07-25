@@ -24,6 +24,7 @@ import { registerPerformanceReadMicrocache } from "./performance/readMicrocache"
 import { registerFactoryDaybookPaginationRoutes } from "./factory/factoryDaybookPaginationRoutes";
 import { registerFactoryStockEntryHistoryPaginationRoutes } from "./factory/factoryStockEntryHistoryPaginationRoutes";
 import { registerFactoryStockAllocationV5PaginationRoutes } from "./factory/factoryStockAllocationV5PaginationRoutes";
+import { registerCentralFactoryPayrollGenerationRoute } from "./payroll/centralFactoryPayrollGenerationRoute";
 import { createContainerDocumentDownloadHandler } from "../services/security/protectedAssetDownloadAdapter";
 
 export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
@@ -129,6 +130,11 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
   registerFactoryDaybookPaginationRoutes(app);
   registerFactoryStockEntryHistoryPaginationRoutes(app);
   registerFactoryStockAllocationV5PaginationRoutes(app);
+
+  // Registered here because registerFactoryRoutes runs before the legacy
+  // registerFactoryPayrollRoutes module in server/routes.ts. The protected route
+  // therefore owns generation without changing the remaining payroll endpoints.
+  registerCentralFactoryPayrollGenerationRoute(app, requireAuth);
 
   registerFactoryStockRoutes(app);
   registerFactorySuppliersRoutes(app);

@@ -20,6 +20,7 @@ export const companies = pgTable("companies", {
   code: varchar("code", { length: 50 }).notNull().unique(),
   name: text("name").notNull(),
   companyType: text("company_type").notNull().default("erp"),
+  parentCompanyId: integer("parent_company_id"),
   active: boolean("active").notNull().default(true),
   baseCurrency: varchar("base_currency", { length: 10 }).default("USD"),
   displayCurrency: varchar("display_currency", { length: 10 }),
@@ -36,6 +37,7 @@ export const insertCompanySchema = createInsertSchema(companies)
     code: z.string().min(1, "Code is required"),
     name: z.string().min(1, "Name is required"),
     companyType: z.enum(["erp", "factory", "factory_v2", "properties", "supplier_partner"]).default("erp"),
+    parentCompanyId: z.number().nullable().optional(),
     baseCurrency: z.string().optional(),
     displayCurrency: z.string().optional(),
   });
