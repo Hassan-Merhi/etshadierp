@@ -316,6 +316,10 @@ export function ContainerFormDialog({
             : null,
         otherCharges: data.otherCharges || "0",
         otherChargesAccountId: data.otherChargesAccountId ? parseInt(data.otherChargesAccountId) : null,
+        // Keep the legacy single-row currency column in sync so the offload dialog
+        // can read the correct currency when pre-filling the Other Charges field.
+        otherChargesCurrencyCode:
+          otherChargeLines.find((l) => parseFloat(l.amount || "0") > 0)?.currencyCode || null,
       };
       const validCharges = otherChargeLines
         .filter((l) => parseFloat(l.amount || "0") > 0)
