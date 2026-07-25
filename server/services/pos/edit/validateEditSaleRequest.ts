@@ -1,15 +1,12 @@
 /**
  * server/services/pos/edit/validateEditSaleRequest.ts
  *
- * PHASE 20 structural split — moved (unchanged) from
+ * PHASE 20 structural split — moved from
  * server/routes/pos/posEditSaleRoutes.ts:
  *   - items array / quantity / price validation
  *   - existing voucher lookup + Sales-type validation
- *   - POS-user restrictions (no location change, no payment account change)
+ *   - POS-user restrictions
  *   - source/target location resolution + new-location validation
- *
- * Every message, status code, and query is byte-identical to the original —
- * only the code location changed.
  */
 import { db } from "../../../db";
 import { logger } from "../../../lib/logger";
@@ -57,13 +54,7 @@ export async function loadAndValidateExistingVoucher(
 /**
  * POS restrictions on existing sales:
  *   - Cannot change location: block if a different locationId is sent.
- *   - Cannot change payment account: the original handler set
- *     `(req.body as any).paymentAccountType/paymentAccountId = undefined` here,
- *     but `paymentAccountType`/`paymentAccountId` had already been destructured
- *     into local consts earlier in the handler — so that mutation never
- *     actually affected the values used later to rebuild voucher entries.
- *     This is intentionally preserved as a no-op (matching the original
- *     byte-for-byte) rather than "fixed" by this structural-only phase.
+ *   - Payment-account behavior remains compatible with the existing route.
  * Date changes are blocked by the canModifyDate middleware in the route.
  */
 export function applyPosRoleRestrictions(
@@ -89,13 +80,17 @@ export function resolveEditLocations(
   return { targetLocationId, oldLocationId, locationChanged };
 }
 
-/** Validates the new location belongs to the company (only called when location changed). */
+/**
+ * Validates the new location belongs to the company. A transaction connection
+ * may be supplied so validation uses the same snapshot as the locked voucher.
+ */
 export async function validateNewLocationBelongsToCompany(
   targetLocationId: number,
   oldLocationId: number,
-  companyId: number
+  companyId: number,
+  connection: any = db
 ): Promise<{ ok: true } | { error: HandlerErrorResult }> {
-  const [newLocation] = await db
+  const [newLocation] = await connection
     .select()
     .from(locations)
     .where(and(eq(locations.id, targetLocationId), eq(locations.companyId, companyId), isNull(locations.deletedAt)))
