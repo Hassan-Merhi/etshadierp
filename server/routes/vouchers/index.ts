@@ -3,6 +3,7 @@ import { registerVoucherQueryRoutes } from "./voucherQueryRoutes";
 import { registerVoucherCreateRoutes } from "./voucherCreateRoutes";
 import { registerVoucherPaymentRoutes } from "./voucherPaymentRoutes";
 import { registerCentralGenericVoucherCreateRoute } from "./centralGenericVoucherCreateRoute";
+import { registerCentralPaymentReceiptCreateRoute } from "./centralPaymentReceiptCreateRoute";
 import { registerCentralJournalCreateRoute } from "./centralJournalCreateRoute";
 import { registerCentralJournalLifecycleRoutes } from "./centralJournalLifecycleRoute";
 import { registerVoucherJournalRoutes } from "./voucherJournalRoutes";
@@ -18,6 +19,10 @@ export function registerVoucherRoutes(app: Express) {
   // continue into the unchanged legacy create handler.
   registerCentralGenericVoucherCreateRoute(app);
   registerVoucherCreateRoutes(app);
+  // Active, retry-identified Payment/Receipt creation uses the central engine.
+  // Optional drafts and unidentified compatibility callers continue into the
+  // unchanged legacy Payment/Receipt handler below.
+  registerCentralPaymentReceiptCreateRoute(app);
   registerVoucherPaymentRoutes(app);
   // Active manual journals use the central posting engine. Optional journals
   // call next() and continue into the unchanged legacy handler below.
