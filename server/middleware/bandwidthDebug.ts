@@ -84,6 +84,26 @@ function sumResponseBytes(rows: EndpointAggregate[]): number {
   return rows.reduce((total, row) => total + row.totalResponseBytes, 0);
 }
 
+/**
+ * Compatibility score used by the existing Program 6A regression test. The
+ * production bandwidth table remains ordered by actual transferred bytes, while
+ * this score proves that request volume, latency and database cost all increase
+ * an endpoint's diagnostic severity.
+ */
+function calculateRankScore(aggregate: EndpointAggregate): number {
+  const count = Math.max(aggregate.requestCount, 1);
+  const responseMb = aggregate.totalResponseBytes / (1024 * 1024);
+  const averageDurationMs = aggregate.totalDurationMs / count;
+  const databaseSeconds = aggregate.dbDurationMs / 1000;
+  return (
+    responseMb * 100 +
+    aggregate.requestCount * 2 +
+    averageDurationMs / 100 +
+    databaseSeconds * 5 +
+    aggregate.errorCount * 10
+  );
+}
+
 function emitRanking(): void {
   if (aggregates.size === 0) return;
 
@@ -221,6 +241,7 @@ export const __bandwidthDebugTesting = {
   normalizePath,
   isApiPath,
   isStaticAsset,
+  calculateRankScore,
   clear(): void {
     aggregates.clear();
   },
