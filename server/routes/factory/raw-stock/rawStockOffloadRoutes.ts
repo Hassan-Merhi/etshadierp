@@ -916,28 +916,25 @@ export function registerRawStockOffloadRoutes(app: Express) {
               narration: `Freight payable to supplier - container ${container.containerNumber}`,
             });
           } else {
-            // No supplier: Dr Factory Charges Payable / Cr chosen account.
-            // Both legs are plain ledger accounts here (no factorySupplierId), and
-            // voucherEntries has no currency/fxRate column of its own — Net Position
-            // and every other GL reader sum debitAmount/creditAmount assuming USD.
-            // (Supplier-linked legs are the one exception: supplier balance routes
-            // re-derive USD from vouchers.currency/exchangeRate downstream, so those
-            // legs correctly stay in native currency — see the `if` branch above.)
-            // Posting freightVal (native currency) here would silently misstate any
-            // non-USD chosen account by the entire FX differential.
+            // Own-account freight: Dr Freight Expense / Cr own account (the account
+            // that physically paid the freight, e.g. Embassy Shipping).
+            // reqFreightAccountId here is the credit/own account (set from
+            // container.freightOwnAccountId by the offload dialog).
+            // Both legs are plain ledger accounts — amounts are stored in USD
+            // (freightUsd) so GL readers that assume USD are always correct.
             await tx.insert(voucherEntries).values({
               voucherId: freightVoucher.id,
-              ledgerAccountId: chargesPayableAcctId,
+              ledgerAccountId: freightExpenseAcctId!,
               debitAmount: String(freightUsd),
               creditAmount: "0",
-              narration: `Freight payable - container ${container.containerNumber}`,
+              narration: `Freight expense - container ${container.containerNumber}`,
             });
             await tx.insert(voucherEntries).values({
               voucherId: freightVoucher.id,
               ledgerAccountId: parseInt(reqFreightAccountId),
               debitAmount: "0",
               creditAmount: String(freightUsd),
-              narration: `Freight - container ${container.containerNumber}`,
+              narration: `Freight paid via own account - container ${container.containerNumber}`,
             });
           }
         }

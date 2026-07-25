@@ -267,6 +267,8 @@ export function OffloadDialog({
     setFreightCurrencyCode(effectiveFreightCcy);
     setFreightFxRate(effectiveFreightCcy === "USD" ? "1" : container.fxRateToUsd || "1");
     if (container.freightSupplierId) setFreightAccountId(`SUP:${container.freightSupplierId}`);
+    else if ((container as any).freightPaidBy === "own" && (container as any).freightOwnAccountId)
+      setFreightAccountId(String((container as any).freightOwnAccountId));
     else if (container.freightAccountId) setFreightAccountId(String(container.freightAccountId));
 
     const ocVal = parseFloat(container.otherCharges || "0");
