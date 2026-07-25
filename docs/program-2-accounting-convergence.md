@@ -86,7 +86,7 @@ This preserves the generic voucher route's linked-ledger reporting model without
 
 ### Step 2A.4 completed — atomic employee balance posting
 
-For active manual-journal creation, employee balance changes now execute inside the same database transaction as:
+For active manual-journal and protected generic-voucher creation, employee balance changes now execute inside the same database transaction as:
 
 - the voucher row;
 - voucher-entry rows;
@@ -103,47 +103,67 @@ Direct `employeeId` entries retain precedence. Ledger entries still map through 
 
 This removes the previous failure window where a voucher could commit and employee synchronization could fail afterward. A replay does not reapply the delta because the employee update runs only when the central posting result is new.
 
+### Step 2A.5 completed — protected generic voucher creation
+
+A startup-installed fetch guard now adds retry-stable identity to both active manual journals and active `/api/vouchers/with-entries` JSON writes, including callers that use `apiRequest` directly. The same payload keeps its identity through CSRF retry, network uncertainty, and repeated submission in the same browser session. Successful and definite 4xx outcomes release the identity; 5xx and network outcomes retain it.
+
+The protected generic route handles only the compatibility-safe subset:
+
+- active, non-optional vouchers;
+- a valid `clientRequestId`;
+- USD transaction currency;
+- at least two entries;
+- amounts with at most two decimal places;
+- no caller-supplied dual-currency fields.
+
+That subset covers the currently known Insurance extra-charge and chatbot voucher producers. The route:
+
+- preserves caller voucher number, type, date, description, location, and legacy voucher-level exchange rate;
+- normalizes entry-level USD historical fields;
+- auto-fills a customer's linked ledger and rejects a mismatched ledger;
+- validates company ownership before insert;
+- writes employee balance changes in the same transaction;
+- skips detailed audit, intercompany notification, and loan reallocation side effects on replay;
+- returns the existing `{ voucher, entries }` response fields plus replay diagnostics.
+
+Unsupported compatibility shapes call `next()` and continue into the unchanged legacy route. This includes:
+
+- optional or intentionally unbalanced drafts;
+- non-USD vouchers;
+- caller-supplied dual-currency fields;
+- amounts with more than two decimal places;
+- requests without a protected identity.
+
 ### Remaining compatibility side effects
 
-After the committed voucher transaction, the route still performs the existing best-effort:
+After a new committed voucher transaction, routes still perform their existing best-effort external or compatibility effects:
 
-- customer-order charge linking and recalculation;
-- factory daybook write;
-- WhatsApp rule evaluation;
-- detailed voucher audit record.
+- customer-order charge linking and recalculation for manual journals;
+- factory daybook writes for manual journals;
+- WhatsApp rule evaluation for manual journals;
+- detailed voucher audit output;
+- intercompany notifications for generic Payment/Receipt vouchers;
+- loan-account reallocation for generic vouchers.
 
-The employee balance is no longer part of that post-commit set.
-
-### Generic voucher endpoint remains unchanged
-
-The generic `/api/vouchers/with-entries` endpoint is deliberately not switched in this slice. Its known callers include insurance extra charges and chatbot-created vouchers. Those callers do not yet all pass a retry-stable request identity through the same client wrapper used by manual journals.
-
-A generic-route cutover must first add a stable identity boundary for all callers, then preserve:
-
-- customer linked-ledger auto-fill and mismatch rejection;
-- caller-provided dual-currency fields;
-- employee balance synchronization;
-- intercompany notifications;
-- loan-account reallocation;
-- detailed compatibility audit output.
+These are skipped when the central result is a replay.
 
 ### Remaining Phase 2A work
 
-- Obtain an executable build/test result for the active journal cutover.
-- Add retry-stable identity coverage for all `/api/vouchers/with-entries` callers.
-- Migrate generic active voucher creation only after those callers are covered.
-- Journal editing and deletion are not yet migrated.
-- Optional or intentionally unbalanced drafts remain on the compatibility path.
+- Obtain an executable build, type-check, and test result for the branch.
 - Design exact transactional reversal of employee deltas before journal edit/delete convergence.
+- Migrate journal editing and deletion only after exact reversal is proven.
+- Decide whether advanced generic multi-currency payloads should be normalized centrally or remain on a dedicated compatibility path.
+- Optional or intentionally unbalanced drafts remain on the legacy path by design.
 
 ## Verification status
 
 Focused regression tests were added for:
 
 - central-engine replay status;
-- request-ID retention and release;
+- manual and generic request-ID retention and release;
 - manual journal USD and CFA normalization;
 - aggregate/per-line rounding balance;
+- generic USD normalization and legacy passthrough boundaries;
 - company target grouping;
 - customer linked-ledger acceptance and mismatch rejection;
 - employee direct-ID and `EMP-*` ledger delta formulas.
