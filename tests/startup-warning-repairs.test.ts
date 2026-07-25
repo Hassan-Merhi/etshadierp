@@ -9,6 +9,7 @@ describe("startup warning repairs", () => {
     const source = read("server/startupWarningRepair.mjs");
 
     expect(source).toContain("pg_advisory_xact_lock");
+    expect(source).toContain("to_regclass('public.exchange_rates_company_date_pair_unique')");
     expect(source).toContain("PARTITION BY company_id, effective_date, from_currency, to_currency");
     expect(source).toContain("ORDER BY id DESC");
     expect(source).toContain("duplicate_rank > 1");
@@ -25,11 +26,13 @@ describe("startup warning repairs", () => {
     const source = read("server/routes/sp/spSupplierVoucherSync.ts");
 
     for (const required of [
-      "ALTER TABLE vouchers ADD COLUMN IF NOT EXISTS supplier_id INTEGER",
-      "ALTER TABLE voucher_entries ADD COLUMN IF NOT EXISTS supplier_id INTEGER",
-      "ALTER TABLE sp_containers ADD COLUMN IF NOT EXISTS supplier_id INTEGER",
-      "ALTER TABLE sp_containers ADD COLUMN IF NOT EXISTS goods_otw_voucher_id INTEGER",
-      "ALTER TABLE ledger_accounts ADD COLUMN IF NOT EXISTS sub_type TEXT",
+      "information_schema.columns",
+      "ALTER TABLE vouchers ADD COLUMN supplier_id INTEGER",
+      "ALTER TABLE voucher_entries ADD COLUMN supplier_id INTEGER",
+      "ALTER TABLE sp_containers ADD COLUMN supplier_id INTEGER",
+      "ALTER TABLE sp_containers ADD COLUMN goods_otw_voucher_id INTEGER",
+      "ALTER TABLE ledger_accounts ADD COLUMN sub_type TEXT",
+      "sp-supplier-voucher-sync-schema-v1",
       "sp-supplier-voucher-sync-trigger-v1",
       "sp-supplier-voucher-link-repair-v1",
       "UPDATE vouchers v",
@@ -39,5 +42,19 @@ describe("startup warning repairs", () => {
     }
 
     expect(source).not.toContain("WITH candidates AS");
+  });
+
+  it("keeps the admin schema diagnostic aligned with SP synchronization", () => {
+    const source = read("server/routes/admin/schemaDiagnosticRoutes.ts");
+
+    for (const required of [
+      '{ table: "vouchers", column: "supplier_id", ddl: "INTEGER" }',
+      '{ table: "voucher_entries", column: "supplier_id",',
+      '{ table: "sp_containers", column: "supplier_id",',
+      '{ table: "sp_containers", column: "goods_otw_voucher_id",',
+      '{ table: "ledger_accounts", column: "sub_type",',
+    ]) {
+      expect(source).toContain(required);
+    }
   });
 });
