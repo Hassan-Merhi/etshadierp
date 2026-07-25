@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  buildSpOffloadChargeSignature,
   buildSpOffloadLockScope,
   classifySpOffloadState,
   isCompatibleSpOffloadReplay,
@@ -12,22 +13,62 @@ describe("SP offload concurrency policy", () => {
     expect(buildSpOffloadLockScope(2, 45)).not.toEqual(buildSpOffloadLockScope(2, 44));
   });
 
+  it("normalizes charge order and parent-agent persistence shape", () => {
+    const requested = buildSpOffloadChargeSignature([
+      { chargeType: "paid_now", description: "Port", amountUsd: 250, creditBankAccountId: 7 },
+      { chargeType: "parent_agent", description: "Agent", amountUsd: 100, parentAgentAccountId: 91 },
+    ]);
+    const persisted = buildSpOffloadChargeSignature([
+      { chargeType: "parent_agent", description: "Agent", amountUsd: "100.0000", creditLedgerAccountId: 91 },
+      { chargeType: "paid_now", description: "Port", amountUsd: "250.0000", creditBankAccountId: 7 },
+    ]);
+    expect(requested).toBe(persisted);
+  });
+
   it("posts only an open container without an existing offload", () => {
     expect(classifySpOffloadState("open", false, false)).toBe("post");
   });
 
   it("accepts only a compatible completed offload as replay", () => {
-    const existing = { offloadDate: "2026-07-25", locationId: 8, totalLandedCostUsd: 1250 };
-    expect(isCompatibleSpOffloadReplay(existing, { ...existing, totalLandedCostUsd: 1250.004 })).toBe(true);
+    const chargeSignature = buildSpOffloadChargeSignature([
+      { chargeType: "paid_now", amountUsd: 1250, creditBankAccountId: 8 },
+    ]);
+    const existing = {
+      offloadDate: "2026-07-25",
+      locationId: 8,
+      totalLandedCostUsd: 1250,
+      chargeSignature,
+    };
+    expect(
+      isCompatibleSpOffloadReplay(existing, {
+        ...existing,
+        totalLandedCostUsd: 1250.004,
+      })
+    ).toBe(true);
     expect(classifySpOffloadState("offloaded", true, true)).toBe("replay");
     expect(classifySpOffloadState("open", true, true)).toBe("replay");
   });
 
-  it("rejects an incompatible retry instead of hiding a changed request", () => {
-    const existing = { offloadDate: "2026-07-25", locationId: 8, totalLandedCostUsd: 1250 };
+  it("rejects changed date, location, total, or charge account allocation", () => {
+    const existing = {
+      offloadDate: "2026-07-25",
+      locationId: 8,
+      totalLandedCostUsd: 1250,
+      chargeSignature: buildSpOffloadChargeSignature([
+        { chargeType: "paid_now", amountUsd: 1250, creditBankAccountId: 8 },
+      ]),
+    };
     expect(isCompatibleSpOffloadReplay(existing, { ...existing, locationId: 9 })).toBe(false);
     expect(isCompatibleSpOffloadReplay(existing, { ...existing, offloadDate: "2026-07-26" })).toBe(false);
     expect(isCompatibleSpOffloadReplay(existing, { ...existing, totalLandedCostUsd: 1250.01 })).toBe(false);
+    expect(
+      isCompatibleSpOffloadReplay(existing, {
+        ...existing,
+        chargeSignature: buildSpOffloadChargeSignature([
+          { chargeType: "paid_now", amountUsd: 1250, creditBankAccountId: 9 },
+        ]),
+      })
+    ).toBe(false);
     expect(classifySpOffloadState("offloaded", true, false)).toBe("conflict");
   });
 
