@@ -11,6 +11,12 @@ import {
 } from "../../services/sp/spOffloadConcurrencyPolicy";
 import { requireSpCompany } from "./spHelpers";
 
+function uniquePositiveIds(values: unknown[]): number[] {
+  return [...new Set(values.map(Number).filter((value) => Number.isInteger(value) && value > 0))].sort(
+    (left, right) => left - right
+  );
+}
+
 async function guardSpOffload(req: Request, res: Response, next: NextFunction): Promise<void> {
   const companyId = await requireSpCompany(req as any, res as any);
   if (!companyId) return;
@@ -29,9 +35,25 @@ async function guardSpOffload(req: Request, res: Response, next: NextFunction): 
 
   const client = await pool.connect();
   let released = false;
-  const release = async () => {
+  let transactionOpen = false;
+
+  const release = async (commit: boolean) => {
     if (released) return;
     released = true;
+    try {
+      if (transactionOpen) {
+        await client.query(commit ? "COMMIT" : "ROLLBACK");
+        transactionOpen = false;
+      }
+    } catch (error) {
+      logger.warn("SP offload ownership-lock transaction cleanup failed", {
+        companyId,
+        containerId,
+        commit,
+        error,
+      });
+    }
+
     try {
       await client.query("SELECT pg_advisory_unlock($1, $2)", [companyId, containerId]);
     } catch (error) {
@@ -56,11 +78,18 @@ async function guardSpOffload(req: Request, res: Response, next: NextFunction): 
       return;
     }
 
-    res.once("finish", () => void release());
-    res.once("close", () => void release());
+    await client.query("BEGIN");
+    transactionOpen = true;
+
+    res.once("finish", () => void release(true));
+    res.once("close", () => void release(false));
 
     const containerResult = await client.query<{ status: string }>(
-      "SELECT status FROM sp_containers WHERE id = $1 AND company_id = $2 LIMIT 1",
+      `SELECT status
+       FROM sp_containers
+       WHERE id = $1 AND company_id = $2
+       LIMIT 1
+       FOR KEY SHARE`,
       [containerId, companyId]
     );
     const container = containerResult.rows[0];
@@ -70,7 +99,11 @@ async function guardSpOffload(req: Request, res: Response, next: NextFunction): 
     }
 
     const locationResult = await client.query(
-      "SELECT id FROM locations WHERE id = $1 AND company_id = $2 AND deleted_at IS NULL LIMIT 1",
+      `SELECT id
+       FROM locations
+       WHERE id = $1 AND company_id = $2 AND deleted_at IS NULL
+       LIMIT 1
+       FOR KEY SHARE`,
       [locationId, companyId]
     );
     if (!locationResult.rows[0]) {
@@ -163,9 +196,111 @@ async function guardSpOffload(req: Request, res: Response, next: NextFunction): 
       return;
     }
 
+    const requiredSubTypes = ["sp_goods_otw", "sp_otw_clearing", "sp_stock", "sp_cost_clearing"];
+    if (requestedCharges.some((charge: any) => charge?.chargeType === "prepaid_used")) {
+      requiredSubTypes.push("sp_prepaid");
+    }
+    if (requestedCharges.some((charge: any) => charge?.chargeType === "parent_agent")) {
+      requiredSubTypes.push("sp_prepaid_expenses");
+    }
+
+    const controlAccounts = await client.query<{ sub_type: string }>(
+      `SELECT sub_type
+       FROM ledger_accounts
+       WHERE company_id = $1
+         AND sub_type = ANY($2::text[])
+         AND deleted_at IS NULL
+       ORDER BY sub_type
+       FOR KEY SHARE`,
+      [companyId, requiredSubTypes]
+    );
+    const foundSubTypes = new Set(controlAccounts.rows.map((row) => row.sub_type));
+    const missingSubTypes = requiredSubTypes.filter((subType) => !foundSubTypes.has(subType));
+    if (missingSubTypes.length > 0) {
+      res.status(400).json({
+        message: `SP accounts not configured: ${missingSubTypes.join(", ")}. Run setup first.`,
+      });
+      return;
+    }
+
+    const bankIds = uniquePositiveIds(
+      requestedCharges
+        .filter((charge: any) => charge?.chargeType === "paid_now")
+        .map((charge: any) => charge?.creditBankAccountId)
+    );
+    if (bankIds.length > 0) {
+      const bankRows = await client.query<{ id: number }>(
+        `SELECT id
+         FROM bank_accounts
+         WHERE company_id = $1 AND id = ANY($2::int[])
+         ORDER BY id
+         FOR KEY SHARE`,
+        [companyId, bankIds]
+      );
+      const foundIds = new Set(bankRows.rows.map((row) => Number(row.id)));
+      const missingId = bankIds.find((id) => !foundIds.has(id));
+      if (missingId) {
+        res.status(400).json({ message: `Bank account #${missingId} not found for this company` });
+        return;
+      }
+    }
+
+    const ledgerIds = uniquePositiveIds(
+      requestedCharges
+        .filter((charge: any) => charge?.chargeType === "unpaid_payable" || charge?.chargeType === "other")
+        .map((charge: any) => charge?.creditLedgerAccountId)
+    );
+    if (ledgerIds.length > 0) {
+      const ledgerRows = await client.query<{ id: number }>(
+        `SELECT id
+         FROM ledger_accounts
+         WHERE company_id = $1
+           AND id = ANY($2::int[])
+           AND deleted_at IS NULL
+         ORDER BY id
+         FOR KEY SHARE`,
+        [companyId, ledgerIds]
+      );
+      const foundIds = new Set(ledgerRows.rows.map((row) => Number(row.id)));
+      const missingId = ledgerIds.find((id) => !foundIds.has(id));
+      if (missingId) {
+        res.status(400).json({ message: `Ledger account #${missingId} not found for this company` });
+        return;
+      }
+    }
+
+    const parentAgentIds = uniquePositiveIds(
+      requestedCharges
+        .filter((charge: any) => charge?.chargeType === "parent_agent")
+        .map((charge: any) => charge?.parentAgentAccountId)
+    );
+    if (parentAgentIds.length > 0) {
+      const parentCompany = await client.query<{ parent_company_id: number | null }>(
+        "SELECT parent_company_id FROM companies WHERE id = $1 LIMIT 1",
+        [companyId]
+      );
+      const parentCompanyId = Number(parentCompany.rows[0]?.parent_company_id ?? 1);
+      const parentLedgers = await client.query<{ id: number }>(
+        `SELECT id
+         FROM ledger_accounts
+         WHERE company_id = $1
+           AND id = ANY($2::int[])
+           AND deleted_at IS NULL
+         ORDER BY id
+         FOR KEY SHARE`,
+        [parentCompanyId, parentAgentIds]
+      );
+      const foundIds = new Set(parentLedgers.rows.map((row) => Number(row.id)));
+      const missingId = parentAgentIds.find((id) => !foundIds.has(id));
+      if (missingId) {
+        res.status(400).json({ message: `Parent agent ledger #${missingId} not found for the parent company` });
+        return;
+      }
+    }
+
     next();
   } catch (error: unknown) {
-    await release();
+    await release(false);
     logger.error("SP offload concurrency guard failed", { companyId, containerId, error });
     res.status(500).json({ message: getErrorMessage(error) });
   }
