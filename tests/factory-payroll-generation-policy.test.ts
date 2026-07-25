@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildFactoryPayrollGenerationLockKey,
   calculateFactoryPayroll,
-} from "../server/services/payroll/factoryPayrollGenerationService";
+} from "../server/services/payroll/factoryPayrollGenerationPolicy";
 
 describe("factory payroll generation policy", () => {
   it("preserves monthly attendance-based salary calculation", () => {
