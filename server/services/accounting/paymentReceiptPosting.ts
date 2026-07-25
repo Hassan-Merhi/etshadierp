@@ -294,7 +294,7 @@ export async function buildPaymentReceiptPostingRequest(
     voucherDate: input.voucherDate,
     notes,
     currency: aggregate.transactionCurrency,
-    exchangeRate: aggregate.historicalExchangeRate,
+    exchangeRate: voucherExchangeRate,
     effectiveDate,
     entries: normalizedEntries,
   });
