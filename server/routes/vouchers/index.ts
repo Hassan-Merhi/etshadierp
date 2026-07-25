@@ -5,6 +5,7 @@ import { registerVoucherPaymentRoutes } from "./voucherPaymentRoutes";
 import { registerCentralGenericVoucherCreateRoute } from "./centralGenericVoucherCreateRoute";
 import { registerCentralPaymentReceiptCreateRoute } from "./centralPaymentReceiptCreateRoute";
 import { registerCentralPaymentReceiptLifecycleRoutes } from "./centralPaymentReceiptLifecycleRoute";
+import { registerCentralPaymentReceiptDeleteRoute } from "./centralPaymentReceiptDeleteRoute";
 import { registerCentralJournalCreateRoute } from "./centralJournalCreateRoute";
 import { registerCentralJournalLifecycleRoutes } from "./centralJournalLifecycleRoute";
 import { registerVoucherJournalRoutes } from "./voucherJournalRoutes";
@@ -27,6 +28,10 @@ export function registerVoucherRoutes(app: Express) {
   // Active Payment/Receipt edits reverse old employee effects and apply new
   // effects in the same transaction. Optional transitions continue to legacy.
   registerCentralPaymentReceiptLifecycleRoutes(app);
+  // Plain active Payment/Receipt deletion reverses employee effects exactly once.
+  // POS sale Receipts, SAL payroll vouchers, optional vouchers, and every other
+  // voucher type continue into their existing specialized deletion paths.
+  registerCentralPaymentReceiptDeleteRoute(app);
   registerVoucherPaymentRoutes(app);
   // Active manual journals use the central posting engine. Optional journals
   // call next() and continue into the unchanged legacy handler below.
