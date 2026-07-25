@@ -67,7 +67,7 @@ function positiveAccountId(value: unknown): number {
 function positiveAmount(value: unknown, index: number): Decimal {
   let amount: Decimal;
   try {
-    amount = new Decimal(value as Decimal.Value);
+    amount = new Decimal(String(value ?? ""));
   } catch {
     throw new PostingValidationError(
       "POSTING_AMOUNT_INVALID",
@@ -281,7 +281,14 @@ export function buildManualJournalPostingRequest(
 
   const clientRequestId = resolveManualJournalClientRequestId(input.clientRequestId);
   const currency = aggregate.transactionCurrency;
-  const exchangeRate = aggregate.historicalExchangeRate;
+  const normalizedExchangeRate = aggregate.historicalExchangeRate;
+  const suppliedRate = input.exchangeRate;
+  const voucherExchangeRate =
+    suppliedRate === null || suppliedRate === undefined || suppliedRate === ""
+      ? currency === "USD"
+        ? null
+        : normalizedExchangeRate
+      : String(suppliedRate);
   const notes = input.notes?.trim() || null;
   const effectiveDate = input.effectiveDate || null;
   const fingerprint = postingFingerprint({
@@ -289,7 +296,7 @@ export function buildManualJournalPostingRequest(
     voucherDate: input.voucherDate,
     notes,
     currency,
-    exchangeRate,
+    exchangeRate: normalizedExchangeRate,
     effectiveDate,
     entries: normalizedEntries,
   });
@@ -308,7 +315,7 @@ export function buildManualJournalPostingRequest(
         totalAmount: baseTotal.toFixed(6),
         optional: false,
         currency,
-        exchangeRate,
+        exchangeRate: voucherExchangeRate,
         effectiveDate,
       },
       entries: normalizedEntries,
