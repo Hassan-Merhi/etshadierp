@@ -4,6 +4,7 @@ import { requireAuth } from "../../auth";
 import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
 import {
+  buildSpOffloadChargeSignature,
   classifySpOffloadState,
   isCompatibleSpOffloadReplay,
   normalizeSpOffloadDate,
@@ -17,6 +18,12 @@ async function guardSpOffload(req: Request, res: Response, next: NextFunction): 
   const containerId = Number(req.body?.containerId);
   if (!Number.isInteger(containerId) || containerId <= 0) {
     res.status(400).json({ message: "containerId is required" });
+    return;
+  }
+
+  const locationId = Number(req.body?.locationId);
+  if (!Number.isInteger(locationId) || locationId <= 0) {
+    res.status(400).json({ message: "locationId is required" });
     return;
   }
 
@@ -62,13 +69,32 @@ async function guardSpOffload(req: Request, res: Response, next: NextFunction): 
       return;
     }
 
+    const locationResult = await client.query(
+      "SELECT id FROM locations WHERE id = $1 AND company_id = $2 AND deleted_at IS NULL LIMIT 1",
+      [locationId, companyId]
+    );
+    if (!locationResult.rows[0]) {
+      res.status(400).json({ message: "Invalid location for this company" });
+      return;
+    }
+
     const existingResult = await client.query(
-      `SELECT o.*,
+      `SELECT o.id,
+              o.company_id AS "companyId",
+              o.container_id AS "containerId",
+              o.offload_date AS "offloadDate",
+              o.total_qty AS "totalQty",
+              o.total_base_cost_usd AS "totalBaseCostUsd",
+              o.total_landed_cost_usd AS "totalLandedCostUsd",
+              o.total_final_cost_usd AS "totalFinalCostUsd",
+              o.voucher_id_reversal AS "voucherIdReversal",
+              o.voucher_id_stock AS "voucherIdStock",
+              o.created_at AS "createdAt",
               (SELECT sm.location_id
                FROM sp_stock_movements sm
                WHERE sm.offload_id = o.id
                ORDER BY sm.id
-               LIMIT 1) AS location_id
+               LIMIT 1) AS "locationId"
        FROM sp_offloads o
        WHERE o.container_id = $1 AND o.company_id = $2
        ORDER BY o.id DESC
@@ -76,34 +102,56 @@ async function guardSpOffload(req: Request, res: Response, next: NextFunction): 
       [containerId, companyId]
     );
     const existingOffload = existingResult.rows[0] ?? null;
-    const requestedLandedTotal = Array.isArray(req.body?.chargeLines)
-      ? req.body.chargeLines.reduce((sum: number, charge: any) => sum + Number(charge?.amountUsd ?? 0), 0)
-      : 0;
+
+    let existingChargeSignature = buildSpOffloadChargeSignature([]);
+    if (existingOffload) {
+      const existingCharges = await client.query(
+        `SELECT charge_type AS "chargeType",
+                description,
+                amount_usd AS "amountUsd",
+                prepaid_charge_id AS "prepaidChargeId",
+                credit_ledger_account_id AS "creditLedgerAccountId",
+                credit_bank_account_id AS "creditBankAccountId"
+         FROM sp_offload_charges
+         WHERE offload_id = $1 AND company_id = $2`,
+        [existingOffload.id, companyId]
+      );
+      existingChargeSignature = buildSpOffloadChargeSignature(existingCharges.rows);
+    }
+
+    const requestedCharges = Array.isArray(req.body?.chargeLines) ? req.body.chargeLines : [];
+    const requestedLandedTotal = requestedCharges.reduce(
+      (sum: number, charge: any) => sum + (Number.isFinite(Number(charge?.amountUsd)) ? Number(charge.amountUsd) : 0),
+      0
+    );
     const replayCompatible = existingOffload
       ? isCompatibleSpOffloadReplay(
           {
-            offloadDate: normalizeSpOffloadDate(existingOffload.offload_date),
-            locationId: Number(existingOffload.location_id),
-            totalLandedCostUsd: Number(existingOffload.total_landed_cost_usd ?? 0),
+            offloadDate: normalizeSpOffloadDate(existingOffload.offloadDate),
+            locationId: Number(existingOffload.locationId),
+            totalLandedCostUsd: Number(existingOffload.totalLandedCostUsd ?? 0),
+            chargeSignature: existingChargeSignature,
           },
           {
             offloadDate: normalizeSpOffloadDate(req.body?.offloadDate),
-            locationId: Number(req.body?.locationId),
+            locationId,
             totalLandedCostUsd: requestedLandedTotal,
+            chargeSignature: buildSpOffloadChargeSignature(requestedCharges),
           }
         )
       : false;
     const decision = classifySpOffloadState(container.status, Boolean(existingOffload), replayCompatible);
 
     if (decision === "replay") {
+      const { locationId: _locationId, ...responseOffload } = existingOffload;
       res.setHeader("X-Idempotent-Replay", "true");
-      res.json(existingOffload);
+      res.json(responseOffload);
       return;
     }
     if (decision === "conflict") {
       res.status(409).json({
         code: "SP_OFFLOAD_REPLAY_MISMATCH",
-        message: "This container is already offloaded with different date, location, or landed-charge totals.",
+        message: "This container is already offloaded with different date, location, or charge allocation.",
       });
       return;
     }
