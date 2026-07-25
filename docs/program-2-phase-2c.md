@@ -67,18 +67,54 @@ The existing edit response, audit, intercompany recalculation, historical curren
 
 POS Sales/Receipt deletion remains on the inventory-aware generic deletion path. Program 2B explicitly excludes Receipt vouchers with sales items from the plain Payment/Receipt deletion route, so inventory restoration and sales-item cleanup continue to run.
 
-## Stock transfer map
+## 2C.3 completed — stock-transfer lifecycle and deletion safety
 
-Stock-transfer revision approval already has a strong transaction boundary with transfer/voucher row locks, company/location/item validation, and deterministic inventory updates.
+### Edit and lifecycle ownership
 
-The older direct stock-transfer edit route still needs a separate convergence slice. Its current audit snapshot is read before the transaction, and the transaction reads the transfer header and old items without first locking the transfer/voucher scope. The next stock-transfer work must:
+The repository already contains `saveStockTransferLifecycle`, which:
 
-- lock the voucher and transfer header before resolving old locations and items;
-- validate source and destination company ownership inside the transaction;
-- lock item and inventory rows in deterministic order;
-- preserve `inventoryApplied` and optional-transfer behavior;
-- prevent simultaneous edit or retry double reversal; and
-- leave the newer revision-approval workflow unchanged.
+- locks the transfer header and parent voucher together;
+- distinguishes optional drafts, posting, unposting, recovery, and posted edits through `optional` and `inventoryApplied`;
+- validates company-owned locations and stock items;
+- locks source inventory in deterministic source/item order;
+- reverses previously applied stock only when required; and
+- applies the replacement transfer atomically.
+
+`stockTransferLifecycleRoutes` is registered before the older direct transfer editor, so the lifecycle service owns active direct edits and the weaker legacy algorithm does not execute for recognized Stock Transfer vouchers. Revision approval remains on its separate transaction-safe workflow.
+
+### Replay-safe deletion
+
+The old generic deletion path loaded the voucher before its transaction and read the transfer header without a row lock. Two concurrent deletion requests could therefore both observe the transfer as applied and reverse the same inventory movement.
+
+A dedicated Admin-only Stock Transfer deletion route now runs before the generic delete handler. One transaction:
+
+1. locks the voucher row;
+2. rechecks company ownership, transfer type, migrated protection, and `deletedAt`;
+3. locks the transfer header and item rows;
+4. decides reversal from `inventoryApplied`, retaining the non-optional fallback for legacy records;
+5. validates the persisted source, destination, and stock-item company scope;
+6. reverses items in deterministic source/item order;
+7. removes the transfer items and header;
+8. preserves employee/intercompany pending cleanup when malformed legacy links exist; and
+9. soft-deletes the voucher.
+
+A second deletion waits for the first transaction and then returns `replayed: true` without moving stock again.
+
+The older mixed bulk-delete implementation is temporarily blocked when the request contains a Stock Transfer voucher because it does not own the same row locks. Stock Transfer vouchers must be deleted individually until bulk deletion is migrated to the lifecycle service.
+
+## Active registry correction
+
+During Phase 2C, the audit found that Program 2 central routes had been added to `server/routes/vouchers/index.ts`, while the running server imports `server/routes/voucherRoutes.ts`. The active registry is now authoritative and registers:
+
+- central generic voucher creation;
+- Payment/Receipt creation, editing, and deletion;
+- Journal creation, editing, and deletion;
+- Stock Transfer deletion; and
+- Stock Transfer lifecycle and revision routes
+
+before their legacy compatibility handlers.
+
+`server/routes/vouchers/index.ts` is now only a compatibility re-export of the active registry. The generic voucher-entry routes remain registered once by `server/routes.ts` immediately after the protected registry, removing the previous duplicate registration.
 
 ## Focused regression coverage added
 
@@ -86,15 +122,20 @@ The older direct stock-transfer edit route still needs a separate convergence sl
 - stable company-scoped POS advisory lock keys;
 - lock-key separation across companies and sale IDs;
 - locked-location fallback when an edit does not submit a new location;
-- explicit location-change resolution; and
-- POS-user location-change rejection against the locked voucher state.
+- explicit location-change resolution;
+- POS-user location-change rejection against the locked voucher state;
+- all persisted Stock Transfer voucher-type spellings;
+- current and legacy deletion-reversal policy;
+- deterministic deletion item ordering;
+- applied transfer deletion restoring inventory exactly once; and
+- optional unapplied transfer deletion without inventory movement.
 
 ## Intentionally unchanged
 
 - POS accounting entry formulas;
 - POS inventory costing and negative-stock policy;
-- POS deletion and inventory restoration;
-- stock-transfer creation, edit, deletion, and revision approval;
+- POS deletion and inventory restoration logic;
+- Stock Transfer posting, unposting, revision formulas, and inventory costing;
 - container, Supplier Partner non-POS, payroll, and rental posting;
 - database schema; and
 - historical records.
