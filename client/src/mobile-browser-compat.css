@@ -1,0 +1,28 @@
+/*
+ * Mobile/tablet browser viewport compatibility.
+ *
+ * The app shell uses modern small/dynamic viewport units when available, but
+ * older Safari, Android WebView, and tablet browsers may ignore those units.
+ * Keep 100vh as the baseline and progressively upgrade without changing any
+ * desktop breakpoint, spacing, width, or business-page styles.
+ */
+:root {
+  --app-viewport-height: 100vh;
+}
+
+@supports (height: 100dvh) {
+  :root {
+    --app-viewport-height: 100dvh;
+  }
+}
+
+@supports (height: 100svh) {
+  :root {
+    --app-viewport-height: 100svh;
+  }
+}
+
+[data-slot="sidebar-wrapper"],
+[data-slot="sidebar-container"] {
+  height: var(--app-viewport-height);
+}
