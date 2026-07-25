@@ -37,6 +37,25 @@ describe("validateCentralPostingRequest", () => {
     });
   });
 
+  it("accepts the customer plus linked-ledger compatibility shape", () => {
+    const input = request({
+      entries: [
+        {
+          ledgerAccountId: 10,
+          customerId: 30,
+          debitAmount: "100",
+          creditAmount: "0",
+        },
+        { bankAccountId: 20, debitAmount: "0", creditAmount: "100" },
+      ],
+    });
+
+    expect(validateCentralPostingRequest(input)).toEqual({
+      debitTotal: "100",
+      creditTotal: "100",
+    });
+  });
+
   it("rejects unbalanced entries", () => {
     const input = request({
       entries: [
@@ -49,12 +68,12 @@ describe("validateCentralPostingRequest", () => {
     );
   });
 
-  it("rejects entries with multiple accounting targets", () => {
+  it("rejects unrelated multiple accounting targets", () => {
     const input = request({
       entries: [
         {
           ledgerAccountId: 10,
-          customerId: 30,
+          supplierId: 30,
           debitAmount: "100",
           creditAmount: "0",
         },
