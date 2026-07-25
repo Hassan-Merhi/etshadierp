@@ -20,6 +20,9 @@ export interface EmployeeBalanceDeltaCollection {
   byEmployeeCode: Map<string, EmployeeBalanceDelta>;
 }
 
+export type EmployeeBalancePostingDirection = "apply" | "reverse";
+export type MissingEmployeeBehavior = "throw" | "skip";
+
 interface MutableDelta {
   balanceChange: Decimal;
   deposits: Decimal;
@@ -38,12 +41,14 @@ function addDelta(
   target: Map<number | string, MutableDelta>,
   key: number | string,
   debit: Decimal,
-  credit: Decimal
+  credit: Decimal,
+  direction: EmployeeBalancePostingDirection
 ): void {
+  const multiplier = direction === "reverse" ? new Decimal(-1) : new Decimal(1);
   const current = target.get(key) ?? emptyDelta();
-  current.balanceChange = current.balanceChange.plus(credit).minus(debit);
-  current.deposits = current.deposits.plus(credit);
-  current.withdrawals = current.withdrawals.plus(debit);
+  current.balanceChange = current.balanceChange.plus(credit.minus(debit).times(multiplier));
+  current.deposits = current.deposits.plus(credit.times(multiplier));
+  current.withdrawals = current.withdrawals.plus(debit.times(multiplier));
   target.set(key, current);
 }
 
@@ -70,16 +75,19 @@ function parseAmount(value: string | null | undefined): Decimal {
  *   totalDeposits  += credit
  *   totalWithdrawals += debit
  *
+ * In reverse mode the exact prior delta is subtracted from all three fields.
  * Direct employeeId entries take precedence. Entries without employeeId may map
  * through a company ledger whose code is `EMP-<employee code>`.
  */
 export function collectEmployeeBalanceDeltas(input: {
   entries: EmployeeBalancePostingEntry[];
   employeeCodeByLedgerId?: ReadonlyMap<number, string>;
+  direction?: EmployeeBalancePostingDirection;
 }): EmployeeBalanceDeltaCollection {
   const byEmployeeIdMutable = new Map<number | string, MutableDelta>();
   const byEmployeeCodeMutable = new Map<number | string, MutableDelta>();
   const employeeCodeByLedgerId = input.employeeCodeByLedgerId ?? new Map<number, string>();
+  const direction = input.direction ?? "apply";
 
   for (const entry of input.entries) {
     const debit = parseAmount(entry.debitAmount);
@@ -90,14 +98,14 @@ export function collectEmployeeBalanceDeltas(input: {
       if (!Number.isInteger(employeeId) || employeeId <= 0) {
         throw new Error(`Invalid employeeId in balance posting: ${entry.employeeId}`);
       }
-      addDelta(byEmployeeIdMutable, employeeId, debit, credit);
+      addDelta(byEmployeeIdMutable, employeeId, debit, credit, direction);
       continue;
     }
 
     if (entry.ledgerAccountId != null) {
       const ledgerId = Number(entry.ledgerAccountId);
       const employeeCode = employeeCodeByLedgerId.get(ledgerId);
-      if (employeeCode) addDelta(byEmployeeCodeMutable, employeeCode, debit, credit);
+      if (employeeCode) addDelta(byEmployeeCodeMutable, employeeCode, debit, credit, direction);
     }
   }
 
@@ -115,7 +123,8 @@ async function applyDeltaByEmployeeId(
   tx: any,
   companyId: number,
   employeeId: number,
-  delta: EmployeeBalanceDelta
+  delta: EmployeeBalanceDelta,
+  missingEmployeeBehavior: MissingEmployeeBehavior
 ): Promise<void> {
   const updated = await tx
     .update(employees)
@@ -127,7 +136,7 @@ async function applyDeltaByEmployeeId(
     .where(and(eq(employees.id, employeeId), eq(employees.companyId, companyId)))
     .returning({ id: employees.id });
 
-  if (updated.length !== 1) {
+  if (updated.length !== 1 && missingEmployeeBehavior === "throw") {
     throw new Error(`Employee ${employeeId} not found in company ${companyId} during balance posting`);
   }
 }
@@ -150,7 +159,7 @@ async function applyDeltaByEmployeeCode(
 
   if (updated.length !== 1) {
     // Preserve the legacy behavior for an EMP-* ledger with no matching employee:
-    // it does not block the voucher posting.
+    // it does not block the voucher posting or reversal.
     return;
   }
 }
@@ -159,6 +168,8 @@ export async function applyEmployeeBalanceDeltasTx(input: {
   tx: any;
   companyId: number;
   entries: EmployeeBalancePostingEntry[];
+  direction?: EmployeeBalancePostingDirection;
+  missingEmployeeBehavior?: MissingEmployeeBehavior;
 }): Promise<void> {
   const ledgerIds = [...new Set(
     input.entries
@@ -189,10 +200,18 @@ export async function applyEmployeeBalanceDeltasTx(input: {
   const deltas = collectEmployeeBalanceDeltas({
     entries: input.entries,
     employeeCodeByLedgerId,
+    direction: input.direction ?? "apply",
   });
 
+  const missingEmployeeBehavior = input.missingEmployeeBehavior ?? "throw";
   for (const [employeeId, delta] of deltas.byEmployeeId) {
-    await applyDeltaByEmployeeId(input.tx, input.companyId, employeeId, delta);
+    await applyDeltaByEmployeeId(
+      input.tx,
+      input.companyId,
+      employeeId,
+      delta,
+      missingEmployeeBehavior
+    );
   }
 
   for (const [employeeCode, delta] of deltas.byEmployeeCode) {
