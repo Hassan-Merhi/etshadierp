@@ -314,8 +314,22 @@ export function ContainerFormDialog({
           freightAmt > 0 && freightPaidBy === "supplier" && data.supplierId
             ? parseInt(data.supplierId)
             : null,
-        otherCharges: data.otherCharges || "0",
-        otherChargesAccountId: data.otherChargesAccountId ? parseInt(data.otherChargesAccountId) : null,
+        // Sync all legacy single-row other-charge columns from the first valid
+        // charge line so the offload dialog pre-fills amount, account, and currency
+        // correctly.  When there are multiple lines the offload dialog still shows
+        // one combined amount (sum) — multi-line per-charge posting happens via the
+        // per-row system at creation/edit time; offload uses the aggregated values.
+        otherCharges: (() => {
+          const total = otherChargeLines
+            .filter((l) => parseFloat(l.amount || "0") > 0)
+            .reduce((sum, l) => sum + parseFloat(l.amount), 0);
+          return total > 0 ? String(total) : data.otherCharges || "0";
+        })(),
+        otherChargesAccountId: (() => {
+          const first = otherChargeLines.find((l) => parseFloat(l.amount || "0") > 0);
+          if (first?.ledgerAccountId) return parseInt(first.ledgerAccountId);
+          return data.otherChargesAccountId ? parseInt(data.otherChargesAccountId) : null;
+        })(),
         // Keep the legacy single-row currency column in sync so the offload dialog
         // can read the correct currency when pre-filling the Other Charges field.
         otherChargesCurrencyCode:

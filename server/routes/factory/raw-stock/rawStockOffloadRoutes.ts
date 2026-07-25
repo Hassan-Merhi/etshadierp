@@ -975,25 +975,22 @@ export function registerRawStockOffloadRoutes(app: Express) {
               narration: `Other charges payable to supplier - container ${container.containerNumber}`,
             });
           } else {
-            // No supplier: Dr Factory Charges Payable / Cr chosen account.
-            // Same reasoning as the freight branch above — both legs are plain
-            // ledger accounts, so they must be posted in USD (ocUsd), not the raw
-            // native-currency otherChargesVal, or a non-USD chosen account silently
-            // misstates the true balance in every USD-summed report (Net Position,
-            // balance sheet, etc).
+            // Own-account other charges: Dr OC Expense / Cr chosen account.
+            // Both legs are plain ledger accounts so amounts must be in USD (ocUsd)
+            // — same reasoning as the freight branch above.
             await tx.insert(voucherEntries).values({
               voucherId: ocMainVoucher.id,
-              ledgerAccountId: chargesPayableAcctId,
+              ledgerAccountId: ocExpenseAcctId!,
               debitAmount: String(ocUsd),
               creditAmount: "0",
-              narration: `Other charges payable - container ${container.containerNumber}`,
+              narration: `Other charges expense - container ${container.containerNumber}`,
             });
             await tx.insert(voucherEntries).values({
               voucherId: ocMainVoucher.id,
               ledgerAccountId: parseInt(reqOtherChargesAccountId),
               debitAmount: "0",
               creditAmount: String(ocUsd),
-              narration: `Other charges - container ${container.containerNumber}`,
+              narration: `Other charges paid via own account - container ${container.containerNumber}`,
             });
           }
         }
