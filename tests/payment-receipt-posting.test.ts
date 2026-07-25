@@ -21,6 +21,15 @@ async function resolveTarget(accountType: string, accountId: number): Promise<Vo
   return { [field]: accountId } as VoucherEntryInsertFields;
 }
 
+async function resolveLegacyEditTarget(
+  accountType: string,
+  accountId: number
+): Promise<VoucherEntryInsertFields> {
+  const field = targets[accountType];
+  if (!field) throw new Error(`Unsupported account type ${accountType}`);
+  return { [field]: accountId } as VoucherEntryInsertFields;
+}
+
 function baseInput(overrides: Record<string, unknown> = {}) {
   return {
     companyId: 1,
@@ -89,6 +98,18 @@ describe("buildPaymentReceiptPostingRequest", () => {
       ledgerAccountId: 1055,
       debitAmount: "25.000000",
     });
+  });
+
+  it("preserves a customer-only target for the legacy edit resolver", async () => {
+    const built = await buildPaymentReceiptPostingRequest(baseInput({
+      entries: [{ accountType: "customer", accountId: 55, amount: "25" }],
+      resolveTarget: resolveLegacyEditTarget,
+    }));
+    expect(built.request.entries[0]).toMatchObject({
+      customerId: 55,
+      debitAmount: "25.000000",
+    });
+    expect(built.request.entries[0]).not.toHaveProperty("ledgerAccountId");
   });
 
   it("keeps non-USD debit and credit totals exactly balanced", async () => {
