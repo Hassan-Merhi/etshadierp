@@ -49,6 +49,15 @@ export type {
 } from "./manualJournalPosting";
 
 export {
+  buildGenericVoucherPostingRequest,
+  supportsCentralGenericVoucher,
+} from "./genericVoucherPosting";
+export type {
+  BuiltGenericVoucherPosting,
+  GenericVoucherInput,
+} from "./genericVoucherPosting";
+
+export {
   assertCustomerLinkedLedgerPairs,
   collectCustomerLedgerPairs,
   validateCustomerLedgerPairs,
