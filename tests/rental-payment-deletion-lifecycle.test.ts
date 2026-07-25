@@ -12,40 +12,46 @@ async function query(text: string, params: unknown[] = []) {
 }
 
 beforeAll(async () => {
-  [({ id: companyId } = await query(
+  const [company] = await query(
     `INSERT INTO companies (name, type, base_currency)
      VALUES ('RentalDelete-' || gen_random_uuid(), 'ERP', 'USD')
      RETURNING id`
-  ))];
+  );
+  companyId = company.id;
 
-  [({ id: unitId } = await query(
+  const [unit] = await query(
     `INSERT INTO property_units
        (company_id, module, unit_type, location_group, unit_number, active)
      VALUES ($1, 'ERP', 'SHOP', 'Deletion Tests', 'DEL-1', true)
      RETURNING id`,
     [companyId]
-  ))];
+  );
+  unitId = unit.id;
 
-  [({ id: contractId } = await query(
+  const [contract] = await query(
     `INSERT INTO property_contracts
        (company_id, module, unit_id, tenant_name, rental_amount, start_date, status, currency)
      VALUES ($1, 'ERP', $2, 'Deletion Tenant', '500.00', '2026-01-01', 'ACTIVE', 'USD')
      RETURNING id`,
     [companyId, unitId]
-  ))];
+  );
+  contractId = contract.id;
 
-  [({ id: cashAccountId } = await query(
+  const [cashAccount] = await query(
     `INSERT INTO ledger_accounts
        (company_id, name, code, account_type, is_active)
      VALUES ($1, 'Rental Delete Cash', 'RENT-DEL-CASH', 'Asset', true)
      RETURNING id`,
     [companyId]
-  ))];
+  );
+  cashAccountId = cashAccount.id;
 });
 
 afterAll(async () => {
+  await query(`DELETE FROM inter_company_transfers WHERE from_company_id = $1 OR to_company_id = $1`, [companyId]);
   await query(`DELETE FROM property_payments WHERE company_id = $1`, [companyId]);
   await query(`DELETE FROM property_monthly_ledger WHERE company_id = $1`, [companyId]);
+  await query(`DELETE FROM voucher_entries WHERE voucher_id IN (SELECT id FROM vouchers WHERE company_id = $1)`, [companyId]);
   await query(`DELETE FROM vouchers WHERE company_id = $1`, [companyId]);
   await query(`DELETE FROM property_contracts WHERE id = $1`, [contractId]);
   await query(`DELETE FROM property_units WHERE id = $1`, [unitId]);
