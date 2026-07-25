@@ -57,6 +57,14 @@ export type {
   GenericVoucherInput,
 } from "./genericVoucherPosting";
 
+export { buildPaymentReceiptPostingRequest } from "./paymentReceiptPosting";
+export type {
+  BuildPaymentReceiptPostingInput,
+  BuiltPaymentReceiptPosting,
+  PaymentReceiptLineInput,
+  PaymentReceiptVoucherType,
+} from "./paymentReceiptPosting";
+
 export {
   assertCustomerLinkedLedgerPairs,
   collectCustomerLedgerPairs,
