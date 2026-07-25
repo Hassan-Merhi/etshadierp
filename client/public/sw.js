@@ -1,6 +1,8 @@
 const CACHE_VERSION = "erp-v9";
 const CACHE_PREFIX = "erp-";
 const APP_SHELL = ["/", "/manifest.json"];
+const HASHED_ASSET_RE =
+  /^\/assets\/[^/]+-[A-Za-z0-9_-]{6,}\.(?:js|css|woff2?|ttf|png|jpe?g|webp|svg|ico)$/i;
 
 // ── Install: cache the latest app shell ───────────────────────────────────────
 self.addEventListener("install", (event) => {
@@ -52,12 +54,17 @@ self.addEventListener("fetch", (event) => {
   } else if (request.mode === "navigate") {
     // Navigation requests: network first, fall back to the single cached SPA shell.
     event.respondWith(navigationHandler(request));
+  } else if (HASHED_ASSET_RE.test(url.pathname)) {
+    // Content-hashed production assets are immutable. Serve the Cache Storage
+    // copy first so refreshes, reopened tabs and repeat visits do not download
+    // the same 1–2 MB bundles from Render again.
+    event.respondWith(cacheFirstHashedAsset(request));
   } else if (
     url.pathname.startsWith("/assets/") ||
     url.pathname.startsWith("/node_modules/.vite/") ||
     url.pathname.startsWith("/src/")
   ) {
-    // Vite bundles + pre-bundled deps + source files: always network-first.
+    // Unhashed/dev assets remain network-first so edits are immediately visible.
     event.respondWith(networkFirstAsset(request));
   } else {
     // Other static assets (fonts, images, sw.js itself): stale-while-revalidate.
@@ -65,7 +72,7 @@ self.addEventListener("fetch", (event) => {
   }
 });
 
-// ── Cache helpers ─────────────────────────────────────────────────────────────
+// ── Cache helpers ──────────────────────────────────────────────────────────────
 
 async function deleteErpCachesExcept(keepName) {
   const keys = await caches.keys();
@@ -77,6 +84,15 @@ async function deleteErpCachesExcept(keepName) {
 async function deleteAllErpCaches() {
   const keys = await caches.keys();
   await Promise.all(keys.filter((key) => key.startsWith(CACHE_PREFIX)).map((key) => caches.delete(key)));
+}
+
+function rejectHtmlAssetResponse(response) {
+  const contentType = response.headers.get("content-type") || "";
+  if (!contentType.includes("text/html")) return null;
+  return new Response("Asset response was HTML", {
+    status: 503,
+    headers: { "Content-Type": "text/plain" },
+  });
 }
 
 // ── Strategies ────────────────────────────────────────────────────────────────
@@ -123,24 +139,36 @@ async function navigationHandler(request) {
   }
 }
 
-// Network-first for Vite content-hashed bundles. Never return HTML as a script
-// or stylesheet; that produces misleading MIME errors and can strand mobile tabs.
+// Cache-first is safe only for Vite content-hashed production files. Their URL
+// changes whenever the content changes, and the server marks them immutable.
+async function cacheFirstHashedAsset(request) {
+  const cache = await caches.open(CACHE_VERSION);
+  const cached = await cache.match(request);
+  if (cached) return cached;
+
+  try {
+    const response = await fetch(request.clone());
+    const invalidResponse = rejectHtmlAssetResponse(response);
+    if (invalidResponse) return invalidResponse;
+    if (response.ok) await cache.put(request, response.clone());
+    return response;
+  } catch {
+    return new Response("Asset unavailable offline", {
+      status: 503,
+      headers: { "Content-Type": "text/plain" },
+    });
+  }
+}
+
+// Network-first for unhashed Vite/development content. Never return HTML as a
+// script or stylesheet; that produces misleading MIME errors on mobile browsers.
 async function networkFirstAsset(request) {
   const cache = await caches.open(CACHE_VERSION);
   try {
     const response = await fetch(request.clone(), { cache: "no-store" });
-    const contentType = response.headers.get("content-type") || "";
-
-    if (contentType.includes("text/html")) {
-      return new Response("Asset response was HTML", {
-        status: 503,
-        headers: { "Content-Type": "text/plain" },
-      });
-    }
-
-    if (response.ok) {
-      await cache.put(request, response.clone());
-    }
+    const invalidResponse = rejectHtmlAssetResponse(response);
+    if (invalidResponse) return invalidResponse;
+    if (response.ok) await cache.put(request, response.clone());
     return response;
   } catch {
     const cached = await cache.match(request);
