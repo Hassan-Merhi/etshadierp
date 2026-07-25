@@ -85,6 +85,13 @@
       "when": 1753111800000,
       "tag": "20260720_006_entity_opening_and_asset_currency",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1784993400000,
+      "tag": "20260720_003_ledger_account_opening_balance_currency",
+      "breakpoints": true
     }
   ]
 }
