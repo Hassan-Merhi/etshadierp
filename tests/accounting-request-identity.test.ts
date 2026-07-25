@@ -1,12 +1,15 @@
 import { describe, expect, it } from "vitest";
 import {
   attachAccountingRequestIdentity,
+  isProtectedAccountingRequest,
   releaseAccountingRequestIdentity,
+  shouldReleaseAccountingRequestIdentity,
 } from "../client/src/lib/accountingRequestIdentity";
 
-const URL = "/api/vouchers/journal";
+const JOURNAL_URL = "/api/vouchers/journal";
+const GENERIC_URL = "/api/vouchers/with-entries";
 
-function payload() {
+function journalPayload() {
   return {
     voucherDate: "2026-07-25",
     notes: "Retry-safe journal",
@@ -18,36 +21,75 @@ function payload() {
   };
 }
 
+function genericPayload() {
+  return {
+    voucher: {
+      voucherNumber: "INS-CHARGE-1",
+      voucherType: "Journal",
+      voucherDate: "2026-07-25",
+      optional: false,
+    },
+    entries: [
+      { ledgerAccountId: 10, debitAmount: "25.00", creditAmount: "0" },
+      { ledgerAccountId: 20, debitAmount: "0", creditAmount: "25.00" },
+    ],
+  };
+}
+
 describe("accounting request identity", () => {
   it("reuses the same identity for the same uncertain journal retry", () => {
-    const first = attachAccountingRequestIdentity("POST", URL, payload()) as Record<string, unknown>;
-    const retry = attachAccountingRequestIdentity("POST", URL, payload()) as Record<string, unknown>;
+    const first = attachAccountingRequestIdentity("POST", JOURNAL_URL, journalPayload()) as Record<string, unknown>;
+    const retry = attachAccountingRequestIdentity("POST", JOURNAL_URL, journalPayload()) as Record<string, unknown>;
 
     expect(typeof first.clientRequestId).toBe("string");
     expect(retry.clientRequestId).toBe(first.clientRequestId);
 
-    releaseAccountingRequestIdentity("POST", URL, first);
+    releaseAccountingRequestIdentity("POST", JOURNAL_URL, first);
+  });
+
+  it("protects active generic vouchers and reuses their uncertain retry identity", () => {
+    const first = attachAccountingRequestIdentity("POST", GENERIC_URL, genericPayload()) as Record<string, unknown>;
+    const retry = attachAccountingRequestIdentity("POST", GENERIC_URL, genericPayload()) as Record<string, unknown>;
+
+    expect(isProtectedAccountingRequest("POST", GENERIC_URL, first)).toBe(true);
+    expect(typeof first.clientRequestId).toBe("string");
+    expect(retry.clientRequestId).toBe(first.clientRequestId);
+
+    releaseAccountingRequestIdentity("POST", GENERIC_URL, first);
   });
 
   it("releases an acknowledged identity so a later intentional journal is new", () => {
-    const first = attachAccountingRequestIdentity("POST", URL, payload()) as Record<string, unknown>;
-    releaseAccountingRequestIdentity("POST", URL, first);
-    const later = attachAccountingRequestIdentity("POST", URL, payload()) as Record<string, unknown>;
+    const first = attachAccountingRequestIdentity("POST", JOURNAL_URL, journalPayload()) as Record<string, unknown>;
+    releaseAccountingRequestIdentity("POST", JOURNAL_URL, first);
+    const later = attachAccountingRequestIdentity("POST", JOURNAL_URL, journalPayload()) as Record<string, unknown>;
 
     expect(later.clientRequestId).not.toBe(first.clientRequestId);
-    releaseAccountingRequestIdentity("POST", URL, later);
+    releaseAccountingRequestIdentity("POST", JOURNAL_URL, later);
   });
 
   it("preserves an identity already stored in an offline replay body", () => {
-    const queued = { ...payload(), clientRequestId: "queued-request-1" };
-    expect(attachAccountingRequestIdentity("POST", URL, queued)).toBe(queued);
+    const queued = { ...genericPayload(), clientRequestId: "queued-request-1" };
+    expect(attachAccountingRequestIdentity("POST", GENERIC_URL, queued)).toBe(queued);
   });
 
-  it("does not add an identity to optional journals or unrelated requests", () => {
-    const optional = { ...payload(), optional: true };
-    expect(attachAccountingRequestIdentity("POST", URL, optional)).toBe(optional);
+  it("does not add an identity to optional journals, optional vouchers, or unrelated requests", () => {
+    const optionalJournal = { ...journalPayload(), optional: true };
+    expect(attachAccountingRequestIdentity("POST", JOURNAL_URL, optionalJournal)).toBe(optionalJournal);
 
-    const unrelated = payload();
+    const optionalVoucher = {
+      ...genericPayload(),
+      voucher: { ...genericPayload().voucher, optional: true },
+    };
+    expect(attachAccountingRequestIdentity("POST", GENERIC_URL, optionalVoucher)).toBe(optionalVoucher);
+
+    const unrelated = journalPayload();
     expect(attachAccountingRequestIdentity("POST", "/api/vouchers/payment", unrelated)).toBe(unrelated);
+  });
+
+  it("releases only successful or definite client-error outcomes", () => {
+    expect(shouldReleaseAccountingRequestIdentity(200)).toBe(true);
+    expect(shouldReleaseAccountingRequestIdentity(409)).toBe(true);
+    expect(shouldReleaseAccountingRequestIdentity(500)).toBe(false);
+    expect(shouldReleaseAccountingRequestIdentity(503)).toBe(false);
   });
 });
