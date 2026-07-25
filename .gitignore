@@ -17,6 +17,7 @@ attached_assets/
 !.env.example
 !.env.production
 !client/.env.production
+!client/.env.capacitor
 *.pem
 *.key
 secrets/
