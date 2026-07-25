@@ -10,7 +10,7 @@ Started: 2026-07-25
 
 Program 1 is verification-first. This branch must not change accounting totals, inventory quantities or valuation, historical transactions, company data, production migrations, permissions, or user-facing workflows while the baseline is being established.
 
-No production database actions, deployments, repairs, backfills, or destructive commands are part of Phase 1A.
+No production database actions, deployments, repairs, backfills, or destructive commands are part of Program 1.
 
 ## Phase 1A — Current-main verification
 
@@ -73,28 +73,80 @@ This proves the intended verification path is wired. It does **not** prove the c
 | Dependency security audit | Blocked | Security job ended before steps |
 | Secret scan | Blocked | Security job ended before steps |
 
-### Phase 1A branch integrity
-
-At this evidence point the branch differs from `main` only by this documentation file. No application, schema, migration, workflow, dependency, test, accounting, inventory, or frontend source file has been changed.
-
 ## Phase 1B — Financial regression baseline
 
-After Phase 1A is understood, Phase 1B will review the focused regression evidence for:
+### Audit method
 
-- Balanced voucher posting and exact deletion/reversal
-- Payments, receipts, and journals
-- POS sale inventory/accounting effects
-- Stock transfers
-- Container offload, freight, reversal, and re-offload
-- Supplier and customer balances
-- Multi-currency historical values and report consistency
-- Company isolation across financial and inventory reads
+Phase 1B reviewed the exact test and source files present on the isolated branch. No test was represented as passing because the Actions runner did not execute. The statuses below describe the **presence and strength of regression coverage**, not current execution results.
 
-Any failing or missing coverage will be documented before production behavior is changed.
+### Coverage matrix
+
+| Financial area | Existing regression evidence | Static assessment |
+|---|---|---|
+| Central posting validation | `tests/central-posting-engine.test.ts` rejects unbalanced entries, multiple accounting targets, declared-total mismatch, and duplicate idempotent posting | Strong service-level validation; production-route adoption is not proven |
+| Manual journals | `tests/workflow.test.ts`, `tests/accounting.test.ts`, and `tests/vouchers.test.ts` cover balanced creation, edit, soft deletion, and ledger effects | Strong for ordinary USD ledger journals |
+| Payments and receipts | Workflow tests cover balance changes, deletion reversal, balanced receipt entries, retrieval, and list visibility | Strong for generic ledger-to-ledger payments; party and FX variants need more coverage |
+| POS accounting and inventory | Workflow tests cover exact cash-ledger movement, voucher DR=CR, inventory deduction, and exact delete reversal | Strong standard ERP coverage |
+| Supplier Partner sales | `tests/sp-sales-accounting.test.ts` protects exact sale-price posting, prevents COGS double-counting, validates bank/cash targets, rejects missing payment account, and preserves final unit cost for profit reporting | Strong targeted SP sale coverage |
+| Stock transfer creation | Workflow and inventory-hardening tests cover source/destination quantities, balanced voucher entries when present, `inventoryApplied`, invalid quantity rejection, same-location rejection, and negative-source conservation | Strong creation coverage; edit/delete reversal remains a gap |
+| SP container lifecycle | `tests/factory-container-lifecycle.test.ts` covers setup idempotency, Goods OTW voucher balance, offload status, inventory quantity/value/rate, offload voucher balance, and double-offload rejection | Strong create/offload coverage; reverse/re-offload and partial charges are not executable tests |
+| Factory supplier costing | `tests/factory-mix-batch-stable-cost.test.ts` protects event-driven moving-average cost, no drift through consumption/create/edit/top-up/delete, no double deduction, and supplier isolation | Strong targeted costing coverage |
+| Cost-cascade precision | `tests/issue-fixes-regression.test.ts` covers per-container source weight and Decimal-based batch/bale cascade precision | Strong targeted regression coverage |
+| Negative-stock costing | `tests/inventory-hardening.test.ts` protects zero on-hand value, preserved non-negative cost memory, exact reversal to zero, repeated receive/reversal stability, and positive-stock value equation | Strong coverage for the current intentional cost-memory policy |
+| Reports | Workflow tests compare ledger API balance with DB entries, assert exact simple-case P&L income, verify known cash balance, and reject NaN/undefined report values | Good basic USD evidence; complex report and FX scenarios remain unproven |
+| Multi-currency storage rules | `tests/multi-currency-integration.test.ts` covers CFA normalization, historical base values, opening-balance currency rules, migration presence, unresolved-history guards, and cash/bank revaluation source rules | Strong pure/static rule coverage; limited route-and-database integration evidence |
+| Company isolation | Workflow tests protect voucher lists, cross-company account balance access, and location inventory from another company | Good core coverage; broader financial/report/export domains need expansion |
+| Party reconciliation | `tests/party-reconciliation-service.test.ts` covers exact match/mismatch calculation, currency mismatch rejection, batch summaries, and duplicate target rejection | Strong service-level unit coverage; customer/supplier route lifecycle is not proven |
+
+### Confirmed coverage gaps
+
+These are evidence gaps, not confirmed production bugs.
+
+1. **ERP/factory container end-to-end lifecycle**
+   - The current lifecycle integration test exercises `sp_containers`, not the separate `factory_containers` / `factory_raw_stock` workflow.
+   - Factory container create, offload, own-account freight, other charges, reversal, and re-offload need a route-level integration suite.
+
+2. **Own-account freight full chain**
+   - Recent code fixes changed freight account selection, voucher posting, reverse-offload posting, supplier balance exclusion, and supplier statement totals.
+   - Existing issue regression coverage protects partial PATCH preservation of `freightSupplierId`, but does not prove the complete accounting chain.
+   - Required future assertions: supplier balance unchanged, selected own account credited, freight expense debited, statement excludes freight, reversal restores both accounts, and reposting is idempotent.
+
+3. **Stock-transfer edit and deletion reversal**
+   - Creation and rejection behavior are protected.
+   - There is no clearly identified end-to-end assertion that deleting or editing a completed transfer restores both locations exactly once and reverses all accounting records.
+
+4. **Customer and supplier balance lifecycle**
+   - Reconciliation arithmetic is unit-tested, but there is no complete route-level matrix for create, edit, delete, opening balance, payment/receipt, foreign currency, and report/statement agreement.
+
+5. **Multi-currency report execution**
+   - Historical amount normalization and guard source behavior are well covered.
+   - A temporary-database workflow should seed USD and CFA historical entries, change the current rate, and prove that sales, expenses, balances, Net Position, and protected reports retain the correct historical/current-translation separation.
+
+6. **Broader company isolation**
+   - Current integration coverage proves vouchers, one account-balance endpoint, and inventory.
+   - Supplier/customer statements, payroll, factory costing, SP records, backup/export endpoints, and analytics/report routes still need cross-company negative tests.
+
+7. **Central posting engine adoption**
+   - The central engine is validated in isolation.
+   - The main production posting routes still require a separate adoption audit; service tests alone do not prove that journals, payments, POS, containers, payroll, rentals, and SP all pass through the same boundary.
+
+8. **SP reverse/re-offload and partial charges**
+   - The lifecycle test still contains three `it.todo` cases for route-level reverse/re-offload and prepaid/paid/unpaid charge combinations.
+   - The TODO explanation about zeroing `averageRate` conflicts with the newer intentional cost-memory tests and must be corrected in Phase 1C before any production change is considered.
+
+### Phase 1B conclusion
+
+The system has substantial financial regression coverage, especially around ordinary vouchers, POS, SP sales, stock-transfer creation, SP offload, factory supplier costing, negative-stock cost memory, and basic company isolation.
+
+The baseline is **not fully verified** because the runner did not execute. The next safest work is Phase 1C: align stale documentation and TODO descriptions with the current implemented inventory policy, without changing production behavior.
 
 ## Phase 1C — Documentation and test alignment
 
-Phase 1C will reconcile documentation and test assumptions with the current implemented business rules, including the intentional negative-stock cost-memory policy.
+Phase 1C will reconcile documentation and test assumptions with current implemented business rules, including the intentional negative-stock cost-memory policy. It will not change costing behavior or unskip route tests until executable evidence is available.
+
+## Branch integrity
+
+At this evidence point the branch differs from `main` only by this documentation file. No application, schema, migration, workflow, dependency, test, accounting, inventory, or frontend source file has been changed.
 
 ## Merge rule
 
