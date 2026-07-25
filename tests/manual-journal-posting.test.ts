@@ -33,7 +33,7 @@ describe("buildManualJournalPostingRequest", () => {
       voucherType: "Journal",
       totalAmount: "100.000000",
       currency: "USD",
-      exchangeRate: "1.0000000000",
+      exchangeRate: null,
       optional: false,
     });
     expect(built.request.entries).toEqual([
@@ -41,11 +41,13 @@ describe("buildManualJournalPostingRequest", () => {
         ledgerAccountId: 10,
         debitAmount: "100.000000",
         creditAmount: "0.000000",
+        historicalExchangeRate: "1.0000000000",
       }),
       expect.objectContaining({
         bankAccountId: 20,
         debitAmount: "0.000000",
         creditAmount: "100.000000",
+        historicalExchangeRate: "1.0000000000",
       }),
     ]);
   });
@@ -74,6 +76,7 @@ describe("buildManualJournalPostingRequest", () => {
     expect(debitTotal.toFixed(6)).toBe("0.666667");
     expect(creditTotal.toFixed(6)).toBe("0.666667");
     expect(built.request.voucher.totalAmount).toBe("0.666667");
+    expect(built.request.voucher.exchangeRate).toBe("3");
   });
 
   it("keeps the idempotency key stable for the same request and changes it when payload changes", () => {
