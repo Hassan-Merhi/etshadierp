@@ -687,6 +687,20 @@ export function registerRawStockOffloadRoutes(app: Express) {
             freight: String(freightVal),
             freightAccountId: reqFreightAccountId ? parseInt(reqFreightAccountId) : null,
             freightSupplierId: effectiveFreightSupplierId,
+            // Record how freight was paid so the supplier balance formula
+            // (isSupplierPaidFreight) does not default to "supplier" and
+            // wrongly include own-account freight in the supplier's payable.
+            freightPaidBy: effectiveFreightSupplierId
+              ? "supplier"
+              : reqFreightAccountId
+                ? "own"
+                : ((container as any).freightPaidBy || "supplier"),
+            // When own-account is used, persist the credit account so the
+            // reverse-offload can correctly restore it without falling back
+            // to the material supplier.
+            freightOwnAccountId: !effectiveFreightSupplierId && reqFreightAccountId
+              ? parseInt(reqFreightAccountId)
+              : null,
             otherCharges: String(otherChargesVal),
             otherChargesCurrencyCode: ocCcy || null,
             otherChargesAccountId: reqOtherChargesAccountId ? parseInt(reqOtherChargesAccountId) : null,
@@ -1360,15 +1374,25 @@ export function registerRawStockOffloadRoutes(app: Express) {
             creditAmount: "0",
             narration: `Freight expense - container ${container.containerNumber}`,
           });
-          // Cr Supplier Payable (use the pre-offload freight supplier, or fall back to container supplier)
-          const freightCreditorSupplierId = restoredFreightSupplierId || container.supplierId;
-          if (freightCreditorSupplierId) {
+          // Cr: supplier when pre-offload freight was supplier-paid;
+          //     own account when it was own-account paid (never fall back
+          //     to container.supplierId — that would silently debit the
+          //     material supplier for freight they didn't owe).
+          if (restoredFreightSupplierId) {
             await tx.insert(voucherEntries).values({
               voucherId: restoredFreightVoucher.id,
-              factorySupplierId: freightCreditorSupplierId,
+              factorySupplierId: restoredFreightSupplierId,
               debitAmount: "0",
               creditAmount: String(restoredFreightAmt),
               narration: `Freight payable to supplier - container ${container.containerNumber}`,
+            });
+          } else if ((container as any).freightOwnAccountId) {
+            await tx.insert(voucherEntries).values({
+              voucherId: restoredFreightVoucher.id,
+              ledgerAccountId: (container as any).freightOwnAccountId,
+              debitAmount: "0",
+              creditAmount: String(restoredFreightAmt),
+              narration: `Freight paid via own account - container ${container.containerNumber}`,
             });
           }
         }
