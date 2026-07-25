@@ -114,4 +114,4 @@ Do not merge the mobile-web compatibility pull request until:
 - Phone and tablet portrait/landscape checks pass.
 - Desktop checks pass at both desktop sizes.
 - No service-worker reload loop occurs.
-- The pull request is current enough with `main` to merge without conflicting edits.
+- The pull request remains conflict-free with `main` at merge time.
