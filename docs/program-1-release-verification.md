@@ -30,21 +30,52 @@ The goal is to establish current evidence for the exact baseline commit rather t
 - Frontend tests
 - Frontend coverage thresholds
 
+### Workflow evidence
+
+Opening draft PR #193 triggered the repository's existing workflows for head commit `5bd7022a0b7aa23ba94470f7606a65a157a276db`.
+
+- CI run `1113` (`30163274267`) concluded `failure`.
+- Security run `661` (`30163274252`) concluded `failure`.
+- The CI job and both Security jobs reported zero executable steps.
+- GitHub exposed no job logs; the log download returned a missing-blob response.
+
+Because no checkout, installation, build, test, audit, or scan step started, these workflow conclusions are classified as **Actions infrastructure / repository execution blocked**, not as application failures.
+
+### Static wiring review
+
+The repository configuration was inspected without changing application code:
+
+- `package.json` defines direct scripts for TypeScript, production build, lint, backend tests, frontend tests, and coverage.
+- The TypeScript command is explicitly `tsc --noEmit` and the project has `strict: true`.
+- The production build runs the Vite frontend build, server bundling, and server-bundle verification.
+- CI is configured for Node.js 20 and a temporary PostgreSQL 15 service.
+- CI is configured to prepare the temporary schema, start the built application, and wait for `/api/health/db` before backend tests.
+- Backend and frontend Vitest configurations and coverage thresholds are present.
+- Security is configured for production dependency auditing and TruffleHog secret scanning.
+
+This proves the intended verification path is wired. It does **not** prove the current baseline passes because the runner never executed a step.
+
 ### Evidence status
 
 | Check | Status | Evidence |
 |---|---|---|
-| Dependency installation | Pending | Awaiting CI run |
-| TypeScript | Pending | Awaiting CI run |
-| Production build | Pending | Awaiting CI run |
-| ESLint | Pending | Awaiting CI run |
-| Formatting | Pending | Awaiting CI run |
-| Temporary database schema | Pending | Awaiting CI run |
-| Startup migrations | Pending | Awaiting CI run |
-| Backend tests | Pending | Awaiting CI run |
-| Backend coverage | Pending | Awaiting CI run |
-| Frontend tests | Pending | Awaiting CI run |
-| Frontend coverage | Pending | Awaiting CI run |
+| Dependency installation | Blocked | CI job ended before checkout or installation |
+| TypeScript | Blocked | Command is configured; no step executed |
+| Production build | Blocked | Command is configured; no step executed |
+| ESLint | Blocked | Command is configured; no step executed |
+| Formatting | Blocked | Changed-file check is configured; no step executed |
+| Temporary database schema | Blocked | PostgreSQL and schema step are configured; no step executed |
+| Startup migrations | Blocked | `/api/health/db` readiness step is configured; no step executed |
+| Backend tests | Blocked | Vitest command is configured; no step executed |
+| Backend coverage | Blocked | Coverage command is configured; no step executed |
+| Frontend tests | Blocked | jsdom/Vitest command is configured; no step executed |
+| Frontend coverage | Blocked | Coverage command is configured; no step executed |
+| Dependency security audit | Blocked | Security job ended before steps |
+| Secret scan | Blocked | Security job ended before steps |
+
+### Phase 1A branch integrity
+
+At this evidence point the branch differs from `main` only by this documentation file. No application, schema, migration, workflow, dependency, test, accounting, inventory, or frontend source file has been changed.
 
 ## Phase 1B — Financial regression baseline
 
