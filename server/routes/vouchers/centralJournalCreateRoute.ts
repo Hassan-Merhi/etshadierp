@@ -18,6 +18,7 @@ import {
 } from "../../services/accounting/centralPostingEngine";
 import { createDatabasePostingDependencies } from "../../services/accounting/databasePostingDependencies";
 import { erpRateToDaybookFxRateToUsd } from "../../services/accounting/currencyAmounts";
+import { applyEmployeeBalanceDeltasTx } from "../../services/accounting/employeeBalancePosting";
 import { buildManualJournalPostingRequest } from "../../services/accounting/manualJournalPosting";
 import { recalculateOrderTotals } from "../factory/_helpers";
 import { checkAccountWhatsAppRule } from "../factoryWhatsappRoutes";
@@ -25,7 +26,6 @@ import {
   buildVoucherChangesForCreate,
   logAudit,
   snapshotVoucherEntries,
-  syncEmployeeBalancesFromEntries,
 } from "../_helpers";
 
 const postingDependencies = createDatabasePostingDependencies();
@@ -244,9 +244,23 @@ async function createActiveJournal(req: Request, res: Response, next: NextFuncti
       });
     }
 
-    const result = (await db.transaction((tx) =>
-      postBalancedVoucherTx(tx, built.request, postingDependencies)
-    )) as PersistedPostingResult;
+    const result = (await db.transaction(async (tx) => {
+      const posted = (await postBalancedVoucherTx(
+        tx,
+        built.request,
+        postingDependencies
+      )) as PersistedPostingResult;
+
+      if (!posted.replayed) {
+        await applyEmployeeBalanceDeltasTx({
+          tx,
+          companyId,
+          entries: posted.entries,
+        });
+      }
+
+      return posted;
+    })) as PersistedPostingResult;
 
     let whatsapp: {
       prompt: boolean;
@@ -256,16 +270,6 @@ async function createActiveJournal(req: Request, res: Response, next: NextFuncti
     } = { prompt: false };
 
     if (!result.replayed) {
-      await syncEmployeeBalancesFromEntries(
-        result.entries.map((entry: any) => ({
-          ledgerAccountId: entry.ledgerAccountId,
-          employeeId: entry.employeeId,
-          debitAmount: entry.debitAmount,
-          creditAmount: entry.creditAmount,
-        })),
-        companyId
-      );
-
       await syncJournalToOrderCharge(companyId, result.entries, result.voucher.id).catch(
         (error: unknown) =>
           logger.error("Central journal order-charge sync failed (non-fatal)", {
