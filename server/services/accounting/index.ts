@@ -21,6 +21,7 @@ export {
 export type {
   CentralPostingDependencies,
   CentralPostingRequest,
+  CentralPostingResult,
   PostingActor,
   PostingAuditWriter,
   PostingIdempotencyStore,
@@ -28,6 +29,12 @@ export type {
   PostingSourceIdentity,
   ValidatedPostingTotals,
 } from "./centralPostingEngine";
+
+export {
+  collectPostingTargetIds,
+  createDatabasePostingDependencies,
+} from "./databasePostingDependencies";
+export type { PostingTargetIds } from "./databasePostingDependencies";
 
 export {
   replaceVoucherTx,
