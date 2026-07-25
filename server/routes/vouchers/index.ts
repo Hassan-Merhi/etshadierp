@@ -4,6 +4,7 @@ import { registerVoucherCreateRoutes } from "./voucherCreateRoutes";
 import { registerVoucherPaymentRoutes } from "./voucherPaymentRoutes";
 import { registerCentralGenericVoucherCreateRoute } from "./centralGenericVoucherCreateRoute";
 import { registerCentralPaymentReceiptCreateRoute } from "./centralPaymentReceiptCreateRoute";
+import { registerCentralPaymentReceiptLifecycleRoutes } from "./centralPaymentReceiptLifecycleRoute";
 import { registerCentralJournalCreateRoute } from "./centralJournalCreateRoute";
 import { registerCentralJournalLifecycleRoutes } from "./centralJournalLifecycleRoute";
 import { registerVoucherJournalRoutes } from "./voucherJournalRoutes";
@@ -23,6 +24,9 @@ export function registerVoucherRoutes(app: Express) {
   // Optional drafts and unidentified compatibility callers continue into the
   // unchanged legacy Payment/Receipt handler below.
   registerCentralPaymentReceiptCreateRoute(app);
+  // Active Payment/Receipt edits reverse old employee effects and apply new
+  // effects in the same transaction. Optional transitions continue to legacy.
+  registerCentralPaymentReceiptLifecycleRoutes(app);
   registerVoucherPaymentRoutes(app);
   // Active manual journals use the central posting engine. Optional journals
   // call next() and continue into the unchanged legacy handler below.
