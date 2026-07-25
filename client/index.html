@@ -18,7 +18,14 @@
     <script>
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', function () {
-          navigator.serviceWorker.register('/sw.js');
+          navigator.serviceWorker
+            .register('/sw.js', { updateViaCache: 'none' })
+            .catch(function () {
+              // Older browsers may not understand updateViaCache. Keep the
+              // original registration path as a compatibility fallback.
+              return navigator.serviceWorker.register('/sw.js');
+            })
+            .catch(function () {});
         });
       }
     </script>

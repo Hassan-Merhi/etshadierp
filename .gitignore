@@ -17,6 +17,7 @@ attached_assets/
 !.env.example
 !.env.production
 !client/.env.production
+!client/.env.capacitor
 *.pem
 *.key
 secrets/
@@ -34,6 +35,9 @@ android/keystore.properties
 # Type-check / CI diagnostic dumps (regenerated on demand, never committed)
 ts-errors*.txt
 *-errors-ci.txt
+
+# Browser smoke screenshots and reports (regenerated on demand)
+artifacts/responsive-smoke/
 
 # User-uploaded content (runtime data, not source)
 uploads/

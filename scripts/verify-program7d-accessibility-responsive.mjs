@@ -6,6 +6,9 @@ const files = {
   financial: "client/src/components/financial/financial-screen.tsx",
   operations: "client/src/components/operations/operations-screen.tsx",
   dialog: "client/src/components/ui/dialog.tsx",
+  mobileHook: "client/src/hooks/use-mobile.tsx",
+  mobileViewport: "client/src/mobile-browser-compat.css",
+  main: "client/src/main.tsx",
 };
 
 const sources = Object.fromEntries(
@@ -68,11 +71,38 @@ for (const token of [
   "min-w-10",
   "motion-reduce:animate-none",
   "motion-reduce:transition-none",
-  "aria-label=\"Close dialog\"",
+  'aria-label="Close dialog"',
   "VisuallyHidden",
   "[&>*]:w-full",
 ]) {
   if (!sources.dialog.includes(token)) failures.push(`Accessible dialog contract missing: ${token}`);
+}
+
+for (const token of [
+  "const MOBILE_BREAKPOINT = 768",
+  'typeof window.matchMedia !== "function"',
+  'window.addEventListener("resize"',
+  'mql.addEventListener("change"',
+  "mql.addListener(onChange)",
+  "mql.removeListener(onChange)",
+]) {
+  if (!sources.mobileHook.includes(token)) failures.push(`Mobile breakpoint compatibility contract missing: ${token}`);
+}
+
+for (const token of [
+  "--app-viewport-height: 100vh",
+  "@supports (height: 100dvh)",
+  "--app-viewport-height: 100dvh",
+  "@supports (height: 100svh)",
+  "--app-viewport-height: 100svh",
+  '[data-slot="sidebar-wrapper"]',
+  '[data-slot="sidebar-container"]',
+]) {
+  if (!sources.mobileViewport.includes(token)) failures.push(`Mobile viewport compatibility contract missing: ${token}`);
+}
+
+if (!sources.main.includes('import "./mobile-browser-compat.css";')) {
+  failures.push("Mobile viewport compatibility stylesheet is not loaded by main.tsx");
 }
 
 if (failures.length) {
