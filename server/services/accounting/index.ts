@@ -66,6 +66,14 @@ export type {
 } from "./paymentReceiptPosting";
 
 export {
+  isPaymentReceiptVoucherType,
+  shouldUseCentralPaymentReceiptDeletion,
+} from "./paymentReceiptDeletionPolicy";
+export type {
+  PaymentReceiptDeletionPolicyInput,
+} from "./paymentReceiptDeletionPolicy";
+
+export {
   assertCustomerLinkedLedgerPairs,
   collectCustomerLedgerPairs,
   validateCustomerLedgerPairs,
