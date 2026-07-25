@@ -3,7 +3,11 @@ import { pool } from "../../db";
 import { requireAuth } from "../../auth";
 import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
-import { classifySpOffloadState } from "../../services/sp/spOffloadConcurrencyPolicy";
+import {
+  classifySpOffloadState,
+  isCompatibleSpOffloadReplay,
+  normalizeSpOffloadDate,
+} from "../../services/sp/spOffloadConcurrencyPolicy";
 import { requireSpCompany } from "./spHelpers";
 
 async function guardSpOffload(req: Request, res: Response, next: NextFunction): Promise<void> {
@@ -59,15 +63,48 @@ async function guardSpOffload(req: Request, res: Response, next: NextFunction): 
     }
 
     const existingResult = await client.query(
-      "SELECT * FROM sp_offloads WHERE container_id = $1 AND company_id = $2 ORDER BY id DESC LIMIT 1",
+      `SELECT o.*,
+              (SELECT sm.location_id
+               FROM sp_stock_movements sm
+               WHERE sm.offload_id = o.id
+               ORDER BY sm.id
+               LIMIT 1) AS location_id
+       FROM sp_offloads o
+       WHERE o.container_id = $1 AND o.company_id = $2
+       ORDER BY o.id DESC
+       LIMIT 1`,
       [containerId, companyId]
     );
     const existingOffload = existingResult.rows[0] ?? null;
-    const decision = classifySpOffloadState(container.status, Boolean(existingOffload));
+    const requestedLandedTotal = Array.isArray(req.body?.chargeLines)
+      ? req.body.chargeLines.reduce((sum: number, charge: any) => sum + Number(charge?.amountUsd ?? 0), 0)
+      : 0;
+    const replayCompatible = existingOffload
+      ? isCompatibleSpOffloadReplay(
+          {
+            offloadDate: normalizeSpOffloadDate(existingOffload.offload_date),
+            locationId: Number(existingOffload.location_id),
+            totalLandedCostUsd: Number(existingOffload.total_landed_cost_usd ?? 0),
+          },
+          {
+            offloadDate: normalizeSpOffloadDate(req.body?.offloadDate),
+            locationId: Number(req.body?.locationId),
+            totalLandedCostUsd: requestedLandedTotal,
+          }
+        )
+      : false;
+    const decision = classifySpOffloadState(container.status, Boolean(existingOffload), replayCompatible);
 
     if (decision === "replay") {
       res.setHeader("X-Idempotent-Replay", "true");
       res.json(existingOffload);
+      return;
+    }
+    if (decision === "conflict") {
+      res.status(409).json({
+        code: "SP_OFFLOAD_REPLAY_MISMATCH",
+        message: "This container is already offloaded with different date, location, or landed-charge totals.",
+      });
       return;
     }
     if (decision === "reject") {
