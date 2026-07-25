@@ -41,6 +41,7 @@ function buildVoucherValues(voucher: VoucherInsertFields) {
     optional: voucher.optional ?? false,
     currency: voucher.currency ?? null,
     exchangeRate: voucher.exchangeRate ?? null,
+    effectiveDate: voucher.effectiveDate ?? null,
     sourceModule: voucher.sourceModule ?? null,
   };
 }
