@@ -79,23 +79,40 @@ On the first successful active-journal posting, the route still performs the exi
 
 The transaction-owned central audit and idempotency marker are written before the voucher transaction commits.
 
-### Step 2A.3 audit — generic voucher compatibility blocker
+### Step 2A.3 completed — verified customer linked-ledger rule
 
-The generic `/api/vouchers/with-entries` route is deliberately not switched yet.
+The central engine now supports exactly two target shapes:
 
-Its current customer compatibility behavior can persist both:
+1. one accounting target; or
+2. `customerId` plus `ledgerAccountId`.
 
-- `customerId`; and
-- the customer's linked `ledgerAccountId`
+The second shape is accepted only after the database adapter confirms all of the following:
 
-on the same voucher entry. The strict central engine currently requires exactly one accounting target per entry. Removing the linked ledger would change existing linked-ledger views and account reporting; allowing arbitrary multiple targets would weaken posting validation.
+- the customer belongs to the active company;
+- the ledger belongs to the active company;
+- the ledger ID is exactly the linked ledger stored on that customer.
 
-The safe next design must introduce an explicit linked-party representation that permits only a verified party plus that party's own company-scoped linked ledger. It must reject unrelated dual targets and keep historical queries unchanged. Until that rule and its tests exist, the generic route remains on its current atomic transaction path.
+A customer paired with a different ledger returns `POSTING_LINKED_LEDGER_MISMATCH`. Other unrelated multi-target combinations remain rejected by `POSTING_TARGET_INVALID`.
+
+This preserves the generic voucher route's linked-ledger reporting model without weakening the central engine into accepting arbitrary duplicate targets.
+
+### Generic voucher endpoint remains unchanged
+
+The generic `/api/vouchers/with-entries` endpoint is deliberately not switched in this slice. Its known callers include insurance extra charges and chatbot-created vouchers. Those callers do not yet all pass a retry-stable request identity through the same client wrapper used by manual journals.
+
+A generic-route cutover must first add a stable identity boundary for all callers, then preserve:
+
+- customer linked-ledger auto-fill and mismatch rejection;
+- caller-provided dual-currency fields;
+- employee balance synchronization;
+- intercompany notifications;
+- loan-account reallocation;
+- detailed compatibility audit output.
 
 ### Remaining Phase 2A work
 
-- Design and test the verified party-plus-linked-ledger compatibility rule for `/api/vouchers/with-entries`.
-- Migrate generic active voucher creation only after that rule is proven.
+- Add retry-stable identity coverage for all `/api/vouchers/with-entries` callers.
+- Migrate generic active voucher creation only after those callers are covered.
 - Journal editing and deletion are not yet migrated.
 - Optional or intentionally unbalanced drafts remain on the compatibility path.
 - Employee balance synchronization is still a legacy post-commit incremental side effect. A failed partial employee sync cannot yet be proven fully idempotent; this must be resolved before journal edit/delete convergence.
