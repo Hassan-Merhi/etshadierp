@@ -5,6 +5,7 @@ import "./runtimeSecurityGuard.mjs";
 import "./runtimeHealthGuard.mjs";
 import "./runtimeObservability.mjs";
 import "./runtimeLifecycleGuard.mjs";
+import "./startupWarningRepair.mjs";
 import { Server } from "node:http";
 import process from "node:process";
 
