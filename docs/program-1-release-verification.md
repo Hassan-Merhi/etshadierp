@@ -132,21 +132,51 @@ These are evidence gaps, not confirmed production bugs.
 
 8. **SP reverse/re-offload and partial charges**
    - The lifecycle test still contains three `it.todo` cases for route-level reverse/re-offload and prepaid/paid/unpaid charge combinations.
-   - The TODO explanation about zeroing `averageRate` conflicts with the newer intentional cost-memory tests and must be corrected in Phase 1C before any production change is considered.
+   - The TODO explanation about zeroing `averageRate` conflicts with the newer intentional cost-memory tests and must not drive a production change.
 
 ### Phase 1B conclusion
 
 The system has substantial financial regression coverage, especially around ordinary vouchers, POS, SP sales, stock-transfer creation, SP offload, factory supplier costing, negative-stock cost memory, and basic company isolation.
 
-The baseline is **not fully verified** because the runner did not execute. The next safest work is Phase 1C: align stale documentation and TODO descriptions with the current implemented inventory policy, without changing production behavior.
+The baseline is **not fully verified** because the runner did not execute.
 
 ## Phase 1C — Documentation and test alignment
 
-Phase 1C will reconcile documentation and test assumptions with current implemented business rules, including the intentional negative-stock cost-memory policy. It will not change costing behavior or unskip route tests until executable evidence is available.
+### Conflict resolved
+
+The audit confirmed that current production logic and active `tests/inventory-hardening.test.ts` intentionally preserve the last non-negative `averageRate` as cost memory while forcing `totalValue = 0` when quantity is zero or negative.
+
+Older skipped-test and TODO descriptions incorrectly prescribe forcing both value and rate to zero. Following those stale descriptions would change the established negative-stock costing policy.
+
+### Authoritative policy added
+
+`docs/inventory-cost-memory-policy.md` now records the current rule:
+
+```text
+quantity <= 0  =>  totalValue = 0 and averageRate >= 0
+```
+
+The document identifies the stale references, explains why cost memory is preserved, lists route-level scenarios that remain unverified, and prohibits changing `inventoryHelper.ts` merely to satisfy the obsolete `rate = 0` expectation.
+
+### Deferred test-file cleanup
+
+No test was unskipped and no large test file was rewritten while CI is unavailable. When an executable runner is restored, the stale skipped-test titles and SP lifecycle TODO descriptions should be updated together with route-level reversal coverage, then the full backend suite must run before any unskip is accepted.
+
+### Phase 1C result
+
+- Current inventory policy is explicitly documented.
+- A dangerous contradictory “fix path” is now blocked by authoritative documentation.
+- No costing, inventory, accounting, schema, route, or user-facing behavior changed.
+- Program 1 has completed its safe static audit and documentation alignment.
 
 ## Branch integrity
 
-At this evidence point the branch differs from `main` only by this documentation file. No application, schema, migration, workflow, dependency, test, accounting, inventory, or frontend source file has been changed.
+At this evidence point the branch differs from `main` only by:
+
+- `docs/program-1-release-verification.md`
+- `docs/inventory-cost-memory-policy.md`
+
+No application, schema, migration, workflow, dependency, test, accounting, inventory, or frontend source file has been changed.
 
 ## Merge rule
 
