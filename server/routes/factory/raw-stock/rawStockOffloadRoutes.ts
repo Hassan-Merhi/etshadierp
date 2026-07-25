@@ -237,10 +237,15 @@ export function registerRawStockOffloadRoutes(app: Express) {
       // offload form should honor the same default, or freight silently falls into the
       // no-payee ledger branch (Dr Factory Charges Payable / Cr Freight), which nets the
       // freight expense to zero and leaves an unresolved balance in Charges Payable.
+      // Resolve who receives the freight credit.
+      // Only auto-assign a supplier if the container has a dedicated freight
+      // supplier (freightSupplierId) — NEVER fall back to the material supplier
+      // (container.supplierId), because freight may be paid via an own account
+      // (e.g. Embassy Shipping) that has nothing to do with the material supplier.
       const effectiveFreightSupplierId: number | null = reqFreightSupplierId
         ? parseInt(reqFreightSupplierId)
-        : !reqFreightAccountId && ((container as any).freightPaidBy || "supplier") === "supplier" && container.supplierId
-          ? container.supplierId
+        : !reqFreightAccountId && (container as any).freightSupplierId
+          ? (container as any).freightSupplierId
           : null;
 
       const freightVal = parseFloat(reqFreight || "0");

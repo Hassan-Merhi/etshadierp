@@ -266,10 +266,14 @@ export function OffloadDialog({
     const effectiveFreightCcy = container.freightCurrencyCode || ccy;
     setFreightCurrencyCode(effectiveFreightCcy);
     setFreightFxRate(effectiveFreightCcy === "USD" ? "1" : container.fxRateToUsd || "1");
+    // Priority: explicit freight supplier → own account → nothing.
+    // DO NOT fall back to container.freightAccountId (that is the DR expense
+    // account, not the credit destination) and do not auto-assign the material
+    // supplier — the user must explicitly pick where freight goes.
     if (container.freightSupplierId) setFreightAccountId(`SUP:${container.freightSupplierId}`);
     else if ((container as any).freightPaidBy === "own" && (container as any).freightOwnAccountId)
       setFreightAccountId(String((container as any).freightOwnAccountId));
-    else if (container.freightAccountId) setFreightAccountId(String(container.freightAccountId));
+    else setFreightAccountId("");
 
     const ocVal = parseFloat(container.otherCharges || "0");
     setOtherCharges(ocVal > 0 ? String(ocVal) : "");
@@ -583,7 +587,6 @@ export function OffloadDialog({
                   onValueChange={setFreightAccountId}
                   accounts={ledgerAccounts}
                   suppliers={factorySuppliers}
-                  disabled={freightFromContainer}
                 />
               </div>
 
