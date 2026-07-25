@@ -130,7 +130,7 @@ async function guardContainerOffload(req: Request, res: Response, next: NextFunc
        FROM locations
        WHERE id = $1 AND company_id = $2 AND deleted_at IS NULL
        LIMIT 1
-       FOR KEY SHARE`,
+       FOR SHARE`,
       [locationId, companyId]
     );
     if (!locationResult.rows[0]) {
@@ -181,7 +181,7 @@ async function guardContainerOffload(req: Request, res: Response, next: NextFunc
            AND id = ANY($2::int[])
            AND deleted_at IS NULL
          ORDER BY id
-         FOR KEY SHARE`,
+         FOR SHARE`,
         [companyId, requestedLedgerIds]
       );
       ledgerSnapshots = ledgerResult.rows;
@@ -231,7 +231,7 @@ async function guardContainerOffload(req: Request, res: Response, next: NextFunc
            AND id = ANY($2::int[])
            AND deleted_at IS NULL
          ORDER BY id
-         FOR KEY SHARE`,
+         FOR SHARE`,
         [companyId, ownFreightAccountIds]
       );
       const foundIds = new Set(ownRows.rows.map((row) => Number(row.id)));
@@ -257,7 +257,7 @@ async function guardContainerOffload(req: Request, res: Response, next: NextFunc
            AND id = ANY($2::int[])
            AND deleted_at IS NULL
          ORDER BY id
-         FOR KEY SHARE`,
+         FOR SHARE`,
         [parentCompanyId, parentAgentIds]
       );
       const foundIds = new Set(parentAgentRows.rows.map((row) => Number(row.id)));
@@ -282,7 +282,7 @@ async function guardContainerOffload(req: Request, res: Response, next: NextFunc
            AND id = ANY($2::int[])
            AND deleted_at IS NULL
          ORDER BY id
-         FOR KEY SHARE`,
+         FOR SHARE`,
         [validCompanyIds, parentFreightAccountIds]
       );
       const foundIds = new Set(parentFreightRows.rows.map((row) => Number(row.id)));
