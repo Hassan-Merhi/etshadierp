@@ -125,6 +125,7 @@ for (const token of [
   "ERP_SMOKE_USERNAME",
   "ERP_SMOKE_REQUIRE_EXACT_ROUTES=1",
   "The target URL must serve a build of the pull-request branch.",
+  "A real rendered pass cannot be claimed from repository inspection alone.",
   "Service-worker deployment check",
   "Desktop non-regression checks",
   "Merge gate",
