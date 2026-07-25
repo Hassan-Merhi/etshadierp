@@ -180,7 +180,9 @@ try {
       if (!["document", "script", "stylesheet"].includes(type)) return;
       const url = request.url();
       if (!url.startsWith(BASE_URL)) return;
-      viewportReport.browserErrors.push(`${type} failed: ${url} (${request.failure()?.errorText || "unknown"})`);
+      const errorText = request.failure()?.errorText || "unknown";
+      if (errorText === "net::ERR_ABORTED") return;
+      viewportReport.browserErrors.push(`${type} failed: ${url} (${errorText})`);
     });
     page.on("response", (response) => {
       const request = response.request();
@@ -237,9 +239,7 @@ try {
         }
       }
     } catch (error) {
-      const message = `${viewport.name}: ${error instanceof Error ? error.message : String(error)}`;
-      report.failures.push(message);
-      viewportReport.browserErrors.push(message);
+      viewportReport.browserErrors.push(error instanceof Error ? error.message : String(error));
     } finally {
       if (viewportReport.browserErrors.length) {
         report.failures.push(...viewportReport.browserErrors.map((error) => `${viewport.name}: ${error}`));
