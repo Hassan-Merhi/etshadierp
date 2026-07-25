@@ -6,125 +6,133 @@ Branch: `refactor/program-2d-special-workflows`
 
 ## Scope
 
-Program 2D completes accounting convergence for:
+Program 2D covers:
 
-1. factory and ERP container offload, including own-account freight;
+1. factory payroll generation and lifecycle safety;
 2. Supplier Partner non-POS offload/posting;
-3. factory payroll generation, payment, undo, and deletion; and
+3. ERP container offload, edit reversal, and freight policy; and
 4. rental accrual/payment posting and reversal.
 
 No historical repair, migration, deployment, or production database command is part of this branch.
 
-## 2D.1 — Atomic factory payroll generation
+## 2D.1 — Atomic factory payroll generation — complete
 
 ### Previous failure window
 
-`POST /api/factory/payroll/generate` previously performed these writes one worker at a time through the global database connection:
-
-- insert `factory_payrolls` row;
-- reduce one or more worker advance balances;
-- insert advance repayment rows;
-- insert `PAYROLL_GENERATED` daybook row; and
-- continue to the next worker.
-
-A failure midway could therefore leave a partial payroll batch, partially reduced advances, incomplete repayment rows, or payroll rows without matching daybook rows. A concurrent retry could also generate duplicate payroll rows and deduct advances again.
+`POST /api/factory/payroll/generate` previously wrote one worker at a time through the global database connection. A failure midway could leave a partial payroll batch, partially reduced advances, incomplete repayment rows, or payroll rows without matching daybook rows. Concurrent retries could also duplicate payroll rows and advance deductions.
 
 ### Protected behavior
 
-The protected route is registered before the legacy payroll route and preserves its array response shape and salary formulas.
+The protected route is registered before the legacy generation route and preserves the existing array response and salary formulas.
 
 Generation now:
 
-1. validates company and exact `YYYY-MM-DD` period values;
-2. opens one database transaction;
-3. acquires a transaction advisory lock scoped to company + exact payroll period;
-4. loads existing payroll rows for that exact period under lock;
-5. returns the existing batch when all active workers already have payroll rows;
-6. fills only missing workers when a historical partial batch exists;
-7. locks outstanding salary-deduction advances in deterministic worker/id order;
-8. inserts payroll rows, advance reductions, repayment rows, and daybook rows in the same transaction; and
-9. commits the entire batch or rolls everything back.
+1. validates the selected company and exact payroll period;
+2. acquires a transaction advisory lock scoped to company and period;
+3. loads existing payroll rows under the lock;
+4. returns the existing batch for an exact retry;
+5. creates only missing workers for a historical partial batch;
+6. locks salary-deduction advances in deterministic worker/ID order;
+7. writes payroll rows, advance reductions, repayment rows, and `PAYROLL_GENERATED` daybook rows in one transaction; and
+8. commits the whole batch or rolls everything back.
 
-### Formula compatibility
+The existing monthly, daily, per-bale, per-kilogram, and advance-cap formulas remain unchanged. Payroll mark-paid, undo, deletion, and `PAYROLL-GEN` rebuild routes remain on their existing specialized paths.
 
-The following legacy calculations are preserved:
+## 2D.2 — Supplier Partner non-POS offload — complete by scope
 
-- Monthly workers use attendance-based daily salary when attendance exists, otherwise calendar-month proration.
-- Daily workers use present/half-day totals when attendance exists, otherwise weekdays in the selected period.
-- Per Bale workers use finalized bale count × per-bale rate.
-- Per KG workers use finalized bale weight × per-kg rate.
-- Overtime, bonuses, and deductions remain initialized at zero during generation.
-- Salary-deduction advances are capped at gross pay and settled oldest database ID first.
-- New payroll rows remain `DRAFT`.
-
-No mark-paid, payment voucher, payroll undo, payroll delete, or `PAYROLL-GEN` rebuild behavior changed in this slice.
-
-## 2D.2 — Supplier Partner non-POS offload in progress
-
-### Existing strengths retained
-
-- Voucher A, Voucher B, charge entries, offload rows, stock movements, inventory updates, and container status updates remain owned by the existing posting transaction.
-- Prepaid balances continue to use row locks before consumption.
-- Existing SP voucher numbering, stock-cost formulas, parent-agent entries, prepaid treatment, and intercompany logic are unchanged.
-
-### Concurrency and replay protection implemented
+The existing SP posting transaction remains authoritative for voucher numbering, Goods OTW reversal, stock recognition, prepaid consumption, parent-agent journals, inventory, and intercompany behavior.
 
 A guard registered before `POST /api/sp/offload` now:
 
 1. resolves the selected Supplier Partner company;
-2. acquires a company/container advisory lock for the complete request lifetime;
-3. rejects a simultaneous request with `SP_OFFLOAD_IN_PROGRESS`;
-4. validates the requested location belongs to the company;
-5. loads any completed offload and its persisted landed-charge allocation;
-6. returns the existing offload only when date, location, total landed cost, charge types, descriptions, prepaid IDs, bank IDs, ledger IDs, and parent-agent IDs match;
-7. returns `SP_OFFLOAD_REPLAY_MISMATCH` for a changed retry; and
-8. preserves the normal camelCase offload response shape on replay.
+2. acquires a company/container advisory lock for the full request;
+3. rejects simultaneous posting with `SP_OFFLOAD_IN_PROGRESS`;
+4. holds the container with `FOR KEY SHARE`, allowing the posting transaction to update status;
+5. holds the location, SP control accounts, bank accounts, current-company ledgers, and parent-agent ledgers with `FOR SHARE`, preventing ownership or soft-delete changes while posting runs;
+6. validates all referenced accounts before the legacy transaction writes;
+7. returns an existing offload only for an exact compatible retry; and
+8. rejects changed retries with `SP_OFFLOAD_REPLAY_MISMATCH`.
 
-The guard does not recalculate or replace any SP accounting formula. The legacy transaction continues only for an open container with no completed offload.
+Replay matching includes offload date, location, landed total, charge type, description, prepaid ID, bank ID, ledger ID, and parent-agent ID. The replay response preserves the normal camelCase `sp_offloads` shape.
 
-### Remaining SP boundary
+The large legacy posting route was deliberately not duplicated or superficially replaced.
 
-Three bank/ledger ownership checks within the legacy posting transaction still use the global database connection rather than the transaction handle. They are read-only checks and the new guard prevents duplicate offload posting, but they should still be converted to transaction-owned reads before 2D.2 is marked complete.
+## 2D.3 — ERP container offload and freight — hardened, lifecycle extraction remaining
 
-## 2D.3 — ERP/factory container offload and own-account freight
+### Protection implemented
 
-Confirmed risk:
+A guard registered before `POST /api/containers/:id/offload` now:
 
-- Offload edit reversal runs in one transaction.
-- Status reset is committed separately.
-- The new offload is then executed through another transaction/service.
-- SP follow-up journals may run in another transaction.
+- scopes the container to the selected company;
+- serializes offload and offload-edit requests by company/container;
+- accepts only `OTW` and `OFFLOADED` lifecycle states;
+- validates and locks the destination location;
+- locks purchase orders and PO line items used for costing;
+- validates and locks all selected charge accounts before an old offload can be reversed;
+- validates own-account freight against the current company;
+- validates parent-agent accounts against the parent company; and
+- accepts parent-paid freight accounts from the current or parent company to preserve same-company and fallback posting behavior.
 
-A failure between those stages can leave a reversed container in an intermediate state. The convergence must preserve exact inventory-value reversal and the existing own/parent/supplier freight policy:
+Location and account rows use `FOR SHARE`, blocking concurrent soft deletion. The container uses `FOR KEY SHARE`, allowing the existing offload transaction to update status without deadlocking.
 
-- `own`: freight is excluded from supplier payable and posted to the selected own account;
-- `parent`: subsidiary owes the parent including freight;
-- `supplier`: supplier payable includes freight.
+### Freight policy verified
 
-This area requires a dedicated lifecycle service rather than wrapping the current route superficially.
+The existing centralized PO calculator already applies the required policy:
 
-## 2D.4 — Rental accounting verification
+- `supplier`: freight remains in the supplier share;
+- `own`: freight is excluded from supplier payable and posted to the selected own account; and
+- `parent`: freight is excluded from the supplier share and handled through parent/same-company posting rules.
 
-The current rental payment service already provides:
+Regression coverage locks these formulas.
 
-- one authoritative posting core;
-- transaction-owned payment, recognition journal, and ledger updates;
-- advisory locking and idempotency;
-- scheduled-to-posted convergence; and
-- atomic advance/prepaid flags.
+### Remaining lifecycle boundary
 
-Program 2D should add lifecycle regression coverage and inspect deletion/reversal boundaries before changing behavior. No replacement service is currently justified.
+The legacy edit path still performs:
+
+1. exact inventory and voucher reversal in one transaction;
+2. container status reset separately;
+3. the replacement offload in another transaction; and
+4. Supplier Partner follow-up journals in another transaction when applicable.
+
+The new guard prevents concurrent edits and rejects predictable validation failures before reversal, substantially reducing the failure window. It does not make those separate write transactions atomic. Completing 2D.3 requires extracting the existing reversal, repost, and SP follow-up logic into one transaction-owned lifecycle service. No safe reusable service currently exists in the repository.
+
+## 2D.4 — Rental payment reversal — complete by scope
+
+Rental creation and scheduled posting already use one authoritative transaction core and a deterministic payment-group advisory lock.
+
+The previous deletion route read one split row before its transaction and subtracted that row's amount from the monthly ledger. Concurrent deletion or deletion of one row from a split payment could therefore leave incorrect payment groups, vouchers, recognition journals, or `paid_amount` values.
+
+A central deletion route now runs before the legacy route for ERP, Factory, and Properties rental modules. It:
+
+1. uses the same deterministic payment-group advisory lock as scheduled posting;
+2. locks all rows in the payment group in ID order;
+3. deletes the complete split-payment group;
+4. removes linked intercompany transfers and their vouchers;
+5. soft-deletes the shared rental payment voucher only when no outside payment references it;
+6. soft-deletes the related `AP-CLEAR-*` voucher;
+7. soft-deletes the `ADV-REC-*` recognition journal;
+8. clears recognition-journal links and advance flags;
+9. resets guarantee-release state when applicable; and
+10. rebuilds monthly `paid_amount` from the remaining `POSTED` payment rows.
+
+Deleting a scheduled payment therefore cannot reduce a legitimate posted balance. Prepaid and advance flags reset when no posted payment remains for the affected month.
 
 ## Focused coverage added
 
-- monthly attendance-based payroll calculation;
-- weekday fallback for daily workers;
-- per-bale and per-kilogram earnings;
-- advance deduction capped at gross pay;
-- company/period payroll concurrency-lock scoping;
-- company/container SP offload lock scoping;
-- exact compatible replay matching; and
-- conflict detection for changed date, location, landed total, description, or charge-account allocation.
+- factory payroll formulas and company/period lock scoping;
+- SP company/container lock scoping and exact replay compatibility;
+- ERP container account collection and lifecycle lock scoping;
+- supplier, own-account, and parent-paid freight totals;
+- posted split-rental group deletion;
+- rental recognition-voucher cleanup; and
+- scheduled-payment deletion preserving remaining posted totals.
+
+## Current status
+
+- 2D.1 Payroll generation: complete.
+- 2D.2 Supplier Partner offload: complete by scope.
+- 2D.3 ERP container lifecycle: guarded and prevalidated; full transaction extraction remains.
+- 2D.4 Rental reversal: complete by scope.
 
 ## Verification limitation
 
