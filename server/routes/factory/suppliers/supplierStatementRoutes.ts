@@ -122,7 +122,7 @@ import CryptoJS from "crypto-js";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
-import { buildBrokerStatement } from "./_supplierStatementHelpers";
+import { buildBrokerStatement, isSupplierPaidFreight } from "./_supplierStatementHelpers";
 
 export function registerSupplierStatementRoutes(app: Express) {
   app.get("/api/factory/suppliers/:id/statement", requireAuth, async (req: any, res: any) => {
@@ -272,7 +272,9 @@ export function registerSupplierStatementRoutes(app: Express) {
         // actualReceivedKg only affects inventory — not the agreed purchase amount.
         const kg = parseFloat(c.totalKg || "0");
         const rate = parseFloat(c.ratePerKg || "0");
-        const freight = parseFloat(c.freight || "0");
+        // Only charge freight to the supplier if they actually owe it —
+        // own-account freight (freightPaidBy="own") must not appear here.
+        const freight = isSupplierPaidFreight(c) ? parseFloat(c.freight || "0") : 0;
         const containerCc = c.currencyCode || "USD";
         // Use freightCurrencyCode to determine which pool freight belongs to.
         // The DB default is "USD", so AUD containers with USD freight (even no explicit setting) correctly
