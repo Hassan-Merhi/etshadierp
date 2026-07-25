@@ -21,6 +21,8 @@ When credentials are supplied, it also verifies that the authenticated app shell
 
 ## Run against a local or preview deployment
 
+The target URL must serve a build of the pull-request branch. Testing the current production deployment does not validate unmerged code.
+
 Login-only smoke:
 
 ```bash
