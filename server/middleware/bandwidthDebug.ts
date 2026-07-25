@@ -8,6 +8,9 @@ import {
 const DEFAULT_THRESHOLD_BYTES = 500 * 1024;
 const DEFAULT_REPORT_INTERVAL_MS = 5 * 60 * 1000;
 const DEFAULT_TOP_N = 20;
+const DEFAULT_API_WINDOW_BUDGET_MB = 50;
+const DEFAULT_STATIC_WINDOW_BUDGET_MB = 20;
+const DEFAULT_ENDPOINT_WINDOW_BUDGET_MB = 20;
 
 type EndpointAggregate = {
   method: string;
@@ -24,6 +27,21 @@ type EndpointAggregate = {
   dbDurationMs: number;
 };
 
+type BandwidthBudgetConfig = {
+  apiWindowBytes: number;
+  staticWindowBytes: number;
+  endpointWindowBytes: number;
+};
+
+type BandwidthBudgetViolation = {
+  code: string;
+  message: string;
+  observedBytes: number;
+  budgetBytes: number;
+  method?: string;
+  path?: string;
+};
+
 const aggregates = new Map<string, EndpointAggregate>();
 let reportTimer: NodeJS.Timeout | undefined;
 
@@ -32,8 +50,29 @@ function positiveNumber(value: string | undefined, fallback: number): number {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
 }
 
+function megabytesToBytes(value: string | undefined, fallbackMb: number): number {
+  return Math.round(positiveNumber(value, fallbackMb) * 1024 * 1024);
+}
+
 function getThresholdBytes(): number {
   return Math.round(positiveNumber(process.env.BANDWIDTH_DEBUG_THRESHOLD_KB, 500) * 1024);
+}
+
+function getBandwidthBudgetConfig(): BandwidthBudgetConfig {
+  return {
+    apiWindowBytes: megabytesToBytes(
+      process.env.BANDWIDTH_DEBUG_API_WINDOW_BUDGET_MB,
+      DEFAULT_API_WINDOW_BUDGET_MB,
+    ),
+    staticWindowBytes: megabytesToBytes(
+      process.env.BANDWIDTH_DEBUG_STATIC_WINDOW_BUDGET_MB,
+      DEFAULT_STATIC_WINDOW_BUDGET_MB,
+    ),
+    endpointWindowBytes: megabytesToBytes(
+      process.env.BANDWIDTH_DEBUG_ENDPOINT_WINDOW_BUDGET_MB,
+      DEFAULT_ENDPOINT_WINDOW_BUDGET_MB,
+    ),
+  };
 }
 
 function normalizePath(req: Request): string {
@@ -104,13 +143,71 @@ function calculateRankScore(aggregate: EndpointAggregate): number {
   );
 }
 
+function evaluateBandwidthBudgets(
+  apiAggregates: EndpointAggregate[],
+  staticAggregates: EndpointAggregate[],
+  config: BandwidthBudgetConfig = getBandwidthBudgetConfig(),
+) {
+  const totalApiResponseBytes = sumResponseBytes(apiAggregates);
+  const totalStaticAssetResponseBytes = sumResponseBytes(staticAggregates);
+  const topApi = [...apiAggregates].sort((left, right) => right.totalResponseBytes - left.totalResponseBytes)[0];
+  const topStatic = [...staticAggregates].sort((left, right) => right.totalResponseBytes - left.totalResponseBytes)[0];
+  const violations: BandwidthBudgetViolation[] = [];
+
+  if (totalApiResponseBytes > config.apiWindowBytes) {
+    violations.push({
+      code: "api_bandwidth_budget_exceeded",
+      message: "API response bandwidth exceeded its reporting-window budget",
+      observedBytes: totalApiResponseBytes,
+      budgetBytes: config.apiWindowBytes,
+    });
+  }
+  if (totalStaticAssetResponseBytes > config.staticWindowBytes) {
+    violations.push({
+      code: "static_bandwidth_budget_exceeded",
+      message: "Static-asset bandwidth exceeded its reporting-window budget",
+      observedBytes: totalStaticAssetResponseBytes,
+      budgetBytes: config.staticWindowBytes,
+    });
+  }
+  if (topApi && topApi.totalResponseBytes > config.endpointWindowBytes) {
+    violations.push({
+      code: "api_endpoint_bandwidth_budget_exceeded",
+      message: "An API endpoint exceeded its reporting-window bandwidth budget",
+      observedBytes: topApi.totalResponseBytes,
+      budgetBytes: config.endpointWindowBytes,
+      method: topApi.method,
+      path: topApi.path,
+    });
+  }
+  if (topStatic && topStatic.totalResponseBytes > config.endpointWindowBytes) {
+    violations.push({
+      code: "static_asset_bandwidth_budget_exceeded",
+      message: "A static asset exceeded its reporting-window bandwidth budget",
+      observedBytes: topStatic.totalResponseBytes,
+      budgetBytes: config.endpointWindowBytes,
+      method: topStatic.method,
+      path: topStatic.path,
+    });
+  }
+
+  return {
+    totalApiResponseBytes,
+    totalStaticAssetResponseBytes,
+    config,
+    violations,
+  };
+}
+
 function emitRanking(): void {
   if (aggregates.size === 0) return;
 
   const topN = Math.round(positiveNumber(process.env.BANDWIDTH_DEBUG_TOP_N, DEFAULT_TOP_N));
+  const windowMs = positiveNumber(process.env.BANDWIDTH_DEBUG_REPORT_INTERVAL_MS, DEFAULT_REPORT_INTERVAL_MS);
   const all = [...aggregates.values()];
   const apiAggregates = all.filter((aggregate) => isApiPath(aggregate.path));
   const staticAggregates = all.filter((aggregate) => isStaticAsset(aggregate.path));
+  const budgetSnapshot = evaluateBandwidthBudgets(apiAggregates, staticAggregates);
 
   const apiRows = apiAggregates
     .map(formatRow)
@@ -134,12 +231,29 @@ function emitRanking(): void {
     endpointCount: all.length,
     apiEndpointCount: apiAggregates.length,
     staticAssetCount: staticAggregates.length,
-    windowMs: positiveNumber(process.env.BANDWIDTH_DEBUG_REPORT_INTERVAL_MS, DEFAULT_REPORT_INTERVAL_MS),
-    totalApiResponseBytes: sumResponseBytes(apiAggregates),
-    totalStaticAssetResponseBytes: sumResponseBytes(staticAggregates),
+    windowMs,
+    totalApiResponseBytes: budgetSnapshot.totalApiResponseBytes,
+    totalStaticAssetResponseBytes: budgetSnapshot.totalStaticAssetResponseBytes,
+    apiWindowBudgetBytes: budgetSnapshot.config.apiWindowBytes,
+    staticWindowBudgetBytes: budgetSnapshot.config.staticWindowBytes,
+    endpointWindowBudgetBytes: budgetSnapshot.config.endpointWindowBytes,
     ranked: apiRows,
     staticAssets: staticRows,
   });
+
+  for (const violation of budgetSnapshot.violations) {
+    recordOperationalEvent({
+      category: "bandwidth",
+      code: violation.code,
+      severity: "warning",
+      message: violation.message,
+      method: violation.method,
+      path: violation.path,
+      responseBytes: violation.observedBytes,
+      budgetBytes: violation.budgetBytes,
+      windowMs,
+    });
+  }
 
   aggregates.clear();
 }
@@ -242,6 +356,8 @@ export const __bandwidthDebugTesting = {
   isApiPath,
   isStaticAsset,
   calculateRankScore,
+  evaluateBandwidthBudgets,
+  getBandwidthBudgetConfig,
   clear(): void {
     aggregates.clear();
   },
