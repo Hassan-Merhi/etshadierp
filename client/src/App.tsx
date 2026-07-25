@@ -60,11 +60,13 @@ function UpdateBanner() {
                 variant="outline"
                 data-testid="button-update-refresh"
                 onClick={() => {
-                  // Clear chunk-reload guards so the reload is clean
+                  // Clear both current and legacy recovery guards before a
+                  // user-requested refresh so the new build starts cleanly.
                   try {
+                    const prefixes = ["assetRecovery:", "swReload:", "chunkReload:", "chunkRetry:"];
                     Object.keys(sessionStorage)
-                      .filter((k) => k.startsWith("chunkReload:") || k.startsWith("chunkRetry:"))
-                      .forEach((k) => sessionStorage.removeItem(k));
+                      .filter((key) => prefixes.some((prefix) => key.startsWith(prefix)))
+                      .forEach((key) => sessionStorage.removeItem(key));
                   } catch {
                     /* ignore */
                   }
