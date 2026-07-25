@@ -16,7 +16,7 @@ The protected creation route is registered before the legacy route and handles o
 - carrying a non-empty `clientRequestId`;
 - carrying at least one contra line.
 
-Optional drafts, unidentified compatibility callers, edits, and deletions continue through the existing handlers.
+Optional drafts and unidentified compatibility callers continue through the existing creation handler.
 
 ## Preserved debit and credit behavior
 
@@ -29,11 +29,11 @@ The central builder reproduces the existing direction rules:
 | Receipt | cash/bank/ledger/customer/fixed asset | payment account | contra account |
 | Receipt | supplier/factory supplier/employee | contra account | payment account |
 
-Customer targets retain the linked-ledger representation. Selecting a customer stamps its linked ledger when present; selecting a customer-linked ledger also stamps the customer. The central ownership adapter verifies the pair belongs to the active company and rejects mismatches.
+For creation, customer targets retain the linked-ledger representation. Selecting a customer stamps its linked ledger when present; selecting a customer-linked ledger also stamps the customer. The central ownership adapter verifies the pair belongs to the active company and rejects mismatches.
 
-## Transaction boundary
+## Creation transaction boundary
 
-For a new protected Payment/Receipt, one database transaction now owns:
+For a new protected Payment/Receipt, one database transaction owns:
 
 - the voucher row;
 - every balanced voucher-entry pair;
@@ -44,7 +44,7 @@ For a new protected Payment/Receipt, one database transaction now owns:
 
 A failure rolls back all of those writes. A replay returns the original voucher and does not apply employee deltas twice.
 
-## Currency behavior
+## Creation currency behavior
 
 - Transaction amounts remain in the selected transaction currency.
 - Historical base amounts remain in USD.
@@ -52,7 +52,7 @@ A failure rolls back all of those writes. A replay returns the original voucher 
 - Aggregate and per-line conversion rounding is reconciled to six decimal places.
 - The exact voucher-level exchange-rate value is included in the idempotency fingerprint.
 
-## Compatibility effects
+## Creation compatibility effects
 
 For a newly committed posting, the route preserves the existing best-effort behavior:
 
@@ -66,7 +66,38 @@ Those effects are skipped when the request is an idempotent replay.
 
 ## Client retry protection
 
-The shared accounting request-identity boundary now covers active Payment/Receipt creation. The same payload keeps the same identity through an uncertain network result. A successful response or definite 4xx releases it; network and 5xx outcomes retain it for a safe retry.
+The shared accounting request-identity boundary covers active Payment/Receipt creation. The same payload keeps the same identity through an uncertain network result. A successful response or definite 4xx releases it; network and 5xx outcomes retain it for a safe retry.
+
+## Step 2B.2 completed — atomic active editing
+
+A protected edit route is registered before the legacy Payment/Receipt editor. It handles only:
+
+- an existing active `Payment` or `Receipt` voucher;
+- a submitted active `Payment` or `Receipt` replacement;
+- a voucher owned by the selected company; and
+- a voucher that is not a read-only migrated record.
+
+Optional-to-active, active-to-optional, optional-to-optional, and non-Payment/Receipt edits continue through the original handler.
+
+For an active edit, one transaction now:
+
+1. locks the voucher row;
+2. rebuilds and validates the replacement posting;
+3. validates every target against the active company;
+4. loads the old entries;
+5. reverses the old employee balance, deposit, and withdrawal effects;
+6. replaces the voucher fields and all entries; and
+7. applies the new employee effects.
+
+Any failure rolls back the reversal, voucher update, entry replacement, and new employee effects together.
+
+### Edit compatibility preserved
+
+The legacy Payment/Receipt edit route represents each account as one target. It does not add a linked customer to a ledger or a linked ledger to a customer during replacement. The protected editor preserves that exact representation while performing ownership validation separately.
+
+The legacy editor also uses submitted currency metadata to normalize replacement entries and calculate the historical base total, but does not rewrite the voucher-level `currency` or `exchangeRate` fields. The protected editor preserves that contract rather than silently changing stored voucher metadata.
+
+After a successful edit, the existing WhatsApp prompt and detailed update-audit behavior remain present. The legacy edit route does not rewrite the factory daybook or rerun intercompany/loan side effects, so the protected editor does not introduce those new behaviors.
 
 ## Focused coverage added
 
@@ -74,7 +105,8 @@ The shared accounting request-identity boundary now covers active Payment/Receip
 - liability-account Payment direction;
 - asset-account Receipt direction;
 - liability-account Receipt direction;
-- customer and linked-ledger targets;
+- customer and linked-ledger creation targets;
+- customer-only legacy edit target support;
 - non-USD exact debit/credit balance;
 - stable idempotency across regenerated voucher numbers;
 - invalid voucher-type rejection; and
@@ -82,9 +114,8 @@ The shared accounting request-identity boundary now covers active Payment/Receip
 
 ## Intentionally unchanged
 
-- Payment/Receipt editing;
 - Payment/Receipt deletion;
-- optional Payment/Receipt drafts;
+- optional Payment/Receipt lifecycle;
 - POS flows;
 - stock transfers;
 - containers;
@@ -96,4 +127,4 @@ The shared accounting request-identity boundary now covers active Payment/Receip
 
 ## Verification limitation
 
-GitHub Actions has repeatedly failed before exposing executable steps or logs. A complete build, type-check, and database-backed test pass is therefore not claimed. Step 2B.2 must not migrate editing until exact old-entry reversal and new-entry application are kept in the same transaction. Deletion convergence must preserve the existing generic voucher cleanup logic and must not intercept non-Payment/Receipt vouchers.
+GitHub Actions has repeatedly failed before exposing executable steps or logs. A complete build, type-check, and database-backed test pass is therefore not claimed. Step 2B.3 must converge deletion separately, reuse the generic voucher cleanup protections, reverse employee effects exactly once, and avoid intercepting unrelated voucher types.
