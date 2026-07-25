@@ -11,7 +11,7 @@ async function assertRequiredTablesReady(): Promise<void> {
        FROM information_schema.tables
       WHERE table_schema = 'public'
         AND table_name = ANY($1::text[])`,
-    [REQUIRED_TABLES],
+    [[...REQUIRED_TABLES]],
   );
   const found = new Set(result.rows.map((row) => row.table_name));
   const missing = REQUIRED_TABLES.filter((table) => !found.has(table));
