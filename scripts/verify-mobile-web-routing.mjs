@@ -128,7 +128,7 @@ for (const token of [
   "A real rendered pass cannot be claimed from repository inspection alone.",
   "Service-worker deployment check",
   "Desktop non-regression checks",
-  "Merge gate",
+  "The pull request remains conflict-free with `main` at merge time.",
 ]) {
   if (!regressionGuide.includes(token)) failures.push(`Responsive regression guide missing: ${token}`);
 }
