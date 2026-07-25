@@ -67,18 +67,6 @@ Every route cutover requires:
   - the compatibility voucher audit record.
 - Existing response fields remain present, with additional `replayed` and `clientRequestId` diagnostics.
 
-### Compatibility side effects preserved
-
-On the first successful active-journal posting, the route still performs the existing:
-
-- employee balance synchronization;
-- customer-order charge linking and recalculation;
-- factory daybook write;
-- WhatsApp rule evaluation;
-- detailed voucher audit record.
-
-The transaction-owned central audit and idempotency marker are written before the voucher transaction commits.
-
 ### Step 2A.3 completed — verified customer linked-ledger rule
 
 The central engine now supports exactly two target shapes:
@@ -95,6 +83,36 @@ The second shape is accepted only after the database adapter confirms all of the
 A customer paired with a different ledger returns `POSTING_LINKED_LEDGER_MISMATCH`. Other unrelated multi-target combinations remain rejected by `POSTING_TARGET_INVALID`.
 
 This preserves the generic voucher route's linked-ledger reporting model without weakening the central engine into accepting arbitrary duplicate targets.
+
+### Step 2A.4 completed — atomic employee balance posting
+
+For active manual-journal creation, employee balance changes now execute inside the same database transaction as:
+
+- the voucher row;
+- voucher-entry rows;
+- the idempotency marker; and
+- the central posting audit record.
+
+The existing formulas are preserved:
+
+- `currentBalance += credit - debit`;
+- `totalDeposits += credit`;
+- `totalWithdrawals += debit`.
+
+Direct `employeeId` entries retain precedence. Ledger entries still map through company-scoped `EMP-<employee code>` accounts. A missing employee for an `EMP-*` ledger remains non-blocking, matching the prior compatibility behavior.
+
+This removes the previous failure window where a voucher could commit and employee synchronization could fail afterward. A replay does not reapply the delta because the employee update runs only when the central posting result is new.
+
+### Remaining compatibility side effects
+
+After the committed voucher transaction, the route still performs the existing best-effort:
+
+- customer-order charge linking and recalculation;
+- factory daybook write;
+- WhatsApp rule evaluation;
+- detailed voucher audit record.
+
+The employee balance is no longer part of that post-commit set.
 
 ### Generic voucher endpoint remains unchanged
 
@@ -116,7 +134,7 @@ A generic-route cutover must first add a stable identity boundary for all caller
 - Migrate generic active voucher creation only after those callers are covered.
 - Journal editing and deletion are not yet migrated.
 - Optional or intentionally unbalanced drafts remain on the compatibility path.
-- Employee balance synchronization is still a legacy post-commit incremental side effect. A failed partial employee sync cannot yet be proven fully idempotent; this must be resolved before journal edit/delete convergence.
+- Design exact transactional reversal of employee deltas before journal edit/delete convergence.
 
 ## Verification status
 
@@ -127,7 +145,8 @@ Focused regression tests were added for:
 - manual journal USD and CFA normalization;
 - aggregate/per-line rounding balance;
 - company target grouping;
-- customer linked-ledger acceptance and mismatch rejection.
+- customer linked-ledger acceptance and mismatch rejection;
+- employee direct-ID and `EMP-*` ledger delta formulas.
 
 GitHub Actions continues to fail before exposing executable steps or logs. Therefore the code is implemented on the draft branch, but a full build, type-check, and database-backed test pass is not claimed.
 
