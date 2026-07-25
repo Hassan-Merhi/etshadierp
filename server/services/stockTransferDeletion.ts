@@ -1,4 +1,4 @@
-import { and, eq, inArray, isNull } from "drizzle-orm";
+import { and, eq, inArray, or } from "drizzle-orm";
 import { db } from "../db";
 import { adjustInventory } from "../inventoryHelper";
 import {
@@ -70,13 +70,7 @@ async function assertPersistedTransferScope(input: {
   const validLocations = await tx
     .select({ id: locations.id })
     .from(locations)
-    .where(
-      and(
-        eq(locations.companyId, companyId),
-        inArray(locations.id, locationIds),
-        isNull(locations.deletedAt)
-      )
-    );
+    .where(and(eq(locations.companyId, companyId), inArray(locations.id, locationIds)));
   if (validLocations.length !== locationIds.length) {
     throw new StockTransferDeletionError(
       "STOCK_TRANSFER_DELETE_SCOPE_INVALID",
@@ -263,16 +257,12 @@ export async function deleteStockTransferVoucher(input: {
       .select()
       .from(interCompanyTransfers)
       .where(
-        and(
-          // This expression is deliberately expanded below by filtering in JS;
-          // stock-transfer vouchers are rarely intercompany-linked, but preserving
-          // cleanup avoids leaving a dangling counterpart in malformed legacy data.
-          eq(interCompanyTransfers.id, interCompanyTransfers.id)
+        or(
+          eq(interCompanyTransfers.fromVoucherId, voucherId),
+          eq(interCompanyTransfers.toVoucherId, voucherId)
         )
       );
-    for (const linked of linkedTransfers.filter(
-      (row) => row.fromVoucherId === voucherId || row.toVoucherId === voucherId
-    )) {
+    for (const linked of linkedTransfers) {
       const otherVoucherId = linked.fromVoucherId === voucherId ? linked.toVoucherId : linked.fromVoucherId;
       await tx.delete(interCompanyTransfers).where(eq(interCompanyTransfers.id, linked.id));
       if (otherVoucherId && otherVoucherId !== voucherId) {
