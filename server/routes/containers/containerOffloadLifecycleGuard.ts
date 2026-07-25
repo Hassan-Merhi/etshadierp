@@ -242,20 +242,15 @@ async function guardContainerOffload(req: Request, res: Response, next: NextFunc
       }
     }
 
-    const parentAgentIds = collectContainerOffloadParentAgentIds(req.body ?? {});
-    const parentFreightAccountIds = uniquePositiveIds(
-      purchaseOrders.rows
-        .filter((row) => row.freight_paid_by === "parent")
-        .map((row) => row.freight_parent_account_id)
+    const parentResult = await client.query<{ parent_company_id: number | null }>(
+      "SELECT parent_company_id FROM companies WHERE id = $1 LIMIT 1",
+      [companyId]
     );
-    const parentLedgerIds = uniquePositiveIds([...parentAgentIds, ...parentFreightAccountIds]);
-    if (parentLedgerIds.length > 0) {
-      const parentResult = await client.query<{ parent_company_id: number | null }>(
-        "SELECT parent_company_id FROM companies WHERE id = $1 LIMIT 1",
-        [companyId]
-      );
-      const parentCompanyId = Number(parentResult.rows[0]?.parent_company_id ?? 1);
-      const parentRows = await client.query<{ id: number }>(
+    const parentCompanyId = Number(parentResult.rows[0]?.parent_company_id ?? 1);
+
+    const parentAgentIds = collectContainerOffloadParentAgentIds(req.body ?? {});
+    if (parentAgentIds.length > 0) {
+      const parentAgentRows = await client.query<{ id: number }>(
         `SELECT id
          FROM ledger_accounts
          WHERE company_id = $1
@@ -263,12 +258,39 @@ async function guardContainerOffload(req: Request, res: Response, next: NextFunc
            AND deleted_at IS NULL
          ORDER BY id
          FOR KEY SHARE`,
-        [parentCompanyId, parentLedgerIds]
+        [parentCompanyId, parentAgentIds]
       );
-      const foundIds = new Set(parentRows.rows.map((row) => Number(row.id)));
-      const missingId = parentLedgerIds.find((id) => !foundIds.has(id));
+      const foundIds = new Set(parentAgentRows.rows.map((row) => Number(row.id)));
+      const missingId = parentAgentIds.find((id) => !foundIds.has(id));
       if (missingId) {
-        res.status(400).json({ message: `Parent-company ledger #${missingId} is unavailable` });
+        res.status(400).json({ message: `Parent-agent ledger #${missingId} is unavailable` });
+        return;
+      }
+    }
+
+    const parentFreightAccountIds = uniquePositiveIds(
+      purchaseOrders.rows
+        .filter((row) => row.freight_paid_by === "parent")
+        .map((row) => row.freight_parent_account_id)
+    );
+    if (parentFreightAccountIds.length > 0) {
+      const validCompanyIds = uniquePositiveIds([companyId, parentCompanyId]);
+      const parentFreightRows = await client.query<{ id: number }>(
+        `SELECT id
+         FROM ledger_accounts
+         WHERE company_id = ANY($1::int[])
+           AND id = ANY($2::int[])
+           AND deleted_at IS NULL
+         ORDER BY id
+         FOR KEY SHARE`,
+        [validCompanyIds, parentFreightAccountIds]
+      );
+      const foundIds = new Set(parentFreightRows.rows.map((row) => Number(row.id)));
+      const missingId = parentFreightAccountIds.find((id) => !foundIds.has(id));
+      if (missingId) {
+        res.status(400).json({
+          message: `Parent-paid freight ledger #${missingId} is unavailable in the current or parent company`,
+        });
         return;
       }
     }
