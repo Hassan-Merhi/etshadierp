@@ -1,5 +1,4 @@
 import { useEffect, useRef } from "react";
-import html2canvas from "html2canvas";
 
 // How often to check if a Developer is watching us (cheap GET, no canvas).
 // Kept at 15 s to avoid saturating the Android WebView JS↔Java bridge with
@@ -15,6 +14,21 @@ const CLICK_RETAIN_MS = 8000;
 const MAX_DATA_URL_LEN = 1_300_000;
 
 const isDev = import.meta.env.DEV;
+
+type Html2Canvas = typeof import("html2canvas")["default"];
+let html2canvasPromise: Promise<Html2Canvas> | null = null;
+
+async function loadHtml2Canvas(): Promise<Html2Canvas> {
+  if (!html2canvasPromise) {
+    html2canvasPromise = import("html2canvas")
+      .then((module) => module.default)
+      .catch((error) => {
+        html2canvasPromise = null;
+        throw error;
+      });
+  }
+  return html2canvasPromise;
+}
 
 export interface ClickEvent {
   x: number;
@@ -99,6 +113,7 @@ const html2canvasBaseOpts = {
 } as const;
 
 async function tryCapture(opts: Record<string, any>): Promise<HTMLCanvasElement> {
+  const html2canvas = await loadHtml2Canvas();
   return Promise.race([
     html2canvas(document.body, {
       ...opts,
