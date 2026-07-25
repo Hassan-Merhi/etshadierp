@@ -37,6 +37,25 @@ describe("validateCentralPostingRequest", () => {
     });
   });
 
+  it("accepts the customer plus linked-ledger compatibility shape", () => {
+    const input = request({
+      entries: [
+        {
+          ledgerAccountId: 10,
+          customerId: 30,
+          debitAmount: "100",
+          creditAmount: "0",
+        },
+        { bankAccountId: 20, debitAmount: "0", creditAmount: "100" },
+      ],
+    });
+
+    expect(validateCentralPostingRequest(input)).toEqual({
+      debitTotal: "100",
+      creditTotal: "100",
+    });
+  });
+
   it("rejects unbalanced entries", () => {
     const input = request({
       entries: [
@@ -49,12 +68,12 @@ describe("validateCentralPostingRequest", () => {
     );
   });
 
-  it("rejects entries with multiple accounting targets", () => {
+  it("rejects unrelated multiple accounting targets", () => {
     const input = request({
       entries: [
         {
           ledgerAccountId: 10,
-          customerId: 30,
+          supplierId: 30,
           debitAmount: "100",
           creditAmount: "0",
         },
@@ -75,7 +94,7 @@ describe("validateCentralPostingRequest", () => {
 });
 
 describe("postBalancedVoucherTx", () => {
-  it("returns an existing posting without inserting or auditing again", async () => {
+  it("returns an existing posting as a replay without inserting or auditing again", async () => {
     const existing = { voucher: { id: 77 }, entries: [{ id: 88 }] };
     const dependencies = {
       ownership: { validateVoucherOwnership: vi.fn() },
@@ -86,7 +105,10 @@ describe("postBalancedVoucherTx", () => {
       audit: { recordPosting: vi.fn() },
     };
 
-    await expect(postBalancedVoucherTx({}, request(), dependencies)).resolves.toBe(existing);
+    await expect(postBalancedVoucherTx({}, request(), dependencies)).resolves.toEqual({
+      ...existing,
+      replayed: true,
+    });
     expect(dependencies.ownership.validateVoucherOwnership).not.toHaveBeenCalled();
     expect(dependencies.idempotency.record).not.toHaveBeenCalled();
     expect(dependencies.audit.recordPosting).not.toHaveBeenCalled();

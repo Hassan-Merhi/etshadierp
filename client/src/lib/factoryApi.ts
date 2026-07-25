@@ -1,5 +1,9 @@
 import { queryClient, apiRequest } from "./queryClient";
 import {
+  attachAccountingRequestIdentity,
+  releaseAccountingRequestIdentity,
+} from "./accountingRequestIdentity";
+import {
   isUnsafeFactoryLoadingScanRequest,
   purgeUnsafeFactoryLoadingScans,
 } from "./factoryOfflineQueueSafety";
@@ -78,14 +82,28 @@ async function requestWithPreparedReplayState(
 ): Promise<Response> {
   const prepareRequest = isHistoricalReplayPrepareRequest(method, url, data);
   const token = historicalReplayTokenFromRequest(method, url, data);
-  const outboundData = freezeHistoricalReplayApplyRequest(method, url, data);
+  const preparedData = freezeHistoricalReplayApplyRequest(method, url, data);
+  const outboundData = attachAccountingRequestIdentity(method, url, preparedData);
+
   try {
     const response = await delegate(method, url, outboundData);
+    releaseAccountingRequestIdentity(method, url, outboundData);
     if (prepareRequest && response.ok) {
       const payload = await response.clone().json().catch(() => null);
       rememberHistoricalReplayPreparation(payload);
     }
     return response;
+  } catch (error: any) {
+    // OfflineQueued means the exact body (including clientRequestId) is persisted.
+    // A 4xx is a definite rejection. Keep the identity only for network errors,
+    // timeouts, and 5xx responses where the commit outcome may be uncertain.
+    if (
+      error?.name === "OfflineQueued" ||
+      (Number(error?.status) >= 400 && Number(error?.status) < 500)
+    ) {
+      releaseAccountingRequestIdentity(method, url, outboundData);
+    }
+    throw error;
   } finally {
     // A token apply is intentionally one-shot in the client. On any response or
     // network error, force a fresh Prepare rather than reusing potentially stale

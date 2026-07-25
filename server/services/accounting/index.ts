@@ -1,4 +1,4 @@
-/**
+/*
  * Central Accounting Service
  *
  * Re-exports the low-level compatibility helpers and the strict Program 2
@@ -16,11 +16,14 @@ export { insertVoucherWithEntriesTx, insertVoucherWithEntries } from "./voucherP
 export {
   postBalancedVoucherTx,
   validateCentralPostingRequest,
+  populatedPostingTargets,
+  hasSupportedPostingTargetShape,
   PostingValidationError,
 } from "./centralPostingEngine";
 export type {
   CentralPostingDependencies,
   CentralPostingRequest,
+  CentralPostingResult,
   PostingActor,
   PostingAuditWriter,
   PostingIdempotencyStore,
@@ -28,6 +31,67 @@ export type {
   PostingSourceIdentity,
   ValidatedPostingTotals,
 } from "./centralPostingEngine";
+
+export {
+  createDatabasePostingDependencies,
+  collectPostingTargetIds,
+} from "./databasePostingDependencies";
+export type { PostingTargetIds } from "./databasePostingDependencies";
+
+export {
+  buildManualJournalPostingRequest,
+  resolveManualJournalClientRequestId,
+} from "./manualJournalPosting";
+export type {
+  BuildManualJournalPostingInput,
+  BuiltManualJournalPosting,
+  ManualJournalEntryInput,
+} from "./manualJournalPosting";
+
+export {
+  buildGenericVoucherPostingRequest,
+  supportsCentralGenericVoucher,
+} from "./genericVoucherPosting";
+export type {
+  BuiltGenericVoucherPosting,
+  GenericVoucherInput,
+} from "./genericVoucherPosting";
+
+export { buildPaymentReceiptPostingRequest } from "./paymentReceiptPosting";
+export type {
+  BuildPaymentReceiptPostingInput,
+  BuiltPaymentReceiptPosting,
+  PaymentReceiptLineInput,
+  PaymentReceiptVoucherType,
+} from "./paymentReceiptPosting";
+
+export {
+  isPaymentReceiptVoucherType,
+  shouldUseCentralPaymentReceiptDeletion,
+} from "./paymentReceiptDeletionPolicy";
+export type {
+  PaymentReceiptDeletionPolicyInput,
+} from "./paymentReceiptDeletionPolicy";
+
+export {
+  assertCustomerLinkedLedgerPairs,
+  collectCustomerLedgerPairs,
+  validateCustomerLedgerPairs,
+} from "./customerLinkedLedgerValidation";
+export type {
+  CustomerLedgerOwnershipRow,
+  CustomerLedgerPair,
+} from "./customerLinkedLedgerValidation";
+
+export {
+  applyEmployeeBalanceDeltasTx,
+  collectEmployeeBalanceDeltas,
+} from "./employeeBalancePosting";
+export type {
+  EmployeeBalanceDelta,
+  EmployeeBalanceDeltaCollection,
+  EmployeeBalancePostingEntry,
+} from "./employeeBalancePosting";
 
 export {
   replaceVoucherTx,

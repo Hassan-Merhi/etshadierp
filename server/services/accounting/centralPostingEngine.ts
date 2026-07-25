@@ -16,6 +16,8 @@ const TARGET_FIELDS = [
   "factorySupplierId",
 ] as const;
 
+type TargetField = (typeof TARGET_FIELDS)[number];
+
 export interface PostingSourceIdentity {
   sourceType: string;
   sourceId: string;
@@ -81,6 +83,10 @@ export interface ValidatedPostingTotals {
   creditTotal: string;
 }
 
+export interface CentralPostingResult<V = unknown, E = unknown> extends VoucherWithEntries<V, E> {
+  replayed: boolean;
+}
+
 export class PostingValidationError extends Error {
   readonly code: string;
 
@@ -118,6 +124,25 @@ function amount(value: string | undefined, field: string, index: number): Decima
   return parsed;
 }
 
+export function populatedPostingTargets(entry: VoucherEntryInsertFields): TargetField[] {
+  return TARGET_FIELDS.filter((field) => entry[field] != null);
+}
+
+/**
+ * Most voucher entries must reference one accounting target. The only supported
+ * compatibility exception is a customer plus that customer's own linked ledger.
+ * The database ownership adapter validates the relationship before insert.
+ */
+export function hasSupportedPostingTargetShape(entry: VoucherEntryInsertFields): boolean {
+  const populated = populatedPostingTargets(entry);
+  if (populated.length === 1) return true;
+  return (
+    populated.length === 2 &&
+    populated.includes("customerId") &&
+    populated.includes("ledgerAccountId")
+  );
+}
+
 export function validateCentralPostingRequest(
   request: CentralPostingRequest
 ): ValidatedPostingTotals {
@@ -146,12 +171,11 @@ export function validateCentralPostingRequest(
   entries.forEach((entry, index) => {
     const debit = amount(entry.debitAmount, "debitAmount", index);
     const credit = amount(entry.creditAmount, "creditAmount", index);
-    const targetCount = TARGET_FIELDS.filter((field) => entry[field] != null).length;
 
-    if (targetCount !== 1) {
+    if (!hasSupportedPostingTargetShape(entry)) {
       throw new PostingValidationError(
         "POSTING_TARGET_INVALID",
-        `Entry ${index + 1} must reference exactly one accounting target`
+        `Entry ${index + 1} must reference one accounting target or a verified customer and linked ledger pair`
       );
     }
     if (debit.isZero() === credit.isZero()) {
@@ -199,12 +223,15 @@ export function validateCentralPostingRequest(
  * boundary validates the posting before writes, enforces company ownership,
  * performs deterministic idempotency lookup/recording, and writes audit data
  * before the transaction is allowed to commit.
+ *
+ * `replayed` lets callers avoid repeating non-transactional compatibility side
+ * effects when the same idempotency key is submitted more than once.
  */
 export async function postBalancedVoucherTx(
   tx: any,
   request: CentralPostingRequest,
   dependencies: CentralPostingDependencies
-): Promise<VoucherWithEntries> {
+): Promise<CentralPostingResult> {
   const totals = validateCentralPostingRequest(request);
   const companyId = request.voucher.companyId;
 
@@ -213,7 +240,7 @@ export async function postBalancedVoucherTx(
     companyId,
     source: request.source,
   });
-  if (existing) return existing;
+  if (existing) return { ...existing, replayed: true };
 
   await dependencies.ownership.validateVoucherOwnership({
     tx,
@@ -241,5 +268,5 @@ export async function postBalancedVoucherTx(
     creditTotal: totals.creditTotal,
   });
 
-  return result;
+  return { ...result, replayed: false };
 }

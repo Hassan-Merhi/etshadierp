@@ -23,6 +23,7 @@ export interface VoucherInsertFields {
   optional?: boolean;
   currency?: string | null;
   exchangeRate?: string | null;
+  effectiveDate?: string | null;
   sourceModule?: string | null;
 }
 
