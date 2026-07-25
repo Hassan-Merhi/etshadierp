@@ -2,6 +2,34 @@ import { Client } from "pg";
 
 const REPAIR_LOCK_KEY = "erp-startup-warning-repair-v1";
 
+const SUPPLIER_SYNC_COLUMNS = [
+  {
+    table: "vouchers",
+    column: "supplier_id",
+    ddl: `ALTER TABLE vouchers ADD COLUMN supplier_id INTEGER`,
+  },
+  {
+    table: "voucher_entries",
+    column: "supplier_id",
+    ddl: `ALTER TABLE voucher_entries ADD COLUMN supplier_id INTEGER`,
+  },
+  {
+    table: "sp_containers",
+    column: "supplier_id",
+    ddl: `ALTER TABLE sp_containers ADD COLUMN supplier_id INTEGER`,
+  },
+  {
+    table: "sp_containers",
+    column: "goods_otw_voucher_id",
+    ddl: `ALTER TABLE sp_containers ADD COLUMN goods_otw_voucher_id INTEGER`,
+  },
+  {
+    table: "ledger_accounts",
+    column: "sub_type",
+    ddl: `ALTER TABLE ledger_accounts ADD COLUMN sub_type TEXT`,
+  },
+];
+
 function structuredLog(level, message, detail = {}) {
   const writer = level === "ERROR" ? console.error : level === "WARN" ? console.warn : console.log;
   writer(
@@ -48,22 +76,24 @@ async function existingTables(client) {
 async function ensureSupplierSyncColumns(client, tables) {
   const ensured = [];
 
-  if (tables.has("vouchers")) {
-    await client.query(`ALTER TABLE vouchers ADD COLUMN IF NOT EXISTS supplier_id INTEGER`);
-    ensured.push("vouchers.supplier_id");
-  }
-  if (tables.has("voucher_entries")) {
-    await client.query(`ALTER TABLE voucher_entries ADD COLUMN IF NOT EXISTS supplier_id INTEGER`);
-    ensured.push("voucher_entries.supplier_id");
-  }
-  if (tables.has("sp_containers")) {
-    await client.query(`ALTER TABLE sp_containers ADD COLUMN IF NOT EXISTS supplier_id INTEGER`);
-    await client.query(`ALTER TABLE sp_containers ADD COLUMN IF NOT EXISTS goods_otw_voucher_id INTEGER`);
-    ensured.push("sp_containers.supplier_id", "sp_containers.goods_otw_voucher_id");
-  }
-  if (tables.has("ledger_accounts")) {
-    await client.query(`ALTER TABLE ledger_accounts ADD COLUMN IF NOT EXISTS sub_type TEXT`);
-    ensured.push("ledger_accounts.sub_type");
+  for (const spec of SUPPLIER_SYNC_COLUMNS) {
+    if (!tables.has(spec.table)) continue;
+
+    const columnCheck = await client.query(
+      `SELECT EXISTS (
+         SELECT 1
+           FROM information_schema.columns
+          WHERE table_schema = 'public'
+            AND table_name = $1
+            AND column_name = $2
+       ) AS exists`,
+      [spec.table, spec.column],
+    );
+
+    if (columnCheck.rows[0]?.exists) continue;
+
+    await client.query(spec.ddl);
+    ensured.push(`${spec.table}.${spec.column}`);
   }
 
   return ensured;
@@ -71,7 +101,14 @@ async function ensureSupplierSyncColumns(client, tables) {
 
 async function repairExchangeRateDuplicates(client, tables) {
   if (!tables.has("exchange_rates")) {
-    return { duplicateRowsRemoved: 0, indexEnsured: false };
+    return { duplicateRowsRemoved: 0, indexEnsured: false, indexAlreadyPresent: false };
+  }
+
+  const indexCheck = await client.query(
+    `SELECT to_regclass('public.exchange_rates_company_date_pair_unique') IS NOT NULL AS exists`,
+  );
+  if (indexCheck.rows[0]?.exists) {
+    return { duplicateRowsRemoved: 0, indexEnsured: true, indexAlreadyPresent: true };
   }
 
   await client.query(`LOCK TABLE exchange_rates IN SHARE ROW EXCLUSIVE MODE`);
@@ -93,13 +130,14 @@ async function repairExchangeRateDuplicates(client, tables) {
   `);
 
   await client.query(`
-    CREATE UNIQUE INDEX IF NOT EXISTS exchange_rates_company_date_pair_unique
+    CREATE UNIQUE INDEX exchange_rates_company_date_pair_unique
       ON exchange_rates (company_id, effective_date, from_currency, to_currency)
   `);
 
   return {
     duplicateRowsRemoved: removed.rowCount ?? 0,
     indexEnsured: true,
+    indexAlreadyPresent: false,
   };
 }
 
