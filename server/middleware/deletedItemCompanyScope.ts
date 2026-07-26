@@ -22,6 +22,7 @@ import {
 } from "@shared/schema";
 import { db } from "../db";
 import { logger } from "../lib/logger";
+import { resolveActiveCompanyId } from "../routes/helpers/resolveActiveCompanyId";
 import {
   classifyDeletedItemScope,
   type DeletedItemScopeType,
@@ -120,7 +121,7 @@ function deny(
       userId: req.session.userId ?? null,
       username: req.session.username ?? null,
       role: req.session.currentRole ?? null,
-      companyId: req.session.currentCompanyId ?? null,
+      companyId: resolveActiveCompanyId(req),
       method: req.method,
       path: req.path,
       reason,
@@ -137,7 +138,7 @@ export async function enforceDeletedItemCompanyScope(
   const match = classifyDeletedItemScope(req.path);
   if (!match) return true;
 
-  const companyId = Number(req.session.currentCompanyId);
+  const companyId = Number(resolveActiveCompanyId(req));
   const role = req.session.currentRole;
   if (!req.session.userId || !role || !Number.isSafeInteger(companyId) || companyId <= 0) {
     return true;
