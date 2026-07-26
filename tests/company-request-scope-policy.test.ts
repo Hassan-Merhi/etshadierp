@@ -6,7 +6,7 @@ describe("explicit company request scope parsing", () => {
     expect(decideExplicitCompanyScope({})).toEqual({ kind: "none" });
   });
 
-  it("normalizes a positive query or body companyId", () => {
+  it("normalizes a positive query, body, or path companyId", () => {
     expect(decideExplicitCompanyScope({ queryCompanyId: "12" })).toEqual({
       kind: "company",
       companyId: 12,
@@ -15,11 +15,15 @@ describe("explicit company request scope parsing", () => {
       kind: "company",
       companyId: 7,
     });
+    expect(decideExplicitCompanyScope({ pathCompanyId: "9" })).toEqual({
+      kind: "company",
+      companyId: 9,
+    });
   });
 
-  it("accepts matching query and body company identifiers", () => {
+  it("accepts matching identifiers from multiple request sources", () => {
     expect(
-      decideExplicitCompanyScope({ queryCompanyId: "4", bodyCompanyId: 4 })
+      decideExplicitCompanyScope({ queryCompanyId: "4", bodyCompanyId: 4, pathCompanyId: "4" })
     ).toEqual({ kind: "company", companyId: 4 });
   });
 
@@ -32,15 +36,15 @@ describe("explicit company request scope parsing", () => {
       kind: "invalid",
       source: "body",
     });
-    expect(decideExplicitCompanyScope({ queryCompanyId: [1, 2] })).toEqual({
+    expect(decideExplicitCompanyScope({ pathCompanyId: [1, 2] })).toEqual({
       kind: "invalid",
-      source: "query",
+      source: "path",
     });
   });
 
-  it("rejects conflicting query and body companies", () => {
+  it("rejects conflicting companies from any request source", () => {
     expect(
-      decideExplicitCompanyScope({ queryCompanyId: 2, bodyCompanyId: 3 })
-    ).toEqual({ kind: "conflict", queryCompanyId: 2, bodyCompanyId: 3 });
+      decideExplicitCompanyScope({ queryCompanyId: 2, bodyCompanyId: 3, pathCompanyId: 2 })
+    ).toEqual({ kind: "conflict", companyIds: [2, 3] });
   });
 });
