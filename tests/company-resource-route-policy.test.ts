@@ -15,7 +15,7 @@ describe("company-owned resource route policy", () => {
     });
   });
 
-  it("classifies inventory and container resources", () => {
+  it("classifies inventory and true factory container resources", () => {
     expect(classifyCompanyOwnedRoute("/api/stock-items/19/prices")).toEqual({
       resourceType: "stock-item",
       resourceId: 19,
@@ -31,6 +31,11 @@ describe("company-owned resource route policy", () => {
       resourceId: 55,
       domain: "factory",
     });
+  });
+
+  it("preserves historical ERP container aliases below the factory path", () => {
+    expect(classifyCompanyOwnedRoute("/api/factory/containers/55/documents")).toBeNull();
+    expect(classifyCompanyOwnedRoute("/api/factory/containers/55/freight")).toBeNull();
   });
 
   it("does not mistake literal route names for record IDs", () => {
