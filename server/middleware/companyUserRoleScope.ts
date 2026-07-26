@@ -7,6 +7,9 @@ import { resolveActiveCompanyId } from "../routes/helpers/resolveActiveCompanyId
 import { enforceGlobalMaintenanceScope } from "./globalMaintenanceScope";
 import {
   canAccessTargetUser,
+  canAssignExistingTargetUser,
+  canAssignRole,
+  canMutateGlobalUserAccount,
   filterRolesForCompany,
   visibleUserIdsForCompany,
   type CompanyUserRoleRow,
@@ -30,7 +33,14 @@ function installJsonArrayFilter(res: Response, filter: (rows: any[]) => any[]): 
     originalJson(Array.isArray(body) ? filter(body) : body);
 }
 
-function deny(req: Request, res: Response, companyId: number, reason: string, message: string): false {
+function deny(
+  req: Request,
+  res: Response,
+  companyId: number,
+  reason: string,
+  message: string,
+  status = 404
+): false {
   logger.error(
     JSON.stringify({
       event: "company_user_role_scope_denied",
@@ -44,7 +54,7 @@ function deny(req: Request, res: Response, companyId: number, reason: string, me
       reason,
     })
   );
-  res.status(404).json({ message });
+  res.status(status).json({ message });
   return false;
 }
 
@@ -84,6 +94,65 @@ export async function enforceCompanyUserRoleScope(
     return true;
   }
 
+  const userMatch = path.match(/^\/api\/users\/([^/]+)$/);
+  const resetPasswordMatch = path.match(/^\/api\/admin\/reset-password\/([^/]+)$/);
+  const globalUserMutationId =
+    userMatch && ["PATCH", "DELETE"].includes(method)
+      ? decodeURIComponent(userMatch[1])
+      : resetPasswordMatch && method === "POST"
+        ? decodeURIComponent(resetPasswordMatch[1])
+        : null;
+
+  if (globalUserMutationId) {
+    const targetRows = await loadRoleRows(globalUserMutationId);
+    if (
+      !canMutateGlobalUserAccount(
+        targetRows,
+        globalUserMutationId,
+        companyId,
+        actorRole
+      )
+    ) {
+      return deny(
+        req,
+        res,
+        companyId,
+        "GLOBAL_USER_MUTATION_SCOPE_DENIED",
+        "User not found"
+      );
+    }
+    return true;
+  }
+
+  if (method === "POST" && path === "/api/user-company-roles") {
+    const body = req.body as Record<string, unknown> | undefined;
+    if (!canAssignRole(actorRole, body?.role)) {
+      return deny(
+        req,
+        res,
+        companyId,
+        "DEVELOPER_ROLE_ASSIGNMENT_DENIED",
+        "Only a Developer can assign the Developer role",
+        403
+      );
+    }
+
+    const targetUserId = body?.userId;
+    if (typeof targetUserId === "string" && targetUserId.length > 0) {
+      const targetRows = await loadRoleRows(targetUserId);
+      if (!canAssignExistingTargetUser(targetRows, targetUserId, actorRole)) {
+        return deny(
+          req,
+          res,
+          companyId,
+          "ROLE_TARGET_SCOPE_DENIED",
+          "User not found"
+        );
+      }
+    }
+    return true;
+  }
+
   const roleMatch = path.match(/^\/api\/user-company-roles\/(\d+)$/);
   if (roleMatch && ["PATCH", "DELETE"].includes(method)) {
     const roleId = Number(roleMatch[1]);
@@ -103,6 +172,18 @@ export async function enforceCompanyUserRoleScope(
     const targetRows = await loadRoleRows(targetRole.userId);
     if (!canAccessTargetUser(targetRows, targetRole.userId, companyId, actorRole)) {
       return deny(req, res, companyId, "ROLE_TARGET_SCOPE_DENIED", "Role not found");
+    }
+
+    const requestedRole = (req.body as Record<string, unknown> | undefined)?.role;
+    if (!canAssignRole(actorRole, requestedRole)) {
+      return deny(
+        req,
+        res,
+        companyId,
+        "DEVELOPER_ROLE_ASSIGNMENT_DENIED",
+        "Only a Developer can assign the Developer role",
+        403
+      );
     }
   }
 
