@@ -143,6 +143,7 @@ export interface AccountTableProps {
   handleAccountChange: (id: string) => void;
   hideBalances: boolean;
   formatAmount: (amt: number) => string;
+  onEdit?: (account: any) => void;
 }
 
 export const exportLabels: Record<
