@@ -11,6 +11,8 @@ export interface PreparedHistoricalReplayResponse {
   frozenOptions: FrozenHistoricalReplayOptions;
   algorithmVersion: string;
   fingerprint?: string;
+  applyAuthorizationToken?: string;
+  productionReleaseId?: string;
 }
 
 interface FrozenHistoricalReplayRequestState {
@@ -18,6 +20,8 @@ interface FrozenHistoricalReplayRequestState {
   options: FrozenHistoricalReplayOptions;
   algorithmVersion: string;
   fingerprint?: string;
+  applyAuthorizationToken?: string;
+  productionReleaseId?: string;
 }
 
 const preparedByToken = new Map<string, FrozenHistoricalReplayRequestState>();
@@ -80,6 +84,14 @@ export function rememberHistoricalReplayPreparation(payload: unknown): boolean {
     return false;
   }
 
+  const rawAuthorizationToken = record.applyAuthorizationToken;
+  const rawReleaseId = record.productionReleaseId;
+  const hasCompleteProductionAuthorization =
+    typeof rawAuthorizationToken === "string"
+    && rawAuthorizationToken.length > 0
+    && typeof rawReleaseId === "string"
+    && rawReleaseId.length > 0;
+
   preparedByToken.set(token, {
     supplierIds,
     options: {
@@ -88,6 +100,8 @@ export function rememberHistoricalReplayPreparation(payload: unknown): boolean {
     },
     algorithmVersion,
     fingerprint: typeof record.fingerprint === "string" ? record.fingerprint : undefined,
+    applyAuthorizationToken: hasCompleteProductionAuthorization ? rawAuthorizationToken : undefined,
+    productionReleaseId: hasCompleteProductionAuthorization ? rawReleaseId : undefined,
   });
   return true;
 }
@@ -95,8 +109,10 @@ export function rememberHistoricalReplayPreparation(payload: unknown): boolean {
 /**
  * Apply requests never trust live checkbox/selection state. When a prepared token
  * is known, the outbound request is rebuilt entirely from the server-returned
- * frozen state. When the cache is missing (for example after a page reload), only
- * the signed token is sent; the server derives scope/options from that token.
+ * frozen state. V8 production authorization is also frozen and remains bound to
+ * that exact prepared token. When the cache is missing, only explicitly supplied
+ * signed tokens are preserved; a page reload therefore fails closed unless the
+ * caller retained both V8 authorization fields.
  */
 export function freezeHistoricalReplayApplyRequest(
   method: string,
@@ -107,7 +123,19 @@ export function freezeHistoricalReplayApplyRequest(
   if (!token) return data;
   const frozen = preparedByToken.get(token);
   if (!frozen) {
-    return { dryRun: false, confirmationToken: token };
+    const record = asRecord(data);
+    const applyAuthorizationToken = record?.applyAuthorizationToken;
+    const productionReleaseId = record?.productionReleaseId;
+    return {
+      dryRun: false,
+      confirmationToken: token,
+      ...(typeof applyAuthorizationToken === "string" && applyAuthorizationToken.length > 0
+        ? { applyAuthorizationToken }
+        : {}),
+      ...(typeof productionReleaseId === "string" && productionReleaseId.length > 0
+        ? { productionReleaseId }
+        : {}),
+    };
   }
   return {
     dryRun: false,
@@ -117,6 +145,12 @@ export function freezeHistoricalReplayApplyRequest(
     includeFinalizedBales: frozen.options.includeFinalizedBales,
     algorithmVersion: frozen.algorithmVersion,
     fingerprint: frozen.fingerprint,
+    ...(frozen.applyAuthorizationToken
+      ? { applyAuthorizationToken: frozen.applyAuthorizationToken }
+      : {}),
+    ...(frozen.productionReleaseId
+      ? { productionReleaseId: frozen.productionReleaseId }
+      : {}),
   };
 }
 
