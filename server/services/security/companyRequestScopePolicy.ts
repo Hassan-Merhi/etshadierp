@@ -1,7 +1,6 @@
 export type ExplicitCompanyScopeDecision =
   | { kind: "none" }
-  | { kind: "authorized-session"; companyId: number }
-  | { kind: "requires-membership"; companyId: number }
+  | { kind: "company"; companyId: number }
   | { kind: "invalid"; source: "query" | "body" }
   | { kind: "conflict"; queryCompanyId: number; bodyCompanyId: number };
 
@@ -14,11 +13,14 @@ function parseCompanyId(value: unknown): number | null | "invalid" {
   return parsed;
 }
 
+/**
+ * Parses caller-supplied company filters without authorizing them. Authorization
+ * remains the responsibility of companyIsolationPolicy, which requires the
+ * requested company to match the server-owned active session company exactly.
+ */
 export function decideExplicitCompanyScope(input: {
   queryCompanyId?: unknown;
   bodyCompanyId?: unknown;
-  currentCompanyId?: unknown;
-  factoryCompanyId?: unknown;
 }): ExplicitCompanyScopeDecision {
   const queryCompanyId = parseCompanyId(input.queryCompanyId);
   if (queryCompanyId === "invalid") return { kind: "invalid", source: "query" };
@@ -31,15 +33,5 @@ export function decideExplicitCompanyScope(input: {
   }
 
   const companyId = queryCompanyId ?? bodyCompanyId;
-  if (companyId === null) return { kind: "none" };
-
-  const sessionCompanyIds = [input.currentCompanyId, input.factoryCompanyId]
-    .map(Number)
-    .filter((value) => Number.isInteger(value) && value > 0);
-
-  if (sessionCompanyIds.includes(companyId)) {
-    return { kind: "authorized-session", companyId };
-  }
-
-  return { kind: "requires-membership", companyId };
+  return companyId === null ? { kind: "none" } : { kind: "company", companyId };
 }
