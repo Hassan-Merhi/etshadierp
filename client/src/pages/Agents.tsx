@@ -661,8 +661,7 @@ export default function Agents() {
                                   </Badge>
                                 </TableCell>
                                 <TableCell className="py-3">
-                                  <p className="text-xs text-muted-foreground/70 font-mono">{v.voucherNumber}</p>
-                                  {note && <p className="text-xs text-muted-foreground mt-0.5 truncate max-w-xs">{note}</p>}
+                                  {note && <p className="text-xs text-muted-foreground truncate max-w-xs">{note}</p>}
                                 </TableCell>
                                 <TableCell className="py-3 text-right font-mono text-sm">
                                   {v.totalDebit > 0 ? (
