@@ -39,6 +39,12 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       const session = req.session as any;
       if (!session?.userId) return next();
 
+      // Historical ERP ContainerDetail aliases live under /api/factory but use
+      // the ERP containers table and their own current-company ownership checks.
+      if (/^\/containers\/\d+\/(documents|freight)(?:\/|$)/.test(req.path)) {
+        return next();
+      }
+
       const assignedFactories = await db
         .select({
           id: companies.id,
