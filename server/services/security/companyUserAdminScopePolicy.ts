@@ -49,6 +49,21 @@ export function canAccessTargetUser(
   return actorRole === "Developer" || !isDeveloperTarget(targetRows, targetUserId);
 }
 
+export function canMutateGlobalUserAccount(
+  rows: readonly CompanyUserRoleRow[],
+  targetUserId: string,
+  activeCompanyId: number,
+  actorRole: string
+): boolean {
+  if (actorRole === "Developer") return true;
+
+  const targetRows = rows.filter((row) => row.userId === targetUserId);
+  if (targetRows.length === 0) return false;
+  if (isDeveloperTarget(targetRows, targetUserId)) return false;
+
+  return targetRows.every((row) => row.companyId === activeCompanyId);
+}
+
 export function canAssignExistingTargetUser(
   rows: readonly CompanyUserRoleRow[],
   targetUserId: string,
