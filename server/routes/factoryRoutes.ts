@@ -28,6 +28,7 @@ import { registerCentralFactoryPayrollGenerationRoute } from "./payroll/centralF
 import { createContainerDocumentDownloadHandler } from "../services/security/protectedAssetDownloadAdapter";
 import { enforceCompanyUserRoleScope } from "../middleware/companyUserRoleScope";
 import { enforceCompanyResourceScope } from "../middleware/companyResourceScope";
+import { enforceDeletedItemCompanyScope } from "../middleware/deletedItemCompanyScope";
 import { chooseAuthorizedFactoryCompany } from "../services/security/factoryCompanyScopePolicy";
 import { isErpContainerFactoryAlias } from "../services/security/companyResourceRoutePolicy";
 
@@ -113,6 +114,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
     try {
       if (!(await enforceCompanyUserRoleScope(req, res))) return;
       if (!(await enforceCompanyResourceScope(req, res))) return;
+      if (!(await enforceDeletedItemCompanyScope(req, res))) return;
       next();
     } catch (error) {
       next(error);
