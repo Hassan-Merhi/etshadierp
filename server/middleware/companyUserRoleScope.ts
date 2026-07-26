@@ -151,6 +151,24 @@ export async function enforceCompanyUserRoleScope(
     return true;
   }
 
+  const permissionMatch = path.match(
+    /^\/api\/admin\/users\/([^/]+)\/security-permissions$/
+  );
+  if (["GET", "PUT"].includes(method) && permissionMatch) {
+    const targetUserId = decodeURIComponent(permissionMatch[1]);
+    const targetRows = await loadRoleRows(targetUserId);
+    if (!canAccessTargetUser(targetRows, targetUserId, companyId, actorRole)) {
+      return deny(
+        req,
+        res,
+        companyId,
+        "SECURITY_PERMISSION_TARGET_SCOPE_DENIED",
+        "User not found"
+      );
+    }
+    return true;
+  }
+
   const userMatch = path.match(/^\/api\/users\/([^/]+)$/);
   const resetPasswordMatch = path.match(/^\/api\/admin\/reset-password\/([^/]+)$/);
   const globalUserMutationId =
