@@ -74,6 +74,7 @@ function authorizeExplicitCompanyScope(req: Request, res: Response): boolean {
   const decision = decideExplicitCompanyScope({
     queryCompanyId: req.query?.companyId,
     bodyCompanyId: (req.body as Record<string, unknown> | undefined)?.companyId,
+    pathCompanyId: req.params?.companyId,
   });
 
   if (decision.kind === "none") return true;
@@ -89,7 +90,7 @@ function authorizeExplicitCompanyScope(req: Request, res: Response): boolean {
   if (decision.kind === "conflict") {
     res.status(400).json({
       code: "COMPANY_ID_CONFLICT",
-      message: "The companyId in the request query and body must match.",
+      message: "All companyId values in the request must match.",
     });
     return false;
   }
