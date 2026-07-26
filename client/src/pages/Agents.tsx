@@ -589,8 +589,8 @@ export default function Agents() {
                       <TableHead className="text-xs h-10 font-bold uppercase tracking-wide text-muted-foreground w-[120px]">Date</TableHead>
                       <TableHead className="text-xs h-10 font-bold uppercase tracking-wide text-muted-foreground w-[110px]">Type</TableHead>
                       <TableHead className="text-xs h-10 font-bold uppercase tracking-wide text-muted-foreground">Particulars</TableHead>
-                      <TableHead className="text-xs h-10 font-bold uppercase tracking-wide text-red-600/70 dark:text-red-400/70 text-right w-[130px]">Debit</TableHead>
-                      <TableHead className="text-xs h-10 font-bold uppercase tracking-wide text-emerald-600/70 dark:text-emerald-400/70 text-right w-[130px]">Credit</TableHead>
+                      <TableHead className="text-xs h-10 font-bold uppercase tracking-wide text-muted-foreground text-right w-[130px]">Debit</TableHead>
+                      <TableHead className="text-xs h-10 font-bold uppercase tracking-wide text-muted-foreground text-right w-[130px]">Credit</TableHead>
                       <TableHead className="text-xs h-10 font-bold uppercase tracking-wide text-muted-foreground text-right w-[145px]">Balance</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -610,12 +610,12 @@ export default function Agents() {
                           <TableCell className="py-3 text-xs font-bold text-muted-foreground uppercase tracking-wider" colSpan={3}>
                             Opening Balance
                           </TableCell>
-                          <TableCell className="py-3 text-right font-mono text-sm text-red-600 dark:text-red-400">
+                          <TableCell className="py-3 text-right font-mono text-sm text-foreground">
                             {selectedAccount.type === "supplier"
                               ? openingBalance < 0 ? formatAmount(Math.abs(openingBalance)) : "—"
                               : openingBalance > 0 ? formatAmount(openingBalance) : "—"}
                           </TableCell>
-                          <TableCell className="py-3 text-right font-mono text-sm text-emerald-600 dark:text-emerald-400">
+                          <TableCell className="py-3 text-right font-mono text-sm text-foreground">
                             {selectedAccount.type === "supplier"
                               ? openingBalance > 0 ? formatAmount(openingBalance) : "—"
                               : openingBalance < 0 ? formatAmount(Math.abs(openingBalance)) : "—"}
@@ -665,21 +665,21 @@ export default function Agents() {
                                 </TableCell>
                                 <TableCell className="py-3 text-right font-mono text-sm">
                                   {v.totalDebit > 0 ? (
-                                    <span className="text-red-600 dark:text-red-400 font-medium">{formatAmount(v.totalDebit)}</span>
+                                    <span className="text-foreground font-medium">{formatAmount(v.totalDebit)}</span>
                                   ) : (
                                     <span className="text-muted-foreground/40">—</span>
                                   )}
                                 </TableCell>
                                 <TableCell className="py-3 text-right font-mono text-sm">
                                   {v.totalCredit > 0 ? (
-                                    <span className="text-emerald-600 dark:text-emerald-400 font-medium">{formatAmount(v.totalCredit)}</span>
+                                    <span className="text-foreground font-medium">{formatAmount(v.totalCredit)}</span>
                                   ) : (
                                     <span className="text-muted-foreground/40">—</span>
                                   )}
                                 </TableCell>
                                 <TableCell className="py-3 text-right font-mono text-sm font-semibold">
                                   {formatAmount(Math.abs(bal))}{" "}
-                                  <span className={`text-xs font-normal ${bal >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-500 dark:text-red-400"}`}>
+                                  <span className="text-xs font-normal text-muted-foreground">
                                     {bal >= 0 ? (selectedAccount.type === "supplier" ? "Cr" : "Dr") : (selectedAccount.type === "supplier" ? "Dr" : "Cr")}
                                   </span>
                                 </TableCell>
@@ -694,10 +694,10 @@ export default function Agents() {
                             <TableCell colSpan={3} className="py-3 text-xs font-bold text-muted-foreground uppercase tracking-wider">
                               Closing Balance
                             </TableCell>
-                            <TableCell className="py-3 text-right font-mono text-sm font-semibold text-red-600 dark:text-red-400">
+                            <TableCell className="py-3 text-right font-mono text-sm font-semibold text-foreground">
                               {formatAmount(periodDebit)}
                             </TableCell>
-                            <TableCell className="py-3 text-right font-mono text-sm font-semibold text-emerald-600 dark:text-emerald-400">
+                            <TableCell className="py-3 text-right font-mono text-sm font-semibold text-foreground">
                               {formatAmount(periodCredit)}
                             </TableCell>
                             <TableCell className="py-3 text-right font-mono text-sm font-bold">
