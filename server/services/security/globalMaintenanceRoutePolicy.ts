@@ -2,10 +2,15 @@ export interface GlobalMaintenanceRouteMatch {
   operation:
     | "recalculate-equity-all"
     | "fix-unattributable-pos-data"
-    | "cleanup-orphaned-charges";
+    | "cleanup-orphaned-charges"
+    | "account-migration";
 }
 
-const ROUTES: Array<{ method: string; path: string; operation: GlobalMaintenanceRouteMatch["operation"] }> = [
+const EXACT_ROUTES: Array<{
+  method: string;
+  path: string;
+  operation: GlobalMaintenanceRouteMatch["operation"];
+}> = [
   {
     method: "POST",
     path: "/api/admin/recalculate-equity-adjustment-all",
@@ -28,7 +33,15 @@ export function classifyGlobalMaintenanceRoute(
   path: string
 ): GlobalMaintenanceRouteMatch | null {
   const normalizedMethod = method.toUpperCase();
-  const match = ROUTES.find(
+
+  if (
+    ["GET", "POST"].includes(normalizedMethod) &&
+    path.startsWith("/api/admin/account-migration/")
+  ) {
+    return { operation: "account-migration" };
+  }
+
+  const match = EXACT_ROUTES.find(
     (route) => route.method === normalizedMethod && route.path === path
   );
   return match ? { operation: match.operation } : null;
