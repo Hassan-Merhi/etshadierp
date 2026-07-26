@@ -1,7 +1,15 @@
 import type { Request, Response } from "express";
-import { and, eq, ne } from "drizzle-orm";
+import { and, eq, like, ne } from "drizzle-orm";
 import { db } from "../../db";
-import { companies, userCompanyRoles, users } from "@shared/schema";
+import {
+  companies,
+  containers,
+  purchaseOrders,
+  userCompanyRoles,
+  users,
+  voucherEntries,
+  vouchers,
+} from "@shared/schema";
 
 function activeCompanyId(req: Request): number | null {
   return (
@@ -153,6 +161,57 @@ async function respondWithCompanyRoles(req: Request, res: Response): Promise<boo
   return true;
 }
 
+async function cleanupCompanyOrphanedCharges(req: Request, res: Response): Promise<boolean> {
+  const companyId = activeCompanyId(req);
+  if (!companyId) {
+    res.status(403).json({ code: "COMPANY_CONTEXT_REQUIRED", message: "No company selected" });
+    return true;
+  }
+
+  const chargeVouchers = await db
+    .select({ id: vouchers.id, voucherNumber: vouchers.voucherNumber })
+    .from(vouchers)
+    .where(and(eq(vouchers.companyId, companyId), like(vouchers.voucherNumber, "CHARGE-%")));
+
+  const orphanedIds: number[] = [];
+  for (const chargeVoucher of chargeVouchers) {
+    const parts = chargeVoucher.voucherNumber.split("-");
+    const containerNumber = parts.length >= 3 ? `${parts[1]}-${parts[2]}` : "";
+    if (!containerNumber) continue;
+
+    const [remainingPo] = await db
+      .select({ id: purchaseOrders.id })
+      .from(purchaseOrders)
+      .innerJoin(containers, eq(purchaseOrders.containerId, containers.id))
+      .where(
+        and(
+          eq(containers.companyId, companyId),
+          eq(containers.containerNumber, containerNumber)
+        )
+      )
+      .limit(1);
+
+    if (!remainingPo) orphanedIds.push(chargeVoucher.id);
+  }
+
+  if (orphanedIds.length > 0) {
+    await db.transaction(async (tx) => {
+      for (const voucherId of orphanedIds) {
+        await tx.delete(voucherEntries).where(eq(voucherEntries.voucherId, voucherId));
+        await tx
+          .delete(vouchers)
+          .where(and(eq(vouchers.id, voucherId), eq(vouchers.companyId, companyId)));
+      }
+    });
+  }
+
+  res.json({
+    message: `Cleaned up ${orphanedIds.length} orphaned charge vouchers`,
+    deletedCount: orphanedIds.length,
+  });
+  return true;
+}
+
 /**
  * Runs inside requireAuth before legacy route middleware. Returns true when the
  * request has been fully handled or rejected; false means normal routing may continue.
@@ -181,6 +240,9 @@ export async function interceptCompanyScopedUserAdministration(
   }
   if ((method === "PATCH" || method === "DELETE") && /^\/api\/user-company-roles\/[^/]+$/.test(path)) {
     return guardRoleRecordCompany(req, res);
+  }
+  if (method === "POST" && path === "/api/cleanup/orphaned-charges") {
+    return cleanupCompanyOrphanedCharges(req, res);
   }
 
   return false;
