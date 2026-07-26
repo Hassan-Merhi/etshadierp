@@ -12,7 +12,6 @@ import {
 } from "./services/security/companyIsolationPolicy";
 import { decideExplicitCompanyScope } from "./services/security/companyRequestScopePolicy";
 import { resolveActiveCompanyId } from "./routes/helpers/resolveActiveCompanyId";
-import { interceptCompanyScopedUserAdministration } from "./routes/security/companyScopedUserAdministrationRoutes";
 
 function logDenied(params: {
   userId?: string | null;
@@ -172,8 +171,6 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
       canAccessCustomers: req.session.canAccessCustomers ?? false,
       canDeleteRecords: req.session.canDeleteRecords ?? false,
     } as any;
-
-    if (await interceptCompanyScopedUserAdministration(req, res)) return;
 
     next();
   } catch (error) {
