@@ -938,83 +938,95 @@ export default function ProductionComparison() {
 
           {/* ── Bale comparison table ── */}
           {filtered.length === 0 ? (
-            <div className="rounded-lg border p-12 text-center text-sm text-muted-foreground">
+            <div className="rounded-xl border p-12 text-center text-sm text-muted-foreground">
               {mergedAll.length === 0
                 ? "No production data found for either period."
                 : "No products match the active filters."}
             </div>
           ) : (
-            <div className="rounded-lg border overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="min-w-[180px]">Product</TableHead>
-                    <TableHead>Category</TableHead>
-                    <TableHead>Grade</TableHead>
-                    <TableHead className="text-right">{labelA} Qty</TableHead>
-                    <TableHead className="text-right">{labelB} Qty</TableHead>
-                    <TableHead className="text-right">Qty Diff</TableHead>
-                    <TableHead className="text-right">%</TableHead>
-                    <TableHead className="text-right">{labelA} Kg</TableHead>
-                    <TableHead className="text-right">{labelB} Kg</TableHead>
-                    <TableHead className="text-right">Kg Diff</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filtered.map((row) => {
-                    const qDiff = row.aQty - row.bQty;
-                    const kDiff = row.aKg - row.bKg;
-                    return (
-                      <TableRow key={row.articleCode}>
-                        <TableCell>
-                          <div className="text-sm font-medium leading-snug">
-                            {row.productName || row.articleCode}
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-sm text-muted-foreground">
-                          {row.categoryName || "—"}
-                        </TableCell>
-                        <TableCell>
-                          {row.grade !== "—" ? (
-                            <Badge variant="secondary" className="text-xs">
-                              {row.grade}
-                            </Badge>
-                          ) : (
-                            <span className="text-muted-foreground text-xs">—</span>
+            <div className="rounded-xl border overflow-hidden shadow-sm">
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm border-collapse">
+                  <thead>
+                    {/* Group row */}
+                    <tr className="bg-muted/40 border-b border-border">
+                      <th rowSpan={2} className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider text-muted-foreground min-w-[200px] border-r border-border/50 align-bottom">
+                        Product
+                      </th>
+                      <th rowSpan={2} className="px-3 py-3 text-left text-xs font-bold uppercase tracking-wider text-muted-foreground border-r border-border/50 align-bottom">
+                        Category
+                      </th>
+                      <th rowSpan={2} className="px-3 py-3 text-left text-xs font-bold uppercase tracking-wider text-muted-foreground border-r border-border/50 align-bottom">
+                        Grade
+                      </th>
+                      <th colSpan={3} className="px-4 py-2 text-center text-xs font-bold uppercase tracking-widest text-blue-600 dark:text-blue-400 border-b border-border/50 border-r border-border/50">
+                        Quantity (Bales)
+                      </th>
+                      <th colSpan={3} className="px-4 py-2 text-center text-xs font-bold uppercase tracking-widest text-violet-600 dark:text-violet-400 border-b border-border/50">
+                        Weight (kg)
+                      </th>
+                    </tr>
+                    {/* Sub-header row */}
+                    <tr className="bg-muted/20 border-b border-border">
+                      <th className="px-4 py-2 text-right text-xs font-semibold text-foreground whitespace-nowrap">{labelA}</th>
+                      <th className="px-4 py-2 text-right text-xs font-medium text-muted-foreground whitespace-nowrap">{labelB}</th>
+                      <th className="px-4 py-2 text-right text-xs font-semibold text-foreground border-r border-border/50">Diff</th>
+                      <th className="px-4 py-2 text-right text-xs font-semibold text-foreground whitespace-nowrap">{labelA}</th>
+                      <th className="px-4 py-2 text-right text-xs font-medium text-muted-foreground whitespace-nowrap">{labelB}</th>
+                      <th className="px-4 py-2 text-right text-xs font-semibold text-foreground">Diff</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filtered.map((row, idx) => {
+                      const qDiff = row.aQty - row.bQty;
+                      const kDiff = row.aKg - row.bKg;
+                      return (
+                        <tr
+                          key={row.articleCode}
+                          className={cn(
+                            "border-b border-border/30 hover:bg-accent/40 transition-colors",
+                            idx % 2 === 1 && "bg-muted/10",
                           )}
-                        </TableCell>
-                        <TableCell className="text-center tabular-nums font-medium">
-                          {fmtNum(row.aQty)}
-                        </TableCell>
-                        <TableCell className="text-center tabular-nums text-muted-foreground">
-                          {fmtNum(row.bQty)}
-                        </TableCell>
-                        <TableCell className="text-center">
-                          <DiffCell
-                            value={qDiff}
-                            fmt={(n) => (n > 0 ? "+" : "") + fmtNum(n)}
-                          />
-                        </TableCell>
-                        <TableCell className="text-center">
-                          <PctCell pct={pctChange(row.aQty, row.bQty)} />
-                        </TableCell>
-                        <TableCell className="text-center tabular-nums text-sm">
-                          {fmtKg(row.aKg)}
-                        </TableCell>
-                        <TableCell className="text-center tabular-nums text-sm text-muted-foreground">
-                          {fmtKg(row.bKg)}
-                        </TableCell>
-                        <TableCell className="text-center">
-                          <DiffCell
-                            value={kDiff}
-                            fmt={(n) => (n > 0 ? "+" : "") + fmtKg(n)}
-                          />
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
+                        >
+                          <td className="px-4 py-2.5 border-r border-border/30">
+                            <span className="font-medium text-sm leading-snug">{row.productName || row.articleCode}</span>
+                          </td>
+                          <td className="px-3 py-2.5 text-sm text-muted-foreground border-r border-border/30">
+                            {row.categoryName || "—"}
+                          </td>
+                          <td className="px-3 py-2.5 border-r border-border/30">
+                            {row.grade !== "—" ? (
+                              <Badge variant="secondary" className="text-xs font-semibold px-2">
+                                {row.grade}
+                              </Badge>
+                            ) : (
+                              <span className="text-muted-foreground text-xs">—</span>
+                            )}
+                          </td>
+                          <td className="px-4 py-2.5 text-right tabular-nums font-semibold text-foreground">
+                            {fmtNum(row.aQty)}
+                          </td>
+                          <td className="px-4 py-2.5 text-right tabular-nums text-muted-foreground">
+                            {fmtNum(row.bQty)}
+                          </td>
+                          <td className="px-4 py-2.5 text-right border-r border-border/30">
+                            <DiffCell value={qDiff} fmt={(n) => (n > 0 ? "+" : "") + fmtNum(n)} />
+                          </td>
+                          <td className="px-4 py-2.5 text-right tabular-nums font-semibold text-foreground">
+                            {fmtKg(row.aKg)}
+                          </td>
+                          <td className="px-4 py-2.5 text-right tabular-nums text-muted-foreground">
+                            {fmtKg(row.bKg)}
+                          </td>
+                          <td className="px-4 py-2.5 text-right">
+                            <DiffCell value={kDiff} fmt={(n) => (n > 0 ? "+" : "") + fmtKg(n)} />
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
             </div>
           )}
         </>
