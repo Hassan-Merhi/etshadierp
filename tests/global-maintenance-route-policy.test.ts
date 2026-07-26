@@ -17,6 +17,27 @@ describe("global maintenance route policy", () => {
     ).toEqual({ operation: "cleanup-orphaned-charges" });
   });
 
+  it("classifies every account migration route as Developer maintenance", () => {
+    expect(
+      classifyGlobalMaintenanceRoute(
+        "GET",
+        "/api/admin/account-migration/companies"
+      )
+    ).toEqual({ operation: "account-migration" });
+    expect(
+      classifyGlobalMaintenanceRoute(
+        "GET",
+        "/api/admin/account-migration/accounts/4"
+      )
+    ).toEqual({ operation: "account-migration" });
+    expect(
+      classifyGlobalMaintenanceRoute(
+        "POST",
+        "/api/admin/account-migration/execute"
+      )
+    ).toEqual({ operation: "account-migration" });
+  });
+
   it("does not classify current-company repair operations", () => {
     expect(
       classifyGlobalMaintenanceRoute(
@@ -32,6 +53,12 @@ describe("global maintenance route policy", () => {
       classifyGlobalMaintenanceRoute(
         "GET",
         "/api/admin/recalculate-equity-adjustment-all"
+      )
+    ).toBeNull();
+    expect(
+      classifyGlobalMaintenanceRoute(
+        "DELETE",
+        "/api/admin/account-migration/execute"
       )
     ).toBeNull();
   });
