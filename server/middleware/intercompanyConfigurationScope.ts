@@ -19,6 +19,14 @@ function positiveId(value: unknown): number | null {
   return Number.isSafeInteger(id) && id > 0 ? id : null;
 }
 
+function optionalPositiveId(
+  body: Record<string, unknown> | undefined,
+  key: string
+): { provided: false } | { provided: true; value: number | null } {
+  if (!body || body[key] === undefined) return { provided: false };
+  return { provided: true, value: positiveId(body[key]) };
+}
+
 async function loadActorScope(userId: string): Promise<IntercompanyActorScope> {
   const roles = await db
     .select({ companyId: userCompanyRoles.companyId, role: userCompanyRoles.role })
@@ -137,11 +145,13 @@ export async function enforceIntercompanyConfigurationScope(
     return true;
   }
 
+  const body = req.body as Record<string, unknown> | undefined;
+
   if (method === "POST" && path === "/api/intercompany-links") {
-    const sourceCompanyId = positiveId(req.body?.sourceCompanyId);
-    const destCompanyId = positiveId(req.body?.destCompanyId);
-    const sourceLedgerAccountId = positiveId(req.body?.sourceLedgerAccountId);
-    const destLedgerAccountId = positiveId(req.body?.destLedgerAccountId);
+    const sourceCompanyId = positiveId(body?.sourceCompanyId);
+    const destCompanyId = positiveId(body?.destCompanyId);
+    const sourceLedgerAccountId = positiveId(body?.sourceLedgerAccountId);
+    const destLedgerAccountId = positiveId(body?.destLedgerAccountId);
     if (
       sourceCompanyId == null ||
       destCompanyId == null ||
@@ -173,17 +183,41 @@ export async function enforceIntercompanyConfigurationScope(
   const link = await loadLink(linkId);
   if (!link) return true;
 
-  const sourceCompanyId = positiveId(req.body?.sourceCompanyId) ?? link.sourceCompanyId;
-  const destCompanyId = positiveId(req.body?.destCompanyId) ?? link.destCompanyId;
+  const sourceCompanyInput = optionalPositiveId(body, "sourceCompanyId");
+  const destCompanyInput = optionalPositiveId(body, "destCompanyId");
+  if (
+    (sourceCompanyInput.provided && sourceCompanyInput.value == null) ||
+    (destCompanyInput.provided && destCompanyInput.value == null)
+  ) {
+    return deny(req, res, "INTERCOMPANY_COMPANY_ID_INVALID", 400, "Invalid company ID");
+  }
+
+  const sourceCompanyId = sourceCompanyInput.provided
+    ? sourceCompanyInput.value!
+    : link.sourceCompanyId;
+  const destCompanyId = destCompanyInput.provided
+    ? destCompanyInput.value!
+    : link.destCompanyId;
   if (!canManageIntercompanyPair(scope, sourceCompanyId, destCompanyId)) {
     return deny(req, res, "INTERCOMPANY_LINK_SCOPE_DENIED");
   }
 
   if (method === "PUT") {
-    const sourceLedgerAccountId =
-      positiveId(req.body?.sourceLedgerAccountId) ?? link.sourceLedgerAccountId;
-    const destLedgerAccountId =
-      positiveId(req.body?.destLedgerAccountId) ?? link.destLedgerAccountId;
+    const sourceLedgerInput = optionalPositiveId(body, "sourceLedgerAccountId");
+    const destLedgerInput = optionalPositiveId(body, "destLedgerAccountId");
+    if (
+      (sourceLedgerInput.provided && sourceLedgerInput.value == null) ||
+      (destLedgerInput.provided && destLedgerInput.value == null)
+    ) {
+      return deny(req, res, "INTERCOMPANY_LEDGER_ID_INVALID", 400, "Invalid ledger account ID");
+    }
+
+    const sourceLedgerAccountId = sourceLedgerInput.provided
+      ? sourceLedgerInput.value!
+      : link.sourceLedgerAccountId;
+    const destLedgerAccountId = destLedgerInput.provided
+      ? destLedgerInput.value!
+      : link.destLedgerAccountId;
     if (
       !(await ledgersBelongToPair({
         sourceCompanyId,
