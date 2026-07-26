@@ -6,6 +6,9 @@ export function enforceGlobalMaintenanceScope(req: Request, res: Response): bool
   const match = classifyGlobalMaintenanceRoute(req.method, req.path);
   if (!match) return true;
 
+  // The legacy route's requireAuth middleware remains authoritative for
+  // unauthenticated requests. This guard only narrows an authenticated role.
+  if (!req.session.userId) return true;
   if (req.session.currentRole === "Developer") return true;
 
   logger.error(
