@@ -10,6 +10,10 @@ import {
   voucherEntries,
   vouchers,
 } from "@shared/schema";
+import {
+  classifyScopedAdministrationRequest,
+  decideSharedUserMutation,
+} from "../../services/security/companyScopedAdministrationPolicy";
 
 function activeCompanyId(req: Request): number | null {
   return (
@@ -45,12 +49,15 @@ async function guardSingleCompanyUserMutation(req: Request, res: Response): Prom
   }
 
   const roles = await loadTargetUserCompanyScope(targetUserId);
-  if (!roles.some((row) => row.companyId === companyId)) {
+  const decision = decideSharedUserMutation(
+    companyId,
+    roles.map((row) => row.companyId)
+  );
+  if (decision === "not-found") {
     res.status(404).json({ message: "User not found" });
     return true;
   }
-
-  if (roles.some((row) => row.companyId !== companyId)) {
+  if (decision === "shared-user-blocked") {
     res.status(409).json({
       code: "SHARED_USER_GLOBAL_MUTATION_BLOCKED",
       message: "This user belongs to multiple companies. Manage the company role instead of changing the shared account globally.",
@@ -223,27 +230,19 @@ export async function interceptCompanyScopedUserAdministration(
   const role = req.session.currentRole;
   if (role !== "Admin" && role !== "Developer") return false;
 
-  const method = req.method.toUpperCase();
-  const path = req.path;
-
-  if (method === "GET" && path === "/api/users") {
-    return respondWithCompanyUsers(req, res);
+  const action = classifyScopedAdministrationRequest(req.method, req.path);
+  switch (action) {
+    case "list-company-users":
+      return respondWithCompanyUsers(req, res);
+    case "list-company-user-roles":
+      return respondWithCompanyRoles(req, res);
+    case "mutate-global-user":
+      return guardSingleCompanyUserMutation(req, res);
+    case "mutate-company-role":
+      return guardRoleRecordCompany(req, res);
+    case "cleanup-orphaned-charges":
+      return cleanupCompanyOrphanedCharges(req, res);
+    default:
+      return false;
   }
-  if (method === "GET" && /^\/api\/users\/[^/]+\/company-roles$/.test(path)) {
-    return respondWithCompanyRoles(req, res);
-  }
-  if ((method === "PATCH" || method === "DELETE") && /^\/api\/users\/[^/]+$/.test(path)) {
-    return guardSingleCompanyUserMutation(req, res);
-  }
-  if (method === "POST" && /^\/api\/admin\/reset-password\/[^/]+$/.test(path)) {
-    return guardSingleCompanyUserMutation(req, res);
-  }
-  if ((method === "PATCH" || method === "DELETE") && /^\/api\/user-company-roles\/[^/]+$/.test(path)) {
-    return guardRoleRecordCompany(req, res);
-  }
-  if (method === "POST" && path === "/api/cleanup/orphaned-charges") {
-    return cleanupCompanyOrphanedCharges(req, res);
-  }
-
-  return false;
 }
