@@ -25,10 +25,12 @@ import { registerFactoryDaybookPaginationRoutes } from "./factory/factoryDaybook
 import { registerFactoryStockEntryHistoryPaginationRoutes } from "./factory/factoryStockEntryHistoryPaginationRoutes";
 import { registerFactoryStockAllocationV5PaginationRoutes } from "./factory/factoryStockAllocationV5PaginationRoutes";
 import { registerCentralFactoryPayrollGenerationRoute } from "./payroll/centralFactoryPayrollGenerationRoute";
+import { registerCentralGlobalTransactionRoutes } from "./global/centralGlobalTransactionRoutes";
 import { createContainerDocumentDownloadHandler } from "../services/security/protectedAssetDownloadAdapter";
 import { enforceCompanyUserRoleScope } from "../middleware/companyUserRoleScope";
 import { enforceCompanyResourceScope } from "../middleware/companyResourceScope";
 import { enforceDeletedItemCompanyScope } from "../middleware/deletedItemCompanyScope";
+import { enforceGlobalTransactionCompanyScope } from "../middleware/globalTransactionCompanyScope";
 import { chooseAuthorizedFactoryCompany } from "../services/security/factoryCompanyScopePolicy";
 import { isErpContainerFactoryAlias } from "../services/security/companyResourceRoutePolicy";
 
@@ -115,11 +117,15 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       if (!(await enforceCompanyUserRoleScope(req, res))) return;
       if (!(await enforceCompanyResourceScope(req, res))) return;
       if (!(await enforceDeletedItemCompanyScope(req, res))) return;
+      if (!(await enforceGlobalTransactionCompanyScope(req, res))) return;
       next();
     } catch (error) {
       next(error);
     }
   });
+
+  // Protected global transaction list/type routes run before the legacy module.
+  registerCentralGlobalTransactionRoutes(app, requireAuth);
 
   registerPerformanceReadMicrocache(app);
 
