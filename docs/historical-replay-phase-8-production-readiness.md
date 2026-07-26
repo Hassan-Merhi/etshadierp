@@ -53,6 +53,26 @@ The endpoint is read-only. It reports:
 
 `readyForApplyAuthorization` must be `true` before an authorized Prepare can issue the second V8 token.
 
+## Exact verification endpoint
+
+Developer and Admin users may verify the latest exact replay record without changing data:
+
+```text
+GET /api/factory/raw-stock/recalc/historical-replay/verification
+```
+
+A specific record can be selected with:
+
+```text
+GET /api/factory/raw-stock/recalc/historical-replay/verification?undoLogId=<id>
+```
+
+The endpoint opens one `REPEATABLE READ READ ONLY` transaction, loads the exact stored scope and snapshot, captures the current rows, and applies the same non-cost and cost equality assertions used by protected Undo. It verifies the stored algorithm version and fingerprint first.
+
+- An applied record must exactly match its stored post-apply snapshot.
+- An undone record must exactly match its stored pre-apply snapshot.
+- Any drift returns a fail-closed verification result and does not attempt repair or Undo.
+
 ## Two-token Apply
 
 Prepare still creates the existing exact replay confirmation token. When all V8 controls pass, the server also creates a short-lived Apply authorization token bound to:
@@ -81,12 +101,13 @@ The second token does not replace any existing V7 protection. Apply must still p
 9. Apply once. Do not retry with an old response after an error; re-open readiness and re-run Prepare.
 10. Record the returned result, audit entry, undo-log ID, algorithm version, scope fingerprint, and release identifier in the release record.
 11. Remove `HISTORICAL_REPLAY_APPLY_MODE` after the approved Apply window so future applies return `HISTORICAL_REPLAY_APPLY_DISABLED`.
-12. Perform read-only post-apply reconciliation before allowing any unrelated cost repair.
+12. Run the exact read-only verification endpoint and perform the remaining financial reconciliation before allowing any unrelated cost repair.
 
 ## Post-apply reconciliation
 
 The operator must verify, without editing data:
 
+- the exact verification endpoint returns `verified: true` and `state: APPLIED`;
 - the latest exact undo record exists for the company;
 - its algorithm version and fingerprint match the approved Prepare;
 - the consumed-token record exists;
@@ -109,6 +130,8 @@ Phase 8 does not loosen Undo. Undo remains:
 - conditional on the current rows still matching the exact post-apply snapshot; and
 - atomic with its audit entry and `undone_at` marker.
 
+After an approved Undo, the exact verification endpoint must return `verified: true` and `state: UNDONE` against the stored pre-apply snapshot.
+
 A stale Undo refusal is a safety result, not permission to bypass the guard or manually rewrite the snapshot.
 
 ## Explicit non-actions
@@ -119,7 +142,7 @@ This phase does not:
 - add autonomous scheduling;
 - run on startup;
 - execute a replay from health/readiness checks;
-- alter historical costs while inspecting readiness;
+- alter historical costs while inspecting readiness or verification;
 - update finalized/sold bales;
 - write accounting entries;
 - change raw-material quantities; or
