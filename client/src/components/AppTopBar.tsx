@@ -87,17 +87,28 @@ export function AppTopBar({
         {/* Divider */}
         <div className="hidden sm:block h-5 w-px bg-border/60 mx-1" />
 
-        {/* User pill */}
-        <div className="hidden md:flex items-center gap-2 px-2.5 py-1 rounded-full border border-border/40 bg-muted/30 shrink-0">
+        {/* Dakzo Systems branding pill */}
+        <div
+          className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-full shrink-0"
+          style={{
+            background: `linear-gradient(135deg, ${accentColor}22 0%, ${accentColor}08 100%)`,
+            border: `1px solid ${accentColor}44`,
+          }}
+        >
           <span
-            className="h-5 w-5 rounded-full flex items-center justify-center text-[9px] font-bold text-white shrink-0"
-            style={{ backgroundColor: accentColor }}
+            className="h-5 w-5 rounded-full flex items-center justify-center text-[9px] font-bold text-white shrink-0 select-none"
+            style={{ background: `linear-gradient(135deg, ${accentColor}dd, ${accentColor}88)` }}
           >
-            {getInitials(user.username)}
+            D
           </span>
-          <span className="text-sm font-medium leading-none">{user.username}</span>
-          <span className="text-xs text-muted-foreground leading-none border-l border-border/50 pl-1.5">
-            {user.role}
+          <span
+            className="text-sm font-semibold tracking-wide leading-none select-none"
+            style={{ color: accentColor }}
+          >
+            Dakzo
+          </span>
+          <span className="text-sm font-light leading-none text-muted-foreground select-none">
+            Systems
           </span>
         </div>
 
