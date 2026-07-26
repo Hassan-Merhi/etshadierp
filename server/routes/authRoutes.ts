@@ -1209,7 +1209,7 @@ export function registerAuthRoutes(app: Express) {
         return res.status(401).json({ message: "Unauthorized" });
       }
 
-      const { dateFormat, preferredCurrency, showProfitComparisonOnPOS } = req.body;
+      const { dateFormat, preferredCurrency, showProfitComparisonOnPOS, showChatWidget, showNotesPanel } = req.body;
 
       // Validate date format if provided
       if (dateFormat && !["MM/DD/YYYY", "DD/MM/YYYY"].includes(dateFormat)) {
@@ -1229,6 +1229,8 @@ export function registerAuthRoutes(app: Express) {
       if (dateFormat) updateFields.dateFormat = dateFormat;
       if (preferredCurrency !== undefined) updateFields.preferredCurrency = preferredCurrency;
       if (showProfitComparisonOnPOS !== undefined) updateFields.showProfitComparisonOnPOS = showProfitComparisonOnPOS;
+      if (showChatWidget !== undefined) updateFields.showChatWidget = showChatWidget;
+      if (showNotesPanel !== undefined) updateFields.showNotesPanel = showNotesPanel;
 
       if (existing.length === 0) {
         // Create new preferences
@@ -1239,6 +1241,8 @@ export function registerAuthRoutes(app: Express) {
             dateFormat: dateFormat || "MM/DD/YYYY",
             preferredCurrency: preferredCurrency || null,
             showProfitComparisonOnPOS: showProfitComparisonOnPOS ?? false,
+            showChatWidget: showChatWidget ?? true,
+            showNotesPanel: showNotesPanel ?? true,
           })
           .returning();
         return res.json(newPrefs[0]);
