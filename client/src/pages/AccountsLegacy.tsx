@@ -581,17 +581,6 @@ export default function Accounts() {
       <div className="flex items-center justify-between flex-wrap gap-2">
         <PageHeader title="Accounts Overview" subtitle="View all accounts, balances, and transaction history" />
         <div className="flex gap-2">
-          {appMode === "factory" && ["Admin", "Owner", "Developer"].includes(currentUser?.role ?? "") && (
-            <Button
-              variant="outline"
-              disabled={!selectedCompany || fixPayrollAccountsMutation.isPending}
-              onClick={() => fixPayrollAccountsMutation.mutate()}
-              title="Rename payroll accounts from city names to worker names and group them under headers"
-            >
-              <Wrench className="w-4 h-4 mr-2" />
-              {fixPayrollAccountsMutation.isPending ? "Fixing…" : "Fix Payroll Accounts"}
-            </Button>
-          )}
           <Button
             data-testid="button-create-account"
             disabled={!selectedCompany}
