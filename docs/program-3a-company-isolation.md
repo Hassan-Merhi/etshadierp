@@ -4,109 +4,86 @@ Started: 2026-07-26
 
 Branch: `security/program-3a-company-isolation`
 
+Status: implemented by scope; draft and unmerged.
+
 ## Security rule
 
-The server-owned active company is authoritative. A caller-supplied `companyId` does not grant access and privileged roles do not bypass tenant isolation.
+The server-owned active company is authoritative. A caller-supplied `companyId` does not grant access, and privileged roles do not bypass tenant isolation.
 
-Factory/properties mode resolves the active company from `session.factoryCompanyId`; ERP mode resolves it from `session.currentCompanyId`.
+Factory and Properties mode resolve the active company from `session.factoryCompanyId`; ERP mode resolves it from `session.currentCompanyId`.
 
-## 3A.1 — Explicit company request boundary — implemented
+## 3A.1 — Explicit company request boundary
 
-`requireAuth` now parses `companyId` from:
+`requireAuth` parses `companyId` from query, JSON body, and URL parameters. It rejects invalid or conflicting identifiers and requires the supplied company to match the server-owned active company through the existing strict `companyIsolationPolicy`.
 
-- the query string;
-- the JSON body; and
-- URL parameters named `companyId`.
+Cross-company denials are logged with user, role, company, method, route, and policy code.
 
-The boundary:
+## 3A.2 — Canonical ID ownership
 
-1. rejects non-positive, non-integer, array, and object identifiers;
-2. rejects conflicting company IDs supplied through different request sources;
-3. compares the requested company to the server-owned active company through the existing `companyIsolationPolicy`;
-4. returns a non-leaking `Forbidden` response for cross-company requests; and
-5. logs the denied company, user, role, method, route, and policy code.
+A pre-route company-resource guard classifies ID-based voucher, ledger, bank, fixed-asset, customer, employee, stock-item, location, ERP-container, and factory-container routes.
 
-An Admin or Developer cannot bypass this comparison. The user must switch company through the authenticated company-switch workflow before operating on that company.
+The guard loads company ownership from canonical database storage through `databaseCompanyIsolationAdapter` and returns a non-leaking not-found response when the record is missing or belongs to another company.
 
-This protects the many existing routes that still accept `companyId` for compatibility without requiring an immediate high-risk rewrite of each route file.
+## 3A.3 — Company user and role administration
 
-## 3A.2 — Company-scoped administration and maintenance — implemented
+The company user gateway now scopes:
 
-The live authentication boundary now intercepts high-risk global and ID-only administration operations before their legacy handlers.
+- user lists;
+- active sessions;
+- user company-role lists;
+- security-permission targets;
+- global user PATCH, DELETE, and password reset;
+- new role assignments;
+- ID-only role PATCH and DELETE;
+- Developer-role assignment; and
+- user-location and POS cash-account configuration.
 
-### User administration
+Company Admins cannot operate on a user outside the active company or globally mutate a user whose account is shared with another company. Developer accounts and Developer-role assignments retain their explicit higher-security rules.
 
-- `GET /api/users` returns only users assigned to the active company and excludes Developer accounts.
-- `GET /api/users/:userId/company-roles` returns only the target user's role for the active company.
-- PATCH/DELETE of a user and Admin password reset require the target user to belong to the active company.
-- A user shared by multiple companies cannot be globally edited, deleted, or password-reset by a company Admin. The request returns `SHARED_USER_GLOBAL_MUTATION_BLOCKED`; the company role must be managed instead.
-- PATCH/DELETE of `user_company_roles` loads the role record first and verifies its canonical company ownership.
-- A role assignment cannot be moved to another company through a body update.
+## 3A.4 — Deleted records and destructive maintenance
 
-### Destructive maintenance
+Deleted-item restore and purge routes load canonical ownership for locations, stock items, stock groups, ledger accounts, employees, customers, bank accounts, vouchers, factory records, proformas, and customer orders.
 
-`POST /api/cleanup/orphaned-charges` previously scanned `CHARGE-*` vouchers globally. The protected path now:
+Global suppliers remain global maintenance and require Developer access.
 
-1. selects vouchers only from the active company;
-2. checks purchase orders through containers owned by that company;
-3. deletes voucher entries and vouchers transactionally; and
-4. keeps a final company predicate on the voucher deletion.
+Companyless maintenance routes are classified and restricted to Developer, including all-company equity repair, unattributable POS cleanup, orphaned-charge cleanup, account migration, parent-company settings, deployment/schema diagnostics, runtime schema changes, and historical intercompany repair.
 
-### Focused coverage
+Deleted-item checks now use the authoritative active-company resolver, including Factory and Properties mode.
 
-`tests/company-scoped-administration-policy.test.ts` verifies route classification and proves that global user mutation is allowed only for a user exclusive to the active company.
+## 3A.5 — Intercompany and global transaction protection
 
-## Existing policy reused
+Intercompany configuration validates authorization for both source and destination companies. It also validates that each selected ledger belongs to the corresponding side of the pair.
 
-The repository already contained:
+Global transaction routes load the voucher's canonical company and require the user to have access to that company before returning or mutating the record.
 
-- `authorizationPolicy.ts` — default-deny role/permission policy;
-- `companyIsolationPolicy.ts` — canonical-storage ownership checks and strict same-company enforcement; and
-- `tests/company-isolation-policy.test.ts` — regression coverage proving Admin does not bypass tenant scope.
+A protected central global-transaction route handles company-aware list and type operations before the legacy module.
 
-Program 3A extends that existing boundary rather than introducing a competing authorization model.
+## 3A.6 — Factory company selection
 
-## Focused coverage added
+Factory company selection is limited to active factory companies assigned to the user. A stale or unauthorized pinned factory is rejected instead of silently selecting a global factory.
 
-`tests/company-request-scope-policy.test.ts` covers:
+Historical ERP-container aliases under `/api/factory` remain mapped to ERP company ownership and do not get misclassified as factory-container records.
 
-- no explicit company;
-- query, body, and path parsing;
-- matching identifiers across request sources;
-- invalid identifiers; and
-- conflicting identifiers.
+## Focused coverage
 
-## Remaining 3A work
+Policy tests cover:
 
-### ID-only business-resource operations
-
-Routes that accept only a record ID must load the record's canonical company before read, update, delete, restore, export, or repair. Remaining high-priority examples include:
-
-- voucher and account ID operations;
-- stock and container repair endpoints;
-- attachments and exports; and
-- deleted-record restore/purge actions.
-
-These will use `authorizeCompanyScopedResourceTx` with a database ownership adapter instead of trusting a request filter.
-
-### Reports, imports, exports, and repairs
-
-All report/export/import/repair paths will be classified as either:
-
-- active-company only;
-- explicitly intercompany with both sides authorized; or
-- Developer-only global maintenance.
-
-### Intercompany operations
-
-Explicit intercompany routes must validate both the source and destination company and must not treat authorization for one company as authorization for the other.
+- explicit company parsing and conflicts;
+- canonical resource-route classification;
+- company user and role scope;
+- deleted-item ownership classification;
+- factory-company selection;
+- global maintenance classification;
+- global transaction classification;
+- intercompany company and ledger pairs; and
+- user-location configuration.
 
 ## Safety
 
 - No database migration, repair, backfill, deployment, or production command was executed.
-- No accounting, inventory, POS, container, payroll, or rental formula was changed.
-- The branch remains draft and unmerged until the phase is complete and explicitly approved.
+- No accounting, inventory, POS, container, payroll, rental, or costing formula was changed.
+- The branch remains draft and unmerged pending explicit approval.
 
 ## Verification limitation
 
-GitHub Actions has recently failed before exposing executable steps or logs. A full build, type-check, browser test, database test, and security scan pass is not claimed unless usable execution evidence becomes available.
+GitHub Actions has repeatedly failed before exposing executable steps or logs. A full build, type-check, browser test, database-backed test, and security scan pass is not claimed unless usable execution evidence becomes available.
