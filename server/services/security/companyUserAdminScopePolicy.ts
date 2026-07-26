@@ -28,6 +28,15 @@ export function filterRolesForCompany<T extends { companyId: number }>(
   return rows.filter((row) => row.companyId === activeCompanyId);
 }
 
+export function isDeveloperTarget(
+  rows: readonly CompanyUserRoleRow[],
+  targetUserId: string
+): boolean {
+  return rows.some(
+    (row) => row.userId === targetUserId && row.role === "Developer"
+  );
+}
+
 export function canAccessTargetUser(
   rows: readonly CompanyUserRoleRow[],
   targetUserId: string,
@@ -37,8 +46,15 @@ export function canAccessTargetUser(
   const targetRows = rows.filter((row) => row.userId === targetUserId);
   if (!targetRows.some((row) => row.companyId === activeCompanyId)) return false;
 
-  const targetIsDeveloper = targetRows.some((row) => row.role === "Developer");
-  return actorRole === "Developer" || !targetIsDeveloper;
+  return actorRole === "Developer" || !isDeveloperTarget(targetRows, targetUserId);
+}
+
+export function canAssignExistingTargetUser(
+  rows: readonly CompanyUserRoleRow[],
+  targetUserId: string,
+  actorRole: string
+): boolean {
+  return actorRole === "Developer" || !isDeveloperTarget(rows, targetUserId);
 }
 
 export function canAssignRole(actorRole: string, requestedRole: unknown): boolean {
