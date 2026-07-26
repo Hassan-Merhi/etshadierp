@@ -1,6 +1,6 @@
 import type { Express } from "express";
 import { eq, and, or } from "drizzle-orm";
-import { companies } from "@shared/schema";
+import { companies, userCompanyRoles } from "@shared/schema";
 import { registerFactoryStockRoutes } from "./factory/factoryStockRoutes";
 import { registerFactorySuppliersRoutes } from "./factory/factorySuppliersRoutes";
 import { registerFactoryProductsRoutes } from "./factory/factoryProductsRoutes";
@@ -28,6 +28,7 @@ import { registerCentralFactoryPayrollGenerationRoute } from "./payroll/centralF
 import { createContainerDocumentDownloadHandler } from "../services/security/protectedAssetDownloadAdapter";
 import { enforceCompanyUserRoleScope } from "../middleware/companyUserRoleScope";
 import { enforceCompanyResourceScope } from "../middleware/companyResourceScope";
+import { chooseAuthorizedFactoryCompany } from "../services/security/factoryCompanyScopePolicy";
 
 export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
   // ─────────────────────────────────────────────────────────────────────────────
@@ -37,41 +38,66 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
     try {
       const session = req.session as any;
       if (!session?.userId) return next();
-      if (session.factoryCompanyId) return next();
 
-      const currentCompanyId = session.currentCompanyId;
+      const assignedFactories = await db
+        .select({
+          id: companies.id,
+          companyType: companies.companyType,
+          active: companies.active,
+        })
+        .from(userCompanyRoles)
+        .innerJoin(companies, eq(companies.id, userCompanyRoles.companyId))
+        .where(
+          and(
+            eq(userCompanyRoles.userId, session.userId),
+            eq(companies.active, true),
+            or(eq(companies.companyType, "factory"), eq(companies.companyType, "factory_v2"))
+          )
+        )
+        .orderBy(companies.id);
 
-      if (currentCompanyId) {
-        const [co] = await db
-          .select({ id: companies.id, companyType: companies.companyType })
+      let currentCompany = assignedFactories.find((company: any) => company.id === session.currentCompanyId) ?? null;
+
+      // A Developer may explicitly switch to any company through /api/auth/set-company.
+      // Preserve that explicit server-owned context, but never choose a global factory
+      // merely because the user opened a factory URL from an ERP company.
+      if (!currentCompany && session.currentRole === "Developer" && session.currentCompanyId) {
+        const [developerCurrent] = await db
+          .select({
+            id: companies.id,
+            companyType: companies.companyType,
+            active: companies.active,
+          })
           .from(companies)
-          .where(eq(companies.id, currentCompanyId));
-        if (co?.companyType === "factory" || co?.companyType === "factory_v2") {
-          session.factoryCompanyId = co.id;
-          return next();
+          .where(eq(companies.id, session.currentCompanyId))
+          .limit(1);
+        if (
+          developerCurrent?.active &&
+          (developerCurrent.companyType === "factory" || developerCurrent.companyType === "factory_v2")
+        ) {
+          currentCompany = developerCurrent;
+          assignedFactories.unshift(developerCurrent);
         }
       }
 
-      // Fall back to any active factory-type company
-      const [factoryComp] = await db
-        .select({ id: companies.id })
-        .from(companies)
-        .where(
-          and(
-            or(eq(companies.companyType, "factory"), eq(companies.companyType, "factory_v2")),
-            eq(companies.active, true)
-          )
-        )
-        .limit(1);
-      if (factoryComp) {
-        session.factoryCompanyId = factoryComp.id;
-        return next();
+      const factoryCompanyId = chooseAuthorizedFactoryCompany({
+        pinnedFactoryId: session.factoryCompanyId,
+        currentCompany,
+        assignedFactoryIds: assignedFactories.map((company: any) => company.id),
+      });
+
+      if (!factoryCompanyId) {
+        delete session.factoryCompanyId;
+        return res.status(403).json({
+          message: "You do not have access to a Factory company.",
+          code: "FACTORY_COMPANY_ACCESS_REQUIRED",
+        });
       }
 
-      if (currentCompanyId) session.factoryCompanyId = currentCompanyId;
-      next();
-    } catch {
-      next();
+      session.factoryCompanyId = factoryCompanyId;
+      return next();
+    } catch (error) {
+      return next(error);
     }
   });
 
