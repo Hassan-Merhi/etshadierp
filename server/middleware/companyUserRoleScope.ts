@@ -4,6 +4,7 @@ import { userCompanyRoles } from "@shared/schema";
 import { db } from "../db";
 import { logger } from "../lib/logger";
 import { resolveActiveCompanyId } from "../routes/helpers/resolveActiveCompanyId";
+import { enforceGlobalMaintenanceScope } from "./globalMaintenanceScope";
 import {
   canAccessTargetUser,
   filterRolesForCompany,
@@ -51,6 +52,10 @@ export async function enforceCompanyUserRoleScope(
   req: Request,
   res: Response
 ): Promise<boolean> {
+  // This middleware is the first Program 3A gateway registered before legacy
+  // routes, so globally destructive maintenance checks run here as well.
+  if (!enforceGlobalMaintenanceScope(req, res)) return false;
+
   const sessionUserId = req.session.userId;
   const actorRole = req.session.currentRole;
   const companyId = resolveActiveCompanyId(req);
