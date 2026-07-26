@@ -27,14 +27,15 @@ import { registerFactoryStockAllocationV5PaginationRoutes } from "./factory/fact
 import { registerCentralFactoryPayrollGenerationRoute } from "./payroll/centralFactoryPayrollGenerationRoute";
 import { createContainerDocumentDownloadHandler } from "../services/security/protectedAssetDownloadAdapter";
 import { enforceCompanyUserRoleScope } from "../middleware/companyUserRoleScope";
+import { enforceCompanyResourceScope } from "../middleware/companyResourceScope";
 
 export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
-  // Program 3A global guard. registerFactoryRoutes is the first route registry in
-  // server/routes.ts, so this middleware executes before the legacy auth/user
-  // handlers without changing their hashing, validation, audit, or session logic.
+  // Program 3A global guards. registerFactoryRoutes is the first route registry in
+  // server/routes.ts, so these execute before legacy auth and business handlers.
   app.use(async (req, res, next) => {
     try {
       if (!(await enforceCompanyUserRoleScope(req, res))) return;
+      if (!(await enforceCompanyResourceScope(req, res))) return;
       next();
     } catch (error) {
       next(error);
