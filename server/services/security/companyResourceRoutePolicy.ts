@@ -7,6 +7,9 @@ export interface CompanyOwnedRouteMatch {
   domain: AuthorizationDomain;
 }
 
+const ERP_CONTAINER_FACTORY_ALIASES =
+  /^\/api\/factory\/containers\/\d+\/(documents|freight)(?:\/|$)/;
+
 const ROUTES: Array<{
   pattern: RegExp;
   resourceType: CompanyScopedResourceType;
@@ -26,6 +29,10 @@ const ROUTES: Array<{
 ];
 
 export function classifyCompanyOwnedRoute(path: string): CompanyOwnedRouteMatch | null {
+  // Historical document/freight aliases live below /api/factory but reference the
+  // ERP containers table and already have dedicated ERP-company ownership checks.
+  if (ERP_CONTAINER_FACTORY_ALIASES.test(path)) return null;
+
   for (const route of ROUTES) {
     const match = path.match(route.pattern);
     if (!match) continue;
