@@ -30,6 +30,32 @@ An Admin or Developer cannot bypass this comparison. The user must switch compan
 
 This protects the many existing routes that still accept `companyId` for compatibility without requiring an immediate high-risk rewrite of each route file.
 
+## 3A.2 — Company-scoped administration and maintenance — implemented
+
+The live authentication boundary now intercepts high-risk global and ID-only administration operations before their legacy handlers.
+
+### User administration
+
+- `GET /api/users` returns only users assigned to the active company and excludes Developer accounts.
+- `GET /api/users/:userId/company-roles` returns only the target user's role for the active company.
+- PATCH/DELETE of a user and Admin password reset require the target user to belong to the active company.
+- A user shared by multiple companies cannot be globally edited, deleted, or password-reset by a company Admin. The request returns `SHARED_USER_GLOBAL_MUTATION_BLOCKED`; the company role must be managed instead.
+- PATCH/DELETE of `user_company_roles` loads the role record first and verifies its canonical company ownership.
+- A role assignment cannot be moved to another company through a body update.
+
+### Destructive maintenance
+
+`POST /api/cleanup/orphaned-charges` previously scanned `CHARGE-*` vouchers globally. The protected path now:
+
+1. selects vouchers only from the active company;
+2. checks purchase orders through containers owned by that company;
+3. deletes voucher entries and vouchers transactionally; and
+4. keeps a final company predicate on the voucher deletion.
+
+### Focused coverage
+
+`tests/company-scoped-administration-policy.test.ts` verifies route classification and proves that global user mutation is allowed only for a user exclusive to the active company.
+
 ## Existing policy reused
 
 The repository already contained:
@@ -52,21 +78,16 @@ Program 3A extends that existing boundary rather than introducing a competing au
 
 ## Remaining 3A work
 
-### ID-only resource operations
+### ID-only business-resource operations
 
-Routes that accept only a record ID must load the record's canonical company before read, update, delete, restore, export, or repair. High-priority examples include:
+Routes that accept only a record ID must load the record's canonical company before read, update, delete, restore, export, or repair. Remaining high-priority examples include:
 
-- user-company-role PATCH/DELETE;
 - voucher and account ID operations;
 - stock and container repair endpoints;
 - attachments and exports; and
 - deleted-record restore/purge actions.
 
 These will use `authorizeCompanyScopedResourceTx` with a database ownership adapter instead of trusting a request filter.
-
-### Global administration reads
-
-User-management and configuration endpoints that currently return global rows must be reviewed so a company Admin sees only the active company's scope. Developer-only global behavior will be documented explicitly where retained.
 
 ### Reports, imports, exports, and repairs
 
@@ -75,6 +96,10 @@ All report/export/import/repair paths will be classified as either:
 - active-company only;
 - explicitly intercompany with both sides authorized; or
 - Developer-only global maintenance.
+
+### Intercompany operations
+
+Explicit intercompany routes must validate both the source and destination company and must not treat authorization for one company as authorization for the other.
 
 ## Safety
 
