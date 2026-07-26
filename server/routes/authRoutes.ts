@@ -455,7 +455,12 @@ export function registerAuthRoutes(app: Express) {
         if (actionVals.length === 1) {
           filterConditions.push(sql`lower(${auditLog.action}) = ${actionVals[0]}`);
         } else if (actionVals.length > 1) {
-          filterConditions.push(sql`lower(${auditLog.action}) = ANY(${actionVals})`);
+          // Use IN(...) with explicit sql literals — passing a JS array directly to Drizzle
+          // generates ANY(($1,$2)) (a tuple) which Postgres rejects; sql.join produces
+          // a proper IN ($1, $2, ...) clause that works correctly.
+          filterConditions.push(
+            sql`lower(${auditLog.action}) IN (${sql.join(actionVals.map((a) => sql`${a}`), sql`, `)})`
+          );
         }
       }
 

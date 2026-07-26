@@ -92,12 +92,13 @@ export default function Accounts() {
   const { selectedCompany } = useCompany();
   const { toast } = useToast();
   const { formatDisplayDate } = useDateFormat();
-  const { formatAmount, formatAmountRaw, isMultiCurrency } = useCurrencyContext();
+  const { formatAmount, formatCashAmount, isMultiCurrency } = useCurrencyContext();
 
-  const RATE_CONVERTED_ACCOUNT_TYPES = new Set(["bank"]);
-
-  function formatAmountForAccount(amount: number, accountType?: string): string {
-    return RATE_CONVERTED_ACCOUNT_TYPES.has(accountType || "") ? formatAmount(amount) : formatAmountRaw(amount);
+  // formatCashAmount handles both USD-base and CFA-base companies correctly:
+  // it converts USD→CFA (or CFA→USD) based on baseCurrency + selectedCurrency,
+  // so all account types — supplier, ledger, customer, bank — show consistent values.
+  function formatAmountForAccount(amount: number, _accountType?: string): string {
+    return formatCashAmount(amount);
   }
   const { data: myErpPages } = useQuery<{ hiddenErpCostFields?: string[] }>({ queryKey: ["/api/my-erp-pages"] });
   const hideBalances = (myErpPages?.hiddenErpCostFields ?? []).includes("accounts_balances");
@@ -254,6 +255,85 @@ export default function Accounts() {
       toast({ title: "Update failed", description: err?.message ?? "Unknown error", variant: "destructive" });
     },
   });
+
+  const updateBankMutation = useMutation({
+    mutationFn: async (data: { id: number; [key: string]: any }) => {
+      const { id, ...rest } = data;
+      const res = await apiRequest("PUT", `/api/bank-accounts/${id}`, rest);
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.message ?? "Update failed");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Bank account updated" });
+      setBankToEdit(null);
+      bankForm.reset();
+      queryClient.invalidateQueries({ queryKey: ["/api/bank-accounts"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/accounts/all"] });
+    },
+    onError: (err: any) => {
+      toast({ title: "Update failed", description: err?.message ?? "Unknown error", variant: "destructive" });
+    },
+  });
+
+  const deleteBankMutation = useMutation({
+    mutationFn: async (id: number) => {
+      const res = await apiRequest("DELETE", `/api/bank-accounts/${id}`);
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.message ?? "Delete failed");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Bank account deleted" });
+      setBankToEdit(null);
+      bankForm.reset();
+      queryClient.invalidateQueries({ queryKey: ["/api/bank-accounts"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/accounts/all"] });
+    },
+    onError: (err: any) => {
+      toast({ title: "Delete failed", description: err?.message ?? "Unknown error", variant: "destructive" });
+    },
+  });
+
+  const createBankMutation = useMutation({
+    mutationFn: async (data: Record<string, any>) => {
+      const res = await apiRequest("POST", "/api/bank-accounts", {
+        ...data,
+        companyId: selectedCompany?.id,
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.message ?? "Create failed");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Bank account created" });
+      setBankToEdit(null);
+      bankForm.reset();
+      queryClient.invalidateQueries({ queryKey: ["/api/bank-accounts"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/accounts/all"] });
+    },
+    onError: (err: any) => {
+      toast({ title: "Create failed", description: err?.message ?? "Unknown error", variant: "destructive" });
+    },
+  });
+
+  const onBankSubmit = (data: any) => {
+    if (bankToEdit) {
+      updateBankMutation.mutate({ id: bankToEdit.id, ...data });
+    } else {
+      createBankMutation.mutate(data);
+    }
+  };
+
+  const handleDeleteBankAccount = () => {
+    if (bankToEdit) deleteBankMutation.mutate(bankToEdit.id);
+  };
 
   const [filterCurrency, setFilterCurrency] = useState<"all" | "CFA">("all");
   const { data: currentUser } = useQuery<{ role?: string }>({ queryKey: ["/api/auth/me"] });
@@ -572,6 +652,23 @@ export default function Accounts() {
   const bankForm = useForm({
     resolver: zodResolver(insertBankAccountSchema.omit({ companyId: true })),
   });
+
+  // Populate bank form fields whenever a bank account is selected for editing.
+  useEffect(() => {
+    if (bankToEdit) {
+      bankForm.reset({
+        code: bankToEdit.code ?? "",
+        name: bankToEdit.name ?? "",
+        bankName: bankToEdit.bankName ?? "",
+        accountNumber: bankToEdit.accountNumber ?? "",
+        routingCode: bankToEdit.routingCode ?? "",
+        openingBalance: bankToEdit.openingBalance ?? "0",
+        openingBalanceSide: bankToEdit.openingBalanceSide ?? "Dr",
+      });
+    } else {
+      bankForm.reset();
+    }
+  }, [bankToEdit]);
   const editForm = useForm({
     resolver: zodResolver(updateLedgerAccountSchema.omit({ id: true, companyId: true })),
   });
@@ -596,10 +693,10 @@ export default function Accounts() {
         bankToEdit={bankToEdit}
         setBankToEdit={setBankToEdit}
         bankForm={bankForm}
-        onBankSubmit={() => {}}
-        updateBankMutation={{}}
-        deleteBankMutation={{}}
-        handleDeleteBankAccount={() => {}}
+        onBankSubmit={onBankSubmit}
+        updateBankMutation={updateBankMutation}
+        deleteBankMutation={deleteBankMutation}
+        handleDeleteBankAccount={handleDeleteBankAccount}
         accountToEdit={accountToEdit}
         setAccountToEdit={setAccountToEdit}
         supplierToEdit={supplierToEdit}

@@ -944,7 +944,7 @@ export default function FactoryOtwTrackingTab({ onEdit }: OtwTrackingTabProps = 
           <SummaryCard
             key={ccy}
             label={ccy === "USD" ? "Total (USD) — cost + freight + commission" : `Total (${ccy})`}
-            value={`${symbol} ${Math.round(amount).toLocaleString()}`}
+            value={`${symbol} ${amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
             icon={<DollarSign className="h-4 w-4 text-emerald-600" />}
             accent="bg-emerald-100 dark:bg-emerald-900/30"
           />
@@ -953,7 +953,7 @@ export default function FactoryOtwTrackingTab({ onEdit }: OtwTrackingTabProps = 
           <SummaryCard
             key={`freight-${ccy}`}
             label={`Freight (${ccy})`}
-            value={`${symbol} ${Math.round(amount).toLocaleString()}`}
+            value={`${symbol} ${amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
             icon={<Ship className="h-4 w-4 text-sky-600" />}
             accent="bg-sky-100 dark:bg-sky-900/30"
           />
