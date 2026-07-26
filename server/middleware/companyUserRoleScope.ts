@@ -6,6 +6,7 @@ import { logger } from "../lib/logger";
 import { resolveActiveCompanyId } from "../routes/helpers/resolveActiveCompanyId";
 import { enforceGlobalMaintenanceScope } from "./globalMaintenanceScope";
 import { enforceIntercompanyConfigurationScope } from "./intercompanyConfigurationScope";
+import { enforceUserLocationConfigurationScope } from "./userLocationConfigurationScope";
 import {
   canAccessTargetUser,
   canAssignExistingTargetUser,
@@ -64,10 +65,11 @@ export async function enforceCompanyUserRoleScope(
   res: Response
 ): Promise<boolean> {
   // This middleware is the first Program 3A gateway registered before legacy
-  // routes, so globally destructive maintenance and two-company configuration
-  // checks run here as well.
+  // routes, so globally destructive maintenance, two-company configuration, and
+  // company-owned user-location checks run here as well.
   if (!enforceGlobalMaintenanceScope(req, res)) return false;
   if (!(await enforceIntercompanyConfigurationScope(req, res))) return false;
+  if (!(await enforceUserLocationConfigurationScope(req, res))) return false;
 
   const sessionUserId = req.session.userId;
   const actorRole = req.session.currentRole;
