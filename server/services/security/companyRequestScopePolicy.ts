@@ -1,8 +1,8 @@
 export type ExplicitCompanyScopeDecision =
   | { kind: "none" }
   | { kind: "company"; companyId: number }
-  | { kind: "invalid"; source: "query" | "body" }
-  | { kind: "conflict"; queryCompanyId: number; bodyCompanyId: number };
+  | { kind: "invalid"; source: "query" | "body" | "path" }
+  | { kind: "conflict"; companyIds: number[] };
 
 function parseCompanyId(value: unknown): number | null | "invalid" {
   if (value === undefined || value === null || value === "") return null;
@@ -21,17 +21,27 @@ function parseCompanyId(value: unknown): number | null | "invalid" {
 export function decideExplicitCompanyScope(input: {
   queryCompanyId?: unknown;
   bodyCompanyId?: unknown;
+  pathCompanyId?: unknown;
 }): ExplicitCompanyScopeDecision {
-  const queryCompanyId = parseCompanyId(input.queryCompanyId);
-  if (queryCompanyId === "invalid") return { kind: "invalid", source: "query" };
+  const values: Array<{ source: "query" | "body" | "path"; value: unknown }> = [
+    { source: "query", value: input.queryCompanyId },
+    { source: "body", value: input.bodyCompanyId },
+    { source: "path", value: input.pathCompanyId },
+  ];
 
-  const bodyCompanyId = parseCompanyId(input.bodyCompanyId);
-  if (bodyCompanyId === "invalid") return { kind: "invalid", source: "body" };
-
-  if (queryCompanyId !== null && bodyCompanyId !== null && queryCompanyId !== bodyCompanyId) {
-    return { kind: "conflict", queryCompanyId, bodyCompanyId };
+  const companyIds: number[] = [];
+  for (const candidate of values) {
+    const parsed = parseCompanyId(candidate.value);
+    if (parsed === "invalid") return { kind: "invalid", source: candidate.source };
+    if (parsed !== null) companyIds.push(parsed);
   }
 
-  const companyId = queryCompanyId ?? bodyCompanyId;
-  return companyId === null ? { kind: "none" } : { kind: "company", companyId };
+  if (companyIds.length === 0) return { kind: "none" };
+
+  const uniqueCompanyIds = [...new Set(companyIds)].sort((left, right) => left - right);
+  if (uniqueCompanyIds.length > 1) {
+    return { kind: "conflict", companyIds: uniqueCompanyIds };
+  }
+
+  return { kind: "company", companyId: uniqueCompanyIds[0] };
 }
