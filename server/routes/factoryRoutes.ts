@@ -29,6 +29,7 @@ import { createContainerDocumentDownloadHandler } from "../services/security/pro
 import { enforceCompanyUserRoleScope } from "../middleware/companyUserRoleScope";
 import { enforceCompanyResourceScope } from "../middleware/companyResourceScope";
 import { chooseAuthorizedFactoryCompany } from "../services/security/factoryCompanyScopePolicy";
+import { isErpContainerFactoryAlias } from "../services/security/companyResourceRoutePolicy";
 
 export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
   // ─────────────────────────────────────────────────────────────────────────────
@@ -41,9 +42,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
       // Historical ERP ContainerDetail aliases live under /api/factory but use
       // the ERP containers table and their own current-company ownership checks.
-      if (/^\/containers\/\d+\/(documents|freight)(?:\/|$)/.test(req.path)) {
-        return next();
-      }
+      if (isErpContainerFactoryAlias(req.path)) return next();
 
       const assignedFactories = await db
         .select({
