@@ -1,8 +1,19 @@
 import { eq } from "drizzle-orm";
 import { db } from "../../db";
 import { userCompanyRoles } from "@shared/schema";
+import {
+  manageableCompanyIds,
+  scopeAllowsCompanyManagement,
+  scopeAllowsCompanyMembership,
+  type UserCompanyAuthorizationScope,
+} from "./companyAuthorizationPolicy";
 
-const COMPANY_MANAGEMENT_ROLES = new Set(["Admin", "Developer"]);
+export {
+  manageableCompanyIds,
+  scopeAllowsCompanyManagement,
+  scopeAllowsCompanyMembership,
+  type UserCompanyAuthorizationScope,
+} from "./companyAuthorizationPolicy";
 
 export class CompanyAuthorizationError extends Error {
   constructor(
@@ -13,11 +24,6 @@ export class CompanyAuthorizationError extends Error {
     super(message);
     this.name = "CompanyAuthorizationError";
   }
-}
-
-export interface UserCompanyAuthorizationScope {
-  isDeveloper: boolean;
-  companyRoles: Map<number, string>;
 }
 
 export async function loadUserCompanyAuthorizationScope(
@@ -32,21 +38,6 @@ export async function loadUserCompanyAuthorizationScope(
     isDeveloper: roles.some((row) => row.role === "Developer"),
     companyRoles: new Map(roles.map((row) => [row.companyId, row.role])),
   };
-}
-
-export function scopeAllowsCompanyMembership(
-  scope: UserCompanyAuthorizationScope,
-  companyId: number
-): boolean {
-  return scope.isDeveloper || scope.companyRoles.has(companyId);
-}
-
-export function scopeAllowsCompanyManagement(
-  scope: UserCompanyAuthorizationScope,
-  companyId: number
-): boolean {
-  if (scope.isDeveloper) return true;
-  return COMPANY_MANAGEMENT_ROLES.has(scope.companyRoles.get(companyId) ?? "");
 }
 
 export async function assertUserCompanyMembership(userId: string, companyId: number): Promise<void> {
@@ -73,10 +64,5 @@ export async function assertUserCanManageCompany(userId: string, companyId: numb
 
 export async function getManageableCompanyIds(userId: string): Promise<number[] | null> {
   const scope = await loadUserCompanyAuthorizationScope(userId);
-  if (scope.isDeveloper) return null;
-
-  return [...scope.companyRoles.entries()]
-    .filter(([, role]) => COMPANY_MANAGEMENT_ROLES.has(role))
-    .map(([companyId]) => companyId)
-    .sort((left, right) => left - right);
+  return manageableCompanyIds(scope);
 }
