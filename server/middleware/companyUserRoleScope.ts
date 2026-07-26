@@ -1,7 +1,7 @@
 import type { Request, Response } from "express";
 import { eq } from "drizzle-orm";
 import { userCompanyRoles } from "@shared/schema";
-import { db } from "../db";
+import { db, pool } from "../db";
 import { logger } from "../lib/logger";
 import { resolveActiveCompanyId } from "../routes/helpers/resolveActiveCompanyId";
 import { enforceGlobalMaintenanceScope } from "./globalMaintenanceScope";
@@ -80,6 +80,58 @@ export async function enforceCompanyUserRoleScope(
     installJsonArrayFilter(res, (rows) =>
       rows.filter((row) => typeof row?.id === "string" && visibleIds.has(row.id))
     );
+    return true;
+  }
+
+  if (method === "GET" && path === "/api/sessions" && actorRole !== "Developer") {
+    const roleRows = await loadRoleRows();
+    const userIds = [...new Set(roleRows.map((row) => row.userId))];
+    const visibleSessionUserIds = new Set(
+      userIds.filter((targetUserId) =>
+        canMutateGlobalUserAccount(
+          roleRows,
+          targetUserId,
+          companyId,
+          actorRole
+        )
+      )
+    );
+    visibleSessionUserIds.add(sessionUserId);
+    installJsonArrayFilter(res, (rows) =>
+      rows.filter(
+        (row) =>
+          typeof row?.userId === "string" &&
+          visibleSessionUserIds.has(row.userId)
+      )
+    );
+    return true;
+  }
+
+  const sessionMatch = path.match(/^\/api\/sessions\/([^/]+)$/);
+  if (method === "DELETE" && sessionMatch && actorRole !== "Developer") {
+    const sid = decodeURIComponent(sessionMatch[1]);
+    const result = await pool.query(`SELECT sess FROM session WHERE sid = $1`, [sid]);
+    const targetUserId = result.rows[0]?.sess?.userId;
+    if (!targetUserId) return true;
+    if (targetUserId === sessionUserId) return true;
+
+    const targetRows = await loadRoleRows(targetUserId);
+    if (
+      !canMutateGlobalUserAccount(
+        targetRows,
+        targetUserId,
+        companyId,
+        actorRole
+      )
+    ) {
+      return deny(
+        req,
+        res,
+        companyId,
+        "SESSION_TARGET_SCOPE_DENIED",
+        "Session not found"
+      );
+    }
     return true;
   }
 
