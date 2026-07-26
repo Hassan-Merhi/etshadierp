@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   canAccessTargetUser,
   canAssignRole,
+  canMutateGlobalUserAccount,
   filterRolesForCompany,
   visibleUserIdsForCompany,
 } from "../server/services/security/companyUserAdminScopePolicy";
@@ -35,6 +36,12 @@ describe("company-scoped user administration policy", () => {
   it("hides developer targets from non-developer administrators", () => {
     expect(canAccessTargetUser(rows, "developer", 1, "Admin")).toBe(false);
     expect(canAccessTargetUser(rows, "developer", 1, "Developer")).toBe(true);
+  });
+
+  it("prevents one company admin from changing a shared global user account", () => {
+    expect(canMutateGlobalUserAccount(rows, "shared", 1, "Admin")).toBe(false);
+    expect(canMutateGlobalUserAccount(rows, "admin-a", 1, "Admin")).toBe(true);
+    expect(canMutateGlobalUserAccount(rows, "shared", 1, "Developer")).toBe(true);
   });
 
   it("allows only Developers to assign the Developer role", () => {
