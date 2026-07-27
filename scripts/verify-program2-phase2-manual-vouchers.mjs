@@ -61,8 +61,9 @@ const checks = [
   [journalLifecycle.includes("isReadonlyMigratedVoucher"), "migrated vouchers must remain read-only"],
   [journalLifecycle.includes('existing.voucherType !== "Journal"'), "non-Journal lifecycle paths must remain isolated"],
   [journalLifecycle.includes("existing.optional") && journalLifecycle.includes("req.body?.optional === true"), "optional Journal transitions must remain on the legacy path"],
-  [routeRegistry.indexOf("registerCentralJournalCreateRoute") < routeRegistry.indexOf("registerVoucherRoutes"), "central journal route must register before legacy voucher routes"],
-  [routeRegistry.indexOf("registerCentralGenericVoucherCreateRoute") < routeRegistry.indexOf("registerVoucherRoutes"), "central generic route must register before legacy voucher routes"],
+  [routeRegistry.indexOf("registerCentralJournalCreateRoute(app);") < routeRegistry.indexOf("registerVoucherJournalRoutes(app);"), "central journal route must register before the legacy journal route"],
+  [routeRegistry.indexOf("registerCentralJournalLifecycleRoutes(app);") < routeRegistry.indexOf("registerVoucherJournalRoutes(app);"), "central journal lifecycle must register before the legacy journal route"],
+  [routeRegistry.indexOf("registerCentralGenericVoucherCreateRoute(app);") < routeRegistry.indexOf("registerVoucherCreateRoutes(app);"), "central generic route must register before the legacy generic creator"],
   [phaseDoc.includes("Status: complete"), "Phase 2 documentation must remain marked complete"],
   [phaseDoc.includes("No database schema or historical record changed"), "Phase 2 safety boundary must remain documented"],
 ];
