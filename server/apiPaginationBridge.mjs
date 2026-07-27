@@ -2,6 +2,8 @@ import process from "node:process";
 
 const INSTALL_KEY = Symbol.for("erp.api-pagination-bridge.installed");
 const PATCH_KEY = Symbol.for("erp.api-pagination-bridge.patch");
+const EXPENSIVE_GET_PATCH_KEY = Symbol.for("erp.expensive-get-cache.patch");
+const RESPONSE_END_PATCH_KEY = Symbol.for("erp.expensive-get-cache.end-patch");
 
 if (!globalThis[INSTALL_KEY]) {
   globalThis[INSTALL_KEY] = true;
@@ -18,6 +20,19 @@ if (!globalThis[INSTALL_KEY]) {
     "/api/factory/v5/stock-allocation",
   ]);
 
+  // These read models are expensive to assemble but are safe to reuse briefly for
+  // the same authenticated user/company. Any write increments the generation and
+  // clears this cache, including 204 responses, so accounting and stock mutations
+  // are never intentionally hidden behind the short cache window.
+  const expensiveGetTtls = new Map([
+    ["/api/factory/suppliers/with-balances", 15_000],
+    ["/api/factory/suppliers/:id/broker-statement", 15_000],
+    ["/api/worker-groups/with-members", 30_000],
+    ["/api/accounts/all", 15_000],
+  ]);
+  const expensiveGetCache = new Map();
+  let writeGeneration = 0;
+
   function readPositiveInt(value, fallback) {
     const parsed = Number.parseInt(String(value ?? ""), 10);
     return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
@@ -29,6 +44,36 @@ if (!globalThis[INSTALL_KEY]) {
       return { pathname: url.pathname, searchParams: url.searchParams };
     } catch {
       return { pathname: req?.path || req?.url || "/", searchParams: new URLSearchParams() };
+    }
+  }
+
+  function normalizedSearch(searchParams) {
+    return [...searchParams.entries()]
+      .sort(([ak, av], [bk, bv]) => ak.localeCompare(bk) || av.localeCompare(bv))
+      .map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(value)}`)
+      .join("&");
+  }
+
+  function expensiveCacheKey(req, routePath) {
+    const { searchParams } = parseRequest(req);
+    const session = req?.session || {};
+    const companyId = session.factoryCompanyId || session.currentCompanyId || "none";
+    const userId = session.userId || req?.user?.id || "anonymous";
+    const role = session.currentRole || req?.user?.role || "unknown";
+    return `${routePath}|company=${companyId}|user=${userId}|role=${role}|${normalizedSearch(searchParams)}`;
+  }
+
+  function clearExpensiveGetCache() {
+    writeGeneration += 1;
+    expensiveGetCache.clear();
+  }
+
+  function trimExpensiveGetCache() {
+    if (expensiveGetCache.size <= 64) return;
+    const oldest = [...expensiveGetCache.entries()].sort((a, b) => a[1].createdAt - b[1].createdAt);
+    while (expensiveGetCache.size > 64 && oldest.length > 0) {
+      const entry = oldest.shift();
+      if (entry) expensiveGetCache.delete(entry[0]);
     }
   }
 
@@ -162,6 +207,75 @@ if (!globalThis[INSTALL_KEY]) {
   const expressNamespace = await import("express");
   const expressModule = expressNamespace.default || expressNamespace;
   const responsePrototype = expressModule.response || expressNamespace.response;
+  const applicationPrototype = expressModule.application || expressNamespace.application;
+
+  if (responsePrototype?.end && !responsePrototype.end[RESPONSE_END_PATCH_KEY]) {
+    const originalEnd = responsePrototype.end;
+    const generationAwareEnd = function generationAwareEnd(...args) {
+      if (this.req?.method && this.req.method !== "GET" && this.req.method !== "HEAD") {
+        clearExpensiveGetCache();
+      }
+      return originalEnd.apply(this, args);
+    };
+    Object.defineProperty(generationAwareEnd, RESPONSE_END_PATCH_KEY, { value: true });
+    responsePrototype.end = generationAwareEnd;
+  }
+
+  if (applicationPrototype?.get && !applicationPrototype.get[EXPENSIVE_GET_PATCH_KEY]) {
+    const originalGet = applicationPrototype.get;
+    const cachedGet = function cachedGet(routePath, ...handlers) {
+      // Preserve Express's app.get(setting) overload and every unlisted route.
+      if (handlers.length === 0 || typeof routePath !== "string" || !expensiveGetTtls.has(routePath)) {
+        return originalGet.call(this, routePath, ...handlers);
+      }
+
+      const ttlMs = expensiveGetTtls.get(routePath);
+      const finalIndex = handlers.length - 1;
+      const finalHandler = handlers[finalIndex];
+      if (typeof finalHandler !== "function") return originalGet.call(this, routePath, ...handlers);
+
+      handlers[finalIndex] = async function cachedExpensiveGetHandler(req, res, next) {
+        const key = expensiveCacheKey(req, routePath);
+        const now = Date.now();
+        const cached = expensiveGetCache.get(key);
+        if (cached && cached.expiresAt > now && cached.generation === writeGeneration) {
+          res.setHeader("X-ERP-Read-Cache", "HIT");
+          return res.json(cached.body);
+        }
+        if (cached) expensiveGetCache.delete(key);
+
+        const generationAtStart = writeGeneration;
+        const originalJson = res.json.bind(res);
+        let stored = false;
+        res.json = function captureExpensiveRead(body) {
+          if (!stored && res.statusCode < 400 && generationAtStart === writeGeneration) {
+            stored = true;
+            expensiveGetCache.set(key, {
+              body,
+              createdAt: Date.now(),
+              expiresAt: Date.now() + ttlMs,
+              generation: generationAtStart,
+            });
+            trimExpensiveGetCache();
+            res.setHeader("X-ERP-Read-Cache", "MISS");
+          }
+          return originalJson(body);
+        };
+
+        try {
+          return await finalHandler(req, res, next);
+        } catch (error) {
+          return next(error);
+        } finally {
+          res.json = originalJson;
+        }
+      };
+
+      return originalGet.call(this, routePath, ...handlers);
+    };
+    Object.defineProperty(cachedGet, EXPENSIVE_GET_PATCH_KEY, { value: true });
+    applicationPrototype.get = cachedGet;
+  }
 
   if (responsePrototype?.json && !responsePrototype.json[PATCH_KEY]) {
     const originalJson = responsePrototype.json;
@@ -202,7 +316,7 @@ if (!globalThis[INSTALL_KEY]) {
     JSON.stringify({
       timestamp: new Date().toISOString(),
       level: "INFO",
-      message: "Heavy API pagination and compact payload bridge enabled",
+      message: "Heavy API pagination, compact payload and expensive-read cache bridge enabled",
       module: "api-pagination-bridge",
       defaultLimit,
       maxLimit,
@@ -212,6 +326,7 @@ if (!globalThis[INSTALL_KEY]) {
         "/api/factory/containers?compact=1",
         "/api/stock-items/light?profile=identity",
       ],
+      expensiveReadCacheRoutes: [...expensiveGetTtls.keys()],
     })
   );
 }
