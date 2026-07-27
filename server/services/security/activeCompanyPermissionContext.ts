@@ -9,6 +9,14 @@ export interface ActiveCompanyPermissionContext {
   companyId: number;
   role: string;
   developerBypass: boolean;
+  assignedLocationId: number | null;
+  cashAccountId: number | null;
+  posStation: number | null;
+  canSellNegativeStock: boolean;
+  posViewOnly: boolean;
+  daybookEditDays: number;
+  canAccessCustomers: boolean;
+  canDeleteRecords: boolean;
 }
 
 export class ActiveCompanyPermissionContextError extends Error {
@@ -50,10 +58,10 @@ export function chooseActiveCompanyRole(
 }
 
 /**
- * Resolve the role used by role-feature permissions from canonical storage.
- * This intentionally does not trust session.currentRole because Factory and
- * Properties requests may use session.factoryCompanyId and because role changes
- * must take effect without waiting for a stale browser session to expire.
+ * Resolve active-company role and operational permission fields from canonical
+ * storage. This intentionally does not trust cached session role/POS fields:
+ * Factory and Properties requests may use session.factoryCompanyId, and role or
+ * location permission changes must take effect on the next protected request.
  */
 export async function getActiveCompanyPermissionContext(
   req: Request
@@ -73,7 +81,18 @@ export async function getActiveCompanyPermissionContext(
   }
 
   const rows = await db
-    .select({ companyId: userCompanyRoles.companyId, role: userCompanyRoles.role })
+    .select({
+      companyId: userCompanyRoles.companyId,
+      role: userCompanyRoles.role,
+      assignedLocationId: userCompanyRoles.assignedLocationId,
+      cashAccountId: userCompanyRoles.cashAccountId,
+      posStation: userCompanyRoles.posStation,
+      canSellNegativeStock: userCompanyRoles.canSellNegativeStock,
+      posViewOnly: userCompanyRoles.posViewOnly,
+      daybookEditDays: userCompanyRoles.daybookEditDays,
+      canAccessCustomers: userCompanyRoles.canAccessCustomers,
+      canDeleteRecords: userCompanyRoles.canDeleteRecords,
+    })
     .from(userCompanyRoles)
     .where(eq(userCompanyRoles.userId, userId));
 
@@ -86,11 +105,20 @@ export async function getActiveCompanyPermissionContext(
     );
   }
 
+  const activeRow = rows.find((row) => row.companyId === companyId) ?? null;
   const context: ActiveCompanyPermissionContext = {
     userId,
     companyId,
     role: selected.role,
     developerBypass: selected.developerBypass,
+    assignedLocationId: activeRow?.assignedLocationId ?? null,
+    cashAccountId: activeRow?.cashAccountId ?? null,
+    posStation: activeRow?.posStation ?? null,
+    canSellNegativeStock: selected.developerBypass ? true : (activeRow?.canSellNegativeStock ?? false),
+    posViewOnly: selected.developerBypass ? false : (activeRow?.posViewOnly ?? false),
+    daybookEditDays: selected.developerBypass ? 9999 : (activeRow?.daybookEditDays ?? 0),
+    canAccessCustomers: selected.developerBypass ? true : (activeRow?.canAccessCustomers ?? false),
+    canDeleteRecords: selected.developerBypass ? true : (activeRow?.canDeleteRecords ?? false),
   };
   req._activeCompanyPermissionContext = context;
   return context;
