@@ -29,7 +29,7 @@ const SUPPLIER_PARTNER_PATHS = new Set([
 ]);
 
 export function AuthenticatedApp() {
-  const { selectedCompany } = useCompany();
+  const { selectedCompany, isLoading: companyLoading } = useCompany();
   usePresence();
   useScreenFeed();
   useWsInvalidation();
@@ -134,6 +134,7 @@ export function AuthenticatedApp() {
     return <Redirect replace to="/properties/daybook" />;
   }
 
+  if (isSupplierPartnerRoute && companyLoading) return <AppLoadingState />;
   if (isSupplierPartnerRoute && !isSupplierPartnerCompany) {
     return <Redirect replace to="/tracking" />;
   }
