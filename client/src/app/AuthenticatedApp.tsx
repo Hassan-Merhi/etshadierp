@@ -124,6 +124,8 @@ export function AuthenticatedApp() {
   const isFactoryRoute = currentLocation.startsWith("/factory/");
   const factoryDefaultPage = computeFactoryDefaultPage(myAccess);
 
+  if (isFactoryRoute && companyLoading) return <AppLoadingState />;
+
   if (isPropertiesCompany && currentLocation === "/my-settings") {
     return <Redirect replace to="/properties/my-settings" />;
   }
