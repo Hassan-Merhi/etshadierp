@@ -234,7 +234,7 @@ export function KeyboardShortcuts() {
       if (e.code === "Digit3") {
         e.preventDefault();
         clearLChord();
-        navigate("/properties/rental/warehouses");
+        navigate("/properties/rentals");
         return;
       }
 
