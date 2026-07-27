@@ -25,7 +25,7 @@
 - Kept Supplier Payable as the clean default route at `/sp/reports`.
 - Added canonical deep links for `/sp/reports?tab=profit` and `/sp/reports?tab=sales-form`.
 - Invalid tab values canonicalize back to the default using replacement history.
-- Refresh and browser navigation now restore the selected report tab.
+- Refresh and browser navigation restore canonical report tab state.
 - Preserved the payable, profit, profit-split, locations, accounts, and both sales-form export contracts.
 - Added focused regression coverage for tab URLs and endpoint preservation.
 
