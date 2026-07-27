@@ -2,6 +2,8 @@ import { Button } from "@/components/ui/button";
 import { ArrowLeft, ChevronUp, ChevronDown } from "lucide-react";
 import { useCursorNav } from "@/contexts/CursorNavContext";
 import { useBackToParent } from "@/hooks/use-back-to-parent";
+import { getParentRoute } from "@/lib/parent-routes";
+import { useLocation } from "wouter";
 
 export interface PageHeaderProps {
   title: React.ReactNode;
@@ -27,14 +29,17 @@ export function PageHeader({
   children,
 }: PageHeaderProps) {
   const { config } = useCursorNav();
-  const handleBack = useBackToParent(backTarget);
-  const hasNav = showBackButton || (showCursorNavButtons && !!config);
+  const [location] = useLocation();
+  const resolvedBackTarget = backTarget === undefined ? getParentRoute(location) : backTarget;
+  const handleBack = useBackToParent(resolvedBackTarget);
+  const hasBack = showBackButton && !!resolvedBackTarget;
+  const hasNav = hasBack || (showCursorNavButtons && !!config);
 
   return (
     <div className="flex flex-col gap-3 mb-5 pb-4 border-b border-border" data-testid="page-header">
       {hasNav && (
         <div className="flex items-center gap-1 flex-wrap -ml-2">
-          {showBackButton && (
+          {hasBack && (
             <Button
               variant="ghost"
               size="sm"
