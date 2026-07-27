@@ -2,8 +2,10 @@ import type { Request } from "express";
 import { eq } from "drizzle-orm";
 import { userCompanyRoles } from "@shared/schema";
 import { db } from "../../db";
-import { resolveActiveCompanyId } from "../../routes/helpers/resolveActiveCompanyId";
-import { chooseActiveCompanyRole } from "./activeCompanyPermissionPolicy";
+import {
+  chooseActiveCompanyRole,
+  resolvePermissionCompanyId,
+} from "./activeCompanyPermissionPolicy";
 
 export interface ActiveCompanyPermissionContext {
   userId: string;
@@ -41,9 +43,9 @@ declare module "express-serve-static-core" {
 
 /**
  * Resolve active-company role and operational permission fields from canonical
- * storage. This intentionally does not trust cached session role/POS fields:
- * Factory and Properties requests may use session.factoryCompanyId, and role or
- * location permission changes must take effect on the next protected request.
+ * storage. This intentionally does not trust cached session role/POS fields.
+ * Factory and Properties use the pinned company; ordinary ERP/POS routes use
+ * currentCompanyId even when another browser tab has Factory mode open.
  */
 export async function getActiveCompanyPermissionContext(
   req: Request
@@ -53,7 +55,12 @@ export async function getActiveCompanyPermissionContext(
   }
 
   const userId = req.session.userId;
-  const companyId = resolveActiveCompanyId(req);
+  const requestPath = req.originalUrl.split("?", 1)[0] || req.path;
+  const companyId = resolvePermissionCompanyId({
+    path: requestPath,
+    currentCompanyId: req.session.currentCompanyId,
+    factoryCompanyId: (req.session as any).factoryCompanyId,
+  });
   if (!userId || !companyId) {
     throw new ActiveCompanyPermissionContextError(
       "An active company session is required.",
