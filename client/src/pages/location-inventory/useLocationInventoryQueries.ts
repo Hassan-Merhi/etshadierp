@@ -79,7 +79,9 @@ export function useLocationInventoryQueries({
         ? [`/api/locations/${selectedLocationLocal.id}/inventory${showZeroStock ? "?includeZero=true" : ""}`, companyId]
         : [],
     queryFn: async () => {
-      const url = `/api/locations/${selectedLocationLocal!.id}/inventory${showZeroStock ? "?includeZero=true" : ""}`;
+      const params = new URLSearchParams({ compact: "1" });
+      if (showZeroStock) params.set("includeZero", "true");
+      const url = `/api/locations/${selectedLocationLocal!.id}/inventory?${params.toString()}`;
       const res = await fetch(url, { credentials: "include" });
       if (!res.ok) throw new Error(await res.text());
       return res.json();
@@ -93,7 +95,8 @@ export function useLocationInventoryQueries({
         ? [`/api/locations/${selectedLocationLocal.id}/inventory?asOfDate=${fromDate}`, companyId]
         : [],
     queryFn: async () => {
-      const url = `/api/locations/${selectedLocationLocal!.id}/inventory?asOfDate=${fromDate}`;
+      const params = new URLSearchParams({ asOfDate: fromDate, compact: "1" });
+      const url = `/api/locations/${selectedLocationLocal!.id}/inventory?${params.toString()}`;
       const res = await fetch(url, { credentials: "include" });
       if (!res.ok) throw new Error(await res.text());
       return res.json();
@@ -109,7 +112,8 @@ export function useLocationInventoryQueries({
         ? [`/api/locations/${selectedLocationLocal.id}/inventory?asOfDate=${asOfDate}`, companyId]
         : [],
     queryFn: async () => {
-      const url = `/api/locations/${selectedLocationLocal!.id}/inventory?asOfDate=${asOfDate}`;
+      const params = new URLSearchParams({ asOfDate, compact: "1" });
+      const url = `/api/locations/${selectedLocationLocal!.id}/inventory?${params.toString()}`;
       const res = await fetch(url, { credentials: "include" });
       if (!res.ok) throw new Error(await res.text());
       return res.json();
