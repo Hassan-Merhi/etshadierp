@@ -35,10 +35,11 @@ interface PropertiesRoutesProps {
 
 /**
  * Route switch for the Properties company shell.
- * Rendered inside the Properties sidebar layout when
- * `isPropertiesCompany && (isPropertiesRoute || currentLocation === "/balance-repair")`.
+ * All canonical workspace routes live under `/properties/*`.
  */
 export function PropertiesRoutes({ user, currentLocation }: PropertiesRoutesProps) {
+  const isAdmin = user?.role === "Admin" || user?.role === "Developer";
+
   return (
     <ErrorBoundary resetKey={currentLocation}>
       <Suspense
@@ -78,37 +79,20 @@ export function PropertiesRoutes({ user, currentLocation }: PropertiesRoutesProp
             path="/properties/ledger-vouchers/:accountId/:year/:month"
             component={PropertiesLedgerVouchers}
           />
-          {(user?.role === "Admin" || user?.role === "Developer") && (
-            <Route path="/properties/settings" component={PropertiesSettings} />
-          )}
-          {(user?.role === "Admin" || user?.role === "Developer") && (
-            <Route path="/properties/net-position-details" component={NetProfitDetails} />
-          )}
-          {(user?.role === "Admin" || user?.role === "Developer") && (
-            <Route path="/properties/deleted-items" component={DeletedItems} />
-          )}
-          {(user?.role === "Admin" || user?.role === "Developer") && (
-            <Route path="/properties/orphaned-records" component={OrphanedRecords} />
-          )}
-          {(user?.role === "Admin" || user?.role === "Developer") && (
-            <Route path="/properties/chatbot-settings" component={ChatbotSettings} />
-          )}
-          {(user?.role === "Admin" || user?.role === "Developer") && (
+          {isAdmin && <Route path="/properties/settings" component={PropertiesSettings} />}
+          {isAdmin && <Route path="/properties/net-position-details" component={NetProfitDetails} />}
+          {isAdmin && <Route path="/properties/deleted-items" component={DeletedItems} />}
+          {isAdmin && <Route path="/properties/orphaned-records" component={OrphanedRecords} />}
+          {isAdmin && <Route path="/properties/chatbot-settings" component={ChatbotSettings} />}
+          {isAdmin && (
             <Route path="/properties/import-cycle-diagnostics" component={ImportCycleDiagnostics} />
           )}
-          {(user?.role === "Admin" || user?.role === "Developer") && (
-            <Route path="/properties/inventory-repair" component={InventoryRepair} />
-          )}
-          {(user?.role === "Admin" || user?.role === "Developer") && (
-            <Route path="/properties/company-data-reset" component={CompanyDataReset} />
-          )}
-          {(user?.role === "Admin" || user?.role === "Developer") && (
-            <Route path="/properties/account-groups" component={AccountGroups} />
-          )}
-          {(user?.role === "Admin" || user?.role === "Developer") && (
-            <Route path="/balance-repair" component={BalanceRepair} />
-          )}
-          <Route path="/my-settings" component={MySettings} />
+          {isAdmin && <Route path="/properties/inventory-repair" component={InventoryRepair} />}
+          {isAdmin && <Route path="/properties/company-data-reset" component={CompanyDataReset} />}
+          {isAdmin && <Route path="/properties/account-groups" component={AccountGroups} />}
+          {isAdmin && <Route path="/properties/balance-repair" component={BalanceRepair} />}
+          <Route path="/properties/my-settings" component={MySettings} />
+
           <Route>
             <Redirect replace to="/properties/daybook" />
           </Route>
