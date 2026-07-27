@@ -68,4 +68,21 @@ describe("active company permission context", () => {
       })
     ).toBe(10);
   });
+
+  it("keeps ERP container document and freight aliases on currentCompanyId", () => {
+    expect(
+      resolvePermissionCompanyId({
+        path: "/api/factory/containers/77/documents",
+        currentCompanyId: 10,
+        factoryCompanyId: 20,
+      })
+    ).toBe(10);
+    expect(
+      resolvePermissionCompanyId({
+        path: "/api/factory/containers/77/freight/pdf",
+        currentCompanyId: 10,
+        factoryCompanyId: 20,
+      })
+    ).toBe(10);
+  });
 });
