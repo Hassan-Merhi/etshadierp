@@ -71,6 +71,6 @@ jobs:
           fetch-depth: 0
 
       - name: Scan repository for verified secrets
-        uses: trufflesecurity/trufflehog@v3.90.4
+        uses: trufflesecurity/trufflehog@v3.96.0
         with:
           extra_args: --results=verified,unknown
