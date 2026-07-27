@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { getErrorMessage } from "../../lib/httpHandlers";
 import { db } from "../../db";
-import { requireAuth } from "../../auth";
+import { requireAuth, requireRole } from "../../auth";
 import { eq, and, isNull, asc } from "drizzle-orm";
 import { ledgerAccounts, locations, bankAccounts } from "@shared/schema";
 import { requireSpCompany, getSpAccount, SP_ACCOUNTS } from "./spHelpers";
@@ -10,7 +10,7 @@ import { getSpSupplierVoucherLinkGapCount, repairSpSupplierVoucherLinks } from "
 // ── Setup ─────────────────────────────────────────────────────────────────
 
 export function registerSpSetupRoutes(app: Express) {
-  app.post("/api/sp/setup", requireAuth, async (req: any, res: any) => {
+  app.post("/api/sp/setup", requireAuth, requireRole("Admin"), async (req: any, res: any) => {
     try {
       const companyId = await requireSpCompany(req, res);
       if (!companyId) return;
