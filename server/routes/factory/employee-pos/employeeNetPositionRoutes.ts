@@ -864,7 +864,10 @@ export function registerEmployeeNetPositionRoutes(app: Express) {
         // factory_worker_advances table sum injected below. Without this, a stray credit
         // balance on that ledger account leaks through here as a bogus liability line.
         const isFactoryWorkerAdvances = nameLower.replace(/\s+/g, " ").trim() === "factory worker advances";
-        return !isPayrollPayable && !isAccruedRentPayable && !isFactoryWorkerAdvances;
+        // Exclude per-worker insurance liability accounts (e.g. "Insurance - أحمد علي رمضان").
+        // These are tracked and displayed separately via the Insurance section, not here.
+        const isInsuranceMember = /^insurance\s*[-–]/i.test(a.name || "");
+        return !isPayrollPayable && !isAccruedRentPayable && !isFactoryWorkerAdvances && !isInsuranceMember;
       });
       const ledgerForUsTotal = round2(ledgerForUs.reduce((s: number, a: any) => s + a.value, 0));
       const ledgerOnUsTotal = round2(ledgerOnUs.reduce((s: number, a: any) => s + a.value, 0));
