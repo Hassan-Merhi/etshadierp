@@ -81,7 +81,7 @@ const checks = [
   [clientCapture.includes('window.addEventListener("error"') && clientCapture.includes('window.addEventListener("unhandledrejection"'), "browser failures must be captured"],
   [errorBoundary.includes("componentDidCatch"), "React render failures must be reported"],
   [roadmap.includes("Phase 4 — Alerts and operational response") && roadmap.includes("Program status: complete"), "Program 1 must be documented as complete"],
-  [runbook.includes("Triage") && runbook.includes("Recovery verification"), "incident runbook must cover triage and recovery"],
+  [runbook.includes("First response") && runbook.includes("Recovery verification"), "incident runbook must cover first response and recovery"],
   [roadmap.includes("Never send request bodies"), "payload privacy boundary must remain documented"],
   [roadmap.includes("Monitoring dependencies must fail open"), "fail-open behavior must remain documented"],
 ];
