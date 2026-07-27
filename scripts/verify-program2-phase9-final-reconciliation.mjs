@@ -1,15 +1,9 @@
 import fs from "node:fs";
+import { spawnSync } from "node:child_process";
 
-const required = [
-  "docs/program-2-phase-1-accounting-foundation.md",
-  "docs/program-2-phase-2-manual-vouchers.md",
-  "docs/program-2-phase-3-payments-receipts.md",
-  "docs/program-2-phase-4-pos-stock-transfers.md",
-  "docs/program-2-phase-5-containers-freight.md",
-  "docs/program-2-phase-6-supplier-partner.md",
-  "docs/program-2-phase-7-payroll.md",
-  "docs/program-2-phase-8-rentals.md",
-  "docs/program-2-phase-9-final-reconciliation.md",
+const phaseVerifiers = [
+  "scripts/verify-program2-phase1-accounting-foundation.mjs",
+  "scripts/verify-program2-phase2-manual-vouchers.mjs",
   "scripts/verify-program2-phase3-payments-receipts.mjs",
   "scripts/verify-program2-phase4-pos-stock-transfers.mjs",
   "scripts/verify-program2-phase5-containers-freight.mjs",
@@ -18,11 +12,41 @@ const required = [
   "scripts/verify-program2-phase8-rentals.mjs",
 ];
 
+const required = [
+  "docs/program-2-phase-1-accounting-foundation.md",
+  "docs/program-2-phase-2-manual-journals-vouchers.md",
+  "docs/program-2-phase-3-payments-receipts.md",
+  "docs/program-2-phase-4-pos-stock-transfers.md",
+  "docs/program-2-phase-5-containers-freight.md",
+  "docs/program-2-phase-6-supplier-partner.md",
+  "docs/program-2-phase-7-payroll.md",
+  "docs/program-2-phase-8-rentals.md",
+  "docs/program-2-phase-9-final-reconciliation.md",
+  ...phaseVerifiers,
+];
+
 const missing = required.filter((path) => !fs.existsSync(path));
 if (missing.length) {
   console.error("Program 2 final reconciliation failed. Missing files:");
   for (const path of missing) console.error(`- ${path}`);
   process.exit(1);
+}
+
+for (const verifier of phaseVerifiers) {
+  console.log(`Running ${verifier}...`);
+  const result = spawnSync(process.execPath, [verifier], {
+    cwd: process.cwd(),
+    encoding: "utf8",
+    stdio: "inherit",
+  });
+  if (result.error) {
+    console.error(`Program 2 final reconciliation failed to execute ${verifier}:`, result.error);
+    process.exit(1);
+  }
+  if (result.status !== 0) {
+    console.error(`Program 2 final reconciliation failed because ${verifier} exited with status ${result.status}.`);
+    process.exit(result.status ?? 1);
+  }
 }
 
 const completion = fs.readFileSync("docs/program-2-phase-9-final-reconciliation.md", "utf8");
@@ -42,4 +66,4 @@ for (const phrase of [
   }
 }
 
-console.log("Program 2 final reconciliation static verification passed.");
+console.log("Program 2 final reconciliation verification passed.");
