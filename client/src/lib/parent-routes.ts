@@ -86,6 +86,7 @@ export function getParentRoute(pathname: string): string | null {
     if (/^\/properties\/orphaned-records/.test(cleanPath)) return "/properties/settings";
     if (/^\/properties\/deleted-items/.test(cleanPath)) return "/properties/settings";
     if (/^\/properties\/chatbot-settings/.test(cleanPath)) return "/properties/settings";
+    if (cleanPath === "/properties/balance-repair") return "/properties/settings";
 
     return null;
   }
