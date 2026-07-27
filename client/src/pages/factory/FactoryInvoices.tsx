@@ -1,7 +1,7 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef } from "react";
 import { useAppMode } from "@/contexts/AppModeContext";
 import { getApiRequest } from "@/lib/factoryApi";
 import { Badge } from "@/components/ui/badge";
@@ -22,6 +22,7 @@ import {
   Container,
   ChevronRight,
   ChevronDown,
+  GripVertical,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -85,6 +86,14 @@ export default function FactoryInvoices() {
   const [customerFilter, setCustomerFilter] = useState<string>("all");
   const [expandedCustomers, setExpandedCustomers] = useState<Set<number>>(new Set());
   const [showHidden, setShowHidden] = useState(false);
+
+  // ── Drag-to-reorder state ──────────────────────────────────────────────────
+  // Keyed by statusFilter+customerFilter+showHidden so each tab view keeps its
+  // own independent order.  We store an array of customerId values in the
+  // desired display order.
+  const [customGroupOrders, setCustomGroupOrders] = useState<Map<string, number[]>>(new Map());
+  const dragIdxRef = useRef<number | null>(null);
+  const [dropIdx, setDropIdx] = useState<number | null>(null);
 
   const toggleCustomer = (customerId: number) => {
     setExpandedCustomers((prev) => {
@@ -295,7 +304,8 @@ export default function FactoryInvoices() {
   };
 
   // Column count for colspan calculations
-  const colCount = 11 - (hideProformaCol ? 1 : 0) - (hideTotalsUsd ? 1 : 0);
+  // +1 for the drag-handle column
+  const colCount = 12 - (hideProformaCol ? 1 : 0) - (hideTotalsUsd ? 1 : 0);
 
   const fmtKg = (val: string | number | null | undefined) => {
     const n = parseFloat(String(val ?? "0"));
@@ -314,6 +324,48 @@ export default function FactoryInvoices() {
     }
     return Array.from(seen.values());
   })();
+
+  // Apply any custom drag-to-reorder order for the current tab/filter combo
+  const groupOrderKey = `${statusFilter}__${customerFilter}__${showHidden}`;
+  const orderedCustomerGroups = (() => {
+    const customOrder = customGroupOrders.get(groupOrderKey);
+    if (!customOrder || customOrder.length === 0) return customerGroups;
+    const groupMap = new Map(customerGroups.map((g) => [g.customerId, g]));
+    const reordered = customOrder.flatMap((id) => {
+      const g = groupMap.get(id);
+      return g ? [g] : [];
+    });
+    const inOrder = new Set(customOrder);
+    const extras = customerGroups.filter((g) => !inOrder.has(g.customerId));
+    return [...reordered, ...extras];
+  })();
+
+  // Drag handlers (group-level reordering)
+  const handleDragStart = (idx: number) => {
+    dragIdxRef.current = idx;
+  };
+  const handleDragOver = (e: React.DragEvent, idx: number) => {
+    e.preventDefault();
+    setDropIdx(idx);
+  };
+  const handleDrop = (toIdx: number) => {
+    const fromIdx = dragIdxRef.current;
+    if (fromIdx === null || fromIdx === toIdx) {
+      dragIdxRef.current = null;
+      setDropIdx(null);
+      return;
+    }
+    const ids = orderedCustomerGroups.map((g) => g.customerId);
+    const [moved] = ids.splice(fromIdx, 1);
+    ids.splice(toIdx, 0, moved);
+    setCustomGroupOrders((prev) => new Map(prev).set(groupOrderKey, ids));
+    dragIdxRef.current = null;
+    setDropIdx(null);
+  };
+  const handleDragEnd = () => {
+    dragIdxRef.current = null;
+    setDropIdx(null);
+  };
 
   return (
     <div className="flex flex-col h-full p-5 gap-4">
@@ -407,6 +459,8 @@ export default function FactoryInvoices() {
             <Table>
               <TableHeader>
                 <TableRow className="bg-muted hover:bg-muted border-b-2 border-border/60">
+                  {/* Drag handle column */}
+                  <TableHead className="w-7 px-1" />
                   <TableHead className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
                     Customer
                   </TableHead>
@@ -470,9 +524,11 @@ export default function FactoryInvoices() {
                     </TableCell>
                   </TableRow>
                 ) : (
-                  customerGroups.map((group) => {
+                  orderedCustomerGroups.map((group, groupIdx) => {
                     const isSingle = group.orders.length === 1;
                     const isExpanded = expandedCustomers.has(group.customerId);
+                    const isDragging = dragIdxRef.current === groupIdx;
+                    const isDropTarget = dropIdx === groupIdx && dragIdxRef.current !== null && dragIdxRef.current !== groupIdx;
 
                     const renderOrderRow = (order: CustomerOrder, indented = false) => {
                       const remaining = getRemainingBales(order);
@@ -481,10 +537,23 @@ export default function FactoryInvoices() {
                       return (
                         <TableRow
                           key={order.id}
-                          className={`cursor-pointer ${order.isHidden ? "opacity-50" : ""}`}
+                          className={`cursor-pointer ${order.isHidden ? "opacity-50" : ""} ${
+                            !indented && isDropTarget ? "border-t-2 border-primary" : ""
+                          } ${!indented && isDragging ? "opacity-40" : ""}`}
+                          draggable={!indented}
+                          onDragStart={!indented ? () => handleDragStart(groupIdx) : undefined}
+                          onDragOver={!indented ? (e) => handleDragOver(e, groupIdx) : undefined}
+                          onDrop={!indented ? () => handleDrop(groupIdx) : undefined}
+                          onDragEnd={!indented ? handleDragEnd : undefined}
                           onClick={() => handleRowClick(order)}
                           data-testid={`row-order-${order.id}`}
                         >
+                          {/* Drag handle — only for top-level (non-indented) rows */}
+                          <TableCell className="w-7 px-1" onClick={(e) => e.stopPropagation()}>
+                            {!indented && (
+                              <GripVertical className="h-4 w-4 text-muted-foreground/30 hover:text-muted-foreground cursor-grab active:cursor-grabbing" />
+                            )}
+                          </TableCell>
                           <TableCell data-testid={`text-customer-name-${order.id}`}>
                             {indented ? (
                               <span className="pl-5 text-muted-foreground/50 text-xs">↳</span>
@@ -763,10 +832,21 @@ export default function FactoryInvoices() {
                         {/* Group summary row */}
                         <TableRow
                           key={`group-${group.customerId}`}
-                          className="cursor-pointer bg-muted/40 font-medium"
+                          className={`cursor-pointer bg-muted/40 font-medium ${
+                            isDropTarget ? "border-t-2 border-primary" : ""
+                          } ${isDragging ? "opacity-40" : ""}`}
+                          draggable
+                          onDragStart={() => handleDragStart(groupIdx)}
+                          onDragOver={(e) => handleDragOver(e, groupIdx)}
+                          onDrop={() => handleDrop(groupIdx)}
+                          onDragEnd={handleDragEnd}
                           onClick={() => toggleCustomer(group.customerId)}
                           data-testid={`row-group-${group.customerId}`}
                         >
+                          {/* Drag handle */}
+                          <TableCell className="w-7 px-1" onClick={(e) => e.stopPropagation()}>
+                            <GripVertical className="h-4 w-4 text-muted-foreground/30 hover:text-muted-foreground cursor-grab active:cursor-grabbing" />
+                          </TableCell>
                           <TableCell data-testid={`text-group-customer-${group.customerId}`}>
                             <div className="flex items-center gap-2">
                               {isExpanded ? (
