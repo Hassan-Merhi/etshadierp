@@ -147,6 +147,8 @@ export const userPreferences = pgTable("user_preferences", {
   dateFormat: text("date_format").notNull().default("MM/DD/YYYY"),
   preferredCurrency: varchar("preferred_currency", { length: 10 }),
   showProfitComparisonOnPOS: boolean("show_profit_comparison_on_pos").notNull().default(false),
+  showChatWidget: boolean("show_chat_widget").notNull().default(true),
+  showNotesPanel: boolean("show_notes_panel").notNull().default(true),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });

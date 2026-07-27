@@ -15,6 +15,7 @@ import { CursorNavProvider } from "@/contexts/CursorNavContext";
 import { DateJumpDialog } from "@/components/DateJumpDialog";
 import { KeyboardShortcuts } from "@/components/KeyboardShortcuts";
 import { UserNotesPanel } from "@/components/UserNotesPanel";
+import { useUserPreferences } from "@/hooks/use-user-preferences";
 import { useServerRestart } from "@/hooks/use-server-restart";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
@@ -102,8 +103,18 @@ function UpdateBanner() {
 
 function AuthGatedUserNotesPanel() {
   const [location] = useLocation();
+  const { prefs } = useUserPreferences();
   if (location === "/login") return null;
+  if (prefs && prefs.showNotesPanel === false) return null;
   return <UserNotesPanel />;
+}
+
+function AuthGatedChatWidget() {
+  const [location] = useLocation();
+  const { prefs } = useUserPreferences();
+  if (location === "/login") return null;
+  if (prefs && prefs.showChatWidget === false) return null;
+  return <ChatWidget />;
 }
 
 function ServerRestartWatcher() {
@@ -131,7 +142,7 @@ export default function App() {
                       </Switch>
                       <Toaster />
                       <UpdateBanner />
-                      <ChatWidget />
+                      <AuthGatedChatWidget />
                       <DateJumpDialog />
                       <AuthGatedUserNotesPanel />
                       <KeyboardShortcuts />
