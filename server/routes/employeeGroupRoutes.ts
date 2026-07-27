@@ -6,11 +6,11 @@
  */
 import type { Express } from "express";
 import { getErrorMessage } from "../lib/httpHandlers";
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { db } from "../db";
 import { storage } from "../storage";
 import { requireAuth } from "../auth";
-import { employees, insertEmployeeGroupSchema } from "@shared/schema";
+import { employeeGroupMembers, employees, insertEmployeeGroupSchema } from "@shared/schema";
 
 export function registerEmployeeGroupRoutes(app: Express) {
   // Employee Groups
@@ -150,27 +150,43 @@ export function registerEmployeeGroupRoutes(app: Express) {
         return type === "Worker";
       });
 
-      // Get members for each group, filtering by company for security
-      const groupsWithMembers = await Promise.all(
-        workerGroups.map(async (group: any) => {
-          const memberRecords = await storage.getEmployeeGroupMembers(group.id);
-          // Get full worker details for each member, ensuring they belong to the same company
-          const members = await Promise.all(
-            memberRecords.map(async (m: any) => {
-              const [worker] = await db
-                .select()
-                .from(employees)
-                .where(and(eq(employees.id, m.employeeId), eq(employees.companyId, companyId)));
-              return worker;
-            })
-          );
-          const finalResult = {
-            ...group,
-            members: members.filter(Boolean),
-          };
-          return finalResult;
+      if (workerGroups.length === 0) return res.json([]);
+
+      // Bulk-load all memberships and workers instead of issuing one membership
+      // query per group and one employee query per member. This keeps the route at
+      // three bounded queries regardless of the number of groups or workers.
+      const workerGroupIds = workerGroups.map((group: any) => group.id as number);
+      const memberLinks = await db
+        .select({
+          employeeGroupId: employeeGroupMembers.employeeGroupId,
+          employeeId: employeeGroupMembers.employeeId,
         })
-      );
+        .from(employeeGroupMembers)
+        .where(inArray(employeeGroupMembers.employeeGroupId, workerGroupIds));
+
+      const employeeIds = Array.from(new Set(memberLinks.map((link) => link.employeeId)));
+      const companyWorkers =
+        employeeIds.length > 0
+          ? await db
+              .select()
+              .from(employees)
+              .where(and(eq(employees.companyId, companyId), inArray(employees.id, employeeIds)))
+          : [];
+
+      const workersById = new Map(companyWorkers.map((worker) => [worker.id, worker]));
+      const membersByGroup = new Map<number, typeof companyWorkers>();
+      for (const link of memberLinks) {
+        const worker = workersById.get(link.employeeId);
+        if (!worker) continue;
+        const members = membersByGroup.get(link.employeeGroupId) || [];
+        members.push(worker);
+        membersByGroup.set(link.employeeGroupId, members);
+      }
+
+      const groupsWithMembers = workerGroups.map((group: any) => ({
+        ...group,
+        members: membersByGroup.get(group.id) || [],
+      }));
       res.json(groupsWithMembers);
     } catch (error: unknown) {
       res.status(500).json({ message: getErrorMessage(error) });
