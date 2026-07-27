@@ -845,6 +845,70 @@ export default function FactoryOtwTrackingTab({ onEdit }: OtwTrackingTabProps = 
     try {
       const text = await file.text();
       const lines = text.split(/\r?\n/).filter((l) => l.trim());
+      // Parse a CSV line respecting quoted fields
+      function parseCsvLine(line: string): string[] {
+        const out: string[] = [];
+        let cur = "";
+        let inQ = false;
+        for (let i = 0; i < line.length; i++) {
+          const ch = line[i];
+          if (inQ) {
+            if (ch === '"' && line[i + 1] === '"') { cur += '"'; i++; }
+            else if (ch === '"') inQ = false;
+            else cur += ch;
+          } else if (ch === '"') {
+            inQ = true;
+          } else if (ch === ",") {
+            out.push(cur.trim()); cur = "";
+          } else {
+            cur += ch;
+          }
+        }
+        out.push(cur.trim());
+        return out;
+      }
+
+      // Convert any recognisable date to YYYY-MM-DD or return null
+      function normaliseDate(raw: string): string | null {
+        const s = raw.trim();
+        if (!s) return null;
+        // Already YYYY-MM-DD
+        if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+        // M/D/YY or M/D/YYYY  (also handles MM/DD/YY etc.)
+        const mdY = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
+        if (mdY) {
+          const [, m, d, yRaw] = mdY;
+          const year = yRaw.length === 2 ? `20${yRaw}` : yRaw;
+          const mm = m.padStart(2, "0");
+          const dd = d.padStart(2, "0");
+          const iso = `${year}-${mm}-${dd}`;
+          if (/^\d{4}-\d{2}-\d{2}$/.test(iso)) return iso;
+        }
+        // D-Mon-YY or D-Mon-YYYY (e.g. 6-Aug-26)
+        const dMonY = s.match(/^(\d{1,2})-([A-Za-z]{3})-(\d{2,4})$/);
+        if (dMonY) {
+          const months: Record<string, string> = {
+            jan:"01",feb:"02",mar:"03",apr:"04",may:"05",jun:"06",
+            jul:"07",aug:"08",sep:"09",oct:"10",nov:"11",dec:"12",
+          };
+          const [, d, mon, yRaw] = dMonY;
+          const mm = months[mon.toLowerCase()];
+          if (mm) {
+            const year = yRaw.length === 2 ? `20${yRaw}` : yRaw;
+            return `${year}-${mm}-${d.padStart(2, "0")}`;
+          }
+        }
+        return null;
+      }
+
+      // Detect column positions from header row
+      const headerCols = parseCsvLine(lines[0]).map((h) => h.toLowerCase());
+      const containerCol = headerCols.findIndex((h) => h.includes("container"));
+      const etaCol = headerCols.findIndex((h) => h.includes("eta"));
+      // Fall back to positional defaults if headers are unrecognised
+      const cIdx = containerCol >= 0 ? containerCol : 0;
+      const eIdx = etaCol >= 0 ? etaCol : 2;
+
       // Skip header row
       const dataLines = lines.slice(1);
       // Build lookup: containerNumber -> container id
@@ -854,15 +918,13 @@ export default function FactoryOtwTrackingTab({ onEdit }: OtwTrackingTabProps = 
       let updated = 0;
       let skipped = 0;
       for (const line of dataLines) {
-        // Simple CSV parse (handles quoted fields)
-        const cols = line.split(",").map((c) => c.trim().replace(/^"|"$/g, "").replace(/""/g, '"'));
-        const containerNum = cols[0]?.toUpperCase().trim();
-        const etaVal = cols[2]?.trim(); // col index 2 = ETA
+        const cols = parseCsvLine(line);
+        const containerNum = (cols[cIdx] ?? "").toUpperCase().trim();
+        const etaRaw = (cols[eIdx] ?? "").trim();
+        const etaVal = normaliseDate(etaRaw);
         if (!containerNum || !etaVal) { skipped++; continue; }
         const id = lookup.get(containerNum);
         if (!id) { skipped++; continue; }
-        // Validate date format YYYY-MM-DD
-        if (!/^\d{4}-\d{2}-\d{2}$/.test(etaVal)) { skipped++; continue; }
         try {
           await factoryApiRequest("PATCH", `/api/factory/containers/${id}`, { arrivalDate: etaVal });
           updated++;
