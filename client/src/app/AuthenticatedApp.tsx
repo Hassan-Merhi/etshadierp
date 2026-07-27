@@ -18,6 +18,16 @@ import { FactoryShell } from "./FactoryShell";
 import { ErpShell } from "./ErpShell";
 import { computeFactoryDefaultPage, computeFactoryGuardRedirect } from "./factoryAccessGuard";
 
+const SUPPLIER_PARTNER_PATHS = new Set([
+  "/sp",
+  "/sp/reports",
+  "/sp/opening-stock",
+  "/sp/aliases",
+  "/sp/setup",
+  "/sp/migration",
+  "/sp/gc-migration",
+]);
+
 export function AuthenticatedApp() {
   const { selectedCompany } = useCompany();
   usePresence();
@@ -132,6 +142,9 @@ export function AuthenticatedApp() {
     (currentLocation === "/sp/migration" || currentLocation === "/sp/gc-migration")
   ) {
     return <Redirect replace to="/sp/setup?tab=migration" />;
+  }
+  if (isSupplierPartnerCompany && isSupplierPartnerRoute && !SUPPLIER_PARTNER_PATHS.has(currentLocation)) {
+    return <Redirect replace to="/sp" />;
   }
 
   if (
