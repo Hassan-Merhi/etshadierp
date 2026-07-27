@@ -37,7 +37,10 @@ const checks = [
   [requestLogger.includes("/api/health/metrics"), "monitoring metrics endpoint must remain available"],
   [requestLogger.includes("isMonitoringRole"), "metrics endpoint must remain role restricted"],
   [requestLogger.includes("recordOperationalEvent"), "HTTP failures must feed operational events"],
-  [intake.includes('const ENDPOINT = "/api/observability/client-error"'), "browser intake endpoint must remain stable"],
+  [
+    intake.includes('const ENDPOINT = "/api/auth/observability/client-error"'),
+    "browser intake must remain authenticated and outside business write blocking",
+  ],
   [intake.includes("Authentication required"), "browser intake must reject unauthenticated requests"],
   [intake.includes("CLIENT_ERROR_RATE_LIMIT"), "server intake must remain rate limited"],
   [intake.includes("CLIENT_ERROR_DEDUPE_MS"), "server intake must deduplicate repeated failures"],
