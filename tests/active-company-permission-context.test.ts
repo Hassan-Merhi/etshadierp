@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { chooseActiveCompanyRole } from "../server/services/security/activeCompanyPermissionContext";
+import { chooseActiveCompanyRole } from "../server/services/security/activeCompanyPermissionPolicy";
 
 describe("active company permission context", () => {
   it("uses the role assigned to the active company", () => {
