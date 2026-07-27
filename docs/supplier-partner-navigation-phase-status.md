@@ -40,9 +40,14 @@
 - Preserved all setup and migration API and operation behavior.
 - Added focused regression coverage for permissions, canonical redirects, Overview landing, and setup API preservation.
 
-## Phase 5 — pending
+## Phase 5 — complete
 
-- Complete deterministic Back and Escape mappings.
-- Add unknown `/sp/*` safe fallback.
-- Add final regression coverage.
-- Reconcile with latest `main` and confirm merge readiness.
+- Added deterministic Escape and Back parents for Reports, Opening Stock, Aliases, and Administration.
+- Kept compatibility migration paths attached to the guarded Migration tab.
+- Added a Supplier Partner-specific fallback so unknown `/sp/*` routes return to `/sp` with replacement history.
+- Added final regression coverage for parent navigation, compatibility redirects, and invalid-route handling.
+- Reconciled the pull request with the latest `main` state and confirmed it remains mergeable.
+
+## Final scope protection
+
+No Supplier Partner accounting, stock, payable, profit split, export, setup operation, migration operation, API, balance, posting, or historical data behavior changed during this navigation audit.
