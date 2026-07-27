@@ -23,7 +23,7 @@ Implemented:
 1. Every API request receives a normalized or generated correlation ID.
 2. The correlation ID is available on the request object and returned in `X-Request-Id`.
 3. Browser API calls send their own correlation IDs and remember the latest server response ID.
-4. A same-origin authenticated `POST /api/observability/client-error` intake is mounted before business routes.
+4. A same-origin authenticated `POST /api/auth/observability/client-error` intake is mounted before business routes.
 5. The intake applies strict text limits, strips query strings from routes, rejects unauthenticated reports, and never accepts business payloads.
 6. React render errors, `window.error`, and non-chunk `unhandledrejection` failures are captured.
 7. Expected stale-asset and chunk-loading recovery failures remain excluded from application-error reporting.
@@ -41,24 +41,29 @@ Privacy boundary:
 - Never send request bodies, response bodies, cookies, authorization headers, passwords, tokens, customer data, voucher contents, or free-form form values.
 - Only bounded error messages, stacks, component stacks, safe routes, request IDs, deployment version, and session-derived identifiers are recorded.
 
-Acceptance criteria satisfied in source:
-
-- A frontend error and its related API activity can be followed using correlation IDs.
-- Production logs contain safe route, deployment, company, and user context.
-- Monitoring failure cannot interrupt the business request.
-- Browser reports are bounded, sanitized, authenticated, deduplicated, and rate-limited.
-
-Verification boundary:
-
-- Static source inspection and the dedicated verifier were completed in the repository change.
-- No claim is made that GitHub Actions, TypeScript, lint, tests, production build, deployment, or live error delivery passed unless separate execution evidence is available.
-
 ## Phase 2 — Structured tracing and dependency timing
 
-- Add safe spans for HTTP, database, and selected external-carrier/WhatsApp operations.
-- Record route templates rather than raw URLs containing identifiers.
-- Add slow database-query and pool-wait measurements without SQL parameter values.
-- Propagate correlation IDs through scheduled jobs and WebSocket-triggered work.
+Status: in progress — HTTP and database tracing core complete.
+
+Completed:
+
+- Added concurrency-safe `AsyncLocalStorage` trace context.
+- Every API request now creates an always-on trace and request-performance context.
+- Structured logs automatically inherit request ID, user, company, Factory company, location, deployment, and source context.
+- Raw identifier-heavy paths are converted to safe route templates.
+- Database query counts and aggregate database time are collected per request without SQL text or parameters.
+- Slow/error request logs include route template, database query count, and database duration.
+- Health metrics include cumulative database request timing.
+- Existing successful activity-audit behavior was preserved in an isolated helper.
+- Added a fail-open `withTraceSpan` helper for selected external dependencies.
+- Extended `npm run verify:program1-observability` to protect the Phase 2 tracing core.
+
+Remaining before Phase 2 is complete:
+
+- Apply trace spans to selected WhatsApp and carrier integrations.
+- Create correlation contexts for scheduled jobs.
+- Propagate correlation through WebSocket-triggered background work.
+- Add focused execution evidence once CI is operational.
 
 ## Phase 3 — Performance dashboards
 
