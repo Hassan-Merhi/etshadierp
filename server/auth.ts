@@ -95,6 +95,13 @@ function authorizeExplicitCompanyScope(req: Request, res: Response): boolean {
     return false;
   }
 
+  // This endpoint intentionally transitions the server-owned active company.
+  // The target ID is still parsed above and the route handler verifies the user
+  // has access before changing or saving any session fields.
+  if (req.method === "POST" && req.path === "/api/auth/set-company") {
+    return true;
+  }
+
   const userId = req.session.userId;
   const role = req.session.currentRole;
   const companyId = resolveActiveCompanyId(req);
