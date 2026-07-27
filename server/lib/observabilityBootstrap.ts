@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import cron from "node-cron";
 import { logger } from "./logger";
+import { installOperationalAlertRuntime } from "./operationalAlertRuntime";
 import { recordRuntimePerformance } from "./runtimePerformance";
 import { getTraceContext, runWithTraceContext, withTraceSpan } from "./traceContext";
 
@@ -91,4 +92,5 @@ if (!globalState[BOOTSTRAP_KEY]) {
   globalState[BOOTSTRAP_KEY] = true;
   installExternalFetchTracing();
   installCronTracing();
+  installOperationalAlertRuntime();
 }
