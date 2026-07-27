@@ -1,102 +1,122 @@
 export function getParentRoute(pathname: string): string | null {
-  if (pathname.startsWith("/factory/")) {
-    // Detail pages → hub pages (using hub's section/tab query params)
-    if (/^\/factory\/employees\/\d+/.test(pathname)) return "/factory/payroll-hub?section=employees";
-    if (/^\/factory\/workers\/\d+/.test(pathname)) return "/factory/payroll-hub?section=workers";
-    if (/^\/factory\/customers\/\d+/.test(pathname)) return "/factory/parties?section=customers";
-    if (pathname === "/factory/containers/new") return "/factory/containers-hub?section=containers";
-    if (/^\/factory\/raw-stock\/opening-balance\/\d+\/edit/.test(pathname)) return "/factory/raw-materials";
-    if (/^\/factory\/sales\/invoices\/\d+/.test(pathname)) return "/factory/invoicing?tab=invoices";
-    if (/^\/factory\/sales\/pending-invoices\/\d+\/verify/.test(pathname)) return "/factory/invoicing?tab=invoices";
-    if (/^\/factory\/sales\/proformas\/\d+\/add-line/.test(pathname)) return "/factory/invoicing";
+  const cleanPath = pathname.split("?")[0].split("#")[0];
+
+  if (cleanPath.startsWith("/factory/")) {
+    // People and parties details → exact hub section.
+    if (/^\/factory\/employees\/\d+/.test(cleanPath)) return "/factory/payroll-hub?section=employees";
+    if (/^\/factory\/workers\/\d+/.test(cleanPath)) return "/factory/payroll-hub?section=workers";
+    if (/^\/factory\/customers\/\d+/.test(cleanPath)) return "/factory/parties?section=customers";
+
+    // Containers, loading, and invoicing details → owning workflow.
+    if (cleanPath === "/factory/containers/new") return "/factory/containers-hub?section=containers";
+    if (cleanPath === "/factory/sales/loading/new") return "/factory/sales/loadings";
+    if (cleanPath === "/factory/sales/loading/pending") return "/factory/sales/loadings";
+    if (/^\/factory\/sales\/invoices\/\d+/.test(cleanPath)) return "/factory/invoicing?tab=invoices";
+    if (/^\/factory\/sales\/pending-invoices\/\d+\/verify/.test(cleanPath)) return "/factory/invoicing?tab=invoices";
+    if (/^\/factory\/sales\/proformas\/\d+\/add-line/.test(cleanPath)) return "/factory/invoicing?tab=proformas";
     {
-      const m = pathname.match(/^\/factory\/invoices\/(\d+)\/loading-scan/);
-      if (m) return `/factory/sales/invoices/${m[1]}`;
+      const match = cleanPath.match(/^\/factory\/invoices\/(\d+)\/loading-scan/);
+      if (match) return `/factory/sales/invoices/${match[1]}`;
     }
-    if (/^\/factory\/stock-query\/\d+/.test(pathname)) return "/factory/stock-query";
+
+    // Raw-material and bale child pages → owning inventory page.
+    if (/^\/factory\/raw-stock\/opening-balance\/\d+\/edit/.test(cleanPath)) return "/factory/raw-materials";
+    if (cleanPath === "/factory/raw-stock/recalculate") return "/factory/raw-materials";
+    if (/^\/factory\/stock-query\/\d+/.test(cleanPath)) return "/factory/stock-query";
+    if (cleanPath === "/factory/bale-relabeling/wipers-re-entry") return "/factory/bale-relabeling";
     {
-      const m = pathname.match(/^\/factory\/ledger-vouchers\/([^/]+)\//);
-      if (m) return `/factory/ledger-monthly/${m[1]}`;
+      const match = cleanPath.match(/^\/factory\/bale-product-history\/(\d+)\/(\d+)\/\d+(?:\/(?:all|\d+))?/);
+      if (match) return `/factory/bale-product-history/${match[1]}/${match[2]}`;
     }
-    if (/^\/factory\/ledger-monthly\//.test(pathname)) return "/factory/accounts";
+    if (/^\/factory\/bale-product-history\/\d+\/\d+/.test(cleanPath)) return "/factory/location-inventory";
+
+    // Accounting detail hierarchy.
     {
-      // dispatch batch ride scan → batch detail
-      const m = pathname.match(/^\/factory\/dispatch-batches\/(\d+)\/rides\/\d+\/scan/);
-      if (m) return `/factory/dispatch-batches/${m[1]}`;
+      const match = cleanPath.match(/^\/factory\/ledger-vouchers\/([^/]+)\//);
+      if (match) return `/factory/ledger-monthly/${match[1]}`;
     }
-    if (/^\/factory\/dispatch-batches\/\d+/.test(pathname)) return "/factory/dispatch-batches";
+    if (/^\/factory\/ledger-monthly\//.test(cleanPath)) return "/factory/accounts";
+    if (/^\/factory\/voucher-detail\//.test(cleanPath)) return "/factory/vouchers";
+    if (/^\/factory\/vouchers\/\d+\/edit/.test(cleanPath)) return "/factory/vouchers";
+
+    // Dispatch ride scan → batch detail → batch list.
     {
-      const m = pathname.match(/^\/factory\/bale-product-history\/(\d+)\/(\d+)\/\d+(?:\/(?:all|\d+))?/);
-      if (m) return `/factory/bale-product-history/${m[1]}/${m[2]}`;
+      const match = cleanPath.match(/^\/factory\/dispatch-batches\/(\d+)\/rides\/\d+\/scan/);
+      if (match) return `/factory/dispatch-batches/${match[1]}`;
     }
-    if (/^\/factory\/bale-product-history\/\d+\/\d+/.test(pathname)) return "/factory/location-inventory";
-    if (/^\/factory\/voucher-detail\//.test(pathname)) return "/factory/vouchers";
-    if (/^\/factory\/vouchers\/\d+\/edit/.test(pathname)) return "/factory/vouchers";
-    if (/^\/factory\/net-position-details/.test(pathname)) return "/factory/intelligence/financial-hub";
-    if (/^\/factory\/financial-snapshot/.test(pathname)) return "/factory/analytics";
-    if (/^\/factory\/import-cycle-diagnostics/.test(pathname)) return "/factory/settings";
+    if (/^\/factory\/dispatch-batches\/\d+/.test(cleanPath)) return "/factory/dispatch-batches";
+
+    // Intelligence and administration children.
+    if (/^\/factory\/net-position-details/.test(cleanPath)) {
+      return "/factory/intelligence/financial-hub?section=net-position";
+    }
+    if (/^\/factory\/financial-snapshot/.test(cleanPath)) return "/factory/analytics";
+    if (/^\/factory\/import-cycle-diagnostics/.test(cleanPath)) return "/factory/settings";
+    if (/^\/factory\/inventory-repair/.test(cleanPath)) return "/factory/settings";
+    if (/^\/factory\/company-data-reset/.test(cleanPath)) return "/factory/settings";
+    if (/^\/factory\/orphaned-records/.test(cleanPath)) return "/factory/settings";
+    if (/^\/factory\/deleted-items/.test(cleanPath)) return "/factory/settings";
+
     return null;
   }
 
-  if (pathname.startsWith("/properties/")) {
-    if (/^\/properties\/voucher-detail\//.test(pathname)) return "/properties/vouchers";
-    if (/^\/properties\/vouchers\/\d+\/edit/.test(pathname)) return "/properties/vouchers";
+  if (cleanPath.startsWith("/properties/")) {
+    if (/^\/properties\/voucher-detail\//.test(cleanPath)) return "/properties/vouchers";
+    if (/^\/properties\/vouchers\/\d+\/edit/.test(cleanPath)) return "/properties/vouchers";
     {
-      const m = pathname.match(/^\/properties\/ledger-vouchers\/([^/]+)\//);
-      if (m) return `/properties/ledger-monthly/${m[1]}`;
+      const match = cleanPath.match(/^\/properties\/ledger-vouchers\/([^/]+)\//);
+      if (match) return `/properties/ledger-monthly/${match[1]}`;
     }
-    if (/^\/properties\/ledger-monthly\//.test(pathname)) return "/properties/accounts";
-    if (/^\/properties\/net-position-details/.test(pathname)) return "/properties/settings";
-    if (/^\/properties\/import-cycle-diagnostics/.test(pathname)) return "/properties/settings";
+    if (/^\/properties\/ledger-monthly\//.test(cleanPath)) return "/properties/accounts";
+    if (/^\/properties\/net-position-details/.test(cleanPath)) return "/properties/settings";
+    if (/^\/properties\/import-cycle-diagnostics/.test(cleanPath)) return "/properties/settings";
     return null;
   }
 
   // ERP — parties
-  if (/^\/suppliers\/\d+\/edit/.test(pathname)) return "/parties?tab=suppliers";
-  if (/^\/suppliers\/\d+\/proformas/.test(pathname)) return "/parties?tab=suppliers";
+  if (/^\/suppliers\/\d+\/edit/.test(cleanPath)) return "/parties?tab=suppliers";
+  if (/^\/suppliers\/\d+\/proformas/.test(cleanPath)) return "/parties?tab=suppliers";
 
   // ERP — containers / purchase orders
-  if (/^\/purchase-orders\/\d+\/edit/.test(pathname)) return "/containers";
-  if (/^\/containers\/\d+\/verification/.test(pathname)) {
-    const m = pathname.match(/^\/containers\/(\d+)\//);
-    return m ? `/containers/${m[1]}` : "/containers";
+  if (/^\/purchase-orders\/\d+\/edit/.test(cleanPath)) return "/containers";
+  if (/^\/containers\/\d+\/verification/.test(cleanPath)) {
+    const match = cleanPath.match(/^\/containers\/(\d+)\//);
+    return match ? `/containers/${match[1]}` : "/containers";
   }
-  if (/^\/containers\/\d+/.test(pathname)) return "/containers";
-  if (/^\/offloads\/\d+/.test(pathname)) return "/containers";
+  if (/^\/containers\/\d+/.test(cleanPath)) return "/containers";
+  if (/^\/offloads\/\d+/.test(cleanPath)) return "/containers";
 
   // ERP — sales report
-  if (pathname.startsWith("/sales-report/")) return "/sales-report";
+  if (cleanPath.startsWith("/sales-report/")) return "/sales-report";
 
   // ERP — accounting / ledger
   {
-    const m = pathname.match(/^\/ledger-vouchers\/([^/]+)\//);
-    if (m) return `/ledger-monthly/${m[1]}`;
+    const match = cleanPath.match(/^\/ledger-vouchers\/([^/]+)\//);
+    if (match) return `/ledger-monthly/${match[1]}`;
   }
-  if (/^\/ledger-monthly\//.test(pathname)) return "/accounts";
-  if (/^\/voucher-detail\//.test(pathname)) return "/vouchers";
-  if (/^\/vouchers\/\d+\/edit/.test(pathname)) return "/vouchers";
+  if (/^\/ledger-monthly\//.test(cleanPath)) return "/accounts";
+  if (/^\/voucher-detail\//.test(cleanPath)) return "/vouchers";
+  if (/^\/vouchers\/\d+\/edit/.test(cleanPath)) return "/vouchers";
 
-  // ERP — stock / inventory (point to hub URLs where old pages are now redirects)
-  if (/^\/stock-query\/\d+/.test(pathname)) return "/stock?tab=query";
-  if (/^\/stock-items\/\d+\/history\/\d+\/\d+/.test(pathname)) {
-    const m = pathname.match(/^\/stock-items\/(\d+)\/history/);
-    return m ? `/stock-items/${m[1]}/history` : "/stock?tab=items";
+  // ERP — stock / inventory
+  if (/^\/stock-query\/\d+/.test(cleanPath)) return "/stock?tab=query";
+  if (/^\/stock-items\/\d+\/history\/\d+\/\d+/.test(cleanPath)) {
+    const match = cleanPath.match(/^\/stock-items\/(\d+)\/history/);
+    return match ? `/stock-items/${match[1]}/history` : "/stock?tab=items";
   }
-  if (/^\/stock-items\/\d+\/history/.test(pathname)) return "/stock?tab=items";
-  if (/^\/stock-items\/\d+\/monthly-summary/.test(pathname)) return "/inventory?tab=by-location";
-  if (/^\/locations\/\d+\/stock-items\/\d+\/vouchers\/\d+\/\d+/.test(pathname)) {
-    const m = pathname.match(/^\/locations\/(\d+)\/stock-items\/(\d+)\//);
-    return m ? `/locations/${m[1]}/stock-items/${m[2]}/history` : "/inventory?tab=by-location";
+  if (/^\/stock-items\/\d+\/history/.test(cleanPath)) return "/stock?tab=items";
+  if (/^\/stock-items\/\d+\/monthly-summary/.test(cleanPath)) return "/inventory?tab=by-location";
+  if (/^\/locations\/\d+\/stock-items\/\d+\/vouchers\/\d+\/\d+/.test(cleanPath)) {
+    const match = cleanPath.match(/^\/locations\/(\d+)\/stock-items\/(\d+)\//);
+    return match ? `/locations/${match[1]}/stock-items/${match[2]}/history` : "/inventory?tab=by-location";
   }
-  if (/^\/locations\/\d+\/stock-items\/\d+\/history/.test(pathname)) return "/inventory?tab=by-location";
+  if (/^\/locations\/\d+\/stock-items\/\d+\/history/.test(cleanPath)) return "/inventory?tab=by-location";
 
-  // ERP — other stock/accounting
-  if (/^\/opening-stock\/[^/]+/.test(pathname)) return "/opening-stock";
-  if (/^\/closing-stock\/[^/]+/.test(pathname)) return "/closing-stock-summary";
+  if (/^\/opening-stock\/[^/]+/.test(cleanPath)) return "/opening-stock";
+  if (/^\/closing-stock\/[^/]+/.test(cleanPath)) return "/closing-stock-summary";
 
-  // ERP — settings sub-pages
-  if (/^\/net-position-details/.test(pathname)) return "/settings";
-  if (/^\/import-cycle-diagnostics/.test(pathname)) return "/settings";
+  if (/^\/net-position-details/.test(cleanPath)) return "/settings";
+  if (/^\/import-cycle-diagnostics/.test(cleanPath)) return "/settings";
 
   return null;
 }
