@@ -3,6 +3,36 @@ export interface CompanyRoleIdentity {
   role: string;
 }
 
+function positiveId(value: unknown): number | null {
+  const parsed = Number(value);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
+}
+
+export function isPinnedCompanyRoute(path: string): boolean {
+  const normalized = (path.split("?", 1)[0] || "/").toLowerCase();
+  return normalized === "/api/factory" ||
+    normalized.startsWith("/api/factory/") ||
+    normalized === "/api/properties" ||
+    normalized.startsWith("/api/properties/");
+}
+
+/**
+ * Factory and Properties use the server-pinned factoryCompanyId. Ordinary ERP,
+ * POS, import, export, repair, and report routes must use currentCompanyId even
+ * when another browser tab has a Factory company pinned in the same session.
+ */
+export function resolvePermissionCompanyId(input: {
+  path: string;
+  currentCompanyId?: unknown;
+  factoryCompanyId?: unknown;
+}): number | null {
+  const currentCompanyId = positiveId(input.currentCompanyId);
+  const factoryCompanyId = positiveId(input.factoryCompanyId);
+  return isPinnedCompanyRoute(input.path)
+    ? factoryCompanyId ?? currentCompanyId
+    : currentCompanyId;
+}
+
 export function chooseActiveCompanyRole(
   companyId: number,
   rows: ReadonlyArray<CompanyRoleIdentity>
