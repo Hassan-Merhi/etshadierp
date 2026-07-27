@@ -40,12 +40,21 @@ function canonicalizeLocation<T extends string>(options: HubQueryStateOptions<T>
 export function useHubQueryState<T extends string>(options: HubQueryStateOptions<T>) {
   const [value, setValue] = useState<T>(() => readValue(options));
 
+  // Use a stable string key derived from the allowed values instead of the array
+  // reference itself. Arrays created inline (e.g. via .map()) produce a new
+  // reference on every render, which would cause this effect to re-fire every
+  // render cycle even though the logical set of allowed values hasn't changed.
+  const allowedValuesKey = options.allowedValues.join(",");
+
   useEffect(() => {
     const syncFromLocation = () => setValue(canonicalizeLocation(options));
     syncFromLocation();
     window.addEventListener("popstate", syncFromLocation);
     return () => window.removeEventListener("popstate", syncFromLocation);
-  }, [options.key, options.defaultValue, options.allowedValues, options.omitDefault]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [options.key, options.defaultValue, allowedValuesKey, options.omitDefault]);
+
+  const clearKeysKey = (options.clearKeys ?? []).join(",");
 
   const updateValue = useCallback(
     (nextValue: T) => {
@@ -66,7 +75,8 @@ export function useHubQueryState<T extends string>(options: HubQueryStateOptions
       // Replacing keeps browser Back focused on meaningful page transitions.
       window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
     },
-    [options.key, options.defaultValue, options.clearKeys, options.omitDefault],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [options.key, options.defaultValue, clearKeysKey, options.omitDefault],
   );
 
   return [value, updateValue] as const;
