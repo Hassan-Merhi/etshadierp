@@ -32,11 +32,15 @@
 - Added focused Properties parent-route regression tests, including root-page null-parent protection and query/hash normalization.
 - Visible Back and Escape now share the same registered parent contract through the existing navigation system.
 
-## Phase 4 — pending
+## Phase 4 — complete
 
-- Add canonical aliases and compatibility redirects.
-- Normalize invalid or retired routes with replacement history.
-- Preserve permission and safe fallback behavior.
+- Added canonical `/properties/my-settings` and `/properties/balance-repair` routes.
+- Normalized the historical `/my-settings` and `/balance-repair` URLs for Properties companies with replacement history.
+- Updated the Properties sidebar to use the canonical My Settings destination.
+- Kept unknown and unauthorized Properties routes on the safe `/properties/daybook` fallback using replacement history.
+- Added the canonical Balance Repair parent mapping back to Properties Settings.
+- Added focused canonical-route regression coverage for aliases, fallback behavior, and sidebar links.
+- Preserved Admin/Developer permission gates without rendering hidden route content before fallback.
 
 ## Phase 5 — pending
 
