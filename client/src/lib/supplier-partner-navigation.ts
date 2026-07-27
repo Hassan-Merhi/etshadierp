@@ -11,7 +11,7 @@ export const SUPPLIER_PARTNER_DAILY_ITEMS: NavItem[] = [
 
 export const SUPPLIER_PARTNER_ADMIN_ITEMS: NavItem[] = [
   { title: "Setup", url: "/sp/setup", icon: Wrench },
-  { title: "Migration", url: "/sp/gc-migration", icon: Building2 },
+  { title: "Migration", url: "/sp/setup?tab=migration", icon: Building2 },
 ];
 
 export const SUPPLIER_PARTNER_SECTIONS: NavSection[] = [
