@@ -374,10 +374,11 @@ export default function Accounts() {
     enabled: waRuleDialogOpen,
   });
 
+  const waRuleBase = appMode === "factory" ? "/api/factory/accounts" : "/api/accounts";
   const { data: waRule = null } = useQuery<WaRule | null>({
-    queryKey: ["/api/factory/accounts", selectedAccountId, "whatsapp-rule"],
+    queryKey: [waRuleBase, selectedAccountId, "whatsapp-rule"],
     queryFn: async () => {
-      const res = await fetch(`/api/factory/accounts/${selectedAccountId}/whatsapp-rule`, { credentials: "include" });
+      const res = await fetch(`${waRuleBase}/${selectedAccountId}/whatsapp-rule`, { credentials: "include" });
       if (!res.ok) return null;
       return res.json();
     },
@@ -399,14 +400,14 @@ export default function Accounts() {
 
   const saveWaRuleMutation = useMutation({
     mutationFn: async (rule: WaRule) => {
-      const res = await apiRequest("PUT", `/api/factory/accounts/${selectedAccountId}/whatsapp-rule`, rule);
+      const res = await apiRequest("PUT", `${waRuleBase}/${selectedAccountId}/whatsapp-rule`, rule);
       if (!res.ok) throw new Error(await res.text());
       return res.json();
     },
     onSuccess: () => {
       toast({ title: "WhatsApp rule saved" });
       setWaRuleDialogOpen(false);
-      queryClient.invalidateQueries({ queryKey: ["/api/factory/accounts", selectedAccountId, "whatsapp-rule"] });
+      queryClient.invalidateQueries({ queryKey: [waRuleBase, selectedAccountId, "whatsapp-rule"] });
     },
     onError: (err: any) => {
       toast({ title: "Save failed", description: err?.message ?? "Unknown error", variant: "destructive" });
@@ -415,7 +416,10 @@ export default function Accounts() {
 
   const sendWaStatementMutation = useMutation({
     mutationFn: async ({ accountId, month }: { accountId: number; month: string }) => {
-      const res = await apiRequest("POST", `/api/factory/accounts/${accountId}/send-statement-whatsapp`, { month });
+      const url = appMode === "factory"
+        ? `/api/factory/accounts/${accountId}/send-statement-whatsapp`
+        : `/api/accounts/${accountId}/send-statement-whatsapp`;
+      const res = await apiRequest("POST", url, { month });
       if (!res.ok) throw new Error((await res.json()).message || "Send failed");
       return res.json();
     },
