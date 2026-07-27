@@ -28,7 +28,8 @@ const deletion = read("server/routes/vouchers/centralPaymentReceiptDeleteRoute.t
 const registry = read("server/routes/voucherRoutes.ts");
 const doc = read("docs/program-2-phase-3-payments-receipts.md");
 
-const before = (a, b) => registry.indexOf(a) >= 0 && registry.indexOf(a) < registry.indexOf(b);
+const registrationIndex = (name) => registry.indexOf(`${name}(app`);
+const before = (a, b) => registrationIndex(a) >= 0 && registrationIndex(a) < registrationIndex(b);
 const checks = [
   [builder.includes("buildPaymentReceiptPostingRequest"), "Payment/Receipt builder must remain available"],
   [builder.includes("clientRequestId"), "creation must preserve stable request identity"],
@@ -46,7 +47,7 @@ const checks = [
   [lifecycle.includes('direction: "reverse"') && lifecycle.includes('direction: "apply"'), "edit must reverse old and apply new employee effects"],
   [lifecycle.includes("isReadonlyMigratedVoucher"), "migrated vouchers must remain read-only"],
   [lifecycle.includes("existing.optional") && lifecycle.includes("body.optional === true") && lifecycle.includes("next()"), "optional edit transitions must remain legacy passthrough"],
-  [lifecycle.includes("voucher-level currency/exchangeRate are not"), "edit currency preservation boundary must remain documented in source"],
+  [lifecycle.includes("voucher currency/exchangeRate are not"), "edit currency preservation boundary must remain documented in source"],
   [policy.includes("shouldUseCentralPaymentReceiptDeletion"), "deletion eligibility policy must remain centralized"],
   [deletion.includes('requireRole("Admin")'), "protected deletion must remain Admin-only"],
   [deletion.includes("FOR UPDATE"), "deletion must lock the voucher row"],
