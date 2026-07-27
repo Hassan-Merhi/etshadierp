@@ -20,10 +20,12 @@ const TAB_OPTIONS: { value: TabValue; label: string; icon: React.ElementType }[]
   { value: "withdrawals", label: "Withdrawals", icon: ArrowDownCircle },
 ];
 
+const TAB_VALUES = TAB_OPTIONS.map((option) => option.value);
+
 export default function FactoryEmployeesHub() {
   const [tab, setTab] = useHubQueryState<TabValue>({
     key: "tab",
-    values: TAB_OPTIONS.map((option) => option.value),
+    allowedValues: TAB_VALUES,
     defaultValue: "employees",
   });
 
