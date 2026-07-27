@@ -3,6 +3,7 @@ import { eq } from "drizzle-orm";
 import { userCompanyRoles } from "@shared/schema";
 import { db } from "../../db";
 import { resolveActiveCompanyId } from "../../routes/helpers/resolveActiveCompanyId";
+import { chooseActiveCompanyRole } from "./activeCompanyPermissionPolicy";
 
 export interface ActiveCompanyPermissionContext {
   userId: string;
@@ -36,25 +37,6 @@ declare module "express-serve-static-core" {
   interface Request {
     _activeCompanyPermissionContext?: ActiveCompanyPermissionContext;
   }
-}
-
-export function chooseActiveCompanyRole(
-  companyId: number,
-  rows: ReadonlyArray<{ companyId: number; role: string }>
-): { role: string; developerBypass: boolean } | null {
-  const activeRole = rows.find((row) => row.companyId === companyId);
-  if (activeRole) {
-    return {
-      role: activeRole.role,
-      developerBypass: activeRole.role === "Developer",
-    };
-  }
-
-  if (rows.some((row) => row.role === "Developer")) {
-    return { role: "Developer", developerBypass: true };
-  }
-
-  return null;
 }
 
 /**
