@@ -10,7 +10,7 @@ Phase 3 protects active Payment and Receipt creation, active-to-active editing, 
 
 `POST /api/vouchers/payment-receipt` uses the central path only when the voucher is active, is a Payment or Receipt, includes a stable `clientRequestId`, and contains at least one contra line. Optional or unidentified requests continue to the unchanged legacy route.
 
-One transaction owns target resolution, company ownership checks, balanced entries, voucher persistence, idempotency, central audit, and employee balance/deposit/withdrawal effects. Replays return the existing voucher and skip compatibility effects.
+One database transaction owns target resolution, company ownership checks, balanced entries, voucher persistence, idempotency, and employee balance/deposit/withdrawal effects. Replays return the existing voucher and skip compatibility effects. Detailed audit logging is a fail-open post-transaction compatibility effect; an audit-delivery failure does not roll back a committed voucher.
 
 The original debit/credit direction is preserved for asset-like and liability-like payment accounts. Customer selections preserve the linked-ledger representation during creation. Historical base amounts remain USD, transaction amounts remain in the selected currency, and conversion rounding is reconciled without changing stored history.
 
@@ -37,7 +37,7 @@ The following remain on specialized legacy deletion paths:
 
 ## Replay-safe compatibility effects
 
-For newly committed creation only, the existing Factory daybook, WhatsApp, detailed audit, intercompany notification, and loan-account allocation effects are preserved. They are skipped on replay.
+For newly committed creation only, the existing Factory daybook, WhatsApp, detailed audit, intercompany notification, and loan-account allocation effects are preserved. They are skipped on replay and remain outside the posting transaction where currently implemented.
 
 ## Safety boundary
 
