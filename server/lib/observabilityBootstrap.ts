@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import cron from "node-cron";
 import { logger } from "./logger";
+import { recordRuntimePerformance } from "./runtimePerformance";
 import { getTraceContext, runWithTraceContext, withTraceSpan } from "./traceContext";
 
 const BOOTSTRAP_KEY = "__erpObservabilityBootstrapInstalled";
@@ -30,6 +31,14 @@ function installExternalFetchTracing(): void {
 
     return withTraceSpan(`external.${dependency}`, () => originalFetch(input, init), ({ durationMs, failed }) => {
       const trace = getTraceContext();
+      recordRuntimePerformance({
+        kind: "dependency",
+        name: dependency,
+        durationMs,
+        failed,
+        source: trace?.source || "background",
+      });
+
       const thresholdMs = Number(process.env.EXTERNAL_DEPENDENCY_SLOW_MS || 1_500);
       const slow = durationMs >= thresholdMs;
       if (!failed && !slow) return;
@@ -52,16 +61,25 @@ function installCronTracing(): void {
   const originalSchedule = cron.schedule.bind(cron);
 
   cronAny.schedule = (expression: string, callback: (...args: any[]) => any, options?: any) => {
+    const jobName = `cron:${String(expression).slice(0, 80)}`;
     const wrapped = (...args: any[]) => {
       const requestId = `scheduler-${randomUUID()}`;
       return runWithTraceContext(
         {
           requestId,
-          routeTemplate: `cron:${String(expression).slice(0, 80)}`,
+          routeTemplate: jobName,
           buildVersion: process.env.BUILD_VERSION || process.env.RENDER_GIT_COMMIT?.substring(0, 8) || "dev",
           source: "scheduler",
         },
-        () => callback(...args),
+        () => withTraceSpan(jobName, async () => callback(...args), ({ durationMs, failed }) => {
+          recordRuntimePerformance({
+            kind: "background",
+            name: jobName,
+            durationMs,
+            failed,
+            source: "scheduler",
+          });
+        }),
       );
     };
     return originalSchedule(expression, wrapped, options);
