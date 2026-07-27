@@ -8,6 +8,12 @@ const RATE_LIMIT = Math.max(1, Number(process.env.CLIENT_ERROR_RATE_LIMIT || 20)
 const DEDUPE_WINDOW_MS = Math.max(1_000, Number(process.env.CLIENT_ERROR_DEDUPE_MS || 60_000));
 const MAX_TEXT = 2_000;
 const MAX_STACK = 8_000;
+const TRUSTED_APP_ORIGINS = new Set([
+  "capacitor://localhost",
+  "ionic://localhost",
+  "https://localhost",
+  "http://localhost",
+]);
 
 const rateWindows = new Map<string, { startedAt: number; count: number }>();
 const recentFingerprints = new Map<string, number>();
@@ -28,6 +34,22 @@ function cleanRoute(value: unknown): string | undefined {
 function positiveInteger(value: unknown): number | undefined {
   const parsed = Number(value);
   return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : undefined;
+}
+
+function isTrustedOrigin(req: Request): boolean {
+  const origin = cleanText(req.headers.origin, 500);
+  const referer = cleanText(req.headers.referer, 500);
+  if (!origin && !referer) return true;
+  if (origin && TRUSTED_APP_ORIGINS.has(origin)) return true;
+
+  const host = req.headers.host;
+  if (!host) return false;
+  try {
+    const sourceHost = origin ? new URL(origin).host : referer ? new URL(referer).host : "";
+    return sourceHost === host;
+  } catch {
+    return false;
+  }
 }
 
 function rateKey(req: Request): string {
@@ -92,6 +114,11 @@ async function deliverExternally(payload: Record<string, unknown>): Promise<void
 
 export function handleClientObservability(req: Request, res: Response, requestId: string): boolean {
   if (req.method !== "POST" || req.path !== ENDPOINT) return false;
+
+  if (!isTrustedOrigin(req)) {
+    res.status(403).json({ message: "Cross-origin observability report rejected." });
+    return true;
+  }
 
   const session = (req as any).session;
   const userId = positiveInteger(session?.userId || (req as any).user?.id);
