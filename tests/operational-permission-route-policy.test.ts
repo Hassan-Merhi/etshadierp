@@ -49,6 +49,22 @@ describe("operational permission route policy", () => {
     });
   });
 
+  it("classifies POS shift controls and summaries", () => {
+    expect(classifyOperationalPermissionRoute("POST", "/api/pos/shifts/open")).toMatchObject({
+      operation: "pos-shift-control",
+      permissionType: "pos",
+      permissionKey: "pos_perm_open_shift",
+    });
+    expect(classifyOperationalPermissionRoute("POST", "/api/pos/shifts/45/close")).toMatchObject({
+      operation: "pos-shift-control",
+      permissionKey: "pos_perm_open_shift",
+    });
+    expect(classifyOperationalPermissionRoute("GET", "/api/pos/shifts/history")).toMatchObject({
+      operation: "pos-shift-summary",
+      permissionKey: "pos_perm_view_shift_summary",
+    });
+  });
+
   it("ignores ordinary JSON report reads", () => {
     expect(classifyOperationalPermissionRoute("GET", "/api/reports/sales")).toBeNull();
   });
