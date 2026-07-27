@@ -561,7 +561,10 @@ export function JournalForm({ voucherIdToEdit, isPOS }: JournalFormProps) {
 
   const sendWaStatementMutation = useMutation({
     mutationFn: async ({ accountId, month }: { accountId: number; month: string }) => {
-      const res = await modeApiRequest("POST", `/api/factory/accounts/${accountId}/send-statement-whatsapp`, { month });
+      const url = appMode === "factory"
+        ? `/api/factory/accounts/${accountId}/send-statement-whatsapp`
+        : `/api/accounts/${accountId}/send-statement-whatsapp`;
+      const res = await modeApiRequest("POST", url, { month });
       const json = await res.json();
       if (!res.ok) throw new Error(json.message || "Failed to send WhatsApp");
       return json;
