@@ -1,7 +1,18 @@
-export type OperationalPermissionType = "action" | "export";
+export type OperationalPermissionType = "action" | "export" | "pos";
 
 export interface OperationalPermissionRouteMatch {
-  operation: "import" | "bulk-maintenance" | "excel-export" | "pdf-export" | "stock-export" | "print" | "whatsapp-export" | "backup-export" | "global-export-center";
+  operation:
+    | "import"
+    | "bulk-maintenance"
+    | "excel-export"
+    | "pdf-export"
+    | "stock-export"
+    | "print"
+    | "whatsapp-export"
+    | "backup-export"
+    | "global-export-center"
+    | "pos-shift-control"
+    | "pos-shift-summary";
   permissionType: OperationalPermissionType;
   permissionKey: string;
   developerOnly?: boolean;
@@ -26,6 +37,33 @@ const IMPORT_PREFIXES = [
   "/api/ai-import",
   "/api/import",
 ];
+
+function posShiftPermission(method: string, path: string): OperationalPermissionRouteMatch | null {
+  const normalizedMethod = method.toUpperCase();
+  if (
+    normalizedMethod === "POST" &&
+    (path === "/api/pos/shifts/open" || /^\/api\/pos\/shifts\/\d+\/close$/.test(path))
+  ) {
+    return {
+      operation: "pos-shift-control",
+      permissionType: "pos",
+      permissionKey: "pos_perm_open_shift",
+    };
+  }
+
+  if (
+    normalizedMethod === "GET" &&
+    (path === "/api/pos/shifts/history" || /^\/api\/pos\/shifts\/\d+$/.test(path))
+  ) {
+    return {
+      operation: "pos-shift-summary",
+      permissionType: "pos",
+      permissionKey: "pos_perm_view_shift_summary",
+    };
+  }
+
+  return null;
+}
 
 function isImportRoute(method: string, path: string): boolean {
   if (path.startsWith("/api/import-cycle") || path.startsWith("/api/stats/import-cycle")) {
@@ -109,6 +147,9 @@ export function classifyOperationalPermissionRoute(
   rawPath: string
 ): OperationalPermissionRouteMatch | null {
   const path = normalizePath(rawPath);
+
+  const shiftPermission = posShiftPermission(method, path);
+  if (shiftPermission) return shiftPermission;
 
   if (isImportRoute(method, path)) {
     return {
