@@ -7,15 +7,18 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { KeyRound, CalendarDays } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { KeyRound, CalendarDays, LayoutPanelLeft } from "lucide-react";
 import { useDateFormat } from "@/contexts/DateFormatContext";
 import { PageHeader } from "@/components/PageHeader";
+import { useUserPreferences } from "@/hooks/use-user-preferences";
 
 type DateFormatType = "MM/DD/YYYY" | "DD/MM/YYYY";
 
 export default function MySettings() {
   const { toast } = useToast();
   const { dateFormat } = useDateFormat();
+  const { prefs, updatePref, isPending: prefsPending } = useUserPreferences();
 
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -123,6 +126,48 @@ export default function MySettings() {
                 </SelectItem>
               </SelectContent>
             </Select>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <LayoutPanelLeft className="h-4 w-4" />
+            Floating Widgets
+          </CardTitle>
+          <CardDescription>Show or hide the floating tools that appear on every page.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-center justify-between gap-4 rounded-lg border p-3">
+            <div>
+              <p className="text-sm font-medium leading-none">AI Agent Chatbot</p>
+              <p className="text-xs text-muted-foreground mt-1">The floating chat bubble in the bottom-right corner.</p>
+            </div>
+            <Switch
+              checked={prefs?.showChatWidget !== false}
+              disabled={prefsPending}
+              onCheckedChange={(val) => {
+                updatePref({ showChatWidget: val });
+                toast({ title: val ? "Chatbot enabled" : "Chatbot hidden", description: val ? "The AI chat widget is now visible." : "The AI chat widget has been hidden." });
+              }}
+              data-testid="switch-show-chat-widget"
+            />
+          </div>
+          <div className="flex items-center justify-between gap-4 rounded-lg border p-3">
+            <div>
+              <p className="text-sm font-medium leading-none">Notebook</p>
+              <p className="text-xs text-muted-foreground mt-1">The floating notepad panel on the side of the screen.</p>
+            </div>
+            <Switch
+              checked={prefs?.showNotesPanel !== false}
+              disabled={prefsPending}
+              onCheckedChange={(val) => {
+                updatePref({ showNotesPanel: val });
+                toast({ title: val ? "Notebook enabled" : "Notebook hidden", description: val ? "The notebook panel is now visible." : "The notebook panel has been hidden." });
+              }}
+              data-testid="switch-show-notes-panel"
+            />
           </div>
         </CardContent>
       </Card>

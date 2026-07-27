@@ -1,7 +1,7 @@
 import { Fragment, useState, useMemo } from "react";
 import { Table, TableBody, TableCell, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { ChevronDown, ChevronRight } from "lucide-react";
+import { ChevronDown, ChevronRight, Pencil } from "lucide-react";
 import { AccountTableProps } from "./accountTypes";
 import { cn } from "@/lib/utils";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
@@ -28,6 +28,7 @@ export function AccountTable({
   handleAccountChange,
   hideBalances,
   formatAmount,
+  onEdit,
 }: AccountTableProps) {
   const { formatAmountRaw } = useCurrencyContext();
 
@@ -102,7 +103,7 @@ export function AccountTable({
               return (
                 <Fragment key={account.id}>
                   <TableRow
-                    className="cursor-pointer transition-colors hover:bg-muted/30"
+                    className="cursor-pointer transition-colors hover:bg-muted/30 group/row"
                     onClick={() => {
                       if (hasKids) toggleParent(account.id);
                       else handleAccountChange(account.id);
@@ -127,6 +128,16 @@ export function AccountTable({
                           <span className="text-[10px] text-muted-foreground font-mono shrink-0">
                             #{account.accountId}
                           </span>
+                        )}
+                        {onEdit && account.type === "ledger" && (
+                          <button
+                            className="opacity-0 group-hover/row:opacity-100 transition-opacity ml-1 p-0.5 rounded hover:bg-muted text-muted-foreground hover:text-foreground shrink-0"
+                            onClick={(e) => { e.stopPropagation(); onEdit(account); }}
+                            title="Edit account"
+                            data-testid={`button-edit-account-${account.accountId}`}
+                          >
+                            <Pencil className="h-3 w-3" />
+                          </button>
                         )}
                       </div>
                     </TableCell>
@@ -160,7 +171,7 @@ export function AccountTable({
                       return (
                         <TableRow
                           key={child.id}
-                          className="cursor-pointer hover:bg-muted/20"
+                          className="cursor-pointer hover:bg-muted/20 group/child"
                           onClick={() => handleAccountChange(child.id)}
                           data-testid={`row-account-${child.id}`}
                         >
@@ -171,6 +182,16 @@ export function AccountTable({
                                 <span className="text-[10px] text-muted-foreground/60 font-mono shrink-0">
                                   #{child.accountId}
                                 </span>
+                              )}
+                              {onEdit && child.type === "ledger" && (
+                                <button
+                                  className="opacity-0 group-hover/child:opacity-100 transition-opacity p-0.5 rounded hover:bg-muted text-muted-foreground hover:text-foreground shrink-0"
+                                  onClick={(e) => { e.stopPropagation(); onEdit(child); }}
+                                  title="Edit account"
+                                  data-testid={`button-edit-account-${child.accountId}`}
+                                >
+                                  <Pencil className="h-3 w-3" />
+                                </button>
                               )}
                             </div>
                           </TableCell>
