@@ -69,9 +69,30 @@ Verification boundary:
 
 ## Phase 3 — Performance dashboards
 
-- Provide Admin/Developer dashboards for latency percentiles, error rate, active requests, memory, database-pool pressure, response size, and top slow route templates.
-- Add bounded time-window aggregation rather than unbounded in-memory history.
-- Separate ERP, Factory, Supplier Partner, Properties, POS, and background-job views.
+Status: in progress — bounded live dashboard foundation complete.
+
+Implemented:
+
+- Added a bounded rolling performance window with configurable time and sample limits.
+- Captures safe route templates, mode, status, latency, response size, database query count, and database duration.
+- Computes p50, p95, and p99 request latency.
+- Computes per-route p95, average and maximum latency, average database time, response size, request count, and 5xx count.
+- Separates ERP, Factory, Supplier Partner, Properties, and POS traffic.
+- Includes memory and database-pool pressure snapshots.
+- Provides a protected Admin/Developer HTML dashboard at `/api/health/performance`.
+- Provides the same bounded snapshot as JSON at `/api/health/performance.json`.
+- The HTML dashboard refreshes every 30 seconds and does not load any external assets.
+
+Remaining before Phase 3 is complete:
+
+- Add bounded background-job and external-dependency aggregates alongside HTTP modes.
+- Add focused verifier coverage and execution evidence.
+- Review production thresholds after live traffic is available.
+
+Configuration:
+
+- `PERFORMANCE_DASHBOARD_WINDOW_MS` defaults to 15 minutes.
+- `PERFORMANCE_DASHBOARD_MAX_SAMPLES` defaults to 5,000 samples.
 
 ## Phase 4 — Alerts and operational response
 
