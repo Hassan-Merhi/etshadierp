@@ -257,5 +257,4 @@ async function main() {
   process.exitCode = summary.ok ? 0 : 1;
 }
 
-const invokedDirectly = process.argv[1] && new URL(`file://${process.argv[1]}`).pathname === new URL(import.meta.url).pathname;
-if (invokedDirectly) await main();
+await main();
