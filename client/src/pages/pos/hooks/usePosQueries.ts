@@ -131,6 +131,12 @@ export function usePosQueries({
 
   const { data: currentShift } = useQuery<any>({
     queryKey: posUser && activeLocation ? ["/api/pos/shifts/current", { locationId: activeLocation.id }] : [],
+    queryFn: async () => {
+      if (!activeLocation) return null;
+      const res = await fetch(`/api/pos/shifts/current?locationId=${activeLocation.id}`, { credentials: "include" });
+      if (!res.ok) return null;
+      return res.json();
+    },
     enabled: !!posUser && !!activeLocation,
     refetchInterval: 60_000,
   });

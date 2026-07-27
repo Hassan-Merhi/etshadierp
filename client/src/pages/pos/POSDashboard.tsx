@@ -127,6 +127,12 @@ export default function POSDashboard({ posUser }: POSDashboardProps) {
   // Fetch current shift
   const { data: currentShift, isLoading: shiftLoading } = useQuery<PosShift | null>({
     queryKey: locationId ? ["/api/pos/shifts/current", { locationId }] : [],
+    queryFn: async () => {
+      if (!locationId) return null;
+      const res = await fetch(`/api/pos/shifts/current?locationId=${locationId}`, { credentials: "include" });
+      if (!res.ok) return null;
+      return res.json();
+    },
     enabled: !!locationId,
   });
 

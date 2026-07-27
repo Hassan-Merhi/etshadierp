@@ -110,6 +110,12 @@ function authorizeExplicitCompanyScope(req: Request, res: Response): boolean {
   // for companies other than the one currently active in their session.
   if (role === "Developer") return true;
 
+  // Admin/Owner/Manager performing a GET (read-only) request may read data from
+  // other companies.  This is required for the Settings → Users page, which fetches
+  // locations from child companies to assign POS roles across the org.  GET carries
+  // no mutation risk, and these roles are already trusted to manage the system.
+  if (req.method === "GET" && ["Admin", "Owner", "Manager"].includes(role ?? "")) return true;
+
   // Use req.session.currentCompanyId (the ERP company), NOT resolveActiveCompanyId.
   // resolveActiveCompanyId returns factoryCompanyId || currentCompanyId; when an admin
   // has visited the factory module the factory company leaks into ERP route checks and

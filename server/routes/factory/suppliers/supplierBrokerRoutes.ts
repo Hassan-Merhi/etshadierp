@@ -10,6 +10,7 @@ import { classifyNetPositionAccounts } from "../../../netPositionHelper";
 import { adjustInventory } from "../../../inventoryHelper";
 import { sqlArray } from "../../../lib/sqlArray";
 import { resolveStoredFxRate } from "../../../services/factory/currencyConversion";
+import { isSupplierPaidFreight } from "./_supplierStatementHelpers";
 import {
   writeDaybookEntry,
   getOrFetchFxRateToUsd,
@@ -304,7 +305,8 @@ export async function buildBrokerStatement(brokerId: number, companyId: number, 
     const cc = c.currencyCode || "USD";
     const kg = parseFloat(c.totalKg || "0");
     const rate = parseFloat(c.ratePerKg || "0");
-    const freight = parseFloat(c.freight || "0");
+    // Own-account freight (freightPaidBy="own") must not appear in the broker/supplier ledger
+    const freight = isSupplierPaidFreight(c) ? parseFloat(c.freight || "0") : 0;
     // Use freightCurrencyCode directly (DB default is "USD", so AUD containers correctly separate USD freight)
     const freightCc = c.freightCurrencyCode || cc;
     const freightSameCcy = freightCc === cc;
