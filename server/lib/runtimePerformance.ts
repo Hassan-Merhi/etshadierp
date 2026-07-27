@@ -1,3 +1,5 @@
+import { AsyncLocalStorage } from "node:async_hooks";
+
 export type RuntimePerformanceKind = "background" | "dependency";
 
 export interface RuntimePerformanceSample {
@@ -9,9 +11,26 @@ export interface RuntimePerformanceSample {
   source: string;
 }
 
-const WINDOW_MS = Math.max(60_000, Number(process.env.PERFORMANCE_DASHBOARD_WINDOW_MS || 15 * 60_000));
-const MAX_SAMPLES = Math.max(100, Number(process.env.PERFORMANCE_DASHBOARD_RUNTIME_MAX_SAMPLES || 2_000));
+function finiteConfig(name: string, fallback: number, minimum: number): number {
+  const parsed = Number(process.env[name]);
+  return Number.isFinite(parsed) ? Math.max(minimum, parsed) : fallback;
+}
+
+const WINDOW_MS = finiteConfig("PERFORMANCE_DASHBOARD_WINDOW_MS", 15 * 60_000, 60_000);
+const MAX_SAMPLES = finiteConfig("PERFORMANCE_DASHBOARD_RUNTIME_MAX_SAMPLES", 2_000, 100);
 const samples: RuntimePerformanceSample[] = [];
+const failureContext = new AsyncLocalStorage<{ failed: boolean }>();
+
+export async function captureRuntimeFailures<T>(operation: () => Promise<T> | T): Promise<{ result: T; failed: boolean }> {
+  const state = { failed: false };
+  const result = await failureContext.run(state, operation);
+  return { result, failed: state.failed };
+}
+
+export function markRuntimeFailure(): void {
+  const state = failureContext.getStore();
+  if (state) state.failed = true;
+}
 
 function prune(now = Date.now()): void {
   const cutoff = now - WINDOW_MS;
