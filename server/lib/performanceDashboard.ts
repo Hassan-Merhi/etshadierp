@@ -27,8 +27,13 @@ interface RouteAggregate {
   durations: number[];
 }
 
-const WINDOW_MS = Math.max(60_000, Number(process.env.PERFORMANCE_DASHBOARD_WINDOW_MS || 15 * 60_000));
-const MAX_SAMPLES = Math.max(500, Number(process.env.PERFORMANCE_DASHBOARD_MAX_SAMPLES || 5_000));
+function finiteConfig(name: string, fallback: number, minimum: number): number {
+  const parsed = Number(process.env[name]);
+  return Number.isFinite(parsed) ? Math.max(minimum, parsed) : fallback;
+}
+
+const WINDOW_MS = finiteConfig("PERFORMANCE_DASHBOARD_WINDOW_MS", 15 * 60_000, 60_000);
+const MAX_SAMPLES = finiteConfig("PERFORMANCE_DASHBOARD_MAX_SAMPLES", 5_000, 500);
 const samples: RequestSample[] = [];
 
 function prune(now = Date.now()): void {
@@ -62,7 +67,8 @@ export function getPerformanceDashboardSnapshot() {
   const completed = samples.length;
   const durations = samples.map((sample) => sample.durationMs);
   const errors = samples.filter((sample) => sample.status >= 500).length;
-  const slow = samples.filter((sample) => sample.durationMs >= Number(process.env.SLOW_REQUEST_MS || 500)).length;
+  const slowThreshold = finiteConfig("SLOW_REQUEST_MS", 500, 0);
+  const slow = samples.filter((sample) => sample.durationMs >= slowThreshold).length;
   const routeMap = new Map<string, RouteAggregate>();
 
   for (const sample of samples) {
