@@ -25,6 +25,11 @@ function cleanRoute(value: unknown): string | undefined {
   return text.split("?")[0].split("#")[0];
 }
 
+function positiveInteger(value: unknown): number | undefined {
+  const parsed = Number(value);
+  return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : undefined;
+}
+
 function rateKey(req: Request): string {
   const sessionUser = (req as any).session?.userId;
   return sessionUser ? `user:${sessionUser}` : `ip:${req.ip || req.socket.remoteAddress || "unknown"}`;
@@ -89,7 +94,7 @@ export function handleClientObservability(req: Request, res: Response, requestId
   if (req.method !== "POST" || req.path !== ENDPOINT) return false;
 
   const session = (req as any).session;
-  const userId = session?.userId || (req as any).user?.id;
+  const userId = positiveInteger(session?.userId || (req as any).user?.id);
   if (!userId) {
     res.status(401).json({ message: "Authentication required." });
     return true;
@@ -114,7 +119,7 @@ export function handleClientObservability(req: Request, res: Response, requestId
     return true;
   }
 
-  const companyId = session?.factoryCompanyId || session?.currentCompanyId;
+  const companyId = positiveInteger(session?.factoryCompanyId || session?.currentCompanyId);
   const fingerprint = `${userId}|${companyId || "none"}|${source}|${route || "unknown"}|${message}|${stack?.split("\n")[0] || ""}`;
   if (isDuplicate(fingerprint)) {
     res.status(202).json({ accepted: false, reason: "duplicate" });
@@ -158,7 +163,7 @@ export function handleClientObservability(req: Request, res: Response, requestId
     message,
     requestId,
     path: route,
-    ...(userId != null ? { userId } : {}),
+    userId,
     ...(companyId != null ? { companyId } : {}),
   });
 
