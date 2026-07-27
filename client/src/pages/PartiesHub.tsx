@@ -1,7 +1,7 @@
 import { Suspense, lazy } from "react";
-import { useLocation, useSearch } from "wouter";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Truck, Users } from "lucide-react";
+import { useHubQueryState } from "@/hooks/use-hub-query-state";
 
 const Suppliers = lazy(() => import("@/pages/Suppliers"));
 const Customers = lazy(() => import("@/pages/Customers"));
@@ -9,20 +9,20 @@ const Customers = lazy(() => import("@/pages/Customers"));
 const TABS = [
   { key: "suppliers", label: "Suppliers", icon: Truck },
   { key: "customers", label: "Customers", icon: Users },
-];
+] as const;
+
+const TAB_KEYS = TABS.map((tab) => tab.key);
 
 export default function PartiesHub() {
-  const [, setLocation] = useLocation();
-  const search = useSearch();
-  const params = new URLSearchParams(search);
-  const tabParam = params.get("tab") ?? "";
-  const activeTab = TABS.find((t) => t.key === tabParam) ? tabParam : "suppliers";
-
-  const setTab = (key: string) => setLocation("/parties?tab=" + key);
+  const [activeTab, setTab] = useHubQueryState({
+    key: "tab",
+    allowedValues: TAB_KEYS,
+    defaultValue: "suppliers",
+  });
 
   return (
     <div className="flex flex-col h-full">
-      <Tabs value={activeTab} onValueChange={setTab} className="flex flex-col h-full">
+      <Tabs value={activeTab} onValueChange={(value) => setTab(value as (typeof TAB_KEYS)[number])} className="flex flex-col h-full">
         <div className="border-b bg-background px-4 pt-3">
           <TabsList className="h-9">
             {TABS.map((t) => (

@@ -19,14 +19,33 @@ function readValue<T extends string>({
   return value && allowedValues.includes(value as T) ? (value as T) : defaultValue;
 }
 
+function canonicalizeLocation<T extends string>(options: HubQueryStateOptions<T>): T {
+  const nextValue = readValue(options);
+  const url = new URL(window.location.href);
+  const rawValue = url.searchParams.get(options.key);
+  const isValid = rawValue ? options.allowedValues.includes(rawValue as T) : true;
+
+  if (!isValid) {
+    if (options.omitDefault && nextValue === options.defaultValue) {
+      url.searchParams.delete(options.key);
+    } else {
+      url.searchParams.set(options.key, nextValue);
+    }
+    window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
+  }
+
+  return nextValue;
+}
+
 export function useHubQueryState<T extends string>(options: HubQueryStateOptions<T>) {
   const [value, setValue] = useState<T>(() => readValue(options));
 
   useEffect(() => {
-    const syncFromLocation = () => setValue(readValue(options));
+    const syncFromLocation = () => setValue(canonicalizeLocation(options));
+    syncFromLocation();
     window.addEventListener("popstate", syncFromLocation);
     return () => window.removeEventListener("popstate", syncFromLocation);
-  }, [options.key, options.defaultValue, options.allowedValues]);
+  }, [options.key, options.defaultValue, options.allowedValues, options.omitDefault]);
 
   const updateValue = useCallback(
     (nextValue: T) => {

@@ -73,12 +73,19 @@ export function getParentRoute(pathname: string): string | null {
     return null;
   }
 
-  // ERP — parties
+  // ERP — parties and supplier workflows.
   if (/^\/suppliers\/\d+\/edit/.test(cleanPath)) return "/parties?tab=suppliers";
   if (/^\/suppliers\/\d+\/proformas/.test(cleanPath)) return "/parties?tab=suppliers";
+  if (cleanPath === "/supplier-profit-check") return "/parties?tab=suppliers";
 
-  // ERP — containers / purchase orders
+  // ERP — POS and sales workflows.
+  if (/^\/pos\/edit\/\d+/.test(cleanPath)) return "/pos";
+  if (cleanPath === "/pos-import") return "/pos";
+  if (cleanPath === "/stock-transfer-order") return "/sales-tools?tab=transfers";
+
+  // ERP — containers / purchase orders.
   if (/^\/purchase-orders\/\d+\/edit/.test(cleanPath)) return "/containers";
+  if (cleanPath === "/po-import") return "/containers";
   if (/^\/containers\/\d+\/verification/.test(cleanPath)) {
     const match = cleanPath.match(/^\/containers\/(\d+)\//);
     return match ? `/containers/${match[1]}` : "/containers";
@@ -86,10 +93,10 @@ export function getParentRoute(pathname: string): string | null {
   if (/^\/containers\/\d+/.test(cleanPath)) return "/containers";
   if (/^\/offloads\/\d+/.test(cleanPath)) return "/containers";
 
-  // ERP — sales report
+  // ERP — sales report details.
   if (cleanPath.startsWith("/sales-report/")) return "/sales-report";
 
-  // ERP — accounting / ledger
+  // ERP — accounting / ledger.
   {
     const match = cleanPath.match(/^\/ledger-vouchers\/([^/]+)\//);
     if (match) return `/ledger-monthly/${match[1]}`;
@@ -97,8 +104,10 @@ export function getParentRoute(pathname: string): string | null {
   if (/^\/ledger-monthly\//.test(cleanPath)) return "/accounts";
   if (/^\/voucher-detail\//.test(cleanPath)) return "/vouchers";
   if (/^\/vouchers\/\d+\/edit/.test(cleanPath)) return "/vouchers";
+  if (cleanPath === "/account-groups") return "/accounts";
+  if (cleanPath === "/account-transfer") return "/accounts";
 
-  // ERP — stock / inventory
+  // ERP — stock / inventory.
   if (/^\/stock-query\/\d+/.test(cleanPath)) return "/stock?tab=query";
   if (/^\/stock-items\/\d+\/history\/\d+\/\d+/.test(cleanPath)) {
     const match = cleanPath.match(/^\/stock-items\/(\d+)\/history/);
@@ -111,12 +120,34 @@ export function getParentRoute(pathname: string): string | null {
     return match ? `/locations/${match[1]}/stock-items/${match[2]}/history` : "/inventory?tab=by-location";
   }
   if (/^\/locations\/\d+\/stock-items\/\d+\/history/.test(cleanPath)) return "/inventory?tab=by-location";
-
+  if (cleanPath === "/import-stock-items") return "/stock?tab=items";
+  if (cleanPath === "/barcode-manager") return "/stock?tab=items";
   if (/^\/opening-stock\/[^/]+/.test(cleanPath)) return "/opening-stock";
   if (/^\/closing-stock\/[^/]+/.test(cleanPath)) return "/closing-stock-summary";
 
+  // ERP — rentals.
+  if (cleanPath === "/erp/rental/warehouses") return "/erp/rental/shops";
+  if (cleanPath === "/erp/rental/payments") return "/erp/rental/shops";
+
+  // ERP — AI and administrative children.
+  if (cleanPath === "/ai-validation") return "/ai-command-center";
   if (/^\/net-position-details/.test(cleanPath)) return "/settings";
   if (/^\/import-cycle-diagnostics/.test(cleanPath)) return "/settings";
+  if (/^\/inventory-repair/.test(cleanPath)) return "/settings";
+  if (/^\/balance-repair/.test(cleanPath)) return "/settings";
+  if (/^\/company-data-reset/.test(cleanPath)) return "/settings";
+  if (/^\/orphaned-records/.test(cleanPath)) return "/settings";
+  if (/^\/deleted-items/.test(cleanPath)) return "/settings";
+  if (/^\/account-migration/.test(cleanPath)) return "/settings";
+  if (/^\/test-data-import/.test(cleanPath)) return "/settings";
+  if (/^\/notification-settings/.test(cleanPath)) return "/settings";
+  if (/^\/chatbot-settings/.test(cleanPath)) return "/settings";
+  if (/^\/intercompany-links/.test(cleanPath)) return "/settings";
+
+  // ERP — Supplier Partner setup and migration children.
+  if (cleanPath === "/sp/setup" || cleanPath === "/sp/migration" || cleanPath === "/sp/gc-migration") {
+    return "/sp/reports";
+  }
 
   return null;
 }

@@ -1,6 +1,6 @@
-import { useSearch, useLocation } from "wouter";
 import { MapPin, Ship, Package } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useHubQueryState } from "@/hooks/use-hub-query-state";
 import LocationInventory from "@/pages/LocationInventory";
 import StockOTW from "@/pages/StockOTW";
 import Containers from "@/pages/ContainersPage";
@@ -9,14 +9,16 @@ const TABS = [
   { value: "by-location", label: "By Location", icon: MapPin },
   { value: "on-the-way", label: "On The Way", icon: Ship },
   { value: "containers", label: "Containers", icon: Package },
-];
+] as const;
+
+const TAB_VALUES = TABS.map((tab) => tab.value);
 
 export default function InventoryHub() {
-  const search = useSearch();
-  const [, navigate] = useLocation();
-  const activeTab = new URLSearchParams(search).get("tab") || "by-location";
-
-  const setTab = (tab: string) => navigate(`/inventory?tab=${tab}`, { replace: true });
+  const [activeTab, setTab] = useHubQueryState({
+    key: "tab",
+    allowedValues: TAB_VALUES,
+    defaultValue: "by-location",
+  });
 
   return (
     <div>

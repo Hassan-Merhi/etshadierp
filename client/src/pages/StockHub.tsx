@@ -1,6 +1,6 @@
-import { useSearch, useLocation } from "wouter";
 import { Package, Search, Truck, Tag } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useHubQueryState } from "@/hooks/use-hub-query-state";
 import StockItems from "@/pages/StockItems";
 import StockQuery from "@/pages/StockQuery";
 import OffloadItemSearch from "@/pages/OffloadItemSearch";
@@ -11,14 +11,16 @@ const TABS = [
   { value: "query", label: "Query", icon: Search },
   { value: "offload", label: "Offload Search", icon: Truck },
   { value: "grades", label: "Grades & Categories", icon: Tag },
-];
+] as const;
+
+const TAB_VALUES = TABS.map((tab) => tab.value);
 
 export default function StockHub() {
-  const search = useSearch();
-  const [, navigate] = useLocation();
-  const activeTab = new URLSearchParams(search).get("tab") || "items";
-
-  const setTab = (tab: string) => navigate(`/stock?tab=${tab}`, { replace: true });
+  const [activeTab, setTab] = useHubQueryState({
+    key: "tab",
+    allowedValues: TAB_VALUES,
+    defaultValue: "items",
+  });
 
   return (
     <div>
