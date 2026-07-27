@@ -30,7 +30,19 @@ export async function enforceCompanyResourceScope(
 
   const userId = req.session.userId;
   const role = req.session.currentRole;
-  const companyId = resolveActiveCompanyId(req);
+
+  // For non-factory domains (accounting, inventory, administration, …) always
+  // use currentCompanyId — the ERP company.  resolveActiveCompanyId() prefers
+  // factoryCompanyId when it is set, which leaks the factory company into ERP
+  // resource checks after an admin has visited the factory module, causing
+  // spurious CROSS_COMPANY_ACCESS_DENIED denials.  Only factory-domain routes
+  // (e.g. /api/factory/containers/:id) should use the factory company.
+  // This mirrors the approach already used in auth.ts → authorizeExplicitCompanyScope.
+  const companyId =
+    match.domain === "factory"
+      ? resolveActiveCompanyId(req)
+      : ((req.session as any).currentCompanyId ?? null);
+
   if (!userId || !role || !companyId) return true;
 
   try {
