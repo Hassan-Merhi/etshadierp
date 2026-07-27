@@ -8,7 +8,7 @@ import {
   type ActiveCompanyPermissionContext,
 } from "../services/security/activeCompanyPermissionContext";
 
-type PermMiddlewareType = "module" | "page" | "action" | "export";
+export type PermMiddlewareType = "module" | "page" | "action" | "export" | "pos";
 
 interface PermissionState {
   context: ActiveCompanyPermissionContext;
@@ -109,7 +109,7 @@ function sendLookupFailure(
 
   // Permission checks are security boundaries. A database or storage failure must
   // never turn into an implicit allow, especially for exports, repairs, imports,
-  // and writes. Return 503 so the caller can safely retry without losing intent.
+  // POS capabilities, and writes. Return 503 so the caller can safely retry.
   logPermissionEvent(req, { event: "permission_lookup_failed", key, permType, error });
   res.status(503).json({
     message: "Permission service is temporarily unavailable. Please retry.",
@@ -153,4 +153,8 @@ export function requireActionAccess(actionKey: string) {
 
 export function requireExportAccess(exportKey: string) {
   return requirePermission(exportKey, "export");
+}
+
+export function requirePosCapability(permissionKey: string) {
+  return requirePermission(permissionKey, "pos");
 }
