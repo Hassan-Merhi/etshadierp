@@ -1,4 +1,4 @@
-const ENDPOINT = "/api/observability/client-error";
+const ENDPOINT = "/api/auth/observability/client-error";
 const RATE_WINDOW_MS = 60_000;
 const RATE_LIMIT = 10;
 const DEDUPE_WINDOW_MS = 60_000;
