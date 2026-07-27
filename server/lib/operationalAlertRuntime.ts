@@ -3,7 +3,8 @@ import { evaluateOperationalAlerts, getOperationalIncidentSnapshot } from "./ope
 import { getPerformanceDashboardSnapshot } from "./performanceDashboard";
 import { logger } from "./logger";
 
-const INTERVAL_MS = Math.max(60_000, Number(process.env.OBSERVABILITY_ALERT_EVALUATION_MS || 60_000));
+const parsedInterval = Number(process.env.OBSERVABILITY_ALERT_EVALUATION_MS);
+const INTERVAL_MS = Number.isFinite(parsedInterval) ? Math.max(60_000, parsedInterval) : 60_000;
 let timer: NodeJS.Timeout | undefined;
 
 function evaluate(): void {
