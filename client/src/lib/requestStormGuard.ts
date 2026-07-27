@@ -13,7 +13,7 @@ type QueueEntry = {
 };
 
 const MAX_CONCURRENT_API_GETS = 6;
-const MAX_CACHE_ENTRIES = 32;
+const MAX_CACHE_ENTRIES = 64;
 const MAX_CACHEABLE_RESPONSE_BYTES = 1_500_000;
 const HIDDEN_TAB_STALE_MS = 10 * 60_000;
 
@@ -34,7 +34,35 @@ const BYPASS_PATHS = [
   /^\/api\/csrf-token$/i,
 ];
 
+// Short-lived snapshots cap repeated GET traffic from legacy raw fetch loops and
+// duplicate mounted consumers. Every write clears these snapshots before and
+// after the request, so normal mutation invalidations still receive fresh data.
 const CACHE_TTLS: Array<{ pattern: RegExp; ttlMs: number }> = [
+  { pattern: /^\/api\/locations\/\d+\/inventory$/, ttlMs: 30_000 },
+  { pattern: /^\/api\/factory\/location-inventory\/\d+$/, ttlMs: 30_000 },
+  { pattern: /^\/api\/ledger-accounts$/, ttlMs: 60_000 },
+  { pattern: /^\/api\/factory\/containers$/, ttlMs: 45_000 },
+  { pattern: /^\/api\/factory\/bale-products$/, ttlMs: 2 * 60_000 },
+  { pattern: /^\/api\/stock-items\/light$/, ttlMs: 5 * 60_000 },
+  { pattern: /^\/api\/factory\/production-value-report$/, ttlMs: 30_000 },
+  { pattern: /^\/api\/factory\/workers$/, ttlMs: 2 * 60_000 },
+  { pattern: /^\/api\/factory\/workers\/attendance-report$/, ttlMs: 30_000 },
+  { pattern: /^\/api\/factory\/monthly-salary-summary$/, ttlMs: 60_000 },
+  { pattern: /^\/api\/factory\/bale-ledger$/, ttlMs: 30_000 },
+  { pattern: /^\/api\/factory\/suppliers$/, ttlMs: 2 * 60_000 },
+  { pattern: /^\/api\/factory\/suppliers\/with-balances$/, ttlMs: 30_000 },
+  { pattern: /^\/api\/factory\/suppliers\/\d+\/broker-statement$/, ttlMs: 30_000 },
+  { pattern: /^\/api\/factory\/categories$/, ttlMs: 5 * 60_000 },
+  { pattern: /^\/api\/pos\/last-sold-prices$/, ttlMs: 30_000 },
+  { pattern: /^\/api\/pos\/drafts$/, ttlMs: 15_000 },
+  { pattern: /^\/api\/accounts\/all$/, ttlMs: 30_000 },
+  { pattern: /^\/api\/accounts\/voucher-sidebar$/, ttlMs: 30_000 },
+  { pattern: /^\/api\/worker-groups\/with-members$/, ttlMs: 60_000 },
+  { pattern: /^\/api\/payroll\/employees-with-balances$/, ttlMs: 60_000 },
+  { pattern: /^\/api\/git\/containers$/, ttlMs: 30_000 },
+  { pattern: /^\/api\/barcode\/[^/]+$/, ttlMs: 30_000 },
+  { pattern: /^\/api\/user\/companies$/, ttlMs: 5 * 60_000 },
+  { pattern: /^\/api\/user-preferences$/, ttlMs: 5 * 60_000 },
   { pattern: /^\/api\/factory\/customer-orders\/\d+$/, ttlMs: 45_000 },
   { pattern: /^\/api\/factory\/customer-orders\/\d+\/bale-removals$/, ttlMs: 5 * 60_000 },
   { pattern: /^\/api\/factory\/bale-stock-count$/, ttlMs: 60_000 },
@@ -50,6 +78,13 @@ const CACHE_TTLS: Array<{ pattern: RegExp; ttlMs: number }> = [
 ];
 
 const HEAVY_HIDDEN_TAB_PATHS = [
+  /^\/api\/locations\/\d+\/inventory$/,
+  /^\/api\/factory\/location-inventory\/\d+$/,
+  /^\/api\/ledger-accounts$/,
+  /^\/api\/factory\/containers$/,
+  /^\/api\/factory\/bale-products$/,
+  /^\/api\/stock-items\/light$/,
+  /^\/api\/factory\/workers$/,
   /^\/api\/factory\/raw-stock$/,
   /^\/api\/factory\/net-position$/,
   /^\/api\/factory\/bale-ledger$/,
@@ -86,7 +121,7 @@ function cacheTtlFor(pathname: string): number {
 }
 
 function shouldBypass(pathname: string, headers: Headers): boolean {
-  if (headers.has("range")) return true;
+  if (headers.has("range") || headers.has("x-bypass-request-storm-guard")) return true;
   return BYPASS_PATHS.some((pattern) => pattern.test(pathname));
 }
 
@@ -259,11 +294,17 @@ export function installRequestStormGuard(): void {
     }
 
     if (method !== "GET") {
-      // Any write can change balances, stock, orders, settings or access. Clear all
-      // short-lived read snapshots first so normal TanStack invalidations always
-      // receive fresh server data immediately after the mutation.
+      // Clear before the write and again after it finishes. The second clear prevents
+      // a GET that raced the mutation from leaving a stale response in the cache.
       clearReadCache();
-      return originalFetch(input, init);
+      try {
+        const response = await originalFetch(input, init);
+        clearReadCache();
+        return response;
+      } catch (error) {
+        clearReadCache();
+        throw error;
+      }
     }
 
     const headers = requestHeaders(input, init);
