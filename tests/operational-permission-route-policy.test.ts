@@ -1,0 +1,55 @@
+import { describe, expect, it } from "vitest";
+import { classifyOperationalPermissionRoute } from "../server/services/security/operationalPermissionRoutePolicy";
+
+describe("operational permission route policy", () => {
+  it("classifies import workflows and excludes import-cycle reads", () => {
+    expect(classifyOperationalPermissionRoute("POST", "/api/po-import/import")).toMatchObject({
+      operation: "import",
+      permissionKey: "act_import_data",
+      deniedRoles: ["POS", "View Only"],
+    });
+    expect(classifyOperationalPermissionRoute("POST", "/api/stock-items/import")).toMatchObject({
+      operation: "import",
+      permissionKey: "act_import_data",
+    });
+    expect(classifyOperationalPermissionRoute("GET", "/api/stats/import-cycle-balance")).toBeNull();
+  });
+
+  it("classifies company-scoped repair and recalculation mutations", () => {
+    expect(
+      classifyOperationalPermissionRoute("POST", "/api/admin/recalculate-equity-adjustment")
+    ).toMatchObject({
+      operation: "bulk-maintenance",
+      permissionKey: "act_bulk_operations",
+    });
+    expect(classifyOperationalPermissionRoute("GET", "/api/admin/repair-preview")).toBeNull();
+  });
+
+  it("makes the all-company export center Developer-only", () => {
+    expect(classifyOperationalPermissionRoute("POST", "/api/export/start")).toEqual({
+      operation: "global-export-center",
+      permissionType: "export",
+      permissionKey: "exp_backup_download",
+      developerOnly: true,
+    });
+  });
+
+  it("uses specific export permissions", () => {
+    expect(classifyOperationalPermissionRoute("GET", "/api/reports/stock/export/excel")).toMatchObject({
+      operation: "stock-export",
+      permissionKey: "exp_stock_report",
+    });
+    expect(classifyOperationalPermissionRoute("GET", "/api/invoices/7/pdf")).toMatchObject({
+      operation: "pdf-export",
+      permissionKey: "exp_pdf",
+    });
+    expect(classifyOperationalPermissionRoute("GET", "/api/vouchers/7/print")).toMatchObject({
+      operation: "print",
+      permissionKey: "exp_print_invoice",
+    });
+  });
+
+  it("ignores ordinary JSON report reads", () => {
+    expect(classifyOperationalPermissionRoute("GET", "/api/reports/sales")).toBeNull();
+  });
+});
