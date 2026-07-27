@@ -48,15 +48,31 @@ export async function upsertChargeMapping(params: {
       charge_type = EXCLUDED.charge_type,
       amount_usd = EXCLUDED.amount_usd,
       source_ledger_account_id = EXCLUDED.source_ledger_account_id,
-      target_ledger_account_id = EXCLUDED.target_ledger_account_id,
-      mapping_method = EXCLUDED.mapping_method,
-      review_status = EXCLUDED.review_status,
-      notes = EXCLUDED.notes
-    RETURNING id, (xmax = 0) AS inserted
+      target_ledger_account_id = CASE
+        WHEN sp_migration_container_charges.mapping_method = 'manual_approval'
+          THEN sp_migration_container_charges.target_ledger_account_id
+        ELSE EXCLUDED.target_ledger_account_id
+      END,
+      mapping_method = CASE
+        WHEN sp_migration_container_charges.mapping_method = 'manual_approval'
+          THEN sp_migration_container_charges.mapping_method
+        ELSE EXCLUDED.mapping_method
+      END,
+      review_status = CASE
+        WHEN sp_migration_container_charges.mapping_method = 'manual_approval'
+          THEN sp_migration_container_charges.review_status
+        ELSE EXCLUDED.review_status
+      END,
+      notes = CASE
+        WHEN sp_migration_container_charges.mapping_method = 'manual_approval'
+          THEN trim(COALESCE(sp_migration_container_charges.notes, '') || ' Source amount refreshed during final synchronization.')
+        ELSE EXCLUDED.notes
+      END
+    RETURNING id, (xmax = 0) AS inserted, review_status
   `);
 
   return {
-    reviewStatus: mapped.reviewStatus,
+    reviewStatus: String((upsertResult as any).rows?.[0]?.review_status ?? mapped.reviewStatus),
     amountUsd: candidate.amountUsd,
     inserted: Boolean((upsertResult as any).rows?.[0]?.inserted),
   };
