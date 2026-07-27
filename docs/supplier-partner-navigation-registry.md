@@ -12,41 +12,47 @@ Supplier Partner routes are valid only when the selected company has:
 companyType === "supplier_partner"
 ```
 
-Any direct `/sp` or `/sp/*` request while another company type is selected must redirect with replacement history to `/tracking`. This prevents SP pages from mounting under a normal ERP, Factory, or Properties company context.
+Any direct `/sp` or `/sp/*` request while another company type is selected redirects with replacement history to `/tracking`. This prevents SP pages from mounting under a normal ERP, Factory, or Properties company context.
 
-## Current route inventory
+## Canonical route inventory
 
-| Route | Screen | Current role | Phase 1 access |
-|---|---|---|---|
-| `/sp` | Namespace entry | Missing before audit | Supplier Partner companies only; replacement redirect to `/sp/reports` |
-| `/sp/reports` | Supplier payable, profit and loss, sales-form exports | Daily operational page | Supplier Partner companies only |
-| `/sp/opening-stock` | Supplier Partner opening-stock workflow | Operational/configuration page | Supplier Partner companies only |
-| `/sp/aliases` | Stock-item alias management | Operational/configuration page | Supplier Partner companies only |
-| `/sp/setup` | Account, warehouse, and supplier-link initialization/repair | Administrative page | Supplier Partner companies only; role tightening deferred to Phase 4 |
-| `/sp/migration` | GC Lshi staged migration | Compatibility route | Supplier Partner companies only; canonicalization deferred to Phase 4 |
-| `/sp/gc-migration` | GC Lshi staged migration | Current sidebar route | Supplier Partner companies only; canonicalization deferred to Phase 4 |
+| Route | Screen | Current role |
+|---|---|---|
+| `/sp` | Supplier Partner Overview | Daily operational landing page |
+| `/sp/reports` | Supplier Payable report | Daily operational page |
+| `/sp/reports?tab=profit` | Profit & Loss report | Daily operational report tab |
+| `/sp/reports?tab=sales-form` | Sales Form exports | Daily operational report tab |
+| `/sp/opening-stock` | Supplier Partner opening-stock workflow | Operational/configuration page |
+| `/sp/aliases` | Stock-item alias management | Operational/configuration page |
+| `/sp/setup` | Account, warehouse, and supplier-link initialization/repair | Administrative page; role tightening deferred to Phase 4 |
+| `/sp/migration` | GC Lshi staged migration | Compatibility route; canonicalization deferred to Phase 4 |
+| `/sp/gc-migration` | GC Lshi staged migration | Historical sidebar route; canonicalization deferred to Phase 4 |
 
-## Current sidebar structure
+## Sidebar structure
 
-Supplier Partner is appended inside the standard ERP sidebar when the selected company is a Supplier Partner company.
+### Supplier Partner
 
-- SP Reports
+- Overview
+- Reports
 - Opening Stock
 - Aliases
-- Setup
-- GC Migration
 
-The section is currently flat. Daily work and administration are not separated yet.
+### SP Administration
+
+- Setup
+- Migration
+
+Supplier Partner items are included in Recent navigation only while a Supplier Partner company is selected.
 
 ## Reports sub-navigation
 
-`/sp/reports` currently contains three internal tabs:
+Allowed `tab` values:
 
-- Supplier Payable
-- Profit & Loss
-- Sales Form
+- `payable` — default; omitted from the clean `/sp/reports` URL
+- `profit`
+- `sales-form`
 
-The tabs currently use component-local default state and are not represented in the URL. URL-backed report tabs are deferred to Phase 3.
+Invalid values canonicalize back to the default using replacement history. Tab changes are view-state changes and do not add browser-history entries. Refresh and browser navigation restore the canonical tab represented by the URL.
 
 ## Current parent-route behavior
 
@@ -58,7 +64,7 @@ Existing parent mappings:
 
 Gaps to resolve in later phases:
 
-- Opening Stock and Aliases have no Supplier Partner parent.
+- Opening Stock and Aliases need `/sp` as their deterministic parent.
 - Setup and Migration should return to an administration/settings parent rather than Reports.
 - `/sp/migration` and `/sp/gc-migration` need one canonical destination.
 - Unknown `/sp/*` paths need a Supplier Partner-specific safe fallback.
@@ -77,12 +83,6 @@ Gaps to resolve in later phases:
 - Setup — `/sp/settings?tab=setup`
 - Migration — `/sp/settings?tab=migration`
 
-### Reports
-
-- Supplier Payable — `/sp/reports`
-- Profit & Loss — `/sp/reports?tab=profit`
-- Sales Form — `/sp/reports?tab=sales-form`
-
 ## Phase plan
 
 1. Registry, company-type guard, and stable `/sp` entry.
@@ -91,9 +91,9 @@ Gaps to resolve in later phases:
 4. Administration/settings consolidation and migration canonicalization.
 5. Back/Escape completion, invalid-route fallback, regression review, and merge readiness.
 
-## Phase 1 decisions
+## Completed decisions
 
-- `/sp` is introduced as the stable namespace entry immediately.
-- Until the dedicated Overview hub is built in Phase 2, `/sp` redirects with replacement history to `/sp/reports`.
+- `/sp` is the stable Supplier Partner Overview landing page.
 - Direct SP route access from non-SP companies redirects with replacement history to `/tracking`.
-- No SP business logic, APIs, calculations, exports, migrations, setup actions, balances, or stock behavior are changed.
+- Reports use canonical URL-backed tab state.
+- No SP business logic, APIs, calculations, exports, migrations, setup actions, balances, or stock behavior changed.
