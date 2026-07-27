@@ -17,24 +17,24 @@ const requiredFiles = [
   "docs/program-2-accounting-convergence.md",
   "docs/program-2-phase-2-manual-journals-vouchers.md",
 ];
-
-for (const file of requiredFiles) {
-  if (!fs.existsSync(file)) throw new Error(`Program 2 Phase 2 missing required file: ${file}`);
-}
-
+for (const file of requiredFiles) if (!fs.existsSync(file)) throw new Error(`Program 2 Phase 2 missing required file: ${file}`);
 const read = (file) => fs.readFileSync(file, "utf8");
-const engine = read("server/services/accounting/centralPostingEngine.ts");
-const deps = read("server/services/accounting/databasePostingDependencies.ts");
-const manual = read("server/services/accounting/manualJournalPosting.ts");
-const generic = read("server/services/accounting/genericVoucherPosting.ts");
-const employee = read("server/services/accounting/employeeBalancePosting.ts");
-const lifecycleService = read("server/services/accounting/voucherLifecycleService.ts");
-const journalCreate = read("server/routes/vouchers/centralJournalCreateRoute.ts");
-const journalLifecycle = read("server/routes/vouchers/centralJournalLifecycleRoute.ts");
-const genericCreate = read("server/routes/vouchers/centralGenericVoucherCreateRoute.ts");
-const routeRegistry = read("server/routes/voucherRoutes.ts");
-const phaseDoc = read("docs/program-2-phase-2-manual-journals-vouchers.md");
-
+const engine = read(requiredFiles[0]);
+const deps = read(requiredFiles[1]);
+const manual = read(requiredFiles[2]);
+const generic = read(requiredFiles[3]);
+const employee = read(requiredFiles[4]);
+const lifecycleService = read(requiredFiles[5]);
+const journalCreate = read(requiredFiles[6]);
+const journalLifecycle = read(requiredFiles[7]);
+const genericCreate = read(requiredFiles[8]);
+const routeRegistry = read(requiredFiles[9]);
+const phaseDoc = read(requiredFiles[14]);
+const before = (a, b) => {
+  const left = routeRegistry.indexOf(a);
+  const right = routeRegistry.indexOf(b);
+  return left >= 0 && right >= 0 && left < right;
+};
 const checks = [
   [engine.includes("postBalancedVoucherTx"), "central posting entrypoint must remain available"],
   [engine.includes("replayed"), "central posting result must preserve replay status"],
@@ -47,29 +47,19 @@ const checks = [
   [employee.includes("reverse"), "employee effects must support exact reversal"],
   [lifecycleService.includes("replaceVoucherTx") && lifecycleService.includes("reverseVoucherTx"), "voucher lifecycle service must preserve replace and reverse boundaries"],
   [journalCreate.includes('"/api/vouchers/journal"'), "protected manual journal route must remain mounted"],
-  [journalCreate.includes("postBalancedVoucherTx"), "manual journal route must use central posting"],
-  [journalCreate.includes("db.transaction"), "manual journal posting must remain transaction-owned"],
-  [journalCreate.includes("if (!posted.replayed)"), "manual journal employee effects must be replay-safe"],
-  [journalCreate.includes("if (!result.replayed)"), "manual journal compatibility effects must be replay-safe"],
+  [journalCreate.includes("postBalancedVoucherTx") && journalCreate.includes("db.transaction"), "manual journal route must use central transaction-owned posting"],
+  [journalCreate.includes("if (!posted.replayed)") && journalCreate.includes("if (!result.replayed)"), "manual journal effects must be replay-safe"],
   [journalCreate.includes("req.body?.optional === true") && journalCreate.includes("next()"), "optional journal drafts must remain on the compatibility path"],
   [genericCreate.includes('"/api/vouchers/with-entries"'), "protected generic voucher route must remain mounted"],
-  [genericCreate.includes("supportsCentralGenericVoucher(req.body)"), "generic route must fail open to the legacy route outside its supported subset"],
-  [genericCreate.includes("postBalancedVoucherTx"), "generic voucher subset must use central posting"],
-  [genericCreate.includes("db.transaction"), "generic voucher posting must remain transaction-owned"],
-  [genericCreate.includes("if (!posted.replayed)"), "generic employee and compatibility effects must remain replay-safe"],
+  [genericCreate.includes("supportsCentralGenericVoucher(req.body)") && genericCreate.includes("postBalancedVoucherTx") && genericCreate.includes("db.transaction"), "generic supported subset must use central transaction-owned posting"],
+  [genericCreate.includes("if (!posted.replayed)"), "generic effects must remain replay-safe"],
   [genericCreate.includes("POSTING_LINKED_LEDGER_MISMATCH"), "customer linked-ledger mismatches must remain rejected"],
-  [journalLifecycle.includes("isReadonlyMigratedVoucher"), "migrated vouchers must remain read-only"],
-  [journalLifecycle.includes('existing.voucherType !== "Journal"'), "non-Journal lifecycle paths must remain isolated"],
+  [journalLifecycle.includes("isReadonlyMigratedVoucher") && journalLifecycle.includes('existing.voucherType !== "Journal"'), "migrated and non-Journal lifecycle paths must remain isolated"],
   [journalLifecycle.includes("existing.optional") && journalLifecycle.includes("req.body?.optional === true"), "optional Journal transitions must remain on the legacy path"],
-  [routeRegistry.indexOf("registerCentralJournalCreateRoute(app);") < routeRegistry.indexOf("registerVoucherJournalRoutes(app);"), "central journal route must register before the legacy journal route"],
-  [routeRegistry.indexOf("registerCentralJournalLifecycleRoutes(app);") < routeRegistry.indexOf("registerVoucherJournalRoutes(app);"), "central journal lifecycle must register before the legacy journal route"],
-  [routeRegistry.indexOf("registerCentralGenericVoucherCreateRoute(app);") < routeRegistry.indexOf("registerVoucherCreateRoutes(app);"), "central generic route must register before the legacy generic creator"],
-  [phaseDoc.includes("Status: complete"), "Phase 2 documentation must remain marked complete"],
-  [phaseDoc.includes("No database schema or historical record changed"), "Phase 2 safety boundary must remain documented"],
+  [before("registerCentralJournalCreateRoute(app);", "registerVoucherJournalRoutes(app);"), "central journal route must register before legacy journal route"],
+  [before("registerCentralJournalLifecycleRoutes(app);", "registerVoucherJournalRoutes(app);"), "central journal lifecycle must register before legacy journal route"],
+  [before("registerCentralGenericVoucherCreateRoute(app);", "registerVoucherCreateRoutes(app);"), "central generic route must register before legacy generic creator"],
+  [phaseDoc.includes("Status: complete") && phaseDoc.includes("No database schema or historical record changed"), "Phase 2 documentation and safety boundary must remain complete"],
 ];
-
-for (const [passed, message] of checks) {
-  if (!passed) throw new Error(`Program 2 Phase 2 verification failed: ${message}`);
-}
-
+for (const [passed, message] of checks) if (!passed) throw new Error(`Program 2 Phase 2 verification failed: ${message}`);
 console.log("Program 2 Phase 2 manual journal and generic voucher contract verified.");
