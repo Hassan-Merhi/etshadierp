@@ -1,0 +1,131 @@
+{
+  "program": "Program 2 — Accounting Convergence",
+  "phase": "Phase 1 — Accounting convergence foundation",
+  "status": "complete",
+  "classificationValues": [
+    "centralized",
+    "hybrid",
+    "legacy-isolated",
+    "read-only-or-repair"
+  ],
+  "requiredInvariants": [
+    "balanced-decimal-posting",
+    "single-transaction-owner",
+    "company-ownership-validation",
+    "deterministic-source-identity",
+    "payload-fingerprint",
+    "replay-safe-side-effects",
+    "historical-currency-preservation",
+    "exact-edit-and-delete-reversal",
+    "period-lock-before-first-write",
+    "read-only-migrated-record-protection",
+    "explicit-compatibility-passthrough",
+    "no-silent-historical-repair",
+    "focused-regression-coverage"
+  ],
+  "authoritativeBoundary": "server/services/accounting/index.ts",
+  "domains": [
+    {
+      "id": "manual-journal",
+      "classification": "hybrid",
+      "phaseOwner": "2A",
+      "entryPoints": ["POST /api/vouchers/journal", "journal edit", "journal delete"],
+      "evidence": [
+        "server/services/accounting/manualJournalPosting.ts",
+        "server/services/accounting/voucherLifecycleService.ts",
+        "server/routes/voucherRoutes.ts"
+      ],
+      "centralizedSubset": "active journals with stable client identity; active Journal edit and deletion",
+      "passthrough": "optional drafts and optional lifecycle transitions"
+    },
+    {
+      "id": "generic-voucher",
+      "classification": "hybrid",
+      "phaseOwner": "2A",
+      "entryPoints": ["POST /api/vouchers/with-entries"],
+      "evidence": [
+        "server/services/accounting/genericVoucherPosting.ts",
+        "server/routes/voucherRoutes.ts"
+      ],
+      "centralizedSubset": "identified active USD simple vouchers with supported precision",
+      "passthrough": "optional, non-USD, advanced dual-currency, high-precision, or unidentified payloads"
+    },
+    {
+      "id": "payment-receipt",
+      "classification": "hybrid",
+      "phaseOwner": "2B",
+      "entryPoints": ["POST /api/vouchers/payment-receipt", "Payment/Receipt edit", "Payment/Receipt delete"],
+      "evidence": [
+        "server/services/accounting/paymentReceiptPosting.ts",
+        "server/services/accounting/paymentReceiptDeletionPolicy.ts",
+        "server/services/accounting/voucherLifecycleService.ts",
+        "server/routes/voucherRoutes.ts"
+      ],
+      "centralizedSubset": "active identified Payment/Receipt creation, active edit, and plain active deletion",
+      "passthrough": "optional vouchers, POS receipts, payroll vouchers, and specialized deletion workflows"
+    },
+    {
+      "id": "pos-sale",
+      "classification": "legacy-isolated",
+      "phaseOwner": "2C",
+      "entryPoints": ["POS sale create", "POS sale edit", "POS sale delete"],
+      "evidence": [
+        "server/services/pos/createSaleService.ts",
+        "server/services/pos/edit/updateSaleService.ts"
+      ],
+      "reason": "accounting and inventory effects require one route-specific transaction owner"
+    },
+    {
+      "id": "stock-transfer",
+      "classification": "legacy-isolated",
+      "phaseOwner": "2C",
+      "entryPoints": ["stock transfer create", "stock transfer edit", "stock transfer delete"],
+      "evidence": ["server/routes/voucherRoutes.ts"],
+      "reason": "source and destination inventory plus accounting must converge atomically"
+    },
+    {
+      "id": "container-offload-and-freight",
+      "classification": "legacy-isolated",
+      "phaseOwner": "2D",
+      "entryPoints": ["container offload", "own-account freight", "post-offload charges"],
+      "evidence": ["docs/program-2d-special-workflows.md"],
+      "reason": "factory costing, supplier balances, container state, and vouchers have high regression risk"
+    },
+    {
+      "id": "supplier-partner",
+      "classification": "legacy-isolated",
+      "phaseOwner": "2D",
+      "entryPoints": ["Supplier Partner sales", "profit split", "migration/setup posting"],
+      "evidence": ["docs/program-2d-special-workflows.md"],
+      "reason": "separate company and profit-sharing compatibility rules"
+    },
+    {
+      "id": "payroll",
+      "classification": "legacy-isolated",
+      "phaseOwner": "2D",
+      "entryPoints": ["payroll run", "salary advance", "payroll reversal"],
+      "evidence": ["docs/program-2d-special-workflows.md"],
+      "reason": "employee balances and payroll-run lifecycle require specialized reversal"
+    },
+    {
+      "id": "rentals-properties",
+      "classification": "legacy-isolated",
+      "phaseOwner": "2D",
+      "entryPoints": ["rental billing", "property payment", "rental reversal"],
+      "evidence": ["docs/program-2d-special-workflows.md"],
+      "reason": "monthly property ledger and payment linkage must remain exact"
+    },
+    {
+      "id": "reconciliation-and-repair",
+      "classification": "read-only-or-repair",
+      "phaseOwner": "foundation",
+      "entryPoints": ["reconciliation report", "approved repair execution", "period lock"],
+      "evidence": [
+        "server/services/accounting/partyReconciliationService.ts",
+        "server/services/accounting/reconciliationRepairService.ts",
+        "server/services/accounting/periodLockService.ts"
+      ],
+      "reason": "not ordinary live posting; repair execution must remain explicit and controlled"
+    }
+  ]
+}
