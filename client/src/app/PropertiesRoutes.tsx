@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 import { Switch, Route, Redirect } from "wouter";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import PropertiesRentalsHub from "@/pages/properties/PropertiesRentalsHub";
 import {
   AccountGroups,
   Agents,
@@ -21,9 +22,6 @@ import {
   PropertiesDaybook,
   PropertiesLedgerMonthly,
   PropertiesLedgerVouchers,
-  PropertiesRentalPayments,
-  PropertiesRentalShops,
-  PropertiesRentalWarehouses,
   PropertiesSettings,
   PropertiesVoucherDetail,
   PropertiesVoucherEdit,
@@ -60,9 +58,18 @@ export function PropertiesRoutes({ user, currentLocation }: PropertiesRoutesProp
           <Route path="/properties/analytics" component={PropertiesAnalytics} />
           <Route path="/properties/agents" component={Agents} />
           <Route path="/properties/daybook" component={PropertiesDaybook} />
-          <Route path="/properties/rental/warehouses" component={PropertiesRentalWarehouses} />
-          <Route path="/properties/rental/shops" component={PropertiesRentalShops} />
-          <Route path="/properties/rental/payments" component={PropertiesRentalPayments} />
+
+          <Route path="/properties/rentals" component={PropertiesRentalsHub} />
+          <Route path="/properties/rental/warehouses">
+            {() => <Redirect replace to="/properties/rentals" />}
+          </Route>
+          <Route path="/properties/rental/shops">
+            {() => <Redirect replace to="/properties/rentals?tab=shops" />}
+          </Route>
+          <Route path="/properties/rental/payments">
+            {() => <Redirect replace to="/properties/rentals?tab=payments" />}
+          </Route>
+
           {user?.role === "Developer" && (
             <Route path="/properties/transfer" component={CompanyTransfer} />
           )}
@@ -103,7 +110,7 @@ export function PropertiesRoutes({ user, currentLocation }: PropertiesRoutesProp
           )}
           <Route path="/my-settings" component={MySettings} />
           <Route>
-            <Redirect to="/properties/daybook" />
+            <Redirect replace to="/properties/daybook" />
           </Route>
         </Switch>
       </Suspense>
