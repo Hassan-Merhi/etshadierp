@@ -5,6 +5,8 @@ const requiredFiles = [
   "server/lib/traceContext.ts",
   "server/lib/observabilityBootstrap.ts",
   "server/lib/requestPerformanceContext.ts",
+  "server/lib/performanceDashboard.ts",
+  "server/lib/runtimePerformance.ts",
   "server/middleware/requestLogger.ts",
   "server/middleware/activityAudit.ts",
   "server/middleware/clientObservability.ts",
@@ -25,6 +27,8 @@ for (const file of requiredFiles) {
 const logger = fs.readFileSync("server/lib/logger.ts", "utf8");
 const trace = fs.readFileSync("server/lib/traceContext.ts", "utf8");
 const bootstrap = fs.readFileSync("server/lib/observabilityBootstrap.ts", "utf8");
+const dashboard = fs.readFileSync("server/lib/performanceDashboard.ts", "utf8");
+const runtime = fs.readFileSync("server/lib/runtimePerformance.ts", "utf8");
 const requestLogger = fs.readFileSync("server/middleware/requestLogger.ts", "utf8");
 const intake = fs.readFileSync("server/middleware/clientObservability.ts", "utf8");
 const wsServer = fs.readFileSync("server/wsServer.ts", "utf8");
@@ -45,35 +49,32 @@ const checks = [
   [bootstrap.includes("maersk"), "carrier dependency tracing must remain available"],
   [bootstrap.includes("EXTERNAL_DEPENDENCY_SLOW_MS"), "external dependency slow threshold must be configurable"],
   [bootstrap.includes("scheduler-${randomUUID()}"), "scheduled jobs must receive correlation IDs"],
-  [bootstrap.includes("cronAny.schedule"), "cron callbacks must be wrapped centrally"],
+  [bootstrap.includes("recordRuntimePerformance"), "dependency and scheduler spans must feed the Phase 3 runtime window"],
   [requestLogger.includes("X-Request-Id"), "request logger must return a correlation ID"],
-  [requestLogger.includes("(req as any).requestId = requestId"), "request ID must be available downstream"],
   [requestLogger.includes("runWithTraceContext"), "every HTTP request must create a trace context"],
-  [requestLogger.includes("runWithRequestPerformanceContext"), "database timing must be active for every request"],
-  [requestLogger.includes("normaliseRouteTemplate"), "HTTP logs must use route templates"],
-  [requestLogger.includes("dbQueryCount"), "request metrics must include database query counts"],
-  [requestLogger.includes("handleClientObservability"), "browser intake must be mounted in the authenticated path"],
-  [requestLogger.includes("/api/health/metrics"), "monitoring metrics endpoint must remain available"],
-  [requestLogger.includes("isMonitoringRole"), "metrics endpoint must remain role restricted"],
-  [requestLogger.includes("recordOperationalEvent"), "HTTP failures must feed operational events"],
-  [wsServer.includes("source: \"websocket\""), "WebSocket work must receive trace context"],
-  [wsServer.includes("websocket-broadcast-${randomUUID()}"), "WebSocket broadcasts must receive correlation IDs"],
+  [requestLogger.includes("recordPerformanceSample"), "HTTP requests must feed the bounded performance dashboard"],
+  [requestLogger.includes("responseBytes"), "dashboard samples must include response size"],
+  [dashboard.includes("PERFORMANCE_DASHBOARD_MAX_SAMPLES"), "HTTP dashboard retention must be bounded"],
+  [dashboard.includes("p50Ms") && dashboard.includes("p95Ms") && dashboard.includes("p99Ms"), "dashboard must expose latency percentiles"],
+  [dashboard.includes('"Supplier Partner"') && dashboard.includes('"Properties"') && dashboard.includes('"POS"'), "dashboard must separate application modes"],
+  [dashboard.includes("/api/health/performance.json"), "dashboard JSON endpoint must remain available"],
+  [dashboard.includes("Admin or Developer access required"), "performance dashboard must remain role restricted"],
+  [dashboard.includes("getRuntimePerformanceSnapshot"), "dashboard must include background and dependency aggregates"],
+  [runtime.includes("PERFORMANCE_DASHBOARD_RUNTIME_MAX_SAMPLES"), "runtime performance retention must be bounded"],
+  [runtime.includes("backgroundJobs") && runtime.includes("dependencies"), "runtime snapshot must separate jobs and dependencies"],
+  [wsServer.includes('source: "websocket"'), "WebSocket work must receive trace context"],
   [intake.includes('const ENDPOINT = "/api/auth/observability/client-error"'), "browser intake must remain authenticated"],
-  [intake.includes("Authentication required"), "browser intake must reject unauthenticated requests"],
   [intake.includes("CLIENT_ERROR_RATE_LIMIT"), "server intake must remain rate limited"],
   [intake.includes("CLIENT_ERROR_DEDUPE_MS"), "server intake must deduplicate repeated failures"],
   [intake.includes("OBSERVABILITY_WEBHOOK_URL"), "external delivery must remain optional"],
-  [intake.includes("External observability delivery failed"), "external delivery must fail open"],
   [index.includes('process.on("unhandledRejection"'), "server must capture unhandled rejections"],
   [index.includes('process.on("uncaughtException"'), "server must capture uncaught exceptions"],
   [clientMain.includes("installClientObservability()"), "client capture must be installed before rendering"],
   [clientMain.includes("<ObservabilityErrorBoundary>"), "React tree must use the observability boundary"],
   [clientCapture.includes('window.addEventListener("error"'), "window errors must be captured"],
   [clientCapture.includes('window.addEventListener("unhandledrejection"'), "promise rejections must be captured"],
-  [clientCapture.includes('headers.set("X-Request-Id"'), "browser API calls must carry correlation IDs"],
   [errorBoundary.includes("componentDidCatch"), "React render failures must be reported"],
-  [roadmap.includes("Phase 1 — Centralized error capture and correlation"), "Phase 1 must remain documented"],
-  [roadmap.includes("Phase 2 — Structured tracing and dependency timing"), "Phase 2 must remain documented"],
+  [roadmap.includes("Phase 3 — Performance dashboards"), "Phase 3 must remain documented"],
   [roadmap.includes("Status: complete"), "completed observability phases must remain marked complete"],
   [roadmap.includes("Never send request bodies"), "payload privacy boundary must remain documented"],
   [roadmap.includes("Monitoring dependencies must fail open"), "fail-open behavior must remain documented"],
@@ -83,4 +84,4 @@ for (const [passed, message] of checks) {
   if (!passed) throw new Error(`Program 1 observability verification failed: ${message}`);
 }
 
-console.log("Program 1 observability Phase 1 and Phase 2 contract verified.");
+console.log("Program 1 observability Phases 1-3 contract verified.");

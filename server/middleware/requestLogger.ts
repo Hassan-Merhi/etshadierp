@@ -8,6 +8,7 @@ import type { Request, Response, NextFunction } from "express";
 import { pool } from "../db";
 import { logger } from "../lib/logger";
 import { getOperationalEventSnapshot, recordOperationalEvent } from "../lib/operationalEvents";
+import { handlePerformanceDashboard, recordPerformanceSample } from "../lib/performanceDashboard";
 import {
   getRequestPerformanceMetrics,
   runWithRequestPerformanceContext,
@@ -22,7 +23,7 @@ import { handleClientObservability } from "./clientObservability";
 
 const SLOW_REQUEST_MS = Number(process.env.SLOW_REQUEST_MS || 500);
 const SUCCESS_SAMPLE_RATE = Math.min(1, Math.max(0, Number(process.env.REQUEST_LOG_SAMPLE_RATE || 0)));
-const SKIPPED_PATHS = new Set(["/api/health", "/api/health/db", "/api/health/metrics", "/api/boot", "/api/csrf-token"]);
+const SKIPPED_PATHS = new Set(["/api/health", "/api/health/db", "/api/health/metrics", "/api/health/performance", "/api/health/performance.json", "/api/boot", "/api/csrf-token"]);
 const startedAt = Date.now();
 
 type DurationBucket = "under100" | "under500" | "under1000" | "under5000" | "over5000";
@@ -144,9 +145,21 @@ export function requestLogger(req: Request, res: Response, next: NextFunction): 
   const initialLocationId = Number(session?.currentLocationId) || undefined;
   const initialUserId = session?.userId || (req as any).user?.id;
   const buildVersion = process.env.BUILD_VERSION || process.env.RENDER_GIT_COMMIT?.substring(0, 8) || "dev";
+  let responseBytes = 0;
 
   (req as any).requestId = requestId;
   res.setHeader("X-Request-Id", requestId);
+
+  const originalWrite = res.write.bind(res);
+  (res as typeof res & { write: typeof res.write }).write = function (chunk: any, ...args: any[]): boolean {
+    if (chunk != null) responseBytes += Buffer.isBuffer(chunk) ? chunk.length : Buffer.byteLength(String(chunk));
+    return originalWrite(chunk, ...args);
+  };
+  const originalEnd = res.end.bind(res);
+  (res as typeof res & { end: typeof res.end }).end = function (chunk?: any, ...args: any[]): Response {
+    if (chunk != null && typeof chunk !== "function") responseBytes += Buffer.isBuffer(chunk) ? chunk.length : Buffer.byteLength(String(chunk));
+    return originalEnd(chunk, ...args);
+  };
 
   runWithTraceContext(
     {
@@ -160,6 +173,7 @@ export function requestLogger(req: Request, res: Response, next: NextFunction): 
     },
     () => runWithRequestPerformanceContext(() => {
       if (handleClientObservability(req, res, requestId)) return;
+      if (handlePerformanceDashboard(req, res)) return;
 
       if (req.method === "GET" && req.path === "/api/health") {
         res.status(200).json({ status: "ok", timestamp: new Date().toISOString(), uptimeSeconds: Math.floor(process.uptime()) });
@@ -207,6 +221,7 @@ export function requestLogger(req: Request, res: Response, next: NextFunction): 
         recordDuration(durationMs);
         metrics.dbQueryCount += databaseMetrics.dbQueryCount;
         metrics.dbDurationMs += databaseMetrics.dbDurationMs;
+        recordPerformanceSample({ method, routeTemplate, status: statusCode, durationMs, responseBytes, dbQueryCount: databaseMetrics.dbQueryCount, dbDurationMs: databaseMetrics.dbDurationMs });
         writeSuccessfulActivityAudit(req, statusCode);
 
         if (statusCode >= 500) metrics.serverError += 1;
@@ -227,6 +242,7 @@ export function requestLogger(req: Request, res: Response, next: NextFunction): 
             path: routeTemplate,
             status: statusCode,
             durationMs,
+            responseBytes,
             dbQueryCount: databaseMetrics.dbQueryCount,
             dbDurationMs: databaseMetrics.dbDurationMs,
             ...(userId != null ? { userId: Number(userId) } : {}),
@@ -252,6 +268,7 @@ export function requestLogger(req: Request, res: Response, next: NextFunction): 
           ...(locationId != null ? { locationId } : {}),
           status: statusCode,
           durationMs,
+          responseBytes,
           dbQueryCount: databaseMetrics.dbQueryCount,
           dbDurationMs: Math.round(databaseMetrics.dbDurationMs),
           slow: isSlow,

@@ -3,6 +3,7 @@
  * Production emits one-line JSON. Development emits compact readable lines.
  * Context is sanitised before output and must never contain request/response bodies.
  */
+import { markRuntimeFailure } from "./runtimePerformance";
 import { getTraceContext } from "./traceContext";
 
 const isDev = process.env.NODE_ENV !== "production";
@@ -34,9 +35,7 @@ const MAX_DEPTH = 4;
 
 function safeError(err: unknown): { message: string; stack?: string } | undefined {
   if (err === undefined || err === null) return undefined;
-  if (err instanceof Error) {
-    return isDev ? { message: err.message, stack: err.stack } : { message: err.message };
-  }
+  if (err instanceof Error) return isDev ? { message: err.message, stack: err.stack } : { message: err.message };
   return { message: String(err).slice(0, MAX_STRING_LENGTH) };
 }
 
@@ -49,7 +48,6 @@ function sanitiseValue(value: unknown, depth = 0, seen = new WeakSet<object>()):
   if (value instanceof Date) return value.toISOString();
   if (Buffer.isBuffer(value)) return `[Buffer ${value.length} bytes]`;
   if (depth >= MAX_DEPTH) return "[MaxDepth]";
-
   if (typeof value === "object") {
     if (seen.has(value)) return "[Circular]";
     seen.add(value);
@@ -74,15 +72,11 @@ function sanitiseContext(ctx: LogContext): Record<string, unknown> {
 
 function emit(level: LogLevel, message: string, ctx: LogContext = {}): void {
   if (level === "debug" && !isDev) return;
-
+  if (level === "error") markRuntimeFailure();
   const trace = getTraceContext();
-  const mergedContext: LogContext = {
-    ...(trace || {}),
-    ...ctx,
-  };
+  const mergedContext: LogContext = { ...(trace || {}), ...ctx };
   const safeContext = sanitiseContext(mergedContext);
   const error = safeError(mergedContext.error);
-
   if (isDev) {
     const parts: string[] = [`[${level.toUpperCase()}]`, message];
     if (mergedContext.module) parts.push(`[${mergedContext.module}${mergedContext.action ? `:${mergedContext.action}` : ""}]`);
@@ -95,36 +89,14 @@ function emit(level: LogLevel, message: string, ctx: LogContext = {}): void {
     if (mergedContext.durationMs != null) parts.push(`(${mergedContext.durationMs}ms)`);
     if (error) parts.push(`— ${error.message}`);
     const line = parts.join(" ");
-    if (level === "error") console.error(line);
-    else if (level === "warn") console.warn(line);
-    else console.log(line);
+    if (level === "error") console.error(line); else if (level === "warn") console.warn(line); else console.log(line);
     return;
   }
-
-  const entry: Record<string, unknown> = {
-    timestamp: new Date().toISOString(),
-    level: level.toUpperCase(),
-    message: message.slice(0, MAX_STRING_LENGTH),
-    ...safeContext,
-  };
+  const entry: Record<string, unknown> = { timestamp: new Date().toISOString(), level: level.toUpperCase(), message: message.slice(0, MAX_STRING_LENGTH), ...safeContext };
   if (error !== undefined) entry.error = error;
-
   let line: string;
-  try {
-    line = JSON.stringify(entry);
-  } catch {
-    line = JSON.stringify({
-      timestamp: new Date().toISOString(),
-      level: "ERROR",
-      message: "Logger serialization failed",
-      module: "logger",
-      action: "serialize",
-    });
-  }
-
-  if (level === "error") console.error(line);
-  else if (level === "warn") console.warn(line);
-  else console.log(line);
+  try { line = JSON.stringify(entry); } catch { line = JSON.stringify({ timestamp: new Date().toISOString(), level: "ERROR", message: "Logger serialization failed", module: "logger", action: "serialize" }); }
+  if (level === "error") console.error(line); else if (level === "warn") console.warn(line); else console.log(line);
 }
 
 export const logger = {

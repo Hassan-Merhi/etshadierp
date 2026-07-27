@@ -69,9 +69,34 @@ Verification boundary:
 
 ## Phase 3 — Performance dashboards
 
-- Provide Admin/Developer dashboards for latency percentiles, error rate, active requests, memory, database-pool pressure, response size, and top slow route templates.
-- Add bounded time-window aggregation rather than unbounded in-memory history.
-- Separate ERP, Factory, Supplier Partner, Properties, POS, and background-job views.
+Status: complete.
+
+Implemented:
+
+- Added a bounded rolling HTTP performance window with configurable time and sample limits.
+- Captures safe route templates, mode, status, latency, response size, database query count, and database duration.
+- Computes p50, p95, and p99 request latency.
+- Computes per-route p95, average and maximum latency, average database time, response size, request count, and 5xx count.
+- Separates ERP, Factory, Supplier Partner, Properties, and POS traffic.
+- Includes memory and database-pool pressure snapshots.
+- Added a second bounded runtime window for scheduled jobs and selected external dependencies.
+- Scheduled jobs show call count, failures, average, p95, and maximum duration.
+- Green API and supported carrier dependencies show call count, failures, average, p95, and maximum duration.
+- Provides a protected Admin/Developer HTML dashboard at `/api/health/performance`.
+- Provides the same bounded snapshot as JSON at `/api/health/performance.json`.
+- The HTML dashboard refreshes every 30 seconds and does not load external assets.
+- Static verification protects role restrictions, bounded retention, latency percentiles, mode separation, runtime aggregates, and privacy boundaries.
+
+Configuration:
+
+- `PERFORMANCE_DASHBOARD_WINDOW_MS` defaults to 15 minutes.
+- `PERFORMANCE_DASHBOARD_MAX_SAMPLES` defaults to 5,000 HTTP samples.
+- `PERFORMANCE_DASHBOARD_RUNTIME_MAX_SAMPLES` defaults to 2,000 runtime samples.
+
+Production threshold review:
+
+- The dashboard intentionally reports measurements without changing runtime behavior.
+- Alert thresholds are deferred to Phase 4 and remain configurable so live traffic can establish a baseline safely.
 
 ## Phase 4 — Alerts and operational response
 

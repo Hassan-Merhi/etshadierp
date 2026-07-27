@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import cron from "node-cron";
 import { logger } from "./logger";
+import { captureRuntimeFailures, recordRuntimePerformance } from "./runtimePerformance";
 import { getTraceContext, runWithTraceContext, withTraceSpan } from "./traceContext";
 
 const BOOTSTRAP_KEY = "__erpObservabilityBootstrapInstalled";
@@ -27,21 +28,35 @@ function installExternalFetchTracing(): void {
   globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
     const dependency = safeDependencyName(input);
     if (!dependency) return originalFetch(input, init);
-
-    return withTraceSpan(`external.${dependency}`, () => originalFetch(input, init), ({ durationMs, failed }) => {
+    const startedAt = performance.now();
+    try {
+      const response = await originalFetch(input, init);
+      const durationMs = performance.now() - startedAt;
+      const failed = !response.ok;
       const trace = getTraceContext();
-      const thresholdMs = Number(process.env.EXTERNAL_DEPENDENCY_SLOW_MS || 1_500);
+      recordRuntimePerformance({ kind: "dependency", name: dependency, durationMs, failed, source: trace?.source || "background" });
+      const configured = Number(process.env.EXTERNAL_DEPENDENCY_SLOW_MS);
+      const thresholdMs = Number.isFinite(configured) ? Math.max(0, configured) : 1_500;
       const slow = durationMs >= thresholdMs;
-      if (!failed && !slow) return;
-      logger[failed ? "error" : "warn"]("External dependency operation", {
-        module: "dependency",
-        action: failed ? "request_failed" : "slow_request",
-        dependency,
-        durationMs: Math.round(durationMs),
-        requestId: trace?.requestId,
-        source: trace?.source,
-      });
-    });
+      if (failed || slow) {
+        logger[failed ? "error" : "warn"]("External dependency operation", {
+          module: "dependency",
+          action: failed ? "request_failed" : "slow_request",
+          dependency,
+          durationMs: Math.round(durationMs),
+          status: response.status,
+          requestId: trace?.requestId,
+          source: trace?.source,
+        });
+      }
+      return response;
+    } catch (error) {
+      const durationMs = performance.now() - startedAt;
+      const trace = getTraceContext();
+      recordRuntimePerformance({ kind: "dependency", name: dependency, durationMs, failed: true, source: trace?.source || "background" });
+      logger.error("External dependency operation", { module: "dependency", action: "request_failed", dependency, durationMs: Math.round(durationMs), requestId: trace?.requestId, source: trace?.source, error });
+      throw error;
+    }
   }) as typeof globalThis.fetch;
 }
 
@@ -52,16 +67,21 @@ function installCronTracing(): void {
   const originalSchedule = cron.schedule.bind(cron);
 
   cronAny.schedule = (expression: string, callback: (...args: any[]) => any, options?: any) => {
+    const jobName = `cron:${String(expression).slice(0, 80)}`;
     const wrapped = (...args: any[]) => {
       const requestId = `scheduler-${randomUUID()}`;
+      let loggedFailure = false;
       return runWithTraceContext(
-        {
-          requestId,
-          routeTemplate: `cron:${String(expression).slice(0, 80)}`,
-          buildVersion: process.env.BUILD_VERSION || process.env.RENDER_GIT_COMMIT?.substring(0, 8) || "dev",
-          source: "scheduler",
-        },
-        () => callback(...args),
+        { requestId, routeTemplate: jobName, buildVersion: process.env.BUILD_VERSION || process.env.RENDER_GIT_COMMIT?.substring(0, 8) || "dev", source: "scheduler" },
+        () => withTraceSpan(
+          jobName,
+          async () => {
+            const outcome = await captureRuntimeFailures(() => callback(...args));
+            loggedFailure = outcome.failed;
+            return outcome.result;
+          },
+          ({ durationMs, failed }) => recordRuntimePerformance({ kind: "background", name: jobName, durationMs, failed: failed || loggedFailure, source: "scheduler" })
+        )
       );
     };
     return originalSchedule(expression, wrapped, options);
