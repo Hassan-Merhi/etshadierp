@@ -31,6 +31,11 @@ import { enforceCompanyUserRoleScope } from "../middleware/companyUserRoleScope"
 import { enforceCompanyResourceScope } from "../middleware/companyResourceScope";
 import { enforceDeletedItemCompanyScope } from "../middleware/deletedItemCompanyScope";
 import { enforceGlobalTransactionCompanyScope } from "../middleware/globalTransactionCompanyScope";
+import { enforceOperationalPermissionScope } from "../middleware/operationalPermissionScope";
+import {
+  ActiveCompanyPermissionContextError,
+  getActiveCompanyPermissionContext,
+} from "../services/security/activeCompanyPermissionContext";
 import { chooseAuthorizedFactoryCompany } from "../services/security/factoryCompanyScopePolicy";
 import { isErpContainerFactoryAlias } from "../services/security/companyResourceRoutePolicy";
 
@@ -124,6 +129,10 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
     }
   });
 
+  // Program 3B operational permissions run after company ownership is resolved
+  // and before every legacy import, repair, export, backup, and bulk handler.
+  app.use(enforceOperationalPermissionScope);
+
   // Protected global transaction list/type routes run before the legacy module.
   registerCentralGlobalTransactionRoutes(app, requireAuth);
 
@@ -133,7 +142,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
   // FACTORY ADMIN GUARD — blocks PUT / PATCH / DELETE for non-admins unless
   // they have a valid admin-override session token
   // ─────────────────────────────────────────────────────────────────────────────
-  app.use("/api/factory", (req: any, res: any, next: any) => {
+  app.use("/api/factory", async (req: any, res: any, next: any) => {
     if (!["PUT", "PATCH", "DELETE"].includes(req.method)) return next();
     if (!req.session?.userId) return next(); // unauthenticated — let requireAuth handle it
 
@@ -159,16 +168,23 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
     // Loading note edits are open to all authenticated factory users (floor staff)
     if (req.method === "PATCH" && /^\/customer-orders\/\d+\/loading-note$/.test(req.path)) return next();
 
-    const role = req.session?.currentRole as string | undefined;
-    if (["Admin", "Owner", "Developer"].includes(role || "")) return next();
+    try {
+      const context = await getActiveCompanyPermissionContext(req);
+      if (["Admin", "Owner", "Developer"].includes(context.role)) return next();
 
-    const overrideUntil = req.session?.factoryAdminOverrideUntil as number | undefined;
-    if (overrideUntil && Date.now() < overrideUntil) return next();
+      const overrideUntil = req.session?.factoryAdminOverrideUntil as number | undefined;
+      if (overrideUntil && Date.now() < overrideUntil) return next();
 
-    return res.status(403).json({
-      message: "Admin authorization required for this action.",
-      requiresAdminOverride: true,
-    });
+      return res.status(403).json({
+        message: "Admin authorization required for this action.",
+        requiresAdminOverride: true,
+      });
+    } catch (error) {
+      if (error instanceof ActiveCompanyPermissionContextError) {
+        return res.status(error.status).json({ message: error.message, code: error.code });
+      }
+      return next(error);
+    }
   });
 
   // Container document downloads are intercepted before the legacy docs module
