@@ -2,7 +2,7 @@ import type { Request, Response } from "express";
 import { logger } from "../lib/logger";
 import { recordOperationalEvent } from "../lib/operationalEvents";
 
-const ENDPOINT = "/api/observability/client-error";
+const ENDPOINT = "/api/auth/observability/client-error";
 const RATE_WINDOW_MS = 60_000;
 const RATE_LIMIT = Math.max(1, Number(process.env.CLIENT_ERROR_RATE_LIMIT || 20));
 const DEDUPE_WINDOW_MS = Math.max(1_000, Number(process.env.CLIENT_ERROR_DEDUPE_MS || 60_000));
