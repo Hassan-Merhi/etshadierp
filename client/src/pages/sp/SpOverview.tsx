@@ -32,8 +32,8 @@ const administration = [
   },
   {
     title: "Migration",
-    description: "Open the staged GC Lshi migration workflow.",
-    href: "/sp/gc-migration",
+    description: "Open the controlled GC Lshi migration workflow.",
+    href: "/sp/setup?tab=migration",
     icon: Building2,
   },
 ];
