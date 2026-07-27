@@ -3,7 +3,7 @@ import cron from "node-cron";
 import { logger } from "./logger";
 import { getTraceContext, runWithTraceContext, withTraceSpan } from "./traceContext";
 
-const BOOTSTRAP_FLAG = Symbol.for("erp.observability.bootstrap.installed");
+const BOOTSTRAP_KEY = "__erpObservabilityBootstrapInstalled";
 const originalFetch = globalThis.fetch?.bind(globalThis);
 
 function safeDependencyName(input: RequestInfo | URL): string | undefined {
@@ -51,7 +51,7 @@ function installCronTracing(): void {
   cronAny.__erpTracePatched = true;
   const originalSchedule = cron.schedule.bind(cron);
 
-  cron.schedule = ((expression: string, callback: (...args: any[]) => any, options?: any) => {
+  cronAny.schedule = (expression: string, callback: (...args: any[]) => any, options?: any) => {
     const wrapped = (...args: any[]) => {
       const requestId = `scheduler-${randomUUID()}`;
       return runWithTraceContext(
@@ -65,12 +65,12 @@ function installCronTracing(): void {
       );
     };
     return originalSchedule(expression, wrapped, options);
-  }) as typeof cron.schedule;
+  };
 }
 
-const globalState = globalThis as typeof globalThis & { [BOOTSTRAP_FLAG]?: boolean };
-if (!globalState[BOOTSTRAP_FLAG]) {
-  globalState[BOOTSTRAP_FLAG] = true;
+const globalState = globalThis as typeof globalThis & Record<string, unknown>;
+if (!globalState[BOOTSTRAP_KEY]) {
+  globalState[BOOTSTRAP_KEY] = true;
   installExternalFetchTracing();
   installCronTracing();
 }
