@@ -46,7 +46,8 @@
 - Kept compatibility migration paths attached to the guarded Migration tab.
 - Added a Supplier Partner-specific fallback so unknown `/sp/*` routes return to `/sp` with replacement history.
 - Added final regression coverage for parent navigation, compatibility redirects, and invalid-route handling.
-- Reconciled the pull request with the latest `main` state and confirmed it remains mergeable.
+- Reviewed the latest `main` commit; it changes only Factory net-position liability filtering and does not overlap this Supplier Partner work.
+- Confirmed PR #237 remains mergeable against the current `main` branch.
 
 ## Final scope protection
 
