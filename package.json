@@ -11,6 +11,7 @@
     "verify:lockfile": "node scripts/verify-lockfile-registry.mjs",
     "verify:server-bundle": "node scripts/verify-server-bundle.mjs",
     "verify:production-dependencies": "node scripts/verify-production-dependencies.mjs",
+    "verify:final-production-readiness": "node scripts/verify-final-production-readiness.mjs",
     "verify:stabilization": "node scripts/verify-memory-stabilization.mjs",
     "verify:mobile-web-routing": "node scripts/verify-mobile-web-routing.mjs",
     "verify:bandwidth": "node scripts/verify-bandwidth-phases-1-2.mjs",
