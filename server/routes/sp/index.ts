@@ -12,6 +12,7 @@ import { registerSpExportRoutes } from "./spExportRoutes";
 import { registerSpMigrationPhase2Routes } from "./spMigrationPhase2Routes";
 import { registerSpMigrationCutoverRoutes } from "./spMigrationCutoverRoutes";
 import { registerSpMigrationFinalVerificationRoutes } from "./spMigrationFinalVerification";
+import { registerSpMigrationPhase4Routes } from "./spMigrationPhase4Routes";
 import { ensureCutoverHardening, installExplicitCompanyWriteGuard } from "./spMigrationCutoverHardening";
 import { ensureSpSupplierVoucherSyncTrigger, repairSpSupplierVoucherLinks } from "./spSupplierVoucherSync";
 
@@ -21,11 +22,12 @@ import { ensureSpSupplierVoucherSyncTrigger, repairSpSupplierVoucherLinks } from
 // adjustment call below is byte-for-byte identical to the original file —
 // only file boundaries and helper imports changed.
 export function registerSpRoutes(app: Express) {
-  // These focused migration handlers register before the legacy migration router.
-  // Phase 3 also moves its write guards before the first Express route, giving
-  // source-company read-only locks full API coverage, including endpoints that
-  // accept an explicit companyId while another company is selected in session.
+  // Phase 4 registers first so strict verification, recovery and final cutover
+  // endpoints supersede Phase 3 and the older final-verification compatibility route.
+  // Both write guards remain before the first Express route, covering session-scoped
+  // and explicit-company write paths throughout the application.
   installExplicitCompanyWriteGuard(app);
+  registerSpMigrationPhase4Routes(app);
   registerSpMigrationCutoverRoutes(app);
   registerSpMigrationPhase2Routes(app);
   registerSpMigrationFinalVerificationRoutes(app);
