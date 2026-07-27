@@ -14,65 +14,56 @@ companyType === "supplier_partner"
 
 Any direct `/sp` or `/sp/*` request while another company type is selected redirects with replacement history to `/tracking`.
 
-## Canonical route inventory
+## Final route inventory
 
-| Route | Screen | Access |
-|---|---|---|
-| `/sp` | Supplier Partner Overview | Supplier Partner company users |
-| `/sp/reports` | Supplier Payable | Supplier Partner company users |
-| `/sp/reports?tab=profit` | Profit & Loss | Supplier Partner company users |
-| `/sp/reports?tab=sales-form` | Sales Form exports | Supplier Partner company users |
-| `/sp/opening-stock` | Opening Stock | Supplier Partner company users |
-| `/sp/aliases` | Item aliases | Supplier Partner company users |
-| `/sp/setup` | Administration — Setup | Admin or Developer |
-| `/sp/setup?tab=migration` | Administration — Migration | Developer only |
-
-## Compatibility routes
-
-The following historical routes remain accepted but never mount the migration page directly:
-
-- `/sp/migration`
-- `/sp/gc-migration`
-
-Both redirect with replacement history to:
-
-```text
-/sp/setup?tab=migration
-```
-
-The consolidated administration hub then enforces Developer-only migration access.
+| Route | Screen | Access | Parent / compatibility behavior |
+|---|---|---|---|
+| `/sp` | Supplier Partner Overview | Supplier Partner companies | Namespace root |
+| `/sp/reports` | Supplier payable, profit and loss, sales-form exports | Supplier Partner companies | Back / Escape → `/sp` |
+| `/sp/opening-stock` | Supplier Partner opening-stock workflow | Supplier Partner companies | Back / Escape → `/sp` |
+| `/sp/aliases` | Stock-item alias management | Supplier Partner companies | Back / Escape → `/sp` |
+| `/sp/setup` | Supplier Partner Administration, Setup tab | Admin or Developer | Back / Escape → `/sp` |
+| `/sp/setup?tab=migration` | Supplier Partner Administration, Migration tab | Developer | Back / Escape → `/sp` |
+| `/sp/migration` | Historical compatibility path | Supplier Partner companies | Replacement redirect → `/sp/setup?tab=migration` |
+| `/sp/gc-migration` | Historical compatibility path | Supplier Partner companies | Replacement redirect → `/sp/setup?tab=migration` |
+| Unknown `/sp/*` | Invalid Supplier Partner route | Supplier Partner companies | Replacement redirect → `/sp` |
 
 ## Sidebar hierarchy
 
-### Supplier Partner
+### Daily work
 
 - Overview — `/sp`
-- SP Reports — `/sp/reports`
+- Reports — `/sp/reports`
 - Opening Stock — `/sp/opening-stock`
 - Aliases — `/sp/aliases`
 
-### SP Administration
+### Administration
 
 - Setup — `/sp/setup`
 - Migration — `/sp/setup?tab=migration`
 
-## Navigation behavior
+Supplier Partner pages are registered with Recent navigation from the same shared route source used by the sidebar.
 
-- `/sp` is the real Supplier Partner landing page.
-- Report tabs are validated URL state and use replacement history.
-- Administration tabs are validated URL state and use replacement history.
-- Wrong-company SP access redirects to `/tracking`.
-- Historical migration URLs redirect to the canonical guarded administration tab.
-- Unknown `/sp/*` fallback and final Back/Escape normalization are completed in Phase 5.
+## Reports sub-navigation
 
-## Phase plan
+- Supplier Payable — `/sp/reports`
+- Profit & Loss — `/sp/reports?tab=profit`
+- Sales Form — `/sp/reports?tab=sales-form`
 
-1. Registry, company-type guard, and stable `/sp` entry — complete.
-2. Supplier Partner overview hub and sidebar organization — complete.
-3. URL-backed Reports tabs — complete.
-4. Administration consolidation, permissions, and migration canonicalization — complete.
-5. Back/Escape completion, invalid-route fallback, regression review, and merge readiness — pending.
+Invalid report-tab values canonicalize to Supplier Payable using replacement history. Refresh restores the selected canonical tab.
 
-## Scope protection
+## Administration sub-navigation
 
-No Supplier Partner accounting, stock, payable, profit-split, export, setup operation, migration operation, API, balance, or posting business logic is changed by this navigation program.
+- Setup — `/sp/setup`
+- Migration — `/sp/setup?tab=migration`
+
+Invalid administration-tab values canonicalize to Setup. Admin users cannot open Migration; non-admin/non-developer users cannot open the administration hub.
+
+## Final decisions
+
+- `/sp` is the stable Supplier Partner landing page.
+- Setup and Migration are consolidated under one guarded administration hub.
+- Both historical migration URLs remain compatible but cannot bypass the administration permissions.
+- Back and Escape behavior is deterministic within the Supplier Partner hierarchy.
+- Unknown Supplier Partner URLs never fall through to the generic ERP 404.
+- No Supplier Partner business logic, APIs, calculations, exports, migrations, setup actions, balances, posting behavior, or historical data behavior changed.
