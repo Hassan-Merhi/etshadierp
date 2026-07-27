@@ -39,6 +39,8 @@ import {
   Filter,
   ChevronDown,
   Scale,
+  Download,
+  Upload,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
@@ -817,6 +819,81 @@ export default function FactoryOtwTrackingTab({ onEdit }: OtwTrackingTabProps = 
 
   const [bulkTracking, setBulkTracking] = useState(false);
   const [bulkProgress, setBulkProgress] = useState<{ done: number; total: number } | null>(null);
+  const [importing, setImporting] = useState(false);
+
+  // ── Dev-only: Export filtered containers as CSV ──────────────────────────
+  function exportCsv() {
+    const rows = [
+      ["Container #", "Supplier", "ETA (YYYY-MM-DD)", "Status", "Cost", "Freight", "Weight (KG)", "Notes"],
+    ];
+    for (const c of filtered) {
+      rows.push([
+        c.containerNumber || "",
+        (c as any).supplierName || "",
+        c.arrivalDate ? c.arrivalDate.slice(0, 10) : "",
+        c.status || "",
+        containerCost(c).amount > 0 ? String(containerCost(c).amount) : "",
+        num((c as any).freight) > 0 ? String(num((c as any).freight)) : "",
+        c.totalKg ? String(c.totalKg) : "",
+        notes[String(c.id)] || "",
+      ]);
+    }
+    const csv = rows
+      .map((r) => r.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(","))
+      .join("\n");
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `containers-otw-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  // ── Dev-only: Import CSV to bulk-update ETA ──────────────────────────────
+  // Expected columns: Container # (col 0), ETA YYYY-MM-DD (col 2)
+  async function handleImportFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    setImporting(true);
+    try {
+      const text = await file.text();
+      const lines = text.split(/\r?\n/).filter((l) => l.trim());
+      // Skip header row
+      const dataLines = lines.slice(1);
+      // Build lookup: containerNumber -> container id
+      const lookup = new Map<string, number>(
+        otwContainers.map((c) => [c.containerNumber?.trim().toUpperCase() ?? "", c.id])
+      );
+      let updated = 0;
+      let skipped = 0;
+      for (const line of dataLines) {
+        // Simple CSV parse (handles quoted fields)
+        const cols = line.split(",").map((c) => c.trim().replace(/^"|"$/g, "").replace(/""/g, '"'));
+        const containerNum = cols[0]?.toUpperCase().trim();
+        const etaVal = cols[2]?.trim(); // col index 2 = ETA
+        if (!containerNum || !etaVal) { skipped++; continue; }
+        const id = lookup.get(containerNum);
+        if (!id) { skipped++; continue; }
+        // Validate date format YYYY-MM-DD
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(etaVal)) { skipped++; continue; }
+        try {
+          await factoryApiRequest("PATCH", `/api/factory/containers/${id}`, { arrivalDate: etaVal });
+          updated++;
+        } catch { skipped++; }
+      }
+      tqClient.invalidateQueries({ queryKey: ["/api/factory/containers"] });
+      toast({
+        title: `Import complete`,
+        description: `${updated} ETA(s) updated, ${skipped} skipped.`,
+      });
+    } catch (err: any) {
+      toast({ title: "Import failed", description: err?.message, variant: "destructive" });
+    } finally {
+      setImporting(false);
+    }
+  }
 
   async function trackAll() {
     const eligible = otwContainers.filter((c) => {
@@ -995,20 +1072,53 @@ export default function FactoryOtwTrackingTab({ onEdit }: OtwTrackingTabProps = 
             : `Track All${trackingEnabledCount > 0 ? ` (${trackingEnabledCount})` : ""}`}
         </Button>
         {currentUser?.role === "Developer" && (
-          <Button
-            variant="outline"
-            onClick={() => jsonCargoEta.refreshBulk()}
-            disabled={jsonCargoEta.bulkIsPending}
-            title="JSONCargo ETA refresh — Maersk, Hapag-Lloyd, MSC, CMA CGM"
-            data-testid="button-update-etas"
-          >
-            {jsonCargoEta.bulkIsPending ? (
-              <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
-            ) : (
-              <RefreshCw className="h-4 w-4 mr-1.5" />
-            )}
-            Update ETAs
-          </Button>
+          <>
+            <Button
+              variant="outline"
+              onClick={() => jsonCargoEta.refreshBulk()}
+              disabled={jsonCargoEta.bulkIsPending}
+              title="JSONCargo ETA refresh — Maersk, Hapag-Lloyd, MSC, CMA CGM"
+              data-testid="button-update-etas"
+            >
+              {jsonCargoEta.bulkIsPending ? (
+                <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
+              ) : (
+                <RefreshCw className="h-4 w-4 mr-1.5" />
+              )}
+              Update ETAs
+            </Button>
+            <Button
+              variant="outline"
+              onClick={exportCsv}
+              disabled={filtered.length === 0}
+              title="Export filtered containers to CSV"
+              data-testid="button-export-csv"
+            >
+              <Download className="h-4 w-4 mr-1.5" />
+              Export CSV
+            </Button>
+            <Button
+              variant="outline"
+              disabled={importing}
+              title="Import CSV to bulk-update ETA. Columns: Container #, Supplier, ETA (YYYY-MM-DD)"
+              data-testid="button-import-csv"
+              onClick={() => document.getElementById("otw-import-input")?.click()}
+            >
+              {importing ? (
+                <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
+              ) : (
+                <Upload className="h-4 w-4 mr-1.5" />
+              )}
+              Import CSV
+            </Button>
+            <input
+              id="otw-import-input"
+              type="file"
+              accept=".csv,.txt"
+              className="hidden"
+              onChange={handleImportFile}
+            />
+          </>
         )}
       </div>
 
@@ -1191,35 +1301,6 @@ export default function FactoryOtwTrackingTab({ onEdit }: OtwTrackingTabProps = 
                     <div className="flex flex-col gap-0.5">
                       <span>{c.containerNumber || "—"}</span>
                       {isTracking && <TrackNowProgressLog containerId={c.id} />}
-                      {!isTracking && hasError && (
-                        <span className="text-xs text-destructive flex items-center gap-1">
-                          <XCircle className="h-3 w-3 shrink-0" />
-                          {(() => {
-                            const err: string = fc.trackingError ?? "";
-                            const low = err.toLowerCase();
-                            if (low.includes("timeout") || low.includes("timed out")) {
-                              return fc.trackingCarrierHint
-                                ? "Timeout — try clearing carrier hint"
-                                : "Carrier timed out — set carrier hint to retry";
-                            }
-                            return err.slice(0, 45);
-                          })()}
-                        </span>
-                      )}
-                      {!isTracking && !hasError && fc.trackingProvider && (
-                        <span className="text-xs text-muted-foreground font-normal">via {fc.trackingProvider}</span>
-                      )}
-                      {(fc.trackingDetectedCarrier || fc.trackingCarrierHint) && (
-                        <span className="text-xs text-muted-foreground font-normal">
-                          {fc.trackingCarrierHint ? (
-                            <>
-                              hint: <span className="font-medium">{fc.trackingCarrierHint}</span>
-                            </>
-                          ) : (
-                            <>carrier: {fc.trackingDetectedCarrier}</>
-                          )}
-                        </span>
-                      )}
                       {fc.trackingLastCheckedAt && (
                         <span className="text-xs text-muted-foreground font-normal">
                           {new Date(fc.trackingLastCheckedAt).toLocaleDateString(undefined, {
