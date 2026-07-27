@@ -1,45 +1,42 @@
 import { Suspense, lazy } from "react";
-import { useLocation, useSearch } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { Book, ArrowLeftRight, Tag } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useHubQueryState } from "@/hooks/use-hub-query-state";
 
 const POSDaybook = lazy(() => import("@/pages/pos/POSDaybook"));
 const StockTransfers = lazy(() => import("@/pages/StockTransfers"));
 const POSPriceList = lazy(() => import("@/pages/pos/POSPriceList"));
 
-export default function SalesToolsHub() {
-  const [, setLocation] = useLocation();
-  const search = useSearch();
-  const params = new URLSearchParams(search.startsWith("?") ? search.slice(1) : search);
-  const tabParam = params.get("tab") ?? "";
+const POS_TABS = [
+  { key: "daybook", label: "POS Daybook", icon: Book },
+  { key: "transfers", label: "Stock Transfers", icon: ArrowLeftRight },
+] as const;
 
+const ERP_TABS = [
+  { key: "transfers", label: "Stock Transfers", icon: ArrowLeftRight },
+  { key: "pricelist", label: "Price List", icon: Tag },
+] as const;
+
+export default function SalesToolsHub() {
   const { data: user } = useQuery<any>({
     queryKey: ["/api/auth/me"],
   });
 
   const isPOS = user?.role === "POS";
-
-  const tabs = isPOS
-    ? [
-        { key: "daybook", label: "POS Daybook", icon: Book },
-        { key: "transfers", label: "Stock Transfers", icon: ArrowLeftRight },
-      ]
-    : [
-        { key: "transfers", label: "Stock Transfers", icon: ArrowLeftRight },
-        { key: "pricelist", label: "Price List", icon: Tag },
-      ];
-
+  const tabs = isPOS ? POS_TABS : ERP_TABS;
+  const tabKeys = tabs.map((tab) => tab.key);
   const defaultTab = tabs[0].key;
-  const activeTab = tabs.find((t) => t.key === tabParam) ? tabParam : defaultTab;
-
-  const setTab = (key: string) => setLocation("/sales-tools?tab=" + key);
+  const [activeTab, setTab] = useHubQueryState({
+    key: "tab",
+    allowedValues: tabKeys,
+    defaultValue: defaultTab,
+  });
 
   return (
     <div className="flex flex-col h-full">
-      <Tabs value={activeTab} onValueChange={setTab} className="flex flex-col h-full">
-        {/* Tab strip header */}
+      <Tabs value={activeTab} onValueChange={(value) => setTab(value as (typeof tabKeys)[number])} className="flex flex-col h-full">
         <div className="border-b bg-background px-4 py-2.5 shrink-0">
           <div className="flex gap-1 p-1 rounded-xl border bg-card w-fit">
             {tabs.map((t) => {
