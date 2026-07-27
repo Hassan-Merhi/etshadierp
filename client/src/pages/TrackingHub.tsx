@@ -2,10 +2,13 @@ import { lazy, Suspense } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { PageHeader } from "@/components/PageHeader";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useHubQueryState } from "@/hooks/use-hub-query-state";
 
 const GITContainers = lazy(() => import("@/pages/GITContainers"));
 const GITMockup = lazy(() => import("@/pages/GITMockup"));
 const TransporterStatement = lazy(() => import("@/pages/TransporterStatement"));
+
+const TAB_VALUES = ["containers-otw", "git-tracking", "transporter-statement"] as const;
 
 function TabFallback() {
   return (
@@ -17,12 +20,18 @@ function TabFallback() {
 }
 
 export default function TrackingHub() {
+  const [activeTab, setTab] = useHubQueryState({
+    key: "tab",
+    allowedValues: TAB_VALUES,
+    defaultValue: "containers-otw",
+  });
+
   return (
     <div className="flex flex-col h-full overflow-hidden">
       <PageHeader title="Tracking" subtitle="Container tracking and GIT workbook" />
 
       <div className="flex-1 overflow-hidden flex flex-col px-4 pb-4">
-        <Tabs defaultValue="containers-otw" className="flex flex-col flex-1 overflow-hidden">
+        <Tabs value={activeTab} onValueChange={(value) => setTab(value as (typeof TAB_VALUES)[number])} className="flex flex-col flex-1 overflow-hidden">
           <TabsList className="w-fit mt-3 mb-2 shrink-0">
             <TabsTrigger value="containers-otw" data-testid="tab-tracking-containers-otw">
               Containers OTW

@@ -1,16 +1,6 @@
 import React from "react";
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-
-const { navigateMock, searchState } = vi.hoisted(() => ({
-  navigateMock: vi.fn(),
-  searchState: { value: "" },
-}));
-
-vi.mock("wouter", () => ({
-  useSearch: () => searchState.value,
-  useLocation: () => ["/", navigateMock],
-}));
 
 vi.mock("@/pages/StockItems", () => ({ default: () => <div>Stock items content</div> }));
 vi.mock("@/pages/StockQuery", () => ({ default: () => <div>Stock query content</div> }));
@@ -27,43 +17,64 @@ import InventoryHub from "@/pages/InventoryHub";
 
 describe("hub tab navigation", () => {
   beforeEach(() => {
-    navigateMock.mockReset();
-    searchState.value = "";
+    window.history.replaceState({}, "", "/");
   });
 
-  it("routes StockHub tab clicks through the stock query parameter", async () => {
+  it("replaces StockHub tab state without adding a page transition", async () => {
     const user = userEvent.setup();
+    window.history.replaceState({}, "", "/stock");
     render(<StockHub />);
 
     expect(screen.getByText("Stock items content")).toBeInTheDocument();
     await user.click(screen.getByTestId("tab-stock-query"));
 
-    expect(navigateMock).toHaveBeenCalledWith("/stock?tab=query", { replace: true });
+    expect(window.location.pathname).toBe("/stock");
+    expect(window.location.search).toBe("?tab=query");
+    expect(screen.getByText("Stock query content")).toBeInTheDocument();
   });
 
-  it("renders the StockHub tab selected by the URL", () => {
-    searchState.value = "?tab=grades";
+  it("renders the StockHub tab selected by a valid direct URL", () => {
+    window.history.replaceState({}, "", "/stock?tab=grades");
     render(<StockHub />);
 
     expect(screen.getByText("Grades content")).toBeInTheDocument();
     expect(screen.queryByText("Stock items content")).not.toBeInTheDocument();
   });
 
-  it("routes InventoryHub tab clicks through the inventory query parameter", async () => {
+  it("canonicalizes an unsupported StockHub tab to the default", async () => {
+    window.history.replaceState({}, "", "/stock?tab=retired-tab");
+    render(<StockHub />);
+
+    expect(screen.getByText("Stock items content")).toBeInTheDocument();
+    await waitFor(() => expect(window.location.search).toBe("?tab=items"));
+  });
+
+  it("replaces InventoryHub tab state without adding a page transition", async () => {
     const user = userEvent.setup();
+    window.history.replaceState({}, "", "/inventory");
     render(<InventoryHub />);
 
     expect(screen.getByText("Location inventory content")).toBeInTheDocument();
     await user.click(screen.getByTestId("tab-containers"));
 
-    expect(navigateMock).toHaveBeenCalledWith("/inventory?tab=containers", { replace: true });
+    expect(window.location.pathname).toBe("/inventory");
+    expect(window.location.search).toBe("?tab=containers");
+    expect(screen.getByText("Containers content")).toBeInTheDocument();
   });
 
-  it("renders the InventoryHub tab selected by the URL", () => {
-    searchState.value = "?tab=on-the-way";
+  it("renders the InventoryHub tab selected by a valid direct URL", () => {
+    window.history.replaceState({}, "", "/inventory?tab=on-the-way");
     render(<InventoryHub />);
 
     expect(screen.getByText("On the way content")).toBeInTheDocument();
     expect(screen.queryByText("Location inventory content")).not.toBeInTheDocument();
+  });
+
+  it("canonicalizes the retired combined-inventory tab to by-location", async () => {
+    window.history.replaceState({}, "", "/inventory?tab=combined");
+    render(<InventoryHub />);
+
+    expect(screen.getByText("Location inventory content")).toBeInTheDocument();
+    await waitFor(() => expect(window.location.search).toBe("?tab=by-location"));
   });
 });
