@@ -51,17 +51,18 @@ function deny(
 
 function applyLiveContextToRequest(req: Request, context: ActiveCompanyPermissionContext): void {
   if (!req.user) return;
-  req.user.role = context.role;
-  req.user.assignedLocationId = context.assignedLocationId;
-  req.user.posStation = context.posStation;
-  req.user.cashAccountId = context.cashAccountId;
-  req.user.canSellNegativeStock =
+  const user = req.user as any;
+  user.role = context.role;
+  user.assignedLocationId = context.assignedLocationId;
+  user.posStation = context.posStation;
+  user.cashAccountId = context.cashAccountId;
+  user.canSellNegativeStock =
     ["Developer", "Admin", "Owner", "Manager"].includes(context.role) ||
     context.canSellNegativeStock;
-  (req.user as any).posViewOnly = context.posViewOnly;
-  req.user.daybookEditDays = context.daybookEditDays;
-  req.user.canAccessCustomers = context.canAccessCustomers;
-  req.user.canDeleteRecords = context.canDeleteRecords;
+  user.posViewOnly = context.posViewOnly;
+  user.daybookEditDays = context.daybookEditDays;
+  user.canAccessCustomers = context.canAccessCustomers;
+  user.canDeleteRecords = context.canDeleteRecords;
 }
 
 async function validateAssignedLocation(
@@ -91,10 +92,7 @@ async function validateAssignedLocation(
   return Boolean(assignment);
 }
 
-async function validateCashLedger(
-  companyId: number,
-  ledgerAccountId: number
-): Promise<boolean> {
+async function validateCashLedger(companyId: number, ledgerAccountId: number): Promise<boolean> {
   const [account] = await db
     .select({ id: ledgerAccounts.id })
     .from(ledgerAccounts)
@@ -157,10 +155,7 @@ async function validatePosCashAccount(
     };
   }
 
-  if (
-    context.cashAccountId &&
-    (await validateCashLedger(context.companyId, context.cashAccountId))
-  ) {
+  if (context.cashAccountId && (await validateCashLedger(context.companyId, context.cashAccountId))) {
     return { valid: true };
   }
 
@@ -256,18 +251,16 @@ export async function enforcePosOperationalPermissionScope(
       requiredLocationId = voucher.locationId;
     }
 
-    if (requiredLocationId) {
-      if (!(await validateAssignedLocation(context, requiredLocationId))) {
-        deny(
-          req,
-          res,
-          context,
-          403,
-          "POS_LOCATION_ACCESS_DENIED",
-          "You are not allowed to use this POS location."
-        );
-        return;
-      }
+    if (requiredLocationId && !(await validateAssignedLocation(context, requiredLocationId))) {
+      deny(
+        req,
+        res,
+        context,
+        403,
+        "POS_LOCATION_ACCESS_DENIED",
+        "You are not allowed to use this POS location."
+      );
+      return;
     }
 
     if (
@@ -287,14 +280,7 @@ export async function enforcePosOperationalPermissionScope(
       }
       const cashValidation = await validatePosCashAccount(context, requiredLocationId);
       if (!cashValidation.valid) {
-        deny(
-          req,
-          res,
-          context,
-          400,
-          cashValidation.code,
-          cashValidation.message
-        );
+        deny(req, res, context, 400, cashValidation.code, cashValidation.message);
         return;
       }
     }
