@@ -1,42 +1,25 @@
-import { useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { BarChart3, Trash2, Beaker, Ship } from "lucide-react";
 import ProductionSummary from "@/pages/factory/ProductionSummary";
 import FactoryWaste from "@/pages/factory/FactoryWaste";
 import FactoryMixOptimizer from "@/pages/factory/FactoryMixOptimizer";
 import FactoryContainerTracking from "@/pages/factory/FactoryContainerTracking";
+import { useHubQueryState } from "@/hooks/use-hub-query-state";
 
 type Section = "production-summary" | "waste" | "mix-optimizer" | "container-tracking";
-
-function getInitialSection(): Section {
-  if (typeof window !== "undefined") {
-    const s = new URLSearchParams(window.location.search).get("section");
-    if (s === "waste") return "waste";
-    if (s === "mix-optimizer") return "mix-optimizer";
-    if (s === "container-tracking") return "container-tracking";
-  }
-  return "production-summary";
-}
-
-function setSectionInUrl(section: Section) {
-  const url = new URL(window.location.href);
-  url.searchParams.set("section", section);
-  url.searchParams.delete("tab");
-  window.history.replaceState(null, "", url.toString());
-}
+const SECTIONS = ["production-summary", "waste", "mix-optimizer", "container-tracking"] as const;
 
 export default function FactoryProductionIntelHub() {
-  const [section, setSection] = useState<Section>(getInitialSection);
-
-  function handleSectionChange(value: string) {
-    const s = value as Section;
-    setSection(s);
-    setSectionInUrl(s);
-  }
+  const [section, setSection] = useHubQueryState<Section>({
+    key: "section",
+    allowedValues: SECTIONS,
+    defaultValue: "production-summary",
+    clearKeys: ["tab"],
+  });
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
-      <Tabs value={section} onValueChange={handleSectionChange} className="flex flex-col h-full overflow-hidden">
+      <Tabs value={section} onValueChange={(value) => setSection(value as Section)} className="flex flex-col h-full overflow-hidden">
         <div className="border-b px-4 pt-3 flex-shrink-0 overflow-x-auto">
           <TabsList className="flex-nowrap">
             <TabsTrigger value="production-summary" data-testid="tab-production-intel-summary">
