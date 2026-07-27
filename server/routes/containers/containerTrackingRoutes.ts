@@ -51,6 +51,7 @@ import {
   ledgerAccounts,
   intercompanyPosConfigs,
   stockItemMergeLogs,
+  userCompanyRoles,
 } from "@shared/schema";
 import {
   eq,
@@ -154,15 +155,45 @@ export function registerContainerTrackingRoutes(app: Express) {
       if (status !== undefined) updateData.status = status;
       if (blDocs !== undefined) updateData.blDocs = blDocs || null;
 
-      await db
-        .update(containers)
-        .set(updateData)
-        .where(and(eq(containers.id, id), eq(containers.companyId, req.session.currentCompanyId)));
+      // Fetch the container first to resolve its company, then verify the user
+      // has access. Admin/Owner users may manage containers from any company
+      // they have a role in (cross-company OTW view), not just their current
+      // session company.
+      const [existing] = await db
+        .select({ id: containers.id, companyId: containers.companyId })
+        .from(containers)
+        .where(eq(containers.id, id))
+        .limit(1);
+
+      if (!existing) {
+        return res.status(404).json({ message: "Container not found" });
+      }
+
+      // Allow if same company, otherwise require an explicit role assignment in
+      // the container's company (covers Admin/Owner cross-company OTW edits).
+      if (existing.companyId !== req.session.currentCompanyId) {
+        const [roleRow] = await db
+          .select({ id: userCompanyRoles.id })
+          .from(userCompanyRoles)
+          .where(
+            and(
+              eq(userCompanyRoles.userId, req.session.userId as string),
+              eq(userCompanyRoles.companyId, existing.companyId)
+            )
+          )
+          .limit(1);
+
+        if (!roleRow) {
+          return res.status(404).json({ message: "Container not found" });
+        }
+      }
+
+      await db.update(containers).set(updateData).where(eq(containers.id, id));
 
       const [updated] = await db
         .select()
         .from(containers)
-        .where(and(eq(containers.id, id), eq(containers.companyId, req.session.currentCompanyId)))
+        .where(eq(containers.id, id))
         .limit(1);
 
       if (!updated) {

@@ -28,8 +28,11 @@ const ROUTES: Array<{
   { pattern: /^\/api\/employees\/(\d+)(?:\/|$)/, resourceType: "employee", domain: "administration" },
   { pattern: /^\/api\/stock-items\/(\d+)(?:\/|$)/, resourceType: "stock-item", domain: "inventory" },
   { pattern: /^\/api\/locations\/(\d+)(?:\/|$)/, resourceType: "stock-location", domain: "inventory" },
-  { pattern: /^\/api\/containers\/(\d+)(?:\/|$)/, resourceType: "container", domain: "inventory" },
-  { pattern: /^\/api\/factory\/containers\/(\d+)(?:\/|$)/, resourceType: "factory-container", domain: "factory" },
+  // Only protect the root resource endpoint. Sub-resource paths (e.g. /tracking,
+  // /settings, /documents) have their own route-level guards and cross-company
+  // access logic, so we match exact ID only.
+  { pattern: /^\/api\/containers\/(\d+)$/, resourceType: "container", domain: "inventory" },
+  { pattern: /^\/api\/factory\/containers\/(\d+)$/, resourceType: "factory-container", domain: "factory" },
 ];
 
 export function classifyCompanyOwnedRoute(path: string): CompanyOwnedRouteMatch | null {
