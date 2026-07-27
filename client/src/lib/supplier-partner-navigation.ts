@@ -1,4 +1,4 @@
-import { BarChart3, Building2, LayoutDashboard, Layers, Link2, Wrench } from "lucide-react";
+import { BarChart3, LayoutDashboard, Layers, Link2, Settings } from "lucide-react";
 import type { NavItem, NavSection } from "@/components/sidebar/sidebarPrimitives";
 import { NAV_COLOR } from "@/components/sidebar/sidebarPrimitives";
 
@@ -10,8 +10,7 @@ export const SUPPLIER_PARTNER_DAILY_ITEMS: NavItem[] = [
 ];
 
 export const SUPPLIER_PARTNER_ADMIN_ITEMS: NavItem[] = [
-  { title: "Setup", url: "/sp/setup", icon: Wrench },
-  { title: "Migration", url: "/sp/gc-migration", icon: Building2 },
+  { title: "SP Settings", url: "/sp/settings", icon: Settings },
 ];
 
 export const SUPPLIER_PARTNER_SECTIONS: NavSection[] = [
