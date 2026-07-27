@@ -5,6 +5,8 @@ import { createRoot } from "react-dom/client";
 import App from "./App";
 import "./index.css";
 import "./mobile-browser-compat.css";
+import { installClientObservability } from "./lib/clientObservability";
+import { ObservabilityErrorBoundary } from "./components/ObservabilityErrorBoundary";
 
 const ASSET_RECOVERY_PREFIX = "assetRecovery:";
 const LEGACY_RECOVERY_PREFIXES = ["swReload:", "chunkReload:", "chunkRetry:"];
@@ -108,9 +110,6 @@ function showStaleAssetRecoveryMessage() {
 async function clearErpCachesForRecovery() {
   if (!("serviceWorker" in navigator)) return;
 
-  // Only force a service-worker update during an actual chunk-recovery event.
-  // Normal page loads rely on the browser's built-in update checks so every
-  // tab does not revalidate and then reload the application independently.
   const registration = await navigator.serviceWorker.getRegistration("/").catch(() => undefined);
   await registration?.update().catch(() => undefined);
 
@@ -128,8 +127,6 @@ async function clearErpCachesForRecovery() {
     return;
   }
 
-  // A first-load page may not be controlled yet. Clear only ERP-owned caches;
-  // IndexedDB and offline mutation queues remain untouched.
   if ("caches" in window) {
     const keys = await caches.keys().catch(() => []);
     await Promise.all(keys.filter((key) => key.startsWith("erp-")).map((key) => caches.delete(key)));
@@ -166,7 +163,6 @@ async function recoverFromStaleAssets() {
   window.location.replace(currentUrl.toString());
 }
 
-// Catch dynamic import failures that occur before or outside React error boundaries.
 window.addEventListener("unhandledrejection", (event) => {
   const reason = event.reason;
   const candidates: string[] = [];
@@ -192,7 +188,6 @@ window.addEventListener("unhandledrejection", (event) => {
     combined.includes("ChunkLoadError") ||
     reason?.name === "ChunkLoadError";
 
-  // Bare "Failed to fetch" is intentionally excluded because it also matches API failures.
   if (isChunkFailure) {
     event.preventDefault();
     void recoverFromStaleAssets();
@@ -202,8 +197,6 @@ window.addEventListener("unhandledrejection", (event) => {
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.addEventListener("message", (event) => {
     if (event?.data?.type === "SW_UPDATED") {
-      // Do not reload every controlled tab. The existing production version
-      // banner will offer one user-controlled refresh when the build changes.
       window.dispatchEvent(
         new CustomEvent("erp:service-worker-updated", {
           detail: { version: String(event.data.version || "unknown") },
@@ -219,5 +212,11 @@ if ("serviceWorker" in navigator) {
   });
 }
 
-createRoot(document.getElementById("root")!).render(<App />);
+installClientObservability();
+
+createRoot(document.getElementById("root")!).render(
+  <ObservabilityErrorBoundary>
+    <App />
+  </ObservabilityErrorBoundary>
+);
 removeRecoveryMarkersAfterStableLoad();
