@@ -57,7 +57,7 @@ export function FactoryRoutes({ user, myAccess, factoryDefaultPage }: FactoryRou
       <Route path="/factory/daybook" component={FactoryDaybook} />
       <Route path="/factory/transporters" component={FactoryTransporters} />
       <Route path="/factory/finance">
-        <Redirect replace to="/factory/workers" />
+        <Redirect replace to="/factory/payroll-hub?section=workers" />
       </Route>
       <Route path="/factory/suppliers">
         <Redirect replace to="/factory/parties?section=suppliers" />
@@ -157,7 +157,7 @@ export function FactoryRoutes({ user, myAccess, factoryDefaultPage }: FactoryRou
         <Redirect replace to="/factory/payroll-hub?section=workers" />
       </Route>
       <Route path="/factory/worker-payroll">
-        <Redirect replace to="/factory/workers?tab=payroll" />
+        <Redirect replace to="/factory/payroll-hub?section=workers&tab=payroll" />
       </Route>
       <Route path="/factory/supplier-report">
         <Redirect replace to="/factory/intelligence/supplier-hub?section=report" />

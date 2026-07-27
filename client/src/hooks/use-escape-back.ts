@@ -1,8 +1,12 @@
-import { useEffect, useCallback } from "react";
+import { useCallback, useEffect, useRef } from "react";
 
-let activeEscapeHandlerCount = 0;
+type EscapeHandler = () => void;
+
+const escapeHandlers: EscapeHandler[] = [];
+let listenerAttached = false;
+
 export function hasActiveEscapeHandler(): boolean {
-  return activeEscapeHandlerCount > 0;
+  return escapeHandlers.length > 0;
 }
 
 function hasAnyOpenDialog(): boolean {
@@ -19,45 +23,76 @@ function hasAnyOpenDialog(): boolean {
   );
 }
 
+function handleDocumentEscape(event: KeyboardEvent) {
+  if (event.key !== "Escape") return;
+
+  // Radix and other layered controls own the first Escape press. Because this
+  // listener runs in capture phase, their open state is still observable here.
+  if (hasAnyOpenDialog()) return;
+
+  const activeElement = document.activeElement as HTMLElement | null;
+  if (
+    activeElement &&
+    (activeElement.tagName === "INPUT" ||
+      activeElement.tagName === "TEXTAREA" ||
+      activeElement.tagName === "SELECT" ||
+      activeElement.isContentEditable)
+  ) {
+    activeElement.blur();
+    event.preventDefault();
+    return;
+  }
+
+  const activeHandler = escapeHandlers[escapeHandlers.length - 1];
+  if (!activeHandler) return;
+
+  event.preventDefault();
+  event.stopImmediatePropagation();
+  activeHandler();
+}
+
+function attachListener() {
+  if (listenerAttached || typeof document === "undefined") return;
+  document.addEventListener("keydown", handleDocumentEscape, { capture: true });
+  listenerAttached = true;
+}
+
+function detachListenerWhenUnused() {
+  if (!listenerAttached || escapeHandlers.length > 0 || typeof document === "undefined") return;
+  document.removeEventListener("keydown", handleDocumentEscape, { capture: true });
+  listenerAttached = false;
+}
+
+/**
+ * Registers one Escape action for the current page or inline layer.
+ *
+ * Escape priority is global and deterministic:
+ * 1. Open dialog, menu, select, command palette, or drawer handles Escape.
+ * 2. Focused editable field is blurred.
+ * 3. The most recently mounted page/inline handler runs.
+ *
+ * A single document listener prevents nested page hooks from navigating twice.
+ */
 export function useEscapeBack(onBack: (() => void) | null) {
-  const handler = useCallback(
-    (e: KeyboardEvent) => {
-      if (e.key !== "Escape") return;
-      if (!onBack) return;
+  const callbackRef = useRef(onBack);
+  callbackRef.current = onBack;
 
-      // Run in capture phase so we check dialog state BEFORE Radix closes it.
-      if (hasAnyOpenDialog()) return;
-
-      const activeEl = document.activeElement;
-      if (
-        activeEl &&
-        (activeEl.tagName === "INPUT" ||
-          activeEl.tagName === "TEXTAREA" ||
-          activeEl.tagName === "SELECT" ||
-          (activeEl as HTMLElement).isContentEditable)
-      ) {
-        (activeEl as HTMLElement).blur();
-        return;
-      }
-
-      e.preventDefault();
-      e.stopPropagation();
-      onBack();
-    },
-    [onBack]
-  );
+  const stableHandler = useCallback(() => {
+    callbackRef.current?.();
+  }, []);
 
   useEffect(() => {
     if (!onBack) return;
-    activeEscapeHandlerCount += 1;
-    // Capture phase: fires before Radix dialog Escape handling,
-    // so data-state is still "open" when we check.
-    document.addEventListener("keydown", handler, { capture: true });
+
+    escapeHandlers.push(stableHandler);
+    attachListener();
+
     return () => {
-      activeEscapeHandlerCount -= 1;
-      document.removeEventListener("keydown", handler, { capture: true });
+      const index = escapeHandlers.lastIndexOf(stableHandler);
+      if (index >= 0) escapeHandlers.splice(index, 1);
+      detachListenerWhenUnused();
     };
-  }, [handler, onBack]);
+  }, [onBack, stableHandler]);
 }
 
 export { hasAnyOpenDialog };

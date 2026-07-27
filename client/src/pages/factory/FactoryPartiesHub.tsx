@@ -1,39 +1,23 @@
-import { useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Users, UserRound } from "lucide-react";
 import FactoryCustomers from "@/pages/factory/FactoryCustomers";
 import FactorySuppliers from "@/pages/factory/FactorySuppliers";
+import { useHubQueryState } from "@/hooks/use-hub-query-state";
 
 type Section = "customers" | "suppliers";
-
-function getInitialSection(): Section {
-  if (typeof window !== "undefined") {
-    const params = new URLSearchParams(window.location.search);
-    const s = params.get("section");
-    if (s === "suppliers") return "suppliers";
-  }
-  return "customers";
-}
-
-function setSectionInUrl(section: Section) {
-  const url = new URL(window.location.href);
-  url.searchParams.set("section", section);
-  url.searchParams.delete("tab");
-  window.history.replaceState(null, "", url.toString());
-}
+const SECTIONS = ["customers", "suppliers"] as const;
 
 export default function FactoryPartiesHub() {
-  const [section, setSection] = useState<Section>(getInitialSection);
-
-  function handleSectionChange(value: string) {
-    const s = value as Section;
-    setSection(s);
-    setSectionInUrl(s);
-  }
+  const [section, setSection] = useHubQueryState<Section>({
+    key: "section",
+    allowedValues: SECTIONS,
+    defaultValue: "customers",
+    clearKeys: ["tab"],
+  });
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
-      <Tabs value={section} onValueChange={handleSectionChange} className="flex flex-col h-full overflow-hidden">
+      <Tabs value={section} onValueChange={(value) => setSection(value as Section)} className="flex flex-col h-full overflow-hidden">
         <div className="border-b px-4 pt-3 flex-shrink-0 overflow-x-auto">
           <TabsList className="flex-nowrap">
             <TabsTrigger value="customers" data-testid="tab-parties-customers">

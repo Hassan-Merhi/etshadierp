@@ -1,40 +1,24 @@
-import { useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ClipboardCheck, FileText, Award } from "lucide-react";
 import FactorySupplierReport from "@/pages/factory/FactorySupplierReport";
 import FactorySupplierStatement from "@/pages/factory/FactorySupplierStatement";
 import FactorySupplierScoreboard from "@/pages/factory/FactorySupplierScoreboard";
+import { useHubQueryState } from "@/hooks/use-hub-query-state";
 
 type Section = "report" | "statement" | "scores";
-
-function getInitialSection(): Section {
-  if (typeof window !== "undefined") {
-    const s = new URLSearchParams(window.location.search).get("section");
-    if (s === "statement") return "statement";
-    if (s === "scores") return "scores";
-  }
-  return "report";
-}
-
-function setSectionInUrl(section: Section) {
-  const url = new URL(window.location.href);
-  url.searchParams.set("section", section);
-  url.searchParams.delete("tab");
-  window.history.replaceState(null, "", url.toString());
-}
+const SECTIONS = ["report", "statement", "scores"] as const;
 
 export default function FactorySupplierHub() {
-  const [section, setSection] = useState<Section>(getInitialSection);
-
-  function handleSectionChange(value: string) {
-    const s = value as Section;
-    setSection(s);
-    setSectionInUrl(s);
-  }
+  const [section, setSection] = useHubQueryState<Section>({
+    key: "section",
+    allowedValues: SECTIONS,
+    defaultValue: "report",
+    clearKeys: ["tab"],
+  });
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
-      <Tabs value={section} onValueChange={handleSectionChange} className="flex flex-col h-full overflow-hidden">
+      <Tabs value={section} onValueChange={(value) => setSection(value as Section)} className="flex flex-col h-full overflow-hidden">
         <div className="border-b px-4 pt-3 flex-shrink-0 overflow-x-auto">
           <TabsList className="flex-nowrap">
             <TabsTrigger value="report" data-testid="tab-supplier-hub-report">
