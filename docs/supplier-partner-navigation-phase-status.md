@@ -29,11 +29,16 @@
 - Preserved the payable, profit, profit-split, locations, accounts, and both sales-form export contracts.
 - Added focused regression coverage for tab URLs and endpoint preservation.
 
-## Phase 4 — pending
+## Phase 4 — complete
 
-- Consolidate Setup and Migration under Supplier Partner administration/settings.
-- Tighten role permissions.
-- Canonicalize the duplicate migration routes using replacement redirects.
+- Consolidated Setup and Migration under the URL-backed Supplier Partner Administration hub at `/sp/setup`.
+- Restricted Setup to Admin and Developer.
+- Restricted Migration to Developer.
+- Canonicalized both `/sp/migration` and `/sp/gc-migration` to `/sp/setup?tab=migration` with replacement history.
+- Updated sidebar, Overview, and Recent navigation to use the canonical administration destinations.
+- Restored `/sp` as the real Supplier Partner Overview landing page.
+- Preserved all setup and migration API and operation behavior.
+- Added focused regression coverage for permissions, canonical redirects, Overview landing, and setup API preservation.
 
 ## Phase 5 — pending
 
