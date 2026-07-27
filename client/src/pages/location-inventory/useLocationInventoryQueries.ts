@@ -49,7 +49,18 @@ export function useLocationInventoryQueries({
   });
 
   const { data: allLocations = [], isLoading: allLocationsLoading } = useQuery<Location[]>({
-    queryKey: companyId ? [`/api/locations?companyId=${companyId}`] : [],
+    // Keep companyId as a second array element for cache scoping (different companies
+    // get separate cache entries), but do NOT embed it in the URL.
+    // The server reads the company from the session (req.session.currentCompanyId).
+    // Putting ?companyId=X in the URL triggers requireAuth's cross-company guard,
+    // which compares it against resolveActiveCompanyId(req) — that returns
+    // factoryCompanyId first, causing 403s for admin users who have been in factory mode.
+    queryKey: companyId ? ["/api/locations", companyId] : [],
+    queryFn: async () => {
+      const res = await fetch("/api/locations", { credentials: "include" });
+      if (!res.ok) throw new Error(`Failed to fetch locations: ${res.status}`);
+      return res.json();
+    },
     enabled: !posUser && !!companyId,
     staleTime: 5 * 60 * 1000,
   });

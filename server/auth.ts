@@ -104,7 +104,17 @@ function authorizeExplicitCompanyScope(req: Request, res: Response): boolean {
 
   const userId = req.session.userId;
   const role = req.session.currentRole;
-  const companyId = resolveActiveCompanyId(req);
+
+  // Developers may access any company's data explicitly — skip the cross-company
+  // guard entirely for them. This lets Developer accounts query settings / ledgers
+  // for companies other than the one currently active in their session.
+  if (role === "Developer") return true;
+
+  // Use req.session.currentCompanyId (the ERP company), NOT resolveActiveCompanyId.
+  // resolveActiveCompanyId returns factoryCompanyId || currentCompanyId; when an admin
+  // has visited the factory module the factory company leaks into ERP route checks and
+  // causes spurious CROSS_COMPANY_ACCESS_DENIED 403s on routes like GET /api/locations.
+  const companyId = (req.session as any).currentCompanyId ?? null;
 
   try {
     assertRequestCompanyMatchesSession(
