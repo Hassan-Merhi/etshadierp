@@ -35,9 +35,9 @@ export const PROPERTIES_NAV_SECTIONS: NavSection[] = [
     label: "Rentals",
     color: NAV_COLOR.finance,
     items: [
-      { title: "Properties (Warehouses)", url: "/properties/rental/warehouses", icon: Building2 },
-      { title: "Shops Rented", url: "/properties/rental/shops", icon: Store },
-      { title: "Payments Log", url: "/properties/rental/payments", icon: ClipboardList },
+      { title: "Properties (Warehouses)", url: "/properties/rentals", icon: Building2 },
+      { title: "Shops Rented", url: "/properties/rentals?tab=shops", icon: Store },
+      { title: "Payments Log", url: "/properties/rentals?tab=payments", icon: ClipboardList },
       { title: "Cash Transfer", url: "/properties/transfer", icon: ArrowLeftRight },
     ],
   },
