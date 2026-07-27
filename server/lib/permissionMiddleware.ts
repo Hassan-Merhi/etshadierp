@@ -1,88 +1,92 @@
-/**
- * Express middleware factory for route-level permission enforcement.
- *
- * Uses the same semantics as permissionHelpers.ts:
- *   Developer / Admin     → always allowed (never restricted via this system)
- *   Owner / Manager / POS → allowed by default; enabled=false in DB = restricted
- *   Normal User           → denied by default; enabled=true in DB = explicitly allowed
- *
- * Reads role/company from req.session directly so it works whether placed
- * before or after per-route requireAuth calls.
- * Silently passes (calls next()) if the session has no userId — the per-route
- * requireAuth will then return 401 as usual.
- *
- * Request-scoped cache (_permMap) avoids redundant DB queries when multiple
- * middleware are chained on the same request.
- */
-
 import type { Request, Response, NextFunction } from "express";
 import { logger } from "./logger";
 import { storage } from "../storage";
 import { buildPermissionMap, canAccess } from "./permissionHelpers";
-
-// ─── Types ────────────────────────────────────────────────────────────────────
+import {
+  ActiveCompanyPermissionContextError,
+  getActiveCompanyPermissionContext,
+  type ActiveCompanyPermissionContext,
+} from "../services/security/activeCompanyPermissionContext";
 
 type PermMiddlewareType = "module" | "page" | "action" | "export";
 
-// Augment Express Request to hold the per-request permission cache
+interface PermissionState {
+  context: ActiveCompanyPermissionContext;
+  permissionMap: Map<string, boolean>;
+}
+
 declare module "express-serve-static-core" {
   interface Request {
-    _permMap?: Map<string, boolean>;
+    _permissionStates?: Map<string, PermissionState>;
   }
 }
 
-// ─── Internal helpers ─────────────────────────────────────────────────────────
-
-/**
- * Load (or return cached) permission map for the current user/company.
- * Falls back to an empty map on DB error so we fail-open rather than
- * breaking legitimate sessions.
- */
-async function getPermMap(req: any): Promise<Map<string, boolean>> {
-  if (req._permMap) return req._permMap as Map<string, boolean>;
-
-  const role: string | undefined = req.session?.currentRole;
-  const companyId: number | undefined = req.session?.currentCompanyId;
-
-  if (!role || !companyId) {
-    req._permMap = new Map<string, boolean>();
-    return req._permMap;
-  }
-
-  try {
-    const rows = await storage.getRoleFeaturePermissions(companyId);
-    req._permMap = buildPermissionMap(rows, role);
-  } catch (err) {
-    logger.error("[permissionMiddleware] Failed to load permissions:", { error: err });
-    req._permMap = new Map<string, boolean>();
-  }
-
-  return req._permMap;
+function permissionStateKey(context: ActiveCompanyPermissionContext): string {
+  return `${context.companyId}:${context.role}`;
 }
 
-/** Emit a structured access-denied log line and respond with 403. */
-function sendDenied(req: any, res: Response, key: string, permType: PermMiddlewareType): void {
-  const role = req.session?.currentRole ?? "unknown";
-  const userId = req.session?.userId ?? null;
-  const username = req.session?.username ?? null;
-  const companyId = req.session?.currentCompanyId ?? null;
+async function getPermissionState(req: Request): Promise<PermissionState> {
+  const context = await getActiveCompanyPermissionContext(req);
+  const key = permissionStateKey(context);
 
+  req._permissionStates ??= new Map<string, PermissionState>();
+  const cached = req._permissionStates.get(key);
+  if (cached) return cached;
+
+  // Developer and Admin remain unrestricted by role-feature rows, but their role
+  // is still loaded from canonical storage above so a stale session cannot grant
+  // privilege in the wrong company.
+  if (context.role === "Developer" || context.role === "Admin") {
+    const state = { context, permissionMap: new Map<string, boolean>() };
+    req._permissionStates.set(key, state);
+    return state;
+  }
+
+  const rows = await storage.getRoleFeaturePermissions(context.companyId);
+  const state = {
+    context,
+    permissionMap: buildPermissionMap(rows, context.role),
+  };
+  req._permissionStates.set(key, state);
+  return state;
+}
+
+function logPermissionEvent(
+  req: Request,
+  details: {
+    event: "access_denied" | "permission_lookup_failed";
+    key: string;
+    permType: PermMiddlewareType;
+    context?: ActiveCompanyPermissionContext | null;
+    error?: unknown;
+  }
+): void {
   logger.warn(
     JSON.stringify({
-      event: "access_denied",
-      permType,
-      key,
-      role,
-      userId,
-      username,
-      companyId,
+      event: details.event,
+      permType: details.permType,
+      key: details.key,
+      role: details.context?.role ?? req.session.currentRole ?? "unknown",
+      userId: details.context?.userId ?? req.session.userId ?? null,
+      username: req.session.username ?? null,
+      companyId: details.context?.companyId ?? req.session.currentCompanyId ?? null,
       method: req.method,
       path: req.path,
       ip: req.ip,
+      error: details.error instanceof Error ? details.error.message : details.error ? String(details.error) : undefined,
       ts: new Date().toISOString(),
     })
   );
+}
 
+function sendDenied(
+  req: Request,
+  res: Response,
+  key: string,
+  permType: PermMiddlewareType,
+  context: ActiveCompanyPermissionContext
+): void {
+  logPermissionEvent(req, { event: "access_denied", key, permType, context });
   res.status(403).json({
     message: "Access denied: you do not have permission for this resource.",
     key,
@@ -90,63 +94,63 @@ function sendDenied(req: any, res: Response, key: string, permType: PermMiddlewa
   });
 }
 
-// ─── Core factory ─────────────────────────────────────────────────────────────
+function sendLookupFailure(
+  req: Request,
+  res: Response,
+  key: string,
+  permType: PermMiddlewareType,
+  error: unknown
+): void {
+  if (error instanceof ActiveCompanyPermissionContextError) {
+    logPermissionEvent(req, { event: "access_denied", key, permType, error });
+    res.status(error.status).json({ message: error.message, code: error.code });
+    return;
+  }
 
-/**
- * Generic permission middleware factory.
- *
- * Usage:
- *   app.use("/api/factory", requirePermission("mod_factory", "module"));
- *   app.post("/api/vouchers", requirePermission("act_create_voucher", "action"), handler);
- */
+  // Permission checks are security boundaries. A database or storage failure must
+  // never turn into an implicit allow, especially for exports, repairs, imports,
+  // and writes. Return 503 so the caller can safely retry without losing intent.
+  logPermissionEvent(req, { event: "permission_lookup_failed", key, permType, error });
+  res.status(503).json({
+    message: "Permission service is temporarily unavailable. Please retry.",
+    code: "PERMISSION_LOOKUP_UNAVAILABLE",
+  });
+}
+
 export function requirePermission(key: string, permType: PermMiddlewareType = "module") {
-  return async (req: any, res: Response, next: NextFunction): Promise<void> => {
-    // No session user → unauthenticated request; pass through so that
-    // per-route requireAuth returns the correct 401.
+  return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    // Preserve the existing middleware composition: unauthenticated requests pass
+    // through so the route's requireAuth middleware returns the canonical 401.
     if (!req.session?.userId) {
       next();
       return;
     }
 
     try {
-      const permMap = await getPermMap(req);
-      const role: string = req.session?.currentRole ?? "";
-
-      if (!canAccess(role, key, permMap)) {
-        sendDenied(req, res, key, permType);
+      const state = await getPermissionState(req);
+      if (!canAccess(state.context.role, key, state.permissionMap)) {
+        sendDenied(req, res, key, permType, state.context);
         return;
       }
-
       next();
-    } catch (err) {
-      // Fail-open: unexpected errors must not lock out legitimate users.
-      logger.error("[permissionMiddleware] Unexpected error for key", { key, error: err });
-      next();
+    } catch (error) {
+      sendLookupFailure(req, res, key, permType, error);
     }
   };
 }
 
-// ─── Convenience wrappers ─────────────────────────────────────────────────────
-
-/** Top-level module guard (e.g. "mod_factory", "mod_pos"). */
 export function requireModuleAccess(moduleKey: string) {
   return requirePermission(moduleKey, "module");
 }
 
-/** Page/route guard (e.g. "page_dashboard"). */
 export function requirePageAccess(pageKey: string) {
   return requirePermission(pageKey, "page");
 }
 
-/**
- * Action guard for write operations (e.g. "act_create_voucher").
- * Typically applied as an inline middleware on POST/PATCH/PUT/DELETE routes.
- */
 export function requireActionAccess(actionKey: string) {
   return requirePermission(actionKey, "action");
 }
 
-/** Export / print guard (e.g. "exp_pdf", "exp_excel"). */
 export function requireExportAccess(exportKey: string) {
   return requirePermission(exportKey, "export");
 }
