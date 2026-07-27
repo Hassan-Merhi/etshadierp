@@ -2,7 +2,6 @@ import { useEffect, useRef } from "react";
 import { useDialogScrollFix } from "@/hooks/use-dialog-scroll-fix";
 import { useLocation, Redirect } from "wouter";
 import { setAppTimezone } from "@/lib/queryClient";
-import { getQueryFn } from "@/lib/queryClient";
 import { useQuery } from "@tanstack/react-query";
 import { useCompany } from "@/contexts/CompanyContext";
 import { useToast } from "@/hooks/use-toast";
@@ -19,20 +18,27 @@ import { FactoryShell } from "./FactoryShell";
 import { ErpShell } from "./ErpShell";
 import { computeFactoryDefaultPage, computeFactoryGuardRedirect } from "./factoryAccessGuard";
 
+const SUPPLIER_PARTNER_PATHS = new Set([
+  "/sp",
+  "/sp/reports",
+  "/sp/opening-stock",
+  "/sp/aliases",
+  "/sp/setup",
+  "/sp/migration",
+  "/sp/gc-migration",
+]);
+
 export function AuthenticatedApp() {
-  const { selectedCompany } = useCompany();
-  usePresence();          // Track user presence
-  useScreenFeed();        // Silently capture screen frames for admin Watch feature
-  useWsInvalidation();    // Real-time cache invalidation via WebSocket
-  useDialogScrollFix();   // Global fix: prevent Radix dialogs from leaving body frozen after close
+  const { selectedCompany, isLoading: companyLoading } = useCompany();
+  usePresence();
+  useScreenFeed();
+  useWsInvalidation();
+  useDialogScrollFix();
 
   const [currentLocation] = useLocation();
   const { user, isLoading, error, loadingTimedOut, handleLogout } = useAuthenticatedUser();
   const { showLeaveConfirm, setShowLeaveConfirm, handleGoBack, handleConfirmLeave } = useAppNavigation();
 
-  // Reset scroll position on every route change and focus the main scroll
-  // container so that native browser arrow-key and two-finger scroll work
-  // immediately without requiring a click first.
   useEffect(() => {
     const main = document.getElementById("main-content");
     if (main) {
@@ -70,7 +76,6 @@ export function AuthenticatedApp() {
   });
   const posImportEnabled = posCompanySettings?.posExcelImportEnabled === true;
 
-  // Keep the app's date utility in sync with the company's configured timezone
   useEffect(() => {
     setAppTimezone(posCompanySettings?.timezone);
   }, [posCompanySettings?.timezone]);
@@ -104,24 +109,21 @@ export function AuthenticatedApp() {
     staleTime: 60000,
   });
 
-  const hasErpAccess     = !myAccess || myAccess.hasErpAccess;
+  const hasErpAccess = !myAccess || myAccess.hasErpAccess;
   const hasFactoryAccess = !myAccess || myAccess.hasFactoryAccess;
-  const isAdminOwner     = user?.role === "Admin" || user?.role === "Owner" || user?.role === "Developer";
+  const isAdminOwner = user?.role === "Admin" || user?.role === "Owner" || user?.role === "Developer";
 
-  // ── Auth guard ──────────────────────────────────────────────────────────────
   if (loadingTimedOut || (!isLoading && (error || !user))) return <Redirect to="/login" />;
   if (isLoading) return <AppLoadingState />;
 
-  // ── Route classification ────────────────────────────────────────────────────
   const isPropertiesCompany = selectedCompany?.companyType === "properties";
-  const isPropertiesRoute   = currentLocation.startsWith("/properties/");
-  const isFactoryCompany    = selectedCompany?.companyType === "factory" || selectedCompany?.companyType === "factory_v2";
-  const isFactoryRoute      = currentLocation.startsWith("/factory/");
-  const factoryDefaultPage  = computeFactoryDefaultPage(myAccess);
+  const isPropertiesRoute = currentLocation.startsWith("/properties/");
+  const isSupplierPartnerCompany = selectedCompany?.companyType === "supplier_partner";
+  const isSupplierPartnerRoute = currentLocation === "/sp" || currentLocation.startsWith("/sp/");
+  const isFactoryCompany = selectedCompany?.companyType === "factory" || selectedCompany?.companyType === "factory_v2";
+  const isFactoryRoute = currentLocation.startsWith("/factory/");
+  const factoryDefaultPage = computeFactoryDefaultPage(myAccess);
 
-  // ── Properties redirects ────────────────────────────────────────────────────
-  // Keep the historical global URLs working, but normalize Properties companies
-  // into the Properties namespace without adding a browser-history entry.
   if (isPropertiesCompany && currentLocation === "/my-settings") {
     return <Redirect replace to="/properties/my-settings" />;
   }
@@ -132,14 +134,26 @@ export function AuthenticatedApp() {
     return <Redirect replace to="/properties/daybook" />;
   }
 
-  // ── Factory redirects ───────────────────────────────────────────────────────
+  if (isSupplierPartnerRoute && companyLoading) return <AppLoadingState />;
+  if (isSupplierPartnerRoute && !isSupplierPartnerCompany) {
+    return <Redirect replace to="/tracking" />;
+  }
+  if (
+    isSupplierPartnerCompany &&
+    (currentLocation === "/sp/migration" || currentLocation === "/sp/gc-migration")
+  ) {
+    return <Redirect replace to="/sp/setup?tab=migration" />;
+  }
+  if (isSupplierPartnerCompany && isSupplierPartnerRoute && !SUPPLIER_PARTNER_PATHS.has(currentLocation)) {
+    return <Redirect replace to="/sp" />;
+  }
+
   if (
     isFactoryCompany &&
     !isFactoryRoute &&
     currentLocation !== "/my-settings" &&
     currentLocation !== "/intercompany-requests"
   ) {
-    // Wait for myAccess before redirecting so restricted users land on their real first page.
     if (myAccessLoading) return <AppLoadingState />;
     if (myAccess === undefined && !myAccessError) return null;
     return <Redirect replace to={factoryDefaultPage} />;
@@ -158,7 +172,6 @@ export function AuthenticatedApp() {
     return <Redirect replace to={factoryDefaultPage} />;
   }
 
-  // ── Route-level access guard ────────────────────────────────────────────────
   const factoryGuardRedirect = computeFactoryGuardRedirect({
     isFactoryRoute,
     isAdminOwner,
@@ -168,10 +181,10 @@ export function AuthenticatedApp() {
     currentLocation,
   });
   if (factoryGuardRedirect) return <Redirect replace to={factoryGuardRedirect} />;
-  // ── End route-level access guard ────────────────────────────────────────────
 
-  // Auto-redirect: factory URL but user has switched to an ERP company
-  if (isFactoryRoute && !isFactoryCompany && !myAccessLoading && hasErpAccess) return <Redirect replace to="/" />;
+  if (isFactoryRoute && !isFactoryCompany && !myAccessLoading && hasErpAccess) {
+    return <Redirect replace to="/" />;
+  }
 
   const leaveConfirmDialog = (
     <AppLeaveConfirmDialog
@@ -181,7 +194,6 @@ export function AuthenticatedApp() {
     />
   );
 
-  // ── POS shell ───────────────────────────────────────────────────────────────
   if (isPOS) {
     return (
       <PosShell
@@ -195,7 +207,6 @@ export function AuthenticatedApp() {
     );
   }
 
-  // ── Properties shell ────────────────────────────────────────────────────────
   if (isPropertiesCompany && isPropertiesRoute) {
     return (
       <PropertiesShell
@@ -207,7 +218,6 @@ export function AuthenticatedApp() {
     );
   }
 
-  // ── Factory shell ───────────────────────────────────────────────────────────
   if (isFactoryRoute || isFactoryCompany) {
     return (
       <FactoryShell
@@ -220,7 +230,6 @@ export function AuthenticatedApp() {
     );
   }
 
-  // ── ERP shell (default) ─────────────────────────────────────────────────────
   return (
     <ErpShell
       user={user}

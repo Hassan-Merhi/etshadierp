@@ -1,182 +1,60 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { apiRequest } from "@/lib/queryClient";
-import { useToast } from "@/hooks/use-toast";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { CheckCircle2, AlertCircle, Loader2, Zap, ShieldCheck } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { Redirect } from "wouter";
+import { Building2, Wrench } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useHubQueryState } from "@/hooks/use-hub-query-state";
+import { getQueryFn } from "@/lib/queryClient";
+import SpSetupPanel from "@/pages/sp/SpSetupPanel";
+import GcLshiMigration from "@/pages/sp/GcLshiMigration";
+
+const ADMIN_TABS = ["setup", "migration"] as const;
+type AdminTab = (typeof ADMIN_TABS)[number];
 
 export default function SpSetup() {
-  const { toast } = useToast();
-  const queryClient = useQueryClient();
-
-  const { data: status, isLoading } = useQuery<any>({
-    queryKey: ["/api/sp/setup/status"],
+  const { data: user, isLoading } = useQuery<any>({
+    queryKey: ["/api/auth/me"],
+    queryFn: getQueryFn({ on401: "returnNull" }),
+    staleTime: 30 * 60 * 1000,
+  });
+  const [tab, setTab] = useHubQueryState<AdminTab>({
+    key: "tab",
+    allowedValues: ADMIN_TABS,
+    defaultValue: "setup",
+    omitDefault: true,
   });
 
-  const setupMutation = useMutation({
-    mutationFn: async () => {
-      const response = await apiRequest("POST", "/api/sp/setup");
-      return response.json();
-    },
-    onSuccess: (data: any) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/sp/setup/status"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/ledger-accounts"] });
+  if (isLoading) return null;
+  const role = user?.currentRole ?? user?.role;
+  const canSetup = role === "Admin" || role === "Developer";
+  const canMigrate = role === "Developer";
 
-      const messages: string[] = [];
-      if (data.created?.length > 0) messages.push(`Created: ${data.created.join(", ")}.`);
-      if (data.repairedSupplierVoucherLinks > 0) {
-        messages.push(
-          `Repaired ${data.repairedSupplierVoucherLinks} Goods-OTW voucher supplier link${
-            data.repairedSupplierVoucherLinks === 1 ? "" : "s"
-          }.`
-        );
-      }
-
-      toast({
-        title: "Supplier Partner setup complete",
-        description: messages.join(" ") || "Accounts, warehouse, and supplier ledger links are already configured.",
-      });
-    },
-    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
-  });
-
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-48">
-        <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-      </div>
-    );
-  }
-
-  const requiredAccountCount = status?.requiredAccountCount ?? status?.spAccounts?.length ?? 0;
-  const supplierLinkGapCount = Number(status?.supplierVoucherLinkGapCount ?? 0);
+  if (!canSetup) return <Redirect replace to="/sp" />;
+  if (tab === "migration" && !canMigrate) return <Redirect replace to="/sp/setup" />;
 
   return (
-    <div className="max-w-2xl mx-auto space-y-6">
+    <div className="space-y-4" data-testid="sp-administration-hub">
       <div>
-        <h1 className="text-xl font-semibold">Supplier Partner Setup</h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          Initialize the SP chart of accounts, default warehouse, and supplier-ledger synchronization.
+        <h1 className="text-xl font-semibold">Supplier Partner Administration</h1>
+        <p className="mt-0.5 text-sm text-muted-foreground">
+          Setup, repair, and controlled migration tools for Supplier Partner companies.
         </p>
       </div>
 
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between flex-wrap gap-2">
-            <div>
-              <CardTitle className="text-base">Chart of Accounts</CardTitle>
-              <CardDescription className="text-xs mt-1">
-                {requiredAccountCount} accounts required for the complete SP accounting flow
-              </CardDescription>
-            </div>
-            {status?.isConfigured ? (
-              <Badge variant="outline" className="text-green-600 border-green-600/40">
-                <CheckCircle2 className="h-3 w-3 mr-1" /> Configured
-              </Badge>
-            ) : (
-              <Badge variant="outline" className="text-amber-600 border-amber-600/40">
-                <AlertCircle className="h-3 w-3 mr-1" /> Not set up
-              </Badge>
-            )}
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {status?.spAccounts && status.spAccounts.length > 0 && (
-            <div className="grid gap-1.5">
-              {status.spAccounts.map((acct: any) => (
-                <div
-                  key={acct.id}
-                  className="flex items-center justify-between text-sm py-1 border-b border-border/40 last:border-0"
-                >
-                  <div className="flex items-center gap-2">
-                    <span className="font-mono text-xs text-muted-foreground w-24">{acct.code}</span>
-                    <span>{acct.name}</span>
-                    {acct.isHidden && (
-                      <Badge variant="secondary" className="text-xs py-0">
-                        hidden
-                      </Badge>
-                    )}
-                  </div>
-                  <span className="text-xs text-muted-foreground">{acct.accountType}</span>
-                </div>
-              ))}
-            </div>
+      <Tabs value={tab} onValueChange={(value) => setTab(value as AdminTab)}>
+        <TabsList className={`grid w-full max-w-lg ${canMigrate ? "grid-cols-2" : "grid-cols-1"}`} data-testid="tabs-sp-administration">
+          <TabsTrigger value="setup" data-testid="tab-sp-administration-setup">
+            <Wrench className="mr-2 h-4 w-4" /> Setup
+          </TabsTrigger>
+          {canMigrate && (
+            <TabsTrigger value="migration" data-testid="tab-sp-administration-migration">
+              <Building2 className="mr-2 h-4 w-4" /> Migration
+            </TabsTrigger>
           )}
+        </TabsList>
 
-          {status?.locations && status.locations.length > 0 && (
-            <div className="text-sm">
-              <span className="text-muted-foreground">Warehouse: </span>
-              <span className="font-medium">{status.locations[0].name}</span>
-            </div>
-          )}
-
-          {status?.bankAccounts?.length === 0 && (
-            <div className="flex items-start gap-2 text-sm text-amber-600 bg-amber-50 dark:bg-amber-950/20 rounded-md p-3">
-              <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
-              <span>No bank accounts found. Add at least one bank account for prepaid payments and sales receipts.</span>
-            </div>
-          )}
-
-          {supplierLinkGapCount > 0 ? (
-            <div className="flex items-start gap-2 text-sm text-amber-600 bg-amber-50 dark:bg-amber-950/20 rounded-md p-3">
-              <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
-              <span>
-                {supplierLinkGapCount} Goods-OTW voucher{supplierLinkGapCount === 1 ? "" : "s"} need supplier-ledger
-                repair. Re-run Setup to fix them safely.
-              </span>
-            </div>
-          ) : (
-            <div className="flex items-start gap-2 text-sm text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-950/20 rounded-md p-3">
-              <CheckCircle2 className="h-4 w-4 mt-0.5 flex-shrink-0" />
-              <span>Container suppliers and Goods-OTW voucher headers are synchronized.</span>
-            </div>
-          )}
-
-          <Button
-            onClick={() => setupMutation.mutate()}
-            disabled={setupMutation.isPending}
-            data-testid="button-sp-setup"
-          >
-            {setupMutation.isPending ? (
-              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-            ) : (
-              <Zap className="h-4 w-4 mr-2" />
-            )}
-            {status?.isConfigured ? "Repair & Re-run Setup" : "Initialize Setup"}
-          </Button>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between flex-wrap gap-2">
-            <div>
-              <CardTitle className="text-base">SP POS Accounting Policy</CardTitle>
-              <CardDescription className="text-xs mt-1">
-                The dedicated Supplier Partner sales flow applies this entry automatically.
-              </CardDescription>
-            </div>
-            <Badge variant="outline" className="text-green-600 border-green-600/40">
-              <ShieldCheck className="h-3 w-3 mr-1" /> Automatic
-            </Badge>
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <div className="rounded-md bg-muted/40 p-3 text-sm space-y-1">
-            <p>
-              <span className="font-medium">Dr Cash / Bank</span> = full customer payment
-            </p>
-            <p>
-              <span className="font-medium">Cr Supplier Cash Payable</span> = full customer payment
-            </p>
-          </div>
-          <p className="text-xs text-muted-foreground">
-            Cost of goods and realized profit are retained on SP sale lines and stock movements for reporting. They are
-            not posted as extra voucher lines, preventing the sale amount from being double-counted.
-          </p>
-        </CardContent>
-      </Card>
+        <TabsContent value="setup" className="mt-4"><SpSetupPanel /></TabsContent>
+        {canMigrate && <TabsContent value="migration" className="mt-4"><GcLshiMigration /></TabsContent>}
+      </Tabs>
     </div>
   );
 }

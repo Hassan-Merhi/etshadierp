@@ -22,13 +22,10 @@ import {
   UserRound,
   ArrowLeftRight,
   ScrollText,
-  Building2,
   Store,
   KeyRound,
   LayoutGrid,
   Handshake,
-  Link2,
-  Wrench,
   Bot,
   ShieldCheck,
   ArrowRight,
@@ -43,6 +40,10 @@ import { useRecentNav } from "@/hooks/use-recent-nav";
 import { Clock } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
+import {
+  SUPPLIER_PARTNER_RECENT_ITEMS,
+  SUPPLIER_PARTNER_SECTIONS,
+} from "@/lib/supplier-partner-navigation";
 import {
   ModuleHeader,
   ModuleFooter,
@@ -237,12 +238,18 @@ export function AppSidebar({ user }: { user?: any }) {
   }, [chatUnread?.count]);
 
   const { sections: visibleSections, isItemVisible } = useErpVisibleSections(user);
-
-  const { openSections, toggleSection } = useOpenSections(visibleSections);
+  const supplierPartnerSections = selectedCompany?.companyType === "supplier_partner" ? SUPPLIER_PARTNER_SECTIONS : [];
+  const sidebarSections = [...visibleSections, ...supplierPartnerSections];
+  const { openSections, toggleSection } = useOpenSections(sidebarSections);
 
   const allNavItems = useMemo(
-    () => [...defaultPinnedItems, ...ERP_NAV_SECTIONS.flatMap((s) => s.items), ...utilityItems],
-    []
+    () => [
+      ...defaultPinnedItems,
+      ...ERP_NAV_SECTIONS.flatMap((s) => s.items),
+      ...utilityItems,
+      ...(selectedCompany?.companyType === "supplier_partner" ? SUPPLIER_PARTNER_RECENT_ITEMS : []),
+    ],
+    [selectedCompany?.companyType]
   );
   const recentItems = useRecentNav(allNavItems, selectedCompany?.id);
 
@@ -272,7 +279,7 @@ export function AppSidebar({ user }: { user?: any }) {
         />
 
         <div className="space-y-1">
-          {visibleSections.map((section) => (
+          {sidebarSections.map((section) => (
             <SidebarSectionGroup
               key={section.label}
               section={section}
@@ -283,26 +290,6 @@ export function AppSidebar({ user }: { user?: any }) {
               trailingFor={trailingFor}
             />
           ))}
-          {selectedCompany?.companyType === "supplier_partner" && (
-            <SidebarSectionGroup
-              section={{
-                label: "Supplier Partner",
-                color: NAV_COLOR.operations,
-                items: [
-                  { title: "SP Reports", url: "/sp/reports", icon: BarChart3 },
-                  { title: "Opening Stock", url: "/sp/opening-stock", icon: Layers },
-                  { title: "Aliases", url: "/sp/aliases", icon: Link2 },
-                  { title: "Setup", url: "/sp/setup", icon: Wrench },
-                  { title: "GC Migration", url: "/sp/gc-migration", icon: Building2 },
-                ],
-              }}
-              isOpen={openSections.has("Supplier Partner")}
-              onToggle={() => toggleSection("Supplier Partner")}
-              sectionTestId="button-section-supplier-partner"
-              testIdFor={(i) => `link-${i.url}`}
-              trailingFor={() => null}
-            />
-          )}
         </div>
 
         {recentItems.length > 0 && (
