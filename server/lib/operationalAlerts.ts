@@ -25,10 +25,15 @@ export interface OperationalIncident {
   action: string;
 }
 
+function finiteConfig(name: string, fallback: number, minimum: number): number {
+  const parsed = Number(process.env[name]);
+  return Number.isFinite(parsed) ? Math.max(minimum, parsed) : fallback;
+}
+
 const incidents = new Map<string, OperationalIncident>();
 const resolved: OperationalIncident[] = [];
-const MAX_RESOLVED = Math.max(20, Number(process.env.OBSERVABILITY_ALERT_HISTORY_LIMIT || 100));
-const COOLDOWN_MS = Math.max(60_000, Number(process.env.OBSERVABILITY_ALERT_COOLDOWN_MS || 15 * 60_000));
+const MAX_RESOLVED = finiteConfig("OBSERVABILITY_ALERT_HISTORY_LIMIT", 100, 20);
+const COOLDOWN_MS = finiteConfig("OBSERVABILITY_ALERT_COOLDOWN_MS", 15 * 60_000, 60_000);
 const ALERT_WEBHOOK_URL = process.env.OBSERVABILITY_ALERT_WEBHOOK_URL?.trim();
 const ALERT_WEBHOOK_TOKEN = process.env.OBSERVABILITY_ALERT_WEBHOOK_TOKEN?.trim();
 
@@ -40,7 +45,7 @@ function threshold(name: string, fallback: number): number {
 async function deliver(incident: OperationalIncident): Promise<void> {
   if (!ALERT_WEBHOOK_URL) return;
   try {
-    await fetch(ALERT_WEBHOOK_URL, {
+    const response = await fetch(ALERT_WEBHOOK_URL, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -63,6 +68,7 @@ async function deliver(incident: OperationalIncident): Promise<void> {
       }),
       signal: AbortSignal.timeout(3_000),
     });
+    if (!response.ok) throw new Error(`Alert webhook returned HTTP ${response.status}`);
   } catch (error) {
     logger.warn("Operational alert delivery failed", {
       module: "observability-alerts",
@@ -80,7 +86,6 @@ function activate(input: Omit<OperationalIncident, "status" | "firstSeenAt" | "l
     ? { ...existing, ...input, status: "active", lastSeenAt: now, occurrences: existing.occurrences + 1 }
     : { ...input, status: "active", firstSeenAt: now, lastSeenAt: now, occurrences: 1 };
   incidents.set(input.key, incident);
-
   const lastNotified = incident.lastNotifiedAt ? new Date(incident.lastNotifiedAt).getTime() : 0;
   if (Date.now() - lastNotified < COOLDOWN_MS) return;
   incident.lastNotifiedAt = now;
@@ -104,12 +109,7 @@ function resolveMissing(activeKeys: Set<string>): void {
     incidents.delete(key);
     resolved.unshift(resolvedIncident);
     if (resolved.length > MAX_RESOLVED) resolved.length = MAX_RESOLVED;
-    logger.info(`Resolved: ${incident.title}`, {
-      module: "observability-alerts",
-      action: "incident_resolved",
-      alertKey: key,
-      occurrences: incident.occurrences,
-    });
+    logger.info(`Resolved: ${incident.title}`, { module: "observability-alerts", action: "incident_resolved", alertKey: key, occurrences: incident.occurrences });
     void deliver(resolvedIncident);
   }
 }
@@ -117,80 +117,30 @@ function resolveMissing(activeKeys: Set<string>): void {
 export function evaluateOperationalAlerts(snapshot: PerformanceAlertInput): void {
   const activeKeys = new Set<string>();
   const rules = [
-    {
-      key: "http-5xx-rate",
-      title: "HTTP 5xx rate is elevated",
-      severity: "critical" as const,
-      observed: snapshot.summary.errorPercent,
-      threshold: threshold("OBSERVABILITY_ALERT_5XX_PERCENT", 5),
-      action: "Open the performance dashboard, identify the failing route template, and correlate recent request IDs with server logs.",
-      enabled: snapshot.summary.requests >= threshold("OBSERVABILITY_ALERT_MIN_REQUESTS", 20),
-    },
-    {
-      key: "http-p95-latency",
-      title: "HTTP p95 latency is elevated",
-      severity: "warning" as const,
-      observed: snapshot.summary.p95Ms,
-      threshold: threshold("OBSERVABILITY_ALERT_P95_MS", 2_000),
-      action: "Review slowest route templates, database duration, response size, and pool pressure before changing business logic.",
-      enabled: snapshot.summary.requests >= threshold("OBSERVABILITY_ALERT_MIN_REQUESTS", 20),
-    },
-    {
-      key: "memory-rss",
-      title: "Process memory pressure is elevated",
-      severity: "critical" as const,
-      observed: snapshot.memoryMb.rss,
-      threshold: threshold("OBSERVABILITY_ALERT_RSS_MB", 900),
-      action: "Check large responses, repeated polling, export jobs, and recent memory growth; restart only after preserving request IDs and logs.",
-      enabled: true,
-    },
-    {
-      key: "database-pool-waiting",
-      title: "Database pool has waiting requests",
-      severity: "critical" as const,
-      observed: snapshot.databasePool.waiting,
-      threshold: threshold("OBSERVABILITY_ALERT_DB_WAITING", 1),
-      action: "Identify long database-heavy routes and scheduled jobs, then inspect transaction duration and connection release paths.",
-      enabled: true,
-    },
+    { key: "http-5xx-rate", title: "HTTP 5xx rate is elevated", severity: "critical" as const, observed: snapshot.summary.errorPercent, threshold: threshold("OBSERVABILITY_ALERT_5XX_PERCENT", 5), action: "Open the performance dashboard, identify the failing route template, and correlate recent request IDs with server logs.", enabled: snapshot.summary.requests >= threshold("OBSERVABILITY_ALERT_MIN_REQUESTS", 20) },
+    { key: "http-p95-latency", title: "HTTP p95 latency is elevated", severity: "warning" as const, observed: snapshot.summary.p95Ms, threshold: threshold("OBSERVABILITY_ALERT_P95_MS", 2_000), action: "Review slowest route templates, database duration, response size, and pool pressure before changing business logic.", enabled: snapshot.summary.requests >= threshold("OBSERVABILITY_ALERT_MIN_REQUESTS", 20) },
+    { key: "memory-rss", title: "Process memory pressure is elevated", severity: "critical" as const, observed: snapshot.memoryMb.rss, threshold: threshold("OBSERVABILITY_ALERT_RSS_MB", 900), action: "Check large responses, repeated polling, export jobs, and recent memory growth; restart only after preserving request IDs and logs.", enabled: true },
+    { key: "database-pool-waiting", title: "Database pool has waiting requests", severity: "critical" as const, observed: snapshot.databasePool.waiting, threshold: threshold("OBSERVABILITY_ALERT_DB_WAITING", 1), action: "Identify long database-heavy routes and scheduled jobs, then inspect transaction duration and connection release paths.", enabled: true },
   ];
-
   for (const rule of rules) {
     if (!rule.enabled || rule.observed < rule.threshold) continue;
     activeKeys.add(rule.key);
     activate(rule);
   }
-
   for (const job of snapshot.backgroundJobs) {
     const failureThreshold = threshold("OBSERVABILITY_ALERT_JOB_FAILURES", 1);
     if (job.failures < failureThreshold) continue;
     const key = `job-failure:${job.name}`;
     activeKeys.add(key);
-    activate({
-      key,
-      title: `Scheduled job failures: ${job.name}`,
-      severity: "critical",
-      observed: job.failures,
-      threshold: failureThreshold,
-      action: "Review the scheduler request ID, dependent export/email/WhatsApp logs, and the last successful run before retrying.",
-    });
+    activate({ key, title: `Scheduled job failures: ${job.name}`, severity: "critical", observed: job.failures, threshold: failureThreshold, action: "Review the scheduler request ID, dependent export/email/WhatsApp logs, and the last successful run before retrying." });
   }
-
   for (const dependency of snapshot.externalDependencies) {
     const failureThreshold = threshold("OBSERVABILITY_ALERT_DEPENDENCY_FAILURES", 1);
     if (dependency.failures < failureThreshold) continue;
     const key = `dependency-failure:${dependency.name}`;
     activeKeys.add(key);
-    activate({
-      key,
-      title: `External dependency failures: ${dependency.name}`,
-      severity: "warning",
-      observed: dependency.failures,
-      threshold: failureThreshold,
-      action: "Confirm provider availability and credentials, then correlate the dependency span with its parent request or scheduled job.",
-    });
+    activate({ key, title: `External dependency failures: ${dependency.name}`, severity: "warning", observed: dependency.failures, threshold: failureThreshold, action: "Confirm provider availability and credentials, then correlate the dependency span with its parent request or scheduled job." });
   }
-
   resolveMissing(activeKeys);
 }
 
