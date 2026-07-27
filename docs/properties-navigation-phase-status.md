@@ -9,12 +9,17 @@
 - Documented the recommended Rentals hub model and the unresolved Dashboard and Account Groups decisions for later phases.
 - Confirmed Phase 1 changes are documentation-only and do not alter property, rental, voucher, ledger, accounting, analytics, or administrative logic.
 
-## Phase 2 — pending
+## Phase 2 — complete
 
-- Implement the Rentals navigation structure.
-- Standardize section state and direct-link behavior.
-- Map Create Property to Warehouses.
-- Resolve Dashboard status.
+- Added `/properties/rentals` as the shared Rentals hub.
+- Standardized Warehouses, Shops, and Payments on one validated `tab` query-state contract.
+- Used replacement history for tab changes so browser Back remains focused on meaningful page transitions.
+- Redirected the three legacy rental URLs to their canonical hub tabs with replacement history.
+- Updated all Properties sidebar rental links to canonical hub URLs.
+- Updated warehouse and shop payment-log navigation to remain inside the shared hub.
+- Preserved the existing rental pages and APIs without changing contracts, balances, payments, accruals, units, tenants, or accounting behavior.
+- Retained `/properties/dashboard` as a hidden compatibility route because repository usage only proves route-table and command-palette access; it is not the operational landing page.
+- Confirmed `/properties/daybook` remains the Properties company landing and unknown-route fallback.
 
 ## Phase 3 — pending
 
