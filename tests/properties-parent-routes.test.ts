@@ -20,6 +20,7 @@ describe("Properties parent route registry", () => {
     ["/properties/orphaned-records", "/properties/settings"],
     ["/properties/deleted-items", "/properties/settings"],
     ["/properties/chatbot-settings", "/properties/settings"],
+    ["/properties/balance-repair", "/properties/settings"],
   ])("maps %s to %s", (path, expected) => {
     expect(getParentRoute(path)).toBe(expected);
   });
@@ -36,5 +37,6 @@ describe("Properties parent route registry", () => {
     expect(getParentRoute("/properties/accounts")).toBeNull();
     expect(getParentRoute("/properties/vouchers")).toBeNull();
     expect(getParentRoute("/properties/settings")).toBeNull();
+    expect(getParentRoute("/properties/my-settings")).toBeNull();
   });
 });
