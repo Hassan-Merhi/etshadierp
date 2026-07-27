@@ -162,9 +162,13 @@ export function getParentRoute(pathname: string): string | null {
   if (/^\/chatbot-settings/.test(cleanPath)) return "/settings";
   if (/^\/intercompany-links/.test(cleanPath)) return "/settings";
 
-  // ERP — Supplier Partner setup and migration children.
-  if (cleanPath === "/sp/setup" || cleanPath === "/sp/migration" || cleanPath === "/sp/gc-migration") {
-    return "/sp/reports";
+  // ERP — Supplier Partner children → Overview hub or Setup tab.
+  if (cleanPath === "/sp/reports") return "/sp";
+  if (cleanPath === "/sp/opening-stock") return "/sp";
+  if (cleanPath === "/sp/aliases") return "/sp";
+  if (cleanPath === "/sp/setup") return "/sp";
+  if (cleanPath === "/sp/migration" || cleanPath === "/sp/gc-migration") {
+    return "/sp/setup?tab=migration";
   }
 
   return null;
