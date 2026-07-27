@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, ChevronUp, ChevronDown } from "lucide-react";
 import { useCursorNav } from "@/contexts/CursorNavContext";
+import { useBackToParent } from "@/hooks/use-back-to-parent";
 
 export interface PageHeaderProps {
   title: React.ReactNode;
@@ -8,6 +9,8 @@ export interface PageHeaderProps {
   /** Optional icon rendered inline next to the title. */
   icon?: React.ReactNode;
   showBackButton?: boolean;
+  /** Optional deterministic Back target. When omitted, the parent-route registry is used. */
+  backTarget?: string | null;
   /** @deprecated — Dashboard button has been removed globally. This prop is kept for backward compatibility but has no effect. */
   showHomeButton?: boolean;
   showCursorNavButtons?: boolean;
@@ -19,15 +22,12 @@ export function PageHeader({
   subtitle,
   icon,
   showBackButton = true,
+  backTarget,
   showCursorNavButtons = true,
   children,
 }: PageHeaderProps) {
   const { config } = useCursorNav();
-
-  const handleBack = () => {
-    window.history.back();
-  };
-
+  const handleBack = useBackToParent(backTarget);
   const hasNav = showBackButton || (showCursorNavButtons && !!config);
 
   return (

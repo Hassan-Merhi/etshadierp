@@ -1,0 +1,54 @@
+import { useCallback, useEffect, useState } from "react";
+
+type HubQueryStateOptions<T extends string> = {
+  key: "section" | "tab";
+  allowedValues: readonly T[];
+  defaultValue: T;
+  clearKeys?: readonly string[];
+  omitDefault?: boolean;
+};
+
+function readValue<T extends string>({
+  key,
+  allowedValues,
+  defaultValue,
+}: HubQueryStateOptions<T>): T {
+  if (typeof window === "undefined") return defaultValue;
+
+  const value = new URLSearchParams(window.location.search).get(key);
+  return value && allowedValues.includes(value as T) ? (value as T) : defaultValue;
+}
+
+export function useHubQueryState<T extends string>(options: HubQueryStateOptions<T>) {
+  const [value, setValue] = useState<T>(() => readValue(options));
+
+  useEffect(() => {
+    const syncFromLocation = () => setValue(readValue(options));
+    window.addEventListener("popstate", syncFromLocation);
+    return () => window.removeEventListener("popstate", syncFromLocation);
+  }, [options.key, options.defaultValue, options.allowedValues]);
+
+  const updateValue = useCallback(
+    (nextValue: T) => {
+      setValue(nextValue);
+
+      const url = new URL(window.location.href);
+      if (options.omitDefault && nextValue === options.defaultValue) {
+        url.searchParams.delete(options.key);
+      } else {
+        url.searchParams.set(options.key, nextValue);
+      }
+
+      for (const key of options.clearKeys ?? []) {
+        url.searchParams.delete(key);
+      }
+
+      // Hub sections are view state, not separate navigation destinations.
+      // Replacing keeps browser Back focused on meaningful page transitions.
+      window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
+    },
+    [options.key, options.defaultValue, options.clearKeys, options.omitDefault],
+  );
+
+  return [value, updateValue] as const;
+}

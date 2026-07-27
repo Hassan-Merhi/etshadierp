@@ -10,6 +10,9 @@ export type CompanyScopedResourceType =
   | "stock-location"
   | "factory-supplier"
   | "factory-container"
+  | "container"
+  | "employee"
+  | "fixed-asset"
   | "report"
   | "export"
   | "attachment";

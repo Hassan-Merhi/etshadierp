@@ -6,6 +6,12 @@ import { eq, and } from "drizzle-orm";
 import { getClientDate } from "./lib/dateUtils";
 import { enforceRuntimeSession } from "./services/security/sessionEnforcementAdapter";
 import { hydrateActiveCredentialVersion } from "./services/security/credentialVersionService";
+import {
+  CompanyIsolationError,
+  assertRequestCompanyMatchesSession,
+} from "./services/security/companyIsolationPolicy";
+import { decideExplicitCompanyScope } from "./services/security/companyRequestScopePolicy";
+import { resolveActiveCompanyId } from "./routes/helpers/resolveActiveCompanyId";
 
 function logDenied(params: {
   userId?: string | null;
@@ -64,6 +70,65 @@ async function enforceCredentialAwareSession(
   return enforceRuntimeSession(req.session as any, options);
 }
 
+function authorizeExplicitCompanyScope(req: Request, res: Response): boolean {
+  const decision = decideExplicitCompanyScope({
+    queryCompanyId: req.query?.companyId,
+    bodyCompanyId: (req.body as Record<string, unknown> | undefined)?.companyId,
+    pathCompanyId: req.params?.companyId,
+  });
+
+  if (decision.kind === "none") return true;
+
+  if (decision.kind === "invalid") {
+    res.status(400).json({
+      code: "COMPANY_ID_INVALID",
+      message: `Invalid companyId in request ${decision.source}.`,
+    });
+    return false;
+  }
+
+  if (decision.kind === "conflict") {
+    res.status(400).json({
+      code: "COMPANY_ID_CONFLICT",
+      message: "All companyId values in the request must match.",
+    });
+    return false;
+  }
+
+  // This endpoint intentionally transitions the server-owned active company.
+  // The target ID is still parsed above and the route handler verifies the user
+  // has access before changing or saving any session fields.
+  if (req.method === "POST" && req.path === "/api/auth/set-company") {
+    return true;
+  }
+
+  const userId = req.session.userId;
+  const role = req.session.currentRole;
+  const companyId = resolveActiveCompanyId(req);
+
+  try {
+    assertRequestCompanyMatchesSession(
+      userId && role && companyId ? { userId, role, companyId } : null,
+      decision.companyId
+    );
+    return true;
+  } catch (error) {
+    if (!(error instanceof CompanyIsolationError)) throw error;
+
+    logDenied({
+      userId: userId ?? null,
+      username: req.session.username ?? null,
+      role: role ?? null,
+      companyId: decision.companyId,
+      method: req.method,
+      path: req.path,
+      reason: error.code,
+    });
+    res.status(403).json({ code: error.code, message: error.message });
+    return false;
+  }
+}
+
 // Light authentication middleware — only requires a valid user session.
 // Does NOT require a company to be selected. Use for personal-account actions.
 export async function requireLogin(req: Request, res: Response, next: NextFunction) {
@@ -80,9 +145,7 @@ export async function requireLogin(req: Request, res: Response, next: NextFuncti
   }
 }
 
-// Authentication middleware for company-scoped routes. Credential-version state
-// is refreshed at a bounded interval; the pure session policy remains synchronous
-// and rejects a session immediately when its stored version no longer matches.
+// Authentication middleware for company-scoped routes.
 export async function requireAuth(req: Request, res: Response, next: NextFunction) {
   try {
     const sessionResult = await enforceCredentialAwareSession(req, {
@@ -97,6 +160,8 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
     if (!role) {
       return res.status(401).json({ message: "Unauthorized" });
     }
+
+    if (!authorizeExplicitCompanyScope(req, res)) return;
 
     req.user = {
       id: req.session.userId,
@@ -230,10 +295,7 @@ export async function checkPOSLocation(req: Request, res: Response, next: NextFu
       return next();
     }
 
-    const rawLocationId =
-      req.params.locationId ??
-      req.body?.locationId ??
-      req.query.locationId;
+    const rawLocationId = req.params.locationId ?? req.body?.locationId ?? req.query.locationId;
     const locationId = Number.parseInt(String(rawLocationId ?? ""), 10);
 
     if (!Number.isInteger(locationId) || locationId <= 0) {
@@ -245,9 +307,6 @@ export async function checkPOSLocation(req: Request, res: Response, next: NextFu
       return res.status(403).json({ message: "No company selected" });
     }
 
-    // Check the exact requested assignment instead of loading every location for
-    // the user. This uses the composite user/company/location index and keeps the
-    // authorization query bounded even when a POS user has many locations.
     const [assignment] = await db
       .select({ id: userLocations.id })
       .from(userLocations)
@@ -266,9 +325,6 @@ export async function checkPOSLocation(req: Request, res: Response, next: NextFu
 
     return next();
   } catch (error) {
-    // Async Express middleware must pass database failures to the central error
-    // handler. Letting this promise reject creates a process-level
-    // unhandledRejection and forces a full Render restart.
     return next(error);
   }
 }

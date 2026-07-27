@@ -1,6 +1,6 @@
 import type { Express } from "express";
 import { eq, and, or } from "drizzle-orm";
-import { companies } from "@shared/schema";
+import { companies, userCompanyRoles } from "@shared/schema";
 import { registerFactoryStockRoutes } from "./factory/factoryStockRoutes";
 import { registerFactorySuppliersRoutes } from "./factory/factorySuppliersRoutes";
 import { registerFactoryProductsRoutes } from "./factory/factoryProductsRoutes";
@@ -25,7 +25,19 @@ import { registerFactoryDaybookPaginationRoutes } from "./factory/factoryDaybook
 import { registerFactoryStockEntryHistoryPaginationRoutes } from "./factory/factoryStockEntryHistoryPaginationRoutes";
 import { registerFactoryStockAllocationV5PaginationRoutes } from "./factory/factoryStockAllocationV5PaginationRoutes";
 import { registerCentralFactoryPayrollGenerationRoute } from "./payroll/centralFactoryPayrollGenerationRoute";
+import { registerCentralGlobalTransactionRoutes } from "./global/centralGlobalTransactionRoutes";
 import { createContainerDocumentDownloadHandler } from "../services/security/protectedAssetDownloadAdapter";
+import { enforceCompanyUserRoleScope } from "../middleware/companyUserRoleScope";
+import { enforceCompanyResourceScope } from "../middleware/companyResourceScope";
+import { enforceDeletedItemCompanyScope } from "../middleware/deletedItemCompanyScope";
+import { enforceGlobalTransactionCompanyScope } from "../middleware/globalTransactionCompanyScope";
+import { enforceOperationalPermissionScope } from "../middleware/operationalPermissionScope";
+import {
+  ActiveCompanyPermissionContextError,
+  getActiveCompanyPermissionContext,
+} from "../services/security/activeCompanyPermissionContext";
+import { chooseAuthorizedFactoryCompany } from "../services/security/factoryCompanyScopePolicy";
+import { isErpContainerFactoryAlias } from "../services/security/companyResourceRoutePolicy";
 
 export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
   // ─────────────────────────────────────────────────────────────────────────────
@@ -35,43 +47,94 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
     try {
       const session = req.session as any;
       if (!session?.userId) return next();
-      if (session.factoryCompanyId) return next();
 
-      const currentCompanyId = session.currentCompanyId;
+      // Historical ERP ContainerDetail aliases live under /api/factory but use
+      // the ERP containers table and their own current-company ownership checks.
+      if (isErpContainerFactoryAlias(req.path)) return next();
 
-      if (currentCompanyId) {
-        const [co] = await db
-          .select({ id: companies.id, companyType: companies.companyType })
+      const assignedFactories = await db
+        .select({
+          id: companies.id,
+          companyType: companies.companyType,
+          active: companies.active,
+        })
+        .from(userCompanyRoles)
+        .innerJoin(companies, eq(companies.id, userCompanyRoles.companyId))
+        .where(
+          and(
+            eq(userCompanyRoles.userId, session.userId),
+            eq(companies.active, true),
+            or(eq(companies.companyType, "factory"), eq(companies.companyType, "factory_v2"))
+          )
+        )
+        .orderBy(companies.id);
+
+      let currentCompany = assignedFactories.find((company: any) => company.id === session.currentCompanyId) ?? null;
+
+      // A Developer may explicitly switch to any company through /api/auth/set-company.
+      // Preserve that explicit server-owned context, but never choose a global factory
+      // merely because the user opened a factory URL from an ERP company.
+      if (!currentCompany && session.currentRole === "Developer" && session.currentCompanyId) {
+        const [developerCurrent] = await db
+          .select({
+            id: companies.id,
+            companyType: companies.companyType,
+            active: companies.active,
+          })
           .from(companies)
-          .where(eq(companies.id, currentCompanyId));
-        if (co?.companyType === "factory" || co?.companyType === "factory_v2") {
-          session.factoryCompanyId = co.id;
-          return next();
+          .where(eq(companies.id, session.currentCompanyId))
+          .limit(1);
+        if (
+          developerCurrent?.active &&
+          (developerCurrent.companyType === "factory" || developerCurrent.companyType === "factory_v2")
+        ) {
+          currentCompany = developerCurrent;
+          assignedFactories.unshift(developerCurrent);
         }
       }
 
-      // Fall back to any active factory-type company
-      const [factoryComp] = await db
-        .select({ id: companies.id })
-        .from(companies)
-        .where(
-          and(
-            or(eq(companies.companyType, "factory"), eq(companies.companyType, "factory_v2")),
-            eq(companies.active, true)
-          )
-        )
-        .limit(1);
-      if (factoryComp) {
-        session.factoryCompanyId = factoryComp.id;
-        return next();
+      const factoryCompanyId = chooseAuthorizedFactoryCompany({
+        pinnedFactoryId: session.factoryCompanyId,
+        currentCompany,
+        assignedFactoryIds: assignedFactories.map((company: any) => company.id),
+      });
+
+      if (!factoryCompanyId) {
+        delete session.factoryCompanyId;
+        return res.status(403).json({
+          message: "You do not have access to a Factory company.",
+          code: "FACTORY_COMPANY_ACCESS_REQUIRED",
+        });
       }
 
-      if (currentCompanyId) session.factoryCompanyId = currentCompanyId;
-      next();
-    } catch {
-      next();
+      session.factoryCompanyId = factoryCompanyId;
+      return next();
+    } catch (error) {
+      return next(error);
     }
   });
+
+  // Program 3A global guards. registerFactoryRoutes is the first route registry in
+  // server/routes.ts. Factory company resolution runs first; these guards then
+  // execute before all legacy auth and business handlers.
+  app.use(async (req, res, next) => {
+    try {
+      if (!(await enforceCompanyUserRoleScope(req, res))) return;
+      if (!(await enforceCompanyResourceScope(req, res))) return;
+      if (!(await enforceDeletedItemCompanyScope(req, res))) return;
+      if (!(await enforceGlobalTransactionCompanyScope(req, res))) return;
+      next();
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Program 3B operational permissions run after company ownership is resolved
+  // and before every legacy import, repair, export, backup, and bulk handler.
+  app.use(enforceOperationalPermissionScope);
+
+  // Protected global transaction list/type routes run before the legacy module.
+  registerCentralGlobalTransactionRoutes(app, requireAuth);
 
   registerPerformanceReadMicrocache(app);
 
@@ -79,7 +142,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
   // FACTORY ADMIN GUARD — blocks PUT / PATCH / DELETE for non-admins unless
   // they have a valid admin-override session token
   // ─────────────────────────────────────────────────────────────────────────────
-  app.use("/api/factory", (req: any, res: any, next: any) => {
+  app.use("/api/factory", async (req: any, res: any, next: any) => {
     if (!["PUT", "PATCH", "DELETE"].includes(req.method)) return next();
     if (!req.session?.userId) return next(); // unauthenticated — let requireAuth handle it
 
@@ -105,16 +168,23 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
     // Loading note edits are open to all authenticated factory users (floor staff)
     if (req.method === "PATCH" && /^\/customer-orders\/\d+\/loading-note$/.test(req.path)) return next();
 
-    const role = req.session?.currentRole as string | undefined;
-    if (["Admin", "Owner", "Developer"].includes(role || "")) return next();
+    try {
+      const context = await getActiveCompanyPermissionContext(req);
+      if (["Admin", "Owner", "Developer"].includes(context.role)) return next();
 
-    const overrideUntil = req.session?.factoryAdminOverrideUntil as number | undefined;
-    if (overrideUntil && Date.now() < overrideUntil) return next();
+      const overrideUntil = req.session?.factoryAdminOverrideUntil as number | undefined;
+      if (overrideUntil && Date.now() < overrideUntil) return next();
 
-    return res.status(403).json({
-      message: "Admin authorization required for this action.",
-      requiresAdminOverride: true,
-    });
+      return res.status(403).json({
+        message: "Admin authorization required for this action.",
+        requiresAdminOverride: true,
+      });
+    } catch (error) {
+      if (error instanceof ActiveCompanyPermissionContextError) {
+        return res.status(error.status).json({ message: error.message, code: error.code });
+      }
+      return next(error);
+    }
   });
 
   // Container document downloads are intercepted before the legacy docs module

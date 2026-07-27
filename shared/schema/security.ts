@@ -1,12 +1,13 @@
 import { pgTable, serial, varchar, integer, text, timestamp, uniqueIndex, index } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
+import { companies } from "./common";
 import { users } from "./users";
 
 export const userSecurityPermissions = pgTable("user_security_permissions", {
   id: serial("id").primaryKey(),
   userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
-  companyId: integer("company_id").notNull(),
+  companyId: integer("company_id").notNull().references(() => companies.id, { onDelete: "restrict" }),
   permission: text("permission").notNull(),
   grantedBy: varchar("granted_by").references(() => users.id, { onDelete: "set null" }),
   createdAt: timestamp("created_at").notNull().defaultNow(),

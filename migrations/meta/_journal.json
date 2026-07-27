@@ -92,6 +92,13 @@
       "when": 1784993400000,
       "tag": "20260720_003_ledger_account_opening_balance_currency",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1785120000000,
+      "tag": "0013_tenant_control_integrity_guards",
+      "breakpoints": true
     }
   ]
 }
