@@ -224,9 +224,13 @@ export function registerCompanySettingsRoutes(app: Express) {
     }
   });
 
-  // System Settings - Parent Company (Admin only)
+  // System Settings - Parent Company (Admin + Developer only)
   app.get("/api/system/parent-company", requireAuth, async (req, res) => {
     try {
+      const userRole = req.session.currentRole;
+      if (userRole !== "Admin" && userRole !== "Developer") {
+        return res.status(403).json({ message: "Only Admin users can access the parent company setting" });
+      }
       const parentCompanyId = await storage.getParentCompanyId();
       res.json({ parentCompanyId });
     } catch (error: unknown) {

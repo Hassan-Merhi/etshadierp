@@ -4,7 +4,6 @@ export interface GlobalMaintenanceRouteMatch {
     | "fix-unattributable-pos-data"
     | "cleanup-orphaned-charges"
     | "account-migration"
-    | "parent-company-setting"
     | "deployment-diagnostics"
     | "runtime-schema-migration"
     | "schema-diagnostic"
@@ -31,16 +30,6 @@ const EXACT_ROUTES: Array<{
     method: "POST",
     path: "/api/cleanup/orphaned-charges",
     operation: "cleanup-orphaned-charges",
-  },
-  {
-    method: "GET",
-    path: "/api/system/parent-company",
-    operation: "parent-company-setting",
-  },
-  {
-    method: "POST",
-    path: "/api/system/parent-company",
-    operation: "parent-company-setting",
   },
   {
     method: "GET",
