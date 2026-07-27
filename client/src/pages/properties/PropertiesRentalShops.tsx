@@ -8,6 +8,7 @@ export default function PropertiesRentalShops() {
       pageTitle="Properties — Shop Rentals"
       pageIcon={<Store className="h-7 w-7 text-purple-600" />}
       testIdPrefix="rental-shops"
+      paymentsLogUrl="/properties/rentals?tab=payments"
     />
   );
 }

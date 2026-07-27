@@ -120,13 +120,16 @@ export function AuthenticatedApp() {
   const factoryDefaultPage  = computeFactoryDefaultPage(myAccess);
 
   // ── Properties redirects ────────────────────────────────────────────────────
-  if (
-    isPropertiesCompany &&
-    !isPropertiesRoute &&
-    currentLocation !== "/my-settings" &&
-    currentLocation !== "/balance-repair"
-  ) {
-    return <Redirect to="/properties/daybook" />;
+  // Keep the historical global URLs working, but normalize Properties companies
+  // into the Properties namespace without adding a browser-history entry.
+  if (isPropertiesCompany && currentLocation === "/my-settings") {
+    return <Redirect replace to="/properties/my-settings" />;
+  }
+  if (isPropertiesCompany && currentLocation === "/balance-repair") {
+    return <Redirect replace to="/properties/balance-repair" />;
+  }
+  if (isPropertiesCompany && !isPropertiesRoute) {
+    return <Redirect replace to="/properties/daybook" />;
   }
 
   // ── Factory redirects ───────────────────────────────────────────────────────
@@ -193,7 +196,7 @@ export function AuthenticatedApp() {
   }
 
   // ── Properties shell ────────────────────────────────────────────────────────
-  if (isPropertiesCompany && (isPropertiesRoute || currentLocation === "/balance-repair")) {
+  if (isPropertiesCompany && isPropertiesRoute) {
     return (
       <PropertiesShell
         user={user}

@@ -8,6 +8,7 @@ export default function PropertiesRentalWarehouses() {
       pageTitle="Properties — Warehouse Rentals"
       pageIcon={<Building2 className="h-7 w-7 text-indigo-600" />}
       testIdPrefix="rental-warehouses"
+      paymentsLogUrl="/properties/rentals?tab=payments"
     />
   );
 }
