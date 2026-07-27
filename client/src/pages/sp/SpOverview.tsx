@@ -1,5 +1,5 @@
 import { Link } from "wouter";
-import { BarChart3, Layers, Link2, Settings } from "lucide-react";
+import { BarChart3, Building2, Layers, Link2, Wrench } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
 const dailyWork = [
@@ -25,10 +25,16 @@ const dailyWork = [
 
 const administration = [
   {
-    title: "SP Settings",
-    description: "Open setup, repair, and controlled migration tools for this Supplier Partner company.",
-    href: "/sp/settings",
-    icon: Settings,
+    title: "Setup",
+    description: "Initialize or repair Supplier Partner accounts, warehouse, and supplier-ledger links.",
+    href: "/sp/setup",
+    icon: Wrench,
+  },
+  {
+    title: "Migration",
+    description: "Open the staged GC Lshi migration workflow.",
+    href: "/sp/gc-migration",
+    icon: Building2,
   },
 ];
 
