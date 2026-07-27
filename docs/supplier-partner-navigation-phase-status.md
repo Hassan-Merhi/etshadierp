@@ -7,15 +7,17 @@
 - Added a company-type boundary so `/sp` and `/sp/*` only mount for `supplier_partner` companies.
 - Added replacement fallback to `/tracking` for direct SP route access from any other company type.
 - Established `/sp` as the stable Supplier Partner namespace entry.
-- Until the Overview hub is introduced in Phase 2, `/sp` redirects with replacement history to `/sp/reports`.
 - Preserved all Supplier Partner accounting, stock, payable, profit split, export, setup, alias, opening-stock, and migration business logic.
 
-## Phase 2 — pending
+## Phase 2 — complete
 
-- Add the Supplier Partner overview hub.
-- Separate daily work from administration in the sidebar.
-- Include Supplier Partner pages in recent-navigation registration.
-- Normalize sidebar active-state behavior.
+- Added `/sp` as the real Supplier Partner overview hub.
+- Added direct cards for Reports, Opening Stock, Aliases, Setup, and Migration.
+- Split the sidebar into Supplier Partner daily work and SP Administration.
+- Centralized Supplier Partner navigation definitions in one shared source.
+- Included Supplier Partner pages in Recent navigation for Supplier Partner companies.
+- Ensured sidebar sections and active-route handling use the same shared route definitions.
+- Added focused regression coverage for landing, section organization, Recent registration, and navigation-only scope.
 
 ## Phase 3 — pending
 
@@ -33,5 +35,5 @@
 
 - Complete deterministic Back and Escape mappings.
 - Add unknown `/sp/*` safe fallback.
-- Add regression coverage.
+- Add final regression coverage.
 - Reconcile with latest `main` and confirm merge readiness.
