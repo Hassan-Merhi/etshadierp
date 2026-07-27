@@ -10,6 +10,20 @@ declare global {
   }
 }
 
+function getSupplierPartnerParent(pathname: string): string | null {
+  const cleanPath = pathname.split("?")[0].split("#")[0];
+
+  if (cleanPath === "/sp/reports") return "/sp";
+  if (cleanPath === "/sp/opening-stock") return "/sp";
+  if (cleanPath === "/sp/aliases") return "/sp";
+  if (cleanPath === "/sp/setup") return "/sp";
+  if (cleanPath === "/sp/migration" || cleanPath === "/sp/gc-migration") {
+    return "/sp/setup?tab=migration";
+  }
+
+  return null;
+}
+
 /**
  * Manages app-level navigation state:
  *   - Leave-confirmation dialog (triggered when __escBackGuard is active)
@@ -22,7 +36,8 @@ export function useAppNavigation() {
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
 
   const navigateToParent = useCallback(() => {
-    const parent = getParentRoute(window.location.pathname);
+    const pathname = window.location.pathname;
+    const parent = getSupplierPartnerParent(pathname) ?? getParentRoute(pathname);
     if (parent) {
       setLocation(parent);
     } else if (window.history.length > 1) {
@@ -46,7 +61,6 @@ export function useAppNavigation() {
     navigateToParent();
   }, [navigateToParent]);
 
-  // Global arrow / page-scroll + ESC handling
   useGlobalScrollKeys(handleGoBack);
 
   return { showLeaveConfirm, setShowLeaveConfirm, handleGoBack, handleConfirmLeave };
