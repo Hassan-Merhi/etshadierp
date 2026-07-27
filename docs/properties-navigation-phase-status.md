@@ -21,11 +21,16 @@
 - Retained `/properties/dashboard` as a hidden compatibility route because repository usage only proves route-table and command-palette access; it is not the operational landing page.
 - Confirmed `/properties/daybook` remains the Properties company landing and unknown-route fallback.
 
-## Phase 3 — pending
+## Phase 3 — complete
 
-- Complete deterministic parent mappings.
-- Align visible Back and Escape behavior.
-- Add regression coverage.
+- Completed deterministic parent mappings for Rentals, accounting details, and administration children.
+- Mapped Create Property to the Warehouses tab and Cash Transfer to the Rentals hub.
+- Mapped legacy rental routes to their exact canonical Rentals tabs.
+- Confirmed voucher detail/edit, monthly ledger, and ledger voucher hierarchy.
+- Classified Account Groups under Accounts after verifying its accounting role.
+- Mapped Net Position, diagnostics, repair, reset, deleted, orphaned, and chatbot pages to Settings.
+- Added focused Properties parent-route regression tests, including root-page null-parent protection and query/hash normalization.
+- Visible Back and Escape now share the same registered parent contract through the existing navigation system.
 
 ## Phase 4 — pending
 
