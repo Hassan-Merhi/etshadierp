@@ -113,11 +113,13 @@ export function AuthenticatedApp() {
   if (isLoading) return <AppLoadingState />;
 
   // ── Route classification ────────────────────────────────────────────────────
-  const isPropertiesCompany = selectedCompany?.companyType === "properties";
-  const isPropertiesRoute   = currentLocation.startsWith("/properties/");
-  const isFactoryCompany    = selectedCompany?.companyType === "factory" || selectedCompany?.companyType === "factory_v2";
-  const isFactoryRoute      = currentLocation.startsWith("/factory/");
-  const factoryDefaultPage  = computeFactoryDefaultPage(myAccess);
+  const isPropertiesCompany     = selectedCompany?.companyType === "properties";
+  const isPropertiesRoute       = currentLocation.startsWith("/properties/");
+  const isSupplierPartnerCompany = selectedCompany?.companyType === "supplier_partner";
+  const isSupplierPartnerRoute   = currentLocation === "/sp" || currentLocation.startsWith("/sp/");
+  const isFactoryCompany        = selectedCompany?.companyType === "factory" || selectedCompany?.companyType === "factory_v2";
+  const isFactoryRoute          = currentLocation.startsWith("/factory/");
+  const factoryDefaultPage      = computeFactoryDefaultPage(myAccess);
 
   // ── Properties redirects ────────────────────────────────────────────────────
   // Keep the historical global URLs working, but normalize Properties companies
@@ -130,6 +132,16 @@ export function AuthenticatedApp() {
   }
   if (isPropertiesCompany && !isPropertiesRoute) {
     return <Redirect replace to="/properties/daybook" />;
+  }
+
+  // ── Supplier Partner redirects ──────────────────────────────────────────────
+  // SP pages are valid only for Supplier Partner companies. `/sp` is the stable
+  // namespace entry point until the dedicated overview hub is introduced.
+  if (isSupplierPartnerRoute && !isSupplierPartnerCompany) {
+    return <Redirect replace to="/tracking" />;
+  }
+  if (isSupplierPartnerCompany && currentLocation === "/sp") {
+    return <Redirect replace to="/sp/reports" />;
   }
 
   // ── Factory redirects ───────────────────────────────────────────────────────
