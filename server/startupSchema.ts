@@ -4204,6 +4204,9 @@ END $$`,
     `ALTER TABLE factory_containers ADD COLUMN IF NOT EXISTS freight_fx_rate_to_usd NUMERIC(20,8)`,
     `ALTER TABLE factory_containers ADD COLUMN IF NOT EXISTS freight_fx_rate_confirmed BOOLEAN NOT NULL DEFAULT false`,
     `ALTER TABLE factory_containers ADD COLUMN IF NOT EXISTS freight_fx_rate_date DATE`,
+    // OTW shared note + docs flag visible to all users (Jul 2026)
+    `ALTER TABLE factory_containers ADD COLUMN IF NOT EXISTS otw_note TEXT`,
+    `ALTER TABLE factory_containers ADD COLUMN IF NOT EXISTS otw_docs_received BOOLEAN NOT NULL DEFAULT false`,
 
     // -- Per-line FX rate on factory_container_other_charges (July 2026) --
     // Each other-charge line may be denominated in its own currency. Store the resolved

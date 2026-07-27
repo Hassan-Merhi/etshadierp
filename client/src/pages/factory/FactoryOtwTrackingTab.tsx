@@ -48,20 +48,6 @@ import { factoryApiRequest } from "@/lib/factoryApi";
 import { useFactoryJsonCargoEta } from "./useFactoryJsonCargoEta";
 import type { FactoryContainer } from "@shared/schema";
 
-// ── localStorage helpers ────────────────────────────────────────────────────
-const NOTES_KEY = "factory-otw-row-notes";
-const DOCS_KEY = "factory-otw-row-docs";
-function loadMap<T>(key: string): Record<string, T> {
-  try {
-    return JSON.parse(localStorage.getItem(key) ?? "{}");
-  } catch {
-    return {};
-  }
-}
-function saveMap(key: string, map: Record<string, any>) {
-  localStorage.setItem(key, JSON.stringify(map));
-}
-
 // ── Types ───────────────────────────────────────────────────────────────────
 interface ContainerWithSupplier extends FactoryContainer {
   supplierName?: string | null;
@@ -249,16 +235,16 @@ function EtaCell({
 // ── Inline notes cell ────────────────────────────────────────────────────────
 function NotesCell({
   containerId,
-  notes,
+  note,
   onSave,
 }: {
   containerId: number;
-  notes: Record<string, string>;
+  note: string;
   onSave: (id: number, val: string) => void;
 }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState("");
-  const current = notes[String(containerId)] ?? "";
+  const current = note ?? "";
 
   function startEdit(e: React.MouseEvent) {
     e.stopPropagation();
@@ -608,9 +594,6 @@ export default function FactoryOtwTrackingTab({ onEdit }: OtwTrackingTabProps = 
   const [search, setSearch] = useState("");
   const [showFilters, setShowFilters] = useState(false);
 
-  const [notes, setNotes] = useState<Record<string, string>>(() => loadMap<string>(NOTES_KEY));
-  const [docs, setDocs] = useState<Record<string, boolean>>(() => loadMap<boolean>(DOCS_KEY));
-
   // Use activeOnly=true so the backend pre-filters to PENDING/IN_TRANSIT/ARRIVED.
   // The queryKey uses the base path so existing invalidations (prefix-match) still work.
   const { data: containers, isLoading } = useQuery<ContainerWithSupplier[]>({
@@ -638,8 +621,8 @@ export default function FactoryOtwTrackingTab({ onEdit }: OtwTrackingTabProps = 
     if (freightFilter === "no_freight" && num(c.freight) > 0) return false;
     if (weightFilter === "has_weight" && !(num(c.totalKg) > 0)) return false;
     if (weightFilter === "no_weight" && num(c.totalKg) > 0) return false;
-    if (docsFilter === "received" && !docs[String(c.id)]) return false;
-    if (docsFilter === "not_received" && !!docs[String(c.id)]) return false;
+    if (docsFilter === "received" && !(c as any).otwDocsReceived) return false;
+    if (docsFilter === "not_received" && !!(c as any).otwDocsReceived) return false;
     if (delayedFilter === "delayed" && calcDelayDays(c) === 0) return false;
     if (delayedFilter === "overdue" && !isOverdue(c)) return false;
     if (search.trim()) {
@@ -728,7 +711,7 @@ export default function FactoryOtwTrackingTab({ onEdit }: OtwTrackingTabProps = 
     }
   }
 
-  const docsReceived = filtered.filter((c) => docs[String(c.id)]).length;
+  const docsReceived = filtered.filter((c) => !!(c as any).otwDocsReceived).length;
   const totalWeight = filtered.reduce((sum, c) => sum + num(c.totalKg), 0);
   const timelineContainer = otwContainers.find((c) => c.id === timelineId) ?? null;
   const trackingEnabledCount = otwContainers.filter((c) => (c as any).trackingEnabled !== false).length;
@@ -742,19 +725,21 @@ export default function FactoryOtwTrackingTab({ onEdit }: OtwTrackingTabProps = 
     delayedFilter !== "all" ||
     sortOrder !== "DEFAULT";
 
-  function saveNote(id: number, val: string) {
-    setNotes((prev) => {
-      const next = { ...prev, [String(id)]: val };
-      saveMap(NOTES_KEY, next);
-      return next;
-    });
+  async function saveNote(id: number, val: string) {
+    try {
+      await factoryApiRequest("PATCH", `/api/factory/containers/${id}`, { otwNote: val || null });
+      tqClient.invalidateQueries({ queryKey: ["/api/factory/containers"] });
+    } catch (err: any) {
+      toast({ title: "Failed to save note", description: err?.message, variant: "destructive" });
+    }
   }
-  function toggleDoc(id: number, checked: boolean) {
-    setDocs((prev) => {
-      const next = { ...prev, [String(id)]: checked };
-      saveMap(DOCS_KEY, next);
-      return next;
-    });
+  async function toggleDoc(id: number, checked: boolean) {
+    try {
+      await factoryApiRequest("PATCH", `/api/factory/containers/${id}`, { otwDocsReceived: checked });
+      tqClient.invalidateQueries({ queryKey: ["/api/factory/containers"] });
+    } catch (err: any) {
+      toast({ title: "Failed to update docs", description: err?.message, variant: "destructive" });
+    }
   }
 
   const etaMutation = useMutation({
@@ -835,7 +820,7 @@ export default function FactoryOtwTrackingTab({ onEdit }: OtwTrackingTabProps = 
         containerCost(c).amount > 0 ? String(containerCost(c).amount) : "",
         num((c as any).freight) > 0 ? String(num((c as any).freight)) : "",
         c.totalKg ? String(c.totalKg) : "",
-        notes[String(c.id)] || "",
+        (c as any).otwNote || "",
       ]);
     }
     const csv = rows
@@ -1271,7 +1256,7 @@ export default function FactoryOtwTrackingTab({ onEdit }: OtwTrackingTabProps = 
               const frSym = ccySym(c.freightCurrencyCode || c.currencyCode);
               const commSym = ccySym(c.commissionCurrencyCode || "USD");
               const dutySym = ccySym(c.currencyCode);
-              const docDone = !!docs[String(c.id)];
+              const docDone = !!(c as any).otwDocsReceived;
               const isTracking = trackingNowId === c.id;
               const hasError = !!fc.trackingError;
               const isEnabled = fc.trackingEnabled !== false;
@@ -1395,7 +1380,7 @@ export default function FactoryOtwTrackingTab({ onEdit }: OtwTrackingTabProps = 
 
                   {/* Notes */}
                   <TableCell onClick={(e) => e.stopPropagation()}>
-                    <NotesCell containerId={c.id} notes={notes} onSave={saveNote} />
+                    <NotesCell containerId={c.id} note={(c as any).otwNote ?? ""} onSave={saveNote} />
                   </TableCell>
 
                   {/* Actions */}

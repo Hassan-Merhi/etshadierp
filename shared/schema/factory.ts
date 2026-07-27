@@ -744,6 +744,9 @@ export const factoryContainers = pgTable(
     jsonCargoLastCheckedAt: timestamp("json_cargo_last_checked_at", { withTimezone: true }),
     jsonCargoTrackingStatus: text("json_cargo_tracking_status"),
     jsonCargoError: text("json_cargo_error"),
+    // OTW shared state — stored server-side so all users see the same values
+    otwNote: text("otw_note"),
+    otwDocsReceived: boolean("otw_docs_received").notNull().default(false),
   },
   (t) => ({
     companyIdx: index("factory_containers_company_idx").on(t.companyId),

@@ -673,6 +673,9 @@ export function registerFactoryContainersRoutes(app: Express) {
       if (b.dutyAccountId !== undefined) updateData.dutyAccountId = int(b.dutyAccountId);
       if (b.dutyStatus !== undefined) updateData.dutyStatus = String(b.dutyStatus || "NONE");
       if (b.dutyNotes !== undefined) updateData.dutyNotes = str(b.dutyNotes);
+      // OTW shared state (visible to all users)
+      if (b.otwNote !== undefined) updateData.otwNote = str(b.otwNote);
+      if (b.otwDocsReceived !== undefined) updateData.otwDocsReceived = Boolean(b.otwDocsReceived);
 
       // Always load the existing container — needed for both FX calc and the
       // freight canonicalization below (a partial PATCH may omit freight fields,
