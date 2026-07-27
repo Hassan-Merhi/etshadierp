@@ -1,5 +1,6 @@
 import type { Request, Response } from "express";
 import { pool } from "../db";
+import { getRuntimePerformanceSnapshot } from "./runtimePerformance";
 
 interface RequestSample {
   timestamp: number;
@@ -141,11 +142,16 @@ export function getPerformanceDashboardSnapshot() {
     slowestRoutes: [...routes].sort((a, b) => b.p95Ms - a.p95Ms).slice(0, 20),
     largestRoutes: [...routes].sort((a, b) => b.averageBytes - a.averageBytes).slice(0, 20),
     busiestRoutes: [...routes].sort((a, b) => b.count - a.count).slice(0, 20),
+    runtime: getRuntimePerformanceSnapshot(),
   };
 }
 
 function escapeHtml(value: unknown): string {
   return String(value ?? "").replace(/[&<>\"]/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '\"': "&quot;" })[char] || char);
+}
+
+function runtimeRows(rows: Array<{ name: string; source: string; calls: number; failures: number; averageMs: number; p95Ms: number; maxMs: number }>): string {
+  return rows.map((row) => `<tr><td><code>${escapeHtml(row.name)}</code></td><td>${escapeHtml(row.source)}</td><td>${row.calls}</td><td>${row.p95Ms}</td><td>${row.averageMs}</td><td>${row.maxMs}</td><td>${row.failures}</td></tr>`).join("");
 }
 
 export function handlePerformanceDashboard(req: Request, res: Response): boolean {
@@ -164,6 +170,10 @@ export function handlePerformanceDashboard(req: Request, res: Response): boolean
 
   const rows = snapshot.slowestRoutes.map((row) => `<tr><td>${escapeHtml(row.mode)}</td><td>${escapeHtml(row.method)}</td><td><code>${escapeHtml(row.route)}</code></td><td>${row.count}</td><td>${row.p95Ms}</td><td>${row.averageMs}</td><td>${row.maxMs}</td><td>${row.averageDbMs}</td><td>${Math.round(row.averageBytes / 1024)} KB</td><td>${row.errors}</td></tr>`).join("");
   const modes = snapshot.byMode.map((row) => `<div class="card"><strong>${escapeHtml(row.mode)}</strong><span>${row.requests} requests</span><span>p95 ${row.p95Ms} ms</span><span>${row.errors} errors</span></div>`).join("");
-  res.status(200).type("html").send(`<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><meta http-equiv="refresh" content="30"><title>ERP Performance</title><style>body{font-family:system-ui;margin:0;background:#0b1020;color:#e8edf8;padding:24px}h1{margin:0}.muted{color:#9aa7bd}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin:20px 0}.card{background:#141b2d;border:1px solid #27304a;border-radius:12px;padding:16px;display:flex;flex-direction:column;gap:6px}table{width:100%;border-collapse:collapse;background:#141b2d;border-radius:12px;overflow:hidden}th,td{text-align:left;padding:10px;border-bottom:1px solid #27304a;font-size:13px}th{color:#9aa7bd}code{color:#9fd3ff}a{color:#9fd3ff}</style></head><body><h1>Production Performance</h1><p class="muted">Bounded ${snapshot.windowMinutes}-minute window · maximum ${snapshot.sampleLimit} samples · refreshed ${escapeHtml(snapshot.timestamp)} · auto-refreshes every 30 seconds · <a href="/api/health/performance.json">JSON</a></p><div class="grid"><div class="card"><strong>${snapshot.summary.requests}</strong><span>Requests</span></div><div class="card"><strong>${snapshot.summary.errorPercent}%</strong><span>5xx error rate</span></div><div class="card"><strong>${snapshot.summary.p95Ms} ms</strong><span>p95 latency</span></div><div class="card"><strong>${snapshot.memoryMb.rss} MB</strong><span>RSS memory</span></div><div class="card"><strong>${snapshot.databasePool.active}/${snapshot.databasePool.max}</strong><span>DB pool active</span></div><div class="card"><strong>${Math.round(snapshot.summary.responseBytes / 1048576)} MB</strong><span>Response volume</span></div></div><h2>Modes</h2><div class="grid">${modes}</div><h2>Slowest route templates</h2><table><thead><tr><th>Mode</th><th>Method</th><th>Route</th><th>Calls</th><th>p95</th><th>Avg</th><th>Max</th><th>DB ms</th><th>Avg size</th><th>Errors</th></tr></thead><tbody>${rows || '<tr><td colspan="10">No samples collected yet.</td></tr>'}</tbody></table></body></html>`);
+  const jobs = runtimeRows(snapshot.runtime.backgroundJobs);
+  const dependencies = runtimeRows(snapshot.runtime.dependencies);
+  const runtimeHeader = "<thead><tr><th>Name</th><th>Source</th><th>Calls</th><th>p95</th><th>Avg</th><th>Max</th><th>Failures</th></tr></thead>";
+
+  res.status(200).type("html").send(`<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><meta http-equiv="refresh" content="30"><title>ERP Performance</title><style>body{font-family:system-ui;margin:0;background:#0b1020;color:#e8edf8;padding:24px}h1{margin:0}.muted{color:#9aa7bd}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin:20px 0}.card{background:#141b2d;border:1px solid #27304a;border-radius:12px;padding:16px;display:flex;flex-direction:column;gap:6px}table{width:100%;border-collapse:collapse;background:#141b2d;border-radius:12px;overflow:hidden;margin-bottom:24px}th,td{text-align:left;padding:10px;border-bottom:1px solid #27304a;font-size:13px}th{color:#9aa7bd}code{color:#9fd3ff}a{color:#9fd3ff}</style></head><body><h1>Production Performance</h1><p class="muted">Bounded ${snapshot.windowMinutes}-minute window · maximum ${snapshot.sampleLimit} HTTP samples · refreshed ${escapeHtml(snapshot.timestamp)} · auto-refreshes every 30 seconds · <a href="/api/health/performance.json">JSON</a></p><div class="grid"><div class="card"><strong>${snapshot.summary.requests}</strong><span>Requests</span></div><div class="card"><strong>${snapshot.summary.errorPercent}%</strong><span>5xx error rate</span></div><div class="card"><strong>${snapshot.summary.p95Ms} ms</strong><span>p95 latency</span></div><div class="card"><strong>${snapshot.memoryMb.rss} MB</strong><span>RSS memory</span></div><div class="card"><strong>${snapshot.databasePool.active}/${snapshot.databasePool.max}</strong><span>DB pool active</span></div><div class="card"><strong>${Math.round(snapshot.summary.responseBytes / 1048576)} MB</strong><span>Response volume</span></div></div><h2>Modes</h2><div class="grid">${modes}</div><h2>Slowest route templates</h2><table><thead><tr><th>Mode</th><th>Method</th><th>Route</th><th>Calls</th><th>p95</th><th>Avg</th><th>Max</th><th>DB ms</th><th>Avg size</th><th>Errors</th></tr></thead><tbody>${rows || '<tr><td colspan="10">No samples collected yet.</td></tr>'}</tbody></table><h2>Background jobs</h2><table>${runtimeHeader}<tbody>${jobs || '<tr><td colspan="7">No background samples collected yet.</td></tr>'}</tbody></table><h2>External dependencies</h2><table>${runtimeHeader}<tbody>${dependencies || '<tr><td colspan="7">No dependency samples collected yet.</td></tr>'}</tbody></table></body></html>`);
   return true;
 }
