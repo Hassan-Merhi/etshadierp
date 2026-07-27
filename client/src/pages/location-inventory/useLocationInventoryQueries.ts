@@ -99,6 +99,8 @@ export function useLocationInventoryQueries({
       return res.json();
     },
     enabled: !!selectedLocationLocal && !!fromDate && !!companyId,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
   });
 
   const { data: closingInventoryData = [], isLoading: closingInventoryLoading } = useQuery<InventoryItem[]>({
@@ -113,6 +115,8 @@ export function useLocationInventoryQueries({
       return res.json();
     },
     enabled: !!selectedLocationLocal && !!asOfDate && !!companyId,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
   });
 
   const { data: allInventoryRaw, isLoading: allInventoryLoading } = useQuery<any>({
