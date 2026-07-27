@@ -36,7 +36,6 @@ import {
   ErpRentalShops,
   ErpRentalWarehouses,
   GITMockup,
-  GcLshiMigration,
   ImportCycleDiagnostics,
   ImportStockItems,
   IntercompanyLinks,
@@ -314,8 +313,8 @@ export function ErpRoutes({ user }: ErpRoutesProps) {
       <Route path="/sp/opening-stock" component={SpOpeningStock} />
       <Route path="/sp/reports" component={SpReports} />
       <Route path="/sp/aliases" component={SpAliases} />
-      <Route path="/sp/migration" component={GcLshiMigration} />
-      <Route path="/sp/gc-migration" component={GcLshiMigration} />
+      <Route path="/sp/migration"><Redirect to="/sp/setup?tab=migration" /></Route>
+      <Route path="/sp/gc-migration"><Redirect to="/sp/setup?tab=migration" /></Route>
       <Route path="/sp/setup" component={SpSetup} />
 
       <Route component={NotFound} />
