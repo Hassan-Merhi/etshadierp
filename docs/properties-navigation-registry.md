@@ -2,110 +2,92 @@
 
 ## Purpose
 
-This document is the authoritative navigation contract for the Properties company shell. It records every route, its visibility, permission boundary, canonical parent, and compatibility behavior. Navigation changes must not alter property, rental, payment, voucher, ledger, accounting, analytics, permission, API, balance, or administrative business logic.
+This document is the authoritative navigation contract for the Properties company shell. It records every routed Properties screen, normal entry point, permission boundary, deterministic parent, Escape target, visible Back target, direct-link behavior, and compatibility exception.
 
-## Operational roots
+The audit is navigation-only. It does not change rental, property, voucher, accounting, ledger, analytics, or administrative business logic.
 
-- `/properties/daybook` — default Properties landing and unknown-route fallback.
-- `/properties/agents` — Agent Ledger root.
-- `/properties/rentals` — shared Rentals hub.
-- `/properties/accounts` — Accounting accounts root.
-- `/properties/vouchers` — Vouchers root.
-- `/properties/analytics` — Analytics root.
-- `/properties/settings` — Admin/Developer settings root.
-- `/my-settings` — compatibility user-settings route outside the Properties namespace.
+## Shell and fallback behavior
 
-## Rentals hub
+| Concern | Final behavior |
+| --- | --- |
+| Company shell | A company with `companyType === "properties"` renders `PropertiesShell`. |
+| Canonical namespace | All normal Properties workspace routes live under `/properties/*`. |
+| Historical aliases | `/my-settings` and `/balance-repair` redirect to their canonical Properties routes with replacement history when a Properties company is selected. |
+| Wrong-mode route | A Properties company entering a non-Properties route is redirected to `/properties/daybook` with replacement history. |
+| Unknown Properties route | The Properties route switch redirects to `/properties/daybook` with replacement history. |
+| Unauthorized Properties route | Permission-gated route components are not mounted; the route falls through safely to `/properties/daybook`. |
+| Root Back behavior | Root pages do not expose arbitrary browser-history Back behavior. |
 
-Canonical route: `/properties/rentals`
+## Final sidebar structure
 
-Validated tabs:
+### Pinned daily work
 
-- `tab=warehouses` — default tab, renders warehouse rental management.
-- `tab=shops` — renders shop rental management.
-- `tab=payments` — renders the rental payment log.
-
-Tab changes are view-state changes and use `history.replaceState`. Browser Back therefore returns to meaningful page transitions rather than cycling through hub tabs.
-
-Legacy routes are preserved as replacement redirects:
-
-- `/properties/rental/warehouses` → `/properties/rentals?tab=warehouses`
-- `/properties/rental/shops` → `/properties/rentals?tab=shops`
-- `/properties/rental/payments` → `/properties/rentals?tab=payments`
-
-## Deterministic parent hierarchy
+| Label | Route | Permission | Classification |
+| --- | --- | --- | --- |
+| Daybook | `/properties/daybook` | Properties user | Root |
+| Agent Ledger | `/properties/agents` | Properties user | Root |
 
 ### Rentals
 
-- `/properties/create` → `/properties/rentals?tab=warehouses`
-- `/properties/transfer` → `/properties/rentals`
-- Legacy warehouse route → exact Warehouses tab
-- Legacy shop route → exact Shops tab
-- Legacy payments route → exact Payments tab
+| Label | Canonical route | Permission | Parent |
+| --- | --- | --- | --- |
+| Properties (Warehouses) | `/properties/rentals` | Properties user | Root hub |
+| Shops Rented | `/properties/rentals?tab=shops` | Properties user | Root hub tab |
+| Payments Log | `/properties/rentals?tab=payments` | Properties user | Root hub tab |
+| Cash Transfer | `/properties/transfer` | Developer only | Rentals hub |
+
+Legacy rental URLs remain supported and redirect with replacement history:
+
+- `/properties/rental/warehouses` → `/properties/rentals`
+- `/properties/rental/shops` → `/properties/rentals?tab=shops`
+- `/properties/rental/payments` → `/properties/rentals?tab=payments`
 
 ### Accounting
 
-- `/properties/voucher-detail/:voucherId` → `/properties/vouchers`
-- `/properties/vouchers/:id/edit` → `/properties/vouchers`
-- `/properties/ledger-vouchers/:accountId/:year/:month` → `/properties/ledger-monthly/:accountId`
-- `/properties/ledger-monthly/:accountId` → `/properties/accounts`
-- `/properties/account-groups` → `/properties/accounts`
+| Label | Route | Permission | Classification |
+| --- | --- | --- | --- |
+| Accounts | `/properties/accounts` | Properties user | Root |
+| Vouchers | `/properties/vouchers` | Properties user | Root |
+| Analytics | `/properties/analytics` | Properties user | Root |
 
-### Administration
+### Footer
 
-The following return to `/properties/settings`:
+| Label | Route | Permission | Classification |
+| --- | --- | --- | --- |
+| My Settings | `/properties/my-settings` | Authenticated Properties user | Root |
+| Settings | `/properties/settings` | Admin or Developer | Root |
 
-- `/properties/net-position-details`
-- `/properties/import-cycle-diagnostics`
-- `/properties/inventory-repair`
-- `/properties/company-data-reset`
-- `/properties/orphaned-records`
-- `/properties/deleted-items`
-- `/properties/chatbot-settings`
+## Complete route hierarchy
 
-Root pages intentionally return no registered parent so Back and Escape do not invent arbitrary history destinations.
-
-## Dashboard decision
-
-`/properties/dashboard` remains available as a hidden compatibility route. Repository usage proves route-table and command-palette access but does not establish it as the operational landing page. `/properties/daybook` remains the company landing page and unknown-route fallback.
-
-## Sidebar contract
-
-Pinned:
-
-- Daybook
-- Agent Ledger
-
-Rentals:
-
-- Warehouses → `/properties/rentals?tab=warehouses`
-- Shops → `/properties/rentals?tab=shops`
-- Payments Log → `/properties/rentals?tab=payments`
-- Cash Transfer → `/properties/transfer` for authorized users
-
-Accounting:
-
-- Accounts
-- Vouchers
-- Analytics
-
-Footer:
-
-- My Settings
-- Settings for Admin/Developer
-
-## Permission boundaries
-
-- Developer only: Cash Transfer route.
-- Admin/Developer: Settings and administrative tools.
-- General authenticated Properties users: Daybook, Agent Ledger, Rentals, Accounts, Vouchers, Analytics, and My Settings.
-
-## Compatibility and fallback rules
-
-- `/my-settings` and `/balance-repair` remain shell exceptions until canonical aliases are introduced in Phase 4.
-- Known legacy rental routes redirect to exact canonical tabs with replacement history.
-- Invalid hub tab values normalize to the default Warehouses tab without adding browser history.
-- Unknown Properties routes fall back to Daybook.
+| Route pattern | Screen | Permission | Deterministic parent |
+| --- | --- | --- | --- |
+| `/properties/dashboard` | Hidden compatibility dashboard | Properties user | Root |
+| `/properties/daybook` | Properties daybook | Properties user | Root |
+| `/properties/agents` | Agent ledger | Properties user | Root |
+| `/properties/rentals` | Shared Rentals hub | Properties user | Root |
+| `/properties/rental/warehouses` | Legacy warehouse alias | Properties user | Warehouses hub tab |
+| `/properties/rental/shops` | Legacy shops alias | Properties user | Shops hub tab |
+| `/properties/rental/payments` | Legacy payments alias | Properties user | Payments hub tab |
+| `/properties/create` | Create property | Properties user | Warehouses hub tab |
+| `/properties/transfer` | Company cash transfer | Developer | Rentals hub |
+| `/properties/accounts` | Accounts | Properties user | Root |
+| `/properties/ledger-monthly/:accountId` | Monthly account ledger | Properties user | Accounts |
+| `/properties/ledger-vouchers/:accountId/:year/:month` | Monthly ledger vouchers | Properties user | Exact monthly ledger |
+| `/properties/vouchers` | Vouchers | Properties user | Root |
+| `/properties/voucher-detail/:voucherId` | Voucher detail | Properties user | Vouchers |
+| `/properties/vouchers/:id/edit` | Voucher edit | Properties user | Vouchers |
+| `/properties/analytics` | Properties analytics | Properties user | Root |
+| `/properties/settings` | Properties settings | Admin or Developer | Root |
+| `/properties/net-position-details` | Net position details | Admin or Developer | Settings |
+| `/properties/deleted-items` | Deleted items | Admin or Developer | Settings |
+| `/properties/orphaned-records` | Orphaned records | Admin or Developer | Settings |
+| `/properties/chatbot-settings` | Chatbot settings | Admin or Developer | Settings |
+| `/properties/import-cycle-diagnostics` | Import-cycle diagnostics | Admin or Developer | Settings |
+| `/properties/inventory-repair` | Inventory repair | Admin or Developer | Settings |
+| `/properties/company-data-reset` | Company data reset | Admin or Developer | Settings |
+| `/properties/account-groups` | Account groups | Admin or Developer | Accounts |
+| `/properties/balance-repair` | Balance repair | Admin or Developer | Settings |
+| `/properties/my-settings` | Personal settings | Authenticated Properties user | Root |
 
 ## Back, Escape, and browser history contract
 
@@ -113,10 +95,25 @@ Footer:
 2. Do not navigate away while an editable control is actively handling Escape.
 3. On child pages, Escape and visible Back use the same deterministic parent.
 4. Root pages do not expose a Back action based only on browser history.
-5. Tab changes inside the Rentals hub replace history.
+5. Hub tab changes replace history instead of adding repetitive entries.
 6. Direct links to valid child screens remain supported.
-7. Invalid or retired aliases canonicalize with replacement history.
+7. Invalid and retired aliases canonicalize with replacement history.
+8. Unknown or unauthorized routes land safely on Properties Daybook.
 
-## Scope protection
+## Permission contract
 
-No navigation phase may change rental contracts, tenants, units, scheduled rent, guarantees, payments, accruals, balances, vouchers, ledgers, reports, APIs, permissions, or company data behavior.
+| Role | Expected Properties navigation access |
+| --- | --- |
+| Regular Properties user | Daily work, Rentals, Accounts, Vouchers, Analytics, My Settings |
+| Admin | Regular access plus Properties Settings and admin repair/diagnostic routes |
+| Developer | Admin access plus Company Cash Transfer |
+
+Unauthorized routes must not mount hidden page content before redirecting to a safe permitted Properties page.
+
+## Remaining phase
+
+### Phase 5 — final regression verification
+
+- Verify direct entry, Back, Forward, Escape, visible Back, permissions, and unknown routes.
+- Reconcile the branch with the latest `main`.
+- Confirm the final diff remains navigation-only before merge.
