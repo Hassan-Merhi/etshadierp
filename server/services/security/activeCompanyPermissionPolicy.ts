@@ -1,3 +1,5 @@
+import { isErpContainerFactoryAlias } from "./companyResourceRoutePolicy";
+
 export interface CompanyRoleIdentity {
   companyId: number;
   role: string;
@@ -10,6 +12,7 @@ function positiveId(value: unknown): number | null {
 
 export function isPinnedCompanyRoute(path: string): boolean {
   const normalized = (path.split("?", 1)[0] || "/").toLowerCase();
+  if (isErpContainerFactoryAlias(normalized)) return false;
   return normalized === "/api/factory" ||
     normalized.startsWith("/api/factory/") ||
     normalized === "/api/properties" ||
@@ -20,6 +23,7 @@ export function isPinnedCompanyRoute(path: string): boolean {
  * Factory and Properties use the server-pinned factoryCompanyId. Ordinary ERP,
  * POS, import, export, repair, and report routes must use currentCompanyId even
  * when another browser tab has a Factory company pinned in the same session.
+ * Historical ERP container document/freight aliases under /api/factory remain ERP.
  */
 export function resolvePermissionCompanyId(input: {
   path: string;
