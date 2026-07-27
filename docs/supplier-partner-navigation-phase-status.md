@@ -19,11 +19,15 @@
 - Ensured sidebar sections and active-route handling use the same shared route definitions.
 - Added focused regression coverage for landing, section organization, Recent registration, and navigation-only scope.
 
-## Phase 3 — pending
+## Phase 3 — complete
 
-- Convert Reports tabs to validated URL query state.
-- Support direct links, refresh, and Back/Forward for Payable, Profit & Loss, and Sales Form.
-- Preserve report data and export contracts.
+- Converted Reports to validated URL-backed tab state.
+- Kept Supplier Payable as the clean default route at `/sp/reports`.
+- Added canonical deep links for `/sp/reports?tab=profit` and `/sp/reports?tab=sales-form`.
+- Invalid tab values canonicalize back to the default using replacement history.
+- Refresh and browser navigation now restore the selected report tab.
+- Preserved the payable, profit, profit-split, locations, accounts, and both sales-form export contracts.
+- Added focused regression coverage for tab URLs and endpoint preservation.
 
 ## Phase 4 — pending
 
