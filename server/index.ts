@@ -1604,6 +1604,31 @@ END $mig$`;
             ADD COLUMN IF NOT EXISTS remaining_balance DECIMAL(15,2) NOT NULL DEFAULT 0,
             ADD COLUMN IF NOT EXISTS fully_paid        BOOLEAN       NOT NULL DEFAULT false;
 
+          -- suppliers: stock_group_id added in Drizzle schema (startupSchema migration index
+          -- ~2423) but that migration is disabled on production via RUN_STARTUP_MIGRATIONS=false.
+          -- db.select().from(schema.suppliers) generates SQL that includes this column; if it
+          -- doesn't exist in production the entire SELECT fails with "column does not exist"
+          -- → 500 on GET /api/accounts/voucher-sidebar and anywhere else that lists suppliers.
+          -- Added here without the FK constraint so it applies even if stock_groups isn't
+          -- yet present; the FK is enforced by the startupSchema migration when it runs.
+          ALTER TABLE suppliers
+            ADD COLUMN IF NOT EXISTS stock_group_id INTEGER;
+
+          -- user_preferences: per-user widget visibility toggles (added post-multicurrency
+          -- Drizzle schema; never reached production because RUN_STARTUP_MIGRATIONS=false).
+          -- Missing columns cause 500s on /api/user-preferences reads.
+          ALTER TABLE user_preferences
+            ADD COLUMN IF NOT EXISTS show_chat_widget BOOLEAN NOT NULL DEFAULT true,
+            ADD COLUMN IF NOT EXISTS show_notes_panel BOOLEAN NOT NULL DEFAULT true;
+
+          -- factory_containers: server-side shared OTW notes + docs-received flag.
+          -- Previously stored in localStorage (per-browser); moved to DB so all users share
+          -- the same state. Missing columns cause 500s on PATCH /api/factory/containers/:id
+          -- when otwNote or otwDocsReceived are included in the request body.
+          ALTER TABLE factory_containers
+            ADD COLUMN IF NOT EXISTS otw_note TEXT,
+            ADD COLUMN IF NOT EXISTS otw_docs_received BOOLEAN NOT NULL DEFAULT false;
+
           -- fiscal_period_closures: the startup migration at index 2673 only adds an FK
           -- constraint but never creates the table itself. Add it here idempotently so the
           -- table exists before the FK migration runs (it is a no-op if already present).
