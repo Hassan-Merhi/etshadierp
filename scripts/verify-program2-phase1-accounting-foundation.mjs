@@ -3,7 +3,6 @@ import fs from "node:fs";
 const phaseDocumentPath = "docs/program-2-phase-1-accounting-foundation.md";
 const inventoryPath = "docs/program-2-posting-path-inventory.json";
 const accountingBoundaryPath = "server/services/accounting/index.ts";
-
 const requiredFiles = [
   phaseDocumentPath,
   inventoryPath,
@@ -23,22 +22,27 @@ const requiredFiles = [
   "server/routes/voucherRoutes.ts",
   "server/services/pos/createSaleService.ts",
   "server/services/pos/edit/updateSaleService.ts",
+  "server/services/stockTransferDeletion.ts",
+  "server/routes/factory/raw-stock/rawStockContainerRoutes.ts",
+  "server/routes/factory/raw-stock/postOffloadChargeMutation.ts",
+  "server/routes/factory/raw-stock/rawStockAdjRoutes.ts",
+  "server/routes/factory/customer-orders/orderChargesRoutes.ts",
+  "server/routes/factory/supplierBrokerRoutes.ts",
+  "server/services/pos/postSaleAccounting.ts",
+  "server/routes/spMigrationRoutes.ts",
+  "server/routes/payrollRoutes.ts",
+  "server/services/rental/rentalPaymentPostingService.ts",
+  "server/routes/rental/rentalPaymentsAccrualRoutes.ts",
   "docs/program-2-accounting-convergence.md",
   "docs/program-2-phase-2b.md",
   "docs/program-2-phase-2c.md",
   "docs/program-2d-special-workflows.md",
 ];
-
-for (const file of requiredFiles) {
-  if (!fs.existsSync(file)) {
-    throw new Error(`Program 2 Phase 1 missing required file: ${file}`);
-  }
-}
+for (const file of requiredFiles) if (!fs.existsSync(file)) throw new Error(`Program 2 Phase 1 missing required file: ${file}`);
 
 const phaseDocument = fs.readFileSync(phaseDocumentPath, "utf8");
 const accountingBoundary = fs.readFileSync(accountingBoundaryPath, "utf8");
 const inventory = JSON.parse(fs.readFileSync(inventoryPath, "utf8"));
-
 const requiredDocumentMarkers = [
   "Status: complete",
   "Balanced decimal posting",
@@ -55,13 +59,9 @@ const requiredDocumentMarkers = [
   "Focused regression evidence",
   "No runtime route, database schema, posting calculation, balance, inventory, costing, permission, or UI behavior changed",
 ];
+for (const marker of requiredDocumentMarkers) if (!phaseDocument.includes(marker)) throw new Error(`Program 2 Phase 1 contract missing marker: ${marker}`);
 
-for (const marker of requiredDocumentMarkers) {
-  if (!phaseDocument.includes(marker)) {
-    throw new Error(`Program 2 Phase 1 contract missing marker: ${marker}`);
-  }
-}
-
+const exportBlocks = [...accountingBoundary.matchAll(/export\s*\{([\s\S]*?)\}\s*from\s*["'][^"']+["'];/g)].map((match) => match[1]).join("\n");
 const requiredBoundaryExports = [
   "postBalancedVoucherTx",
   "createDatabasePostingDependencies",
@@ -77,87 +77,48 @@ const requiredBoundaryExports = [
   "generateReconciliationReportTx",
   "executeApprovedRepairsTx",
 ];
-
 for (const exportedName of requiredBoundaryExports) {
-  if (!accountingBoundary.includes(exportedName)) {
-    throw new Error(`Accounting public boundary no longer exposes ${exportedName}`);
-  }
+  const declaration = new RegExp(`(?:^|[,\\s])${exportedName}(?:\\s+as\\s+\\w+)?(?:[,\\s]|$)`);
+  if (!declaration.test(exportBlocks)) throw new Error(`Accounting public boundary no longer exports ${exportedName}`);
 }
 
-if (inventory.program !== "Program 2 — Accounting Convergence") {
-  throw new Error("Program 2 inventory has the wrong program identifier");
-}
-if (inventory.phase !== "Phase 1 — Accounting convergence foundation") {
-  throw new Error("Program 2 inventory has the wrong phase identifier");
-}
-if (inventory.status !== "complete") {
-  throw new Error("Program 2 Phase 1 inventory must remain complete");
-}
-if (inventory.authoritativeBoundary !== accountingBoundaryPath) {
-  throw new Error("Program 2 inventory must identify the accounting public boundary");
-}
+if (inventory.program !== "Program 2 — Accounting Convergence") throw new Error("Program 2 inventory has the wrong program identifier");
+if (inventory.phase !== "Phase 1 — Accounting convergence foundation") throw new Error("Program 2 inventory has the wrong phase identifier");
+if (inventory.status !== "complete") throw new Error("Program 2 Phase 1 inventory must remain complete");
+if (inventory.authoritativeBoundary !== accountingBoundaryPath) throw new Error("Program 2 inventory must identify the accounting public boundary");
 
-const allowedClassifications = new Set([
-  "centralized",
-  "hybrid",
-  "legacy-isolated",
-  "read-only-or-repair",
-]);
-const requiredDomainIds = new Set([
-  "manual-journal",
-  "generic-voucher",
-  "payment-receipt",
-  "pos-sale",
-  "stock-transfer",
-  "container-offload-and-freight",
-  "supplier-partner",
-  "payroll",
-  "rentals-properties",
-  "reconciliation-and-repair",
+const requiredClassifications = new Map([
+  ["manual-journal", "hybrid"],
+  ["generic-voucher", "hybrid"],
+  ["payment-receipt", "hybrid"],
+  ["pos-sale", "legacy-isolated"],
+  ["stock-transfer", "legacy-isolated"],
+  ["container-offload-and-freight", "legacy-isolated"],
+  ["raw-stock-adjustment", "legacy-isolated"],
+  ["customer-order-charges", "legacy-isolated"],
+  ["supplier-partner", "legacy-isolated"],
+  ["payroll", "legacy-isolated"],
+  ["rentals-properties", "legacy-isolated"],
+  ["reconciliation-and-repair", "read-only-or-repair"],
 ]);
 const domains = Array.isArray(inventory.domains) ? inventory.domains : [];
-const seenDomainIds = new Set();
-
+const seen = new Set();
 for (const domain of domains) {
-  if (!domain || typeof domain !== "object") {
-    throw new Error("Program 2 inventory contains an invalid domain entry");
-  }
-  if (!requiredDomainIds.has(domain.id)) {
-    throw new Error(`Program 2 inventory contains an unreviewed domain: ${domain.id}`);
-  }
-  if (seenDomainIds.has(domain.id)) {
-    throw new Error(`Program 2 inventory contains duplicate domain: ${domain.id}`);
-  }
-  seenDomainIds.add(domain.id);
-  if (!allowedClassifications.has(domain.classification)) {
-    throw new Error(`Program 2 domain ${domain.id} has invalid classification ${domain.classification}`);
-  }
-  if (!Array.isArray(domain.entryPoints) || domain.entryPoints.length === 0) {
-    throw new Error(`Program 2 domain ${domain.id} must list entry points`);
-  }
-  if (!Array.isArray(domain.evidence) || domain.evidence.length === 0) {
-    throw new Error(`Program 2 domain ${domain.id} must list evidence files`);
-  }
-  for (const evidencePath of domain.evidence) {
-    if (!fs.existsSync(evidencePath)) {
-      throw new Error(`Program 2 domain ${domain.id} references missing evidence: ${evidencePath}`);
-    }
-  }
-  if (domain.classification === "hybrid" && (!domain.centralizedSubset || !domain.passthrough)) {
-    throw new Error(`Hybrid Program 2 domain ${domain.id} must define centralizedSubset and passthrough`);
-  }
-  if ((domain.classification === "legacy-isolated" || domain.classification === "read-only-or-repair") && !domain.reason) {
-    throw new Error(`Deferred Program 2 domain ${domain.id} must explain its isolation reason`);
-  }
+  if (!domain || typeof domain !== "object") throw new Error("Program 2 inventory contains an invalid domain entry");
+  if (!requiredClassifications.has(domain.id)) throw new Error(`Program 2 inventory contains an unreviewed domain: ${domain.id}`);
+  if (seen.has(domain.id)) throw new Error(`Program 2 inventory contains duplicate domain: ${domain.id}`);
+  seen.add(domain.id);
+  const requiredClassification = requiredClassifications.get(domain.id);
+  if (domain.classification !== requiredClassification) throw new Error(`Program 2 domain ${domain.id} must remain ${requiredClassification}, found ${domain.classification}`);
+  if (!Array.isArray(domain.entryPoints) || domain.entryPoints.length === 0) throw new Error(`Program 2 domain ${domain.id} must list entry points`);
+  if (!Array.isArray(domain.evidence) || domain.evidence.length === 0) throw new Error(`Program 2 domain ${domain.id} must list evidence files`);
+  for (const evidencePath of domain.evidence) if (!fs.existsSync(evidencePath)) throw new Error(`Program 2 domain ${domain.id} references missing evidence: ${evidencePath}`);
+  if (domain.classification === "hybrid" && (!domain.centralizedSubset || !domain.passthrough)) throw new Error(`Hybrid Program 2 domain ${domain.id} must define centralizedSubset and passthrough`);
+  if ((domain.classification === "legacy-isolated" || domain.classification === "read-only-or-repair") && !domain.reason) throw new Error(`Deferred Program 2 domain ${domain.id} must explain its isolation reason`);
 }
+for (const id of requiredClassifications.keys()) if (!seen.has(id)) throw new Error(`Program 2 inventory is missing domain: ${id}`);
 
-for (const requiredDomainId of requiredDomainIds) {
-  if (!seenDomainIds.has(requiredDomainId)) {
-    throw new Error(`Program 2 inventory is missing domain: ${requiredDomainId}`);
-  }
-}
-
-const requiredInvariants = new Set([
+const requiredInvariants = [
   "balanced-decimal-posting",
   "single-transaction-owner",
   "company-ownership-validation",
@@ -171,21 +132,7 @@ const requiredInvariants = new Set([
   "explicit-compatibility-passthrough",
   "no-silent-historical-repair",
   "focused-regression-coverage",
-]);
+];
 const inventoryInvariants = new Set(Array.isArray(inventory.requiredInvariants) ? inventory.requiredInvariants : []);
-for (const invariant of requiredInvariants) {
-  if (!inventoryInvariants.has(invariant)) {
-    throw new Error(`Program 2 inventory is missing invariant: ${invariant}`);
-  }
-}
-
-const migratedDomains = domains.filter((domain) => domain.classification === "centralized" || domain.classification === "hybrid");
-if (migratedDomains.length < 3) {
-  throw new Error("Program 2 inventory must retain the known centralized/hybrid accounting boundaries");
-}
-const isolatedDomains = domains.filter((domain) => domain.classification === "legacy-isolated");
-if (isolatedDomains.length < 5) {
-  throw new Error("Program 2 inventory must keep high-risk workflows explicitly isolated");
-}
-
+for (const invariant of requiredInvariants) if (!inventoryInvariants.has(invariant)) throw new Error(`Program 2 inventory is missing invariant: ${invariant}`);
 console.log("Program 2 Phase 1 accounting foundation contract verified.");
