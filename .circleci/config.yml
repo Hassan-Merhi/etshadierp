@@ -1,18 +1,35 @@
 version: 2.1
 
+orbs:
+  node: circleci/node@7.1.0
+
+executors:
+  node22:
+    docker:
+      - image: cimg/node:22.14
+    resource_class: medium+
+    working_directory: ~/project
+    environment:
+      NODE_ENV: test
+      SESSION_SECRET: circleci-session-secret
+      CSRF_ENFORCE: "0"
+      ENABLE_SCHEDULERS: "false"
+      NODE_OPTIONS: --max-old-space-size=4096
+      PORT: "5000"
+
 jobs:
   dns-control:
-    docker:
-      - image: cimg/node:22.14
-    resource_class: medium+
+    executor: node22
     steps:
-      - run: echo control-ok
+      - checkout
+      - run:
+          name: Control
+          command: echo control-ok
 
   dns-resolve:
-    docker:
-      - image: cimg/node:22.14
-    resource_class: medium+
+    executor: node22
     steps:
+      - checkout
       - run:
           name: Verify Pastepile DNS resolution
           command: |
