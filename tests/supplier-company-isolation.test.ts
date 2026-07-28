@@ -1,71 +1,80 @@
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import request from "supertest";
-import { seedTestData, cleanupTestData, closeTestServer, type TestContext } from "./setup";
+import { and, eq, inArray } from "drizzle-orm";
 import { db } from "../server/db";
-import { eq } from "drizzle-orm";
-import * as schema from "../shared/schema";
 import { storage } from "../server/storage";
-import { resolveParentCompanyId, isParentCompanyContext } from "../server/routes/helpers/supplierBalanceHelpers";
+import * as schema from "../shared/schema";
+import { companyScopedSuppliers } from "../shared/schema/supplierCompanyScope";
+import {
+  cleanupTestData,
+  closeTestServer,
+  seedTestData,
+  type TestContext,
+} from "./setup";
 
-// Regression suite for: a newly created ERP child company must NOT show
-// suppliers/balances belonging to the parent company.
-//
-// Business rules under test:
-//  - supplier master identities are global, but supplier BALANCES are company-specific.
-//  - supplier.openingBalance only ever applies in the explicitly configured parent
-//    company's context (never guessed via "lowest company ID").
-//  - a child company starts every supplier at $0 and only accrues balance from its
-//    own vouchers.
-//  - child companies omit suppliers with no activity in that company from the
-//    Accounts-style lists.
-//  - the parent supplier record itself is never mutated by any of this.
+const TEST_PREFIX = "supscope";
 
-const TEST_PREFIX = "supisotest";
-
-let ctx: TestContext; // parent company
-let agent: request.SuperAgentTest; // logged in, scoped to parent
-
+let ctx: TestContext;
+let parentAgent: request.SuperAgentTest;
+let childAgent: request.SuperAgentTest;
 let childCompanyId: number;
 let childCashLedgerId: number;
-let childAgent: request.SuperAgentTest;
-
-let supplierId: number;
+let parentSupplierId: number;
+let childSupplierId: number;
 let originalParentCompanyId: number | null;
 
-async function setCompany(a: request.SuperAgentTest, companyId: number) {
-  const res = await a.post("/api/auth/set-company").send({ companyId });
-  if (res.status !== 200) {
-    throw new Error(`set-company to ${companyId} failed: ${res.status} ${JSON.stringify(res.body)}`);
+async function setCompany(agent: request.SuperAgentTest, companyId: number) {
+  const response = await agent.post("/api/auth/set-company").send({ companyId });
+  if (response.status !== 200) {
+    throw new Error(`set-company failed: ${response.status} ${JSON.stringify(response.body)}`);
   }
 }
 
-function supplierJournalBody(type: "DR" | "CR", cashLedgerId: number, amount: number) {
-  const other: "DR" | "CR" = type === "DR" ? "CR" : "DR";
+function supplierJournalBody(supplierId: number, cashLedgerId: number, amount: number) {
   return {
-    voucherDate: new Date().toISOString().split("T")[0],
-    notes: "Supplier isolation test entry",
+    voucherDate: new Date().toISOString().slice(0, 10),
+    notes: "Strict supplier company-scope regression",
     entries: [
-      { type, accountType: "supplier", accountId: supplierId, amount: String(amount), narration: "" },
-      { type: other, accountType: "ledger", accountId: cashLedgerId, amount: String(amount), narration: "" },
+      {
+        type: "CR",
+        accountType: "supplier",
+        accountId: supplierId,
+        amount: String(amount),
+        narration: "Supplier credit",
+      },
+      {
+        type: "DR",
+        accountType: "ledger",
+        accountId: cashLedgerId,
+        amount: String(amount),
+        narration: "Offsetting debit",
+      },
     ],
   };
 }
 
 beforeAll(async () => {
   ctx = await seedTestData(TEST_PREFIX);
-  agent = request.agent(ctx.app);
-  const loginRes = await agent
+  originalParentCompanyId = await storage.getParentCompanyId();
+  await storage.setParentCompanyId(ctx.companyId);
+
+  parentAgent = request.agent(ctx.app);
+  const parentLogin = await parentAgent
     .post("/api/auth/login")
     .send({ username: `${TEST_PREFIX}_testuser`, password: "testpassword123" });
-  if (loginRes.status !== 200) {
-    throw new Error(`Login failed: ${loginRes.status} ${JSON.stringify(loginRes.body)}`);
+  if (parentLogin.status !== 200) {
+    throw new Error(`Parent login failed: ${parentLogin.status} ${JSON.stringify(parentLogin.body)}`);
   }
-  await setCompany(agent, ctx.companyId);
+  await setCompany(parentAgent, ctx.companyId);
 
-  // Create a child ERP company and give the same test user access to it.
   const [childCompany] = await db
     .insert(schema.companies)
-    .values({ code: `${TEST_PREFIX.toUpperCase().slice(0, 6)}CH`, name: `${TEST_PREFIX}_ChildCo`, baseCurrency: "USD" })
+    .values({
+      code: `${TEST_PREFIX.toUpperCase().slice(0, 6)}CH`,
+      name: `${TEST_PREFIX}_ChildCompany`,
+      baseCurrency: "USD",
+      parentCompanyId: ctx.companyId,
+    })
     .returning();
   childCompanyId = childCompany.id;
 
@@ -80,7 +89,7 @@ beforeAll(async () => {
     .values({
       companyId: childCompanyId,
       code: `${TEST_PREFIX}_CHCASH`,
-      name: "Child Cash Account",
+      name: "Child Cash",
       accountType: "Cash",
       subType: "Cash",
       openingBalance: "0",
@@ -98,201 +107,125 @@ beforeAll(async () => {
   }
   await setCompany(childAgent, childCompanyId);
 
-  // A supplier with a historical opening balance, as if it were set up in the
-  // parent company's books before this child company ever existed.
-  const [supplier] = await db
-    .insert(schema.suppliers)
-    .values({
-      code: `${TEST_PREFIX}_SUP1`,
-      legalName: `${TEST_PREFIX} Supplier One`,
-      email: `${TEST_PREFIX}.supplier@example.com`,
-      openingBalance: "500.00",
-      active: true,
-    })
-    .returning();
-  supplierId = supplier.id;
+  const parentSupplier = await parentAgent.post("/api/suppliers").send({
+    code: `${TEST_PREFIX.toUpperCase()}-SUP`,
+    legalName: `${TEST_PREFIX} Parent Supplier`,
+    email: `${TEST_PREFIX}.parent@example.com`,
+    openingBalance: "500.00",
+    active: true,
+  });
+  if (parentSupplier.status !== 201) {
+    throw new Error(
+      `Parent supplier creation failed: ${parentSupplier.status} ${JSON.stringify(parentSupplier.body)}`
+    );
+  }
+  parentSupplierId = parentSupplier.body.id;
 
-  // Point the explicit parent-company setting at our seeded parent company,
-  // and remember the original value so we can restore it afterwards.
-  originalParentCompanyId = await storage.getParentCompanyId();
-  await storage.setParentCompanyId(ctx.companyId);
+  // The same supplier code is valid in another company because uniqueness is
+  // now (company_id, code), not global code alone.
+  const childSupplier = await childAgent.post("/api/suppliers").send({
+    code: `${TEST_PREFIX.toUpperCase()}-SUP`,
+    legalName: `${TEST_PREFIX} Child Supplier`,
+    email: `${TEST_PREFIX}.child@example.com`,
+    openingBalance: "0",
+    active: true,
+  });
+  if (childSupplier.status !== 201) {
+    throw new Error(
+      `Child supplier creation failed: ${childSupplier.status} ${JSON.stringify(childSupplier.body)}`
+    );
+  }
+  childSupplierId = childSupplier.body.id;
 }, 60000);
 
 afterAll(async () => {
-  await db.delete(schema.voucherEntries).where(eq(schema.voucherEntries.supplierId, supplierId));
-  await db.delete(schema.suppliers).where(eq(schema.suppliers.id, supplierId));
+  if (parentSupplierId || childSupplierId) {
+    await db
+      .delete(schema.voucherEntries)
+      .where(inArray(schema.voucherEntries.supplierId, [parentSupplierId, childSupplierId].filter(Boolean)));
+    await db
+      .delete(companyScopedSuppliers)
+      .where(inArray(companyScopedSuppliers.id, [parentSupplierId, childSupplierId].filter(Boolean)));
+  }
   await storage.setParentCompanyId(originalParentCompanyId);
   await cleanupTestData(TEST_PREFIX);
   closeTestServer();
 }, 30000);
 
-describe("Supplier balance isolation across companies", () => {
-  it("1. parent company sees the supplier's full opening balance intact", async () => {
-    const res = await agent.get("/api/accounts/all").set("Cache-Control", "no-cache");
-    expect(res.status).toBe(200);
-    const acct = res.body.find((a: any) => a.accountId === supplierId && a.type === "supplier");
-    expect(acct).toBeTruthy();
-    expect(parseFloat(acct.balance)).toBeCloseTo(500, 2);
-    expect(parseFloat(acct.openingBalance)).toBeCloseTo(500, 2);
+describe("strict supplier company ownership", () => {
+  it("returns only suppliers owned by the active company", async () => {
+    const [parentResponse, childResponse] = await Promise.all([
+      parentAgent.get("/api/suppliers"),
+      childAgent.get("/api/suppliers"),
+    ]);
+
+    expect(parentResponse.status).toBe(200);
+    expect(childResponse.status).toBe(200);
+    expect(parentResponse.body.some((supplier: any) => supplier.id === parentSupplierId)).toBe(true);
+    expect(parentResponse.body.some((supplier: any) => supplier.id === childSupplierId)).toBe(false);
+    expect(childResponse.body.some((supplier: any) => supplier.id === childSupplierId)).toBe(true);
+    expect(childResponse.body.some((supplier: any) => supplier.id === parentSupplierId)).toBe(false);
   });
 
-  it("2. child company omits the supplier entirely before any activity (no cross-company bleed, no opening balance)", async () => {
-    const res = await agent.get("/api/accounts/all").set("Cache-Control", "no-cache");
-    expect(res.status).toBe(200);
-
-    const childRes = await childAgent.get("/api/accounts/all").set("Cache-Control", "no-cache");
-    expect(childRes.status).toBe(200);
-    const acct = childRes.body.find((a: any) => a.accountId === supplierId && a.type === "supplier");
-    expect(acct).toBeFalsy();
-  });
-
-  it("3. suppliers/stats omits the no-activity supplier for the child, and suppliers/:id/balance reports zero", async () => {
-    const statsRes = await childAgent.get("/api/suppliers/stats");
-    expect(statsRes.status).toBe(200);
-    // Child has no activity for this supplier yet — it must be omitted from
-    // the activity-gated stats list entirely.
-    expect(statsRes.body.find((s: any) => s.id === supplierId)).toBeFalsy();
-
-    const balRes = await childAgent.get(`/api/suppliers/${supplierId}/balance`);
-    expect(balRes.status).toBe(200);
-    expect(balRes.body.balance).toBeCloseTo(0, 2);
-  });
-
-  it("4. child company can post its own supplier voucher, and only accrues its own activity", async () => {
-    const res = await childAgent
-      .post("/api/vouchers/journal")
-      .send(supplierJournalBody("CR", childCashLedgerId, 200));
-    expect(res.status).toBe(200);
-
-    const allRes = await childAgent.get("/api/accounts/all").set("Cache-Control", "no-cache");
-    const acct = allRes.body.find((a: any) => a.accountId === supplierId && a.type === "supplier");
-    expect(acct).toBeTruthy();
-    expect(parseFloat(acct.balance)).toBeCloseTo(200, 2);
-    expect(parseFloat(acct.openingBalance)).toBeCloseTo(0, 2);
-
-    const statsRes = await childAgent.get("/api/suppliers/stats");
-    const stat = statsRes.body.find((s: any) => s.id === supplierId);
-    expect(stat).toBeTruthy();
-    expect(stat.hasActivity).toBe(true);
-    expect(stat.balance).toBeCloseTo(200, 2);
-  });
-
-  it("5. parent company's balance is unaffected by the child's voucher", async () => {
-    const res = await agent.get("/api/accounts/all").set("Cache-Control", "no-cache");
-    const acct = res.body.find((a: any) => a.accountId === supplierId && a.type === "supplier");
-    expect(acct).toBeTruthy();
-    expect(parseFloat(acct.balance)).toBeCloseTo(500, 2);
-  });
-
-  it("6. suppliers/stats, payables, and voucher-sidebar stay consistent with accounts/all for both companies", async () => {
-    const [childStats, childPayables, childSidebar] = await Promise.all([
+  it("does not expose a foreign supplier by ID, balance, or stats", async () => {
+    const [detail, balance, stats] = await Promise.all([
+      childAgent.get(`/api/suppliers/${parentSupplierId}`),
+      childAgent.get(`/api/suppliers/${parentSupplierId}/balance`),
       childAgent.get("/api/suppliers/stats"),
-      childAgent.get("/api/accounts/payables"),
-      childAgent.get("/api/accounts/voucher-sidebar"),
     ]);
-    expect(childStats.body.find((s: any) => s.id === supplierId).balance).toBeCloseTo(200, 2);
-    expect(childPayables.body.find((p: any) => p.id === supplierId).balance).toBeCloseTo(200, 2);
-    const childSidebarSupplier = childSidebar.body.suppliers?.find?.((s: any) => s.id === supplierId) ??
-      (Array.isArray(childSidebar.body) ? childSidebar.body.find((s: any) => s.id === supplierId) : undefined);
-    if (childSidebarSupplier) {
-      expect(childSidebarSupplier.balance).toBeCloseTo(-200, 2);
-    }
 
-    const [parentStats, parentPayables] = await Promise.all([
-      agent.get("/api/suppliers/stats"),
-      agent.get("/api/accounts/payables"),
-    ]);
-    expect(parentStats.body.find((s: any) => s.id === supplierId).balance).toBeCloseTo(500, 2);
-    expect(parentPayables.body.find((p: any) => p.id === supplierId).balance).toBeCloseTo(500, 2);
+    expect(detail.status).toBe(404);
+    expect(balance.status).toBe(404);
+    expect(stats.status).toBe(200);
+    expect(stats.body.some((supplier: any) => supplier.id === parentSupplierId)).toBe(false);
   });
 
-  it("7. date-filtered/brought-forward supplier transactions are scoped per company, not global", async () => {
-    const future = new Date();
-    future.setDate(future.getDate() + 1);
-    const futureStr = future.toISOString().split("T")[0];
-
-    const childTx = await childAgent.get(
-      `/api/accounts/supplier/${supplierId}/transactions?startDate=${futureStr}`
-    );
-    expect(childTx.status).toBe(200);
-    // Brought-forward for the child should reflect only the child's own 200 CR entry,
-    // never any entries that might exist under the parent company.
-    expect(parseFloat(childTx.body.preNetBalance)).toBeCloseTo(-200, 2);
-
-    // The parent company has no *voucher entries* for this supplier at all (its
-    // balance comes entirely from supplier.openingBalance, which this endpoint's
-    // brought-forward figure does not include) — so it must show 0, and critically
-    // must NOT pick up the child's -200 across the (shared) supplier record.
-    const parentTx = await agent.get(`/api/accounts/supplier/${supplierId}/transactions?startDate=${futureStr}`);
-    expect(parentTx.status).toBe(200);
-    expect(parseFloat(parentTx.body.preNetBalance)).toBeCloseTo(0, 2);
+  it("rejects an active-company override in the supplier list", async () => {
+    const response = await childAgent.get(`/api/suppliers?companyId=${ctx.companyId}`);
+    expect(response.status).toBe(403);
   });
 
-  it("8. an unauthorized companyId query param on supplier transactions is rejected", async () => {
-    const res = await childAgent.get(`/api/accounts/supplier/${supplierId}/transactions?companyId=1`);
-    expect(res.status).toBe(403);
+  it("rejects posting against a supplier owned by another company", async () => {
+    const response = await childAgent
+      .post("/api/vouchers/journal")
+      .send(supplierJournalBody(parentSupplierId, childCashLedgerId, 200));
+
+    expect([400, 403, 404]).toContain(response.status);
   });
 
-  it("9. pre-period-balance for supplier type is scoped per company", async () => {
-    const future = new Date();
-    future.setDate(future.getDate() + 1);
-    const futureStr = future.toISOString().split("T")[0];
+  it("allows posting against the supplier owned by the active company", async () => {
+    const response = await childAgent
+      .post("/api/vouchers/journal")
+      .send(supplierJournalBody(childSupplierId, childCashLedgerId, 200));
+    expect(response.status).toBe(200);
 
-    const childPre = await childAgent.get(
-      `/api/accounts/supplier/${supplierId}/pre-period-balance?endDate=${futureStr}`
-    );
-    expect(childPre.status).toBe(200);
-    expect(parseFloat(childPre.body.balance)).toBeCloseTo(200, 2);
-
-    const parentPre = await agent.get(`/api/accounts/supplier/${supplierId}/pre-period-balance?endDate=${futureStr}`);
-    expect(parentPre.status).toBe(200);
-    expect(parseFloat(parentPre.body.balance)).toBeCloseTo(500, 2);
+    const balance = await childAgent.get(`/api/suppliers/${childSupplierId}/balance`);
+    expect(balance.status).toBe(200);
+    expect(Number(balance.body.balance)).toBeCloseTo(200, 2);
   });
 
-  it("10. parent detection never guesses via lowest company ID, even though a lower-ID company exists", async () => {
-    const allCompanies = await storage.getAllCompanies();
-    const lowestId = Math.min(...allCompanies.map((c: any) => c.id));
-    expect(lowestId).toBeLessThan(ctx.companyId);
-
-    const resolved = await resolveParentCompanyId();
-    expect(resolved).toBe(ctx.companyId);
-    expect(resolved).not.toBe(lowestId);
-
-    expect(await isParentCompanyContext(lowestId)).toBe(false);
-    expect(await isParentCompanyContext(ctx.companyId)).toBe(true);
+  it("keeps the parent supplier opening balance isolated", async () => {
+    const parentBalance = await parentAgent.get(`/api/suppliers/${parentSupplierId}/balance`);
+    expect(parentBalance.status).toBe(200);
+    expect(Number(parentBalance.body.openingBalance)).toBeCloseTo(500, 2);
+    expect(Number(parentBalance.body.balance)).toBeCloseTo(500, 2);
   });
 
-  it("11. creating a brand-new company does not copy supplier balances, and the parent's supplier record is never mutated", async () => {
-    const [grandchild] = await db
-      .insert(schema.companies)
-      .values({
-        code: `${TEST_PREFIX.toUpperCase().slice(0, 5)}GC`,
-        name: `${TEST_PREFIX}_GrandchildCo`,
-        baseCurrency: "USD",
-      })
-      .returning();
+  it("rejects linking a supplier to a stock group from another company", async () => {
+    const response = await childAgent
+      .patch(`/api/suppliers/${childSupplierId}/stock-group`)
+      .send({ stockGroupId: ctx.stockGroupId });
+    expect(response.status).toBe(404);
 
-    await db.insert(schema.userCompanyRoles).values({
-      userId: ctx.userId,
-      companyId: grandchild.id,
-      role: "Admin",
-    });
-
-    const gcAgent = request.agent(ctx.app);
-    await gcAgent.post("/api/auth/login").send({ username: `${TEST_PREFIX}_testuser`, password: "testpassword123" });
-    await setCompany(gcAgent, grandchild.id);
-
-    const gcAll = await gcAgent.get("/api/accounts/all").set("Cache-Control", "no-cache");
-    expect(gcAll.body.find((a: any) => a.accountId === supplierId)).toBeFalsy();
-
-    const gcBalance = await gcAgent.get(`/api/suppliers/${supplierId}/balance`);
-    expect(gcBalance.body.balance).toBeCloseTo(0, 2);
-
-    // The parent supplier row itself must be untouched by any of this.
-    const [supplierRow] = await db.select().from(schema.suppliers).where(eq(schema.suppliers.id, supplierId));
-    expect(parseFloat(supplierRow.openingBalance || "0")).toBeCloseTo(500, 2);
-
-    await db.delete(schema.userCompanyRoles).where(eq(schema.userCompanyRoles.companyId, grandchild.id));
-    await db.delete(schema.companies).where(eq(schema.companies.id, grandchild.id));
+    const [row] = await db
+      .select({ stockGroupId: companyScopedSuppliers.stockGroupId })
+      .from(companyScopedSuppliers)
+      .where(
+        and(
+          eq(companyScopedSuppliers.id, childSupplierId),
+          eq(companyScopedSuppliers.companyId, childCompanyId)
+        )
+      );
+    expect(row.stockGroupId).toBeNull();
   });
 });

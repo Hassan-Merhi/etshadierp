@@ -8,10 +8,10 @@ import {
   fixedAssets,
   ledgerAccounts,
   locations,
-  suppliers,
   voucherEntries,
   vouchers,
 } from "@shared/schema";
+import { companyScopedSuppliers } from "@shared/schema/supplierCompanyScope";
 import type { VoucherEntryInsertFields } from "./accountingTypes";
 import {
   PostingValidationError,
@@ -97,24 +97,6 @@ async function assertCompanyOwnedIds(input: {
   }
 }
 
-async function assertExistingIds(input: {
-  tx: any;
-  ids: number[];
-  table: any;
-  idColumn: any;
-  label: string;
-}) {
-  const { tx, ids, table, idColumn, label } = input;
-  if (ids.length === 0) return;
-
-  const rows = await tx.select({ id: idColumn }).from(table).where(inArray(idColumn, ids));
-  const found = new Set(rows.map((row: { id: number }) => Number(row.id)));
-  const missing = ids.filter((id) => !found.has(id));
-  if (missing.length > 0) {
-    throw new PostingValidationError("POSTING_TARGET_NOT_FOUND", `${label} ${missing.join(", ")} not found`);
-  }
-}
-
 function actorUserId(actor: PostingActor): string {
   const value = String(actor.userId ?? "system").trim();
   return value || "system";
@@ -189,6 +171,15 @@ export function createDatabasePostingDependencies(): CentralPostingDependencies 
           assertCompanyOwnedIds({
             tx,
             companyId,
+            ids: targets.supplierId,
+            table: companyScopedSuppliers,
+            idColumn: companyScopedSuppliers.id,
+            companyColumn: companyScopedSuppliers.companyId,
+            label: "Supplier",
+          }),
+          assertCompanyOwnedIds({
+            tx,
+            companyId,
             ids: targets.employeeId,
             table: employees,
             idColumn: employees.id,
@@ -213,20 +204,8 @@ export function createDatabasePostingDependencies(): CentralPostingDependencies 
             companyColumn: factorySuppliers.companyId,
             label: "Factory supplier",
           }),
-          // ERP suppliers are currently global in the schema. Phase 2A can verify
-          // existence but cannot claim company ownership until Program 3 adds a
-          // tenant mapping or company_id boundary for this table.
-          assertExistingIds({
-            tx,
-            ids: targets.supplierId,
-            table: suppliers,
-            idColumn: suppliers.id,
-            label: "Supplier",
-          }),
         ]);
 
-        // A customer+ledger pair is allowed only when the ledger is the exact
-        // company-scoped linked ledger stored on that customer record.
         await assertCustomerLinkedLedgerPairs({ tx, companyId, entries });
       },
     },

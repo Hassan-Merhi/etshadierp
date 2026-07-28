@@ -1,4 +1,5 @@
 import type { Express, Request, Response } from "express";
+import { randomBytes } from "crypto";
 import { getErrorMessage } from "../lib/httpHandlers";
 import {
   generateRegistrationOptions,
@@ -180,11 +181,29 @@ export function registerPasskeyRoutes(app: Express) {
       `);
 
       const userId: string = String(cred.uid);
+      const [userRecord] = await db.select().from(users).where(eq(users.id, userId));
+      if (!userRecord) return res.status(401).json({ message: "User not found" });
+
+      // Resolve authorization context before session regeneration. The challenge
+      // has already been verified, and no authenticated state is written until a
+      // fresh session ID has been issued.
+      const userCompanies = await storage.getUserCompaniesWithRoles(userId);
+
+      await new Promise<void>((resolve, reject) => {
+        req.session.regenerate((err) => {
+          if (err) reject(err);
+          else resolve();
+        });
+      });
+
       req.session.userId = userId;
       req.session.username = cred.username;
-      (req.session as any).csrfToken = require("crypto").randomBytes(32).toString("hex");
+      (req.session as any).csrfToken = randomBytes(32).toString("hex");
+      (req.session as any).ip =
+        (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() || req.socket.remoteAddress || null;
+      (req.session as any).userAgent = req.headers["user-agent"] || null;
+      (req.session as any).loginAt = new Date().toISOString();
 
-      const userCompanies = await storage.getUserCompaniesWithRoles(userId);
       if (userCompanies.length > 0) {
         const fc = userCompanies[0] as any;
         req.session.currentCompanyId = fc.companyId;
@@ -199,11 +218,13 @@ export function registerPasskeyRoutes(app: Express) {
         (req.session as any).currentCompanyName = fc.companyName || null;
       }
 
-      delete (req.session as any).passkeyChallenge;
-
-      const [userRecord] = await db.select().from(users).where(eq(users.id, userId));
-      if (!userRecord) return res.status(401).json({ message: "User not found" });
       const { password: _pw, ...userWithoutPassword } = userRecord;
+      await new Promise<void>((resolve, reject) => {
+        req.session.save((err) => {
+          if (err) reject(err);
+          else resolve();
+        });
+      });
       res.json({ ...userWithoutPassword, currentRole: req.session.currentRole ?? null });
     } catch (err: unknown) {
       res.status(500).json({ message: getErrorMessage(err) });

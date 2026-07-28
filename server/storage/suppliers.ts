@@ -1,47 +1,88 @@
-import { eq, and, asc, ilike, isNull } from "drizzle-orm";
+import { and, asc, eq, ilike, isNull } from "drizzle-orm";
 import { db } from "../db";
-import * as schema from "@shared/schema";
-import type { Supplier, InsertSupplier } from "@shared/schema";
+import { companyScopedSuppliers } from "@shared/schema/supplierCompanyScope";
+import type {
+  CompanyScopedSupplier,
+  InsertCompanyScopedSupplier,
+} from "@shared/schema/supplierCompanyScope";
 
-export async function getAllSuppliers(search?: string, limit?: number): Promise<Supplier[]> {
-  const conditions: any[] = [isNull(schema.suppliers.deletedAt)];
+export async function getAllSuppliers(
+  search?: string,
+  limit?: number,
+  companyId?: number
+): Promise<CompanyScopedSupplier[]> {
+  const conditions: any[] = [isNull(companyScopedSuppliers.deletedAt)];
+  if (companyId) {
+    conditions.push(eq(companyScopedSuppliers.companyId, companyId));
+  }
   if (search) {
-    conditions.push(ilike(schema.suppliers.legalName, `%${search}%`));
+    conditions.push(ilike(companyScopedSuppliers.legalName, `%${search}%`));
   }
   let query = db
     .select()
-    .from(schema.suppliers)
-    .where(conditions.length === 1 ? conditions[0] : and(...conditions))
-    .orderBy(asc(schema.suppliers.legalName)) as any;
+    .from(companyScopedSuppliers)
+    .where(and(...conditions))
+    .orderBy(asc(companyScopedSuppliers.legalName)) as any;
   if (limit) {
     query = query.limit(limit);
   }
   return await query;
 }
 
-export async function getSupplierByCode(code: string): Promise<Supplier | undefined> {
-  const [supplier] = await db.select().from(schema.suppliers).where(eq(schema.suppliers.code, code));
+export async function getSupplierByCode(
+  code: string,
+  companyId?: number
+): Promise<CompanyScopedSupplier | undefined> {
+  const conditions = [eq(companyScopedSuppliers.code, code), isNull(companyScopedSuppliers.deletedAt)];
+  if (companyId) conditions.push(eq(companyScopedSuppliers.companyId, companyId));
+  const [supplier] = await db
+    .select()
+    .from(companyScopedSuppliers)
+    .where(and(...conditions));
   return supplier;
 }
 
-export async function getSupplierById(id: number): Promise<Supplier | undefined> {
-  const [supplier] = await db.select().from(schema.suppliers).where(eq(schema.suppliers.id, id));
+export async function getSupplierById(
+  id: number,
+  companyId?: number
+): Promise<CompanyScopedSupplier | undefined> {
+  const conditions = [eq(companyScopedSuppliers.id, id), isNull(companyScopedSuppliers.deletedAt)];
+  if (companyId) conditions.push(eq(companyScopedSuppliers.companyId, companyId));
+  const [supplier] = await db
+    .select()
+    .from(companyScopedSuppliers)
+    .where(and(...conditions));
   return supplier;
 }
 
-export async function createSupplier(supplier: InsertSupplier): Promise<Supplier> {
-  const [created] = await db
-    .insert(schema.suppliers)
-    .values(supplier as any)
-    .returning();
+export async function createSupplier(supplier: InsertCompanyScopedSupplier): Promise<CompanyScopedSupplier> {
+  const [created] = await db.insert(companyScopedSuppliers).values(supplier as any).returning();
   return created;
 }
 
-export async function updateSupplier(id: number, updates: Partial<InsertSupplier>): Promise<Supplier> {
-  const [updated] = await db.update(schema.suppliers).set(updates).where(eq(schema.suppliers.id, id)).returning();
+export async function updateSupplier(
+  id: number,
+  updates: Partial<InsertCompanyScopedSupplier>,
+  companyId?: number
+): Promise<CompanyScopedSupplier> {
+  const conditions = [eq(companyScopedSuppliers.id, id)];
+  if (companyId) conditions.push(eq(companyScopedSuppliers.companyId, companyId));
+  const [updated] = await db
+    .update(companyScopedSuppliers)
+    .set(updates)
+    .where(and(...conditions))
+    .returning();
+  if (!updated) throw new Error("Supplier not found");
   return updated;
 }
 
-export async function deleteSupplier(id: number): Promise<void> {
-  await db.update(schema.suppliers).set({ deletedAt: new Date(), active: false }).where(eq(schema.suppliers.id, id));
+export async function deleteSupplier(id: number, companyId?: number): Promise<void> {
+  const conditions = [eq(companyScopedSuppliers.id, id)];
+  if (companyId) conditions.push(eq(companyScopedSuppliers.companyId, companyId));
+  const [deleted] = await db
+    .update(companyScopedSuppliers)
+    .set({ deletedAt: new Date(), active: false })
+    .where(and(...conditions))
+    .returning({ id: companyScopedSuppliers.id });
+  if (!deleted) throw new Error("Supplier not found");
 }

@@ -7,6 +7,7 @@ export default defineConfig({
     environment: "node",
     testTimeout: 30000,
     hookTimeout: 30000,
+    setupFiles: ["./server/supplierCompanyScopeBridge.mjs"],
     include: ["tests/**/*.test.ts"],
     exclude: ["tests/ui/**"],
     pool: "forks",
@@ -23,10 +24,26 @@ export default defineConfig({
         "shared/**/*.d.ts",
       ],
       thresholds: {
-        lines: 5,
-        statements: 5,
-        functions: 3,
-        branches: 3,
+        // Raise the whole-backend floor while legacy monoliths are still being
+        // split, and add stronger gates for the critical modules below.
+        lines: 8,
+        statements: 8,
+        functions: 6,
+        branches: 6,
+
+        "server/routes/helpers/passwordHelpers.ts": {
+          lines: 95,
+          statements: 95,
+          functions: 100,
+          branches: 90,
+        },
+
+        "server/services/accounting/centralPostingEngine.ts": {
+          lines: 45,
+          statements: 45,
+          functions: 40,
+          branches: 35,
+        },
       },
     },
   },

@@ -15,8 +15,16 @@ if (!globalThis[INSTALL_KEY]) {
     "/api/stock-items",
     "/api/inventory",
     "/api/factory/bales",
+    "/api/factory/daybook",
     "/api/factory/v5/stock-allocation",
+    "/api/vouchers",
+    "/api/ledger-accounts",
   ]);
+
+  const heavyArrayPathPatterns = [
+    /^\/api\/vouchers\/\d+\/(?:entries|view-entries)$/,
+    /^\/api\/accounts\/(?:ledger|supplier|customer|employee|bank|asset)\/\d+\/transactions$/,
+  ];
 
   function readPositiveInt(value, fallback) {
     const parsed = Number.parseInt(String(value ?? ""), 10);
@@ -30,6 +38,10 @@ if (!globalThis[INSTALL_KEY]) {
     } catch {
       return { pathname: req?.path || req?.url || "/", searchParams: new URLSearchParams() };
     }
+  }
+
+  function isProtectedPath(pathname) {
+    return heavyArrayPaths.has(pathname) || heavyArrayPathPatterns.some((pattern) => pattern.test(pathname));
   }
 
   function wantsPagination(searchParams) {
@@ -56,13 +68,17 @@ if (!globalThis[INSTALL_KEY]) {
     return { page, limit, offset: (page - 1) * limit };
   }
 
-  function setPaginationHeaders(res, total, page, limit, totalPages) {
+  function setPaginationHeaders(res, total, page, limit, totalPages, defaultApplied) {
     if (res.headersSent) return;
     res.setHeader("X-Total-Count", String(total));
     res.setHeader("X-Page", String(page));
     res.setHeader("X-Page-Size", String(limit));
     res.setHeader("X-Total-Pages", String(totalPages));
-    res.setHeader("Access-Control-Expose-Headers", "X-Total-Count, X-Page, X-Page-Size, X-Total-Pages");
+    res.setHeader("X-Default-Limit-Applied", defaultApplied ? "true" : "false");
+    res.setHeader(
+      "Access-Control-Expose-Headers",
+      "X-Total-Count, X-Page, X-Page-Size, X-Total-Pages, X-Default-Limit-Applied"
+    );
   }
 
   function compactOtwContainerSummary(body) {
@@ -176,21 +192,26 @@ if (!globalThis[INSTALL_KEY]) {
 
       const { pathname, searchParams } = parseRequest(req);
       const profiledBody = applyResponseProfile(pathname, searchParams, body);
-
-      if (
-        !Array.isArray(profiledBody) ||
-        !heavyArrayPaths.has(pathname) ||
-        !wantsPagination(searchParams)
-      ) {
+      if (!Array.isArray(profiledBody) || !isProtectedPath(pathname)) {
         return originalJson.call(this, profiledBody);
       }
 
-      const { page, limit, offset } = parsePagination(searchParams);
       const total = profiledBody.length;
+
+      // Preserve the legacy array response shape while enforcing a safe default
+      // upper bound for callers that have not opted into structured pagination.
+      if (!wantsPagination(searchParams)) {
+        const limit = defaultLimit;
+        const totalPages = total === 0 ? 0 : Math.ceil(total / limit);
+        setPaginationHeaders(this, total, 1, limit, totalPages, true);
+        return originalJson.call(this, profiledBody.slice(0, limit));
+      }
+
+      const { page, limit, offset } = parsePagination(searchParams);
       const totalPages = total === 0 ? 0 : Math.ceil(total / limit);
       const items = profiledBody.slice(offset, offset + limit);
 
-      setPaginationHeaders(this, total, page, limit, totalPages);
+      setPaginationHeaders(this, total, page, limit, totalPages, false);
       return originalJson.call(this, {
         items,
         total,
@@ -215,6 +236,7 @@ if (!globalThis[INSTALL_KEY]) {
       defaultLimit,
       maxLimit,
       protectedPaths: [...heavyArrayPaths],
+      protectedPathPatterns: heavyArrayPathPatterns.map((pattern) => pattern.source),
       responseProfiles: ["otw-summary", "stock-otw", "combined-detail"],
     })
   );
