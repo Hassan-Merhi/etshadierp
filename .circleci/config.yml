@@ -151,6 +151,9 @@ jobs:
           name: Prepare disposable database schema
           command: node node_modules/drizzle-kit/bin.cjs push --force
       - run:
+          name: Verify disposable database schema
+          command: node scripts/verify-ci-disposable-schema.mjs
+      - run:
           name: Critical dependency audit
           command: npm audit --audit-level=critical
       - run:
