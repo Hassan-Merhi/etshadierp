@@ -3,7 +3,7 @@ version: 2.1
 executors:
   dns:
     docker:
-      - image: cimg/base:stable
+      - image: cimg/node:22.14
     resource_class: medium
 
 jobs:
