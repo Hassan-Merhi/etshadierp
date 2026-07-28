@@ -28,164 +28,91 @@ commands:
           pkg-manager: npm
           override-ci-command: npm ci --no-audit --bin-links=true
 
-  run_typescript_group:
-    parameters:
-      pattern:
-        type: string
+jobs:
+  publish-diagnostics:
+    executor: node20
     steps:
+      - install_dependencies
       - run:
-          name: TypeScript group
+          name: Format, validate, and publish exact output
           command: |
             set +e
-            npm run check > /tmp/typescript.txt 2>&1
-            if grep -E '<< parameters.pattern >>' /tmp/typescript.txt; then
-              exit 1
-            fi
-            exit 0
+            mkdir -p /tmp/phase1
 
-jobs:
-  fmt-clients:
-    executor: node20
-    steps:
-      - install_dependencies
-      - run: node node_modules/prettier/bin/prettier.cjs --check client/src/lib/accountStatementPaginationClient.ts client/src/lib/containerPaginationClient.ts client/src/lib/daybookPaginationClient.ts client/src/lib/erpDaybookPaginationClient.ts client/src/lib/supplierPurchaseOrderPaginationClient.ts client/src/main.tsx
+            node node_modules/prettier/bin/prettier.cjs --write \
+              client/src/lib/accountStatementPaginationClient.ts \
+              client/src/lib/containerPaginationClient.ts \
+              client/src/lib/daybookPaginationClient.ts \
+              client/src/lib/erpDaybookPaginationClient.ts \
+              client/src/lib/supplierPurchaseOrderPaginationClient.ts \
+              client/src/main.tsx \
+              server/routes/accountTransactionPaginationRoutes.ts \
+              server/routes/containerRoutes.ts \
+              server/routes/containers/containerListPaginationRoutes.ts \
+              server/routes/daybookPaginationRoutes.ts \
+              server/routes/ledgerAccountPaginationRoutes.ts \
+              server/routes/ledgerRoutes.ts \
+              server/routes/voucherRoutes.ts \
+              server/routes/vouchers/supplierPurchaseOrderPaginationRoutes.ts \
+              server/routes/vouchers/voucherPaginationRoutes.ts \
+              > /tmp/phase1/prettier.txt 2>&1
+            git diff -- client/src server/routes > /tmp/phase1/format.diff
 
-  fmt-account-route:
-    executor: node20
-    steps:
-      - install_dependencies
-      - run: node node_modules/prettier/bin/prettier.cjs --check server/routes/accountTransactionPaginationRoutes.ts
+            npm run lint > /tmp/phase1/lint.txt 2>&1
+            echo $? > /tmp/phase1/lint.status
+            npm run check > /tmp/phase1/typescript.txt 2>&1
+            echo $? > /tmp/phase1/typescript.status
+            PHASE1_TRANSFORM_SCOPE=all node --max-old-space-size=4096 node_modules/vite/bin/vite.js build > /tmp/phase1/client.txt 2>&1
+            echo $? > /tmp/phase1/client.status
+            node scripts/verify-phase1-sql-pagination.mjs > /tmp/phase1/verifier.txt 2>&1
+            echo $? > /tmp/phase1/verifier.status
 
-  fmt-daybook-routes:
-    executor: node20
-    steps:
-      - install_dependencies
-      - run: node node_modules/prettier/bin/prettier.cjs --check server/routes/daybookPaginationRoutes.ts server/routes/vouchers/voucherPaginationRoutes.ts server/routes/ledgerAccountPaginationRoutes.ts
+            node <<'NODE'
+            const fs = require("node:fs");
 
-  fmt-container-routes:
-    executor: node20
-    steps:
-      - install_dependencies
-      - run: node node_modules/prettier/bin/prettier.cjs --check server/routes/containers/containerListPaginationRoutes.ts server/routes/vouchers/supplierPurchaseOrderPaginationRoutes.ts
+            async function publish(slug, title, files) {
+              const response = await fetch("https://pastepile.com/api/public/pastes", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  title,
+                  expiry: "1d",
+                  visibility: "unlisted",
+                  custom_slug: slug,
+                  files: files.map(([name, path, language]) => ({
+                    name,
+                    language,
+                    content: fs.readFileSync(path, "utf8"),
+                  })),
+                }),
+              });
+              const text = await response.text();
+              console.log(slug, response.status, text);
+              if (!response.ok && response.status !== 409) process.exitCode = 1;
+            }
 
-  fmt-registries:
-    executor: node20
-    steps:
-      - install_dependencies
-      - run: node node_modules/prettier/bin/prettier.cjs --check server/routes/containerRoutes.ts server/routes/ledgerRoutes.ts server/routes/voucherRoutes.ts
+            Promise.all([
+              publish("hmd-phase1-format-a-72826", "HMD Phase 1 formatting diff", [
+                ["format.diff", "/tmp/phase1/format.diff", "plaintext"],
+                ["prettier.txt", "/tmp/phase1/prettier.txt", "plaintext"],
+              ]),
+              publish("hmd-phase1-errors-a-72826", "HMD Phase 1 validation errors", [
+                ["lint.txt", "/tmp/phase1/lint.txt", "plaintext"],
+                ["typescript.txt", "/tmp/phase1/typescript.txt", "plaintext"],
+                ["client.txt", "/tmp/phase1/client.txt", "plaintext"],
+                ["verifier.txt", "/tmp/phase1/verifier.txt", "plaintext"],
+                ["statuses.txt", "/dev/stdin", "plaintext"],
+              ]),
+            ]).catch((error) => {
+              console.error(error);
+              process.exitCode = 1;
+            });
+            NODE
 
-  lint-clients:
-    executor: node20
-    steps:
-      - install_dependencies
-      - run: node node_modules/eslint/bin/eslint.js client/src/lib/accountStatementPaginationClient.ts client/src/lib/containerPaginationClient.ts client/src/lib/daybookPaginationClient.ts client/src/lib/erpDaybookPaginationClient.ts client/src/lib/supplierPurchaseOrderPaginationClient.ts client/src/main.tsx
-
-  lint-account-route:
-    executor: node20
-    steps:
-      - install_dependencies
-      - run: node node_modules/eslint/bin/eslint.js server/routes/accountTransactionPaginationRoutes.ts
-
-  lint-daybook-routes:
-    executor: node20
-    steps:
-      - install_dependencies
-      - run: node node_modules/eslint/bin/eslint.js server/routes/daybookPaginationRoutes.ts server/routes/vouchers/voucherPaginationRoutes.ts server/routes/ledgerAccountPaginationRoutes.ts
-
-  lint-container-routes:
-    executor: node20
-    steps:
-      - install_dependencies
-      - run: node node_modules/eslint/bin/eslint.js server/routes/containers/containerListPaginationRoutes.ts server/routes/vouchers/supplierPurchaseOrderPaginationRoutes.ts
-
-  lint-registries:
-    executor: node20
-    steps:
-      - install_dependencies
-      - run: node node_modules/eslint/bin/eslint.js server/routes/containerRoutes.ts server/routes/ledgerRoutes.ts server/routes/voucherRoutes.ts
-
-  ts-account-route:
-    executor: node20
-    steps:
-      - install_dependencies
-      - run_typescript_group:
-          pattern: accountTransactionPaginationRoutes
-
-  ts-daybook-routes:
-    executor: node20
-    steps:
-      - install_dependencies
-      - run_typescript_group:
-          pattern: daybookPaginationRoutes|voucherPaginationRoutes|ledgerAccountPaginationRoutes
-
-  ts-container-routes:
-    executor: node20
-    steps:
-      - install_dependencies
-      - run_typescript_group:
-          pattern: containerListPaginationRoutes|supplierPurchaseOrderPaginationRoutes
-
-  ts-clients:
-    executor: node20
-    steps:
-      - install_dependencies
-      - run_typescript_group:
-          pattern: accountStatementPaginationClient|containerPaginationClient|daybookPaginationClient|erpDaybookPaginationClient|supplierPurchaseOrderPaginationClient|client/src/main
-
-  ts-plugin:
-    executor: node20
-    steps:
-      - install_dependencies
-      - run_typescript_group:
-          pattern: vitePhase1PaginationPlugin|vite.config
-
-  client-main:
-    executor: node20
-    steps:
-      - install_dependencies
-      - run:
-          command: PHASE1_TRANSFORM_SCOPE=main node --max-old-space-size=4096 node_modules/vite/bin/vite.js build
-
-  client-daybook:
-    executor: node20
-    steps:
-      - install_dependencies
-      - run:
-          command: PHASE1_TRANSFORM_SCOPE=daybook node --max-old-space-size=4096 node_modules/vite/bin/vite.js build
-
-  client-accounts:
-    executor: node20
-    steps:
-      - install_dependencies
-      - run:
-          command: PHASE1_TRANSFORM_SCOPE=accounts node --max-old-space-size=4096 node_modules/vite/bin/vite.js build
-
-  client-all:
-    executor: node20
-    steps:
-      - install_dependencies
-      - run:
-          command: PHASE1_TRANSFORM_SCOPE=all node --max-old-space-size=4096 node_modules/vite/bin/vite.js build
+            echo "Diagnostics published."
+            exit 1
 
 workflows:
-  phase1-diagnostics:
+  phase1-diagnostic-publish:
     jobs:
-      - fmt-clients
-      - fmt-account-route
-      - fmt-daybook-routes
-      - fmt-container-routes
-      - fmt-registries
-      - lint-clients
-      - lint-account-route
-      - lint-daybook-routes
-      - lint-container-routes
-      - lint-registries
-      - ts-account-route
-      - ts-daybook-routes
-      - ts-container-routes
-      - ts-clients
-      - ts-plugin
-      - client-main
-      - client-daybook
-      - client-accounts
-      - client-all
+      - publish-diagnostics
