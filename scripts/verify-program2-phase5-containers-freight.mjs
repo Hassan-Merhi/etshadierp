@@ -1,6 +1,7 @@
 import fs from "node:fs";
 
 const requiredFiles = [
+  "server/routes/factory/factoryRawStockRoutes.ts",
   "server/routes/factory/raw-stock/rawStockContainerRoutes.ts",
   "server/routes/factory/raw-stock/rawStockOffloadRoutes.ts",
   "server/routes/factory/suppliers/supplierCrudRoutes.ts",
@@ -8,26 +9,36 @@ const requiredFiles = [
   "server/routes/factory/suppliers/supplierBalanceRoutes.ts",
   "server/services/factory/currencyConversion.ts",
   "server/services/factory/postOffloadChargeMutation.ts",
+  "server/services/security/postOffloadLedgerOwnershipGuard.ts",
   "docs/program-2-accounting-convergence.md",
   "docs/program-2-phase-5-containers-freight.md",
 ];
 for (const file of requiredFiles) if (!fs.existsSync(file)) throw new Error(`Program 2 Phase 5 missing required file: ${file}`);
 const read = (file) => fs.readFileSync(file, "utf8");
-const container = read(requiredFiles[0]);
-const offload = read(requiredFiles[1]);
-const supplierCrud = read(requiredFiles[2]);
-const broker = read(requiredFiles[3]);
-const supplierBalance = read(requiredFiles[4]);
-const currency = read(requiredFiles[5]);
-const mutation = read(requiredFiles[6]);
-const phaseDoc = read(requiredFiles[8]);
+const registry = read(requiredFiles[0]);
+const container = read(requiredFiles[1]);
+const offload = read(requiredFiles[2]);
+const supplierCrud = read(requiredFiles[3]);
+const broker = read(requiredFiles[4]);
+const supplierBalance = read(requiredFiles[5]);
+const currency = read(requiredFiles[6]);
+const mutation = read(requiredFiles[7]);
+const ownershipGuard = read(requiredFiles[8]);
+const phaseDoc = read(requiredFiles[10]);
 const combined = [container, offload, supplierCrud, broker, supplierBalance, mutation].join("\n");
-const ownedLedgerMatches = container.match(/eq\(ledgerAccounts\.companyId,\s*companyId\)/g) || [];
+
 const checks = [
   [phaseDoc.includes("Status: complete"), "Phase 5 documentation must remain complete"],
   [phaseDoc.includes("own-account freight must not be added"), "own-account freight exclusion must remain documented"],
   [phaseDoc.includes("No database schema or historical record changed"), "historical-data safety boundary must remain documented"],
-  [ownedLedgerMatches.length >= 2, "POST and PATCH post-offload ledger lookups must require the active company"],
+  [registry.includes('app.use("/api/factory/containers", requirePostOffloadLedgerOwnership)'), "post-offload ownership guard must register before container routes"],
+  [registry.indexOf("requirePostOffloadLedgerOwnership") < registry.indexOf("registerRawStockContainerRoutes(app);"), "ownership guard must execute before post-offload handlers"],
+  [ownershipGuard.includes("inArray(ledgerAccounts.id, ledgerIds)"), "ownership guard must validate every requested ledger"],
+  [ownershipGuard.includes("eq(ledgerAccounts.companyId, companyId)"), "ownership guard must require selected-company ownership"],
+  [ownershipGuard.includes("eq(ledgerAccounts.active, true)"), "ownership guard must reject inactive ledgers"],
+  [ownershipGuard.includes("isNull(ledgerAccounts.deletedAt)"), "ownership guard must reject deleted ledgers"],
+  [ownershipGuard.includes("POST_OFFLOAD_LEDGER_COMPANY_MISMATCH"), "ownership mismatch must remain explicit"],
+  [ownershipGuard.includes('req.method === "POST"') && ownershipGuard.includes('req.method === "PATCH"'), "POST and PATCH charge paths must both be guarded"],
   [mutation.includes("companyId") && mutation.includes("voucherCompanyId"), "post-offload mutation must retain explicit source and voucher company context"],
   [combined.includes("freight"), "freight handling must remain present"],
   [combined.includes("commission"), "commission handling must remain present"],
