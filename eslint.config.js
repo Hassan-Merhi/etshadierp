@@ -48,6 +48,10 @@ export default tseslint.config(
       "@typescript-eslint/no-wrapper-object-types": "off",
       "@typescript-eslint/no-unsafe-function-type": "off",
       "@typescript-eslint/no-namespace": ["error", { allowDeclarations: true }],
+      "@typescript-eslint/no-unused-expressions": [
+        "error",
+        { allowShortCircuit: true, allowTernary: true },
+      ],
 
       "no-console": "off",
       "no-undef": "off",
@@ -61,5 +65,5 @@ export default tseslint.config(
       "react-hooks/exhaustive-deps": "warn",
     },
   },
-  configPrettier
+  configPrettier,
 );
