@@ -3,11 +3,12 @@ import { decideSessionSecurity } from "../server/services/security/sessionSecuri
 import { hydrateActiveCredentialVersion, revokeUserSessions } from "../server/services/security/credentialVersionService";
 
 function selectDb(version: number) {
+  const execute = vi.fn(async () => undefined);
   const limit = vi.fn(async () => [{ credentialVersion: version }]);
   const where = vi.fn(() => ({ limit }));
   const from = vi.fn(() => ({ where }));
   const select = vi.fn(() => ({ from }));
-  return { db: { select }, select, from, where, limit };
+  return { db: { execute, select }, execute, select, from, where, limit };
 }
 
 describe("credential version lifecycle", () => {
