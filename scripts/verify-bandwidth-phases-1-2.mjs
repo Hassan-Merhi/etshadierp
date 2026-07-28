@@ -85,14 +85,14 @@ requireText(
   'import "./bandwidthPhase2PayloadGuard";',
   "The Phase 2 payload guard must be installed before accounting fetch protection."
 );
-requireText(hotspotGuard, "/api\\/containers\\/otw-items", "OTW container items must be request-contained.");
-requireText(hotspotGuard, "/api\\/factory\\/containers", "Factory containers must be request-contained.");
-requireText(hotspotGuard, "/api\\/ledger-accounts", "Ledger accounts must be request-contained.");
-requireText(hotspotGuard, "/api\\/factory\\/bale-products", "Bale products must be request-contained.");
-requireText(hotspotGuard, "/api\\/factory\\/workers", "Factory workers must be request-contained.");
-requireText(hotspotGuard, "/api\\/factory\\/mix-batches", "Mix batches must be request-contained.");
-requireText(hotspotGuard, "/api\\/factory\\/raw-stock", "Raw-stock reads must be request-contained.");
-requireText(hotspotGuard, "/api\\/accounts\\/all", "Accounts reads must be request-contained.");
+requireText(hotspotGuard, "/api\/containers\/otw-items", "OTW container items must be request-contained.");
+requireText(hotspotGuard, "/api\/factory\/containers", "Factory containers must be request-contained.");
+requireText(hotspotGuard, "/api\/ledger-accounts", "Ledger accounts must be request-contained.");
+requireText(hotspotGuard, "/api\/factory\/bale-products", "Bale products must be request-contained.");
+requireText(hotspotGuard, "/api\/factory\/workers", "Factory workers must be request-contained.");
+requireText(hotspotGuard, "/api\/factory\/mix-batches", "Mix batches must be request-contained.");
+requireText(hotspotGuard, "/api\/factory\/raw-stock", "Raw-stock reads must be request-contained.");
+requireText(hotspotGuard, "/api\/accounts\/all", "Accounts reads must be request-contained.");
 requireText(hotspotGuard, "inFlightRequests", "Identical hotspot GETs must share one in-flight request.");
 requireText(hotspotGuard, "writeGeneration", "Writes must prevent raced GETs from caching stale data.");
 requireText(hotspotGuard, "writeGeneration += 1", "Every write boundary must advance the cache generation.");
@@ -110,30 +110,66 @@ requireText(
 );
 requireText(hotspotGuard, "MAX_CACHE_ENTRIES = 32", "The hotspot response cache must remain memory-bounded.");
 
-requireText(payloadGuard, 'window.location.pathname !== "/inventory"', "Phase 2 profiles must be limited to Inventory Hub.");
-requireText(payloadGuard, 'get("tab") === "on-the-way"', "Phase 2 profiles must be limited to the OTW tab.");
+requireText(payloadGuard, 'url.pathname === "/inventory"', "Phase 2 profiles must be limited to Inventory Hub.");
+requireText(
+  payloadGuard,
+  'url.searchParams.get("tab") === "on-the-way"',
+  "Phase 2 profiles must be limited to the OTW tab."
+);
 requireText(payloadGuard, 'return "otw-summary";', "The OTW tab must request compact container summaries.");
 requireText(payloadGuard, 'return "stock-otw";', "The OTW tab must request grouped stock rows.");
 requireText(payloadGuard, 'return "combined";', "Combined Inventory must request aggregated inventory rows.");
-requireText(payloadGuard, 'return "combined-detail";', "Combined Inventory must request compact container details.");
-requireText(payloadGuard, 'url.searchParams.set("profile", profile);', "Payload profiles must be explicit query parameters.");
+requireText(
+  payloadGuard,
+  'return "combined-detail";',
+  "Combined Inventory must request compact container details."
+);
+requireText(
+  payloadGuard,
+  'url.searchParams.set("profile", profile);',
+  "Payload profiles must be explicit query parameters."
+);
 requireText(payloadGuard, "removeQueries", "Compact query data must be removed at OTW navigation boundaries.");
-requireText(payloadGuard, 'wrapHistoryMethod("pushState")', "Push navigation must isolate compact query caches.");
-requireText(payloadGuard, 'wrapHistoryMethod("replaceState")', "Replace navigation must isolate compact query caches.");
-requireText(payloadGuard, 'addEventListener("popstate"', "Back and forward navigation must isolate compact query caches.");
-requireText(payloadGuard, 'first === "/api/containers"', "Full container list query keys must be cleared outside OTW.");
-requireText(payloadGuard, '/^\\/api\\/containers\\/\\d+$/.test(first)', "Container detail query keys must be cleared outside OTW.");
+requireText(payloadGuard, "window.history.pushState =", "Push navigation must isolate compact query caches.");
+requireText(payloadGuard, "window.history.replaceState =", "Replace navigation must isolate compact query caches.");
+requireText(
+  payloadGuard,
+  'addEventListener("popstate"',
+  "Back and forward navigation must isolate compact query caches."
+);
+requireText(
+  payloadGuard,
+  'first === "/api/containers"',
+  "Full container list query keys must be cleared outside OTW."
+);
+requireText(
+  payloadGuard,
+  '/^\/api\/containers\/\d+$/.test(first)',
+  "Container detail query keys must be cleared outside OTW."
+);
 
 requireText(apiBridge, "compactOtwContainerSummary", "The server must compact OTW container summaries.");
 requireText(apiBridge, "compactStockOtwItems", "The server must aggregate Stock OTW line items.");
-requireText(apiBridge, "compactCombinedContainerDetail", "The server must compact Combined Inventory container details.");
+requireText(
+  apiBridge,
+  "compactCombinedContainerDetail",
+  "The server must compact Combined Inventory container details."
+);
 requireText(apiBridge, 'profile === "otw-summary"', "The OTW summary profile must remain opt-in.");
 requireText(apiBridge, 'profile === "stock-otw"', "The grouped Stock OTW profile must remain opt-in.");
 requireText(apiBridge, 'profile === "combined-detail"', "The compact detail profile must remain opt-in.");
 
 requireText(inventoryRoutes, 'profile === "combined"', "Inventory must expose an opt-in combined summary profile.");
-requireText(inventoryRoutes, "SUM(${inventory.quantity}::numeric)", "Combined inventory quantities must aggregate in SQL.");
-requireText(inventoryRoutes, "SUM(${inventory.totalValue}::numeric)", "Combined inventory values must aggregate in SQL.");
+requireText(
+  inventoryRoutes,
+  "SUM(${inventory.quantity}::numeric)",
+  "Combined inventory quantities must aggregate in SQL."
+);
+requireText(
+  inventoryRoutes,
+  "SUM(${inventory.totalValue}::numeric)",
+  "Combined inventory values must aggregate in SQL."
+);
 requireText(inventoryRoutes, ".groupBy(", "Combined inventory must group by stock item rather than location row.");
 requireText(inventoryRoutes, "pageSize: data.length", "Combined inventory must return its complete aggregated result.");
 
