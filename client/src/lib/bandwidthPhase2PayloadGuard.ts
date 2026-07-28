@@ -58,21 +58,25 @@ function clearProfiledQueries(): void {
 
 function installNavigationCacheIsolation(): void {
   let lastWasOtw = isInventoryOtwTab();
+  const originalPushState = window.history.pushState.bind(window.history);
+  const originalReplaceState = window.history.replaceState.bind(window.history);
 
-  const wrapHistoryMethod = (method: "pushState" | "replaceState") => {
-    const original = window.history[method].bind(window.history);
-    window.history[method] = ((data: any, unused: string, url?: string | URL | null) => {
-      const nextUrl = url == null ? new URL(window.location.href) : new URL(String(url), window.location.href);
-      const nextWasOtw = isInventoryOtwUrl(nextUrl);
-      if (nextWasOtw !== lastWasOtw) clearProfiledQueries();
-      const result = original(data, unused, url);
-      lastWasOtw = nextWasOtw;
-      return result;
-    }) as History[typeof method];
+  window.history.pushState = (data: any, unused: string, url?: string | URL | null) => {
+    const nextUrl = url == null ? new URL(window.location.href) : new URL(String(url), window.location.href);
+    const nextWasOtw = isInventoryOtwUrl(nextUrl);
+    if (nextWasOtw !== lastWasOtw) clearProfiledQueries();
+    originalPushState(data, unused, url);
+    lastWasOtw = nextWasOtw;
   };
 
-  wrapHistoryMethod("pushState");
-  wrapHistoryMethod("replaceState");
+  window.history.replaceState = (data: any, unused: string, url?: string | URL | null) => {
+    const nextUrl = url == null ? new URL(window.location.href) : new URL(String(url), window.location.href);
+    const nextWasOtw = isInventoryOtwUrl(nextUrl);
+    if (nextWasOtw !== lastWasOtw) clearProfiledQueries();
+    originalReplaceState(data, unused, url);
+    lastWasOtw = nextWasOtw;
+  };
+
   window.addEventListener("popstate", () => {
     const nextWasOtw = isInventoryOtwTab();
     if (nextWasOtw !== lastWasOtw) clearProfiledQueries();
