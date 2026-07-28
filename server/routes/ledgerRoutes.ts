@@ -2,6 +2,7 @@ import type { Express } from "express";
 import { getErrorMessage } from "../lib/httpHandlers";
 import { requireAuth } from "../auth";
 import { getLedgerParentGroupOptions } from "../services/ledgerAccountOptionsService";
+import { registerLedgerAccountPaginationRoutes } from "./ledgerAccountPaginationRoutes";
 import { registerLedgerRoutes as registerLegacyLedgerRoutes } from "./ledgerRoutesLegacy";
 import {
   normalizeAccountOpeningBalance,
@@ -42,5 +43,7 @@ export function registerLedgerRoutes(app: Express) {
     }
   });
 
+  // Bound the main account selector at SQL level before the broad legacy route.
+  registerLedgerAccountPaginationRoutes(app);
   registerLegacyLedgerRoutes(app);
 }
