@@ -89,11 +89,11 @@ jobs:
           command: |
             git fetch origin main --depth=1
             mapfile -d '' changed_files < <(
-              git diff --name-only --diff-filter=ACMR -z origin/main...HEAD -- client/src server shared tests |
-                grep -zE '\.(ts|tsx|css)$' || true
+              git diff --name-only --diff-filter=ACMR -z origin/main...HEAD -- client/src server shared tests scripts |
+                grep -zE '\.(ts|tsx|css|mjs)$' || true
             )
             if [ "${#changed_files[@]}" -eq 0 ]; then
-              echo "No changed TypeScript, TSX, or CSS files require formatting checks."
+              echo "No changed source files require formatting checks."
               exit 0
             fi
             printf 'Checking formatting for %s changed source file(s):\n' "${#changed_files[@]}"
@@ -135,16 +135,7 @@ jobs:
           command: node node_modules/drizzle-kit/bin.cjs push --force
       - run:
           name: Verify disposable database schema
-          command: |
-            node --input-type=module - <<'NODE'
-            import pg from "pg";
-            const client = new pg.Client({ connectionString: process.env.DATABASE_URL, ssl: false });
-            await client.connect();
-            const result = await client.query("select current_database() as database, count(*)::int as tables from information_schema.tables where table_schema = 'public'");
-            console.log(result.rows[0]);
-            if (!result.rows[0] || result.rows[0].tables < 1) throw new Error("Disposable schema contains no public tables");
-            await client.end();
-            NODE
+          command: node scripts/verify-ci-disposable-schema.mjs
       - run:
           name: Build application
           command: npm run build
