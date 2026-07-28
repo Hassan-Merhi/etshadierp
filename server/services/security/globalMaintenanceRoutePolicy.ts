@@ -4,6 +4,7 @@ export interface GlobalMaintenanceRouteMatch {
     | "fix-unattributable-pos-data"
     | "cleanup-orphaned-charges"
     | "account-migration"
+    | "parent-company-setting"
     | "deployment-diagnostics"
     | "runtime-schema-migration"
     | "schema-diagnostic"
@@ -30,6 +31,16 @@ const EXACT_ROUTES: Array<{
     method: "POST",
     path: "/api/cleanup/orphaned-charges",
     operation: "cleanup-orphaned-charges",
+  },
+  {
+    method: "GET",
+    path: "/api/system/parent-company",
+    operation: "parent-company-setting",
+  },
+  {
+    method: "POST",
+    path: "/api/system/parent-company",
+    operation: "parent-company-setting",
   },
   {
     method: "GET",
@@ -60,7 +71,7 @@ const EXACT_ROUTES: Array<{
 
 export function classifyGlobalMaintenanceRoute(
   method: string,
-  path: string
+  path: string,
 ): GlobalMaintenanceRouteMatch | null {
   const normalizedMethod = method.toUpperCase();
 
@@ -72,7 +83,7 @@ export function classifyGlobalMaintenanceRoute(
   }
 
   const match = EXACT_ROUTES.find(
-    (route) => route.method === normalizedMethod && route.path === path
+    (route) => route.method === normalizedMethod && route.path === path,
   );
   return match ? { operation: match.operation } : null;
 }
