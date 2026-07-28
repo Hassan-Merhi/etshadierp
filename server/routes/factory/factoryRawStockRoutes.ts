@@ -1,6 +1,7 @@
 import type { Express } from "express";
 import { requireExplicitCompanyContext } from "../../services/security/companyContextEnforcementAdapter";
 import { requireLegacyPrivilegedWrite } from "../../services/security/legacyPrivilegedWriteGuard";
+import { requirePostOffloadLedgerOwnership } from "../../services/security/postOffloadLedgerOwnershipGuard";
 import { requireRawStockSensitiveInput } from "../../services/security/rawStockSensitiveInputGuard";
 import { registerRawStockCrudRoutes } from "./raw-stock/rawStockCrudRoutes";
 import { registerRawStockOffloadRoutes } from "./raw-stock/rawStockOffloadRoutes";
@@ -23,6 +24,11 @@ export function registerFactoryRawStockRoutes(app: Express) {
   // Validate and freeze high-impact repair payloads before permission,
   // confirmation, audit, or business logic can consume them.
   app.use("/api/factory/raw-stock", requireRawStockSensitiveInput);
+
+  // Post-offload charge routes live under /api/factory/containers even though
+  // they are registered by the raw-stock module. Reject foreign, inactive, or
+  // deleted ledger targets before the route can derive a voucher company from them.
+  app.use("/api/factory/containers", requirePostOffloadLedgerOwnership);
 
   const confirmedRepair = (action: string, sourceType: string) =>
     requireLegacyPrivilegedWrite({
