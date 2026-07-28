@@ -1,4 +1,5 @@
 import type { Express } from "express";
+import { registerDaybookPaginationRoutes } from "./daybookPaginationRoutes";
 import { registerVoucherPaginationRoutes } from "./vouchers/voucherPaginationRoutes";
 import { registerVoucherQueryRoutes } from "./vouchers/voucherQueryRoutes";
 import { registerVoucherCreateRoutes } from "./vouchers/voucherCreateRoutes";
@@ -22,6 +23,9 @@ export function registerVoucherRoutes(app: Express) {
   // Stock-transfer lifecycle routes must shadow the older direct transfer editor.
   registerStockTransferLifecycleRoutes(app);
   registerStockTransferRevisionLifecycleRoutes(app);
+
+  // The ERP Daybook uses one SQL-paged chronological union of vouchers and offloads.
+  registerDaybookPaginationRoutes(app);
 
   // Native SQL pagination shadows the legacy array reader while preserving its
   // array response for callers that do not explicitly request pagination.
