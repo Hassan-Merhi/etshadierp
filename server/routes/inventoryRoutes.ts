@@ -7,13 +7,7 @@ import { requireAuth } from "../auth";
 import { logAudit } from "./_helpers";
 import { adjustInventory } from "../inventoryHelper";
 import { registerInventoryMovementRoutes } from "./inventoryMovementRoutes";
-import {
-  locations,
-  inventory,
-  stockItems,
-  stockGroups,
-  companies,
-} from "@shared/schema";
+import { locations, inventory, stockItems, stockGroups, companies } from "@shared/schema";
 import { eq, and, or, asc, sql, isNull, ilike } from "drizzle-orm";
 
 export function registerInventoryRoutes(app: Express) {
@@ -23,7 +17,7 @@ export function registerInventoryRoutes(app: Express) {
         return res.status(400).json({ message: "No company selected" });
       }
       const companyId = req.session.currentCompanyId;
-      const { page, pageSize, search, locationId, stockGroupId } = req.query;
+      const { page, pageSize, search, locationId, stockGroupId, profile } = req.query;
 
       // Always return paginated format { data, page, pageSize, total, totalPages }.
       // Page and pageSize are optional and default when not supplied so that legacy
@@ -48,6 +42,44 @@ export function registerInventoryRoutes(app: Express) {
         conditions.push(or(ilike(stockItems.name, q), ilike(stockItems.code, q)));
       }
       const where = and(...conditions);
+
+      if (profile === "combined") {
+        const data = await db
+          .select({
+            stockItemId: inventory.stockItemId,
+            stockItemName: sql<string>`COALESCE(${stockItems.name}, '')`,
+            stockItemCode: sql<string>`COALESCE(${stockItems.code}, '')`,
+            quantity: sql<string>`COALESCE(SUM(${inventory.quantity}::numeric), 0)::text`,
+            averageRate: sql<string>`CASE
+              WHEN COALESCE(SUM(${inventory.quantity}::numeric), 0) = 0 THEN '0'
+              ELSE (COALESCE(SUM(${inventory.totalValue}::numeric), 0) / NULLIF(SUM(${inventory.quantity}::numeric), 0))::text
+            END`,
+            totalValue: sql<string>`COALESCE(SUM(${inventory.totalValue}::numeric), 0)::text`,
+            stockGroupId: stockItems.stockGroupId,
+            stockGroupName: sql<string>`COALESCE(${stockGroups.name}, '')`,
+          })
+          .from(inventory)
+          .leftJoin(stockItems, eq(inventory.stockItemId, stockItems.id))
+          .leftJoin(stockGroups, eq(stockItems.stockGroupId, stockGroups.id))
+          .innerJoin(locations, eq(inventory.locationId, locations.id))
+          .where(where)
+          .groupBy(
+            inventory.stockItemId,
+            stockItems.name,
+            stockItems.code,
+            stockItems.stockGroupId,
+            stockGroups.name
+          )
+          .orderBy(asc(stockItems.code));
+
+        return res.json({
+          data,
+          page: 1,
+          pageSize: data.length,
+          total: data.length,
+          totalPages: data.length === 0 ? 0 : 1,
+        });
+      }
 
       const [{ total }] = await db
         .select({ total: sql<number>`count(*)::int` })
@@ -92,7 +124,12 @@ export function registerInventoryRoutes(app: Express) {
         totalPages: Math.ceil(total / pageSizeNum),
       });
     } catch (error: unknown) {
-      logger.error("Inventory fetch failed", { module: "inventory", action: "getInventory", companyId: req.session.currentCompanyId, error });
+      logger.error("Inventory fetch failed", {
+        module: "inventory",
+        action: "getInventory",
+        companyId: req.session.currentCompanyId,
+        error,
+      });
       res.status(500).json({ message: getErrorMessage(error) });
     }
   });
