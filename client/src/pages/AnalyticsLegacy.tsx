@@ -884,6 +884,9 @@ export default function Analytics() {
   const liabilityAccounts = accounts.filter(
     (acc) =>
       acc.type === "ledger" &&
+      // Exclude per-worker insurance liability accounts ("Insurance - [name]").
+      // These belong to the Insurance section, not the balance-sheet liabilities list.
+      !/^Insurance\s*[-–]/i.test(acc.name) &&
       (acc.accountType === "Liability" ||
         acc.accountType === "Accounts Payable" ||
         acc.accountType === "Loans" ||
