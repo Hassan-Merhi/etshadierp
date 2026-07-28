@@ -1,380 +1,314 @@
 import type { Express } from "express";
-import { getErrorMessage } from "../lib/httpHandlers";
-import { db, pool } from "../db";
+import { and, eq, isNull } from "drizzle-orm";
+import { stockGroups } from "@shared/schema";
+import {
+  companyScopedSuppliers,
+  insertCompanyScopedSupplierSchema,
+} from "@shared/schema/supplierCompanyScope";
+import { db } from "../db";
 import { storage } from "../storage";
-import { requireAuth, requireRole, canDelete, requireNonPOS, checkPOSLocation } from "../auth";
-import { upload, logAudit, getCurrentExchangeRate, syncEmployeeBalancesFromEntries } from "./_helpers";
-import { resolveParentCompanyId, getSupplierBalanceForContext } from "./helpers/supplierBalanceHelpers";
-import {
-  locations,
-  inventory,
-  stockItems,
-  stockGroups,
-  ledgerAccounts,
-  employees,
-  employeeGroups,
-  employeeGroupMembers,
-  suppliers,
-  customers,
-  customerBalances,
-  customerOrders,
-  stockTransferVouchers,
-  stockTransferItems,
-  stockAdjustmentVouchers,
-  stockAdjustmentItems,
-  containers,
-  containerOffloads,
-  containerOffloadItems,
-  vouchers,
-  voucherEntries,
-  salesItems,
-  insertLocationSchema,
-  insertLedgerAccountSchema,
-  updateLedgerAccountSchema,
-  insertEmployeeSchema,
-  insertEmployeeGroupSchema,
-  insertSupplierSchema,
-  insertCustomerSchema,
-  userLocations,
-  userCompanyRoles,
-  companies,
-  bankAccounts,
-  fixedAssets,
-  agentAccounts,
-  auditLog,
-  users,
-  FEATURE_KEYS,
-} from "@shared/schema";
-import {
-  eq,
-  and,
-  or,
-  desc,
-  asc,
-  lt,
-  gt,
-  ne,
-  inArray,
-  sql,
-  isNull,
-  isNotNull,
-  not,
-  gte,
-  lte,
-  like,
-  ilike,
-} from "drizzle-orm";
-import { format } from "date-fns";
-import { z } from "zod";
+import { requireAuth, requireNonPOS } from "../auth";
+import { getErrorMessage } from "../lib/httpHandlers";
+import { logAudit } from "./_helpers";
+import { getSupplierBalanceForContext } from "./helpers/supplierBalanceHelpers";
+
+function currentCompanyId(req: any): number | null {
+  const value = Number(req.session?.currentCompanyId);
+  return Number.isInteger(value) && value > 0 ? value : null;
+}
+
+function supplierIdParam(value: string): number | null {
+  const id = Number.parseInt(value, 10);
+  return Number.isInteger(id) && id > 0 ? id : null;
+}
+
+function auditIdentity(req: any) {
+  return {
+    userId: req.session.userId!,
+    username: req.session.username || "unknown",
+  };
+}
 
 export function registerSupplierRoutes(app: Express) {
-  app.get("/api/suppliers", requireAuth, async (req, res) => {
+  app.get("/api/suppliers", requireAuth, async (req: any, res) => {
     try {
-      const search = (req.query.search as string | undefined)?.trim() || undefined;
-      const companyId = req.query.companyId ? parseInt(req.query.companyId as string) : null;
+      const companyId = currentCompanyId(req);
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      if (companyId && !isNaN(companyId)) {
-        // Determine the company type so we can isolate ERP vs factory suppliers
-        const companyRow = await pool.query(`SELECT company_type FROM companies WHERE id = $1`, [companyId]);
-        const companyType: string = companyRow.rows[0]?.company_type ?? "erp";
-        const isFactory = companyType === "factory" || companyType === "factory_v2";
-        const peerTypes = isFactory ? ["factory", "factory_v2"] : ["erp", "properties", "supplier_partner"];
-        const peerTypesParam = peerTypes.map((_, i) => `$${i + 2}`).join(", ");
-
-        // Return suppliers that:
-        //   a) have at least one PO with a company of the same type group, OR
-        //   b) have NO purchase orders at all (new/uncategorised suppliers)
-        // This keeps factory and ERP supplier lists isolated while allowing new
-        // suppliers to appear until their first PO assigns them to a type.
-        const searchClause = search ? `AND lower(s.legal_name) LIKE lower($${peerTypes.length + 2})` : "";
-        const params: any[] = [companyId, ...peerTypes];
-        if (search) params.push(`%${search}%`);
-
-        const result = await pool.query(
-          `SELECT s.*
-           FROM suppliers s
-           WHERE s.deleted_at IS NULL
-             ${searchClause}
-             AND (
-               EXISTS (
-                 SELECT 1 FROM purchase_orders po
-                 JOIN companies c ON c.id = po.company_id
-                 WHERE po.supplier_id = s.id
-                   AND c.company_type IN (${peerTypesParam})
-               )
-               OR NOT EXISTS (
-                 SELECT 1 FROM purchase_orders po2
-                 WHERE po2.supplier_id = s.id
-               )
-             )
-           ORDER BY s.legal_name
-           ${search ? `LIMIT 50` : ""}`,
-          params
-        );
-        return res.json(result.rows);
+      if (req.query.companyId && Number(req.query.companyId) !== companyId) {
+        return res.status(403).json({ message: "Supplier access is limited to the active company" });
       }
 
-      // No companyId — fall back to returning all suppliers (existing behaviour for
-      // other callers like stats, chatbot, admin pages)
-      const limit = search ? 50 : undefined;
-      const result = await storage.getAllSuppliers(search, limit);
-      res.json(result);
+      const search = typeof req.query.search === "string" ? req.query.search.trim() : "";
+      const suppliers = await storage.getAllSuppliers(search || undefined, search ? 50 : undefined, companyId);
+      res.json(suppliers);
     } catch (error: unknown) {
       res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
-  // Get suppliers with their container counts and balances, filtered by current company
-  // MUST come before /api/suppliers/:id to avoid route matching issues
-  app.get("/api/suppliers/stats", requireAuth, async (req, res) => {
+  // MUST come before /api/suppliers/:id to avoid route matching issues.
+  app.get("/api/suppliers/stats", requireAuth, async (req: any, res) => {
     try {
-      const companyId = (req.session as any).currentCompanyId;
-      const suppliers = await storage.getAllSuppliers();
+      const companyId = currentCompanyId(req);
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      // The supplier opening balance is a historical value that belongs only to
-      // the explicitly configured parent company's books (never guessed via
-      // "lowest company ID"). Sub-companies that transact with the same
-      // supplier start from zero.
+      const suppliers = await storage.getAllSuppliers(undefined, undefined, companyId);
       const suppliersWithStats = await Promise.all(
         suppliers.map(async (supplier) => {
-          const containerCount = await storage.getContainerCountBySupplier(supplier.id, companyId || undefined);
-
-          const { balance, openingBalance, hasActivity: hasEntries } = await getSupplierBalanceForContext(
-            supplier,
-            companyId || undefined
-          );
-
-          let poCount = 0;
-          if (companyId) {
-            const pos = await storage.getPurchaseOrdersBySupplier(supplier.id, companyId);
-            poCount = pos.length;
-          }
+          const [containerCount, balanceResult, purchaseOrders] = await Promise.all([
+            storage.getContainerCountBySupplier(supplier.id, companyId),
+            getSupplierBalanceForContext(supplier, companyId),
+            storage.getPurchaseOrdersBySupplier(supplier.id, companyId),
+          ]);
 
           return {
             ...supplier,
             containerCount,
-            balance,
-            hasActivity: containerCount > 0 || hasEntries || poCount > 0,
+            balance: balanceResult.balance,
+            openingBalance: balanceResult.openingBalance,
+            hasActivity:
+              containerCount > 0 || balanceResult.hasActivity || purchaseOrders.length > 0,
           };
         })
       );
 
-      if (companyId) {
-        res.json(suppliersWithStats.filter((s) => s.hasActivity));
-      } else {
-        res.json(suppliersWithStats);
-      }
+      res.json(suppliersWithStats);
     } catch (error: unknown) {
       res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
-  app.get("/api/suppliers/:id", requireAuth, async (req, res) => {
+  app.get("/api/suppliers/:id", requireAuth, async (req: any, res) => {
     try {
-      const supplierId = parseInt(req.params.id);
-      if (isNaN(supplierId)) {
-        return res.status(400).json({ message: "Invalid supplier ID" });
-      }
+      const companyId = currentCompanyId(req);
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      const supplierId = supplierIdParam(req.params.id);
+      if (!supplierId) return res.status(400).json({ message: "Invalid supplier ID" });
 
-      const supplier = await storage.getSupplierById(supplierId);
-      if (!supplier) {
-        return res.status(404).json({ message: "Supplier not found" });
-      }
-
+      const supplier = await storage.getSupplierById(supplierId, companyId);
+      if (!supplier) return res.status(404).json({ message: "Supplier not found" });
       res.json(supplier);
     } catch (error: unknown) {
       res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
-  app.get("/api/suppliers/:id/balance", requireAuth, async (req, res) => {
+  app.get("/api/suppliers/:id/balance", requireAuth, async (req: any, res) => {
     res.set("Cache-Control", "no-store");
     try {
-      const supplierId = parseInt(req.params.id);
-      if (isNaN(supplierId)) {
-        return res.status(400).json({ message: "Invalid supplier ID" });
-      }
-      const companyId = (req.session as any).currentCompanyId;
-      const supplier = await storage.getSupplierById(supplierId);
-      if (!supplier) {
-        return res.status(404).json({ message: "Supplier not found" });
-      }
-      // Opening balance belongs only to the explicitly configured parent
-      // company — never guessed via "lowest company ID".
-      const { balance } = await getSupplierBalanceForContext(supplier, companyId || undefined);
-      res.json({ balance });
+      const companyId = currentCompanyId(req);
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      const supplierId = supplierIdParam(req.params.id);
+      if (!supplierId) return res.status(400).json({ message: "Invalid supplier ID" });
+
+      const supplier = await storage.getSupplierById(supplierId, companyId);
+      if (!supplier) return res.status(404).json({ message: "Supplier not found" });
+
+      const { balance, openingBalance, balancesByCurrency, historicalBaseBalance } =
+        await getSupplierBalanceForContext(supplier, companyId);
+      res.json({ balance, openingBalance, balancesByCurrency, historicalBaseBalance });
     } catch (error: unknown) {
       res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
-  app.post("/api/suppliers", requireAuth, requireNonPOS, async (req, res) => {
+  app.post("/api/suppliers", requireAuth, requireNonPOS, async (req: any, res) => {
     try {
-      const parsed = insertSupplierSchema.parse(req.body);
+      const companyId = currentCompanyId(req);
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      // Auto-generate code from legalName if not provided
-      if (!parsed.code) {
-        // Generate code from name: remove non-alphanumeric, take first 6 letters, uppercase
+      const parsed = insertCompanyScopedSupplierSchema.parse({
+        ...req.body,
+        companyId,
+      });
+
+      let code = parsed.code?.trim();
+      if (!code) {
         const sanitized = parsed.legalName.trim().replace(/[^a-zA-Z0-9]/g, "");
-        let baseCode = sanitized.substring(0, 6).toUpperCase();
-
-        // Fallback if baseCode is empty after sanitization
-        if (!baseCode || baseCode.length === 0) {
-          baseCode = "SUP";
-        }
-
-        // Ensure uniqueness by adding suffix if needed
-        let code = baseCode;
+        const baseCode = sanitized.substring(0, 6).toUpperCase() || "SUP";
+        code = baseCode;
         let suffix = 1;
-        while (await storage.getSupplierByCode(code)) {
+        while (await storage.getSupplierByCode(code, companyId)) {
           code = `${baseCode}${suffix}`;
-          suffix++;
+          suffix += 1;
         }
-        parsed.code = code;
-      } else {
-        // Check for duplicate code if manually provided
-        const existing = await storage.getSupplierByCode(parsed.code);
-        if (existing) {
-          return res.status(400).json({ message: "Supplier code already exists" });
-        }
+      } else if (await storage.getSupplierByCode(code, companyId)) {
+        return res.status(400).json({ message: "Supplier code already exists in this company" });
       }
 
-      // Provide defaults for optional fields
-      const supplierData = {
+      const supplier = await storage.createSupplier({
         ...parsed,
+        code,
         email: parsed.email || "",
         phone: parsed.phone || "",
         address: parsed.address || "",
         taxId: parsed.taxId || "",
         paymentTerms: parsed.paymentTerms || "",
-      };
+      });
 
-      const supplier = await storage.createSupplier(supplierData);
-      try {
-        await logAudit({
-          userId: req.session.userId!,
-          username: (req.session as any).username || "unknown",
-          companyId: req.session.currentCompanyId!,
-          action: "create",
-          tableName: "suppliers",
-          recordId: supplier.id,
-          recordIdentifier: supplier.legalName,
-          changes: {
-            name: { old: null, new: supplier.legalName },
-            code: { old: null, new: supplier.code },
-            phone: { old: null, new: supplier.phone || null },
-            email: { old: null, new: supplier.email || null },
-            address: { old: null, new: supplier.address || null },
-          },
-        });
-      } catch {
-        /* non-fatal */
-      }
+      await logAudit({
+        ...auditIdentity(req),
+        companyId,
+        action: "create",
+        tableName: "suppliers",
+        recordId: supplier.id,
+        recordIdentifier: supplier.legalName,
+        changes: {
+          companyId: { old: null, new: companyId },
+          name: { old: null, new: supplier.legalName },
+          code: { old: null, new: supplier.code },
+          phone: { old: null, new: supplier.phone || null },
+          email: { old: null, new: supplier.email || null },
+          address: { old: null, new: supplier.address || null },
+        },
+      });
+
       res.status(201).json(supplier);
     } catch (error: unknown) {
       res.status(400).json({ message: getErrorMessage(error) });
     }
   });
 
-  app.patch("/api/suppliers/:id", requireAuth, requireNonPOS, async (req, res) => {
+  app.patch("/api/suppliers/:id", requireAuth, requireNonPOS, async (req: any, res) => {
     try {
-      const supplierId = parseInt(req.params.id);
-      if (isNaN(supplierId)) {
-        return res.status(400).json({ message: "Invalid supplier ID" });
-      }
+      const companyId = currentCompanyId(req);
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      const supplierId = supplierIdParam(req.params.id);
+      if (!supplierId) return res.status(400).json({ message: "Invalid supplier ID" });
 
-      const existingSupplier = await storage.getSupplierById(supplierId);
-      if (!existingSupplier) {
-        return res.status(404).json({ message: "Supplier not found" });
-      }
+      const existing = await storage.getSupplierById(supplierId, companyId);
+      if (!existing) return res.status(404).json({ message: "Supplier not found" });
 
-      // If code is being changed, check for duplicates
-      if (req.body.code && req.body.code !== existingSupplier.code) {
-        const duplicate = await storage.getSupplierByCode(req.body.code);
-        if (duplicate) {
-          return res.status(400).json({ message: "Supplier code already exists" });
+      const { companyId: _ignoredCompanyId, ...requestedUpdates } = req.body || {};
+      const parsed = insertCompanyScopedSupplierSchema
+        .omit({ companyId: true })
+        .partial()
+        .parse(requestedUpdates);
+
+      if (parsed.code && parsed.code !== existing.code) {
+        const duplicate = await storage.getSupplierByCode(parsed.code, companyId);
+        if (duplicate && duplicate.id !== supplierId) {
+          return res.status(400).json({ message: "Supplier code already exists in this company" });
         }
       }
 
-      const parsed = insertSupplierSchema.partial().parse(req.body);
-      const updatedSupplier = await storage.updateSupplier(supplierId, parsed);
-
-      try {
-        const _supChanges: Record<string, { old?: any; new?: any }> = {};
-        for (const _f of ["legalName", "phone", "email", "address", "taxId", "paymentTerms"] as const) {
-          if (String((existingSupplier as any)[_f] ?? "") !== String((updatedSupplier as any)[_f] ?? "")) {
-            _supChanges[_f] = { old: (existingSupplier as any)[_f], new: (updatedSupplier as any)[_f] };
-          }
+      const updated = await storage.updateSupplier(supplierId, parsed, companyId);
+      const changes: Record<string, { old?: unknown; new?: unknown }> = {};
+      for (const field of [
+        "legalName",
+        "code",
+        "phone",
+        "email",
+        "address",
+        "taxId",
+        "paymentTerms",
+        "openingBalance",
+        "active",
+      ] as const) {
+        if (String((existing as any)[field] ?? "") !== String((updated as any)[field] ?? "")) {
+          changes[field] = { old: (existing as any)[field], new: (updated as any)[field] };
         }
-        await logAudit({
-          userId: req.session.userId!,
-          username: (req.session as any).username || "unknown",
-          companyId: req.session.currentCompanyId!,
-          action: "update",
-          tableName: "suppliers",
-          recordId: updatedSupplier.id,
-          recordIdentifier: updatedSupplier.legalName,
-          changes: _supChanges,
-        });
-      } catch {
-        /* non-fatal */
       }
-      res.json(updatedSupplier);
+
+      await logAudit({
+        ...auditIdentity(req),
+        companyId,
+        action: "update",
+        tableName: "suppliers",
+        recordId: updated.id,
+        recordIdentifier: updated.legalName,
+        changes,
+      });
+
+      res.json(updated);
     } catch (error: unknown) {
       res.status(400).json({ message: getErrorMessage(error) });
     }
   });
 
-  app.delete("/api/suppliers/:id", requireAuth, requireNonPOS, async (req, res) => {
+  app.delete("/api/suppliers/:id", requireAuth, requireNonPOS, async (req: any, res) => {
     try {
-      const supplierId = parseInt(req.params.id);
-      if (isNaN(supplierId)) {
-        return res.status(400).json({ message: "Invalid supplier ID" });
-      }
-      const existing = await storage.getSupplierById(supplierId);
-      if (!existing) {
-        return res.status(404).json({ message: "Supplier not found" });
-      }
-      await storage.deleteSupplier(supplierId);
-      try {
-        await logAudit({
-          userId: req.session.userId!,
-          username: (req.session as any).username || "unknown",
-          companyId: req.session.currentCompanyId!,
-          action: "delete",
-          tableName: "suppliers",
-          recordId: existing.id,
-          recordIdentifier: existing.legalName,
-          changes: {
-            name: { old: existing.legalName, new: null },
-            code: { old: existing.code, new: null },
-            phone: { old: existing.phone || null, new: null },
-            email: { old: existing.email || null, new: null },
-          },
-        });
-      } catch {
-        /* non-fatal */
-      }
+      const companyId = currentCompanyId(req);
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      const supplierId = supplierIdParam(req.params.id);
+      if (!supplierId) return res.status(400).json({ message: "Invalid supplier ID" });
+
+      const existing = await storage.getSupplierById(supplierId, companyId);
+      if (!existing) return res.status(404).json({ message: "Supplier not found" });
+      await storage.deleteSupplier(supplierId, companyId);
+
+      await logAudit({
+        ...auditIdentity(req),
+        companyId,
+        action: "delete",
+        tableName: "suppliers",
+        recordId: existing.id,
+        recordIdentifier: existing.legalName,
+        changes: {
+          name: { old: existing.legalName, new: null },
+          code: { old: existing.code, new: null },
+          phone: { old: existing.phone || null, new: null },
+          email: { old: existing.email || null, new: null },
+        },
+      });
+
       res.status(204).send();
     } catch (error: unknown) {
       res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
-  // PATCH /api/suppliers/:id/stock-group — link/unlink a stock group from a supplier
-  app.patch("/api/suppliers/:id/stock-group", requireAuth, requireNonPOS, async (req: any, res: any) => {
+  app.patch("/api/suppliers/:id/stock-group", requireAuth, requireNonPOS, async (req: any, res) => {
     try {
-      const supplierId = parseInt(req.params.id);
-      const { stockGroupId } = req.body; // null to unlink
-      await db
-        .update(suppliers)
-        .set({ stockGroupId: stockGroupId ?? null })
-        .where(eq(suppliers.id, supplierId));
-      res.json({ success: true });
+      const companyId = currentCompanyId(req);
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      const supplierId = supplierIdParam(req.params.id);
+      if (!supplierId) return res.status(400).json({ message: "Invalid supplier ID" });
+
+      const supplier = await storage.getSupplierById(supplierId, companyId);
+      if (!supplier) return res.status(404).json({ message: "Supplier not found" });
+
+      const rawStockGroupId = req.body?.stockGroupId;
+      const stockGroupId = rawStockGroupId == null ? null : Number(rawStockGroupId);
+      if (stockGroupId !== null) {
+        if (!Number.isInteger(stockGroupId) || stockGroupId <= 0) {
+          return res.status(400).json({ message: "Invalid stock group ID" });
+        }
+        const [ownedGroup] = await db
+          .select({ id: stockGroups.id })
+          .from(stockGroups)
+          .where(and(eq(stockGroups.id, stockGroupId), eq(stockGroups.companyId, companyId)))
+          .limit(1);
+        if (!ownedGroup) return res.status(404).json({ message: "Stock group not found" });
+      }
+
+      const [updated] = await db
+        .update(companyScopedSuppliers)
+        .set({ stockGroupId })
+        .where(
+          and(
+            eq(companyScopedSuppliers.id, supplierId),
+            eq(companyScopedSuppliers.companyId, companyId),
+            isNull(companyScopedSuppliers.deletedAt)
+          )
+        )
+        .returning();
+      if (!updated) return res.status(404).json({ message: "Supplier not found" });
+
+      await logAudit({
+        ...auditIdentity(req),
+        companyId,
+        action: "update",
+        tableName: "suppliers",
+        recordId: supplierId,
+        recordIdentifier: supplier.legalName,
+        changes: { stockGroupId: { old: supplier.stockGroupId ?? null, new: stockGroupId } },
+      });
+
+      res.json({ success: true, supplier: updated });
     } catch (error: unknown) {
       res.status(500).json({ message: getErrorMessage(error) });
     }
   });
-
-  // Customers
 }
