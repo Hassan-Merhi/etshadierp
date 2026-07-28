@@ -1,7 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const auditValues = vi.fn(async () => undefined);
-const auditInsert = vi.fn(() => ({ values: auditValues }));
+const { auditValues, auditInsert } = vi.hoisted(() => {
+  const values = vi.fn(async () => undefined);
+  return {
+    auditValues: values,
+    auditInsert: vi.fn(() => ({ values })),
+  };
+});
 
 vi.mock("../server/db", () => ({
   db: {
