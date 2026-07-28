@@ -81,20 +81,32 @@ async function executeChain(req: any) {
   let routeReached = false;
   let forwardedError: unknown;
 
-  await new Promise<void>((resolve) => {
-    validation(req, res as any, (validationError?: unknown) => {
-      if (validationError) {
-        forwardedError = validationError;
+  await new Promise<void>((resolve, reject) => {
+    let settled = false;
+    const finish = () => {
+      if (!settled) {
+        settled = true;
         resolve();
-        return;
       }
-      Promise.resolve(
-        privileged(req, res as any, (privilegedError?: unknown) => {
-          forwardedError = privilegedError;
-          if (!privilegedError) routeReached = true;
-        })
-      ).finally(resolve);
-    });
+    };
+
+    Promise.resolve(
+      validation(req, res as any, (validationError?: unknown) => {
+        if (validationError) {
+          forwardedError = validationError;
+          finish();
+          return;
+        }
+        Promise.resolve(
+          privileged(req, res as any, (privilegedError?: unknown) => {
+            forwardedError = privilegedError;
+            if (!privilegedError) routeReached = true;
+          }),
+        ).then(finish, reject);
+      }),
+    ).then(() => {
+      if (res.statusCode !== 200) finish();
+    }, reject);
   });
 
   return { res, routeReached, forwardedError };
@@ -207,7 +219,7 @@ describe("Program 4 end-to-end enforcement", () => {
     }));
 
     expect(detectSecurityAnomalies(events, { now, denialThreshold: 5 }).map((item) => item.code)).toEqual(
-      expect.arrayContaining(["REPEATED_DENIALS", "PRIVILEGED_OPERATION_FAILURE"])
+      expect.arrayContaining(["REPEATED_DENIALS", "PRIVILEGED_OPERATION_FAILURE"]),
     );
   });
 });
