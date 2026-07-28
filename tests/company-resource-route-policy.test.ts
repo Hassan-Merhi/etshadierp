@@ -15,22 +15,27 @@ describe("company-owned resource route policy", () => {
     });
   });
 
-  it("classifies inventory and true factory container resources", () => {
+  it("classifies inventory and true factory container root resources", () => {
     expect(classifyCompanyOwnedRoute("/api/stock-items/19/prices")).toEqual({
       resourceType: "stock-item",
       resourceId: 19,
       domain: "inventory",
     });
-    expect(classifyCompanyOwnedRoute("/api/containers/81/offload")).toEqual({
+    expect(classifyCompanyOwnedRoute("/api/containers/81")).toEqual({
       resourceType: "container",
       resourceId: 81,
       domain: "inventory",
     });
-    expect(classifyCompanyOwnedRoute("/api/factory/containers/55/reverse-offload")).toEqual({
+    expect(classifyCompanyOwnedRoute("/api/factory/containers/55")).toEqual({
       resourceType: "factory-container",
       resourceId: 55,
       domain: "factory",
     });
+  });
+
+  it("leaves container sub-resource routes to their dedicated route guards", () => {
+    expect(classifyCompanyOwnedRoute("/api/containers/81/offload")).toBeNull();
+    expect(classifyCompanyOwnedRoute("/api/factory/containers/55/reverse-offload")).toBeNull();
   });
 
   it("preserves historical ERP container aliases below the factory path", () => {
