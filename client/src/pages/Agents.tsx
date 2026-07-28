@@ -433,7 +433,7 @@ export default function Agents() {
                     <div className="min-w-0">
                       <p className="text-sm font-semibold truncate leading-tight">{account.name}</p>
                       {account.balance !== 0 ? (
-                        <p className={`text-xs tabular-nums font-mono mt-0.5 ${isCr ? "text-emerald-600 dark:text-emerald-400" : "text-red-500 dark:text-red-400"}`}>
+                        <p className={`text-xs tabular-nums font-mono mt-0.5 ${isCr ? "text-red-500 dark:text-red-400" : "text-emerald-600 dark:text-emerald-400"}`}>
                           {formatAmount(Math.abs(account.balance))}{" "}
                           <span className="font-sans font-medium">{account.balanceSide ?? ""}</span>
                         </p>
