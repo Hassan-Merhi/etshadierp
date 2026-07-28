@@ -117,6 +117,38 @@ try {
     )
   `);
 
+  // The strict supplier company-scope migration is raw SQL and therefore is not
+  // represented by `drizzle-kit push`. Disposable CI databases start empty, so
+  // install the structural portion here before tests create any companies or
+  // suppliers. Tests and current application routes always provide company_id.
+  await client.query("ALTER TABLE suppliers ADD COLUMN IF NOT EXISTS company_id INTEGER");
+  await client.query("ALTER TABLE suppliers DROP CONSTRAINT IF EXISTS suppliers_code_unique");
+  await client.query("DROP INDEX IF EXISTS suppliers_code_unique");
+  await client.query("CREATE INDEX IF NOT EXISTS suppliers_company_idx ON suppliers(company_id)");
+  await client.query(`
+    CREATE UNIQUE INDEX IF NOT EXISTS suppliers_company_code_unique
+      ON suppliers(company_id, code)
+      WHERE company_id IS NOT NULL
+  `);
+  await client.query(`
+    DO $$
+    BEGIN
+      IF NOT EXISTS (
+        SELECT 1
+          FROM pg_constraint
+         WHERE conname = 'suppliers_company_id_fkey'
+           AND conrelid = 'suppliers'::regclass
+      ) THEN
+        ALTER TABLE suppliers
+          ADD CONSTRAINT suppliers_company_id_fkey
+          FOREIGN KEY (company_id)
+          REFERENCES companies(id)
+          ON DELETE RESTRICT;
+      END IF;
+    END
+    $$
+  `);
+
   // Runtime rental posting uses ON CONFLICT with the active ledger name. The
   // disposable migration baseline must expose the same partial uniqueness as
   // production before integration tests create any companies or accounts.
@@ -172,7 +204,14 @@ try {
       to_regclass('public.whatsapp_stock_settings') AS whatsapp_stock_settings,
       to_regclass('public.net_position_export_settings') AS net_position_export_settings,
       to_regclass('public.factory_recalc_undo_log') AS factory_recalc_undo_log,
-      to_regclass('public.sp_migration_rehearsal_runs') AS sp_migration_rehearsal_runs
+      to_regclass('public.sp_migration_rehearsal_runs') AS sp_migration_rehearsal_runs,
+      EXISTS (
+        SELECT 1
+          FROM information_schema.columns
+         WHERE table_schema = 'public'
+           AND table_name = 'suppliers'
+           AND column_name = 'company_id'
+      ) AS suppliers_company_id
   `);
   const row = required.rows[0];
   for (const table of [
@@ -185,6 +224,9 @@ try {
     "sp_migration_rehearsal_runs",
   ]) {
     if (!row?.[table]) throw new Error(`Disposable schema is missing ${table}`);
+  }
+  if (!row?.suppliers_company_id) {
+    throw new Error("Disposable schema is missing suppliers.company_id");
   }
 } finally {
   await client.end();
