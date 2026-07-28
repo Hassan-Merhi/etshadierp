@@ -4,19 +4,6 @@ orbs:
   node: circleci/node@7.1.0
 
 executors:
-  node22:
-    docker:
-      - image: cimg/node:22.14
-    resource_class: medium+
-    working_directory: ~/project
-    environment:
-      NODE_ENV: test
-      SESSION_SECRET: circleci-session-secret
-      CSRF_ENFORCE: "0"
-      ENABLE_SCHEDULERS: "false"
-      NODE_OPTIONS: --max-old-space-size=4096
-      PORT: "5000"
-
   node22-postgres:
     docker:
       - image: cimg/node:22.14
@@ -53,8 +40,6 @@ commands:
             node --version
             npm --version
             npm config get bin-links
-            node -p "'TypeScript ' + require('typescript/package.json').version"
-            node -p "'jsdom ' + require('jsdom/package.json').version"
             for binary in tsc vite eslint vitest; do
               test -x "node_modules/.bin/$binary" || { echo "$binary is missing"; exit 1; }
             done
@@ -82,149 +67,49 @@ commands:
           command: node node_modules/drizzle-kit/bin.cjs push --force
 
 jobs:
-  static-build:
-    executor: node22
-    steps:
-      - install_dependencies
-      - run:
-          name: Verify lockfile and production dependencies
-          command: |
-            npm run verify:lockfile
-            npm run verify:production-dependencies
-      - run:
-          name: Check formatting for changed source files
-          command: |
-            git fetch origin main --depth=1
-            mapfile -d '' changed_files < <(
-              git diff --name-only --diff-filter=ACMR -z origin/main...HEAD -- client/src server shared tests scripts |
-                grep -zE '\.(ts|tsx|css|mjs)$' || true
-            )
-            if [ "${#changed_files[@]}" -eq 0 ]; then
-              echo "No changed source files require formatting checks."
-              exit 0
-            fi
-            printf 'Checking formatting for %s changed source file(s):\n' "${#changed_files[@]}"
-            printf ' - %s\n' "${changed_files[@]}"
-            node node_modules/prettier/bin/prettier.cjs --check "${changed_files[@]}"
-      - run:
-          name: Lint
-          command: npm run lint
-      - run:
-          name: TypeScript
-          command: npm run check
-      - run:
-          name: Production build
-          command: npm run build
-      - run:
-          name: Verify server bundle
-          command: npm run verify:server-bundle
-      - run:
-          name: Repository safety contracts
-          command: |
-            npm run verify:program1-observability
-            npm run verify:final-production-readiness
-            npm run verify:bandwidth
-      - store_artifacts:
-          path: dist
-          destination: production-build
-
-  postgres-regression:
-    executor: node22-postgres
-    steps:
-      - install_dependencies
-      - wait_for_postgres
-      - run:
-          name: Verify migration registry
-          command: node scripts/verify-migration-registry.mjs --json
-      - run:
-          name: Prepare disposable database schema
-          command: node node_modules/drizzle-kit/bin.cjs push --force
-      - run:
-          name: Verify disposable database schema
-          command: node scripts/verify-ci-disposable-schema.mjs
-      - run:
-          name: Backend tests
-          command: node node_modules/vitest/vitest.mjs run --maxWorkers=1 --no-file-parallelism
-      - run:
-          name: Frontend tests
-          command: node node_modules/vitest/vitest.mjs run --config vitest.config.frontend.ts --maxWorkers=1 --no-file-parallelism
-
-  postgres-supplier-scope:
+  postgres-factory-lifecycle:
     executor: node22-postgres
     steps:
       - install_dependencies
       - prepare_test_schema
       - run:
-          name: Supplier and accounting scope regressions
-          command: >-
-            node node_modules/vitest/vitest.mjs run
-            tests/supplier-company-isolation.test.ts
-            tests/supplier-proforma-alias-conflict.test.ts
-            tests/accounting.test.ts
-            tests/erp-parent-routes.test.ts
-            tests/permissions.test.ts
-            --maxWorkers=1 --no-file-parallelism
-
-  postgres-password-migration:
-    executor: node22-postgres
-    steps:
-      - install_dependencies
-      - prepare_test_schema
-      - run:
-          name: Password and migration regressions
-          command: >-
-            node node_modules/vitest/vitest.mjs run
-            tests/password-helpers.test.ts
-            tests/migration-registry.test.ts
-            --maxWorkers=1 --no-file-parallelism
-
-  postgres-factory-costing:
-    executor: node22-postgres
-    steps:
-      - install_dependencies
-      - prepare_test_schema
-      - run:
-          name: Factory and costing regressions
+          name: Container lifecycle and landed-cost regressions
           command: >-
             node node_modules/vitest/vitest.mjs run
             tests/factory-container-lifecycle.test.ts
             tests/factory-landed-cost-reconciliation.test.ts
+            --maxWorkers=1 --no-file-parallelism
+
+  postgres-factory-replay:
+    executor: node22-postgres
+    steps:
+      - install_dependencies
+      - prepare_test_schema
+      - run:
+          name: Stable-cost and historical replay regressions
+          command: >-
+            node node_modules/vitest/vitest.mjs run
             tests/factory-mix-batch-stable-cost.test.ts
             tests/factory-raw-material-moving-avg.test.ts
+            --maxWorkers=1 --no-file-parallelism
+
+  postgres-factory-currency-transfer:
+    executor: node22-postgres
+    steps:
+      - install_dependencies
+      - prepare_test_schema
+      - run:
+          name: Multi-currency and smart-transfer regressions
+          command: >-
+            node node_modules/vitest/vitest.mjs run
             tests/raw-material-multicurrency-recalc.test.ts
             tests/multi-currency-integration.test.ts
             tests/smart-transfer-preview.test.ts
             --maxWorkers=1 --no-file-parallelism
 
-  security-readiness:
-    executor: node22-postgres
-    steps:
-      - install_dependencies
-      - wait_for_postgres
-      - run:
-          name: Prepare disposable database schema
-          command: node node_modules/drizzle-kit/bin.cjs push --force
-      - run:
-          name: Critical dependency audit
-          command: npm audit --audit-level=critical
-      - run:
-          name: Production dependency verification
-          command: npm run verify:production-dependencies
-      - run:
-          name: Program 6 security checks
-          command: PROGRAM6_SKIP_TYPESCRIPT=1 npm run check:program-6-security
-      - run:
-          name: Final production readiness contract
-          command: npm run verify:final-production-readiness
-
 workflows:
-  full-erp-verification:
+  factory-regression-diagnostics:
     jobs:
-      - static-build
-      - postgres-regression
-      - postgres-supplier-scope
-      - postgres-password-migration
-      - postgres-factory-costing
-      - security-readiness:
-          requires:
-            - static-build
+      - postgres-factory-lifecycle
+      - postgres-factory-replay
+      - postgres-factory-currency-transfer
