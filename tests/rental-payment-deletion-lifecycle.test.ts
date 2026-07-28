@@ -13,8 +13,13 @@ async function query(text: string, params: unknown[] = []) {
 
 beforeAll(async () => {
   const [company] = await query(
-    `INSERT INTO companies (name, company_type, base_currency)
-     VALUES ('RentalDelete-' || gen_random_uuid(), 'erp', 'USD')
+    `INSERT INTO companies (code, name, company_type, base_currency)
+     VALUES (
+       'RENT-DEL-' || substr(replace(gen_random_uuid()::text, '-', ''), 1, 16),
+       'RentalDelete-' || gen_random_uuid(),
+       'erp',
+       'USD'
+     )
      RETURNING id`,
   );
   companyId = company.id;
