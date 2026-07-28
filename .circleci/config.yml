@@ -74,6 +74,16 @@ commands:
             echo "PostgreSQL did not become ready."
             exit 1
 
+  prepare_test_database:
+    steps:
+      - wait_for_postgres
+      - run:
+          name: Prepare disposable database schema
+          command: node node_modules/drizzle-kit/bin.cjs push --force
+      - run:
+          name: Verify disposable database schema
+          command: node scripts/verify-ci-disposable-schema.mjs
+
 jobs:
   static-build:
     executor: node22
@@ -125,16 +135,10 @@ jobs:
     executor: node22-postgres
     steps:
       - install_dependencies
-      - wait_for_postgres
+      - prepare_test_database
       - run:
           name: Verify migration registry
           command: node scripts/verify-migration-registry.mjs --json
-      - run:
-          name: Prepare disposable database schema
-          command: node node_modules/drizzle-kit/bin.cjs push --force
-      - run:
-          name: Verify disposable database schema
-          command: node scripts/verify-ci-disposable-schema.mjs
       - run:
           name: Backend tests
           command: node node_modules/vitest/vitest.mjs run --maxWorkers=1 --no-file-parallelism
@@ -142,17 +146,25 @@ jobs:
           name: Frontend tests
           command: node node_modules/vitest/vitest.mjs run --config vitest.config.frontend.ts --maxWorkers=1 --no-file-parallelism
 
+  supplier-scope-regression:
+    executor: node22-postgres
+    steps:
+      - install_dependencies
+      - prepare_test_database
+      - run:
+          name: Supplier company-scope tests
+          command: |
+            node node_modules/vitest/vitest.mjs run \
+              tests/supplier-company-isolation.test.ts \
+              tests/supplier-proforma-alias-conflict.test.ts \
+              tests/erp-parent-routes.test.ts \
+              --maxWorkers=1 --no-file-parallelism
+
   security-readiness:
     executor: node22-postgres
     steps:
       - install_dependencies
-      - wait_for_postgres
-      - run:
-          name: Prepare disposable database schema
-          command: node node_modules/drizzle-kit/bin.cjs push --force
-      - run:
-          name: Verify disposable database schema
-          command: node scripts/verify-ci-disposable-schema.mjs
+      - prepare_test_database
       - run:
           name: Critical dependency audit
           command: npm audit --audit-level=critical
@@ -171,6 +183,7 @@ workflows:
     jobs:
       - static-build
       - postgres-regression
+      - supplier-scope-regression
       - security-readiness:
           requires:
             - static-build
