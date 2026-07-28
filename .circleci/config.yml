@@ -75,19 +75,14 @@ commands:
             exit 1
 
 jobs:
-  static-build:
+  phase1-format:
     executor: node20
     steps:
       - install_dependencies
       - run:
-          name: Phase 1 branch formatting and diagnostic report
+          name: Check Phase 1 formatting
           command: |
-            if [ "${CIRCLE_BRANCH}" != "agent/phase1-sql-pagination" ]; then
-              echo "Not the Phase 1 branch; skipping."
-              exit 0
-            fi
-
-            node node_modules/prettier/bin/prettier.cjs --write \
+            node node_modules/prettier/bin/prettier.cjs --check \
               client/src/lib/accountStatementPaginationClient.ts \
               client/src/lib/containerPaginationClient.ts \
               client/src/lib/daybookPaginationClient.ts \
@@ -104,45 +99,42 @@ jobs:
               server/routes/vouchers/supplierPurchaseOrderPaginationRoutes.ts \
               server/routes/vouchers/voucherPaginationRoutes.ts
 
-            set +e
-            mkdir -p docs
-            {
-              echo "PHASE 1 VALIDATION REPORT"
-              echo "commit=$(git rev-parse HEAD)"
-              echo
-              echo "=== TYPESCRIPT ==="
-              npm run check
-              CHECK_STATUS=$?
-              echo "typescript_status=$CHECK_STATUS"
-              echo
-              echo "=== STATIC VERIFIER ==="
-              node scripts/verify-phase1-sql-pagination.mjs
-              VERIFY_STATUS=$?
-              echo "verifier_status=$VERIFY_STATUS"
-              echo
-              echo "=== PRODUCTION BUILD ==="
-              npm run build
-              BUILD_STATUS=$?
-              echo "build_status=$BUILD_STATUS"
-              echo
-              echo "SUMMARY typescript=$CHECK_STATUS verifier=$VERIFY_STATUS build=$BUILD_STATUS"
-            } > docs/phase1-validation-report.txt 2>&1
-            cat docs/phase1-validation-report.txt
-            set -e
+  phase1-lint:
+    executor: node20
+    steps:
+      - install_dependencies
+      - run:
+          name: Lint
+          command: npm run lint
 
-            git config user.name "circleci"
-            git config user.email "circleci@users.noreply.github.com"
-            git fetch origin main --depth=1
-            git checkout origin/main -- .circleci/config.yml
-            rm -f .github/workflows/phase1-pagination-validate.yml
-            git add .circleci/config.yml .github/workflows/phase1-pagination-validate.yml client/src server/routes docs/phase1-validation-report.txt
-            if git diff --cached --quiet; then
-              echo "Nothing to commit."
-            else
-              git commit -m "chore: format and diagnose Phase 1 pagination"
-              git push origin HEAD:${CIRCLE_BRANCH}
-            fi
-            exit 1
+  phase1-typescript:
+    executor: node20
+    steps:
+      - install_dependencies
+      - run:
+          name: TypeScript
+          command: npm run check
+
+  phase1-client-build:
+    executor: node20
+    steps:
+      - install_dependencies
+      - run:
+          name: Client build
+          command: node --max-old-space-size=4096 node_modules/vite/bin/vite.js build
+
+  phase1-server-build:
+    executor: node20
+    steps:
+      - install_dependencies
+      - run:
+          name: Server build
+          command: node scripts/build-server.mjs
+
+  static-build:
+    executor: node20
+    steps:
+      - install_dependencies
       - run:
           name: Verify lockfile and production dependencies
           command: |
@@ -234,6 +226,11 @@ jobs:
 workflows:
   full-erp-verification:
     jobs:
+      - phase1-format
+      - phase1-lint
+      - phase1-typescript
+      - phase1-client-build
+      - phase1-server-build
       - static-build
       - postgres-regression
       - security-readiness
