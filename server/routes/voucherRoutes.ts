@@ -1,5 +1,6 @@
 import type { Express } from "express";
 import { registerDaybookPaginationRoutes } from "./daybookPaginationRoutes";
+import { registerSupplierPurchaseOrderPaginationRoutes } from "./vouchers/supplierPurchaseOrderPaginationRoutes";
 import { registerVoucherPaginationRoutes } from "./vouchers/voucherPaginationRoutes";
 import { registerVoucherQueryRoutes } from "./vouchers/voucherQueryRoutes";
 import { registerVoucherCreateRoutes } from "./vouchers/voucherCreateRoutes";
@@ -26,6 +27,10 @@ export function registerVoucherRoutes(app: Express) {
 
   // The ERP Daybook uses one SQL-paged chronological union of vouchers and offloads.
   registerDaybookPaginationRoutes(app);
+
+  // Supplier purchase-order reads follow the company-owned supplier model and
+  // shadow the historical cross-company compatibility route below.
+  registerSupplierPurchaseOrderPaginationRoutes(app);
 
   // Native SQL pagination shadows the legacy array reader while preserving its
   // array response for callers that do not explicitly request pagination.
