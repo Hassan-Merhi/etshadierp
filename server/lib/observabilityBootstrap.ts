@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import cron from "node-cron";
 import { logger } from "./logger";
+import { installOperationalAlertRuntime } from "./operationalAlertRuntime";
 import { captureRuntimeFailures, recordRuntimePerformance } from "./runtimePerformance";
 import { getTraceContext, runWithTraceContext, withTraceSpan } from "./traceContext";
 
@@ -18,9 +19,7 @@ function safeDependencyName(input: RequestInfo | URL): string | undefined {
     if (host.includes("msc.com")) return "msc";
     if (host.includes("hapag") || host.includes("hlag")) return "hapag-lloyd";
     return undefined;
-  } catch {
-    return undefined;
-  }
+  } catch { return undefined; }
 }
 
 function installExternalFetchTracing(): void {
@@ -38,17 +37,7 @@ function installExternalFetchTracing(): void {
       const configured = Number(process.env.EXTERNAL_DEPENDENCY_SLOW_MS);
       const thresholdMs = Number.isFinite(configured) ? Math.max(0, configured) : 1_500;
       const slow = durationMs >= thresholdMs;
-      if (failed || slow) {
-        logger[failed ? "error" : "warn"]("External dependency operation", {
-          module: "dependency",
-          action: failed ? "request_failed" : "slow_request",
-          dependency,
-          durationMs: Math.round(durationMs),
-          status: response.status,
-          requestId: trace?.requestId,
-          source: trace?.source,
-        });
-      }
+      if (failed || slow) logger[failed ? "error" : "warn"]("External dependency operation", { module: "dependency", action: failed ? "request_failed" : "slow_request", dependency, durationMs: Math.round(durationMs), status: response.status, requestId: trace?.requestId, source: trace?.source });
       return response;
     } catch (error) {
       const durationMs = performance.now() - startedAt;
@@ -65,7 +54,6 @@ function installCronTracing(): void {
   if (cronAny.__erpTracePatched) return;
   cronAny.__erpTracePatched = true;
   const originalSchedule = cron.schedule.bind(cron);
-
   cronAny.schedule = (expression: string, callback: (...args: any[]) => any, options?: any) => {
     const jobName = `cron:${String(expression).slice(0, 80)}`;
     const wrapped = (...args: any[]) => {
@@ -73,15 +61,7 @@ function installCronTracing(): void {
       let loggedFailure = false;
       return runWithTraceContext(
         { requestId, routeTemplate: jobName, buildVersion: process.env.BUILD_VERSION || process.env.RENDER_GIT_COMMIT?.substring(0, 8) || "dev", source: "scheduler" },
-        () => withTraceSpan(
-          jobName,
-          async () => {
-            const outcome = await captureRuntimeFailures(() => callback(...args));
-            loggedFailure = outcome.failed;
-            return outcome.result;
-          },
-          ({ durationMs, failed }) => recordRuntimePerformance({ kind: "background", name: jobName, durationMs, failed: failed || loggedFailure, source: "scheduler" })
-        )
+        () => withTraceSpan(jobName, async () => { const outcome = await captureRuntimeFailures(() => callback(...args)); loggedFailure = outcome.failed; return outcome.result; }, ({ durationMs, failed }) => recordRuntimePerformance({ kind: "background", name: jobName, durationMs, failed: failed || loggedFailure, source: "scheduler" }))
       );
     };
     return originalSchedule(expression, wrapped, options);
@@ -93,4 +73,5 @@ if (!globalState[BOOTSTRAP_KEY]) {
   globalState[BOOTSTRAP_KEY] = true;
   installExternalFetchTracing();
   installCronTracing();
+  installOperationalAlertRuntime();
 }
