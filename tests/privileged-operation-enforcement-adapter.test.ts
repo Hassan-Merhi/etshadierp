@@ -4,11 +4,17 @@ import { requirePrivilegedOperation } from "../server/services/security/privileg
 function harness(body: Record<string, unknown>, session: Record<string, unknown> = {}) {
   const req: any = {
     body,
+    ip: "127.0.0.1",
+    method: "POST",
+    path: "/api/admin/inventory-rebuild",
+    get: vi.fn(() => "vitest"),
     session: {
       userId: "user-1",
       currentRole: "Admin",
       currentCompanyId: 10,
       passwordConfirmedAt: 999_000,
+      securityPermissions: ["administration.repair"],
+      securityPermissionsCompanyId: 10,
       ...session,
     },
   };
@@ -84,7 +90,7 @@ describe("privileged operation enforcement adapter", () => {
         idempotencyKey: "inventory-rebuild:10:v1",
         sourceId: "diagnostic-1",
       },
-      { securityPermissions: ["administration.read"], securityPermissionsCompanyId: 10 },
+      { securityPermissions: ["security.anomalies.read"], securityPermissionsCompanyId: 10 },
     );
     await middleware(h.req, h.res, h.next);
     expect(h.status).toHaveBeenCalledWith(403);
