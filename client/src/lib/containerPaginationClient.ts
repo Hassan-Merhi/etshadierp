@@ -1,3 +1,5 @@
+import "./supplierPurchaseOrderPaginationClient";
+
 const ENDPOINTS = new Set([
   "/api/containers",
   "/api/containers/active",
