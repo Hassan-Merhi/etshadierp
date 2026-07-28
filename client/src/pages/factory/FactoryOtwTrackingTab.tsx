@@ -725,9 +725,19 @@ export default function FactoryOtwTrackingTab({ onEdit }: OtwTrackingTabProps = 
     delayedFilter !== "all" ||
     sortOrder !== "DEFAULT";
 
+  /** Immediately patch the in-memory cache entry so the UI reflects the new
+   *  value without waiting for the background refetch to complete. */
+  function patchCacheContainer(id: number, patch: Partial<ContainerWithSupplier>) {
+    tqClient.setQueriesData<ContainerWithSupplier[]>(
+      { queryKey: ["/api/factory/containers"] },
+      (old) => old?.map((c) => (c.id === id ? { ...c, ...patch } : c)),
+    );
+  }
+
   async function saveNote(id: number, val: string) {
     try {
       await factoryApiRequest("PATCH", `/api/factory/containers/${id}`, { otwNote: val || null });
+      patchCacheContainer(id, { otwNote: val || null } as any);
       tqClient.invalidateQueries({ queryKey: ["/api/factory/containers"] });
     } catch (err: any) {
       toast({ title: "Failed to save note", description: err?.message, variant: "destructive" });
@@ -736,6 +746,7 @@ export default function FactoryOtwTrackingTab({ onEdit }: OtwTrackingTabProps = 
   async function toggleDoc(id: number, checked: boolean) {
     try {
       await factoryApiRequest("PATCH", `/api/factory/containers/${id}`, { otwDocsReceived: checked });
+      patchCacheContainer(id, { otwDocsReceived: checked });
       tqClient.invalidateQueries({ queryKey: ["/api/factory/containers"] });
     } catch (err: any) {
       toast({ title: "Failed to update docs", description: err?.message, variant: "destructive" });
@@ -753,7 +764,8 @@ export default function FactoryOtwTrackingTab({ onEdit }: OtwTrackingTabProps = 
       }
       return res.json();
     },
-    onSuccess: () => {
+    onSuccess: (_data, variables) => {
+      patchCacheContainer(variables.id, { arrivalDate: variables.arrivalDate });
       tqClient.invalidateQueries({ queryKey: ["/api/factory/containers"] });
     },
     onError: (err: any) => {
