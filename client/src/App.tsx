@@ -23,7 +23,7 @@ import Login from "@/pages/Login";
 import { AuthenticatedApp } from "@/app/AuthenticatedApp";
 
 // ── Production-only update banner ─────────────────────────────────────────────
-// Polls /api/version every 5 minutes. When the build version changes it shows a
+// Polls /api/build-info every 5 minutes. When the build version changes it shows a
 // small non-blocking toast with a manual "Refresh" button. It NEVER auto-refreshes.
 // A service-worker update triggers the same version check immediately without
 // forcing every open tab to download the full application again.
@@ -38,7 +38,7 @@ function UpdateBanner() {
 
     async function checkVersion() {
       try {
-        const res = await fetch("/api/version", { credentials: "same-origin" });
+        const res = await fetch("/api/build-info", { credentials: "same-origin" });
         if (!res.ok) return;
         const data = await res.json();
         const ver: string = data.version ?? "";
