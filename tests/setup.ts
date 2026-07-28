@@ -30,8 +30,16 @@ function stableTestCompanyCode(prefix: string): string {
     hash ^= char.charCodeAt(0);
     hash = Math.imul(hash, 16777619);
   }
-  const base = prefix.replace(/[^a-z0-9]/gi, "").toUpperCase().slice(0, 4).padEnd(4, "X");
-  const suffix = (hash >>> 0).toString(16).toUpperCase().padStart(8, "0").slice(-4);
+  const base = prefix
+    .replace(/[^a-z0-9]/gi, "")
+    .toUpperCase()
+    .slice(0, 4)
+    .padEnd(4, "X");
+  const suffix = (hash >>> 0)
+    .toString(16)
+    .toUpperCase()
+    .padStart(8, "0")
+    .slice(-4);
   return `${base}${suffix}`;
 }
 
@@ -121,12 +129,21 @@ export async function cleanupTestData(prefix: string): Promise<void> {
     // referencing this company; those FKs otherwise block the company delete
     // below on the NEXT run that reuses this prefix. Delete in FK-safe order.
     await pool.query("DELETE FROM factory_bales WHERE company_id = $1", [company.id]);
-    await pool.query("DELETE FROM factory_mix_batch_sources WHERE mix_batch_id IN (SELECT id FROM factory_mix_batches WHERE company_id = $1)", [company.id]);
+    await pool.query(
+      "DELETE FROM factory_mix_batch_sources WHERE mix_batch_id IN (SELECT id FROM factory_mix_batches WHERE company_id = $1)",
+      [company.id],
+    );
     await pool.query("DELETE FROM factory_mix_batches WHERE company_id = $1", [company.id]);
     await pool.query("DELETE FROM factory_raw_stock WHERE company_id = $1", [company.id]);
-    await pool.query("DELETE FROM factory_container_other_charges WHERE company_id = $1", [company.id]);
-    await pool.query("DELETE FROM factory_offload_additional_charges WHERE company_id = $1", [company.id]);
-    await pool.query("DELETE FROM factory_container_commissions WHERE company_id = $1", [company.id]);
+    await pool.query("DELETE FROM factory_container_other_charges WHERE company_id = $1", [
+      company.id,
+    ]);
+    await pool.query("DELETE FROM factory_offload_additional_charges WHERE company_id = $1", [
+      company.id,
+    ]);
+    await pool.query("DELETE FROM factory_container_commissions WHERE company_id = $1", [
+      company.id,
+    ]);
     await pool.query("DELETE FROM factory_containers WHERE company_id = $1", [company.id]);
     await pool.query("DELETE FROM factory_suppliers WHERE company_id = $1", [company.id]);
     await pool.query("DELETE FROM factory_daybook_entries WHERE company_id = $1", [company.id]);
