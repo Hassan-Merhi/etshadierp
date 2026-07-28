@@ -17,6 +17,26 @@ executors:
       NODE_OPTIONS: --max-old-space-size=4096
       PORT: "5000"
 
+  node20-postgres:
+    docker:
+      - image: cimg/node:20.19
+        environment:
+          NODE_ENV: test
+          SESSION_SECRET: circleci-session-secret
+          CSRF_ENFORCE: "0"
+          ENABLE_SCHEDULERS: "false"
+          NODE_OPTIONS: --max-old-space-size=4096
+          PORT: "5000"
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/heliumdb
+          PGSSLMODE: disable
+      - image: cimg/postgres:15.13
+        environment:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: heliumdb
+    resource_class: medium+
+    working_directory: ~/project
+
 commands:
   install_dependencies:
     steps:
@@ -38,6 +58,21 @@ commands:
             for binary in tsc vite eslint vitest; do
               test -x "node_modules/.bin/$binary" || { echo "$binary is missing"; exit 1; }
             done
+
+  wait_for_postgres:
+    steps:
+      - run:
+          name: Wait for PostgreSQL
+          command: |
+            for attempt in $(seq 1 60); do
+              if (echo > /dev/tcp/127.0.0.1/5432) >/dev/null 2>&1; then
+                echo "PostgreSQL is accepting connections."
+                exit 0
+              fi
+              sleep 1
+            done
+            echo "PostgreSQL did not become ready."
+            exit 1
 
 jobs:
   static-build:
@@ -88,38 +123,10 @@ jobs:
           destination: production-build
 
   postgres-regression:
-    docker:
-      - image: cimg/node:20.19
-        environment:
-          NODE_ENV: test
-          SESSION_SECRET: circleci-session-secret
-          CSRF_ENFORCE: "0"
-          ENABLE_SCHEDULERS: "false"
-          NODE_OPTIONS: --max-old-space-size=4096
-          PORT: "5000"
-          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/heliumdb
-          PGSSLMODE: disable
-      - image: cimg/postgres:15.13
-        environment:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: heliumdb
-    resource_class: medium+
-    working_directory: ~/project
+    executor: node20-postgres
     steps:
       - install_dependencies
-      - run:
-          name: Wait for PostgreSQL
-          command: |
-            for attempt in $(seq 1 60); do
-              if (echo > /dev/tcp/127.0.0.1/5432) >/dev/null 2>&1; then
-                echo "PostgreSQL is accepting connections."
-                exit 0
-              fi
-              sleep 1
-            done
-            echo "PostgreSQL did not become ready."
-            exit 1
+      - wait_for_postgres
       - run:
           name: Verify migration registry
           command: node scripts/verify-migration-registry.mjs --json
@@ -168,9 +175,13 @@ jobs:
           destination: database-readiness
 
   security-readiness:
-    executor: node20
+    executor: node20-postgres
     steps:
       - install_dependencies
+      - wait_for_postgres
+      - run:
+          name: Prepare disposable database schema
+          command: node node_modules/drizzle-kit/bin.cjs push --force
       - run:
           name: Critical dependency audit
           command: npm audit --audit-level=critical
