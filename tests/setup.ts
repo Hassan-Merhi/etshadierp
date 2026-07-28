@@ -5,6 +5,7 @@ import { db } from "../server/db";
 import { pool } from "../server/db";
 import { eq, and, sql } from "drizzle-orm";
 import * as schema from "../shared/schema";
+import { KNOWN_SECURITY_PERMISSIONS } from "../server/services/security/namedPermissionService";
 
 let testApp: express.Express;
 let testServer: any;
@@ -23,6 +24,17 @@ export interface TestContext {
   cashAccountId: number;
 }
 
+function stableTestCompanyCode(prefix: string): string {
+  let hash = 2166136261;
+  for (const char of prefix) {
+    hash ^= char.charCodeAt(0);
+    hash = Math.imul(hash, 16777619);
+  }
+  const base = prefix.replace(/[^a-z0-9]/gi, "").toUpperCase().slice(0, 4).padEnd(4, "X");
+  const suffix = (hash >>> 0).toString(16).toUpperCase().padStart(8, "0").slice(-4);
+  return `${base}${suffix}`;
+}
+
 export async function setupTestApp(): Promise<express.Express> {
   const app = express();
   app.use(express.json());
@@ -33,7 +45,7 @@ export async function setupTestApp(): Promise<express.Express> {
       secret: "test-secret-key-for-integration-tests",
       resave: false,
       saveUninitialized: false,
-      cookie: { secure: false, httpOnly: true, maxAge: 60000 },
+      cookie: { secure: false, httpOnly: true, maxAge: 30 * 60 * 1000 },
     }),
   );
 
@@ -91,6 +103,9 @@ export async function cleanupTestData(prefix: string): Promise<void> {
       .delete(schema.ledgerAccounts)
       .where(eq(schema.ledgerAccounts.companyId, company.id));
     await db
+      .delete(schema.userSecurityPermissions)
+      .where(eq(schema.userSecurityPermissions.companyId, company.id));
+    await db
       .delete(schema.userCompanyRoles)
       .where(eq(schema.userCompanyRoles.companyId, company.id));
     await db
@@ -145,7 +160,7 @@ export async function seedTestData(prefix: string): Promise<TestContext> {
     })
     .returning();
 
-  const companyCode = prefix.toUpperCase().slice(0, 8);
+  const companyCode = stableTestCompanyCode(prefix);
   const [company] = await db
     .insert(schema.companies)
     .values({
@@ -160,6 +175,15 @@ export async function seedTestData(prefix: string): Promise<TestContext> {
     companyId: company.id,
     role: "Admin",
   });
+
+  await db.insert(schema.userSecurityPermissions).values(
+    KNOWN_SECURITY_PERMISSIONS.map((permission) => ({
+      userId: user.id,
+      companyId: company.id,
+      permission,
+      grantedBy: user.id,
+    })),
+  );
 
   const [location1] = await db
     .insert(schema.locations)
