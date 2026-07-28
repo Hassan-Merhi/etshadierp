@@ -1,11 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import request from "supertest";
-import {
-  seedTestData,
-  cleanupTestData,
-  closeTestServer,
-  type TestContext,
-} from "./setup";
+import { seedTestData, cleanupTestData, closeTestServer, type TestContext } from "./setup";
 import { db } from "../server/db";
 import { eq } from "drizzle-orm";
 import * as schema from "../shared/schema";
@@ -15,10 +10,12 @@ const TEST_PREFIX = "permtest";
 
 let ctx: TestContext;
 let agent: request.SuperAgentTest;
-
-let posUserId: string;
 let posUserAgent: request.SuperAgentTest;
 let posLocationId: number;
+
+function accountsFromResponse(body: any): any[] {
+  return Array.isArray(body) ? body : Array.isArray(body?.accounts) ? body.accounts : [];
+}
 
 async function loginAsTestUser() {
   const loginRes = await agent.post("/api/auth/login").send({
@@ -41,13 +38,12 @@ beforeAll(async () => {
     .insert(schema.users)
     .values({ username: `${TEST_PREFIX}_posuser`, password: hashedPw })
     .returning();
-  posUserId = posUser.id;
 
   await db.insert(schema.userCompanyRoles).values({
     userId: posUser.id,
     companyId: ctx.companyId,
     role: "POS",
-    posStation: "1",
+    posStation: 1,
   });
 
   const [loc] = await db
@@ -72,7 +68,7 @@ beforeAll(async () => {
     password: "pospassword123",
   });
   if (posLogin.status !== 200) {
-    console.warn("POS login failed:", posLogin.status, posLogin.body);
+    throw new Error(`POS login failed: ${posLogin.status} ${JSON.stringify(posLogin.body)}`);
   }
   await posUserAgent.post("/api/auth/set-company").send({ companyId: ctx.companyId });
 }, 60000);
@@ -84,14 +80,12 @@ afterAll(async () => {
 
 describe("Unauthenticated Access", () => {
   it("blocks /api/inventory without session", async () => {
-    const anonAgent = request.agent(ctx.app);
-    const res = await anonAgent.get(`/api/inventory?locationId=${ctx.locationId}`);
+    const res = await request.agent(ctx.app).get(`/api/inventory?locationId=${ctx.locationId}`);
     expect(res.status).toBe(401);
   });
 
   it("blocks /api/pos/sales without session", async () => {
-    const anonAgent = request.agent(ctx.app);
-    const res = await anonAgent.post("/api/pos/sales").send({
+    const res = await request.agent(ctx.app).post("/api/pos/sales").send({
       locationId: ctx.locationId,
       items: [{ stockItemId: ctx.stockItemIds[0], quantity: 1, rate: 10 }],
       paymentAccountType: "ledger",
@@ -102,32 +96,27 @@ describe("Unauthenticated Access", () => {
   });
 
   it("blocks /api/vouchers without session", async () => {
-    const anonAgent = request.agent(ctx.app);
-    const res = await anonAgent.post("/api/vouchers").send({});
+    const res = await request.agent(ctx.app).post("/api/vouchers").send({});
     expect(res.status).toBe(401);
   });
 
   it("blocks /api/accounts/all without session", async () => {
-    const anonAgent = request.agent(ctx.app);
-    const res = await anonAgent.get("/api/accounts/all");
+    const res = await request.agent(ctx.app).get("/api/accounts/all");
     expect(res.status).toBe(401);
   });
 
   it("blocks /api/stock-transfers without session", async () => {
-    const anonAgent = request.agent(ctx.app);
-    const res = await anonAgent.post("/api/stock-transfers").send({});
+    const res = await request.agent(ctx.app).post("/api/stock-transfers").send({});
     expect(res.status).toBe(401);
   });
 
   it("blocks /api/inventory/quick-adjust without session", async () => {
-    const anonAgent = request.agent(ctx.app);
-    const res = await anonAgent.post("/api/inventory/quick-adjust").send({});
+    const res = await request.agent(ctx.app).post("/api/inventory/quick-adjust").send({});
     expect(res.status).toBe(401);
   });
 
   it("blocks /api/vouchers/journal without session", async () => {
-    const anonAgent = request.agent(ctx.app);
-    const res = await anonAgent.post("/api/vouchers/journal").send({});
+    const res = await request.agent(ctx.app).post("/api/vouchers/journal").send({});
     expect(res.status).toBe(401);
   });
 });
@@ -150,9 +139,7 @@ describe("Admin Access", () => {
   });
 
   it("admin can fetch ledger account balance", async () => {
-    const res = await agent.get(
-      `/api/accounts/ledger/${ctx.cashAccountId}/balance`,
-    );
+    const res = await agent.get(`/api/accounts/ledger/${ctx.cashAccountId}/balance`);
     expect(res.status).toBe(200);
   });
 
@@ -199,12 +186,9 @@ describe("POS User — Location Restrictions", () => {
 });
 
 describe("POS User — Blocked from Accounting/Cost Data", () => {
-  // Routes that use requireNonPOS — POS users are blocked with 403
   it("POS user cannot fetch profit-loss report (requireNonPOS enforced)", async () => {
     const today = new Date().toISOString().split("T")[0];
-    const res = await posUserAgent.get(
-      `/api/reports/profit-loss?fromDate=2024-01-01&toDate=${today}`,
-    );
+    const res = await posUserAgent.get(`/api/reports/profit-loss?fromDate=2024-01-01&toDate=${today}`);
     expect(res.status).toBeGreaterThanOrEqual(400);
   });
 
@@ -213,18 +197,13 @@ describe("POS User — Blocked from Accounting/Cost Data", () => {
     expect(res.status).toBeGreaterThanOrEqual(400);
   });
 
-  // NOTE: /api/accounts/all and /api/accounts/ledger/:id/balance use requireAuth only
-  // (no requireNonPOS) — POS users currently have read access to these endpoints.
-  // These tests document current behaviour. Add requireNonPOS to lock them down if desired.
   it("POS user can currently read accounts list (no POS restriction on this route)", async () => {
     const res = await posUserAgent.get("/api/accounts/all");
     expect(res.status).toBe(200);
   });
 
   it("POS user can currently read ledger account balance (no POS restriction on this route)", async () => {
-    const res = await posUserAgent.get(
-      `/api/accounts/ledger/${ctx.cashAccountId}/balance`,
-    );
+    const res = await posUserAgent.get(`/api/accounts/ledger/${ctx.cashAccountId}/balance`);
     expect(res.status).toBe(200);
   });
 });
@@ -240,7 +219,6 @@ describe("Cross-Company Isolation", () => {
       .insert(schema.companies)
       .values({ code: "LEAKTEST2", name: `${TEST_PREFIX}_LeakCo2`, baseCurrency: "USD" })
       .returning();
-
     const uniqueCode = `${TEST_PREFIX}_PERM_LEAK_${Date.now()}`;
     const [otherAccount] = await db
       .insert(schema.ledgerAccounts)
@@ -255,21 +233,13 @@ describe("Cross-Company Isolation", () => {
       })
       .returning();
 
-    const res = await agent.get("/api/accounts/all");
-    const codes = (res.body as any[]).map((a) => a.code);
-
-    await db.delete(schema.ledgerAccounts).where(eq(schema.ledgerAccounts.id, otherAccount.id));
-    await db.delete(schema.companies).where(eq(schema.companies.id, otherCompany.id));
-
-    expect(codes).not.toContain(uniqueCode);
+    try {
+      const res = await agent.get("/api/accounts/all");
+      const codes = accountsFromResponse(res.body).map((account: any) => account.code);
+      expect(codes).not.toContain(uniqueCode);
+    } finally {
+      await db.delete(schema.ledgerAccounts).where(eq(schema.ledgerAccounts.id, otherAccount.id));
+      await db.delete(schema.companies).where(eq(schema.companies.id, otherCompany.id));
+    }
   });
 });
-
-/*
- * What this file protects:
- * - Unauthenticated Access: all major endpoints require a session
- * - Admin Access: admin can reach inventory, accounts, ledger balance, and reports
- * - POS Location Restrictions: POS users cannot sell at unassigned locations or create/delete vouchers
- * - POS blocked from accounting: POS role cannot read ledger balances, accounts list, or financial reports
- * - Cross-Company Isolation: set-company rejects foreign companies; accounts/all is company-scoped
- */
