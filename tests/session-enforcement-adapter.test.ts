@@ -45,6 +45,23 @@ describe("session enforcement adapter", () => {
     expect(result).toMatchObject({ valid: false, code: "SESSION_COMPANY_REQUIRED", status: 401 });
   });
 
+  it("keeps sessions active for 30 minutes of inactivity", () => {
+    const lastSeenAt = 10_000;
+    expect(
+      enforceRuntimeSession(session({ lastSeenAt, absoluteExpiresAt: lastSeenAt + 12 * 60 * 60 * 1000 }), {
+        requireCompanyContext: true,
+        now: lastSeenAt + 30 * 60 * 1000,
+      })
+    ).toMatchObject({ valid: true, code: "SESSION_VALID", destroySession: false });
+
+    expect(
+      enforceRuntimeSession(session({ lastSeenAt, absoluteExpiresAt: lastSeenAt + 12 * 60 * 60 * 1000 }), {
+        requireCompanyContext: true,
+        now: lastSeenAt + 30 * 60 * 1000 + 1,
+      })
+    ).toMatchObject({ valid: false, code: "SESSION_IDLE_EXPIRED", destroySession: true });
+  });
+
   it("expires idle and absolute-lifetime sessions", () => {
     expect(
       enforceRuntimeSession(session({ lastSeenAt: 1 }), { requireCompanyContext: true, now: 2_000_000 })
