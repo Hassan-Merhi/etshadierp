@@ -28,7 +28,10 @@ export interface ProtectedAssetRecord {
 }
 
 export interface ProtectedAssetLookup {
-  loadAsset(assetId: string | number, kind: ProtectedAssetKind): Promise<ProtectedAssetRecord | null>;
+  loadAsset(
+    assetId: string | number,
+    kind: ProtectedAssetKind,
+  ): Promise<ProtectedAssetRecord | null>;
 }
 
 export interface ProtectedAssetAccessRequest {
@@ -57,7 +60,10 @@ export class ProtectedAssetAccessError extends Error {
     | "ASSET_FILE_NAME_INVALID"
     | "ASSET_SIZE_INVALID";
 
-  constructor(code: ProtectedAssetAccessError["code"], publicMessage: "Not found" | "Forbidden" = "Not found") {
+  constructor(
+    code: ProtectedAssetAccessError["code"],
+    publicMessage: "Not found" | "Forbidden" = "Not found",
+  ) {
     super(publicMessage);
     this.name = "ProtectedAssetAccessError";
     this.code = code;
@@ -71,13 +77,18 @@ function validIdentifier(value: unknown): boolean {
   );
 }
 
-function sameIdentity(left: string | number | null | undefined, right: string | number | null | undefined): boolean {
+function sameIdentity(
+  left: string | number | null | undefined,
+  right: string | number | null | undefined,
+): boolean {
   return left != null && right != null && String(left) === String(right);
 }
 
 export function sanitizeDownloadFileName(value: unknown): string | null {
   if (value == null) return null;
-  if (typeof value !== "string") throw new ProtectedAssetAccessError("ASSET_FILE_NAME_INVALID");
+  if (typeof value !== "string") {
+    throw new ProtectedAssetAccessError("ASSET_FILE_NAME_INVALID");
+  }
 
   const normalized = value
     .normalize("NFKC")
@@ -94,7 +105,9 @@ export function sanitizeDownloadFileName(value: unknown): string | null {
 }
 
 export function validateStorageKey(value: unknown): string {
-  if (typeof value !== "string") throw new ProtectedAssetAccessError("ASSET_STORAGE_KEY_INVALID");
+  if (typeof value !== "string") {
+    throw new ProtectedAssetAccessError("ASSET_STORAGE_KEY_INVALID");
+  }
   const key = value.trim();
   if (
     !key ||
@@ -133,17 +146,24 @@ export async function authorizeProtectedAssetAccess(
     throw new AuthorizationDeniedError({ effect: "deny", code: "COMPANY_CONTEXT_INVALID" });
   }
   if (actor.companyId !== asset.companyId) {
-    throw new AuthorizationDeniedError({ effect: "deny", code: "CROSS_COMPANY_ACCESS_DENIED" });
+    throw new AuthorizationDeniedError({
+      effect: "deny",
+      code: "CROSS_COMPANY_ACCESS_DENIED",
+    });
   }
 
-  if (asset.byteSize != null && (!Number.isSafeInteger(asset.byteSize) || asset.byteSize < 0)) {
+  if (
+    asset.byteSize != null &&
+    (!Number.isSafeInteger(asset.byteSize) || asset.byteSize < 0)
+  ) {
     throw new ProtectedAssetAccessError("ASSET_SIZE_INVALID");
   }
 
   if (request.action !== "generate") validateStorageKey(asset.storageKey);
   const safeFileName = sanitizeDownloadFileName(asset.fileName);
-  const ownerAllowed = request.allowOwnerAccess === true && sameIdentity(actor.userId, asset.ownerUserId);
-  const configuredRoles = ownerAllowed ? [actor.role] : request.allowedRoles ?? [];
+  const ownerAllowed =
+    request.allowOwnerAccess === true && sameIdentity(actor.userId, asset.ownerUserId);
+  const configuredRoles = ownerAllowed ? [actor.role] : (request.allowedRoles ?? []);
   const roleAllowed = configuredRoles.includes(actor.role);
   const permissionAllowed = actor.permissions?.includes(request.requiredPermission) === true;
 
@@ -160,10 +180,17 @@ export async function authorizeProtectedAssetAccess(
     requiredPermissions: ownerAllowed || roleAllowed ? [] : [request.requiredPermission],
   });
 
-  return { asset: Object.freeze({ ...asset }), safeFileName, disposition: "attachment" };
+  return {
+    asset: Object.freeze({ ...asset }),
+    safeFileName,
+    disposition: "attachment",
+  };
 }
 
-export function assertExportCompanyScope(sessionCompanyId: number, requestedCompanyId: unknown): number {
+export function assertExportCompanyScope(
+  sessionCompanyId: number,
+  requestedCompanyId: unknown,
+): number {
   if (!Number.isSafeInteger(sessionCompanyId) || sessionCompanyId <= 0) {
     throw new ProtectedAssetAccessError("ASSET_COMPANY_INVALID", "Forbidden");
   }
