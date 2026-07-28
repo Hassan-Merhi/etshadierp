@@ -159,6 +159,45 @@ export function OffloadDialog({
     return kg * rate;
   }, [isSubsequentReceipt, selectedContainer, actualReceivedKg]);
 
+  /** Estimated landed avg cost/kg (USD) — live preview summing all charges entered so far. */
+  const estimatedAvgCostKg = useMemo(() => {
+    const kg = parseFloat(actualReceivedKg || "0");
+    if (!kg || !selectedContainerId) return null;
+
+    const materialUsd =
+      parseFloat(costPerKg || "0") * parseFloat(fxRateToUsd || "1") * kg;
+    const freightUsd =
+      parseFloat(freight || "0") * parseFloat(freightFxRate || "1");
+    const otherUsd =
+      parseFloat(otherCharges || "0") * parseFloat(otherChargesFxRate || "1");
+
+    let commissionUsd = 0;
+    if (commissionPersonName.trim() && parseFloat(commissionRate || "0") > 0) {
+      const commBase =
+        parseFloat(commissionRate || "0") * parseFloat(commissionFxRate || "1");
+      commissionUsd = commissionType === "PER_KG" ? commBase * kg : commBase;
+    }
+
+    const extraUsd = additionalCharges
+      .filter((c) => parseFloat(c.amount || "0") > 0)
+      .reduce(
+        (sum, c) =>
+          sum + parseFloat(c.amount || "0") * parseFloat(c.fxRate || "1"),
+        0
+      );
+
+    // Duty is entered in USD; skip it in the preview when payment is still pending.
+    const dutyUsd = dutyPending ? 0 : parseFloat(dutyAmount || "0");
+
+    const totalUsd = materialUsd + freightUsd + otherUsd + commissionUsd + extraUsd + dutyUsd;
+    return totalUsd / kg;
+  }, [
+    actualReceivedKg, selectedContainerId, costPerKg, fxRateToUsd,
+    freight, freightFxRate, otherCharges, otherChargesFxRate,
+    commissionPersonName, commissionRate, commissionFxRate, commissionType,
+    additionalCharges, dutyAmount, dutyPending,
+  ]);
+
   // Auto-fetch the live USD exchange rate whenever the freight currency is changed
   // away from USD (and isn't already pinned to the container's own fx rate). Without
   // this, entering e.g. a EUR freight amount with fxRate left at "1" would post it to
@@ -753,6 +792,17 @@ export function OffloadDialog({
                 The offload will be validated by the server — if it fails, check that an exchange rate is configured for {containerCommissionCcy}.
               </div>
             )}
+
+          {estimatedAvgCostKg !== null && estimatedAvgCostKg > 0 && (
+            <div className="rounded-md border border-emerald-300 bg-emerald-50 dark:bg-emerald-950/30 dark:border-emerald-800 px-4 py-3 flex items-center justify-between">
+              <span className="text-sm font-medium text-emerald-800 dark:text-emerald-300">
+                Estimated Avg Cost / kg
+              </span>
+              <span className="text-base font-bold font-mono text-emerald-700 dark:text-emerald-200">
+                ${estimatedAvgCostKg.toFixed(4)} <span className="text-xs font-normal">USD</span>
+              </span>
+            </div>
+          )}
 
           <div className="flex justify-end gap-2 pt-4">
             <Button variant="outline" onClick={() => onOpenChange(false)}>
