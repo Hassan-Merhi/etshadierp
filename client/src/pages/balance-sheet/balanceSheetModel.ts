@@ -41,7 +41,14 @@ export function groupBalanceSheetAccounts(accounts: BalanceSheetAccount[]): Bala
       groups.assets.push(account);
     }
 
-    if (account.type === "supplier" || (account.type === "ledger" && account.accountType === "Liability")) {
+    if (
+      account.type === "supplier" ||
+      (account.type === "ledger" &&
+        account.accountType === "Liability" &&
+        // Exclude per-worker insurance accounts (e.g. "Insurance - أحمد علي رمضان").
+        // These are tracked in the Insurance section, not as balance-sheet liabilities.
+        !/^Insurance\s*[-–]/i.test(account.name))
+    ) {
       groups.liabilities.push(account);
     }
 
