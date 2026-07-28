@@ -1,7 +1,9 @@
 import { spawnSync } from "node:child_process";
 
+const skipTypeScript = process.env.PROGRAM6_SKIP_TYPESCRIPT === "1";
+
 const commands = [
-  ["npm", ["run", "check"]],
+  ...(skipTypeScript ? [] : [["npm", ["run", "check"]]]),
   [
     "node",
     [
@@ -17,9 +19,15 @@ const commands = [
       "tests/program-4-end-to-end-enforcement.test.ts",
       "tests/protected-asset-download-adapter.test.ts",
       "tests/security-audit-runtime.test.ts",
+      "--maxWorkers=1",
+      "--no-file-parallelism",
     ],
   ],
 ];
+
+if (skipTypeScript) {
+  console.log("Skipping duplicate TypeScript compilation; the CI static-build job already completed it.");
+}
 
 for (const [command, args] of commands) {
   console.log(`\n$ ${command} ${args.join(" ")}`);
