@@ -151,7 +151,12 @@ if (!globalThis[INSTALL_KEY]) {
       return compactStockOtwItems(body);
     }
 
-    if (/^\/api\/containers\/\d+$/.test(pathname) && profile === "combined-detail" && body && typeof body === "object") {
+    if (
+      /^\/api\/containers\/\d+$/.test(pathname) &&
+      profile === "combined-detail" &&
+      body &&
+      typeof body === "object"
+    ) {
       return compactCombinedContainerDetail(body);
     }
 
@@ -172,7 +177,11 @@ if (!globalThis[INSTALL_KEY]) {
       const { pathname, searchParams } = parseRequest(req);
       const profiledBody = applyResponseProfile(pathname, searchParams, body);
 
-      if (!Array.isArray(profiledBody) || !heavyArrayPaths.has(pathname) || !wantsPagination(searchParams)) {
+      if (
+        !Array.isArray(profiledBody) ||
+        !heavyArrayPaths.has(pathname) ||
+        !wantsPagination(searchParams)
+      ) {
         return originalJson.call(this, profiledBody);
       }
 
