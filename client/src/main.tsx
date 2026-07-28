@@ -1,7 +1,6 @@
 import "./lib/requestStormGuard";
 import "./lib/accountingRequestFetchGuard";
 import "./lib/v5AllocationPaginationClient";
-import "./lib/containerPaginationClient";
 import { createRoot } from "react-dom/client";
 import App from "./App";
 import "./index.css";
