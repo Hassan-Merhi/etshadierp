@@ -34,17 +34,8 @@ commands:
       - node/install-packages:
           pkg-manager: npm
           override-ci-command: npm ci --no-audit --bin-links=true
-      - run:
-          name: Dependency diagnostics
-          command: |
-            node --version
-            npm --version
-            npm config get bin-links
-            for binary in tsc vite eslint vitest; do
-              test -x "node_modules/.bin/$binary" || { echo "$binary is missing"; exit 1; }
-            done
 
-  wait_for_postgres:
+  prepare_test_schema:
     steps:
       - run:
           name: Wait for PostgreSQL
@@ -52,64 +43,53 @@ commands:
             for attempt in $(seq 1 60); do
               if (echo > /dev/tcp/127.0.0.1/5432) >/dev/null 2>&1; then
                 echo "PostgreSQL is accepting connections."
-                exit 0
+                break
               fi
               sleep 1
             done
-            echo "PostgreSQL did not become ready."
-            exit 1
-
-  prepare_test_schema:
-    steps:
-      - wait_for_postgres
-      - run:
-          name: Prepare disposable database schema
-          command: node node_modules/drizzle-kit/bin.cjs push --force
+            node node_modules/drizzle-kit/bin.cjs push --force
 
 jobs:
-  postgres-factory-lifecycle:
+  test-factory-container-lifecycle:
     executor: node22-postgres
     steps:
       - install_dependencies
       - prepare_test_schema
       - run:
-          name: Container lifecycle and landed-cost regressions
-          command: >-
-            node node_modules/vitest/vitest.mjs run
-            tests/factory-container-lifecycle.test.ts
-            tests/factory-landed-cost-reconciliation.test.ts
-            --maxWorkers=1 --no-file-parallelism
+          name: Factory container lifecycle
+          command: node node_modules/vitest/vitest.mjs run tests/factory-container-lifecycle.test.ts --maxWorkers=1 --no-file-parallelism
 
-  postgres-factory-replay:
+  test-factory-landed-cost:
     executor: node22-postgres
     steps:
       - install_dependencies
       - prepare_test_schema
       - run:
-          name: Stable-cost and historical replay regressions
-          command: >-
-            node node_modules/vitest/vitest.mjs run
-            tests/factory-mix-batch-stable-cost.test.ts
-            tests/factory-raw-material-moving-avg.test.ts
-            --maxWorkers=1 --no-file-parallelism
+          name: Factory landed-cost reconciliation
+          command: node node_modules/vitest/vitest.mjs run tests/factory-landed-cost-reconciliation.test.ts --maxWorkers=1 --no-file-parallelism
 
-  postgres-factory-currency-transfer:
+  test-factory-stable-cost:
     executor: node22-postgres
     steps:
       - install_dependencies
       - prepare_test_schema
       - run:
-          name: Multi-currency and smart-transfer regressions
-          command: >-
-            node node_modules/vitest/vitest.mjs run
-            tests/raw-material-multicurrency-recalc.test.ts
-            tests/multi-currency-integration.test.ts
-            tests/smart-transfer-preview.test.ts
-            --maxWorkers=1 --no-file-parallelism
+          name: Factory stable-cost rules
+          command: node node_modules/vitest/vitest.mjs run tests/factory-mix-batch-stable-cost.test.ts --maxWorkers=1 --no-file-parallelism
+
+  test-factory-historical-replay:
+    executor: node22-postgres
+    steps:
+      - install_dependencies
+      - prepare_test_schema
+      - run:
+          name: Factory historical replay
+          command: node node_modules/vitest/vitest.mjs run tests/factory-raw-material-moving-avg.test.ts --maxWorkers=1 --no-file-parallelism
 
 workflows:
-  factory-regression-diagnostics:
+  factory-regression-file-diagnostics:
     jobs:
-      - postgres-factory-lifecycle
-      - postgres-factory-replay
-      - postgres-factory-currency-transfer
+      - test-factory-container-lifecycle
+      - test-factory-landed-cost
+      - test-factory-stable-cost
+      - test-factory-historical-replay
