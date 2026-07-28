@@ -62,6 +62,8 @@ export function createReadMicrocacheMiddleware(options: ReadMicrocacheOptions = 
   function clearForWrite(): void {
     writeGeneration += 1;
     cache.clear();
+    for (const pending of inFlight.values()) pending.resolve(null);
+    inFlight.clear();
   }
 
   function pruneExpired(currentTime: number): void {
@@ -141,17 +143,18 @@ export function createReadMicrocacheMiddleware(options: ReadMicrocacheOptions = 
     const pendingPromise = new Promise<ReadMicrocacheEntry | null>((resolve) => {
       resolvePending = resolve;
     });
-    inFlight.set(key, {
+    const currentPending: PendingRead = {
       generation: generationAtStart,
       promise: pendingPromise,
       resolve: resolvePending,
-    });
+    };
+    inFlight.set(key, currentPending);
 
     let settled = false;
     const settle = (entry: ReadMicrocacheEntry | null) => {
       if (settled) return;
       settled = true;
-      inFlight.delete(key);
+      if (inFlight.get(key) === currentPending) inFlight.delete(key);
       resolvePending(entry);
     };
 
