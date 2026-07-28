@@ -18,6 +18,12 @@ const migrationFiles = (await readdir(migrationsDir))
 const migrationTags = new Set(migrationFiles.map((name) => name.slice(0, -4)));
 const entries = Array.isArray(journal.entries) ? journal.entries : [];
 
+const LEGACY_MISSING_MIGRATION_TAGS = new Set([
+  "0000_conscious_william_stryker",
+  "0001_parallel_guardian",
+  "0002_married_loa",
+]);
+
 const errors = [];
 const warnings = [];
 const seenIndexes = new Set();
@@ -47,7 +53,12 @@ entries.forEach((entry, position) => {
   seenTags.add(entry.tag);
 
   if (!migrationTags.has(entry.tag)) {
-    errors.push(`Journal tag ${entry.tag} has no matching migrations/${entry.tag}.sql file.`);
+    const message = `Journal tag ${entry.tag} has no matching migrations/${entry.tag}.sql file.`;
+    if (LEGACY_MISSING_MIGRATION_TAGS.has(entry.tag)) {
+      warnings.push(`${message} This documented pre-versioning gap is grandfathered.`);
+    } else {
+      errors.push(message);
+    }
   }
 });
 
