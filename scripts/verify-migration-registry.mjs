@@ -18,10 +18,20 @@ const migrationFiles = (await readdir(migrationsDir))
 const migrationTags = new Set(migrationFiles.map((name) => name.slice(0, -4)));
 const entries = Array.isArray(journal.entries) ? journal.entries : [];
 
+// These three Drizzle journal entries predate the repository's versioned
+// migration controls. Their original SQL files were never committed. Keep the
+// exception explicit and bounded so every newer missing migration still fails.
+const knownLegacyMissingSqlTags = new Set([
+  "0000_conscious_william_stryker",
+  "0001_parallel_guardian",
+  "0002_married_loa",
+]);
+
 const errors = [];
 const warnings = [];
 const seenIndexes = new Set();
 const seenTags = new Set();
+const legacyMissingFiles = [];
 
 if (journal.dialect !== "postgresql") {
   errors.push(`Expected PostgreSQL migration journal, found ${String(journal.dialect)}.`);
@@ -47,9 +57,20 @@ entries.forEach((entry, position) => {
   seenTags.add(entry.tag);
 
   if (!migrationTags.has(entry.tag)) {
+    if (knownLegacyMissingSqlTags.has(entry.tag)) {
+      legacyMissingFiles.push(`${entry.tag}.sql`);
+      return;
+    }
     errors.push(`Journal tag ${entry.tag} has no matching migrations/${entry.tag}.sql file.`);
   }
 });
+
+if (legacyMissingFiles.length > 0) {
+  warnings.push(
+    `Known legacy journal entries have no committed SQL files: ${legacyMissingFiles.join(", ")}. ` +
+      "Only these explicitly listed pre-versioning gaps are tolerated.",
+  );
+}
 
 const unregisteredFiles = migrationFiles.filter((name) => !seenTags.has(name.slice(0, -4)));
 if (unregisteredFiles.length > 0) {
@@ -71,6 +92,7 @@ const result = {
   strict,
   registeredCount: entries.length,
   sqlFileCount: migrationFiles.length,
+  legacyMissingFiles,
   unregisteredFiles,
   warnings,
   errors,
