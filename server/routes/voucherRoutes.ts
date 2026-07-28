@@ -1,4 +1,5 @@
 import type { Express } from "express";
+import { registerVoucherPaginationRoutes } from "./vouchers/voucherPaginationRoutes";
 import { registerVoucherQueryRoutes } from "./vouchers/voucherQueryRoutes";
 import { registerVoucherCreateRoutes } from "./vouchers/voucherCreateRoutes";
 import { registerVoucherPaymentRoutes } from "./vouchers/voucherPaymentRoutes";
@@ -22,6 +23,9 @@ export function registerVoucherRoutes(app: Express) {
   registerStockTransferLifecycleRoutes(app);
   registerStockTransferRevisionLifecycleRoutes(app);
 
+  // Native SQL pagination shadows the legacy array reader while preserving its
+  // array response for callers that do not explicitly request pagination.
+  registerVoucherPaginationRoutes(app);
   registerVoucherQueryRoutes(app);
 
   // Program 2 protected creation handlers call next() for unsupported legacy
