@@ -19,6 +19,7 @@ const app = read("client/src/App.tsx");
 const screenFeed = read("client/src/hooks/use-screen-feed.ts");
 const presence = read("client/src/hooks/use-presence.ts");
 const lazyImports = read("build/viteLazyHeavyImportsPlugin.ts");
+const labelAssetPlugin = read("build/viteLabelAssetExtractionPlugin.ts");
 const viteConfig = read("vite.config.ts");
 const bandwidthDebug = read("server/middleware/bandwidthDebug.ts");
 const operationalEvents = read("server/lib/operationalEvents.ts");
@@ -235,10 +236,61 @@ rejectText(
   "Canonical supplier balances must not restore one query per supplier."
 );
 
+// Phase 4: static assets, image extraction, and production build budgets.
+requireText(viteConfig, "labelAssetExtractionPlugin()", "The label asset extraction plugin must remain enabled.");
+requireText(viteConfig, 'return "label-printing";', "Label printing code must remain isolated from core bundles.");
+requireText(labelAssetPlugin, "EMBEDDED_LABEL_LOGO_RE", "The embedded label logo must be replaced during builds.");
+requireText(labelAssetPlugin, "createHash", "The extracted label logo must use a content-derived filename.");
+requireText(labelAssetPlugin, "this.emitFile", "The extracted label logo must be emitted as a build asset.");
+requireText(labelAssetPlugin, 'Cache-Control", "public, max-age=31536000, immutable"', "The dev label asset must mirror immutable production caching.");
+requireText(serviceWorker, "networkOnlyApi(request)", "The service worker must not persist large API payloads.");
+rejectText(serviceWorker, "async function networkFirstApi", "The service worker must not restore API Cache Storage writes.");
+requireText(serviceWorker, "MAX_STATIC_CACHE_ENTRIES = 200", "Static Cache Storage must remain entry-bounded.");
+requireText(serviceWorker, "putBounded", "Every service-worker static write must enforce the cache bound.");
+requireText(serviceWorker, "isVersionedLabelAsset(url)", "Versioned label images must use cache-first delivery.");
+requireText(serviceWorker, 'url.searchParams.has("t")', "Custom label images must be keyed by their update timestamp.");
+
+const distAssets = path.join(root, "dist", "public", "assets");
+if (fs.existsSync(distAssets)) {
+  const assetFiles = fs.readdirSync(distAssets);
+  const jsFiles = assetFiles.filter((name) => name.endsWith(".js"));
+  const labelChunks = jsFiles.filter((name) => /^label-printing-[A-Za-z0-9_-]+\.js$/.test(name));
+  const labelLogos = assetFiles.filter((name) => /^hmd-label-logo-[a-f0-9]{12}\.jpg$/.test(name));
+
+  if (labelChunks.length !== 1) {
+    failures.push(`Expected exactly one label-printing chunk, found ${labelChunks.length}.`);
+  }
+  if (labelLogos.length !== 1) {
+    failures.push(`Expected exactly one hashed HMD label logo, found ${labelLogos.length}.`);
+  }
+
+  const embeddedLogoSignature = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAABQAAAANV";
+  for (const name of jsFiles) {
+    const filePath = path.join(distAssets, name);
+    const size = fs.statSync(filePath).size;
+    const source = fs.readFileSync(filePath, "utf8");
+    if (source.includes(embeddedLogoSignature)) {
+      failures.push(`${name} still contains the full embedded HMD label PNG.`);
+    }
+    if (/^index-[A-Za-z0-9_-]+\.js$/.test(name) && size > 1_500_000) {
+      failures.push(`${name} exceeds the 1.5 MB core entry budget (${size} bytes).`);
+    }
+  }
+
+  for (const name of labelChunks) {
+    const size = fs.statSync(path.join(distAssets, name)).size;
+    if (size > 200_000) {
+      failures.push(`${name} exceeds the 200 KB label-printing budget (${size} bytes).`);
+    }
+  }
+} else {
+  console.log("Build artifact checks skipped because dist/public/assets does not exist.");
+}
+
 if (failures.length > 0) {
   console.error("Bandwidth phase verification failed:");
   for (const failure of failures) console.error(`- ${failure}`);
   process.exit(1);
 }
 
-console.log("Bandwidth phases 1-3 request, payload, and query-pressure invariants verified.");
+console.log("Bandwidth phases 1-4 request, payload, query-pressure, and asset invariants verified.");
