@@ -60,9 +60,7 @@ export function AccountCombobox({
   const displayLabel = selectedSupplier
     ? selectedSupplier.name
     : selectedAccount
-      ? selectedAccount.code
-        ? `${selectedAccount.code} - ${selectedAccount.name}`
-        : selectedAccount.name
+      ? selectedAccount.name
       : placeholder;
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -114,7 +112,7 @@ export function AccountCombobox({
                   <Check
                     className={cn("mr-2 h-4 w-4", value === account.id.toString() ? "opacity-100" : "opacity-0")}
                   />
-                  {account.code ? `${account.code} - ${account.name}` : account.name}
+                  {account.name}
                 </CommandItem>
               ))}
             </CommandGroup>
