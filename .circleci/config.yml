@@ -33,49 +33,10 @@ jobs:
             )
             node node_modules/prettier/bin/prettier.cjs --write "${files[@]}"
             git diff -- "${files[@]}" > /tmp/phase1-prettier.patch
-            cat > /tmp/recipient-cert.pem <<'CERT'
-            -----BEGIN CERTIFICATE-----
-            MIIEHTCCAoWgAwIBAgIUaWzOnQ/3+tiGQZLnoZHcCHcfL0cwDQYJKoZIhvcNAQEL
-            BQAwHjEcMBoGA1UEAwwTcGhhc2UxLWZvcm1hdC1wcjI4MDAeFw0yNjA3MjgxNTM5
-            MzVaFw0yNjA3MjkxNTM5MzVaMB4xHDAaBgNVBAMME3BoYXNlMS1mb3JtYXQtcHIy
-            ODAwggGiMA0GCSqGSIb3DQEBAQUAA4IBjwAwggGKAoIBgQChCsmGNqH0ecpgZhMo
-            CMNhUVMd5lJHrbu+y/v4qUYyAEz287DTUUfLlUb2stEkEGdLrhkhznAkuMwzI7Un
-            vJmbKwUxqs7ksWf/MvvM/ZMWa37yT+JQ5x4R77GVmqEp4qBJfNhuaf/du/ysafno
-            3XufQ32XF5d+QHxzv292zYRYrBZm2nhQMuwsSTzOGvIMGLupxZiDgx5hoLrEFs27
-            IIuOw2nMsIQXZc7s6/oh15W3IlEHGQjg17jqkFbItW4TIwajQc3cMH692Jbuz/Dx
-            LTdYOo+m2yqh8iDPfvWwSjCUpVgXJ7vAHAcVZLiYKr93CTuTTY+HTsv62g+0s2ru
-            9qIsUT4dDNq7RBD+q6apXk1Rcuq86JjhEniCHtf+YCBvaT7mjFckH1tDzftXSrJY
-            lPUDt+lgMc1cGRqKJLfPjQncDPdfPIuZCQX98RMbk52tNS0zBgdpJUiNTOeGaL0s
-            N3zgCKodXu8HQGOJicVbLONjXPdJzqoeAYktRza13tLIBW0CAwEAAaNTMFEwHQYD
-            VR0OBBYEFOWd9V4e2TxmrP+n6gYpCDcnKxg/MB8GA1UdIwQYMBaAFOWd9V4e2Txm
-            rP+n6gYpCDcnKxg/MA8GA1UdEwEB/wQFMAMBAf8wDQYJKoZIhvcNAQELBQADggGB
-            ACnBnlWlIYdooj6A0I8NrHgK+m/oDCGSuoh0X7X4APiZ14o/oWq8GbSkp99Nn8Sf
-            ReZbv5VDQdJFLry1LuldAv15QsVTLWgKS9rdrF5cYOi26AGfI2QMKN/HH5H1S07u
-            JeW48AUDDA6b7dlsAsDwQA3PnZoHMWhFQ5/tRXHQI7p+HT5mUoO9jRnV6FxiyUAU
-            ixD7KQwsjEqyeB+QbH6ilT4N6z8OVWHILX1vIjDCwHrm4ZCBUm7B8y93IGaDEB4E
-            NduxDuFlvxk3RkNUczgNvEAUDJoVOdWYZLH6dMDhP3TZ0ByKyPOGzr3fd9SpGqsK
-            ILKMrzUDdQ6ZPjN701C1wF18EFmisoTIjCCh2zW2UtwSiCP2vm1uyn7WxGq98hzG
-            jypKJ41eGKIZFoZjIKpY2CaJc+EpoAnhJkjt6vUHpZLQpMj72u4bpYHO3L5vjUQ7
-            cRmLj2HPDulTZd1emA7FxOupWkgJhEUfSCv6ZkCrPAKGucF687yaYfSywh5VnOUo
-            Og==
-            -----END CERTIFICATE-----
-            CERT
-            sed -i 's/^            //' /tmp/recipient-cert.pem
+            echo 'LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSUVIVENDQW9XZ0F3SUJBZ0lVYVd6T25RLzMrdGlHUVpMbm9aSGNDSGNmTDBjd0RRWUpLb1pJaHZjTkFRRUwKQlFBd0hqRWNNQm9HQTFVRUF3d1RjR2hoYzJVeExXWnZjbTFoZEMxd2NqSTRNREFlRncweU5qQTNNamd4TlRNNQpNelZhRncweU5qQTNNamt4TlRNNU16VmFNQjR4SERBYUJnTlZCQU1NRTNCb1lYTmxNUzFtYjNKdFlYUXRjSEl5Ck9EQXdnZ0dpTUEwR0NTcUdTSWIzRFFFQkFRVUFBNElCandBd2dnR0tBb0lCZ1FDaENzbUdOcUgwZWNwZ1poTW8KQ01OaFVWTWQ1bEpIcmJ1K3kvdjRxVVl5QUV6Mjg3RFRVVWZMbFViMnN0RWtFR2RMcmhraHpuQWt1TXd6STdVbgp2Sm1iS3dVeHFzN2tzV2YvTXZ2TS9aTVdhMzd5VCtKUTV4NFI3N0dWbXFFcDRxQkpmTmh1YWYvZHUveXNhZm5vCjNYdWZRMzJYRjVkK1FIeHp2MjkyellSWXJCWm0ybmhRTXV3c1NUek9HdklNR0x1cHhaaURneDVob0xyRUZzMjcKSUl1T3cybk1zSVFYWmM3czYvb2gxNVczSWxFSEdRamcxN2pxa0ZiSXRXNFRJd2FqUWMzY01INjkySmJ1ei9EeApMVGRZT28rbTJ5cWg4aURQZnZXd1NqQ1VwVmdYSjd2QUhBY1ZaTGlZS3I5M0NUdVRUWStIVHN2NjJnKzBzMnJ1CjlxSXNVVDRkRE5xN1JCRCtxNmFwWGsxUmN1cTg2SmpoRW5pQ0h0ZitZQ0J2YVQ3bWpGY2tIMXREemZ0WFNySlkKbFBVRHQrbGdNYzFjR1JxS0pMZlBqUW5jRFBkZlBJdVpDUVg5OFJNYms1MnROUzB6QmdkcEpVaU5UT2VHYUwwcwpOM3pnQ0tvZFh1OEhRR09KaWNWYkxPTmpYUGRKenFvZUFZa3RSemExM3RMSUJXMENBd0VBQWFOVE1GRXdIUVlEClZSME9CQllFRk9XZDlWNGUyVHhtclArbjZnWXBDRGNuS3hnL01COEdBMVVkSXdRWU1CYUFGT1dkOVY0ZTJUeG0KclArbjZnWXBDRGNuS3hnL01BOEdBMVVkRXdFQi93UUZNQU1CQWY4d0RRWUpLb1pJaHZjTkFRRUxCUUFEZ2dHQgpBQ25CbmxXbElZZG9vajZBMEk4TnJIZ0srbS9vRENHU3VvaDBYN1g0QVBpWjE0by9vV3E4R2JTa3A5OU5uOFNmClJlWmJ2NVZEUWRKRkxyeTFMdWxkQXYxNVFzVlRMV2dLUzlyZHJGNWNZT2kyNkFHZkkyUU1LTi9ISDVIMVMwN3UKSmVXNDhBVUREQTZiN2Rsc0FzRHdRQTNQblpvSE1XaEZRNS90UlhIUUk3cCtIVDVtVW9POWpSblY2RnhpeVVBVQppeEQ3S1F3c2pFcXllQitRYkg2aWxUNE42ejhPVldISUxYMXZJakRDd0hybTRaQ0JVbTdCOHk5M0lHYURFQjRFCk5kdXhEdUZsdnhrM1JrTlVjemdOdkVBVURKb1ZPZFdZWkxINmRNRGhQM1RaMEJ5S3lQT0d6cjNmZDlTcEdxc0sKSUxLTXJ6VURkUTZaUGpONzAxQzF3RjE4RUZtaXNvVElqQ0NoMnpXMlV0d1NpQ1Aydm0xdXluN1d4R3E5OGh6RwpqeXBLSjQxZUdLSVpGb1pqSUtwWTJDYUpjK0Vwb0FuaEpranQ2dlVIcFpMUXBNajcydTRicFlITzNMNXZqVVE3CmNSbUxqMkhQRHVsVFpkMWVtQTdGeE91cFdrZ0poRVVmU0N2NlprQ3JQQUtHdWNGNjg3eWFZZlN5d2g1Vm5PVW8KT2c9PQotLS0tLUVORCBDRVJUSUZJQ0FURS0tLS0tCg==' | base64 -d > /tmp/recipient-cert.pem
             openssl cms -encrypt -binary -aes-256-cbc -in /tmp/phase1-prettier.patch -out /tmp/phase1-prettier.cms -outform DER /tmp/recipient-cert.pem
             base64 -w0 /tmp/phase1-prettier.cms > /tmp/ciphertext.txt
-            python - <<'PY'
-            import json
-            from pathlib import Path
-            payload = {
-                "title": "Encrypted Phase 1 PR 280 formatter patch",
-                "content": Path("/tmp/ciphertext.txt").read_text(),
-                "language": "plaintext",
-                "expiry": "1d",
-                "visibility": "unlisted",
-                "custom_slug": "p1-pr280-20260728-a7c9",
-            }
-            Path("/tmp/paste.json").write_text(json.dumps(payload))
-            PY
+            python -c 'import json; from pathlib import Path; Path("/tmp/paste.json").write_text(json.dumps({"title":"Encrypted Phase 1 PR 280 formatter patch","content":Path("/tmp/ciphertext.txt").read_text(),"language":"plaintext","expiry":"1d","visibility":"unlisted","custom_slug":"p1-pr280-20260728-a7c9"}))'
             curl --fail --silent --show-error -X POST https://pastepile.com/api/public/pastes -H 'Content-Type: application/json' --data-binary @/tmp/paste.json
 
 workflows:
