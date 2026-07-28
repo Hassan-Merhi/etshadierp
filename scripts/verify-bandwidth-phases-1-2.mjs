@@ -27,6 +27,9 @@ const payloadGuard = read("client/src/lib/bandwidthPhase2PayloadGuard.ts");
 const accountingGuard = read("client/src/lib/accountingRequestFetchGuard.ts");
 const apiBridge = read("server/apiPaginationBridge.mjs");
 const inventoryRoutes = read("server/routes/inventoryRoutes.ts");
+const readMicrocache = read("server/routes/performance/readMicrocache.ts");
+const supplierBatcher = read("server/routes/performance/supplierVoucherEntryBatcher.ts");
+const supplierBalanceHelpers = read("server/routes/helpers/supplierBalanceHelpers.ts");
 
 requireText(serviceWorker, "HASHED_ASSET_RE", "Hashed production assets must be identified.");
 requireText(serviceWorker, "cacheFirstHashedAsset(request)", "Hashed assets must use cache-first loading.");
@@ -85,14 +88,14 @@ requireText(
   'import "./bandwidthPhase2PayloadGuard";',
   "The Phase 2 payload guard must be installed before accounting fetch protection."
 );
-requireText(hotspotGuard, "/api\/containers\/otw-items", "OTW container items must be request-contained.");
-requireText(hotspotGuard, "/api\/factory\/containers", "Factory containers must be request-contained.");
-requireText(hotspotGuard, "/api\/ledger-accounts", "Ledger accounts must be request-contained.");
-requireText(hotspotGuard, "/api\/factory\/bale-products", "Bale products must be request-contained.");
-requireText(hotspotGuard, "/api\/factory\/workers", "Factory workers must be request-contained.");
-requireText(hotspotGuard, "/api\/factory\/mix-batches", "Mix batches must be request-contained.");
-requireText(hotspotGuard, "/api\/factory\/raw-stock", "Raw-stock reads must be request-contained.");
-requireText(hotspotGuard, "/api\/accounts\/all", "Accounts reads must be request-contained.");
+requireText(hotspotGuard, "/api\\/containers\\/otw-items", "OTW container items must be request-contained.");
+requireText(hotspotGuard, "/api\\/factory\\/containers", "Factory containers must be request-contained.");
+requireText(hotspotGuard, "/api\\/ledger-accounts", "Ledger accounts must be request-contained.");
+requireText(hotspotGuard, "/api\\/factory\\/bale-products", "Bale products must be request-contained.");
+requireText(hotspotGuard, "/api\\/factory\\/workers", "Factory workers must be request-contained.");
+requireText(hotspotGuard, "/api\\/factory\\/mix-batches", "Mix batches must be request-contained.");
+requireText(hotspotGuard, "/api\\/factory\\/raw-stock", "Raw-stock reads must be request-contained.");
+requireText(hotspotGuard, "/api\\/accounts\\/all", "Accounts reads must be request-contained.");
 requireText(hotspotGuard, "inFlightRequests", "Identical hotspot GETs must share one in-flight request.");
 requireText(hotspotGuard, "writeGeneration", "Writes must prevent raced GETs from caching stale data.");
 requireText(hotspotGuard, "writeGeneration += 1", "Every write boundary must advance the cache generation.");
@@ -144,7 +147,7 @@ requireText(
 );
 requireText(
   payloadGuard,
-  '/^\/api\/containers\/\d+$/.test(first)',
+  '/^\\/api\\/containers\\/\\d+$/.test(first)',
   "Container detail query keys must be cleared outside OTW."
 );
 
@@ -173,10 +176,69 @@ requireText(
 requireText(inventoryRoutes, ".groupBy(", "Combined inventory must group by stock item rather than location row.");
 requireText(inventoryRoutes, "pageSize: data.length", "Combined inventory must return its complete aggregated result.");
 
+requireText(
+  readMicrocache,
+  '"/api/factory/suppliers/with-balances", 15_000',
+  "Supplier balance summaries must use the Phase 3 server microcache."
+);
+requireText(
+  readMicrocache,
+  '"/api/factory/raw-stock", 10_000',
+  "Raw-stock reads must use the Phase 3 server microcache."
+);
+requireText(
+  readMicrocache,
+  '"/api/factory/mix-batches", 10_000',
+  "Mix-batch reads must use the Phase 3 server microcache."
+);
+requireText(
+  readMicrocache,
+  '"/api/factory/bale-ledger", 10_000',
+  "Bale-ledger reads must use the Phase 3 server microcache."
+);
+requireText(
+  readMicrocache,
+  '"/api/factory/production-value-report", 10_000',
+  "Production-value reads must use the Phase 3 server microcache."
+);
+requireText(readMicrocache, "const inFlight = new Map", "Simultaneous expensive server reads must be coalesced.");
+requireText(readMicrocache, "writeGeneration", "Server read caching must reject responses raced by writes.");
+requireText(readMicrocache, "clearForWrite();", "State-changing requests must invalidate server read caches.");
+requireText(readMicrocache, '"X-ERP-Read-Cache"', "Server cache hit and coalescing state must be observable.");
+requireText(readMicrocache, "maxBodyBytes ?? 5_000_000", "Server read caching must remain body-size bounded.");
+requireText(readMicrocache, "maxEntries ?? 128", "Server read caching must remain entry-count bounded.");
+requireText(
+  readMicrocache,
+  'req.headers["x-bypass-request-storm-guard"]',
+  "Explicit cache bypass must work consistently on client and server."
+);
+
+requireText(
+  supplierBatcher,
+  "ve.supplier_id = ANY($1::int[])",
+  "Supplier voucher entries must load through one bounded SQL query."
+);
+requireText(supplierBatcher, "queueMicrotask", "Concurrent supplier balance reads must batch in the same turn.");
+requireText(
+  supplierBatcher,
+  "pendingByCompany",
+  "Supplier entry batches must remain isolated by company context."
+);
+requireText(
+  supplierBalanceHelpers,
+  "getVoucherEntriesBySupplierBatched",
+  "Canonical supplier balances must use the Phase 3 batch loader."
+);
+rejectText(
+  supplierBalanceHelpers,
+  "storage.getVoucherEntriesBySupplier(supplier.id",
+  "Canonical supplier balances must not restore one query per supplier."
+);
+
 if (failures.length > 0) {
   console.error("Bandwidth phase verification failed:");
   for (const failure of failures) console.error(`- ${failure}`);
   process.exit(1);
 }
 
-console.log("Bandwidth phases 1-2 request and payload invariants verified.");
+console.log("Bandwidth phases 1-3 request, payload, and query-pressure invariants verified.");
