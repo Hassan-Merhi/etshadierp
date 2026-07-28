@@ -58,13 +58,17 @@ export default function Accounts() {
   const cleanupRef = useRef<(() => void) | null>(null);
   if (!cleanupRef.current) cleanupRef.current = installParentGroupFetchPatch();
 
-  useEffect(() => () => {
-    cleanupRef.current?.();
-    cleanupRef.current = null;
-  }, []);
+  useEffect(
+    () => () => {
+      cleanupRef.current?.();
+      cleanupRef.current = null;
+    },
+    [],
+  );
 
   return (
     <div className="space-y-4">
+      {/* AccountsLegacy owns the desktop AccountTable and responsive account views. */}
       {/* CashBankRevaluationPanel hidden */}
       {/* HistoricalOpeningResolver hidden */}
       <AccountsLegacy />
