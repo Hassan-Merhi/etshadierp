@@ -110,6 +110,9 @@ function showStaleAssetRecoveryMessage() {
 async function clearErpCachesForRecovery() {
   if (!("serviceWorker" in navigator)) return;
 
+  // Only force a service-worker update during an actual chunk-recovery event.
+  // Normal page loads rely on the browser's built-in update checks so every
+  // tab does not revalidate and then reload the application independently.
   const registration = await navigator.serviceWorker.getRegistration("/").catch(() => undefined);
   await registration?.update().catch(() => undefined);
 
@@ -197,6 +200,8 @@ window.addEventListener("unhandledrejection", (event) => {
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.addEventListener("message", (event) => {
     if (event?.data?.type === "SW_UPDATED") {
+      // Do not reload every controlled tab. The existing production version
+      // banner will offer one user-controlled refresh when the build changes.
       window.dispatchEvent(
         new CustomEvent("erp:service-worker-updated", {
           detail: { version: String(event.data.version || "unknown") },
