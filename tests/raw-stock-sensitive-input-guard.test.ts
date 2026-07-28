@@ -1,7 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const auditValues = vi.fn(async () => undefined);
-const auditInsert = vi.fn(() => ({ values: auditValues }));
+const { auditValues, auditInsert } = vi.hoisted(() => {
+  const values = vi.fn(async () => undefined);
+  return {
+    auditValues: values,
+    auditInsert: vi.fn(() => ({ values })),
+  };
+});
 
 vi.mock("../server/db", () => ({
   db: { insert: auditInsert },
@@ -68,12 +73,16 @@ describe("raw-stock sensitive input guard", () => {
   });
 
   it("uses originalUrl when Express has rewritten the mounted req.path", async () => {
-    const result = await run("/", {
-      containerIds: [4],
-      reason: "Apply approved FX rate",
-      idempotencyKey: "fx:company:1:container:4",
-      unexpected: true,
-    }, { mountedPath: "/api/factory/raw-stock/recalc/auto-apply-fx?source=admin" });
+    const result = await run(
+      "/",
+      {
+        containerIds: [4],
+        reason: "Apply approved FX rate",
+        idempotencyKey: "fx:company:1:container:4",
+        unexpected: true,
+      },
+      { mountedPath: "/api/factory/raw-stock/recalc/auto-apply-fx?source=admin" }
+    );
 
     expect(result.response.statusCode).toBe(400);
     expect(result.next).not.toHaveBeenCalled();
