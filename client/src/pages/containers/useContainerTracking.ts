@@ -41,9 +41,19 @@ export function useContainerTracking(filteredOtwContainers: Container[]) {
   const updateTrackingMutation = useMutation({
     mutationFn: async ({ id, data }: { id: number; data: Partial<Container> }) => {
       const res = await apiRequest("PATCH", `/api/containers/${id}/tracking`, data);
-      return res.json();
+      return res.json() as Promise<Container>;
     },
-    onSuccess: (_, { id }) => {
+    onSuccess: (updatedContainer, { id }) => {
+      // Immediately patch every cache entry that holds this container so that
+      // the input doesn't revert to the stale server value while the
+      // background refetch is in flight.
+      queryClient.setQueriesData(
+        { queryKey: ["/api/containers/active"], exact: false },
+        (old: unknown) => {
+          if (!Array.isArray(old)) return old;
+          return (old as Container[]).map((c) => (c.id === id ? { ...c, ...updatedContainer } : c));
+        },
+      );
       queryClient.invalidateQueries({ queryKey: ["/api/containers/active"] });
       setTrackingEdits((prev) => {
         const next = { ...prev };
@@ -105,7 +115,16 @@ export function useContainerTracking(filteredOtwContainers: Container[]) {
       const data = trackingEdits[id];
       if (!data || Object.keys(data).length === 0) continue;
       try {
-        await apiRequest("PATCH", `/api/containers/${id}/tracking`, data);
+        const res = await apiRequest("PATCH", `/api/containers/${id}/tracking`, data);
+        const updatedContainer: Container = await res.json();
+        // Patch the cache immediately so the row shows the new value.
+        queryClient.setQueriesData(
+          { queryKey: ["/api/containers/active"], exact: false },
+          (old: unknown) => {
+            if (!Array.isArray(old)) return old;
+            return (old as Container[]).map((c) => (c.id === id ? { ...c, ...updatedContainer } : c));
+          },
+        );
         savedCount++;
       } catch (e) {
         errorCount++;
