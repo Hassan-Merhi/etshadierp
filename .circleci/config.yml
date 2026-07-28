@@ -80,6 +80,70 @@ jobs:
     steps:
       - install_dependencies
       - run:
+          name: Phase 1 branch formatting and diagnostic report
+          command: |
+            if [ "${CIRCLE_BRANCH}" != "agent/phase1-sql-pagination" ]; then
+              echo "Not the Phase 1 branch; skipping."
+              exit 0
+            fi
+
+            node node_modules/prettier/bin/prettier.cjs --write \
+              client/src/lib/accountStatementPaginationClient.ts \
+              client/src/lib/containerPaginationClient.ts \
+              client/src/lib/daybookPaginationClient.ts \
+              client/src/lib/erpDaybookPaginationClient.ts \
+              client/src/lib/supplierPurchaseOrderPaginationClient.ts \
+              client/src/main.tsx \
+              server/routes/accountTransactionPaginationRoutes.ts \
+              server/routes/containerRoutes.ts \
+              server/routes/containers/containerListPaginationRoutes.ts \
+              server/routes/daybookPaginationRoutes.ts \
+              server/routes/ledgerAccountPaginationRoutes.ts \
+              server/routes/ledgerRoutes.ts \
+              server/routes/voucherRoutes.ts \
+              server/routes/vouchers/supplierPurchaseOrderPaginationRoutes.ts \
+              server/routes/vouchers/voucherPaginationRoutes.ts
+
+            set +e
+            mkdir -p docs
+            {
+              echo "PHASE 1 VALIDATION REPORT"
+              echo "commit=$(git rev-parse HEAD)"
+              echo
+              echo "=== TYPESCRIPT ==="
+              npm run check
+              CHECK_STATUS=$?
+              echo "typescript_status=$CHECK_STATUS"
+              echo
+              echo "=== STATIC VERIFIER ==="
+              node scripts/verify-phase1-sql-pagination.mjs
+              VERIFY_STATUS=$?
+              echo "verifier_status=$VERIFY_STATUS"
+              echo
+              echo "=== PRODUCTION BUILD ==="
+              npm run build
+              BUILD_STATUS=$?
+              echo "build_status=$BUILD_STATUS"
+              echo
+              echo "SUMMARY typescript=$CHECK_STATUS verifier=$VERIFY_STATUS build=$BUILD_STATUS"
+            } > docs/phase1-validation-report.txt 2>&1
+            cat docs/phase1-validation-report.txt
+            set -e
+
+            git config user.name "circleci"
+            git config user.email "circleci@users.noreply.github.com"
+            git fetch origin main --depth=1
+            git checkout origin/main -- .circleci/config.yml
+            rm -f .github/workflows/phase1-pagination-validate.yml
+            git add .circleci/config.yml .github/workflows/phase1-pagination-validate.yml client/src server/routes docs/phase1-validation-report.txt
+            if git diff --cached --quiet; then
+              echo "Nothing to commit."
+            else
+              git commit -m "chore: format and diagnose Phase 1 pagination"
+              git push origin HEAD:${CIRCLE_BRANCH}
+            fi
+            exit 1
+      - run:
           name: Verify lockfile and production dependencies
           command: |
             npm run verify:lockfile
