@@ -8,7 +8,7 @@ import {
   DropdownMenuTrigger,
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
-import { FileDown, MoreHorizontal, Eye, Upload, Download, FileText, FileSpreadsheet, Save, Check } from "lucide-react";
+import { FileDown, MoreHorizontal, Eye, Upload, Download, FileText, FileSpreadsheet, Save, Check, Sheet } from "lucide-react";
 import { Link } from "wouter";
 
 export interface POSHeaderProps {
@@ -29,6 +29,8 @@ export interface POSHeaderProps {
   onUpdateDraft?: () => void;
   onSummaryExport?: () => void;
   onDetailedExport?: () => void;
+  /** Admin/Developer-only: export the current edit-mode transaction to Excel */
+  onExportTransaction?: () => void;
 }
 
 function useRelativeTime(date: Date | null | undefined) {
@@ -68,12 +70,29 @@ export function POSHeader({
   onUpdateDraft,
   onSummaryExport,
   onDetailedExport,
+  onExportTransaction,
 }: POSHeaderProps) {
   const autosaveLabel = useRelativeTime(lastAutosaved);
 
   return (
     <PageHeader title={editVoucherId ? "Edit Transaction" : "Point of Sale"}>
-      {editVoucherId ? null : (
+      {editVoucherId ? (
+        <>
+          {onExportTransaction && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onExportTransaction}
+              className="gap-2"
+              data-testid="button-export-transaction"
+              title="Export transaction to Excel (admin/dev only)"
+            >
+              <Sheet className="h-4 w-4" />
+              <span className="hidden sm:inline">Export Excel</span>
+            </Button>
+          )}
+        </>
+      ) : (
         <>
           {autosaveLabel && <span className="text-xs text-muted-foreground hidden sm:inline">{autosaveLabel}</span>}
 
