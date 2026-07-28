@@ -144,7 +144,7 @@ function cacheResponse(
   key: string,
   response: Response,
   rule: HotspotCacheRule,
-  generationAtStart: number,
+  generationAtStart: number
 ): void {
   if (!response.ok || generationAtStart !== writeGeneration) return;
   const rawLength = response.headers.get("content-length");
@@ -185,10 +185,7 @@ function waitUntilVisible(signal?: AbortSignal | null): Promise<void> {
   });
 }
 
-async function cloneSharedResponse(
-  request: Promise<Response>,
-  signal?: AbortSignal | null,
-): Promise<Response> {
+async function cloneSharedResponse(request: Promise<Response>, signal?: AbortSignal | null): Promise<Response> {
   if (!signal) return (await request).clone();
   if (signal.aborted) throw new DOMException("The operation was aborted.", "AbortError");
 
@@ -203,7 +200,7 @@ async function cloneSharedResponse(
       (error) => {
         signal.removeEventListener("abort", onAbort);
         reject(error);
-      },
+      }
     );
   });
 }
