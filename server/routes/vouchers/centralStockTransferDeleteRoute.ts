@@ -23,7 +23,7 @@ function parseVoucherId(value: unknown): number | null {
 async function deleteStockTransfer(
   req: Request,
   res: Response,
-  next: NextFunction
+  next: NextFunction,
 ): Promise<void> {
   const voucherId = parseVoucherId(req.params.id);
   if (!voucherId) {
@@ -113,7 +113,7 @@ async function deleteStockTransfer(
 async function blockUnsafeBulkStockTransferDelete(
   req: Request,
   res: Response,
-  next: NextFunction
+  next: NextFunction,
 ): Promise<void> {
   const companyId = req.session.currentCompanyId;
   if (!companyId || !Array.isArray(req.body?.voucherIds)) {
@@ -121,12 +121,12 @@ async function blockUnsafeBulkStockTransferDelete(
     return;
   }
 
-  const ids = Array.from(
+  const ids: number[] = Array.from(
     new Set(
       req.body.voucherIds
         .map((value: unknown) => parseVoucherId(value))
-        .filter((value: number | null): value is number => value !== null)
-    )
+        .filter((value: number | null): value is number => value !== null),
+    ),
   );
   if (ids.length === 0) {
     next();
@@ -161,13 +161,13 @@ export function registerCentralStockTransferDeleteRoutes(app: Express): void {
     "/api/vouchers/:id",
     requireAuth,
     requireRole("Admin"),
-    (req, res, next) => void deleteStockTransfer(req, res, next)
+    (req, res, next) => void deleteStockTransfer(req, res, next),
   );
 
   app.post(
     "/api/vouchers/bulk-delete",
     requireAuth,
     requireRole("Admin"),
-    (req, res, next) => void blockUnsafeBulkStockTransferDelete(req, res, next)
+    (req, res, next) => void blockUnsafeBulkStockTransferDelete(req, res, next),
   );
 }

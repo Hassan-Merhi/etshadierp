@@ -47,7 +47,15 @@ function positiveId(value: unknown, label: string): number {
 }
 
 export function collectPostingTargetIds(entries: VoucherEntryInsertFields[]): PostingTargetIds {
-  const grouped = Object.fromEntries(TARGET_FIELDS.map((field) => [field, []])) as PostingTargetIds;
+  const grouped: PostingTargetIds = {
+    ledgerAccountId: [],
+    bankAccountId: [],
+    fixedAssetId: [],
+    supplierId: [],
+    employeeId: [],
+    customerId: [],
+    factorySupplierId: [],
+  };
 
   for (const entry of entries) {
     for (const field of TARGET_FIELDS) {
@@ -84,7 +92,7 @@ async function assertCompanyOwnedIds(input: {
   if (missing.length > 0) {
     throw new PostingValidationError(
       "POSTING_TARGET_NOT_OWNED",
-      `${label} ${missing.join(", ")} not found in company ${companyId}`
+      `${label} ${missing.join(", ")} not found in company ${companyId}`,
     );
   }
 }
@@ -235,8 +243,8 @@ export function createDatabasePostingDependencies(): CentralPostingDependencies 
             and(
               eq(auditLog.companyId, companyId),
               eq(auditLog.tableName, IDEMPOTENCY_TABLE),
-              eq(auditLog.recordIdentifier, source.idempotencyKey)
-            )
+              eq(auditLog.recordIdentifier, source.idempotencyKey),
+            ),
           )
           .orderBy(desc(auditLog.id))
           .limit(1);
@@ -246,7 +254,7 @@ export function createDatabasePostingDependencies(): CentralPostingDependencies 
         if (!Number.isInteger(voucherId) || voucherId <= 0) {
           throw new PostingValidationError(
             "POSTING_IDEMPOTENCY_CORRUPT",
-            `Idempotency marker ${source.idempotencyKey} has no valid voucher reference`
+            `Idempotency marker ${source.idempotencyKey} has no valid voucher reference`,
           );
         }
 
@@ -258,7 +266,7 @@ export function createDatabasePostingDependencies(): CentralPostingDependencies 
         if (!voucher) {
           throw new PostingValidationError(
             "POSTING_IDEMPOTENCY_CORRUPT",
-            `Idempotency marker ${source.idempotencyKey} references a missing voucher`
+            `Idempotency marker ${source.idempotencyKey} references a missing voucher`,
           );
         }
 

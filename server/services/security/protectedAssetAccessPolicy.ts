@@ -1,5 +1,6 @@
 import {
   assertAuthorized,
+  AuthorizationDeniedError,
   type AuthorizationActor,
   type AuthorizationDomain,
 } from "./authorizationPolicy";
@@ -109,7 +110,7 @@ export function validateStorageKey(value: unknown): string {
 
 export async function authorizeProtectedAssetAccess(
   lookup: ProtectedAssetLookup,
-  request: ProtectedAssetAccessRequest
+  request: ProtectedAssetAccessRequest,
 ): Promise<ProtectedAssetAccessDecision> {
   if (!validIdentifier(request.assetId)) {
     throw new ProtectedAssetAccessError("ASSET_ID_INVALID");
@@ -130,15 +131,23 @@ export async function authorizeProtectedAssetAccess(
 
   if (request.action !== "generate") validateStorageKey(asset.storageKey);
   const safeFileName = sanitizeDownloadFileName(asset.fileName);
-  const ownerAllowed = request.allowOwnerAccess === true && sameIdentity(request.actor?.userId, asset.ownerUserId);
+  const actor = request.actor;
+  const ownerAllowed = request.allowOwnerAccess === true && sameIdentity(actor?.userId, asset.ownerUserId);
+  const configuredRoles = ownerAllowed ? [actor!.role] : request.allowedRoles ?? [];
+  const roleAllowed = actor != null && configuredRoles.includes(actor.role);
+  const permissionAllowed = actor?.permissions?.includes(request.requiredPermission) === true;
+
+  if (!ownerAllowed && !roleAllowed && !permissionAllowed) {
+    throw new AuthorizationDeniedError({ effect: "deny", code: "PERMISSION_REQUIRED" });
+  }
 
   assertAuthorized({
-    actor: request.actor,
+    actor,
     domain: request.domain ?? "reporting",
     action: `asset.${request.kind}.${request.action}`,
     resource: { companyId: asset.companyId, ownerUserId: asset.ownerUserId ?? null },
-    allowedRoles: ownerAllowed ? [request.actor!.role] : request.allowedRoles ?? [],
-    requiredPermissions: ownerAllowed ? [] : [request.requiredPermission],
+    allowedRoles: ownerAllowed || roleAllowed ? [actor!.role] : [],
+    requiredPermissions: ownerAllowed || roleAllowed ? [] : [request.requiredPermission],
   });
 
   return { asset: Object.freeze({ ...asset }), safeFileName, disposition: "attachment" };

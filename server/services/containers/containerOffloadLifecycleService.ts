@@ -811,9 +811,10 @@ export async function executeContainerOffloadLifecycle(
       );
     }
 
-const poIds = purchaseOrders.map(
-  (po: typeof schema.purchaseOrders.$inferSelect) => po.id,
-);    const lineItems = await tx
+        const poIds = purchaseOrders.map(
+      (po: typeof schema.purchaseOrders.$inferSelect) => po.id,
+    );
+    const lineItems = await tx
       .select({
         stockItemId: schema.poLineItems.stockItemId,
         quantity: schema.poLineItems.quantity,

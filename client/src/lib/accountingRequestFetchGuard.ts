@@ -21,7 +21,7 @@ function parseJsonBody(init?: RequestInit): Record<string, unknown> | null {
   try {
     const parsed = JSON.parse(init.body);
     return parsed && typeof parsed === "object" && !Array.isArray(parsed)
-      ? parsed as Record<string, unknown>
+      ? (parsed as Record<string, unknown>)
       : null;
   } catch {
     return null;
@@ -55,17 +55,11 @@ export function installAccountingRequestFetchGuard(): void {
       body: JSON.stringify(outboundBody),
     };
 
-    try {
-      const response = await originalFetch(input, outboundInit);
-      if (shouldReleaseAccountingRequestIdentity(response.status)) {
-        releaseAccountingRequestIdentity(method, pathname, outboundBody);
-      }
-      return response;
-    } catch (error) {
-      // Keep the identity for an uncertain network outcome. The next identical
-      // submission will reuse it and the server will return the original posting.
-      throw error;
+    const response = await originalFetch(input, outboundInit);
+    if (shouldReleaseAccountingRequestIdentity(response.status)) {
+      releaseAccountingRequestIdentity(method, pathname, outboundBody);
     }
+    return response;
   };
 }
 
