@@ -99,49 +99,47 @@ export async function getHistoricalCurrencyReadiness(
       unresolved_employee_openings: string;
       unresolved_fixed_assets: string;
     }>(
+      // Only flag records whose currency is explicitly set to a non-USD value
+      // but whose base amount has not been filled in.  Records with NULL
+      // currency are pre-multi-currency legacy data implicitly denominated in
+      // the base currency (USD) and do not need backfilling — this mirrors the
+      // same COALESCE(UPPER(currency),'USD') <> 'USD' gate used for voucher
+      // entries above.
       `SELECT
          (SELECT COUNT(*)
             FROM ledger_accounts la
            WHERE la.company_id = $1
              AND la.deleted_at IS NULL
              AND COALESCE(la.opening_balance, 0)::numeric <> 0
-             AND (
-               la.opening_balance_native_amount IS NULL OR
-               la.opening_balance_currency IS NULL OR
-               la.opening_balance_base_amount IS NULL
-             )
+             AND la.opening_balance_currency IS NOT NULL
+             AND COALESCE(UPPER(la.opening_balance_currency), 'USD') <> 'USD'
+             AND la.opening_balance_base_amount IS NULL
          )::text AS unresolved_ledger_openings,
          (SELECT COUNT(*)
             FROM bank_accounts ba
            WHERE ba.company_id = $1
              AND ba.deleted_at IS NULL
              AND COALESCE(ba.opening_balance, 0)::numeric <> 0
-             AND (
-               ba.opening_balance_native_amount IS NULL OR
-               ba.opening_balance_currency IS NULL OR
-               ba.opening_balance_base_amount IS NULL
-             )
+             AND ba.opening_balance_currency IS NOT NULL
+             AND COALESCE(UPPER(ba.opening_balance_currency), 'USD') <> 'USD'
+             AND ba.opening_balance_base_amount IS NULL
          )::text AS unresolved_bank_openings,
          (SELECT COUNT(*)
             FROM customers c
            WHERE c.company_id = $1
              AND c.deleted_at IS NULL
              AND COALESCE(c.opening_balance, 0)::numeric <> 0
-             AND (
-               c.opening_balance_native_amount IS NULL OR
-               c.opening_balance_currency IS NULL OR
-               c.opening_balance_base_amount IS NULL
-             )
+             AND c.opening_balance_currency IS NOT NULL
+             AND COALESCE(UPPER(c.opening_balance_currency), 'USD') <> 'USD'
+             AND c.opening_balance_base_amount IS NULL
          )::text AS unresolved_customer_openings,
          (SELECT COUNT(*)
             FROM suppliers s
            WHERE s.deleted_at IS NULL
              AND COALESCE(s.opening_balance, 0)::numeric <> 0
-             AND (
-               s.opening_balance_native_amount IS NULL OR
-               s.opening_balance_currency IS NULL OR
-               s.opening_balance_base_amount IS NULL
-             )
+             AND s.opening_balance_currency IS NOT NULL
+             AND COALESCE(UPPER(s.opening_balance_currency), 'USD') <> 'USD'
+             AND s.opening_balance_base_amount IS NULL
              AND EXISTS (
                SELECT 1
                  FROM voucher_entries ve
@@ -156,21 +154,17 @@ export async function getHistoricalCurrencyReadiness(
            WHERE e.company_id = $1
              AND e.deleted_at IS NULL
              AND COALESCE(e.opening_balance, 0)::numeric <> 0
-             AND (
-               e.opening_balance_native_amount IS NULL OR
-               e.opening_balance_currency IS NULL OR
-               e.opening_balance_base_amount IS NULL
-             )
+             AND e.opening_balance_currency IS NOT NULL
+             AND COALESCE(UPPER(e.opening_balance_currency), 'USD') <> 'USD'
+             AND e.opening_balance_base_amount IS NULL
          )::text AS unresolved_employee_openings,
          (SELECT COUNT(*)
             FROM fixed_assets fa
            WHERE fa.company_id = $1
              AND COALESCE(fa.purchase_amount, 0)::numeric <> 0
-             AND (
-               fa.purchase_native_amount IS NULL OR
-               fa.purchase_currency IS NULL OR
-               fa.purchase_base_amount IS NULL
-             )
+             AND fa.purchase_currency IS NOT NULL
+             AND COALESCE(UPPER(fa.purchase_currency), 'USD') <> 'USD'
+             AND fa.purchase_base_amount IS NULL
          )::text AS unresolved_fixed_assets`,
       [companyId],
     ),
