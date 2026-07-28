@@ -1,8 +1,10 @@
-const CACHE_VERSION = "erp-v9";
+const CACHE_VERSION = "erp-v10";
 const CACHE_PREFIX = "erp-";
 const APP_SHELL = ["/", "/manifest.json"];
+const MAX_STATIC_CACHE_ENTRIES = 200;
 const HASHED_ASSET_RE =
   /^\/assets\/[^/]+-[A-Za-z0-9_-]{6,}\.(?:js|css|woff2?|ttf|png|jpe?g|webp|svg|ico)$/i;
+const LABEL_PREVIEW_RE = /^\/labels\/previews\/[^/]+-preview\.webp$/i;
 
 // ── Install: cache the latest app shell ───────────────────────────────────────
 self.addEventListener("install", (event) => {
@@ -43,22 +45,28 @@ self.addEventListener("message", (event) => {
 self.addEventListener("fetch", (event) => {
   const { request } = event;
 
-  // Only handle same-origin GET requests.
-  if (request.method !== "GET") return;
+  // Only handle same-origin GET requests. Range responses must stay on the
+  // network because a cached partial response can corrupt later downloads.
+  if (request.method !== "GET" || request.headers.has("range")) return;
   const url = new URL(request.url);
   if (url.origin !== self.location.origin) return;
 
   if (url.pathname.startsWith("/api/")) {
-    // Network-first for API calls; offline JSON fallback.
-    event.respondWith(networkFirstApi(request));
+    // API responses contain company-scoped and user-scoped data. They are
+    // already protected by the in-memory request guards and server microcache;
+    // persisting multi-megabyte JSON in shared Cache Storage would create stale
+    // cross-login data and unbounded device storage. Always use the network.
+    event.respondWith(networkOnlyApi(request));
   } else if (request.mode === "navigate") {
     // Navigation requests: network first, fall back to the single cached SPA shell.
     event.respondWith(navigationHandler(request));
   } else if (HASHED_ASSET_RE.test(url.pathname)) {
-    // Content-hashed production assets are immutable. Serve the Cache Storage
-    // copy first so refreshes, reopened tabs and repeat visits do not download
-    // the same 1–2 MB bundles from Render again.
+    // Content-hashed production assets are immutable and safe for cache-first.
     event.respondWith(cacheFirstHashedAsset(request));
+  } else if (isVersionedLabelAsset(url)) {
+    // Label previews are immutable defaults; custom banners carry a stable
+    // ?t=<updatedAt> version. Both can avoid repeat downloads safely.
+    event.respondWith(cacheFirstVersionedAsset(request));
   } else if (
     url.pathname.startsWith("/assets/") ||
     url.pathname.startsWith("/node_modules/.vite/") ||
@@ -67,12 +75,17 @@ self.addEventListener("fetch", (event) => {
     // Unhashed/dev assets remain network-first so edits are immediately visible.
     event.respondWith(networkFirstAsset(request));
   } else {
-    // Other static assets (fonts, images, sw.js itself): stale-while-revalidate.
+    // Other small static assets use stale-while-revalidate with a bounded cache.
     event.respondWith(staleWhileRevalidate(request));
   }
 });
 
 // ── Cache helpers ──────────────────────────────────────────────────────────────
+
+function isVersionedLabelAsset(url) {
+  if (LABEL_PREVIEW_RE.test(url.pathname)) return true;
+  return url.pathname.startsWith("/labels/") && url.searchParams.has("t");
+}
 
 async function deleteErpCachesExcept(keepName) {
   const keys = await caches.keys();
@@ -86,6 +99,14 @@ async function deleteAllErpCaches() {
   await Promise.all(keys.filter((key) => key.startsWith(CACHE_PREFIX)).map((key) => caches.delete(key)));
 }
 
+async function putBounded(cache, request, response) {
+  await cache.put(request, response);
+  const keys = await cache.keys();
+  const overflow = keys.length - MAX_STATIC_CACHE_ENTRIES;
+  if (overflow <= 0) return;
+  await Promise.all(keys.slice(0, overflow).map((key) => cache.delete(key)));
+}
+
 function rejectHtmlAssetResponse(response) {
   const contentType = response.headers.get("content-type") || "";
   if (!contentType.includes("text/html")) return null;
@@ -97,17 +118,10 @@ function rejectHtmlAssetResponse(response) {
 
 // ── Strategies ────────────────────────────────────────────────────────────────
 
-async function networkFirstApi(request) {
+async function networkOnlyApi(request) {
   try {
-    const response = await fetch(request.clone());
-    if (response.ok) {
-      const cache = await caches.open(CACHE_VERSION);
-      cache.put(request, response.clone());
-    }
-    return response;
+    return await fetch(request.clone(), { cache: "no-store" });
   } catch {
-    const cached = await caches.match(request);
-    if (cached) return cached;
     return new Response(JSON.stringify({ error: "Offline", offline: true }), {
       status: 503,
       headers: { "Content-Type": "application/json" },
@@ -150,7 +164,26 @@ async function cacheFirstHashedAsset(request) {
     const response = await fetch(request.clone());
     const invalidResponse = rejectHtmlAssetResponse(response);
     if (invalidResponse) return invalidResponse;
-    if (response.ok) await cache.put(request, response.clone());
+    if (response.ok) await putBounded(cache, request, response.clone());
+    return response;
+  } catch {
+    return new Response("Asset unavailable offline", {
+      status: 503,
+      headers: { "Content-Type": "text/plain" },
+    });
+  }
+}
+
+async function cacheFirstVersionedAsset(request) {
+  const cache = await caches.open(CACHE_VERSION);
+  const cached = await cache.match(request);
+  if (cached) return cached;
+
+  try {
+    const response = await fetch(request.clone());
+    const invalidResponse = rejectHtmlAssetResponse(response);
+    if (invalidResponse) return invalidResponse;
+    if (response.ok) await putBounded(cache, request, response.clone());
     return response;
   } catch {
     return new Response("Asset unavailable offline", {
@@ -168,7 +201,7 @@ async function networkFirstAsset(request) {
     const response = await fetch(request.clone(), { cache: "no-store" });
     const invalidResponse = rejectHtmlAssetResponse(response);
     if (invalidResponse) return invalidResponse;
-    if (response.ok) await cache.put(request, response.clone());
+    if (response.ok) await putBounded(cache, request, response.clone());
     return response;
   } catch {
     const cached = await cache.match(request);
@@ -185,12 +218,12 @@ async function staleWhileRevalidate(request) {
   const cached = await cache.match(request);
 
   const fetchPromise = fetch(request.clone())
-    .then((response) => {
+    .then(async (response) => {
       if (response.ok) {
         // Never cache HTML under a non-navigation URL — prevents MIME corruption.
         const contentType = response.headers.get("content-type") || "";
         if (!contentType.includes("text/html")) {
-          cache.put(request, response.clone());
+          await putBounded(cache, request, response.clone());
         }
       }
       return response;

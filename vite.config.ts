@@ -4,11 +4,13 @@ import path from "path";
 import runtimeErrorOverlay from "@replit/vite-plugin-runtime-error-modal";
 import { heavyListPaginationPlugin } from "./build/viteHeavyListPaginationPlugin";
 import { lazyHeavyImportsPlugin } from "./build/viteLazyHeavyImportsPlugin";
+import { labelAssetExtractionPlugin } from "./build/viteLabelAssetExtractionPlugin";
 
 export default defineConfig({
   plugins: [
     heavyListPaginationPlugin(),
     lazyHeavyImportsPlugin(),
+    labelAssetExtractionPlugin(),
     react(),
     runtimeErrorOverlay(),
     ...(process.env.NODE_ENV !== "production" &&
@@ -37,6 +39,10 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks(id) {
+          const normalizedId = id.replace(/\\/g, "/");
+          if (normalizedId.endsWith("/client/src/lib/labelHtml.ts")) {
+            return "label-printing";
+          }
           if (
             id.includes("node_modules/react/") ||
             id.includes("node_modules/react-dom/") ||

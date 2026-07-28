@@ -1,5 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
-import { buildReadMicrocacheKey, createReadMicrocacheMiddleware, READ_MICROCACHE_PATHS } from "./readMicrocache";
+import {
+  buildReadMicrocacheKey,
+  createReadMicrocacheMiddleware,
+  READ_MICROCACHE_PATHS,
+  READ_MICROCACHE_TTL_MS,
+} from "./readMicrocache";
 
 function makeRequest(overrides: Record<string, unknown> = {}) {
   return {
@@ -22,11 +27,16 @@ function makeResponse(statusCode = 200) {
     statusCode,
     sentBody: undefined as unknown,
     jsonBody: undefined as unknown,
+    headers: {} as Record<string, string>,
     status(code: number) {
       this.statusCode = code;
       return this;
     },
     type() {
+      return this;
+    },
+    setHeader(name: string, value: string) {
+      this.headers[name] = value;
       return this;
     },
     send(body: unknown) {
@@ -41,15 +51,27 @@ function makeResponse(statusCode = 200) {
 }
 
 describe("Phase 7C read microcache", () => {
-  it("covers factory, account, Daybook, and reporting read paths", () => {
+  it("covers the current database-pressure hotspots", () => {
     expect(READ_MICROCACHE_PATHS).toEqual(
       new Set([
         "/api/factory/daybook",
         "/api/accounts/all",
         "/api/stats/monthly-data",
         "/api/dashboard/sales-report-all",
+        "/api/factory/suppliers/with-balances",
+        "/api/factory/raw-stock",
+        "/api/factory/raw-stock/available-containers",
+        "/api/factory/mix-batches",
+        "/api/factory/bale-ledger",
+        "/api/factory/production-value-report",
+        "/api/factory/containers",
+        "/api/factory/bale-products",
+        "/api/factory/workers",
+        "/api/ledger-accounts",
       ])
     );
+    expect(READ_MICROCACHE_TTL_MS.get("/api/accounts/all")).toBe(15_000);
+    expect(READ_MICROCACHE_TTL_MS.get("/api/factory/bale-products")).toBe(30_000);
   });
 
   it("isolates cache keys by user, company, role, and full query", () => {
@@ -79,6 +101,7 @@ describe("Phase 7C read microcache", () => {
 
     expect(secondNext).not.toHaveBeenCalled();
     expect(secondRes.sentBody).toBe(JSON.stringify({ total: 12 }));
+    expect(secondRes.headers["X-ERP-Read-Cache"]).toBe("HIT");
   });
 
   it("does not cache failed responses or requests outside the allowlist", () => {
@@ -92,7 +115,11 @@ describe("Phase 7C read microcache", () => {
     expect(retryNext).toHaveBeenCalledOnce();
 
     const unrelatedNext = vi.fn();
-    middleware(makeRequest({ path: "/api/vouchers", originalUrl: "/api/vouchers" }), makeResponse(), unrelatedNext);
+    middleware(
+      makeRequest({ path: "/api/vouchers", originalUrl: "/api/vouchers" }),
+      makeResponse(),
+      unrelatedNext
+    );
     expect(unrelatedNext).toHaveBeenCalledOnce();
   });
 
@@ -107,5 +134,24 @@ describe("Phase 7C read microcache", () => {
     const next = vi.fn();
     middleware(req, makeResponse(), next);
     expect(next).toHaveBeenCalledOnce();
+  });
+
+  it("clears cached reads before a state-changing request", () => {
+    const middleware = createReadMicrocacheMiddleware({ ttlMs: 5_000 });
+    const req = makeRequest();
+    const firstRes = makeResponse();
+    middleware(req, firstRes, () => firstRes.json({ ok: true }));
+
+    const writeNext = vi.fn();
+    middleware(
+      makeRequest({ method: "POST", path: "/api/vouchers", originalUrl: "/api/vouchers" }),
+      makeResponse(),
+      writeNext
+    );
+    expect(writeNext).toHaveBeenCalledOnce();
+
+    const readNext = vi.fn();
+    middleware(req, makeResponse(), readNext);
+    expect(readNext).toHaveBeenCalledOnce();
   });
 });
