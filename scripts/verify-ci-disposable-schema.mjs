@@ -97,7 +97,9 @@ try {
   await client.query(
     "ALTER TABLE factory_mix_batches ALTER COLUMN total_weight_kg SET DEFAULT 0",
   );
-  await client.query("ALTER TABLE factory_mix_batches ALTER COLUMN total_cost SET DEFAULT 0");
+  await client.query(
+    "ALTER TABLE factory_mix_batches ALTER COLUMN total_cost SET DEFAULT 0",
+  );
 
   // Preserve historical soft-deleted raw-stock rows while allowing one current
   // row per company/container. The old unconditional unique index made that
