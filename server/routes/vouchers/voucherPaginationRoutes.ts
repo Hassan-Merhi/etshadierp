@@ -1,4 +1,4 @@
-import type { Express, Request, Response } from "express";
+import type { Express, NextFunction, Request, Response } from "express";
 import { and, asc, desc, eq, ilike, inArray, isNull, or, sql } from "drizzle-orm";
 import { requireAuth } from "../../auth";
 import { db } from "../../db";
@@ -46,24 +46,26 @@ function applyPaginationHeaders(
   total: number,
   page: number,
   limit: number,
-  totalPages: number,
-  defaultApplied: boolean
+  totalPages: number
 ): void {
   res.setHeader("X-Total-Count", String(total));
   res.setHeader("X-Page", String(page));
   res.setHeader("X-Page-Size", String(limit));
   res.setHeader("X-Total-Pages", String(totalPages));
-  res.setHeader("X-Default-Limit-Applied", defaultApplied ? "true" : "false");
   res.setHeader(
     "Access-Control-Expose-Headers",
-    "X-Total-Count, X-Page, X-Page-Size, X-Total-Pages, X-Default-Limit-Applied"
+    "X-Total-Count, X-Page, X-Page-Size, X-Total-Pages"
   );
 }
 
 function sanitizeForPos(rows: any[]): any[] {
   return rows.map((voucher) => {
     const voucherType = String(voucher.voucherType || "").toLowerCase();
-    if (voucherType === "stock transfer" || voucherType === "stocktransfer" || voucherType.includes("stock transfer")) {
+    if (
+      voucherType === "stock transfer" ||
+      voucherType === "stocktransfer" ||
+      voucherType.includes("stock transfer")
+    ) {
       return { ...voucher, totalAmount: "0" };
     }
     return voucher;
@@ -71,95 +73,120 @@ function sanitizeForPos(rows: any[]): any[] {
 }
 
 export function registerVoucherPaginationRoutes(app: Express): void {
-  app.get("/api/vouchers", requireAuth, async (req: Request, res: Response) => {
-    try {
-      const companyId = req.session.currentCompanyId;
-      if (!companyId) return res.status(400).json({ message: "No company selected" });
+  app.get(
+    "/api/vouchers",
+    requireAuth,
+    async (req: Request, res: Response, next: NextFunction) => {
+      // Compatibility callers still depend on the complete legacy array. Only
+      // explicit pagination requests are intercepted by this native SQL reader.
+      if (!wantsStructuredPagination(req)) return next();
 
-      let startDate = normalizeDate(req.query.startDate);
-      let endDate = normalizeDate(req.query.endDate);
-      if (!startDate || !endDate) {
-        const end = new Date();
-        const start = new Date();
-        start.setDate(start.getDate() - 90);
-        startDate = start.toISOString().slice(0, 10);
-        endDate = end.toISOString().slice(0, 10);
-      }
+      try {
+        const companyId = req.session.currentCompanyId;
+        if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const conditions: any[] = [
-        eq(vouchers.companyId, companyId),
-        isNull(vouchers.deletedAt),
-        sql`${vouchers.voucherDate} >= ${startDate}`,
-        sql`${vouchers.voucherDate} <= ${endDate}`,
-        sql`${vouchers.voucherNumber} NOT LIKE 'SP-OTW-REV-%'`,
-        sql`${vouchers.voucherNumber} NOT LIKE 'SP-STOCK-%'`,
-        sql`${vouchers.voucherNumber} NOT LIKE 'SP-OPNSTK-%'`,
-      ];
-
-      const voucherType = typeof req.query.voucherType === "string" ? req.query.voucherType.trim() : "";
-      if (voucherType && voucherType !== "all") conditions.push(eq(vouchers.voucherType, voucherType));
-
-      const statusFilter = typeof req.query.statusFilter === "string" ? req.query.statusFilter : "all";
-      if (statusFilter === "active") conditions.push(eq(vouchers.optional, false));
-      else if (statusFilter === "optional") conditions.push(eq(vouchers.optional, true));
-
-      const search = typeof req.query.search === "string" ? req.query.search.trim() : "";
-      if (search) {
-        const query = `%${search}%`;
-        conditions.push(or(ilike(vouchers.voucherNumber, query), ilike(vouchers.description, query)));
-      }
-
-      const minAmount = Number.parseFloat(String(req.query.minAmount ?? ""));
-      const maxAmount = Number.parseFloat(String(req.query.maxAmount ?? ""));
-      if (Number.isFinite(minAmount)) conditions.push(sql`${vouchers.totalAmount}::numeric >= ${minAmount}`);
-      if (Number.isFinite(maxAmount)) conditions.push(sql`${vouchers.totalAmount}::numeric <= ${maxAmount}`);
-
-      const isPos = req.session.currentRole === "POS";
-      if (isPos && req.user?.id) {
-        const assignedLocations = await db
-          .select({ locationId: userLocations.locationId })
-          .from(userLocations)
-          .where(and(eq(userLocations.userId, req.user.id), eq(userLocations.companyId, companyId)));
-        const allowedLocationIds = assignedLocations.map((row) => row.locationId);
-        if (allowedLocationIds.length > 0) {
-          conditions.push(or(isNull(vouchers.locationId), inArray(vouchers.locationId, allowedLocationIds)));
+        let startDate = normalizeDate(req.query.startDate);
+        let endDate = normalizeDate(req.query.endDate);
+        if (!startDate || !endDate) {
+          const end = new Date();
+          const start = new Date();
+          start.setDate(start.getDate() - 90);
+          startDate = start.toISOString().slice(0, 10);
+          endDate = end.toISOString().slice(0, 10);
         }
+
+        const conditions: any[] = [
+          eq(vouchers.companyId, companyId),
+          isNull(vouchers.deletedAt),
+          sql`${vouchers.voucherDate} >= ${startDate}`,
+          sql`${vouchers.voucherDate} <= ${endDate}`,
+          sql`${vouchers.voucherNumber} NOT LIKE 'SP-OTW-REV-%'`,
+          sql`${vouchers.voucherNumber} NOT LIKE 'SP-STOCK-%'`,
+          sql`${vouchers.voucherNumber} NOT LIKE 'SP-OPNSTK-%'`,
+        ];
+
+        const voucherType =
+          typeof req.query.voucherType === "string" ? req.query.voucherType.trim() : "";
+        if (voucherType && voucherType !== "all") {
+          conditions.push(eq(vouchers.voucherType, voucherType));
+        }
+
+        const statusFilter =
+          typeof req.query.statusFilter === "string" ? req.query.statusFilter : "all";
+        if (statusFilter === "active") conditions.push(eq(vouchers.optional, false));
+        else if (statusFilter === "optional") conditions.push(eq(vouchers.optional, true));
+
+        const search = typeof req.query.search === "string" ? req.query.search.trim() : "";
+        if (search) {
+          const query = `%${search}%`;
+          conditions.push(
+            or(ilike(vouchers.voucherNumber, query), ilike(vouchers.description, query))
+          );
+        }
+
+        const minAmount = Number.parseFloat(String(req.query.minAmount ?? ""));
+        const maxAmount = Number.parseFloat(String(req.query.maxAmount ?? ""));
+        if (Number.isFinite(minAmount)) {
+          conditions.push(sql`${vouchers.totalAmount}::numeric >= ${minAmount}`);
+        }
+        if (Number.isFinite(maxAmount)) {
+          conditions.push(sql`${vouchers.totalAmount}::numeric <= ${maxAmount}`);
+        }
+
+        const isPos = req.session.currentRole === "POS";
+        if (isPos && req.user?.id) {
+          const assignedLocations = await db
+            .select({ locationId: userLocations.locationId })
+            .from(userLocations)
+            .where(
+              and(
+                eq(userLocations.userId, req.user.id),
+                eq(userLocations.companyId, companyId)
+              )
+            );
+          const allowedLocationIds = assignedLocations.map((row) => row.locationId);
+          if (allowedLocationIds.length > 0) {
+            conditions.push(
+              or(isNull(vouchers.locationId), inArray(vouchers.locationId, allowedLocationIds))
+            );
+          }
+        }
+
+        const { page, limit, offset } = parsePagination(req);
+        const where = and(...conditions);
+        const dateSort = sql`COALESCE(${vouchers.effectiveDate}, ${vouchers.voucherDate})`;
+        const ascending = req.query.sortOrder === "asc";
+
+        const [countRows, data] = await Promise.all([
+          db.select({ total: sql<number>`count(*)::int` }).from(vouchers).where(where),
+          db
+            .select()
+            .from(vouchers)
+            .where(where)
+            .orderBy(
+              ascending ? asc(dateSort) : desc(dateSort),
+              ascending ? asc(vouchers.id) : desc(vouchers.id)
+            )
+            .limit(limit)
+            .offset(offset),
+        ]);
+
+        const total = countRows[0]?.total ?? 0;
+        const totalPages = total === 0 ? 0 : Math.ceil(total / limit);
+        const items = isPos ? sanitizeForPos(data) : data;
+        applyPaginationHeaders(res, total, page, limit, totalPages);
+        return res.json({
+          items,
+          total,
+          page,
+          limit,
+          totalPages,
+          hasNextPage: page < totalPages,
+          hasPreviousPage: page > 1 && totalPages > 0,
+        });
+      } catch (error: unknown) {
+        return res.status(500).json({ message: getErrorMessage(error) });
       }
-
-      const { page, limit, offset } = parsePagination(req);
-      const where = and(...conditions);
-      const dateSort = sql`COALESCE(${vouchers.effectiveDate}, ${vouchers.voucherDate})`;
-      const ascending = req.query.sortOrder === "asc";
-
-      const [countRows, data] = await Promise.all([
-        db.select({ total: sql<number>`count(*)::int` }).from(vouchers).where(where),
-        db
-          .select()
-          .from(vouchers)
-          .where(where)
-          .orderBy(ascending ? asc(dateSort) : desc(dateSort), ascending ? asc(vouchers.id) : desc(vouchers.id))
-          .limit(limit)
-          .offset(offset),
-      ]);
-
-      const total = countRows[0]?.total ?? 0;
-      const totalPages = total === 0 ? 0 : Math.ceil(total / limit);
-      const items = isPos ? sanitizeForPos(data) : data;
-      const structured = wantsStructuredPagination(req);
-      applyPaginationHeaders(res, total, page, limit, totalPages, !structured);
-
-      if (!structured) return res.json(items);
-      return res.json({
-        items,
-        total,
-        page,
-        limit,
-        totalPages,
-        hasNextPage: page < totalPages,
-        hasPreviousPage: page > 1 && totalPages > 0,
-      });
-    } catch (error: unknown) {
-      return res.status(500).json({ message: getErrorMessage(error) });
     }
-  });
+  );
 }
