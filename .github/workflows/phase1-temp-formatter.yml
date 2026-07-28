@@ -12,30 +12,31 @@ jobs:
   format-phase1:
     if: github.head_ref == 'agent/phase1-sql-pagination'
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 10
     steps:
       - name: Checkout Phase 1 branch
         uses: actions/checkout@v4
         with:
           repository: ${{ github.event.pull_request.head.repo.full_name }}
           ref: ${{ github.event.pull_request.head.ref }}
-          fetch-depth: 0
+          fetch-depth: 1
           persist-credentials: false
 
       - name: Set up Node.js 22
         uses: actions/setup-node@v4
         with:
           node-version: "22"
-          cache: npm
 
-      - name: Install dependencies
+      - name: Download Prettier 3.8.4
         run: |
-          sed -i 's#http://package-firewall.replit.local/npm/#https://registry.npmjs.org/#g' package-lock.json
-          npm ci --no-audit --bin-links=true
+          mkdir -p /tmp/phase1-prettier
+          cd /tmp/phase1-prettier
+          npm pack prettier@3.8.4 --silent
+          tar -xzf prettier-3.8.4.tgz
 
       - name: Format Phase 1 files
         run: |
-          node node_modules/prettier/bin/prettier.cjs --write \
+          node /tmp/phase1-prettier/package/bin/prettier.cjs --write \
             build/vitePhase1PaginationPlugin.ts \
             client/src/lib/accountStatementPaginationClient.ts \
             client/src/lib/containerPaginationClient.ts \
