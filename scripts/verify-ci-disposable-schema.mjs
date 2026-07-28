@@ -120,7 +120,7 @@ try {
   // The strict supplier company-scope migration is raw SQL and therefore is not
   // represented by `drizzle-kit push`. Disposable CI databases start empty, so
   // install the structural portion here before tests create any companies or
-  // suppliers. Tests and current application routes always provide company_id.
+  // suppliers. The compatibility trigger mirrors production for legacy inserts.
   await client.query("ALTER TABLE suppliers ADD COLUMN IF NOT EXISTS company_id INTEGER");
   await client.query("ALTER TABLE suppliers DROP CONSTRAINT IF EXISTS suppliers_code_unique");
   await client.query("DROP INDEX IF EXISTS suppliers_code_unique");
@@ -147,6 +147,66 @@ try {
       END IF;
     END
     $$
+  `);
+  await client.query(`
+    CREATE OR REPLACE FUNCTION assign_supplier_company_id()
+    RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+    DECLARE
+      resolved_company_id INTEGER;
+      fallback_parent_count INTEGER;
+    BEGIN
+      IF NEW.company_id IS NOT NULL THEN
+        RETURN NEW;
+      END IF;
+
+      SELECT CASE
+               WHEN value ~ '^[1-9][0-9]*$' THEN value::INTEGER
+               ELSE NULL
+             END
+        INTO resolved_company_id
+        FROM system_settings
+       WHERE key = 'parentCompanyId'
+       LIMIT 1;
+
+      IF resolved_company_id IS NULL THEN
+        SELECT COUNT(*)::INTEGER
+          INTO fallback_parent_count
+          FROM companies
+         WHERE active = TRUE
+           AND company_type = 'erp'
+           AND parent_company_id IS NULL;
+
+        IF fallback_parent_count = 1 THEN
+          SELECT id
+            INTO resolved_company_id
+            FROM companies
+           WHERE active = TRUE
+             AND company_type = 'erp'
+             AND parent_company_id IS NULL
+           LIMIT 1;
+        ELSE
+          RAISE EXCEPTION
+            'Supplier company ownership is required; configure system_settings.parentCompanyId';
+        END IF;
+      END IF;
+
+      IF NOT EXISTS (SELECT 1 FROM companies WHERE id = resolved_company_id) THEN
+        RAISE EXCEPTION 'Configured supplier parent company % does not exist', resolved_company_id;
+      END IF;
+
+      NEW.company_id := resolved_company_id;
+      RETURN NEW;
+    END
+    $$
+  `);
+  await client.query("DROP TRIGGER IF EXISTS suppliers_assign_company_id ON suppliers");
+  await client.query(`
+    CREATE TRIGGER suppliers_assign_company_id
+    BEFORE INSERT ON suppliers
+    FOR EACH ROW
+    EXECUTE FUNCTION assign_supplier_company_id()
   `);
 
   // Runtime rental posting uses ON CONFLICT with the active ledger name. The
@@ -211,7 +271,8 @@ try {
          WHERE table_schema = 'public'
            AND table_name = 'suppliers'
            AND column_name = 'company_id'
-      ) AS suppliers_company_id
+      ) AS suppliers_company_id,
+      to_regprocedure('public.assign_supplier_company_id()') IS NOT NULL AS supplier_trigger_function
   `);
   const row = required.rows[0];
   for (const table of [
@@ -227,6 +288,9 @@ try {
   }
   if (!row?.suppliers_company_id) {
     throw new Error("Disposable schema is missing suppliers.company_id");
+  }
+  if (!row?.supplier_trigger_function) {
+    throw new Error("Disposable schema is missing supplier ownership trigger support");
   }
 } finally {
   await client.end();
