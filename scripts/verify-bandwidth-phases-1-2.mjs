@@ -29,8 +29,16 @@ requireText(serviceWorker, "HASHED_ASSET_RE", "Hashed production assets must be 
 requireText(serviceWorker, "cacheFirstHashedAsset(request)", "Hashed assets must use cache-first loading.");
 requireText(serviceWorker, "if (cached) return cached;", "Cached hashed assets must be returned before network access.");
 rejectText(main, 'url.searchParams.set("_sw"', "Service-worker activation must not auto-reload every tab.");
-requireText(main, 'new CustomEvent("erp:service-worker-updated"', "Service-worker activation must notify the update banner.");
-requireText(app, 'window.addEventListener("erp:service-worker-updated"', "The update banner must handle service-worker updates.");
+requireText(
+  main,
+  'new CustomEvent("erp:service-worker-updated"',
+  "Service-worker activation must notify the update banner."
+);
+requireText(
+  app,
+  'window.addEventListener("erp:service-worker-updated"',
+  "The update banner must handle service-worker updates."
+);
 
 rejectText(screenFeed, 'import html2canvas from "html2canvas"', "html2canvas must not be statically imported.");
 requireText(screenFeed, 'import("html2canvas")', "html2canvas must load only when capture starts.");
@@ -42,16 +50,32 @@ requireText(viteConfig, "lazyHeavyImportsPlugin()", "The lazy-heavy-import Vite 
 
 requireText(presence, 'document.visibilityState === "visible"', "Presence heartbeats must pause in hidden tabs.");
 requireText(bandwidthDebug, "totalApiResponseBytes", "Bandwidth snapshots must report total API bytes.");
-requireText(bandwidthDebug, "totalStaticAssetResponseBytes", "Bandwidth snapshots must report total static-asset bytes.");
+requireText(
+  bandwidthDebug,
+  "totalStaticAssetResponseBytes",
+  "Bandwidth snapshots must report total static-asset bytes."
+);
 requireText(bandwidthDebug, "isApiPath", "API rankings must exclude non-API paths.");
-requireText(bandwidthDebug, "calculateRankScore", "The Program 6A ranking regression helper must remain available.");
-requireText(operationalEvents, "ranked: event.ranked", "Ranked endpoint rows must reach structured production logs.");
-requireText(operationalEvents, 'else logger.info(event.message, context)', "Informational bandwidth snapshots must log at info level.");
+requireText(
+  bandwidthDebug,
+  "calculateRankScore",
+  "The Program 6A ranking regression helper must remain available."
+);
+requireText(
+  operationalEvents,
+  "ranked: event.ranked",
+  "Ranked endpoint rows must reach structured production logs."
+);
+requireText(
+  operationalEvents,
+  'else logger.info(event.message, context)',
+  "Informational bandwidth snapshots must log at info level."
+);
 
 requireText(
   accountingGuard,
   'import "./bandwidthPhase1HotspotGuard";',
-  "The Phase 1 hotspot guard must be installed before accounting fetch protection.",
+  "The Phase 1 hotspot guard must be installed before accounting fetch protection."
 );
 requireText(hotspotGuard, "/api\\/containers\\/otw-items", "OTW container items must be request-contained.");
 requireText(hotspotGuard, "/api\\/factory\\/containers", "Factory containers must be request-contained.");
@@ -66,8 +90,16 @@ requireText(hotspotGuard, "writeGeneration", "Writes must prevent raced GETs fro
 requireText(hotspotGuard, "writeGeneration += 1", "Every write boundary must advance the cache generation.");
 requireText(hotspotGuard, "clearCache();", "Writes must clear short-lived hotspot snapshots.");
 requireText(hotspotGuard, "waitUntilVisible(signal)", "Heavy hotspot reads must pause in hidden tabs.");
-requireText(hotspotGuard, "x-bypass-request-storm-guard", "Operators must be able to bypass request snapshots explicitly.");
-requireText(hotspotGuard, "maxResponseBytes: 4_000_000", "The OTW response must use a bounded large-response allowance.");
+requireText(
+  hotspotGuard,
+  "x-bypass-request-storm-guard",
+  "Operators must be able to bypass request snapshots explicitly."
+);
+requireText(
+  hotspotGuard,
+  "maxResponseBytes: 4_000_000",
+  "The OTW response must use a bounded large-response allowance."
+);
 requireText(hotspotGuard, "MAX_CACHE_ENTRIES = 32", "The hotspot response cache must remain memory-bounded.");
 
 if (failures.length > 0) {
