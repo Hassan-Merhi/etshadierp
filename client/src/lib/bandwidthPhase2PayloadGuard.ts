@@ -1,8 +1,6 @@
-type QueryClientLike = {
-  removeQueries: (filters: { predicate: (query: { queryKey: readonly unknown[] }) => boolean }) => void;
-};
+import type { QueryClient } from "@tanstack/react-query";
 
-let resolvedQueryClient: QueryClientLike | null = null;
+let resolvedQueryClient: QueryClient | null = null;
 const queryClientReady = import("./queryClient")
   .then(({ queryClient }) => {
     resolvedQueryClient = queryClient;
@@ -45,7 +43,7 @@ function isProfiledQuery(query: { queryKey: readonly unknown[] }): boolean {
 }
 
 function clearProfiledQueries(): void {
-  const clear = (client: QueryClientLike | null) => {
+  const clear = (client: QueryClient | null) => {
     client?.removeQueries({ predicate: isProfiledQuery });
   };
 
@@ -61,7 +59,7 @@ function installNavigationCacheIsolation(): void {
   const originalPushState = window.history.pushState.bind(window.history);
   const originalReplaceState = window.history.replaceState.bind(window.history);
 
-  window.history.pushState = (data: any, unused: string, url?: string | URL | null) => {
+  window.history.pushState = (data: unknown, unused: string, url?: string | URL | null) => {
     const nextUrl = url == null ? new URL(window.location.href) : new URL(String(url), window.location.href);
     const nextWasOtw = isInventoryOtwUrl(nextUrl);
     if (nextWasOtw !== lastWasOtw) clearProfiledQueries();
@@ -69,7 +67,7 @@ function installNavigationCacheIsolation(): void {
     lastWasOtw = nextWasOtw;
   };
 
-  window.history.replaceState = (data: any, unused: string, url?: string | URL | null) => {
+  window.history.replaceState = (data: unknown, unused: string, url?: string | URL | null) => {
     const nextUrl = url == null ? new URL(window.location.href) : new URL(String(url), window.location.href);
     const nextWasOtw = isInventoryOtwUrl(nextUrl);
     if (nextWasOtw !== lastWasOtw) clearProfiledQueries();
