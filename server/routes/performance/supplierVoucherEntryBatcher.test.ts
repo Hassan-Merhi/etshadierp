@@ -46,19 +46,13 @@ describe("supplier voucher-entry batcher", () => {
 
     expect(mocks.query).toHaveBeenCalledOnce();
     expect(mocks.query.mock.calls[0][1]).toEqual([[11, 12], 7]);
-    expect(supplier11).toEqual([
-      expect.objectContaining({ entryId: 1, creditAmount: "25", companyId: 7 }),
-    ]);
-    expect(supplier12).toEqual([
-      expect.objectContaining({ entryId: 2, debitAmount: "5", companyId: 7 }),
-    ]);
+    expect(supplier11).toEqual([expect.objectContaining({ entryId: 1, creditAmount: "25", companyId: 7 })]);
+    expect(supplier12).toEqual([expect.objectContaining({ entryId: 2, debitAmount: "5", companyId: 7 })]);
     expect(supplier11[0]).not.toHaveProperty("__supplierId");
   });
 
   it("keeps batches isolated by company", async () => {
-    mocks.query
-      .mockResolvedValueOnce({ rows: [] })
-      .mockResolvedValueOnce({ rows: [] });
+    mocks.query.mockResolvedValueOnce({ rows: [] }).mockResolvedValueOnce({ rows: [] });
 
     await Promise.all([
       getVoucherEntriesBySupplierBatched(11, 7),
@@ -66,6 +60,11 @@ describe("supplier voucher-entry batcher", () => {
     ]);
 
     expect(mocks.query).toHaveBeenCalledTimes(2);
-    expect(mocks.query.mock.calls.map((call) => call[1])).toEqual(expect.arrayContaining([[[11], 7], [[11], 8]]));
+    expect(mocks.query.mock.calls.map((call) => call[1])).toEqual(
+      expect.arrayContaining([
+        [[11], 7],
+        [[11], 8],
+      ])
+    );
   });
 });
