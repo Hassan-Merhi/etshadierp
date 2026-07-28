@@ -1,6 +1,7 @@
 import "./lib/requestStormGuard";
 import "./lib/accountingRequestFetchGuard";
 import "./lib/v5AllocationPaginationClient";
+import "./lib/containerPaginationClient";
 import { createRoot } from "react-dom/client";
 import App from "./App";
 import "./index.css";
@@ -49,7 +50,6 @@ function removeRecoveryMarkersAfterStableLoad() {
 
 function showStaleAssetRecoveryMessage() {
   if (document.getElementById("stale-asset-recovery")) return;
-
   const panel = document.createElement("div");
   panel.id = "stale-asset-recovery";
   panel.setAttribute("role", "alert");
@@ -67,20 +67,17 @@ function showStaleAssetRecoveryMessage() {
 
   const content = document.createElement("div");
   content.style.maxWidth = "460px";
-
   const title = document.createElement("h1");
   title.textContent = "Application update required";
   title.style.fontSize = "22px";
   title.style.fontWeight = "700";
   title.style.margin = "0 0 12px";
-
   const description = document.createElement("p");
   description.textContent =
     "The browser could not load the latest application files. Refresh once after checking your connection.";
   description.style.fontSize = "16px";
   description.style.lineHeight = "1.5";
   description.style.margin = "0 0 20px";
-
   const button = document.createElement("button");
   button.type = "button";
   button.textContent = "Refresh application";
@@ -97,13 +94,11 @@ function showStaleAssetRecoveryMessage() {
     } catch {
       /* sessionStorage may be blocked */
     }
-
     const cleanUrl = new URL(window.location.href);
     cleanUrl.searchParams.delete("_asset_recovery");
     cleanUrl.searchParams.delete("_sw");
     window.location.replace(cleanUrl.toString());
   });
-
   content.append(title, description, button);
   panel.append(content);
   document.body.append(panel);
@@ -111,13 +106,8 @@ function showStaleAssetRecoveryMessage() {
 
 async function clearErpCachesForRecovery() {
   if (!("serviceWorker" in navigator)) return;
-
-  // Only force a service-worker update during an actual chunk-recovery event.
-  // Normal page loads rely on the browser's built-in update checks so every
-  // tab does not revalidate and then reload the application independently.
   const registration = await navigator.serviceWorker.getRegistration("/").catch(() => undefined);
   await registration?.update().catch(() => undefined);
-
   const controller = navigator.serviceWorker.controller;
   if (controller) {
     await new Promise<void>((resolve) => {
@@ -131,7 +121,6 @@ async function clearErpCachesForRecovery() {
     });
     return;
   }
-
   if ("caches" in window) {
     const keys = await caches.keys().catch(() => []);
     await Promise.all(keys.filter((key) => key.startsWith("erp-")).map((key) => caches.delete(key)));
@@ -140,29 +129,24 @@ async function clearErpCachesForRecovery() {
 
 async function recoverFromStaleAssets() {
   if (assetRecoveryInFlight || import.meta.env.DEV) return;
-
   const currentUrl = new URL(window.location.href);
   const recoveryKey = pathScopedKey(ASSET_RECOVERY_PREFIX);
   let alreadyAttempted = currentUrl.searchParams.has("_asset_recovery");
-
   try {
     alreadyAttempted = alreadyAttempted || !!sessionStorage.getItem(recoveryKey);
   } catch {
     /* the URL marker still prevents loops when storage is blocked */
   }
-
   if (alreadyAttempted) {
     showStaleAssetRecoveryMessage();
     return;
   }
-
   assetRecoveryInFlight = true;
   try {
     sessionStorage.setItem(recoveryKey, String(Date.now()));
   } catch {
     /* continue with the URL marker */
   }
-
   await clearErpCachesForRecovery().catch(() => undefined);
   currentUrl.searchParams.set("_asset_recovery", String(Date.now()));
   window.location.replace(currentUrl.toString());
@@ -171,7 +155,6 @@ async function recoverFromStaleAssets() {
 window.addEventListener("unhandledrejection", (event) => {
   const reason = event.reason;
   const candidates: string[] = [];
-
   if (typeof reason === "string") {
     candidates.push(reason);
   } else if (reason && typeof reason === "object") {
@@ -183,7 +166,6 @@ window.addEventListener("unhandledrejection", (event) => {
       /* ignore */
     }
   }
-
   const combined = candidates.join(" ");
   const isChunkFailure =
     combined.includes("dynamically imported module") ||
@@ -192,7 +174,6 @@ window.addEventListener("unhandledrejection", (event) => {
     combined.includes("Unable to preload CSS") ||
     combined.includes("ChunkLoadError") ||
     reason?.name === "ChunkLoadError";
-
   if (isChunkFailure) {
     event.preventDefault();
     void recoverFromStaleAssets();
@@ -202,8 +183,6 @@ window.addEventListener("unhandledrejection", (event) => {
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.addEventListener("message", (event) => {
     if (event?.data?.type === "SW_UPDATED") {
-      // Do not reload every controlled tab. The existing production version
-      // banner will offer one user-controlled refresh when the build changes.
       window.dispatchEvent(
         new CustomEvent("erp:service-worker-updated", {
           detail: { version: String(event.data.version || "unknown") },
