@@ -116,7 +116,7 @@ beforeAll(async () => {
   });
   if (parentSupplier.status !== 201) {
     throw new Error(
-      `Parent supplier creation failed: ${parentSupplier.status} ${JSON.stringify(parentSupplier.body)}`,
+      `Parent supplier creation failed: ${parentSupplier.status} ${JSON.stringify(parentSupplier.body)}`
     );
   }
   parentSupplierId = parentSupplier.body.id;
@@ -132,7 +132,7 @@ beforeAll(async () => {
   });
   if (childSupplier.status !== 201) {
     throw new Error(
-      `Child supplier creation failed: ${childSupplier.status} ${JSON.stringify(childSupplier.body)}`,
+      `Child supplier creation failed: ${childSupplier.status} ${JSON.stringify(childSupplier.body)}`
     );
   }
   childSupplierId = childSupplier.body.id;
@@ -223,8 +223,8 @@ describe("strict supplier company ownership", () => {
       .where(
         and(
           eq(companyScopedSuppliers.id, childSupplierId),
-          eq(companyScopedSuppliers.companyId, childCompanyId),
-        ),
+          eq(companyScopedSuppliers.companyId, childCompanyId)
+        )
       );
     expect(row.stockGroupId).toBeNull();
   });
