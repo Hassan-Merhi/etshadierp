@@ -13,7 +13,7 @@ This phase contains repeated high-bandwidth API reads observed in the July 28, 2
 - A write-generation guard prevents a GET racing a mutation from repopulating stale data.
 - `Range`, `no-store`, `reload`, and `X-Bypass-Request-Storm-Guard` requests bypass snapshots.
 - The cache is limited to 32 entries.
-- Normal responses are capped at 1.5 MB; `/api/containers/otw-items` alone receives a bounded 4 MB allowance until Phase 2 replaces its oversized response.
+- Normal responses are capped at 1.5 MB; `/api/containers/otw-items` alone receives a bounded 4 MB allowance until the Phase 2 compact profile is deployed.
 
 ## Primary protected routes
 
