@@ -43,6 +43,12 @@ function stableTestCompanyCode(prefix: string): string {
   return `${base}${suffix}`;
 }
 
+function testCompanyType(prefix: string): "erp" | "factory" {
+  // Factory export integration tests must exercise the same authorized factory
+  // company resolution used in production. Ordinary ERP/POS tests remain ERP.
+  return prefix === "xlsexp" ? "factory" : "erp";
+}
+
 export async function setupTestApp(): Promise<express.Express> {
   const app = express();
   app.use(express.json());
@@ -72,19 +78,13 @@ export async function cleanupTestData(prefix: string): Promise<void> {
   for (const company of companies) {
     await pool.query("DELETE FROM audit_log WHERE company_id = $1", [company.id]);
     await pool.query("DELETE FROM login_history WHERE company_id = $1", [company.id]);
-    await db
-      .delete(schema.inventory)
-      .where(eq(schema.inventory.companyId, company.id));
+    await db.delete(schema.inventory).where(eq(schema.inventory.companyId, company.id));
     await db
       .delete(schema.salesItems)
-      .where(
-        sql`${schema.salesItems.voucherId} IN (SELECT id FROM vouchers WHERE company_id = ${company.id})`,
-      );
+      .where(sql`${schema.salesItems.voucherId} IN (SELECT id FROM vouchers WHERE company_id = ${company.id})`);
     await db
       .delete(schema.voucherEntries)
-      .where(
-        sql`${schema.voucherEntries.voucherId} IN (SELECT id FROM vouchers WHERE company_id = ${company.id})`,
-      );
+      .where(sql`${schema.voucherEntries.voucherId} IN (SELECT id FROM vouchers WHERE company_id = ${company.id})`);
     await db
       .delete(schema.stockTransferItems)
       .where(
@@ -95,30 +95,16 @@ export async function cleanupTestData(prefix: string): Promise<void> {
       .where(
         sql`${schema.stockTransferVouchers.voucherId} IN (SELECT id FROM vouchers WHERE company_id = ${company.id})`,
       );
-    await db
-      .delete(schema.vouchers)
-      .where(eq(schema.vouchers.companyId, company.id));
-    await db
-      .delete(schema.stockItems)
-      .where(eq(schema.stockItems.companyId, company.id));
-    await db
-      .delete(schema.stockGroups)
-      .where(eq(schema.stockGroups.companyId, company.id));
-    await db
-      .delete(schema.locations)
-      .where(eq(schema.locations.companyId, company.id));
-    await db
-      .delete(schema.ledgerAccounts)
-      .where(eq(schema.ledgerAccounts.companyId, company.id));
+    await db.delete(schema.vouchers).where(eq(schema.vouchers.companyId, company.id));
+    await db.delete(schema.stockItems).where(eq(schema.stockItems.companyId, company.id));
+    await db.delete(schema.stockGroups).where(eq(schema.stockGroups.companyId, company.id));
+    await db.delete(schema.locations).where(eq(schema.locations.companyId, company.id));
+    await db.delete(schema.ledgerAccounts).where(eq(schema.ledgerAccounts.companyId, company.id));
     await db
       .delete(schema.userSecurityPermissions)
       .where(eq(schema.userSecurityPermissions.companyId, company.id));
-    await db
-      .delete(schema.userCompanyRoles)
-      .where(eq(schema.userCompanyRoles.companyId, company.id));
-    await db
-      .delete(schema.userLocations)
-      .where(eq(schema.userLocations.companyId, company.id));
+    await db.delete(schema.userCompanyRoles).where(eq(schema.userCompanyRoles.companyId, company.id));
+    await db.delete(schema.userLocations).where(eq(schema.userLocations.companyId, company.id));
 
     // Authentication and audit middleware can finish asynchronously while a test
     // is tearing down. Clear any rows written after the initial cleanup before
@@ -135,15 +121,9 @@ export async function cleanupTestData(prefix: string): Promise<void> {
     );
     await pool.query("DELETE FROM factory_mix_batches WHERE company_id = $1", [company.id]);
     await pool.query("DELETE FROM factory_raw_stock WHERE company_id = $1", [company.id]);
-    await pool.query("DELETE FROM factory_container_other_charges WHERE company_id = $1", [
-      company.id,
-    ]);
-    await pool.query("DELETE FROM factory_offload_additional_charges WHERE company_id = $1", [
-      company.id,
-    ]);
-    await pool.query("DELETE FROM factory_container_commissions WHERE company_id = $1", [
-      company.id,
-    ]);
+    await pool.query("DELETE FROM factory_container_other_charges WHERE company_id = $1", [company.id]);
+    await pool.query("DELETE FROM factory_offload_additional_charges WHERE company_id = $1", [company.id]);
+    await pool.query("DELETE FROM factory_container_commissions WHERE company_id = $1", [company.id]);
     await pool.query("DELETE FROM factory_containers WHERE company_id = $1", [company.id]);
     await pool.query("DELETE FROM factory_suppliers WHERE company_id = $1", [company.id]);
     await pool.query("DELETE FROM factory_daybook_entries WHERE company_id = $1", [company.id]);
@@ -183,6 +163,7 @@ export async function seedTestData(prefix: string): Promise<TestContext> {
     .values({
       code: companyCode,
       name: `${prefix}_TestCompany`,
+      companyType: testCompanyType(prefix),
       baseCurrency: "USD",
     })
     .returning();
@@ -297,36 +278,20 @@ export async function seedTestData(prefix: string): Promise<TestContext> {
   };
 }
 
-export async function getInventoryQty(
-  locationId: number,
-  stockItemId: number,
-): Promise<number> {
+export async function getInventoryQty(locationId: number, stockItemId: number): Promise<number> {
   const [inv] = await db
     .select()
     .from(schema.inventory)
-    .where(
-      and(
-        eq(schema.inventory.locationId, locationId),
-        eq(schema.inventory.stockItemId, stockItemId),
-      ),
-    )
+    .where(and(eq(schema.inventory.locationId, locationId), eq(schema.inventory.stockItemId, stockItemId)))
     .limit(1);
   return inv ? parseFloat(inv.quantity) : 0;
 }
 
-export async function getInventoryRecord(
-  locationId: number,
-  stockItemId: number,
-) {
+export async function getInventoryRecord(locationId: number, stockItemId: number) {
   const [inv] = await db
     .select()
     .from(schema.inventory)
-    .where(
-      and(
-        eq(schema.inventory.locationId, locationId),
-        eq(schema.inventory.stockItemId, stockItemId),
-      ),
-    )
+    .where(and(eq(schema.inventory.locationId, locationId), eq(schema.inventory.stockItemId, stockItemId)))
     .limit(1);
   return inv;
 }
