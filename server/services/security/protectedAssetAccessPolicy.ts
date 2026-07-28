@@ -125,17 +125,27 @@ export async function authorizeProtectedAssetAccess(
     throw new ProtectedAssetAccessError("ASSET_COMPANY_INVALID");
   }
 
+  const actor = request.actor;
+  if (!actor) {
+    throw new AuthorizationDeniedError({ effect: "deny", code: "AUTHENTICATION_REQUIRED" });
+  }
+  if (!Number.isSafeInteger(actor.companyId) || actor.companyId <= 0) {
+    throw new AuthorizationDeniedError({ effect: "deny", code: "COMPANY_CONTEXT_INVALID" });
+  }
+  if (actor.companyId !== asset.companyId) {
+    throw new AuthorizationDeniedError({ effect: "deny", code: "CROSS_COMPANY_ACCESS_DENIED" });
+  }
+
   if (asset.byteSize != null && (!Number.isSafeInteger(asset.byteSize) || asset.byteSize < 0)) {
     throw new ProtectedAssetAccessError("ASSET_SIZE_INVALID");
   }
 
   if (request.action !== "generate") validateStorageKey(asset.storageKey);
   const safeFileName = sanitizeDownloadFileName(asset.fileName);
-  const actor = request.actor;
-  const ownerAllowed = request.allowOwnerAccess === true && sameIdentity(actor?.userId, asset.ownerUserId);
-  const configuredRoles = ownerAllowed ? [actor!.role] : request.allowedRoles ?? [];
-  const roleAllowed = actor != null && configuredRoles.includes(actor.role);
-  const permissionAllowed = actor?.permissions?.includes(request.requiredPermission) === true;
+  const ownerAllowed = request.allowOwnerAccess === true && sameIdentity(actor.userId, asset.ownerUserId);
+  const configuredRoles = ownerAllowed ? [actor.role] : request.allowedRoles ?? [];
+  const roleAllowed = configuredRoles.includes(actor.role);
+  const permissionAllowed = actor.permissions?.includes(request.requiredPermission) === true;
 
   if (!ownerAllowed && !roleAllowed && !permissionAllowed) {
     throw new AuthorizationDeniedError({ effect: "deny", code: "PERMISSION_REQUIRED" });
@@ -146,7 +156,7 @@ export async function authorizeProtectedAssetAccess(
     domain: request.domain ?? "reporting",
     action: `asset.${request.kind}.${request.action}`,
     resource: { companyId: asset.companyId, ownerUserId: asset.ownerUserId ?? null },
-    allowedRoles: ownerAllowed || roleAllowed ? [actor!.role] : [],
+    allowedRoles: ownerAllowed || roleAllowed ? [actor.role] : [],
     requiredPermissions: ownerAllowed || roleAllowed ? [] : [request.requiredPermission],
   });
 
