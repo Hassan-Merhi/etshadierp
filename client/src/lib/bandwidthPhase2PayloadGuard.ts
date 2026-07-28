@@ -1,3 +1,15 @@
+type QueryClientLike = {
+  removeQueries: (filters: { predicate: (query: { queryKey: readonly unknown[] }) => boolean }) => void;
+};
+
+let resolvedQueryClient: QueryClientLike | null = null;
+const queryClientReady = import("./queryClient")
+  .then(({ queryClient }) => {
+    resolvedQueryClient = queryClient;
+    return queryClient;
+  })
+  .catch(() => null);
+
 function resolveUrl(input: RequestInfo | URL): URL | null {
   try {
     if (typeof input === "string") return new URL(input, window.location.origin);
@@ -13,9 +25,59 @@ function requestMethod(input: RequestInfo | URL, init?: RequestInit): string {
   return (init?.method || (input instanceof Request ? input.method : "GET")).toUpperCase();
 }
 
+function isInventoryOtwUrl(url: URL): boolean {
+  return url.pathname === "/inventory" && url.searchParams.get("tab") === "on-the-way";
+}
+
 function isInventoryOtwTab(): boolean {
-  if (typeof window === "undefined" || window.location.pathname !== "/inventory") return false;
-  return new URLSearchParams(window.location.search).get("tab") === "on-the-way";
+  return isInventoryOtwUrl(new URL(window.location.href));
+}
+
+function isProfiledQuery(query: { queryKey: readonly unknown[] }): boolean {
+  const first = query.queryKey[0];
+  if (typeof first !== "string") return false;
+  return (
+    first === "/api/containers" ||
+    first === "/api/containers/otw-items" ||
+    first === "/api/inventory" ||
+    /^\/api\/containers\/\d+$/.test(first)
+  );
+}
+
+function clearProfiledQueries(): void {
+  const clear = (client: QueryClientLike | null) => {
+    client?.removeQueries({ predicate: isProfiledQuery });
+  };
+
+  if (resolvedQueryClient) {
+    clear(resolvedQueryClient);
+    return;
+  }
+  void queryClientReady.then(clear);
+}
+
+function installNavigationCacheIsolation(): void {
+  let lastWasOtw = isInventoryOtwTab();
+
+  const wrapHistoryMethod = (method: "pushState" | "replaceState") => {
+    const original = window.history[method].bind(window.history);
+    window.history[method] = ((data: any, unused: string, url?: string | URL | null) => {
+      const nextUrl = url == null ? new URL(window.location.href) : new URL(String(url), window.location.href);
+      const nextWasOtw = isInventoryOtwUrl(nextUrl);
+      if (nextWasOtw !== lastWasOtw) clearProfiledQueries();
+      const result = original(data, unused, url);
+      lastWasOtw = nextWasOtw;
+      return result;
+    }) as History[typeof method];
+  };
+
+  wrapHistoryMethod("pushState");
+  wrapHistoryMethod("replaceState");
+  window.addEventListener("popstate", () => {
+    const nextWasOtw = isInventoryOtwTab();
+    if (nextWasOtw !== lastWasOtw) clearProfiledQueries();
+    lastWasOtw = nextWasOtw;
+  });
 }
 
 function profileFor(url: URL): string | null {
@@ -45,6 +107,7 @@ export function installBandwidthPhase2PayloadGuard(): void {
   if (typeof window === "undefined" || (window as any).__bandwidthPhase2PayloadGuardInstalled) return;
   (window as any).__bandwidthPhase2PayloadGuardInstalled = true;
 
+  installNavigationCacheIsolation();
   const originalFetch = window.fetch.bind(window);
 
   window.fetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
