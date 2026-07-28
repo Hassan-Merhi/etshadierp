@@ -1,3 +1,5 @@
+export {};
+
 const ENDPOINT_PATTERN = /^\/api\/suppliers\/\d+\/purchase-orders$/;
 const PAGE_SIZE = 250;
 
