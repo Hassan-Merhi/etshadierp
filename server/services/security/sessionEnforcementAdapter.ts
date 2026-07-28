@@ -1,5 +1,6 @@
 import type { Session } from "express-session";
 import {
+  DEFAULT_IDLE_TIMEOUT_MS,
   decideSessionSecurity,
   type SessionSecurityCode,
   type SessionSecurityState,
@@ -66,6 +67,7 @@ export function enforceRuntimeSession(
     session,
     activeCredentialVersion,
     now,
+    idleTimeoutMs: DEFAULT_IDLE_TIMEOUT_MS,
     requireCompanyContext: options.requireCompanyContext,
     requireRecentPasswordConfirmation: options.requireRecentPasswordConfirmation,
   });
