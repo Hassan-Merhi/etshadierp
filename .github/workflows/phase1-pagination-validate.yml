@@ -1,0 +1,74 @@
+name: Phase 1 Pagination Validation
+
+on:
+  push:
+    branches:
+      - agent/phase1-sql-pagination
+
+permissions:
+  contents: write
+
+concurrency:
+  group: phase1-pagination-validation
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@v4
+        with:
+          ref: agent/phase1-sql-pagination
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Format changed application files
+        run: |
+          node node_modules/prettier/bin/prettier.cjs --write \
+            client/src/lib/accountStatementPaginationClient.ts \
+            client/src/lib/containerPaginationClient.ts \
+            client/src/lib/daybookPaginationClient.ts \
+            client/src/lib/erpDaybookPaginationClient.ts \
+            client/src/lib/supplierPurchaseOrderPaginationClient.ts \
+            client/src/main.tsx \
+            server/routes/accountTransactionPaginationRoutes.ts \
+            server/routes/containerRoutes.ts \
+            server/routes/containers/containerListPaginationRoutes.ts \
+            server/routes/daybookPaginationRoutes.ts \
+            server/routes/ledgerAccountPaginationRoutes.ts \
+            server/routes/ledgerRoutes.ts \
+            server/routes/voucherRoutes.ts \
+            server/routes/vouchers/supplierPurchaseOrderPaginationRoutes.ts \
+            server/routes/vouchers/voucherPaginationRoutes.ts
+
+      - name: Commit formatting and remove this workflow
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm .github/workflows/phase1-pagination-validate.yml
+          git add client/src server/routes
+          if git diff --cached --quiet; then
+            echo "No formatting changes"
+          else
+            git commit -m "chore: format Phase 1 pagination"
+            git push origin HEAD:agent/phase1-sql-pagination
+          fi
+
+      - name: TypeScript check
+        run: npm run check
+
+      - name: Phase 1 static verifier
+        run: node scripts/verify-phase1-sql-pagination.mjs
+
+      - name: Production build
+        run: npm run build
