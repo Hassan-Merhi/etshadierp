@@ -21,7 +21,11 @@ function isInventoryOtwTab(): boolean {
 function profileFor(url: URL): string | null {
   if (url.pathname === "/api/containers") return "otw-summary";
   if (url.pathname === "/api/containers/otw-items") return "stock-otw";
-  if (url.pathname === "/api/inventory" && url.searchParams.get("page") === "1" && url.searchParams.get("pageSize") === "100") {
+  if (
+    url.pathname === "/api/inventory" &&
+    url.searchParams.get("page") === "1" &&
+    url.searchParams.get("pageSize") === "100"
+  ) {
     return "combined";
   }
   if (/^\/api\/containers\/\d+$/.test(url.pathname)) return "combined-detail";
