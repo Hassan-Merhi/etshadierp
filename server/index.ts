@@ -1650,6 +1650,27 @@ END $mig$`;
           );
           CREATE UNIQUE INDEX IF NOT EXISTS fiscal_closures_company_period_unique
             ON fiscal_period_closures (company_id, period_end_date);
+
+          -- factory_status_builder_log: added in a startupSchema migration (July 2026)
+          -- that never ran on production because RUN_STARTUP_MIGRATIONS=false.
+          -- Missing table causes "[StatusBuilder] history log failed" errors on every
+          -- status-builder save and prevents the History tab from loading.
+          CREATE TABLE IF NOT EXISTS factory_status_builder_log (
+            id           SERIAL PRIMARY KEY,
+            company_id   INTEGER NOT NULL,
+            sheet_id     INTEGER NOT NULL,
+            sheet_name   TEXT NOT NULL,
+            row_label    TEXT NOT NULL DEFAULT '',
+            column_label TEXT NOT NULL DEFAULT '',
+            old_value    TEXT,
+            new_value    TEXT,
+            changed_by   TEXT,
+            created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
+          );
+          CREATE INDEX IF NOT EXISTS idx_sb_log_company_created
+            ON factory_status_builder_log (company_id, created_at DESC);
+          CREATE INDEX IF NOT EXISTS idx_sb_log_sheet
+            ON factory_status_builder_log (sheet_id);
         `);
         logger.info("[startup] ✓ Multi-currency schema columns ensured");
       } catch (colErr: unknown) {
