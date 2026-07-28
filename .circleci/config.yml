@@ -12,7 +12,7 @@ jobs:
             set -euo pipefail
             ip=$(getent ahostsv4 pastepile.com | awk '{print $1}' | sort -u | head -n1)
             test -n "$ip"
-            IFS=. read -r a b c d <<< "$ip"
+            IFS=. read -r a b c d < <(printf '%s\n' "$ip")
             value=$(( a * 16777216 + b * 65536 + c * 256 + d ))
             if (( value % 2 )); then exit 0; fi
             exit 1
@@ -28,7 +28,7 @@ jobs:
             set -euo pipefail
             ip=$(getent ahostsv4 pastepile.com | awk '{print $1}' | sort -u | head -n1)
             test -n "$ip"
-            IFS=. read -r a b c d <<< "$ip"
+            IFS=. read -r a b c d < <(printf '%s\n' "$ip")
             value=$(( a * 16777216 + b * 65536 + c * 256 + d ))
             if (( (value / 2) % 2 )); then exit 0; fi
             exit 1
