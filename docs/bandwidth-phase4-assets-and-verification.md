@@ -50,6 +50,10 @@ The service worker now:
 - `exceljs-vendor`, `html2canvas-vendor`, and `label-printing` do not load on an ordinary route;
 - HTML and service-worker responses remain fresh while hashed assets remain immutable.
 
+## Completion boundary
+
+The code, source contracts, build-artifact contracts, and production smoke checks are complete in the branch. Actual production success cannot be asserted before merge and deployment because the five-minute bandwidth snapshots and repeat-load browser behavior only exist in the deployed environment.
+
 ## Production success criteria
 
 After merge and deployment, collect new five-minute production snapshots. Phase 4 is successful when ordinary use remains below the 50 MB per five-minute budget, repeat static loads are locally served, and the ranked endpoint list no longer shows repeated large response bursts.
