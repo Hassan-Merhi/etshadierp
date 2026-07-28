@@ -51,6 +51,33 @@ try {
       updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
     )
   `);
+  await client.query(`
+    CREATE TABLE IF NOT EXISTS whatsapp_stock_settings (
+      id INTEGER PRIMARY KEY,
+      company_id INTEGER,
+      recipient_id INTEGER REFERENCES whatsapp_recipients(id) ON DELETE SET NULL,
+      auto_send BOOLEAN NOT NULL DEFAULT false,
+      enabled BOOLEAN NOT NULL DEFAULT false,
+      frequency TEXT NOT NULL DEFAULT 'daily',
+      send_hour INTEGER NOT NULL DEFAULT 18,
+      send_day_of_week INTEGER,
+      last_sent_at TIMESTAMPTZ,
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    )
+  `);
+  await client.query(`
+    CREATE TABLE IF NOT EXISTS net_position_export_settings (
+      id INTEGER PRIMARY KEY,
+      recipient_id INTEGER REFERENCES whatsapp_recipients(id) ON DELETE SET NULL,
+      frequency TEXT NOT NULL DEFAULT 'daily',
+      send_hour INTEGER NOT NULL DEFAULT 18,
+      send_day_of_week INTEGER,
+      enabled BOOLEAN NOT NULL DEFAULT false,
+      auto_send BOOLEAN NOT NULL DEFAULT false,
+      last_sent_at TIMESTAMPTZ,
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    )
+  `);
 
   await client.query(`
     CREATE TABLE IF NOT EXISTS factory_recalc_undo_log (
@@ -90,6 +117,15 @@ try {
     )
   `);
 
+  // Runtime rental posting uses ON CONFLICT with the active ledger name. The
+  // disposable migration baseline must expose the same partial uniqueness as
+  // production before integration tests create any companies or accounts.
+  await client.query(`
+    CREATE UNIQUE INDEX IF NOT EXISTS ledger_accounts_company_name_active_unique
+      ON ledger_accounts(company_id, name)
+      WHERE deleted_at IS NULL
+  `);
+
   // The runtime schema requires these values for real batch creation, but a few
   // focused audit fixtures intentionally exercise source-cost logic without
   // constructing a complete production batch. Defaults keep those direct test
@@ -100,6 +136,14 @@ try {
   await client.query(
     "ALTER TABLE factory_mix_batches ALTER COLUMN total_cost SET DEFAULT 0",
   );
+
+  // Preserve the decimal precision guaranteed by the costing migrations even
+  // when the disposable database is built from a stale schema snapshot.
+  await client.query(`
+    ALTER TABLE factory_mix_batches
+      ALTER COLUMN cost_per_kg TYPE NUMERIC(20,8)
+      USING cost_per_kg::NUMERIC(20,8)
+  `);
 
   // Preserve historical soft-deleted raw-stock rows while allowing one current
   // row per company/container. The old unconditional unique index made that
@@ -125,6 +169,8 @@ try {
       to_regclass('public.inventory_negative_layers') AS inventory_negative_layers,
       to_regclass('public.whatsapp_settings') AS whatsapp_settings,
       to_regclass('public.whatsapp_recipients') AS whatsapp_recipients,
+      to_regclass('public.whatsapp_stock_settings') AS whatsapp_stock_settings,
+      to_regclass('public.net_position_export_settings') AS net_position_export_settings,
       to_regclass('public.factory_recalc_undo_log') AS factory_recalc_undo_log,
       to_regclass('public.sp_migration_rehearsal_runs') AS sp_migration_rehearsal_runs
   `);
@@ -133,6 +179,8 @@ try {
     "inventory_negative_layers",
     "whatsapp_settings",
     "whatsapp_recipients",
+    "whatsapp_stock_settings",
+    "net_position_export_settings",
     "factory_recalc_undo_log",
     "sp_migration_rehearsal_runs",
   ]) {
