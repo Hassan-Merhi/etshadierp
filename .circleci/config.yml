@@ -38,58 +38,102 @@ commands:
   prepare_test_schema:
     steps:
       - run:
-          name: Wait for PostgreSQL
+          name: Prepare PostgreSQL schema
           command: |
             for attempt in $(seq 1 60); do
               if (echo > /dev/tcp/127.0.0.1/5432) >/dev/null 2>&1; then
-                echo "PostgreSQL is accepting connections."
-                break
+                node node_modules/drizzle-kit/bin.cjs push --force
+                exit 0
               fi
               sleep 1
             done
-            node node_modules/drizzle-kit/bin.cjs push --force
+            exit 1
+
+  run_test_pattern:
+    parameters:
+      file:
+        type: string
+      pattern:
+        type: string
+    steps:
+      - run:
+          name: Run focused regression
+          command: >-
+            node node_modules/vitest/vitest.mjs run << parameters.file >>
+            -t '<< parameters.pattern >>'
+            --maxWorkers=1 --no-file-parallelism
 
 jobs:
-  test-factory-container-lifecycle:
+  lifecycle-setup-create:
     executor: node22-postgres
     steps:
       - install_dependencies
       - prepare_test_schema
-      - run:
-          name: Factory container lifecycle
-          command: node node_modules/vitest/vitest.mjs run tests/factory-container-lifecycle.test.ts --maxWorkers=1 --no-file-parallelism
+      - run_test_pattern:
+          file: tests/factory-container-lifecycle.test.ts
+          pattern: SP lifecycle setup|SP container creation
 
-  test-factory-landed-cost:
+  lifecycle-offload:
     executor: node22-postgres
     steps:
       - install_dependencies
       - prepare_test_schema
-      - run:
-          name: Factory landed-cost reconciliation
-          command: node node_modules/vitest/vitest.mjs run tests/factory-landed-cost-reconciliation.test.ts --maxWorkers=1 --no-file-parallelism
+      - run_test_pattern:
+          file: tests/factory-container-lifecycle.test.ts
+          pattern: SP container offload
 
-  test-factory-stable-cost:
+  stable-receipt-rate:
     executor: node22-postgres
     steps:
       - install_dependencies
       - prepare_test_schema
-      - run:
-          name: Factory stable-cost rules
-          command: node node_modules/vitest/vitest.mjs run tests/factory-mix-batch-stable-cost.test.ts --maxWorkers=1 --no-file-parallelism
+      - run_test_pattern:
+          file: tests/factory-mix-batch-stable-cost.test.ts
+          pattern: Stable receipt-weighted supplier cost rate
 
-  test-factory-historical-replay:
+  stable-adjustments:
     executor: node22-postgres
     steps:
       - install_dependencies
       - prepare_test_schema
-      - run:
-          name: Factory historical replay
-          command: node node_modules/vitest/vitest.mjs run tests/factory-raw-material-moving-avg.test.ts --maxWorkers=1 --no-file-parallelism
+      - run_test_pattern:
+          file: tests/factory-mix-batch-stable-cost.test.ts
+          pattern: Adjustments, tamper resistance and explicit corrections
+
+  stable-landed-correction:
+    executor: node22-postgres
+    steps:
+      - install_dependencies
+      - prepare_test_schema
+      - run_test_pattern:
+          file: tests/factory-mix-batch-stable-cost.test.ts
+          pattern: Landed-cost correction
+
+  stable-diagnostics:
+    executor: node22-postgres
+    steps:
+      - install_dependencies
+      - prepare_test_schema
+      - run_test_pattern:
+          file: tests/factory-mix-batch-stable-cost.test.ts
+          pattern: Diagnostic endpoint
+
+  stable-delete-kpi:
+    executor: node22-postgres
+    steps:
+      - install_dependencies
+      - prepare_test_schema
+      - run_test_pattern:
+          file: tests/factory-mix-batch-stable-cost.test.ts
+          pattern: Delete/reverse|KPI reconciliation
 
 workflows:
-  factory-regression-file-diagnostics:
+  factory-regression-block-diagnostics:
     jobs:
-      - test-factory-container-lifecycle
-      - test-factory-landed-cost
-      - test-factory-stable-cost
-      - test-factory-historical-replay
+      - lifecycle-setup-create
+      - lifecycle-offload
+      - stable-receipt-rate
+      - stable-adjustments
+      - stable-landed-correction
+      - stable-diagnostics
+      - stable-delete-kpi
