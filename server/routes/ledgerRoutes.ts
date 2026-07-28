@@ -3,6 +3,7 @@ import { getErrorMessage } from "../lib/httpHandlers";
 import { requireAuth } from "../auth";
 import { getLedgerParentGroupOptions } from "../services/ledgerAccountOptionsService";
 import { registerLedgerAccountPaginationRoutes } from "./ledgerAccountPaginationRoutes";
+import { registerAccountTransactionPaginationRoutes } from "./accountTransactionPaginationRoutes";
 import { registerLedgerRoutes as registerLegacyLedgerRoutes } from "./ledgerRoutesLegacy";
 import {
   normalizeAccountOpeningBalance,
@@ -43,7 +44,9 @@ export function registerLedgerRoutes(app: Express) {
     }
   });
 
-  // Bound the main account selector at SQL level before the broad legacy route.
+  // These native readers register before AccountRoutes later installs its legacy
+  // compatibility handlers, so explicit page requests are SQL-bounded end to end.
+  registerAccountTransactionPaginationRoutes(app);
   registerLedgerAccountPaginationRoutes(app);
   registerLegacyLedgerRoutes(app);
 }
