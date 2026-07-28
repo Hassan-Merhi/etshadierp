@@ -144,17 +144,32 @@ function transformAccountTypes(source: string): string {
   );
 }
 
+function scopeAllows(scope: string, group: "main" | "daybook" | "accounts"): boolean {
+  return scope === "all" || scope === group;
+}
+
 export function phase1PaginationPlugin(): Plugin {
   return {
     name: "erp-phase1-pagination",
     enforce: "pre",
     transform(source, id) {
       const normalizedId = id.replaceAll("\\", "/").split("?")[0];
-      if (normalizedId.endsWith(MAIN_SUFFIX)) return { code: transformMain(source), map: null };
-      if (normalizedId.endsWith(DAYBOOK_SUFFIX)) return { code: transformDaybook(source), map: null };
-      if (normalizedId.endsWith(ACCOUNTS_SUFFIX)) return { code: transformAccounts(source), map: null };
-      if (normalizedId.endsWith(ACCOUNT_STATEMENT_SUFFIX)) return { code: transformAccountStatement(source), map: null };
-      if (normalizedId.endsWith(ACCOUNT_TYPES_SUFFIX)) return { code: transformAccountTypes(source), map: null };
+      const scope = process.env.PHASE1_TRANSFORM_SCOPE || "all";
+      if (scopeAllows(scope, "main") && normalizedId.endsWith(MAIN_SUFFIX)) {
+        return { code: transformMain(source), map: null };
+      }
+      if (scopeAllows(scope, "daybook") && normalizedId.endsWith(DAYBOOK_SUFFIX)) {
+        return { code: transformDaybook(source), map: null };
+      }
+      if (scopeAllows(scope, "accounts") && normalizedId.endsWith(ACCOUNTS_SUFFIX)) {
+        return { code: transformAccounts(source), map: null };
+      }
+      if (scopeAllows(scope, "accounts") && normalizedId.endsWith(ACCOUNT_STATEMENT_SUFFIX)) {
+        return { code: transformAccountStatement(source), map: null };
+      }
+      if (scopeAllows(scope, "accounts") && normalizedId.endsWith(ACCOUNT_TYPES_SUFFIX)) {
+        return { code: transformAccountTypes(source), map: null };
+      }
       return null;
     },
   };
