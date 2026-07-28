@@ -22,7 +22,7 @@ export const SUPPLIER_PARTNER_SECTIONS: NavSection[] = [
   },
   {
     label: "SP Administration",
-    color: NAV_COLOR.administration,
+    color: NAV_COLOR.utility,
     items: SUPPLIER_PARTNER_ADMIN_ITEMS,
   },
 ];
