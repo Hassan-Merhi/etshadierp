@@ -1,0 +1,68 @@
+name: One-time Phase 1 Formatter
+
+on:
+  pull_request:
+    branches: [main]
+    types: [reopened]
+
+permissions:
+  contents: write
+
+jobs:
+  format-phase1:
+    if: github.head_ref == 'agent/phase1-sql-pagination'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout Phase 1 branch
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ github.event.pull_request.head.repo.full_name }}
+          ref: ${{ github.event.pull_request.head.ref }}
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install dependencies
+        run: |
+          sed -i 's#http://package-firewall.replit.local/npm/#https://registry.npmjs.org/#g' package-lock.json
+          npm ci --no-audit --bin-links=true
+
+      - name: Format Phase 1 files
+        run: |
+          node node_modules/prettier/bin/prettier.cjs --write \
+            build/vitePhase1PaginationPlugin.ts \
+            client/src/lib/accountStatementPaginationClient.ts \
+            client/src/lib/containerPaginationClient.ts \
+            client/src/lib/daybookPaginationClient.ts \
+            client/src/lib/erpDaybookPaginationClient.ts \
+            client/src/lib/supplierPurchaseOrderPaginationClient.ts \
+            client/src/main.tsx \
+            scripts/verify-phase1-sql-pagination.mjs \
+            server/routes/accountTransactionPaginationRoutes.ts \
+            server/routes/containerRoutes.ts \
+            server/routes/containers/containerListPaginationRoutes.ts \
+            server/routes/daybookPaginationRoutes.ts \
+            server/routes/ledgerAccountPaginationRoutes.ts \
+            server/routes/ledgerRoutes.ts \
+            server/routes/voucherRoutes.ts \
+            server/routes/vouchers/supplierPurchaseOrderPaginationRoutes.ts \
+            server/routes/vouchers/voucherPaginationRoutes.ts \
+            vite.config.ts
+
+      - name: Commit formatted files
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add build client/src scripts server/routes vite.config.ts
+          if git diff --cached --quiet; then
+            echo "All Phase 1 files were already formatted."
+            exit 0
+          fi
+          git commit -m "chore: format Phase 1 pagination"
+          git push origin HEAD:${{ github.event.pull_request.head.ref }}
