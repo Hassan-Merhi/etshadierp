@@ -80,9 +80,9 @@ export function createReadMicrocacheMiddleware(options: ReadMicrocacheOptions = 
     }
   }
 
-  function sendEntry(res: any, entry: ReadMicrocacheEntry, state: "HIT" | "COALESCED"): unknown {
+  function sendEntry(res: any, entry: ReadMicrocacheEntry, state: "HIT" | "COALESCED"): void {
     res.setHeader?.("X-ERP-Read-Cache", state);
-    return res.status(entry.statusCode).type("application/json").send(entry.body);
+    res.status(entry.statusCode).type("application/json").send(entry.body);
   }
 
   return (req, res, next) => {
@@ -119,7 +119,8 @@ export function createReadMicrocacheMiddleware(options: ReadMicrocacheOptions = 
     if (cached && cached.expiresAt > currentTime) {
       cache.delete(key);
       cache.set(key, cached);
-      return sendEntry(res, cached, "HIT");
+      sendEntry(res, cached, "HIT");
+      return;
     }
     if (cached) cache.delete(key);
 
