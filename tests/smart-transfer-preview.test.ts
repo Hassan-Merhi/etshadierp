@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { and, eq, inArray } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { db } from "../server/db";
 import * as schema from "../shared/schema";
 import { buildSmartTransferPreview } from "../server/services/smartTransferAllocation";
@@ -22,8 +22,8 @@ async function createLocation(name: string, code: string): Promise<number> {
 async function createTransfer(
   voucherNumber: string,
   voucherDate: string,
-  lines: Array<{ stockItemId: number; sourceLocationId: number; quantity: number }>
-) {
+  lines: Array<{ stockItemId: number; sourceLocationId: number; quantity: number }>,
+): Promise<void> {
   const [voucher] = await db
     .insert(schema.vouchers)
     .values({
@@ -58,11 +58,16 @@ async function createTransfer(
       quantity: String(line.quantity),
       rate: "1.00",
       totalAmount: String(line.quantity),
-    }))
+    })),
   );
 }
 
-async function createSale(voucherNumber: string, voucherDate: string, stockItemId: number, quantity: number) {
+async function createSale(
+  voucherNumber: string,
+  voucherDate: string,
+  stockItemId: number,
+  quantity: number,
+): Promise<void> {
   const [voucher] = await db
     .insert(schema.vouchers)
     .values({
@@ -90,7 +95,7 @@ async function createSale(voucherNumber: string, voucherDate: string, stockItemI
   });
 }
 
-async function setInventory(locationId: number, stockItemId: number, quantity: number) {
+async function setInventory(locationId: number, stockItemId: number, quantity: number): Promise<void> {
   await db.insert(schema.inventory).values({
     companyId,
     locationId,
@@ -101,7 +106,7 @@ async function setInventory(locationId: number, stockItemId: number, quantity: n
   });
 }
 
-async function cleanup() {
+async function cleanup(): Promise<void> {
   if (!companyId) return;
 
   const companyVouchers = await db
@@ -120,6 +125,7 @@ async function cleanup() {
       await db.delete(schema.stockTransferItems).where(inArray(schema.stockTransferItems.transferId, transferIds));
       await db.delete(schema.stockTransferVouchers).where(inArray(schema.stockTransferVouchers.id, transferIds));
     }
+    await db.delete(schema.salesItems).where(inArray(schema.salesItems.voucherId, voucherIds));
     await db.delete(schema.vouchers).where(inArray(schema.vouchers.id, voucherIds));
   }
 
@@ -212,16 +218,19 @@ afterAll(async () => {
 });
 
 describe("buildSmartTransferPreview", () => {
-  it("generates an exact target across four sources while preserving reserves", async () => {
+  it("generates an exact target across four sources without mutating inventory", async () => {
     const beforeInventory = await db
-      .select({ locationId: schema.inventory.locationId, stockItemId: schema.inventory.stockItemId, quantity: schema.inventory.quantity })
+      .select({
+        locationId: schema.inventory.locationId,
+        stockItemId: schema.inventory.stockItemId,
+        quantity: schema.inventory.quantity,
+      })
       .from(schema.inventory)
       .where(eq(schema.inventory.companyId, companyId));
 
     const result = await buildSmartTransferPreview(companyId, sourceIds, destinationId, 50, {
       asOfDate: "2026-07-22",
       includeOtw: false,
-      minimumSourceReserve: 5,
       targetCoverageDays: 21,
     });
 
@@ -231,11 +240,15 @@ describe("buildSmartTransferPreview", () => {
     expect(result.lines.reduce((sum, line) => sum + line.suggestedQuantity, 0)).toBe(50);
     expect(new Set(result.lines.map((line) => line.sourceLocationId))).toEqual(new Set(sourceIds));
     expect(result.lines.every((line) => line.suggestedQuantity <= line.availableAtSource)).toBe(true);
-    expect(result.lines.every((line) => line.sourceReserveQty === 5)).toBe(true);
+    expect(result.lines.every((line) => line.sourceReserveQty === 0)).toBe(true);
     expect(result.lines.every((line) => line.sourceLocationId !== destinationId)).toBe(true);
 
     const afterInventory = await db
-      .select({ locationId: schema.inventory.locationId, stockItemId: schema.inventory.stockItemId, quantity: schema.inventory.quantity })
+      .select({
+        locationId: schema.inventory.locationId,
+        stockItemId: schema.inventory.stockItemId,
+        quantity: schema.inventory.quantity,
+      })
       .from(schema.inventory)
       .where(eq(schema.inventory.companyId, companyId));
     expect(afterInventory).toEqual(beforeInventory);
@@ -245,35 +258,35 @@ describe("buildSmartTransferPreview", () => {
     const result = await buildSmartTransferPreview(companyId, sourceIds, destinationId, 30, {
       asOfDate: "2026-07-22",
       includeOtw: false,
-      minimumSourceReserve: 5,
       stockGroupIds: [groupAId],
     });
 
     expect(result.achievedQuantity).toBe(30);
     expect(new Set(result.lines.map((line) => line.stockItemId))).toEqual(new Set([itemAId]));
-    expect(result.excludedItems.some((item) => item.stockItemId === itemBId && /stock-group filter/i.test(item.reason))).toBe(
-      true
-    );
+    expect(
+      result.excludedItems.some(
+        (item) => item.stockItemId === itemBId && /stock-group filter/i.test(item.reason),
+      ),
+    ).toBe(true);
   });
 
-  it("returns an explainable shortfall when reserves leave insufficient stock", async () => {
-    const result = await buildSmartTransferPreview(companyId, sourceIds, destinationId, 50, {
+  it("returns an explainable shortfall when the target exceeds qualified demand and stock", async () => {
+    const target = 500;
+    const result = await buildSmartTransferPreview(companyId, sourceIds, destinationId, target, {
       asOfDate: "2026-07-22",
       includeOtw: false,
-      minimumSourceReserve: 19,
     });
 
-    expect(result.achievedQuantity).toBe(4);
+    expect(result.achievedQuantity).toBeLessThan(target);
     expect(result.shortfall).toBe(true);
-    expect(result.shortfallQuantity).toBe(46);
-    expect(result.warnings.some((warning) => /short by 46/i.test(warning))).toBe(true);
+    expect(result.shortfallQuantity).toBe(target - result.achievedQuantity);
+    expect(result.warnings.some((warning) => /short by/i.test(warning))).toBe(true);
   });
 
   it("returns source totals matching the generated preview lines", async () => {
     const result = await buildSmartTransferPreview(companyId, sourceIds, destinationId, 40, {
       asOfDate: "2026-07-22",
       includeOtw: false,
-      minimumSourceReserve: 5,
     });
 
     const lineTotal = result.lines.reduce((sum, line) => sum + line.suggestedQuantity, 0);
