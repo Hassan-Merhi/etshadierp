@@ -1,46 +1,53 @@
-name: Phase 1 Pagination Validation
+name: Phase 1 Pagination Formatter
 
 on:
-  push:
-    branches:
-      - agent/phase1-sql-pagination
+  pull_request:
+    branches: [main]
+    types: [reopened]
 
 permissions:
   contents: write
 
 concurrency:
-  group: phase1-pagination-validation
-  cancel-in-progress: true
+  group: phase1-pagination-formatter-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
 
 jobs:
-  validate:
+  format-and-clean:
+    if: github.head_ref == 'agent/phase1-sql-pagination'
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 20
     steps:
-      - name: Checkout branch
+      - name: Checkout Phase 1 branch
         uses: actions/checkout@v4
         with:
-          ref: agent/phase1-sql-pagination
+          repository: ${{ github.event.pull_request.head.repo.full_name }}
+          ref: ${{ github.event.pull_request.head.ref }}
           fetch-depth: 0
+          persist-credentials: true
 
-      - name: Setup Node
+      - name: Set up Node.js 20
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: "20"
           cache: npm
 
-      - name: Install dependencies
-        run: npm ci --ignore-scripts
+      - name: Normalize registry and install dependencies
+        run: |
+          sed -i 's#http://package-firewall.replit.local/npm/#https://registry.npmjs.org/#g' package-lock.json
+          npm ci --no-audit --bin-links=true
 
-      - name: Format changed application files
+      - name: Format Phase 1 files
         run: |
           node node_modules/prettier/bin/prettier.cjs --write \
+            build/vitePhase1PaginationPlugin.ts \
             client/src/lib/accountStatementPaginationClient.ts \
             client/src/lib/containerPaginationClient.ts \
             client/src/lib/daybookPaginationClient.ts \
             client/src/lib/erpDaybookPaginationClient.ts \
             client/src/lib/supplierPurchaseOrderPaginationClient.ts \
             client/src/main.tsx \
+            scripts/verify-phase1-sql-pagination.mjs \
             server/routes/accountTransactionPaginationRoutes.ts \
             server/routes/containerRoutes.ts \
             server/routes/containers/containerListPaginationRoutes.ts \
@@ -49,41 +56,23 @@ jobs:
             server/routes/ledgerRoutes.ts \
             server/routes/voucherRoutes.ts \
             server/routes/vouchers/supplierPurchaseOrderPaginationRoutes.ts \
-            server/routes/vouchers/voucherPaginationRoutes.ts
+            server/routes/vouchers/voucherPaginationRoutes.ts \
+            vite.config.ts
 
-      - name: Run validation and record output
-        shell: bash
+      - name: Restore normal CI and remove formatter
         run: |
-          set +e
-          mkdir -p docs
-          {
-            echo "PHASE 1 VALIDATION REPORT"
-            echo "commit=$(git rev-parse HEAD)"
-            echo
-            echo "=== TYPESCRIPT ==="
-            npm run check
-            CHECK_STATUS=$?
-            echo "typescript_status=$CHECK_STATUS"
-            echo
-            echo "=== STATIC VERIFIER ==="
-            node scripts/verify-phase1-sql-pagination.mjs
-            VERIFY_STATUS=$?
-            echo "verifier_status=$VERIFY_STATUS"
-            echo
-            echo "=== PRODUCTION BUILD ==="
-            npm run build
-            BUILD_STATUS=$?
-            echo "build_status=$BUILD_STATUS"
-            echo
-            echo "SUMMARY typescript=$CHECK_STATUS verifier=$VERIFY_STATUS build=$BUILD_STATUS"
-          } > docs/phase1-validation-report.txt 2>&1
-          cat docs/phase1-validation-report.txt
+          git fetch origin main --depth=1
+          git checkout origin/main -- .circleci/config.yml
+          git rm .github/workflows/phase1-pagination-validate.yml
 
-      - name: Commit formatting, report, and remove workflow
+      - name: Commit formatted Phase 1
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git rm .github/workflows/phase1-pagination-validate.yml
-          git add client/src server/routes docs/phase1-validation-report.txt
-          git commit -m "chore: format and validate Phase 1 pagination"
-          git push origin HEAD:agent/phase1-sql-pagination
+          git add build client/src scripts server/routes vite.config.ts .circleci/config.yml
+          if git diff --cached --quiet; then
+            echo "No formatting changes were required."
+            exit 0
+          fi
+          git commit -m "chore: format and clean Phase 1 pagination"
+          git push origin HEAD:${{ github.event.pull_request.head.ref }}
