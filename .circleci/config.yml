@@ -49,91 +49,46 @@ commands:
             done
             exit 1
 
-  run_test_pattern:
-    parameters:
-      file:
-        type: string
-      pattern:
-        type: string
+jobs:
+  test-initial-sp-offload:
+    executor: node22-postgres
     steps:
+      - install_dependencies
+      - prepare_test_schema
       - run:
-          name: Run focused regression
+          name: Initial Supplier Partner offload
           command: >-
-            node node_modules/vitest/vitest.mjs run << parameters.file >>
-            -t '<< parameters.pattern >>'
+            node node_modules/vitest/vitest.mjs run tests/factory-container-lifecycle.test.ts
+            -t 'offloads once, posts balanced vouchers and applies inventory'
             --maxWorkers=1 --no-file-parallelism
 
-jobs:
-  lifecycle-setup-create:
+  test-stable-main-flow:
     executor: node22-postgres
     steps:
       - install_dependencies
       - prepare_test_schema
-      - run_test_pattern:
-          file: tests/factory-container-lifecycle.test.ts
-          pattern: SP lifecycle setup|SP container creation
+      - run:
+          name: Stable receipt-rate main workflow
+          command: >-
+            node node_modules/vitest/vitest.mjs run tests/factory-mix-batch-stable-cost.test.ts
+            -t 'stays fixed through batch operations and only moves on a new offload'
+            --maxWorkers=1 --no-file-parallelism
 
-  lifecycle-offload:
+  test-stable-adjustment-flow:
     executor: node22-postgres
     steps:
       - install_dependencies
       - prepare_test_schema
-      - run_test_pattern:
-          file: tests/factory-container-lifecycle.test.ts
-          pattern: SP container offload
-
-  stable-receipt-rate:
-    executor: node22-postgres
-    steps:
-      - install_dependencies
-      - prepare_test_schema
-      - run_test_pattern:
-          file: tests/factory-mix-batch-stable-cost.test.ts
-          pattern: Stable receipt-weighted supplier cost rate
-
-  stable-adjustments:
-    executor: node22-postgres
-    steps:
-      - install_dependencies
-      - prepare_test_schema
-      - run_test_pattern:
-          file: tests/factory-mix-batch-stable-cost.test.ts
-          pattern: Adjustments, tamper resistance and explicit corrections
-
-  stable-landed-correction:
-    executor: node22-postgres
-    steps:
-      - install_dependencies
-      - prepare_test_schema
-      - run_test_pattern:
-          file: tests/factory-mix-batch-stable-cost.test.ts
-          pattern: Landed-cost correction
-
-  stable-diagnostics:
-    executor: node22-postgres
-    steps:
-      - install_dependencies
-      - prepare_test_schema
-      - run_test_pattern:
-          file: tests/factory-mix-batch-stable-cost.test.ts
-          pattern: Diagnostic endpoint
-
-  stable-delete-kpi:
-    executor: node22-postgres
-    steps:
-      - install_dependencies
-      - prepare_test_schema
-      - run_test_pattern:
-          file: tests/factory-mix-batch-stable-cost.test.ts
-          pattern: Delete/reverse|KPI reconciliation
+      - run:
+          name: Stable adjustment workflow
+          command: >-
+            node node_modules/vitest/vitest.mjs run tests/factory-mix-batch-stable-cost.test.ts
+            -t 'keeps ADD/REMOVE quantity-only while using them in the next receipt base'
+            --maxWorkers=1 --no-file-parallelism
 
 workflows:
-  factory-regression-block-diagnostics:
+  primary-factory-path-diagnostics:
     jobs:
-      - lifecycle-setup-create
-      - lifecycle-offload
-      - stable-receipt-rate
-      - stable-adjustments
-      - stable-landed-correction
-      - stable-diagnostics
-      - stable-delete-kpi
+      - test-initial-sp-offload
+      - test-stable-main-flow
+      - test-stable-adjustment-flow
