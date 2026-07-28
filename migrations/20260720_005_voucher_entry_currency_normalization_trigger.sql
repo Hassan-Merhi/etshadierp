@@ -31,7 +31,7 @@ BEGIN
       NEW.transaction_currency IS DISTINCT FROM OLD.transaction_currency
       OR NEW.transaction_debit_amount IS DISTINCT FROM OLD.transaction_debit_amount
       OR NEW.transaction_credit_amount IS DISTINCT FROM OLD.transaction_credit_amount
-      OR NEW.base_debit_amount IS DISTINCT FROM OLD.base_debit_amount
+      OR NEW.base_debit_amount IS DISTINCT FROM OLD.base_base_debit_amount
       OR NEW.base_credit_amount IS DISTINCT FROM OLD.base_credit_amount
       OR NEW.historical_exchange_rate IS DISTINCT FROM OLD.historical_exchange_rate
       OR NEW.rate_convention IS DISTINCT FROM OLD.rate_convention;
@@ -185,9 +185,10 @@ BEGIN
     RETURN NEW;
   END IF;
 
-  -- Other currencies use several established factory/supplier rate conventions.
-  -- Do not guess or block those flows. Leave the dual-currency fields NULL so the
-  -- row remains explicitly unresolved until its caller supplies a full convention.
+  -- Other currencies remain explicitly unresolved. They use several established
+  -- factory/supplier rate conventions, so this trigger must neither guess nor block
+  -- those flows. Leave the dual-currency fields NULL until the caller supplies a
+  -- complete historical rate and convention.
   RETURN NEW;
 END;
 $$;
