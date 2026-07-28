@@ -2,9 +2,7 @@ import type { Plugin } from "vite";
 
 const MAIN_SUFFIX = "/client/src/main.tsx";
 const DAYBOOK_SUFFIX = "/client/src/pages/Daybook.tsx";
-const ACCOUNTS_SUFFIX = "/client/src/pages/AccountsLegacy.tsx";
 const ACCOUNT_STATEMENT_SUFFIX = "/client/src/pages/accounts/AccountStatementView.tsx";
-const ACCOUNT_TYPES_SUFFIX = "/client/src/pages/accounts/accountTypes.ts";
 
 function replaceExactly(source: string, before: string, after: string, label: string): string {
   const first = source.indexOf(before);
@@ -25,7 +23,9 @@ function replaceRange(source: string, start: string, end: string, replacement: s
 
 function replaceAllChecked(source: string, before: string, after: string, minimum: number, label: string): string {
   const count = source.split(before).length - 1;
-  if (count < minimum) throw new Error(`[phase1-pagination] Expected at least ${minimum} targets for ${label}, found ${count}`);
+  if (count < minimum) {
+    throw new Error(`[phase1-pagination] Expected at least ${minimum} targets for ${label}, found ${count}`);
+  }
   return source.split(before).join(after);
 }
 
@@ -33,7 +33,7 @@ function transformMain(source: string): string {
   return replaceExactly(
     source,
     `import "./lib/v5AllocationPaginationClient";`,
-    `import "./lib/v5AllocationPaginationClient";\nimport "./lib/accountStatementPaginationClient";`,
+    `import "./lib/v5AllocationPaginationClient";\nimport "./lib/accountStatementPaginationClient";\nimport "./lib/containerPaginationClient";`,
     "pagination bootstrap import"
   );
 }
@@ -89,63 +89,48 @@ function transformDaybook(source: string): string {
   return code;
 }
 
-function transformAccounts(source: string): string {
-  let code = source;
-  code = replaceExactly(
-    code,
-    `  const closingBalance = useMemo(() => {\n    if (vouchersWithBalance.length > 0) {\n      return vouchersWithBalance[vouchersWithBalance.length - 1].runningBalance;\n    }\n    return broughtForwardBalance;\n  }, [vouchersWithBalance, broughtForwardBalance]);`,
-    `  const closingBalance = useMemo(() => {\n    const rawOB = parseFloat(String(selectedAccount?.openingBalance ?? 0)) || 0;\n    const obSide = (selectedAccount as any)?.openingBalanceSide || "Dr";\n    const storedOB = obSide === "Cr" ? -rawOB : rawOB;\n    if (rawTransactionData && !Array.isArray(rawTransactionData)) {\n      const serverClosing = Number(rawTransactionData.closingNetBalance);\n      if (Number.isFinite(serverClosing)) return storedOB + serverClosing;\n    }\n    if (vouchersWithBalance.length > 0) {\n      return vouchersWithBalance[vouchersWithBalance.length - 1].runningBalance;\n    }\n    return broughtForwardBalance;\n  }, [rawTransactionData, selectedAccount, vouchersWithBalance, broughtForwardBalance]);`,
-    "full-period statement closing balance"
-  );
-  code = replaceExactly(
-    code,
-    `               transactionError={(transactionsQueryError as Error | null)?.message ?? null}\n               selectedVoucherIds={selectedVoucherIds}`,
-    `               transactionError={(transactionsQueryError as Error | null)?.message ?? null}\n               transactionTotal={!Array.isArray(rawTransactionData) ? rawTransactionData?.total : undefined}\n               periodDebitTotal={!Array.isArray(rawTransactionData) ? rawTransactionData?.periodDebitTotal : undefined}\n               periodCreditTotal={!Array.isArray(rawTransactionData) ? rawTransactionData?.periodCreditTotal : undefined}\n               statementPage={!Array.isArray(rawTransactionData) ? rawTransactionData?.page : undefined}\n               statementLimit={!Array.isArray(rawTransactionData) ? rawTransactionData?.limit : undefined}\n               statementTotalPages={!Array.isArray(rawTransactionData) ? rawTransactionData?.totalPages : undefined}\n               selectedVoucherIds={selectedVoucherIds}`,
-    "statement pagination metadata props"
-  );
-  return code;
-}
-
 function transformAccountStatement(source: string): string {
   let code = source;
   code = replaceExactly(
     code,
-    `  transactionError,\n}: AccountStatementViewProps) {`,
-    `  transactionError,\n  transactionTotal,\n  periodDebitTotal,\n  periodCreditTotal,\n  statementPage,\n  statementLimit,\n  statementTotalPages,\n}: AccountStatementViewProps) {`,
-    "statement pagination prop destructuring"
+    `import { useMemo, useState } from "react";`,
+    `import { useMemo, useState, useSyncExternalStore } from "react";\nimport { getAccountStatementPaginationSnapshot, subscribeAccountStatementPagination } from "@/lib/accountStatementPaginationClient";`,
+    "statement metadata imports"
+  );
+  code = replaceExactly(
+    code,
+    `  const [pdfLang, setPdfLang] = useState<"en" | "fr" | "ar">("en");`,
+    `  const [pdfLang, setPdfLang] = useState<"en" | "fr" | "ar">("en");\n  const statementMeta = useSyncExternalStore(\n    subscribeAccountStatementPagination,\n    getAccountStatementPaginationSnapshot,\n    getAccountStatementPaginationSnapshot\n  );\n  const rawOpeningBalance = parseFloat(String(selectedAccount?.openingBalance ?? 0)) || 0;\n  const openingBalanceSide = (selectedAccount as any)?.openingBalanceSide || "Dr";\n  const signedOpeningBalance = openingBalanceSide === "Cr" ? -rawOpeningBalance : rawOpeningBalance;\n  const displayClosingBalance =\n    statementMeta?.closingNetBalance != null\n      ? signedOpeningBalance + statementMeta.closingNetBalance\n      : closingBalance;`,
+    "statement metadata subscription"
   );
   code = replaceExactly(
     code,
     `  const totalDebit = useMemo(\n    () => vouchersWithBalance.reduce((s, v) => s + (v.totalDebit || 0), 0),\n    [vouchersWithBalance]\n  );\n  const totalCredit = useMemo(\n    () => vouchersWithBalance.reduce((s, v) => s + (v.totalCredit || 0), 0),\n    [vouchersWithBalance]\n  );`,
-    `  const totalDebit = useMemo(\n    () => periodDebitTotal ?? vouchersWithBalance.reduce((s, v) => s + (v.totalDebit || 0), 0),\n    [periodDebitTotal, vouchersWithBalance]\n  );\n  const totalCredit = useMemo(\n    () => periodCreditTotal ?? vouchersWithBalance.reduce((s, v) => s + (v.totalCredit || 0), 0),\n    [periodCreditTotal, vouchersWithBalance]\n  );`,
+    `  const totalDebit = useMemo(\n    () =>\n      statementMeta?.periodDebitTotal ??\n      vouchersWithBalance.reduce((s, v) => s + (v.totalDebit || 0), 0),\n    [statementMeta?.periodDebitTotal, vouchersWithBalance]\n  );\n  const totalCredit = useMemo(\n    () =>\n      statementMeta?.periodCreditTotal ??\n      vouchersWithBalance.reduce((s, v) => s + (v.totalCredit || 0), 0),\n    [statementMeta?.periodCreditTotal, vouchersWithBalance]\n  );`,
     "full-period statement totals"
   );
+  code = replaceAllChecked(code, "Math.abs(closingBalance)", "Math.abs(displayClosingBalance)", 2, "closing amounts");
+  code = replaceAllChecked(code, `closingBalance >= 0`, `displayClosingBalance >= 0`, 1, "closing side");
+  code = replaceAllChecked(code, `balSide(closingBalance)`, `balSide(displayClosingBalance)`, 1, "closing label");
   code = replaceExactly(
     code,
     `<p className="text-base font-semibold leading-none tabular-nums">{vouchersWithBalance.length}</p>`,
-    `<p className="text-base font-semibold leading-none tabular-nums">{transactionTotal ?? vouchersWithBalance.length}</p>`,
+    `<p className="text-base font-semibold leading-none tabular-nums">\n                {statementMeta?.total ?? vouchersWithBalance.length}\n              </p>`,
     "full-period transaction count"
   );
   code = replaceExactly(
     code,
     `      {/* Table */}`,
-    `      {statementTotalPages !== undefined && statementTotalPages > 0 && (\n        <p className="text-xs text-muted-foreground text-center" data-testid="account-statement-page-summary">\n          Showing page {statementPage ?? 1} of {Math.max(statementTotalPages, 1)}\n          {statementLimit ? \` · up to \${statementLimit} transactions per page\` : ""}\n        </p>\n      )}\n\n      {/* Table */}`,
+    `      {statementMeta && statementMeta.totalPages > 0 && (\n        <p\n          className="text-center text-xs text-muted-foreground"\n          data-testid="account-statement-page-summary"\n        >\n          Showing page {statementMeta.page} of {Math.max(statementMeta.totalPages, 1)} · up to {statementMeta.limit} transactions per page\n        </p>\n      )}\n\n      {/* Table */}`,
     "statement page summary"
   );
-  return code;
-}
-
-function transformAccountTypes(source: string): string {
-  return replaceExactly(
-    source,
-    `  transactionError?: string | null;\n  selectedVoucherIds: Set<number>;`,
-    `  transactionError?: string | null;\n  transactionTotal?: number;\n  periodDebitTotal?: number;\n  periodCreditTotal?: number;\n  statementPage?: number;\n  statementLimit?: number;\n  statementTotalPages?: number;\n  selectedVoucherIds: Set<number>;`,
-    "statement metadata types"
+  code = replaceExactly(
+    code,
+    `            closingBalance={closingBalance}`,
+    `            closingBalance={displayClosingBalance}`,
+    "statement table closing balance"
   );
-}
-
-function scopeAllows(scope: string, group: "main" | "daybook" | "accounts"): boolean {
-  return scope === "all" || scope === group;
+  return code;
 }
 
 export function phase1PaginationPlugin(): Plugin {
@@ -154,21 +139,14 @@ export function phase1PaginationPlugin(): Plugin {
     enforce: "pre",
     transform(source, id) {
       const normalizedId = id.replaceAll("\\", "/").split("?")[0];
-      const scope = process.env.PHASE1_TRANSFORM_SCOPE || "all";
-      if (scopeAllows(scope, "main") && normalizedId.endsWith(MAIN_SUFFIX)) {
+      if (normalizedId.endsWith(MAIN_SUFFIX)) {
         return { code: transformMain(source), map: null };
       }
-      if (scopeAllows(scope, "daybook") && normalizedId.endsWith(DAYBOOK_SUFFIX)) {
+      if (normalizedId.endsWith(DAYBOOK_SUFFIX)) {
         return { code: transformDaybook(source), map: null };
       }
-      if (scopeAllows(scope, "accounts") && normalizedId.endsWith(ACCOUNTS_SUFFIX)) {
-        return { code: transformAccounts(source), map: null };
-      }
-      if (scopeAllows(scope, "accounts") && normalizedId.endsWith(ACCOUNT_STATEMENT_SUFFIX)) {
+      if (normalizedId.endsWith(ACCOUNT_STATEMENT_SUFFIX)) {
         return { code: transformAccountStatement(source), map: null };
-      }
-      if (scopeAllows(scope, "accounts") && normalizedId.endsWith(ACCOUNT_TYPES_SUFFIX)) {
-        return { code: transformAccountTypes(source), map: null };
       }
       return null;
     },
