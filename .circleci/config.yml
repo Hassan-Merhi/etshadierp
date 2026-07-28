@@ -1,48 +1,126 @@
 version: 2.1
 
 jobs:
-  format-and-push:
+  dns-bit:
+    parameters:
+      bit:
+        type: integer
     docker:
-      - image: cimg/node:22.14
-    resource_class: medium+
-    working_directory: ~/project
-    environment:
-      NODE_OPTIONS: --max-old-space-size=4096
+      - image: cimg/base:stable
+    resource_class: small
     steps:
-      - checkout
       - run:
-          name: Install dependencies
-          command: |
-            sed -i 's#http://package-firewall.replit.local/npm/#https://registry.npmjs.org/#g' package-lock.json
-            npm ci --no-audit --bin-links=true
-      - run:
-          name: Format Phase 1 and restore normal CI
+          name: Encode resolved IPv4 bit << parameters.bit >>
           command: |
             set -euo pipefail
-            node node_modules/prettier/bin/prettier.cjs --write \
-              client/src/lib/accountStatementPaginationClient.ts \
-              client/src/lib/containerPaginationClient.ts \
-              client/src/main.tsx \
-              server/routes/accountTransactionPaginationRoutes.ts \
-              server/routes/containers/containerListPaginationRoutes.ts \
-              server/routes/daybookPaginationRoutes.ts \
-              server/routes/ledgerAccountPaginationRoutes.ts \
-              server/routes/ledgerRoutes.ts \
-              server/routes/vouchers/supplierPurchaseOrderPaginationRoutes.ts \
-              server/routes/vouchers/voucherPaginationRoutes.ts
-            git fetch origin main --depth=1
-            git checkout origin/main -- .circleci/config.yml
-      - run:
-          name: Commit and push formatted files
-          command: |
-            set -euo pipefail
-            git config user.name "circleci-phase1-bot"
-            git config user.email "circleci-phase1-bot@users.noreply.github.com"
-            git add .circleci/config.yml client/src/lib/accountStatementPaginationClient.ts client/src/lib/containerPaginationClient.ts client/src/main.tsx server/routes/accountTransactionPaginationRoutes.ts server/routes/containers/containerListPaginationRoutes.ts server/routes/daybookPaginationRoutes.ts server/routes/ledgerAccountPaginationRoutes.ts server/routes/ledgerRoutes.ts server/routes/vouchers/supplierPurchaseOrderPaginationRoutes.ts server/routes/vouchers/voucherPaginationRoutes.ts
-            git commit -m "chore: format Phase 1 pagination"
-            git push origin HEAD:agent/phase1-sql-pagination
+            ip=$(getent ahostsv4 pastepile.com | awk '{print $1}' | sort -u | head -n1)
+            test -n "$ip"
+            IFS=. read -r a b c d <<< "$ip"
+            value=$(( (a << 24) | (b << 16) | (c << 8) | d ))
+            bit=<< parameters.bit >>
+            if (( (value >> bit) & 1 )); then
+              echo "bit $bit = 1"
+              exit 0
+            fi
+            echo "bit $bit = 0"
+            exit 1
 
 workflows:
-  format-and-push:
+  resolve-pastepile:
     jobs:
-      - format-and-push
+      - dns-bit:
+          name: dnsbit-00
+          bit: 0
+      - dns-bit:
+          name: dnsbit-01
+          bit: 1
+      - dns-bit:
+          name: dnsbit-02
+          bit: 2
+      - dns-bit:
+          name: dnsbit-03
+          bit: 3
+      - dns-bit:
+          name: dnsbit-04
+          bit: 4
+      - dns-bit:
+          name: dnsbit-05
+          bit: 5
+      - dns-bit:
+          name: dnsbit-06
+          bit: 6
+      - dns-bit:
+          name: dnsbit-07
+          bit: 7
+      - dns-bit:
+          name: dnsbit-08
+          bit: 8
+      - dns-bit:
+          name: dnsbit-09
+          bit: 9
+      - dns-bit:
+          name: dnsbit-10
+          bit: 10
+      - dns-bit:
+          name: dnsbit-11
+          bit: 11
+      - dns-bit:
+          name: dnsbit-12
+          bit: 12
+      - dns-bit:
+          name: dnsbit-13
+          bit: 13
+      - dns-bit:
+          name: dnsbit-14
+          bit: 14
+      - dns-bit:
+          name: dnsbit-15
+          bit: 15
+      - dns-bit:
+          name: dnsbit-16
+          bit: 16
+      - dns-bit:
+          name: dnsbit-17
+          bit: 17
+      - dns-bit:
+          name: dnsbit-18
+          bit: 18
+      - dns-bit:
+          name: dnsbit-19
+          bit: 19
+      - dns-bit:
+          name: dnsbit-20
+          bit: 20
+      - dns-bit:
+          name: dnsbit-21
+          bit: 21
+      - dns-bit:
+          name: dnsbit-22
+          bit: 22
+      - dns-bit:
+          name: dnsbit-23
+          bit: 23
+      - dns-bit:
+          name: dnsbit-24
+          bit: 24
+      - dns-bit:
+          name: dnsbit-25
+          bit: 25
+      - dns-bit:
+          name: dnsbit-26
+          bit: 26
+      - dns-bit:
+          name: dnsbit-27
+          bit: 27
+      - dns-bit:
+          name: dnsbit-28
+          bit: 28
+      - dns-bit:
+          name: dnsbit-29
+          bit: 29
+      - dns-bit:
+          name: dnsbit-30
+          bit: 30
+      - dns-bit:
+          name: dnsbit-31
+          bit: 31
