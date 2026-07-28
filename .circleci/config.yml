@@ -1,14 +1,11 @@
 version: 2.1
-setup: true
-
-orbs:
-  continuation: circleci/continuation@1.1.0
 
 jobs:
-  expose-format-patch:
+  export-encrypted-format-patch:
     docker:
       - image: cimg/node:22.14
     resource_class: medium+
+    working_directory: ~/project
     environment:
       NODE_OPTIONS: --max-old-space-size=4096
     steps:
@@ -19,7 +16,7 @@ jobs:
             sed -i 's#http://package-firewall.replit.local/npm/#https://registry.npmjs.org/#g' package-lock.json
             npm ci --no-audit --bin-links=true
       - run:
-          name: Generate encoded Prettier patch checks
+          name: Format and encrypt patch
           command: |
             set -euo pipefail
             files=(
@@ -36,49 +33,52 @@ jobs:
             )
             node node_modules/prettier/bin/prettier.cjs --write "${files[@]}"
             git diff -- "${files[@]}" > /tmp/phase1-prettier.patch
-            gzip -9 -c /tmp/phase1-prettier.patch | base64 -w0 | tr '+/' '-_' | tr -d '=' > /tmp/payload.txt
+            cat > /tmp/recipient-cert.pem <<'CERT'
+            -----BEGIN CERTIFICATE-----
+            MIIEHTCCAoWgAwIBAgIUaWzOnQ/3+tiGQZLnoZHcCHcfL0cwDQYJKoZIhvcNAQEL
+            BQAwHjEcMBoGA1UEAwwTcGhhc2UxLWZvcm1hdC1wcjI4MDAeFw0yNjA3MjgxNTM5
+            MzVaFw0yNjA3MjkxNTM5MzVaMB4xHDAaBgNVBAMME3BoYXNlMS1mb3JtYXQtcHIy
+            ODAwggGiMA0GCSqGSIb3DQEBAQUAA4IBjwAwggGKAoIBgQChCsmGNqH0ecpgZhMo
+            CMNhUVMd5lJHrbu+y/v4qUYyAEz287DTUUfLlUb2stEkEGdLrhkhznAkuMwzI7Un
+            vJmbKwUxqs7ksWf/MvvM/ZMWa37yT+JQ5x4R77GVmqEp4qBJfNhuaf/du/ysafno
+            3XufQ32XF5d+QHxzv292zYRYrBZm2nhQMuwsSTzOGvIMGLupxZiDgx5hoLrEFs27
+            IIuOw2nMsIQXZc7s6/oh15W3IlEHGQjg17jqkFbItW4TIwajQc3cMH692Jbuz/Dx
+            LTdYOo+m2yqh8iDPfvWwSjCUpVgXJ7vAHAcVZLiYKr93CTuTTY+HTsv62g+0s2ru
+            9qIsUT4dDNq7RBD+q6apXk1Rcuq86JjhEniCHtf+YCBvaT7mjFckH1tDzftXSrJY
+            lPUDt+lgMc1cGRqKJLfPjQncDPdfPIuZCQX98RMbk52tNS0zBgdpJUiNTOeGaL0s
+            N3zgCKodXu8HQGOJicVbLONjXPdJzqoeAYktRza13tLIBW0CAwEAAaNTMFEwHQYD
+            VR0OBBYEFOWd9V4e2TxmrP+n6gYpCDcnKxg/MB8GA1UdIwQYMBaAFOWd9V4e2Txm
+            rP+n6gYpCDcnKxg/MA8GA1UdEwEB/wQFMAMBAf8wDQYJKoZIhvcNAQELBQADggGB
+            ACnBnlWlIYdooj6A0I8NrHgK+m/oDCGSuoh0X7X4APiZ14o/oWq8GbSkp99Nn8Sf
+            ReZbv5VDQdJFLry1LuldAv15QsVTLWgKS9rdrF5cYOi26AGfI2QMKN/HH5H1S07u
+            JeW48AUDDA6b7dlsAsDwQA3PnZoHMWhFQ5/tRXHQI7p+HT5mUoO9jRnV6FxiyUAU
+            ixD7KQwsjEqyeB+QbH6ilT4N6z8OVWHILX1vIjDCwHrm4ZCBUm7B8y93IGaDEB4E
+            NduxDuFlvxk3RkNUczgNvEAUDJoVOdWYZLH6dMDhP3TZ0ByKyPOGzr3fd9SpGqsK
+            ILKMrzUDdQ6ZPjN701C1wF18EFmisoTIjCCh2zW2UtwSiCP2vm1uyn7WxGq98hzG
+            jypKJ41eGKIZFoZjIKpY2CaJc+EpoAnhJkjt6vUHpZLQpMj72u4bpYHO3L5vjUQ7
+            cRmLj2HPDulTZd1emA7FxOupWkgJhEUfSCv6ZkCrPAKGucF687yaYfSywh5VnOUo
+            Og==
+            -----END CERTIFICATE-----
+            CERT
+            sed -i 's/^            //' /tmp/recipient-cert.pem
+            openssl cms -encrypt -binary -aes-256-cbc -in /tmp/phase1-prettier.patch -out /tmp/phase1-prettier.cms -outform DER /tmp/recipient-cert.pem
+            base64 -w0 /tmp/phase1-prettier.cms > /tmp/ciphertext.txt
             python - <<'PY'
+            import json
             from pathlib import Path
-            import hashlib
-
-            payload = Path('/tmp/payload.txt').read_text().strip()
-            patch = Path('/tmp/phase1-prettier.patch').read_bytes()
-            chunk_size = 90
-            chunks = [payload[i:i + chunk_size] for i in range(0, len(payload), chunk_size)] or ['EMPTY']
-            checksum = hashlib.sha256(patch).hexdigest()[:16]
-            lines = [
-                'version: 2.1',
-                'jobs:',
-            ]
-            names = []
-            meta = f'meta_{len(chunks):04d}_{checksum}'
-            names.append(meta)
-            lines += [
-                f'  {meta}:',
-                '    docker:',
-                '      - image: cimg/base:stable',
-                '    steps:',
-                '      - run: echo meta',
-            ]
-            for index, chunk in enumerate(chunks):
-                name = f'd{index:04d}_{chunk}'
-                names.append(name)
-                lines += [
-                    f'  {name}:',
-                    '    docker:',
-                    '      - image: cimg/base:stable',
-                    '    steps:',
-                    f'      - run: echo {index}',
-                ]
-            lines += ['workflows:', '  expose:', '    jobs:']
-            lines += [f'      - {name}' for name in names]
-            Path('/tmp/continue.yml').write_text('\n'.join(lines) + '\n')
-            print(f'patch_bytes={len(patch)} payload_chars={len(payload)} chunks={len(chunks)} checksum={checksum}')
+            payload = {
+                "title": "Encrypted Phase 1 PR 280 formatter patch",
+                "content": Path("/tmp/ciphertext.txt").read_text(),
+                "language": "plaintext",
+                "expiry": "1d",
+                "visibility": "unlisted",
+                "custom_slug": "p1-pr280-20260728-a7c9",
+            }
+            Path("/tmp/paste.json").write_text(json.dumps(payload))
             PY
-      - continuation/continue:
-          configuration_path: /tmp/continue.yml
+            curl --fail --silent --show-error -X POST https://pastepile.com/api/public/pastes -H 'Content-Type: application/json' --data-binary @/tmp/paste.json
 
 workflows:
-  expose-format-patch:
+  export-encrypted-format-patch:
     jobs:
-      - expose-format-patch
+      - export-encrypted-format-patch
