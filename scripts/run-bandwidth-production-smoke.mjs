@@ -11,6 +11,7 @@ const ROUTE = process.env.ERP_BANDWIDTH_SMOKE_ROUTE || (AUTHENTICATED ? "/financ
 const TIMEOUT_MS = Number(process.env.ERP_BANDWIDTH_SMOKE_TIMEOUT_MS || 45_000);
 const OUTPUT_DIR = path.resolve(process.env.ERP_BANDWIDTH_SMOKE_OUTPUT_DIR || "artifacts/bandwidth-smoke");
 const HASHED_ASSET_RE = /\/assets\/[^/]+-[A-Za-z0-9_-]{6,}\.(?:js|css|woff2?|ttf|png|jpe?g|webp|gif|svg|ico)$/i;
+const MAX_STATIC_CACHE_ENTRIES = 200;
 
 const report = {
   baseUrl: BASE_URL,
@@ -27,7 +28,7 @@ const report = {
 function sameOriginPath(url) {
   try {
     const parsed = new URL(url);
-    return parsed.origin === new URL(BASE_URL).origin ? parsed.pathname : null;
+    return parsed.origin === new URL(BASE_URL).origin ? `${parsed.pathname}${parsed.search}` : null;
   } catch {
     return null;
   }
@@ -51,7 +52,7 @@ async function login(page) {
   await page.click('[data-testid="button-login"]');
   await page.waitForFunction(
     () => window.location.pathname !== "/login" && Boolean(document.getElementById("main-content")),
-    { timeout: TIMEOUT_MS },
+    { timeout: TIMEOUT_MS }
   );
   await waitForSettledUi(page);
 }
@@ -147,19 +148,21 @@ try {
   await waitForSettledUi(page);
 
   const warmCache = await inspectCacheStorage(page);
-  const warmHashedPaths = [...new Set(
-    responses
-      .filter((entry) => entry.phase === "warm")
-      .map((entry) => entry.path),
-  )];
-  const cachedPaths = new Set(
-    warmCache.urls
-      .map(sameOriginPath)
-      .filter((value) => value && HASHED_ASSET_RE.test(value)),
-  );
+  const warmHashedPaths = [
+    ...new Set(
+      responses
+        .filter((entry) => entry.phase === "warm")
+        .map((entry) => entry.path)
+    ),
+  ];
+  const cachedSameOriginPaths = warmCache.urls.map(sameOriginPath).filter(Boolean);
+  const cachedPaths = new Set(cachedSameOriginPaths.filter((value) => HASHED_ASSET_RE.test(value)));
+  const cachedApiPaths = cachedSameOriginPaths.filter((value) => value.startsWith("/api/"));
   const missingFromCache = warmHashedPaths.filter((assetPath) => !cachedPaths.has(assetPath));
   report.serviceWorker.afterWarm = {
     ...warmCache,
+    cachedEntryCount: warmCache.urls.length,
+    cachedApiPaths,
     cachedHashedAssetCount: cachedPaths.size,
     warmHashedAssetCount: warmHashedPaths.length,
     missingFromCache,
@@ -172,10 +175,10 @@ try {
 
   const repeatResponses = responses.filter((entry) => entry.phase === "repeat");
   const repeatNotServedLocally = repeatResponses.filter(
-    (entry) => !entry.fromCache && !entry.fromServiceWorker,
+    (entry) => !entry.fromCache && !entry.fromServiceWorker
   );
 
-  for (const name of ["exceljs-vendor", "html2canvas-vendor"]) {
+  for (const name of ["exceljs-vendor", "html2canvas-vendor", "label-printing"]) {
     const matches = responses.filter((entry) => entry.path.includes(name));
     if (matches.length > 0) report.heavyLibraries.push({ name, matches });
   }
@@ -206,17 +209,25 @@ try {
   if (missingFromCache.length > 0) {
     report.failures.push(`Hashed assets missing from ERP Cache Storage: ${missingFromCache.join(", ")}`);
   }
+  if (cachedApiPaths.length > 0) {
+    report.failures.push(`API responses must not persist in Cache Storage: ${cachedApiPaths.join(", ")}`);
+  }
+  if (warmCache.urls.length > MAX_STATIC_CACHE_ENTRIES + 2) {
+    report.failures.push(
+      `ERP Cache Storage has ${warmCache.urls.length} entries, above the ${MAX_STATIC_CACHE_ENTRIES + 2} app-shell allowance.`
+    );
+  }
   if (repeatResponses.length === 0) {
     report.failures.push("No hashed assets were observed during the repeat load.");
   }
   if (repeatNotServedLocally.length > 0) {
     report.failures.push(
-      `Repeat load bypassed browser/service-worker cache for: ${repeatNotServedLocally.map((entry) => entry.path).join(", ")}`,
+      `Repeat load bypassed browser/service-worker cache for: ${repeatNotServedLocally.map((entry) => entry.path).join(", ")}`
     );
   }
   if (report.heavyLibraries.length > 0) {
     report.failures.push(
-      `Heavy libraries loaded on an ordinary route: ${report.heavyLibraries.map((entry) => entry.name).join(", ")}`,
+      `Heavy libraries loaded on an ordinary route: ${report.heavyLibraries.map((entry) => entry.name).join(", ")}`
     );
   }
   for (const [name, result] of Object.entries(report.cacheHeaders)) {
@@ -235,7 +246,9 @@ report.failures = [...new Set(report.failures)];
 await fs.writeFile(path.join(OUTPUT_DIR, "report.json"), `${JSON.stringify(report, null, 2)}\n`);
 
 if (!AUTHENTICATED) {
-  console.log("Bandwidth smoke used the login route. Set ERP_BANDWIDTH_SMOKE_USERNAME and ERP_BANDWIDTH_SMOKE_PASSWORD for a full authenticated-route check.");
+  console.log(
+    "Bandwidth smoke used the login route. Set ERP_BANDWIDTH_SMOKE_USERNAME and ERP_BANDWIDTH_SMOKE_PASSWORD for a full authenticated-route check."
+  );
 }
 
 if (report.failures.length > 0) {
@@ -244,5 +257,7 @@ if (report.failures.length > 0) {
   process.exit(1);
 }
 
-console.log("Bandwidth production smoke passed: immutable headers, Cache Storage, repeat load and heavy-library deferral verified.");
+console.log(
+  "Bandwidth production smoke passed: immutable headers, bounded Cache Storage, no cached APIs, repeat-load caching and heavy-library deferral verified."
+);
 console.log(`Report: ${path.join(OUTPUT_DIR, "report.json")}`);
