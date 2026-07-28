@@ -27,30 +27,30 @@ import {
 
 const postingDependencies = createDatabasePostingDependencies();
 type PersistedPostingResult = CentralPostingResult<any, any>;
+type CustomerLinkedLedgerRow = { id: number; ledgerAccountId: number | null };
 
 async function resolveCustomerLinkedLedgersTx(input: {
   tx: any;
   companyId: number;
   entries: Array<Record<string, unknown>>;
 }): Promise<Array<Record<string, unknown>>> {
-  const customerIds = [...new Set(
-    input.entries
-      .map((entry) => Number(entry.customerId))
-      .filter((id) => Number.isInteger(id) && id > 0)
-  )];
+  const customerIds = [
+    ...new Set(
+      input.entries
+        .map((entry) => Number(entry.customerId))
+        .filter((id) => Number.isInteger(id) && id > 0),
+    ),
+  ];
 
   if (customerIds.length === 0) return input.entries.map((entry) => ({ ...entry }));
 
-  const rows = await input.tx
+  const rows: CustomerLinkedLedgerRow[] = await input.tx
     .select({ id: customers.id, ledgerAccountId: customers.ledgerAccountId })
     .from(customers)
-    .where(
-      and(
-        eq(customers.companyId, input.companyId),
-        inArray(customers.id, customerIds)
-      )
-    );
-  const customerById = new Map(rows.map((row: { id: number; ledgerAccountId: number | null }) => [Number(row.id), row]));
+    .where(and(eq(customers.companyId, input.companyId), inArray(customers.id, customerIds)));
+  const customerById = new Map<number, CustomerLinkedLedgerRow>(
+    rows.map((row) => [Number(row.id), row] as const),
+  );
 
   return input.entries.map((entry) => {
     const customerId = Number(entry.customerId);
@@ -60,7 +60,7 @@ async function resolveCustomerLinkedLedgersTx(input: {
     if (!customer) {
       throw new PostingValidationError(
         "POSTING_TARGET_NOT_OWNED",
-        `Customer ${customerId} not found in company ${input.companyId}`
+        `Customer ${customerId} not found in company ${input.companyId}`,
       );
     }
 
@@ -69,7 +69,7 @@ async function resolveCustomerLinkedLedgersTx(input: {
     if (linkedLedgerId && suppliedLedgerId && linkedLedgerId !== suppliedLedgerId) {
       throw new PostingValidationError(
         "POSTING_LINKED_LEDGER_MISMATCH",
-        `Customer ${customerId} is linked to ledger ${linkedLedgerId}, but the entry specifies ledger ${suppliedLedgerId}`
+        `Customer ${customerId} is linked to ledger ${linkedLedgerId}, but the entry specifies ledger ${suppliedLedgerId}`,
       );
     }
 
@@ -87,7 +87,7 @@ function postingStatus(error: PostingValidationError): number {
 async function createCentralGenericVoucher(
   req: Request,
   res: Response,
-  next: NextFunction
+  next: NextFunction,
 ): Promise<void> {
   if (!supportsCentralGenericVoucher(req.body)) {
     next();
@@ -106,11 +106,8 @@ async function createCentralGenericVoucher(
 
     const currentRate = await getCurrentExchangeRate(companyId);
     const suppliedRate = req.body.voucher?.exchangeRate;
-    const voucherExchangeRate = suppliedRate != null
-      ? String(suppliedRate)
-      : currentRate != null
-        ? String(currentRate)
-        : null;
+    const voucherExchangeRate =
+      suppliedRate != null ? String(suppliedRate) : currentRate != null ? String(currentRate) : null;
 
     const result = await db.transaction(async (tx) => {
       const resolvedEntries = await resolveCustomerLinkedLedgersTx({
@@ -134,7 +131,7 @@ async function createCentralGenericVoucher(
       const posted = (await postBalancedVoucherTx(
         tx,
         built.request,
-        postingDependencies
+        postingDependencies,
       )) as PersistedPostingResult;
 
       if (!posted.replayed) {
@@ -178,12 +175,12 @@ async function createCentralGenericVoucher(
         posted.voucher.totalAmount || "0",
         posted.voucher.description,
         posted.entries.map((entry: any) => entry.ledgerAccountId),
-        posted.voucher.voucherType
+        posted.voucher.voucherType,
       ).catch(() => {});
 
       autoReallocateLoansAccounts(
         companyId,
-        posted.entries.map((entry: any) => entry.ledgerAccountId)
+        posted.entries.map((entry: any) => entry.ledgerAccountId),
       ).catch(() => {});
     }
 
@@ -227,6 +224,6 @@ export function registerCentralGenericVoucherCreateRoute(app: Express): void {
     "/api/vouchers/with-entries",
     requireAuth,
     requireNonPOS,
-    (req, res, next) => void createCentralGenericVoucher(req, res, next)
+    (req, res, next) => void createCentralGenericVoucher(req, res, next),
   );
 }
