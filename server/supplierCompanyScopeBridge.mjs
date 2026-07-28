@@ -20,16 +20,19 @@ if (!globalThis[INSTALL_KEY]) {
     process.env.PGDATABASE
   ) {
     const { PGHOST, PGPORT, PGUSER, PGPASSWORD, PGDATABASE } = process.env;
-    connectionString = `postgresql://${encodeURIComponent(PGUSER)}:${encodeURIComponent(PGPASSWORD)}@${PGHOST}:${PGPORT}/${PGDATABASE}`;
+    connectionString =
+      `postgresql://${encodeURIComponent(PGUSER)}:${encodeURIComponent(PGPASSWORD)}` +
+      `@${PGHOST}:${PGPORT}/${PGDATABASE}`;
   }
 
   if (!connectionString) {
     throw new Error(
-      "Supplier company-scope migration could not start because no PostgreSQL configuration is available.",
+      "Supplier company-scope migration could not start because no PostgreSQL configuration is available."
     );
   }
 
-  const isLocalReplitDB = process.env.PGHOST === "helium" || connectionString.includes("@helium:");
+  const isLocalReplitDB =
+    process.env.PGHOST === "helium" || connectionString.includes("@helium:");
   const sslExplicitlyDisabled = process.env.PGSSLMODE === "disable";
   const requiresSSL = !isLocalReplitDB && !sslExplicitlyDisabled;
   const isTestEnvironment = process.env.NODE_ENV === "test";
@@ -88,12 +91,12 @@ if (!globalThis[INSTALL_KEY]) {
           level: "INFO",
           message: "Supplier company-scope test schema applied",
           module: "supplier-company-scope-migration",
-        }),
+        })
       );
     } else {
       const migrationSql = await readFile(
         new URL("../migrations/20260728_001_supplier_company_scope.sql", import.meta.url),
-        "utf8",
+        "utf8"
       );
       await pool.query(migrationSql);
       console.log(
@@ -102,7 +105,7 @@ if (!globalThis[INSTALL_KEY]) {
           level: "INFO",
           message: "Supplier company-scope migration applied",
           module: "supplier-company-scope-migration",
-        }),
+        })
       );
     }
   } catch (error) {
@@ -113,7 +116,7 @@ if (!globalThis[INSTALL_KEY]) {
         message: "Supplier company-scope migration failed",
         module: "supplier-company-scope-migration",
         error: error instanceof Error ? error.message : String(error),
-      }),
+      })
     );
     throw error;
   } finally {
