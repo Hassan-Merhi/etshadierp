@@ -74,6 +74,13 @@ commands:
             echo "PostgreSQL did not become ready."
             exit 1
 
+  prepare_test_schema:
+    steps:
+      - wait_for_postgres
+      - run:
+          name: Prepare disposable database schema
+          command: node node_modules/drizzle-kit/bin.cjs push --force
+
 jobs:
   static-build:
     executor: node22
@@ -142,6 +149,53 @@ jobs:
           name: Frontend tests
           command: node node_modules/vitest/vitest.mjs run --config vitest.config.frontend.ts --maxWorkers=1 --no-file-parallelism
 
+  postgres-supplier-scope:
+    executor: node22-postgres
+    steps:
+      - install_dependencies
+      - prepare_test_schema
+      - run:
+          name: Supplier and accounting scope regressions
+          command: >-
+            node node_modules/vitest/vitest.mjs run
+            tests/supplier-company-isolation.test.ts
+            tests/supplier-proforma-alias-conflict.test.ts
+            tests/accounting.test.ts
+            tests/erp-parent-routes.test.ts
+            tests/permissions.test.ts
+            --maxWorkers=1 --no-file-parallelism
+
+  postgres-password-migration:
+    executor: node22-postgres
+    steps:
+      - install_dependencies
+      - prepare_test_schema
+      - run:
+          name: Password and migration regressions
+          command: >-
+            node node_modules/vitest/vitest.mjs run
+            tests/password-helpers.test.ts
+            tests/migration-registry.test.ts
+            --maxWorkers=1 --no-file-parallelism
+
+  postgres-factory-costing:
+    executor: node22-postgres
+    steps:
+      - install_dependencies
+      - prepare_test_schema
+      - run:
+          name: Factory and costing regressions
+          command: >-
+            node node_modules/vitest/vitest.mjs run
+            tests/factory-container-lifecycle.test.ts
+            tests/factory-landed-cost-reconciliation.test.ts
+            tests/factory-mix-batch-stable-cost.test.ts
+            tests/factory-raw-material-moving-avg.test.ts
+            tests/raw-material-multicurrency-recalc.test.ts
+            tests/multi-currency-integration.test.ts
+            tests/smart-transfer-preview.test.ts
+            --maxWorkers=1 --no-file-parallelism
+
   security-readiness:
     executor: node22-postgres
     steps:
@@ -168,6 +222,9 @@ workflows:
     jobs:
       - static-build
       - postgres-regression
+      - postgres-supplier-scope
+      - postgres-password-migration
+      - postgres-factory-costing
       - security-readiness:
           requires:
             - static-build
