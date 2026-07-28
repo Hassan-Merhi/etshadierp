@@ -6,7 +6,7 @@ on:
     types: [reopened]
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   format-phase1:
@@ -20,7 +20,7 @@ jobs:
           repository: ${{ github.event.pull_request.head.repo.full_name }}
           ref: ${{ github.event.pull_request.head.ref }}
           fetch-depth: 0
-          persist-credentials: true
+          persist-credentials: false
 
       - name: Set up Node.js 22
         uses: actions/setup-node@v4
@@ -55,14 +55,32 @@ jobs:
             server/routes/vouchers/voucherPaginationRoutes.ts \
             vite.config.ts
 
-      - name: Commit formatted files
+      - name: Package formatted files
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add build client/src scripts server/routes vite.config.ts
-          if git diff --cached --quiet; then
-            echo "All Phase 1 files were already formatted."
-            exit 0
-          fi
-          git commit -m "chore: format Phase 1 pagination"
-          git push origin HEAD:${{ github.event.pull_request.head.ref }}
+          tar -czf /tmp/phase1-formatted.tar.gz \
+            build/vitePhase1PaginationPlugin.ts \
+            client/src/lib/accountStatementPaginationClient.ts \
+            client/src/lib/containerPaginationClient.ts \
+            client/src/lib/daybookPaginationClient.ts \
+            client/src/lib/erpDaybookPaginationClient.ts \
+            client/src/lib/supplierPurchaseOrderPaginationClient.ts \
+            client/src/main.tsx \
+            scripts/verify-phase1-sql-pagination.mjs \
+            server/routes/accountTransactionPaginationRoutes.ts \
+            server/routes/containerRoutes.ts \
+            server/routes/containers/containerListPaginationRoutes.ts \
+            server/routes/daybookPaginationRoutes.ts \
+            server/routes/ledgerAccountPaginationRoutes.ts \
+            server/routes/ledgerRoutes.ts \
+            server/routes/voucherRoutes.ts \
+            server/routes/vouchers/supplierPurchaseOrderPaginationRoutes.ts \
+            server/routes/vouchers/voucherPaginationRoutes.ts \
+            vite.config.ts
+
+      - name: Upload formatted files
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase1-formatted
+          path: /tmp/phase1-formatted.tar.gz
+          retention-days: 1
+          if-no-files-found: error
