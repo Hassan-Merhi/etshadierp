@@ -1,6 +1,10 @@
 // Compatibility barrel — all existing imports from this path continue to work.
 // Implementation has been split into focused files under server/routes/helpers/.
 
+// Evaluate the emergency impersonation policy before authRoutes reads
+// process.env.MASTER_PASSWORD into its module-level constants.
+import "./helpers/masterPasswordPolicy";
+
 export { upload } from "./helpers/uploadHelpers";
 
 export { hashPassword, isLegacySHA256Hash, verifyLegacyPassword, verifyPassword } from "./helpers/passwordHelpers";
