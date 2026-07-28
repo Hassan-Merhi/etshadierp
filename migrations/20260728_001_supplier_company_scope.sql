@@ -7,48 +7,61 @@ DO $$
 DECLARE
   configured_parent_id INTEGER;
   fallback_parent_count INTEGER;
+  unowned_supplier_count INTEGER;
 BEGIN
-  SELECT CASE
-           WHEN value ~ '^[1-9][0-9]*$' THEN value::INTEGER
-           ELSE NULL
-         END
-    INTO configured_parent_id
-    FROM system_settings
-   WHERE key = 'parentCompanyId'
-   LIMIT 1;
+  SELECT COUNT(*)::INTEGER
+    INTO unowned_supplier_count
+    FROM suppliers
+   WHERE company_id IS NULL;
 
-  IF configured_parent_id IS NULL THEN
-    SELECT COUNT(*)::INTEGER
-      INTO fallback_parent_count
-      FROM companies
-     WHERE active = TRUE
-       AND company_type = 'erp'
-       AND parent_company_id IS NULL;
+  -- Fresh disposable/test databases have no supplier rows yet. In that case
+  -- there is nothing to backfill, so requiring a pre-existing parent company
+  -- would incorrectly prevent the application and test suite from starting.
+  -- The insert trigger below still fails closed for any future legacy insert
+  -- that omits company_id and cannot resolve exactly one valid owner.
+  IF unowned_supplier_count > 0 THEN
+    SELECT CASE
+             WHEN value ~ '^[1-9][0-9]*$' THEN value::INTEGER
+             ELSE NULL
+           END
+      INTO configured_parent_id
+      FROM system_settings
+     WHERE key = 'parentCompanyId'
+     LIMIT 1;
 
-    IF fallback_parent_count = 1 THEN
-      SELECT id
-        INTO configured_parent_id
+    IF configured_parent_id IS NULL THEN
+      SELECT COUNT(*)::INTEGER
+        INTO fallback_parent_count
         FROM companies
        WHERE active = TRUE
          AND company_type = 'erp'
-         AND parent_company_id IS NULL
-       LIMIT 1;
-    ELSE
-      RAISE EXCEPTION
-        'Cannot backfill suppliers.company_id: configure system_settings.parentCompanyId first (found % eligible ERP parent companies)',
-        fallback_parent_count;
+         AND parent_company_id IS NULL;
+
+      IF fallback_parent_count = 1 THEN
+        SELECT id
+          INTO configured_parent_id
+          FROM companies
+         WHERE active = TRUE
+           AND company_type = 'erp'
+           AND parent_company_id IS NULL
+         LIMIT 1;
+      ELSE
+        RAISE EXCEPTION
+          'Cannot backfill suppliers.company_id: configure system_settings.parentCompanyId first (found % eligible ERP parent companies)',
+          fallback_parent_count;
+      END IF;
     END IF;
-  END IF;
 
-  IF NOT EXISTS (SELECT 1 FROM companies WHERE id = configured_parent_id) THEN
-    RAISE EXCEPTION
-      'Cannot backfill suppliers.company_id: configured parent company % does not exist',
-      configured_parent_id;
-  END IF;
+    IF NOT EXISTS (SELECT 1 FROM companies WHERE id = configured_parent_id) THEN
+      RAISE EXCEPTION
+        'Cannot backfill suppliers.company_id: configured parent company % does not exist',
+        configured_parent_id;
+    END IF;
 
-  UPDATE suppliers
-     SET company_id = configured_parent_id
-   WHERE company_id IS NULL;
+    UPDATE suppliers
+       SET company_id = configured_parent_id
+     WHERE company_id IS NULL;
+  END IF;
 END
 $$;
 
