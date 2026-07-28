@@ -16,6 +16,8 @@ import Decimal from "decimal.js";
 import { storage } from "../../storage";
 import { getVoucherEntriesBySupplierBatched } from "../performance/supplierVoucherEntryBatcher";
 
+let parentCompanyResolution: Promise<number> | null = null;
+
 export class ParentCompanyNotConfiguredError extends Error {
   constructor() {
     super(
@@ -33,16 +35,31 @@ export class ParentCompanyNotConfiguredError extends Error {
  *   - exactly one ERP company exists → that company is unambiguously the parent.
  *   - more than one ERP company exists → this is a genuine configuration gap;
  *     throw a clear diagnostic error instead of guessing.
+ *
+ * Concurrent account-list calls share one in-flight resolution. This preserves
+ * the exact configuration semantics while preventing one parent lookup per
+ * supplier before the voucher-entry batch is assembled.
  */
 export async function resolveParentCompanyId(): Promise<number> {
-  const configured = await storage.getParentCompanyId();
-  if (configured) return configured;
+  if (parentCompanyResolution) return parentCompanyResolution;
 
-  const allCompanies = await storage.getAllCompanies();
-  const erpCompanies = allCompanies.filter((c: any) => !c.companyType || c.companyType === "erp");
-  if (erpCompanies.length === 1) return erpCompanies[0].id;
+  const resolution = (async () => {
+    const configured = await storage.getParentCompanyId();
+    if (configured) return configured;
 
-  throw new ParentCompanyNotConfiguredError();
+    const allCompanies = await storage.getAllCompanies();
+    const erpCompanies = allCompanies.filter((c: any) => !c.companyType || c.companyType === "erp");
+    if (erpCompanies.length === 1) return erpCompanies[0].id;
+
+    throw new ParentCompanyNotConfiguredError();
+  })();
+
+  parentCompanyResolution = resolution;
+  try {
+    return await resolution;
+  } finally {
+    if (parentCompanyResolution === resolution) parentCompanyResolution = null;
+  }
 }
 
 /**
