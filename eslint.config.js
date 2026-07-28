@@ -61,6 +61,14 @@ export default tseslint.config(
       "prefer-const": "warn",
       "no-var": "warn",
 
+      // ESLint 10 promoted these rules into the recommended baseline. Keep them
+      // visible while the legacy code is repaired incrementally, without turning
+      // a toolchain upgrade into a repository-wide CI outage.
+      "preserve-caught-error": "warn",
+      "no-useless-assignment": "warn",
+      "no-control-regex": "warn",
+      "no-extra-boolean-cast": "warn",
+
       "react-hooks/rules-of-hooks": "warn",
       "react-hooks/exhaustive-deps": "warn",
     },
