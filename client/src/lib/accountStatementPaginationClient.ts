@@ -1,7 +1,8 @@
 import { queryClient } from "./queryClient";
 
 const ACCOUNT_ROUTE_SUFFIX = "/accounts";
-const ENDPOINT_PATTERN = /^\/api\/accounts\/(ledger|bank|fixed-asset|supplier|employee|customer)\/\d+\/transactions$/;
+const ENDPOINT_PATTERN =
+  /^\/api\/accounts\/(ledger|bank|fixed-asset|supplier|employee|customer)\/\d+\/transactions$/;
 const DEFAULT_LIMIT = 100;
 const ALLOWED_LIMITS = [50, 100, 250];
 
@@ -13,14 +14,37 @@ interface StatementPage {
   totalPages: number;
   hasNextPage: boolean;
   hasPreviousPage: boolean;
+  periodDebitTotal?: number;
+  periodCreditTotal?: number;
+  closingNetBalance?: number;
 }
 
-interface PaginationMeta {
+export interface AccountStatementPaginationSnapshot {
   key: string;
   total: number;
   page: number;
   limit: number;
   totalPages: number;
+  periodDebitTotal: number | null;
+  periodCreditTotal: number | null;
+  closingNetBalance: number | null;
+}
+
+let statementSnapshot: AccountStatementPaginationSnapshot | null = null;
+const statementListeners = new Set<() => void>();
+
+export function getAccountStatementPaginationSnapshot(): AccountStatementPaginationSnapshot | null {
+  return statementSnapshot;
+}
+
+export function subscribeAccountStatementPagination(listener: () => void): () => void {
+  statementListeners.add(listener);
+  return () => statementListeners.delete(listener);
+}
+
+function updateStatementSnapshot(next: AccountStatementPaginationSnapshot | null): void {
+  statementSnapshot = next;
+  for (const listener of statementListeners) listener();
 }
 
 declare global {
@@ -37,7 +61,7 @@ if (typeof window !== "undefined" && !window.__erpAccountStatementPaginationInst
   window.__erpAccountStatementPaginationInstalled = true;
 
   const previousFetch = window.fetch.bind(window);
-  let activeMeta: PaginationMeta | null = null;
+  let activeMeta: AccountStatementPaginationSnapshot | null = null;
   let activeBaseKey = "";
   let selectedPage = 1;
   let selectedLimit = DEFAULT_LIMIT;
@@ -219,7 +243,23 @@ if (typeof window !== "undefined" && !window.__erpAccountStatementPaginationInst
         selectedPage = serverPage;
       }
       selectedLimit = limit;
-      activeMeta = { key, total, page: selectedPage, limit, totalPages };
+      activeMeta = {
+        key,
+        total,
+        page: selectedPage,
+        limit,
+        totalPages,
+        periodDebitTotal: Number.isFinite(Number(payload.periodDebitTotal))
+          ? Number(payload.periodDebitTotal)
+          : null,
+        periodCreditTotal: Number.isFinite(Number(payload.periodCreditTotal))
+          ? Number(payload.periodCreditTotal)
+          : null,
+        closingNetBalance: Number.isFinite(Number(payload.closingNetBalance))
+          ? Number(payload.closingNetBalance)
+          : null,
+      };
+      updateStatementSnapshot(activeMeta);
       renderControls();
       return response;
     } catch {
@@ -233,6 +273,7 @@ if (typeof window !== "undefined" && !window.__erpAccountStatementPaginationInst
       activeBaseKey = "";
       selectedPage = 1;
       selectedLimit = DEFAULT_LIMIT;
+      updateStatementSnapshot(null);
     }
     renderControls();
   };
