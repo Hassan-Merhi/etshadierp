@@ -61,7 +61,7 @@ async function flushBatch(key: string, companyId: number | undefined, batch: Pen
       companyFilter = ` AND v.company_id = $${params.length}`;
     }
 
-    const result = await pool.query<EntryRow>(
+    const result = await pool.query(
       `SELECT
          ve.supplier_id                                               AS "__supplierId",
          ve.id                                                        AS "entryId",
@@ -91,7 +91,7 @@ async function flushBatch(key: string, companyId: number | undefined, batch: Pen
     );
 
     const rowsBySupplier = new Map<number, any[]>();
-    for (const row of result.rows) {
+    for (const row of result.rows as EntryRow[]) {
       const supplierId = Number(row.__supplierId);
       if (!rowsBySupplier.has(supplierId)) rowsBySupplier.set(supplierId, []);
       rowsBySupplier.get(supplierId)!.push(stripInternalSupplierId(row));
