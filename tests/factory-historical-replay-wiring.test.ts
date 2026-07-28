@@ -20,15 +20,13 @@ describe("Historical Replay final wiring", () => {
   it("invalidates tokens prepared by incomplete earlier replay versions", () => {
     const types = read("server/services/factory/historical-replay/types.ts");
     expect(types).toContain(
-      'REPLAY_ALGORITHM_VERSION = "HISTORICAL_COST_REPLAY_V7_INVENTORY_OWNERSHIP_FINAL"'
+      'REPLAY_ALGORITHM_VERSION = "HISTORICAL_COST_REPLAY_V7_INVENTORY_OWNERSHIP_FINAL"',
     );
   });
 
   it("registers full-company scope, safety guard and exact handlers before legacy routes", () => {
     const routes = read("server/routes/factory/raw-stock/rawStockRecalcRoutes.ts");
-    const fullCompany = routes.indexOf(
-      "registerHistoricalReplayFullCompanyScopeRoutes(app)"
-    );
+    const fullCompany = routes.indexOf("registerHistoricalReplayFullCompanyScopeRoutes(app)");
     const guard = routes.indexOf("registerHistoricalReplayPhase6GuardRoutes(app)");
     const exact = routes.indexOf("registerHistoricalReplayRoutesV4(app)");
     const legacy = routes.indexOf("registerLegacyRawStockRecalcRoutes(app)");
@@ -41,14 +39,15 @@ describe("Historical Replay final wiring", () => {
   it("keeps apply authority in the signed token after client state changes or reload", () => {
     const prepared = read("client/src/lib/historicalReplayPreparedRequest.ts");
     expect(prepared).toContain("server-returned, signed preparation state");
-    expect(prepared).toContain("return { dryRun: false, confirmationToken: token }");
+    expect(prepared).toContain("dryRun: false");
+    expect(prepared).toContain("confirmationToken: token");
     expect(prepared).toContain("includeFinalizedBales: frozen.options.includeFinalizedBales");
+    expect(prepared).toContain("applyAuthorizationToken");
+    expect(prepared).toContain("productionReleaseId");
   });
 
   it("ships the schema migration and database-boundary ownership guard", () => {
-    const migration = read(
-      "migrations/20260721_001_factory_mix_batch_sources_inventory_supplier.sql"
-    );
+    const migration = read("migrations/20260721_001_factory_mix_batch_sources_inventory_supplier.sql");
     expect(migration).toContain("inventory_supplier_id");
     expect(migration).toContain("valuation_basis");
     expect(migration).toContain("factory_resolve_mix_source_inventory_supplier");
