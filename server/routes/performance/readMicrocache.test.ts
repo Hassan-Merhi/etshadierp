@@ -115,7 +115,11 @@ describe("Phase 7C read microcache", () => {
     expect(retryNext).toHaveBeenCalledOnce();
 
     const unrelatedNext = vi.fn();
-    middleware(makeRequest({ path: "/api/vouchers", originalUrl: "/api/vouchers" }), makeResponse(), unrelatedNext);
+    middleware(
+      makeRequest({ path: "/api/vouchers", originalUrl: "/api/vouchers" }),
+      makeResponse(),
+      unrelatedNext
+    );
     expect(unrelatedNext).toHaveBeenCalledOnce();
   });
 
@@ -139,7 +143,11 @@ describe("Phase 7C read microcache", () => {
     middleware(req, firstRes, () => firstRes.json({ ok: true }));
 
     const writeNext = vi.fn();
-    middleware(makeRequest({ method: "POST", path: "/api/vouchers", originalUrl: "/api/vouchers" }), makeResponse(), writeNext);
+    middleware(
+      makeRequest({ method: "POST", path: "/api/vouchers", originalUrl: "/api/vouchers" }),
+      makeResponse(),
+      writeNext
+    );
     expect(writeNext).toHaveBeenCalledOnce();
 
     const readNext = vi.fn();
