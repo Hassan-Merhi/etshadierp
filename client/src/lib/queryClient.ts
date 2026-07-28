@@ -57,16 +57,22 @@ export function resetCsrfToken() {
 const _CAPACITOR_API_BASE: string = ((import.meta as any).env?.VITE_API_BASE_URL as string) || "";
 
 /* ── Session-expiry redirect ─────────────────────────────────────────────── */
-// Single-fire: when any /api/* request returns 401 while the user is on an
-// authenticated page, redirect to /login once. This stops all React Query
-// polling, setInterval heartbeats, and screen-feed polls by unmounting every
-// authenticated component — the correct response to an expired idle session.
-// NOTE: the server uses 401 exclusively for session issues; permission denials
-// use 403, so every 401 we see here genuinely means "session gone".
+// Single-fire: only after /api/auth/me confirms the session is truly gone do
+// we redirect to /login. This prevents false logouts caused by business
+// endpoints that legitimately return 401 (permission-based, POS-gated, etc.)
+// while the user's session is still perfectly valid.
 let _sessionExpiredHandled = false;
+/** @internal – injected by unit tests to observe redirects without a browser */
+let _redirectFn: ((href: string) => void) | null = null;
 
 function scheduleSessionExpiredRedirect() {
   if (_sessionExpiredHandled) return;
+  // Test hook: avoids needing a browser environment.
+  if (_redirectFn) {
+    _sessionExpiredHandled = true;
+    _redirectFn("/login");
+    return;
+  }
   if (typeof window === "undefined") return;
   // Don't redirect when already on the login page — avoids loops from
   // wrong-password 401s and initial unauthenticated loads.
@@ -75,6 +81,68 @@ function scheduleSessionExpiredRedirect() {
   _sessionExpiredHandled = true;
   // Small delay so the current render cycle finishes cleanly before we navigate.
   setTimeout(() => { window.location.href = "/login"; }, 300);
+}
+
+// ── Session verification (prevents false logout on business 401s) ──────────
+// A shared promise ensures multiple simultaneous 401 responses only trigger
+// ONE /api/auth/me check. Uses originalFetch directly to bypass the patched
+// window.fetch and avoid an infinite interception loop.
+let _sessionVerificationPromise: Promise<boolean> | null = null;
+
+export async function verifySessionExpired(
+  originalFetch: typeof window.fetch,
+): Promise<boolean> {
+  if (_sessionVerificationPromise) return _sessionVerificationPromise;
+  _sessionVerificationPromise = (async () => {
+    try {
+      const res = await originalFetch("/api/auth/me", {
+        method: "GET",
+        credentials: "include",
+        cache: "no-store",
+        headers: { Accept: "application/json" },
+      });
+      // Only treat a confirmed 401 as session expiry.
+      // 5xx / network errors / 502 proxy restarts → do NOT log the user out.
+      return res.status === 401;
+    } catch {
+      // Network failure or timeout — never log the user out speculatively.
+      return false;
+    } finally {
+      _sessionVerificationPromise = null;
+    }
+  })();
+  return _sessionVerificationPromise;
+}
+
+// Routes that must never trigger session verification to avoid recursion or
+// interfering with the login flow itself.
+const AUTH_PATHS = new Set([
+  "/api/auth/me",
+  "/api/auth/login",
+  "/api/auth/logout",
+  "/api/csrf-token",
+]);
+
+export async function handlePossibleSessionExpiry(
+  response: Response,
+  pathname: string | null,
+  originalFetch: typeof window.fetch,
+): Promise<void> {
+  if (response.status !== 401) return;
+  if (!pathname?.startsWith("/api/")) return;
+  if (AUTH_PATHS.has(pathname)) return;
+  const expired = await verifySessionExpired(originalFetch);
+  if (expired) scheduleSessionExpiredRedirect();
+}
+
+/** @internal – reset state between tests only */
+export function _testOnly_resetSessionExpired() {
+  _sessionExpiredHandled = false;
+  _sessionVerificationPromise = null;
+}
+/** @internal – inject a redirect observer for unit tests (no browser required) */
+export function _testOnly_setRedirectFn(fn: ((href: string) => void) | null) {
+  _redirectFn = fn;
 }
 
 /* ── Global fetch interceptor ────────────────────────────────────────────── */
@@ -97,27 +165,28 @@ if (typeof window !== "undefined" && !(window as any).__csrfFetchPatched) {
   const originalFetch = window.fetch.bind(window);
 
   async function fetchWithCsrf(input: RequestInfo | URL, init?: RequestInit, isRetry = false): Promise<Response> {
+    // Capacitor: prefix relative /api/* paths with the remote server base URL.
+    // No-op when VITE_API_BASE_URL is unset (all web builds — zero behavior change).
+    if (_CAPACITOR_API_BASE && typeof input === "string" && input.startsWith("/")) {
+      input = `${_CAPACITOR_API_BASE}${input}`;
+    }
+
+    // Resolve pathname BEFORE the try block so it is accessible in both the
+    // state-changing path (inside try) and the GET fallback path (after try).
+    let pathname: string | null = null;
     try {
-      // Capacitor: prefix relative /api/* paths with the remote server base URL.
-      // No-op when VITE_API_BASE_URL is unset (all web builds — zero behavior change).
-      if (_CAPACITOR_API_BASE && typeof input === "string" && input.startsWith("/")) {
-        input = `${_CAPACITOR_API_BASE}${input}`;
+      if (typeof input === "string") {
+        pathname = input.startsWith("/") ? input.split("?")[0] : new URL(input, window.location.origin).pathname;
+      } else if (input instanceof URL) {
+        pathname = input.pathname;
+      } else if (input instanceof Request) {
+        pathname = new URL(input.url, window.location.origin).pathname;
       }
+    } catch {
+      /* opaque URL — skip */
+    }
 
-      // Resolve the URL pathname for /api/* matching
-      let pathname: string | null = null;
-      try {
-        if (typeof input === "string") {
-          pathname = input.startsWith("/") ? input.split("?")[0] : new URL(input, window.location.origin).pathname;
-        } else if (input instanceof URL) {
-          pathname = input.pathname;
-        } else if (input instanceof Request) {
-          pathname = new URL(input.url, window.location.origin).pathname;
-        }
-      } catch {
-        /* opaque URL — skip */
-      }
-
+    try {
       const method = (init?.method || (input instanceof Request ? input.method : "GET")).toUpperCase();
       const isStateChanging = method !== "GET" && method !== "HEAD" && method !== "OPTIONS";
       const isApi = !!pathname && pathname.startsWith("/api/") && pathname !== "/api/csrf-token";
@@ -146,8 +215,8 @@ if (typeof window !== "undefined" && !(window as any).__csrfFetchPatched) {
                 /* not JSON — not a CSRF error */
               }
             }
-            // Session-expiry detection for state-changing /api/* requests
-            if (res.status === 401) scheduleSessionExpiredRedirect();
+            // Verify session before redirecting — a business 401 must not log users out.
+            await handlePossibleSessionExpiry(res, pathname, originalFetch);
             return res;
           }
         }
@@ -158,17 +227,8 @@ if (typeof window !== "undefined" && !(window as any).__csrfFetchPatched) {
     // GET (and other non-state-changing) requests fall through here.
     // Capture the response so we can detect session expiry on polling queries.
     const fallbackRes = await originalFetch(input, init);
-    if (fallbackRes.status === 401) {
-      try {
-        const urlStr =
-          typeof input === "string" ? input
-          : input instanceof Request ? input.url
-          : String(input);
-        if (urlStr.includes("/api/") && !urlStr.includes("/api/csrf-token")) {
-          scheduleSessionExpiredRedirect();
-        }
-      } catch { /* opaque URL — skip */ }
-    }
+    // Verify session before redirecting — a business 401 must not log users out.
+    await handlePossibleSessionExpiry(fallbackRes, pathname, originalFetch);
     return fallbackRes;
   }
 
@@ -371,11 +431,10 @@ export const getQueryFn: <T>(options: { on401: UnauthorizedBehavior }) => QueryF
 // (component unmounted), just remove the error so it doesn't flash on remount.
 const globalQueryCache = new QueryCache({
   onError: (error: any, query) => {
-    // Session expiry: redirect once and let component unmounts clear all intervals.
-    if (error?.status === 401) {
-      scheduleSessionExpiredRedirect();
-      return;
-    }
+    // NOTE: 401 handling is intentionally NOT here. The global fetch interceptor
+    // is the single source of session-expiry detection; it verifies /api/auth/me
+    // before redirecting. Handling 401 here too would bypass that check and cause
+    // false logouts on business endpoints that return 401 for non-session reasons.
     if (error?.name !== "AbortError") return;
     // Swallow — schedule a transparent recovery refetch if the component is still mounted
     const observerCount = query.getObserversCount();
