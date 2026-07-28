@@ -1,3 +1,4 @@
+import "./bandwidthPhase1HotspotGuard";
 import {
   attachAccountingRequestIdentity,
   isProtectedAccountingRequest,
