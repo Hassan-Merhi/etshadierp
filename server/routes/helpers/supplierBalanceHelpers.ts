@@ -1,16 +1,9 @@
 // Canonical, company-isolated supplier balance calculation.
 //
-// Business rule: a supplier's `openingBalance` is a one-time historical figure
-// that belongs ONLY to the configured parent company's books. Every other
-// (child/sub) company starts that supplier at $0 and only accrues a balance
-// from its OWN vouchers/POs/containers. The parent company is never inferred
-// by "lowest company ID" — it must come from the explicit `parentCompanyId`
-// system setting (storage.getParentCompanyId()).
-//
-// Every endpoint that renders a supplier balance (accounts/all, payables,
-// suppliers/stats, supplier balance, voucher-sidebar, transactions,
-// brought-forward/date-filtered queries, PDF/Excel statement exports) MUST
-// route through these helpers instead of re-implementing the parent check.
+// Supplier rows are company-owned through suppliers.company_id. A supplier may
+// be read or posted only from its owning company. The legacy parent-company
+// setting is retained solely as a compatibility fallback for rows observed
+// before the company-scope migration has run.
 
 import Decimal from "decimal.js";
 import { storage } from "../../storage";
@@ -22,7 +15,7 @@ export class ParentCompanyNotConfiguredError extends Error {
   constructor() {
     super(
       "Parent company is not configured (system setting 'parentCompanyId' is unset) and there is more than one " +
-        "ERP company, so supplier opening balances cannot be safely isolated. An Admin must set the parent " +
+        "ERP company, so legacy supplier opening balances cannot be safely isolated. An Admin must set the parent " +
         "company under Company Settings before viewing supplier balances."
     );
     this.name = "ParentCompanyNotConfiguredError";
@@ -30,15 +23,9 @@ export class ParentCompanyNotConfiguredError extends Error {
 }
 
 /**
- * Resolves the ID of the company that owns supplier.openingBalance.
- * NEVER guesses via "lowest company ID". If the explicit setting is unset:
- *   - exactly one ERP company exists → that company is unambiguously the parent.
- *   - more than one ERP company exists → this is a genuine configuration gap;
- *     throw a clear diagnostic error instead of guessing.
- *
- * Concurrent account-list calls share one in-flight resolution. This preserves
- * the exact configuration semantics while preventing one parent lookup per
- * supplier before the voucher-entry batch is assembled.
+ * Resolves the legacy company that owned supplier opening balances before
+ * suppliers.company_id existed. Never guesses via lowest company ID. Concurrent
+ * callers share one in-flight resolution to avoid repeated configuration reads.
  */
 export async function resolveParentCompanyId(): Promise<number> {
   if (parentCompanyResolution) return parentCompanyResolution;
@@ -62,11 +49,6 @@ export async function resolveParentCompanyId(): Promise<number> {
   }
 }
 
-/**
- * True when `companyId` is the parent company. When `companyId` is omitted
- * (legacy "all companies" views), treated as parent context so the caller
- * keeps its existing cross-company behavior.
- */
 export async function isParentCompanyContext(companyId?: number | null): Promise<boolean> {
   if (!companyId) return true;
   const parentCompanyId = await resolveParentCompanyId();
@@ -88,24 +70,40 @@ export interface SupplierBalanceContextResult {
   }>;
   /** Net balance in each transaction currency: { currency: { debit, credit, net } }. */
   balancesByCurrency: Record<string, { debit: number; credit: number; net: number }>;
-  /** Sum of COALESCE(base_debit_amount, debit_amount) − COALESCE(base_credit_amount, credit_amount) across all entries. */
+  /** Sum of base debits minus base credits, including the owned opening balance. */
   historicalBaseBalance: number;
 }
 
+function emptySupplierBalance(): SupplierBalanceContextResult {
+  return {
+    balance: 0,
+    openingBalance: 0,
+    hasActivity: false,
+    entries: [],
+    balancesByCurrency: {},
+    historicalBaseBalance: 0,
+  };
+}
+
 /**
- * Canonical supplier balance for a given viewing context.
- *  - companyId provided: opening balance only applies if companyId is the
- *    parent company; credits/debits are scoped to THAT company's own vouchers.
- *  - companyId omitted: legacy "all companies" aggregate view — opening
- *    balance + credits/debits across every company (unchanged prior behavior
- *    for callers that intentionally show a global rollup).
+ * Canonical supplier balance for a viewing company.
+ *
+ * When suppliers.company_id is present, a mismatched company receives an empty
+ * result even if historical cross-company voucher references still exist. This
+ * prevents legacy references from making a foreign supplier visible.
  */
 export async function getSupplierBalanceForContext(
-  supplier: { id: number; openingBalance?: string | null },
+  supplier: { id: number; companyId?: number | null; openingBalance?: string | null },
   companyId?: number | null
 ): Promise<SupplierBalanceContextResult> {
-  const isParent = await isParentCompanyContext(companyId);
-  const openingBalanceD = isParent ? new Decimal(supplier.openingBalance || "0") : new Decimal(0);
+  if (companyId && supplier.companyId && supplier.companyId !== companyId) {
+    return emptySupplierBalance();
+  }
+
+  const ownsOpeningBalance = supplier.companyId
+    ? !companyId || supplier.companyId === companyId
+    : await isParentCompanyContext(companyId);
+  const openingBalanceD = ownsOpeningBalance ? new Decimal(supplier.openingBalance || "0") : new Decimal(0);
   const openingBalance = openingBalanceD.toNumber();
   const entries = await getVoucherEntriesBySupplierBatched(supplier.id, companyId || undefined);
 
@@ -118,7 +116,6 @@ export async function getSupplierBalanceForContext(
   }, openingBalanceD);
   const balance = balanceD.toNumber();
 
-  // Build balancesByCurrency: group by transactionCurrency (fall back to "USD" when null)
   const balancesByCurrency: Record<string, { debit: number; credit: number; net: number }> = {};
   for (const entry of entries as any[]) {
     const ccy: string = (entry.transactionCurrency as string | null) || "USD";
@@ -134,7 +131,6 @@ export async function getSupplierBalanceForContext(
     balancesByCurrency[ccy].net = balancesByCurrency[ccy].credit - balancesByCurrency[ccy].debit;
   }
 
-  // historicalBaseBalance: sum of COALESCE(base_debit_amount, debit_amount) − COALESCE(base_credit_amount, credit_amount)
   let historicalBaseBalance = openingBalanceD.toNumber();
   for (const entry of entries as any[]) {
     const baseDr = parseFloat((entry.baseDebitAmount as string | null) ?? (entry.debitAmount as string | null) ?? "0");
@@ -145,9 +141,6 @@ export async function getSupplierBalanceForContext(
     if (baseDr > 0 && baseCr === 0) historicalBaseBalance -= baseDr;
   }
 
-  // A nonzero opening balance (only ever present in the parent's own context)
-  // counts as activity too — otherwise the parent company itself would
-  // wrongly have its own suppliers filtered out of activity-gated lists.
   return {
     balance,
     openingBalance,
@@ -159,9 +152,9 @@ export async function getSupplierBalanceForContext(
 }
 
 /**
- * Authorizes an arbitrary `companyId` query parameter against the
- * authenticated user's actual company access, instead of trusting it blindly.
- * Returns the authorized companyId, or null if the user has no access to it.
+ * Authorizes an arbitrary companyId query parameter against the authenticated
+ * user's actual company access. Supplier master routes should still prefer the
+ * active session company and should not use this helper to broaden visibility.
  */
 export async function authorizeCompanyIdParam(
   req: { session: { currentCompanyId?: number; userId?: string } },
