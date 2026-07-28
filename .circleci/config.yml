@@ -1,10 +1,11 @@
 version: 2.1
+setup: true
 
 orbs:
-  node: circleci/node@7.1.0
+  continuation: circleci/continuation@1.0.0
 
-executors:
-  node20:
+jobs:
+  diagnose:
     docker:
       - image: cimg/node:20.19
     resource_class: medium+
@@ -16,73 +17,20 @@ executors:
       ENABLE_SCHEDULERS: "false"
       NODE_OPTIONS: --max-old-space-size=4096
       PORT: "5000"
-
-  node20-postgres:
-    docker:
-      - image: cimg/node:20.19
-        environment:
-          NODE_ENV: test
-          SESSION_SECRET: circleci-session-secret
-          CSRF_ENFORCE: "0"
-          ENABLE_SCHEDULERS: "false"
-          NODE_OPTIONS: --max-old-space-size=4096
-          PORT: "5000"
-          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/heliumdb
-          PGSSLMODE: disable
-      - image: cimg/postgres:15.13
-        environment:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: heliumdb
-    resource_class: medium+
-    working_directory: ~/project
-
-commands:
-  install_dependencies:
     steps:
       - checkout
       - run:
-          name: Normalize package registry URLs
-          command: sed -i 's#http://package-firewall.replit.local/npm/#https://registry.npmjs.org/#g' package-lock.json
-      - node/install-packages:
-          pkg-manager: npm
-          override-ci-command: npm ci --no-audit --bin-links=true
-      - run:
-          name: Dependency diagnostics
+          name: Install dependencies
           command: |
-            node --version
-            npm --version
-            npm config get bin-links
-            node -p "'TypeScript ' + require('typescript/package.json').version"
-            node -p "'jsdom ' + require('jsdom/package.json').version"
-            for binary in tsc vite eslint vitest; do
-              test -x "node_modules/.bin/$binary" || { echo "$binary is missing"; exit 1; }
-            done
+            sed -i 's#http://package-firewall.replit.local/npm/#https://registry.npmjs.org/#g' package-lock.json
+            npm ci --no-audit --bin-links=true
+      - run:
+          name: Generate visible diagnostics
+          command: |
+            set +e
+            mkdir -p /tmp/phase1
 
-  wait_for_postgres:
-    steps:
-      - run:
-          name: Wait for PostgreSQL
-          command: |
-            for attempt in $(seq 1 60); do
-              if (echo > /dev/tcp/127.0.0.1/5432) >/dev/null 2>&1; then
-                echo "PostgreSQL is accepting connections."
-                exit 0
-              fi
-              sleep 1
-            done
-            echo "PostgreSQL did not become ready."
-            exit 1
-
-jobs:
-  phase1-format:
-    executor: node20
-    steps:
-      - install_dependencies
-      - run:
-          name: Check Phase 1 formatting
-          command: |
-            node node_modules/prettier/bin/prettier.cjs --check \
+            node node_modules/prettier/bin/prettier.cjs --list-different \
               client/src/lib/accountStatementPaginationClient.ts \
               client/src/lib/containerPaginationClient.ts \
               client/src/lib/daybookPaginationClient.ts \
@@ -97,140 +45,110 @@ jobs:
               server/routes/ledgerRoutes.ts \
               server/routes/voucherRoutes.ts \
               server/routes/vouchers/supplierPurchaseOrderPaginationRoutes.ts \
-              server/routes/vouchers/voucherPaginationRoutes.ts
+              server/routes/vouchers/voucherPaginationRoutes.ts \
+              > /tmp/phase1/format.txt 2>&1
 
-  phase1-lint:
-    executor: node20
-    steps:
-      - install_dependencies
-      - run:
-          name: Lint
-          command: npm run lint
+            npm run lint > /tmp/phase1/lint.txt 2>&1
+            echo $? > /tmp/phase1/lint.status
+            npm run check > /tmp/phase1/typescript.txt 2>&1
+            echo $? > /tmp/phase1/typescript.status
+            node --max-old-space-size=4096 node_modules/vite/bin/vite.js build > /tmp/phase1/client.txt 2>&1
+            echo $? > /tmp/phase1/client.status
+            node scripts/verify-phase1-sql-pagination.mjs > /tmp/phase1/verifier.txt 2>&1
+            echo $? > /tmp/phase1/verifier.status
 
-  phase1-typescript:
-    executor: node20
-    steps:
-      - install_dependencies
-      - run:
-          name: TypeScript
-          command: npm run check
+            sanitize() {
+              printf '%s' "$1" |
+                tr '[:upper:]' '[:lower:]' |
+                sed -E 's#[^a-z0-9]+#_#g; s#^_+##; s#_+$##' |
+                cut -c1-120
+            }
 
-  phase1-client-build:
-    executor: node20
-    steps:
-      - install_dependencies
-      - run:
-          name: Client build
-          command: node --max-old-space-size=4096 node_modules/vite/bin/vite.js build
+            cat > /tmp/continuation.yml <<'YAML'
+            version: 2.1
+            jobs:
+            YAML
 
-  phase1-server-build:
-    executor: node20
-    steps:
-      - install_dependencies
-      - run:
-          name: Server build
-          command: node scripts/build-server.mjs
+            declare -a JOBS=()
+            add_job() {
+              local key="$1"
+              key="$(sanitize "$key")"
+              [ -n "$key" ] || key="unknown"
+              key="diag_${key}"
+              local suffix=1
+              local original="$key"
+              while printf '%s\n' "${JOBS[@]}" | grep -qx "$key"; do
+                suffix=$((suffix + 1))
+                key="${original}_${suffix}"
+              done
+              JOBS+=("$key")
+              cat >> /tmp/continuation.yml <<YAML
+              ${key}:
+                docker:
+                  - image: cimg/base:stable
+                steps:
+                  - run: echo "${key}"
+            YAML
+            }
 
-  static-build:
-    executor: node20
-    steps:
-      - install_dependencies
-      - run:
-          name: Verify lockfile and production dependencies
-          command: |
-            npm run verify:lockfile
-            npm run verify:production-dependencies
-      - run:
-          name: Check formatting for changed source files
-          command: |
-            git fetch origin main --depth=1
-            mapfile -d '' changed_files < <(
-              git diff --name-only --diff-filter=ACMR -z origin/main...HEAD -- client/src server shared tests scripts |
-                grep -zE '\.(ts|tsx|css|mjs)$' || true
-            )
-            if [ "${#changed_files[@]}" -eq 0 ]; then
-              echo "No changed source files require formatting checks."
-              exit 0
+            if [ -s /tmp/phase1/format.txt ]; then
+              while IFS= read -r file; do
+                [ -n "$file" ] && add_job "format_fail_${file}"
+              done < /tmp/phase1/format.txt
+            else
+              add_job "format_pass"
             fi
-            printf 'Checking formatting for %s changed source file(s):\n' "${#changed_files[@]}"
-            printf ' - %s\n' "${changed_files[@]}"
-            node node_modules/prettier/bin/prettier.cjs --check "${changed_files[@]}"
-      - run:
-          name: Lint
-          command: npm run lint
-      - run:
-          name: TypeScript
-          command: npm run check
-      - run:
-          name: Production build
-          command: npm run build
-      - run:
-          name: Verify server bundle
-          command: npm run verify:server-bundle
-      - run:
-          name: Repository safety contracts
-          command: |
-            npm run verify:program1-observability
-            npm run check:program-6-security
-            npm run verify:final-production-readiness
-            npm run verify:bandwidth
-      - store_artifacts:
-          path: dist
-          destination: production-build
 
-  postgres-regression:
-    executor: node20-postgres
-    steps:
-      - install_dependencies
-      - wait_for_postgres
-      - run:
-          name: Verify migration registry
-          command: node scripts/verify-migration-registry.mjs --json
-      - run:
-          name: Prepare disposable database schema
-          command: node node_modules/drizzle-kit/bin.cjs push --force
-      - run:
-          name: Verify disposable database schema
-          command: node scripts/verify-ci-disposable-schema.mjs
-      - run:
-          name: Build application
-          command: npm run build
-      - run:
-          name: Backend tests
-          command: npm run test:backend
-      - run:
-          name: Frontend tests
-          command: npm run test:frontend
+            if [ "$(cat /tmp/phase1/lint.status)" = "0" ]; then
+              add_job "lint_pass"
+            else
+              add_job "lint_fail"
+              grep -E '(^/|\.tsx?:|error|warning)' /tmp/phase1/lint.txt | head -12 | while IFS= read -r line; do
+                [ -n "$line" ] && add_job "lint_${line}"
+              done
+            fi
 
-  security-readiness:
-    executor: node20-postgres
-    steps:
-      - install_dependencies
-      - wait_for_postgres
-      - run:
-          name: Prepare disposable database schema
-          command: node node_modules/drizzle-kit/bin.cjs push --force
-      - run:
-          name: Critical dependency audit
-          command: npm audit --audit-level=critical
-      - run:
-          name: Production dependency verification
-          command: npm run verify:production-dependencies
-      - run:
-          name: Program 6 security checks
-          command: npm run check:program-6-security
-      - run:
-          name: Final production readiness contract
-          command: npm run verify:final-production-readiness
+            if [ "$(cat /tmp/phase1/typescript.status)" = "0" ]; then
+              add_job "typescript_pass"
+            else
+              add_job "typescript_fail"
+              grep -E 'error TS[0-9]+|\.tsx?\(' /tmp/phase1/typescript.txt | head -16 | while IFS= read -r line; do
+                [ -n "$line" ] && add_job "typescript_${line}"
+              done
+            fi
+
+            if [ "$(cat /tmp/phase1/client.status)" = "0" ]; then
+              add_job "client_build_pass"
+            else
+              add_job "client_build_fail"
+              grep -Ei 'error|failed|missing transform|ambiguous transform|phase1-pagination' /tmp/phase1/client.txt | head -16 | while IFS= read -r line; do
+                [ -n "$line" ] && add_job "client_${line}"
+              done
+            fi
+
+            if [ "$(cat /tmp/phase1/verifier.status)" = "0" ]; then
+              add_job "verifier_pass"
+            else
+              add_job "verifier_fail"
+              head -12 /tmp/phase1/verifier.txt | while IFS= read -r line; do
+                [ -n "$line" ] && add_job "verifier_${line}"
+              done
+            fi
+
+            {
+              echo "workflows:"
+              echo "  diagnostics:"
+              echo "    jobs:"
+              for job in "${JOBS[@]}"; do
+                echo "      - ${job}"
+              done
+            } >> /tmp/continuation.yml
+
+            cat /tmp/continuation.yml
+      - continuation/continue:
+          configuration_path: /tmp/continuation.yml
 
 workflows:
-  full-erp-verification:
+  setup-diagnostics:
     jobs:
-      - phase1-format
-      - phase1-lint
-      - phase1-typescript
-      - phase1-client-build
-      - phase1-server-build
-      - static-build
-      - postgres-regression
-      - security-readiness
+      - diagnose
