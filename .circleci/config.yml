@@ -4,9 +4,9 @@ orbs:
   node: circleci/node@7.1.0
 
 executors:
-  node20:
+  node22:
     docker:
-      - image: cimg/node:20.19
+      - image: cimg/node:22.14
     resource_class: medium+
     working_directory: ~/project
     environment:
@@ -16,6 +16,26 @@ executors:
       ENABLE_SCHEDULERS: "false"
       NODE_OPTIONS: --max-old-space-size=4096
       PORT: "5000"
+
+  node22-postgres:
+    docker:
+      - image: cimg/node:22.14
+        environment:
+          NODE_ENV: test
+          SESSION_SECRET: circleci-session-secret
+          CSRF_ENFORCE: "0"
+          ENABLE_SCHEDULERS: "false"
+          NODE_OPTIONS: --max-old-space-size=2048
+          PORT: "5000"
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/heliumdb
+          PGSSLMODE: disable
+      - image: cimg/postgres:15.13
+        environment:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: heliumdb
+    resource_class: medium+
+    working_directory: ~/project
 
 commands:
   install_dependencies:
@@ -27,188 +47,127 @@ commands:
       - node/install-packages:
           pkg-manager: npm
           override-ci-command: npm ci --no-audit --bin-links=true
+      - run:
+          name: Dependency diagnostics
+          command: |
+            node --version
+            npm --version
+            npm config get bin-links
+            node -p "'TypeScript ' + require('typescript/package.json').version"
+            node -p "'jsdom ' + require('jsdom/package.json').version"
+            for binary in tsc vite eslint vitest; do
+              test -x "node_modules/.bin/$binary" || { echo "$binary is missing"; exit 1; }
+            done
 
-  ts_file_check:
-    parameters:
-      pattern:
-        type: string
+  wait_for_postgres:
     steps:
       - run:
-          name: TypeScript file isolation
+          name: Wait for PostgreSQL
           command: |
-            set +e
-            npm run check > /tmp/typescript.txt 2>&1
-            if grep -E '<< parameters.pattern >>' /tmp/typescript.txt; then
-              exit 1
-            fi
-            exit 0
+            for attempt in $(seq 1 60); do
+              if (echo > /dev/tcp/127.0.0.1/5432) >/dev/null 2>&1; then
+                echo "PostgreSQL is accepting connections."
+                exit 0
+              fi
+              sleep 1
+            done
+            echo "PostgreSQL did not become ready."
+            exit 1
 
 jobs:
-  fmt-account-statement-client:
-    executor: node20
+  static-build:
+    executor: node22
     steps:
       - install_dependencies
-      - run: node node_modules/prettier/bin/prettier.cjs --check client/src/lib/accountStatementPaginationClient.ts
-  fmt-container-client:
-    executor: node20
-    steps:
-      - install_dependencies
-      - run: node node_modules/prettier/bin/prettier.cjs --check client/src/lib/containerPaginationClient.ts
-  fmt-factory-daybook-client:
-    executor: node20
-    steps:
-      - install_dependencies
-      - run: node node_modules/prettier/bin/prettier.cjs --check client/src/lib/daybookPaginationClient.ts
-  fmt-erp-daybook-client:
-    executor: node20
-    steps:
-      - install_dependencies
-      - run: node node_modules/prettier/bin/prettier.cjs --check client/src/lib/erpDaybookPaginationClient.ts
-  fmt-supplier-po-client:
-    executor: node20
-    steps:
-      - install_dependencies
-      - run: node node_modules/prettier/bin/prettier.cjs --check client/src/lib/supplierPurchaseOrderPaginationClient.ts
-  fmt-main-client:
-    executor: node20
-    steps:
-      - install_dependencies
-      - run: node node_modules/prettier/bin/prettier.cjs --check client/src/main.tsx
-  fmt-account-route:
-    executor: node20
-    steps:
-      - install_dependencies
-      - run: node node_modules/prettier/bin/prettier.cjs --check server/routes/accountTransactionPaginationRoutes.ts
-  fmt-daybook-route:
-    executor: node20
-    steps:
-      - install_dependencies
-      - run: node node_modules/prettier/bin/prettier.cjs --check server/routes/daybookPaginationRoutes.ts
-  fmt-voucher-route:
-    executor: node20
-    steps:
-      - install_dependencies
-      - run: node node_modules/prettier/bin/prettier.cjs --check server/routes/vouchers/voucherPaginationRoutes.ts
-  fmt-ledger-route:
-    executor: node20
-    steps:
-      - install_dependencies
-      - run: node node_modules/prettier/bin/prettier.cjs --check server/routes/ledgerAccountPaginationRoutes.ts
-  fmt-container-list-route:
-    executor: node20
-    steps:
-      - install_dependencies
-      - run: node node_modules/prettier/bin/prettier.cjs --check server/routes/containers/containerListPaginationRoutes.ts
-  fmt-supplier-po-route:
-    executor: node20
-    steps:
-      - install_dependencies
-      - run: node node_modules/prettier/bin/prettier.cjs --check server/routes/vouchers/supplierPurchaseOrderPaginationRoutes.ts
-  fmt-container-registry:
-    executor: node20
-    steps:
-      - install_dependencies
-      - run: node node_modules/prettier/bin/prettier.cjs --check server/routes/containerRoutes.ts
-  fmt-ledger-registry:
-    executor: node20
-    steps:
-      - install_dependencies
-      - run: node node_modules/prettier/bin/prettier.cjs --check server/routes/ledgerRoutes.ts
-  fmt-voucher-registry:
-    executor: node20
-    steps:
-      - install_dependencies
-      - run: node node_modules/prettier/bin/prettier.cjs --check server/routes/voucherRoutes.ts
+      - run:
+          name: Verify lockfile and production dependencies
+          command: |
+            npm run verify:lockfile
+            npm run verify:production-dependencies
+      - run:
+          name: Check formatting for changed source files
+          command: |
+            git fetch origin main --depth=1
+            mapfile -d '' changed_files < <(
+              git diff --name-only --diff-filter=ACMR -z origin/main...HEAD -- client/src server shared tests scripts |
+                grep -zE '\.(ts|tsx|css|mjs)$' || true
+            )
+            if [ "${#changed_files[@]}" -eq 0 ]; then
+              echo "No changed source files require formatting checks."
+              exit 0
+            fi
+            printf 'Checking formatting for %s changed source file(s):\n' "${#changed_files[@]}"
+            printf ' - %s\n' "${changed_files[@]}"
+            node node_modules/prettier/bin/prettier.cjs --check "${changed_files[@]}"
+      - run:
+          name: Lint
+          command: npm run lint
+      - run:
+          name: TypeScript
+          command: npm run check
+      - run:
+          name: Production build
+          command: npm run build
+      - run:
+          name: Verify server bundle
+          command: npm run verify:server-bundle
+      - run:
+          name: Repository safety contracts
+          command: |
+            npm run verify:program1-observability
+            npm run verify:final-production-readiness
+            npm run verify:bandwidth
+      - store_artifacts:
+          path: dist
+          destination: production-build
 
-  ts-account-statement-client:
-    executor: node20
+  postgres-regression:
+    executor: node22-postgres
     steps:
       - install_dependencies
-      - ts_file_check:
-          pattern: accountStatementPaginationClient
-  ts-container-client:
-    executor: node20
-    steps:
-      - install_dependencies
-      - ts_file_check:
-          pattern: containerPaginationClient
-  ts-factory-daybook-client:
-    executor: node20
-    steps:
-      - install_dependencies
-      - ts_file_check:
-          pattern: daybookPaginationClient
-  ts-erp-daybook-client:
-    executor: node20
-    steps:
-      - install_dependencies
-      - ts_file_check:
-          pattern: erpDaybookPaginationClient
-  ts-supplier-po-client:
-    executor: node20
-    steps:
-      - install_dependencies
-      - ts_file_check:
-          pattern: supplierPurchaseOrderPaginationClient
-  ts-main-client:
-    executor: node20
-    steps:
-      - install_dependencies
-      - ts_file_check:
-          pattern: client/src/main
+      - wait_for_postgres
+      - run:
+          name: Verify migration registry
+          command: node scripts/verify-migration-registry.mjs --json
+      - run:
+          name: Prepare disposable database schema
+          command: node node_modules/drizzle-kit/bin.cjs push --force
+      - run:
+          name: Verify disposable database schema
+          command: node scripts/verify-ci-disposable-schema.mjs
+      - run:
+          name: Backend tests
+          command: node node_modules/vitest/vitest.mjs run --maxWorkers=1 --no-file-parallelism
+      - run:
+          name: Frontend tests
+          command: node node_modules/vitest/vitest.mjs run --config vitest.config.frontend.ts --maxWorkers=1 --no-file-parallelism
 
-  client-accounts-page:
-    executor: node20
+  security-readiness:
+    executor: node22-postgres
     steps:
       - install_dependencies
+      - wait_for_postgres
       - run:
-          command: |
-            sed -i 's#const ACCOUNT_STATEMENT_SUFFIX = .*#const ACCOUNT_STATEMENT_SUFFIX = "/__disabled_statement__";#' build/vitePhase1PaginationPlugin.ts
-            sed -i 's#const ACCOUNT_TYPES_SUFFIX = .*#const ACCOUNT_TYPES_SUFFIX = "/__disabled_types__";#' build/vitePhase1PaginationPlugin.ts
-            PHASE1_TRANSFORM_SCOPE=accounts node --max-old-space-size=4096 node_modules/vite/bin/vite.js build
-  client-account-statement:
-    executor: node20
-    steps:
-      - install_dependencies
+          name: Prepare disposable database schema
+          command: node node_modules/drizzle-kit/bin.cjs push --force
       - run:
-          command: |
-            sed -i 's#const ACCOUNTS_SUFFIX = .*#const ACCOUNTS_SUFFIX = "/__disabled_accounts__";#' build/vitePhase1PaginationPlugin.ts
-            sed -i 's#const ACCOUNT_TYPES_SUFFIX = .*#const ACCOUNT_TYPES_SUFFIX = "/__disabled_types__";#' build/vitePhase1PaginationPlugin.ts
-            PHASE1_TRANSFORM_SCOPE=accounts node --max-old-space-size=4096 node_modules/vite/bin/vite.js build
-  client-account-types:
-    executor: node20
-    steps:
-      - install_dependencies
+          name: Critical dependency audit
+          command: npm audit --audit-level=critical
       - run:
-          command: |
-            sed -i 's#const ACCOUNTS_SUFFIX = .*#const ACCOUNTS_SUFFIX = "/__disabled_accounts__";#' build/vitePhase1PaginationPlugin.ts
-            sed -i 's#const ACCOUNT_STATEMENT_SUFFIX = .*#const ACCOUNT_STATEMENT_SUFFIX = "/__disabled_statement__";#' build/vitePhase1PaginationPlugin.ts
-            PHASE1_TRANSFORM_SCOPE=accounts node --max-old-space-size=4096 node_modules/vite/bin/vite.js build
+          name: Production dependency verification
+          command: npm run verify:production-dependencies
+      - run:
+          name: Program 6 security checks
+          command: PROGRAM6_SKIP_TYPESCRIPT=1 npm run check:program-6-security
+      - run:
+          name: Final production readiness contract
+          command: npm run verify:final-production-readiness
 
 workflows:
-  phase1-pinpoint:
+  full-erp-verification:
     jobs:
-      - fmt-account-statement-client
-      - fmt-container-client
-      - fmt-factory-daybook-client
-      - fmt-erp-daybook-client
-      - fmt-supplier-po-client
-      - fmt-main-client
-      - fmt-account-route
-      - fmt-daybook-route
-      - fmt-voucher-route
-      - fmt-ledger-route
-      - fmt-container-list-route
-      - fmt-supplier-po-route
-      - fmt-container-registry
-      - fmt-ledger-registry
-      - fmt-voucher-registry
-      - ts-account-statement-client
-      - ts-container-client
-      - ts-factory-daybook-client
-      - ts-erp-daybook-client
-      - ts-supplier-po-client
-      - ts-main-client
-      - client-accounts-page
-      - client-account-statement
-      - client-account-types
+      - static-build
+      - postgres-regression
+      - security-readiness:
+          requires:
+            - static-build
