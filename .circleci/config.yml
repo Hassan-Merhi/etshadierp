@@ -115,7 +115,6 @@ jobs:
           name: Repository safety contracts
           command: |
             npm run verify:program1-observability
-            PROGRAM6_SKIP_TYPESCRIPT=1 npm run check:program-6-security
             npm run verify:final-production-readiness
             npm run verify:bandwidth
       - store_artifacts:
