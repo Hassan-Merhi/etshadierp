@@ -90,6 +90,25 @@ try {
     )
   `);
 
+  // The runtime schema requires these values for real batch creation, but a few
+  // focused audit fixtures intentionally exercise source-cost logic without
+  // constructing a complete production batch. Defaults keep those direct test
+  // inserts valid without weakening the route-level validation contract.
+  await client.query(
+    "ALTER TABLE factory_mix_batches ALTER COLUMN total_weight_kg SET DEFAULT 0",
+  );
+  await client.query("ALTER TABLE factory_mix_batches ALTER COLUMN total_cost SET DEFAULT 0");
+
+  // Preserve historical soft-deleted raw-stock rows while allowing one current
+  // row per company/container. The old unconditional unique index made that
+  // history impossible to represent.
+  await client.query("DROP INDEX IF EXISTS factory_raw_stock_company_container_unique");
+  await client.query(`
+    CREATE UNIQUE INDEX IF NOT EXISTS factory_raw_stock_company_container_active_unique
+      ON factory_raw_stock(company_id, container_id)
+      WHERE deleted_at IS NULL
+  `);
+
   const result = await client.query(
     "select current_database() as database, count(*)::int as tables from information_schema.tables where table_schema = 'public'",
   );
