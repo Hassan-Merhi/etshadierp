@@ -131,14 +131,15 @@ export async function authorizeProtectedAssetAccess(
   if (request.action !== "generate") validateStorageKey(asset.storageKey);
   const safeFileName = sanitizeDownloadFileName(asset.fileName);
   const ownerAllowed = request.allowOwnerAccess === true && sameIdentity(request.actor?.userId, asset.ownerUserId);
+  const configuredRoles = ownerAllowed ? [request.actor!.role] : request.allowedRoles ?? [];
 
   assertAuthorized({
     actor: request.actor,
     domain: request.domain ?? "reporting",
     action: `asset.${request.kind}.${request.action}`,
     resource: { companyId: asset.companyId, ownerUserId: asset.ownerUserId ?? null },
-    allowedRoles: ownerAllowed ? [request.actor!.role] : request.allowedRoles ?? [],
-    requiredPermissions: ownerAllowed ? [] : [request.requiredPermission],
+    allowedRoles: configuredRoles,
+    requiredPermissions: ownerAllowed || configuredRoles.length > 0 ? [] : [request.requiredPermission],
   });
 
   return { asset: Object.freeze({ ...asset }), safeFileName, disposition: "attachment" };
