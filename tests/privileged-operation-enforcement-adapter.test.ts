@@ -4,11 +4,17 @@ import { requirePrivilegedOperation } from "../server/services/security/privileg
 function harness(body: Record<string, unknown>, session: Record<string, unknown> = {}) {
   const req: any = {
     body,
+    ip: "127.0.0.1",
+    method: "POST",
+    path: "/api/admin/inventory-rebuild",
+    get: vi.fn(() => "vitest"),
     session: {
       userId: "user-1",
       currentRole: "Admin",
       currentCompanyId: 10,
       passwordConfirmedAt: 999_000,
+      securityPermissions: ["administration.repair"],
+      securityPermissionsCompanyId: 10,
       ...session,
     },
   };
@@ -30,22 +36,22 @@ const middleware = requirePrivilegedOperation({
 });
 
 describe("privileged operation enforcement adapter", () => {
-  it("allows the default dry-run without destructive confirmation", () => {
+  it("allows the default dry-run without destructive confirmation", async () => {
     const h = harness({});
-    middleware(h.req, h.res, h.next);
+    await middleware(h.req, h.res, h.next);
     expect(h.next).toHaveBeenCalledOnce();
     expect(h.status).not.toHaveBeenCalled();
   });
 
-  it("denies an apply without the required safety metadata", () => {
+  it("denies an apply without the required safety metadata", async () => {
     const h = harness({ dryRun: false });
-    middleware(h.req, h.res, h.next);
+    await middleware(h.req, h.res, h.next);
     expect(h.status).toHaveBeenCalledWith(403);
     expect(h.json).toHaveBeenCalledWith({ message: "Forbidden" });
     expect(h.next).not.toHaveBeenCalled();
   });
 
-  it("allows a fully confirmed same-company apply", () => {
+  it("allows a fully confirmed same-company apply", async () => {
     const now = Date.now();
     const h = harness(
       {
@@ -55,14 +61,14 @@ describe("privileged operation enforcement adapter", () => {
         idempotencyKey: "inventory-rebuild:10:2026-07-18:v1",
         sourceId: "inventory-diagnostic-2026-07-18",
       },
-      { passwordConfirmedAt: now - 1_000 }
+      { passwordConfirmedAt: now - 1_000 },
     );
-    middleware(h.req, h.res, h.next);
+    await middleware(h.req, h.res, h.next);
     expect(h.next).toHaveBeenCalledOnce();
     expect(h.status).not.toHaveBeenCalled();
   });
 
-  it("denies a wrong confirmation token without leaking the reason", () => {
+  it("denies a wrong confirmation token without leaking the reason", async () => {
     const h = harness({
       dryRun: false,
       reason: "Reviewed repair",
@@ -70,12 +76,12 @@ describe("privileged operation enforcement adapter", () => {
       idempotencyKey: "inventory-rebuild:10:v1",
       sourceId: "diagnostic-1",
     });
-    middleware(h.req, h.res, h.next);
+    await middleware(h.req, h.res, h.next);
     expect(h.status).toHaveBeenCalledWith(403);
     expect(h.json).toHaveBeenCalledWith({ message: "Forbidden" });
   });
 
-  it("denies explicit permission sets that omit the route permission", () => {
+  it("denies explicit permission sets that omit the route permission", async () => {
     const h = harness(
       {
         dryRun: false,
@@ -84,9 +90,9 @@ describe("privileged operation enforcement adapter", () => {
         idempotencyKey: "inventory-rebuild:10:v1",
         sourceId: "diagnostic-1",
       },
-      { securityPermissions: ["administration.read"] }
+      { securityPermissions: ["security.anomalies.read"], securityPermissionsCompanyId: 10 },
     );
-    middleware(h.req, h.res, h.next);
+    await middleware(h.req, h.res, h.next);
     expect(h.status).toHaveBeenCalledWith(403);
     expect(h.next).not.toHaveBeenCalled();
   });

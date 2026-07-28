@@ -18,7 +18,7 @@ export function registerRentalRoutes(
   module: RentalModule,
   urlPrefix: string,
   incomeAccountName: string,
-  shopExpenseAccountName: string = "Rent Expense - Shops"
+  shopExpenseAccountName: string = "Rent Expense - Shops",
 ) {
   registerRentalUnitsContractsRoutes(app, module, urlPrefix, incomeAccountName, shopExpenseAccountName);
   // The central route owns DELETE /payments/:id. Registration order keeps the
@@ -32,8 +32,10 @@ export function registerRentalRoutes(
     try {
       const companyId = getCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
-      // FIX #10: restrict to Administrator / Developer roles
-      const userRole = (req.session as any)?.role;
+      // Authentication stores the active role in currentRole. Keep the legacy
+      // role fallback for older sessions while enforcing the same Admin/Developer gate.
+      const session = req.session as any;
+      const userRole = session?.currentRole ?? session?.role;
       if (userRole !== "Admin" && userRole !== "Developer") {
         return res.status(403).json({ message: "Administrator or Developer role required" });
       }

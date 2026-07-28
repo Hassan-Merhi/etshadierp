@@ -1,26 +1,11 @@
 /**
  * Shared, authoritative landed-cost computation for a factory container.
  *
- * This is the single canonical implementation of the landed-cost formula.
- * Every code path that needs to compute or validate a container's cost/kg
- * must import from here — rawStockOffloadRoutes, rawStockContainerRoutes,
- * and rawStockRecalc all delegate to this module so the formula is never
- * duplicated.
- *
- * Business rules:
- *
- *   Full value basis (originalCostBasisKg):
- *     container.totalKg || container.declaredKg || container.actualReceivedKg
- *   The full material value (basePayable = originalCostBasisKg × ratePerKg) and
- *   all fixed charges (freight, commission, duty, additional) are computed from
- *   this quantity and are NEVER reduced because fewer kilograms were received.
- *
- *   Per-kg allocation basis (receivedAllocationKg):
- *     container.actualReceivedKg when > 0, otherwise originalCostBasisKg
- *   This quantity is used ONLY as the denominator for costPerKg / costPerKgUsd.
- *   When the actual received weight is lower than the original agreed quantity,
- *   the full container value is spread over fewer kilograms, producing a higher
- *   cost/kg — which is the correct business outcome.
+ * Business rule: the full material value and every fixed landed charge are
+ * allocated across the original agreed quantity
+ * (`totalKg || declaredKg || actualReceivedKg`). A partial receipt therefore
+ * receives only its proportional value, while the rate/kg remains fixed across
+ * the first receipt, later receipts, and final offload.
  */
 import Decimal from "decimal.js";
 import {
@@ -35,18 +20,9 @@ import { resolveStoredFxRate } from "./currencyConversion";
 export const COST_SCALE = 6;
 
 export interface ContainerLandedCostResult {
-  /**
-   * Original agreed quantity (totalKg → declaredKg → actualReceivedKg).
-   * Used as the full-value basis; kept for backward compatibility with
-   * historical-detection code that reads this field.
-   */
+  /** Original agreed quantity used for material value and fixed-rate allocation. */
   valuationKg: number;
-  /**
-   * Actual received quantity used as the cost/kg denominator.
-   * Equals container.actualReceivedKg when > 0, otherwise valuationKg.
-   * When actualReceivedKg < valuationKg, the full container value is spread
-   * over fewer kilograms, producing a higher cost/kg.
-   */
+  /** Stable per-kg allocation denominator; currently equal to valuationKg. */
   allocationKg: number;
   /** Full container landed value in native container currency. */
   fullCost: number;
@@ -56,62 +32,58 @@ export interface ContainerLandedCostResult {
   costPerKg: number;
   /** fullCostUsd / allocationKg, rounded to COST_SCALE decimal places. */
   costPerKgUsd: number;
-  /** True when a non-USD currency has no confirmed FX rate — do NOT store or cascade. */
+  /** True when a non-USD currency has no confirmed FX rate. */
   fxUnresolved: boolean;
 }
 
-/**
- * Pure, Decimal.js computation of a container's full landed cost.
- *
- * @param container          - Factory container row (post-offload fields must be set).
- * @param additionalCharges  - factoryOffloadAdditionalCharges rows for this container.
- * @param commissionRecord   - Latest factoryContainerCommissions row (or null).
- * @param otherChargesRows   - Optional: per-line factoryContainerOtherCharges rows.
- *   When present and non-empty, they replace the aggregate container.otherCharges
- *   field so multi-currency other-charges are converted correctly.
- */
 export function computeContainerLandedCost(
   container: typeof factoryContainers.$inferSelect,
   additionalCharges: (typeof factoryOffloadAdditionalCharges.$inferSelect)[],
   commissionRecord: typeof factoryContainerCommissions.$inferSelect | null,
-  otherChargesRows?: (typeof factoryContainerOtherCharges.$inferSelect)[]
+  otherChargesRows?: (typeof factoryContainerOtherCharges.$inferSelect)[],
 ): ContainerLandedCostResult {
   const containerCcy = container.currencyCode || "USD";
   const { fxRate, looksSet: fxLooksSet } = resolveStoredFxRate(
     containerCcy,
     container.fxRateToUsdOffload || container.fxRateToUsd,
-    (container as any).fxRateConfirmed
+    (container as any).fxRateConfirmed,
   );
   if (!fxLooksSet) {
-    return { valuationKg: 0, allocationKg: 0, fullCost: 0, fullCostUsd: 0, costPerKg: 0, costPerKgUsd: 0, fxUnresolved: true };
+    return {
+      valuationKg: 0,
+      allocationKg: 0,
+      fullCost: 0,
+      fullCostUsd: 0,
+      costPerKg: 0,
+      costPerKgUsd: 0,
+      fxUnresolved: true,
+    };
   }
 
-  // originalCostBasisKg: the original agreed quantity used to compute the full material
-  // value (totalKg → declaredKg → actualReceivedKg for legacy records with neither set).
-  // This drives basePayable and all fixed charges — it never decreases because some kg
-  // were missing on arrival.
   const originalCostBasisKg = new Decimal(
-    (container as any).totalKg || container.declaredKg || container.actualReceivedKg || "0"
+    (container as any).totalKg || container.declaredKg || container.actualReceivedKg || "0",
   );
   if (originalCostBasisKg.lte(0)) {
-    return { valuationKg: 0, allocationKg: 0, fullCost: 0, fullCostUsd: 0, costPerKg: 0, costPerKgUsd: 0, fxUnresolved: false };
+    return {
+      valuationKg: 0,
+      allocationKg: 0,
+      fullCost: 0,
+      fullCostUsd: 0,
+      costPerKg: 0,
+      costPerKgUsd: 0,
+      fxUnresolved: false,
+    };
   }
 
-  // receivedAllocationKg: the actual received quantity used ONLY as the cost/kg denominator.
-  // When the factory received fewer kilograms than originally agreed, the full container
-  // value is spread over the smaller received quantity, raising cost/kg accordingly.
-  const rawReceivedKg = parseFloat(container.actualReceivedKg || "0");
-  const receivedAllocationKg = rawReceivedKg > 0
-    ? new Decimal(container.actualReceivedKg!)
-    : originalCostBasisKg;
-
+  // The agreed quantity is deliberately also the allocation denominator. Using
+  // actualReceivedKg here would inflate the rate on the first partial receipt and
+  // change it again on every later receipt.
+  const allocationKg = originalCostBasisKg;
   const dFxRate = new Decimal(fxRate);
   const baseRate = new Decimal(container.ratePerKg || "0");
-  // Full material value always uses the original agreed quantity — not reduced by short delivery.
   const basePayable = originalCostBasisKg.times(baseRate);
   const baseMaterialUsd = containerCcy === "USD" ? basePayable : basePayable.times(dFxRate);
 
-  // ── Freight ──────────────────────────────────────────────────────────────
   const freightVal = new Decimal(container.freight || "0");
   const freightCcy = container.freightCurrencyCode || containerCcy;
   const rawFreightFx = parseFloat((container as any).freightFxRateToUsd || "");
@@ -123,63 +95,66 @@ export function computeContainerLandedCost(
   } else if (Number.isFinite(rawFreightFx) && rawFreightFx > 0 && freightFxConfirmed) {
     dFreightFx = new Decimal(rawFreightFx);
   } else if (freightCcy === containerCcy) {
-    // Same currency as container — the confirmed container offload FX applies.
     dFreightFx = dFxRate;
   } else if (freightVal.gt(0)) {
-    // Non-USD, different currency, positive amount, no confirmed own FX rate.
     freightFxUnresolved = true;
     dFreightFx = new Decimal(0);
   } else {
-    dFreightFx = dFxRate; // zero amount — rate irrelevant
+    dFreightFx = dFxRate;
   }
   const freightUsd = freightCcy === "USD" ? freightVal : freightVal.times(dFreightFx);
   const freightInContainerCcy =
-    freightCcy === containerCcy ? freightVal : dFxRate.gt(0) ? freightUsd.div(dFxRate) : freightVal;
+    freightCcy === containerCcy
+      ? freightVal
+      : dFxRate.gt(0)
+        ? freightUsd.div(dFxRate)
+        : freightVal;
 
-  // ── Other charges ─────────────────────────────────────────────────────────
   let ocInContainerCcy: Decimal;
   let ocUsd: Decimal;
   let ocFxUnresolved = false;
   if (otherChargesRows && otherChargesRows.length > 0) {
     ocInContainerCcy = new Decimal(0);
     ocUsd = new Decimal(0);
-    for (const oc of otherChargesRows) {
-      const ocAmt = new Decimal(oc.amount || "0");
-      const ocCcy = oc.currencyCode || containerCcy;
-      const rawOcFx = parseFloat((oc as any).fxRateToUsd || "");
-      const ocFxConfirmed = !!(oc as any).fxRateConfirmed;
-      let dOcFx: Decimal;
-      if (ocCcy === "USD") {
-        dOcFx = new Decimal(1);
-      } else if (Number.isFinite(rawOcFx) && rawOcFx > 0 && ocFxConfirmed) {
-        dOcFx = new Decimal(rawOcFx);
-      } else if (ocCcy === containerCcy) {
-        // Same currency as container — confirmed container offload FX applies.
-        dOcFx = dFxRate;
-      } else if (ocAmt.gt(0)) {
-        // Non-USD, different currency, positive amount, no confirmed own FX rate.
+    for (const otherCharge of otherChargesRows) {
+      const amount = new Decimal(otherCharge.amount || "0");
+      const currency = otherCharge.currencyCode || containerCcy;
+      const rawFx = parseFloat((otherCharge as any).fxRateToUsd || "");
+      const confirmed = !!(otherCharge as any).fxRateConfirmed;
+      let chargeFx: Decimal;
+      if (currency === "USD") {
+        chargeFx = new Decimal(1);
+      } else if (Number.isFinite(rawFx) && rawFx > 0 && confirmed) {
+        chargeFx = new Decimal(rawFx);
+      } else if (currency === containerCcy) {
+        chargeFx = dFxRate;
+      } else if (amount.gt(0)) {
         ocFxUnresolved = true;
-        continue; // skip this charge; don't accumulate zeros into the totals
+        continue;
       } else {
-        dOcFx = dFxRate; // zero amount — rate irrelevant
+        chargeFx = dFxRate;
       }
-      const ocAmtUsd = ocCcy === "USD" ? ocAmt : ocAmt.times(dOcFx);
-      const ocAmtInContainerCcy =
-        ocCcy === containerCcy ? ocAmt : dFxRate.gt(0) ? ocAmtUsd.div(dFxRate) : ocAmt;
-      ocInContainerCcy = ocInContainerCcy.plus(ocAmtInContainerCcy);
-      ocUsd = ocUsd.plus(ocAmtUsd);
+      const amountUsd = currency === "USD" ? amount : amount.times(chargeFx);
+      const amountInContainerCcy =
+        currency === containerCcy
+          ? amount
+          : dFxRate.gt(0)
+            ? amountUsd.div(dFxRate)
+            : amount;
+      ocInContainerCcy = ocInContainerCcy.plus(amountInContainerCcy);
+      ocUsd = ocUsd.plus(amountUsd);
     }
   } else {
-    const ocVal = new Decimal(container.otherCharges || "0");
-    const ocCcy = (container as any).otherChargesCurrencyCode || containerCcy;
-    if (ocCcy === "USD") {
-      ocUsd = ocVal;
-      ocInContainerCcy = containerCcy === "USD" ? ocVal : dFxRate.gt(0) ? ocVal.div(dFxRate) : ocVal;
-    } else if (ocCcy === containerCcy) {
-      ocInContainerCcy = ocVal;
-      ocUsd = dFxRate.gt(0) ? ocVal.times(dFxRate) : ocVal;
-    } else if (ocVal.gt(0)) {
-      // Non-USD, different currency from the container, positive amount — unresolvable.
+    const amount = new Decimal(container.otherCharges || "0");
+    const currency = (container as any).otherChargesCurrencyCode || containerCcy;
+    if (currency === "USD") {
+      ocUsd = amount;
+      ocInContainerCcy =
+        containerCcy === "USD" ? amount : dFxRate.gt(0) ? amount.div(dFxRate) : amount;
+    } else if (currency === containerCcy) {
+      ocInContainerCcy = amount;
+      ocUsd = dFxRate.gt(0) ? amount.times(dFxRate) : amount;
+    } else if (amount.gt(0)) {
       ocFxUnresolved = true;
       ocUsd = new Decimal(0);
       ocInContainerCcy = new Decimal(0);
@@ -189,126 +164,125 @@ export function computeContainerLandedCost(
     }
   }
 
-  // ── Commission ────────────────────────────────────────────────────────────
-  let commUsd: Decimal = new Decimal(0);
-  let commInContainerCcy: Decimal = new Decimal(0);
-  let commFxUnresolved = false;
+  let commissionUsd = new Decimal(0);
+  let commissionInContainerCcy = new Decimal(0);
+  let commissionFxUnresolved = false;
 
-  function applyCommFx(commVal: Decimal, commCcy: string, commFx: Decimal): void {
-    if (commCcy === "USD") {
-      commUsd = commVal;
-      commInContainerCcy =
-        containerCcy === "USD" ? commVal : dFxRate.gt(0) ? commVal.div(dFxRate) : commVal;
-    } else if (commCcy === containerCcy) {
-      commInContainerCcy = commVal;
-      commUsd = dFxRate.gt(0) ? commVal.times(dFxRate) : commVal;
+  function applyCommissionFx(amount: Decimal, currency: string, commissionFx: Decimal): void {
+    if (currency === "USD") {
+      commissionUsd = amount;
+      commissionInContainerCcy =
+        containerCcy === "USD" ? amount : dFxRate.gt(0) ? amount.div(dFxRate) : amount;
+    } else if (currency === containerCcy) {
+      commissionInContainerCcy = amount;
+      commissionUsd = dFxRate.gt(0) ? amount.times(dFxRate) : amount;
     } else {
-      commUsd = commVal.times(commFx);
-      commInContainerCcy = dFxRate.gt(0) ? commUsd.div(dFxRate) : commVal;
+      commissionUsd = amount.times(commissionFx);
+      commissionInContainerCcy =
+        dFxRate.gt(0) ? commissionUsd.div(dFxRate) : amount;
     }
   }
 
   if (commissionRecord) {
-    const commVal = new Decimal(commissionRecord.commissionTotal || "0");
-    const commCcy = commissionRecord.currencyCode || containerCcy;
-    const rawCommFx = parseFloat(commissionRecord.fxRateToUsd || "");
-    const commConfirmed = (commissionRecord as any).fxRateConfirmed === true;
-    if (commCcy === "USD") {
-      applyCommFx(commVal, "USD", new Decimal(1));
-    } else if (commCcy === containerCcy) {
-      applyCommFx(commVal, commCcy, dFxRate);
+    const amount = new Decimal(commissionRecord.commissionTotal || "0");
+    const currency = commissionRecord.currencyCode || containerCcy;
+    const rawFx = parseFloat(commissionRecord.fxRateToUsd || "");
+    const confirmed = (commissionRecord as any).fxRateConfirmed === true;
+    if (currency === "USD") {
+      applyCommissionFx(amount, "USD", new Decimal(1));
+    } else if (currency === containerCcy) {
+      applyCommissionFx(amount, currency, dFxRate);
+    } else if (Number.isFinite(rawFx) && rawFx > 0 && confirmed) {
+      applyCommissionFx(amount, currency, new Decimal(rawFx));
     } else {
-      if (Number.isFinite(rawCommFx) && rawCommFx > 0 && commConfirmed) {
-        applyCommFx(commVal, commCcy, new Decimal(rawCommFx));
+      const snapshotFx = parseFloat((container as any).commissionFxRateToUsd || "");
+      const snapshotConfirmed = (container as any).commissionFxRateConfirmed === true;
+      if (Number.isFinite(snapshotFx) && snapshotFx > 0 && snapshotConfirmed) {
+        applyCommissionFx(amount, currency, new Decimal(snapshotFx));
       } else {
-        const snapFx = parseFloat((container as any).commissionFxRateToUsd || "");
-        const snapConfirmed = (container as any).commissionFxRateConfirmed === true;
-        if (Number.isFinite(snapFx) && snapFx > 0 && snapConfirmed) {
-          applyCommFx(commVal, commCcy, new Decimal(snapFx));
-        } else {
-          commFxUnresolved = true;
-          commUsd = new Decimal(0);
-          commInContainerCcy = new Decimal(0);
-        }
+        commissionFxUnresolved = true;
       }
     }
   } else {
-    const commVal = new Decimal(container.commissionAmount || "0");
-    const commCcy = (container as any).commissionCurrencyCode || containerCcy;
-    if (commCcy === "USD") {
-      applyCommFx(commVal, "USD", new Decimal(1));
-    } else if (commCcy === containerCcy) {
-      applyCommFx(commVal, commCcy, dFxRate);
+    const amount = new Decimal(container.commissionAmount || "0");
+    const currency = (container as any).commissionCurrencyCode || containerCcy;
+    if (currency === "USD") {
+      applyCommissionFx(amount, "USD", new Decimal(1));
+    } else if (currency === containerCcy) {
+      applyCommissionFx(amount, currency, dFxRate);
     } else {
-      const snapFx = parseFloat((container as any).commissionFxRateToUsd || "");
-      const snapConfirmed = (container as any).commissionFxRateConfirmed === true;
-      if (Number.isFinite(snapFx) && snapFx > 0 && snapConfirmed) {
-        applyCommFx(commVal, commCcy, new Decimal(snapFx));
-      } else if (commVal.gt(0)) {
-        commFxUnresolved = true;
-        commUsd = new Decimal(0);
-        commInContainerCcy = new Decimal(0);
+      const snapshotFx = parseFloat((container as any).commissionFxRateToUsd || "");
+      const snapshotConfirmed = (container as any).commissionFxRateConfirmed === true;
+      if (Number.isFinite(snapshotFx) && snapshotFx > 0 && snapshotConfirmed) {
+        applyCommissionFx(amount, currency, new Decimal(snapshotFx));
+      } else if (amount.gt(0)) {
+        commissionFxUnresolved = true;
       }
     }
   }
 
-  // ── Duty (always in container currency) ──────────────────────────────────
-  const dutyVal =
+  const dutyValue =
     container.dutyStatus === "CONFIRMED"
       ? new Decimal(container.dutyAmount || "0")
       : new Decimal(0);
-  const dutyUsd = containerCcy === "USD" ? dutyVal : dutyVal.times(dFxRate);
+  const dutyUsd = containerCcy === "USD" ? dutyValue : dutyValue.times(dFxRate);
 
-  // ── Additional charges (each row stores its own currency + fx rate) ───────
-  let addlInContainerCcy = new Decimal(0);
-  let addlUsd = new Decimal(0);
-  let addlFxUnresolved = false;
-  for (const c of additionalCharges) {
-    const amt = new Decimal(c.amount || "0");
-    const ccy = c.currencyCode || containerCcy;
-    const rawCfx = parseFloat(c.fxRateToUsd || "");
-    const cfxConfirmed = !!(c as any).fxRateConfirmed;
-    let dCfx: Decimal;
-    if (ccy === "USD") {
-      dCfx = new Decimal(1);
-    } else if (Number.isFinite(rawCfx) && rawCfx > 0 && cfxConfirmed) {
-      dCfx = new Decimal(rawCfx);
-    } else if (ccy === containerCcy) {
-      // Same currency as container — confirmed container offload FX applies.
-      dCfx = dFxRate;
-    } else if (amt.gt(0)) {
-      // Non-USD, different currency, positive amount, no confirmed own FX rate.
-      addlFxUnresolved = true;
-      continue; // skip this charge; don't pollute totals with a wrong rate
+  let additionalInContainerCcy = new Decimal(0);
+  let additionalUsd = new Decimal(0);
+  let additionalFxUnresolved = false;
+  for (const charge of additionalCharges) {
+    const amount = new Decimal(charge.amount || "0");
+    const currency = charge.currencyCode || containerCcy;
+    const rawFx = parseFloat(charge.fxRateToUsd || "");
+    const confirmed = !!(charge as any).fxRateConfirmed;
+    let chargeFx: Decimal;
+    if (currency === "USD") {
+      chargeFx = new Decimal(1);
+    } else if (Number.isFinite(rawFx) && rawFx > 0 && confirmed) {
+      chargeFx = new Decimal(rawFx);
+    } else if (currency === containerCcy) {
+      chargeFx = dFxRate;
+    } else if (amount.gt(0)) {
+      additionalFxUnresolved = true;
+      continue;
     } else {
-      dCfx = dFxRate; // zero amount — rate irrelevant
+      chargeFx = dFxRate;
     }
-    const amtUsd = ccy === "USD" ? amt : amt.times(dCfx);
-    const amtInContainerCcy = ccy === containerCcy ? amt : dFxRate.gt(0) ? amtUsd.div(dFxRate) : amt;
-    addlInContainerCcy = addlInContainerCcy.plus(amtInContainerCcy);
-    addlUsd = addlUsd.plus(amtUsd);
+    const amountUsd = currency === "USD" ? amount : amount.times(chargeFx);
+    const amountInContainerCcy =
+      currency === containerCcy
+        ? amount
+        : dFxRate.gt(0)
+          ? amountUsd.div(dFxRate)
+          : amount;
+    additionalInContainerCcy = additionalInContainerCcy.plus(amountInContainerCcy);
+    additionalUsd = additionalUsd.plus(amountUsd);
   }
 
   const totalCost = basePayable
     .plus(freightInContainerCcy)
     .plus(ocInContainerCcy)
-    .plus(commInContainerCcy)
-    .plus(dutyVal)
-    .plus(addlInContainerCcy);
+    .plus(commissionInContainerCcy)
+    .plus(dutyValue)
+    .plus(additionalInContainerCcy);
   const totalUsd = baseMaterialUsd
     .plus(freightUsd)
     .plus(ocUsd)
-    .plus(commUsd)
+    .plus(commissionUsd)
     .plus(dutyUsd)
-    .plus(addlUsd);
+    .plus(additionalUsd);
 
   return {
     valuationKg: originalCostBasisKg.toNumber(),
-    allocationKg: receivedAllocationKg.toNumber(),
+    allocationKg: allocationKg.toNumber(),
     fullCost: totalCost.toNumber(),
     fullCostUsd: totalUsd.toNumber(),
-    costPerKg: totalCost.div(receivedAllocationKg).toDecimalPlaces(COST_SCALE).toNumber(),
-    costPerKgUsd: totalUsd.div(receivedAllocationKg).toDecimalPlaces(COST_SCALE).toNumber(),
-    fxUnresolved: commFxUnresolved || freightFxUnresolved || ocFxUnresolved || addlFxUnresolved,
+    costPerKg: totalCost.div(allocationKg).toDecimalPlaces(COST_SCALE).toNumber(),
+    costPerKgUsd: totalUsd.div(allocationKg).toDecimalPlaces(COST_SCALE).toNumber(),
+    fxUnresolved:
+      commissionFxUnresolved ||
+      freightFxUnresolved ||
+      ocFxUnresolved ||
+      additionalFxUnresolved,
   };
 }

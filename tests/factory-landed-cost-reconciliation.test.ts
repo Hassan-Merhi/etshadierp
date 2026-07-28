@@ -2,16 +2,14 @@
  * Regression tests for the factory raw-material landed-cost reconciliation bug:
  *
  *   1. cascadeContainerCostChange must correctly propagate a corrected
- *      container cost/kg down to mix batch sources, recompute each affected
- *      batch's weighted-average cost across ALL its sources (not just the one
- *      container being corrected), and cascade the new blended cost to bales.
+ *      container cost/kg down to container-direct mix batch sources, recompute
+ *      each affected batch's weighted-average cost across ALL its sources, and
+ *      cascade the new blended cost to bales.
  *   2. GET /api/factory/raw-stock/history/:supplierId must report each
  *      supplier's OWN weighted cost/kg (from factory_mix_batch_sources), not
- *      the batch's blended cost/kg — which silently misattributes cost when a
- *      batch draws from more than one supplier/source.
+ *      the batch's blended cost/kg.
  *   3. POST /api/factory/raw-stock/offload must refuse to silently default a
- *      non-USD container's FX rate to 1 when the live FX lookup fails and the
- *      container has no explicitly-set fxRateToUsd to fall back on.
+ *      non-USD container's FX rate to 1 when no confirmed rate is available.
  */
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import request from "supertest";
@@ -46,11 +44,11 @@ async function cleanupFactoryTables(companyId: number) {
   await pool.query(`DELETE FROM factory_fx_rates WHERE company_id = $1`, [companyId]);
   await pool.query(
     `DELETE FROM factory_bales WHERE mix_batch_id IN (SELECT id FROM factory_mix_batches WHERE company_id = $1)`,
-    [companyId]
+    [companyId],
   );
   await pool.query(
     `DELETE FROM factory_mix_batch_sources WHERE mix_batch_id IN (SELECT id FROM factory_mix_batches WHERE company_id = $1)`,
-    [companyId]
+    [companyId],
   );
   await pool.query(`DELETE FROM factory_mix_batches WHERE company_id = $1`, [companyId]);
   await pool.query(`DELETE FROM factory_raw_stock WHERE company_id = $1`, [companyId]);
@@ -60,10 +58,6 @@ async function cleanupFactoryTables(companyId: number) {
 
 beforeAll(async () => {
   ctx = await seedTestData(TEST_PREFIX);
-  // The /api/factory/* company-resolution middleware only recognizes companies
-  // with companyType "factory"/"factory_v2" (falling back to an unrelated
-  // factory company otherwise), so the seeded test company must be marked as
-  // a factory company before any /api/factory request is made.
   await db.update(schema.companies).set({ companyType: "factory" }).where(eq(schema.companies.id, ctx.companyId));
   agent = request.agent(ctx.app);
   await loginAsTestUser();
@@ -87,7 +81,7 @@ afterAll(async () => {
 }, 30000);
 
 describe("cascadeContainerCostChange", () => {
-  it("propagates a corrected container cost through sources, batch weighted-average, and bales", async () => {
+  it("propagates a corrected container-direct cost through sources, batch weighted-average, and bales", async () => {
     const [container] = await db
       .insert(schema.factoryContainers)
       .values({
@@ -129,7 +123,6 @@ describe("cascadeContainerCostChange", () => {
       costPerKgUsd: "0.80",
     });
 
-    // One mix batch blended from BOTH containers: 600kg @ 0.50 + 200kg @ 0.80 = 460 total / 800kg = 0.575/kg
     const [batch] = await db
       .insert(schema.factoryMixBatches)
       .values({
@@ -142,10 +135,13 @@ describe("cascadeContainerCostChange", () => {
       })
       .returning();
 
+    // This source is intentionally container-direct. Supplier-priced sources are
+    // owned by the locked-rate historical replay and must not be overwritten by
+    // an individual-container cascade.
     await db.insert(schema.factoryMixBatchSources).values({
       mixBatchId: batch.id,
       containerId: container.id,
-      supplierId: supplierAId,
+      supplierId: null,
       weightKg: "600",
       costPerKg: "0.50",
       totalCost: "300.00",
@@ -153,7 +149,7 @@ describe("cascadeContainerCostChange", () => {
     await db.insert(schema.factoryMixBatchSources).values({
       mixBatchId: batch.id,
       containerId: otherContainer.id,
-      supplierId: supplierBId,
+      supplierId: null,
       weightKg: "200",
       costPerKg: "0.80",
       totalCost: "160.00",
@@ -173,17 +169,15 @@ describe("cascadeContainerCostChange", () => {
       })
       .returning();
 
-    // Correct container 1's cost from 0.50 -> 0.60 per kg (e.g. a landed-cost repair).
-    const result = await db.transaction(async (tx) => {
-      return cascadeContainerCostChange(tx, {
+    const result = await db.transaction(async (tx) =>
+      cascadeContainerCostChange(tx, {
         companyId: ctx.companyId,
         containerId: container.id,
         newCostPerKg: 0.6,
         newCostPerKgUsd: 0.6,
-      });
-    });
+      }),
+    );
 
-    // Raw stock updated
     const [updatedRawStock] = await db
       .select()
       .from(schema.factoryRawStock)
@@ -191,30 +185,32 @@ describe("cascadeContainerCostChange", () => {
     expect(parseFloat(updatedRawStock.costPerKg)).toBeCloseTo(0.6, 4);
     expect(parseFloat(updatedRawStock.costPerKgUsd!)).toBeCloseTo(0.6, 4);
 
-    // Container 1's mix batch source updated to the new rate
     const [srcA] = await db
       .select()
       .from(schema.factoryMixBatchSources)
       .where(eq(schema.factoryMixBatchSources.containerId, container.id));
     expect(parseFloat(srcA.costPerKg)).toBeCloseTo(0.6, 4);
-    expect(parseFloat(srcA.totalCost)).toBeCloseTo(360, 2); // 600kg * 0.60
+    expect(parseFloat(srcA.totalCost)).toBeCloseTo(360, 2);
 
-    // Container 2's mix batch source (untouched container) is unchanged
     const [srcB] = await db
       .select()
       .from(schema.factoryMixBatchSources)
       .where(eq(schema.factoryMixBatchSources.containerId, otherContainer.id));
     expect(parseFloat(srcB.costPerKg)).toBeCloseTo(0.8, 4);
 
-    // Batch weighted average recomputed from BOTH sources: (360 + 160) / 800 = 0.65
-    const [updatedBatch] = await db.select().from(schema.factoryMixBatches).where(eq(schema.factoryMixBatches.id, batch.id));
+    const [updatedBatch] = await db
+      .select()
+      .from(schema.factoryMixBatches)
+      .where(eq(schema.factoryMixBatches.id, batch.id));
     expect(parseFloat(updatedBatch.costPerKg)).toBeCloseTo(0.65, 4);
     expect(parseFloat(updatedBatch.totalCost)).toBeCloseTo(520, 2);
 
-    // Bale cascaded to the new blended batch cost
-    const [updatedBale] = await db.select().from(schema.factoryBales).where(eq(schema.factoryBales.id, bale.id));
+    const [updatedBale] = await db
+      .select()
+      .from(schema.factoryBales)
+      .where(eq(schema.factoryBales.id, bale.id));
     expect(parseFloat(updatedBale.costPerKg)).toBeCloseTo(0.65, 4);
-    expect(parseFloat(updatedBale.totalCost)).toBeCloseTo(65, 2); // 100kg * 0.65
+    expect(parseFloat(updatedBale.totalCost)).toBeCloseTo(65, 2);
 
     expect(result.affectedBatches.length).toBe(1);
     expect(result.affectedBales.length).toBe(1);
@@ -242,16 +238,12 @@ describe("GET /api/factory/raw-stock/history/:supplierId", () => {
         companyId: ctx.companyId,
         batchCode: `${TEST_PREFIX}-B2`,
         totalWeightKg: "500",
-        // Blended batch cost is deliberately far from supplier A's own rate,
-        // to prove the endpoint isn't just echoing this field.
         costPerKg: "1.20",
         totalCost: "600.00",
         status: "ACTIVE",
       })
       .returning();
 
-    // Supplier A contributed 300kg @ 0.40/kg = 120; Supplier B contributed 200kg @ 2.40/kg = 480.
-    // Blended batch cost = 600/500 = 1.20 (matches above) but supplier A's own rate is 0.40, not 1.20.
     await db.insert(schema.factoryMixBatchSources).values({
       mixBatchId: batch.id,
       containerId: container.id,
@@ -270,10 +262,10 @@ describe("GET /api/factory/raw-stock/history/:supplierId", () => {
 
     const res = await agent.get(`/api/factory/raw-stock/history/${supplierAId}`);
     expect(res.status).toBe(200);
-    const batchEntry = (res.body.entries || res.body.timeline || res.body).find?.((e: any) => e.batchId === batch.id) ??
-      (Array.isArray(res.body) ? res.body.find((e: any) => e.batchId === batch.id) : undefined);
+    const batchEntry =
+      (res.body.entries || res.body.timeline || res.body).find?.((entry: any) => entry.batchId === batch.id) ??
+      (Array.isArray(res.body) ? res.body.find((entry: any) => entry.batchId === batch.id) : undefined);
     expect(batchEntry).toBeTruthy();
-    // Must reflect supplier A's own 0.40/kg rate, NOT the batch's blended 1.20/kg.
     expect(batchEntry.costPerKg).toBeCloseTo(0.4, 4);
   });
 });
@@ -287,20 +279,14 @@ describe("POST /api/factory/raw-stock/offload — FX safeguard", () => {
         containerNumber: `${TEST_PREFIX}-C4`,
         supplierId: supplierAId,
         actualReceivedKg: "1000",
-        // Not a real ISO currency code, so the live FX lookup is guaranteed to fail —
-        // exercising the failure path deterministically instead of depending on
-        // network availability in the test environment.
         currencyCode: "ZZZ",
-        // fxRateToUsd left at the schema default of "1" — i.e. never explicitly set.
         status: "PENDING",
       })
       .returning();
 
     const res = await agent.post("/api/factory/raw-stock/offload").send({
       containerId: container.id,
-      // No fxRateToUsd supplied and no valid FX rate can be resolved for "ZZZ",
-      // so this must fail closed rather than silently costing the container at
-      // a 1:1 rate.
+      receivedKg: "1000",
     });
 
     expect(res.status).toBe(400);

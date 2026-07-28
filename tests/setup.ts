@@ -5,6 +5,7 @@ import { db } from "../server/db";
 import { pool } from "../server/db";
 import { eq, and, sql } from "drizzle-orm";
 import * as schema from "../shared/schema";
+import { KNOWN_SECURITY_PERMISSIONS } from "../server/services/security/namedPermissionService";
 
 let testApp: express.Express;
 let testServer: any;
@@ -23,6 +24,31 @@ export interface TestContext {
   cashAccountId: number;
 }
 
+function stableTestCompanyCode(prefix: string): string {
+  let hash = 2166136261;
+  for (const char of prefix) {
+    hash ^= char.charCodeAt(0);
+    hash = Math.imul(hash, 16777619);
+  }
+  const base = prefix
+    .replace(/[^a-z0-9]/gi, "")
+    .toUpperCase()
+    .slice(0, 4)
+    .padEnd(4, "X");
+  const suffix = (hash >>> 0)
+    .toString(16)
+    .toUpperCase()
+    .padStart(8, "0")
+    .slice(-4);
+  return `${base}${suffix}`;
+}
+
+function testCompanyType(prefix: string): "erp" | "factory" {
+  // Factory export integration tests must exercise the same authorized factory
+  // company resolution used in production. Ordinary ERP/POS tests remain ERP.
+  return prefix === "xlsexp" ? "factory" : "erp";
+}
+
 export async function setupTestApp(): Promise<express.Express> {
   const app = express();
   app.use(express.json());
@@ -33,7 +59,7 @@ export async function setupTestApp(): Promise<express.Express> {
       secret: "test-secret-key-for-integration-tests",
       resave: false,
       saveUninitialized: false,
-      cookie: { secure: false, httpOnly: true, maxAge: 60000 },
+      cookie: { secure: false, httpOnly: true, maxAge: 30 * 60 * 1000 },
     }),
   );
 
@@ -52,19 +78,13 @@ export async function cleanupTestData(prefix: string): Promise<void> {
   for (const company of companies) {
     await pool.query("DELETE FROM audit_log WHERE company_id = $1", [company.id]);
     await pool.query("DELETE FROM login_history WHERE company_id = $1", [company.id]);
-    await db
-      .delete(schema.inventory)
-      .where(eq(schema.inventory.companyId, company.id));
+    await db.delete(schema.inventory).where(eq(schema.inventory.companyId, company.id));
     await db
       .delete(schema.salesItems)
-      .where(
-        sql`${schema.salesItems.voucherId} IN (SELECT id FROM vouchers WHERE company_id = ${company.id})`,
-      );
+      .where(sql`${schema.salesItems.voucherId} IN (SELECT id FROM vouchers WHERE company_id = ${company.id})`);
     await db
       .delete(schema.voucherEntries)
-      .where(
-        sql`${schema.voucherEntries.voucherId} IN (SELECT id FROM vouchers WHERE company_id = ${company.id})`,
-      );
+      .where(sql`${schema.voucherEntries.voucherId} IN (SELECT id FROM vouchers WHERE company_id = ${company.id})`);
     await db
       .delete(schema.stockTransferItems)
       .where(
@@ -75,27 +95,16 @@ export async function cleanupTestData(prefix: string): Promise<void> {
       .where(
         sql`${schema.stockTransferVouchers.voucherId} IN (SELECT id FROM vouchers WHERE company_id = ${company.id})`,
       );
+    await db.delete(schema.vouchers).where(eq(schema.vouchers.companyId, company.id));
+    await db.delete(schema.stockItems).where(eq(schema.stockItems.companyId, company.id));
+    await db.delete(schema.stockGroups).where(eq(schema.stockGroups.companyId, company.id));
+    await db.delete(schema.locations).where(eq(schema.locations.companyId, company.id));
+    await db.delete(schema.ledgerAccounts).where(eq(schema.ledgerAccounts.companyId, company.id));
     await db
-      .delete(schema.vouchers)
-      .where(eq(schema.vouchers.companyId, company.id));
-    await db
-      .delete(schema.stockItems)
-      .where(eq(schema.stockItems.companyId, company.id));
-    await db
-      .delete(schema.stockGroups)
-      .where(eq(schema.stockGroups.companyId, company.id));
-    await db
-      .delete(schema.locations)
-      .where(eq(schema.locations.companyId, company.id));
-    await db
-      .delete(schema.ledgerAccounts)
-      .where(eq(schema.ledgerAccounts.companyId, company.id));
-    await db
-      .delete(schema.userCompanyRoles)
-      .where(eq(schema.userCompanyRoles.companyId, company.id));
-    await db
-      .delete(schema.userLocations)
-      .where(eq(schema.userLocations.companyId, company.id));
+      .delete(schema.userSecurityPermissions)
+      .where(eq(schema.userSecurityPermissions.companyId, company.id));
+    await db.delete(schema.userCompanyRoles).where(eq(schema.userCompanyRoles.companyId, company.id));
+    await db.delete(schema.userLocations).where(eq(schema.userLocations.companyId, company.id));
 
     // Authentication and audit middleware can finish asynchronously while a test
     // is tearing down. Clear any rows written after the initial cleanup before
@@ -106,7 +115,10 @@ export async function cleanupTestData(prefix: string): Promise<void> {
     // referencing this company; those FKs otherwise block the company delete
     // below on the NEXT run that reuses this prefix. Delete in FK-safe order.
     await pool.query("DELETE FROM factory_bales WHERE company_id = $1", [company.id]);
-    await pool.query("DELETE FROM factory_mix_batch_sources WHERE mix_batch_id IN (SELECT id FROM factory_mix_batches WHERE company_id = $1)", [company.id]);
+    await pool.query(
+      "DELETE FROM factory_mix_batch_sources WHERE mix_batch_id IN (SELECT id FROM factory_mix_batches WHERE company_id = $1)",
+      [company.id],
+    );
     await pool.query("DELETE FROM factory_mix_batches WHERE company_id = $1", [company.id]);
     await pool.query("DELETE FROM factory_raw_stock WHERE company_id = $1", [company.id]);
     await pool.query("DELETE FROM factory_container_other_charges WHERE company_id = $1", [company.id]);
@@ -145,12 +157,13 @@ export async function seedTestData(prefix: string): Promise<TestContext> {
     })
     .returning();
 
-  const companyCode = prefix.toUpperCase().slice(0, 8);
+  const companyCode = stableTestCompanyCode(prefix);
   const [company] = await db
     .insert(schema.companies)
     .values({
       code: companyCode,
       name: `${prefix}_TestCompany`,
+      companyType: testCompanyType(prefix),
       baseCurrency: "USD",
     })
     .returning();
@@ -160,6 +173,15 @@ export async function seedTestData(prefix: string): Promise<TestContext> {
     companyId: company.id,
     role: "Admin",
   });
+
+  await db.insert(schema.userSecurityPermissions).values(
+    KNOWN_SECURITY_PERMISSIONS.map((permission) => ({
+      userId: user.id,
+      companyId: company.id,
+      permission,
+      grantedBy: user.id,
+    })),
+  );
 
   const [location1] = await db
     .insert(schema.locations)
@@ -256,36 +278,20 @@ export async function seedTestData(prefix: string): Promise<TestContext> {
   };
 }
 
-export async function getInventoryQty(
-  locationId: number,
-  stockItemId: number,
-): Promise<number> {
+export async function getInventoryQty(locationId: number, stockItemId: number): Promise<number> {
   const [inv] = await db
     .select()
     .from(schema.inventory)
-    .where(
-      and(
-        eq(schema.inventory.locationId, locationId),
-        eq(schema.inventory.stockItemId, stockItemId),
-      ),
-    )
+    .where(and(eq(schema.inventory.locationId, locationId), eq(schema.inventory.stockItemId, stockItemId)))
     .limit(1);
   return inv ? parseFloat(inv.quantity) : 0;
 }
 
-export async function getInventoryRecord(
-  locationId: number,
-  stockItemId: number,
-) {
+export async function getInventoryRecord(locationId: number, stockItemId: number) {
   const [inv] = await db
     .select()
     .from(schema.inventory)
-    .where(
-      and(
-        eq(schema.inventory.locationId, locationId),
-        eq(schema.inventory.stockItemId, stockItemId),
-      ),
-    )
+    .where(and(eq(schema.inventory.locationId, locationId), eq(schema.inventory.stockItemId, stockItemId)))
     .limit(1);
   return inv;
 }

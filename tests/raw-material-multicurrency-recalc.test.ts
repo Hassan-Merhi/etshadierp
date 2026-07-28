@@ -37,7 +37,7 @@ beforeAll(async () => {
 }, 30000);
 
 afterAll(async () => {
-  if (!ctx) return; // beforeAll never completed — nothing to tear down
+  if (!ctx) return;
   await pool.query(`DELETE FROM factory_daybook_entries WHERE company_id = $1`, [ctx.companyId]);
   await pool.query(`DELETE FROM factory_offload_additional_charges WHERE company_id = $1`, [ctx.companyId]);
   await pool.query(`DELETE FROM factory_container_commissions WHERE company_id = $1`, [ctx.companyId]);
@@ -56,7 +56,7 @@ describe("Multi-currency raw-material cost recomputation (decimal.js)", () => {
       fxRateToUsdOffload: "1.08",
       fxRateConfirmed: true,
       actualReceivedKg: "1000",
-      ratePerKg: "2.5", // 2.5 EUR/kg
+      ratePerKg: "2.5",
       freight: "0",
       freightCurrencyCode: "EUR",
       otherCharges: "0",
@@ -68,20 +68,17 @@ describe("Multi-currency raw-material cost recomputation (decimal.js)", () => {
     };
     const additionalCharges: any[] = [
       {
-        amount: "50000", // 50,000 CDF
+        amount: "50000",
         currencyCode: "CDF",
-        fxRateToUsd: "0.00038", // 1 CDF = 0.00038 USD
+        fxRateToUsd: "0.00038",
+        fxRateConfirmed: true,
       },
     ];
 
     const result = computeCorrectContainerCost(container, additionalCharges, null);
 
     expect(result.fxUnresolved).toBe(false);
-    // Base: 1000kg * 2.5 EUR/kg = 2500 EUR -> USD at 1.08 = 2700 USD
-    // Additional charge: 50000 CDF * 0.00038 = 19 USD
-    // Total USD = 2719
     expect(result.totalUsd).toBeCloseTo(2719, 4);
-    // Total in container currency: base 2500 EUR + (19 USD / 1.08 EUR-rate) = 2500 + 17.592592... EUR
     expect(result.totalCost).toBeCloseTo(2500 + 19 / 1.08, 4);
     expect(result.costPerKgUsd).toBeCloseTo(2719 / 1000, 6);
   });
@@ -89,7 +86,7 @@ describe("Multi-currency raw-material cost recomputation (decimal.js)", () => {
   it("surfaces fxUnresolved instead of guessing rate=1 for a non-USD container with no confirmed rate", () => {
     const container: any = {
       currencyCode: "EUR",
-      fxRateToUsd: "1", // looks like the old "unset" heuristic value
+      fxRateToUsd: "1",
       fxRateToUsdOffload: null,
       fxRateConfirmed: false,
       actualReceivedKg: "500",
@@ -134,7 +131,6 @@ describe("Opening-balance import: commission FX rejection", () => {
       receivedKg: "100",
       costPerKg: "2",
       currencyCode: "EUR",
-      // fxRateToUsd intentionally omitted
     });
     expect(res.status).toBe(400);
   });
@@ -147,7 +143,6 @@ describe("Opening-balance import: commission FX rejection", () => {
       currencyCode: "USD",
       commissionAmount: "50",
       commissionCurrencyCode: "EUR",
-      // commissionFxRateToUsd intentionally omitted
     });
     expect(res.status).toBe(400);
     expect(res.body.message).toMatch(/[Cc]ommission/);

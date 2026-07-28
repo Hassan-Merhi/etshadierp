@@ -13,8 +13,9 @@ async function query(text: string, params: unknown[] = []) {
 
 beforeAll(async () => {
   const [company] = await query(
-    `INSERT INTO companies (name, company_type, base_currency)
-     VALUES ('RentalDelete-' || gen_random_uuid(), 'erp', 'USD')
+    `INSERT INTO companies (code, name, company_type, base_currency)
+     VALUES ('RDEL-' || substr(replace(gen_random_uuid()::text, '-', ''), 1, 8),
+             'RentalDelete-' || gen_random_uuid(), 'erp', 'USD')
      RETURNING id`,
   );
   companyId = company.id;
@@ -39,7 +40,7 @@ beforeAll(async () => {
 
   const [cashAccount] = await query(
     `INSERT INTO ledger_accounts
-       (company_id, name, code, account_type, is_active)
+       (company_id, name, code, account_type, active)
      VALUES ($1, 'Rental Delete Cash', 'RENT-DEL-CASH', 'Asset', true)
      RETURNING id`,
     [companyId],
@@ -57,7 +58,6 @@ afterAll(async () => {
   await query(`DELETE FROM property_units WHERE id = $1`, [unitId]);
   await query(`DELETE FROM ledger_accounts WHERE id = $1`, [cashAccountId]);
   await query(`DELETE FROM companies WHERE id = $1`, [companyId]);
-  await pool.end();
 });
 
 describe("rental payment deletion lifecycle", () => {
@@ -122,10 +122,7 @@ describe("rental payment deletion lifecycle", () => {
     expect(result.found).toBe(true);
     expect(result.deletedCount).toBe(2);
 
-    const remainingPayments = await query(
-      `SELECT id FROM property_payments WHERE payment_group_id = $1`,
-      [groupId],
-    );
+    const remainingPayments = await query(`SELECT id FROM property_payments WHERE payment_group_id = $1`, [groupId]);
     expect(remainingPayments).toHaveLength(0);
 
     const ledgerAfter = await query(
@@ -179,10 +176,7 @@ describe("rental payment deletion lifecycle", () => {
     });
     expect(result.deletedCount).toBe(1);
 
-    const [ledgerAfter] = await query(
-      `SELECT paid_amount FROM property_monthly_ledger WHERE id = $1`,
-      [ledgerRow.id],
-    );
+    const [ledgerAfter] = await query(`SELECT paid_amount FROM property_monthly_ledger WHERE id = $1`, [ledgerRow.id]);
     expect(Number(ledgerAfter.paid_amount)).toBe(100);
   });
 });
