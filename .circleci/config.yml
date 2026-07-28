@@ -1,0 +1,192 @@
+version: 2.1
+
+orbs:
+  node: circleci/node@7.1.0
+
+executors:
+  node20:
+    docker:
+      - image: cimg/node:20.19
+    resource_class: medium+
+    working_directory: ~/project
+    environment:
+      NODE_ENV: test
+      SESSION_SECRET: circleci-session-secret
+      CSRF_ENFORCE: "0"
+      ENABLE_SCHEDULERS: "false"
+      NODE_OPTIONS: --max-old-space-size=4096
+      PORT: "5000"
+
+commands:
+  install_dependencies:
+    steps:
+      - checkout
+      - run:
+          name: Normalize package registry URLs
+          command: sed -i 's#http://package-firewall.replit.local/npm/#https://registry.npmjs.org/#g' package-lock.json
+      - node/install-packages:
+          pkg-manager: npm
+          override-ci-command: npm ci --no-audit --bin-links=true
+      - run:
+          name: Dependency diagnostics
+          command: |
+            node --version
+            npm --version
+            npm config get bin-links
+            node -p "'TypeScript ' + require('typescript/package.json').version"
+            node -p "'jsdom ' + require('jsdom/package.json').version"
+            for binary in tsc vite eslint vitest; do
+              test -x "node_modules/.bin/$binary" || { echo "$binary is missing"; exit 1; }
+            done
+
+jobs:
+  static-build:
+    executor: node20
+    steps:
+      - install_dependencies
+      - run:
+          name: Verify lockfile and production dependencies
+          command: |
+            npm run verify:lockfile
+            npm run verify:production-dependencies
+      - run:
+          name: Check formatting for changed source files
+          command: |
+            git fetch origin main --depth=1
+            mapfile -d '' changed_files < <(
+              git diff --name-only --diff-filter=ACMR -z origin/main...HEAD -- client/src server shared |
+                grep -zE '\.(ts|tsx|css)$' || true
+            )
+            if [ "${#changed_files[@]}" -eq 0 ]; then
+              echo "No changed TypeScript, TSX, or CSS files require formatting checks."
+              exit 0
+            fi
+            printf 'Checking formatting for %s changed source file(s):\n' "${#changed_files[@]}"
+            printf ' - %s\n' "${changed_files[@]}"
+            node node_modules/prettier/bin/prettier.cjs --check "${changed_files[@]}"
+      - run:
+          name: Lint
+          command: npm run lint
+      - run:
+          name: TypeScript
+          command: npm run check
+      - run:
+          name: Production build
+          command: npm run build
+      - run:
+          name: Verify server bundle
+          command: npm run verify:server-bundle
+      - run:
+          name: Repository safety contracts
+          command: |
+            npm run verify:program1-observability
+            npm run check:program-6-security
+            npm run verify:final-production-readiness
+            npm run verify:bandwidth
+      - store_artifacts:
+          path: dist
+          destination: production-build
+
+  postgres-regression:
+    docker:
+      - image: cimg/node:20.19
+        environment:
+          NODE_ENV: test
+          SESSION_SECRET: circleci-session-secret
+          CSRF_ENFORCE: "0"
+          ENABLE_SCHEDULERS: "false"
+          NODE_OPTIONS: --max-old-space-size=4096
+          PORT: "5000"
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/heliumdb
+          PGSSLMODE: disable
+      - image: cimg/postgres:15.13
+        environment:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: heliumdb
+    resource_class: medium+
+    working_directory: ~/project
+    steps:
+      - install_dependencies
+      - run:
+          name: Wait for PostgreSQL
+          command: |
+            for attempt in $(seq 1 60); do
+              if (echo > /dev/tcp/127.0.0.1/5432) >/dev/null 2>&1; then
+                echo "PostgreSQL is accepting connections."
+                exit 0
+              fi
+              sleep 1
+            done
+            echo "PostgreSQL did not become ready."
+            exit 1
+      - run:
+          name: Verify migration registry
+          command: node scripts/verify-migration-registry.mjs --json
+      - run:
+          name: Prepare disposable database schema
+          command: node node_modules/drizzle-kit/bin.cjs push --force
+      - run:
+          name: Build application
+          command: npm run build
+      - run:
+          name: Verify startup migrations and readiness
+          command: |
+            mkdir -p circleci-artifacts
+            node dist/index.js > circleci-artifacts/startup.log 2>&1 &
+            app_pid=$!
+            cleanup() {
+              kill "$app_pid" 2>/dev/null || true
+              wait "$app_pid" 2>/dev/null || true
+            }
+            trap cleanup EXIT
+            for attempt in $(seq 1 180); do
+              if curl --fail --silent --show-error http://127.0.0.1:${PORT}/api/health/db > circleci-artifacts/health-db.json && \
+                 curl --fail --silent --show-error http://127.0.0.1:${PORT}/api/health/ready > circleci-artifacts/health-ready.json; then
+                cat circleci-artifacts/health-db.json
+                cat circleci-artifacts/health-ready.json
+                exit 0
+              fi
+              if ! kill -0 "$app_pid" 2>/dev/null; then
+                echo "Application exited before readiness completed."
+                cat circleci-artifacts/startup.log
+                exit 1
+              fi
+              sleep 1
+            done
+            echo "Timed out waiting for application readiness."
+            cat circleci-artifacts/startup.log
+            exit 1
+      - run:
+          name: Backend tests
+          command: npm run test:backend
+      - run:
+          name: Frontend tests
+          command: npm run test:frontend
+      - store_artifacts:
+          path: circleci-artifacts
+          destination: database-readiness
+
+  security-readiness:
+    executor: node20
+    steps:
+      - install_dependencies
+      - run:
+          name: Critical dependency audit
+          command: npm audit --audit-level=critical
+      - run:
+          name: Production dependency verification
+          command: npm run verify:production-dependencies
+      - run:
+          name: Program 6 security checks
+          command: npm run check:program-6-security
+      - run:
+          name: Final production readiness contract
+          command: npm run verify:final-production-readiness
+
+workflows:
+  full-erp-verification:
+    jobs:
+      - static-build
+      - postgres-regression
+      - security-readiness
