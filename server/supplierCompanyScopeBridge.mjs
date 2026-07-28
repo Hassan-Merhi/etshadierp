@@ -20,9 +20,7 @@ if (!globalThis[INSTALL_KEY]) {
     process.env.PGDATABASE
   ) {
     const { PGHOST, PGPORT, PGUSER, PGPASSWORD, PGDATABASE } = process.env;
-    connectionString =
-      `postgresql://${encodeURIComponent(PGUSER)}:${encodeURIComponent(PGPASSWORD)}` +
-      `@${PGHOST}:${PGPORT}/${PGDATABASE}`;
+    connectionString = `postgresql://${encodeURIComponent(PGUSER)}:${encodeURIComponent(PGPASSWORD)}@${PGHOST}:${PGPORT}/${PGDATABASE}`;
   }
 
   if (!connectionString) {
@@ -31,11 +29,13 @@ if (!globalThis[INSTALL_KEY]) {
     );
   }
 
-  const isLocalReplitDB =
-    process.env.PGHOST === "helium" || connectionString.includes("@helium:");
+  const isLocalReplitDB = process.env.PGHOST === "helium" || connectionString.includes("@helium:");
   const sslExplicitlyDisabled = process.env.PGSSLMODE === "disable";
   const requiresSSL = !isLocalReplitDB && !sslExplicitlyDisabled;
-  const isTestEnvironment = process.env.NODE_ENV === "test";
+  const migrationSql = await readFile(
+    new URL("../migrations/20260728_001_supplier_company_scope.sql", import.meta.url),
+    "utf8"
+  );
 
   const pool = new Pool({
     connectionString,
@@ -47,67 +47,15 @@ if (!globalThis[INSTALL_KEY]) {
   });
 
   try {
-    if (isTestEnvironment) {
-      // Disposable test databases begin empty, before any parent company or
-      // supplier fixture exists. Install only the structural contract here;
-      // production startup still runs the complete audited backfill below.
-      await pool.query(`
-        ALTER TABLE suppliers
-          ADD COLUMN IF NOT EXISTS company_id INTEGER;
-
-        ALTER TABLE suppliers
-          DROP CONSTRAINT IF EXISTS suppliers_code_unique;
-
-        DROP INDEX IF EXISTS suppliers_code_unique;
-
-        CREATE INDEX IF NOT EXISTS suppliers_company_idx
-          ON suppliers(company_id);
-
-        CREATE UNIQUE INDEX IF NOT EXISTS suppliers_company_code_unique
-          ON suppliers(company_id, code)
-          WHERE company_id IS NOT NULL;
-
-        DO $$
-        BEGIN
-          IF NOT EXISTS (
-            SELECT 1
-              FROM pg_constraint
-             WHERE conname = 'suppliers_company_id_fkey'
-               AND conrelid = 'suppliers'::regclass
-          ) THEN
-            ALTER TABLE suppliers
-              ADD CONSTRAINT suppliers_company_id_fkey
-              FOREIGN KEY (company_id)
-              REFERENCES companies(id)
-              ON DELETE RESTRICT;
-          END IF;
-        END
-        $$;
-      `);
-
-      console.log(
-        JSON.stringify({
-          timestamp: new Date().toISOString(),
-          level: "INFO",
-          message: "Supplier company-scope test schema applied",
-          module: "supplier-company-scope-migration",
-        })
-      );
-    } else {
-      const migrationSql = await readFile(
-        new URL("../migrations/20260728_001_supplier_company_scope.sql", import.meta.url),
-        "utf8"
-      );
-      await pool.query(migrationSql);
-      console.log(
-        JSON.stringify({
-          timestamp: new Date().toISOString(),
-          level: "INFO",
-          message: "Supplier company-scope migration applied",
-          module: "supplier-company-scope-migration",
-        })
-      );
-    }
+    await pool.query(migrationSql);
+    console.log(
+      JSON.stringify({
+        timestamp: new Date().toISOString(),
+        level: "INFO",
+        message: "Supplier company-scope migration applied",
+        module: "supplier-company-scope-migration",
+      })
+    );
   } catch (error) {
     console.error(
       JSON.stringify({
