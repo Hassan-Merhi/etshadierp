@@ -1,11 +1,10 @@
 version: 2.1
-setup: true
 
 orbs:
-  continuation: circleci/continuation@1.0.0
+  node: circleci/node@7.1.0
 
-jobs:
-  diagnose:
+executors:
+  node20:
     docker:
       - image: cimg/node:20.19
     resource_class: medium+
@@ -17,138 +16,176 @@ jobs:
       ENABLE_SCHEDULERS: "false"
       NODE_OPTIONS: --max-old-space-size=4096
       PORT: "5000"
+
+commands:
+  install_dependencies:
     steps:
       - checkout
       - run:
-          name: Install dependencies
-          command: |
-            sed -i 's#http://package-firewall.replit.local/npm/#https://registry.npmjs.org/#g' package-lock.json
-            npm ci --no-audit --bin-links=true
+          name: Normalize package registry URLs
+          command: sed -i 's#http://package-firewall.replit.local/npm/#https://registry.npmjs.org/#g' package-lock.json
+      - node/install-packages:
+          pkg-manager: npm
+          override-ci-command: npm ci --no-audit --bin-links=true
+
+  run_typescript_group:
+    parameters:
+      pattern:
+        type: string
+    steps:
       - run:
-          name: Generate visible diagnostics
+          name: TypeScript group
           command: |
             set +e
-            mkdir -p /tmp/phase1
-
-            node node_modules/prettier/bin/prettier.cjs --list-different \
-              client/src/lib/accountStatementPaginationClient.ts \
-              client/src/lib/containerPaginationClient.ts \
-              client/src/lib/daybookPaginationClient.ts \
-              client/src/lib/erpDaybookPaginationClient.ts \
-              client/src/lib/supplierPurchaseOrderPaginationClient.ts \
-              client/src/main.tsx \
-              server/routes/accountTransactionPaginationRoutes.ts \
-              server/routes/containerRoutes.ts \
-              server/routes/containers/containerListPaginationRoutes.ts \
-              server/routes/daybookPaginationRoutes.ts \
-              server/routes/ledgerAccountPaginationRoutes.ts \
-              server/routes/ledgerRoutes.ts \
-              server/routes/voucherRoutes.ts \
-              server/routes/vouchers/supplierPurchaseOrderPaginationRoutes.ts \
-              server/routes/vouchers/voucherPaginationRoutes.ts \
-              > /tmp/phase1/format.txt 2>&1
-
-            npm run lint > /tmp/phase1/lint.txt 2>&1
-            echo $? > /tmp/phase1/lint.status
-            npm run check > /tmp/phase1/typescript.txt 2>&1
-            echo $? > /tmp/phase1/typescript.status
-            node --max-old-space-size=4096 node_modules/vite/bin/vite.js build > /tmp/phase1/client.txt 2>&1
-            echo $? > /tmp/phase1/client.status
-            node scripts/verify-phase1-sql-pagination.mjs > /tmp/phase1/verifier.txt 2>&1
-            echo $? > /tmp/phase1/verifier.status
-
-            sanitize() {
-              printf '%s' "$1" |
-                tr '[:upper:]' '[:lower:]' |
-                sed -E 's#[^a-z0-9]+#_#g; s#^_+##; s#_+$##' |
-                cut -c1-120
-            }
-
-            cat > /tmp/continuation.yml <<'YAML'
-            version: 2.1
-            jobs:
-            YAML
-
-            declare -a JOBS=()
-            add_job() {
-              local key="$1"
-              key="$(sanitize "$key")"
-              [ -n "$key" ] || key="unknown"
-              key="diag_${key}"
-              local suffix=1
-              local original="$key"
-              while printf '%s\n' "${JOBS[@]}" | grep -qx "$key"; do
-                suffix=$((suffix + 1))
-                key="${original}_${suffix}"
-              done
-              JOBS+=("$key")
-              cat >> /tmp/continuation.yml <<YAML
-              ${key}:
-                docker:
-                  - image: cimg/base:stable
-                steps:
-                  - run: echo "${key}"
-            YAML
-            }
-
-            if [ -s /tmp/phase1/format.txt ]; then
-              while IFS= read -r file; do
-                [ -n "$file" ] && add_job "format_fail_${file}"
-              done < /tmp/phase1/format.txt
-            else
-              add_job "format_pass"
+            npm run check > /tmp/typescript.txt 2>&1
+            if grep -E '<< parameters.pattern >>' /tmp/typescript.txt; then
+              exit 1
             fi
+            exit 0
 
-            if [ "$(cat /tmp/phase1/lint.status)" = "0" ]; then
-              add_job "lint_pass"
-            else
-              add_job "lint_fail"
-              grep -E '(^/|\.tsx?:|error|warning)' /tmp/phase1/lint.txt | head -12 | while IFS= read -r line; do
-                [ -n "$line" ] && add_job "lint_${line}"
-              done
-            fi
+jobs:
+  fmt-clients:
+    executor: node20
+    steps:
+      - install_dependencies
+      - run: node node_modules/prettier/bin/prettier.cjs --check client/src/lib/accountStatementPaginationClient.ts client/src/lib/containerPaginationClient.ts client/src/lib/daybookPaginationClient.ts client/src/lib/erpDaybookPaginationClient.ts client/src/lib/supplierPurchaseOrderPaginationClient.ts client/src/main.tsx
 
-            if [ "$(cat /tmp/phase1/typescript.status)" = "0" ]; then
-              add_job "typescript_pass"
-            else
-              add_job "typescript_fail"
-              grep -E 'error TS[0-9]+|\.tsx?\(' /tmp/phase1/typescript.txt | head -16 | while IFS= read -r line; do
-                [ -n "$line" ] && add_job "typescript_${line}"
-              done
-            fi
+  fmt-account-route:
+    executor: node20
+    steps:
+      - install_dependencies
+      - run: node node_modules/prettier/bin/prettier.cjs --check server/routes/accountTransactionPaginationRoutes.ts
 
-            if [ "$(cat /tmp/phase1/client.status)" = "0" ]; then
-              add_job "client_build_pass"
-            else
-              add_job "client_build_fail"
-              grep -Ei 'error|failed|missing transform|ambiguous transform|phase1-pagination' /tmp/phase1/client.txt | head -16 | while IFS= read -r line; do
-                [ -n "$line" ] && add_job "client_${line}"
-              done
-            fi
+  fmt-daybook-routes:
+    executor: node20
+    steps:
+      - install_dependencies
+      - run: node node_modules/prettier/bin/prettier.cjs --check server/routes/daybookPaginationRoutes.ts server/routes/vouchers/voucherPaginationRoutes.ts server/routes/ledgerAccountPaginationRoutes.ts
 
-            if [ "$(cat /tmp/phase1/verifier.status)" = "0" ]; then
-              add_job "verifier_pass"
-            else
-              add_job "verifier_fail"
-              head -12 /tmp/phase1/verifier.txt | while IFS= read -r line; do
-                [ -n "$line" ] && add_job "verifier_${line}"
-              done
-            fi
+  fmt-container-routes:
+    executor: node20
+    steps:
+      - install_dependencies
+      - run: node node_modules/prettier/bin/prettier.cjs --check server/routes/containers/containerListPaginationRoutes.ts server/routes/vouchers/supplierPurchaseOrderPaginationRoutes.ts
 
-            {
-              echo "workflows:"
-              echo "  diagnostics:"
-              echo "    jobs:"
-              for job in "${JOBS[@]}"; do
-                echo "      - ${job}"
-              done
-            } >> /tmp/continuation.yml
+  fmt-registries:
+    executor: node20
+    steps:
+      - install_dependencies
+      - run: node node_modules/prettier/bin/prettier.cjs --check server/routes/containerRoutes.ts server/routes/ledgerRoutes.ts server/routes/voucherRoutes.ts
 
-            cat /tmp/continuation.yml
-      - continuation/continue:
-          configuration_path: /tmp/continuation.yml
+  lint-clients:
+    executor: node20
+    steps:
+      - install_dependencies
+      - run: node node_modules/eslint/bin/eslint.js client/src/lib/accountStatementPaginationClient.ts client/src/lib/containerPaginationClient.ts client/src/lib/daybookPaginationClient.ts client/src/lib/erpDaybookPaginationClient.ts client/src/lib/supplierPurchaseOrderPaginationClient.ts client/src/main.tsx
+
+  lint-account-route:
+    executor: node20
+    steps:
+      - install_dependencies
+      - run: node node_modules/eslint/bin/eslint.js server/routes/accountTransactionPaginationRoutes.ts
+
+  lint-daybook-routes:
+    executor: node20
+    steps:
+      - install_dependencies
+      - run: node node_modules/eslint/bin/eslint.js server/routes/daybookPaginationRoutes.ts server/routes/vouchers/voucherPaginationRoutes.ts server/routes/ledgerAccountPaginationRoutes.ts
+
+  lint-container-routes:
+    executor: node20
+    steps:
+      - install_dependencies
+      - run: node node_modules/eslint/bin/eslint.js server/routes/containers/containerListPaginationRoutes.ts server/routes/vouchers/supplierPurchaseOrderPaginationRoutes.ts
+
+  lint-registries:
+    executor: node20
+    steps:
+      - install_dependencies
+      - run: node node_modules/eslint/bin/eslint.js server/routes/containerRoutes.ts server/routes/ledgerRoutes.ts server/routes/voucherRoutes.ts
+
+  ts-account-route:
+    executor: node20
+    steps:
+      - install_dependencies
+      - run_typescript_group:
+          pattern: accountTransactionPaginationRoutes
+
+  ts-daybook-routes:
+    executor: node20
+    steps:
+      - install_dependencies
+      - run_typescript_group:
+          pattern: daybookPaginationRoutes|voucherPaginationRoutes|ledgerAccountPaginationRoutes
+
+  ts-container-routes:
+    executor: node20
+    steps:
+      - install_dependencies
+      - run_typescript_group:
+          pattern: containerListPaginationRoutes|supplierPurchaseOrderPaginationRoutes
+
+  ts-clients:
+    executor: node20
+    steps:
+      - install_dependencies
+      - run_typescript_group:
+          pattern: accountStatementPaginationClient|containerPaginationClient|daybookPaginationClient|erpDaybookPaginationClient|supplierPurchaseOrderPaginationClient|client/src/main
+
+  ts-plugin:
+    executor: node20
+    steps:
+      - install_dependencies
+      - run_typescript_group:
+          pattern: vitePhase1PaginationPlugin|vite.config
+
+  client-main:
+    executor: node20
+    steps:
+      - install_dependencies
+      - run:
+          command: PHASE1_TRANSFORM_SCOPE=main node --max-old-space-size=4096 node_modules/vite/bin/vite.js build
+
+  client-daybook:
+    executor: node20
+    steps:
+      - install_dependencies
+      - run:
+          command: PHASE1_TRANSFORM_SCOPE=daybook node --max-old-space-size=4096 node_modules/vite/bin/vite.js build
+
+  client-accounts:
+    executor: node20
+    steps:
+      - install_dependencies
+      - run:
+          command: PHASE1_TRANSFORM_SCOPE=accounts node --max-old-space-size=4096 node_modules/vite/bin/vite.js build
+
+  client-all:
+    executor: node20
+    steps:
+      - install_dependencies
+      - run:
+          command: PHASE1_TRANSFORM_SCOPE=all node --max-old-space-size=4096 node_modules/vite/bin/vite.js build
 
 workflows:
-  setup-diagnostics:
+  phase1-diagnostics:
     jobs:
-      - diagnose
+      - fmt-clients
+      - fmt-account-route
+      - fmt-daybook-routes
+      - fmt-container-routes
+      - fmt-registries
+      - lint-clients
+      - lint-account-route
+      - lint-daybook-routes
+      - lint-container-routes
+      - lint-registries
+      - ts-account-route
+      - ts-daybook-routes
+      - ts-container-routes
+      - ts-clients
+      - ts-plugin
+      - client-main
+      - client-daybook
+      - client-accounts
+      - client-all
