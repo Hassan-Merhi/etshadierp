@@ -14,7 +14,15 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
+      - name: Initialize diagnostic report
+        run: |
+          echo "run=${GITHUB_RUN_ID}" > /tmp/phase1-formatter-report.txt
+          echo "head_ref=${GITHUB_HEAD_REF}" >> /tmp/phase1-formatter-report.txt
+          echo "workspace=${GITHUB_WORKSPACE}" >> /tmp/phase1-formatter-report.txt
+
       - name: Checkout Phase 1 branch
+        id: checkout
+        continue-on-error: true
         uses: actions/checkout@v4
         with:
           repository: ${{ github.event.pull_request.head.repo.full_name }}
@@ -22,66 +30,92 @@ jobs:
           fetch-depth: 1
           persist-credentials: false
 
-      - name: Set up Node.js 22
-        uses: actions/setup-node@v4
-        with:
-          node-version: "22"
+      - name: Record checkout state
+        if: always()
+        run: |
+          echo "checkout_outcome=${{ steps.checkout.outcome }}" >> /tmp/phase1-formatter-report.txt
+          pwd >> /tmp/phase1-formatter-report.txt
+          ls -la >> /tmp/phase1-formatter-report.txt 2>&1 || true
+          test -f package.json && echo "package_json=present" >> /tmp/phase1-formatter-report.txt || echo "package_json=missing" >> /tmp/phase1-formatter-report.txt
 
       - name: Download Prettier 3.8.4
+        id: prettier
+        if: steps.checkout.outcome == 'success'
+        continue-on-error: true
         run: |
+          set +e
           mkdir -p /tmp/phase1-prettier
           cd /tmp/phase1-prettier
-          npm pack prettier@3.8.4 --silent
-          tar -xzf prettier-3.8.4.tgz
+          npm pack prettier@3.8.4 --silent > /tmp/prettier-pack.stdout 2> /tmp/prettier-pack.stderr
+          code=$?
+          echo "prettier_pack_exit=${code}" >> /tmp/phase1-formatter-report.txt
+          cat /tmp/prettier-pack.stdout >> /tmp/phase1-formatter-report.txt
+          cat /tmp/prettier-pack.stderr >> /tmp/phase1-formatter-report.txt
+          if [ "$code" -eq 0 ]; then
+            tar -xzf prettier-3.8.4.tgz
+          fi
+          exit "$code"
 
-      - name: Format Phase 1 files
+      - name: Format and package Phase 1 files
+        id: format
+        if: steps.prettier.outcome == 'success'
+        continue-on-error: true
         run: |
-          node /tmp/phase1-prettier/package/bin/prettier.cjs --write \
-            build/vitePhase1PaginationPlugin.ts \
-            client/src/lib/accountStatementPaginationClient.ts \
-            client/src/lib/containerPaginationClient.ts \
-            client/src/lib/daybookPaginationClient.ts \
-            client/src/lib/erpDaybookPaginationClient.ts \
-            client/src/lib/supplierPurchaseOrderPaginationClient.ts \
-            client/src/main.tsx \
-            scripts/verify-phase1-sql-pagination.mjs \
-            server/routes/accountTransactionPaginationRoutes.ts \
-            server/routes/containerRoutes.ts \
-            server/routes/containers/containerListPaginationRoutes.ts \
-            server/routes/daybookPaginationRoutes.ts \
-            server/routes/ledgerAccountPaginationRoutes.ts \
-            server/routes/ledgerRoutes.ts \
-            server/routes/voucherRoutes.ts \
-            server/routes/vouchers/supplierPurchaseOrderPaginationRoutes.ts \
-            server/routes/vouchers/voucherPaginationRoutes.ts \
+          set +e
+          files=(
+            build/vitePhase1PaginationPlugin.ts
+            client/src/lib/accountStatementPaginationClient.ts
+            client/src/lib/containerPaginationClient.ts
+            client/src/lib/daybookPaginationClient.ts
+            client/src/lib/erpDaybookPaginationClient.ts
+            client/src/lib/supplierPurchaseOrderPaginationClient.ts
+            client/src/main.tsx
+            scripts/verify-phase1-sql-pagination.mjs
+            server/routes/accountTransactionPaginationRoutes.ts
+            server/routes/containerRoutes.ts
+            server/routes/containers/containerListPaginationRoutes.ts
+            server/routes/daybookPaginationRoutes.ts
+            server/routes/ledgerAccountPaginationRoutes.ts
+            server/routes/ledgerRoutes.ts
+            server/routes/voucherRoutes.ts
+            server/routes/vouchers/supplierPurchaseOrderPaginationRoutes.ts
+            server/routes/vouchers/voucherPaginationRoutes.ts
             vite.config.ts
+          )
+          node /tmp/phase1-prettier/package/bin/prettier.cjs --write "${files[@]}" > /tmp/phase1-format.stdout 2> /tmp/phase1-format.stderr
+          code=$?
+          echo "format_exit=${code}" >> /tmp/phase1-formatter-report.txt
+          cat /tmp/phase1-format.stdout >> /tmp/phase1-formatter-report.txt
+          cat /tmp/phase1-format.stderr >> /tmp/phase1-formatter-report.txt
+          if [ "$code" -eq 0 ]; then
+            tar -czf /tmp/phase1-formatted.tar.gz "${files[@]}"
+          fi
+          exit "$code"
 
-      - name: Package formatted files
+      - name: Record final outcomes
+        if: always()
         run: |
-          tar -czf /tmp/phase1-formatted.tar.gz \
-            build/vitePhase1PaginationPlugin.ts \
-            client/src/lib/accountStatementPaginationClient.ts \
-            client/src/lib/containerPaginationClient.ts \
-            client/src/lib/daybookPaginationClient.ts \
-            client/src/lib/erpDaybookPaginationClient.ts \
-            client/src/lib/supplierPurchaseOrderPaginationClient.ts \
-            client/src/main.tsx \
-            scripts/verify-phase1-sql-pagination.mjs \
-            server/routes/accountTransactionPaginationRoutes.ts \
-            server/routes/containerRoutes.ts \
-            server/routes/containers/containerListPaginationRoutes.ts \
-            server/routes/daybookPaginationRoutes.ts \
-            server/routes/ledgerAccountPaginationRoutes.ts \
-            server/routes/ledgerRoutes.ts \
-            server/routes/voucherRoutes.ts \
-            server/routes/vouchers/supplierPurchaseOrderPaginationRoutes.ts \
-            server/routes/vouchers/voucherPaginationRoutes.ts \
-            vite.config.ts
+          echo "prettier_outcome=${{ steps.prettier.outcome }}" >> /tmp/phase1-formatter-report.txt
+          echo "format_outcome=${{ steps.format.outcome }}" >> /tmp/phase1-formatter-report.txt
+
+      - name: Upload diagnostic report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase1-formatter-report
+          path: /tmp/phase1-formatter-report.txt
+          retention-days: 1
+          if-no-files-found: error
 
       - name: Upload formatted files
+        if: steps.format.outcome == 'success'
         uses: actions/upload-artifact@v4
         with:
           name: phase1-formatted
           path: /tmp/phase1-formatted.tar.gz
           retention-days: 1
           if-no-files-found: error
+
+      - name: Fail when formatting did not complete
+        if: steps.format.outcome != 'success'
+        run: exit 1
