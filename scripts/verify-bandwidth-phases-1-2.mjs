@@ -117,6 +117,12 @@ requireText(payloadGuard, 'return "stock-otw";', "The OTW tab must request group
 requireText(payloadGuard, 'return "combined";', "Combined Inventory must request aggregated inventory rows.");
 requireText(payloadGuard, 'return "combined-detail";', "Combined Inventory must request compact container details.");
 requireText(payloadGuard, 'url.searchParams.set("profile", profile);', "Payload profiles must be explicit query parameters.");
+requireText(payloadGuard, "removeQueries", "Compact query data must be removed at OTW navigation boundaries.");
+requireText(payloadGuard, 'wrapHistoryMethod("pushState")', "Push navigation must isolate compact query caches.");
+requireText(payloadGuard, 'wrapHistoryMethod("replaceState")', "Replace navigation must isolate compact query caches.");
+requireText(payloadGuard, 'addEventListener("popstate"', "Back and forward navigation must isolate compact query caches.");
+requireText(payloadGuard, 'first === "/api/containers"', "Full container list query keys must be cleared outside OTW.");
+requireText(payloadGuard, '/^\\/api\\/containers\\/\\d+$/.test(first)', "Container detail query keys must be cleared outside OTW.");
 
 requireText(apiBridge, "compactOtwContainerSummary", "The server must compact OTW container summaries.");
 requireText(apiBridge, "compactStockOtwItems", "The server must aggregate Stock OTW line items.");
