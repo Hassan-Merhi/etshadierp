@@ -159,7 +159,7 @@ afterAll(async () => {
     await pool.query(`DELETE FROM users WHERE username = $1`, [`${TEST_PREFIX}_spuser`]);
   }
   await cleanupTestData(TEST_PREFIX);
-  await closeTestServer(erpCtx);
+  closeTestServer();
 }, 30000);
 
 describe("SP lifecycle setup", () => {
