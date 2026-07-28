@@ -2,7 +2,7 @@ import { assertRequestCompanyMatchesSession, CompanyIsolationError } from "./com
 import type { AuthorizationActor } from "./authorizationPolicy";
 
 interface CompanyScopedSession {
-  userId?: number | null;
+  userId?: string | number | null;
   currentRole?: string | null;
   currentCompanyId?: number | null;
   factoryCompanyId?: number | null;
@@ -20,12 +20,23 @@ function parsePositiveCompanyId(value: unknown): number | null {
   return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
 }
 
+function parseActorUserId(value: unknown): string | number | null {
+  if (typeof value === "number") {
+    return Number.isInteger(value) && value > 0 ? value : null;
+  }
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    return trimmed.length > 0 ? trimmed : null;
+  }
+  return null;
+}
+
 export function resolveSessionCompanyActor(request: CompanyScopedRequestLike): AuthorizationActor {
   const session = request.session;
   const companyId = parsePositiveCompanyId(session?.factoryCompanyId ?? session?.currentCompanyId);
-  const userId = Number(session?.userId);
+  const userId = parseActorUserId(session?.userId);
 
-  if (!companyId || !Number.isInteger(userId) || userId <= 0) {
+  if (!companyId || userId == null) {
     throw new CompanyIsolationError("RESOURCE_COMPANY_INVALID");
   }
 
