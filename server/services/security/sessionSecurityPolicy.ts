@@ -44,7 +44,7 @@ export class SessionSecurityError extends Error {
   }
 }
 
-const DEFAULT_IDLE_TIMEOUT_MS = 30 * 60 * 1000;
+export const DEFAULT_IDLE_TIMEOUT_MS = 30 * 60 * 1000;
 const DEFAULT_ABSOLUTE_LIFETIME_MS = 12 * 60 * 60 * 1000;
 const DEFAULT_PASSWORD_CONFIRMATION_MAX_AGE_MS = 5 * 60 * 1000;
 
