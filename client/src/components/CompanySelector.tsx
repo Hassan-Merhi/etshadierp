@@ -9,7 +9,6 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
-import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useConnectivity } from "@/contexts/ConnectivityContext";
 import { enqueueRequest } from "@/lib/offlineQueue";
@@ -53,36 +52,33 @@ export function CompanySelector() {
   const { toast } = useToast();
 
   const handleCompanyChange = async (company: any) => {
-    if (company.id === selectedCompany?.id) return;
+    if (company.id === selectedCompany?.id || isLoading) return;
 
-    if (!isOnline) {
-      selectCompany(company);
-      enqueueRequest(
-        "/api/auth/set-company",
-        "POST",
-        JSON.stringify({ companyId: company.id }),
-        `Switch to ${company.name}`
-      );
+    const switched = await selectCompany(company, isOnline ? undefined : { offline: true });
+    if (!switched) {
       toast({
-        title: `Switched to ${company.name}`,
-        description: "Your work will be saved under this company. The data view will refresh when you reconnect.",
+        title: "Failed to switch company",
+        description: "The server did not accept the workspace change. Your current company was kept.",
+        variant: "destructive",
       });
       return;
     }
 
-    try {
-      await apiRequest("POST", "/api/auth/set-company", { companyId: company.id });
-      // Write localStorage before reload so the context initialises with the
-      // right company on the next page load without an extra set-company POST.
-      localStorage.setItem("selectedCompanyId", company.id.toString());
-      window.location.reload();
-    } catch (error: any) {
+    if (!isOnline) {
+      enqueueRequest(
+        "/api/auth/set-company",
+        "POST",
+        JSON.stringify({ companyId: company.id }),
+        `Switch to ${company.name}`,
+      );
       toast({
-        title: "Failed to switch company",
-        description: error.message || "Please try again.",
-        variant: "destructive",
+        title: `Switched to ${company.name}`,
+        description: "The local workspace changed. The server session will synchronize when you reconnect.",
       });
+      return;
     }
+
+    toast({ title: `Switched to ${company.name}` });
   };
 
   if (isLoading || !selectedCompany) {
@@ -95,7 +91,6 @@ export function CompanySelector() {
   }
 
   const activeType = (selectedCompany as any).companyType ?? "erp";
-  const { color: activeColor } = getTypeMeta(activeType);
 
   if (companies.length <= 1) {
     return (
@@ -121,7 +116,6 @@ export function CompanySelector() {
       </DropdownMenuTrigger>
 
       <DropdownMenuContent align="end" className="w-64 p-1.5">
-        {/* Header */}
         <div className="flex items-center justify-between px-2 py-1.5 mb-1">
           <div className="flex items-center gap-1.5 text-muted-foreground">
             <Layers className="h-3.5 w-3.5" />
@@ -133,12 +127,10 @@ export function CompanySelector() {
         </div>
 
         {!isOnline && (
-          <>
-            <div className="px-2 py-1.5 text-xs text-muted-foreground flex items-center gap-1.5 bg-muted/50 rounded-md mb-1">
-              <WifiOff className="h-3 w-3 shrink-0" />
-              Offline — switch will sync on reconnect
-            </div>
-          </>
+          <div className="px-2 py-1.5 text-xs text-muted-foreground flex items-center gap-1.5 bg-muted/50 rounded-md mb-1">
+            <WifiOff className="h-3 w-3 shrink-0" />
+            Offline — switch will sync on reconnect
+          </div>
         )}
 
         <DropdownMenuSeparator className="mx-0 my-1" />
