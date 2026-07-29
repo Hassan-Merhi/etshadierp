@@ -1,4 +1,5 @@
 import { companyQueryKey } from "./companyQueryScope";
+import { canonicalApiUrl, companyDataKey } from "./frontendDataArchitecture";
 
 /**
  * Shared query-key factories for all heavy endpoints.
@@ -14,108 +15,96 @@ import { companyQueryKey } from "./companyQueryScope";
  *  - Never place a new object literal directly in a key on every render.
  */
 
-// ── Normaliser ────────────────────────────────────────────────────────────────
 export function normalizeFilters(
   filters: Record<string, unknown> | null | undefined,
 ): Record<string, unknown> | undefined {
   if (!filters) return undefined;
   const clean: Record<string, unknown> = {};
-  for (const k of Object.keys(filters).sort()) {
-    const v = filters[k];
-    if (v !== undefined && v !== null && v !== "") {
-      clean[k] = v;
-    }
+  for (const key of Object.keys(filters).sort()) {
+    const value = filters[key];
+    if (value !== undefined && value !== null && value !== "") clean[key] = value;
   }
   return Object.keys(clean).length ? clean : undefined;
 }
 
-// ── Core company/session keys ─────────────────────────────────────────────────
 export const companyKeys = {
   scoped: (url: string, companyId: number | string | null | undefined, ...parts: readonly unknown[]) =>
     companyQueryKey(url, companyId, ...parts),
 
+  url: (requestUrl: string, companyId: number | string | null | undefined, ...identity: readonly unknown[]) =>
+    companyDataKey(requestUrl, companyId, ...identity),
+
   reference: (url: string, companyId: number | string | null | undefined) =>
-    companyQueryKey(url, companyId),
+    companyDataKey(url, companyId),
+
+  accounts: (
+    companyId: number | string | null | undefined,
+    params?: Record<string, string | number | boolean | null | undefined>,
+  ) => companyDataKey(canonicalApiUrl("/api/accounts/all", params), companyId),
+
+  vouchers: (
+    companyId: number | string | null | undefined,
+    params?: Record<string, string | number | boolean | null | undefined>,
+  ) => companyDataKey(canonicalApiUrl("/api/vouchers", params), companyId),
+
+  dashboardCash: (companyId: number | string | null | undefined) =>
+    companyDataKey("/api/dashboard-cash-accounts", companyId),
+
+  dashboardPayables: (companyId: number | string | null | undefined) =>
+    companyDataKey("/api/dashboard-payable-accounts", companyId),
 
   simpleTransfers: (companyId: number | string | null | undefined) =>
-    companyQueryKey("/api/simple-company-transfers", companyId),
+    companyDataKey("/api/simple-company-transfers", companyId),
 
   companyAccounts: (
     activeCompanyId: number | string | null | undefined,
     targetCompanyId: number | string | null | undefined,
-  ) => companyQueryKey(`/api/company-accounts/${targetCompanyId ?? "no-company"}`, activeCompanyId, targetCompanyId),
+  ) => companyDataKey(`/api/company-accounts/${targetCompanyId ?? "no-company"}`, activeCompanyId, targetCompanyId),
 
   autoTransferConfig: (
     companyId: number | string | null | undefined,
     modulePrefix: string,
-  ) => companyQueryKey(`${modulePrefix}/auto-transfer-config`, companyId),
+  ) => companyDataKey(`${modulePrefix}/auto-transfer-config`, companyId),
 
   voucherSearch: (companyId: number | string | null | undefined, search: string) =>
-    companyQueryKey("/api/vouchers/search", companyId, search),
+    companyDataKey("/api/vouchers/search", companyId, search),
 };
 
-// ── Factory keys ──────────────────────────────────────────────────────────────
 export const factoryKeys = {
-  /** Paginated bale list. Pass { date, page, limit, search, status, mixBatchId }. */
   bales: (companyId: number | string | undefined, filters?: Record<string, unknown>) =>
     ["/api/factory/bales", companyId, normalizeFilters(filters)] as const,
-
-  /** Stock-allocation board. Pass { hideZero, search, page, limit }. */
   stockAllocation: (companyId: number | string | undefined, filters?: Record<string, unknown>) =>
     ["/api/factory/v5/stock-allocation", companyId, normalizeFilters(filters)] as const,
-
-  /** Factory day-book. */
   daybook: (companyId: number | string | undefined, filters?: Record<string, unknown>) =>
     ["/api/factory/daybook", companyId, normalizeFilters(filters)] as const,
-
-  /** Bale stock-entry history. */
   stockEntryHistory: (companyId: number | string | undefined, filters?: Record<string, unknown>) =>
     ["/api/factory/bales/stock-entry-history", companyId, normalizeFilters(filters)] as const,
 };
 
-// ── Inventory keys ────────────────────────────────────────────────────────────
 export const inventoryKeys = {
   list: (companyId: number | string | undefined, filters?: Record<string, unknown>) =>
     ["/api/inventory", companyId, normalizeFilters(filters)] as const,
 };
 
-// ── Stock-item keys ───────────────────────────────────────────────────────────
 export const stockItemKeys = {
-  /**
-   * Lightweight list (id, code, name, uom, barcode, active, stockGroupId,
-   * categoryId, gradeId) — for dropdowns and selectors only.
-   *
-   * The first element is the real URL fetched by the shared query function.
-   * This key does NOT share a cache with the full endpoint so broad
-   * invalidations of "/api/stock-items" do not trigger a 649 KB download.
-   */
-  light: (companyId: number | string | undefined) =>
-    ["/api/stock-items/light", companyId] as const,
-
-  /**
-   * Full list including all fields. Only used by screens that genuinely need
-   * price/costing/alias/location-pricing data.
-   *
-   * Prefer the paginated management-page query ("/api/stock-items?page=…")
-   * over this key for list screens.
-   */
-  full: (companyId: number | string | undefined) =>
-    ["/api/stock-items", companyId] as const,
+  light: (companyId: number | string | undefined) => ["/api/stock-items/light", companyId] as const,
+  full: (companyId: number | string | undefined) => ["/api/stock-items", companyId] as const,
+  page: (
+    companyId: number | string | undefined,
+    params: Record<string, string | number | boolean | null | undefined>,
+  ) => companyDataKey(canonicalApiUrl("/api/stock-items", params), companyId),
 };
 
-// ── Analytics and financial-report keys ──────────────────────────────────────
 export const analyticsKeys = {
   locations: (companyId: number | undefined) => ["/api/locations", companyId] as const,
   stockGroups: (companyId: number | undefined) => ["/api/stock-groups", companyId] as const,
   suppliers: () => ["/api/suppliers"] as const,
   accounts: (companyId: number | undefined, startDate: string, endDate: string) =>
-    ["/api/accounts/all", companyId, startDate, endDate] as const,
+    companyKeys.accounts(companyId, { startDate, endDate }),
   financialSales: (companyId: number | undefined, dateRange: Record<string, string>) =>
     ["/api/financial/sales", companyId, normalizeFilters(dateRange)] as const,
-  financialTransactions: (
-    locationId: number | null,
-    dateRange: Record<string, string>,
-  ) => ["/api/financial/sales", locationId, "transactions", normalizeFilters(dateRange)] as const,
+  financialTransactions: (locationId: number | null, dateRange: Record<string, string>) =>
+    ["/api/financial/sales", locationId, "transactions", normalizeFilters(dateRange)] as const,
   userCompanies: () => ["/api/user/companies"] as const,
   urlScoped: (url: string, companyId?: number) => [url, companyId] as const,
   factorySalesByCustomer: (companyId: number | undefined, url: string) =>
