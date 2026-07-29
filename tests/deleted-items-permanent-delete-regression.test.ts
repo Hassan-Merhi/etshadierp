@@ -15,17 +15,13 @@ describe("dependent Deleted Items permanent deletion", () => {
     );
   });
 
-  it("serializes bulk permanent deletes across app instances", () => {
-    const routes = source("server/routes/adminRoutes.ts");
-    const serialization = source("server/routes/admin/permanentDeleteSerialization.ts");
+  it("serializes bulk permanent deletes inside the existing transaction", () => {
+    const route = source("server/routes/admin/dependentDeletedItemPermanentRoutes.ts");
 
-    expect(routes).toContain(
-      'app.use("/api/deleted-items/:type/:id/permanent", serializeDeletedItemPermanentDeletes)'
-    );
-    expect(serialization).toContain("pg_advisory_lock");
-    expect(serialization).toContain("pg_advisory_unlock");
-    expect(serialization).toContain('res.once("finish", release)');
-    expect(serialization).toContain('res.once("close", release)');
+    expect(route).toContain("pg_advisory_xact_lock");
+    expect(route).toContain("PERMANENT_DELETE_LOCK_NAMESPACE");
+    expect(route.indexOf("pg_advisory_xact_lock")).toBeLessThan(route.indexOf('if (type === "factoryContainer")'));
+    expect(route).not.toContain("pg_advisory_lock(");
   });
 
   it("clears the restrictive container receipt and factory dependencies transactionally", () => {
