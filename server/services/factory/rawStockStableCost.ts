@@ -1,18 +1,15 @@
 /**
  * Stable, receipt-weighted raw-material cost/kg for a supplier.
  *
- * This is the ONLY correct way to price a mix-batch supplier source. It must be
- * weighted by each row's RECEIVED kg — never by remaining/available kg — so the
- * rate stays fixed while stock is consumed (FIFO or otherwise) and only moves
- * when new stock is received or an existing container's landed cost is corrected.
- *
- * Do not inline this calculation elsewhere. Any supplier-source costing path in
- * factoryMixBatchRoutes.ts (create/edit/top-up/etc.) must call this helper so the
- * rate is computed identically everywhere.
+ * This is the legacy fallback used only when a supplier has no persisted locked
+ * rate. It is weighted by RECEIVED kg — never remaining kg — so FIFO consumption
+ * cannot move the fallback calculation. Normal business reads use the persisted,
+ * event-driven rate from rawStockLockedRate.ts.
  */
 import { eq, and, isNull, sql } from "drizzle-orm";
 import Decimal from "decimal.js";
 import { factoryRawStock, factoryContainers } from "@shared/schema";
+import { calculateWeightedAverageCost } from "./factoryCostingEngine";
 
 export interface StableSupplierRawStockRow {
   id: number;
@@ -28,23 +25,20 @@ export interface StableSupplierCostResult {
   costPerKgUsd: number;
   /** Total received kg across all non-deleted offloaded rows (used as the weight). */
   totalReceivedKg: number;
-  /** Raw stock rows for this supplier, ordered oldest-offloaded-first — for FIFO allocation only. */
+  /** Raw stock rows for this supplier, oldest-first, for FIFO allocation only. */
   rows: StableSupplierRawStockRow[];
 }
 
 /**
- * Computes the stable receipt-weighted cost/kg for a supplier's raw stock, and
- * returns the underlying rows (oldest-first) for FIFO usedKg allocation.
- *
- * IMPORTANT: `tx` should be the active transaction when called from inside a
- * mix-batch mutation so `.for("update")` row locks are honored consistently
- * with the existing FIFO-deduction code paths.
+ * Returns the receipt-weighted legacy fallback and the source rows required by
+ * FIFO quantity allocation. The transaction handle should be used by mutations
+ * so optional row locks remain inside the owning transaction.
  */
 export async function getStableSupplierCost(
   tx: any,
   companyId: number,
   supplierId: number,
-  opts: { forUpdate?: boolean } = {}
+  opts: { forUpdate?: boolean } = {},
 ): Promise<StableSupplierCostResult> {
   let query = tx
     .select({
@@ -64,42 +58,41 @@ export async function getStableSupplierCost(
         eq(factoryContainers.supplierId, supplierId),
         sql`${factoryContainers.status} != 'DELETED'`,
         isNull(factoryRawStock.deletedAt),
-        isNull(factoryContainers.deletedAt)
-      )
+        isNull(factoryContainers.deletedAt),
+      ),
     )
     .orderBy(factoryRawStock.offloadedAt, factoryRawStock.id);
 
   if (opts.forUpdate) query = query.for("update");
 
   const rawRows = await query;
+  const rows: StableSupplierRawStockRow[] = rawRows.map((row: any) => {
+    const receivedKg = new Decimal(row.receivedKg || 0).toNumber();
+    const rawUsdRate = new Decimal(row.costPerKgUsd || 0);
+    const costPerKgUsd = rawUsdRate.gt(0)
+      ? rawUsdRate.toNumber()
+      : new Decimal(row.costPerKg || 0).toNumber();
 
-  let weightedCostSumD = new Decimal(0);
-  let totalReceivedKgD = new Decimal(0);
-  const rows: StableSupplierRawStockRow[] = [];
-
-  for (const r of rawRows) {
-    const receivedKgD = new Decimal(r.receivedKg || 0);
-    const usedKg = new Decimal(r.usedKg || 0).toNumber();
-    // Fall back to costPerKg only for legacy rows that predate the USD column.
-    const costPerKgUsdRaw = new Decimal(r.costPerKgUsd || 0);
-    const costPerKgUsdD = costPerKgUsdRaw.gt(0) ? costPerKgUsdRaw : new Decimal(r.costPerKg || 0);
-    const receivedKg = receivedKgD.toNumber();
-    const costPerKgUsd = costPerKgUsdD.toNumber();
-
-    weightedCostSumD = weightedCostSumD.plus(receivedKgD.times(costPerKgUsdD));
-    totalReceivedKgD = totalReceivedKgD.plus(receivedKgD);
-    rows.push({
-      id: r.id,
-      containerId: r.containerId,
+    return {
+      id: row.id,
+      containerId: row.containerId,
       receivedKg,
-      usedKg,
+      usedKg: new Decimal(row.usedKg || 0).toNumber(),
       costPerKgUsd,
-      offloadedAt: r.offloadedAt,
-    });
-  }
+      offloadedAt: row.offloadedAt,
+    };
+  });
 
-  const costPerKgUsd = totalReceivedKgD.gt(0) ? weightedCostSumD.dividedBy(totalReceivedKgD).toNumber() : 0;
-  const totalReceivedKg = totalReceivedKgD.toNumber();
+  const aggregate = calculateWeightedAverageCost(
+    rows.map((row) => ({
+      quantityKg: row.receivedKg,
+      unitCostPerKg: row.costPerKgUsd,
+    })),
+  );
 
-  return { costPerKgUsd, totalReceivedKg, rows };
+  return {
+    costPerKgUsd: aggregate.weightedUnitCostPerKg.toNumber(),
+    totalReceivedKg: aggregate.totalQuantityKg.toNumber(),
+    rows,
+  };
 }
