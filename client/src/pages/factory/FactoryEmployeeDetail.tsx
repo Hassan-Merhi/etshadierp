@@ -186,9 +186,9 @@ export default function FactoryEmployeeDetail() {
   });
 
   const { data: cashAccounts = [] } = useQuery<LedgerAccount[]>({
-    queryKey: ["/api/ledger-accounts"],
+    queryKey: ["/api/ledger-accounts?includeHidden=true"],
     queryFn: async () => {
-      const res = await fetch("/api/ledger-accounts", { credentials: "include" });
+      const res = await fetch("/api/ledger-accounts?includeHidden=true", { credentials: "include" });
       if (!res.ok) return [];
       const data = await res.json();
       return (data || []).filter(

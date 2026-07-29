@@ -390,7 +390,7 @@ export default function FactoryInsurance() {
   const ecDrRef = useRef<HTMLDivElement>(null);
   const ecCrRef = useRef<HTMLDivElement>(null);
 
-  const { data: ledgerAccounts = [] } = useQuery<any[]>({ queryKey: ["/api/ledger-accounts"], staleTime: 60_000, refetchOnWindowFocus: false });
+  const { data: ledgerAccounts = [] } = useQuery<any[]>({ queryKey: ["/api/ledger-accounts?includeHidden=true"], staleTime: 60_000, refetchOnWindowFocus: false });
 
   // Find the Insurance Expense account dynamically from the fetched accounts list
   const insuranceExpenseAccount = useMemo(
