@@ -8,47 +8,53 @@ DECLARE
   configured_parent_id INTEGER;
   fallback_parent_count INTEGER;
 BEGIN
-  SELECT CASE
-           WHEN value ~ '^[1-9][0-9]*$' THEN value::INTEGER
-           ELSE NULL
-         END
-    INTO configured_parent_id
-    FROM system_settings
-   WHERE key = 'parentCompanyId'
-   LIMIT 1;
+  IF EXISTS (
+    SELECT 1
+      FROM suppliers
+     WHERE company_id IS NULL
+  ) THEN
+    SELECT CASE
+             WHEN value ~ '^[1-9][0-9]*$' THEN value::INTEGER
+             ELSE NULL
+           END
+      INTO configured_parent_id
+      FROM system_settings
+     WHERE key = 'parentCompanyId'
+     LIMIT 1;
 
-  IF configured_parent_id IS NULL THEN
-    SELECT COUNT(*)::INTEGER
-      INTO fallback_parent_count
-      FROM companies
-     WHERE active = TRUE
-       AND company_type = 'erp'
-       AND parent_company_id IS NULL;
-
-    IF fallback_parent_count = 1 THEN
-      SELECT id
-        INTO configured_parent_id
+    IF configured_parent_id IS NULL THEN
+      SELECT COUNT(*)::INTEGER
+        INTO fallback_parent_count
         FROM companies
        WHERE active = TRUE
          AND company_type = 'erp'
-         AND parent_company_id IS NULL
-       LIMIT 1;
-    ELSE
-      RAISE EXCEPTION
-        'Cannot backfill suppliers.company_id: configure system_settings.parentCompanyId first (found % eligible ERP parent companies)',
-        fallback_parent_count;
+         AND parent_company_id IS NULL;
+
+      IF fallback_parent_count = 1 THEN
+        SELECT id
+          INTO configured_parent_id
+          FROM companies
+         WHERE active = TRUE
+           AND company_type = 'erp'
+           AND parent_company_id IS NULL
+         LIMIT 1;
+      ELSE
+        RAISE EXCEPTION
+          'Cannot backfill suppliers.company_id: configure system_settings.parentCompanyId first (found % eligible ERP parent companies)',
+          fallback_parent_count;
+      END IF;
     END IF;
-  END IF;
 
-  IF NOT EXISTS (SELECT 1 FROM companies WHERE id = configured_parent_id) THEN
-    RAISE EXCEPTION
-      'Cannot backfill suppliers.company_id: configured parent company % does not exist',
-      configured_parent_id;
-  END IF;
+    IF NOT EXISTS (SELECT 1 FROM companies WHERE id = configured_parent_id) THEN
+      RAISE EXCEPTION
+        'Cannot backfill suppliers.company_id: configured parent company % does not exist',
+        configured_parent_id;
+    END IF;
 
-  UPDATE suppliers
-     SET company_id = configured_parent_id
-   WHERE company_id IS NULL;
+    UPDATE suppliers
+       SET company_id = configured_parent_id
+     WHERE company_id IS NULL;
+  END IF;
 END
 $$;
 
