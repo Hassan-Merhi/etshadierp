@@ -3,6 +3,14 @@ import { z } from "zod";
 
 import { TransferRouteError } from "./transferErrors";
 
+const clientRequestIdSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .max(128)
+  .regex(/^[A-Za-z0-9._:-]+$/)
+  .optional();
+
 const simpleTransferSchema = z.object({
   fromCompanyId: z.number().int().positive(),
   toCompanyId: z.number().int().positive(),
@@ -11,10 +19,15 @@ const simpleTransferSchema = z.object({
   amount: z.string(),
   transferDate: z.string(),
   description: z.string().optional(),
+  clientRequestId: clientRequestIdSchema,
+});
+
+const interCompanyTransferSchema = insertInterCompanyTransferSchema.extend({
+  clientRequestId: clientRequestIdSchema,
 });
 
 export function parseInterCompanyTransferInput(input: unknown) {
-  return insertInterCompanyTransferSchema.parse(input);
+  return interCompanyTransferSchema.parse(input);
 }
 
 export function parseSimpleTransferInput(input: unknown) {

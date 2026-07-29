@@ -9,6 +9,8 @@ import {
 const JOURNAL_URL = "/api/vouchers/journal";
 const GENERIC_URL = "/api/vouchers/with-entries";
 const PAYMENT_RECEIPT_URL = "/api/vouchers/payment-receipt";
+const SIMPLE_TRANSFER_URL = "/api/simple-company-transfer";
+const INTER_COMPANY_TRANSFER_URL = "/api/inter-company-transfers";
 
 function journalPayload() {
   return {
@@ -48,6 +50,18 @@ function paymentReceiptPayload() {
   };
 }
 
+function transferPayload() {
+  return {
+    transferType: "Cash",
+    fromCompanyId: 1,
+    toCompanyId: 2,
+    transferDate: "2026-07-25",
+    amount: "125.00",
+    fromLedgerAccountId: 10,
+    toLedgerAccountId: 20,
+  };
+}
+
 describe("accounting request identity", () => {
   it("reuses the same identity for the same uncertain journal retry", () => {
     const first = attachAccountingRequestIdentity("POST", JOURNAL_URL, journalPayload()) as Record<string, unknown>;
@@ -74,12 +88,12 @@ describe("accounting request identity", () => {
     const first = attachAccountingRequestIdentity(
       "POST",
       PAYMENT_RECEIPT_URL,
-      paymentReceiptPayload()
+      paymentReceiptPayload(),
     ) as Record<string, unknown>;
     const retry = attachAccountingRequestIdentity(
       "POST",
       PAYMENT_RECEIPT_URL,
-      paymentReceiptPayload()
+      paymentReceiptPayload(),
     ) as Record<string, unknown>;
 
     expect(isProtectedAccountingRequest("POST", PAYMENT_RECEIPT_URL, first)).toBe(true);
@@ -87,6 +101,18 @@ describe("accounting request identity", () => {
     expect(retry.clientRequestId).toBe(first.clientRequestId);
 
     releaseAccountingRequestIdentity("POST", PAYMENT_RECEIPT_URL, first);
+  });
+
+  it("protects both company-transfer posting routes", () => {
+    for (const url of [SIMPLE_TRANSFER_URL, INTER_COMPANY_TRANSFER_URL]) {
+      const first = attachAccountingRequestIdentity("POST", url, transferPayload()) as Record<string, unknown>;
+      const retry = attachAccountingRequestIdentity("POST", url, transferPayload()) as Record<string, unknown>;
+
+      expect(isProtectedAccountingRequest("POST", url, first)).toBe(true);
+      expect(typeof first.clientRequestId).toBe("string");
+      expect(retry.clientRequestId).toBe(first.clientRequestId);
+      releaseAccountingRequestIdentity("POST", url, first);
+    }
   });
 
   it("releases an acknowledged identity so a later intentional journal is new", () => {

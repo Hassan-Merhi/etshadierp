@@ -1,14 +1,20 @@
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import {
   containers,
   containerSales,
   insertContainerSaleSchema,
-  voucherEntries,
-  vouchers,
 } from "@shared/schema";
 
 import { db } from "../../db";
+import {
+  buildContainerSalePostingRequest,
+  createDatabasePostingDependencies,
+  postBalancedVoucherTx,
+  type PostingActor,
+} from "../../services/accounting";
 import { storage } from "../../storage";
+
+const postingDependencies = createDatabasePostingDependencies();
 
 export class ContainerSaleRouteError extends Error {
   constructor(
@@ -56,7 +62,7 @@ export const containerSalesService = {
     return storage.getContainerSalesByCustomer(customerId, companyId);
   },
 
-  async create(companyId: number, input: unknown) {
+  async create(companyId: number, input: unknown, actor?: PostingActor) {
     const parsed = insertContainerSaleSchema.parse({
       ...(input && typeof input === "object" ? input : {}),
       companyId,
@@ -67,7 +73,7 @@ export const containerSalesService = {
       storage.getContainerById(parsed.containerId),
       storage.getContainerSaleByContainerId(parsed.containerId, companyId),
     ]);
-
+    if (existingSale) return existingSale;
     if (!customer) throw new ContainerSaleRouteError(404, "Customer not found");
     if (customer.companyId !== companyId) {
       throw new ContainerSaleRouteError(403, "Customer belongs to a different company");
@@ -76,51 +82,66 @@ export const containerSalesService = {
     if (container.companyId !== companyId) {
       throw new ContainerSaleRouteError(403, "Container belongs to a different company");
     }
-    if (existingSale) throw new ContainerSaleRouteError(400, "Container has already been sold");
     if (!customer.ledgerAccountId) {
       throw new ContainerSaleRouteError(400, "Customer does not have a ledger account");
     }
 
     const commissionAccountId = await resolveCommissionAccountId(companyId, parsed.commissionAccountId);
     return db.transaction(async (tx) => {
-      const voucherNumber = `CS-${Date.now()}`;
-      const [voucher] = await tx
-        .insert(vouchers)
-        .values({
-          companyId,
-          voucherNumber,
-          voucherType: "Sales",
-          voucherDate: parsed.saleDate,
-          description: parsed.notes || `Container sale - ${container.containerNumber} to ${customer.legalName}`,
-          totalAmount: parsed.totalAmount,
-        })
-        .returning();
+      const [currentSale] = await tx
+        .select()
+        .from(containerSales)
+        .where(
+          and(
+            eq(containerSales.companyId, companyId),
+            eq(containerSales.containerId, parsed.containerId),
+          ),
+        )
+        .limit(1);
+      if (currentSale) return currentSale;
 
-      await tx.insert(voucherEntries).values({
-        voucherId: voucher.id,
-        ledgerAccountId: customer.ledgerAccountId,
-        debitAmount: parsed.totalAmount,
-        creditAmount: "0",
-        narration: `Container sale - ${voucherNumber}`,
+      const voucherNumber = `CS-${Date.now()}`;
+      const description = parsed.notes || `Container sale - ${container.containerNumber} to ${customer.legalName}`;
+      const built = buildContainerSalePostingRequest({
+        companyId,
+        containerId: parsed.containerId,
+        voucherNumber,
+        voucherDate: parsed.saleDate,
+        description,
+        debitNarration: `Container sale - ${voucherNumber}`,
+        creditNarration: `Container sale commission - ${voucherNumber}`,
+        totalAmount: parsed.totalAmount,
+        customerLedgerAccountId: customer.ledgerAccountId,
+        commissionAccountId,
+        actor: actor ?? { reason: "Container sale posting" },
       });
-      await tx.insert(voucherEntries).values({
-        voucherId: voucher.id,
-        ledgerAccountId: commissionAccountId,
-        debitAmount: "0",
-        creditAmount: parsed.totalAmount,
-        narration: `Container sale commission - ${voucherNumber}`,
-      });
+      const posted = await postBalancedVoucherTx(tx, built.request, postingDependencies);
+
+      const [replayedSale] = await tx
+        .select()
+        .from(containerSales)
+        .where(
+          and(
+            eq(containerSales.companyId, companyId),
+            eq(containerSales.voucherId, Number((posted.voucher as any).id)),
+          ),
+        )
+        .limit(1);
+      if (replayedSale) return replayedSale;
 
       const [createdSale] = await tx
         .insert(containerSales)
         .values({
           ...parsed,
           commissionAccountId,
-          voucherId: voucher.id,
+          voucherId: (posted.voucher as any).id,
         })
         .returning();
 
-      await tx.update(containers).set({ status: "SOLD" }).where(eq(containers.id, parsed.containerId));
+      await tx
+        .update(containers)
+        .set({ status: "SOLD" })
+        .where(and(eq(containers.id, parsed.containerId), eq(containers.companyId, companyId)));
       return createdSale;
     });
   },

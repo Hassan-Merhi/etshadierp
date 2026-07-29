@@ -65,6 +65,20 @@ export type {
   PaymentReceiptVoucherType,
 } from "./paymentReceiptPosting";
 
+export { buildCompanyTransferPostingRequest } from "./companyTransferPosting";
+export type {
+  BuildCompanyTransferPostingInput,
+  BuiltCompanyTransferPosting,
+  CompanyTransferSide,
+  CompanyTransferVoucherType,
+} from "./companyTransferPosting";
+
+export { buildContainerSalePostingRequest } from "./containerSalePosting";
+export type {
+  BuildContainerSalePostingInput,
+  BuiltContainerSalePosting,
+} from "./containerSalePosting";
+
 export {
   isPaymentReceiptVoucherType,
   shouldUseCentralPaymentReceiptDeletion,
