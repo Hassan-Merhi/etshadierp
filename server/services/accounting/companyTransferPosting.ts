@@ -17,6 +17,8 @@ export interface BuildCompanyTransferPostingInput {
   voucherType: CompanyTransferVoucherType;
   voucherDate: string;
   description?: string | null;
+  debitNarration?: string | null;
+  creditNarration?: string | null;
   amount: string | number;
   debitLedgerAccountId: number;
   creditLedgerAccountId: number;
@@ -58,6 +60,8 @@ function fingerprint(input: {
   voucherType: CompanyTransferVoucherType;
   voucherDate: string;
   description: string | null;
+  debitNarration: string | null;
+  creditNarration: string | null;
   amount: string;
   debitLedgerAccountId: number;
   creditLedgerAccountId: number;
@@ -82,18 +86,20 @@ export function buildCompanyTransferPostingRequest(
 
   const clientRequestId = resolveManualJournalClientRequestId(input.clientRequestId);
   const description = input.description?.trim() || null;
+  const debitNarration = input.debitNarration?.trim() || description;
+  const creditNarration = input.creditNarration?.trim() || description;
   const entries: VoucherEntryInsertFields[] = [
     {
       ledgerAccountId: debitLedgerAccountId,
       debitAmount: amount,
       creditAmount: "0",
-      narration: description,
+      narration: debitNarration,
     },
     {
       ledgerAccountId: creditLedgerAccountId,
       debitAmount: "0",
       creditAmount: amount,
-      narration: description,
+      narration: creditNarration,
     },
   ];
   const payloadFingerprint = fingerprint({
@@ -101,6 +107,8 @@ export function buildCompanyTransferPostingRequest(
     voucherType: input.voucherType,
     voucherDate: input.voucherDate,
     description,
+    debitNarration,
+    creditNarration,
     amount,
     debitLedgerAccountId,
     creditLedgerAccountId,
