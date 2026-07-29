@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { apiRequest, queryClient, setAppTimezone } from "@/lib/queryClient";
+import { apiRequest, getQueryFn, queryClient, setAppTimezone } from "@/lib/queryClient";
 import {
   cancelCompanySessionQueries,
   companyQueryKey,
@@ -8,6 +8,12 @@ import {
   removeCompanySessionQueries,
 } from "@/lib/companyQueryScope";
 import { createCompanySwitchQueue, type CompanySwitchQueue } from "@/lib/companySwitchQueue";
+import {
+  parseSessionCompany,
+  parseUserCompanies,
+  type CompanyType,
+  type UserCompanyAssignment,
+} from "@/contracts/sessionContracts";
 
 const PREFETCH_KEYS = [
   "/api/suppliers",
@@ -17,30 +23,26 @@ const PREFETCH_KEYS = [
   "/api/locations",
   "/api/employees",
   "/api/fixed-assets",
-];
+] as const;
 
 function prefetchReferenceData(companyId: number, role?: string) {
-  // POS sessions are intentionally denied access to the general ERP reference
-  // endpoints below. Their dedicated POS queries load only the permitted data.
   if (role === "POS") return;
-
   for (const url of PREFETCH_KEYS) {
     queryClient.prefetchQuery({ queryKey: companyQueryKey(url, companyId) });
   }
 }
 
-interface Company {
+export interface Company {
   id: number;
   code: string;
   name: string;
   active: boolean;
   role?: string;
-  companyType: "erp" | "factory" | "factory_v2" | "properties" | "supplier_partner";
+  companyType: CompanyType;
   displayCurrency?: string | null;
 }
 
 export interface CompanySelectionOptions {
-  /** Deliberately change the local workspace while the server is unreachable. */
   offline?: boolean;
 }
 
@@ -58,10 +60,22 @@ interface CompanyCommitOptions {
 
 const CompanyContext = createContext<CompanyContextType | undefined>(undefined);
 
+function mapCompanyAssignment(assignment: UserCompanyAssignment): Company {
+  return {
+    id: assignment.companyId,
+    code: assignment.companyCode,
+    name: assignment.companyName,
+    active: assignment.companyActive,
+    role: assignment.role,
+    companyType: assignment.companyType,
+    displayCurrency: assignment.displayCurrency,
+  };
+}
+
 async function switchCompanyOnServer(companyId: number): Promise<boolean> {
   try {
-    const res = await apiRequest("POST", "/api/auth/set-company", { companyId });
-    return res.ok;
+    const response = await apiRequest("POST", "/api/auth/set-company", { companyId });
+    return response.ok;
   } catch {
     return false;
   }
@@ -81,25 +95,22 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
     switchQueueRef.current = createCompanySwitchQueue(setIsSyncingCompany);
   }
 
-  const { data: userCompanies = [], isLoading } = useQuery<any[]>({
+  const { data: userCompanyAssignments = [], isLoading } = useQuery<UserCompanyAssignment[]>({
     queryKey: ["/api/user/companies"],
+    queryFn: async (context) => {
+      const value = await getQueryFn({ on401: "throw" })(context);
+      return parseUserCompanies(value);
+    },
   });
 
-  const companies: Company[] = userCompanies
-    .map((uc) => ({
-      id: uc.companyId,
-      code: uc.companyCode,
-      name: uc.companyName,
-      active: uc.companyActive,
-      role: uc.role,
-      companyType: uc.companyType || "erp",
-      displayCurrency: uc.displayCurrency ?? null,
-    }))
-    .filter((company, index, self) => index === self.findIndex((candidate) => candidate.id === company.id));
+  const companies: Company[] = userCompanyAssignments
+    .map(mapCompanyAssignment)
+    .filter(
+      (company, index, allCompanies) =>
+        index === allCompanies.findIndex((candidate) => candidate.id === company.id),
+    );
 
   const commitCompanySelection = useCallback((company: Company, options: CompanyCommitOptions) => {
-    // Prevent the previous company's timezone from being used while the new
-    // company's settings query is loading.
     setAppTimezone(null);
     lastSyncedCompanyId.current = options.serverSynced ? company.id : null;
     selectedCompanyRef.current = company;
@@ -114,8 +125,6 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
         if (options.offline || lastSyncedCompanyId.current === company.id) return true;
       }
 
-      // Stop previous-company responses before changing the server session. A
-      // late response must never repopulate the cache after the switch.
       await cancelCompanySessionQueries(queryClient);
 
       if (options.offline) {
@@ -126,8 +135,6 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
 
       const ok = await switchCompanyOnServer(company.id);
       if (!ok) {
-        // The active company did not change. Restore any mounted queries that
-        // were cancelled while the switch was attempted.
         queryClient.invalidateQueries({
           predicate: (query) => isCompanySessionQueryKey(query.queryKey),
           refetchType: "active",
@@ -135,8 +142,6 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
         return false;
       }
 
-      // Remove, rather than merely invalidate, every previous-company cache.
-      // Global auth/company-list queries remain available through the allow-list.
       removeCompanySessionQueries(queryClient);
       commitCompanySelection(company, { prefetch: true, serverSynced: true });
       return true;
@@ -179,18 +184,19 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
     initialSyncStarted.current = true;
 
     if (typeof navigator !== "undefined" && navigator.onLine === false) {
-      void selectCompany(target, { offline: true }).catch((error) => {
+      void selectCompany(target, { offline: true }).catch((error: unknown) => {
         console.error("[Company] Failed to activate the offline company selection.", error);
         scheduleInitialSyncRetry();
       });
       return;
     }
 
-    // Fast path: if the server session already holds the target company, clear
-    // any persisted in-memory company data and activate it without another write.
-    // Otherwise use the same serialized switch path as every user-initiated change.
     void fetch("/api/auth/session-company", { credentials: "include", cache: "no-store" })
-      .then((response) => (response.ok ? response.json() : Promise.resolve({ companyId: null })))
+      .then(async (response) => {
+        if (!response.ok) return { companyId: null };
+        const value: unknown = await response.json();
+        return parseSessionCompany(value);
+      })
       .catch(() => ({ companyId: null }))
       .then(async ({ companyId: sessionCompanyId }) => {
         if (sessionCompanyId === target.id) {
@@ -205,8 +211,6 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
         const ok = await selectCompany(target);
         if (ok) return;
 
-        // The requested company could not be activated. If the server reported
-        // another accessible company, align the browser to that confirmed scope.
         const serverCompany = companies.find((company) => company.id === sessionCompanyId);
         if (serverCompany) {
           await switchQueueRef.current!.enqueue(async () => {
@@ -220,7 +224,7 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
         console.error("[Company] Failed to synchronize the initial company selection; retrying.");
         scheduleInitialSyncRetry();
       })
-      .catch((error) => {
+      .catch((error: unknown) => {
         console.error("[Company] Initial company synchronization failed; retrying.", error);
         scheduleInitialSyncRetry();
       });
