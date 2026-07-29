@@ -598,8 +598,13 @@ export function registerVoucherQueryRoutes(app: Express) {
       }
 
       // If this is a Stock Transfer voucher, fetch transfer details
+      // Factory transfers use voucherType "Transfer"; imports/POS use "Stock Transfer" or "StockTransfer"
       let transferData = null;
-      if (voucher.voucherType === "Stock Transfer") {
+      if (
+        voucher.voucherType === "Stock Transfer" ||
+        voucher.voucherType === "StockTransfer" ||
+        voucher.voucherType === "Transfer"
+      ) {
         const transfer = await db
           .select()
           .from(stockTransferVouchers)
