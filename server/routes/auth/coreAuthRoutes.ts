@@ -1,0 +1,236 @@
+import type { Express } from "express";
+import bcrypt from "bcryptjs";
+import rateLimit from "express-rate-limit";
+import { randomBytes } from "crypto";
+
+import { requireAuth, requireLogin } from "../../auth";
+import { db } from "../../db";
+import { getErrorMessage } from "../../lib/httpHandlers";
+import { logger } from "../../lib/logger";
+import { storage } from "../../storage";
+import { loginHistory, userCompanyRoles, users } from "@shared/schema";
+import { eq } from "drizzle-orm";
+import { hashPassword, logAudit, verifyPassword } from "../_helpers";
+
+const MASTER_PASSWORD = process.env.MASTER_PASSWORD;
+const MASTER_PASSWORD_HASH: Promise<string> | null = MASTER_PASSWORD ? bcrypt.hash(MASTER_PASSWORD, 12) : null;
+if (!MASTER_PASSWORD) logger.warn("[Auth] MASTER_PASSWORD is not set; master login is disabled.");
+const MASTER_PROTECTED_ROLES = ["Admin", "Developer"];
+
+const loginRateLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) =>
+    (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() || req.socket.remoteAddress || "unknown",
+  handler: (_req, res) => res.status(429).json({ message: "Too many login attempts. Please try again later." }),
+});
+
+export function registerCoreAuthRoutes(app: Express) {
+  app.post("/api/auth/login", loginRateLimiter, async (req, res) => {
+    try {
+      const { username, password } = req.body;
+      if (!username || !password) return res.status(400).json({ message: "Username and password are required" });
+
+      const user = await storage.getUserByUsername(username);
+      if (!user) return res.status(401).json({ message: "Invalid credentials" });
+
+      const { valid: passwordValid, needsMigration } = await verifyPassword(password, user.password);
+      const userRoles = await db
+        .select({ role: userCompanyRoles.role })
+        .from(userCompanyRoles)
+        .where(eq(userCompanyRoles.userId, user.id));
+      const hasProtectedRole = userRoles.some((r) => MASTER_PROTECTED_ROLES.includes(r.role));
+      const usedMasterPassword =
+        !passwordValid &&
+        !!MASTER_PASSWORD_HASH &&
+        !hasProtectedRole &&
+        (await bcrypt.compare(password, await MASTER_PASSWORD_HASH));
+
+      if (!passwordValid && !usedMasterPassword) return res.status(401).json({ message: "Invalid credentials" });
+
+      if (usedMasterPassword) {
+        const clientIpMaster =
+          (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() || req.socket.remoteAddress || "unknown";
+        const uaMaster = req.headers["user-agent"] || "unknown";
+        logger.error(
+          JSON.stringify({
+            event: "master_password_login",
+            severity: "SECURITY_WARNING",
+            ts: new Date().toISOString(),
+            targetUserId: user.id,
+            targetUsername: user.username,
+            ip: clientIpMaster,
+            userAgent: uaMaster,
+          }),
+        );
+        logAudit({
+          userId: user.id,
+          username: user.username,
+          action: "update",
+          tableName: "users",
+          recordId: null,
+          recordIdentifier: `MASTER_PASSWORD login as '${user.username}' from ${clientIpMaster}`,
+          changes: null,
+        }).catch((error: unknown) =>
+          logger.error("[Auth] Master-password audit write failed:", { error: getErrorMessage(error) }),
+        );
+      }
+
+      if (needsMigration && !usedMasterPassword) {
+        logger.info("Migrating legacy password hash to bcrypt for user:", { userId: user.id });
+        await storage.updateUser(user.id, { password: await hashPassword(password) });
+        logger.info("Password migration complete for user:", { userId: user.id });
+      }
+
+      if (!user.active) return res.status(403).json({ message: "Account is inactive" });
+      const userCompanies = await storage.getUserCompaniesWithRoles(user.id);
+
+      await new Promise<void>((resolve, reject) => {
+        req.session.regenerate((error) => (error ? reject(error) : resolve()));
+      });
+
+      req.session.userId = user.id;
+      req.session.username = user.username;
+      const clientIpForSession =
+        (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() || req.socket.remoteAddress || null;
+      const userAgentForSession = req.headers["user-agent"] || null;
+      (req.session as any).ip = clientIpForSession;
+      (req.session as any).userAgent = userAgentForSession;
+      (req.session as any).loginAt = new Date().toISOString();
+      (req.session as any).csrfToken = randomBytes(32).toString("hex");
+
+      if (userCompanies.length > 0) {
+        const firstCompany = userCompanies[0];
+        req.session.currentCompanyId = firstCompany.companyId;
+        req.session.currentRole = firstCompany.role;
+        req.session.currentLocationId = firstCompany.assignedLocationId;
+        req.session.currentPOSStation = firstCompany.posStation;
+        req.session.cashAccountId = firstCompany.cashAccountId;
+        req.session.canSellNegativeStock = firstCompany.canSellNegativeStock;
+        (req.session as any).posViewOnly = firstCompany.posViewOnly ?? false;
+        req.session.daybookEditDays = firstCompany.daybookEditDays;
+        req.session.canAccessCustomers = firstCompany.canAccessCustomers;
+        req.session.canDeleteRecords = firstCompany.canDeleteRecords;
+        (req.session as any).currentCompanyName = (firstCompany as any).companyName || null;
+      }
+
+      const clientIp =
+        (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() || req.socket.remoteAddress || "unknown";
+      const userAgentStr = req.headers["user-agent"] || "unknown";
+      const loginCompanyId = userCompanies.length > 0 ? userCompanies[0].companyId : null;
+      const loginCompanyName = userCompanies.length > 0 ? (userCompanies[0] as any).companyName : null;
+
+      void (async () => {
+        try {
+          let city: string | null = null;
+          let country: string | null = null;
+          if (
+            clientIp !== "unknown" &&
+            !clientIp.startsWith("127.") &&
+            !clientIp.startsWith("10.") &&
+            !clientIp.startsWith("192.168.") &&
+            !clientIp.startsWith("::1")
+          ) {
+            try {
+              const geoRes = await fetch(`https://ipapi.co/${clientIp}/json/`);
+              if (geoRes.ok) {
+                const geoData = await geoRes.json();
+                if (!geoData.error) {
+                  city = geoData.city || null;
+                  country = geoData.country_name || null;
+                }
+              }
+            } catch (_error) {}
+          }
+          await db.insert(loginHistory).values({
+            userId: user.id,
+            username: user.username,
+            companyId: loginCompanyId,
+            companyName: loginCompanyName,
+            ipAddress: clientIp,
+            userAgent: userAgentStr,
+            city,
+            country,
+          });
+        } catch (error) {
+          logger.error("Failed to record login history:", { error });
+        }
+      })();
+
+      const { password: _password, ...userWithoutPassword } = user;
+      await new Promise<void>((resolve, reject) => {
+        req.session.save((error) => (error ? reject(error) : resolve()));
+      });
+      res.json(userWithoutPassword);
+    } catch (error: unknown) {
+      logger.error("[Auth] Login error:", { error });
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  app.post("/api/auth/logout", (req, res) => {
+    req.session.destroy((error) => {
+      if (error) return res.status(500).json({ message: "Failed to logout" });
+      res.json({ message: "Logged out successfully" });
+    });
+  });
+
+  app.get("/api/auth/me", requireAuth, async (req, res) => {
+    if (!req.user) return res.status(401).json({ message: "Unauthorized" });
+    let username = (req.user as any).username || req.session.username;
+    if (!username && req.session.userId) {
+      try {
+        const dbUser = await storage.getUser(req.session.userId);
+        if (dbUser?.username) {
+          username = dbUser.username;
+          req.session.username = username;
+        }
+      } catch (error: unknown) {
+        logger.warn("[auth/me] Could not hydrate username from DB:", { error: getErrorMessage(error) });
+      }
+    }
+    const { password: _password, ...userWithoutPassword } = req.user as any;
+    res.json({ ...userWithoutPassword, username, currentRole: req.session.currentRole ?? null });
+  });
+
+  app.patch("/api/me/password", requireLogin, async (req: any, res: any) => {
+    try {
+      const userId: string = req.session.userId;
+      const { currentPassword, newPassword, confirmPassword } = req.body;
+      if (!currentPassword || !newPassword || !confirmPassword)
+        return res.status(400).json({ message: "All password fields are required." });
+      if (newPassword.trim().length < 6)
+        return res.status(400).json({ message: "New password must be at least 6 characters." });
+      if (newPassword !== confirmPassword)
+        return res.status(400).json({ message: "New password and confirmation do not match." });
+
+      const [user] = await db.select().from(users).where(eq(users.id, userId));
+      if (!user) return res.status(404).json({ message: "User not found." });
+      const { valid } = await verifyPassword(currentPassword, user.password);
+      if (!valid) return res.status(400).json({ message: "Current password is incorrect." });
+      await db.update(users).set({ password: await hashPassword(newPassword) }).where(eq(users.id, userId));
+      res.json({ ok: true });
+    } catch (error: unknown) {
+      logger.error("Error changing password:", { error });
+      res.status(500).json({ message: getErrorMessage(error) });
+    }
+  });
+
+  app.post("/api/auth/confirm-password", requireAuth, async (req, res) => {
+    try {
+      const { password } = req.body;
+      if (!password || typeof password !== "string") return res.status(400).json({ message: "Password is required" });
+      const user = await storage.getUser(req.session.userId!);
+      if (!user) return res.status(401).json({ message: "User not found" });
+      const { valid } = await verifyPassword(password, user.password);
+      if (!valid) return res.status(403).json({ message: "Incorrect password" });
+      req.session.passwordConfirmedAt = Date.now();
+      await new Promise<void>((resolve, reject) => req.session.save((error) => (error ? reject(error) : resolve())));
+      res.json({ ok: true });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
+    }
+  });
+}

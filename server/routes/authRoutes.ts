@@ -1,12 +1,23 @@
 import type { Express } from "express";
 
-import { registerAuthRoutes as registerLegacyAuthRoutes } from "./authRoutesLegacy";
+import { registerAuthAuditLogRoutes } from "./auth/auditLogRoutes";
+import { registerCompanyAccessRoutes } from "./auth/companyAccessRoutes";
+import { registerCoreAuthRoutes } from "./auth/coreAuthRoutes";
 import { registerSessionRoutes } from "./auth/sessionRoutes";
+import { registerUserAccessRoutes } from "./auth/userAccessRoutes";
+import { registerUserAdministrationRoutes } from "./auth/userAdministrationRoutes";
+import { registerExchangeRateRoutes } from "./exchangeRateRoutes";
+import { registerUserPresenceRoutes } from "./userPresenceRoutes";
+import { registerAuthRoutes as registerLegacyAuthRoutes } from "./authRoutesLegacy";
 
 export function registerAuthRoutes(app: Express) {
-  // Session management registers first and shadows its historical handlers.
-  // Login, user administration, audit access, and remaining authentication
-  // compatibility endpoints continue through the byte-for-byte legacy registry.
+  registerCoreAuthRoutes(app);
   registerSessionRoutes(app);
+  registerAuthAuditLogRoutes(app);
+  registerUserAdministrationRoutes(app);
+  registerUserAccessRoutes(app);
+  registerCompanyAccessRoutes(app);
+  registerUserPresenceRoutes(app);
+  registerExchangeRateRoutes(app);
   registerLegacyAuthRoutes(app);
 }
