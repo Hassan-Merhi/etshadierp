@@ -14,6 +14,10 @@ Mix-batch create/edit/top-up/delete, consumption, reservations, and any client-s
 
 **Why:** earlier logic weighted by remaining-kg-at-read-time (drifts under FIFO consumption) or recomputed from all-time received kg (wrongly re-averages consumed stock back in on every correction).
 
-**How to apply:** any new read path (a report, KPI, diagnostic) must call the same `getLockedSupplierRate`/`getAuthoritativeSupplierRemainingKg` helpers in `server/services/factory/rawStockLockedRate.ts` — never inline a fallback default (e.g. defaulting a NULL persisted column to 0), or that surface will silently disagree with every other display of the same rate. KPI "Total Used Value" should sum `factoryMixBatchSources.totalCost` per supplier (locked-rate-at-creation-time), not a blended average × used kg.
+**How to apply:** all new quantity, rate, value-delta, weighted-source, and precision math must use `server/services/factory/factoryCostingEngine.ts`. Database-facing supplier reads must continue through `getLockedSupplierRate` / `getAuthoritativeSupplierRemainingKg` in `rawStockLockedRate.ts`; container landed value must continue through `computeContainerLandedCost`; cascades must continue through `cascadeContainerCostChange` / `recomputeBatchAndCascadeBales`. Do not inline a fallback default or a new weighted-average formula in a route, report, repair script, or UI adapter.
+
+Supplier-backed source rows are priced from the locked supplier rate captured at consumption time. A `containerId` on those rows is FIFO provenance only. Container-direct rows may follow an approved landed-cost correction. Batch headers are always derived from persisted source values, and bale values are derived from the batch rate.
+
+KPI "Total Used Value" should sum `factoryMixBatchSources.totalCost` per supplier (locked-rate-at-creation-time), not a blended average × used kg.
 
 Also: `npx tsc --noEmit` can OOM on this repo's size; run with `NODE_OPTIONS=--max-old-space-size=4096` first before assuming a real type error.
