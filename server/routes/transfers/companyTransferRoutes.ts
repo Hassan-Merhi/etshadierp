@@ -24,7 +24,12 @@ export function registerCompanyTransferRoutes(app: Express) {
   app.post("/api/inter-company-transfers", requireAuth, requireNonPOS, async (req, res) => {
     try {
       getActiveTransferCompanyId(req);
-      const transfer = await interCompanyTransferService.create(req.body);
+      const userId = getTransferUserId(req);
+      const transfer = await interCompanyTransferService.create(userId, req.body, {
+        userId,
+        username: (req.session as any).username || "unknown",
+        reason: "Inter-company transfer",
+      });
       return res.status(201).json(transfer);
     } catch (error: unknown) {
       return sendTransferRouteError(res, error, 400);
@@ -54,7 +59,11 @@ export function registerCompanyTransferRoutes(app: Express) {
   app.post("/api/simple-company-transfer", requireAuth, requireNonPOS, async (req, res) => {
     try {
       const userId = getTransferUserId(req);
-      const transfer = await simpleCompanyTransferService.create(userId, req.body);
+      const transfer = await simpleCompanyTransferService.create(userId, req.body, {
+        userId,
+        username: (req.session as any).username || "unknown",
+        reason: "Simple company transfer",
+      });
       return res.status(201).json(transfer);
     } catch (error: unknown) {
       return sendTransferRouteError(res, error, 400);
