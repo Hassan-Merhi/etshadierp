@@ -55,7 +55,10 @@ export function useVoucherQueries({
     // includeHidden=true so cash / loan / bank accounts marked isHidden still appear in voucher pickers.
     // companyId is embedded in the URL so the server uses the explicit company rather than relying
     // on the session (which may not have updated yet on a company switch).
-    queryKey: [`/api/ledger-accounts?includeHidden=true&companyId=${selectedCompany?.id}`, selectedCompany?.id],
+    // limit=500 bypasses the 100-item default cap in apiPaginationBridge (capped server-side at 250).
+    // Companies with >100 ledger accounts (e.g. 212 accounts) were silently truncated at position 100,
+    // causing Cash/Bank/Loans accounts beyond position 100 to disappear from the Pay From picker.
+    queryKey: [`/api/ledger-accounts?includeHidden=true&companyId=${selectedCompany?.id}&limit=500`, selectedCompany?.id],
     enabled: !!selectedCompany?.id,
   });
 
