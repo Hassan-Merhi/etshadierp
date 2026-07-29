@@ -25,13 +25,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
   Dialog,
   DialogContent,
   DialogHeader,
@@ -134,7 +127,7 @@ export default function FactoryStockAllocationV5() {
   const [showGarbageWipers, setShowGarbageWipers] = useState(false);
   const [refreshFlash, setRefreshFlash] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  const [categoryFilter, setCategoryFilter] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState<string[]>([]);
   // Debounced value sent to the server — prevents one request per keystroke.
   const [debouncedSearch, setDebouncedSearch] = useState("");
   useEffect(() => {
@@ -457,9 +450,10 @@ export default function FactoryStockAllocationV5() {
   const garbageWipersCount = allRows.filter(isGarbageOrWipers).length;
   const filteredRows = showGarbageWipers ? allRows : allRows.filter((r) => !isGarbageOrWipers(r));
   const negativeFilteredRows = showNegativeOnly ? filteredRows.filter((r) => r.freeToPromise < 0) : filteredRows;
-  const categoryFilteredRows = categoryFilter
-    ? negativeFilteredRows.filter((r) => (r.categoryName ?? "") === categoryFilter)
-    : negativeFilteredRows;
+  const categoryFilteredRows =
+    categoryFilter.length > 0
+      ? negativeFilteredRows.filter((r) => categoryFilter.includes(r.categoryName ?? ""))
+      : negativeFilteredRows;
   const rows = searchQuery.trim()
     ? categoryFilteredRows.filter((r) => {
         const q = searchQuery.toLowerCase();
@@ -670,11 +664,31 @@ export default function FactoryStockAllocationV5() {
     [allRows]
   );
 
+  /* ── Category multi-select helpers ───────────────────────────────────── */
+  const [catDropOpen, setCatDropOpen] = useState(false);
+  const catDropRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (catDropRef.current && !catDropRef.current.contains(e.target as Node)) setCatDropOpen(false);
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, []);
+  function toggleCategory(cat: string) {
+    setCategoryFilter((prev) => (prev.includes(cat) ? prev.filter((c) => c !== cat) : [...prev, cat]));
+  }
+  const catLabel =
+    categoryFilter.length === 0
+      ? "All Categories"
+      : categoryFilter.length === 1
+        ? categoryFilter[0]
+        : `${categoryFilter.length} categories`;
+
   /* ── Render ───────────────────────────────────────────────────────────── */
   return (
-    <div className="p-4 flex flex-col gap-4 h-full">
-      {/* Header */}
-      <div className="flex items-center justify-between gap-2 flex-wrap">
+    <div className="flex flex-col h-full">
+      {/* ── Row 1: Title + action buttons ─────────────────────────────────── */}
+      <div className="flex items-center justify-between gap-2 px-4 pt-4 pb-3 border-b flex-wrap">
         <div className="flex items-center gap-2 flex-wrap">
           <PageHeader title="Stock Allocation" />
           <Badge variant="secondary" className="text-[11px] font-semibold tracking-wide">
@@ -687,7 +701,27 @@ export default function FactoryStockAllocationV5() {
             </Badge>
           )}
         </div>
-        <div className="flex items-center gap-1.5 flex-wrap">
+        <div className="flex items-center gap-2 flex-wrap">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setRestoreDialogOpen(true)}
+            data-testid="button-v5-restore-cancelled"
+          >
+            <RotateCcw className="h-3.5 w-3.5 mr-1.5" />
+            Restore Cancelled
+          </Button>
+          <Button size="sm" onClick={() => setCreateDrawerOpen(true)} data-testid="button-v5-open-create-proforma">
+            <Plus className="h-4 w-4 mr-1.5" />
+            Create Proforma
+          </Button>
+        </div>
+      </div>
+
+      {/* ── Row 2: Toolbar (search + filters + icon buttons) ──────────────── */}
+      <div className="flex items-center justify-between gap-3 px-4 py-2.5 border-b bg-muted/30 flex-wrap">
+        {/* Left: search + category */}
+        <div className="flex items-center gap-2 flex-wrap">
           <div className="relative">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
             <Input
@@ -700,66 +734,137 @@ export default function FactoryStockAllocationV5() {
             {searchQuery && (
               <button
                 onClick={() => setSearchQuery("")}
-                className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover-elevate rounded"
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground rounded"
                 data-testid="button-v5-clear-search"
               >
                 <X className="h-3.5 w-3.5" />
               </button>
             )}
           </div>
-          {allCategories.length > 0 && (
-            <Select
-              value={categoryFilter || "__all__"}
-              onValueChange={(v) => setCategoryFilter(v === "__all__" ? "" : v)}
-              data-testid="select-v5-category-filter"
-            >
-              <SelectTrigger className="h-9 w-48 text-sm" data-testid="trigger-v5-category-filter">
-                <SelectValue placeholder="All Categories" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__all__">All Categories</SelectItem>
-                {allCategories.map((cat) => (
-                  <SelectItem key={cat} value={cat}>
-                    {cat}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          )}
-          <Button
-            variant={hideZero ? "default" : "outline"}
-            size="sm"
-            onClick={() => setHideZero((v) => !v)}
-            data-testid="button-v5-toggle-zero"
-          >
-            {hideZero ? "Show Zero Rows" : "Hide Zero Rows"}
-          </Button>
-          <Button
-            variant={showNegativeOnly ? "destructive" : "outline"}
-            size="sm"
-            onClick={() => setShowNegativeOnly((v) => !v)}
-            data-testid="button-v5-toggle-negative-only"
-          >
-            {showNegativeOnly ? `Negative Only (${rows.length})` : "Negative Only"}
-          </Button>
-          <Button
-            variant={showGarbageWipers ? "secondary" : "outline"}
-            size="sm"
-            onClick={() => setShowGarbageWipers((v) => !v)}
-            data-testid="button-v5-toggle-garbage-wipers"
-          >
-            {showGarbageWipers
-              ? `Hide Garbage/Wipers (${garbageWipersCount})`
-              : `Show Garbage/Wipers${garbageWipersCount > 0 ? ` (${garbageWipersCount})` : ""}`}
-          </Button>
 
-          <div className="w-px h-5 bg-border mx-1 hidden sm:block" />
+          {/* Category multi-select */}
+          {allCategories.length > 0 && (
+            <div ref={catDropRef} className="relative" data-testid="select-v5-category-filter">
+              <button
+                onClick={() => setCatDropOpen((v) => !v)}
+                className={cn(
+                  "flex h-9 min-w-[160px] items-center justify-between gap-2 rounded-md border px-3 text-sm font-medium transition-colors",
+                  catDropOpen || categoryFilter.length > 0
+                    ? "border-primary bg-primary/10 text-primary"
+                    : "border-input bg-background text-foreground hover:bg-accent"
+                )}
+              >
+                <span className="truncate">{catLabel}</span>
+                <div className="flex items-center gap-1 shrink-0">
+                  {categoryFilter.length > 0 && (
+                    <span
+                      onClick={(e) => { e.stopPropagation(); setCategoryFilter([]); }}
+                      className="flex h-4 w-4 items-center justify-center rounded-full bg-primary/20 hover:bg-primary/30"
+                    >
+                      <X className="h-2.5 w-2.5" />
+                    </span>
+                  )}
+                  <ChevronDown className={cn("h-3.5 w-3.5 transition-transform", catDropOpen && "rotate-180")} />
+                </div>
+              </button>
+              {catDropOpen && (
+                <div className="absolute top-full left-0 z-50 mt-1.5 w-56 rounded-lg border bg-popover shadow-lg overflow-hidden">
+                  <button
+                    onClick={() => setCategoryFilter(categoryFilter.length === allCategories.length ? [] : [...allCategories])}
+                    className="flex w-full items-center gap-2.5 border-b px-3 py-2.5 text-xs font-semibold text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
+                  >
+                    <div className={cn(
+                      "flex h-4 w-4 items-center justify-center rounded border transition-colors",
+                      categoryFilter.length === allCategories.length
+                        ? "border-primary bg-primary"
+                        : "border-input"
+                    )}>
+                      {categoryFilter.length === allCategories.length && <CheckCircle2 className="h-2.5 w-2.5 text-primary-foreground" />}
+                      {categoryFilter.length > 0 && categoryFilter.length < allCategories.length && (
+                        <div className="h-1.5 w-1.5 rounded-sm bg-primary" />
+                      )}
+                    </div>
+                    Select all
+                  </button>
+                  {allCategories.map((cat) => {
+                    const checked = categoryFilter.includes(cat);
+                    return (
+                      <button
+                        key={cat}
+                        onClick={() => toggleCategory(cat)}
+                        className={cn(
+                          "flex w-full items-center gap-2.5 px-3 py-2.5 text-sm transition-colors",
+                          checked ? "bg-primary/10 text-primary" : "text-foreground hover:bg-accent"
+                        )}
+                      >
+                        <div className={cn(
+                          "flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-colors",
+                          checked ? "border-primary bg-primary" : "border-input"
+                        )}>
+                          {checked && <CheckCircle2 className="h-2.5 w-2.5 text-primary-foreground" />}
+                        </div>
+                        {cat}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Right: toggle pill group + icon buttons */}
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* Grouped toggle pills */}
+          <div className="flex items-center rounded-lg border bg-background p-1 gap-0.5">
+            <button
+              onClick={() => setHideZero((v) => !v)}
+              data-testid="button-v5-toggle-zero"
+              className={cn(
+                "rounded-md px-3 py-1.5 text-xs font-semibold transition-all",
+                !hideZero
+                  ? "bg-primary text-primary-foreground shadow-sm"
+                  : "text-muted-foreground hover:bg-accent hover:text-foreground"
+              )}
+            >
+              Show Zero Rows
+            </button>
+            <button
+              onClick={() => setShowNegativeOnly((v) => !v)}
+              data-testid="button-v5-toggle-negative-only"
+              className={cn(
+                "rounded-md px-3 py-1.5 text-xs font-semibold transition-all",
+                showNegativeOnly
+                  ? "bg-destructive text-destructive-foreground shadow-sm"
+                  : "text-muted-foreground hover:bg-accent hover:text-foreground"
+              )}
+            >
+              {showNegativeOnly ? `Negative Only (${rows.length})` : "Negative Only"}
+            </button>
+            <button
+              onClick={() => setShowGarbageWipers((v) => !v)}
+              data-testid="button-v5-toggle-garbage-wipers"
+              className={cn(
+                "rounded-md px-3 py-1.5 text-xs font-semibold transition-all",
+                showGarbageWipers
+                  ? "bg-secondary text-secondary-foreground shadow-sm"
+                  : "text-muted-foreground hover:bg-accent hover:text-foreground"
+              )}
+            >
+              {showGarbageWipers
+                ? `Hide Garbage/Wipers (${garbageWipersCount})`
+                : `Show Garbage/Wipers${garbageWipersCount > 0 ? ` (${garbageWipersCount})` : ""}`}
+            </button>
+          </div>
+
+          <div className="w-px h-5 bg-border hidden sm:block" />
 
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
                 variant="outline"
                 size="icon"
+                className="h-9 w-9"
                 onClick={() => setExportDialogOpen(true)}
                 disabled={rows.length === 0}
                 data-testid="button-v5-export-excel"
@@ -773,31 +878,12 @@ export default function FactoryStockAllocationV5() {
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
-                variant="outline"
-                size="icon"
-                onClick={() => setRestoreDialogOpen(true)}
-                data-testid="button-v5-restore-cancelled"
-              >
-                <RotateCcw className="h-4 w-4" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>Restore Cancelled</TooltipContent>
-          </Tooltip>
-
-          <Button size="sm" onClick={() => setCreateDrawerOpen(true)} data-testid="button-v5-open-create-proforma">
-            <Plus className="h-4 w-4 mr-1.5" />
-            Create Proforma
-          </Button>
-
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
                 variant={refreshFlash ? "secondary" : "outline"}
                 size="icon"
+                className={cn("h-9 w-9", refreshFlash && "ring-2 ring-primary/40")}
                 onClick={handleRefresh}
                 disabled={query.isFetching}
                 data-testid="button-v5-refresh"
-                className={cn(refreshFlash && "ring-2 ring-primary/40")}
               >
                 {refreshFlash ? <CheckCircle2 className="h-4 w-4 text-primary" /> : <RefreshCw className="h-4 w-4" />}
               </Button>
@@ -821,32 +907,34 @@ export default function FactoryStockAllocationV5() {
           </Button>
         </div>
       ) : rows.length === 0 ? (
-        <Card>
-          <CardContent className="p-8 text-center text-muted-foreground">
-            No data found. Create a proforma with containers to use V5 stock allocation.
-          </CardContent>
-        </Card>
+        <div className="p-4">
+          <Card>
+            <CardContent className="p-8 text-center text-muted-foreground">
+              No data found. Create a proforma with containers to use V5 stock allocation.
+            </CardContent>
+          </Card>
+        </div>
       ) : (
-        <div className="overflow-auto rounded-md border max-h-[calc(100vh-180px)]">
+        <div className="overflow-auto max-h-[calc(100vh-160px)]">
           <table className="w-full text-sm border-collapse min-w-max">
             <thead>
               <tr className="bg-muted sticky top-0 z-30">
-                <th className="text-left px-3 py-2.5 font-medium border-b border-r whitespace-nowrap sticky left-0 bg-muted z-20 min-w-[200px]">
+                <th className="text-left px-3 pb-2.5 pt-0 font-medium border-b border-r whitespace-nowrap sticky left-0 bg-muted z-20 min-w-[200px] border-t-2 border-t-border">
                   Product
                 </th>
-                <th className="text-right px-3 py-2.5 font-medium border-b border-r whitespace-nowrap min-w-[120px]">
+                <th className="text-right px-3 pb-2.5 pt-0 font-medium border-b border-r whitespace-nowrap min-w-[120px] border-t-2 border-t-green-500 text-green-700 dark:text-green-400">
                   Stock Available
                 </th>
-                <th className="text-right px-3 py-2.5 font-medium border-b border-r whitespace-nowrap min-w-[130px] text-amber-600 dark:text-amber-400">
+                <th className="text-right px-3 pb-2.5 pt-0 font-medium border-b border-r whitespace-nowrap min-w-[130px] border-t-2 border-t-amber-500 text-amber-600 dark:text-amber-400">
                   Expected to Load
                 </th>
-                <th className="text-right px-3 py-2.5 font-medium border-b border-r whitespace-nowrap min-w-[110px] text-blue-600 dark:text-blue-400">
+                <th className="text-right px-3 pb-2.5 pt-0 font-medium border-b border-r whitespace-nowrap min-w-[110px] border-t-2 border-t-blue-500 text-blue-600 dark:text-blue-400">
                   Total Loaded
                 </th>
-                <th className="text-right px-3 py-2.5 font-medium border-b border-r whitespace-nowrap min-w-[140px]">
+                <th className="text-right px-3 pb-2.5 pt-0 font-medium border-b border-r whitespace-nowrap min-w-[140px] border-t-2 border-t-border">
                   Available Balance
                 </th>
-                <th className="text-center px-3 py-2.5 font-medium border-b whitespace-nowrap min-w-[70px]">Detail</th>
+                <th className="text-center px-3 pb-2.5 pt-0 font-medium border-b whitespace-nowrap min-w-[70px] border-t-2 border-t-border">Detail</th>
               </tr>
             </thead>
             <tbody>
@@ -863,6 +951,7 @@ export default function FactoryStockAllocationV5() {
                         idx % 2 === 0 ? "bg-background" : "bg-muted/20",
                         isShortage && "bg-destructive/5"
                       )}
+                      style={isShortage ? { boxShadow: "inset 3px 0 0 hsl(var(--destructive))" } : undefined}
                       data-testid={`row-v5-${row.articleCode}`}
                     >
                       <td className="px-3 py-2 border-r sticky left-0 bg-inherit z-10">
@@ -906,25 +995,26 @@ export default function FactoryStockAllocationV5() {
                         {row.totalLoaded > 0 ? row.totalLoaded : <span className="text-muted-foreground/40">—</span>}
                       </td>
 
-                      <td
-                        className={cn(
-                          "px-3 py-2 border-r text-right font-mono tabular-nums text-xs font-semibold",
-                          row.freeToPromise < 0
-                            ? "text-destructive"
-                            : row.freeToPromise === 0
-                              ? "text-muted-foreground"
-                              : "text-green-700 dark:text-green-400"
-                        )}
-                      >
-                        <span className="flex items-center justify-end gap-1">
-                          {isShortage && <AlertTriangle className="h-3 w-3" />}
-                          {row.freeToPromise > 0 ? `+${row.freeToPromise}` : row.freeToPromise}
-                        </span>
-                        {isShortage && (
-                          <div className="text-[10px] text-destructive/80 font-normal text-right">
-                            need {Math.abs(row.freeToPromise)} more
-                          </div>
-                        )}
+                      <td className="px-3 py-2 border-r text-right">
+                        <div className="flex flex-col items-end gap-0.5">
+                          <span
+                            className={cn(
+                              "inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-bold font-mono tabular-nums ring-1",
+                              row.freeToPromise < 0
+                                ? "bg-destructive/10 text-destructive ring-destructive/30"
+                                : row.freeToPromise === 0
+                                  ? "bg-muted text-muted-foreground ring-border"
+                                  : "bg-green-500/10 text-green-700 dark:text-green-400 ring-green-500/30"
+                            )}
+                          >
+                            {row.freeToPromise > 0 ? `+${row.freeToPromise}` : row.freeToPromise}
+                          </span>
+                          {isShortage && (
+                            <span className="text-[10px] text-destructive/70 font-normal">
+                              need {Math.abs(row.freeToPromise)} more
+                            </span>
+                          )}
+                        </div>
                       </td>
 
                       <td className="px-3 py-2 text-center">
@@ -1120,17 +1210,19 @@ export default function FactoryStockAllocationV5() {
                   <td className="px-3 py-2 border-r text-right font-mono tabular-nums text-blue-600 dark:text-blue-400">
                     {totals.totalLoaded > 0 ? totals.totalLoaded : "—"}
                   </td>
-                  <td
-                    className={cn(
-                      "px-3 py-2 border-r text-right font-mono tabular-nums",
-                      totals.freeToPromise < 0
-                        ? "text-destructive"
-                        : totals.freeToPromise === 0
-                          ? "text-muted-foreground"
-                          : "text-green-700 dark:text-green-400"
-                    )}
-                  >
-                    {totals.freeToPromise > 0 ? `+${totals.freeToPromise}` : totals.freeToPromise}
+                  <td className="px-3 py-2 border-r text-right">
+                    <span
+                      className={cn(
+                        "inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-bold font-mono tabular-nums ring-1",
+                        totals.freeToPromise < 0
+                          ? "bg-destructive/10 text-destructive ring-destructive/30"
+                          : totals.freeToPromise === 0
+                            ? "bg-muted text-muted-foreground ring-border"
+                            : "bg-green-500/10 text-green-700 dark:text-green-400 ring-green-500/30"
+                      )}
+                    >
+                      {totals.freeToPromise > 0 ? `+${totals.freeToPromise}` : totals.freeToPromise}
+                    </span>
                   </td>
                   <td />
                 </tr>
