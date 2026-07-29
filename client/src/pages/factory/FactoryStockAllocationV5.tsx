@@ -25,6 +25,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   Dialog,
   DialogContent,
   DialogHeader,
@@ -701,22 +708,23 @@ export default function FactoryStockAllocationV5() {
             )}
           </div>
           {allCategories.length > 0 && (
-            <div className="relative">
-              <select
-                value={categoryFilter}
-                onChange={(e) => setCategoryFilter(e.target.value)}
-                className="h-9 rounded-md border border-input bg-background px-3 pr-8 text-sm text-foreground appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
-                data-testid="select-v5-category-filter"
-              >
-                <option value="">All Categories</option>
+            <Select
+              value={categoryFilter || "__all__"}
+              onValueChange={(v) => setCategoryFilter(v === "__all__" ? "" : v)}
+              data-testid="select-v5-category-filter"
+            >
+              <SelectTrigger className="h-9 w-48 text-sm" data-testid="trigger-v5-category-filter">
+                <SelectValue placeholder="All Categories" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__all__">All Categories</SelectItem>
                 {allCategories.map((cat) => (
-                  <option key={cat} value={cat}>
+                  <SelectItem key={cat} value={cat}>
                     {cat}
-                  </option>
+                  </SelectItem>
                 ))}
-              </select>
-              <ChevronDown className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-            </div>
+              </SelectContent>
+            </Select>
           )}
           <Button
             variant={hideZero ? "default" : "outline"}
