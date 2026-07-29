@@ -18,7 +18,10 @@ if (!globalThis[INSTALL_KEY]) {
     "/api/factory/daybook",
     "/api/factory/v5/stock-allocation",
     "/api/vouchers",
-    "/api/ledger-accounts",
+    // /api/ledger-accounts intentionally excluded: voucher pickers need the full
+    // list for all companies (HADI L'SHI has 212 accounts). Structured pagination
+    // is still available via ledgerAccountPaginationRoutes for callers that opt in
+    // with explicit ?page= / ?limit= / ?pagination=1 params.
   ]);
 
   const heavyArrayPathPatterns = [
