@@ -33,9 +33,26 @@ const SENSITIVE_KEY_PATTERN = /(?:password|passwd|secret|token|authorization|coo
 const MAX_STRING_LENGTH = 2_000;
 const MAX_DEPTH = 4;
 
-function safeError(err: unknown): { message: string; stack?: string } | undefined {
+function safeError(
+  err: unknown,
+  depth = 0
+): { message: string; stack?: string; code?: string; detail?: string; cause?: unknown } | undefined {
   if (err === undefined || err === null) return undefined;
-  if (err instanceof Error) return isDev ? { message: err.message, stack: err.stack } : { message: err.message };
+  if (err instanceof Error) {
+    const out: { message: string; stack?: string; code?: string; detail?: string; cause?: unknown } = {
+      message: err.message.slice(0, MAX_STRING_LENGTH),
+    };
+    if (isDev) out.stack = err.stack;
+    // Expose pg/Drizzle error metadata
+    const e = err as Record<string, unknown>;
+    if (typeof e["code"] === "string") out.code = e["code"];
+    if (typeof e["detail"] === "string") out.detail = e["detail"].slice(0, MAX_STRING_LENGTH);
+    // Walk the cause chain so Drizzle "Failed query" errors expose the underlying pg error
+    if (depth < 3 && e["cause"] != null) {
+      out.cause = safeError(e["cause"] as unknown, depth + 1);
+    }
+    return out;
+  }
   return { message: String(err).slice(0, MAX_STRING_LENGTH) };
 }
 
