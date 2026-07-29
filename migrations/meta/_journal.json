@@ -99,6 +99,13 @@
       "when": 1785120000000,
       "tag": "0013_tenant_control_integrity_guards",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1785310649000,
+      "tag": "20260729_001_factory_container_jsoncargo_columns",
+      "breakpoints": true
     }
   ]
 }
