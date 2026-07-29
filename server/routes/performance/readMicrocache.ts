@@ -194,5 +194,9 @@ export function createReadMicrocacheMiddleware(options: ReadMicrocacheOptions = 
 }
 
 export function registerPerformanceReadMicrocache(app: { use: (handler: RequestHandler) => unknown }): void {
+  // Integration suites write fixtures directly through Drizzle/pg, bypassing the
+  // HTTP write boundary that invalidates this production cache. Keep those suites
+  // deterministic while dedicated readMicrocache unit tests exercise the cache itself.
+  if (process.env.NODE_ENV === "test") return;
   app.use(createReadMicrocacheMiddleware());
 }
