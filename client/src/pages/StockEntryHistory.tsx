@@ -20,12 +20,14 @@ import {
   MapPin,
   Tag,
   Layers,
+  Check,
 } from "lucide-react";
 import ProductionPlannerDialog from "./factory/ProductionPlannerDialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -234,7 +236,7 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
   }, [fromActive, fromDate]);
 
   const [categoryFilter, setCategoryFilter] = useState("all");
-  const [productCategoryFilter, setProductCategoryFilter] = useState("all");
+  const [productCategoryFilter, setProductCategoryFilter] = useState<string[]>([]);
   const [workerIdFilter, setWorkerIdFilter] = useState("all");
   const [productIdFilter, setProductIdFilter] = useState("all");
   const [locationIdFilter, setLocationIdFilter] = useState("all");
@@ -266,7 +268,7 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
         productIdFilter,
         locationIdFilter,
         categoryFilter,
-        productCategoryFilter,
+        productCategoryFilter.join(","),
         statusFilter,
         debouncedSearch,
         String(includeUnassigned),
@@ -282,7 +284,7 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
   if (workerIdFilter !== "all") params.set("workerId", workerIdFilter);
   if (productIdFilter !== "all") params.set("productId", productIdFilter);
   if (locationIdFilter !== "all") params.set("locationId", locationIdFilter);
-  if (productCategoryFilter !== "all") params.set("categoryId", productCategoryFilter);
+  if (productCategoryFilter.length > 0) params.set("categoryId", productCategoryFilter.join(","));
   if (statusFilter !== "all") params.set("status", statusFilter);
   if (debouncedSearch.trim()) params.set("search", debouncedSearch.trim());
   if (!includeUnassigned) params.set("includeUnassigned", "false");
@@ -1046,19 +1048,57 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
               <Layers className="h-3 w-3" />
               Bale Category
             </div>
-            <Select value={productCategoryFilter} onValueChange={setProductCategoryFilter}>
-              <SelectTrigger className="h-8 text-xs" data-testid="select-product-category">
-                <SelectValue placeholder="All categories" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Categories</SelectItem>
-                {productCategories.map((c: any) => (
-                  <SelectItem key={c.id} value={String(c.id)}>
-                    {c.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <Popover>
+              <PopoverTrigger asChild>
+                <button
+                  className="flex h-8 w-full items-center justify-between rounded-md border border-input bg-background px-2 text-xs shadow-sm hover:bg-accent focus:outline-none"
+                  data-testid="select-product-category"
+                >
+                  <span className="truncate text-left">
+                    {productCategoryFilter.length === 0
+                      ? "All Categories"
+                      : productCategoryFilter.length === 1
+                        ? (productCategories.find((c: any) => String(c.id) === productCategoryFilter[0])?.name ?? "1 selected")
+                        : `${productCategoryFilter.length} selected`}
+                  </span>
+                  <ChevronDown className="ml-1 h-3 w-3 shrink-0 text-muted-foreground" />
+                </button>
+              </PopoverTrigger>
+              <PopoverContent className="w-52 p-1" align="start">
+                <div className="max-h-64 overflow-y-auto">
+                  {/* "All" shortcut */}
+                  <button
+                    className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-xs hover:bg-accent"
+                    onClick={() => setProductCategoryFilter([])}
+                  >
+                    <span className={`flex h-3.5 w-3.5 items-center justify-center rounded-sm border ${productCategoryFilter.length === 0 ? "bg-primary border-primary" : "border-muted-foreground"}`}>
+                      {productCategoryFilter.length === 0 && <Check className="h-2.5 w-2.5 text-primary-foreground" />}
+                    </span>
+                    All Categories
+                  </button>
+                  {productCategories.map((c: any) => {
+                    const id = String(c.id);
+                    const checked = productCategoryFilter.includes(id);
+                    return (
+                      <button
+                        key={c.id}
+                        className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-xs hover:bg-accent"
+                        onClick={() =>
+                          setProductCategoryFilter((prev) =>
+                            checked ? prev.filter((x) => x !== id) : [...prev, id]
+                          )
+                        }
+                      >
+                        <span className={`flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-sm border ${checked ? "bg-primary border-primary" : "border-muted-foreground"}`}>
+                          {checked && <Check className="h-2.5 w-2.5 text-primary-foreground" />}
+                        </span>
+                        {c.name}
+                      </button>
+                    );
+                  })}
+                </div>
+              </PopoverContent>
+            </Popover>
           </div>
           <div className="space-y-1">
             <div className="flex items-center gap-1 text-xs text-muted-foreground font-medium">

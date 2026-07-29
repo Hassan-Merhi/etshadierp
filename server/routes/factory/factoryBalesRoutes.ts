@@ -2243,7 +2243,16 @@ export function registerFactoryBalesRoutes(app: Express) {
       const workerFilter = workerId ? sql`AND fb.finalized_by = ${parseInt(workerId)}` : sql``;
       const productFilter = productId ? sql`AND fb.product_id = ${parseInt(productId)}` : sql``;
       const locationFilter = locationId ? sql`AND fb.erp_location_id = ${parseInt(locationId)}` : sql``;
-      const categoryFilter2 = categoryId ? sql`AND fbp.category_id = ${parseInt(categoryId)}` : sql``;
+      // categoryId may be comma-separated for multi-select; build an IN(...) clause
+      const categoryIds2 = categoryId
+        ? categoryId.split(",").map((s: string) => parseInt(s, 10)).filter((n: number) => Number.isFinite(n) && n > 0)
+        : [];
+      const categoryFilter2 =
+        categoryIds2.length === 1
+          ? sql`AND fbp.category_id = ${categoryIds2[0]}`
+          : categoryIds2.length > 1
+            ? sql`AND fbp.category_id = ANY(${categoryIds2}::int[])`
+            : sql``;
       const statusFilter = status ? sql`AND fb.status = ${status}` : sql``;
       const searchFilter = search
         ? sql`AND LOWER(fb.reference_number) LIKE ${"%" + search.toLowerCase() + "%"}`
