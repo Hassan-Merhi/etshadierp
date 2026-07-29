@@ -15,6 +15,19 @@ describe("dependent Deleted Items permanent deletion", () => {
     );
   });
 
+  it("serializes bulk permanent deletes across app instances", () => {
+    const routes = source("server/routes/adminRoutes.ts");
+    const serialization = source("server/routes/admin/permanentDeleteSerialization.ts");
+
+    expect(routes).toContain(
+      'app.use("/api/deleted-items/:type/:id/permanent", serializeDeletedItemPermanentDeletes)'
+    );
+    expect(serialization).toContain("pg_advisory_lock");
+    expect(serialization).toContain("pg_advisory_unlock");
+    expect(serialization).toContain('res.once("finish", release)');
+    expect(serialization).toContain('res.once("close", release)');
+  });
+
   it("clears the restrictive container receipt and factory dependencies transactionally", () => {
     const route = source("server/routes/admin/dependentDeletedItemPermanentRoutes.ts");
 
