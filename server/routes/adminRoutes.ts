@@ -6,6 +6,7 @@ import { registerImportExportRoutes } from "./admin/importExportRoutes";
 import { registerAdminPoFixRoutes } from "./admin/adminPoFixRoutes";
 import { registerAdminRepairRoutes } from "./admin/adminRepairRoutes";
 import { registerDependentDeletedItemPermanentRoutes } from "./admin/dependentDeletedItemPermanentRoutes";
+import { serializeDeletedItemPermanentDeletes } from "./admin/permanentDeleteSerialization";
 import { registerDeletedItemsRoutes } from "./admin/deletedItemsRoutes";
 import { registerSecurityAnomalyRoutes } from "./admin/securityAnomalyRoutes";
 import { registerSecurityPermissionRoutes } from "./admin/securityPermissionRoutes";
@@ -28,6 +29,8 @@ export function registerAdminRoutes(app: Express) {
   ]) {
     app.use(path, enforceAdminCompanyScope);
   }
+
+  app.use("/api/deleted-items/:type/:id/permanent", serializeDeletedItemPermanentDeletes);
 
   app.use(
     "/api/admin/rebuild-inventory",
