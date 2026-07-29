@@ -1682,6 +1682,19 @@ END $mig$`;
             ON factory_status_builder_log (company_id, created_at DESC);
           CREATE INDEX IF NOT EXISTS idx_sb_log_sheet
             ON factory_status_builder_log (sheet_id);
+
+          -- ledger_accounts: is_hidden column (added in startup migration ~2419)
+          -- Drizzle enumerates every declared column in SELECT statements. If this
+          -- column is absent in production (RUN_STARTUP_MIGRATIONS=false), every
+          -- getAllLedgerAccounts() call throws "column does not exist" → 500 →
+          -- Pay From / Receive Into and all account pickers return empty.
+          ALTER TABLE ledger_accounts
+            ADD COLUMN IF NOT EXISTS is_hidden BOOLEAN NOT NULL DEFAULT false;
+
+          -- ledger_accounts: sub_type and parent_id (declared in Drizzle schema)
+          ALTER TABLE ledger_accounts
+            ADD COLUMN IF NOT EXISTS sub_type  TEXT,
+            ADD COLUMN IF NOT EXISTS parent_id INTEGER;
         `);
         logger.info("[startup] ✓ Multi-currency schema columns ensured");
       } catch (colErr: unknown) {
