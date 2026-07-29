@@ -106,7 +106,7 @@ export function VoucherDetailsDialog({
     staleTime: 30_000,
   });
 
-  const transferDetail = voucherDetail?.transfer ?? null;
+  const transferDetail = voucherDetail?.transferData ?? null;
 
   if (!selectedVoucher) return null;
 

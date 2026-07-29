@@ -446,6 +446,7 @@ export function registerVoucherEntryRoutes(app: Express) {
               id: stockTransferItems.id,
               transferId: stockTransferItems.transferId,
               stockItemId: stockTransferItems.stockItemId,
+              sourceLocationId: stockTransferItems.sourceLocationId,
               quantity: stockTransferItems.quantity,
               rate: stockTransferItems.rate,
               totalAmount: stockTransferItems.totalAmount,
@@ -457,24 +458,48 @@ export function registerVoucherEntryRoutes(app: Express) {
             .where(eq(stockTransferItems.transferId, transferVoucher.id));
 
           if (transferItemsList.length > 0) {
-            const itemsWithDetails = transferItemsList.map((item) => ({
-              id: item.id,
-              voucherId: id,
-              stockItemId: item.stockItemId,
-              stockItemName: item.stockItemName || "Unknown Item",
-              stockItemCode: item.stockItemCode || "-",
-              quantity: item.quantity,
-              rate: isPOSUser ? null : item.rate,
-              debitAmount: "0",
-              creditAmount: isPOSUser ? "0" : item.totalAmount,
-              narration: isPOSUser
-                ? `Transfer of ${item.quantity} x ${item.stockItemName || "Unknown Item"}`
-                : `Transfer of ${item.quantity} x ${item.stockItemName || "Unknown Item"} @ ${item.rate}`,
-              accountName: item.stockItemName || "Unknown Item",
-              accountCode: item.stockItemCode || "-",
-              isStockItem: true,
-              totalAmount: isPOSUser ? null : item.totalAmount,
-            }));
+            // Collect all location IDs we need to resolve
+            const locationIdSet = new Set<number>();
+            if (transferVoucher.sourceLocationId) locationIdSet.add(transferVoucher.sourceLocationId);
+            for (const item of transferItemsList) {
+              if (item.sourceLocationId) locationIdSet.add(item.sourceLocationId);
+            }
+            const locationIds = Array.from(locationIdSet);
+            const locationRows = locationIds.length > 0
+              ? await db
+                  .select({ id: locations.id, name: locations.name })
+                  .from(locations)
+                  .where(inArray(locations.id, locationIds))
+              : [];
+            const locationMap = new Map(locationRows.map((l) => [l.id, l.name]));
+            const transferSourceName = transferVoucher.sourceLocationId
+              ? (locationMap.get(transferVoucher.sourceLocationId) ?? "")
+              : "";
+
+            const itemsWithDetails = transferItemsList.map((item) => {
+              const itemSourceName = item.sourceLocationId
+                ? (locationMap.get(item.sourceLocationId) ?? transferSourceName)
+                : transferSourceName;
+              return {
+                id: item.id,
+                voucherId: id,
+                stockItemId: item.stockItemId,
+                stockItemName: item.stockItemName || "Unknown Item",
+                stockItemCode: item.stockItemCode || "-",
+                quantity: item.quantity,
+                rate: isPOSUser ? null : item.rate,
+                debitAmount: "0",
+                creditAmount: isPOSUser ? "0" : item.totalAmount,
+                narration: isPOSUser
+                  ? `Transfer of ${item.quantity} x ${item.stockItemName || "Unknown Item"}`
+                  : `Transfer of ${item.quantity} x ${item.stockItemName || "Unknown Item"} @ ${item.rate}`,
+                accountName: item.stockItemName || "Unknown Item",
+                accountCode: item.stockItemCode || "-",
+                isStockItem: true,
+                totalAmount: isPOSUser ? null : item.totalAmount,
+                sourceLocationName: itemSourceName,
+              };
+            });
             return res.json(itemsWithDetails);
           }
           // stockTransferVouchers record exists but no items — return empty array
