@@ -37,7 +37,7 @@ export function parseAccountValue(val: string): { type: "ledger" | "supplier"; i
 interface AccountComboboxProps {
   value: string;
   onValueChange: (value: string) => void;
-  accounts: { id: number; name: string; code?: string }[];
+  accounts: { id: number; name: string; code?: string; accountType?: string; subType?: string }[];
   suppliers?: { id: number; name: string }[];
   placeholder?: string;
   disabled?: boolean;
@@ -77,45 +77,61 @@ export function AccountCombobox({
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-full p-0" align="start">
+      <PopoverContent
+        className="w-[var(--radix-popover-trigger-width)] min-w-[20rem] max-w-[calc(100vw-2rem)] p-0"
+        align="start"
+      >
         <Command>
-          <CommandInput placeholder="Search..." />
-          <CommandList>
-            <CommandEmpty>Nothing found.</CommandEmpty>
+          <CommandInput placeholder="Search account, code, type, or supplier..." />
+          <CommandList className="max-h-[360px]">
+            <CommandEmpty>No account found.</CommandEmpty>
+            <CommandGroup heading="All Ledger Accounts">
+              {accounts.map((account) => (
+                <CommandItem
+                  key={`acc-${account.id}`}
+                  value={[account.code, account.name, account.accountType, account.subType].filter(Boolean).join(" ")}
+                  onSelect={() => {
+                    onValueChange(account.id.toString());
+                    setOpen(false);
+                  }}
+                  data-testid={`option-ledger-account-${account.id}`}
+                >
+                  <Check
+                    className={cn(
+                      "mr-2 h-4 w-4 shrink-0",
+                      value === account.id.toString() ? "opacity-100" : "opacity-0"
+                    )}
+                  />
+                  <span className="min-w-0 flex-1 truncate">{account.name}</span>
+                  <span className="ml-2 shrink-0 text-xs text-muted-foreground">
+                    {[account.accountType, account.code].filter(Boolean).join(" · ")}
+                  </span>
+                </CommandItem>
+              ))}
+            </CommandGroup>
             {suppliers && suppliers.length > 0 && (
               <CommandGroup heading="Brokers & Suppliers">
                 {suppliers.map((s) => (
                   <CommandItem
                     key={`sup-${s.id}`}
-                    value={`supplier ${s.name}`}
+                    value={`supplier broker ${s.name}`}
                     onSelect={() => {
                       onValueChange(`SUP:${s.id}`);
                       setOpen(false);
                     }}
+                    data-testid={`option-factory-supplier-${s.id}`}
                   >
-                    <Check className={cn("mr-2 h-4 w-4", value === `SUP:${s.id}` ? "opacity-100" : "opacity-0")} />
-                    {s.name}
+                    <Check
+                      className={cn(
+                        "mr-2 h-4 w-4 shrink-0",
+                        value === `SUP:${s.id}` ? "opacity-100" : "opacity-0"
+                      )}
+                    />
+                    <span className="truncate">{s.name}</span>
                   </CommandItem>
                 ))}
               </CommandGroup>
             )}
-            <CommandGroup heading="Ledger Accounts">
-              {accounts.map((account) => (
-                <CommandItem
-                  key={`acc-${account.id}`}
-                  value={account.code ? `${account.code} ${account.name}` : account.name}
-                  onSelect={() => {
-                    onValueChange(account.id.toString());
-                    setOpen(false);
-                  }}
-                >
-                  <Check
-                    className={cn("mr-2 h-4 w-4", value === account.id.toString() ? "opacity-100" : "opacity-0")}
-                  />
-                  {account.name}
-                </CommandItem>
-              ))}
-            </CommandGroup>
           </CommandList>
         </Command>
       </PopoverContent>
