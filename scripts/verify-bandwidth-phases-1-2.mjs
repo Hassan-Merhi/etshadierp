@@ -27,7 +27,10 @@ const hotspotGuard = read("client/src/lib/bandwidthPhase1HotspotGuard.ts");
 const payloadGuard = read("client/src/lib/bandwidthPhase2PayloadGuard.ts");
 const accountingGuard = read("client/src/lib/accountingRequestFetchGuard.ts");
 const apiBridge = read("server/apiPaginationBridge.mjs");
-const inventoryRoutes = read("server/routes/inventoryRoutes.ts");
+const inventoryRoutes = [
+  read("server/routes/inventoryRoutes.ts"),
+  read("server/routes/inventory/inventoryQueryService.ts"),
+].join("\n");
 const readMicrocache = read("server/routes/performance/readMicrocache.ts");
 const supplierBatcher = read("server/routes/performance/supplierVoucherEntryBatcher.ts");
 const supplierBalanceHelpers = read("server/routes/helpers/supplierBalanceHelpers.ts");
