@@ -1,33 +1,32 @@
-# Phase 6 — Chat reporting domains
+# Phase 6 — Chat report domain extraction
 
-## Purpose
+## Status
 
-Separate chat report classification and domain ownership from the main chat orchestration path without changing any report SQL, formatting, query names, or response payloads.
+Phase 6 is **in progress**.
 
-## Architecture
+The stable `server/chat/reports.ts` facade and semantic ownership boundaries are present, but the original report implementations remain consolidated in `server/chat/reports/legacyReportEngine.ts`. At approximately 3,704 lines, that compatibility engine is still an oversized file and must be removed before this phase can be called complete.
 
-`server/chatService.ts` continues to depend on the stable `runDataQuery` entry point from `server/chat/reports.ts`. The public report module is now a thin facade over a domain dispatcher.
+## Completed
 
-Focused ownership modules cover:
+- Kept `chatService.ts` dependent on the stable `runDataQuery` entry point.
+- Reduced `server/chat/reports.ts` to a thin facade.
+- Added shared report context and result contracts.
+- Added ownership modules for accounting, customers/suppliers, inventory, factory, containers, sales, and operations.
+- Added deterministic domain dispatch.
+- Preserved existing SQL, query names, limits, labels, tables, statistics, and no-data behavior through the compatibility engine.
+- Added a static verifier and source-contract test.
 
-- accounting and finance;
-- customers and suppliers;
-- inventory and stock movement;
-- factory and workforce reporting;
-- containers and arrivals;
-- sales and profitability;
-- general operations.
+## Completion criteria
 
-The original read-only execution engine is preserved at `server/chat/reports/legacyReportEngine.ts`. Domain handlers delegate to it so SQL, date handling, limits, labels, tables, stats, and no-data behavior remain unchanged. Unknown or historical query names also use the compatibility fallback.
+Phase 6 is complete only when all of the following are true:
 
-## Guardrails
-
-- `chatService.ts` may not regain a `switch (params.queryType)` report dispatcher.
-- `server/chat/reports.ts` must remain a small facade.
-- Each classified query type has one domain owner.
-- The compatibility engine remains read-only and frozen for behavior preservation.
-- New report names must be assigned to a focused domain before being added.
+1. Every report implementation is physically moved into bounded handler modules.
+2. `server/chat/reports/legacyReportEngine.ts` is deleted.
+3. No compatibility fallback delegates to one monolithic switch.
+4. Every supported query type has exactly one owner and implementation.
+5. `chatService.ts` contains no report SQL or query-type switch.
+6. Existing query names and response shapes remain unchanged.
 
 ## Verification boundary
 
-The static verifier and Vitest source-contract test were added but intentionally not executed. No TypeScript, lint, formatting, database, production build, browser, CI, or deployment result is claimed.
+No CI, TypeScript, formatting, lint, tests, database execution, production build, browser verification, deployment, or runtime smoke checks have been run.
