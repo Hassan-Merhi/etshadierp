@@ -623,6 +623,10 @@ export function registerFactoryContainersRoutes(app: Express) {
     } catch (error: unknown) {
       logger.error("factory container create failed", { module: "factoryContainers", action: "create", userId: _uid, companyId: _cid, durationMs: Date.now() - _t, error });
       logger.error("Error creating factory container:", { error: error });
+      const cause = (error as any)?.cause ?? (error as any);
+      if (cause?.code === "23505" && cause?.detail?.includes("container_number")) {
+        return res.status(409).json({ message: "A container with this number already exists. Please use a different container number." });
+      }
       res.status(400).json({ message: getErrorMessage(error) });
     }
   });
