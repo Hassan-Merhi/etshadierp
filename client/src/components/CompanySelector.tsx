@@ -1,5 +1,6 @@
-import { useCompany } from "@/contexts/CompanyContext";
-import { WifiOff, ChevronDown, Layers } from "lucide-react";
+import { useCompany, type Company } from "@/contexts/CompanyContext";
+import type { CompanyType } from "@/contracts/sessionContracts";
+import { ChevronDown, Layers, WifiOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -13,18 +14,16 @@ import { useToast } from "@/hooks/use-toast";
 import { useConnectivity } from "@/contexts/ConnectivityContext";
 import { enqueueRequest } from "@/lib/offlineQueue";
 
-type CompanyType = "erp" | "factory" | "properties" | string;
-
-const TYPE_META: Record<string, { color: string; label: string }> = {
-  erp:              { color: "#3b82f6", label: "ERP" },
-  factory:          { color: "#f97316", label: "Factory" },
-  factory_v2:       { color: "#f97316", label: "Factory V2" },
-  properties:       { color: "#6366f1", label: "Properties" },
+const TYPE_META: Record<CompanyType, { color: string; label: string }> = {
+  erp: { color: "#3b82f6", label: "ERP" },
+  factory: { color: "#f97316", label: "Factory" },
+  factory_v2: { color: "#f97316", label: "Factory V2" },
+  properties: { color: "#6366f1", label: "Properties" },
   supplier_partner: { color: "#f43f5e", label: "Supplier Partner" },
 };
 
 function getTypeMeta(type: CompanyType) {
-  return TYPE_META[type] ?? { color: "#6b7280", label: type ?? "Unknown" };
+  return TYPE_META[type];
 }
 
 function getInitials(name: string) {
@@ -46,39 +45,51 @@ function CompanyAvatar({ name, type, size = "sm" }: { name: string; type: Compan
   );
 }
 
+function getErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : "Please try again.";
+}
+
 export function CompanySelector() {
   const { selectedCompany, companies, isLoading, selectCompany } = useCompany();
   const { isOnline } = useConnectivity();
   const { toast } = useToast();
 
-  const handleCompanyChange = async (company: any) => {
+  const handleCompanyChange = async (company: Company) => {
     if (company.id === selectedCompany?.id || isLoading) return;
 
-    const switched = await selectCompany(company, isOnline ? undefined : { offline: true });
-    if (!switched) {
+    try {
+      const switched = await selectCompany(company, isOnline ? undefined : { offline: true });
+      if (!switched) {
+        toast({
+          title: "Failed to switch company",
+          description: "The server did not accept the workspace change. Your current company was kept.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      if (!isOnline) {
+        enqueueRequest(
+          "/api/auth/set-company",
+          "POST",
+          JSON.stringify({ companyId: company.id }),
+          `Switch to ${company.name}`,
+        );
+        toast({
+          title: `Switched to ${company.name}`,
+          description: "The local workspace changed. The server session will synchronize when you reconnect.",
+        });
+        return;
+      }
+
+      toast({ title: `Switched to ${company.name}` });
+    } catch (error: unknown) {
       toast({
         title: "Failed to switch company",
-        description: "The server did not accept the workspace change. Your current company was kept.",
+        description: getErrorMessage(error),
         variant: "destructive",
       });
-      return;
     }
-
-    if (!isOnline) {
-      enqueueRequest(
-        "/api/auth/set-company",
-        "POST",
-        JSON.stringify({ companyId: company.id }),
-        `Switch to ${company.name}`,
-      );
-      toast({
-        title: `Switched to ${company.name}`,
-        description: "The local workspace changed. The server session will synchronize when you reconnect.",
-      });
-      return;
-    }
-
-    toast({ title: `Switched to ${company.name}` });
   };
 
   if (isLoading || !selectedCompany) {
@@ -90,7 +101,7 @@ export function CompanySelector() {
     );
   }
 
-  const activeType = (selectedCompany as any).companyType ?? "erp";
+  const activeType = selectedCompany.companyType;
 
   if (companies.length <= 1) {
     return (
@@ -136,8 +147,7 @@ export function CompanySelector() {
         <DropdownMenuSeparator className="mx-0 my-1" />
 
         {companies.map((company) => {
-          const cType = (company as any).companyType ?? "erp";
-          const { color, label } = getTypeMeta(cType);
+          const { color, label } = getTypeMeta(company.companyType);
           const isActive = company.id === selectedCompany.id;
 
           return (
@@ -148,7 +158,7 @@ export function CompanySelector() {
               className="rounded-md px-2 py-2 gap-2.5 cursor-pointer"
               style={isActive ? { backgroundColor: `${color}14` } : undefined}
             >
-              <CompanyAvatar name={company.name} type={cType} size="md" />
+              <CompanyAvatar name={company.name} type={company.companyType} size="md" />
               <div className="flex flex-col flex-1 min-w-0">
                 <span className="text-sm font-medium leading-tight truncate">{company.name}</span>
                 <span className="text-[10px] leading-tight" style={{ color: `${color}cc` }}>
