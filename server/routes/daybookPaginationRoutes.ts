@@ -14,13 +14,20 @@ function parsePositiveInt(value: unknown, fallback: number): number {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
 }
 
-function parsePagination(req: Request): { page: number; limit: number; offset: number } {
+function parsePagination(req: Request): {
+  page: number;
+  limit: number;
+  offset: number;
+} {
   const limit = Math.min(
     MAX_PAGE_SIZE,
-    parsePositiveInt(req.query.limit ?? req.query.pageSize, DEFAULT_PAGE_SIZE)
+    parsePositiveInt(req.query.limit ?? req.query.pageSize, DEFAULT_PAGE_SIZE),
   );
   if (req.query.offset !== undefined) {
-    const offset = Math.max(0, Number.parseInt(String(req.query.offset), 10) || 0);
+    const offset = Math.max(
+      0,
+      Number.parseInt(String(req.query.offset), 10) || 0,
+    );
     return { page: Math.floor(offset / limit) + 1, limit, offset };
   }
   const page = parsePositiveInt(req.query.page, 1);
@@ -35,7 +42,8 @@ export function registerDaybookPaginationRoutes(app: Express): void {
   app.get("/api/daybook", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = req.session.currentCompanyId;
-      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      if (!companyId)
+        return res.status(400).json({ message: "No company selected" });
 
       let startDate = normalizeDate(req.query.startDate);
       let endDate = normalizeDate(req.query.endDate);
@@ -68,21 +76,27 @@ export function registerDaybookPaginationRoutes(app: Express): void {
       ];
 
       const voucherType =
-        typeof req.query.voucherType === "string" ? req.query.voucherType.trim() : "";
+        typeof req.query.voucherType === "string"
+          ? req.query.voucherType.trim()
+          : "";
       if (voucherType && voucherType !== "all") {
         voucherConditions.push(`v.voucher_type = ${bind(voucherType)}`);
       }
 
       const statusFilter =
-        typeof req.query.statusFilter === "string" ? req.query.statusFilter : "all";
+        typeof req.query.statusFilter === "string"
+          ? req.query.statusFilter
+          : "all";
       if (statusFilter === "active") voucherConditions.push("v.optional = false");
-      else if (statusFilter === "optional") voucherConditions.push("v.optional = true");
+      else if (statusFilter === "optional")
+        voucherConditions.push("v.optional = true");
 
-      const search = typeof req.query.search === "string" ? req.query.search.trim() : "";
+      const search =
+        typeof req.query.search === "string" ? req.query.search.trim() : "";
       if (search) {
         const param = bind(`%${search}%`);
         voucherConditions.push(
-          `(v.voucher_number ILIKE ${param} OR COALESCE(v.description, '') ILIKE ${param} OR COALESCE(v.location_name, '') ILIKE ${param})`
+          `(v.voucher_number ILIKE ${param} OR COALESCE(v.description, '') ILIKE ${param} OR COALESCE(v.location_name, '') ILIKE ${param})`,
         );
       }
 
@@ -103,13 +117,13 @@ export function registerDaybookPaginationRoutes(app: Express): void {
           .where(
             and(
               eq(userLocations.userId, req.user.id),
-              eq(userLocations.companyId, companyId)
-            )
+              eq(userLocations.companyId, companyId),
+            ),
           );
         const locationIds = assignedLocations.map((row) => row.locationId);
         if (locationIds.length > 0) {
           voucherConditions.push(
-            `(v.location_id IS NULL OR v.location_id = ANY(${bind(locationIds)}::int[]))`
+            `(v.location_id IS NULL OR v.location_id = ANY(${bind(locationIds)}::int[]))`,
           );
         }
       }
@@ -232,14 +246,16 @@ export function registerDaybookPaginationRoutes(app: Express): void {
       const result = await pool.query(query, values);
       const total = Number(result.rows[0]?.total || 0);
       const totalPages = total === 0 ? 0 : Math.ceil(total / limit);
-      const items = Array.isArray(result.rows[0]?.items) ? result.rows[0].items : [];
+      const items = Array.isArray(result.rows[0]?.items)
+        ? result.rows[0].items
+        : [];
       res.setHeader("X-Total-Count", String(total));
       res.setHeader("X-Page", String(page));
       res.setHeader("X-Page-Size", String(limit));
       res.setHeader("X-Total-Pages", String(totalPages));
       res.setHeader(
         "Access-Control-Expose-Headers",
-        "X-Total-Count, X-Page, X-Page-Size, X-Total-Pages"
+        "X-Total-Count, X-Page, X-Page-Size, X-Total-Pages",
       );
       return res.json({
         items,
