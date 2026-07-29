@@ -10,6 +10,7 @@ import { seedTestData, cleanupTestData, closeTestServer, type TestContext } from
 import { db, pool } from "../server/db";
 import { eq } from "drizzle-orm";
 import * as schema from "../shared/schema";
+import { companyScopedSuppliers } from "../shared/schema/supplierCompanyScope";
 import {
   normalizeJsonCargoCarrier,
   isValidContainerNumber,
@@ -68,7 +69,7 @@ beforeAll(async () => {
   ctx = await seedTestData(TEST_PREFIX);
 
   const [supplier] = await db
-    .insert(schema.companyScopedSuppliers)
+    .insert(companyScopedSuppliers)
     .values({
       companyId: ctx.companyId,
       code: `${TEST_PREFIX}-SUP1`,
@@ -352,7 +353,7 @@ describe("routes — permissions and company isolation", () => {
     const otherCtx = await seedTestData(`${TEST_PREFIX}other`);
     try {
       const [foreignSupplier] = await db
-        .insert(schema.companyScopedSuppliers)
+        .insert(companyScopedSuppliers)
         .values({
           companyId: otherCtx.companyId,
           code: `${TEST_PREFIX}-FSUP`,
