@@ -1,1 +1,0 @@
-Run the one-time Phase 1 formatter on July 29, 2026. Delete this file after applying the artifact.
