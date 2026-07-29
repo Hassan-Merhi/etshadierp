@@ -152,7 +152,7 @@ function normalizeCurrency(value: unknown): string {
 
 function decimal(value: unknown, field: string, options: { allowZero?: boolean } = {}) {
   try {
-    return factoryCostDecimal(value as any, field, { allowZero: options.allowZero !== false });
+    return factoryCostDecimal(value as any, field, { allowZero: options.allowZero === true });
   } catch {
     throw new MixBatchCostingValidationError(
       "MIX_BATCH_AMOUNT_INVALID",
