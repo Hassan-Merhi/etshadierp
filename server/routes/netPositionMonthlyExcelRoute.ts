@@ -1,4 +1,3 @@
-import { parseOptionalId } from "../lib/parseId";
 import { getErrorMessage } from "../lib/httpHandlers";
 import { logger } from "../lib/logger";
 /**
@@ -7,24 +6,24 @@ import { logger } from "../lib/logger";
  */
 
 import type { Express } from "express";
-import { requireAuth } from "../auth";
+import { requireAuth, requireNonPOS } from "../auth";
 import { storage } from "../storage";
 import { generateNetPositionExcel, generateMonthEnds } from "../helpers/generateNetPositionExcel";
 import { getClientDate } from "../lib/dateUtils";
+import {
+  resolveAuthorizedCompanyId,
+  sendCompanyAccessError,
+} from "../security/companyAccessBoundary";
 
 export function registerNetPositionMonthlyExcelRoute(app: Express) {
-  app.get("/api/reports/net-position-monthly-excel", requireAuth, async (req, res) => {
+  app.get("/api/reports/net-position-monthly-excel", requireAuth, requireNonPOS, async (req, res) => {
     try {
-      const role = req.user?.role;
-      const isAdminOrDev = role === "Admin" || role === "Developer";
-      const requestedCompanyId = req.query.companyId ? parseOptionalId(req.query.companyId) : null;
-      const companyId = isAdminOrDev && requestedCompanyId ? requestedCompanyId : req.session.currentCompanyId;
-
-      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      const companyId = await resolveAuthorizedCompanyId(req, req.query.companyId);
 
       const allCompanies = await storage.getAllCompanies();
-      const company = allCompanies.find((c: any) => c.id === companyId);
-      const companyName = company?.name || "Company";
+      const company = allCompanies.find((candidate: any) => candidate.id === companyId);
+      if (!company) return res.status(404).json({ message: "Company not found" });
+      const companyName = company.name || "Company";
 
       const startDate = (req.query.startDate as string) || "";
       const endDate = (req.query.endDate as string) || getClientDate(req);
@@ -39,12 +38,15 @@ export function registerNetPositionMonthlyExcelRoute(app: Express) {
       res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
       res.setHeader(
         "Content-Disposition",
-        `attachment; filename="NetPosition_Monthly_${safeCompany}_${safeStart}_${safeEnd}.xlsx"`
+        `attachment; filename="NetPosition_Monthly_${safeCompany}_${safeStart}_${safeEnd}.xlsx"`,
       );
       await generateNetPositionExcel(companyId, companyName, startDate, endDate, res);
       res.end();
     } catch (error: unknown) {
-      logger.error("Net position monthly Excel error:", { error: error });
+      logger.error("Net position monthly Excel error:", { error });
+      if ((error as any)?.name === "CompanyAccessError") {
+        return sendCompanyAccessError(res, error);
+      }
       res.status(500).json({ message: getErrorMessage(error) });
     }
   });
