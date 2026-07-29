@@ -30,19 +30,11 @@ export const simpleCompanyTransferService = {
     const parsed = parseSimpleTransferInput(input);
     await requireCompanyAccess(userId, [parsed.fromCompanyId, parsed.toCompanyId]);
 
-    const [fromCompany, toCompany, fromAccount, toAccount] = await Promise.all([
+    const [fromCompany, toCompany] = await Promise.all([
       transferRepository.getCompany(parsed.fromCompanyId),
       transferRepository.getCompany(parsed.toCompanyId),
-      transferRepository.getLedgerAccount(parsed.fromLedgerAccountId),
-      transferRepository.getLedgerAccount(parsed.toLedgerAccountId),
     ]);
     if (!fromCompany || !toCompany) throw new TransferRouteError(404, "Company not found");
-    if (!fromAccount || fromAccount.companyId !== parsed.fromCompanyId) {
-      throw new TransferRouteError(404, "From ledger account not found or doesn't belong to from company");
-    }
-    if (!toAccount || toAccount.companyId !== parsed.toCompanyId) {
-      throw new TransferRouteError(404, "To ledger account not found or doesn't belong to to company");
-    }
 
     const description = parsed.description || `Transfer to ${toCompany.name}`;
     const [fromClearing, toClearing] = await Promise.all([
