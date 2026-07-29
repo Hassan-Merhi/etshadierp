@@ -298,6 +298,20 @@ async function guardSpOffload(req: Request, res: Response, next: NextFunction): 
       }
     }
 
+    // The legacy offload handler commits its own write transaction before calling
+    // res.json(). Release this guard's advisory lock first, then emit the response.
+    // That guarantees the client never observes "request complete" while the lock is
+    // still held, so an immediate identical retry is classified as a replay instead
+    // of racing the asynchronous finish-event cleanup and receiving a false 409.
+    const originalJson = res.json.bind(res);
+    let responseScheduled = false;
+    res.json = ((body: unknown) => {
+      if (responseScheduled) return res;
+      responseScheduled = true;
+      void release(res.statusCode < 500).then(() => originalJson(body));
+      return res;
+    }) as typeof res.json;
+
     next();
   } catch (error: unknown) {
     await release(false);
