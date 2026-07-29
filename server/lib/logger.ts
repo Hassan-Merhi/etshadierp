@@ -3,6 +3,7 @@
  * Production emits one-line JSON. Development emits compact readable lines.
  * Context is sanitised before output and must never contain request/response bodies.
  */
+import { serialiseErrorForLog } from "./errorLogMetadata";
 import { markRuntimeFailure } from "./runtimePerformance";
 import { getTraceContext } from "./traceContext";
 
@@ -33,18 +34,12 @@ const SENSITIVE_KEY_PATTERN = /(?:password|passwd|secret|token|authorization|coo
 const MAX_STRING_LENGTH = 2_000;
 const MAX_DEPTH = 4;
 
-function safeError(err: unknown): { message: string; stack?: string } | undefined {
-  if (err === undefined || err === null) return undefined;
-  if (err instanceof Error) return isDev ? { message: err.message, stack: err.stack } : { message: err.message };
-  return { message: String(err).slice(0, MAX_STRING_LENGTH) };
-}
-
 function sanitiseValue(value: unknown, depth = 0, seen = new WeakSet<object>()): unknown {
   if (value === null || value === undefined || typeof value === "number" || typeof value === "boolean") return value;
   if (typeof value === "string") return value.length > MAX_STRING_LENGTH ? `${value.slice(0, MAX_STRING_LENGTH)}…` : value;
   if (typeof value === "bigint") return value.toString();
   if (typeof value === "function" || typeof value === "symbol") return String(value);
-  if (value instanceof Error) return safeError(value);
+  if (value instanceof Error) return serialiseErrorForLog(value, isDev);
   if (value instanceof Date) return value.toISOString();
   if (Buffer.isBuffer(value)) return `[Buffer ${value.length} bytes]`;
   if (depth >= MAX_DEPTH) return "[MaxDepth]";
@@ -76,7 +71,7 @@ function emit(level: LogLevel, message: string, ctx: LogContext = {}): void {
   const trace = getTraceContext();
   const mergedContext: LogContext = { ...(trace || {}), ...ctx };
   const safeContext = sanitiseContext(mergedContext);
-  const error = safeError(mergedContext.error);
+  const error = serialiseErrorForLog(mergedContext.error, isDev);
   if (isDev) {
     const parts: string[] = [`[${level.toUpperCase()}]`, message];
     if (mergedContext.module) parts.push(`[${mergedContext.module}${mergedContext.action ? `:${mergedContext.action}` : ""}]`);
