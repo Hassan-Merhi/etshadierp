@@ -72,6 +72,7 @@ interface ProformaDetail {
 interface V5Row {
   articleCode: string;
   productName: string;
+  categoryName?: string;
   stockAvailable: number;
   totalLoaded: number;
   expectedToLoad: number;
@@ -126,6 +127,7 @@ export default function FactoryStockAllocationV5() {
   const [showGarbageWipers, setShowGarbageWipers] = useState(false);
   const [refreshFlash, setRefreshFlash] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState("");
   // Debounced value sent to the server — prevents one request per keystroke.
   const [debouncedSearch, setDebouncedSearch] = useState("");
   useEffect(() => {
@@ -448,12 +450,24 @@ export default function FactoryStockAllocationV5() {
   const garbageWipersCount = allRows.filter(isGarbageOrWipers).length;
   const filteredRows = showGarbageWipers ? allRows : allRows.filter((r) => !isGarbageOrWipers(r));
   const negativeFilteredRows = showNegativeOnly ? filteredRows.filter((r) => r.freeToPromise < 0) : filteredRows;
+  const categoryFilteredRows = categoryFilter
+    ? negativeFilteredRows.filter((r) => (r.categoryName ?? "") === categoryFilter)
+    : negativeFilteredRows;
   const rows = searchQuery.trim()
-    ? negativeFilteredRows.filter((r) => {
+    ? categoryFilteredRows.filter((r) => {
         const q = searchQuery.toLowerCase();
         return r.productName.toLowerCase().includes(q) || r.articleCode.toLowerCase().includes(q);
       })
-    : negativeFilteredRows;
+    : categoryFilteredRows;
+
+  // Unique sorted category names from all loaded rows (unfiltered) for the dropdown
+  const allCategories = useMemo(() => {
+    const cats = new Set<string>();
+    allRows.forEach((r) => {
+      if (r.categoryName) cats.add(r.categoryName);
+    });
+    return Array.from(cats).sort();
+  }, [allRows]);
   const totals = query.data?.totals;
 
   // Auto-expand rows that contain the focused proforma, then scroll to first match
@@ -686,6 +700,24 @@ export default function FactoryStockAllocationV5() {
               </button>
             )}
           </div>
+          {allCategories.length > 0 && (
+            <div className="relative">
+              <select
+                value={categoryFilter}
+                onChange={(e) => setCategoryFilter(e.target.value)}
+                className="h-9 rounded-md border border-input bg-background px-3 pr-8 text-sm text-foreground appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                data-testid="select-v5-category-filter"
+              >
+                <option value="">All Categories</option>
+                {allCategories.map((cat) => (
+                  <option key={cat} value={cat}>
+                    {cat}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+            </div>
+          )}
           <Button
             variant={hideZero ? "default" : "outline"}
             size="sm"

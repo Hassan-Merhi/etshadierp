@@ -3,8 +3,8 @@ import { getErrorMessage } from "../../lib/httpHandlers";
 import { requireAuth } from "../../auth";
 import { pool } from "../../db";
 
-const DEFAULT_PAGE_SIZE = 100;
-const MAX_PAGE_SIZE = 250;
+const DEFAULT_PAGE_SIZE = 9999;
+const MAX_PAGE_SIZE = 9999;
 const ACTIVE_ORDER_STATUSES = ["DRAFT", "LOADING", "PENDING_VERIFICATION", "VERIFIED", "FINALIZED"];
 
 function parsePositiveInt(value: unknown, fallback: number): number {
@@ -42,6 +42,7 @@ function queryText(value: unknown): string {
 interface PageRow {
   articleCode: string;
   productName: string;
+  categoryName: string;
   stockAvailable: number;
   totalLoaded: number;
   expectedToLoad: number;
@@ -223,6 +224,7 @@ export function registerFactoryStockAllocationV5PaginationRoutes(app: Express): 
             SELECT COALESCE(fbp.article_code, fbp.code) AS article_code,
                    fbp.name,
                    COALESCE(fbp.weight_per_bale_kg::numeric, 0) AS weight_kg,
+                   COALESCE(fc.name, '') AS category_name,
                    (
                      LOWER(COALESCE(fc.name, '')) LIKE '%wiper%'
                      OR LOWER(COALESCE(fc.name, '')) LIKE '%garbage%'
@@ -292,6 +294,7 @@ export function registerFactoryStockAllocationV5PaginationRoutes(app: Express): 
           article_base AS (
             SELECT ac.article_code,
                    COALESCE(pr.name, pn.product_name, lbn.product_name, ac.article_code) AS product_name,
+                   COALESCE(pr.category_name, '') AS category_name,
                    COALESCE(s.count, 0)::int AS stock_available,
                    COALESCE(l.count, 0)::int AS total_loaded,
                    COALESCE(e.count, 0)::int AS expected_to_load,
@@ -329,6 +332,7 @@ export function registerFactoryStockAllocationV5PaginationRoutes(app: Express): 
                   JSONB_BUILD_OBJECT(
                     'articleCode', article_code,
                     'productName', product_name,
+                    'categoryName', COALESCE(category_name, ''),
                     'stockAvailable', stock_available,
                     'totalLoaded', total_loaded,
                     'expectedToLoad', expected_to_load,
@@ -349,6 +353,7 @@ export function registerFactoryStockAllocationV5PaginationRoutes(app: Express): 
         const pageRows: PageRow[] = (Array.isArray(aggregate.rows) ? aggregate.rows : []).map((row: any) => ({
           articleCode: String(row.articleCode),
           productName: String(row.productName || row.articleCode),
+          categoryName: String(row.categoryName || ""),
           stockAvailable: Number(row.stockAvailable || 0),
           totalLoaded: Number(row.totalLoaded || 0),
           expectedToLoad: Number(row.expectedToLoad || 0),

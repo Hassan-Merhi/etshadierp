@@ -300,13 +300,16 @@ export function registerFactoryStockAllocationV5Routes(app: Express) {
       //    Using both code and article_code columns to build a full code→name map + weight map
       const allProductsRaw = await db.execute(
         sql`SELECT code, COALESCE(article_code, code) AS "articleCode", name,
-                   weight_per_bale_kg AS "weightKg"
-            FROM factory_bale_products
-            WHERE company_id = ${companyId} AND active = true
-            ORDER BY name`
+                   weight_per_bale_kg AS "weightKg",
+                   COALESCE(fc.name, '') AS "categoryName"
+            FROM factory_bale_products fbp
+            LEFT JOIN factory_categories fc ON fc.id = fbp.category_id
+            WHERE fbp.company_id = ${companyId} AND fbp.active = true
+            ORDER BY fbp.name`
       );
       const allProductsMap = new Map<string, string>();
       const weightMap = new Map<string, number>();
+      const categoryMap = new Map<string, string>();
       ((allProductsRaw as any).rows ?? (allProductsRaw as unknown as any[])).forEach((r: any) => {
         if (r.name && r.articleCode) {
           // Use only the canonical articleCode (COALESCE(article_code, code)) as the map key.
@@ -318,6 +321,9 @@ export function registerFactoryStockAllocationV5Routes(app: Express) {
         const w = r.weightKg ? parseFloat(r.weightKg) : 0;
         if (w > 0 && r.articleCode) {
           weightMap.set(r.articleCode, w);
+        }
+        if (r.categoryName && r.articleCode) {
+          categoryMap.set(r.articleCode, r.categoryName);
         }
       });
 
@@ -464,9 +470,11 @@ export function registerFactoryStockAllocationV5Routes(app: Express) {
           const weightKg = weightMap.get(articleCode) ?? 0;
           const totalKg = Math.round(stockAvailable * weightKg);
           const isGarbageOrWipers = excludedCodes.has(articleCode);
+          const categoryName = categoryMap.get(articleCode) ?? "";
           return {
             articleCode,
             productName,
+            categoryName,
             stockAvailable,
             totalLoaded,
             expectedToLoad,

@@ -2,7 +2,7 @@ import { queryClient } from "./queryClient";
 
 const ENDPOINT = "/api/factory/v5/stock-allocation";
 const ROUTE = "/factory/stock-allocation-v5";
-const DEFAULT_LIMIT = 50;
+const DEFAULT_LIMIT = 9999;
 const MAX_ACTION_LIMIT = 250;
 const ALLOWED_LIMITS = [25, 50, 100];
 
@@ -237,7 +237,7 @@ if (typeof window !== "undefined" && !window.__erpV5AllocationPaginationInstalle
 
   function renderControls(): void {
     const root = ensureControls();
-    if (!activeMeta || window.location.pathname !== ROUTE || negativeOnlyMode || hasFocusedDeepLink()) {
+    if (!activeMeta || window.location.pathname !== ROUTE || negativeOnlyMode || hasFocusedDeepLink() || activeMeta.totalPages <= 1) {
       root.style.display = "none";
       return;
     }
