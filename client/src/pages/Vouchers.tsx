@@ -483,9 +483,6 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
         <div className="flex items-start justify-between gap-3 pb-4 border-b">
           <div>
             <h1 className="text-xl font-semibold tracking-tight">Vouchers</h1>
-            <p className="text-sm text-muted-foreground mt-0.5">
-              Payments, receipts, journals and inventory transactions
-            </p>
           </div>
         </div>
       )}
