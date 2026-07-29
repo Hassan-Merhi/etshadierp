@@ -8,6 +8,7 @@ import { customerOrders, factoryContainers, factoryMixBatches } from "@shared/sc
 
 const PERMANENT_DELETE_PATH = "/api/deleted-items/:type/:id/permanent";
 const HANDLED_TYPES = new Set<string>(["factoryContainer", "factoryMixBatch", "customerOrder"]);
+const PERMANENT_DELETE_LOCK_NAMESPACE = 20260729;
 
 type RestrictiveReference = {
   schema_name: string;
@@ -142,6 +143,14 @@ export function registerDependentDeletedItemPermanentRoutes(app: Express): void 
 
       try {
         const deleted = await db.transaction(async (tx) => {
+          // The Deleted Items screen sends bulk requests together. Serialize every
+          // destructive cleanup for the same company on this transaction's existing
+          // connection, avoiding cross-linked mix-batch deadlocks without consuming
+          // a second pool connection per waiting request.
+          await tx.execute(
+            sql`SELECT pg_advisory_xact_lock(${PERMANENT_DELETE_LOCK_NAMESPACE}::integer, ${companyId}::integer)`
+          );
+
           if (type === "factoryContainer") {
             const [target] = await tx
               .select({ id: factoryContainers.id })
