@@ -22,6 +22,12 @@ import {
   factoryMixBatches,
   factoryMixBatchSources,
   factoryBales,
+  factoryContainerCommissions,
+  factoryDutyAuditLog,
+  factoryFxAllocations,
+  factoryOffloadAdditionalCharges,
+  factoryContainerOtherCharges,
+  factoryWasteEntries,
   customerProformas,
   customerProformaLines,
   customerOrders,
@@ -1284,11 +1290,23 @@ export function registerDeletedItemsRoutes(app: Express) {
             .delete(factoryBaleProducts)
             .where(and(eq(factoryBaleProducts.id, itemId), eq(factoryBaleProducts.companyId, companyId)));
           break;
-        case "factoryContainer":
+        case "factoryContainer": {
+          // Delete child rows in FK dependency order before the parent.
+          // RESTRICT tables must be cleared manually; CASCADE tables
+          // (factory_offload_additional_charges, factory_container_other_charges,
+          //  factory_container_profit_snapshots) are handled automatically.
+          await db.delete(factoryWasteEntries).where(eq(factoryWasteEntries.containerId, itemId));
+          await db.delete(factoryDutyAuditLog).where(eq(factoryDutyAuditLog.containerId, itemId));
+          await db.delete(factoryFxAllocations).where(eq(factoryFxAllocations.containerId, itemId));
+          await db.delete(factoryContainerCommissions).where(eq(factoryContainerCommissions.containerId, itemId));
+          // mix_batch_sources refs both container and raw_stock — delete before raw_stock
+          await db.delete(factoryMixBatchSources).where(eq(factoryMixBatchSources.containerId, itemId));
+          await db.delete(factoryRawStock).where(eq(factoryRawStock.containerId, itemId));
           await db
             .delete(factoryContainers)
             .where(and(eq(factoryContainers.id, itemId), eq(factoryContainers.companyId, companyId)));
           break;
+        }
         case "factoryRawStock":
           await db
             .delete(factoryRawStock)
