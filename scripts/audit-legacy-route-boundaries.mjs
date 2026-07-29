@@ -15,7 +15,8 @@ function readJson(filePath) {
 
 function lineCount(source) {
   if (source.length === 0) return 0;
-  return source.split(/\r?\n/).length;
+  const withoutTrailingNewline = source.replace(/\r?\n$/, "");
+  return withoutTrailingNewline.split(/\r?\n/).length;
 }
 
 function lineNumberAt(source, index) {
