@@ -1,4 +1,5 @@
 import type { Express } from "express";
+import { registerContainerListPaginationRoutes } from "./containers/containerListPaginationRoutes";
 import { registerContainerCrudRoutes } from "./containers/containerCrudRoutes";
 import { registerContainerTrackingRoutes } from "./containers/containerTrackingRoutes";
 import { registerContainerAccountingRoutes } from "./containers/containerAccountingRoutes";
@@ -15,6 +16,9 @@ export function registerContainerRoutes(app: Express) {
   // must be matched before containerCrudRoutes' /api/containers/:id, since Express
   // resolves routes strictly in registration order (not by specificity).
   registerContainerTrackingRoutes(app);
+  // Explicit pagination requests are handled in SQL; legacy callers continue to
+  // fall through to the compatibility readers below.
+  registerContainerListPaginationRoutes(app);
   registerContainerCrudRoutes(app);
   registerContainerAccountingRoutes(app);
   registerContainerFreightRoutes(app);
