@@ -60,8 +60,6 @@ function fingerprint(input: {
   voucherType: CompanyTransferVoucherType;
   voucherDate: string;
   description: string | null;
-  debitNarration: string | null;
-  creditNarration: string | null;
   amount: string;
   debitLedgerAccountId: number;
   creditLedgerAccountId: number;
@@ -107,8 +105,6 @@ export function buildCompanyTransferPostingRequest(
     voucherType: input.voucherType,
     voucherDate: input.voucherDate,
     description,
-    debitNarration,
-    creditNarration,
     amount,
     debitLedgerAccountId,
     creditLedgerAccountId,
