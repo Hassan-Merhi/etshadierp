@@ -2,9 +2,7 @@ import type { Express } from "express";
 
 /**
  * Phase 2 compatibility boundary.
- *
- * All report handlers have moved into focused route modules registered by
- * reportsRoutes.ts. This registrar intentionally remains as a no-op until the
- * final legacy-registry removal phase, so imports stay stable for stacked work.
+ * All report handlers now live in focused modules registered by reportsRoutes.ts.
+ * This no-op remains only until the final legacy-registry removal phase.
  */
 export function registerReportsRoutes(_app: Express) {}
