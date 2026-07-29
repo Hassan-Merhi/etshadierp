@@ -1,0 +1,34 @@
+{
+  "version": 1,
+  "description": "Frozen Phase 1 baseline for the remaining backend legacy route registries. Budgets may only decrease as routes move into focused modules.",
+  "files": [
+    {
+      "path": "server/routes/reportsRoutesLegacy.ts",
+      "owner": "Reporting",
+      "maxLines": 1628,
+      "targetLines": 400,
+      "migrationPhase": 2
+    },
+    {
+      "path": "server/routes/authRoutesLegacy.ts",
+      "owner": "Authentication and access control",
+      "maxLines": 1537,
+      "targetLines": 350,
+      "migrationPhase": 3
+    },
+    {
+      "path": "server/routesLegacy.ts",
+      "owner": "Accounting, vouchers, inventory and operations",
+      "maxLines": 1478,
+      "targetLines": 300,
+      "migrationPhase": 5
+    },
+    {
+      "path": "server/routes/customerRoutesLegacy.ts",
+      "owner": "Customer accounting and operations",
+      "maxLines": 1073,
+      "targetLines": 300,
+      "migrationPhase": 4
+    }
+  ]
+}
