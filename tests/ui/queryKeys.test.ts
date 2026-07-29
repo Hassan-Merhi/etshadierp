@@ -48,6 +48,17 @@ describe("companyKeys", () => {
     ]);
   });
 
+  it("uses canonical request URLs and company scope", () => {
+    expect(companyKeys.accounts(3, { endDate: "2026-01-31", startDate: "2026-01-01" })).toEqual([
+      "/api/accounts/all?endDate=2026-01-31&startDate=2026-01-01",
+      3,
+    ]);
+  });
+
+  it("separates identical endpoint filters across companies", () => {
+    expect(companyKeys.vouchers(1, { page: 1 })).not.toEqual(companyKeys.vouchers(2, { page: 1 }));
+  });
+
   it("separates company-transfer history by active company", () => {
     expect(companyKeys.simpleTransfers(1)).toEqual(["/api/simple-company-transfers", 1]);
     expect(companyKeys.simpleTransfers(2)).not.toEqual(companyKeys.simpleTransfers(1));
@@ -86,20 +97,19 @@ describe("factory / inventory key factories", () => {
 });
 
 describe("stockItemKeys", () => {
-  it("keeps light and full lists on separate cache URLs", () => {
+  it("keeps light, full, and paginated management caches separate", () => {
     expect(stockItemKeys.light(1)[0]).toBe("/api/stock-items/light");
     expect(stockItemKeys.full(1)[0]).toBe("/api/stock-items");
+    expect(stockItemKeys.page(1, { page: 2, limit: 100 })[0]).toBe("/api/stock-items?limit=100&page=2");
     expect(stockItemKeys.light(1)[0]).not.toBe(stockItemKeys.full(1)[0]);
   });
 });
 
 describe("analyticsKeys", () => {
-  it("builds date-scoped account keys", () => {
+  it("builds canonical date-scoped account keys", () => {
     expect(analyticsKeys.accounts(3, "2026-01-01", "2026-01-31")).toEqual([
-      "/api/accounts/all",
+      "/api/accounts/all?endDate=2026-01-31&startDate=2026-01-01",
       3,
-      "2026-01-01",
-      "2026-01-31",
     ]);
   });
 
