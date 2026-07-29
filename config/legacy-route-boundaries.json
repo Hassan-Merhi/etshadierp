@@ -1,5 +1,5 @@
 {
-  "version": 4,
+  "version": 5,
   "description": "Frozen legacy route boundaries. Budgets may only decrease as routes move into focused modules.",
   "files": [
     {
@@ -18,9 +18,9 @@
     },
     {
       "path": "server/routesLegacy.ts",
-      "owner": "Accounting, vouchers, inventory and operations",
-      "maxLines": 1478,
-      "targetLines": 300,
+      "owner": "Application route compatibility export",
+      "maxLines": 14,
+      "targetLines": 0,
       "migrationPhase": 5
     },
     {
