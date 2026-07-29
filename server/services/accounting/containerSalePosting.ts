@@ -84,8 +84,6 @@ export function buildContainerSalePostingRequest(
         containerId: input.containerId,
         voucherDate: input.voucherDate,
         description,
-        debitNarration,
-        creditNarration,
         amount,
         customerLedgerAccountId,
         commissionAccountId,
