@@ -1,5 +1,15 @@
 import type { Express, NextFunction, Request, Response } from "express";
-import { and, asc, desc, eq, ilike, inArray, isNull, or, sql } from "drizzle-orm";
+import {
+  and,
+  asc,
+  desc,
+  eq,
+  ilike,
+  inArray,
+  isNull,
+  or,
+  sql,
+} from "drizzle-orm";
 import { requireAuth } from "../../auth";
 import { db } from "../../db";
 import { getErrorMessage } from "../../lib/httpHandlers";
@@ -24,13 +34,20 @@ function wantsStructuredPagination(req: Request): boolean {
   );
 }
 
-function parsePagination(req: Request): { page: number; limit: number; offset: number } {
+function parsePagination(req: Request): {
+  page: number;
+  limit: number;
+  offset: number;
+} {
   const limit = Math.min(
     MAX_PAGE_SIZE,
-    parsePositiveInt(req.query.limit ?? req.query.pageSize, DEFAULT_PAGE_SIZE)
+    parsePositiveInt(req.query.limit ?? req.query.pageSize, DEFAULT_PAGE_SIZE),
   );
   if (req.query.offset !== undefined) {
-    const offset = Math.max(0, Number.parseInt(String(req.query.offset), 10) || 0);
+    const offset = Math.max(
+      0,
+      Number.parseInt(String(req.query.offset), 10) || 0,
+    );
     return { page: Math.floor(offset / limit) + 1, limit, offset };
   }
   const page = parsePositiveInt(req.query.page, 1);
@@ -46,7 +63,7 @@ function applyPaginationHeaders(
   total: number,
   page: number,
   limit: number,
-  totalPages: number
+  totalPages: number,
 ): void {
   res.setHeader("X-Total-Count", String(total));
   res.setHeader("X-Page", String(page));
@@ -54,7 +71,7 @@ function applyPaginationHeaders(
   res.setHeader("X-Total-Pages", String(totalPages));
   res.setHeader(
     "Access-Control-Expose-Headers",
-    "X-Total-Count, X-Page, X-Page-Size, X-Total-Pages"
+    "X-Total-Count, X-Page, X-Page-Size, X-Total-Pages",
   );
 }
 
@@ -83,7 +100,8 @@ export function registerVoucherPaginationRoutes(app: Express): void {
 
       try {
         const companyId = req.session.currentCompanyId;
-        if (!companyId) return res.status(400).json({ message: "No company selected" });
+        if (!companyId)
+          return res.status(400).json({ message: "No company selected" });
 
         let startDate = normalizeDate(req.query.startDate);
         let endDate = normalizeDate(req.query.endDate);
@@ -106,21 +124,31 @@ export function registerVoucherPaginationRoutes(app: Express): void {
         ];
 
         const voucherType =
-          typeof req.query.voucherType === "string" ? req.query.voucherType.trim() : "";
+          typeof req.query.voucherType === "string"
+            ? req.query.voucherType.trim()
+            : "";
         if (voucherType && voucherType !== "all") {
           conditions.push(eq(vouchers.voucherType, voucherType));
         }
 
         const statusFilter =
-          typeof req.query.statusFilter === "string" ? req.query.statusFilter : "all";
-        if (statusFilter === "active") conditions.push(eq(vouchers.optional, false));
-        else if (statusFilter === "optional") conditions.push(eq(vouchers.optional, true));
+          typeof req.query.statusFilter === "string"
+            ? req.query.statusFilter
+            : "all";
+        if (statusFilter === "active")
+          conditions.push(eq(vouchers.optional, false));
+        else if (statusFilter === "optional")
+          conditions.push(eq(vouchers.optional, true));
 
-        const search = typeof req.query.search === "string" ? req.query.search.trim() : "";
+        const search =
+          typeof req.query.search === "string" ? req.query.search.trim() : "";
         if (search) {
           const query = `%${search}%`;
           conditions.push(
-            or(ilike(vouchers.voucherNumber, query), ilike(vouchers.description, query))
+            or(
+              ilike(vouchers.voucherNumber, query),
+              ilike(vouchers.description, query),
+            ),
           );
         }
 
@@ -141,13 +169,18 @@ export function registerVoucherPaginationRoutes(app: Express): void {
             .where(
               and(
                 eq(userLocations.userId, req.user.id),
-                eq(userLocations.companyId, companyId)
-              )
+                eq(userLocations.companyId, companyId),
+              ),
             );
-          const allowedLocationIds = assignedLocations.map((row) => row.locationId);
+          const allowedLocationIds = assignedLocations.map(
+            (row) => row.locationId,
+          );
           if (allowedLocationIds.length > 0) {
             conditions.push(
-              or(isNull(vouchers.locationId), inArray(vouchers.locationId, allowedLocationIds))
+              or(
+                isNull(vouchers.locationId),
+                inArray(vouchers.locationId, allowedLocationIds),
+              ),
             );
           }
         }
@@ -158,14 +191,17 @@ export function registerVoucherPaginationRoutes(app: Express): void {
         const ascending = req.query.sortOrder === "asc";
 
         const [countRows, data] = await Promise.all([
-          db.select({ total: sql<number>`count(*)::int` }).from(vouchers).where(where),
+          db
+            .select({ total: sql<number>`count(*)::int` })
+            .from(vouchers)
+            .where(where),
           db
             .select()
             .from(vouchers)
             .where(where)
             .orderBy(
               ascending ? asc(dateSort) : desc(dateSort),
-              ascending ? asc(vouchers.id) : desc(vouchers.id)
+              ascending ? asc(vouchers.id) : desc(vouchers.id),
             )
             .limit(limit)
             .offset(offset),
@@ -187,6 +223,6 @@ export function registerVoucherPaginationRoutes(app: Express): void {
       } catch (error: unknown) {
         return res.status(500).json({ message: getErrorMessage(error) });
       }
-    }
+    },
   );
 }
