@@ -1629,6 +1629,17 @@ END $mig$`;
             ADD COLUMN IF NOT EXISTS otw_note TEXT,
             ADD COLUMN IF NOT EXISTS otw_docs_received BOOLEAN NOT NULL DEFAULT false;
 
+          -- factory_containers: JSONCargo tracking columns.
+          -- Drizzle enumerates every declared column in INSERT statements. These three
+          -- columns were added to the schema but never applied to production (which runs
+          -- with RUN_STARTUP_MIGRATIONS=false), so every new factory-container CREATE
+          -- failed with a "column does not exist" error. Added here idempotently so
+          -- production gets the columns on next startup regardless of migration mode.
+          ALTER TABLE factory_containers
+            ADD COLUMN IF NOT EXISTS json_cargo_last_checked_at  TIMESTAMPTZ,
+            ADD COLUMN IF NOT EXISTS json_cargo_tracking_status  TEXT,
+            ADD COLUMN IF NOT EXISTS json_cargo_error            TEXT;
+
           -- fiscal_period_closures: the startup migration at index 2673 only adds an FK
           -- constraint but never creates the table itself. Add it here idempotently so the
           -- table exists before the FK migration runs (it is a no-op if already present).
