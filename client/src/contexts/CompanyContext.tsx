@@ -1,6 +1,12 @@
-import { createContext, useContext, useState, useEffect, useRef, ReactNode } from "react";
+import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { queryClient, apiRequest } from "@/lib/queryClient";
+import { apiRequest, getQueryFn, queryClient } from "@/lib/queryClient";
+import {
+  parseSessionCompany,
+  parseUserCompanies,
+  type CompanyType,
+  type UserCompanyAssignment,
+} from "@/contracts/sessionContracts";
 
 const PREFETCH_KEYS = [
   "/api/suppliers",
@@ -10,7 +16,7 @@ const PREFETCH_KEYS = [
   "/api/locations",
   "/api/employees",
   "/api/fixed-assets",
-];
+] as const;
 
 function prefetchReferenceData(companyId: number, role?: string) {
   // POS sessions are intentionally denied access to the general ERP reference
@@ -22,13 +28,13 @@ function prefetchReferenceData(companyId: number, role?: string) {
   }
 }
 
-interface Company {
+export interface Company {
   id: number;
   code: string;
   name: string;
   active: boolean;
   role?: string;
-  companyType: "erp" | "factory" | "factory_v2" | "properties" | "supplier_partner";
+  companyType: CompanyType;
   displayCurrency?: string | null;
 }
 
@@ -36,15 +42,27 @@ interface CompanyContextType {
   selectedCompany: Company | null;
   companies: Company[];
   isLoading: boolean;
-  selectCompany: (company: Company) => void;
+  selectCompany: (company: Company) => Promise<void>;
 }
 
 const CompanyContext = createContext<CompanyContextType | undefined>(undefined);
 
+function mapCompanyAssignment(assignment: UserCompanyAssignment): Company {
+  return {
+    id: assignment.companyId,
+    code: assignment.companyCode,
+    name: assignment.companyName,
+    active: assignment.companyActive,
+    role: assignment.role,
+    companyType: assignment.companyType,
+    displayCurrency: assignment.displayCurrency,
+  };
+}
+
 async function switchCompanyOnServer(companyId: number): Promise<boolean> {
   try {
-    const res = await apiRequest("POST", "/api/auth/set-company", { companyId });
-    return res.ok;
+    const response = await apiRequest("POST", "/api/auth/set-company", { companyId });
+    return response.ok;
   } catch {
     return false;
   }
@@ -56,20 +74,19 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
   const lastSyncedCompanyId = useRef<number | null>(null);
   const initialSyncStarted = useRef(false);
 
-  const { data: userCompanies = [], isLoading } = useQuery<any[]>({
+  const { data: userCompanyAssignments = [], isLoading } = useQuery<UserCompanyAssignment[]>({
     queryKey: ["/api/user/companies"],
+    queryFn: async (context) => {
+      const value = await getQueryFn({ on401: "throw" })(context);
+      return parseUserCompanies(value);
+    },
   });
 
-  const companies: Company[] = userCompanies
-    .map((uc) => ({
-      id: uc.companyId,
-      code: uc.companyCode,
-      name: uc.companyName,
-      active: uc.companyActive,
-      role: uc.role,
-      companyType: uc.companyType || "erp",
-    }))
-    .filter((company, index, self) => index === self.findIndex((c) => c.id === company.id));
+  const companies: Company[] = userCompanyAssignments
+    .map(mapCompanyAssignment)
+    .filter((company, index, allCompanies) =>
+      index === allCompanies.findIndex((candidate) => candidate.id === company.id),
+    );
 
   const invalidateCompanyQueries = () => {
     queryClient.invalidateQueries({
@@ -90,7 +107,7 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
     queryClient.removeQueries({ queryKey: ["/api/audit-log"] });
   };
 
-  const selectCompany = async (company: Company) => {
+  const selectCompany = async (company: Company): Promise<void> => {
     if (lastSyncedCompanyId.current === company.id && selectedCompany?.id === company.id) return;
 
     setIsSyncingCompany(true);
@@ -119,7 +136,7 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
     let companyToSelect: Company | undefined;
 
     if (savedCompanyId) {
-      companyToSelect = companies.find((c) => c.id === parseInt(savedCompanyId, 10));
+      companyToSelect = companies.find((company) => company.id === Number.parseInt(savedCompanyId, 10));
     }
     if (!companyToSelect) {
       companyToSelect = companies[0];
@@ -135,11 +152,14 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
     // skip the set-company POST entirely and unblock the UI immediately.
     // Slow path (session differs or GET fails): fall back to the full POST.
     fetch("/api/auth/session-company", { credentials: "include" })
-      .then((r) => (r.ok ? r.json() : Promise.resolve({ companyId: null })))
+      .then(async (response) => {
+        if (!response.ok) return { companyId: null };
+        const value: unknown = await response.json();
+        return parseSessionCompany(value);
+      })
       .catch(() => ({ companyId: null }))
       .then(async ({ companyId: sessionCompanyId }) => {
         if (sessionCompanyId === target.id) {
-          // Session is already correct — no write needed.
           clearActivityCache();
           lastSyncedCompanyId.current = target.id;
           setSelectedCompany(target);
@@ -149,7 +169,6 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
           return;
         }
 
-        // Session has a different (or missing) company — must POST to sync.
         const ok = await switchCompanyOnServer(target.id);
         if (!ok) {
           console.error("[Company] Failed to synchronize the initial company selection.");
