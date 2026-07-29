@@ -74,7 +74,13 @@ export function registerCompanyTransferRoutes(app: Express) {
     try {
       const userId = getTransferUserId(req);
       const transferId = parseTransferId(req.params.id);
-      return res.json(await simpleCompanyTransferService.delete(userId, transferId));
+      return res.json(
+        await simpleCompanyTransferService.delete(userId, transferId, {
+          userId,
+          username: (req.session as any).username || "unknown",
+          reason: `Reverse simple company transfer ${transferId}`,
+        }),
+      );
     } catch (error: unknown) {
       return sendTransferRouteError(res, error, 500);
     }
