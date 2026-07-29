@@ -21,7 +21,9 @@ describe("frontend company-state isolation wiring", () => {
     expect(context).toContain("cancelCompanySessionQueries(queryClient)");
     expect(context).toContain("removeCompanySessionQueries(queryClient)");
     expect(context).toContain("const ok = await switchCompanyOnServer(company.id)");
-    expect(context).toContain("commitCompanySelection(company, true)");
+    expect(context).toContain("commitCompanySelection(company, { prefetch: true, serverSynced: true })");
+    expect(context).toContain("commitCompanySelection(company, { prefetch: false, serverSynced: false })");
+    expect(context).toContain("scheduleInitialSyncRetry");
     expect(context).not.toContain("invalidateCompanyQueries");
   });
 
