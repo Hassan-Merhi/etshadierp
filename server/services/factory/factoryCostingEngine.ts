@@ -177,11 +177,12 @@ export interface MovingAverageRateInput {
 export function calculateMovingAverageRate(input: MovingAverageRateInput): Decimal {
   const existingQuantity = parseDecimal(input.existingQuantityKg, "existingQuantityKg");
   const existingRate = parseDecimal(input.existingRatePerKg, "existingRatePerKg");
-  const incomingQuantity = parseDecimal(input.incomingQuantityKg, "incomingQuantityKg");
+  const incomingQuantity = parseDecimal(input.incomingQuantityKg, "incomingQuantityKg", {
+    allowZero: false,
+  });
   const incomingRate = parseDecimal(input.incomingRatePerKg, "incomingRatePerKg");
   const combinedQuantity = existingQuantity.plus(incomingQuantity);
 
-  if (combinedQuantity.isZero()) return incomingRate;
   return existingQuantity
     .times(existingRate)
     .plus(incomingQuantity.times(incomingRate))
@@ -269,5 +270,6 @@ export function calculateProportionalInventoryValueDelta(
   const remainingKg = parseDecimal(input.remainingKg, "remainingKg");
   const valuationKg = parseDecimal(input.valuationKg, "valuationKg");
   if (valuationKg.isZero() || remainingKg.isZero()) return new Decimal(0);
-  return newFullValue.minus(oldFullValue).times(remainingKg.div(valuationKg));
+  const remainingFraction = Decimal.min(1, remainingKg.div(valuationKg));
+  return newFullValue.minus(oldFullValue).times(remainingFraction);
 }
