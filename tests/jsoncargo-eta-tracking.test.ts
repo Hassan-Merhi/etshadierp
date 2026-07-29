@@ -67,11 +67,10 @@ beforeAll(async () => {
 
   ctx = await seedTestData(TEST_PREFIX);
 
-  // Note: `suppliers` is a global table with no companyId column (see schema) —
-  // it is scoped only by its unique `code`.
   const [supplier] = await db
-    .insert(schema.suppliers)
+    .insert(schema.companyScopedSuppliers)
     .values({
+      companyId: ctx.companyId,
       code: `${TEST_PREFIX}-SUP1`,
       legalName: `${TEST_PREFIX}_Supplier`,
       email: `${TEST_PREFIX}_supplier@example.com`,
@@ -353,8 +352,9 @@ describe("routes — permissions and company isolation", () => {
     const otherCtx = await seedTestData(`${TEST_PREFIX}other`);
     try {
       const [foreignSupplier] = await db
-        .insert(schema.suppliers)
+        .insert(schema.companyScopedSuppliers)
         .values({
+          companyId: otherCtx.companyId,
           code: `${TEST_PREFIX}-FSUP`,
           legalName: "Foreign Supplier",
           email: `${TEST_PREFIX}_foreign@example.com`,
