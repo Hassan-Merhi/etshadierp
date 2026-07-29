@@ -1,11 +1,11 @@
-import { useState, useMemo } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
-import { queryClient, apiRequest } from "@/lib/queryClient";
+import { useMemo, useState } from "react";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { apiRequest, keyStartsWith, queryClient } from "@/lib/queryClient";
+import { companyKeys } from "@/lib/queryKeys";
 import { useCompany } from "@/contexts/CompanyContext";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -23,7 +23,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Switch } from "@/components/ui/switch";
-import { Undo2, Zap, Trash2, Plus } from "lucide-react";
+import { Plus, Trash2, Undo2, Zap } from "lucide-react";
 
 interface LedgerAccount {
   id: number;
@@ -79,47 +79,45 @@ export default function CompanyTransfer() {
   const { toast } = useToast();
 
   const [undoTarget, setUndoTarget] = useState<Transfer | null>(null);
-
-  // Auto-rule editor state (one "add" form at a time per module)
   const [addingModule, setAddingModule] = useState<string | null>(null);
-  const [ruleDestCompanyId, setRuleDestCompanyId] = useState<string>("");
-  const [ruleDestAccountId, setRuleDestAccountId] = useState<string>("");
+  const [ruleDestCompanyId, setRuleDestCompanyId] = useState("");
+  const [ruleDestAccountId, setRuleDestAccountId] = useState("");
   const [ruleCashAccountIds, setRuleCashAccountIds] = useState<number[]>([]);
   const [ruleEnabled, setRuleEnabled] = useState(true);
   const [deleteConfirmRuleId, setDeleteConfirmRuleId] = useState<{ id: number; module: string } | null>(null);
 
   const fromCompanyId = currentCompany?.id;
+  const otherCompanies = useMemo(
+    () => companies.filter((company) => company.id !== fromCompanyId),
+    [companies, fromCompanyId],
+  );
 
-  const otherCompanies = useMemo(() => companies.filter((c) => c.id !== fromCompanyId), [companies, fromCompanyId]);
-
-  // Accounts for current (from) company
   const { data: fromAccounts = [] } = useQuery<LedgerAccount[]>({
-    queryKey: [`/api/company-accounts/${fromCompanyId}`],
+    queryKey: companyKeys.companyAccounts(fromCompanyId, fromCompanyId),
     enabled: !!fromCompanyId,
   });
 
-  // Accounts for rule destination company
   const { data: ruleDestAccounts = [] } = useQuery<LedgerAccount[]>({
-    queryKey: [`/api/company-accounts/${ruleDestCompanyId}`],
-    enabled: !!ruleDestCompanyId,
+    queryKey: companyKeys.companyAccounts(fromCompanyId, ruleDestCompanyId || null),
+    enabled: !!fromCompanyId && !!ruleDestCompanyId,
   });
 
-  // All transfers for current company
+  const transferKey = companyKeys.simpleTransfers(fromCompanyId);
   const { data: transfers = [], isLoading } = useQuery<Transfer[]>({
-    queryKey: ["/api/simple-company-transfers"],
+    queryKey: transferKey,
+    enabled: !!fromCompanyId,
   });
 
-  // Auto-transfer configs — one query per module returning arrays (hooks cannot be in .map)
   const cfgProperties = useQuery<AutoTransferConfig[]>({
-    queryKey: [`/api/properties/rental/auto-transfer-config`],
+    queryKey: companyKeys.autoTransferConfig(fromCompanyId, MODULE_PREFIXES.PROPERTIES),
     enabled: !!fromCompanyId,
   });
   const cfgErp = useQuery<AutoTransferConfig[]>({
-    queryKey: [`/api/erp/rental/auto-transfer-config`],
+    queryKey: companyKeys.autoTransferConfig(fromCompanyId, MODULE_PREFIXES.ERP),
     enabled: !!fromCompanyId,
   });
   const cfgFactory = useQuery<AutoTransferConfig[]>({
-    queryKey: [`/api/factory/rental/auto-transfer-config`],
+    queryKey: companyKeys.autoTransferConfig(fromCompanyId, MODULE_PREFIXES.FACTORY),
     enabled: !!fromCompanyId,
   });
   const autoConfigQueries = [cfgProperties, cfgErp, cfgFactory];
@@ -127,24 +125,25 @@ export default function CompanyTransfer() {
   const undoMutation = useMutation({
     mutationFn: (id: number) => apiRequest("DELETE", `/api/simple-company-transfer/${id}`),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/simple-company-transfers"] });
-      toast({ title: "Transfer reversed", description: "Both entries removed." });
+      queryClient.invalidateQueries({ queryKey: transferKey });
+      queryClient.invalidateQueries({ predicate: keyStartsWith("/api/accounts"), refetchType: "active" });
+      queryClient.invalidateQueries({ predicate: keyStartsWith("/api/stats"), refetchType: "active" });
+      toast({ title: "Transfer reversed", description: "Both company balances were restored." });
       setUndoTarget(null);
     },
-    onError: (e: any) => {
-      toast({ title: "Undo failed", description: e.message, variant: "destructive" });
+    onError: (error: any) => {
+      toast({ title: "Undo failed", description: error.message, variant: "destructive" });
       setUndoTarget(null);
     },
   });
 
   const saveRuleMutation = useMutation({
-    mutationFn: ({ module, body }: { module: string; body: object }) => {
-      const prefix = MODULE_PREFIXES[module];
-      return apiRequest("POST", `${prefix}/auto-transfer-config`, body);
-    },
+    mutationFn: ({ module, body }: { module: string; body: object }) =>
+      apiRequest("POST", `${MODULE_PREFIXES[module]}/auto-transfer-config`, body),
     onSuccess: (_, { module }) => {
-      const prefix = MODULE_PREFIXES[module];
-      queryClient.invalidateQueries({ queryKey: [`${prefix}/auto-transfer-config`] });
+      queryClient.invalidateQueries({
+        queryKey: companyKeys.autoTransferConfig(fromCompanyId, MODULE_PREFIXES[module]),
+      });
       toast({ title: "Rule added", description: "Auto-transfer rule is now active." });
       setAddingModule(null);
       setRuleDestCompanyId("");
@@ -152,24 +151,23 @@ export default function CompanyTransfer() {
       setRuleCashAccountIds([]);
       setRuleEnabled(true);
     },
-    onError: (e: any) => {
-      toast({ title: "Save failed", description: e.message, variant: "destructive" });
+    onError: (error: any) => {
+      toast({ title: "Save failed", description: error.message, variant: "destructive" });
     },
   });
 
   const deleteRuleMutation = useMutation({
-    mutationFn: ({ module, id }: { module: string; id: number }) => {
-      const prefix = MODULE_PREFIXES[module];
-      return apiRequest("DELETE", `${prefix}/auto-transfer-config/${id}`);
-    },
+    mutationFn: ({ module, id }: { module: string; id: number }) =>
+      apiRequest("DELETE", `${MODULE_PREFIXES[module]}/auto-transfer-config/${id}`),
     onSuccess: (_, { module }) => {
-      const prefix = MODULE_PREFIXES[module];
-      queryClient.invalidateQueries({ queryKey: [`${prefix}/auto-transfer-config`] });
+      queryClient.invalidateQueries({
+        queryKey: companyKeys.autoTransferConfig(fromCompanyId, MODULE_PREFIXES[module]),
+      });
       toast({ title: "Rule removed", description: "Auto-transfer rule deleted." });
       setDeleteConfirmRuleId(null);
     },
-    onError: (e: any) => {
-      toast({ title: "Delete failed", description: e.message, variant: "destructive" });
+    onError: (error: any) => {
+      toast({ title: "Delete failed", description: error.message, variant: "destructive" });
       setDeleteConfirmRuleId(null);
     },
   });
@@ -183,7 +181,9 @@ export default function CompanyTransfer() {
   };
 
   const toggleCashAccount = (id: number) => {
-    setRuleCashAccountIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+    setRuleCashAccountIds((previous) =>
+      previous.includes(id) ? previous.filter((accountId) => accountId !== id) : [...previous, id],
+    );
   };
 
   const handleSaveRule = () => {
@@ -195,33 +195,34 @@ export default function CompanyTransfer() {
       });
       return;
     }
+
     saveRuleMutation.mutate({
       module: addingModule,
       body: {
-        destCompanyId: parseInt(ruleDestCompanyId),
-        destLedgerAccountId: parseInt(ruleDestAccountId),
+        destCompanyId: Number.parseInt(ruleDestCompanyId, 10),
+        destLedgerAccountId: Number.parseInt(ruleDestAccountId, 10),
         sourceCashAccountIds: ruleCashAccountIds,
         enabled: ruleEnabled,
       },
     });
   };
 
-  const accountOptions = (list: LedgerAccount[]) => list.filter((a) => a.code !== "TRANSFER-CLEARING");
+  const accountOptions = (accounts: LedgerAccount[]) =>
+    accounts.filter((account) => account.code !== "TRANSFER-CLEARING");
 
   return (
-    <div className="flex flex-col h-full overflow-auto">
-      <div className="border-b px-6 py-4 shrink-0">
+    <div className="flex h-full flex-col overflow-auto">
+      <div className="shrink-0 border-b px-6 py-4">
         <PageHeader
           title="Company Transfer"
           subtitle="Move a balance from one company to another. The amount is removed from the source and added to the destination."
         />
       </div>
 
-      <div className="p-6 space-y-6">
-        {/* Auto-Transfer Rules */}
+      <div className="space-y-6 p-6">
         <Card>
           <CardHeader>
-            <CardTitle className="text-base flex items-center gap-2">
+            <CardTitle className="flex items-center gap-2 text-base">
               <Zap className="h-4 w-4 text-amber-500" />
               Automatic Transfer Rules
             </CardTitle>
@@ -231,39 +232,36 @@ export default function CompanyTransfer() {
             </p>
           </CardHeader>
           <CardContent className="space-y-4">
-            {MODULES.map((mod, idx) => {
-              const rules = autoConfigQueries[idx].data ?? [];
-              const isAdding = addingModule === mod;
+            {MODULES.map((module, index) => {
+              const rules = autoConfigQueries[index].data ?? [];
+              const isAdding = addingModule === module;
 
               return (
-                <div key={mod} className="rounded-md border p-3 space-y-2" data-testid={`rule-section-${mod}`}>
-                  {/* Module header */}
+                <div key={module} className="space-y-2 rounded-md border p-3" data-testid={`rule-section-${module}`}>
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <div className="flex items-center gap-2">
-                      <span className="font-medium text-sm">{MODULE_LABELS[mod]}</span>
+                      <span className="text-sm font-medium">{MODULE_LABELS[module]}</span>
                       <Badge variant={rules.length > 0 ? "default" : "outline"} className="text-xs">
                         {rules.length === 0 ? "No rules" : `${rules.length} rule${rules.length > 1 ? "s" : ""}`}
                       </Badge>
                     </div>
-                    {!isAdding && (
+                    {!isAdding ? (
                       <Button
                         size="sm"
                         variant="outline"
-                        onClick={() => openAddRule(mod)}
-                        data-testid={`button-add-rule-${mod}`}
+                        onClick={() => openAddRule(module)}
+                        data-testid={`button-add-rule-${module}`}
                       >
-                        <Plus className="h-3.5 w-3.5 mr-1" />
+                        <Plus className="mr-1 h-3.5 w-3.5" />
                         Add Rule
                       </Button>
-                    )}
-                    {isAdding && (
+                    ) : (
                       <Button size="sm" variant="ghost" onClick={() => setAddingModule(null)}>
                         Cancel
                       </Button>
                     )}
                   </div>
 
-                  {/* Existing rules list */}
                   {rules.length > 0 && (
                     <div className="space-y-1.5">
                       {rules.map((rule) => (
@@ -272,8 +270,8 @@ export default function CompanyTransfer() {
                           className="flex flex-wrap items-start justify-between gap-2 rounded-md bg-muted/40 px-3 py-2"
                           data-testid={`rule-item-${rule.id}`}
                         >
-                          <div className="space-y-0.5 text-sm min-w-0">
-                            <div className="flex items-center gap-1.5 flex-wrap">
+                          <div className="min-w-0 space-y-0.5 text-sm">
+                            <div className="flex flex-wrap items-center gap-1.5">
                               <Badge variant={rule.enabled ? "default" : "secondary"} className="text-xs">
                                 {rule.enabled ? "Active" : "Paused"}
                               </Badge>
@@ -288,7 +286,7 @@ export default function CompanyTransfer() {
                             <p className="text-xs text-muted-foreground">
                               Triggers on:{" "}
                               {(rule.sourceCashAccountIds ?? []).length > 0 ? (
-                                (rule.sourceAccountNames ?? []).map((a) => a.name).join(", ") ||
+                                (rule.sourceAccountNames ?? []).map((account) => account.name).join(", ") ||
                                 `${rule.sourceCashAccountIds.length} account(s)`
                               ) : (
                                 <em>all cash accounts</em>
@@ -298,7 +296,7 @@ export default function CompanyTransfer() {
                           <Button
                             size="icon"
                             variant="ghost"
-                            onClick={() => setDeleteConfirmRuleId({ id: rule.id, module: mod })}
+                            onClick={() => setDeleteConfirmRuleId({ id: rule.id, module })}
                             data-testid={`button-delete-rule-${rule.id}`}
                           >
                             <Trash2 className="h-4 w-4 text-destructive" />
@@ -308,28 +306,27 @@ export default function CompanyTransfer() {
                     </div>
                   )}
 
-                  {/* Add-rule form */}
                   {isAdding && (
-                    <div className="space-y-3 pt-1 border-t mt-2">
-                      <p className="text-xs font-medium text-muted-foreground pt-1">New rule</p>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="mt-2 space-y-3 border-t pt-2">
+                      <p className="text-xs font-medium text-muted-foreground">New rule</p>
+                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                         <div className="space-y-1.5">
                           <Label className="text-xs">Destination Company</Label>
                           <Select
                             value={ruleDestCompanyId}
-                            onValueChange={(v) => {
-                              setRuleDestCompanyId(v);
+                            onValueChange={(value) => {
+                              setRuleDestCompanyId(value);
                               setRuleDestAccountId("");
                             }}
-                            data-testid={`select-rule-dest-company-${mod}`}
+                            data-testid={`select-rule-dest-company-${module}`}
                           >
                             <SelectTrigger>
                               <SelectValue placeholder="Select company" />
                             </SelectTrigger>
                             <SelectContent>
-                              {otherCompanies.map((c) => (
-                                <SelectItem key={c.id} value={String(c.id)}>
-                                  {c.name}
+                              {otherCompanies.map((company) => (
+                                <SelectItem key={company.id} value={String(company.id)}>
+                                  {company.name}
                                 </SelectItem>
                               ))}
                             </SelectContent>
@@ -341,7 +338,7 @@ export default function CompanyTransfer() {
                             value={ruleDestAccountId}
                             onValueChange={setRuleDestAccountId}
                             disabled={!ruleDestCompanyId}
-                            data-testid={`select-rule-dest-account-${mod}`}
+                            data-testid={`select-rule-dest-account-${module}`}
                           >
                             <SelectTrigger>
                               <SelectValue
@@ -349,10 +346,10 @@ export default function CompanyTransfer() {
                               />
                             </SelectTrigger>
                             <SelectContent>
-                              {accountOptions(ruleDestAccounts).map((a) => (
-                                <SelectItem key={a.id} value={String(a.id)}>
-                                  {a.name}
-                                  <span className="text-muted-foreground text-xs ml-1">({a.accountType})</span>
+                              {accountOptions(ruleDestAccounts).map((account) => (
+                                <SelectItem key={account.id} value={String(account.id)}>
+                                  {account.name}
+                                  <span className="ml-1 text-xs text-muted-foreground">({account.accountType})</span>
                                 </SelectItem>
                               ))}
                             </SelectContent>
@@ -360,55 +357,48 @@ export default function CompanyTransfer() {
                         </div>
                       </div>
 
-                      {/* Cash account filter */}
                       <div className="space-y-1.5">
                         <Label className="text-xs">
                           Trigger on cash accounts
-                          <span className="text-muted-foreground font-normal ml-1">
+                          <span className="ml-1 font-normal text-muted-foreground">
                             (leave all unchecked = every cash account)
                           </span>
                         </Label>
-                        <div className="rounded-md border p-2 flex flex-wrap gap-x-4 gap-y-1.5">
-                          {accountOptions(fromAccounts).map((a) => (
+                        <div className="flex flex-wrap gap-x-4 gap-y-1.5 rounded-md border p-2">
+                          {accountOptions(fromAccounts).map((account) => (
                             <label
-                              key={a.id}
-                              className="flex items-center gap-1.5 cursor-pointer text-sm select-none"
-                              data-testid={`checkbox-cash-account-${a.id}`}
+                              key={account.id}
+                              className="flex cursor-pointer select-none items-center gap-1.5 text-sm"
+                              data-testid={`checkbox-cash-account-${account.id}`}
                             >
                               <input
                                 type="checkbox"
-                                checked={ruleCashAccountIds.includes(a.id)}
-                                onChange={() => toggleCashAccount(a.id)}
+                                checked={ruleCashAccountIds.includes(account.id)}
+                                onChange={() => toggleCashAccount(account.id)}
                                 className="accent-primary"
                               />
-                              {a.name}
+                              {account.name}
                             </label>
                           ))}
                           {accountOptions(fromAccounts).length === 0 && (
                             <span className="text-xs text-muted-foreground">No accounts found</span>
                           )}
                         </div>
-                        {ruleCashAccountIds.length === 0 && (
-                          <p className="text-xs text-muted-foreground">All cash accounts will trigger this rule.</p>
-                        )}
-                        {ruleCashAccountIds.length > 0 && (
-                          <p className="text-xs text-muted-foreground">
-                            Only when payment uses:{" "}
-                            <strong>
-                              {accountOptions(fromAccounts)
-                                .filter((a) => ruleCashAccountIds.includes(a.id))
-                                .map((a) => a.name)
-                                .join(", ")}
-                            </strong>
-                          </p>
-                        )}
+                        <p className="text-xs text-muted-foreground">
+                          {ruleCashAccountIds.length === 0
+                            ? "All cash accounts will trigger this rule."
+                            : `Only when payment uses: ${accountOptions(fromAccounts)
+                                .filter((account) => ruleCashAccountIds.includes(account.id))
+                                .map((account) => account.name)
+                                .join(", ")}`}
+                        </p>
                       </div>
 
                       <div className="flex items-center gap-2">
                         <Switch
                           checked={ruleEnabled}
                           onCheckedChange={setRuleEnabled}
-                          data-testid={`switch-rule-enabled-${mod}`}
+                          data-testid={`switch-rule-enabled-${module}`}
                         />
                         <Label className="text-sm">{ruleEnabled ? "Enabled" : "Paused"}</Label>
                       </div>
@@ -416,7 +406,7 @@ export default function CompanyTransfer() {
                         size="sm"
                         onClick={handleSaveRule}
                         disabled={saveRuleMutation.isPending}
-                        data-testid={`button-save-rule-${mod}`}
+                        data-testid={`button-save-rule-${module}`}
                       >
                         {saveRuleMutation.isPending ? "Saving…" : "Add Rule"}
                       </Button>
@@ -428,16 +418,15 @@ export default function CompanyTransfer() {
           </CardContent>
         </Card>
 
-        {/* Transfer History */}
         <Card>
           <CardHeader>
             <CardTitle className="text-base">Transfer History</CardTitle>
           </CardHeader>
           <CardContent className="p-0">
             {isLoading ? (
-              <p className="text-sm text-muted-foreground p-4">Loading…</p>
+              <p className="p-4 text-sm text-muted-foreground">Loading…</p>
             ) : transfers.length === 0 ? (
-              <p className="text-sm text-muted-foreground p-4">No transfers yet.</p>
+              <p className="p-4 text-sm text-muted-foreground">No transfers yet.</p>
             ) : (
               <Table>
                 <TableHeader className="sticky top-0 z-30 bg-background">
@@ -453,23 +442,23 @@ export default function CompanyTransfer() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {transfers.map((t) => (
-                    <TableRow key={t.id} data-testid={`row-transfer-${t.id}`}>
-                      <TableCell className="text-sm">{t.transferDate}</TableCell>
-                      <TableCell className="font-medium text-sm">{t.fromCompanyName}</TableCell>
-                      <TableCell className="text-sm text-muted-foreground">{t.fromAccountName}</TableCell>
-                      <TableCell className="font-medium text-sm">{t.toCompanyName}</TableCell>
-                      <TableCell className="text-sm text-muted-foreground">{t.toAccountName}</TableCell>
+                  {transfers.map((transfer) => (
+                    <TableRow key={transfer.id} data-testid={`row-transfer-${transfer.id}`}>
+                      <TableCell className="text-sm">{transfer.transferDate}</TableCell>
+                      <TableCell className="text-sm font-medium">{transfer.fromCompanyName}</TableCell>
+                      <TableCell className="text-sm text-muted-foreground">{transfer.fromAccountName}</TableCell>
+                      <TableCell className="text-sm font-medium">{transfer.toCompanyName}</TableCell>
+                      <TableCell className="text-sm text-muted-foreground">{transfer.toAccountName}</TableCell>
                       <TableCell className="font-mono text-sm font-semibold">
-                        {formatAmount(parseFloat(t.amount))}
+                        {formatAmount(Number.parseFloat(transfer.amount))}
                       </TableCell>
-                      <TableCell className="text-sm text-muted-foreground">{t.description ?? "—"}</TableCell>
+                      <TableCell className="text-sm text-muted-foreground">{transfer.description ?? "—"}</TableCell>
                       <TableCell className="text-right">
                         <Button
                           size="icon"
                           variant="ghost"
-                          onClick={() => setUndoTarget(t)}
-                          data-testid={`button-undo-${t.id}`}
+                          onClick={() => setUndoTarget(transfer)}
+                          data-testid={`button-undo-${transfer.id}`}
                         >
                           <Undo2 className="h-4 w-4" />
                         </Button>
@@ -483,24 +472,19 @@ export default function CompanyTransfer() {
         </Card>
       </div>
 
-      {/* Undo transfer dialog */}
-      <AlertDialog
-        open={!!undoTarget}
-        onOpenChange={(open) => {
-          if (!open) setUndoTarget(null);
-        }}
-      >
+      <AlertDialog open={!!undoTarget} onOpenChange={(open) => !open && setUndoTarget(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Reverse this transfer?</AlertDialogTitle>
             <AlertDialogDescription>
               {undoTarget && (
                 <>
-                  This will remove the <strong>{formatAmount(parseFloat(undoTarget.amount))}</strong> transfer from{" "}
+                  This will reverse the <strong>{formatAmount(Number.parseFloat(undoTarget.amount))}</strong> transfer from{" "}
                   <strong>{undoTarget.fromCompanyName}</strong> to <strong>{undoTarget.toCompanyName}</strong> on{" "}
-                  <strong>{undoTarget.transferDate}</strong>.<br />
+                  <strong>{undoTarget.transferDate}</strong>.
                   <br />
-                  Both entries will be deleted and the balances will return to what they were before.
+                  <br />
+                  Both company balances will return to their prior values and the transfer history entry will be removed.
                 </>
               )}
             </AlertDialogDescription>
@@ -518,13 +502,7 @@ export default function CompanyTransfer() {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Delete rule confirmation */}
-      <AlertDialog
-        open={!!deleteConfirmRuleId}
-        onOpenChange={(open) => {
-          if (!open) setDeleteConfirmRuleId(null);
-        }}
-      >
+      <AlertDialog open={!!deleteConfirmRuleId} onOpenChange={(open) => !open && setDeleteConfirmRuleId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Remove this auto-transfer rule?</AlertDialogTitle>
