@@ -1,4 +1,8 @@
-import Decimal from "decimal.js";
+import {
+  calculateCostLine,
+  calculateWeightedAverageCost,
+  factoryCostDecimal,
+} from "./factoryCostingEngine";
 
 export interface MixBatchSourceIdentity {
   sourceType: string;
@@ -146,20 +150,15 @@ function normalizeCurrency(value: unknown): string {
   return currency;
 }
 
-function decimal(value: unknown, field: string, options: { allowZero?: boolean } = {}): Decimal {
-  let parsed: Decimal;
+function decimal(value: unknown, field: string, options: { allowZero?: boolean } = {}) {
   try {
-    parsed = new Decimal(String(value));
+    return factoryCostDecimal(value as any, field, { allowZero: options.allowZero === true });
   } catch {
-    throw new MixBatchCostingValidationError("MIX_BATCH_AMOUNT_INVALID", `${field} is invalid`);
-  }
-  if (!parsed.isFinite() || parsed.isNegative() || (!options.allowZero && parsed.isZero())) {
     throw new MixBatchCostingValidationError(
       "MIX_BATCH_AMOUNT_INVALID",
-      `${field} must be ${options.allowZero ? "non-negative" : "positive"}`
+      `${field} must be ${options.allowZero ? "non-negative" : "positive"}`,
     );
   }
-  return parsed;
 }
 
 export function validateMixBatchCostingRequest(request: MixBatchCostingRequest): {
@@ -184,11 +183,11 @@ export function validateMixBatchCostingRequest(request: MixBatchCostingRequest):
     if (seen.has(supplierId)) {
       throw new MixBatchCostingValidationError(
         "MIX_BATCH_DUPLICATE_SUPPLIER",
-        `Supplier ${supplierId} appears more than once in the same mix batch`
+        `Supplier ${supplierId} appears more than once in the same mix batch`,
       );
     }
     seen.add(supplierId);
-    decimal(component.quantityKg, `components[${index}].quantityKg`);
+    decimal(component.quantityKg, `components[${index}].quantityKg`, { allowZero: false });
     decimal(component.expectedUnitCostPerKg, `components[${index}].expectedUnitCostPerKg`, { allowZero: true });
     if (
       component.expectedRawStockVersion != null &&
@@ -196,7 +195,7 @@ export function validateMixBatchCostingRequest(request: MixBatchCostingRequest):
     ) {
       throw new MixBatchCostingValidationError(
         "MIX_BATCH_VERSION_INVALID",
-        `components[${index}].expectedRawStockVersion is invalid`
+        `components[${index}].expectedRawStockVersion is invalid`,
       );
     }
     return supplierId;
@@ -208,16 +207,15 @@ export function validateMixBatchCostingRequest(request: MixBatchCostingRequest):
 /**
  * Canonical transaction-owned mix-batch costing boundary.
  *
- * Every supplier state is locked in deterministic order. Component value is
- * derived from the supplier's locked unit cost; callers cannot inject a new
- * rate. Deductions reduce quantity and total cost proportionally, preserving
- * each supplier's cost/kg exactly. The resulting batch cost is the sum of those
- * historical component values and does not re-average any supplier balance.
+ * Supplier state is locked in deterministic order. Component value is always
+ * derived from the supplier's locked unit cost; callers cannot inject a rate.
+ * Quantity and total cost are deducted proportionally so the supplier rate never
+ * drifts because of consumption.
  */
 export async function createMixBatchCostTx(
   tx: any,
   request: MixBatchCostingRequest,
-  adapter: MixBatchCostingAdapter
+  adapter: MixBatchCostingAdapter,
 ): Promise<MixBatchCostingResult> {
   const validated = validateMixBatchCostingRequest(request);
 
@@ -244,26 +242,24 @@ export async function createMixBatchCostTx(
   if (lockedStates.length !== validated.supplierIds.length) {
     throw new MixBatchCostingValidationError(
       "MIX_BATCH_SUPPLIER_STATE_MISSING",
-      "One or more supplier raw-stock states could not be locked"
+      "One or more supplier raw-stock states could not be locked",
     );
   }
 
   const statesBySupplier = new Map(lockedStates.map((state) => [state.supplierId, state]));
-  let totalQuantity = new Decimal(0);
-  let totalValue = new Decimal(0);
 
   const components = request.components.map((component): MixBatchComponentResult => {
     const state = statesBySupplier.get(component.supplierId);
     if (!state) {
       throw new MixBatchCostingValidationError(
         "MIX_BATCH_SUPPLIER_STATE_MISSING",
-        `Missing locked state for supplier ${component.supplierId}`
+        `Missing locked state for supplier ${component.supplierId}`,
       );
     }
     if (normalizeCurrency(state.currency) !== validated.currency) {
       throw new MixBatchCostingValidationError(
         "MIX_BATCH_CURRENCY_MISMATCH",
-        `Supplier ${component.supplierId} currency ${state.currency} does not match ${validated.currency}`
+        `Supplier ${component.supplierId} currency ${state.currency} does not match ${validated.currency}`,
       );
     }
     if (!Number.isInteger(state.version) || state.version < 0) {
@@ -272,11 +268,11 @@ export async function createMixBatchCostTx(
     if (component.expectedRawStockVersion != null && component.expectedRawStockVersion !== state.version) {
       throw new MixBatchCostingValidationError(
         "MIX_BATCH_VERSION_CONFLICT",
-        `Supplier ${component.supplierId} expected version ${component.expectedRawStockVersion} but locked version is ${state.version}`
+        `Supplier ${component.supplierId} expected version ${component.expectedRawStockVersion} but locked version is ${state.version}`,
       );
     }
 
-    const quantity = decimal(component.quantityKg, "component.quantityKg");
+    const quantity = decimal(component.quantityKg, "component.quantityKg", { allowZero: false });
     const availableQuantity = decimal(state.quantityKg, "state.quantityKg", { allowZero: true });
     const totalCost = decimal(state.totalCost, "state.totalCost", { allowZero: true });
     const unitCost = decimal(state.unitCostPerKg, "state.unitCostPerKg", { allowZero: true });
@@ -287,46 +283,43 @@ export async function createMixBatchCostTx(
     if (!availableQuantity.isZero() && !totalCost.div(availableQuantity).eq(unitCost)) {
       throw new MixBatchCostingValidationError(
         "MIX_BATCH_SUPPLIER_STATE_INCONSISTENT",
-        `Supplier ${component.supplierId} quantity, total cost, and unit cost are inconsistent`
+        `Supplier ${component.supplierId} quantity, total cost, and unit cost are inconsistent`,
       );
     }
     if (availableQuantity.isZero() && (!totalCost.isZero() || !unitCost.isZero())) {
       throw new MixBatchCostingValidationError(
         "MIX_BATCH_SUPPLIER_STATE_INCONSISTENT",
-        `Supplier ${component.supplierId} has cost without quantity`
+        `Supplier ${component.supplierId} has cost without quantity`,
       );
     }
     if (!expectedUnitCost.eq(unitCost)) {
       throw new MixBatchCostingValidationError(
         "MIX_BATCH_RATE_CONFLICT",
-        `Supplier ${component.supplierId} cost/kg changed from ${expectedUnitCost.toFixed()} to ${unitCost.toFixed()}`
+        `Supplier ${component.supplierId} cost/kg changed from ${expectedUnitCost.toFixed()} to ${unitCost.toFixed()}`,
       );
     }
     if (quantity.gt(availableQuantity)) {
       throw new MixBatchCostingValidationError(
         "MIX_BATCH_INSUFFICIENT_STOCK",
-        `Supplier ${component.supplierId} has ${availableQuantity.toFixed()} kg but ${quantity.toFixed()} kg was requested`
+        `Supplier ${component.supplierId} has ${availableQuantity.toFixed()} kg but ${quantity.toFixed()} kg was requested`,
       );
     }
 
-    const value = quantity.mul(unitCost);
+    const value = calculateCostLine(quantity, unitCost).totalCost;
     const afterQuantity = availableQuantity.minus(quantity);
     const afterTotalCost = totalCost.minus(value);
     if (afterQuantity.isZero() && !afterTotalCost.isZero()) {
       throw new MixBatchCostingValidationError(
         "MIX_BATCH_DEPLETION_COST_REMAINDER",
-        `Supplier ${component.supplierId} would retain cost after full depletion`
+        `Supplier ${component.supplierId} would retain cost after full depletion`,
       );
     }
     if (!afterQuantity.isZero() && !afterTotalCost.div(afterQuantity).eq(unitCost)) {
       throw new MixBatchCostingValidationError(
         "MIX_BATCH_SUPPLIER_RATE_DRIFT",
-        `Supplier ${component.supplierId} cost/kg would change during mix-batch deduction`
+        `Supplier ${component.supplierId} cost/kg would change during mix-batch deduction`,
       );
     }
-
-    totalQuantity = totalQuantity.plus(quantity);
-    totalValue = totalValue.plus(value);
 
     return {
       supplierId: component.supplierId,
@@ -341,13 +334,21 @@ export async function createMixBatchCostTx(
     };
   });
 
+  const aggregate = calculateWeightedAverageCost(
+    components.map((component) => ({
+      quantityKg: component.quantityKg,
+      unitCostPerKg: component.unitCostPerKg,
+      totalCost: component.value,
+    })),
+  );
+
   const result: MixBatchCostingResult = {
     companyId: request.companyId,
     batchId: request.batchId,
     currency: validated.currency,
-    totalQuantityKg: totalQuantity.toFixed(),
-    totalValue: totalValue.toFixed(),
-    weightedUnitCostPerKg: totalValue.div(totalQuantity).toFixed(),
+    totalQuantityKg: aggregate.totalQuantityKg.toFixed(),
+    totalValue: aggregate.totalCost.toFixed(),
+    weightedUnitCostPerKg: aggregate.weightedUnitCostPerKg.toFixed(),
     components,
     idempotent: false,
   };
