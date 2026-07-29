@@ -114,12 +114,18 @@ export const interCompanyTransferService = {
       );
       if (existingTransfer) return existingTransfer;
 
-      const { clientRequestId: _clientRequestId, fromVoucherId: _fromVoucherId, toVoucherId: _toVoucherId, ...values } = parsed;
       return transferRepository.createTransferTx(tx, {
-        ...values,
+        transferType: parsed.transferType,
+        fromCompanyId: parsed.fromCompanyId,
+        toCompanyId: parsed.toCompanyId,
+        transferDate: parsed.transferDate,
         amount: fromBuilt.amount,
+        fromLedgerAccountId: parsed.fromLedgerAccountId,
+        toLedgerAccountId: parsed.toLedgerAccountId,
         fromVoucherId: (fromPosted.voucher as any).id,
         toVoucherId: (toPosted.voucher as any).id,
+        description: parsed.description ?? null,
+        sourcePaymentId: parsed.sourcePaymentId ?? null,
       });
     });
   },
