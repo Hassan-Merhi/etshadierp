@@ -52,8 +52,10 @@ export function useVoucherQueries({
   });
 
   const { data: ledgerAccounts = [], isFetched: ledgerAccountsFetched } = useQuery<LedgerAccount[]>({
-    // includeHidden=true so cash / loan / bank accounts marked isHidden still appear in voucher pickers
-    queryKey: ["/api/ledger-accounts?includeHidden=true", selectedCompany?.id],
+    // includeHidden=true so cash / loan / bank accounts marked isHidden still appear in voucher pickers.
+    // companyId is embedded in the URL so the server uses the explicit company rather than relying
+    // on the session (which may not have updated yet on a company switch).
+    queryKey: [`/api/ledger-accounts?includeHidden=true&companyId=${selectedCompany?.id}`, selectedCompany?.id],
     enabled: !!selectedCompany?.id,
   });
 
