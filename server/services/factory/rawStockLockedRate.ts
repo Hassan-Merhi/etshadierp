@@ -11,6 +11,11 @@ import {
 import { getStableSupplierCost } from "./rawStockStableCost";
 import { db as sharedDb } from "../../db";
 import { FACTORY_HISTORICAL_REPLAY_V7_SCHEMA_SQL } from "./historicalReplayV7MigrationSql";
+import {
+  calculateCostLine,
+  calculateMovingAverageRate,
+  formatFactoryLockedRate,
+} from "./factoryCostingEngine";
 
 /**
  * Authoritative supplier raw-material quantity. This is the same quantity shown by
@@ -127,7 +132,7 @@ export async function getLockedSupplierRate(
   if (costPerKgUsd > 0) {
     await tx
       .update(factorySuppliers)
-      .set({ currentRawMaterialCostPerKgUsd: String(costPerKgUsd) })
+      .set({ currentRawMaterialCostPerKgUsd: formatFactoryLockedRate(costPerKgUsd) })
       .where(and(eq(factorySuppliers.id, supplierId), eq(factorySuppliers.companyId, companyId)));
   }
   return costPerKgUsd;
@@ -218,8 +223,8 @@ export async function getLockedRateDiagnosticsForCompany(
       const { rate } = await getLockedSupplierRateReadOnly(tx, companyId, supplier.id);
       const remainingKg = await getAuthoritativeSupplierRemainingKg(tx, companyId, supplier.id);
       const reservedKg = reservedBySupplierId.get(supplier.id) || 0;
-      const displayedValue = remainingKg * rate;
-      const expectedValue = remainingKg * (persistedLockedRate ?? 0);
+      const displayedValue = calculateCostLine(remainingKg, rate).totalCost;
+      const expectedValue = calculateCostLine(remainingKg, persistedLockedRate ?? 0).totalCost;
 
       rows.push({
         companyId,
@@ -233,7 +238,7 @@ export async function getLockedRateDiagnosticsForCompany(
         freeKg: remainingKg,
         displayedValue: displayedValue.toFixed(2),
         expectedValue: expectedValue.toFixed(2),
-        difference: (displayedValue - expectedValue).toFixed(2),
+        difference: displayedValue.minus(expectedValue).toFixed(2),
         backfillRequired: persistedLockedRate === null,
       });
     }
@@ -262,26 +267,22 @@ export async function applyOffloadMovingAverage(
     0,
     await getAuthoritativeSupplierRemainingKg(tx, companyId, supplierId)
   );
-  const oldRemaining = new Decimal(oldRemainingKg);
-  const received = new Decimal(newReceivedKg);
-  const denominator = oldRemaining.plus(received);
-  const newLockedRate = denominator.gt(0)
-    ? oldRemaining
-        .times(oldLockedRate)
-        .plus(received.times(newContainerLandedCostPerKgUsd))
-        .dividedBy(denominator)
-        .toNumber()
-    : new Decimal(newContainerLandedCostPerKgUsd).toNumber();
+  const newLockedRate = calculateMovingAverageRate({
+    existingQuantityKg: oldRemainingKg,
+    existingRatePerKg: oldLockedRate,
+    incomingQuantityKg: newReceivedKg,
+    incomingRatePerKg: newContainerLandedCostPerKgUsd,
+  });
 
   await tx
     .update(factorySuppliers)
     .set({
-      currentRawMaterialCostPerKgUsd: String(newLockedRate),
+      currentRawMaterialCostPerKgUsd: formatFactoryLockedRate(newLockedRate),
       updatedAt: new Date(),
     })
     .where(and(eq(factorySuppliers.id, supplierId), eq(factorySuppliers.companyId, companyId)));
 
-  return { oldRemainingKg, oldLockedRate, newLockedRate };
+  return { oldRemainingKg, oldLockedRate, newLockedRate: newLockedRate.toNumber() };
 }
 
 /** Quantity-only manual ADDs require an already-established locked rate. */
