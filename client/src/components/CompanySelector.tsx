@@ -1,5 +1,6 @@
-import { useCompany } from "@/contexts/CompanyContext";
-import { WifiOff, ChevronDown, Layers } from "lucide-react";
+import { useCompany, type Company } from "@/contexts/CompanyContext";
+import type { CompanyType } from "@/contracts/sessionContracts";
+import { ChevronDown, Layers, WifiOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -14,18 +15,16 @@ import { useToast } from "@/hooks/use-toast";
 import { useConnectivity } from "@/contexts/ConnectivityContext";
 import { enqueueRequest } from "@/lib/offlineQueue";
 
-type CompanyType = "erp" | "factory" | "properties" | string;
-
-const TYPE_META: Record<string, { color: string; label: string }> = {
-  erp:              { color: "#3b82f6", label: "ERP" },
-  factory:          { color: "#f97316", label: "Factory" },
-  factory_v2:       { color: "#f97316", label: "Factory V2" },
-  properties:       { color: "#6366f1", label: "Properties" },
+const TYPE_META: Record<CompanyType, { color: string; label: string }> = {
+  erp: { color: "#3b82f6", label: "ERP" },
+  factory: { color: "#f97316", label: "Factory" },
+  factory_v2: { color: "#f97316", label: "Factory V2" },
+  properties: { color: "#6366f1", label: "Properties" },
   supplier_partner: { color: "#f43f5e", label: "Supplier Partner" },
 };
 
 function getTypeMeta(type: CompanyType) {
-  return TYPE_META[type] ?? { color: "#6b7280", label: type ?? "Unknown" };
+  return TYPE_META[type];
 }
 
 function getInitials(name: string) {
@@ -47,21 +46,25 @@ function CompanyAvatar({ name, type, size = "sm" }: { name: string; type: Compan
   );
 }
 
+function getErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : "Please try again.";
+}
+
 export function CompanySelector() {
   const { selectedCompany, companies, isLoading, selectCompany } = useCompany();
   const { isOnline } = useConnectivity();
   const { toast } = useToast();
 
-  const handleCompanyChange = async (company: any) => {
+  const handleCompanyChange = async (company: Company) => {
     if (company.id === selectedCompany?.id) return;
 
     if (!isOnline) {
-      selectCompany(company);
+      await selectCompany(company);
       enqueueRequest(
         "/api/auth/set-company",
         "POST",
         JSON.stringify({ companyId: company.id }),
-        `Switch to ${company.name}`
+        `Switch to ${company.name}`,
       );
       toast({
         title: `Switched to ${company.name}`,
@@ -72,14 +75,12 @@ export function CompanySelector() {
 
     try {
       await apiRequest("POST", "/api/auth/set-company", { companyId: company.id });
-      // Write localStorage before reload so the context initialises with the
-      // right company on the next page load without an extra set-company POST.
       localStorage.setItem("selectedCompanyId", company.id.toString());
       window.location.reload();
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: "Failed to switch company",
-        description: error.message || "Please try again.",
+        description: getErrorMessage(error),
         variant: "destructive",
       });
     }
@@ -94,8 +95,7 @@ export function CompanySelector() {
     );
   }
 
-  const activeType = (selectedCompany as any).companyType ?? "erp";
-  const { color: activeColor } = getTypeMeta(activeType);
+  const activeType = selectedCompany.companyType;
 
   if (companies.length <= 1) {
     return (
@@ -121,7 +121,6 @@ export function CompanySelector() {
       </DropdownMenuTrigger>
 
       <DropdownMenuContent align="end" className="w-64 p-1.5">
-        {/* Header */}
         <div className="flex items-center justify-between px-2 py-1.5 mb-1">
           <div className="flex items-center gap-1.5 text-muted-foreground">
             <Layers className="h-3.5 w-3.5" />
@@ -133,19 +132,16 @@ export function CompanySelector() {
         </div>
 
         {!isOnline && (
-          <>
-            <div className="px-2 py-1.5 text-xs text-muted-foreground flex items-center gap-1.5 bg-muted/50 rounded-md mb-1">
-              <WifiOff className="h-3 w-3 shrink-0" />
-              Offline — switch will sync on reconnect
-            </div>
-          </>
+          <div className="px-2 py-1.5 text-xs text-muted-foreground flex items-center gap-1.5 bg-muted/50 rounded-md mb-1">
+            <WifiOff className="h-3 w-3 shrink-0" />
+            Offline — switch will sync on reconnect
+          </div>
         )}
 
         <DropdownMenuSeparator className="mx-0 my-1" />
 
         {companies.map((company) => {
-          const cType = (company as any).companyType ?? "erp";
-          const { color, label } = getTypeMeta(cType);
+          const { color, label } = getTypeMeta(company.companyType);
           const isActive = company.id === selectedCompany.id;
 
           return (
@@ -156,7 +152,7 @@ export function CompanySelector() {
               className="rounded-md px-2 py-2 gap-2.5 cursor-pointer"
               style={isActive ? { backgroundColor: `${color}14` } : undefined}
             >
-              <CompanyAvatar name={company.name} type={cType} size="md" />
+              <CompanyAvatar name={company.name} type={company.companyType} size="md" />
               <div className="flex flex-col flex-1 min-w-0">
                 <span className="text-sm font-medium leading-tight truncate">{company.name}</span>
                 <span className="text-[10px] leading-tight" style={{ color: `${color}cc` }}>
