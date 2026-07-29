@@ -1,6 +1,5 @@
 import "./deploymentPreflight.mjs";
 import "./criticalSecuritySchemaBridge.mjs";
-import "./factoryContainerSchemaBridge.mjs";
 import "./runtimeReleaseState.mjs";
 import "./runtimeSecurityGuard.mjs";
 import "./runtimeHealthGuard.mjs";
