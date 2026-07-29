@@ -2,6 +2,7 @@ import type { Express } from "express";
 import type { Server } from "http";
 
 import { registerRoutes as registerLegacyRoutes } from "./routesLegacy";
+import { registerOperationalMonitoringRoutes } from "./routes/admin/operationalMonitoringRoutes";
 
 /**
  * Public API composition root.
@@ -11,5 +12,6 @@ import { registerRoutes as registerLegacyRoutes } from "./routesLegacy";
  * business logic must be added to a domain module, not to this entry point.
  */
 export function registerRoutes(app: Express): Promise<Server> {
+  registerOperationalMonitoringRoutes(app);
   return registerLegacyRoutes(app);
 }

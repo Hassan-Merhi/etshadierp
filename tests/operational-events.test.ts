@@ -1,8 +1,8 @@
 /**
  * Unit tests for server/lib/operationalEvents.ts — the in-memory operational
- * event recorder (error/bandwidth/integrity counters + a bounded recent-events
+ * event recorder (category/severity/code counters + a bounded recent-events
  * ring buffer). Covers input normalisation, newest-first ordering, the 50-item
- * cap, snapshot immutability, and severity → logger routing.
+ * cap, snapshot immutability, rollups, and severity → logger routing.
  */
 import { vi } from "vitest";
 
@@ -20,15 +20,25 @@ beforeEach(() => {
   resetOperationalEventsForTests();
   logger.error.mockClear();
   logger.warn.mockClear();
+  logger.info.mockClear();
 });
 
 describe("recordOperationalEvent", () => {
-  it("increments the per-category counter", () => {
-    recordOperationalEvent({ category: "error", code: "x", severity: "warning", message: "m" });
-    recordOperationalEvent({ category: "error", code: "y", severity: "warning", message: "m" });
-    recordOperationalEvent({ category: "bandwidth", code: "z", severity: "info", message: "m" });
+  it("increments category, severity, and code rollups", () => {
+    recordOperationalEvent({ category: "error", code: "HTTP Failure", severity: "warning", message: "first" });
+    recordOperationalEvent({ category: "error", code: "HTTP Failure", severity: "critical", message: "latest" });
+    recordOperationalEvent({ category: "bandwidth", code: "large_response", severity: "info", message: "m" });
     const snap = getOperationalEventSnapshot();
+
     expect(snap.counts).toEqual({ error: 2, bandwidth: 1, integrity: 0 });
+    expect(snap.severityCounts).toEqual({ info: 1, warning: 1, critical: 1 });
+    expect(snap.byCode[0]).toMatchObject({
+      code: "http_failure",
+      category: "error",
+      severity: "critical",
+      count: 2,
+      lastMessage: "latest",
+    });
   });
 
   it("stores events newest-first", () => {
@@ -64,17 +74,19 @@ describe("recordOperationalEvent", () => {
     }
     const snap = getOperationalEventSnapshot();
     expect(snap.recent).toHaveLength(50);
-    expect(snap.counts.error).toBe(60); // counter is not capped
-    expect(snap.recent[0].code).toBe("c59"); // newest retained
+    expect(snap.counts.error).toBe(60);
+    expect(snap.recent[0].code).toBe("c59");
   });
 
-  it("routes critical severity to logger.error, others to logger.warn", () => {
+  it("routes critical severity to logger.error, warning to logger.warn, and info to logger.info", () => {
     recordOperationalEvent({ category: "error", code: "c", severity: "critical", message: "bad" });
     expect(logger.error).toHaveBeenCalledTimes(1);
-    expect(logger.warn).not.toHaveBeenCalled();
 
     recordOperationalEvent({ category: "error", code: "c", severity: "warning", message: "meh" });
     expect(logger.warn).toHaveBeenCalledTimes(1);
+
+    recordOperationalEvent({ category: "error", code: "c", severity: "info", message: "ok" });
+    expect(logger.info).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -93,9 +105,11 @@ describe("getOperationalEventSnapshot", () => {
     recordOperationalEvent({ category: "error", code: "c", severity: "info", message: "m" });
     const snap = getOperationalEventSnapshot();
     snap.recent.push({ category: "error" } as never);
+    snap.byCode[0].count = 999;
     snap.counts.error = 999;
     const fresh = getOperationalEventSnapshot();
     expect(fresh.recent).toHaveLength(1);
+    expect(fresh.byCode[0].count).toBe(1);
     expect(fresh.counts.error).toBe(1);
   });
 });
