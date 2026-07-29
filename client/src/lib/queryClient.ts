@@ -380,6 +380,14 @@ export const getQueryFn: <T>(options: { on401: UnauthorizedBehavior }) => QueryF
   async ({ queryKey, signal: querySignal }) => {
     // The queryKey is expected to be a single URL string as the first element
     const url = queryKey[0] as string;
+    // Factory accounting pickers must include hidden system accounts such as
+    // Cash and Bank. Other ERP pages retain the normal hidden-account behavior.
+    const requestUrl =
+      typeof window !== "undefined" &&
+      window.location.pathname.startsWith("/factory/") &&
+      url === "/api/ledger-accounts"
+        ? "/api/ledger-accounts?includeHidden=true"
+        : url;
 
     // Apply a 5-minute hard timeout so queries never hang indefinitely.
     // We race the caller's own signal (query cancellation) against our timeout.
@@ -395,7 +403,10 @@ export const getQueryFn: <T>(options: { on401: UnauthorizedBehavior }) => QueryF
 
     try {
       // Capacitor: resolve to absolute URL when VITE_API_BASE_URL is set; no-op on web.
-      const _apiUrl = _CAPACITOR_API_BASE && url.startsWith("/") ? `${_CAPACITOR_API_BASE}${url}` : url;
+      const _apiUrl =
+        _CAPACITOR_API_BASE && requestUrl.startsWith("/")
+          ? `${_CAPACITOR_API_BASE}${requestUrl}`
+          : requestUrl;
       const res = await fetch(_apiUrl, {
         credentials: "include",
         signal: controller.signal,
@@ -413,7 +424,7 @@ export const getQueryFn: <T>(options: { on401: UnauthorizedBehavior }) => QueryF
     } catch (error: any) {
       clearTimeout(timeoutId);
       if (timedOut && error?.name === "AbortError") {
-        throw new Error(`Request timed out after 30 seconds: GET ${url}`, { cause: error });
+        throw new Error(`Request timed out after 30 seconds: GET ${requestUrl}`, { cause: error });
       }
       throw error;
     }
