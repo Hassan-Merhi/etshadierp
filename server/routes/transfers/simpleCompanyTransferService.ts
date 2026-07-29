@@ -2,6 +2,7 @@ import {
   buildCompanyTransferPostingRequest,
   createDatabasePostingDependencies,
   postBalancedVoucherTx,
+  type CentralPostingRequest,
   type PostingActor,
 } from "../../services/accounting";
 import { requireCompanyAccess } from "./transferRequestContext";
@@ -10,6 +11,8 @@ import { transferRepository } from "./transferRepository";
 import { parseSimpleTransferInput } from "./transferValidation";
 
 const postingDependencies = createDatabasePostingDependencies();
+
+type TransferSide = "from" | "to";
 
 async function getOrCreateClearingAccount(companyId: number) {
   const accounts = await transferRepository.listLedgerAccounts(companyId);
@@ -23,6 +26,50 @@ async function getOrCreateClearingAccount(companyId: number) {
     openingBalance: "0",
     active: true,
   });
+}
+
+function buildTransferReversalRequest(input: {
+  transferId: number;
+  side: TransferSide;
+  transferDate: string;
+  snapshot: { voucher: any; entries: any[] };
+  actor: PostingActor;
+}): CentralPostingRequest {
+  const { transferId, side, transferDate, snapshot, actor } = input;
+  const idempotencyKey = `simple-company-transfer-reversal:${transferId}:${side}`;
+  const entries = snapshot.entries.map((entry) => ({
+    ledgerAccountId: entry.ledgerAccountId ?? undefined,
+    bankAccountId: entry.bankAccountId ?? undefined,
+    fixedAssetId: entry.fixedAssetId ?? undefined,
+    supplierId: entry.supplierId ?? undefined,
+    employeeId: entry.employeeId ?? undefined,
+    customerId: entry.customerId ?? undefined,
+    factorySupplierId: entry.factorySupplierId ?? undefined,
+    debitAmount: String(entry.creditAmount ?? "0"),
+    creditAmount: String(entry.debitAmount ?? "0"),
+    narration: entry.narration
+      ? `Reversal: ${entry.narration}`
+      : `Reversal of ${snapshot.voucher.voucherNumber}`,
+  }));
+
+  return {
+    voucher: {
+      companyId: snapshot.voucher.companyId,
+      voucherNumber: `REV-${snapshot.voucher.voucherNumber}-${Date.now()}`,
+      voucherType: "Journal",
+      voucherDate: transferDate,
+      description: `Reversal of company transfer #${transferId} (${side})`,
+      totalAmount: snapshot.voucher.totalAmount,
+      optional: false,
+    },
+    entries,
+    source: {
+      sourceType: "simple-company-transfer-reversal",
+      sourceId: `${transferId}:${side}`,
+      idempotencyKey,
+    },
+    actor,
+  };
 }
 
 export const simpleCompanyTransferService = {
@@ -112,21 +159,68 @@ export const simpleCompanyTransferService = {
     });
   },
 
-  async delete(userId: string, transferId: number) {
+  async delete(userId: string, transferId: number, actor?: PostingActor) {
     const transfer = await transferRepository.getSimpleTransfer(transferId);
-    if (!transfer) throw new TransferRouteError(404, "Transfer not found");
+    if (!transfer) {
+      if (await transferRepository.hasCompletedTransferReversal(transferId)) {
+        return { success: true, replayed: true };
+      }
+      throw new TransferRouteError(404, "Transfer not found");
+    }
     await requireCompanyAccess(userId, [transfer.fromCompanyId, transfer.toCompanyId]);
 
     return transferRepository.transaction(async (tx) => {
       const lockedTransfer = await transferRepository.getSimpleTransferForUpdateTx(tx, transferId);
       if (!lockedTransfer) return { success: true, replayed: true };
 
-      const voucherIds = [lockedTransfer.fromVoucherId, lockedTransfer.toVoucherId]
-        .map(Number)
-        .filter((id) => Number.isInteger(id) && id > 0);
+      const fromVoucherId = Number(lockedTransfer.fromVoucherId);
+      const toVoucherId = Number(lockedTransfer.toVoucherId);
+      if (!Number.isInteger(fromVoucherId) || !Number.isInteger(toVoucherId)) {
+        throw new TransferRouteError(409, "Transfer is missing one or both accounting vouchers");
+      }
+
+      const [fromSnapshot, toSnapshot] = await Promise.all([
+        transferRepository.getVoucherSnapshotTx(tx, lockedTransfer.fromCompanyId, fromVoucherId),
+        transferRepository.getVoucherSnapshotTx(tx, lockedTransfer.toCompanyId, toVoucherId),
+      ]);
+      if (!fromSnapshot || !toSnapshot) {
+        throw new TransferRouteError(409, "Transfer accounting vouchers could not be loaded for reversal");
+      }
+
+      const reversalActor = actor ?? { userId, reason: `Reverse company transfer ${transferId}` };
+      const fromReversal = await postBalancedVoucherTx(
+        tx,
+        buildTransferReversalRequest({
+          transferId,
+          side: "from",
+          transferDate: lockedTransfer.transferDate,
+          snapshot: fromSnapshot,
+          actor: reversalActor,
+        }),
+        postingDependencies,
+      );
+      const toReversal = await postBalancedVoucherTx(
+        tx,
+        buildTransferReversalRequest({
+          transferId,
+          side: "to",
+          transferDate: lockedTransfer.transferDate,
+          snapshot: toSnapshot,
+          actor: reversalActor,
+        }),
+        postingDependencies,
+      );
+
+      // Replaces the legacy deleteTransferVoucher behavior: originals remain for audit.
       await transferRepository.deleteSimpleTransferTx(tx, transferId);
-      await transferRepository.deleteTransferVouchersTx(tx, voucherIds);
-      return { success: true, replayed: false };
+      return {
+        success: true,
+        replayed: fromReversal.replayed && toReversal.replayed,
+        reversalVoucherIds: [
+          Number((fromReversal.voucher as any).id),
+          Number((toReversal.voucher as any).id),
+        ],
+      };
     });
   },
 };
