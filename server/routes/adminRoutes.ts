@@ -5,6 +5,7 @@ import { registerCompanySettingsRoutes } from "./admin/companySettingsRoutes";
 import { registerImportExportRoutes } from "./admin/importExportRoutes";
 import { registerAdminPoFixRoutes } from "./admin/adminPoFixRoutes";
 import { registerAdminRepairRoutes } from "./admin/adminRepairRoutes";
+import { registerDependentDeletedItemPermanentRoutes } from "./admin/dependentDeletedItemPermanentRoutes";
 import { registerDeletedItemsRoutes } from "./admin/deletedItemsRoutes";
 import { registerSecurityAnomalyRoutes } from "./admin/securityAnomalyRoutes";
 import { registerSecurityPermissionRoutes } from "./admin/securityPermissionRoutes";
@@ -54,6 +55,7 @@ export function registerAdminRoutes(app: Express) {
   registerImportExportRoutes(app);
   registerAdminPoFixRoutes(app);
   registerAdminRepairRoutes(app);
+  registerDependentDeletedItemPermanentRoutes(app);
   registerDeletedItemsRoutes(app);
   registerSecurityAnomalyRoutes(app);
   registerSecurityPermissionRoutes(app);
