@@ -72,15 +72,20 @@ export const interCompanyTransferService = {
       accounts: toAccounts,
     });
     const voucherTimestamp = Date.now();
+    const fromVoucherNumber = `ICT-FROM-${voucherTimestamp}`;
+    const toVoucherNumber = `ICT-TO-${voucherTimestamp}`;
     const description = parsed.description || `Inter-company transfer to ${toCompany.name}`;
 
     return transferRepository.transaction(async (tx) => {
+      const fromNarration = `Transfer to ${toCompany.name} - ${fromVoucherNumber}`;
       const fromBuilt = buildCompanyTransferPostingRequest({
         companyId: parsed.fromCompanyId,
-        voucherNumber: `ICT-FROM-${voucherTimestamp}`,
+        voucherNumber: fromVoucherNumber,
         voucherType: "Payment",
         voucherDate: parsed.transferDate,
         description,
+        debitNarration: fromNarration,
+        creditNarration: fromNarration,
         amount: parsed.amount,
         debitLedgerAccountId: fromInterCompanyAccount.id,
         creditLedgerAccountId: parsed.fromLedgerAccountId,
@@ -91,12 +96,15 @@ export const interCompanyTransferService = {
       });
       const fromPosted = await postBalancedVoucherTx(tx, fromBuilt.request, postingDependencies);
 
+      const toNarration = `Transfer from ${fromCompany.name} - ${toVoucherNumber}`;
       const toBuilt = buildCompanyTransferPostingRequest({
         companyId: parsed.toCompanyId,
-        voucherNumber: `ICT-TO-${voucherTimestamp}`,
+        voucherNumber: toVoucherNumber,
         voucherType: "Receipt",
         voucherDate: parsed.transferDate,
         description: parsed.description || `Inter-company transfer from ${fromCompany.name}`,
+        debitNarration: toNarration,
+        creditNarration: toNarration,
         amount: parsed.amount,
         debitLedgerAccountId: parsed.toLedgerAccountId,
         creditLedgerAccountId: toInterCompanyAccount.id,
