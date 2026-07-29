@@ -26,8 +26,9 @@ for (const invariant of [
   "cancelCompanySessionQueries(queryClient)",
   "removeCompanySessionQueries(queryClient)",
   "const ok = await switchCompanyOnServer(company.id)",
-  "commitCompanySelection(company, true)",
-  "commitCompanySelection(company, false)",
+  "commitCompanySelection(company, { prefetch: true, serverSynced: true })",
+  "commitCompanySelection(company, { prefetch: false, serverSynced: false })",
+  "scheduleInitialSyncRetry",
   "refetchType: \"active\"",
 ]) {
   if (!context.includes(invariant)) {
@@ -116,6 +117,7 @@ for (const testPath of [
 }
 
 const completion = read("docs/engineering/phase4-frontend-company-state-isolation.md");
+const normalizedCompletion = completion.toLowerCase();
 for (const phrase of [
   "server-authoritative switch",
   "cache eviction",
@@ -123,10 +125,10 @@ for (const phrase of [
   "serialized company switching",
   "offline workspace switch",
   "company-scoped query keys",
-  "Verification boundary",
-  "Merge boundary",
+  "verification boundary",
+  "merge boundary",
 ]) {
-  if (!completion.includes(phrase)) {
+  if (!normalizedCompletion.includes(phrase)) {
     failures.push(`docs/engineering/phase4-frontend-company-state-isolation.md: missing ${phrase}`);
   }
 }
