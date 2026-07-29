@@ -1,5 +1,5 @@
 {
-  "version": 3,
+  "version": 4,
   "description": "Frozen legacy route boundaries. Budgets may only decrease as routes move into focused modules.",
   "files": [
     {
@@ -26,8 +26,8 @@
     {
       "path": "server/routes/customerRoutesLegacy.ts",
       "owner": "Customer accounting and operations",
-      "maxLines": 1073,
-      "targetLines": 300,
+      "maxLines": 12,
+      "targetLines": 0,
       "migrationPhase": 4
     }
   ]
