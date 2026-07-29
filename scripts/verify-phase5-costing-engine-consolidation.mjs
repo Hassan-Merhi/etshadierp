@@ -35,6 +35,15 @@ for (const forbidden of ["@shared/schema", "../../db", ".insert(", ".update(", "
   if (engine.includes(forbidden)) failures.push(`${enginePath}: contains database dependency ${forbidden}`);
 }
 
+const stableFallbackPath = "server/services/factory/rawStockStableCost.ts";
+const stableFallback = requireText(
+  stableFallbackPath,
+  "calculateWeightedAverageCost",
+  "central weighted fallback",
+);
+forbidText(stableFallbackPath, "weightedCostSumD", "inline receipt-weighted total");
+forbidText(stableFallbackPath, "totalReceivedKgD", "inline receipt-weighted denominator");
+
 const lockedRatePath = "server/services/factory/rawStockLockedRate.ts";
 const lockedRate = requireText(
   lockedRatePath,
