@@ -108,6 +108,8 @@ export const containerSalesService = {
         voucherNumber,
         voucherDate: parsed.saleDate,
         description,
+        debitNarration: `Container sale - ${voucherNumber}`,
+        creditNarration: `Container sale commission - ${voucherNumber}`,
         totalAmount: parsed.totalAmount,
         customerLedgerAccountId: customer.ledgerAccountId,
         commissionAccountId,
