@@ -1211,9 +1211,60 @@ export function registerDeletedItemsRoutes(app: Express) {
           await db.update(voucherEntries).set({ employeeId: null }).where(eq(voucherEntries.employeeId, itemId));
           await db.delete(employees).where(and(eq(employees.id, itemId), eq(employees.companyId, companyId)));
           break;
-        case "customer":
-          await db.delete(customers).where(and(eq(customers.id, itemId), eq(customers.companyId, companyId)));
+        case "customer": {
+          // Permanent customer delete — must clear all FK references first.
+          // Use db.transaction() + tx.execute(sql`...`) matching the established
+          // pattern in this file (pool.connect parameterized queries fail here).
+          await db.transaction(async (tx) => {
+            // 1. Null out nullable FKs (keep vouchers/bales intact)
+            await tx.execute(sql`UPDATE voucher_entries SET customer_id = NULL WHERE customer_id = ${itemId}`);
+            await tx.execute(sql`UPDATE bales SET customer_id = NULL WHERE customer_id = ${itemId}`);
+            await tx.execute(sql`UPDATE factory_pos_sales SET customer_id = NULL WHERE customer_id = ${itemId}`);
+
+            // 2. Delete dispatch sub-rows (deepest first)
+            await tx.execute(sql`
+              DELETE FROM customer_dispatch_bale_scans
+              WHERE batch_id IN (SELECT id FROM customer_dispatch_batches WHERE customer_id = ${itemId})`);
+            await tx.execute(sql`
+              DELETE FROM customer_dispatch_truck_rides
+              WHERE batch_id IN (SELECT id FROM customer_dispatch_batches WHERE customer_id = ${itemId})`);
+            await tx.execute(sql`DELETE FROM customer_dispatch_batches WHERE customer_id = ${itemId}`);
+
+            // 3. Delete invoice loading sessions
+            await tx.execute(sql`DELETE FROM factory_invoice_loading_sessions WHERE customer_id = ${itemId}`);
+
+            // 4. Delete container sales
+            await tx.execute(sql`DELETE FROM container_sales WHERE customer_id = ${itemId}`);
+
+            // 5. Delete customer order children then orders
+            await tx.execute(sql`
+              DELETE FROM customer_order_bales_history
+              WHERE order_id IN (SELECT id FROM customer_orders WHERE customer_id = ${itemId})`);
+            await tx.execute(sql`
+              DELETE FROM customer_order_bales
+              WHERE order_id IN (SELECT id FROM customer_orders WHERE customer_id = ${itemId})`);
+            await tx.execute(sql`
+              DELETE FROM customer_order_lines
+              WHERE order_id IN (SELECT id FROM customer_orders WHERE customer_id = ${itemId})`);
+            await tx.execute(sql`
+              DELETE FROM customer_order_charges
+              WHERE order_id IN (SELECT id FROM customer_orders WHERE customer_id = ${itemId})`);
+            await tx.execute(sql`DELETE FROM customer_orders WHERE customer_id = ${itemId}`);
+
+            // 6. Delete customer proforma children then proformas
+            await tx.execute(sql`
+              DELETE FROM proforma_stock_reservations
+              WHERE proforma_id IN (SELECT id FROM customer_proformas WHERE customer_id = ${itemId})`);
+            await tx.execute(sql`
+              DELETE FROM customer_proforma_lines
+              WHERE proforma_id IN (SELECT id FROM customer_proformas WHERE customer_id = ${itemId})`);
+            await tx.execute(sql`DELETE FROM customer_proformas WHERE customer_id = ${itemId}`);
+
+            // 7. Delete the customer (customerBalances + customerLogos cascade automatically)
+            await tx.execute(sql`DELETE FROM customers WHERE id = ${itemId} AND company_id = ${companyId}`);
+          });
           break;
+        }
         case "supplier":
           await db.delete(suppliers).where(eq(suppliers.id, itemId));
           break;

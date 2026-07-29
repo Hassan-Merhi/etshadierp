@@ -60,6 +60,7 @@ export function registerFactoryStockEntryHistoryPaginationRoutes(app: Express): 
         const workerId = parseOptionalId(req.query.workerId);
         const productId = parseOptionalId(req.query.productId);
         const locationId = parseOptionalId(req.query.locationId);
+        const categoryId = parseOptionalId(req.query.categoryId);
         const status = typeof req.query.status === "string" && req.query.status ? req.query.status : undefined;
         const search = typeof req.query.search === "string" ? req.query.search.trim().toLowerCase() : "";
         const includeUnassigned = req.query.includeUnassigned !== "false";
@@ -84,6 +85,7 @@ export function registerFactoryStockEntryHistoryPaginationRoutes(app: Express): 
         if (workerId) conditions.push(`fb.finalized_by = ${bind(workerId)}`);
         if (productId) conditions.push(`fb.product_id = ${bind(productId)}`);
         if (locationId) conditions.push(`fb.erp_location_id = ${bind(locationId)}`);
+        if (categoryId) conditions.push(`fbp.category_id = ${bind(categoryId)}`);
         if (status) conditions.push(`fb.status = ${bind(status)}`);
         if (search) conditions.push(`LOWER(fb.reference_number) LIKE ${bind(`%${search}%`)}`);
         if (!includeUnassigned) conditions.push(`fb.finalized_by IS NOT NULL`);

@@ -2226,7 +2226,7 @@ export function registerFactoryBalesRoutes(app: Express) {
         ((req.session as any).currentRole as string) || ((req.session as any).factoryRole as string) || "";
       const isPrivileged = ["Admin", "Owner", "Manager", "Developer"].includes(userRole);
 
-      const { startDate, endDate, workerId, productId, locationId, status, search, includeUnassigned, lite } =
+      const { startDate, endDate, workerId, productId, locationId, categoryId, status, search, includeUnassigned, lite } =
         req.query as Record<string, string>;
 
       const today = getClientDate(req);
@@ -2243,6 +2243,7 @@ export function registerFactoryBalesRoutes(app: Express) {
       const workerFilter = workerId ? sql`AND fb.finalized_by = ${parseInt(workerId)}` : sql``;
       const productFilter = productId ? sql`AND fb.product_id = ${parseInt(productId)}` : sql``;
       const locationFilter = locationId ? sql`AND fb.erp_location_id = ${parseInt(locationId)}` : sql``;
+      const categoryFilter2 = categoryId ? sql`AND fbp.category_id = ${parseInt(categoryId)}` : sql``;
       const statusFilter = status ? sql`AND fb.status = ${status}` : sql``;
       const searchFilter = search
         ? sql`AND LOWER(fb.reference_number) LIKE ${"%" + search.toLowerCase() + "%"}`
@@ -2262,6 +2263,7 @@ export function registerFactoryBalesRoutes(app: Express) {
           ${workerFilter}
           ${productFilter}
           ${locationFilter}
+          ${categoryFilter2}
           ${statusFilter}
           ${searchFilter}
           ${unassignedFilter}`;

@@ -234,6 +234,7 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
   }, [fromActive, fromDate]);
 
   const [categoryFilter, setCategoryFilter] = useState("all");
+  const [productCategoryFilter, setProductCategoryFilter] = useState("all");
   const [workerIdFilter, setWorkerIdFilter] = useState("all");
   const [productIdFilter, setProductIdFilter] = useState("all");
   const [locationIdFilter, setLocationIdFilter] = useState("all");
@@ -265,12 +266,13 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
         productIdFilter,
         locationIdFilter,
         categoryFilter,
+        productCategoryFilter,
         statusFilter,
         debouncedSearch,
         String(includeUnassigned),
         String(useLite),
       ].join("|"),
-    [fromActive, fromDate, toActive, toDate, workerIdFilter, productIdFilter, locationIdFilter, categoryFilter, statusFilter, debouncedSearch, includeUnassigned, useLite]
+    [fromActive, fromDate, toActive, toDate, workerIdFilter, productIdFilter, locationIdFilter, categoryFilter, productCategoryFilter, statusFilter, debouncedSearch, includeUnassigned, useLite]
   );
   // (page/pageSize reset removed — no pagination)
 
@@ -280,6 +282,7 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
   if (workerIdFilter !== "all") params.set("workerId", workerIdFilter);
   if (productIdFilter !== "all") params.set("productId", productIdFilter);
   if (locationIdFilter !== "all") params.set("locationId", locationIdFilter);
+  if (productCategoryFilter !== "all") params.set("categoryId", productCategoryFilter);
   if (statusFilter !== "all") params.set("status", statusFilter);
   if (debouncedSearch.trim()) params.set("search", debouncedSearch.trim());
   if (!includeUnassigned) params.set("includeUnassigned", "false");
@@ -311,6 +314,12 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
   const { data: categories = [] } = useQuery<any[]>({
     queryKey: ["/api/factory/worker-categories"],
     queryFn: () => fetch("/api/factory/worker-categories", { credentials: "include" }).then((r) => r.json()),
+  });
+  const { data: productCategories = [] } = useQuery<any[]>({
+    queryKey: ["/api/factory/categories"],
+    queryFn: () => fetch("/api/factory/categories", { credentials: "include" }).then((r) => r.json()),
+    staleTime: 60_000,
+    refetchOnWindowFocus: false,
   });
 
   // Fetch production plan targets when viewing a single day
@@ -532,6 +541,7 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
     setFromDate(today);
     setToDate(today);
     setCategoryFilter("all");
+    setProductCategoryFilter("all");
     setWorkerIdFilter("all");
     setProductIdFilter("all");
     setLocationIdFilter("all");
@@ -1030,11 +1040,30 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
 
       {/* ── Filters panel ── */}
       <div className="rounded-xl border bg-muted/30 p-3">
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5">
           <div className="space-y-1">
             <div className="flex items-center gap-1 text-xs text-muted-foreground font-medium">
               <Layers className="h-3 w-3" />
-              Category
+              Bale Category
+            </div>
+            <Select value={productCategoryFilter} onValueChange={setProductCategoryFilter}>
+              <SelectTrigger className="h-8 text-xs" data-testid="select-product-category">
+                <SelectValue placeholder="All categories" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Categories</SelectItem>
+                {productCategories.map((c: any) => (
+                  <SelectItem key={c.id} value={String(c.id)}>
+                    {c.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1">
+            <div className="flex items-center gap-1 text-xs text-muted-foreground font-medium">
+              <Users className="h-3 w-3" />
+              Worker Group
             </div>
             <Select
               value={categoryFilter}
@@ -1044,10 +1073,10 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
               }}
             >
               <SelectTrigger className="h-8 text-xs" data-testid="select-category">
-                <SelectValue placeholder="All categories" />
+                <SelectValue placeholder="All groups" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Categories</SelectItem>
+                <SelectItem value="all">All Groups</SelectItem>
                 {categories.map((c: any) => (
                   <SelectItem key={c.id} value={String(c.id)}>
                     {c.name}
