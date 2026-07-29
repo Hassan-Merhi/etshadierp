@@ -5,14 +5,17 @@ function source(path: string): string {
 }
 
 describe("Phase 5 factory costing consolidation contracts", () => {
-  it("routes supplier locked-rate changes through the central costing engine", () => {
+  it("routes supplier locked-rate changes and legacy fallback through the central engine", () => {
     const lockedRate = source("server/services/factory/rawStockLockedRate.ts");
+    const stableFallback = source("server/services/factory/rawStockStableCost.ts");
 
     expect(lockedRate).toContain('from "./factoryCostingEngine"');
     expect(lockedRate).toContain("calculateMovingAverageRate");
     expect(lockedRate).toContain("formatFactoryLockedRate");
     expect(lockedRate).toContain("calculateCostLine");
     expect(lockedRate).not.toContain("oldRemaining.times(oldLockedRate)");
+    expect(stableFallback).toContain("calculateWeightedAverageCost");
+    expect(stableFallback).not.toContain("weightedCostSumD");
   });
 
   it("routes correction, batch, and bale valuation through the same primitives", () => {
