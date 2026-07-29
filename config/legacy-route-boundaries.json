@@ -1,12 +1,12 @@
 {
-  "version": 1,
-  "description": "Frozen Phase 1 baseline for the remaining backend legacy route registries. Budgets may only decrease as routes move into focused modules.",
+  "version": 2,
+  "description": "Frozen legacy route boundaries. Budgets may only decrease as routes move into focused modules.",
   "files": [
     {
       "path": "server/routes/reportsRoutesLegacy.ts",
       "owner": "Reporting",
-      "maxLines": 1628,
-      "targetLines": 400,
+      "maxLines": 12,
+      "targetLines": 0,
       "migrationPhase": 2
     },
     {
