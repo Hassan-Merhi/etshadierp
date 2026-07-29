@@ -179,14 +179,17 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
     initialSyncStarted.current = true;
 
     if (typeof navigator !== "undefined" && navigator.onLine === false) {
-      selectCompany(target, { offline: true });
+      void selectCompany(target, { offline: true }).catch((error) => {
+        console.error("[Company] Failed to activate the offline company selection.", error);
+        scheduleInitialSyncRetry();
+      });
       return;
     }
 
     // Fast path: if the server session already holds the target company, clear
     // any persisted in-memory company data and activate it without another write.
     // Otherwise use the same serialized switch path as every user-initiated change.
-    fetch("/api/auth/session-company", { credentials: "include", cache: "no-store" })
+    void fetch("/api/auth/session-company", { credentials: "include", cache: "no-store" })
       .then((response) => (response.ok ? response.json() : Promise.resolve({ companyId: null })))
       .catch(() => ({ companyId: null }))
       .then(async ({ companyId: sessionCompanyId }) => {
@@ -215,6 +218,10 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
         }
 
         console.error("[Company] Failed to synchronize the initial company selection; retrying.");
+        scheduleInitialSyncRetry();
+      })
+      .catch((error) => {
+        console.error("[Company] Initial company synchronization failed; retrying.", error);
         scheduleInitialSyncRetry();
       });
   }, [
