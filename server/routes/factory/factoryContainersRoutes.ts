@@ -388,6 +388,25 @@ export function registerFactoryContainersRoutes(app: Express) {
         if (sup?.parentId) values.commissionSupplierId = sup.parentId;
       }
 
+      // Guard: verify the commission supplier actually exists in factory_suppliers.
+      // The FK factory_containers_commission_supplier_id_fkey enforces referential integrity,
+      // so an orphaned/stale commissionSupplierId (e.g. a supplier deleted after the form
+      // was opened, or a parentId pointing to a non-existent broker row) would cause a
+      // hard FK-violation INSERT failure. Null it out gracefully instead.
+      if (values.commissionSupplierId) {
+        const [commSupExists] = await db
+          .select({ id: factorySuppliers.id })
+          .from(factorySuppliers)
+          .where(eq(factorySuppliers.id, values.commissionSupplierId));
+        if (!commSupExists) {
+          logger.warn("commissionSupplierId not found in factory_suppliers — clearing to avoid FK violation", {
+            module: "factoryContainers", action: "create", commissionSupplierId: values.commissionSupplierId,
+          });
+          values.commissionSupplierId = null;
+          values.commissionAccountId = null;
+        }
+      }
+
       // Auto-create commission ledger account for the broker if commission amount > 0
       const commissionAmt = parseFloat(values.commissionAmount || "0");
       if (!values.commissionAccountId && values.commissionSupplierId) {
