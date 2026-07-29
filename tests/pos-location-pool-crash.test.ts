@@ -37,4 +37,22 @@ describe("POS location database-pool crash protection", () => {
     expect(migration).toContain("base_debit_amount NUMERIC(20,6)");
     expect(migration).toContain("base_credit_amount NUMERIC(20,6)");
   });
+
+  it("does not prefetch general ERP reference data for POS sessions", () => {
+    const context = source("client/src/contexts/CompanyContext.tsx");
+
+    expect(context).toContain('if (role === "POS") return;');
+    expect(context).toContain("role: uc.role");
+    expect(context).toContain("prefetchReferenceData(company.id, company.role)");
+    expect(context).toContain("prefetchReferenceData(target.id, target.role)");
+  });
+
+  it("does not mount the hidden ERP command palette for ordinary POS users", () => {
+    const shell = source("client/src/app/PosShell.tsx");
+
+    expect(shell).toContain("{hasAdminSearch && (");
+    expect(shell).toContain(
+      '<CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} isPOS={true} user={user} />'
+    );
+  });
 });
