@@ -1,5 +1,5 @@
 {
-  "version": 2,
+  "version": 3,
   "description": "Frozen legacy route boundaries. Budgets may only decrease as routes move into focused modules.",
   "files": [
     {
@@ -12,8 +12,8 @@
     {
       "path": "server/routes/authRoutesLegacy.ts",
       "owner": "Authentication and access control",
-      "maxLines": 1537,
-      "targetLines": 350,
+      "maxLines": 12,
+      "targetLines": 0,
       "migrationPhase": 3
     },
     {
