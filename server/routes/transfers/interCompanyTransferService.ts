@@ -1,6 +1,15 @@
+import {
+  buildCompanyTransferPostingRequest,
+  createDatabasePostingDependencies,
+  postBalancedVoucherTx,
+  type PostingActor,
+} from "../../services/accounting";
+import { requireCompanyAccess } from "./transferRequestContext";
 import { TransferRouteError } from "./transferErrors";
 import { transferRepository } from "./transferRepository";
 import { parseInterCompanyTransferInput } from "./transferValidation";
+
+const postingDependencies = createDatabasePostingDependencies();
 
 async function getOrCreateInterCompanyAccount(params: {
   companyId: number;
@@ -26,8 +35,10 @@ export const interCompanyTransferService = {
     return transferRepository.listInterCompanyTransfers(companyId);
   },
 
-  async create(input: unknown) {
+  async create(userId: string, input: unknown, actor?: PostingActor) {
     const parsed = parseInterCompanyTransferInput(input);
+    await requireCompanyAccess(userId, [parsed.fromCompanyId, parsed.toCompanyId]);
+
     const [fromCompany, toCompany, fromAccount, toAccount, fromAccounts, toAccounts] = await Promise.all([
       transferRepository.getCompany(parsed.fromCompanyId),
       transferRepository.getCompany(parsed.toCompanyId),
@@ -60,59 +71,56 @@ export const interCompanyTransferService = {
       accountType: "Liability",
       accounts: toAccounts,
     });
+    const voucherTimestamp = Date.now();
+    const description = parsed.description || `Inter-company transfer to ${toCompany.name}`;
 
-    const fromVoucherNumber = `ICT-FROM-${Date.now()}`;
-    const fromVoucher = await transferRepository.createVoucher({
-      companyId: parsed.fromCompanyId,
-      voucherNumber: fromVoucherNumber,
-      voucherType: "Payment",
-      voucherDate: parsed.transferDate,
-      description: parsed.description || `Inter-company transfer to ${toCompany.name}`,
-      totalAmount: parsed.amount,
-    });
-    await transferRepository.insertVoucherEntry({
-      voucherId: fromVoucher.id,
-      ledgerAccountId: fromInterCompanyAccount.id,
-      debitAmount: parsed.amount,
-      creditAmount: "0",
-      narration: `Transfer to ${toCompany.name} - ${fromVoucherNumber}`,
-    });
-    await transferRepository.insertVoucherEntry({
-      voucherId: fromVoucher.id,
-      ledgerAccountId: parsed.fromLedgerAccountId,
-      debitAmount: "0",
-      creditAmount: parsed.amount,
-      narration: `Transfer to ${toCompany.name} - ${fromVoucherNumber}`,
-    });
+    return transferRepository.transaction(async (tx) => {
+      const fromBuilt = buildCompanyTransferPostingRequest({
+        companyId: parsed.fromCompanyId,
+        voucherNumber: `ICT-FROM-${voucherTimestamp}`,
+        voucherType: "Payment",
+        voucherDate: parsed.transferDate,
+        description,
+        amount: parsed.amount,
+        debitLedgerAccountId: fromInterCompanyAccount.id,
+        creditLedgerAccountId: parsed.fromLedgerAccountId,
+        clientRequestId: parsed.clientRequestId,
+        sourceType: "inter-company-transfer",
+        sourceSide: "from",
+        actor: actor ?? { userId, reason: "Inter-company transfer source posting" },
+      });
+      const fromPosted = await postBalancedVoucherTx(tx, fromBuilt.request, postingDependencies);
 
-    const toVoucherNumber = `ICT-TO-${Date.now()}`;
-    const toVoucher = await transferRepository.createVoucher({
-      companyId: parsed.toCompanyId,
-      voucherNumber: toVoucherNumber,
-      voucherType: "Receipt",
-      voucherDate: parsed.transferDate,
-      description: parsed.description || `Inter-company transfer from ${fromCompany.name}`,
-      totalAmount: parsed.amount,
-    });
-    await transferRepository.insertVoucherEntry({
-      voucherId: toVoucher.id,
-      ledgerAccountId: parsed.toLedgerAccountId,
-      debitAmount: parsed.amount,
-      creditAmount: "0",
-      narration: `Transfer from ${fromCompany.name} - ${toVoucherNumber}`,
-    });
-    await transferRepository.insertVoucherEntry({
-      voucherId: toVoucher.id,
-      ledgerAccountId: toInterCompanyAccount.id,
-      debitAmount: "0",
-      creditAmount: parsed.amount,
-      narration: `Transfer from ${fromCompany.name} - ${toVoucherNumber}`,
-    });
+      const toBuilt = buildCompanyTransferPostingRequest({
+        companyId: parsed.toCompanyId,
+        voucherNumber: `ICT-TO-${voucherTimestamp}`,
+        voucherType: "Receipt",
+        voucherDate: parsed.transferDate,
+        description: parsed.description || `Inter-company transfer from ${fromCompany.name}`,
+        amount: parsed.amount,
+        debitLedgerAccountId: parsed.toLedgerAccountId,
+        creditLedgerAccountId: toInterCompanyAccount.id,
+        clientRequestId: fromBuilt.clientRequestId,
+        sourceType: "inter-company-transfer",
+        sourceSide: "to",
+        actor: actor ?? { userId, reason: "Inter-company transfer destination posting" },
+      });
+      const toPosted = await postBalancedVoucherTx(tx, toBuilt.request, postingDependencies);
 
-    return transferRepository.createInterCompanyTransfer({
-      ...parsed,
-      fromVoucherId: fromVoucher.id,
-      toVoucherId: toVoucher.id,
+      const existingTransfer = await transferRepository.findTransferByVoucherIdsTx(
+        tx,
+        Number((fromPosted.voucher as any).id),
+        Number((toPosted.voucher as any).id),
+      );
+      if (existingTransfer) return existingTransfer;
+
+      const { clientRequestId: _clientRequestId, fromVoucherId: _fromVoucherId, toVoucherId: _toVoucherId, ...values } = parsed;
+      return transferRepository.createTransferTx(tx, {
+        ...values,
+        amount: fromBuilt.amount,
+        fromVoucherId: (fromPosted.voucher as any).id,
+        toVoucherId: (toPosted.voucher as any).id,
+      });
     });
   },
 };
