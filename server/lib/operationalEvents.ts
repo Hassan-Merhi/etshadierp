@@ -38,12 +38,27 @@ interface OperationalEventRecord extends OperationalEventInput {
   timestamp: string;
 }
 
+interface OperationalEventCodeSummary {
+  code: string;
+  category: OperationalEventCategory;
+  severity: OperationalEventSeverity;
+  count: number;
+  lastSeenAt: string;
+  lastMessage: string;
+}
+
 const MAX_RECENT_EVENTS = 50;
 const counts: Record<OperationalEventCategory, number> = {
   error: 0,
   bandwidth: 0,
   integrity: 0,
 };
+const severityCounts: Record<OperationalEventSeverity, number> = {
+  info: 0,
+  warning: 0,
+  critical: 0,
+};
+const codeSummaries = new Map<string, OperationalEventCodeSummary>();
 const recentEvents: OperationalEventRecord[] = [];
 
 function normalizeCode(code: string): string {
@@ -58,6 +73,19 @@ function normalizeMessage(message: string): string {
   return message.trim().slice(0, 200) || "Operational event detected";
 }
 
+function updateCodeSummary(event: OperationalEventRecord): void {
+  const key = `${event.category}:${event.code}`;
+  const existing = codeSummaries.get(key);
+  codeSummaries.set(key, {
+    code: event.code,
+    category: event.category,
+    severity: event.severity,
+    count: (existing?.count ?? 0) + 1,
+    lastSeenAt: event.timestamp,
+    lastMessage: event.message,
+  });
+}
+
 export function recordOperationalEvent(input: OperationalEventInput): void {
   const event: OperationalEventRecord = {
     ...input,
@@ -67,6 +95,8 @@ export function recordOperationalEvent(input: OperationalEventInput): void {
   };
 
   counts[event.category] += 1;
+  severityCounts[event.severity] += 1;
+  updateCodeSummary(event);
   recentEvents.unshift(event);
   if (recentEvents.length > MAX_RECENT_EVENTS) recentEvents.length = MAX_RECENT_EVENTS;
 
@@ -124,6 +154,10 @@ export function recordIntegrityEvent(
 export function getOperationalEventSnapshot() {
   return {
     counts: { ...counts },
+    severityCounts: { ...severityCounts },
+    byCode: [...codeSummaries.values()]
+      .sort((left, right) => right.count - left.count || right.lastSeenAt.localeCompare(left.lastSeenAt))
+      .map((summary) => ({ ...summary })),
     recent: recentEvents.map((event) => ({ ...event })),
   };
 }
@@ -132,5 +166,9 @@ export function resetOperationalEventsForTests(): void {
   counts.error = 0;
   counts.bandwidth = 0;
   counts.integrity = 0;
+  severityCounts.info = 0;
+  severityCounts.warning = 0;
+  severityCounts.critical = 0;
+  codeSummaries.clear();
   recentEvents.length = 0;
 }
