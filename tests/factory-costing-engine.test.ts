@@ -26,6 +26,17 @@ describe("factory costing engine", () => {
     expect(rate.toNumber()).toBeCloseTo((7000 * 0.28 + 10000 * 0.4) / 17000, 12);
   });
 
+  it("requires a positive incoming quantity for a receipt event", () => {
+    expect(() =>
+      calculateMovingAverageRate({
+        existingQuantityKg: "7000",
+        existingRatePerKg: "0.28",
+        incomingQuantityKg: "0",
+        incomingRatePerKg: "0.40",
+      }),
+    ).toThrow(FactoryCostingError);
+  });
+
   it("does not move a rate when quantity is consumed without a value event", () => {
     const before = calculateRateAfterInventoryValueDelta({
       inventoryQuantityKg: "8000",
@@ -93,6 +104,17 @@ describe("factory costing engine", () => {
     });
 
     expect(delta.toFixed()).toBe("300");
+  });
+
+  it("caps a late-charge inventory fraction at the full container value", () => {
+    const delta = calculateProportionalInventoryValueDelta({
+      oldFullValue: "10000",
+      newFullValue: "11200",
+      remainingKg: "12000",
+      valuationKg: "10000",
+    });
+
+    expect(delta.toFixed()).toBe("1200");
   });
 
   it("uses one shared precision policy", () => {
