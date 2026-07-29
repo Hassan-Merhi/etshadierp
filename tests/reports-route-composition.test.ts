@@ -20,8 +20,9 @@ describe("report route composition", () => {
 
     expect(legacyIndex).toBeGreaterThan(-1);
     for (const registrar of focusedRegistrars) {
-      expect(source.indexOf(registrar), `${registrar} must be registered`).toBeGreaterThan(-1);
-      expect(source.indexOf(registrar), `${registrar} must precede the legacy boundary`).toBeLessThan(legacyIndex);
+      const registrarIndex = source.indexOf(registrar);
+      expect(registrarIndex, `${registrar} must be registered`).toBeGreaterThan(-1);
+      expect(registrarIndex, `${registrar} must precede the legacy boundary`).toBeLessThan(legacyIndex);
     }
   });
 
@@ -29,15 +30,13 @@ describe("report route composition", () => {
     const legacyPath = path.resolve(process.cwd(), "server/routes/reportsRoutesLegacy.ts");
     const legacySource = fs.readFileSync(legacyPath, "utf8");
 
-    expect(legacySource).not.toContain("app.get(");
-    expect(legacySource).not.toContain("app.post(");
-    expect(legacySource).not.toContain("app.put(");
-    expect(legacySource).not.toContain("app.patch(");
-    expect(legacySource).not.toContain("app.delete(");
+    for (const method of ["get", "post", "put", "patch", "delete"]) {
+      expect(legacySource).not.toContain(`app.${method}(`);
+    }
   });
 
   it("keeps each extracted endpoint in a focused module", () => {
-    const expectedRoutes = [
+    const expectedRoutes: Array<[string, string]> = [
       ["reportsContainerTrackingRoutes.ts", 'app.get("/api/dashboard/container-tracking"'],
       ["reportsLedgerRoutes.ts", 'app.get("/api/reports/ledger-monthly-summary/:accountId"'],
       ["reportsLedgerRoutes.ts", 'app.get("/api/reports/ledger-vouchers/:accountId/:year/:month"'],
