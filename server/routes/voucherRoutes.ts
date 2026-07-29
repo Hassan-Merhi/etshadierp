@@ -17,11 +17,41 @@ import { registerSmartTransferPreviewRoutes } from "./vouchers/smartTransferPrev
 import { registerStockTransferLifecycleRoutes } from "./vouchers/stockTransferLifecycleRoutes";
 import { registerStockTransferRevisionLifecycleRoutes } from "./vouchers/stockTransferRevisionLifecycleRoutes";
 
+function registerVoucherDetailCompatibility(app: Express) {
+  app.get("/api/vouchers/:id", (_req, res, next) => {
+    const sendJson = res.json.bind(res);
+
+    res.json = ((body: unknown) => {
+      if (
+        body &&
+        typeof body === "object" &&
+        !Array.isArray(body) &&
+        "transferData" in body &&
+        !("transfer" in body)
+      ) {
+        const voucherDetail = body as Record<string, unknown>;
+        return sendJson({
+          ...voucherDetail,
+          transfer: voucherDetail.transferData,
+        });
+      }
+
+      return sendJson(body);
+    }) as typeof res.json;
+
+    next();
+  });
+}
+
 export function registerVoucherRoutes(app: Express) {
   // Stock-transfer lifecycle routes must shadow the older direct transfer editor.
   registerStockTransferLifecycleRoutes(app);
   registerStockTransferRevisionLifecycleRoutes(app);
 
+  // The daybook detail dialog reads `transfer`, while the canonical voucher
+  // endpoint currently returns `transferData`. Preserve both keys so source and
+  // destination locations render without changing existing API consumers.
+  registerVoucherDetailCompatibility(app);
   registerVoucherQueryRoutes(app);
 
   // Program 2 protected creation handlers call next() for unsupported legacy
