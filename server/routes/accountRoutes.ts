@@ -42,15 +42,17 @@ export function registerAccountRoutes(app: Express) {
       // Fire all independent lookups in parallel instead of serially.
       // getAllSuppliers is always fetched; for factory companies the result is
       // discarded — the wasted query is small compared to the serial latency saved.
-      const [currentCompany, ledgers, banks, assets, employees, allSuppliers, companyCustomers] = await Promise.all([
+      const [currentCompany, ledgersAll, banks, assets, employees, allSuppliers, companyCustomers] = await Promise.all([
         storage.getCompanyById(companyId),
-        storage.getAllLedgerAccounts(companyId),
+        storage.getAllLedgerAccounts(companyId, true), // include hidden so cash/loan/bank accounts appear in pickers
         storage.getAllBankAccounts(companyId),
         storage.getAllFixedAssets(companyId),
         storage.getAllEmployees(companyId),
         storage.getAllSuppliers(),
         storage.getAllCustomers(companyId),
       ]);
+      // Strip internal system-only accounts (isHidden=true for a reason — never show in pickers)
+      const ledgers = ledgersAll.filter((a: any) => !["sp_stock", "sp_opnbal"].includes(a.subType ?? ""));
       const isFactoryCompany = currentCompany?.companyType === "factory";
       const isPropertiesCompany = currentCompany?.companyType === "properties";
       const suppliers = isFactoryCompany || isPropertiesCompany ? [] : allSuppliers;
@@ -680,7 +682,7 @@ export function registerAccountRoutes(app: Express) {
 
       // Phase 2: all independent fetches in parallel (allEntries runs concurrently with others)
       const [
-        ledgers,
+        ledgersRaw,
         banks,
         assets,
         employees,
@@ -691,7 +693,7 @@ export function registerAccountRoutes(app: Express) {
         companyVouchers,
         allEntries,
       ] = await Promise.all([
-        storage.getAllLedgerAccounts(companyId),
+        storage.getAllLedgerAccounts(companyId, true), // include hidden so cash/loan/bank accounts appear in pickers
         storage.getAllBankAccounts(companyId),
         storage.getAllFixedAssets(companyId),
         storage.getAllEmployees(companyId),
@@ -728,6 +730,8 @@ export function registerAccountRoutes(app: Express) {
           )
           .execute(),
       ]);
+      // Strip internal system-only accounts (sp_stock, sp_opnbal are isHidden=true for a reason)
+      const ledgers = ledgersRaw.filter((a: any) => !["sp_stock", "sp_opnbal"].includes(a.subType ?? ""));
 
       const companyVoucherIds = companyVouchers.map((v) => v.id);
       // FACTORY-PAY-* voucher IDs — excluded when computing factory supplier voucher-paid amounts

@@ -52,7 +52,8 @@ export function useVoucherQueries({
   });
 
   const { data: ledgerAccounts = [], isFetched: ledgerAccountsFetched } = useQuery<LedgerAccount[]>({
-    queryKey: ["/api/ledger-accounts", selectedCompany?.id],
+    // includeHidden=true so cash / loan / bank accounts marked isHidden still appear in voucher pickers
+    queryKey: ["/api/ledger-accounts?includeHidden=true", selectedCompany?.id],
     enabled: !!selectedCompany?.id,
   });
 
