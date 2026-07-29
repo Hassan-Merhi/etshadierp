@@ -3,8 +3,8 @@ import { getErrorMessage } from "../../lib/httpHandlers";
 import { requireAuth } from "../../auth";
 import { pool } from "../../db";
 
-const DEFAULT_PAGE_SIZE = 9999;
-const MAX_PAGE_SIZE = 9999;
+const DEFAULT_PAGE_SIZE = 50;
+const MAX_PAGE_SIZE = 250;
 const ACTIVE_ORDER_STATUSES = ["DRAFT", "LOADING", "PENDING_VERIFICATION", "VERIFIED", "FINALIZED"];
 
 function parsePositiveInt(value: unknown, fallback: number): number {

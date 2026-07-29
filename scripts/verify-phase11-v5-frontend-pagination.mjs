@@ -7,9 +7,10 @@ import path from "node:path";
 const ROOT = process.cwd();
 const read = (relativePath) => fs.readFile(path.join(ROOT, relativePath), "utf8");
 
-const [main, client, plugin, source] = await Promise.all([
+const [main, client, server, plugin, source] = await Promise.all([
   read("client/src/main.tsx"),
   read("client/src/lib/v5AllocationPaginationClient.ts"),
+  read("server/routes/factory/factoryStockAllocationV5PaginationRoutes.ts"),
   read("build/viteHeavyListPaginationPlugin.ts"),
   read("client/src/pages/factory/FactoryStockAllocationV5.tsx"),
 ]);
@@ -17,6 +18,8 @@ const [main, client, plugin, source] = await Promise.all([
 assert.match(main, /import "\.\/lib\/v5AllocationPaginationClient";/, "main.tsx must install V5 pagination");
 assert.match(client, /const ENDPOINT = "\/api\/factory\/v5\/stock-allocation";/, "V5 endpoint must be targeted");
 assert.match(client, /const DEFAULT_LIMIT = 50;/, "V5 screen default must remain 50 rows");
+assert.match(server, /const DEFAULT_PAGE_SIZE = 50;/, "V5 server default must remain 50 rows");
+assert.match(server, /const MAX_PAGE_SIZE = 250;/, "V5 server must cap paginated requests at 250 rows");
 assert.match(client, /fullAction/, "explicit full-data requests need an interceptor bypass marker");
 assert.match(client, /fetchAllV5AllocationData/, "all-pages loader is required for business actions");
 assert.match(client, /for \(let page = 2; page <= totalPages; page \+= 1\)/, "all-pages loader must fetch every page");
@@ -61,6 +64,8 @@ console.log(
       checks: [
         "V5 startup wiring",
         "normal 50-row paging",
+        "server 50-row default",
+        "server 250-row cap",
         "all-pages action loader",
         "focused deep-link bypass",
         "global Negative Only preservation",

@@ -206,7 +206,9 @@ export function PosShell({
           </div>
         </div>
       </SidebarProvider>
-      <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} isPOS={true} user={user} />
+      {hasAdminSearch && (
+        <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} isPOS={true} user={user} />
+      )}
       {leaveConfirmDialog}
     </>
   );
