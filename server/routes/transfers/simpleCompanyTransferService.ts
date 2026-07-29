@@ -52,12 +52,15 @@ export const simpleCompanyTransferService = {
     const voucherTimestamp = Date.now();
 
     return transferRepository.transaction(async (tx) => {
+      const fromNarration = `Transfer out to ${toCompany.name}`;
       const fromBuilt = buildCompanyTransferPostingRequest({
         companyId: parsed.fromCompanyId,
         voucherNumber: `TR-OUT-${voucherTimestamp}`,
         voucherType: "Payment",
         voucherDate: parsed.transferDate,
         description: `${description} → ${toCompany.name}`,
+        debitNarration: fromNarration,
+        creditNarration: fromNarration,
         amount: parsed.amount,
         debitLedgerAccountId: fromClearing.id,
         creditLedgerAccountId: parsed.fromLedgerAccountId,
@@ -68,12 +71,15 @@ export const simpleCompanyTransferService = {
       });
       const fromPosted = await postBalancedVoucherTx(tx, fromBuilt.request, postingDependencies);
 
+      const toNarration = `Transfer in from ${fromCompany.name}`;
       const toBuilt = buildCompanyTransferPostingRequest({
         companyId: parsed.toCompanyId,
         voucherNumber: `TR-IN-${voucherTimestamp}`,
         voucherType: "Receipt",
         voucherDate: parsed.transferDate,
         description: `Transfer from ${fromCompany.name}`,
+        debitNarration: toNarration,
+        creditNarration: toNarration,
         amount: parsed.amount,
         debitLedgerAccountId: parsed.toLedgerAccountId,
         creditLedgerAccountId: toClearing.id,
