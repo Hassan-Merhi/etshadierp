@@ -12,7 +12,11 @@ const PREFETCH_KEYS = [
   "/api/fixed-assets",
 ];
 
-function prefetchReferenceData(companyId: number) {
+function prefetchReferenceData(companyId: number, role?: string) {
+  // POS sessions are intentionally denied access to the general ERP reference
+  // endpoints below. Their dedicated POS queries load only the permitted data.
+  if (role === "POS") return;
+
   for (const key of PREFETCH_KEYS) {
     queryClient.prefetchQuery({ queryKey: [key, companyId] });
   }
@@ -23,6 +27,7 @@ interface Company {
   code: string;
   name: string;
   active: boolean;
+  role?: string;
   companyType: "erp" | "factory" | "factory_v2" | "properties" | "supplier_partner";
   displayCurrency?: string | null;
 }
@@ -61,6 +66,7 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
       code: uc.companyCode,
       name: uc.companyName,
       active: uc.companyActive,
+      role: uc.role,
       companyType: uc.companyType || "erp",
     }))
     .filter((company, index, self) => index === self.findIndex((c) => c.id === company.id));
@@ -100,7 +106,7 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
       lastSyncedCompanyId.current = company.id;
       setSelectedCompany(company);
       invalidateCompanyQueries();
-      prefetchReferenceData(company.id);
+      prefetchReferenceData(company.id, company.role);
     }
 
     setIsSyncingCompany(false);
@@ -138,7 +144,7 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
           lastSyncedCompanyId.current = target.id;
           setSelectedCompany(target);
           localStorage.setItem("selectedCompanyId", target.id.toString());
-          prefetchReferenceData(target.id);
+          prefetchReferenceData(target.id, target.role);
           queryClient.invalidateQueries({ queryKey: ["/api/audit-log"] });
           return;
         }
@@ -154,7 +160,7 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
         lastSyncedCompanyId.current = target.id;
         setSelectedCompany(target);
         localStorage.setItem("selectedCompanyId", target.id.toString());
-        prefetchReferenceData(target.id);
+        prefetchReferenceData(target.id, target.role);
         queryClient.invalidateQueries({ queryKey: ["/api/audit-log"] });
       })
       .finally(() => {

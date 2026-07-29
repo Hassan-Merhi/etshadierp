@@ -2,7 +2,7 @@ import { queryClient } from "./queryClient";
 
 const ENDPOINT = "/api/factory/v5/stock-allocation";
 const ROUTE = "/factory/stock-allocation-v5";
-const DEFAULT_LIMIT = 9999;
+const DEFAULT_LIMIT = 50;
 const MAX_ACTION_LIMIT = 250;
 const ALLOWED_LIMITS = [25, 50, 100];
 
