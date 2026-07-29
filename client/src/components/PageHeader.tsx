@@ -1,4 +1,5 @@
 import { Button } from "@/components/ui/button";
+import { WorkspaceActions } from "@/components/ui/workspace-layout";
 import { ArrowLeft, ChevronUp, ChevronDown } from "lucide-react";
 import { useCursorNav } from "@/contexts/CursorNavContext";
 import { useBackToParent } from "@/hooks/use-back-to-parent";
@@ -36,9 +37,9 @@ export function PageHeader({
   const hasNav = hasBack || (showCursorNavButtons && !!config);
 
   return (
-    <div className="flex flex-col gap-3 mb-5 pb-4 border-b border-border" data-testid="page-header">
+    <header className="mb-5 flex min-w-0 flex-col gap-3 border-b border-border pb-4" data-testid="page-header">
       {hasNav && (
-        <div className="flex items-center gap-1 flex-wrap -ml-2">
+        <nav className="-ml-2 flex flex-wrap items-center gap-1" aria-label="Page navigation">
           {hasBack && (
             <Button
               variant="ghost"
@@ -47,7 +48,7 @@ export function PageHeader({
               className="gap-1 text-muted-foreground hover:text-foreground"
               data-testid="button-back"
             >
-              <ArrowLeft className="h-4 w-4" />
+              <ArrowLeft className="h-4 w-4" aria-hidden="true" />
               <span className="hidden sm:inline">Back</span>
             </Button>
           )}
@@ -59,40 +60,42 @@ export function PageHeader({
                 size="icon"
                 onClick={config.onUp}
                 disabled={!config.canNavigateUp}
+                aria-label="Previous record"
                 data-testid="button-cursor-up"
               >
-                <ChevronUp className="h-4 w-4" />
+                <ChevronUp className="h-4 w-4" aria-hidden="true" />
               </Button>
               <Button
                 variant="ghost"
                 size="icon"
                 onClick={config.onDown}
                 disabled={!config.canNavigateDown}
+                aria-label="Next record"
                 data-testid="button-cursor-down"
               >
-                <ChevronDown className="h-4 w-4" />
+                <ChevronDown className="h-4 w-4" aria-hidden="true" />
               </Button>
             </>
           )}
-        </div>
+        </nav>
       )}
-      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3 sm:gap-4">
+      <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-end sm:justify-between sm:gap-4">
         <div className="min-w-0 flex-1 border-l-[3px] border-primary pl-3">
           <h1
-            className="text-xl sm:text-2xl font-bold tracking-tight truncate flex items-center gap-2"
+            className="flex min-w-0 items-center gap-2 text-xl font-bold tracking-tight sm:text-2xl"
             data-testid="text-page-title"
           >
-            {icon && <span className="shrink-0 text-muted-foreground inline-flex">{icon}</span>}
-            <span className="truncate">{title}</span>
+            {icon && <span className="inline-flex shrink-0 text-muted-foreground">{icon}</span>}
+            <span className="min-w-0 break-words">{title}</span>
           </h1>
           {subtitle && (
-            <p className="mt-1 text-muted-foreground text-sm truncate" data-testid="text-page-subtitle">
+            <p className="mt-1 max-w-3xl text-sm leading-5 text-muted-foreground" data-testid="text-page-subtitle">
               {subtitle}
             </p>
           )}
         </div>
-        {children && <div className="flex items-center gap-2 flex-wrap shrink-0">{children}</div>}
+        {children && <WorkspaceActions className="shrink-0">{children}</WorkspaceActions>}
       </div>
-    </div>
+    </header>
   );
 }
