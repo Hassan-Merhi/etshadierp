@@ -44,7 +44,7 @@ function safeError(
     };
     if (isDev) out.stack = err.stack;
     // Expose pg/Drizzle error metadata
-    const e = err as Record<string, unknown>;
+    const e = err as unknown as Record<string, unknown>;
     if (typeof e["code"] === "string") out.code = e["code"];
     if (typeof e["detail"] === "string") out.detail = e["detail"].slice(0, MAX_STRING_LENGTH);
     // Walk the cause chain so Drizzle "Failed query" errors expose the underlying pg error
