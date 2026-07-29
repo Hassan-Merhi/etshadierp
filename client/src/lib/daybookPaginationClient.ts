@@ -2,7 +2,7 @@ import { queryClient } from "./queryClient";
 
 const ENDPOINT = "/api/factory/daybook";
 const ROUTES = new Set(["/factory/daybook", "/properties/daybook"]);
-const DEFAULT_LIMIT = 100;
+const DEFAULT_LIMIT = 9999;
 const MAX_ACTION_LIMIT = 250;
 const ALLOWED_LIMITS = [50, 100, 250];
 
@@ -203,7 +203,13 @@ if (typeof window !== "undefined" && !window.__erpDaybookPaginationInstalled) {
 
   function renderControls(): void {
     const root = ensureControls();
-    if (!activeMeta || !ROUTES.has(window.location.pathname) || hasDeepLink()) {
+    // Hide the bar when there's nothing to paginate or only one page
+    if (
+      !activeMeta ||
+      !ROUTES.has(window.location.pathname) ||
+      hasDeepLink() ||
+      Math.max(activeMeta.totalPages, 1) <= 1
+    ) {
       root.style.display = "none";
       return;
     }
