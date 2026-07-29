@@ -3,6 +3,7 @@ import path from "node:path";
 
 const root = process.cwd();
 const read = (file) => fs.readFileSync(path.join(root, file), "utf8");
+const exists = (file) => fs.existsSync(path.join(root, file));
 const lines = (file) => read(file).split(/\r?\n/).length;
 
 const facade = read("server/chat/reports.ts");
@@ -14,9 +15,10 @@ if (lines("server/chat/reports.ts") > 30) failures.push("server/chat/reports.ts 
 if (!facade.includes("dispatchDataQuery")) failures.push("report facade must delegate to the domain dispatcher");
 if (!chatService.includes('from "./chat/reports"')) failures.push("chatService must use the stable report facade");
 if ((chatService.match(/runDataQuery/g) || []).length < 2) failures.push("chatService report gateway wiring is missing");
-if (chatService.includes("switch (params.queryType)")) failures.push("chatService must not own report dispatch logic");
+if (/switch\s*\(\s*params\.queryType\s*\)/.test(chatService)) failures.push("chatService must not own report dispatch logic");
 if (!dispatcher.includes("reportDomains")) failures.push("domain registry is missing");
-if (!dispatcher.includes("runLegacyDataQuery")) failures.push("compatibility fallback is missing");
+if (/runLegacyDataQuery|legacyReportEngine/.test(dispatcher)) failures.push("compatibility report fallback must be removed");
+if (exists("server/chat/reports/legacyReportEngine.ts")) failures.push("legacyReportEngine.ts must be deleted before Phase 6 is complete");
 
 const domainFiles = fs.readdirSync(path.join(root, "server/chat/reports/domains"))
   .filter((name) => name.endsWith("ReportDomain.ts"));
@@ -27,7 +29,7 @@ for (const file of domainFiles) {
   const source = read(path.join("server/chat/reports/domains", file));
   for (const match of source.matchAll(/"([a-z0-9_]+)"/g)) {
     const queryType = match[1];
-    if (queryType === "accounting" || queryType === "inventory" || queryType === "factory" || queryType === "containers" || queryType === "sales" || queryType === "operations") continue;
+    if (["accounting", "inventory", "factory", "containers", "sales", "operations"].includes(queryType)) continue;
     const owner = seen.get(queryType);
     if (owner) failures.push(`duplicate report ownership for ${queryType}: ${owner}, ${file}`);
     seen.set(queryType, file);
