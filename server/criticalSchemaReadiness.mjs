@@ -11,6 +11,7 @@ export const criticalTables = Object.freeze([
   "exchange_rates",
   "salary_advances",
   "fiscal_period_closures",
+  "factory_containers",
 ]);
 
 export const criticalColumns = Object.freeze([
@@ -35,6 +36,9 @@ export const criticalColumns = Object.freeze([
   ["exchange_rates", "effective_date"],
   ["salary_advances", "remaining_balance"],
   ["salary_advances", "fully_paid"],
+  ["factory_containers", "json_cargo_last_checked_at"],
+  ["factory_containers", "json_cargo_tracking_status"],
+  ["factory_containers", "json_cargo_error"],
 ]);
 
 export const criticalIndexes = Object.freeze([
