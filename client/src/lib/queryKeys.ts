@@ -1,3 +1,5 @@
+import { companyQueryKey } from "./companyQueryScope";
+
 /**
  * Shared query-key factories for all heavy endpoints.
  *
@@ -5,7 +7,7 @@
  *  - All callers of the same data MUST use exactly the same key so React Query
  *    deduplicates the request and shares the cache.
  *  - The first element of every key MUST be the real URL that the shared
- *    getQueryFn will fetch.  Do NOT put a fake discriminator after the URL
+ *    getQueryFn will fetch. Do NOT put a fake discriminator after the URL
  *    while relying on the shared query function.
  *  - Filters are normalised before inclusion: undefined/null/empty values are
  *    dropped, object keys are sorted, primitives are used directly.
@@ -27,13 +29,38 @@ export function normalizeFilters(
   return Object.keys(clean).length ? clean : undefined;
 }
 
+// ── Core company/session keys ─────────────────────────────────────────────────
+export const companyKeys = {
+  scoped: (url: string, companyId: number | string | null | undefined, ...parts: readonly unknown[]) =>
+    companyQueryKey(url, companyId, ...parts),
+
+  reference: (url: string, companyId: number | string | null | undefined) =>
+    companyQueryKey(url, companyId),
+
+  simpleTransfers: (companyId: number | string | null | undefined) =>
+    companyQueryKey("/api/simple-company-transfers", companyId),
+
+  companyAccounts: (
+    activeCompanyId: number | string | null | undefined,
+    targetCompanyId: number | string | null | undefined,
+  ) => companyQueryKey(`/api/company-accounts/${targetCompanyId ?? "no-company"}`, activeCompanyId, targetCompanyId),
+
+  autoTransferConfig: (
+    companyId: number | string | null | undefined,
+    modulePrefix: string,
+  ) => companyQueryKey(`${modulePrefix}/auto-transfer-config`, companyId),
+
+  voucherSearch: (companyId: number | string | null | undefined, search: string) =>
+    companyQueryKey("/api/vouchers/search", companyId, search),
+};
+
 // ── Factory keys ──────────────────────────────────────────────────────────────
 export const factoryKeys = {
-  /** Paginated bale list.  Pass { date, page, limit, search, status, mixBatchId }. */
+  /** Paginated bale list. Pass { date, page, limit, search, status, mixBatchId }. */
   bales: (companyId: number | string | undefined, filters?: Record<string, unknown>) =>
     ["/api/factory/bales", companyId, normalizeFilters(filters)] as const,
 
-  /** Stock-allocation board.  Pass { hideZero, search, page, limit }. */
+  /** Stock-allocation board. Pass { hideZero, search, page, limit }. */
   stockAllocation: (companyId: number | string | undefined, filters?: Record<string, unknown>) =>
     ["/api/factory/v5/stock-allocation", companyId, normalizeFilters(filters)] as const,
 
@@ -66,7 +93,7 @@ export const stockItemKeys = {
     ["/api/stock-items/light", companyId] as const,
 
   /**
-   * Full list including all fields.  Only used by screens that genuinely need
+   * Full list including all fields. Only used by screens that genuinely need
    * price/costing/alias/location-pricing data.
    *
    * Prefer the paginated management-page query ("/api/stock-items?page=…")

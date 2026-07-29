@@ -1,11 +1,12 @@
 /**
  * Unit tests for client/src/lib/queryKeys.ts — the shared React Query key
  * factories. Correctness here is what makes callers of the same data share a
- * cache and dedupe requests, so the normalisation rules (drop empties, sort
- * keys, keep the real URL first) are pinned down explicitly.
+ * cache and dedupe requests, so the normalisation and company-scoping rules are
+ * pinned down explicitly.
  */
 import {
   normalizeFilters,
+  companyKeys,
   factoryKeys,
   inventoryKeys,
   stockItemKeys,
@@ -38,6 +39,33 @@ describe("normalizeFilters", () => {
   });
 });
 
+describe("companyKeys", () => {
+  it("keeps the real URL first and active company second", () => {
+    expect(companyKeys.scoped("/api/accounts/all", 7, "2026-07-29")).toEqual([
+      "/api/accounts/all",
+      7,
+      "2026-07-29",
+    ]);
+  });
+
+  it("separates company-transfer history by active company", () => {
+    expect(companyKeys.simpleTransfers(1)).toEqual(["/api/simple-company-transfers", 1]);
+    expect(companyKeys.simpleTransfers(2)).not.toEqual(companyKeys.simpleTransfers(1));
+  });
+
+  it("separates destination-account caches by active and target company", () => {
+    expect(companyKeys.companyAccounts(3, 9)).toEqual(["/api/company-accounts/9", 3, 9]);
+    expect(companyKeys.companyAccounts(4, 9)).not.toEqual(companyKeys.companyAccounts(3, 9));
+  });
+
+  it("scopes auto-transfer rules to the active company", () => {
+    expect(companyKeys.autoTransferConfig(5, "/api/erp/rental")).toEqual([
+      "/api/erp/rental/auto-transfer-config",
+      5,
+    ]);
+  });
+});
+
 describe("factory / inventory key factories", () => {
   it("puts the real URL first, then company, then normalised filters", () => {
     expect(factoryKeys.bales(7, { page: 2, empty: "" })).toEqual([
@@ -59,7 +87,6 @@ describe("factory / inventory key factories", () => {
 
 describe("stockItemKeys", () => {
   it("keeps light and full lists on separate cache URLs", () => {
-    // The light list must not share a cache with the heavy full endpoint.
     expect(stockItemKeys.light(1)[0]).toBe("/api/stock-items/light");
     expect(stockItemKeys.full(1)[0]).toBe("/api/stock-items");
     expect(stockItemKeys.light(1)[0]).not.toBe(stockItemKeys.full(1)[0]);

@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react";
 import { useDialogScrollFix } from "@/hooks/use-dialog-scroll-fix";
 import { useLocation, Redirect } from "wouter";
 import { setAppTimezone } from "@/lib/queryClient";
+import { companyQueryKey } from "@/lib/companyQueryScope";
 import { useQuery } from "@tanstack/react-query";
 import { useCompany } from "@/contexts/CompanyContext";
 import { useToast } from "@/hooks/use-toast";
@@ -52,9 +53,9 @@ export function AuthenticatedApp() {
   const prevUnreadRef = useRef<number>(-1);
 
   const { data: chatUnread } = useQuery<{ count: number }>({
-    queryKey: ["/api/chat/unread-count"],
+    queryKey: companyQueryKey("/api/chat/unread-count", selectedCompany?.id),
     refetchInterval: 60000,
-    enabled: isPOS && !!user,
+    enabled: isPOS && !!user && !!selectedCompany,
   });
 
   useEffect(() => {
@@ -71,8 +72,8 @@ export function AuthenticatedApp() {
   }, [chatUnread?.count, isPOS]);
 
   const { data: posCompanySettings } = useQuery<any>({
-    queryKey: ["/api/company-settings"],
-    enabled: !!user,
+    queryKey: companyQueryKey("/api/company-settings", selectedCompany?.id),
+    enabled: !!user && !!selectedCompany,
   });
   const posImportEnabled = posCompanySettings?.posExcelImportEnabled === true;
 
@@ -93,19 +94,19 @@ export function AuthenticatedApp() {
     companyName?: string;
     hiddenCostFields?: string[];
   }>({
-    queryKey: ["/api/factory/my-access"],
-    enabled: !!user && !isPOS,
+    queryKey: companyQueryKey("/api/factory/my-access", selectedCompany?.id),
+    enabled: !!user && !isPOS && !!selectedCompany,
     staleTime: 30000,
     retry: 2,
   });
 
   const { data: factorySettings } = useQuery<Record<string, any>>({
-    queryKey: ["/api/factory/settings"],
+    queryKey: companyQueryKey("/api/factory/settings", selectedCompany?.id),
     queryFn: async () => {
       const r = await fetch("/api/factory/settings");
       return r.ok ? r.json() : {};
     },
-    enabled: !!user && !isPOS,
+    enabled: !!user && !isPOS && !!selectedCompany,
     staleTime: 60000,
   });
 
@@ -114,17 +115,15 @@ export function AuthenticatedApp() {
   const isAdminOwner = user?.role === "Admin" || user?.role === "Owner" || user?.role === "Developer";
 
   if (loadingTimedOut || (!isLoading && (error || !user))) return <Redirect to="/login" />;
-  if (isLoading) return <AppLoadingState />;
+  if (isLoading || companyLoading || !selectedCompany) return <AppLoadingState />;
 
-  const isPropertiesCompany = selectedCompany?.companyType === "properties";
+  const isPropertiesCompany = selectedCompany.companyType === "properties";
   const isPropertiesRoute = currentLocation.startsWith("/properties/");
-  const isSupplierPartnerCompany = selectedCompany?.companyType === "supplier_partner";
+  const isSupplierPartnerCompany = selectedCompany.companyType === "supplier_partner";
   const isSupplierPartnerRoute = currentLocation === "/sp" || currentLocation.startsWith("/sp/");
-  const isFactoryCompany = selectedCompany?.companyType === "factory" || selectedCompany?.companyType === "factory_v2";
+  const isFactoryCompany = selectedCompany.companyType === "factory" || selectedCompany.companyType === "factory_v2";
   const isFactoryRoute = currentLocation.startsWith("/factory/");
   const factoryDefaultPage = computeFactoryDefaultPage(myAccess);
-
-  if (isFactoryRoute && companyLoading) return <AppLoadingState />;
 
   if (isPropertiesCompany && currentLocation === "/my-settings") {
     return <Redirect replace to="/properties/my-settings" />;
@@ -136,7 +135,6 @@ export function AuthenticatedApp() {
     return <Redirect replace to="/properties/daybook" />;
   }
 
-  if (isSupplierPartnerRoute && companyLoading) return <AppLoadingState />;
   if (isSupplierPartnerRoute && !isSupplierPartnerCompany) {
     return <Redirect replace to="/tracking" />;
   }
