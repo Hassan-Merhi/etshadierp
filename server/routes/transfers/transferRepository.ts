@@ -1,8 +1,23 @@
 import { and, desc, eq, inArray, or } from "drizzle-orm";
-import { interCompanyTransfers, ledgerAccounts, voucherEntries, vouchers } from "@shared/schema";
+import {
+  auditLog,
+  interCompanyTransfers,
+  ledgerAccounts,
+  voucherEntries,
+  vouchers,
+} from "@shared/schema";
 
 import { db } from "../../db";
 import { storage } from "../../storage";
+
+const IDEMPOTENCY_TABLE = "accounting_posting_idempotency";
+
+function transferReversalKeys(transferId: number): string[] {
+  return [
+    `simple-company-transfer-reversal:${transferId}:from`,
+    `simple-company-transfer-reversal:${transferId}:to`,
+  ];
+}
 
 export const transferRepository = {
   transaction<T>(callback: (tx: any) => Promise<T>): Promise<T> {
@@ -56,6 +71,20 @@ export const transferRepository = {
       .then((rows) => rows[0] ?? null);
   },
 
+  async hasCompletedTransferReversal(transferId: number): Promise<boolean> {
+    const keys = transferReversalKeys(transferId);
+    const rows = await db
+      .select({ key: auditLog.recordIdentifier })
+      .from(auditLog)
+      .where(
+        and(
+          eq(auditLog.tableName, IDEMPOTENCY_TABLE),
+          inArray(auditLog.recordIdentifier, keys),
+        ),
+      );
+    return new Set(rows.map((row) => row.key).filter(Boolean)).size === keys.length;
+  },
+
   async getSimpleTransferForUpdateTx(tx: any, transferId: number) {
     const [transfer] = await tx
       .select()
@@ -64,6 +93,17 @@ export const transferRepository = {
       .for("update")
       .limit(1);
     return transfer ?? null;
+  },
+
+  async getVoucherSnapshotTx(tx: any, companyId: number, voucherId: number) {
+    const [voucher] = await tx
+      .select()
+      .from(vouchers)
+      .where(and(eq(vouchers.id, voucherId), eq(vouchers.companyId, companyId)))
+      .limit(1);
+    if (!voucher) return null;
+    const entries = await tx.select().from(voucherEntries).where(eq(voucherEntries.voucherId, voucherId));
+    return { voucher, entries };
   },
 
   async listSimpleTransfers(companyId: number) {
@@ -105,12 +145,5 @@ export const transferRepository = {
 
   async deleteSimpleTransferTx(tx: any, transferId: number): Promise<void> {
     await tx.delete(interCompanyTransfers).where(eq(interCompanyTransfers.id, transferId));
-  },
-
-  async deleteTransferVouchersTx(tx: any, voucherIds: number[]): Promise<void> {
-    const ids = [...new Set(voucherIds.filter((id) => Number.isInteger(id) && id > 0))];
-    if (ids.length === 0) return;
-    await tx.delete(voucherEntries).where(inArray(voucherEntries.voucherId, ids));
-    await tx.delete(vouchers).where(inArray(vouchers.id, ids));
   },
 };
