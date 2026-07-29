@@ -641,23 +641,6 @@ export default function StockItems() {
           <span className="font-semibold">{totalItems.toLocaleString()}</span>
         </div>
         <div className="rounded-lg border bg-muted/40 px-3 py-2 text-sm flex items-center gap-2">
-          <span className="h-2 w-2 rounded-full bg-green-500" />
-          <span className="text-muted-foreground">Active</span>
-          <span className="font-semibold">{activeCount.toLocaleString()}</span>
-        </div>
-        {inactiveCount > 0 && (
-          <div className="rounded-lg border bg-muted/40 px-3 py-2 text-sm flex items-center gap-2">
-            <span className="h-2 w-2 rounded-full bg-muted-foreground" />
-            <span className="text-muted-foreground">Inactive</span>
-            <span className="font-semibold">{inactiveCount.toLocaleString()}</span>
-          </div>
-        )}
-        <div className="rounded-lg border bg-muted/40 px-3 py-2 text-sm flex items-center gap-2">
-          <Tag className="h-4 w-4 text-muted-foreground" />
-          <span className="text-muted-foreground">Grades</span>
-          <span className="font-semibold">{stockGrades.length}</span>
-        </div>
-        <div className="rounded-lg border bg-muted/40 px-3 py-2 text-sm flex items-center gap-2">
           <Layers className="h-4 w-4 text-muted-foreground" />
           <span className="text-muted-foreground">Categories</span>
           <span className="font-semibold">{stockCategories.length}</span>
