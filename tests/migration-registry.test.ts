@@ -5,11 +5,7 @@ import { describe, expect, it } from "vitest";
 const root = path.resolve(process.cwd());
 const read = (relativePath: string) => fs.readFileSync(path.join(root, relativePath), "utf8");
 
-const LEGACY_MISSING_MIGRATION_TAGS = new Set([
-  "0000_conscious_william_stryker",
-  "0001_parallel_guardian",
-  "0002_married_loa",
-]);
+const LEGACY_MISSING_MIGRATION_TAGS = new Set<string>([]);
 
 describe("versioned migration registry", () => {
   it("has unique sequential indexes and a SQL file for every non-legacy registered migration", () => {
