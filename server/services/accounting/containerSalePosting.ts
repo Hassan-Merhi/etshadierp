@@ -13,6 +13,8 @@ export interface BuildContainerSalePostingInput {
   voucherNumber: string;
   voucherDate: string;
   description?: string | null;
+  debitNarration?: string | null;
+  creditNarration?: string | null;
   totalAmount: string | number;
   customerLedgerAccountId: number;
   commissionAccountId: number;
@@ -59,18 +61,20 @@ export function buildContainerSalePostingRequest(
   }
 
   const description = input.description?.trim() || null;
+  const debitNarration = input.debitNarration?.trim() || description;
+  const creditNarration = input.creditNarration?.trim() || description;
   const entries: VoucherEntryInsertFields[] = [
     {
       ledgerAccountId: customerLedgerAccountId,
       debitAmount: amount,
       creditAmount: "0",
-      narration: description,
+      narration: debitNarration,
     },
     {
       ledgerAccountId: commissionAccountId,
       debitAmount: "0",
       creditAmount: amount,
-      narration: description,
+      narration: creditNarration,
     },
   ];
   const payloadFingerprint = createHash("sha256")
@@ -80,6 +84,8 @@ export function buildContainerSalePostingRequest(
         containerId: input.containerId,
         voucherDate: input.voucherDate,
         description,
+        debitNarration,
+        creditNarration,
         amount,
         customerLedgerAccountId,
         commissionAccountId,
