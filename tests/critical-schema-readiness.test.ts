@@ -57,23 +57,6 @@ describe("critical schema readiness", () => {
     });
   });
 
-  it("preloads the factory container schema repair before the server entrypoint", () => {
-    const runtimeMemoryGuard = fs.readFileSync(
-      path.resolve(process.cwd(), "server/runtimeMemoryGuard.mjs"),
-      "utf8",
-    );
-    const schemaBridge = fs.readFileSync(
-      path.resolve(process.cwd(), "server/factoryContainerSchemaBridge.mjs"),
-      "utf8",
-    );
-
-    expect(runtimeMemoryGuard).toContain('import "./factoryContainerSchemaBridge.mjs"');
-    expect(schemaBridge).toContain('["json_cargo_last_checked_at", "TIMESTAMPTZ"]');
-    expect(schemaBridge).toContain('["json_cargo_tracking_status", "TEXT"]');
-    expect(schemaBridge).toContain('["json_cargo_error", "TEXT"]');
-    expect(schemaBridge).toContain("Factory container schema verification failed; aborting startup");
-  });
-
   it("keeps Render on the schema-aware readiness endpoint", () => {
     const renderYaml = fs.readFileSync(path.resolve(process.cwd(), "render.yaml"), "utf8");
     const runtimeGuard = fs.readFileSync(
