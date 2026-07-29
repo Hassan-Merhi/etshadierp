@@ -15,6 +15,15 @@ describe("dependent Deleted Items permanent deletion", () => {
     );
   });
 
+  it("serializes bulk permanent deletes inside the existing transaction", () => {
+    const route = source("server/routes/admin/dependentDeletedItemPermanentRoutes.ts");
+
+    expect(route).toContain("pg_advisory_xact_lock");
+    expect(route).toContain("PERMANENT_DELETE_LOCK_NAMESPACE");
+    expect(route.indexOf("pg_advisory_xact_lock")).toBeLessThan(route.indexOf('if (type === "factoryContainer")'));
+    expect(route).not.toContain("pg_advisory_lock(");
+  });
+
   it("clears the restrictive container receipt and factory dependencies transactionally", () => {
     const route = source("server/routes/admin/dependentDeletedItemPermanentRoutes.ts");
 
@@ -48,6 +57,28 @@ describe("dependent Deleted Items permanent deletion", () => {
     expect(route).toContain("DELETE FROM customer_order_bale_removals");
     expect(route).toContain("DELETE FROM customer_order_expected_lines");
     expect(route).toContain("DELETE FROM customer_order_bales_history");
+  });
+
+  it("uses the live PostgreSQL catalog to clear schema-drifted restrictive references", () => {
+    const route = source("server/routes/admin/dependentDeletedItemPermanentRoutes.ts");
+
+    expect(route).toContain("FROM pg_constraint constraint_row");
+    expect(route).toContain("constraint_row.confdeltype IN ('a', 'r')");
+    expect(route).toContain("cardinality(constraint_row.conkey) = 1");
+    expect(route).toContain("reference.column_not_null");
+    expect(route).toContain("SET ${column} = NULL");
+    expect(route).toContain('clearRemainingRestrictiveReferences(tx, "factory_containers", itemId)');
+    expect(route).toContain('clearRemainingRestrictiveReferences(tx, "factory_mix_batches", itemId)');
+    expect(route).toContain('clearRemainingRestrictiveReferences(tx, "customer_orders", itemId)');
+  });
+
+  it("surfaces the nested PostgreSQL reason if a non-FK blocker remains", () => {
+    const route = source("server/routes/admin/dependentDeletedItemPermanentRoutes.ts");
+
+    expect(route).toContain("extractDatabaseErrorMetadata");
+    expect(route).toContain("dbErrorCode: databaseError.code");
+    expect(route).toContain("dbConstraint: databaseError.constraint");
+    expect(route).toContain("databaseError.message || getErrorMessage(error)");
   });
 
   it("requires company scope and an already soft-deleted target", () => {
