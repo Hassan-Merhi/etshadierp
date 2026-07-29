@@ -151,6 +151,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
     supplierSearchResults,
     customerSearchResults,
     allAccounts,
+    payFromAccounts,
     liveAccountSearch,
     setLiveAccountSearch,
   } = useVoucherQueries({
@@ -561,6 +562,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                 accountBalance={accountBalance}
                 accountCurrencyBalances={accountCurrencyBalances}
                 allAccounts={allAccounts}
+                payFromAccounts={payFromAccounts}
                 sidebarAccounts={sidebarAccounts}
                 isEditMode={!!voucherIdToEdit}
                 filteredSidebarAccounts={filteredSidebarAccounts}
@@ -630,6 +632,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
                 accountBalance={accountBalance}
                 accountCurrencyBalances={accountCurrencyBalances}
                 allAccounts={allAccounts}
+                payFromAccounts={payFromAccounts}
                 sidebarAccounts={sidebarAccounts}
                 isEditMode={!!voucherIdToEdit}
                 filteredSidebarAccounts={filteredSidebarAccounts}

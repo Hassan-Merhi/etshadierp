@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { UseFormReturn, UseFieldArrayReturn } from "react-hook-form";
 import { format } from "date-fns";
 import { useDateFormat } from "@/contexts/DateFormatContext";
@@ -48,6 +48,7 @@ export interface PaymentReceiptTabProps {
   accountBalance: number;
   accountCurrencyBalances?: { currency: string; balance: number }[] | null;
   allAccounts: CombinedAccount[];
+  payFromAccounts?: CombinedAccount[];
   sidebarAccounts: Account[];
   filteredSidebarAccounts: Account[];
   sidebarSearchValue: string;
@@ -89,6 +90,7 @@ export function PaymentReceiptTab({
   accountBalance,
   accountCurrencyBalances,
   allAccounts,
+  payFromAccounts,
   sidebarAccounts,
   filteredSidebarAccounts,
   sidebarSearchValue,
@@ -205,10 +207,22 @@ export function PaymentReceiptTab({
       ? accountBalance - originalTotal + total
       : accountBalance + total;
 
+  // When the Pay From / Receive Into field is active, restrict the sidebar and autocomplete to
+  // Cash / Bank / Loans ledger accounts + bank accounts only.
+  const payFromKeys = useMemo(() => {
+    const src = payFromAccounts ?? allAccounts;
+    return new Set(src.map((a) => `${a.type}:${a.id}`));
+  }, [payFromAccounts, allAccounts]);
+
+  const filteredSidebarForPayFrom = useMemo(
+    () => filteredSidebarAccounts.filter((a) => payFromKeys.has(`${a.type}:${a.id}`)),
+    [filteredSidebarAccounts, payFromKeys]
+  );
+
   // Shared AccountSidebar props
   const sidebarProps = {
     accounts: sidebarAccounts,
-    filteredAccounts: filteredSidebarAccounts,
+    filteredAccounts: payFromActive ? filteredSidebarForPayFrom : filteredSidebarAccounts,
     onSelectAccount: handleAccountSelect,
     searchValue: sidebarSearchValue,
     onSearchChange: setSidebarSearchValue,
@@ -449,7 +463,7 @@ export function PaymentReceiptTab({
                                 form.setValue("paymentAccountId", id);
                                 form.setValue("paymentAccountName", name);
                               }}
-                              allAccounts={allAccounts}
+                              allAccounts={payFromAccounts ?? allAccounts}
                               rowIndex={-1}
                               placeholder={accountPlaceholder}
                               testId={accountTestId}
@@ -705,6 +719,8 @@ export function PaymentReceiptTab({
             {(() => {
               const search = payFromSearch.toLowerCase().replace(/[\s.-]/g, "");
               const filtered = sidebarAccounts.filter((a) => {
+                // Only show cash / bank / loan eligible accounts in the Pay From sheet
+                if (!payFromKeys.has(`${a.type}:${a.id}`)) return false;
                 if (!payFromSearch) return true;
                 return a.name
                   .toLowerCase()
