@@ -33,7 +33,11 @@ export function registerContainerSalesRoutes(app: Express) {
   app.post("/api/container-sales", requireAuth, requireNonPOS, async (req, res) => {
     try {
       const companyId = getActiveCustomerCompanyId(req);
-      const sale = await containerSalesService.create(companyId, req.body);
+      const sale = await containerSalesService.create(companyId, req.body, {
+        userId: req.session.userId ?? null,
+        username: (req.session as any).username || "unknown",
+        reason: "Container sale",
+      });
       return res.status(201).json(sale);
     } catch (error: unknown) {
       return sendContainerSaleError(res, error, 400);
