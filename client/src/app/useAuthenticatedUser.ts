@@ -1,10 +1,12 @@
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { getQueryFn, queryClient, apiRequest } from "@/lib/queryClient";
+import { apiRequest, getQueryFn, queryClient } from "@/lib/queryClient";
+import { parseAuthenticatedUser, type AuthenticatedUser } from "@/contracts/sessionContracts";
 
 /**
  * Manages the authenticated user session:
- *   - /api/auth/me query with 30-minute stale time
+ *   - /api/auth/me query with runtime response validation
+ *   - 30-minute stale time
  *   - 12-second loading timeout (forces redirect to /login if auth is stuck)
  *   - handleLogout — clears cache, clears biometric credentials, redirects
  */
@@ -13,32 +15,36 @@ export function useAuthenticatedUser() {
     data: user,
     isLoading,
     error,
-  } = useQuery<any>({
+  } = useQuery<AuthenticatedUser | null>({
     queryKey: ["/api/auth/me"],
-    queryFn: getQueryFn({ on401: "returnNull" }),
+    queryFn: async (context) => {
+      const value = await getQueryFn({ on401: "returnNull" })(context);
+      return parseAuthenticatedUser(value);
+    },
     retry: false,
     staleTime: 30 * 60 * 1000,
   });
 
-  // Safety-net: if still loading after 12 seconds, force redirect to login
   const [loadingTimedOut, setLoadingTimedOut] = useState(false);
   useEffect(() => {
     if (!isLoading) return;
-    const t = setTimeout(() => setLoadingTimedOut(true), 12000);
-    return () => clearTimeout(t);
+    const timer = window.setTimeout(() => setLoadingTimedOut(true), 12000);
+    return () => window.clearTimeout(timer);
   }, [isLoading]);
 
-  const handleLogout = async () => {
+  const handleLogout = async (): Promise<void> => {
     try {
       await apiRequest("POST", "/api/auth/logout", {});
       queryClient.clear();
       try {
         const { clearBiometricCredentials } = await import("@/pages/Login");
         await clearBiometricCredentials();
-      } catch {}
+      } catch {
+        // Biometric support is optional and must not block logout.
+      }
       window.location.href = "/login";
-    } catch (err) {
-      console.error("Logout failed:", err);
+    } catch (logoutError: unknown) {
+      console.error("Logout failed:", logoutError);
     }
   };
 
