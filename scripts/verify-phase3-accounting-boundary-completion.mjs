@@ -40,6 +40,18 @@ for (const servicePath of [
   forbidText(servicePath, ".insert(voucherEntries)", "direct voucher-entry insert");
 }
 
+const simpleTransfer = read("server/routes/transfers/simpleCompanyTransferService.ts");
+for (const invariant of [
+  "simple-company-transfer-reversal",
+  "getVoucherSnapshotTx",
+  "hasCompletedTransferReversal",
+  "originals remain for audit",
+]) {
+  if (!simpleTransfer.includes(invariant)) {
+    failures.push(`server/routes/transfers/simpleCompanyTransferService.ts: missing ${invariant}`);
+  }
+}
+
 const repository = requireText(
   "server/routes/transfers/transferRepository.ts",
   "db.transaction",
@@ -49,12 +61,15 @@ for (const boundary of [
   "createTransferTx",
   "findTransferByVoucherIdsTx",
   "getSimpleTransferForUpdateTx",
-  "deleteTransferVouchersTx",
+  "getVoucherSnapshotTx",
+  "hasCompletedTransferReversal",
 ]) {
   if (!repository.includes(boundary)) {
     failures.push(`server/routes/transfers/transferRepository.ts: missing ${boundary}`);
   }
 }
+forbidText("server/routes/transfers/transferRepository.ts", ".delete(vouchers)", "voucher hard delete");
+forbidText("server/routes/transfers/transferRepository.ts", ".delete(voucherEntries)", "voucher-entry hard delete");
 
 const containerSales = requireText(
   "server/routes/containers/containerSalesService.ts",
@@ -100,6 +115,7 @@ for (const phrase of [
   "company ownership",
   "atomic cross-company transfer",
   "retry-stable request identity",
+  "auditable reversal",
   "container sale",
   "Verification boundary",
   "Merge boundary",
