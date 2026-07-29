@@ -4,6 +4,7 @@ export * from "./users";
 export * from "./security";
 export * from "./inventory";
 export * from "./erp";
+export * from "./supplierCompanyScope";
 export * from "./containers";
 export * from "./factory";
 export * from "./properties";
