@@ -56,6 +56,18 @@ function isActiveGenericVoucher(
   return data.voucher.optional !== true;
 }
 
+function isCompanyTransfer(
+  method: string,
+  pathname: string,
+  data: unknown
+): data is AccountingRequestPayload {
+  return (
+    method.toUpperCase() === "POST" &&
+    (pathname === "/api/simple-company-transfer" || pathname === "/api/inter-company-transfers") &&
+    isRecord(data)
+  );
+}
+
 export function isProtectedAccountingRequest(
   method: string,
   url: string,
@@ -65,7 +77,8 @@ export function isProtectedAccountingRequest(
   return (
     isActiveManualJournal(method, pathname, data) ||
     isActivePaymentReceipt(method, pathname, data) ||
-    isActiveGenericVoucher(method, pathname, data)
+    isActiveGenericVoucher(method, pathname, data) ||
+    isCompanyTransfer(method, pathname, data)
   );
 }
 
