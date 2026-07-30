@@ -2,8 +2,9 @@ import fs from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 
-const compositionPath = path.resolve(process.cwd(), "server/routes/authRoutes.ts");
-const legacyPath = path.resolve(process.cwd(), "server/routes/authRoutesLegacy.ts");
+const root = process.cwd();
+const compositionPath = path.resolve(root, "server/routes/authRoutes.ts");
+const legacyPath = path.resolve(root, "server/routes/authRoutesLegacy.ts");
 
 const focusedRegistrars = [
   "registerCoreAuthRoutes(app)",
@@ -17,28 +18,30 @@ const focusedRegistrars = [
 ];
 
 describe("auth route composition", () => {
-  it("registers every focused auth domain before the compatibility boundary", () => {
+  it("registers every focused auth domain in preserved order", () => {
     const source = fs.readFileSync(compositionPath, "utf8");
-    const legacyIndex = source.indexOf("registerLegacyAuthRoutes(app)");
-    expect(legacyIndex).toBeGreaterThan(-1);
+    let previousIndex = -1;
+
     for (const registrar of focusedRegistrars) {
-      expect(source.indexOf(registrar)).toBeGreaterThan(-1);
-      expect(source.indexOf(registrar)).toBeLessThan(legacyIndex);
+      const index = source.indexOf(registrar);
+      expect(index, `${registrar} must be registered`).toBeGreaterThan(previousIndex);
+      previousIndex = index;
     }
+
+    expect(source).not.toContain("authRoutesLegacy");
+    expect(source).not.toContain("registerLegacyAuthRoutes");
   });
 
-  it("keeps the compatibility boundary free of HTTP handlers", () => {
-    const source = fs.readFileSync(legacyPath, "utf8");
-    expect(source).not.toMatch(/app\.(get|post|put|patch|delete)\s*\(/);
-    expect(source.split(/\r?\n/).length).toBeLessThanOrEqual(12);
+  it("keeps the retired auth compatibility path deleted", () => {
+    expect(fs.existsSync(legacyPath)).toBe(false);
   });
 
   it("keeps security-sensitive endpoints in focused modules", () => {
-    const core = fs.readFileSync(path.resolve(process.cwd(), "server/routes/auth/coreAuthRoutes.ts"), "utf8");
-    const users = fs.readFileSync(path.resolve(process.cwd(), "server/routes/auth/userAdministrationRoutes.ts"), "utf8");
-    const access = fs.readFileSync(path.resolve(process.cwd(), "server/routes/auth/userAccessRoutes.ts"), "utf8");
-    const companies = fs.readFileSync(path.resolve(process.cwd(), "server/routes/auth/companyAccessRoutes.ts"), "utf8");
-    const audit = fs.readFileSync(path.resolve(process.cwd(), "server/routes/auth/auditLogRoutes.ts"), "utf8");
+    const core = fs.readFileSync(path.resolve(root, "server/routes/auth/coreAuthRoutes.ts"), "utf8");
+    const users = fs.readFileSync(path.resolve(root, "server/routes/auth/userAdministrationRoutes.ts"), "utf8");
+    const access = fs.readFileSync(path.resolve(root, "server/routes/auth/userAccessRoutes.ts"), "utf8");
+    const companies = fs.readFileSync(path.resolve(root, "server/routes/auth/companyAccessRoutes.ts"), "utf8");
+    const audit = fs.readFileSync(path.resolve(root, "server/routes/auth/auditLogRoutes.ts"), "utf8");
 
     expect(core).toContain('app.post("/api/auth/login"');
     expect(core).toContain("req.session.regenerate");
