@@ -1,4 +1,4 @@
-import { runDataQuery as runLegacyDataQuery } from "../legacyReportEngine";
+import { runReportImplementation } from "../implementations/reportImplementationRegistry";
 import type { DataQueryContext, DataQueryResult, ReportDomainHandler } from "../types";
 
 export function createReportDomainHandler(domain: string, queryTypes: readonly string[]): ReportDomainHandler {
@@ -10,7 +10,7 @@ export function createReportDomainHandler(domain: string, queryTypes: readonly s
       return owned.has(queryType);
     },
     run(ctx: DataQueryContext): Promise<DataQueryResult> {
-      return runLegacyDataQuery(ctx as any);
+      return runReportImplementation(ctx);
     },
   };
 }
