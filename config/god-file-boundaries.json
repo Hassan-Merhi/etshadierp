@@ -1,0 +1,24 @@
+{
+  "version": 10,
+  "description": "Final god-file architecture boundaries for the ERP route composition layer.",
+  "retiredFiles": [
+    "server/routesLegacy.ts",
+    "server/routes/reportsRoutesLegacy.ts",
+    "server/routes/authRoutesLegacy.ts",
+    "server/routes/customerRoutesLegacy.ts"
+  ],
+  "boundedFiles": [
+    {
+      "path": "server/routes.ts",
+      "owner": "Public route entry point",
+      "maxLines": 30,
+      "forbidPatterns": ["app.get(", "app.post(", "app.put(", "app.patch(", "app.delete(", "app.use("]
+    },
+    {
+      "path": "server/routes/applicationRoutes.ts",
+      "owner": "Application route composition",
+      "maxLines": 220,
+      "forbidPatterns": ["app.get(", "app.post(", "app.put(", "app.patch(", "app.delete("]
+    }
+  ]
+}
