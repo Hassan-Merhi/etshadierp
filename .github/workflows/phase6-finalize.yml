@@ -1,0 +1,169 @@
+name: Phase 6 Finalize
+
+on:
+  push:
+    branches: [fix/phase-6-post-offload-safety-repair]
+
+permissions:
+  contents: write
+
+jobs:
+  finalize:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@v7
+        with:
+          ref: fix/phase-6-post-offload-safety-repair
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: "20"
+          cache: npm
+
+      - name: Install dependencies
+        run: |
+          sed -i 's#http://package-firewall.replit.local/npm/#https://registry.npmjs.org/#g' package-lock.json
+          npm ci --no-audit --bin-links=true
+
+      - name: Tighten Phase 6 clean-state classification
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path("server/services/factory/postOffloadPhase6Safety.ts")
+          text = path.read_text()
+
+          text = text.replace(
+              "  normalizeReplayWriteScope,\n  replayBaleIdsForScope,",
+              "  normalizeReplayWriteScope,\n  previewHistoricalCostReplayWithExecutor,\n  replayBaleIdsForScope,",
+          )
+          text = text.replace(
+              '      !Number.isInteger(row.batchId) ||\n      typeof row.batchCode !== "string" ||',
+              '      typeof row.batchId !== "number" ||\n      !Number.isInteger(row.batchId) ||\n      typeof row.batchCode !== "string" ||',
+          )
+          text = text.replace(
+              '      const { previewHistoricalCostReplayWithExecutor } = await import("./historicalCostReplay");\n      preview = await previewHistoricalCostReplayWithExecutor(executor, params.companyId);',
+              '      preview = await previewHistoricalCostReplayWithExecutor(executor, params.companyId);',
+          )
+
+          old = '''function buildBlockers(params: {
+            control: ReturnType<typeof readHistoricalReplayProductionControl>;
+            schema: Awaited<ReturnType<typeof inspectHistoricalReplayProductionSchema>>;
+            safety: ReturnType<typeof evaluateHistoricalReplaySafetyReadiness>;
+            scope: ReplayWriteScope;
+            selectedSupplierIds: number[];
+          }): string[] {
+            const blockers = [
+              ...params.control.configurationErrors.map((value) => `production-control:${value}`),
+              ...params.schema.missingObjects.map((value) => `schema:${value}`),
+              ...params.safety.blockers.map((value) => `safety:${value.gate}=${value.count}`),
+              ...params.scope.blockedBatches.flatMap((batch) =>
+                batch.reasons.map((reason) => `batch:${batch.batchId}:${reason}`)
+              ),
+            ];
+            if (params.selectedSupplierIds.length === 0) blockers.push("scope:no-safe-post-offload-suppliers");
+            return [...new Set(blockers)].sort();
+          }
+
+          function classifyStatus(params: {
+            automaticRepairEligible: boolean;
+            integrityIssueCount: number;
+            totalWritableRows: number;
+            blockers: string[];
+          }): PostOffloadPhase6Status {
+            if (params.blockers.length > 0) return "blocked";
+            if (params.integrityIssueCount > 0 || params.totalWritableRows > 0) return "repair_required";
+            return params.automaticRepairEligible ? "repair_required" : "ready";
+          }'''
+
+          new = '''function buildBlockers(params: {
+            control: ReturnType<typeof readHistoricalReplayProductionControl>;
+            schema: Awaited<ReturnType<typeof inspectHistoricalReplayProductionSchema>>;
+            safety: ReturnType<typeof evaluateHistoricalReplaySafetyReadiness>;
+            scope: ReplayWriteScope;
+            selectedSupplierIds: number[];
+            hasPostOffloadSuppliers: boolean;
+            hasHistoricalRepairWork: boolean;
+          }): string[] {
+            const blockers = [
+              ...params.schema.missingObjects.map((value) => `schema:${value}`),
+              ...(params.hasHistoricalRepairWork
+                ? params.control.configurationErrors.map((value) => `production-control:${value}`)
+                : []),
+              ...(params.hasPostOffloadSuppliers
+                ? params.safety.blockers.map((value) => `safety:${value.gate}=${value.count}`)
+                : []),
+              ...params.scope.blockedBatches.flatMap((batch) =>
+                batch.reasons.map((reason) => `batch:${batch.batchId}:${reason}`)
+              ),
+            ];
+            if (params.hasHistoricalRepairWork && params.selectedSupplierIds.length === 0) {
+              blockers.push("scope:no-safe-post-offload-suppliers");
+            }
+            return [...new Set(blockers)].sort();
+          }
+
+          function classifyStatus(params: {
+            integrityIssueCount: number;
+            totalWritableRows: number;
+            blockers: string[];
+          }): PostOffloadPhase6Status {
+            if (params.blockers.length > 0) return "blocked";
+            if (params.integrityIssueCount > 0 || params.totalWritableRows > 0) return "repair_required";
+            return "ready";
+          }'''
+
+          if old not in text:
+              raise SystemExit("Phase 6 classification block was not found")
+          text = text.replace(old, new)
+          text = text.replace(
+              "    const blockers = buildBlockers({ control, schema, safety, scope, selectedSupplierIds });",
+              "    const blockers = buildBlockers({\n      control,\n      schema,\n      safety,\n      scope,\n      selectedSupplierIds,\n      hasPostOffloadSuppliers: postOffloadSupplierIds.length > 0,\n      hasHistoricalRepairWork: counts.totalWritableRows > 0,\n    });",
+          )
+          text = text.replace(
+              "    const status = classifyStatus({\n      automaticRepairEligible,\n      integrityIssueCount: integrity.issueCount,",
+              "    const status = classifyStatus({\n      integrityIssueCount: integrity.issueCount,",
+          )
+          text = text.replace(
+              '        readiness.status === "ready"\n          ? "No post-offload historical cost repair is required."\n          : "Apply is blocked. Resolve every production-control, schema, safety, accounting, FX, or scope blocker and run the dry-run again.",',
+              '        readiness.status === "ready"\n          ? "No post-offload historical cost repair is required."\n          : readiness.status === "blocked"\n            ? "Apply is blocked. Resolve every production-control, schema, safety, FX, or scope blocker and run the dry-run again."\n            : "Repair is still required, but no automatic historical cost scope is eligible. Repair the reported charge, accounting, reversal, or raw-stock integrity issues and run readiness again.",',
+          )
+
+          path.write_text(text)
+          PY
+
+      - name: Format Phase 6 files
+        run: |
+          node node_modules/prettier/bin/prettier.cjs --write \
+            server/services/factory/postOffloadPhase6Safety.ts \
+            server/routes/factory/raw-stock/postOffloadPhase6SafetyRoutes.ts \
+            server/routes/factory/factoryRawStockRoutes.ts \
+            server/routes/factory/raw-stock/index.ts \
+            tests/factory-post-offload-phase6-safety-repair.test.ts
+
+      - name: Commit generated fixes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add \
+            server/services/factory/postOffloadPhase6Safety.ts \
+            server/routes/factory/raw-stock/postOffloadPhase6SafetyRoutes.ts \
+            server/routes/factory/factoryRawStockRoutes.ts \
+            server/routes/factory/raw-stock/index.ts \
+            tests/factory-post-offload-phase6-safety-repair.test.ts
+          if ! git diff --cached --quiet; then
+            git commit -m "Phase 6: finalize safety classification and formatting"
+            git push origin HEAD:fix/phase-6-post-offload-safety-repair
+          fi
+
+      - name: Type-check
+        run: npm run check
+
+      - name: Focused Phase 6 contracts
+        run: |
+          node node_modules/vitest/vitest.mjs run \
+            tests/factory-post-offload-phase6-safety-repair.test.ts \
+            --maxWorkers=1 --no-file-parallelism
