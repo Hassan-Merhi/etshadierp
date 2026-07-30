@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "criticalFiles": {
+    "tests/inventory.test.ts": {
+      "skips": [
+        "should handle sequential adjustments correctly",
+        "should enforce qty <= 0 implies total_value = 0 and rate = 0 (Bug 4 fix)",
+        "should subtract exact value and normalize invariants",
+        "should produce idempotent results across reverse/re-offload cycles",
+        "should handle negative-stock offload reversal without value inflation",
+        "should handle concurrent quick adjustments without lost updates"
+      ],
+      "todos": []
+    },
+    "tests/factory-container-lifecycle.test.ts": {
+      "skips": [],
+      "todos": [
+        "reverse offload restores the open container and removes inventory",
+        "re-offload after reversal reproduces the original inventory result",
+        "offload supports prepaid, paid-now and unpaid-payable charge lines"
+      ]
+    }
+  },
+  "activeReplacements": {
+    "tests/inventory-cost-memory-legacy-regression.test.ts": [
+      "keeps zero asset value and non-negative cost memory below zero quantity",
+      "normalizes exact reversal value while preserving the previous valid rate",
+      "remains stable across repeated matched receive and exact-reversal cycles",
+      "re-offloads negative stock without accumulating phantom inventory value"
+    ],
+    "tests/inventory-hardening.test.ts": [
+      "applies rapid sequential adjustments without losing company context"
+    ]
+  }
+}
