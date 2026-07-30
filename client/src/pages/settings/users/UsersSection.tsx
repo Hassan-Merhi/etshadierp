@@ -12,7 +12,7 @@ export function UsersSection() {
   const [addDialogOpen, setAddDialogOpen] = useState(false);
 
   const { data: rawUsers = [], isLoading } = useQuery<any[]>({
-    queryKey: ["/api/factory/users"],
+    queryKey: ["/api/users"],
   });
   const users = [...rawUsers].sort((a, b) =>
     (a.displayName || a.username || "").localeCompare(b.displayName || b.username || "")
