@@ -174,14 +174,9 @@ export function OffloadDialog({
     // Use the container's full declared weight as the valuation basis — identical to
     // how the server computes costPerKg.  Fall back to the received kg only when the
     // container has no declared weight recorded yet (edge case).
-    const valuationKg =
-      parseFloat((selectedContainer as any).totalKg || "0") > 0
-        ? parseFloat((selectedContainer as any).totalKg)
-        : kg;
-
-    // Material cost scales with valuationKg (total declared kg), not the partial receipt.
+    // Material cost uses received weight — same basis as the denominator.
     const materialUsd =
-      parseFloat(costPerKg || "0") * parseFloat(fxRateToUsd || "1") * valuationKg;
+      parseFloat(costPerKg || "0") * parseFloat(fxRateToUsd || "1") * kg;
 
     // Fixed charges: full container amounts, already independent of received kg.
     const freightUsd =
@@ -193,8 +188,8 @@ export function OffloadDialog({
     if (commissionPersonName.trim() && parseFloat(commissionRate || "0") > 0) {
       const commBase =
         parseFloat(commissionRate || "0") * parseFloat(commissionFxRate || "1");
-      // PER_KG commission is agreed on the full declared weight (server mirrors this).
-      commissionUsd = commissionType === "PER_KG" ? commBase * valuationKg : commBase;
+      // PER_KG commission also uses received weight.
+      commissionUsd = commissionType === "PER_KG" ? commBase * kg : commBase;
     }
 
     const extraUsd = additionalCharges
